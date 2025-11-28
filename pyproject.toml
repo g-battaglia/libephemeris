@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "0.1.7"
+version = "0.1.8"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.10"
