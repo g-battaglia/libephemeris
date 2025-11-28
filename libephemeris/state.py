@@ -24,6 +24,7 @@ from skyfield.jpllib import SpiceKernel
 # =============================================================================
 
 _EPHEMERIS_PATH: Optional[str] = None  # Custom ephemeris directory
+_EPHEMERIS_FILE: str = "de421.bsp"  # Ephemeris file to use (default: DE421)
 _LOADER: Optional[Loader] = None  # Skyfield data loader
 _PLANETS: Optional[SpiceKernel]  = None  # Loaded planetary ephemeris
 _TS: Optional[Timescale] = None  # Timescale object
@@ -76,20 +77,31 @@ def get_planets() -> SpiceKernel:
         SpiceKernel: Loaded JPL ephemeris kernel containing planetary positions
         
     Raises:
-        FileNotFoundError: If de421.bsp cannot be found or downloaded
+        FileNotFoundError: If ephemeris file cannot be found or downloaded
         
     Note:
-        Searches for de421.bsp in the workspace root, then downloads if not found.
+        Uses the ephemeris file set via set_ephemeris_file() (default: de421.bsp).
+        Searches in _EPHEMERIS_PATH if set, then workspace root, then downloads.
     """
     global _PLANETS
     if _PLANETS is None:
         load = get_loader()
+        
+        # Try custom ephemeris path first if set
+        if _EPHEMERIS_PATH:
+            bsp_path = os.path.join(_EPHEMERIS_PATH, _EPHEMERIS_FILE)
+            if os.path.exists(bsp_path):
+                _PLANETS = load(bsp_path)
+                return _PLANETS
+        
+        # Try workspace root
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        bsp_path = os.path.join(base_dir, "de421.bsp")
-        if not os.path.exists(bsp_path):
-            _PLANETS = load("de421.bsp")
-        else:
+        bsp_path = os.path.join(base_dir, _EPHEMERIS_FILE)
+        if os.path.exists(bsp_path):
             _PLANETS = load(bsp_path)
+        else:
+            # Download from internet
+            _PLANETS = load(_EPHEMERIS_FILE)
     return _PLANETS
 
 
@@ -206,8 +218,38 @@ def set_ephe_path(path: Optional[str]) -> None:
         path: Path to directory containing ephemeris files.
         
     Note:
-        This is currently a placeholder for compatibility.
-        libephemeris uses Skyfield which manages its own cache.
+        This sets the directory where get_planets() will look for the ephemeris
+        file specified by set_ephemeris_file(). If the file is not found there,
+        it will fall back to the workspace root and then download if needed.
     """
-    global _EPHEMERIS_PATH
+    global _EPHEMERIS_PATH, _PLANETS
     _EPHEMERIS_PATH = path
+    # Clear cached planets to force reload from new path
+    _PLANETS = None
+
+
+def set_ephemeris_file(filename: str) -> None:
+    """
+    Set the ephemeris file to use for planetary calculations.
+    
+    Args:
+        filename: Name of the JPL ephemeris file (e.g., "de421.bsp", "de422.bsp", "de431.bsp")
+        
+    Note:
+        This allows using different ephemeris files with varying date ranges:
+        - de421.bsp: 1900-2050 (default, 16 MB)
+        - de422.bsp: -3000-3000 (623 MB)
+        - de430.bsp: 1550-2650 (128 MB)
+        - de431.bsp: -13200-17191 (3.4 GB)
+        
+        The file will be searched in:
+        1. The path set by set_ephe_path() if configured
+        2. The workspace root directory
+        3. Downloaded from JPL if not found locally
+        
+        Changing the ephemeris file clears the cached planets and forces a reload.
+    """
+    global _EPHEMERIS_FILE, _PLANETS
+    _EPHEMERIS_FILE = filename
+    # Clear cached planets to force reload with new file
+    _PLANETS = None

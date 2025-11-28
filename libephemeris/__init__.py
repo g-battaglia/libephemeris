@@ -9,7 +9,11 @@ from .planets import (
     swe_set_sid_mode,
 )
 from .houses import swe_houses, swe_houses_ex, swe_house_name
-from .state import set_topo as swe_set_topo, set_ephe_path as swe_set_ephe_path
+from .state import (
+    set_topo as swe_set_topo,
+    set_ephe_path as swe_set_ephe_path,
+    set_ephemeris_file as swe_set_ephemeris_file,
+)
 from .crossing import swe_solcross_ut, swe_mooncross_ut, swe_cross_ut
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import swe_fixstar_ut
@@ -43,6 +47,7 @@ set_sid_mode = swe_set_sid_mode
 # Observer location
 set_topo = swe_set_topo
 set_ephe_path = swe_set_ephe_path
+set_ephemeris_file = swe_set_ephemeris_file
 
 # Fixed Stars
 fixstar_ut = swe_fixstar_ut
@@ -101,6 +106,8 @@ __all__ = [
     "set_topo",
     "swe_set_ephe_path",
     "set_ephe_path",
+    "swe_set_ephemeris_file",
+    "set_ephemeris_file",
     # Crossings
     "swe_solcross_ut",
     "solcross_ut",
