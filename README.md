@@ -323,18 +323,4 @@ See [LICENSE](LICENSE) for full details.
 
 ---
 
-## �️ Roadmap
-
--   [x] Extended ephemeris support (Lunar Nodes, Lilith)
--   [x] Asteroid positions (Major asteroids & TNOs)
--   [x] Fixed stars support (Basic)
--   [x] Crossing calculations
--   [ ] Eclipse calculations
--   [ ] Rise/set/transit times
--   [ ] Additional house systems
--   [ ] Performance optimizations
--   [ ] Web API service
-
----
-
 **Built with ❤️ for the astronomical and astrological communities**
