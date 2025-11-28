@@ -1,0 +1,50 @@
+[project]
+name = "libephemeris"
+version = "0.1.7"
+description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Giacomo Battaglia", email = "giacomo.battaglia@example.com" }
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+dependencies = [
+    "skyfield>=1.53",
+    "skyfield-data>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/g-battaglia/libephemeris"
+Repository = "https://github.com/g-battaglia/libephemeris"
+Issues = "https://github.com/g-battaglia/libephemeris/issues"
+
+[dependency-groups]
+dev = [
+    "poethepoet>=0.38.0",
+    "pyswisseph>=2.10.3.2",
+    "pytest>=9.0.1",
+    "ruff>=0.14.6",
+    "pytest-cov>=6.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["libephemeris"]
+
+[tool.poe.tasks]
+format = "ruff format ."
+lint = "ruff check . --fix"
+test = "pytest"
+coverage = "pytest --cov=libephemeris --cov-report=term-missing"
