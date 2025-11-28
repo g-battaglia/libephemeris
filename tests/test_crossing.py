@@ -17,9 +17,7 @@ class TestSunCrossing:
         jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
 
         # Find when Sun crosses 0°
-        jd_cross, err = ephem.swe_solcross_ut(0.0, jd_start, 0)
-
-        assert err == "", f"Error in solcross: {err}"
+        jd_cross = ephem.swe_solcross_ut(0.0, jd_start, 0)
 
         # Verify the crossing
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
@@ -33,9 +31,7 @@ class TestSunCrossing:
         """Test Sun crossing 90° (Summer Solstice)."""
         jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
 
-        jd_cross, err = ephem.swe_solcross_ut(90.0, jd_start, 0)
-
-        assert err == ""
+        jd_cross = ephem.swe_solcross_ut(90.0, jd_start, 0)
 
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
         diff = min(abs(pos[0] - 90.0), 360 - abs(pos[0] - 90.0))
@@ -48,12 +44,10 @@ class TestSunCrossing:
         target_lon = 120.0
 
         # LibEphemeris
-        jd_cross_py, err_py = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+        jd_cross_py = ephem.swe_solcross_ut(target_lon, jd_start, 0)
 
         # SwissEph (returns single float, not tuple)
         jd_cross_swe = swe.solcross_ut(target_lon, jd_start, 0)
-
-        assert err_py == ""
 
         # Times should match within ~10 seconds (1/86400 day)
         diff_seconds = abs(jd_cross_py - jd_cross_swe) * 86400
@@ -66,9 +60,7 @@ class TestSunCrossing:
         """Test Sun crossing all zodiac signs."""
         jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
 
-        jd_cross, err = ephem.swe_solcross_ut(target_lon, jd_start, 0)
-
-        assert err == "", f"Error crossing {target_lon}°"
+        jd_cross = ephem.swe_solcross_ut(target_lon, jd_start, 0)
 
         # Verify position
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
@@ -82,9 +74,7 @@ class TestSunCrossing:
         """Test sub-arcsecond precision of crossing."""
         jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
 
-        jd_cross, err = ephem.swe_solcross_ut(45.0, jd_start, 0)
-
-        assert err == ""
+        jd_cross = ephem.swe_solcross_ut(45.0, jd_start, 0)
 
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
         diff = abs(pos[0] - 45.0)
@@ -101,9 +91,7 @@ class TestMoonCrossing:
         """Test basic Moon crossing."""
         jd_start = ephem.swe_julday(2024, 11, 28, 0.0)
 
-        jd_cross, err = ephem.swe_mooncross_ut(90.0, jd_start, 0)
-
-        assert err == "", f"Error in mooncross: {err}"
+        jd_cross = ephem.swe_mooncross_ut(90.0, jd_start, 0)
 
         # Verify crossing
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
@@ -119,12 +107,10 @@ class TestMoonCrossing:
         target_lon = 180.0
 
         # LibEphemeris
-        jd_cross_py, err_py = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+        jd_cross_py = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
 
         # SwissEph (returns single float)
         jd_cross_swe = swe.mooncross_ut(target_lon, jd_start, 0)
-
-        assert err_py == ""
 
         # Times should match within ~60 seconds
         diff_seconds = abs(jd_cross_py - jd_cross_swe) * 86400
@@ -135,9 +121,7 @@ class TestMoonCrossing:
         """Test Moon crossing various longitudes."""
         jd_start = ephem.swe_julday(2024, 11, 1, 0.0)
 
-        jd_cross, err = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
-
-        assert err == ""
+        jd_cross = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
 
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
         diff = abs(pos[0] - target_lon)
@@ -150,9 +134,7 @@ class TestMoonCrossing:
         """Test precision of Moon crossing."""
         jd_start = ephem.swe_julday(2024, 11, 28, 0.0)
 
-        jd_cross, err = ephem.swe_mooncross_ut(123.456, jd_start, 0)
-
-        assert err == ""
+        jd_cross = ephem.swe_mooncross_ut(123.456, jd_start, 0)
 
         pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
         diff = abs(pos[0] - 123.456)
@@ -164,9 +146,7 @@ class TestMoonCrossing:
         """Test that Moon crossing is found quickly (near start date)."""
         jd_start = ephem.swe_julday(2024, 11, 28, 0.0)
 
-        jd_cross, err = ephem.swe_mooncross_ut(200.0, jd_start, 0)
-
-        assert err == ""
+        jd_cross = ephem.swe_mooncross_ut(200.0, jd_start, 0)
 
         # Moon completes orbit in ~27 days, should find crossing within that
         days_diff = abs(jd_cross - jd_start)
@@ -187,8 +167,7 @@ class TestCrossingIntegration:
         # Find Sun crossing each sign (30° increments)
         for i in range(12):
             target = i * 30.0
-            jd_cross, err = ephem.swe_solcross_ut(target, jd, 0)
-            assert err == ""
+            jd_cross = ephem.swe_solcross_ut(target, jd, 0)
             crossings.append(jd_cross)
             jd = jd_cross + 1  # Start next search 1 day after
 
@@ -200,7 +179,16 @@ class TestCrossingIntegration:
         """Test error handling for invalid inputs."""
         jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
 
-        # These should complete (maybe with error message)
-        jd_cross, err = ephem.swe_solcross_ut(400.0, jd_start, 0)  # >360°
-        # Function should normalize or handle gracefully
-        assert isinstance(err, str)
+        # These should complete (normalizes >360°)
+        jd_cross = ephem.swe_solcross_ut(400.0, jd_start, 0)  # >360°
+        # Function should normalize (400° = 40°)
+        assert isinstance(jd_cross, float)
+        
+        # Verify it actually found 40° crossing
+        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+        expected = 400.0 % 360.0
+        diff = abs(pos[0] - expected)
+        if diff > 180:
+            diff = 360 - diff
+        assert diff < 0.01, f"Expected {expected}°, got {pos[0]:.4f}°"
+
