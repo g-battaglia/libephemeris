@@ -279,6 +279,7 @@ LibEphemeris is licensed under the **GNU Lesser General Public License v3.0 (LGP
 
 See `LICENSE` for the full text.
 
----
+**What this means for you:**
 
-Built for the astronomical and astrological communities.
+1.  **Commercial Use**: You **can** use this library in proprietary/commercial software without releasing your source code, provided you link to the library dynamically (e.g., as a Python dependency).
+2.  **Modifications**: If you modify the source code of _LibEphemeris itself_, you **must** release those modifications under the LGPL.
