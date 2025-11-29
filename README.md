@@ -2,12 +2,31 @@
 
 **High-precision astronomical ephemeris library for Python (Swiss Ephemeris compatible, powered by Skyfield and JPL DE ephemerides).**
 
-> [!WARNING]
-> **Pre-Alpha Release**
+> [!WARNING] > **Pre-Alpha Release**
 >
 > LibEphemeris is currently in an early pre-alpha stage. The public API is unstable and may change without notice. Do not rely on it in production yet.
 
-LibEphemeris is an open-source alternative to Swiss Ephemeris that provides scientific-grade astronomical calculations using NASA JPL ephemerides via [Skyfield](https://rhodesmill.org/skyfield/). The goal is to mirror the Swiss Ephemeris API (as exposed by `pyswisseph`) while using modern, freely available data and a pure-Python implementation.
+## Project Philosophy & Roadmap
+
+LibEphemeris is born from the need for a **truly open, maintainable, and scientifically rigorous** alternative to the Swiss Ephemeris. While Swiss Ephemeris is the industry standard, its codebase is complex, difficult to maintain, and rooted in older C practices.
+
+**Our Goals:**
+
+1.  **True Open Source**: A codebase that is easy to read, contribute to, and maintain.
+2.  **Scientific Precision**: Leveraging modern astronomical data from NASA JPL (via Skyfield/Starfield) to guarantee precision that matches or exceeds current standards.
+3.  **Independence**: A completely original implementation, not just a wrapper around the existing C library.
+
+### Roadmap
+
+- **Milestone 1 (Current)**: **Pure Python Library**
+    - A 1:1 drop-in replacement for `pyswisseph`.
+    - Powered by [Skyfield](https://rhodesmill.org/skyfield/) and NASA JPL DE421+ ephemerides.
+    - Focus on correctness, readability, and higher scientific precision than Swiss Ephemeris implementations.
+
+- **Milestone 2 (Next Step)**: **Rust Core Rewrite**
+    - Porting the core logic to **Rust** for maximum performance, memory safety, and stability.
+    - Will utilize [Starfield](https://docs.rs/starfield/latest/starfield/) (a Rust port of Skyfield) instead of the Python Skyfield library.
+    - This will provide a high-performance backend while maintaining the easy-to-use Python interface.
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org)
@@ -181,13 +200,13 @@ If you try to compute positions outside the date range covered by the selected k
 
 LibEphemeris has been tested against Swiss Ephemeris using an automated test suite.
 
-| Component               | Tests | Pass Rate | Max Difference |
-| ----------------------- | ----- | --------- | -------------- |
-| Planetary positions     | 229   | 100%      | < 0.001°       |
-| House systems           | 113   | 100%      | < 0.001°       |
-| Ayanamsha values        | 129   | 100%      | < 0.06°        |
-| Lunar nodes / Lilith    | 40+   | 100%      | < 0.01°        |
-| Velocities              | 100   | 100%      | < 0.01°/day    |
+| Component            | Tests | Pass Rate | Max Difference |
+| -------------------- | ----- | --------- | -------------- |
+| Planetary positions  | 229   | 100%      | < 0.001°       |
+| House systems        | 113   | 100%      | < 0.001°       |
+| Ayanamsha values     | 129   | 100%      | < 0.06°        |
+| Lunar nodes / Lilith | 40+   | 100%      | < 0.01°        |
+| Velocities           | 100   | 100%      | < 0.01°/day    |
 
 These comparisons are implemented in the `tests/` and `compare_scripts/` directories, and are run regularly during development.
 
