@@ -16,15 +16,15 @@ def compare_sun_crossing(target_lon, jd_start, test_name):
     """Compare Sun crossing calculation."""
     print(f"\n{test_name:-^80}")
 
-    # LibEphemeris
-    jd_cross_py, err_py = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+    # LibEphemeris - now returns float directly, raises exception on error
+    try:
+        jd_cross_py = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+    except Exception as e:
+        print(f"ERROR (LibEphemeris): {e}")
+        return False, 0.0
 
     # SwissEphemeris
     jd_cross_swe = swe.solcross_ut(target_lon, jd_start, 0)
-
-    if err_py:
-        print(f"ERROR (LibEphemeris): {err_py}")
-        return False, 0.0
 
     # Calculate time difference in seconds
     diff_seconds = abs(jd_cross_py - jd_cross_swe) * 86400
@@ -60,15 +60,15 @@ def compare_moon_crossing(target_lon, jd_start, test_name):
     """Compare Moon crossing calculation."""
     print(f"\n{test_name:-^80}")
 
-    # LibEphemeris
-    jd_cross_py, err_py = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+    # LibEphemeris - now returns float directly, raises exception on error
+    try:
+        jd_cross_py = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+    except Exception as e:
+        print(f"ERROR (LibEphemeris): {e}")
+        return False, 0.0
 
     # SwissEphemeris
     jd_cross_swe = swe.mooncross_ut(target_lon, jd_start, 0)
-
-    if err_py:
-        print(f"ERROR (LibEphemeris): {err_py}")
-        return False, 0.0
 
     # Calculate time difference in seconds
     diff_seconds = abs(jd_cross_py - jd_cross_swe) * 86400

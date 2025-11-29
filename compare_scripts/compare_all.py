@@ -140,7 +140,7 @@ def compare_houses(jd, name, date_str, lat, lon):
             for i in range(1, 13):
                 val_swe = 0.0
                 if len(cusps_swe) == 12:
-                    val_swe = cusps_swe[i - 1]
+                    val_swe = cusps_swe[i - 1]  # 0-indexed
                 elif len(cusps_swe) == 13:
                     val_swe = cusps_swe[i]
                 else:
@@ -149,7 +149,7 @@ def compare_houses(jd, name, date_str, lat, lon):
                     )
                     break
 
-                val_py = cusps_py[i]  # pyephem always returns 13
+                val_py = cusps_py[i - 1]  # Both return 12-element tuples, 0-indexed
 
                 if i == 1:
                     val_swe_1 = val_swe

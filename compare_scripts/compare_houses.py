@@ -105,10 +105,12 @@ def compare_houses(
             all_passed = False
 
     # Compare Ascendant, MC, ARMC, Vertex, Equatorial Asc, co-Asc
-    # Skip elements that are 0 in Python Ephemeris (not yet implemented)
+    # Skip elements that are 0 in either implementation (not yet implemented)
     for i in range(min(len(ascmc_swe), len(ascmc_py))):
-        # Skip if Python value is 0 (not implemented)
-        if ascmc_py[i] == 0.0:
+        # Skip if either value is 0 (not implemented)
+        # SwissEph returns 0 for Vertex, Co-Ascendants
+        # PyEphem may return 0 for features not yet implemented
+        if ascmc_py[i] == 0.0 or ascmc_swe[i] == 0.0:
             continue
 
         diff = angular_diff(ascmc_swe[i], ascmc_py[i])
