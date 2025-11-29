@@ -1667,12 +1667,66 @@ def _houses_gauquelin(armc, lat, eps, asc, mc):
     return placidus_cusps
 
 
+def _cotrans(x: List[float], eps: float) -> List[float]:
+    """
+    Coordinate transformation (rotation around x-axis by angle eps).
+    
+    Equivalent to Swiss Ephemeris swe_cotrans().
+    Rotates spherical coordinates [lon, lat, r] by angle eps.
+    
+    Args:
+        x: [longitude, latitude, radius] in degrees
+        eps: Rotation angle in degrees
+        
+    Returns:
+        Transformed [longitude, latitude, radius]
+    """
+    eps_rad = math.radians(eps)
+    lon_rad = math.radians(x[0])
+    lat_rad = math.radians(x[1])
+    r = x[2]
+    
+    # Convert to Cartesian
+    cos_lat = math.cos(lat_rad)
+    x_cart = r * cos_lat * math.cos(lon_rad)
+    y_cart = r * cos_lat * math.sin(lon_rad)
+    z_cart = r * math.sin(lat_rad)
+    
+    # Rotate around x-axis by eps
+    cos_eps = math.cos(eps_rad)
+    sin_eps = math.sin(eps_rad)
+    
+    x_new = x_cart
+    y_new = y_cart * cos_eps + z_cart * sin_eps
+    z_new = -y_cart * sin_eps + z_cart * cos_eps
+    
+    # Convert back to spherical
+    r_new = math.sqrt(x_new**2 + y_new**2 + z_new**2)
+    
+    if r_new > 0:
+        lon_new = math.degrees(math.atan2(y_new, x_new))
+        lat_new = math.degrees(math.asin(z_new / r_new))
+    else:
+        lon_new = 0.0
+        lat_new = 0.0
+    
+    return [(lon_new % 360.0), lat_new, r_new]
+
+
 def _houses_krusinski(armc: float, lat: float, eps: float, asc: float, mc: float) -> List[float]:
     """
     Krusinski-Pisa house system.
     
-    FIXME: Not yet implemented - uses Porphyry as fallback.
-    Krusinski is a modified Regiomontanus system requiring additional research.
+    Based on great circle passing through Ascendant and Zenith.
+    Divides this circle into 12 equal 30° parts, then projects onto ecliptic.
+    
+    Algorithm from Bogdan Krusinski:
+    1. Transform Ascendant from ecliptic to equatorial coordinates
+    2. Rotate to align with meridian  
+    3. Transform to horizontal coordinates
+    4. Rotate to create Asc-Zenith great circle
+    5. Divide circle into 30° segments
+    6. Transform each cusp back to ecliptic
     
     Args:
         armc: Sidereal time at Greenwich (RAMC) in degrees
@@ -1682,9 +1736,74 @@ def _houses_krusinski(armc: float, lat: float, eps: float, asc: float, mc: float
         mc: Midheaven longitude in degrees
         
     Returns:
-        List of 13 house cusp longitudes
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are cusps)
     """
-    return _houses_porphyry(asc, mc)
+    cusps = [0.0] * 13
+    
+    # Within polar circle, swap AC/DC if AC is on wrong side
+    acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
+    if acmc_diff < 0:
+        asc = (asc + 180.0) % 360.0
+    
+    # A0. Start point - ecliptic coords of ascendant
+    x = [asc, 0.0, 1.0]  # lon, lat, radius
+    
+    # A1. Transform into equatorial coords
+    x = _cotrans(x, -eps)
+    
+    # A2. Rotate
+    x[0] = (x[0] - (armc - 90.0)) % 360.0
+    
+    # A3. Transform into horizontal coords
+    x = _cotrans(x, -(90.0 - lat))
+    
+    # Save horizon longitude of Asc to restore later
+    kr_horizon_lon = x[0]
+    
+    # A4. Rotate (set to zero)
+    x[0] = 0.0
+    
+    # A5. Transform into house system great circle (asc-zenith)
+    x = _cotrans(x, -90.0)
+    
+    # Now divide the great circle into 12 equal parts (30° each)
+    for i in range(6):
+        # B0. Set n-th house cusp (0°, 30°, 60°, 90°, 120°, 150°)
+        x_cusp = [30.0 * i, 0.0, 1.0]
+        
+        # B1. Transform back into horizontal coords
+        x_cusp = _cotrans(x_cusp, 90.0)
+        
+        # B2. Rotate back
+        x_cusp[0] = (x_cusp[0] + kr_horizon_lon) % 360.0
+        
+        # B3. Transform back into equatorial coords
+        x_cusp = _cotrans(x_cusp, 90.0 - lat)
+        
+        # B4. Rotate back → RA of house cusp
+        x_cusp[0] = (x_cusp[0] + (armc - 90.0)) % 360.0
+        
+        # B5. Convert RA to ecliptic longitude
+        # Formula: lon = atan(tan(RA) / cos(obliquity))
+        ra = x_cusp[0]
+        tan_ra = math.tan(math.radians(ra))
+        cos_eps = math.cos(math.radians(eps))
+        
+        if abs(cos_eps) > 1e-10:
+            lon = math.degrees(math.atan(tan_ra / cos_eps))
+        else:
+            lon = ra
+        
+        # Adjust quadrant
+        if 90.0 < ra <= 270.0:
+            lon = (lon + 180.0) % 360.0
+        
+        lon = lon % 360.0
+        
+        cusps[i + 1] = lon
+        cusps[i + 7] = (lon + 180.0) % 360.0
+    
+    return cusps
 
 
 def _houses_equal_mc(mc: float) -> List[float]:
@@ -1827,22 +1946,107 @@ def _houses_natural_gradient(armc: float, lat: float, eps: float, asc: float, mc
     return cusps
 
 
+def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
+    """
+    Calculate one sector of APC (Ascendant-Parallel Circle) house system.
+
+    Args:
+        n: House number (1-12)
+        ph: Geographic latitude in radians
+        e: Obliquity of ecliptic in radians  
+        az: ARMC in radians
+        
+    Returns:
+        Ecliptic longitude of house cusp in degrees
+    """
+    VERY_SMALL = 1e-10
+    PI = math.pi  
+    
+    # Calculate kv (ascensional difference of ascendant) and dasc (declination of ascendant)
+    if abs(math.degrees(ph)) > 90 - VERY_SMALL:
+        kv = 0.0
+        dasc = 0.0
+    else:
+        kv = math.atan(
+            math.tan(ph) * math.tan(e) * math.cos(az) /
+            (1 + math.tan(ph) * math.tan(e) * math.sin(az))
+        )
+        
+        if abs(math.degrees(ph)) < VERY_SMALL:
+            dasc = math.radians(90.0 - VERY_SMALL)
+            if ph < 0:
+                dasc = -dasc
+        else:
+            dasc = math.atan(math.sin(kv) / math.tan(ph))
+    
+    # Determine which arc to use (below or above horizon)
+    if n < 8:
+        is_below_hor = True  # Houses 1-7
+        k = n - 1
+    else:
+        is_below_hor = False  # Houses 8-12
+        k = n - 13
+    
+    # Calculate right ascension of house cusp on APC circle
+    if is_below_hor:
+        a = kv + az + PI/2 + k * (PI/2 - kv) / 3
+    else:
+        a = kv + az + PI/2 + k * (PI/2 + kv) / 3
+    
+    a = a % (2 * PI)
+    
+    # Calculate ecliptic longitude
+    dret = math.atan2(
+        math.tan(dasc) * math.tan(ph) * math.sin(az) + math.sin(a),
+        math.cos(e) * (math.tan(dasc) * math.tan(ph) * math.cos(az) + math.cos(a)) +
+        math.sin(e) * math.tan(ph) * math.sin(az - a)
+    )
+    
+    dret = math.degrees(dret) % 360.0
+    
+    return dret
+
+
 def _houses_apc(armc: float, lat: float, eps: float, asc: float, mc: float) -> List[float]:
     """
-    APC (Astronomical Planetary Cusps) house system.
+    APC (Ascendant-Parallel Circle) house system.
     
-    FIXME: Not yet implemented - uses Porphyry as fallback.
-    The APC system is a specialized house system that requires additional research
-    to implement correctly.
+    Based on the great circle parallel to the horizon passing through the Ascendant.
+    Algorithm from Swiss Ephemeris swehouse.c lines 1806-1829.
     
     Args:
-        armc: Sidereal time at Greenwich in degrees
+        armc: Sidereal time at Greenwich (RAMC) in degrees
         lat: Geographic latitude in degrees
         eps: True obliquity of ecliptic in degrees
         asc: Ascendant longitude in degrees
         mc: Midheaven longitude in degrees
         
     Returns:
-        List of 13 house cusp longitudes (index 0 is 0.0)
+        List of 13 house cusp longitudes (index 0 unused, 1-12 are cusps)
     """
-    return _houses_porphyry(asc, mc)
+    cusps = [0.0] * 13
+    
+    # Convert to radians for apc_sector
+    ph_rad = math.radians(lat)
+    e_rad = math.radians(eps)
+    az_rad = math.radians(armc)
+    
+    # Calculate all 12 house cusps
+    for i in range(1, 13):
+        cusps[i] = _apc_sector(i, ph_rad, e_rad, az_rad)
+    
+    # MC from apc_sector near latitude 90 is not accurate, use calculated MC
+    cusps[10] = mc
+    cusps[4] = (mc + 180.0) % 360.0
+    
+    # Within polar circle, handle horizon crossing
+    if abs(lat) >= 90.0 - eps:
+        acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
+        if acmc_diff < 0:
+            # Flip all cusps by 180° (clockwise direction)
+            asc = (asc + 180.0) % 360.0
+            mc = (mc + 180.0) % 360.0  
+            for i in range(1, 13):
+                cusps[i] = (cusps[i] + 180.0) % 360.0
+    
+    return cusps
