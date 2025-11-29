@@ -84,11 +84,29 @@ def angular_diff(a: float, b: float) -> float:
 
 def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     """
-    Calculates the Vertex (intersection of Prime Vertical and Ecliptic in Western hemisphere).
+    Calculate the Vertex (intersection of Prime Vertical and Ecliptic in Western hemisphere).
+    
+    The Vertex is an auxiliary angle representing where the Prime Vertical (great circle
+    through zenith perpendicular to meridian) intersects the ecliptic in the western sky.
+    Often used in astrology for fateful encounters or significant relationships.
+    
+    Args:
+        armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
+        eps: True obliquity of ecliptic in degrees
+        lat: Geographic latitude in degrees
+        mc: Midheaven longitude in degrees (for hemisphere verification)
+        
+    Returns:
+        Vertex longitude in degrees (western hemisphere)
+        
+    FIXME: Precision - Equator handling approximation
+        Uses small epsilon (1e-6 degrees ≈ 0.036 arcsec) to avoid division by zero
+        at equator. Impact negligible for practical purposes but technically imprecise
+        at exactly 0° latitude. For strict correctness, use limiting case formula.
     """
-    # Handle equator by using a small epsilon
+    # Handle equator singularity with small epsilon to avoid division by zero
     calc_lat = lat
-    if abs(calc_lat) < 1e-6:
+    if abs(calc_lat) < 1e-6:  # ~0.036 arcsec threshold
         calc_lat = 1e-6
 
     armc_rad = math.radians(armc_deg)
@@ -118,10 +136,33 @@ def swe_houses(
     tjdut: float, lat: float, lon: float, hsys: int
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
-    Computes house cusps and ascmc.
-    Returns (cusps, ascmc).
-    cusps is a tuple of 12 floats (houses 1-12).
-    ascmc is a tuple of 8 floats.
+    Calculate astrological house cusps and angles for a given time and location.
+    
+    Swiss Ephemeris compatible function. Computes house divisions according to
+    the specified house system and returns both house cusps and major angles (ASCMC).
+    
+    Args:
+        tjdut: Julian Day in Universal Time (UT1)
+        lat: Geographic latitude in degrees (positive North, negative South)
+        lon: Geographic longitude in degrees (positive East, negative West)
+        hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
+        
+    Returns:
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes (houses 1-12) in degrees
+            - ascmc: Tuple of 8 angles: [Asc, MC, ARMC, Vertex, EquAsc, CoAsc, CoAscKoch, PolarAsc]
+            
+    House Systems Supported:
+        'P' = Placidus, 'K' = Koch, 'R' = Regiomontanus, 'C' = Campanus,
+        'E'/'A' = Equal, 'W' = Whole Sign, 'O' = Porphyry, 'B' = Alcabitius,
+        'T' = Topocentric, 'M' = Morinus, 'X' = Meridian, 'H' = Horizontal,
+        'V' = Vehlow, 'G' = Gauquelin, 'U' = Krusinski, 'F' = Carter,
+        'Y' = APC, 'N' = Natural Gradient
+        
+    Example:
+        >>> cusps, ascmc = swe_houses(2451545.0, 51.5, -0.12, ord('P'))  # London, Placidus
+        >>> asc, mc = ascmc[0], ascmc[1]
+        >>> house_1_start = cusps[0]  # First house cusp
     """
     # 1. Calculate Sidereal Time (ARMC)
     # ARMC = GMST + lon
@@ -274,15 +315,20 @@ def swe_houses(
     x = math.cos(equ_asc_ra_r) * math.cos(eps_r)
     equ_asc = math.degrees(math.atan2(y, x)) % 360.0
 
-    # Co-Ascendant (Walter Koch)
-    # Placeholder - requires further research on exact formula
+    # FIXME: Precision - Co-Ascendant not implemented
+    # Co-Ascendant (Walter Koch variant) - returns 0.0 placeholder
+    # Requires specific formula from Koch's original work ("Häuser und Wesen-spunkte")
+    # Impact: Co-Ascendant always 0.0, not usable for interpretative work
     co_asc = 0.0
 
-    # Co-Ascendant (Koch) - alternative calculation
+    # FIXME: Precision - Co-Ascendant Koch not implemented
+    # Alternative Co-Ascendant calculation (Koch system) - returns 0.0 placeholder
     co_asc_koch = 0.0
 
-    # Polar Ascendant
-    # Placeholder - requires further research on exact formula
+    # FIXME: Precision - Polar Ascendant not implemented  
+    # Polar Ascendant (point of ecliptic on prime vertical at pole) - returns 0.0
+    # Used in some Arctic astrological traditions
+    # Impact: Polar Ascendant always 0.0, not usable
     polar_asc = 0.0
 
     # Build ASCMC array with 8 elements (pyswisseph compatible)
@@ -361,17 +407,27 @@ def swe_houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int, flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
-    Extended house calculation (supports sidereal).
+    Extended house calculation with sidereal zodiac support.
+    
+    Similar to swe_houses() but applies ayanamsa correction when SEFLG_SIDEREAL
+    flag is set, converting tropical positions to sidereal.
     
     Args:
-        tjdut: Julian Day in UT
-        lat: Latitude in degrees
-        lon: Longitude in degrees
-        hsys: House system (int or bytes)
-        flags: Calculation flags (e.g., FLG_SIDEREAL)
+        tjdut: Julian Day in Universal Time (UT1)
+        lat: Geographic latitude in degrees
+        lon: Geographic longitude in degrees
+        hsys: House system identifier (int or bytes)
+        flags: Calculation flags bitmask (e.g., SEFLG_SIDEREAL)
     
     Returns:
-        (cusps, ascmc): Tuple of house cusps and angles
+        Tuple containing:
+            - cusps: Tuple of 12 house cusp longitudes in degrees
+            - ascmc: Tuple of 8 angles (Asc, MC corrected if sidereal)
+            
+    Example:
+        >>> from libephemeris import swe_set_sid_mode, SE_SIDM_LAHIRI
+        >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
+        >>> cusps, ascmc = swe_houses_ex(2451545.0, 51.5, -0.12, ord('P'), SEFLG_SIDEREAL)
     """
     cusps, ascmc = swe_houses(tjdut, lat, lon, hsys)
 
@@ -387,7 +443,6 @@ def swe_houses_ex(
     return cusps, ascmc
 
 
-    return cusps, ascmc
 
 
 def swe_house_name(hsys: int) -> str:
@@ -477,12 +532,10 @@ def _houses_placidus(armc: float, lat: float, eps: float, asc: float, mc: float)
 
         ra = (armc + offset_deg) % 360.0
 
-        for _ in range(10):  # 10 iterations usually enough
-            # Get declination of this RA on ecliptic
-            # tan(dec) = sin(ra) * tan(eps)
-            # But RA is equatorial.
-            # We need to convert RA to Ecliptic to get Dec?
-            # No, if point is on ecliptic, then tan(dec) = sin(ra)*tan(eps) is true.
+        # Iterate to convergence (typically 5-7 iterations, max 10 for safety)
+        for _ in range(10):
+            # Calculate declination for point at this RA on ecliptic
+            # Using spherical astronomy formula: tan(dec) = sin(RA) * tan(eps)
 
             sin_ra = math.sin(math.radians(ra))
             tan_dec = sin_ra * math.tan(rad_eps)
@@ -1420,18 +1473,29 @@ def _houses_carter(armc: float, lat: float, eps: float, asc: float, mc: float) -
 
 def _houses_gauquelin(armc, lat, eps, asc, mc):
     """
-    Gauquelin Sectors (36 sectors).
+    Gauquelin Sectors house system.
 
-    Gauquelin divides the diurnal motion into 36 equal sectors based on
-    semi-arc divisions above and below the horizon.
+    FIXME: Precision - Simplified Gauquelin implementation
+        Uses Placidus as approximation. Full Gauquelin divides diurnal motion into
+        36 equal sectors based on semi-arc divisions above/below horizon.
+        Proper implementation requires:
+          1. Divide above-horizon semi-arc into 18 sectors
+          2. Divide below-horizon semi-arc into 18 sectors  
+          3. Map 36 sectors to 12 houses (3 sectors per house)
+        Impact: Results approximate, not suitable for strict Gauquelin research.
 
     The 36 sectors are mapped to 12 houses, with each house containing 3 sectors.
-    House cusps are at sectors: 18, 21, 24, 27, 30, 33, 0, 3, 6, 9, 12, 15.
-
-    Algorithm:
-    1. Divide above-horizon semi-arc (from Asc to Desc through MC) into 18 sectors
-    2. Divide below-horizon semi-arc (from Desc to Asc through IC) into 18 sectors
-    3. Map to 12 houses
+    House cusps nominally at sectors: 18, 21, 24, 27, 30, 33, 0, 3, 6, 9, 12, 15.
+    
+    Args:
+        armc: Sidereal time at Greenwich in degrees
+        lat: Geographic latitude in degrees
+        eps: True obliquity of ecliptic in degrees
+        asc: Ascendant longitude in degrees
+        mc: Midheaven longitude in degrees
+        
+    Returns:
+        List of 13 house cusp longitudes (currently Placidus-based approximation)
     """
 
     cusps = [0.0] * 13
@@ -1478,21 +1542,21 @@ def _houses_krusinski(armc: float, lat: float, eps: float, asc: float, mc: float
 def _houses_equal_mc(mc: float) -> List[float]:
     """
     Equal houses from MC (Axial Rotation system).
-    Despite the name, this uses equal 30° divisions from the Ascendant,
-    similar to Equal (Ascendant). The "MC" refers to the house system's
-    relationship to the MC, not its starting point.
-
-    NOTE: SwissEph appears to return the same as Equal (Ascendant) for this mode.
-    We need to calculate Ascendant first or accept it as a parameter.
-    For now, use MC-based approximation.
+    
+    FIXME: Precision - Approximation without true Ascendant
+        Uses MC+90° as Ascendant approximation, then applies equal 30° divisions.
+        True implementation needs actual Ascendant from observer location.
+        SwissEph returns Equal (Ascendant) for this mode with proper Asc calculation.
+        Impact: Results approximate for latitudes far from equator.
+    
+    Args:
+        mc: Midheaven longitude in degrees
+        
+    Returns:
+        List of 13 house cusp longitudes (approximated from MC)
     """
     cusps = [0.0] * 13
-    # In Equal MC, houses are still 30° apart
-    # But we need the actual Ascendant to start from
-    # Since we don't have it here, approximate from MC
-    # House 10 = MC, House 1 is typically MC + 90 + some adjustment
-    # But SwissEph shows House 1 = Asc, so we need Asc as parameter
-    # For now, return equal divisions from MC+90 as placeholder
+    # Approximate Ascendant as MC + 90° (exact only at equator)
     asc_approx = (mc + 90.0) % 360.0
     for i in range(1, 13):
         cusps[i] = (asc_approx + (i - 1) * 30.0) % 360.0
@@ -1564,12 +1628,13 @@ def _houses_horizontal(armc, lat, eps, asc, mc):
         current_lon = best_lon
         step = 1.0
 
-        # Iterative refinement
+        # Iterative refinement using numerical gradient descent
+        # Max 50 iterations (typically converges in 10-20)
         for _ in range(50):
             az = get_azimuth(current_lon)
             diff = angular_diff(az, target_az)  # az - target
 
-            if abs(diff) < 0.00001:
+            if abs(diff) < 0.00001:  # Convergence threshold ~0.036 arcsec
                 break
 
             # Determine direction
