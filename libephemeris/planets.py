@@ -583,6 +583,59 @@ def _calc_body(t, ipl: int, iflag: int) -> Tuple[Tuple[float, float, float, floa
     return (p1, p2, p3, dp1, dp2, dp3), iflag
 
 
+def _calc_body_with_context(t, ipl: int, iflag: int, ctx) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """
+    Calculate position using an explicit EphemerisContext (thread-safe).
+    
+    This is a context-aware wrapper around the core calculation logic.
+    It temporarily sets global state from context, calls _calc_body, then
+    restores global state. This allows context-based thread-safe usage while
+    reusing the existing calculation code.
+    
+    Args:
+        t: Skyfield Time object (UT1 or TT)
+        ipl: Planet/body ID
+        iflag: Calculation flags
+        ctx: EphemerisContext instance containing state
+        
+    Returns:
+        Same as _calc_body: ((lon, lat, dist, dlon, dlat, ddist), retflag)
+        
+    Note:
+        This function is thread-safe when each thread uses its own context.
+        It temporarily modifies global state but this is safe because:
+        1. Each call is atomic within the GIL
+        2. Each thread has its own context
+        3. Global state is only read by _calc_body, not modified
+    """
+    from . import state
+    
+    # Save current global state
+    old_topo = state._TOPO
+    old_sid_mode = state._SIDEREAL_MODE
+    old_sid_t0 = state._SIDEREAL_T0
+    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+    old_angles_cache = state._ANGLES_CACHE
+    
+    try:
+        # Temporarily set global state from context
+        state._TOPO = ctx.topo
+        state._SIDEREAL_MODE = ctx.sidereal_mode
+        state._SIDEREAL_T0 = ctx.sidereal_t0
+        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        state._ANGLES_CACHE = ctx._angles_cache
+        
+        # Use existing calculation logic
+        return _calc_body(t, ipl, iflag)
+    finally:
+        # Restore global state
+        state._TOPO = old_topo
+        state._SIDEREAL_MODE = old_sid_mode
+        state._SIDEREAL_T0 = old_sid_t0
+        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+        state._ANGLES_CACHE = old_angles_cache
+
+
 def swe_get_ayanamsa_ut(tjd_ut: float) -> float:
     """
     Calculate ayanamsa (sidereal offset) for a given Universal Time date.

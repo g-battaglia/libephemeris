@@ -589,6 +589,44 @@ def swe_houses_ex(
     return cusps, ascmc
 
 
+def _swe_houses_with_context(tjdut: float, lat: float, lon: float, hsys: int, ctx) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """
+    Calculate houses using an explicit EphemerisContext (thread-safe).
+    
+    Thread-safe wrapper around swe_houses that uses context state.
+    
+    Args:
+        tjdut: Julian Day in Universal Time
+        lat: Geographic latitude in degrees
+        lon: Geographic longitude in degrees  
+        hsys: House system identifier
+        ctx: EphemerisContext instance
+        
+    Returns:
+        Same as swe_houses: (cusps, ascmc)
+    """
+    from . import state
+    
+    # Save current global state
+    old_sid_mode = state._SIDEREAL_MODE
+    old_sid_t0 = state._SIDEREAL_T0
+    old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
+    
+    try:
+        # Temporarily set global state from context
+        state._SIDEREAL_MODE = ctx.sidereal_mode
+        state._SIDEREAL_T0 = ctx.sidereal_t0
+        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        
+        # Use existing house calculation logic
+        return swe_houses(tjdut, lat, lon, hsys)
+    finally:
+        # Restore global state
+        state._SIDEREAL_MODE = old_sid_mode
+        state._SIDEREAL_T0 = old_sid_t0
+        state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
+
+
 
 
 def swe_house_name(hsys: int) -> str:

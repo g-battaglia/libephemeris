@@ -17,6 +17,8 @@ from .state import (
 from .crossing import swe_solcross_ut, swe_mooncross_ut, swe_cross_ut
 from .utils import difdeg2n, swe_calc_angles
 from .fixed_stars import swe_fixstar_ut
+from .context import EphemerisContext  # NEW: Thread-safe context API
+
 
 # =============================================================================
 # PYSWISSEPH-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
@@ -70,6 +72,8 @@ __author__ = "Giacomo Battaglia"
 __license__ = "LGPL-3.0"
 
 __all__ = [
+    # Thread-safe Context API
+    "EphemerisContext",
     # Time functions (both swe_ and non-prefixed aliases)
     "swe_julday",
     "julday",
