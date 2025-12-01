@@ -1,5 +1,15 @@
 # LibEphemeris
 
+<div align="left">
+    <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
+    <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
+    <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
+    <img src="https://img.shields.io/pypi/v/libephemeris.svg" alt="PyPI Version">
+    <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
+    <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
+</div>
+
+
 **High-precision astronomical ephemeris library for Python (Swiss Ephemeris compatible, powered by Skyfield and JPL DE ephemerides).**
 
 > [!WARNING] > **Pre-Alpha Release**
@@ -28,9 +38,6 @@ LibEphemeris is born from the need for a **truly open, maintainable, and scienti
     -   Porting the core logic to **Rust** for maximum performance, memory safety, and stability.
     -   Will utilize [Starfield](https://docs.rs/starfield/latest/starfield/) (a Rust port of Skyfield) instead of the Python Skyfield library.
     -   This will provide a high-performance backend while maintaining the easy-to-use Python interface.
-
-[![License: LGPL v3](https://img.shields.io/badge/License-LGPL%20v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org)
 
 ---
 
@@ -354,5 +361,5 @@ See `LICENSE` for the full text.
 
 **What this means for you:**
 
-1.  **Commercial Use**: You **can** use this library in proprietary/commercial software without releasing your source code, provided you link to the library dynamically (e.g., as a Python dependency).
+1.  **Commercial Use**: You **can** use this library in proprietary/commercial software without releasing your source code, provided you link to the library dynamically (e.g., as a normal Python dependency installed via `pip`).
 2.  **Modifications**: If you modify the source code of _LibEphemeris itself_, you **must** release those modifications under the LGPL.
