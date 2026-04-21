@@ -5,6 +5,100 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-04-21
+
+**Backward crossing search: `swe_solcross_ut`, `swe_mooncross_ut`, and `swe_mooncross_node_ut` (plus their TT variants — six functions in total) now accept a `backwards` flag, mirroring the existing `swe_helio_cross_ut` behavior.**
+
+### Added
+
+- **`backwards: bool = False` parameter on Solar/Lunar/Node crossing functions.**
+  When `True`, the Newton–Raphson (+ Brent fallback) search steps backward from
+  the given Julian Day, returning the most recent past crossing instead of the
+  next one. Applies to six functions across two crossing families:
+
+  Ecliptic-longitude target crossings (four functions):
+  - `swe_solcross_ut(target_lon, jd_start, backwards=False)`
+  - `swe_solcross(target_lon, jd_start, backwards=False)` (TT variant)
+  - `swe_mooncross_ut(target_lon, jd_start, backwards=False)`
+  - `swe_mooncross(target_lon, jd_start, backwards=False)` (TT variant)
+
+  Latitude-zero (lunar-node) crossings (two functions):
+  - `swe_mooncross_node_ut(jd_start, backwards=False)`
+  - `swe_mooncross_node(jd_start, backwards=False)` (TT variant)
+
+### Why
+
+Planetary-return search naturally requires symmetric step-forward / step-back
+navigation (e.g. "show me my previous solar return"). Prior to this release,
+consumers had to implement ad-hoc seeding hacks — offsetting the start date
+by one mean tropical year / sidereal month and relying on forward search to
+land on the previous crossing. That approach is fragile near cycle boundaries
+and impossible for irregular intervals (lunar node mean motion varies ±1 d
+per half-cycle). A native `backwards` flag resolves this cleanly and matches
+the existing API surface of `swe_helio_cross_ut`.
+
+### Fixed
+
+- **Backward search no longer jumps a full cycle when the caller is within
+  seconds of a crossing.** Previous implementation used an overly wide
+  "at-crossing" dead-zone on the backward path:
+  - Solar/lunar (`swe_solcross_ut`, `swe_mooncross_ut` and their TT
+    variants): a `1e-3°` threshold covered ~86 seconds of solar motion and
+    ~11 seconds of lunar motion. Calling `backwards=True` from a start
+    time that was merely a few seconds after a crossing would collapse
+    into a full synodic-cycle step back instead of returning the
+    just-missed crossing.
+  - Lunar node (`swe_mooncross_node_ut`, `swe_mooncross_node`): a 0.001-day
+    (~86 seconds) backward-only rejection window in the post-convergence
+    check had the same effect, producing a half-nodal-month jump where a
+    few-second step back was correct.
+
+  Fix: solar/lunar guards now normalize the angular difference into signed
+  space and use a `1e-6°` threshold (tight enough to distinguish 1 s of
+  motion from Newton-Raphson noise). The node function detects the
+  at-crossing case directly via `|latitude| < 10 × NR_TOLERANCE_MOON` and
+  tightens the post-convergence direction guard to `1e-6` days.
+
+  This closes a regression surfaced by the planetary-return navigator,
+  whose forward/backward round-trips call the crossing functions with
+  timestamps already at the converged crossing.
+
+### Tests
+
+- 37 tests in `tests/test_crossing/test_crossings_backwards.py` covering:
+  - Forward/backward round-trip symmetry (solar, lunar, node)
+  - Multi-step navigation across consecutive returns (solar 5-year span,
+    lunar 6-month span, node 10-step)
+  - TT variant parity
+  - **`TestJustAfterCrossing`**: regression suite verifying that a
+    `backwards=True` call issued sub-second to 80 seconds after a
+    crossing returns that same crossing, not the one a full cycle
+    earlier. Covers the solar, lunar, and node paths; parametrized at
+    0.5/1/10/60/80 s offsets.
+  - Exact-crossing-start behavior: a `backwards=True` call whose input
+    JD equals the crossing itself must step a full cycle back (this is
+    the navigator's intended flow).
+
+  Round-trip precision tolerance is ~0.1 s, well within the astronomical
+  precision of the underlying Chebyshev interpolation.
+
+### Known limitations
+
+The same class of sub-second dead-zone behavior remains in
+`swe_helio_cross_ut` / `swe_helio_cross`. It was left unchanged because a
+correct fix requires per-planet threshold calibration, a direction guard
+(absent from the helio path), Brent-fallback interaction analysis, and a
+forward-path symmetric patch. Tracking issue to be filed; production
+consumers are unaffected because the only active caller (the planetary-
+return navigator) serializes timestamps at millisecond precision, which
+falls well inside the existing helio dead-zone and therefore produces the
+intended full-cycle backward step.
+
+### Compatibility
+
+Fully backward-compatible. Default value `backwards=False` preserves existing
+call signatures; no consumer code needs changes.
+
 ## [1.0.0] — 2026-04-06
 
 First stable release of LibEphemeris. This entry summarizes all changes across

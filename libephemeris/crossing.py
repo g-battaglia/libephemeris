@@ -292,16 +292,22 @@ def _find_bracket_for_crossing(
     )
 
 
-def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> float:
+def swe_solcross_ut(
+    x2cross: float,
+    tjdut: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
+) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude.
 
-    Searches FORWARD in time for the next crossing after tjdut.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdut``.
 
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -323,6 +329,8 @@ def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> 
         >>> jd_ingress = swe_solcross_ut(0.0, jd_now)
         >>> # Find summer solstice (90°)
         >>> jd_solstice = swe_solcross_ut(90.0, jd_now)
+        >>> # Find PREVIOUS Aries ingress
+        >>> jd_prev = swe_solcross_ut(0.0, jd_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
@@ -333,23 +341,41 @@ def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> 
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
 
-    # Calculate angular distance to target (always forward)
-    diff = (x2cross - lon_start) % 360.0
-
-    # Handle retrograde motion
-    if speed < 0 and diff > 0:
-        diff -= 360.0
-
-    # If already very close, look for next complete crossing
-    if abs(diff) < 1e-5:
-        if speed > 0:
-            diff += 360.0
-        else:
-            diff -= 360.0
-
     # Initial time estimate (linear approximation)
     if speed == 0:
         speed = 0.9856  # Average Sun motion ~1°/day
+
+    # Calculate angular distance to target — direction-aware
+    diff = (x2cross - lon_start) % 360.0  # in [0, 360)
+
+    if backwards:
+        # Map diff from [0, 360) into (-360, 0].
+        # When the Newton-Raphson forward result is passed back in, lon_start
+        # lands within NR_TOLERANCE (~2.78e-7°) of the target — and can sit on
+        # EITHER side, which means `diff` wraps close to 0 *or* close to 360.
+        # Normalize to signed space first so the "at-crossing" guard catches
+        # both sides. Threshold 1e-6° keeps a safety margin above
+        # NR_TOLERANCE yet stays well below 1 second of apparent motion
+        # (~1.14e-5°/s for Sun, ~1.52e-4°/s for Moon), so callers querying
+        # the previous crossing moments after an event still get the nearby
+        # event rather than a full cycle back.
+        signed = diff - 360.0 if diff > 180.0 else diff
+        if abs(signed) < 1e-6:
+            diff = -360.0
+        else:
+            diff -= 360.0
+    else:
+        # Handle retrograde motion (Sun is never retrograde geocentrically,
+        # but keep the original guard for robustness)
+        if speed < 0 and diff > 0:
+            diff -= 360.0
+
+        # If already very close, look for next complete crossing
+        if abs(diff) < 1e-5:
+            if speed > 0:
+                diff += 360.0
+            else:
+                diff -= 360.0
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -388,19 +414,25 @@ def swe_solcross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> 
     raise RuntimeError("Maximum iterations reached in solar crossing calculation")
 
 
-def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> float:
+def swe_solcross(
+    x2cross: float,
+    tjdet: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
+) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude (TT version).
 
     This is the Terrestrial Time version of swe_solcross_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
-    Searches FORWARD in time for the next crossing after tjdet.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdet``.
 
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -427,6 +459,8 @@ def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> flo
         >>> jd_ingress_tt = swe_solcross(0.0, jd_tt_now)
         >>> # Find summer solstice (90°)
         >>> jd_solstice_tt = swe_solcross(90.0, jd_tt_now)
+        >>> # Find previous Aries ingress using TT
+        >>> jd_prev_tt = swe_solcross(0.0, jd_tt_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
@@ -437,23 +471,31 @@ def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> flo
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
 
-    # Calculate angular distance to target (always forward)
-    diff = (x2cross - lon_start) % 360.0
-
-    # Handle retrograde motion
-    if speed < 0 and diff > 0:
-        diff -= 360.0
-
-    # If already very close, look for next complete crossing
-    if abs(diff) < 1e-5:
-        if speed > 0:
-            diff += 360.0
-        else:
-            diff -= 360.0
-
     # Initial time estimate (linear approximation)
     if speed == 0:
         speed = 0.9856  # Average Sun motion ~1°/day
+
+    # Calculate angular distance to target — direction-aware
+    diff = (x2cross - lon_start) % 360.0
+
+    if backwards:
+        # See swe_solcross_ut for the signed-normalization rationale.
+        signed = diff - 360.0 if diff > 180.0 else diff
+        if abs(signed) < 1e-6:
+            diff = -360.0
+        else:
+            diff -= 360.0
+    else:
+        # Handle retrograde motion (Sun/Moon prograde, guard for safety)
+        if speed < 0 and diff > 0:
+            diff -= 360.0
+
+        # If already very close, look for next complete crossing
+        if abs(diff) < 1e-5:
+            if speed > 0:
+                diff += 360.0
+            else:
+                diff -= 360.0
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -491,16 +533,22 @@ def swe_solcross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> flo
     raise RuntimeError("Maximum iterations reached in solar crossing calculation")
 
 
-def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) -> float:
+def swe_mooncross_ut(
+    x2cross: float,
+    tjdut: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
+) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude.
 
-    Searches FORWARD in time for the next crossing after tjdut.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdut``.
 
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -519,6 +567,8 @@ def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) ->
         >>> # Find next new moon (Sun-Moon conjunction at same longitude)
         >>> sun_pos, _ = swe_calc_ut(jd_now, SE_SUN, SEFLG_SWIEPH)
         >>> jd_new_moon = swe_mooncross_ut(sun_pos[0], jd_now)
+        >>> # Find PREVIOUS Moon crossing of 0°
+        >>> jd_prev = swe_mooncross_ut(0.0, jd_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
@@ -529,21 +579,29 @@ def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) ->
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
 
-    # Calculate initial guess for NEXT crossing
-    diff = (x2cross - lon_start) % 360.0
-
-    if speed < 0 and diff > 0:
-        diff -= 360.0
-
-    if abs(diff) < 1e-5:
-        if speed > 0:
-            diff += 360.0
-        else:
-            diff -= 360.0
-
     # Initial time estimate
     if speed == 0:
         speed = 13.176  # Average Moon motion ~13.18°/day
+
+    # Calculate initial guess — direction-aware
+    diff = (x2cross - lon_start) % 360.0
+
+    if backwards:
+        # See swe_solcross_ut for the signed-normalization rationale.
+        signed = diff - 360.0 if diff > 180.0 else diff
+        if abs(signed) < 1e-6:
+            diff = -360.0
+        else:
+            diff -= 360.0
+    else:
+        if speed < 0 and diff > 0:
+            diff -= 360.0
+
+        if abs(diff) < 1e-5:
+            if speed > 0:
+                diff += 360.0
+            else:
+                diff -= 360.0
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -582,19 +640,25 @@ def swe_mooncross_ut(x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH) ->
     raise RuntimeError("Maximum iterations reached in moon crossing calculation")
 
 
-def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> float:
+def swe_mooncross(
+    x2cross: float,
+    tjdet: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
+) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude (TT version).
 
     This is the Terrestrial Time version of swe_mooncross_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
-    Searches FORWARD in time for the next crossing after tjdet.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdet``.
 
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -623,6 +687,8 @@ def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> fl
         >>> # Find next new moon (Sun-Moon conjunction at same longitude) using TT
         >>> sun_pos, _ = swe_calc(jd_tt_now, SE_SUN, SEFLG_SWIEPH)
         >>> jd_new_moon_tt = swe_mooncross(sun_pos[0], jd_tt_now)
+        >>> # Find previous Moon crossing of 0° using TT
+        >>> jd_prev_tt = swe_mooncross(0.0, jd_tt_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
@@ -633,21 +699,29 @@ def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> fl
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
 
-    # Calculate initial guess for NEXT crossing
-    diff = (x2cross - lon_start) % 360.0
-
-    if speed < 0 and diff > 0:
-        diff -= 360.0
-
-    if abs(diff) < 1e-5:
-        if speed > 0:
-            diff += 360.0
-        else:
-            diff -= 360.0
-
     # Initial time estimate
     if speed == 0:
         speed = 13.176  # Average Moon motion ~13.18°/day
+
+    # Calculate initial guess — direction-aware
+    diff = (x2cross - lon_start) % 360.0
+
+    if backwards:
+        # See swe_solcross_ut for the signed-normalization rationale.
+        signed = diff - 360.0 if diff > 180.0 else diff
+        if abs(signed) < 1e-6:
+            diff = -360.0
+        else:
+            diff -= 360.0
+    else:
+        if speed < 0 and diff > 0:
+            diff -= 360.0
+
+        if abs(diff) < 1e-5:
+            if speed > 0:
+                diff += 360.0
+            else:
+                diff -= 360.0
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -686,7 +760,9 @@ def swe_mooncross(x2cross: float, tjdet: float, flags: int = SEFLG_SWIEPH) -> fl
 
 
 def swe_mooncross_node_ut(
-    tjdut: float, flags: int = SEFLG_SWIEPH
+    tjdut: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (ascending or descending).
@@ -695,11 +771,12 @@ def swe_mooncross_node_ut(
     it crosses the ecliptic plane. This is important for eclipse calculations,
     as eclipses can only occur when the Sun and Moon are near the lunar nodes.
 
-    Searches FORWARD in time for the next node crossing after tjdut.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdut``.
 
     Args:
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         tuple: (jd_cross, xlon, xlat) - Julian Day of crossing, ecliptic longitude,
@@ -714,9 +791,9 @@ def swe_mooncross_node_ut(
         3. Convert result TT back to UT for return value
 
     Note:
-        The function finds the NEXT node crossing regardless of whether it's
-        ascending (latitude going from negative to positive) or descending
-        (latitude going from positive to negative).
+        The function finds the NEXT (or PREVIOUS when ``backwards=True``) node
+        crossing regardless of whether it's ascending (latitude going from
+        negative to positive) or descending (positive to negative).
 
         Moon crosses each node approximately every 13.6 days (half the nodal
         month of ~27.2 days).
@@ -727,6 +804,8 @@ def swe_mooncross_node_ut(
         >>> # Check if ascending or descending by examining latitude velocity
         >>> pos, _ = swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
         >>> is_ascending = pos[4] > 0  # positive lat velocity = ascending
+        >>> # Find PREVIOUS lunar node crossing
+        >>> jd_prev, _, _ = swe_mooncross_node_ut(jd_now, backwards=True)
     """
     from .state import get_timescale
 
@@ -736,7 +815,7 @@ def swe_mooncross_node_ut(
     jd_tt_start = t_start.tt
 
     # Delegate to the TT version
-    jd_tt_cross, xlon, xlat = swe_mooncross_node(jd_tt_start, flags)
+    jd_tt_cross, xlon, xlat = swe_mooncross_node(jd_tt_start, flags, backwards=backwards)
 
     # Convert result from TT back to UT
     t_cross = ts.tt_jd(jd_tt_cross)
@@ -746,7 +825,9 @@ def swe_mooncross_node_ut(
 
 
 def swe_mooncross_node(
-    tjdet: float, flags: int = SEFLG_SWIEPH
+    tjdet: float,
+    flags: int = SEFLG_SWIEPH,
+    backwards: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (TT version).
@@ -758,11 +839,12 @@ def swe_mooncross_node(
     it crosses the ecliptic plane. This is important for eclipse calculations,
     as eclipses can only occur when the Sun and Moon are near the lunar nodes.
 
-    Searches FORWARD in time for the next node crossing after tjdet.
+    Searches forward (or backward if ``backwards=True``) in time from ``tjdet``.
 
     Args:
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        backwards: If True, search backward in time instead of forward.
 
     Returns:
         tuple: (jd_cross, xlon, xlat) - Julian Day of crossing (TT), ecliptic longitude,
@@ -779,9 +861,12 @@ def swe_mooncross_node(
     Example:
         >>> # Find next lunar node crossing using TT
         >>> jd_node_tt, xlon, xlat = swe_mooncross_node(jd_tt_now)
+        >>> # Find previous lunar node crossing using TT
+        >>> jd_prev_tt, _, _ = swe_mooncross_node(jd_tt_now, backwards=True)
     """
     # Half nodal month - time between successive node crossings
     HALF_NODAL_MONTH = 13.6
+    direction = -1.0 if backwards else 1.0
 
     try:
         pos, _ = swe_calc(tjdet, SE_MOON, flags | SEFLG_SPEED)
@@ -797,27 +882,43 @@ def swe_mooncross_node(
     # Initial time estimate to reach latitude = 0
     dt_guess = -lat / lat_speed
 
-    # If dt_guess is negative, very small, OR too large (> half nodal month),
-    # the linear estimate is unreliable. Search for the actual crossing.
-    if dt_guess < 0.1 or dt_guess > HALF_NODAL_MONTH:
-        # Search in steps to find where latitude changes sign
-        jd_search_start = tjdet + 0.5
-
-        pos_start, _ = swe_calc(jd_search_start, SE_MOON, flags | SEFLG_SPEED)
-        lat_sign = 1 if pos_start[1] >= 0 else -1
-
-        for step in range(8):  # Up to 16 days
-            jd_check = jd_search_start + step * 2.0
-            pos_check, _ = swe_calc(jd_check, SE_MOON, flags | SEFLG_SPEED)
-            current_sign = 1 if pos_check[1] >= 0 else -1
-
-            if current_sign != lat_sign:
-                jd_guess = jd_check - 1.0
-                break
-        else:
-            jd_guess = tjdet + HALF_NODAL_MONTH
+    # If starting essentially at a node crossing, the linear estimate is
+    # dominated by FP noise and NR would converge on the start point
+    # (failing the direction check and bouncing forever). Take a full
+    # half-nodal-month step in the requested direction instead.
+    if abs(lat) < 10 * NR_TOLERANCE_MOON:
+        jd_guess = tjdet + HALF_NODAL_MONTH * direction
     else:
-        jd_guess = tjdet + dt_guess
+        # For forward search, dt_guess should be in (0, HALF_NODAL_MONTH].
+        # For backward search, dt_guess should be in [-HALF_NODAL_MONTH, 0).
+        # Scan only when the linear estimate points the wrong way or past
+        # one half-cycle. Small-magnitude guesses (caller is seconds after
+        # a crossing) still land on the correct nearby event.
+        if backwards:
+            needs_scan = dt_guess >= 0.0 or dt_guess < -HALF_NODAL_MONTH
+        else:
+            needs_scan = dt_guess <= 0.0 or dt_guess > HALF_NODAL_MONTH
+
+        if needs_scan:
+            jd_search_start = tjdet + 0.5 * direction
+
+            pos_start, _ = swe_calc(jd_search_start, SE_MOON, flags | SEFLG_SPEED)
+            lat_sign = 1 if pos_start[1] >= 0 else -1
+
+            for step in range(8):  # Up to 16 days in the requested direction
+                jd_check = jd_search_start + step * 2.0 * direction
+                pos_check, _ = swe_calc(jd_check, SE_MOON, flags | SEFLG_SPEED)
+                current_sign = 1 if pos_check[1] >= 0 else -1
+
+                if current_sign != lat_sign:
+                    # Crossing between jd_check - 2*direction and jd_check —
+                    # take midpoint as the Newton starting guess.
+                    jd_guess = jd_check - 1.0 * direction
+                    break
+            else:
+                jd_guess = tjdet + HALF_NODAL_MONTH * direction
+        else:
+            jd_guess = tjdet + dt_guess
 
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_MOON):
@@ -832,10 +933,16 @@ def swe_mooncross_node(
 
         # Check convergence (< 0.001 arcsecond for Moon)
         if abs(lat) < NR_TOLERANCE_MOON:
-            if jd > tjdet + 0.001:
-                # Return tuple (jd_cross, xlon, xlat) matching reference API
+            # Must be strictly past tjdet in the requested direction. The
+            # epsilon (~0.09 s) is tight enough to accept legitimate results
+            # seconds before/after tjdet yet wide enough to reject the
+            # numerically identical "same event" case when the caller starts
+            # at the exact node crossing itself.
+            if (not backwards and jd > tjdet + 1e-6) or (backwards and jd < tjdet - 1e-6):
                 return (jd, pos[0], lat)
-            jd = jd + HALF_NODAL_MONTH / 2
+            # Converged on the wrong side of tjdet — nudge to the next
+            # (or previous) crossing and keep iterating.
+            jd = jd + (HALF_NODAL_MONTH / 2) * direction
             continue
 
         # Newton-Raphson step
@@ -844,9 +951,11 @@ def swe_mooncross_node(
 
         jd -= lat / lat_speed
 
-        # Safety check
-        if jd < tjdet:
+        # Safety check — clamp to the requested direction
+        if not backwards and jd < tjdet:
             jd = tjdet + HALF_NODAL_MONTH / 2
+        elif backwards and jd > tjdet:
+            jd = tjdet - HALF_NODAL_MONTH / 2
         elif abs(jd - tjdet) > 30:
             raise RuntimeError("Moon node crossing search diverged")
 
