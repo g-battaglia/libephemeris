@@ -7,18 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] — 2026-04-21
 
-**Backward crossing search: `swe_solcross_ut`, `swe_mooncross_ut`, and `swe_mooncross_node_ut` now accept a `backwards` flag, mirroring the existing `swe_helio_cross_ut` behavior.**
+**Backward crossing search: `swe_solcross_ut`, `swe_mooncross_ut`, and `swe_mooncross_node_ut` (plus their TT variants — six functions in total) now accept a `backwards` flag, mirroring the existing `swe_helio_cross_ut` behavior.**
 
 ### Added
 
 - **`backwards: bool = False` parameter on Solar/Lunar/Node crossing functions.**
   When `True`, the Newton–Raphson (+ Brent fallback) search steps backward from
   the given Julian Day, returning the most recent past crossing instead of the
-  next one. Applies to all four ecliptic-longitude crossing primitives:
+  next one. Applies to six functions across two crossing families:
+
+  Ecliptic-longitude target crossings (four functions):
   - `swe_solcross_ut(target_lon, jd_start, backwards=False)`
   - `swe_solcross(target_lon, jd_start, backwards=False)` (TT variant)
   - `swe_mooncross_ut(target_lon, jd_start, backwards=False)`
   - `swe_mooncross(target_lon, jd_start, backwards=False)` (TT variant)
+
+  Latitude-zero (lunar-node) crossings (two functions):
   - `swe_mooncross_node_ut(jd_start, backwards=False)`
   - `swe_mooncross_node(jd_start, backwards=False)` (TT variant)
 
@@ -61,15 +65,16 @@ the existing API surface of `swe_helio_cross_ut`.
 
 ### Tests
 
-- 34 tests in `tests/test_crossing/test_crossings_backwards.py` covering:
+- 37 tests in `tests/test_crossing/test_crossings_backwards.py` covering:
   - Forward/backward round-trip symmetry (solar, lunar, node)
   - Multi-step navigation across consecutive returns (solar 5-year span,
     lunar 6-month span, node 10-step)
   - TT variant parity
   - **`TestJustAfterCrossing`**: regression suite verifying that a
-    `backwards=True` call issued 1–80 seconds after a crossing returns
-    that same crossing, not the one a full cycle earlier. Covers the
-    solar, lunar, and node paths; parametrized at 1/10/60/80 s offsets.
+    `backwards=True` call issued sub-second to 80 seconds after a
+    crossing returns that same crossing, not the one a full cycle
+    earlier. Covers the solar, lunar, and node paths; parametrized at
+    0.5/1/10/60/80 s offsets.
   - Exact-crossing-start behavior: a `backwards=True` call whose input
     JD equals the crossing itself must step a full cycle back (this is
     the navigator's intended flow).

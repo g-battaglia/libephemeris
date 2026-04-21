@@ -161,9 +161,9 @@ class TestJustAfterCrossing:
     # Seconds → JD fraction
     _SEC = 1.0 / 86400.0
 
-    @pytest.mark.parametrize("offset_sec", [1.0, 10.0, 60.0, 80.0])
+    @pytest.mark.parametrize("offset_sec", [0.5, 1.0, 10.0, 60.0, 80.0])
     def test_solcross_just_after(self, offset_sec):
-        """30 s after 55° crossing, previous must be that same crossing."""
+        """Sub-second to 80 s after a 55° crossing, previous must be that same crossing."""
         jd_cross = swe.solcross_ut(55.0, JD_J2000)
         jd_start = jd_cross + offset_sec * self._SEC
         jd_prev = swe.solcross_ut(55.0, jd_start, backwards=True)
@@ -174,7 +174,7 @@ class TestJustAfterCrossing:
             f"— suggests the backward dead-zone jumped a full cycle."
         )
 
-    @pytest.mark.parametrize("offset_sec", [1.0, 10.0, 60.0, 80.0])
+    @pytest.mark.parametrize("offset_sec", [0.5, 1.0, 10.0, 60.0, 80.0])
     def test_mooncross_just_after(self, offset_sec):
         jd_cross = swe.mooncross_ut(120.0, JD_J2000)
         jd_start = jd_cross + offset_sec * self._SEC
@@ -184,9 +184,9 @@ class TestJustAfterCrossing:
             f"Previous moon crossing off by {err_sec:.2f} s from the one {offset_sec}s ago"
         )
 
-    @pytest.mark.parametrize("offset_sec", [1.0, 10.0, 60.0, 80.0])
+    @pytest.mark.parametrize("offset_sec", [0.5, 1.0, 10.0, 60.0, 80.0])
     def test_mooncross_node_just_after(self, offset_sec):
-        """1–80 s after a node crossing, previous must be that same crossing."""
+        """Sub-second to 80 s after a node crossing, previous must be that same crossing."""
         jd_cross, _, _ = swe.mooncross_node_ut(JD_J2000)
         jd_start = jd_cross + offset_sec * self._SEC
         jd_prev, _, lat = swe.mooncross_node_ut(jd_start, backwards=True)
