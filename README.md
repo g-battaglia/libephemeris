@@ -163,6 +163,18 @@ poe test:compare:skyfield          # Cross-validate vs pyswisseph
 
 ---
 
+## Part of the Kerykeion Ecosystem
+
+LibEphemeris is the computation engine behind:
+
+- **[Astrologer Studio](https://www.astrologerstudio.com)** — professional online astrology software (in production)
+- **[Kerykeion](https://github.com/g-battaglia/kerykeion)** — Python astrology library (v6 alpha)
+- **[Astrologer API](https://www.kerykeion.net/astrologer-api)** — hosted REST API for astrology data and SVG charts (upcoming)
+
+Learn more at [kerykeion.net](https://kerykeion.net).
+
+---
+
 ## License
 
 AGPL-3.0. See [LICENSE](LICENSE).
