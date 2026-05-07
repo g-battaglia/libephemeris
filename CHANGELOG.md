@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-05-08
+
+### Added
+
+- **Native fixed-star catalog metadata API.** `list_fixed_stars()` exposes the
+  libephemeris-owned fixed-star catalog as immutable `FixedStarInfo` records
+  (`name`, `nomenclature`, `hip_number`, `magnitude`) without relying on Swiss
+  Ephemeris catalog files.
+- **Batch fixed-star calculation.** `swe_batch_fixstars_ut()` and the public
+  alias `batch_fixstars_ut()` calculate multiple fixed stars in input order and
+  reuse shared Earth-at-time positions. `skip_errors=True` preserves input slots
+  with `None` for unresolved stars.
+
+### Changed
+
+- Fixed-star calculations now use the existing observer/time caches on the hot
+  path, avoiding repeated `earth.at(t)` work when many stars are calculated for
+  the same Julian Day.
+
+### Compatibility
+
+- Additive release. Existing `swe_fixstar_ut()`, `swe_fixstar()`, `swe_fixstar2_*`,
+  and magnitude APIs retain their existing behavior.
+
 ## [1.1.0] — 2026-04-21
 
 **Backward crossing search: `swe_solcross_ut`, `swe_mooncross_ut`, and `swe_mooncross_node_ut` (plus their TT variants — six functions in total) now accept a `backwards` flag, mirroring the existing `swe_helio_cross_ut` behavior.**
