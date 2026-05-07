@@ -455,6 +455,7 @@ from .fixed_stars import (
     swe_fixstar_mag,
     swe_fixstar2_mag,
     list_fixed_stars,
+    StarCatalogEntry,
     propagate_proper_motion,
 )
 from .context import EphemerisContext  # NEW: Thread-safe context API
@@ -1215,6 +1216,7 @@ __all__ = [
     "swe_batch_fixstars_ut",
     "batch_fixstars_ut",
     "list_fixed_stars",
+    "StarCatalogEntry",
     "swe_fixstar_mag",
     "fixstar_mag",
     "swe_fixstar2_mag",

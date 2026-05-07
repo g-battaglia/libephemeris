@@ -74,3 +74,30 @@ def test_batch_fixstars_ut_raises_by_default_for_unknown_star() -> None:
 
 def test_batch_fixstars_ut_public_alias() -> None:
     assert swe.batch_fixstars_ut is swe.swe_batch_fixstars_ut
+
+
+def test_batch_fixstars_ut_empty_list() -> None:
+    batch = swe.swe_batch_fixstars_ut((), JD, 0)
+    assert len(batch) == 0
+    assert isinstance(batch, tuple)
+
+
+def test_batch_fixstars_ut_single_star() -> None:
+    batch = swe.swe_batch_fixstars_ut(("Regulus",), JD, 0)
+    single = swe.swe_fixstar_ut("Regulus", JD, 0)
+    assert len(batch) == 1
+    assert batch[0][0] == pytest.approx(single[0], abs=1e-9)
+    assert batch[0][1] == single[1]
+
+
+def test_batch_fixstars_ut_duplicate_names() -> None:
+    batch = swe.swe_batch_fixstars_ut(("Regulus", "Regulus"), JD, 0)
+    assert len(batch) == 2
+    assert batch[0][0] == pytest.approx(batch[1][0], abs=1e-12)
+    assert batch[0][1] == batch[1][1]
+
+
+def test_star_catalog_entry_exported() -> None:
+    assert hasattr(swe, "StarCatalogEntry")
+    catalog = swe.list_fixed_stars()
+    assert isinstance(catalog[0], swe.StarCatalogEntry)
