@@ -51,7 +51,7 @@ References:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
@@ -247,6 +247,11 @@ class StarCatalogEntry:
     hip_number: int
     data: StarData
     magnitude: float
+
+
+def list_fixed_stars() -> Tuple[StarCatalogEntry, ...]:
+    """Return the fixed-star catalog entries."""
+    return tuple(STAR_CATALOG)
 
 
 def propagate_proper_motion(
@@ -3800,6 +3805,59 @@ def get_canonical_star_name(star_id: int) -> str | None:
     return None
 
 
+def _calc_star_position_from_observer(
+    star_id: int,
+    earth_at_t,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
+) -> Tuple[float, float, float]:
+    """Calculate one fixed star from a precomputed observer position."""
+    if star_id not in FIXED_STARS:
+        raise ValueError(f"could not find star name {star_id}")
+
+    star_data = FIXED_STARS[star_id]
+
+    # Create Skyfield Star object
+    # Note: pm_ra in StarData is already "pm_ra * cos(dec)" (proper motion in RA direction)
+    # Skyfield expects ra_mas_per_year which is the same convention
+    star = Star(
+        ra_hours=star_data.ra_j2000 / 15.0,  # Convert degrees to hours
+        dec_degrees=star_data.dec_j2000,
+        ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
+        dec_mas_per_year=star_data.pm_dec * 1000.0,
+        parallax_mas=star_data.parallax_mas,  # Trigonometric parallax for distance
+        radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
+    )
+
+    # Calculate position
+    astrometric = earth_at_t.observe(star)
+
+    if noaberr:
+        pos = astrometric
+    elif nogdefl:
+        # Aberration without gravitational deflection:
+        # Pass empty deflectors tuple to skip deflection while keeping aberration.
+        pos = astrometric.apparent(deflectors=())
+    else:
+        pos = astrometric.apparent()
+
+    # Transform to ecliptic coordinates
+    frame = ecliptic_J2000_frame if j2000_frame else ecliptic_frame
+    ecl = pos.frame_latlon(frame)
+
+    # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
+    lat = ecl[0].degrees
+    lon = ecl[1].degrees % 360.0
+    # Distance from parallax (AU). Stars without parallax data (parallax_mas=0)
+    # will have a very large distance from Skyfield; cap at 100000 AU for those.
+    dist = ecl[2].au
+    if star_data.parallax_mas == 0.0:
+        dist = 100000.0
+
+    return lon, lat, dist
+
+
 def _calc_star_position_skyfield(
     star_id: int,
     jd_tt: float,
@@ -3833,59 +3891,15 @@ def _calc_star_position_skyfield(
     Raises:
         ValueError: If star_id not in catalog
     """
-    if star_id not in FIXED_STARS:
-        raise ValueError(f"could not find star name {star_id}")
+    from .cache import get_cached_observer_at, get_cached_time_tt
+    from .state import get_planets
 
-    star_data = FIXED_STARS[star_id]
-
-    # Create Skyfield Star object
-    # Note: pm_ra in StarData is already "pm_ra * cos(dec)" (proper motion in RA direction)
-    # Skyfield expects ra_mas_per_year which is the same convention
-    star = Star(
-        ra_hours=star_data.ra_j2000 / 15.0,  # Convert degrees to hours
-        dec_degrees=star_data.dec_j2000,
-        ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
-        dec_mas_per_year=star_data.pm_dec * 1000.0,
-        parallax_mas=star_data.parallax_mas,  # Trigonometric parallax for distance
-        radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
+    t = get_cached_time_tt(jd_tt)
+    earth = get_planets()["earth"]
+    earth_at_t = get_cached_observer_at(earth, t)
+    return _calc_star_position_from_observer(
+        star_id, earth_at_t, noaberr, nogdefl, j2000_frame
     )
-
-    # Get timescale and ephemeris
-    from .state import get_timescale, get_planets
-
-    ts = get_timescale()
-    eph = get_planets()
-    earth = eph["earth"]
-
-    # Create time object
-    t = ts.tt_jd(jd_tt)
-
-    # Calculate position
-    astrometric = earth.at(t).observe(star)
-
-    if noaberr:
-        pos = astrometric
-    elif nogdefl:
-        # Aberration without gravitational deflection:
-        # Pass empty deflectors tuple to skip deflection while keeping aberration.
-        pos = astrometric.apparent(deflectors=())
-    else:
-        pos = astrometric.apparent()
-
-    # Transform to ecliptic coordinates
-    frame = ecliptic_J2000_frame if j2000_frame else ecliptic_frame
-    ecl = pos.frame_latlon(frame)
-
-    # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
-    lat = ecl[0].degrees
-    lon = ecl[1].degrees % 360.0
-    # Distance from parallax (AU). Stars without parallax data (parallax_mas=0)
-    # will have a very large distance from Skyfield; cap at 100000 AU for those.
-    dist = ecl[2].au
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
-
-    return lon, lat, dist
 
 
 def calc_fixed_star_position(
@@ -4220,10 +4234,9 @@ def swe_fixstar_ut(
         raise Error(error)
 
     # Convert UT to TT using timescale (applies Delta T)
-    from .state import get_timescale
+    from .cache import get_cached_time_ut1
 
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
+    t = get_cached_time_ut1(tjdut)
 
     try:
         noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
@@ -4251,6 +4264,100 @@ def swe_fixstar_ut(
         raise
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
+
+
+def swe_batch_fixstars_ut(
+    stars: Sequence[str],
+    tjdut: float,
+    flags: int = SEFLG_SWIEPH,
+    *,
+    skip_errors: bool = False,
+) -> Tuple[
+    Tuple[Tuple[float, float, float, float, float, float], str, int] | None, ...
+]:
+    """Calculate multiple fixed-star positions for Universal Time.
+
+    The result order matches the input order. When ``skip_errors`` is True,
+    unresolved stars keep their input slot as ``None``.
+    """
+    flags = _preprocess_flags(flags)
+
+    results: list[
+        Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+    ] = [None] * len(stars)
+    resolved: list[tuple[int, int, str]] = []
+    for index, star_name in enumerate(stars):
+        star_id, error, canonical_name = _resolve_star_id(star_name)
+        if error:
+            if skip_errors:
+                continue
+            raise Error(error)
+        resolved.append((index, star_id, canonical_name or ""))
+
+    if not resolved:
+        return tuple(results)
+
+    from .cache import get_cached_observer_at, get_cached_time_tt, get_cached_time_ut1
+    from .state import get_planets
+
+    noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
+    nogdefl = bool(flags & SEFLG_NOGDEFL)
+    use_j2000 = bool(flags & SEFLG_J2000)
+    want_speed = bool(flags & SEFLG_SPEED)
+
+    t = get_cached_time_ut1(tjdut)
+    earth = get_planets()["earth"]
+    earth_at_t = get_cached_observer_at(earth, t)
+
+    if want_speed:
+        t_prev = get_cached_time_tt(t.tt - 0.5)
+        t_next = get_cached_time_tt(t.tt + 0.5)
+        earth_at_prev = get_cached_observer_at(earth, t_prev)
+        earth_at_next = get_cached_observer_at(earth, t_next)
+    else:
+        earth_at_prev = None
+        earth_at_next = None
+
+    for index, star_id, canonical_name in resolved:
+        try:
+            lon, lat, dist = _calc_star_position_from_observer(
+                star_id, earth_at_t, noaberr, nogdefl, use_j2000
+            )
+            if want_speed:
+                lon_prev, lat_prev, _dist_prev = _calc_star_position_from_observer(
+                    star_id, earth_at_prev, noaberr, nogdefl, use_j2000
+                )
+                lon_next, lat_next, _dist_next = _calc_star_position_from_observer(
+                    star_id, earth_at_next, noaberr, nogdefl, use_j2000
+                )
+                speed_lon = lon_next - lon_prev
+                if speed_lon > 180.0:
+                    speed_lon -= 360.0
+                elif speed_lon < -180.0:
+                    speed_lon += 360.0
+                speed_lat = lat_next - lat_prev
+                speed_dist = 0.0
+            else:
+                speed_lon = 0.0
+                speed_lat = 0.0
+                speed_dist = 0.0
+
+            result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+            result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
+            results[index] = (result, canonical_name, flags)
+        except Error:
+            if skip_errors:
+                continue
+            raise
+        except (OSError, ValueError, KeyError) as e:
+            if skip_errors:
+                continue
+            raise Error(str(e)) from e
+
+    return tuple(results)
+
+
+batch_fixstars_ut = swe_batch_fixstars_ut
 
 
 def swe_fixstar(

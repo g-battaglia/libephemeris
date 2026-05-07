@@ -451,8 +451,10 @@ from .fixed_stars import (
     swe_fixstar,
     swe_fixstar2,
     swe_fixstar2_ut,
+    swe_batch_fixstars_ut,
     swe_fixstar_mag,
     swe_fixstar2_mag,
+    list_fixed_stars,
     propagate_proper_motion,
 )
 from .context import EphemerisContext  # NEW: Thread-safe context API
@@ -721,6 +723,7 @@ fixstar_ut = swe_fixstar_ut
 fixstar = swe_fixstar
 fixstar2 = swe_fixstar2
 fixstar2_ut = swe_fixstar2_ut
+batch_fixstars_ut = swe_batch_fixstars_ut
 fixstar_mag = swe_fixstar_mag
 fixstar2_mag = swe_fixstar2_mag
 
@@ -773,7 +776,7 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"
@@ -1209,6 +1212,9 @@ __all__ = [
     "fixstar2",
     "swe_fixstar2_ut",
     "fixstar2_ut",
+    "swe_batch_fixstars_ut",
+    "batch_fixstars_ut",
+    "list_fixed_stars",
     "swe_fixstar_mag",
     "fixstar_mag",
     "swe_fixstar2_mag",
