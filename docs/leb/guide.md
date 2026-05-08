@@ -421,6 +421,27 @@ mmap_preload_start = 1800    # start year
 mmap_preload_end = 2200      # end year
 ```
 
+**Page cache release (containerised environments):** In cgroup v2
+environments (Docker, Railway, Kubernetes), file-backed page cache is
+counted in `memory.current`.  All readers expose a `cool()` method
+(complement of `warm()`) that calls `madvise(MADV_DONTNEED)` to advise
+the kernel that mmap pages can be reclaimed from the cgroup counter.
+The `release_data_cache()` function does the same for all files in the
+data directory via `posix_fadvise(FADV_DONTNEED)`.
+
+```python
+import libephemeris
+
+reader = libephemeris.get_leb_reader()
+if reader:
+    reader.cool()                    # release mmap pages
+libephemeris.release_data_cache()    # release data file pages
+```
+
+Both are advisory hints — the kernel ignores them on desktop systems
+with available RAM.  `cool()` is idempotent and safe on closed readers.
+It does not clear Python-level caches (`_eval_cache`, `_chunk_cache`).
+
 **Resource safety:** The `__init__` wraps `_parse()` in try/except. If parsing
 fails, `close()` is called to release the mmap and file handle before
 re-raising the exception (`leb_reader.py:181-186`).

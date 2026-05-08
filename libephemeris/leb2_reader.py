@@ -57,6 +57,7 @@ from .leb_format import (
     read_section_dir,
     read_star_entry,
     _madvise_ranges,
+    _madvise_dontneed,
 )
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
@@ -266,6 +267,14 @@ class LEB2Reader:
                 ranges.append((entry.data_offset, entry.compressed_size))
 
         _madvise_ranges(self._mm, ranges)
+
+    def cool(self) -> None:
+        """Advise the kernel that mmap pages can be reclaimed.
+
+        Idempotent and safe to call on closed readers.
+        """
+        if self._mm is not None:
+            _madvise_dontneed(self._mm)
 
     def has_body(self, body_id: int) -> bool:
         return body_id in self._bodies

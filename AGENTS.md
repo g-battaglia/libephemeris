@@ -44,7 +44,7 @@ These are libephemeris-only features, not part of the SwissEph-compatible API su
 - **`reset_session()`** — lightweight state reset preserving file handles, LEB reader, Skyfield timescale, and LRU caches. Only resets topo, sidereal mode, angles cache. Use between independent calculations instead of `close()`. 1750x faster than `close()` for consecutive calcs.
 - **`set_ephe_path()` idempotent** — no-op when path unchanged (avoids teardown).
 - **LEB2 v2 chunked format** — 10-year temporal chunks per body. Reader auto-detects v1 (monolithic) vs v2 (chunked). Cold-start 33x faster (47ms vs 1568ms). Generate with `scripts/generate_leb2.py convert`.
-- **Lazy mmap (no global `MADV_WILLNEED`)** — pages are loaded on demand by the kernel. Use `reader.warm(jd_start, jd_end)` for selective preloading of specific date ranges. Configurable via TOML keys `mmap_preload`, `mmap_preload_start`, `mmap_preload_end`.
+- **Lazy mmap (no global `MADV_WILLNEED`)** — pages are loaded on demand by the kernel. Use `reader.warm(jd_start, jd_end)` for selective preloading of specific date ranges. Configurable via TOML keys `mmap_preload`, `mmap_preload_start`, `mmap_preload_end`. Use `reader.cool()` + `libephemeris.release_data_cache()` to advise kernel to reclaim page cache (containerised environments).
 
 Key files for performance work:
 - `libephemeris/state.py` — `reset_session()`, `set_ephe_path()`

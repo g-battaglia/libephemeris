@@ -578,3 +578,19 @@ def _madvise_ranges(mm: Any, ranges: list[tuple[int, int]]) -> None:
             mm.madvise(_mmap.MADV_WILLNEED, start_page, length)
         except (OSError, AttributeError, ValueError):
             pass
+
+
+def _madvise_dontneed(mm: Any) -> None:
+    """Advise the kernel that all mmap pages can be reclaimed.
+
+    Args:
+        mm: An open mmap object (or ``None`` for a no-op).
+    """
+    import mmap as _mmap
+
+    if mm is None:
+        return
+    try:
+        mm.madvise(_mmap.MADV_DONTNEED)
+    except (OSError, AttributeError, ValueError):
+        pass

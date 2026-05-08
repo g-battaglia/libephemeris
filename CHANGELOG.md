@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-08
+
+### Added
+
+- **`cool()` method** on `LEBReader`, `LEB2Reader`, and
+  `CompositeLEBReader`.  Calls `madvise(MADV_DONTNEED)` to advise the
+  kernel that mmap pages can be reclaimed.  Idempotent, safe on closed
+  readers, does not clear Python-level caches (`_eval_cache`,
+  `_chunk_cache`).  Complement of `warm()`.
+- **`release_data_cache()` function** in `libephemeris.state` (exported
+  from `libephemeris`).  Calls `posix_fadvise(FADV_DONTNEED)` on all
+  files in the data directory.  No-op on macOS/Windows.  Useful in
+  containerised environments where cgroup v2 counts page cache in the
+  memory limit.
+
+### Fixed
+
+- **Leaked file descriptor in `get_leb_reader()`.** When opening a
+  modular LEB file (e.g. `base_core.leb2`), the code opened the file
+  once with `open_leb()` and then re-opened it via
+  `CompositeLEBReader.from_file_with_companions()`.  The first reader
+  was never closed.  Now the modular path is taken directly without the
+  redundant open.
+
+### Changed
+
+- Extracted `_resolve_data_dir()` helper from `_get_data_dir()`.
+  Resolves the data directory path (env / TOML / default) without
+  creating it.  Used by `release_data_cache()`.
+
+### Compatibility
+
+- Fully backward-compatible.  `cool()` and `release_data_cache()` are
+  additive.  Existing code is unaffected.
+
 ## [1.3.0] - 2026-05-08
 
 ### Changed

@@ -35,28 +35,33 @@ DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".libephemeris")
 _DATA_DIR_ENV_VAR = "LIBEPHEMERIS_DATA_DIR"
 
 
-def _get_data_dir() -> str:
-    """Get the base data directory for all downloaded/cached files.
+def _resolve_data_dir() -> str:
+    """Resolve the data directory path without creating it.
 
     Resolution order:
         1. LIBEPHEMERIS_DATA_DIR environment variable
         2. TOML config ``data_dir``
         3. DEFAULT_DATA_DIR (~/.libephemeris)
 
-    The directory is created if it doesn't exist.
-
     Returns:
         str: Absolute path to the data directory.
     """
     env_value = os.environ.get(_DATA_DIR_ENV_VAR, "").strip()
     if env_value:
-        data_dir = env_value
-    else:
-        from ._config_toml import get_str as _toml_str
+        return os.path.abspath(env_value)
+    from ._config_toml import get_str as _toml_str
 
-        toml_value = _toml_str("data_dir")
-        data_dir = toml_value if toml_value else DEFAULT_DATA_DIR
-    data_dir = os.path.abspath(data_dir)
+    toml_value = _toml_str("data_dir")
+    return os.path.abspath(toml_value if toml_value else DEFAULT_DATA_DIR)
+
+
+def _get_data_dir() -> str:
+    """Get the base data directory, creating it if needed.
+
+    Returns:
+        str: Absolute path to the data directory.
+    """
+    data_dir = _resolve_data_dir()
     os.makedirs(data_dir, exist_ok=True)
     return data_dir
 
@@ -412,6 +417,51 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
         logger.warning("mmap preload failed: %s", exc)
 
 
+def release_data_cache() -> None:
+    """Advise the kernel to reclaim page cache for ephemeris data files.
+
+    Calls ``posix_fadvise(FADV_DONTNEED)`` on all regular files in the
+    data directory.  In containerised environments (cgroup v2), this
+    reduces the memory counter without affecting correctness — pages
+    are reloaded transparently on next access.
+
+    Note:
+        Safe to call on any platform.  No-op where ``posix_fadvise``
+        is unavailable (macOS, Windows).  Only processes regular files;
+        FIFOs, devices, and symlinks are skipped.
+    """
+    _fadvise = getattr(os, "posix_fadvise", None)
+    _advice = getattr(os, "POSIX_FADV_DONTNEED", None)
+    if _fadvise is None or _advice is None:
+        return
+    data_dir = _resolve_data_dir()
+    if not os.path.isdir(data_dir):
+        return
+    import stat
+
+    for root, _, files in os.walk(data_dir):
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                st = os.stat(path)
+                if not stat.S_ISREG(st.st_mode):
+                    continue
+            except OSError:
+                continue
+            fd = -1
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+                _fadvise(fd, 0, st.st_size, _advice)
+            except OSError:
+                pass
+            finally:
+                if fd >= 0:
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+
+
 def get_leb_reader() -> Optional["LEBReader"]:
     """Get the active LEBReader, if any.
 
@@ -466,19 +516,15 @@ def get_leb_reader() -> Optional["LEBReader"]:
 
         if path is not None:
             try:
-                from .leb_reader import open_leb
-
-                reader = open_leb(path)
-                # If the file has companion group files, wrap in composite
-                directory = os.path.dirname(os.path.abspath(path))
                 basename = os.path.splitext(os.path.basename(path))[0]
                 if "_" in basename:
-                    # Looks like a modular file (e.g. base_core.leb2)
                     from .leb_composite import CompositeLEBReader
 
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
                 else:
-                    _LEB_READER = reader
+                    from .leb_reader import open_leb
+
+                    _LEB_READER = open_leb(path)
                 _maybe_warm_reader(_LEB_READER)
             except (FileNotFoundError, ValueError, OSError) as e:
                 if mode == "leb":
