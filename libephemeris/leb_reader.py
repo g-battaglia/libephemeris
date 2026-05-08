@@ -53,6 +53,7 @@ from .leb_format import (
     read_star_entry,
     segment_byte_size,
     _madvise_ranges,
+    _madvise_dontneed,
 )
 
 
@@ -303,6 +304,14 @@ class LEBReader:
             ranges.append((offset, size))
 
         _madvise_ranges(self._mm, ranges)
+
+    def cool(self) -> None:
+        """Advise the kernel that mmap pages can be reclaimed.
+
+        Idempotent and safe to call on closed readers.
+        """
+        if self._mm is not None:
+            _madvise_dontneed(self._mm)
 
     def has_body(self, body_id: int) -> bool:
         """Check if a body is available in this .leb file."""

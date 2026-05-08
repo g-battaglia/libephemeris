@@ -192,6 +192,8 @@ from .state import (
     get_precision_tier,
     list_tiers,
     get_spk_date_range_for_tier,
+    # Page cache management (containerised environments)
+    release_data_cache,
 )
 from .iers_data import (
     # IERS data download functions
@@ -777,7 +779,7 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"
@@ -1267,6 +1269,8 @@ __all__ = [
     "get_precision_tier",
     "list_tiers",
     "get_spk_date_range_for_tier",
+    # Page cache management (containerised environments)
+    "release_data_cache",
     # SPK discovery and ensure
     "discover_local_spks",
     "ensure_all_ephemerides",

@@ -176,6 +176,18 @@ class CompositeLEBReader:
         for reader in self._readers:
             reader.warm(jd_start, jd_end)
 
+    def cool(self) -> None:
+        """Advise the kernel that mmap pages can be reclaimed.
+
+        Delegates to all constituent readers.  Idempotent and safe to
+        call on closed readers.
+        """
+        for reader in self._readers:
+            try:
+                reader.cool()
+            except (OSError, AttributeError, ValueError):
+                pass
+
     def has_body(self, body_id: int) -> bool:
         return body_id in self._body_map
 
