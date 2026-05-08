@@ -3891,12 +3891,11 @@ def _calc_star_position_skyfield(
     Raises:
         ValueError: If star_id not in catalog
     """
-    from .cache import get_cached_observer_at, get_cached_time_tt
-    from .state import get_planets
+    from .state import get_planets, get_timescale
 
-    t = get_cached_time_tt(jd_tt)
+    t = get_timescale().tt_jd(jd_tt)
     earth = get_planets()["earth"]
-    earth_at_t = get_cached_observer_at(earth, t)
+    earth_at_t = earth.at(t)
     return _calc_star_position_from_observer(
         star_id, earth_at_t, noaberr, nogdefl, j2000_frame
     )
@@ -4234,9 +4233,9 @@ def swe_fixstar_ut(
         raise Error(error)
 
     # Convert UT to TT using timescale (applies Delta T)
-    from .cache import get_cached_time_ut1
+    from .state import get_timescale
 
-    t = get_cached_time_ut1(tjdut)
+    t = get_timescale().ut1_jd(tjdut)
 
     try:
         noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
@@ -4297,23 +4296,23 @@ def swe_batch_fixstars_ut(
     if not resolved:
         return tuple(results)
 
-    from .cache import get_cached_observer_at, get_cached_time_tt, get_cached_time_ut1
-    from .state import get_planets
+    from .state import get_planets, get_timescale
 
     noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
     nogdefl = bool(flags & SEFLG_NOGDEFL)
     use_j2000 = bool(flags & SEFLG_J2000)
     want_speed = bool(flags & SEFLG_SPEED)
 
-    t = get_cached_time_ut1(tjdut)
+    ts = get_timescale()
+    t = ts.ut1_jd(tjdut)
     earth = get_planets()["earth"]
-    earth_at_t = get_cached_observer_at(earth, t)
+    earth_at_t = earth.at(t)
 
     if want_speed:
-        t_prev = get_cached_time_tt(t.tt - 0.5)
-        t_next = get_cached_time_tt(t.tt + 0.5)
-        earth_at_prev = get_cached_observer_at(earth, t_prev)
-        earth_at_next = get_cached_observer_at(earth, t_next)
+        t_prev = ts.tt_jd(t.tt - 0.5)
+        t_next = ts.tt_jd(t.tt + 0.5)
+        earth_at_prev = earth.at(t_prev)
+        earth_at_next = earth.at(t_next)
     else:
         earth_at_prev = None
         earth_at_next = None

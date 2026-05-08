@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Fixed-star calculations now reuse cached time and observer positions when
-  available, reducing repeated work in chart-level fixed-star scans.
+- Batch fixed-star calculations reuse time and observer positions locally within
+  each call, reducing repeated work without adding persistent per-star caches.
 
 ### Compatibility
 

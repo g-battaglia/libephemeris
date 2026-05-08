@@ -11,7 +11,7 @@ Highlights:
 - `swe_batch_fixstars_ut()` and `batch_fixstars_ut()` calculate multiple stars
   in input order.
 - `skip_errors=True` keeps unresolved stars as `None` in their original slots.
-- Fixed-star calculations reuse cached time and observer positions where
-  possible.
+- Batch fixed-star calculations reuse time and observer positions locally within
+  each call without adding persistent per-star caches.
 
 This release is backward-compatible and additive.
