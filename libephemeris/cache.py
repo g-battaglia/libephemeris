@@ -36,10 +36,10 @@ import erfa
 # - OBLIQUITY_CACHE_SIZE: Caches obliquity values, same usage pattern
 # - TIME_CACHE_SIZE: Caches Skyfield Time objects per JD to avoid recreating
 #   nutation/precession matrices for repeated calls at the same JD
-_NUTATION_CACHE_SIZE = 128
-_OBLIQUITY_CACHE_SIZE = 128
-_TIME_CACHE_SIZE = 64
-_OBSERVER_CACHE_MAX = 256
+_NUTATION_CACHE_SIZE = 16
+_OBLIQUITY_CACHE_SIZE = 16
+_TIME_CACHE_SIZE = 8
+_OBSERVER_CACHE_MAX = 32
 
 # J2000.0 epoch in Julian Days
 _J2000_JD = 2451545.0

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-08
+
+### Added
+
+- **Fixed-star catalog listing.** `list_fixed_stars()` exposes the existing
+  fixed-star catalog entries for downstream discovery workflows.
+- **Batch fixed-star calculation.** `swe_batch_fixstars_ut()` and
+  `batch_fixstars_ut()` calculate multiple fixed stars in input order.
+  `skip_errors=True` preserves unresolved input slots with `None`.
+
+### Changed
+
+- Batch fixed-star calculations reuse time and observer positions locally within
+  each call, reducing repeated work without adding persistent per-star caches.
+
+### Compatibility
+
+- Additive release. Existing fixed-star position and magnitude APIs keep their
+  current behavior.
+
 ## [1.1.0] — 2026-04-21
 
 **Backward crossing search: `swe_solcross_ut`, `swe_mooncross_ut`, and `swe_mooncross_node_ut` (plus their TT variants — six functions in total) now accept a `backwards` flag, mirroring the existing `swe_helio_cross_ut` behavior.**
