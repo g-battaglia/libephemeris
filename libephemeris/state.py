@@ -368,6 +368,34 @@ def _discover_leb_file() -> Optional[str]:
     return None
 
 
+def _year_to_jd(year: int) -> float:
+    """Convert a Gregorian year to an approximate Julian Day (Jan 1, 12:00 TT)."""
+    a = (14 - 1) // 12
+    y = year + 4800 - a
+    m = 1 + 12 * a - 3
+    return 1 + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045.0
+
+
+def _maybe_warm_reader(reader: "LEBReader") -> None:
+    """Call reader.warm() if mmap_preload is enabled in TOML config."""
+    from ._config_toml import get_bool, get_int
+
+    if not get_bool("mmap_preload"):
+        return
+
+    start_year = get_int("mmap_preload_start") or 1800
+    end_year = get_int("mmap_preload_end") or 2200
+    jd_start = _year_to_jd(start_year)
+    jd_end = _year_to_jd(end_year)
+    try:
+        reader.warm(jd_start, jd_end)
+        logger = get_logger()
+        logger.debug("mmap preload: warmed JD range %s-%s (%d-%d)", jd_start, jd_end, start_year, end_year)
+    except Exception as exc:
+        logger = get_logger()
+        logger.warning("mmap preload failed: %s", exc)
+
+
 def get_leb_reader() -> Optional["LEBReader"]:
     """Get the active LEBReader, if any.
 
@@ -435,6 +463,7 @@ def get_leb_reader() -> Optional["LEBReader"]:
                     _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
                 else:
                     _LEB_READER = reader
+                _maybe_warm_reader(_LEB_READER)
             except (FileNotFoundError, ValueError, OSError) as e:
                 if mode == "leb":
                     raise RuntimeError(

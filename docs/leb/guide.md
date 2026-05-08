@@ -385,6 +385,7 @@ class LEBReader:
     def eval_nutation(self, jd_tt: float) -> (dpsi, deps)
     def delta_t(self, jd: float) -> float
     def get_star(self, star_id: int) -> StarEntry
+    def warm(self, jd_start: float, jd_end: float) -> None
     def close(self) -> None
 
     # Properties
@@ -397,6 +398,28 @@ class LEBReader:
 The file is opened read-only via `mmap.mmap(fd, 0, access=mmap.ACCESS_READ)`.
 All struct reads use `struct.unpack_from()` which operates directly on the
 mmap'd buffer — **zero-copy** for coefficient access.
+
+Pages are loaded **on demand** by the kernel (demand paging).  No
+`madvise(MADV_WILLNEED)` is issued at open time, so the mmap does not
+pre-fault pages into physical RAM.  This keeps idle RSS near zero
+regardless of file size.
+
+**Selective preloading:** Both `LEBReader` and `LEB2Reader` expose a
+`warm(jd_start, jd_end)` method that calls `madvise(MADV_WILLNEED)` on
+the page-aligned byte ranges of segments/chunks overlapping the given
+Julian Day range.  This allows pre-faulting only the date ranges that
+will be needed (e.g. 1800-2200 CE ≈ 11 MB for extended tier) without
+loading the entire file (~855 MB).  `CompositeLEBReader.warm()` delegates
+to all constituent readers.
+
+Automatic preloading can be enabled via TOML configuration:
+
+```toml
+[libephemeris]
+mmap_preload = true          # default: false
+mmap_preload_start = 1800    # start year
+mmap_preload_end = 2200      # end year
+```
 
 **Resource safety:** The `__init__` wraps `_parse()` in try/except. If parsing
 fails, `close()` is called to release the mmap and file handle before
@@ -1174,6 +1197,8 @@ All four are accessible as `libephemeris.set_leb_file()`,
 - `mmap` read access is safe from multiple threads
 - `struct.unpack_from()` is a pure function
 - Clenshaw evaluation uses only local variables
+- `warm()` only calls `madvise()` (a read-only advisory hint) and is safe
+  to call from any thread
 
 ### 8.2 EphemerisContext LEB Integration (`context.py`)
 

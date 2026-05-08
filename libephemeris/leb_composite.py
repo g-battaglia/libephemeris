@@ -166,6 +166,11 @@ class CompositeLEBReader:
         jd_end = max(r.jd_range[1] for r in self._readers)
         return (jd_start, jd_end)
 
+    def warm(self, jd_start: float, jd_end: float) -> None:
+        """Pre-fault mmap pages across all constituent readers."""
+        for reader in self._readers:
+            reader.warm(jd_start, jd_end)
+
     def has_body(self, body_id: int) -> bool:
         return body_id in self._body_map
 

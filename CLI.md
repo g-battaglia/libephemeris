@@ -490,6 +490,9 @@ strict_precision = true      # require SPK for major asteroids
 iers_auto_download = false   # auto-download IERS data
 iers_delta_t = false         # use observed Delta T from IERS
 log_level = "WARNING"        # DEBUG | INFO | WARNING | ERROR | CRITICAL
+mmap_preload = false         # pre-fault mmap pages for a date range
+mmap_preload_start = 1800    # start year (when mmap_preload = true)
+mmap_preload_end = 2200      # end year (when mmap_preload = true)
 ```
 
 ### Configuration resolution order

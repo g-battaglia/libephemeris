@@ -20,6 +20,7 @@ File layout:
 
 from __future__ import annotations
 
+import os
 import struct
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -532,3 +533,48 @@ def segment_byte_size(degree: int, components: int) -> int:
         Size in bytes of one segment's coefficient data.
     """
     return components * (degree + 1) * 8  # 8 bytes per f64
+
+
+# ---------------------------------------------------------------------------
+# mmap warm helper
+# ---------------------------------------------------------------------------
+
+try:
+    _PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
+except (AttributeError, ValueError):
+    _PAGE_SIZE = 4096
+_PAGE_MASK = ~(_PAGE_SIZE - 1)
+
+
+def _madvise_ranges(mm: Any, ranges: list[tuple[int, int]]) -> None:
+    """Call madvise(MADV_WILLNEED) on merged, page-aligned byte ranges.
+
+    Args:
+        mm: An open mmap object.
+        ranges: List of (offset, size) byte ranges to pre-fault.
+    """
+    import mmap as _mmap
+
+    if not ranges:
+        return
+
+    ranges.sort()
+    merged: list[tuple[int, int]] = [ranges[0]]
+    for offset, size in ranges[1:]:
+        prev_off, prev_size = merged[-1]
+        if offset <= prev_off + prev_size + _PAGE_SIZE:
+            merged[-1] = (prev_off, max(prev_size, offset + size - prev_off))
+        else:
+            merged.append((offset, size))
+
+    mm_len = len(mm)
+    for offset, size in merged:
+        start_page = offset & _PAGE_MASK
+        end_page = (offset + size + _PAGE_SIZE - 1) & _PAGE_MASK
+        length = min(end_page, mm_len) - start_page
+        if length <= 0:
+            continue
+        try:
+            mm.madvise(_mmap.MADV_WILLNEED, start_page, length)
+        except (OSError, AttributeError, ValueError):
+            pass

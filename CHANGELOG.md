@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-08
+
+### Changed
+
+- **Removed global `madvise(MADV_WILLNEED)` from LEB readers.** Both
+  `LEBReader` and `LEB2Reader` no longer pre-fault the entire mmap into
+  physical RAM at open time.  Pages are now loaded on demand by the kernel,
+  reducing idle RSS from ~855 MB (extended tier) to only the pages actually
+  accessed.  Calculation results are identical; the only observable effect is
+  a one-time page-fault latency (~5-15 ms) on first access to a cold date
+  range.
+
+### Added
+
+- **`warm(jd_start, jd_end)` method** on `LEBReader`, `LEB2Reader`, and
+  `CompositeLEBReader`.  Pre-faults mmap pages for chunks (v2) or segments
+  (v1) covering the given Julian Day range via targeted
+  `madvise(MADV_WILLNEED)` calls.  Byte ranges are page-aligned and merged
+  to minimise syscalls.  Gracefully degrades on platforms where `madvise` is
+  unavailable.
+- **TOML configuration keys for selective preloading:**
+  - `mmap_preload` (bool, default `false`) -- enable warm on reader creation.
+  - `mmap_preload_start` (int, default 1800) -- start year for warm range.
+  - `mmap_preload_end` (int, default 2200) -- end year for warm range.
+  When enabled, `get_leb_reader()` automatically calls `reader.warm()` for
+  the configured range after opening the reader.
+
+### Compatibility
+
+- Fully backward-compatible.  No changes to calculation logic, public API
+  signatures, or file formats.  Existing code that does not set
+  `mmap_preload` will see reduced memory usage with no configuration
+  changes.
+
 ## [1.2.0] - 2026-05-08
 
 ### Added
