@@ -420,13 +420,15 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
 def release_data_cache() -> None:
     """Advise the kernel to reclaim page cache for ephemeris data files.
 
-    Calls ``posix_fadvise(FADV_DONTNEED)`` on all files in the data
-    directory.  In containerised environments (cgroup v2), this reduces
-    the memory counter without affecting correctness — pages are
-    reloaded transparently on next access.
+    Calls ``posix_fadvise(FADV_DONTNEED)`` on all regular files in the
+    data directory.  In containerised environments (cgroup v2), this
+    reduces the memory counter without affecting correctness — pages
+    are reloaded transparently on next access.
 
-    Safe to call on any platform.  No-op where ``posix_fadvise`` is
-    unavailable (macOS, Windows).
+    Note:
+        Safe to call on any platform.  No-op where ``posix_fadvise``
+        is unavailable (macOS, Windows).  Only processes regular files;
+        FIFOs, devices, and symlinks are skipped.
     """
     _fadvise = getattr(os, "posix_fadvise", None)
     _advice = getattr(os, "POSIX_FADV_DONTNEED", None)

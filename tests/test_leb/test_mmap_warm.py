@@ -327,6 +327,8 @@ class TestReleaseDataCache:
         from libephemeris.state import release_data_cache
 
         (tmp_path / "regular.dat").write_bytes(b"\x00" * 512)
+        if not hasattr(os, "mkfifo"):
+            pytest.skip("os.mkfifo is not supported on this platform")
         os.mkfifo(str(tmp_path / "fifo.dat"))
         monkeypatch.setenv("LIBEPHEMERIS_DATA_DIR", str(tmp_path))
         release_data_cache()
