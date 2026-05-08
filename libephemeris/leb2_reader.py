@@ -241,9 +241,13 @@ class LEB2Reader:
     def warm(self, jd_start: float, jd_end: float) -> None:
         """Pre-fault mmap pages for data covering [jd_start, jd_end].
 
-        Calls madvise(MADV_WILLNEED) on the byte ranges of chunks (v2) or
-        body entries (v1) that overlap the requested JD range.  Ranges are
+        Calls ``madvise(MADV_WILLNEED)`` on the byte ranges of chunks (v2)
+        or body blobs (v1) that overlap the requested JD range.  Ranges are
         page-aligned and merged to minimise syscalls.
+
+        Args:
+            jd_start: Start of the Julian Day range to pre-fault.
+            jd_end: End of the Julian Day range to pre-fault.
         """
         ranges: list[tuple[int, int]] = []
         if self._chunked:
@@ -253,6 +257,9 @@ class LEB2Reader:
                         continue
                     ranges.append((chunk.blob_offset, chunk.compressed_size))
         else:
+            # v1 non-chunked: the body data is a single compressed blob,
+            # so we cannot target individual segments within it.  Warm the
+            # entire blob if the body's JD range overlaps.
             for entry in self._bodies.values():
                 if entry.jd_end < jd_start or entry.jd_start > jd_end:
                     continue

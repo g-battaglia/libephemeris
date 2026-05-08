@@ -278,8 +278,13 @@ class LEBReader:
     def warm(self, jd_start: float, jd_end: float) -> None:
         """Pre-fault mmap pages for segments covering [jd_start, jd_end].
 
-        Computes which segments overlap the requested JD range for each body
-        and calls madvise(MADV_WILLNEED) on the corresponding byte ranges.
+        Computes which Chebyshev segments overlap the requested JD range for
+        each body and calls ``madvise(MADV_WILLNEED)`` on the corresponding
+        byte ranges.
+
+        Args:
+            jd_start: Start of the Julian Day range to pre-fault.
+            jd_end: End of the Julian Day range to pre-fault.
         """
         ranges: list[tuple[int, int]] = []
         for entry in self._bodies.values():

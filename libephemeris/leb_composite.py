@@ -167,7 +167,12 @@ class CompositeLEBReader:
         return (jd_start, jd_end)
 
     def warm(self, jd_start: float, jd_end: float) -> None:
-        """Pre-fault mmap pages across all constituent readers."""
+        """Pre-fault mmap pages across all constituent readers.
+
+        Args:
+            jd_start: Start of the Julian Day range to pre-fault.
+            jd_end: End of the Julian Day range to pre-fault.
+        """
         for reader in self._readers:
             reader.warm(jd_start, jd_end)
 

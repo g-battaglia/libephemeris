@@ -369,7 +369,16 @@ def _discover_leb_file() -> Optional[str]:
 
 
 def _year_to_jd(year: int) -> float:
-    """Convert a Gregorian year to an approximate Julian Day (Jan 1, 12:00 TT)."""
+    """Convert a Gregorian year to a Julian Day (Jan 1, 12:00 TT).
+
+    Uses the proleptic Gregorian calendar algorithm.
+
+    Args:
+        year: Gregorian calendar year.
+
+    Returns:
+        Julian Day number for January 1 of the given year at noon TT.
+    """
     a = (14 - 1) // 12
     y = year + 4800 - a
     m = 1 + 12 * a - 3
@@ -377,7 +386,14 @@ def _year_to_jd(year: int) -> float:
 
 
 def _maybe_warm_reader(reader: "LEBReader") -> None:
-    """Call reader.warm() if mmap_preload is enabled in TOML config."""
+    """Conditionally warm the reader based on TOML ``mmap_preload`` config.
+
+    When ``mmap_preload = true`` in the TOML configuration, converts the
+    configured year range to Julian Days and calls ``reader.warm()``.
+
+    Args:
+        reader: An open LEBReader, LEB2Reader, or CompositeLEBReader.
+    """
     from ._config_toml import get_bool, get_int
 
     if not get_bool("mmap_preload"):
@@ -391,7 +407,7 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
         reader.warm(jd_start, jd_end)
         logger = get_logger()
         logger.debug("mmap preload: warmed JD range %s-%s (%d-%d)", jd_start, jd_end, start_year, end_year)
-    except Exception as exc:
+    except (AttributeError, OSError, ValueError) as exc:
         logger = get_logger()
         logger.warning("mmap preload failed: %s", exc)
 
