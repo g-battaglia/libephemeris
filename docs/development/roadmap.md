@@ -197,3 +197,51 @@ All three LEB tiers are available via GitHub Releases (`data-v1`) and CLI downlo
 **Status:** Pending
 
 ASSIST integration is slow for single evaluations (~ms per call). Performance characteristics need to be measured and documented to set user expectations. The REBOUND results caching approach (task 4.5) was deprioritized since the LEB system covers the primary use case.
+
+### 4. Automatic Page Cache Release in `reset_session()`
+
+**Status:** Proposed
+
+**Problem:** libephemeris uses mmap for LEB file access (zero-copy,
+~80x faster than Skyfield).  In cgroup v2 environments (Docker,
+Railway, Kubernetes), file-backed page cache is counted in
+`memory.current` and billed. The libephemeris's mmap design introduces
+a container-specific regression: idle memory grows to ~1 GB+ even 
+though the process heap is only ~220 MB.
+
+**Current workaround:** Applications call `reader.cool()` +
+`libephemeris.release_data_cache()` explicitly (added in v1.4.0).
+The astrologer-api does this via middleware after each HTTP response.
+
+**Proposed fix:** Call `cool()` automatically inside `reset_session()`
+(`state.py`).  This is the natural cleanup point between calculation
+sessions — kerykeion already calls it between charts.  No config,
+no user action required.
+
+**Considerations before implementing:**
+- Interaction with `warm()`: warm pre-faults pages, then reset_session
+  would mark them reclaimable.  Semantically OK because the kernel
+  doesn't reclaim immediately — pages stay cached unless there's
+  memory pressure.
+- Batch processing: thousands of consecutive `swe_calc_ut()` calls
+  without reset_session would accumulate page cache.  This is the
+  expected fast path — cool() should NOT run per-calculation.
+- `release_data_cache()` walks the entire data directory — too heavy
+  for reset_session.  Only `cool()` (one madvise syscall) belongs
+  there.  Data directory cleanup remains application-side.
+
+### 5. Port Eclipse/Fixed Stars/Heliacal Modules to LEB Path
+
+**Status:** Proposed — analysis complete
+
+**Problem:** `eclipse.py`, `fixed_stars.py`, and `heliacal.py` bypass
+the LEB path and call Skyfield `get_planets()` directly.  When
+invoked, Skyfield loads the DE kernel (up to 3.1 GB for DE441) into
+memory.  The LEB files already contain all the position data these
+modules need.
+
+**Analysis document:** `docs/analysis/skyfield-to-leb-porting.md`
+
+**Estimated effort:** fixed_stars (1-2 days), heliacal (2-3 days),
+eclipse (2-4 weeks).  Requires implementing SEFLG_XYZ and
+SEFLG_TOPOCTR in the LEB fast_calc path.
