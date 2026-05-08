@@ -84,6 +84,9 @@ _VALID_KEYS: Dict[str, type] = {
     "strict_precision": bool,
     "iers_auto_download": bool,
     "iers_delta_t": bool,
+    "mmap_preload": bool,
+    "mmap_preload_start": int,
+    "mmap_preload_end": int,
 }
 
 

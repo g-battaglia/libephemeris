@@ -56,6 +56,7 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
+    _madvise_ranges,
 )
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
@@ -77,7 +78,6 @@ class LEB2Reader:
         self._path = path
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        self._mm.madvise(mmap.MADV_WILLNEED)
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
         self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
@@ -237,6 +237,35 @@ class LEB2Reader:
     @property
     def jd_range(self) -> Tuple[float, float]:
         return (self._header.jd_start, self._header.jd_end)
+
+    def warm(self, jd_start: float, jd_end: float) -> None:
+        """Pre-fault mmap pages for data covering [jd_start, jd_end].
+
+        Calls ``madvise(MADV_WILLNEED)`` on the byte ranges of chunks (v2)
+        or body blobs (v1) that overlap the requested JD range.  Ranges are
+        page-aligned and merged to minimise syscalls.
+
+        Args:
+            jd_start: Start of the Julian Day range to pre-fault.
+            jd_end: End of the Julian Day range to pre-fault.
+        """
+        ranges: list[tuple[int, int]] = []
+        if self._chunked:
+            for chunks in self._chunk_index.values():
+                for chunk in chunks:
+                    if chunk.jd_end < jd_start or chunk.jd_start > jd_end:
+                        continue
+                    ranges.append((chunk.blob_offset, chunk.compressed_size))
+        else:
+            # v1 non-chunked: the body data is a single compressed blob,
+            # so we cannot target individual segments within it.  Warm the
+            # entire blob if the body's JD range overlaps.
+            for entry in self._bodies.values():
+                if entry.jd_end < jd_start or entry.jd_start > jd_end:
+                    continue
+                ranges.append((entry.data_offset, entry.compressed_size))
+
+        _madvise_ranges(self._mm, ranges)
 
     def has_body(self, body_id: int) -> bool:
         return body_id in self._bodies

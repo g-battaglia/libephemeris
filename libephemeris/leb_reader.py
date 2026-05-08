@@ -52,6 +52,7 @@ from .leb_format import (
     read_section_dir,
     read_star_entry,
     segment_byte_size,
+    _madvise_ranges,
 )
 
 
@@ -182,7 +183,6 @@ class LEBReader:
         self._path = path
         self._file = open(path, "rb")
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
-        self._mm.madvise(mmap.MADV_WILLNEED)
         self._eval_cache: Dict[
             Tuple[int, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],
@@ -274,6 +274,35 @@ class LEBReader:
     def jd_range(self) -> Tuple[float, float]:
         """Return (jd_start, jd_end) covered by this file."""
         return (self._header.jd_start, self._header.jd_end)
+
+    def warm(self, jd_start: float, jd_end: float) -> None:
+        """Pre-fault mmap pages for segments covering [jd_start, jd_end].
+
+        Computes which Chebyshev segments overlap the requested JD range for
+        each body and calls ``madvise(MADV_WILLNEED)`` on the corresponding
+        byte ranges.
+
+        Args:
+            jd_start: Start of the Julian Day range to pre-fault.
+            jd_end: End of the Julian Day range to pre-fault.
+        """
+        ranges: list[tuple[int, int]] = []
+        for entry in self._bodies.values():
+            if entry.jd_end < jd_start or entry.jd_start > jd_end:
+                continue
+            seg_bytes = (entry.degree + 1) * entry.components * 8
+            first_seg = max(0, int((jd_start - entry.jd_start) / entry.interval_days))
+            last_seg = min(
+                entry.segment_count - 1,
+                int((jd_end - entry.jd_start) / entry.interval_days),
+            )
+            if first_seg > last_seg:
+                continue
+            offset = entry.data_offset + first_seg * seg_bytes
+            size = (last_seg - first_seg + 1) * seg_bytes
+            ranges.append((offset, size))
+
+        _madvise_ranges(self._mm, ranges)
 
     def has_body(self, body_id: int) -> bool:
         """Check if a body is available in this .leb file."""
