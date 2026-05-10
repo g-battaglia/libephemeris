@@ -3858,6 +3858,125 @@ def _calc_star_position_from_observer(
     return lon, lat, dist
 
 
+def _calc_star_position_leb(
+    star_id: int,
+    jd_tt: float,
+    noaberr: bool = False,
+    nogdefl: bool = False,
+    j2000_frame: bool = False,
+) -> Tuple[float, float, float]:
+    """Calculate fixed star position using LEB data (no Skyfield DE kernel).
+
+    Same interface as _calc_star_position_skyfield but uses the LEB reader
+    for Earth position/velocity instead of loading the full DE kernel.
+
+    The pipeline mirrors _pipeline_icrs() in fast_calc.py adapted for stars:
+    Earth from LEB → proper motion → ICRS Cartesian → geocentric vector →
+    light-time → gravitational deflection → aberration → frame rotation.
+    """
+    import math
+
+    from .fast_calc import (
+        C_LIGHT_AU_DAY,
+        _apply_aberration,
+        _apply_gravitational_deflection,
+        _cartesian_to_spherical,
+        _fw2m,
+        _get_leb_frame_data,
+        _iau2006_precession_angles,
+        _mat3_vec3,
+        _rotate_equatorial_to_ecliptic,
+        _rotate_icrs_to_ecliptic_j2000,
+        _vec3_dist,
+        _vec3_sub,
+    )
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is None:
+        raise KeyError("No LEB reader available")
+
+    if star_id not in FIXED_STARS:
+        raise ValueError(f"could not find star name {star_id}")
+
+    star_data = FIXED_STARS[star_id]
+    from .constants import SE_EARTH
+
+    # 1. Earth position and velocity from LEB (ICRS barycentric)
+    earth_pos, earth_vel = reader.eval_body(SE_EARTH, jd_tt)
+
+    # 2. Propagate proper motion from J2000 to observation date
+    ra_date, dec_date = propagate_proper_motion(
+        star_data.ra_j2000,
+        star_data.dec_j2000,
+        star_data.pm_ra,
+        star_data.pm_dec,
+        J2000,
+        jd_tt,
+    )
+
+    # 3. RA/Dec → ICRS Cartesian
+    if star_data.parallax_mas > 0.0:
+        dist_internal = 206265000.0 / star_data.parallax_mas
+    else:
+        dist_internal = 1e12
+
+    # Apply radial velocity correction to distance (matching Skyfield Star behavior)
+    if star_data.radial_km_per_s != 0.0 and dist_internal < 1e11:
+        dt_years = (jd_tt - J2000) / DAYS_PER_JULIAN_YEAR
+        au_per_year = star_data.radial_km_per_s * 365.25 * 86400.0 / 149597870.7
+        dist_internal += au_per_year * dt_years
+
+    ra_rad = math.radians(ra_date)
+    dec_rad = math.radians(dec_date)
+    cos_dec = math.cos(dec_rad)
+    star_icrs = (
+        dist_internal * cos_dec * math.cos(ra_rad),
+        dist_internal * cos_dec * math.sin(ra_rad),
+        dist_internal * math.sin(dec_rad),
+    )
+
+    # 4. Geocentric vector
+    geo = _vec3_sub(star_icrs, earth_pos)
+
+    # 5. Light-time
+    geo_dist = _vec3_dist(geo)
+    lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
+
+    # 6. Gravitational deflection (skip if noaberr or nogdefl)
+    if not noaberr and not nogdefl:
+        geo = _apply_gravitational_deflection(geo, earth_pos, jd_tt, lt, reader)
+
+    # 7. Aberration (skip if noaberr)
+    if not noaberr:
+        geo = _apply_aberration(geo, earth_vel, lt)
+
+    # 8. Frame rotation
+    if j2000_frame:
+        ecl = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
+        lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
+    else:
+        try:
+            pn_mat, _dpsi, _deps, eps_true_rad = _get_leb_frame_data(reader, jd_tt)
+        except (KeyError, ValueError, AttributeError):
+            import erfa
+
+            dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
+            gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
+            eps_true_rad = epsa + deps_rad
+            pn_mat = _fw2m(gamb, phib, psib + dpsi_rad, eps_true_rad)
+        geo_eq = _mat3_vec3(pn_mat, geo)
+        ecl = _rotate_equatorial_to_ecliptic(
+            geo_eq[0], geo_eq[1], geo_eq[2], eps_true_rad
+        )
+        lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
+
+    if star_data.parallax_mas == 0.0:
+        dist = 100000.0
+
+    return lon, lat, dist
+
+
 def _calc_star_position_skyfield(
     star_id: int,
     jd_tt: float,
@@ -3941,7 +4060,23 @@ def calc_fixed_star_position(
         IAU 2006 precession (Capitaine et al.)
         Skyfield library for apparent position calculation
     """
-    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl, j2000_frame)
+    from .state import get_leb_reader
+
+    if get_leb_reader() is not None:
+        try:
+            return _calc_star_position_leb(
+                star_id, jd_tt, noaberr, nogdefl, j2000_frame
+            )
+        except KeyError:
+            pass  # Body (SE_EARTH) not in LEB file
+        except ValueError as _leb_err:
+            # Date outside LEB range — star_id validation runs before
+            # this point so ValueError here is always from the reader.
+            from .logging_config import get_logger
+            get_logger().debug("LEB star fallback: %s", _leb_err)
+    return _calc_star_position_skyfield(
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame
+    )
 
 
 def calc_fixed_star_velocity(
@@ -4296,7 +4431,7 @@ def swe_batch_fixstars_ut(
     if not resolved:
         return tuple(results)
 
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader, get_timescale
 
     noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
     nogdefl = bool(flags & SEFLG_NOGDEFL)
@@ -4305,12 +4440,56 @@ def swe_batch_fixstars_ut(
 
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
+    jd_tt = t.tt
+
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            for index, star_id, canonical_name in resolved:
+                lon, lat, dist = _calc_star_position_leb(
+                    star_id, jd_tt, noaberr, nogdefl, use_j2000
+                )
+                if want_speed:
+                    lon_prev, lat_prev, _ = _calc_star_position_leb(
+                        star_id, jd_tt - 0.5, noaberr, nogdefl, use_j2000
+                    )
+                    lon_next, lat_next, _ = _calc_star_position_leb(
+                        star_id, jd_tt + 0.5, noaberr, nogdefl, use_j2000
+                    )
+                    speed_lon = lon_next - lon_prev
+                    if speed_lon > 180.0:
+                        speed_lon -= 360.0
+                    elif speed_lon < -180.0:
+                        speed_lon += 360.0
+                    speed_lat = lat_next - lat_prev
+                    speed_dist = 0.0
+                else:
+                    speed_lon = 0.0
+                    speed_lat = 0.0
+                    speed_dist = 0.0
+
+                result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
+                result = _apply_fixstar_flags(
+                    result, jd_tt, flags, j2000_native=use_j2000
+                )
+                results[index] = (result, canonical_name, flags)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass  # LEB cannot serve — fall through to Skyfield batch
+
+    if _leb_ok:
+        return tuple(results)
+
+    # Skyfield fallback path
+    from .state import get_planets
+
     earth = get_planets()["earth"]
     earth_at_t = earth.at(t)
 
     if want_speed:
-        t_prev = ts.tt_jd(t.tt - 0.5)
-        t_next = ts.tt_jd(t.tt + 0.5)
+        t_prev = ts.tt_jd(jd_tt - 0.5)
+        t_next = ts.tt_jd(jd_tt + 0.5)
         earth_at_prev = earth.at(t_prev)
         earth_at_next = earth.at(t_next)
     else:
@@ -4342,7 +4521,9 @@ def swe_batch_fixstars_ut(
                 speed_dist = 0.0
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
+            result = _apply_fixstar_flags(
+                result, jd_tt, flags, j2000_native=use_j2000
+            )
             results[index] = (result, canonical_name, flags)
         except Error:
             if skip_errors:

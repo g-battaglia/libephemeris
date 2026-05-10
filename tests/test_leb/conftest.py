@@ -33,6 +33,7 @@ def test_leb_file(tmp_path_factory):
     bodies = [
         0,  # SE_SUN
         1,  # SE_MOON
+        3,  # SE_VENUS  (needed by heliacal no-kernel tests)
         4,  # SE_MARS
         14,  # SE_EARTH
         10,  # SE_MEAN_NODE

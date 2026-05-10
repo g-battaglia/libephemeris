@@ -1659,3 +1659,40 @@ def swe_calc_angles(jd_ut: float, lat: float, lon: float):
     set_angles_cache(angles_dict)
 
     return angles_dict
+
+
+def angular_separation(
+    lon1: float, lat1: float, lon2: float, lat2: float
+) -> float:
+    """Compute the great-circle angular separation between two points.
+
+    Uses the Vincenty formula, which is numerically stable at all
+    separations (including < 1 arcsecond where the spherical law of
+    cosines loses precision).
+
+    Args:
+        lon1: Longitude of the first point in degrees.
+        lat1: Latitude of the first point in degrees.
+        lon2: Longitude of the second point in degrees.
+        lat2: Latitude of the second point in degrees.
+
+    Returns:
+        Angular separation in degrees, in the range [0, 180].
+    """
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    dlon = math.radians(lon2 - lon1)
+    sin_lat1 = math.sin(lat1_rad)
+    cos_lat1 = math.cos(lat1_rad)
+    sin_lat2 = math.sin(lat2_rad)
+    cos_lat2 = math.cos(lat2_rad)
+    sin_dlon = math.sin(dlon)
+    cos_dlon = math.cos(dlon)
+
+    num = math.sqrt(
+        (cos_lat2 * sin_dlon) ** 2
+        + (cos_lat1 * sin_lat2 - sin_lat1 * cos_lat2 * cos_dlon) ** 2
+    )
+    den = sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_dlon
+
+    return math.degrees(math.atan2(num, den))
