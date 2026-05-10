@@ -1017,7 +1017,7 @@ def swe_calc(
     if h_client is not None:
         try:
             from . import horizons_backend
-            from .delta_t import swe_deltat
+            from .time_utils import swe_deltat
 
             # swe_calc uses TT, convert to UT for horizons_calc_ut
             jd_ut_approx = tjdet - swe_deltat(tjdet)
@@ -5223,6 +5223,139 @@ def _calc_moon_magnitude(
     return base + dist_correction
 
 
+def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
+    """Compute planetary phenomena using the LEB fast path.
+
+    Calls ``fast_calc.fast_calc_ut`` directly to obtain positions without
+    loading the Skyfield DE kernel.  The results are numerically equivalent
+    to ``_calc_pheno`` for all bodies
+    supported by the LEB reader.
+
+    Args:
+        tjd_ut: Julian Day in Universal Time (UT1).
+        ipl: Planet/body ID (SE_SUN, SE_MOON, SE_MERCURY, etc.).
+        iflag: Calculation flags.
+
+    Returns:
+        Tuple of 20 floats (matching pyswisseph).
+
+    Raises:
+        KeyError: If the body is not available in the LEB reader.
+        ValueError: If the date is outside the LEB coverage.
+    """
+    from . import fast_calc
+    from .state import get_leb_reader
+    from .utils import angular_separation
+
+    reader = get_leb_reader()
+    if reader is None:
+        raise KeyError("No LEB reader available for _calc_pheno_leb")
+
+    def _leb_calc(jd, body, flags):
+        """Call fast_calc directly — no Skyfield fallback."""
+        return fast_calc.fast_calc_ut(reader, jd, body, flags)
+
+    # Preserve TRUEPOS if caller requested geometric (no aberration) positions
+    base_flags = SEFLG_SPEED | (iflag & SEFLG_TRUEPOS)
+
+    # ------------------------------------------------------------------
+    # Special case: Sun
+    # ------------------------------------------------------------------
+    if ipl == SE_SUN:
+        sun_pos, _ = _leb_calc(tjd_ut, SE_SUN, base_flags)
+        sun_dist_au = float(sun_pos[2])
+
+        sun_radius_km = _BODY_RADIUS_KM.get(SE_SUN, 695700.0)
+        diameter = _calc_apparent_diameter(sun_radius_km, sun_dist_au)
+        magnitude = (
+            -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
+        )
+
+        return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
+
+    # ------------------------------------------------------------------
+    # Geocentric ecliptic positions of target and Sun
+    # ------------------------------------------------------------------
+    target_pos, _ = _leb_calc(tjd_ut, ipl, base_flags)
+    sun_pos, _ = _leb_calc(tjd_ut, SE_SUN, base_flags)
+
+    target_lon = float(target_pos[0])
+    target_lat = float(target_pos[1])
+    geo_dist = float(target_pos[2])
+
+    sun_lon = float(sun_pos[0])
+    sun_lat = float(sun_pos[1])
+    sun_dist = float(sun_pos[2])  # Earth-Sun distance in AU
+
+    # ------------------------------------------------------------------
+    # Elongation (angular separation on the ecliptic sphere)
+    # ------------------------------------------------------------------
+    elongation = angular_separation(target_lon, target_lat, sun_lon, sun_lat)
+
+    # ------------------------------------------------------------------
+    # Heliocentric distance of the target
+    # ------------------------------------------------------------------
+    helio_pos, _ = _leb_calc(tjd_ut, ipl, base_flags | SEFLG_HELCTR)
+    helio_dist = float(helio_pos[2])
+
+    # ------------------------------------------------------------------
+    # Phase angle
+    # ------------------------------------------------------------------
+    # Law of cosines in the Sun-Planet-Earth triangle:
+    #   cos(phase_angle) = (d² + r² - R²) / (2·d·r)
+    # where d = geo_dist, r = helio_dist, R = sun_dist.
+    if geo_dist > 0 and helio_dist > 0:
+        cos_pa = (geo_dist**2 + helio_dist**2 - sun_dist**2) / (
+            2.0 * geo_dist * helio_dist
+        )
+        cos_pa = max(-1.0, min(1.0, cos_pa))
+        phase_angle = math.degrees(math.acos(cos_pa))
+    else:
+        phase_angle = 0.0
+
+    # ------------------------------------------------------------------
+    # Phase (illuminated fraction)
+    # ------------------------------------------------------------------
+    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+
+    # ------------------------------------------------------------------
+    # Apparent diameter
+    # ------------------------------------------------------------------
+    body_radius_km = _BODY_RADIUS_KM.get(ipl, 1000.0)
+    diameter = _calc_apparent_diameter(body_radius_km, geo_dist)
+
+    # ------------------------------------------------------------------
+    # Visual magnitude
+    # ------------------------------------------------------------------
+    if ipl == SE_MOON:
+        magnitude = _calc_moon_magnitude(phase_angle, geo_dist, helio_dist)
+    else:
+        # For Saturn we need ecliptic coordinates for ring tilt
+        geo_lon = float(target_pos[0])
+        geo_lat = float(target_pos[1])
+        helio_lon = float(helio_pos[0])
+        helio_lat = float(helio_pos[1])
+
+        # TT approximation for Saturn ring / Neptune secular brightness
+        from .time_utils import swe_deltat
+
+        tjd = tjd_ut + swe_deltat(tjd_ut)
+
+        magnitude = _calc_planet_magnitude(
+            ipl,
+            helio_dist,
+            geo_dist,
+            phase_angle,
+            geo_lon,
+            geo_lat,
+            helio_lon,
+            helio_lat,
+            tjd,
+        )
+
+    return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+
+
 def swe_pheno_ut(
     tjdut: float, planet: int, flags: int = SEFLG_SWIEPH
 ) -> Tuple[float, ...]:
@@ -5260,6 +5393,17 @@ def swe_pheno_ut(
         >>> print(f"Diameter: {attr[3]:.2f} arcsec")
         >>> print(f"Magnitude: {attr[4]:.2f}")
     """
+    # --- LEB fast path ---
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            return _calc_pheno_leb(tjdut, planet, flags)
+        except (KeyError, ValueError):
+            pass  # LEB cannot serve (out of range or missing body)
+    # --- END LEB fast path ---
+
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
     return _calc_pheno(t, planet, flags)
@@ -5286,6 +5430,20 @@ def swe_pheno(
     See Also:
         swe_pheno_ut: Same function for Universal Time input
     """
+    # --- LEB fast path ---
+    from .state import get_leb_reader
+
+    reader = get_leb_reader()
+    if reader is not None:
+        try:
+            from .time_utils import swe_deltat
+
+            tjd_ut = tjdet - swe_deltat(tjdet)
+            return _calc_pheno_leb(tjd_ut, planet, flags)
+        except (KeyError, ValueError):
+            pass  # LEB cannot serve (out of range or missing body)
+    # --- END LEB fast path ---
+
     ts = get_timescale()
     t = ts.tt_jd(tjdet)
     return _calc_pheno(t, planet, flags)
