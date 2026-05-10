@@ -171,18 +171,28 @@ class TestFastCalcUnsupported:
     """Test fast_calc_ut with unsupported flags."""
 
     @pytest.mark.unit
-    def test_topocentric_raises(self):
-        """SEFLG_TOPOCTR should raise KeyError."""
-        with open_leb(LEB_BASE_PATH) as reader:
-            with pytest.raises(KeyError):
-                fast_calc_ut(reader, 2451545.0, SE_SUN, SEFLG_TOPOCTR)
+    def test_topocentric_requires_topo(self):
+        """SEFLG_TOPOCTR without swe_set_topo() raises ValueError."""
+        from libephemeris import state
+
+        saved_topo = state._TOPO
+        state._TOPO = None
+        try:
+            with open_leb(LEB_BASE_PATH) as reader:
+                with pytest.raises(ValueError, match="swe_set_topo"):
+                    fast_calc_ut(reader, 2451545.0, SE_SUN, SEFLG_TOPOCTR)
+        finally:
+            state._TOPO = saved_topo
 
     @pytest.mark.unit
-    def test_xyz_raises(self):
-        """SEFLG_XYZ should raise KeyError."""
+    def test_xyz_returns_cartesian(self):
+        """SEFLG_XYZ returns Cartesian coordinates (~1 AU for Sun)."""
+        import math
+
         with open_leb(LEB_BASE_PATH) as reader:
-            with pytest.raises(KeyError):
-                fast_calc_ut(reader, 2451545.0, SE_SUN, SEFLG_XYZ)
+            result, _ = fast_calc_ut(reader, 2451545.0, SE_SUN, SEFLG_XYZ)
+            r = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
+            assert 0.98 < r < 1.02
 
     @pytest.mark.unit
     def test_unknown_body_raises(self):
