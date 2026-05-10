@@ -1,8 +1,8 @@
 # Porting eclipse/fixed\_stars/heliacal da Skyfield a LEB
 
-**Stato:** Analisi — proposta di design, non ancora implementata.
+**Stato:** Implementato (Fasi 0-4 completate, Fase 5 cleanup parziale).
 **Versione libephemeris:** 1.3.0+
-**Data:** 2026-05-08
+**Data:** 2026-05-08 (analisi), 2026-05-08 (implementazione)
 **Autore:** Giacomo Battaglia + Claude
 
 ---
