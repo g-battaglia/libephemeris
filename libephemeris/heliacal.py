@@ -839,6 +839,902 @@ def is_inner_planet(body: int) -> bool:
     return body in INNER_PLANETS
 
 
+# =============================================================================
+# LEB (Binary Ephemeris) paths for heliacal functions
+# =============================================================================
+#
+# These private functions replicate the Skyfield-based heliacal logic
+# using the LEB fast_calc pipeline.  They are called from the three public
+# entry-points (heliacal_ut, heliacal_pheno_ut, vis_limit_mag) when a
+# LEBReader is available, avoiding the 3 GB DE-kernel load entirely.
+# =============================================================================
+
+
+def _star_name_from_id(star_id: int) -> str:
+    """Return the canonical star name for a star body ID."""
+    from .fixed_stars import STAR_CATALOG
+
+    for entry in STAR_CATALOG:
+        if entry.id == star_id:
+            return entry.name
+    raise ValueError(f"Star ID {star_id} not found in catalog")
+
+
+def _leb_body_altaz(
+    reader,
+    jd_ut: float,
+    body_id: int,
+    geopos_lonlat: tuple,
+    atpress: float,
+    attemp: float,
+    is_star: bool = False,
+    star_name: str | None = None,
+):
+    """Compute horizontal coordinates (az, true_alt, app_alt) for a body via LEB.
+
+    Args:
+        reader: LEBReader instance.
+        jd_ut: Julian Day UT1.
+        body_id: SE_* body constant.
+        geopos_lonlat: (lon_deg, lat_deg, alt_m) for the observer.
+        atpress: Atmospheric pressure in mbar.
+        attemp: Atmospheric temperature in Celsius.
+        is_star: True when computing a fixed star position.
+        star_name: Star name string (required when is_star is True).
+
+    Returns:
+        (azimuth, true_altitude, apparent_altitude) in degrees.
+    """
+    from .utils import azalt, SE_ECL2HOR
+
+    if is_star:
+        from .fixed_stars import swe_fixstar_ut
+
+        assert star_name is not None
+        pos, _name, _flags = swe_fixstar_ut(star_name, jd_ut, SEFLG_SPEED)
+        ecl_lon, ecl_lat, ecl_dist = pos[0], pos[1], pos[2]
+    else:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+
+        jd_tt = jd_ut + swe_deltat(jd_ut)
+        topo = _topo_ecliptic(reader, jd_tt, jd_ut, body_id, geopos_lonlat)
+        ecl_lon, ecl_lat, ecl_dist = topo[0], topo[1], topo[2]
+
+    az, alt_true, alt_app = azalt(
+        jd_ut, SE_ECL2HOR, geopos_lonlat, atpress, attemp,
+        (ecl_lon, ecl_lat, ecl_dist),
+    )
+    return az, alt_true, alt_app
+
+
+def _leb_ecliptic_pos(
+    reader,
+    jd_ut: float,
+    body_id: int,
+    geopos_lonlat: tuple,
+    is_star: bool = False,
+    star_name: str | None = None,
+):
+    """Return ecliptic (lon, lat, dist) for a body via LEB.
+
+    For planets this is topocentric ecliptic of date; for stars it
+    uses the already-LEB-ported swe_fixstar_ut.
+    """
+    if is_star:
+        from .fixed_stars import swe_fixstar_ut
+
+        assert star_name is not None
+        pos, _name, _flags = swe_fixstar_ut(star_name, jd_ut, SEFLG_SPEED)
+        return pos[0], pos[1], pos[2]
+    else:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+
+        jd_tt = jd_ut + swe_deltat(jd_ut)
+        topo = _topo_ecliptic(reader, jd_tt, jd_ut, body_id, geopos_lonlat)
+        return topo[0], topo[1], topo[2]
+
+
+def _heliacal_ut_leb(
+    reader,
+    jd_start: float,
+    lat: float,
+    lon: float,
+    altitude: float,
+    pressure: float,
+    temperature: float,
+    humidity: float,
+    body: int,
+    event_type: int,
+    flags: int,
+) -> tuple:
+    """LEB-backed implementation of heliacal_ut().
+
+    Mirrors the Skyfield version but obtains all positions via
+    _topo_ecliptic / swe_fixstar_ut / azalt / angular_separation.
+    """
+    from .constants import (
+        SE_HELIACAL_RISING,
+        SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST,
+        SE_MORNING_LAST,
+    )
+    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .utils import angular_separation
+
+    # --- validation (same as Skyfield path) ---
+    if event_type not in (
+        SE_HELIACAL_RISING, SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST, SE_MORNING_LAST,
+    ):
+        raise ValueError(
+            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
+            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+        )
+    if event_type in (SE_EVENING_FIRST, SE_MORNING_LAST):
+        if is_fixed_star(body):
+            raise ValueError(
+                "SE_EVENING_FIRST and SE_MORNING_LAST are not valid for fixed stars. "
+                "For fixed stars, use SE_HELIACAL_RISING or SE_HELIACAL_SETTING."
+            )
+        if not is_inner_planet(body):
+            raise ValueError(
+                "SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets "
+                "(Mercury, Venus). For outer planets, use SE_HELIACAL_RISING or "
+                "SE_HELIACAL_SETTING."
+            )
+    if body == SE_SUN:
+        raise ValueError("SE_SUN is not valid for heliacal calculations")
+    if body == SE_MOON:
+        raise ValueError("SE_MOON is not valid for heliacal calculations")
+
+    is_star = is_fixed_star(body)
+    if not is_star and body not in _PLANET_MAP:
+        raise ValueError(f"illegal planet number {body}.")
+
+    star_name: str | None = None
+    star_magnitude = 0.0
+    if is_star:
+        star_name = _star_name_from_id(body)
+        star_magnitude = _get_star_magnitude(body)
+
+    # Observer geopos in (lon, lat, alt) order for azalt / _topo_ecliptic
+    geopos = (lon, lat, altitude)
+
+    # --- inner helpers (closures over reader / geopos / etc.) ---
+
+    def _get_altitudes(jd: float):
+        """Return (sun_alt, body_alt, body_az)."""
+        _, sun_alt, _ = _leb_body_altaz(
+            reader, jd, SE_SUN, geopos, pressure, temperature,
+        )
+        az, body_alt, _ = _leb_body_altaz(
+            reader, jd, body, geopos, pressure, temperature,
+            is_star=is_star, star_name=star_name,
+        )
+        return sun_alt, body_alt, az
+
+    def _get_elongation(jd: float) -> float:
+        if not is_star:
+            try:
+                pheno = swe_pheno_ut(jd, body, flags)
+                return pheno[2]
+            except (ValueError, TypeError, ArithmeticError):
+                pass
+        # Manual elongation from ecliptic coords
+        sun_ecl = _leb_ecliptic_pos(reader, jd, SE_SUN, geopos)
+        body_ecl = _leb_ecliptic_pos(
+            reader, jd, body, geopos,
+            is_star=is_star, star_name=star_name,
+        )
+        return angular_separation(sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1])
+
+    def _get_body_magnitude(jd: float) -> float:
+        if is_star:
+            return star_magnitude
+        try:
+            pheno = swe_pheno_ut(jd, body, flags)
+            return pheno[4]
+        except (ValueError, TypeError, ArithmeticError):
+            return 0.0
+
+    schaefer = create_schaefer_model(
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
+        altitude=altitude,
+    )
+
+    def _get_moon_data(jd: float):
+        """Return (moon_alt, phase, moon_body_sep)."""
+        _, moon_alt, _ = _leb_body_altaz(
+            reader, jd, SE_MOON, geopos, pressure, temperature,
+        )
+        # Moon phase from ecliptic separation Sun-Moon
+        sun_ecl = _leb_ecliptic_pos(reader, jd, SE_SUN, geopos)
+        moon_ecl = _leb_ecliptic_pos(reader, jd, SE_MOON, geopos)
+        elong_moon = angular_separation(
+            sun_ecl[0], sun_ecl[1], moon_ecl[0], moon_ecl[1],
+        )
+        phase = (1.0 - math.cos(math.radians(elong_moon))) / 2.0
+
+        body_ecl = _leb_ecliptic_pos(
+            reader, jd, body, geopos,
+            is_star=is_star, star_name=star_name,
+        )
+        moon_body_sep = angular_separation(
+            moon_ecl[0], moon_ecl[1], body_ecl[0], body_ecl[1],
+        )
+        return moon_alt, phase, moon_body_sep
+
+    def _is_body_visible(jd: float):
+        sun_alt, body_alt, _body_az = _get_altitudes(jd)
+        elongation = _get_elongation(jd)
+        if body_alt < 0:
+            return False, sun_alt, body_alt, elongation
+        if sun_alt > 0:
+            return False, sun_alt, body_alt, elongation
+        body_mag = _get_body_magnitude(jd)
+        moon_alt, moon_phase, moon_body_sep = _get_moon_data(jd)
+        visible = schaefer.is_visible(
+            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
+            elongation=elongation, moon_alt=moon_alt, moon_phase=moon_phase,
+            moon_obj_angle=moon_body_sep,
+        )
+        return visible, sun_alt, body_alt, elongation
+
+    def _is_body_visible_no_moon(jd: float, margin: float = 0.5) -> bool:
+        sun_alt, body_alt, _ = _get_altitudes(jd)
+        elongation = _get_elongation(jd)
+        if body_alt < 0 or sun_alt > 0:
+            return False
+        body_mag = _get_body_magnitude(jd)
+        return schaefer.is_visible(
+            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
+            elongation=elongation, moon_alt=-90.0, moon_phase=0.0,
+            moon_obj_angle=180.0, margin=margin,
+        )
+
+    def _find_twilight_center(jd_day: float, morning: bool) -> float:
+        best_ut = -1.0
+        best_score = -999.0
+        for h in range(24):
+            jd_check = jd_day + h / 24.0
+            sun_alt, _, _ = _get_altitudes(jd_check)
+            if -22.0 < sun_alt < 2.0:
+                jd_next = jd_day + (h + 1) / 24.0
+                sun_next, _, _ = _get_altitudes(jd_next)
+                if morning and sun_next > sun_alt:
+                    score = -abs(sun_alt + 8.0)
+                    if best_ut < 0 or score > best_score:
+                        best_score = score
+                        best_ut = float(h)
+                elif not morning and sun_next < sun_alt:
+                    score = -abs(sun_alt + 8.0)
+                    if best_ut < 0 or score > best_score:
+                        best_score = score
+                        best_ut = float(h)
+        return best_ut
+
+    def _check_twilight_visibility(jd_day: float, morning: bool):
+        center_ut = _find_twilight_center(jd_day, morning)
+        if center_ut < 0:
+            return False, 0.0
+        sun_upper = -5.0 if morning else -2.0
+        for dt_min in range(-180, 181, 15):
+            ut_hour = center_ut + dt_min / 60.0
+            jd_check = jd_day + ut_hour / 24.0
+            sun_alt, body_alt, _ = _get_altitudes(jd_check)
+            if -18.0 < sun_alt < sun_upper and body_alt > 0.5:
+                if morning:
+                    vis_margin = 0.70 if sun_alt <= -10.0 else 0.50
+                else:
+                    elong = _get_elongation(jd_check)
+                    vis_margin = min(0.63 + elong * 0.006, 0.85)
+                visible = _is_body_visible_no_moon(jd_check, margin=vis_margin)
+                if visible:
+                    return True, jd_check
+        return False, 0.0
+
+    # --- Vectorized batch is NOT used in the LEB path ---
+    # The LEB path is already ~14x faster per call than Skyfield,
+    # so the simpler per-day loop is adequate.
+
+    _HELIACAL_BATCH = 100
+
+    def _batch_check_twilight_visibility(jd_days_list: list, morning: bool) -> list:
+        """Per-day twilight visibility check (non-vectorized LEB version)."""
+        return [_check_twilight_visibility(jd_day, morning) for jd_day in jd_days_list]
+
+    def _refine_heliacal_time(jd_approx: float, is_morning: bool) -> float:
+        jd_low = jd_approx - 0.1
+        jd_high = jd_approx + 0.1
+        for _ in range(30):
+            jd_mid = (jd_low + jd_high) / 2
+            visible, _sun_alt, _body_alt, _elong = _is_body_visible(jd_mid)
+            if is_morning:
+                if visible:
+                    jd_high = jd_mid
+                else:
+                    jd_low = jd_mid
+            else:
+                if visible:
+                    jd_low = jd_mid
+                else:
+                    jd_high = jd_mid
+            if jd_high - jd_low < 1e-6:
+                break
+        return (jd_low + jd_high) / 2
+
+    def _search_heliacal_rising(jd_start_inner: float) -> float:
+        max_days = 800
+        lookback_jds = [jd_start_inner - i for i in range(1, 7)]
+        lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
+        consecutive_invisible = 0
+        for vis, _ in lookback_vis:
+            if not vis:
+                consecutive_invisible += 1
+            else:
+                break
+        for batch_start in range(0, max_days, _HELIACAL_BATCH):
+            batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+            jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
+            vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
+            for vis, jd_vis in vis_results:
+                if not vis:
+                    consecutive_invisible += 1
+                else:
+                    if consecutive_invisible >= 5:
+                        return _refine_heliacal_time(jd_vis, is_morning=True)
+                    consecutive_invisible = 0
+        return 0.0
+
+    def _search_heliacal_setting(jd_start_inner: float) -> float:
+        max_days = 800
+        last_visible_jd = 0.0
+        consecutive_invisible = 0
+        for batch_start in range(0, max_days, _HELIACAL_BATCH):
+            batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+            jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
+            vis_results = _batch_check_twilight_visibility(jd_days, morning=False)
+            for vis, jd_vis in vis_results:
+                if vis:
+                    last_visible_jd = jd_vis
+                    consecutive_invisible = 0
+                else:
+                    consecutive_invisible += 1
+                    if consecutive_invisible >= 5 and last_visible_jd > 0:
+                        return _refine_heliacal_time(last_visible_jd, is_morning=False)
+        if last_visible_jd > 0:
+            return _refine_heliacal_time(last_visible_jd, is_morning=False)
+        return 0.0
+
+    def _search_evening_first(jd_start_inner: float) -> float:
+        max_days = 800
+        was_invisible = False
+        for batch_start in range(0, max_days, _HELIACAL_BATCH):
+            batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+            jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
+            vis_results = _batch_check_twilight_visibility(jd_days, morning=False)
+            for vis, jd_vis in vis_results:
+                if not vis:
+                    was_invisible = True
+                elif was_invisible:
+                    return _refine_heliacal_time(jd_vis, is_morning=False)
+        return 0.0
+
+    def _search_morning_last(jd_start_inner: float) -> float:
+        max_days = 800
+        last_visible_jd = 0.0
+        found_visible = False
+        consecutive_invisible = 0
+        for batch_start in range(0, max_days, _HELIACAL_BATCH):
+            batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+            jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
+            vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
+            for vis, jd_vis in vis_results:
+                if vis:
+                    last_visible_jd = jd_vis
+                    found_visible = True
+                    consecutive_invisible = 0
+                elif found_visible:
+                    consecutive_invisible += 1
+                    if consecutive_invisible >= 3 and last_visible_jd > 0:
+                        return _refine_heliacal_time(last_visible_jd, is_morning=True)
+        return last_visible_jd if last_visible_jd > 0 else 0.0
+
+    # --- main dispatch ---
+    if event_type == SE_HELIACAL_RISING:
+        jd_event = _search_heliacal_rising(jd_start)
+    elif event_type == SE_HELIACAL_SETTING:
+        jd_event = _search_heliacal_setting(jd_start)
+    elif event_type == SE_EVENING_FIRST:
+        jd_event = _search_evening_first(jd_start)
+    elif event_type == SE_MORNING_LAST:
+        jd_event = _search_morning_last(jd_start)
+    else:
+        jd_event = 0.0
+
+    if jd_event > 0:
+        return jd_event, event_type
+    else:
+        return 0.0, -1
+
+
+def _heliacal_pheno_ut_leb(
+    reader,
+    jd: float,
+    lat: float,
+    lon: float,
+    altitude: float,
+    pressure: float,
+    temperature: float,
+    humidity: float,
+    body: int,
+    event_type: int,
+    flags: int,
+) -> tuple:
+    """LEB-backed implementation of heliacal_pheno_ut()."""
+    from .constants import (
+        SE_HELIACAL_RISING,
+        SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST,
+        SE_MORNING_LAST,
+    )
+    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .utils import angular_separation
+
+    if event_type not in (
+        SE_HELIACAL_RISING, SE_HELIACAL_SETTING,
+        SE_EVENING_FIRST, SE_MORNING_LAST,
+    ):
+        raise ValueError(
+            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
+            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+        )
+
+    is_star = is_fixed_star(body)
+    if not is_star and body not in _PLANET_MAP:
+        raise ValueError(f"illegal planet number {body}.")
+
+    star_name: str | None = None
+    star_magnitude = 0.0
+    if is_star:
+        star_name = _star_name_from_id(body)
+        star_magnitude = _get_star_magnitude(body)
+
+    geopos = (lon, lat, altitude)
+
+    # --- positions via LEB ---
+    # Sun
+    sun_az, sun_alt_deg, _ = _leb_body_altaz(
+        reader, jd, SE_SUN, geopos, pressure, temperature,
+    )
+
+    # Body
+    body_az_deg, body_alt_deg, _body_app_alt = _leb_body_altaz(
+        reader, jd, body, geopos, pressure, temperature,
+        is_star=is_star, star_name=star_name,
+    )
+
+    # Atmospheric refraction (same formula as Skyfield path)
+    if body_alt_deg > -1:
+        refraction = 1.02 / math.tan(
+            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
+        )
+        refraction /= 60.0
+    else:
+        refraction = 0.5
+    app_alt_deg = body_alt_deg + refraction
+
+    # Get ecliptic positions for parallax and elongation calculations
+    body_ecl = _leb_ecliptic_pos(
+        reader, jd, body, geopos,
+        is_star=is_star, star_name=star_name,
+    )
+    sun_ecl = _leb_ecliptic_pos(reader, jd, SE_SUN, geopos)
+
+    # Geocentric altitude from equatorial coords (matching Skyfield path)
+    from .constants import SEFLG_EQUATORIAL
+
+    if is_star:
+        from .fixed_stars import swe_fixstar_ut
+        _eq_pos, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_EQUATORIAL | SEFLG_SPEED)
+        _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
+    else:
+        from .planets import swe_calc_ut as _scu_hp
+        _eq_pos, _ = _scu_hp(jd, body, SEFLG_EQUATORIAL | SEFLG_SPEED)
+        _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
+
+    from .time_utils import _sidtime_internal
+    from .state import get_timescale as _gts_hp
+    from .cache import get_true_obliquity as _gto_hp
+
+    _ts_hp = _gts_hp()
+    _t_hp = _ts_hp.ut1_jd(jd)
+    _jd_tt_hp = _t_hp.tt
+    import erfa as _erfa_hp
+    _dpsi_hp, _deps_hp = _erfa_hp.nut06a(2451545.0, _jd_tt_hp - 2451545.0)
+    _eps0_hp = _erfa_hp.obl06(2451545.0, _jd_tt_hp - 2451545.0)
+    _eps_hp = math.degrees(_eps0_hp + _deps_hp)
+    _dpsi_deg_hp = math.degrees(_dpsi_hp)
+    _lst_hours = _sidtime_internal(jd, geopos[0], _eps_hp, _dpsi_deg_hp)
+    _ha_deg = (_lst_hours * 15.0 - _body_ra_deg) % 360.0
+    _ha_rad = math.radians(_ha_deg)
+    _dec_rad = math.radians(_body_dec_deg)
+    _lat_rad = math.radians(geopos[1])
+    _sin_alt = (math.sin(_lat_rad) * math.sin(_dec_rad)
+                + math.cos(_lat_rad) * math.cos(_dec_rad) * math.cos(_ha_rad))
+    geo_alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, _sin_alt))))
+
+    # Arcus visionis
+    tav_act = body_alt_deg - sun_alt_deg
+    arcv_act = geo_alt_deg - sun_alt_deg
+
+    # Azimuth difference
+    daz_act = body_az_deg - sun_az
+    while daz_act > 180:
+        daz_act -= 360
+    while daz_act < -180:
+        daz_act += 360
+    daz_act = abs(daz_act)
+
+    # Elongation and magnitude
+    if is_star:
+        elongation = angular_separation(
+            sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+        )
+        magnitude = star_magnitude
+        phase_angle = 0.0
+    else:
+        try:
+            pheno = swe_pheno_ut(jd, body, flags)
+            elongation = pheno[2]
+            magnitude = pheno[4]
+            phase_angle = pheno[0]
+        except (ValueError, TypeError, ArithmeticError):
+            elongation = angular_separation(
+                sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+            )
+            magnitude = 0.0
+            phase_angle = 0.0
+
+    arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
+
+    schaefer = create_schaefer_model(
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
+        altitude=altitude,
+    )
+    k_act = schaefer.k_total
+    min_tav = schaefer.arcus_visionis_required(magnitude)
+
+    # Parallax
+    if is_star:
+        parallax = 0.0
+    else:
+        earth_radius_au = 6371.0 / 149597870.7
+        dist_au = body_ecl[2]
+        if dist_au > 0:
+            parallax = math.degrees(math.asin(earth_radius_au / dist_au))
+        else:
+            parallax = 0.0
+
+    # Rise/set estimates (same simplified logic as Skyfield path)
+    is_morning = event_type in (SE_HELIACAL_RISING, SE_MORNING_LAST)
+    rise_set_correction = -0.833
+    lat_rad = math.radians(lat)
+
+    if body_alt_deg != 0:
+        alt_rate = 15.0 * math.cos(lat_rad)
+        if alt_rate > 0:
+            if is_morning:
+                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
+                rise_o = jd - time_to_horizon / 24.0
+            else:
+                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
+                rise_o = jd + time_to_horizon / 24.0
+        else:
+            rise_o = jd
+    else:
+        rise_o = jd
+
+    if sun_alt_deg != 0:
+        alt_rate = 15.0 * math.cos(lat_rad)
+        if alt_rate > 0:
+            if is_morning:
+                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
+                rise_s = jd - time_to_horizon / 24.0
+            else:
+                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
+                rise_s = jd + time_to_horizon / 24.0
+        else:
+            rise_s = jd
+    else:
+        rise_s = jd
+
+    lag = rise_o - rise_s
+
+    if sun_alt_deg < -6 and body_alt_deg > 0:
+        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0
+    else:
+        tvis_vr = 0.0
+
+    if not is_star and phase_angle > 0:
+        illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
+    else:
+        illumination = 0.0
+
+    w_moon = 0.0
+    l_moon = 0.0
+    if body == SE_MOON:
+        try:
+            moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
+            phase_angle_deg = moon_pheno[0]
+            illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
+            if phase_angle_deg > 0:
+                pa_rad = math.radians(phase_angle_deg)
+                w_moon = 15.0 * (1 - math.cos(pa_rad / 2)) / 60.0
+            moon_diameter = (
+                moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
+            )
+            l_moon = math.pi * moon_diameter / 2
+        except (ValueError, TypeError, ArithmeticError):
+            pass
+
+    if body == SE_MOON:
+        w = w_moon * 60.0
+        q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
+        q_yallop = (arcv_act - q_criterion) / 10.0
+        q_crit = q_criterion
+    else:
+        q_yallop = 0.0
+        q_crit = 0.0
+
+    sun_rate = 15.0 * math.cos(lat_rad)
+    if sun_rate > 0:
+        if is_morning:
+            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
+            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
+            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
+        else:
+            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
+            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
+            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
+    else:
+        t_first_vr = jd
+        t_best_vr = jd
+        t_last_vr = jd
+
+    t_b_yallop = t_best_vr
+
+    dret = [0.0] * 50
+    dret[0] = body_alt_deg
+    dret[1] = app_alt_deg
+    dret[2] = geo_alt_deg
+    dret[3] = body_az_deg
+    dret[4] = sun_alt_deg
+    dret[5] = sun_az
+    dret[6] = tav_act
+    dret[7] = arcv_act
+    dret[8] = daz_act
+    dret[9] = arcl_act
+    dret[10] = k_act
+    dret[11] = min_tav
+    dret[12] = t_first_vr
+    dret[13] = t_best_vr
+    dret[14] = t_last_vr
+    dret[15] = t_b_yallop
+    dret[16] = w_moon
+    dret[17] = q_yallop
+    dret[18] = q_crit
+    dret[19] = parallax
+    dret[20] = magnitude
+    dret[21] = rise_o
+    dret[22] = rise_s
+    dret[23] = lag
+    dret[24] = tvis_vr
+    dret[25] = l_moon
+    dret[26] = phase_angle
+    dret[27] = illumination
+
+    return tuple(dret), flags
+
+
+def _vis_limit_mag_leb(
+    reader,
+    tjdut: float,
+    geopos: tuple,
+    atmo: tuple,
+    observer_tup: tuple,
+    objname: str,
+    flags: int,
+) -> tuple:
+    """LEB-backed implementation of vis_limit_mag()."""
+    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
+    from .utils import azalt, angular_separation, SE_ECL2HOR
+    from .constants import (
+        SE_SUN,
+        SE_MOON,
+        SE_HELFLAG_VISLIM_DARK,
+        SE_HELFLAG_VISLIM_NOMOON,
+        SE_HELFLAG_BELOW_HORIZON,
+        SE_HELFLAG_PHOTOPIC,
+        SE_HELFLAG_SCOTOPIC,
+        SE_HELFLAG_MIXED,
+    )
+
+    if not objname:
+        raise ValueError("objname cannot be empty")
+
+    lon = geopos[0] if len(geopos) > 0 else 0.0
+    lat = geopos[1] if len(geopos) > 1 else 0.0
+    alt_m = geopos[2] if len(geopos) > 2 else 0.0
+
+    pressure = atmo[0] if len(atmo) > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 50.0
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
+
+    observer_age = observer_tup[0] if len(observer_tup) > 0 else 36.0
+    snellen_ratio = observer_tup[1] if len(observer_tup) > 1 else 1.0
+
+    geopos_ll = (lon, lat, alt_m)
+
+    # Sun position
+    sun_az, sun_alt, _ = _leb_body_altaz(
+        reader, tjdut, SE_SUN, geopos_ll, pressure, temperature,
+    )
+
+    # Moon position
+    moon_az, moon_alt, _ = _leb_body_altaz(
+        reader, tjdut, SE_MOON, geopos_ll, pressure, temperature,
+    )
+
+    # Determine object
+    body_id = None
+    is_star_flag = False
+
+    try:
+        body_id = int(objname)
+    except ValueError:
+        name_upper = objname.upper().strip()
+        planet_names = {
+            "SUN": SE_SUN, "MOON": SE_MOON,
+            "MERCURY": 2, "VENUS": 3, "MARS": 4,
+            "JUPITER": 5, "SATURN": 6, "URANUS": 7,
+            "NEPTUNE": 8, "PLUTO": 9,
+        }
+        if name_upper in planet_names:
+            body_id = planet_names[name_upper]
+        else:
+            is_star_flag = True
+
+    obj_alt = 0.0
+    obj_az = 0.0
+    obj_mag = 0.0
+
+    if is_star_flag:
+        try:
+            star_result, star_name_out, retflag = swe_fixstar2_ut(
+                objname, tjdut, flags & 0xFF
+            )
+            star_lon = star_result[0]
+            star_lat = star_result[1]
+
+            try:
+                star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
+                obj_mag = star_mag_val
+            except (ValueError, TypeError, ArithmeticError):
+                obj_mag = 2.0
+
+            hor_result = azalt(
+                tjdut, SE_ECL2HOR, geopos_ll, pressure, temperature,
+                (star_lon, star_lat, 1.0),
+            )
+            obj_az = hor_result[0]
+            obj_alt = hor_result[1]
+        except ValueError:
+            raise
+        except (KeyError, IndexError, OSError) as e:
+            raise ValueError(f"could not find star name {objname.lower()}: {e}") from e
+    else:
+        if body_id is None:
+            raise ValueError(f"Unknown object: {objname}")
+
+        if body_id in _PLANET_MAP:
+            az, alt_true, _ = _leb_body_altaz(
+                reader, tjdut, body_id, geopos_ll, pressure, temperature,
+            )
+            obj_alt = alt_true
+            obj_az = az
+
+            try:
+                pheno_result = swe_pheno_ut(tjdut, body_id, flags)
+                obj_mag = pheno_result[4]
+            except (ValueError, TypeError, ArithmeticError):
+                obj_mag = 0.0
+        else:
+            raise ValueError(f"illegal planet number {body_id}.")
+
+    if obj_alt < 0:
+        dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        return float(SE_HELFLAG_BELOW_HORIZON), dret
+
+    use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
+    exclude_moon = bool(flags & SE_HELFLAG_VISLIM_NOMOON)
+
+    if use_dark_sky:
+        sun_alt = -90.0
+    if exclude_moon:
+        moon_alt = -90.0
+
+    schaefer = create_schaefer_model(
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity_pct,
+        met_range=met_range,
+        altitude=alt_m,
+        observer_age=observer_age,
+        snellen=snellen_ratio,
+    )
+
+    # Moon phase and angular separations via LEB ecliptic positions
+    moon_phase = 0.0
+    moon_obj_angle = 180.0
+    sun_obj_angle = 180.0
+    try:
+        moon_pheno = swe_pheno_ut(tjdut, SE_MOON, flags & 0xFF)
+        phase_angle = moon_pheno[0]
+        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+
+        if is_star_flag:
+            from .fixed_stars import swe_fixstar_ut as _sfut_vlm
+            _star_ecl, _, _ = _sfut_vlm(objname, tjdut, SEFLG_SPEED)
+            _star_pos = (_star_ecl[0], _star_ecl[1])
+        else:
+            _body_ecl = _leb_ecliptic_pos(reader, tjdut, body_id, geopos_ll)
+            _star_pos = (_body_ecl[0], _body_ecl[1])
+        moon_ecl = _leb_ecliptic_pos(reader, tjdut, SE_MOON, geopos_ll)
+        sun_ecl = _leb_ecliptic_pos(reader, tjdut, SE_SUN, geopos_ll)
+        moon_obj_angle = angular_separation(
+            _star_pos[0], _star_pos[1], moon_ecl[0], moon_ecl[1],
+        )
+        sun_obj_angle = angular_separation(
+            _star_pos[0], _star_pos[1], sun_ecl[0], sun_ecl[1],
+        )
+    except (ValueError, TypeError, AttributeError):
+        pass
+
+    limiting_mag = schaefer.limiting_magnitude(
+        sun_alt=sun_alt,
+        moon_alt=moon_alt if not exclude_moon else -90.0,
+        moon_phase=moon_phase,
+        obj_alt=obj_alt,
+        sun_obj_angle=sun_obj_angle,
+        moon_obj_angle=moon_obj_angle,
+    )
+
+    apparent_obj_mag = obj_mag + schaefer.extinction(obj_alt)
+
+    if sun_alt >= -6:
+        vision_type = SE_HELFLAG_PHOTOPIC
+    elif sun_alt >= -12:
+        vision_type = SE_HELFLAG_MIXED
+    else:
+        vision_type = SE_HELFLAG_SCOTOPIC
+
+    dret = (
+        limiting_mag, obj_alt, obj_az,
+        sun_alt, sun_az, moon_alt, moon_az,
+        apparent_obj_mag, 0.0, 0.0,
+    )
+    return float(vision_type), dret
+
+
 def heliacal_ut(
     jd_start: float,
     lat: float,
@@ -922,6 +1818,25 @@ def heliacal_ut(
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
+    # --- LEB fast path ---
+    from .state import get_leb_reader as _get_leb_reader
+
+    _leb_rdr = _get_leb_reader()
+    if _leb_rdr is not None:
+        try:
+            return _heliacal_ut_leb(
+                _leb_rdr, jd_start, lat, lon, altitude,
+                pressure, temperature, humidity, body, event_type, flags,
+            )
+        except KeyError:
+            pass  # Body not in LEB file
+        except ValueError as _leb_err:
+            if "outside range" not in str(_leb_err).lower():
+                raise
+            from .logging_config import get_logger
+            get_logger().debug("LEB fallback: %s", _leb_err)
+    # --- END LEB fast path ---
+
     from .constants import (
         SE_HELIACAL_RISING,
         SE_HELIACAL_SETTING,
@@ -1652,7 +2567,7 @@ def heliacal_ut(
         for _ in range(30):  # ~30 iterations gives very high precision
             jd_mid = (jd_low + jd_high) / 2
 
-            visible, sun_alt, body_alt, elong = _is_body_visible(jd_mid)
+            visible, _sun_alt, _body_alt, _elong = _is_body_visible(jd_mid)
 
             # For heliacal rising: looking for first visibility
             # For heliacal setting: looking for last visibility
@@ -2054,6 +2969,25 @@ def heliacal_pheno_ut(
         - Reference API: swe_heliacal_pheno_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
     """
+    # --- LEB fast path ---
+    from .state import get_leb_reader as _get_leb_reader
+
+    _leb_rdr = _get_leb_reader()
+    if _leb_rdr is not None:
+        try:
+            return _heliacal_pheno_ut_leb(
+                _leb_rdr, jd, lat, lon, altitude,
+                pressure, temperature, humidity, body, event_type, flags,
+            )
+        except KeyError:
+            pass  # Body not in LEB file
+        except ValueError as _leb_err:
+            if "outside range" not in str(_leb_err).lower():
+                raise
+            from .logging_config import get_logger
+            get_logger().debug("LEB fallback: %s", _leb_err)
+    # --- END LEB fast path ---
+
     from .constants import (
         SE_HELIACAL_RISING,
         SE_HELIACAL_SETTING,
@@ -2585,6 +3519,24 @@ def vis_limit_mag(
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
     """
+    # --- LEB fast path ---
+    from .state import get_leb_reader as _get_leb_reader
+
+    _leb_rdr = _get_leb_reader()
+    if _leb_rdr is not None:
+        try:
+            return _vis_limit_mag_leb(
+                _leb_rdr, tjdut, geopos, atmo, observer, objname, flags,
+            )
+        except KeyError:
+            pass  # Body not in LEB file
+        except ValueError as _leb_err:
+            if "outside range" not in str(_leb_err).lower():
+                raise
+            from .logging_config import get_logger
+            get_logger().debug("LEB fallback: %s", _leb_err)
+    # --- END LEB fast path ---
+
     from .planets import _PLANET_MAP, swe_pheno_ut
     from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
     from .state import get_planets, get_timescale
@@ -2714,7 +3666,7 @@ def vis_limit_mag(
             raise
         except (KeyError, IndexError, OSError) as e:
             # Star not found or other error
-            raise ValueError(f"could not find star name {objname.lower()}: {e}")
+            raise ValueError(f"could not find star name {objname.lower()}: {e}") from e
     else:
         # Planet calculation
         if body_id is None:

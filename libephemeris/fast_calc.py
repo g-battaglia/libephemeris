@@ -938,6 +938,144 @@ def _calc_ayanamsa_from_leb(
 
 
 # =============================================================================
+# TOPOCENTRIC HELPERS
+# =============================================================================
+
+_EARTH_OMEGA_RAD_S = 7.2921150e-5  # Earth angular velocity (rad/s)
+_SEC_PER_DAY = 86400.0
+
+
+def _topocentric_offset(
+    geopos: Tuple[float, float, float],
+    jd_tt: float,
+    jd_ut1: float,
+    reader: "LEBReader",
+) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+    """Compute observer ICRS position and velocity offset from geocenter.
+
+    Uses ERFA for WGS84→ITRF and celestial-to-terrestrial matrix.
+    Returns (pos_au, vel_au_day) both as 3-tuples in ICRS.
+
+    Args:
+        geopos: (longitude_deg, latitude_deg, altitude_m)
+        jd_tt: Julian Day TT
+        jd_ut1: Julian Day UT1
+        reader: LEB reader (for frame data)
+    """
+    import erfa
+
+    lon_rad = math.radians(geopos[0])
+    lat_rad = math.radians(geopos[1])
+    alt_m = geopos[2]
+
+    # WGS84 geodetic → ITRF geocentric (metres)
+    xyz_itrf_m = erfa.gd2gc(1, lon_rad, lat_rad, alt_m)  # 1 = WGS84
+
+    # Celestial-to-terrestrial matrix (polar motion xp=yp=0)
+    c2t = erfa.c2t06a(2451545.0, jd_tt - 2451545.0, 2451545.0, jd_ut1 - 2451545.0, 0.0, 0.0)
+
+    # Terrestrial → celestial (transpose)
+    t2c_0 = (float(c2t[0][0]), float(c2t[1][0]), float(c2t[2][0]))
+    t2c_1 = (float(c2t[0][1]), float(c2t[1][1]), float(c2t[2][1]))
+    t2c_2 = (float(c2t[0][2]), float(c2t[1][2]), float(c2t[2][2]))
+
+    # Position: ITRF → ICRS (AU)
+    x_m = float(xyz_itrf_m[0])
+    y_m = float(xyz_itrf_m[1])
+    z_m = float(xyz_itrf_m[2])
+
+    pos_au = (
+        (t2c_0[0] * x_m + t2c_0[1] * y_m + t2c_0[2] * z_m) / _AU_M,
+        (t2c_1[0] * x_m + t2c_1[1] * y_m + t2c_1[2] * z_m) / _AU_M,
+        (t2c_2[0] * x_m + t2c_2[1] * y_m + t2c_2[2] * z_m) / _AU_M,
+    )
+
+    # Velocity: Earth rotation cross product in ITRF, then rotate to ICRS
+    omega = _EARTH_OMEGA_RAD_S
+    vx_itrf = -omega * y_m
+    vy_itrf = omega * x_m
+    vz_itrf = 0.0
+
+    vel_au_day = (
+        (t2c_0[0] * vx_itrf + t2c_0[1] * vy_itrf + t2c_0[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
+        (t2c_1[0] * vx_itrf + t2c_1[1] * vy_itrf + t2c_1[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
+        (t2c_2[0] * vx_itrf + t2c_2[1] * vy_itrf + t2c_2[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
+    )
+
+    return pos_au, vel_au_day
+
+
+def _topo_ecliptic(
+    reader: "LEBReader",
+    jd_tt: float,
+    jd_ut1: float,
+    ipl: int,
+    geopos: Tuple[float, float, float],
+    iflag: int = 0,
+) -> Tuple[float, float, float, float, float, float]:
+    """Compute topocentric ecliptic position without mutating global state.
+
+    Runs _pipeline_icrs with observer = Earth + topocentric offset.
+    Returns (lon, lat, dist, dlon, dlat, ddist) in ecliptic of date.
+
+    Args:
+        reader: Open LEB reader.
+        jd_tt: Julian Day TT.
+        jd_ut1: Julian Day UT1.
+        ipl: Body ID (SE_SUN, SE_MOON, etc.)
+        geopos: (longitude_deg, latitude_deg, altitude_m)
+        iflag: Additional flags (SEFLG_SPEED, etc.). SEFLG_TOPOCTR is implied.
+    """
+    obs_pos, obs_vel = _topocentric_offset(geopos, jd_tt, jd_ut1, reader)
+
+    want_velocity = bool(iflag & SEFLG_SPEED)
+
+    # Check if body is a system barycenter (needs COB correction)
+    _is_sys_bary = False
+    if reader.has_body(ipl):
+        _body = reader._bodies[ipl]
+        _is_sys_bary = _body.coord_type == COORD_ICRS_BARY_SYSTEM
+
+    result = _pipeline_icrs(
+        reader,
+        jd_tt,
+        ipl,
+        iflag & ~SEFLG_TOPOCTR,
+        want_velocity=want_velocity,
+        is_system_bary=_is_sys_bary,
+        topo_offset=(obs_pos, obs_vel),
+    )
+
+    if want_velocity:
+        return result  # type: ignore[return-value]
+    return result[0], result[1], result[2], 0.0, 0.0, 0.0  # type: ignore[return-value]
+
+
+def _apparent_icrs_cartesian(
+    reader: "LEBReader",
+    jd_tt: float,
+    ipl: int,
+) -> Tuple[float, float, float]:
+    """Geocentric apparent ICRS Cartesian position (post-aberration/deflection).
+
+    Runs _pipeline_icrs steps 1-6 and returns the geo[] vector in ICRS
+    without any frame rotation. Equivalent to Skyfield's .position.au
+    on an apparent() object.
+
+    Used by eclipse.py Pattern E for Besselian shadow geometry.
+    """
+    result = _pipeline_icrs(
+        reader,
+        jd_tt,
+        ipl,
+        SEFLG_EQUATORIAL | SEFLG_J2000,
+        want_velocity=False,
+        want_xyz=True,
+    )
+    return result[0], result[1], result[2]  # type: ignore[return-value]
+
+
+# =============================================================================
 # PIPELINE A: ICRS BARYCENTRIC BODIES
 # =============================================================================
 
@@ -949,6 +1087,8 @@ def _pipeline_icrs(
     iflag: int,
     want_velocity: bool = False,
     is_system_bary: bool = False,
+    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    want_xyz: bool = False,
 ) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
 
@@ -1002,8 +1142,22 @@ def _pipeline_icrs(
     else:
         # Geocentric (default) — need Earth position and velocity
         earth_pos, earth_vel = reader.eval_body(SE_EARTH, jd_tt)
-        observer = earth_pos
-        observer_vel = earth_vel
+        if topo_offset is not None:
+            topo_pos, topo_vel = topo_offset
+            observer = (
+                earth_pos[0] + topo_pos[0],
+                earth_pos[1] + topo_pos[1],
+                earth_pos[2] + topo_pos[2],
+            )
+            observer_vel = (
+                earth_vel[0] + topo_vel[0],
+                earth_vel[1] + topo_vel[1],
+                earth_vel[2] + topo_vel[2],
+            )
+            earth_vel = observer_vel
+        else:
+            observer = earth_pos
+            observer_vel = earth_vel
 
     # 3. Geometric vector
     geo = _vec3_sub(target_pos, observer)
@@ -1068,100 +1222,118 @@ def _pipeline_icrs(
     #   SID only: output ecliptic-of-date, ayanamsha subtracted in _fast_calc_core
     #   SID+J2K: output J2000 ecliptic, ayanamsha subtracted in _fast_calc_core
     _is_sidereal = bool(iflag & SEFLG_SIDEREAL)
+    _want_nonut = bool(iflag & SEFLG_NONUT)
+
+    _want_xyz = want_xyz or bool(iflag & SEFLG_XYZ)
 
     if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
         # ICRS J2000 equatorial -- geo is already in this frame
-        # (same for sidereal and non-sidereal: ICRS ≡ J2000 equatorial)
-        lon_deg, lat_deg, dist = _cartesian_to_spherical(geo[0], geo[1], geo[2])
+        if _want_xyz:
+            lon_deg, lat_deg, dist = geo[0], geo[1], geo[2]
+        else:
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(geo[0], geo[1], geo[2])
         if want_velocity:
-            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                geo[0],
-                geo[1],
-                geo[2],
-                geo_vel[0],
-                geo_vel[1],
-                geo_vel[2],
-            )
+            if _want_xyz:
+                dlon, dlat, ddist = geo_vel[0], geo_vel[1], geo_vel[2]
+            else:
+                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                    geo[0], geo[1], geo[2],
+                    geo_vel[0], geo_vel[1], geo_vel[2],
+                )
 
     elif (iflag & SEFLG_EQUATORIAL) and _is_sidereal:
-        # Sidereal equatorial of date: use MEAN equator (P matrix, no nutation)
-        # Pyswisseph uses the precession-only frame for SID+EQ output.
         p_mat = _prec_matrix(jd_tt)
         geo_eq = _mat3_vec3(p_mat, geo)
-        lon_deg, lat_deg, dist = _cartesian_to_spherical(
-            geo_eq[0], geo_eq[1], geo_eq[2]
-        )
+        if _want_xyz:
+            lon_deg, lat_deg, dist = geo_eq[0], geo_eq[1], geo_eq[2]
+        else:
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(
+                geo_eq[0], geo_eq[1], geo_eq[2]
+            )
         if want_velocity:
             vel_eq = _mat3_vec3(p_mat, geo_vel)
-            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                geo_eq[0],
-                geo_eq[1],
-                geo_eq[2],
-                vel_eq[0],
-                vel_eq[1],
-                vel_eq[2],
-            )
+            if _want_xyz:
+                dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
+            else:
+                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                    geo_eq[0], geo_eq[1], geo_eq[2],
+                    vel_eq[0], vel_eq[1], vel_eq[2],
+                )
 
     elif iflag & SEFLG_EQUATORIAL:
-        # True equator of date (non-sidereal)
-        pn_mat, _, _, _ = _frame_data(jd_tt)
-        geo_eq = _mat3_vec3(pn_mat, geo)
-        lon_deg, lat_deg, dist = _cartesian_to_spherical(
-            geo_eq[0], geo_eq[1], geo_eq[2]
-        )
-        if want_velocity:
-            vel_eq = _mat3_vec3(pn_mat, geo_vel)
-            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                geo_eq[0],
-                geo_eq[1],
-                geo_eq[2],
-                vel_eq[0],
-                vel_eq[1],
-                vel_eq[2],
+        # NONUT: use P matrix (mean equator), else PNM (true equator)
+        if _want_nonut:
+            _eq_mat = _prec_matrix(jd_tt)
+        else:
+            _eq_mat, _, _, _ = _frame_data(jd_tt)
+        geo_eq = _mat3_vec3(_eq_mat, geo)
+        if _want_xyz:
+            lon_deg, lat_deg, dist = geo_eq[0], geo_eq[1], geo_eq[2]
+        else:
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(
+                geo_eq[0], geo_eq[1], geo_eq[2]
             )
+        if want_velocity:
+            vel_eq = _mat3_vec3(_eq_mat, geo_vel)
+            if _want_xyz:
+                dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
+            else:
+                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                    geo_eq[0], geo_eq[1], geo_eq[2],
+                    vel_eq[0], vel_eq[1], vel_eq[2],
+                )
 
     elif iflag & SEFLG_J2000:
-        # J2000 ecliptic
         ecl = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
-        lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
+        if _want_xyz:
+            lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
+        else:
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
         if want_velocity:
-            vel_ecl = _rotate_icrs_to_ecliptic_j2000(geo_vel[0], geo_vel[1], geo_vel[2])
-            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                ecl[0],
-                ecl[1],
-                ecl[2],
-                vel_ecl[0],
-                vel_ecl[1],
-                vel_ecl[2],
+            vel_ecl = _rotate_icrs_to_ecliptic_j2000(
+                geo_vel[0], geo_vel[1], geo_vel[2]
             )
+            if _want_xyz:
+                dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
+            else:
+                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                    ecl[0], ecl[1], ecl[2],
+                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
+                )
 
     else:
         # TRUE ECLIPTIC OF DATE (default) -- most common path
-        # Get PNM matrix and true obliquity from Skyfield (IAU 2000A)
-        pn_mat, _, _, eps_true_rad = _frame_data(jd_tt)
+        # SEFLG_NONUT: mean ecliptic (P matrix only, no nutation)
+        if _want_nonut:
+            _rot_mat = _prec_matrix(jd_tt)
+            eps_rad = math.radians(_mean_obliquity_iau2006(jd_tt))
+        else:
+            _rot_mat, _, _, eps_rad = _frame_data(jd_tt)
 
-        # Step 1: Precess ICRS -> equatorial of date
-        geo_eq = _mat3_vec3(pn_mat, geo)
+        geo_eq = _mat3_vec3(_rot_mat, geo)
 
-        # Step 2: Rotate equatorial -> ecliptic using true obliquity
         ecl = _rotate_equatorial_to_ecliptic(
-            geo_eq[0], geo_eq[1], geo_eq[2], eps_true_rad
+            geo_eq[0], geo_eq[1], geo_eq[2], eps_rad
         )
-        lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
+        if _want_xyz:
+            lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
+        else:
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(
+                ecl[0], ecl[1], ecl[2]
+            )
 
         if want_velocity:
-            vel_eq = _mat3_vec3(pn_mat, geo_vel)
+            vel_eq = _mat3_vec3(_rot_mat, geo_vel)
             vel_ecl = _rotate_equatorial_to_ecliptic(
-                vel_eq[0], vel_eq[1], vel_eq[2], eps_true_rad
+                vel_eq[0], vel_eq[1], vel_eq[2], eps_rad
             )
-            dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                ecl[0],
-                ecl[1],
-                ecl[2],
-                vel_ecl[0],
-                vel_ecl[1],
-                vel_ecl[2],
-            )
+            if _want_xyz:
+                dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
+            else:
+                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
+                    ecl[0], ecl[1], ecl[2],
+                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
+                )
 
     if want_velocity:
         return lon_deg, lat_deg, dist, dlon, dlat, ddist
@@ -1217,23 +1389,24 @@ def _pipeline_ecliptic(
 
     # Nutation in longitude (dpsi) handling.
     # When SIDEREAL+EQUATORIAL: pyswisseph outputs mean ecliptic (no nutation)
-    # converted with mean obliquity.  For SID-only ecliptic output, dpsi is
-    # added here and later cancelled by true ayanamsha subtraction (true_aya
-    # = mean_aya + dpsi).  SEFLG_NONUT falls back to Skyfield before reaching
-    # this point.  Velocity is NOT corrected — the Skyfield path also computes
+    # Nutation handling for ecliptic-direct bodies.
+    # Mean bodies are stored without nutation; true bodies include it.
+    # SEFLG_NONUT: output on mean ecliptic (no nutation).
+    # Velocity is NOT corrected — the Skyfield path also computes
     # velocity from the un-nutated polynomial.
     _sid_eq = bool(iflag & SEFLG_SIDEREAL) and bool(iflag & SEFLG_EQUATORIAL)
+    _want_nonut_b = bool(iflag & SEFLG_NONUT)
+
     if ipl in (SE_MEAN_NODE, SE_MEAN_APOG):
-        # Mean bodies are stored without nutation.  Add dpsi for true ecliptic
-        # output, UNLESS sidereal+equatorial (which needs mean ecliptic).
-        if not _sid_eq:
+        # Mean bodies stored without nutation. Add dpsi for true ecliptic,
+        # UNLESS NONUT or sidereal+equatorial (both want mean ecliptic).
+        if not _sid_eq and not _want_nonut_b:
             _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon + math.degrees(dpsi_rad)) % 360.0
-    elif ipl in (SE_TRUE_NODE, SE_OSCU_APOG):
-        # True/osculating bodies naturally include nutation from orbital
-        # computation.  When sidereal+equatorial, strip dpsi to get mean
-        # ecliptic, matching pyswisseph behavior.
-        if _sid_eq:
+    elif ipl in (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG):
+        # True/osculating bodies include nutation. Strip dpsi when NONUT
+        # or sidereal+equatorial (both want mean ecliptic).
+        if _sid_eq or _want_nonut_b:
             _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
@@ -1275,8 +1448,8 @@ def _pipeline_ecliptic(
 
     elif iflag & SEFLG_EQUATORIAL:
         # Equatorial of date: rotate ecliptic-of-date → equatorial-of-date.
-        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
-        if iflag & SEFLG_SIDEREAL:
+        # Sidereal/NONUT modes use mean obliquity (no nutation).
+        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
@@ -1505,20 +1678,26 @@ def fast_calc_ut(
         KeyError: If body is not in the .leb file (caller should fall back).
         ValueError: If JD is outside the .leb file's range.
     """
-    # Flags not supported in LEB mode — fall back to Skyfield
-    if iflag & SEFLG_TOPOCTR:
-        raise KeyError("SEFLG_TOPOCTR not supported in LEB mode")
-    if iflag & SEFLG_XYZ:
-        raise KeyError("SEFLG_XYZ not supported in LEB mode")
-    if iflag & SEFLG_RADIANS:
-        raise KeyError("SEFLG_RADIANS not supported in LEB mode")
-    if iflag & SEFLG_NONUT:
-        raise KeyError("SEFLG_NONUT not supported in LEB mode")
+    # SEFLG_ICRS: not yet implemented in LEB — fall back to Skyfield
     if iflag & SEFLG_ICRS:
         raise KeyError("SEFLG_ICRS not supported in LEB mode")
 
     # Strip SEFLG_MOSEPH (always ignored)
     iflag = iflag & ~SEFLG_MOSEPH
+
+    # SEFLG_TOPOCTR: resolve observer position from global state
+    topo_offset = None
+    if iflag & SEFLG_TOPOCTR:
+        from .state import get_topo
+
+        topo = get_topo()
+        if topo is None:
+            raise ValueError("swe_set_topo() must be called before SEFLG_TOPOCTR")
+        topo_geopos = (
+            float(topo.longitude.degrees),
+            float(topo.latitude.degrees),
+            float(topo.elevation.m),
+        )
 
     # Snapshot sidereal state once at entry (thread-safe)
     if sid_mode is None and (iflag & SEFLG_SIDEREAL):
@@ -1529,14 +1708,13 @@ def fast_calc_ut(
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
     # Delta-T conversion: UT -> TT
-    # Use swe_deltat() for exact match with the Skyfield reference path.
-    # The LEB reader's linearly-interpolated sparse table introduces up to
-    # ~0.004s error near 1985, which at the Moon's ~0.5"/s speed exceeds
-    # the 0.001" target.
     from .time_utils import swe_deltat
 
     delta_t = swe_deltat(tjd_ut)
     jd_tt = tjd_ut + delta_t
+
+    if iflag & SEFLG_TOPOCTR:
+        topo_offset = _topocentric_offset(topo_geopos, jd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
 
     return _fast_calc_core(
         reader,
@@ -1547,6 +1725,7 @@ def fast_calc_ut(
         sid_mode=sid_mode,
         sid_t0=sid_t0,
         sid_ayan_t0=sid_ayan_t0,
+        topo_offset=topo_offset,
     )
 
 
@@ -1578,21 +1757,24 @@ def fast_calc_tt(
         KeyError: If body is not in the .leb file.
         ValueError: If JD is outside the .leb file's range.
     """
-    # Flags not supported in LEB mode — fall back to Skyfield
-    if iflag & SEFLG_TOPOCTR:
-        raise KeyError("SEFLG_TOPOCTR not supported in LEB mode")
-    if iflag & SEFLG_XYZ:
-        raise KeyError("SEFLG_XYZ not supported in LEB mode")
-    if iflag & SEFLG_RADIANS:
-        raise KeyError("SEFLG_RADIANS not supported in LEB mode")
-    if iflag & SEFLG_NONUT:
-        raise KeyError("SEFLG_NONUT not supported in LEB mode")
     if iflag & SEFLG_ICRS:
         raise KeyError("SEFLG_ICRS not supported in LEB mode")
 
     iflag = iflag & ~SEFLG_MOSEPH
 
-    # Snapshot sidereal state once at entry (thread-safe)
+    topo_offset = None
+    if iflag & SEFLG_TOPOCTR:
+        from .state import get_topo
+
+        topo = get_topo()
+        if topo is None:
+            raise ValueError("swe_set_topo() must be called before SEFLG_TOPOCTR")
+        topo_geopos = (
+            float(topo.longitude.degrees),
+            float(topo.latitude.degrees),
+            float(topo.elevation.m),
+        )
+
     if sid_mode is None and (iflag & SEFLG_SIDEREAL):
         from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
 
@@ -1600,9 +1782,10 @@ def fast_calc_tt(
         sid_t0 = _SIDEREAL_T0
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
-    # For swe_calc, input is already TT
-    # We need UT for sidereal ayanamsa, approximate: ut ≈ tt - delta_t(tt)
     tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
+
+    if iflag & SEFLG_TOPOCTR:
+        topo_offset = _topocentric_offset(topo_geopos, tjd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
 
     return _fast_calc_core(
         reader,
@@ -1613,6 +1796,7 @@ def fast_calc_tt(
         sid_mode=sid_mode,
         sid_t0=sid_t0,
         sid_ayan_t0=sid_ayan_t0,
+        topo_offset=topo_offset,
     )
 
 
@@ -1626,6 +1810,7 @@ def _fast_calc_core(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Core fast calculation logic shared by fast_calc_ut and fast_calc_tt.
 
@@ -1663,35 +1848,48 @@ def _fast_calc_core(
     # ecliptic-of-date coords, then precess to J2000.
     _deferred_sid_j2k = False
 
-    # Dispatch to appropriate pipeline based on coordinate type
+    _pipeline_a = False
+
+    # Dispatch to appropriate pipeline based on coordinate type.
+    # When XYZ+SIDEREAL, force Pipeline A to return spherical so the
+    # shared sidereal correction (longitude subtraction) can run first;
+    # XYZ conversion then happens in the post-processing stage.
+    _xyz_sid = bool(iflag & SEFLG_XYZ) and bool(iflag & SEFLG_SIDEREAL)
+    _pipe_iflag = (iflag & ~SEFLG_XYZ) if _xyz_sid else iflag
+
     if body.coord_type == COORD_ICRS_BARY:
-        # Pipeline A: ICRS barycentric with analytical velocity
+        _pipeline_a = not _xyz_sid
         if iflag & SEFLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
-                reader, jd_tt, ipl, iflag, want_velocity=True
+                reader, jd_tt, ipl, _pipe_iflag, want_velocity=True,
+                topo_offset=topo_offset,
             )
         else:
-            lon, lat, dist = _pipeline_icrs(reader, jd_tt, ipl, iflag)
+            lon, lat, dist = _pipeline_icrs(
+                reader, jd_tt, ipl, _pipe_iflag, topo_offset=topo_offset,
+            )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ICRS_BARY_SYSTEM:
-        # Pipeline A': ICRS system barycenter — COB correction applied at runtime
+        _pipeline_a = not _xyz_sid
         if iflag & SEFLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
                 reader,
                 jd_tt,
                 ipl,
-                iflag,
+                _pipe_iflag,
                 want_velocity=True,
                 is_system_bary=True,
+                topo_offset=topo_offset,
             )
         else:
             lon, lat, dist = _pipeline_icrs(
                 reader,
                 jd_tt,
                 ipl,
-                iflag,
+                _pipe_iflag,
                 is_system_bary=True,
+                topo_offset=topo_offset,
             )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
@@ -1809,5 +2007,38 @@ def _fast_calc_core(
         dlat = (j_fwd_lat - j_now_lat) / dt_step
         lon = j_now_lon
         lat = j_now_lat
+
+    # SEFLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
+    # Pipeline A handles XYZ internally via _pipeline_icrs; skip here.
+    if (iflag & SEFLG_XYZ) and not _pipeline_a:
+        _lon_r = math.radians(lon)
+        _lat_r = math.radians(lat)
+        _cos_lat = math.cos(_lat_r)
+        x = dist * _cos_lat * math.cos(_lon_r)
+        y = dist * _cos_lat * math.sin(_lon_r)
+        z = dist * math.sin(_lat_r)
+        if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
+            _dlon_r = math.radians(dlon)
+            _dlat_r = math.radians(dlat)
+            _sin_lat = math.sin(_lat_r)
+            vx = (-dist * _cos_lat * math.sin(_lon_r) * _dlon_r
+                  - dist * _sin_lat * math.cos(_lon_r) * _dlat_r
+                  + _cos_lat * math.cos(_lon_r) * ddist)
+            vy = (dist * _cos_lat * math.cos(_lon_r) * _dlon_r
+                  - dist * _sin_lat * math.sin(_lon_r) * _dlat_r
+                  + _cos_lat * math.sin(_lon_r) * ddist)
+            vz = dist * _cos_lat * _dlat_r + _sin_lat * ddist
+        else:
+            vx = vy = vz = 0.0
+        return (x, y, z, vx, vy, vz), iflag
+
+    # SEFLG_RADIANS: convert angular output from degrees to radians
+    # Skip when XYZ is active — values are Cartesian AU, not angles
+    if (iflag & SEFLG_RADIANS) and not (iflag & SEFLG_XYZ):
+        _d2r = math.pi / 180.0
+        lon = lon * _d2r
+        lat = lat * _d2r
+        dlon = dlon * _d2r
+        dlat = dlat * _d2r
 
     return (lon, lat, dist, dlon, dlat, ddist), iflag
