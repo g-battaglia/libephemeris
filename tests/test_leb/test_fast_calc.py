@@ -270,22 +270,48 @@ class TestFastCalcFlags:
         assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
-    def test_topoctr_raises(self, leb_reader, jd_mid):
-        """SEFLG_TOPOCTR should raise KeyError (fall back to Skyfield)."""
-        with pytest.raises(KeyError, match="SEFLG_TOPOCTR"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_TOPOCTR)
+    def test_topoctr_requires_topo(self, leb_reader, jd_mid):
+        """SEFLG_TOPOCTR without swe_set_topo() raises ValueError."""
+        from libephemeris import state
+
+        saved = state._TOPO
+        state._TOPO = None
+        try:
+            with pytest.raises(ValueError, match="swe_set_topo"):
+                fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_TOPOCTR)
+        finally:
+            state._TOPO = saved
 
     @pytest.mark.integration
-    def test_xyz_raises(self, leb_reader, jd_mid):
-        """SEFLG_XYZ should raise KeyError (fall back to Skyfield)."""
-        with pytest.raises(KeyError, match="SEFLG_XYZ"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_XYZ)
+    def test_topoctr_with_topo(self, leb_reader, jd_mid):
+        """SEFLG_TOPOCTR works after swe_set_topo()."""
+        import libephemeris
+        from libephemeris import state
+
+        saved = state._TOPO
+        libephemeris.set_topo(12.5, 41.9, 0)
+        try:
+            result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_TOPOCTR)
+            assert 0.0 < result[0] < 360.0
+        finally:
+            state._TOPO = saved
 
     @pytest.mark.integration
-    def test_radians_raises(self, leb_reader, jd_mid):
-        """SEFLG_RADIANS should raise KeyError (fall back to Skyfield)."""
-        with pytest.raises(KeyError, match="SEFLG_RADIANS"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_RADIANS)
+    def test_xyz_flag(self, leb_reader, jd_mid):
+        """SEFLG_XYZ returns Cartesian coordinates (~1 AU from Sun)."""
+        import math
+
+        result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_XYZ)
+        r = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
+        assert 0.98 < r < 1.02  # ~1 AU distance
+
+    @pytest.mark.integration
+    def test_radians_flag(self, leb_reader, jd_mid):
+        """SEFLG_RADIANS returns coordinates in radians."""
+        import math
+        result_deg, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, 0)
+        result_rad, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_RADIANS)
+        assert abs(result_rad[0] - math.radians(result_deg[0])) < 1e-10
 
 
 class TestEclipticDirectVelocity:
@@ -418,20 +444,20 @@ class TestNonutFallback:
     """Test SEFLG_NONUT triggers Skyfield fallback."""
 
     @pytest.mark.integration
-    def test_nonut_raises_keyerror_ut(self, leb_reader):
-        """SEFLG_NONUT should raise KeyError to trigger fallback."""
+    def test_nonut_flag_ut(self, leb_reader):
+        """SEFLG_NONUT should work in LEB mode (mean ecliptic)."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        with pytest.raises(KeyError, match="SEFLG_NONUT"):
-            fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        assert 0.0 < result[0] < 360.0
 
     @pytest.mark.integration
-    def test_nonut_raises_keyerror_tt(self, leb_reader):
-        """SEFLG_NONUT should raise KeyError to trigger fallback in TT path."""
+    def test_nonut_flag_tt(self, leb_reader):
+        """SEFLG_NONUT should work in TT path too."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        with pytest.raises(KeyError, match="SEFLG_NONUT"):
-            fast_calc_tt(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        result, _flags = fast_calc_tt(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        assert 0.0 < result[0] < 360.0
 
 
 class TestExplicitSiderealParams:

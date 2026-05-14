@@ -49,6 +49,7 @@ from .constants import (
     SE_PLUTO,
     SEFLG_SPEED,
     SEFLG_SWIEPH,
+    SEFLG_EQUATORIAL,
     SE_ECL_TOTAL,
     SE_ECL_ANNULAR,
     SE_ECL_PARTIAL,
@@ -68,6 +69,14 @@ from .constants import (
 )
 from .planets import swe_calc_ut
 from .state import get_timescale
+
+
+def _get_leb_reader_safe():
+    """Return LEB reader or None. Wraps get_leb_reader for eclipse dispatch."""
+    from .state import get_leb_reader
+
+    return get_leb_reader()
+
 
 # Constants for eclipse calculations
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
@@ -486,25 +495,32 @@ def _calc_gamma(jd: float) -> float:
     Returns:
         Gamma value in Earth equatorial radii
     """
-    # Import here to avoid circular dependency at module load
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     AU_TO_KM = 149597870.7
 
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    earth_at = earth.at(t)
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
-
-    sun_pos = sun_apparent.position.au
-    moon_pos = moon_apparent.position.au
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
+        earth_at = eph["earth"].at(t)
+        sun_pos = earth_at.observe(eph["sun"]).apparent().position.au
+        moon_pos = earth_at.observe(eph["moon"]).apparent().position.au
 
     # Shadow axis direction (Sun to Moon)
     shadow_dir = [
@@ -601,26 +617,14 @@ def _calc_penumbra_limit(jd: float) -> float:
     Returns the radius in Earth radii where the penumbral shadow intersects
     the fundamental plane.
     """
-    from .state import get_planets, get_timescale
-
     AU_TO_KM = 149597870.7
     SUN_RADIUS_KM = 696340.0
     MOON_RADIUS_KM = 1737.4
 
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
-
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
-
-    earth_at = earth.at(t)
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
-
-    sun_dist_au = sun_apparent.distance().au
-    moon_dist_au = moon_apparent.distance().au
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+    sun_dist_au = sun_pos[2]
+    moon_dist_au = moon_pos[2]
 
     sun_dist_km = sun_dist_au * AU_TO_KM
     moon_dist_km = moon_dist_au * AU_TO_KM
@@ -670,26 +674,14 @@ def _calc_umbra_limit(jd: float) -> float:
     Returns the radius in Earth radii. Negative for umbra (total eclipse),
     positive for antumbra (annular eclipse).
     """
-    from .state import get_planets, get_timescale
-
     AU_TO_KM = 149597870.7
     SUN_RADIUS_KM = 696340.0
     MOON_RADIUS_KM = 1737.4
 
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
-
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
-
-    earth_at = earth.at(t)
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
-
-    sun_dist_au = sun_apparent.distance().au
-    moon_dist_au = moon_apparent.distance().au
+    sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+    sun_dist_au = sun_pos[2]
+    moon_dist_au = moon_pos[2]
 
     sun_dist_km = sun_dist_au * AU_TO_KM
     moon_dist_km = moon_dist_au * AU_TO_KM
@@ -1219,30 +1211,49 @@ def _calc_local_eclipse_max_time(
     Returns:
         Tuple of (jd_maximum, min_separation_degrees)
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        # geopos for topo/azalt: (lon, lat, alt)
+        geopos = (lon, lat, altitude)
 
-    def _get_separation(jd: float) -> float:
-        """Get angular separation between Sun and Moon at given JD."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, geopos)
+            return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+    else:
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
 
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-        return sun_app.separation_from(moon_app).degrees
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
+
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon at given JD."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+
+            return sun_app.separation_from(moon_app).degrees
 
     # Golden section search for minimum separation
     phi = (1 + math.sqrt(5)) / 2
@@ -1546,48 +1557,97 @@ def _calculate_local_eclipse_phases(
             [8]: Azimuth of Sun at maximum eclipse
             [9]: Altitude of Sun at maximum eclipse
     """
-    from skyfield.api import wgs84
+    from .state import get_leb_reader
 
-    from .state import get_planets, get_timescale
+    reader = get_leb_reader()
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    if reader is not None:
+        try:
+            from .fast_calc import _topo_ecliptic
+            from .time_utils import swe_deltat
+            _topo_ecliptic(reader, jd_max_global + swe_deltat(jd_max_global),
+                           jd_max_global, SE_SUN, (lon, lat, altitude))
+        except (KeyError, ValueError):
+            reader = None
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        geopos = (lon, lat, altitude)
+
+        def _get_sun_moon_separation(jd: float) -> float:
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, geopos)
+            return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+
+        def _get_sun_altaz(jd: float) -> Tuple[float, float]:
+            """Get Sun altitude and azimuth at given JD from observer location."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, geopos)
+            sun_az, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, sun_pos[:3])
+            # azalt returns SE convention azimuth (S=0)
+            return sun_alt_true, sun_az
+
+        def _get_distances(jd: float) -> Tuple[float, float]:
+            """Get Sun and Moon distances at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, geopos)
+            return sun_pos[2], moon_pos[2]
+    else:
+        from skyfield.api import wgs84
+
+        from .state import get_planets, get_timescale
+
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
+
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
+
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        def _get_sun_moon_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon at given JD."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            # Get apparent positions from observer
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+
+            # Calculate angular separation
+            sep = sun_app.separation_from(moon_app)
+            return sep.degrees
+
+        def _get_sun_altaz(jd: float) -> Tuple[float, float]:
+            """Get Sun altitude and azimuth at given JD from observer location."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            alt, az, _ = sun_app.altaz()
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
+
+        def _get_distances(jd: float) -> Tuple[float, float]:
+            """Get Sun and Moon distances at given JD."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+            return sun_app.distance().au, moon_app.distance().au
 
     # Search for local maximum around global maximum
     # The local maximum can differ from global by up to ~1 hour
     search_range = 3.0 / 24.0  # 3 hours in days
-
-    def _get_sun_moon_separation(jd: float) -> float:
-        """Get angular separation between Sun and Moon at given JD."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-
-        # Get apparent positions from observer
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
-
-        # Calculate angular separation
-        sep = sun_app.separation_from(moon_app)
-        return sep.degrees
-
-    def _get_sun_altaz(jd: float) -> Tuple[float, float]:
-        """Get Sun altitude and azimuth at given JD from observer location."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        alt, az, _ = sun_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
 
     # First check if Sun is above horizon at global maximum
     sun_alt, sun_az = _get_sun_altaz(jd_max_global)
@@ -1633,16 +1693,7 @@ def _calculate_local_eclipse_phases(
         return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     # Get angular sizes of Sun and Moon at local maximum
-    t_max = ts.ut1_jd(jd_local_max)
-    observer_at = earth + observer
-
-    sun_app = observer_at.at(t_max).observe(sun).apparent()
-    moon_app = observer_at.at(t_max).observe(moon).apparent()
-
-    # Sun angular radius: ~959.63" at 1 AU
-    # Moon angular radius: ~932.56" at mean distance
-    sun_dist_au = sun_app.distance().au
-    moon_dist_au = moon_app.distance().au
+    sun_dist_au, moon_dist_au = _get_distances(jd_local_max)
 
     sun_angular_radius = (959.63 / 3600.0) / sun_dist_au  # degrees
     moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)  # degrees
@@ -1911,12 +1962,6 @@ def sol_eclipse_when_loc(
     MAX_SEARCH_YEARS = 50  # Maximum search range
     MAX_ECLIPSES = int(MAX_SEARCH_YEARS * 2.4)  # ~2.4 eclipses per year on average
 
-    from .state import get_planets, get_timescale
-
-    # Get ephemeris for Moon/Sun diameter calculations
-    eph = get_planets()
-    ts = get_timescale()
-
     jd = jd_start
 
     for _ in range(MAX_ECLIPSES):
@@ -1941,18 +1986,23 @@ def sol_eclipse_when_loc(
         if jd_local_max > 0 and magnitude > 0:
             # Eclipse visible! Prepare return values
 
-            # Get Moon/Sun apparent diameters at local maximum
-            t_max = ts.ut1_jd(jd_local_max)
-            from skyfield.api import wgs84
-
-            observer = wgs84.latlon(lat, lon, altitude)
-            observer_at = eph["earth"] + observer
-
-            sun_app = observer_at.at(t_max).observe(eph["sun"]).apparent()
-            moon_app = observer_at.at(t_max).observe(eph["moon"]).apparent()
-
-            sun_dist_au = sun_app.distance().au
-            moon_dist_au = moon_app.distance().au
+            # Get Moon/Sun topocentric distances at local maximum
+            from .constants import SEFLG_TOPOCTR as _TOPOCTR_LOC
+            from .state import get_topo as _gt_loc
+            import libephemeris as _le_loc
+            _saved_topo_loc = _gt_loc()
+            _le_loc.set_topo(lon, lat, altitude)
+            try:
+                sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, SEFLG_SPEED | _TOPOCTR_LOC)
+                moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, SEFLG_SPEED | _TOPOCTR_LOC)
+            finally:
+                from libephemeris import state as _st_loc
+                if _saved_topo_loc is not None:
+                    _le_loc.set_topo(_saved_topo_loc.longitude.degrees, _saved_topo_loc.latitude.degrees, _saved_topo_loc.elevation.m)
+                else:
+                    _st_loc._TOPO = None
+            sun_dist_au = sun_pos[2]
+            moon_dist_au = moon_pos[2]
 
             sun_diameter = 2 * (959.63 / 3600.0) / sun_dist_au
             moon_diameter = 2 * (932.56 / 3600.0) * (0.002569 / moon_dist_au)
@@ -2096,9 +2146,7 @@ def swe_sol_eclipse_when_loc(
     """
     from typing import Sequence
 
-    from skyfield.api import wgs84
-
-    from .state import get_planets, get_timescale, set_topo
+    from .state import get_leb_reader, set_topo
 
     # Validate geopos
     if len(geopos) < 3:
@@ -2112,110 +2160,183 @@ def swe_sol_eclipse_when_loc(
     MAX_SEARCH_YEARS = 50
     MAX_ECLIPSES = int(MAX_SEARCH_YEARS * 2.4)
 
-    # Get ephemeris
-    eph = get_planets()
-    ts = get_timescale()
-
     # Set topocentric position for later calculations
     set_topo(lon, lat, altitude)
 
-    # Create observer
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
-    observer = wgs84.latlon(lat, lon, altitude)
+    reader = get_leb_reader()
 
-    def _get_sun_moon_data(
-        jd: float,
-    ) -> Tuple[float, float, float, float, float, float, float]:
-        """Get Sun-Moon separation and Sun position data at given JD."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-        # Get apparent positions from observer (topocentric)
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+        # geopos for topo/azalt: (lon, lat, alt)
+        _geopos = (lon, lat, altitude)
 
-        # Angular separation
-        sep = sun_app.separation_from(moon_app).degrees
+        def _get_sun_moon_data(
+            jd: float,
+        ) -> Tuple[float, float, float, float, float, float, float]:
+            """Get Sun-Moon separation and Sun position data at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _geopos)
+            sep = angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+            sun_az, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _geopos, 0, 0, sun_pos[:3])
+            return (
+                sep,
+                sun_alt_true,
+                sun_az,
+                sun_pos[2],
+                moon_pos[2],
+                sun_alt_true,
+                sun_az,
+            )
 
-        # Sun altitude and azimuth
-        sun_alt, sun_az, _ = sun_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        sun_az_se = (sun_az.degrees + 180.0) % 360.0
-
-        # Distances
-        sun_dist_au = sun_app.distance().au
-        moon_dist_au = moon_app.distance().au
-
-        return (
-            sep,
-            sun_alt.degrees,
-            sun_az_se,
-            sun_dist_au,
-            moon_dist_au,
-            sun_alt.degrees,
-            sun_az_se,
-        )
-
-    def _get_sun_altaz(jd: float) -> Tuple[float, float, float]:
-        """Get Sun altitude, azimuth, and apparent altitude at given JD."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        alt, az, _ = sun_app.altaz()
-
-        # Calculate apparent altitude with refraction
-        # Using standard atmospheric refraction formula
-        true_alt = alt.degrees
-        if true_alt > -1.0:
-            # Bennett's formula for refraction
-            if true_alt > 0:
-                refraction = 1.0 / math.tan(
-                    math.radians(true_alt + 7.31 / (true_alt + 4.4))
-                )
-                apparent_alt = true_alt + refraction / 60.0
+        def _get_sun_altaz(jd: float) -> Tuple[float, float, float]:
+            """Get Sun altitude, azimuth, and apparent altitude at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _geopos)
+            sun_az, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _geopos, 0, 0, sun_pos[:3])
+            # Calculate apparent altitude with refraction
+            true_alt = sun_alt_true
+            if true_alt > -1.0:
+                if true_alt > 0:
+                    refraction = 1.0 / math.tan(
+                        math.radians(true_alt + 7.31 / (true_alt + 4.4))
+                    )
+                    apparent_alt = true_alt + refraction / 60.0
+                else:
+                    apparent_alt = true_alt + 0.58
             else:
-                # Near horizon, use approximation
-                apparent_alt = true_alt + 0.58
-        else:
-            apparent_alt = true_alt
+                apparent_alt = true_alt
+            return true_alt, sun_az, apparent_alt
 
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return true_alt, (az.degrees + 180.0) % 360.0, apparent_alt
+        def _get_angular_sizes(jd: float) -> Tuple[float, float, float, float]:
+            """Get angular radii and diameters of Sun and Moon."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _geopos)
+            sun_angular_radius = (959.63 / 3600.0) / sun_pos[2]
+            moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_pos[2])
+            return (
+                sun_angular_radius,
+                moon_angular_radius,
+                2 * sun_angular_radius,
+                2 * moon_angular_radius,
+            )
 
-    def _get_angular_sizes(jd: float) -> Tuple[float, float, float, float]:
-        """Get angular radii and diameters of Sun and Moon."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _geopos)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _geopos)
+            return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+    else:
+        from skyfield.api import wgs84
 
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+        from .state import get_planets, get_timescale
 
-        sun_dist_au = sun_app.distance().au
-        moon_dist_au = moon_app.distance().au
+        # Get ephemeris
+        eph = get_planets()
+        ts = get_timescale()
 
-        # Angular radii in degrees
-        sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
-        moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+        # Create observer
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
+        observer = wgs84.latlon(lat, lon, altitude)
 
-        return (
-            sun_angular_radius,
-            moon_angular_radius,
-            2 * sun_angular_radius,
-            2 * moon_angular_radius,
-        )
+        def _get_sun_moon_data(
+            jd: float,
+        ) -> Tuple[float, float, float, float, float, float, float]:
+            """Get Sun-Moon separation and Sun position data at given JD."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
 
-    def _get_separation(jd: float) -> float:
-        """Get angular separation between Sun and Moon."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+            # Get apparent positions from observer (topocentric)
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
 
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+            # Angular separation
+            sep = sun_app.separation_from(moon_app).degrees
 
-        return sun_app.separation_from(moon_app).degrees
+            # Sun altitude and azimuth
+            sun_alt, sun_az, _ = sun_app.altaz()
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            sun_az_se = (sun_az.degrees + 180.0) % 360.0
+
+            # Distances
+            sun_dist_au = sun_app.distance().au
+            moon_dist_au = moon_app.distance().au
+
+            return (
+                sep,
+                sun_alt.degrees,
+                sun_az_se,
+                sun_dist_au,
+                moon_dist_au,
+                sun_alt.degrees,
+                sun_az_se,
+            )
+
+        def _get_sun_altaz(jd: float) -> Tuple[float, float, float]:
+            """Get Sun altitude, azimuth, and apparent altitude at given JD."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            alt, az, _ = sun_app.altaz()
+
+            # Calculate apparent altitude with refraction
+            # Using standard atmospheric refraction formula
+            true_alt = alt.degrees
+            if true_alt > -1.0:
+                # Bennett's formula for refraction
+                if true_alt > 0:
+                    refraction = 1.0 / math.tan(
+                        math.radians(true_alt + 7.31 / (true_alt + 4.4))
+                    )
+                    apparent_alt = true_alt + refraction / 60.0
+                else:
+                    # Near horizon, use approximation
+                    apparent_alt = true_alt + 0.58
+            else:
+                apparent_alt = true_alt
+
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return true_alt, (az.degrees + 180.0) % 360.0, apparent_alt
+
+        def _get_angular_sizes(jd: float) -> Tuple[float, float, float, float]:
+            """Get angular radii and diameters of Sun and Moon."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+
+            sun_dist_au = sun_app.distance().au
+            moon_dist_au = moon_app.distance().au
+
+            # Angular radii in degrees
+            sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
+            moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+
+            return (
+                sun_angular_radius,
+                moon_angular_radius,
+                2 * sun_angular_radius,
+                2 * moon_angular_radius,
+            )
+
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+
+            return sun_app.separation_from(moon_app).degrees
 
     def _find_local_maximum(
         jd_center: float, search_range: float = 3.0 / 24.0
@@ -2770,44 +2891,81 @@ def swe_sol_eclipse_where(
         - Meeus "Astronomical Algorithms" Ch. 54
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     AU_TO_KM = 149597870.7  # AU to km conversion
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
+    reader = get_leb_reader()
 
-    # Get Earth, Sun, Moon objects
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    earth_at = earth.at(t)
+        # Get geocentric Moon position for initial guess (via swe_calc_ut)
+        moon_eq, _ = swe_calc_ut(tjdut, SE_MOON, SEFLG_EQUATORIAL | SEFLG_SPEED)
+        moon_ra_deg = moon_eq[0]  # degrees
+        moon_dec_deg = moon_eq[1]
 
-    # Get geocentric Moon position for initial guess
-    moon_geo = earth_at.observe(moon).apparent()
-    moon_ra, moon_dec, _ = moon_geo.radec()
+        # Calculate sub-lunar point as initial guess
+        jd_tt = tjdut + swe_deltat(tjdut)
+        # Approximate GMST from JD (same approach as Skyfield)
+        T = (jd_tt - 2451545.0) / 36525.0
+        gmst_hours = (280.46061837 + 360.98564736629 * (tjdut - 2451545.0) + 0.000387933 * T * T) / 15.0
+        init_lon = moon_ra_deg - gmst_hours * 15.0
+        init_lon = ((init_lon + 180) % 360) - 180
+        init_lat = moon_dec_deg
 
-    # Calculate sub-lunar point as initial guess
-    gmst = t.gmst  # Greenwich Mean Sidereal Time in hours
-    init_lon = moon_ra.hours * 15.0 - gmst * 15.0
-    init_lon = ((init_lon + 180) % 360) - 180
-    init_lat = moon_dec.degrees
+        def get_separation(lat_arg: float, lon_arg: float) -> float:
+            """Get angular separation between Sun and Moon from observer location."""
+            try:
+                gp = (lon_arg, lat_arg, 0.0)
+                jd_tt_loc = tjdut + swe_deltat(tjdut)
+                sun_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, SE_SUN, gp)
+                moon_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, SE_MOON, gp)
+                return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+            except (KeyError, ValueError, ArithmeticError, IndexError):
+                return 999.0
+
+    else:
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
+
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(tjdut)
+
+        # Get Earth, Sun, Moon objects
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
+
+        earth_at = earth.at(t)
+
+        # Get geocentric Moon position for initial guess
+        moon_geo = earth_at.observe(moon).apparent()
+        moon_ra, moon_dec, _ = moon_geo.radec()
+
+        # Calculate sub-lunar point as initial guess
+        gmst = t.gmst  # Greenwich Mean Sidereal Time in hours
+        init_lon = moon_ra.hours * 15.0 - gmst * 15.0
+        init_lon = ((init_lon + 180) % 360) - 180
+        init_lat = moon_dec.degrees
+
+        def get_separation(lat_arg: float, lon_arg: float) -> float:
+            """Get angular separation between Sun and Moon from observer location."""
+            try:
+                observer = wgs84.latlon(lat_arg, lon_arg, 0.0)
+                observer_at = earth + observer
+                sun_app = observer_at.at(t).observe(sun).apparent()
+                moon_app = observer_at.at(t).observe(moon).apparent()
+                return sun_app.separation_from(moon_app).degrees
+            except (KeyError, ValueError, ArithmeticError, IndexError):
+                return 999.0  # Return large value on error
 
     # Function to calculate Sun-Moon separation at a given location
-    def get_separation(lat: float, lon: float) -> float:
-        """Get angular separation between Sun and Moon from observer location."""
-        try:
-            observer = wgs84.latlon(lat, lon, 0.0)
-            observer_at = earth + observer
-            sun_app = observer_at.at(t).observe(sun).apparent()
-            moon_app = observer_at.at(t).observe(moon).apparent()
-            return sun_app.separation_from(moon_app).degrees
-        except (ValueError, ArithmeticError, IndexError):
-            return 999.0  # Return large value on error
+    # (defined above in each branch)
 
     # Gradient descent to find minimum separation (eclipse center)
     # This finds the point on Earth where Sun and Moon appear closest
@@ -2853,38 +3011,65 @@ def swe_sol_eclipse_where(
 
     # Now calculate eclipse attributes at this location
     try:
-        observer = wgs84.latlon(central_lat, central_lon, 0.0)
-        observer_at = earth + observer
+        if reader is not None:
+            _gp = (central_lon, central_lat, 0.0)
+            _jd_tt = tjdut + swe_deltat(tjdut)
+            sun_topo = _topo_ecliptic(reader, _jd_tt, tjdut, SE_SUN, _gp)
+            moon_topo = _topo_ecliptic(reader, _jd_tt, tjdut, SE_MOON, _gp)
 
-        # Get apparent positions from observer (topocentric)
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+            # Get Sun altitude and azimuth at central line
+            sun_az_val, sun_alt_true, sun_alt_app_val = azalt(tjdut, SE_ECL2HOR, _gp, 0, 0, sun_topo[:3])
+            sun_altitude = sun_alt_true
+            sun_azimuth = sun_az_val
 
-        # Get Sun altitude and azimuth at central line
-        sun_alt, sun_az, _ = sun_app.altaz()
-        sun_altitude = sun_alt.degrees
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        sun_azimuth = (sun_az.degrees + 180.0) % 360.0
-
-        # Calculate apparent altitude with refraction
-        if sun_altitude > -1.0:
-            if sun_altitude > 0:
-                # Bennett's formula for refraction
-                refraction = 1.0 / math.tan(
-                    math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
-                )
-                apparent_alt = sun_altitude + refraction / 60.0
+            # Calculate apparent altitude with refraction
+            if sun_altitude > -1.0:
+                if sun_altitude > 0:
+                    refraction = 1.0 / math.tan(
+                        math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+                    )
+                    apparent_alt = sun_altitude + refraction / 60.0
+                else:
+                    apparent_alt = sun_altitude + 0.58
             else:
-                apparent_alt = sun_altitude + 0.58
+                apparent_alt = sun_altitude
+
+            separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+            local_sun_dist = sun_topo[2]
+            local_moon_dist = moon_topo[2]
         else:
-            apparent_alt = sun_altitude
+            observer = wgs84.latlon(central_lat, central_lon, 0.0)
+            observer_at = earth + observer
 
-        # Calculate angular separation
-        separation = sun_app.separation_from(moon_app).degrees
+            # Get apparent positions from observer (topocentric)
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
 
-        # Get local distances
-        local_sun_dist = sun_app.distance().au
-        local_moon_dist = moon_app.distance().au
+            # Get Sun altitude and azimuth at central line
+            sun_alt, sun_az, _ = sun_app.altaz()
+            sun_altitude = sun_alt.degrees
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            sun_azimuth = (sun_az.degrees + 180.0) % 360.0
+
+            # Calculate apparent altitude with refraction
+            if sun_altitude > -1.0:
+                if sun_altitude > 0:
+                    # Bennett's formula for refraction
+                    refraction = 1.0 / math.tan(
+                        math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+                    )
+                    apparent_alt = sun_altitude + refraction / 60.0
+                else:
+                    apparent_alt = sun_altitude + 0.58
+            else:
+                apparent_alt = sun_altitude
+
+            # Calculate angular separation
+            separation = sun_app.separation_from(moon_app).degrees
+
+            # Get local distances
+            local_sun_dist = sun_app.distance().au
+            local_moon_dist = moon_app.distance().au
 
         # Local angular radii (in degrees)
         local_sun_radius = (959.63 / 3600.0) / local_sun_dist
@@ -2962,7 +3147,7 @@ def swe_sol_eclipse_where(
         if is_total_shadow:
             path_width_km = -path_width_km
 
-    except (ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError):
         # If calculation fails, return zeros (10-element geopos, 20-element attr)
         return (
             0,
@@ -3311,8 +3496,7 @@ def swe_sol_eclipse_how(
         - Reference API: swe_sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Validate and extract geopos
     if len(geopos) < 3:
@@ -3322,104 +3506,117 @@ def swe_sol_eclipse_how(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        _gp = (lon, lat, altitude)
 
-    # Get Skyfield time
-    t = ts.ut1_jd(tjdut)
-
-    # Create observer position
-    observer_at = earth + observer
-
-    # Get apparent positions from observer
-    try:
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        # If calculation fails, return zeros (20 elements per reference API spec)
-        return 0, (
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        )
-
-    # Get Sun altitude and azimuth
-    sun_alt, sun_az, _ = sun_app.altaz()
-    sun_altitude = sun_alt.degrees
-    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-    sun_azimuth = (sun_az.degrees + 180.0) % 360.0
-
-    # Calculate apparent altitude with refraction
-    if sun_altitude > -1.0:
-        if sun_altitude > 0:
-            # Bennett's formula for refraction
-            refraction = 1.0 / math.tan(
-                math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+        try:
+            jd_tt = tjdut + swe_deltat(tjdut)
+            sun_topo = _topo_ecliptic(reader, jd_tt, tjdut, SE_SUN, _gp)
+            moon_topo = _topo_ecliptic(reader, jd_tt, tjdut, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0, (
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
             )
-            apparent_alt = sun_altitude + refraction / 60.0
+
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(tjdut, SE_ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_altitude = sun_alt_true
+        sun_azimuth = sun_az_val
+
+        # Calculate apparent altitude with refraction
+        if sun_altitude > -1.0:
+            if sun_altitude > 0:
+                refraction = 1.0 / math.tan(
+                    math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+                )
+                apparent_alt = sun_altitude + refraction / 60.0
+            else:
+                apparent_alt = sun_altitude + 0.58
         else:
-            # Near horizon, use approximation
-            apparent_alt = sun_altitude + 0.58
+            apparent_alt = sun_altitude
+
+        # If Sun is below horizon, no visible eclipse
+        if sun_altitude < -1.0:
+            return 0, (
+                0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            )
+
+        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        sun_dist_au = sun_topo[2]
+        moon_dist_au = moon_topo[2]
     else:
-        apparent_alt = sun_altitude
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
 
-    # If Sun is below horizon, no visible eclipse (20 elements per reference API spec)
-    if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return 0, (
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            sun_azimuth,
-            sun_altitude,
-            apparent_alt,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        )
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-    # Calculate angular separation between Sun and Moon
-    separation = sun_app.separation_from(moon_app).degrees
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
 
-    # Get distances for angular size calculations
-    sun_dist_au = sun_app.distance().au
-    moon_dist_au = moon_app.distance().au
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        # Get Skyfield time
+        t = ts.ut1_jd(tjdut)
+
+        # Create observer position
+        observer_at = earth + observer
+
+        # Get apparent positions from observer
+        try:
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            # If calculation fails, return zeros (20 elements per reference API spec)
+            return 0, (
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            )
+
+        # Get Sun altitude and azimuth
+        sun_alt, sun_az, _ = sun_app.altaz()
+        sun_altitude = sun_alt.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        sun_azimuth = (sun_az.degrees + 180.0) % 360.0
+
+        # Calculate apparent altitude with refraction
+        if sun_altitude > -1.0:
+            if sun_altitude > 0:
+                # Bennett's formula for refraction
+                refraction = 1.0 / math.tan(
+                    math.radians(sun_altitude + 7.31 / (sun_altitude + 4.4))
+                )
+                apparent_alt = sun_altitude + refraction / 60.0
+            else:
+                # Near horizon, use approximation
+                apparent_alt = sun_altitude + 0.58
+        else:
+            apparent_alt = sun_altitude
+
+        # If Sun is below horizon, no visible eclipse (20 elements per reference API spec)
+        if sun_altitude < -1.0:  # Allow for refraction near horizon
+            return 0, (
+                0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            )
+
+        # Calculate angular separation between Sun and Moon
+        separation = sun_app.separation_from(moon_app).degrees
+
+        # Get distances for angular size calculations
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
 
     # Angular radii (in degrees)
     # Sun: mean radius 959.63" at 1 AU
@@ -3685,9 +3882,7 @@ def swe_sol_eclipse_how_details(
         - Reference documentation
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from skyfield.api import wgs84
-
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Validate and extract geopos
     if len(geopos) < 3:
@@ -3697,84 +3892,152 @@ def swe_sol_eclipse_how_details(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        _gp = (lon, lat, altitude)
 
-    def _get_sun_moon_positions(jd: float):
-        """Get Sun and Moon positions from observer."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+            return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
 
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
+        def _get_sun_altaz(jd: float) -> tuple:
+            """Get Sun altitude and azimuth at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            sun_az, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, sun_pos[:3])
+            return sun_alt_true, sun_az
 
-        return sun_app, moon_app
+        def _get_angular_sizes(jd: float) -> tuple:
+            """Get angular radii of Sun and Moon."""
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+            sun_angular_radius = (959.63 / 3600.0) / sun_pos[2]
+            moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_pos[2])
+            return sun_angular_radius, moon_angular_radius
 
-    def _get_separation(jd: float) -> float:
-        """Get angular separation between Sun and Moon."""
-        sun_app, moon_app = _get_sun_moon_positions(jd)
-        return sun_app.separation_from(moon_app).degrees
+        def _calc_position_angle(jd: float) -> float:
+            """Calculate position angle of Moon relative to Sun (topocentric ICRS)."""
+            from .constants import SEFLG_EQUATORIAL as _EQ_PA, SEFLG_J2000 as _J2K_PA
+            from .constants import SEFLG_TOPOCTR as _TP_PA
+            from .state import get_topo as _gt_pa
+            import libephemeris as _le_pa
+            _saved_topo_pa = _gt_pa()
+            _le_pa.set_topo(_gp[0], _gp[1], _gp[2])
+            try:
+                _pa_flags = _EQ_PA | _J2K_PA | _TP_PA | SEFLG_SPEED
+                sun_eq, _ = swe_calc_ut(jd, SE_SUN, _pa_flags)
+                moon_eq, _ = swe_calc_ut(jd, SE_MOON, _pa_flags)
+            finally:
+                from libephemeris import state as _st_pa
+                if _saved_topo_pa is not None:
+                    _le_pa.set_topo(_saved_topo_pa.longitude.degrees, _saved_topo_pa.latitude.degrees, _saved_topo_pa.elevation.m)
+                else:
+                    _st_pa._TOPO = None
+            sun_ra_rad = math.radians(sun_eq[0])
+            sun_dec_rad = math.radians(sun_eq[1])
+            moon_ra_rad = math.radians(moon_eq[0])
+            moon_dec_rad = math.radians(moon_eq[1])
+            delta_ra = moon_ra_rad - sun_ra_rad
+            y = math.sin(delta_ra)
+            x = math.cos(sun_dec_rad) * math.tan(moon_dec_rad) - math.sin(
+                sun_dec_rad
+            ) * math.cos(delta_ra)
+            pa = math.degrees(math.atan2(y, x))
+            if pa < 0:
+                pa += 360.0
+            return pa
+    else:
+        from skyfield.api import wgs84
 
-    def _get_sun_altaz(jd: float) -> tuple:
-        """Get Sun altitude and azimuth at given JD."""
-        sun_app, _ = _get_sun_moon_positions(jd)
-        alt, az, _ = sun_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
+        from .state import get_planets, get_timescale
 
-    def _get_angular_sizes(jd: float) -> tuple:
-        """Get angular radii of Sun and Moon."""
-        sun_app, moon_app = _get_sun_moon_positions(jd)
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-        sun_dist_au = sun_app.distance().au
-        moon_dist_au = moon_app.distance().au
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
 
-        # Angular radii in degrees
-        sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
-        moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
 
-        return sun_angular_radius, moon_angular_radius
+        def _get_sun_moon_positions(jd: float):
+            """Get Sun and Moon positions from observer."""
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
 
-    def _calc_position_angle(jd: float) -> float:
-        """
-        Calculate position angle of Moon relative to Sun.
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
 
-        Position angle is measured from North through East (counterclockwise).
-        Returns angle in degrees (0-360).
-        """
-        sun_app, moon_app = _get_sun_moon_positions(jd)
+            return sun_app, moon_app
 
-        # Get RA and Dec for both bodies
-        sun_ra, sun_dec, _ = sun_app.radec()
-        moon_ra, moon_dec, _ = moon_app.radec()
+        def _get_separation(jd: float) -> float:
+            """Get angular separation between Sun and Moon."""
+            sun_app, moon_app = _get_sun_moon_positions(jd)
+            return sun_app.separation_from(moon_app).degrees
 
-        sun_ra_rad = sun_ra.radians
-        sun_dec_rad = sun_dec.radians
-        moon_ra_rad = moon_ra.radians
-        moon_dec_rad = moon_dec.radians
+        def _get_sun_altaz(jd: float) -> tuple:
+            """Get Sun altitude and azimuth at given JD."""
+            sun_app, _ = _get_sun_moon_positions(jd)
+            alt, az, _ = sun_app.altaz()
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
 
-        # Position angle formula
-        delta_ra = moon_ra_rad - sun_ra_rad
+        def _get_angular_sizes(jd: float) -> tuple:
+            """Get angular radii of Sun and Moon."""
+            sun_app, moon_app = _get_sun_moon_positions(jd)
 
-        y = math.sin(delta_ra)
-        x = math.cos(sun_dec_rad) * math.tan(moon_dec_rad) - math.sin(
-            sun_dec_rad
-        ) * math.cos(delta_ra)
+            sun_dist_au = sun_app.distance().au
+            moon_dist_au = moon_app.distance().au
 
-        pa = math.degrees(math.atan2(y, x))
-        if pa < 0:
-            pa += 360.0
+            # Angular radii in degrees
+            sun_angular_radius = (959.63 / 3600.0) / sun_dist_au
+            moon_angular_radius = (932.56 / 3600.0) * (0.002569 / moon_dist_au)
 
-        return pa
+            return sun_angular_radius, moon_angular_radius
+
+        def _calc_position_angle(jd: float) -> float:
+            """
+            Calculate position angle of Moon relative to Sun.
+
+            Position angle is measured from North through East (counterclockwise).
+            Returns angle in degrees (0-360).
+            """
+            sun_app, moon_app = _get_sun_moon_positions(jd)
+
+            # Get RA and Dec for both bodies
+            sun_ra, sun_dec, _ = sun_app.radec()
+            moon_ra, moon_dec, _ = moon_app.radec()
+
+            sun_ra_rad = sun_ra.radians
+            sun_dec_rad = sun_dec.radians
+            moon_ra_rad = moon_ra.radians
+            moon_dec_rad = moon_dec.radians
+
+            # Position angle formula
+            delta_ra = moon_ra_rad - sun_ra_rad
+
+            y = math.sin(delta_ra)
+            x = math.cos(sun_dec_rad) * math.tan(moon_dec_rad) - math.sin(
+                sun_dec_rad
+            ) * math.cos(delta_ra)
+
+            pa = math.degrees(math.atan2(y, x))
+            if pa < 0:
+                pa += 360.0
+
+            return pa
 
     def _find_local_maximum(
         jd_center: float, search_range: float = 3.0 / 24.0
@@ -3995,7 +4258,7 @@ def swe_sol_eclipse_how_details(
 
         # Position angle at C1
         result["position_angle_c1"] = _calc_position_angle(jd_c1)
-    except (ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError):
         pass
 
     # Fourth contact (separation increasing from sum of radii)
@@ -4015,7 +4278,7 @@ def swe_sol_eclipse_how_details(
 
         # Position angle at C4
         result["position_angle_c4"] = _calc_position_angle(jd_c4)
-    except (ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError):
         pass
 
     # Second and third contacts (for central eclipses only)
@@ -4038,7 +4301,7 @@ def swe_sol_eclipse_how_details(
 
             # Position angle at C2
             result["position_angle_c2"] = _calc_position_angle(jd_c2)
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             pass
 
         # Third contact
@@ -4058,7 +4321,7 @@ def swe_sol_eclipse_how_details(
 
             # Position angle at C3
             result["position_angle_c3"] = _calc_position_angle(jd_c3)
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             pass
 
     # Calculate durations
@@ -4867,17 +5130,9 @@ def lun_eclipse_when_loc(
         MAX_SEARCH_YEARS * 2.4
     )  # ~2.4 lunar eclipses per year on average
 
-    from .state import get_planets, get_timescale
-    from skyfield.api import wgs84
+    from .state import get_leb_reader
 
-    # Get ephemeris
-    eph = get_planets()
-    ts = get_timescale()
-
-    # Create observer
-    earth = eph["earth"]
-    moon = eph["moon"]
-    observer = wgs84.latlon(lat, lon, altitude)
+    reader = get_leb_reader()
 
     # Geometric center altitude threshold for moonrise/moonset.
     # Atmospheric refraction near the horizon lifts the Moon's apparent
@@ -4889,35 +5144,68 @@ def lun_eclipse_when_loc(
     # across a wide range of eclipses and observer locations.
     _MOON_HORIZON_ALT = -0.36
 
-    def _get_moon_altaz(jd: float) -> Tuple[float, float]:
-        """Get Moon geometric altitude and azimuth at given JD.
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-        Returns:
-            Tuple of (geometric_altitude_degrees, azimuth_degrees).
-            Azimuth uses the reference API convention (S=0, W=90).
-        """
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        moon_app = observer_at.at(t).observe(moon).apparent()
-        alt, az, _ = moon_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
+        _gp = (lon, lat, altitude)
 
-    def _get_moon_apparent_alt(jd: float) -> float:
-        """Get Moon apparent altitude with atmospheric refraction.
+        def _get_moon_altaz(jd: float) -> Tuple[float, float]:
+            """Get Moon geometric altitude and azimuth at given JD."""
+            jd_tt = jd + swe_deltat(jd)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+            moon_az, moon_alt_true, moon_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, moon_pos[:3])
+            return moon_alt_true, moon_az
 
-        Uses standard atmosphere (T=10°C, P=1013.25 mbar) for
-        atmospheric refraction correction, matching the conditions
-        used by the reference API.
+        def _get_moon_apparent_alt(jd: float) -> float:
+            """Get Moon apparent altitude with atmospheric refraction."""
+            jd_tt = jd + swe_deltat(jd)
+            moon_pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+            moon_az, moon_alt_true, moon_alt_app = azalt(jd, SE_ECL2HOR, _gp, 1013.25, 10.0, moon_pos[:3])
+            return moon_alt_app
+    else:
+        from .state import get_planets, get_timescale
+        from skyfield.api import wgs84
 
-        Returns:
-            Apparent altitude in degrees (refraction-corrected).
-        """
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        moon_app = observer_at.at(t).observe(moon).apparent()
-        alt, _, _ = moon_app.altaz(temperature_C=10.0, pressure_mbar=1013.25)
-        return alt.degrees
+        # Get ephemeris
+        eph = get_planets()
+        ts = get_timescale()
+
+        # Create observer
+        earth = eph["earth"]
+        moon_obj = eph["moon"]
+        observer = wgs84.latlon(lat, lon, altitude)
+
+        def _get_moon_altaz(jd: float) -> Tuple[float, float]:
+            """Get Moon geometric altitude and azimuth at given JD.
+
+            Returns:
+                Tuple of (geometric_altitude_degrees, azimuth_degrees).
+                Azimuth uses the reference API convention (S=0, W=90).
+            """
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_obj).apparent()
+            alt, az, _ = moon_app.altaz()
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
+
+        def _get_moon_apparent_alt(jd: float) -> float:
+            """Get Moon apparent altitude with atmospheric refraction.
+
+            Uses standard atmosphere (T=10°C, P=1013.25 mbar) for
+            atmospheric refraction correction, matching the conditions
+            used by the reference API.
+
+            Returns:
+                Apparent altitude in degrees (refraction-corrected).
+            """
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_obj).apparent()
+            alt, _, _ = moon_app.altaz(temperature_C=10.0, pressure_mbar=1013.25)
+            return alt.degrees
 
     def _is_moon_visible(jd: float, min_alt: float = -1.0) -> bool:
         """Check if Moon is above horizon (accounting for refraction).
@@ -5255,42 +5543,64 @@ def lun_eclipse_how(
         - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from skyfield.api import wgs84
+    from .state import get_leb_reader
 
-    from .state import get_planets, get_timescale
+    reader = get_leb_reader()
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+        _gp = (lon, lat, altitude)
 
-    # Get Moon object
-    moon = eph["moon"]
-    earth = eph["earth"]
+        try:
+            jd_tt = jd + swe_deltat(jd)
+            moon_topo = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0, tuple([0.0] * 20)
 
-    # Get Skyfield time
-    t = ts.ut1_jd(jd)
+        moon_az_val, moon_alt_true, moon_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, moon_topo[:3])
+        moon_altitude = moon_alt_true
+        moon_azimuth = moon_az_val
+        moon_dist_au = moon_topo[2]
+    else:
+        from skyfield.api import wgs84
 
-    # Create observer position
-    observer_at = earth + observer
+        from .state import get_planets, get_timescale
 
-    # Get Moon apparent position from observer
-    try:
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        # If calculation fails, return zeros (20 elements)
-        return 0, tuple([0.0] * 20)
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-    # Get Moon altitude and azimuth
-    moon_alt, moon_az, _ = moon_app.altaz()
-    moon_altitude = moon_alt.degrees
-    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-    moon_azimuth = (moon_az.degrees + 180.0) % 360.0
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
 
-    # Get Moon's distance for angular size calculation
-    moon_dist_au = moon_app.distance().au
+        # Get Moon object
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        # Get Skyfield time
+        t = ts.ut1_jd(jd)
+
+        # Create observer position
+        observer_at = earth + observer
+
+        # Get Moon apparent position from observer
+        try:
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            # If calculation fails, return zeros (20 elements)
+            return 0, tuple([0.0] * 20)
+
+        # Get Moon altitude and azimuth
+        moon_alt, moon_az, _ = moon_app.altaz()
+        moon_altitude = moon_alt.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        moon_azimuth = (moon_az.degrees + 180.0) % 360.0
+
+        # Get Moon's distance for angular size calculation
+        moon_dist_au = moon_app.distance().au
 
     # Calculate eclipse geometry using the same calculations as lun_eclipse_when
     (
@@ -5446,9 +5756,7 @@ def swe_lun_eclipse_how(
         - Reference API: swe_lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from skyfield.api import wgs84
-
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Validate and extract geopos
     if len(geopos) < 3:
@@ -5458,54 +5766,90 @@ def swe_lun_eclipse_how(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-    # Get Moon object
-    moon = eph["moon"]
-    earth = eph["earth"]
+        _gp = (lon, lat, altitude)
 
-    # Get Skyfield time
-    t = ts.ut1_jd(tjdut)
+        try:
+            jd_tt = tjdut + swe_deltat(tjdut)
+            moon_topo = _topo_ecliptic(reader, jd_tt, tjdut, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0, tuple([0.0] * 20)
 
-    # Create observer position
-    observer_at = earth + observer
+        moon_az_val, moon_alt_true, moon_alt_app = azalt(tjdut, SE_ECL2HOR, _gp, 0, 0, moon_topo[:3])
+        moon_altitude = moon_alt_true
+        moon_azimuth = moon_az_val
+        moon_dist_au = moon_topo[2]
 
-    # Get Moon apparent position from observer (topocentric)
-    try:
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        # If calculation fails, return zeros (20 elements)
-        return 0, tuple([0.0] * 20)
-
-    # Get Moon altitude and azimuth
-    moon_alt, moon_az, _ = moon_app.altaz()
-    moon_altitude = moon_alt.degrees
-    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-    moon_azimuth = (moon_az.degrees + 180.0) % 360.0
-
-    # Get Moon's distance for angular size calculation
-    moon_dist_au = moon_app.distance().au
-
-    # Calculate apparent altitude with atmospheric refraction
-    # Bennett's formula for atmospheric refraction
-    if moon_altitude > -1.0:
-        if moon_altitude > 0:
-            # Standard atmospheric refraction formula
-            refraction = 1.0 / math.tan(
-                math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
-            )
-            apparent_altitude = moon_altitude + refraction / 60.0
+        # Calculate apparent altitude with atmospheric refraction
+        if moon_altitude > -1.0:
+            if moon_altitude > 0:
+                refraction = 1.0 / math.tan(
+                    math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
+                )
+                apparent_altitude = moon_altitude + refraction / 60.0
+            else:
+                apparent_altitude = moon_altitude + 0.58
         else:
-            # Near horizon, use approximation
-            # Refraction at horizon is about 34 arcminutes
-            apparent_altitude = moon_altitude + 0.58
+            apparent_altitude = moon_altitude
     else:
-        apparent_altitude = moon_altitude
+        from skyfield.api import wgs84
+
+        from .state import get_planets, get_timescale
+
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
+
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
+
+        # Get Moon object
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        # Get Skyfield time
+        t = ts.ut1_jd(tjdut)
+
+        # Create observer position
+        observer_at = earth + observer
+
+        # Get Moon apparent position from observer (topocentric)
+        try:
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            # If calculation fails, return zeros (20 elements)
+            return 0, tuple([0.0] * 20)
+
+        # Get Moon altitude and azimuth
+        moon_alt, moon_az, _ = moon_app.altaz()
+        moon_altitude = moon_alt.degrees
+        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        moon_azimuth = (moon_az.degrees + 180.0) % 360.0
+
+        # Get Moon's distance for angular size calculation
+        moon_dist_au = moon_app.distance().au
+
+        # Calculate apparent altitude with atmospheric refraction
+        # Bennett's formula for atmospheric refraction
+        if moon_altitude > -1.0:
+            if moon_altitude > 0:
+                # Standard atmospheric refraction formula
+                refraction = 1.0 / math.tan(
+                    math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
+                )
+                apparent_altitude = moon_altitude + refraction / 60.0
+            else:
+                # Near horizon, use approximation
+                # Refraction at horizon is about 34 arcminutes
+                apparent_altitude = moon_altitude + 0.58
+        else:
+            apparent_altitude = moon_altitude
 
     # Calculate eclipse geometry using the same calculations as lun_eclipse_when
     (
@@ -5683,7 +6027,7 @@ def lun_occult_when_glob(
         - Reference API: swe_lun_occult_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader, get_planets, get_timescale
     from .fixed_stars import swe_fixstar_ut
     from .constants import (
         SE_MERCURY,
@@ -5715,78 +6059,73 @@ def lun_occult_when_glob(
     MAX_SEARCH_YEARS = 20
     MAX_ITERATIONS = int(MAX_SEARCH_YEARS * 365)  # Check roughly daily
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-
-    earth = eph["earth"]
-    moon_body = eph["moon"]
-
-    # Moon's mean angular radius in degrees (varies from ~14.7' to ~16.7')
-    # 932.56 arcsec at mean distance (0.002569 AU)
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    def _get_moon_position(jd: float) -> Tuple[float, float, float, float]:
-        """Get Moon's geocentric RA, Dec, distance in AU, and angular radius."""
-        t = ts.ut1_jd(jd)
-        moon_app = earth.at(t).observe(moon_body).apparent()
-        ra, dec, dist = moon_app.radec(epoch="date")
-        # Moon angular radius varies with distance
-        moon_angular_radius = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist.au)
-        return ra.hours * 15.0, dec.degrees, dist.au, moon_angular_radius
+    reader = get_leb_reader()
+    if reader is not None:
+        from .constants import SEFLG_EQUATORIAL
 
-    def _get_target_position(jd: float) -> Tuple[float, float, float]:
-        """Get target body's geocentric RA, Dec, and angular radius."""
-        if planet == 0:
-            # Fixed star — use Skyfield Star for proper precession to epoch
-            # of date, matching the Moon's epoch="date" frame.  The previous
-            # approach used J2000 RA/Dec + proper motion without precession,
-            # introducing ~0.8° RA offset by 2017 and causing false-positive
-            # occultation detections.
-            from .fixed_stars import FIXED_STARS
-            from .fixed_stars import _resolve_star_id
-            from skyfield.api import Star as SkyfieldStar
+        def _get_moon_position(jd: float) -> Tuple[float, float, float, float]:
+            moon_eq, _ = swe_calc_ut(jd, SE_MOON, SEFLG_EQUATORIAL | SEFLG_SPEED)
+            dist_au = moon_eq[2]
+            moon_angular_radius = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist_au)
+            return moon_eq[0], moon_eq[1], dist_au, moon_angular_radius
+    else:
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        moon_body = eph["moon"]
 
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
-
-            star = FIXED_STARS[star_id]
-
+        def _get_moon_position(jd: float) -> Tuple[float, float, float, float]:
             t = ts.ut1_jd(jd)
+            moon_app = earth.at(t).observe(moon_body).apparent()
+            ra, dec, dist = moon_app.radec(epoch="date")
+            moon_angular_radius = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist.au)
+            return ra.hours * 15.0, dec.degrees, dist.au, moon_angular_radius
 
-            # Build a Skyfield Star with J2000 coordinates and proper motion
-            star_obj = SkyfieldStar(
-                ra_hours=star.ra_j2000 / 15.0,
-                dec_degrees=star.dec_j2000,
-                ra_mas_per_year=star.pm_ra * 1000.0,
-                dec_mas_per_year=star.pm_dec * 1000.0,
-            )
+    if reader is not None:
+        def _get_target_position(jd: float) -> Tuple[float, float, float]:
+            if planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                pos, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return pos[0], pos[1], 0.0001
+            else:
+                if planet not in _PLANET_MAP:
+                    raise ValueError(f"illegal planet number {planet}.")
+                target_eq, _ = swe_calc_ut(jd, planet, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                angular_radius = _calc_planet_angular_radius(planet, target_eq[2])
+                return target_eq[0], target_eq[1], angular_radius
+    else:
+        def _get_target_position(jd: float) -> Tuple[float, float, float]:
+            if planet == 0:
+                from .fixed_stars import FIXED_STARS
+                from .fixed_stars import _resolve_star_id
+                from skyfield.api import Star as SkyfieldStar
 
-            # Apparent position precessed to epoch of date (same as Moon)
-            star_app = earth.at(t).observe(star_obj).apparent()
-            ra, dec, _ = star_app.radec(epoch="date")
-            ra_deg = ra.hours * 15.0
-            dec_deg = dec.degrees
-
-            # Stars have negligible angular radius
-            return ra_deg, dec_deg, 0.0001  # ~0.4 arcsec for point source
-        else:
-            # Planet
-            if planet not in _PLANET_MAP:
-                raise ValueError(f"illegal planet number {planet}.")
-
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-
-            t = ts.ut1_jd(jd)
-            target_app = earth.at(t).observe(target).apparent()
-            ra, dec, dist = target_app.radec(epoch="date")
-
-            # Dynamic angular radius from physical radius and distance
-            angular_radius = _calc_planet_angular_radius(planet, dist.au)
-
-            return ra.hours * 15.0, dec.degrees, angular_radius
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t = ts.ut1_jd(jd)
+                star_obj = SkyfieldStar(
+                    ra_hours=star.ra_j2000 / 15.0,
+                    dec_degrees=star.dec_j2000,
+                    ra_mas_per_year=star.pm_ra * 1000.0,
+                    dec_mas_per_year=star.pm_dec * 1000.0,
+                )
+                star_app = earth.at(t).observe(star_obj).apparent()
+                ra, dec, _ = star_app.radec(epoch="date")
+                return ra.hours * 15.0, dec.degrees, 0.0001
+            else:
+                if planet not in _PLANET_MAP:
+                    raise ValueError(f"illegal planet number {planet}.")
+                target_name = _PLANET_MAP[planet]
+                target = get_planet_target(eph, target_name)
+                t = ts.ut1_jd(jd)
+                target_app = earth.at(t).observe(target).apparent()
+                ra, dec, dist = target_app.radec(epoch="date")
+                angular_radius = _calc_planet_angular_radius(planet, dist.au)
+                return ra.hours * 15.0, dec.degrees, angular_radius
 
     def _angular_separation(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
         """Calculate angular separation between two points (in degrees)."""
@@ -6079,6 +6418,18 @@ def lun_occult_when_glob(
         return jd_first, jd_second, jd_third, jd_fourth
 
     # --- Vectorized batch search (~20-50x speedup) ---
+    # The batch search uses Skyfield vectorized calls (earth.at(t_array)).
+    # When reader is None (Skyfield-only), eph/ts/earth/moon_body are
+    # already defined from the dispatch above.  When reader is not None,
+    # we need them for the batch scan.
+    if reader is not None:
+        # Batch scan requires Skyfield; load only if not already loaded
+        from .state import get_planets as _gp_batch
+        eph = _gp_batch()
+        ts = get_timescale()
+        earth = eph["earth"]
+        moon_body = eph["moon"]
+
     # Pre-resolve target once for batch computation
     if planet != 0 and planet not in _PLANET_MAP:
         raise ValueError(f"illegal planet number {planet}.")
@@ -6409,96 +6760,110 @@ def lun_occult_when_loc(
     jd_start = tjdut
 
     MAX_SEARCH_YEARS = 50
-    MAX_OCCULTATIONS = int(MAX_SEARCH_YEARS * 20)  # Check many potential occultations
+    MAX_OCCULTATIONS = int(MAX_SEARCH_YEARS * 20)
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-
-    earth = eph["earth"]
-    moon_body = eph["moon"]
-
-    # Create observer
-    observer = wgs84.latlon(lat, lon, altitude)
-
-    # Moon's mean angular radius in degrees
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    def _get_moon_altaz(jd: float) -> Tuple[float, float]:
-        """Get Moon altitude and azimuth at given JD from observer location."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        moon_app = observer_at.at(t).observe(moon_body).apparent()
-        alt, az, _ = moon_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
+    from .state import get_leb_reader
 
-    def _get_target_altaz(jd: float) -> Tuple[float, float]:
-        """Get target altitude and azimuth at given JD from observer location."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
+    reader = get_leb_reader()
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-        if planet == 0:
-            # Fixed star - calculate alt/az from RA/Dec
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
+        geopos = (lon, lat, altitude)
 
-            star = FIXED_STARS[star_id]
+        def _get_moon_altaz(jd: float) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            pos = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, geopos, SEFLG_SPEED)
+            az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, pos[:3])
+            return alt_true, az
 
-            # Time from J2000.0
-            t_years = (jd - 2451545.0) / 365.25
+        def _get_target_altaz(jd: float) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            if planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                star_pos, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_SPEED)
+                az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, star_pos[:3])
+                return alt_true, az
+            else:
+                pos = _topo_ecliptic(reader, jd_tt, jd, planet, geopos, SEFLG_SPEED)
+                az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, pos[:3])
+                return alt_true, az
 
-            # Apply proper motion
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+        def _is_visible(jd: float, min_alt: float = -1.0) -> bool:
+            moon_alt, _ = _get_moon_altaz(jd)
+            target_alt, _ = _get_target_altaz(jd)
+            return moon_alt > min_alt and target_alt > min_alt
 
-            # Create a position object for the star and get alt/az
-            from skyfield.api import Star
+        def _get_moon_angular_info(jd: float) -> Tuple[float, float, float]:
+            moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+            dist = moon_pos[2]
+            moon_diameter = 2 * MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
+            return moon_diameter, dist, MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
 
-            star_obj = Star(
-                ra_hours=ra_deg / 15.0,
-                dec_degrees=dec_deg,
-            )
-            star_app = observer_at.at(t).observe(star_obj).apparent()
-            alt, az, _ = star_app.altaz()
-            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        def _get_target_angular_info(jd: float) -> float:
+            if planet == 0:
+                return 0.0001
+            target_pos, _ = swe_calc_ut(jd, planet, SEFLG_SPEED)
+            dist = target_pos[2]
+            return 2 * _calc_planet_angular_radius(planet, dist)
+    else:
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        moon_body = eph["moon"]
+        observer = wgs84.latlon(lat, lon, altitude)
+
+        def _get_moon_altaz(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_body).apparent()
+            alt, az, _ = moon_app.altaz()
             return alt.degrees, (az.degrees + 180.0) % 360.0
-        else:
-            # Planet
-            if planet not in _PLANET_MAP:
-                raise ValueError(f"illegal planet number {planet}.")
 
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-            target_app = observer_at.at(t).observe(target).apparent()
-            alt, az, _ = target_app.altaz()
-            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-            return alt.degrees, (az.degrees + 180.0) % 360.0
+        def _get_target_altaz(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            if planet == 0:
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t_years = (jd - 2451545.0) / 365.25
+                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                from skyfield.api import Star
+                star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                star_app = observer_at.at(t).observe(star_obj).apparent()
+                alt, az, _ = star_app.altaz()
+                return alt.degrees, (az.degrees + 180.0) % 360.0
+            else:
+                if planet not in _PLANET_MAP:
+                    raise ValueError(f"illegal planet number {planet}.")
+                target_name = _PLANET_MAP[planet]
+                target = get_planet_target(eph, target_name)
+                target_app = observer_at.at(t).observe(target).apparent()
+                alt, az, _ = target_app.altaz()
+                return alt.degrees, (az.degrees + 180.0) % 360.0
 
-    def _is_visible(jd: float, min_alt: float = -1.0) -> bool:
-        """Check if both Moon and target are above horizon."""
-        moon_alt, _ = _get_moon_altaz(jd)
-        target_alt, _ = _get_target_altaz(jd)
-        return moon_alt > min_alt and target_alt > min_alt
+        def _is_visible(jd: float, min_alt: float = -1.0) -> bool:
+            moon_alt, _ = _get_moon_altaz(jd)
+            target_alt, _ = _get_target_altaz(jd)
+            return moon_alt > min_alt and target_alt > min_alt
 
-    def _get_moon_angular_info(jd: float) -> Tuple[float, float, float]:
-        """Get Moon's apparent diameter and distance at given JD from observer."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        moon_app = observer_at.at(t).observe(moon_body).apparent()
-        dist = moon_app.distance().au
-        # Moon angular diameter varies with distance
-        moon_diameter = 2 * MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
-        return moon_diameter, dist, MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
+        def _get_moon_angular_info(jd: float) -> Tuple[float, float, float]:
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_body).apparent()
+            dist = moon_app.distance().au
+            moon_diameter = 2 * MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
+            return moon_diameter, dist, MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist)
 
-    def _get_target_angular_info(jd: float) -> float:
-        """Get target's angular diameter in degrees at given JD."""
-        if planet == 0:
-            # Fixed star - negligible angular size
-            return 0.0001  # ~0.4 arcsec for point source
-        else:
-            # Compute distance to planet for dynamic angular size
+        def _get_target_angular_info(jd: float) -> float:
+            if planet == 0:
+                return 0.0001
             if planet not in _PLANET_MAP:
                 return 0.0001
             target_name = _PLANET_MAP[planet]
@@ -7092,65 +7457,65 @@ def lun_occult_where(
 
     jd = tjdut
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-
-    earth = eph["earth"]
-    moon_body = eph["moon"]
-
-    # Moon's mean angular radius in degrees (varies from ~14.7' to ~16.7')
-    # 932.56 arcsec at mean distance (0.002569 AU)
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
-
-    # Zero return values for no occultation
     zero_geopos = (0.0,) * 10
     zero_attr = (0.0,) * 20
 
-    def _get_moon_geocentric(jd_calc: float) -> Tuple[float, float, float, float]:
-        """Get Moon's geocentric RA, Dec, distance, and angular radius."""
-        t = ts.ut1_jd(jd_calc)
-        moon_app = earth.at(t).observe(moon_body).apparent()
-        ra, dec, dist = moon_app.radec(epoch="date")
-        # Moon angular radius varies with distance
-        moon_angular_radius = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist.au)
-        return ra.hours * 15.0, dec.degrees, dist.au, moon_angular_radius
+    from .state import get_leb_reader
+    _reader = get_leb_reader()
+    if _reader is not None:
+        from .constants import SEFLG_EQUATORIAL
 
-    def _get_target_position(jd_calc: float) -> Tuple[float, float, float]:
-        """Get target body's geocentric RA, Dec, and angular radius."""
-        if planet == 0:
-            # Fixed star
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
+        def _get_moon_geocentric(jd_calc: float) -> Tuple[float, float, float, float]:
+            moon_eq, _ = swe_calc_ut(jd_calc, SE_MOON, SEFLG_EQUATORIAL | SEFLG_SPEED)
+            dist_au = moon_eq[2]
+            moon_ar = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist_au)
+            return moon_eq[0], moon_eq[1], dist_au, moon_ar
 
-            star = FIXED_STARS[star_id]
+        def _get_target_position(jd_calc: float) -> Tuple[float, float, float]:
+            if planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                pos, _, _ = swe_fixstar_ut(star_name, jd_calc, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return pos[0], pos[1], 0.0001
+            else:
+                if planet not in _PLANET_MAP:
+                    raise ValueError(f"illegal planet number {planet}.")
+                tgt_eq, _ = swe_calc_ut(jd_calc, planet, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                ar = _calc_planet_angular_radius(planet, tgt_eq[2])
+                return tgt_eq[0], tgt_eq[1], ar
+    else:
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        moon_body = eph["moon"]
 
-            # Time from J2000.0
-            t_years = (jd_calc - 2451545.0) / 365.25
-
-            # Apply proper motion
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-
-            # Stars have negligible angular radius
-            return ra_deg, dec_deg, 0.0001  # ~0.4 arcsec for point source
-        else:
-            # Planet
-            if planet not in _PLANET_MAP:
-                raise ValueError(f"illegal planet number {planet}.")
-
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-
+        def _get_moon_geocentric(jd_calc: float) -> Tuple[float, float, float, float]:
             t = ts.ut1_jd(jd_calc)
-            target_app = earth.at(t).observe(target).apparent()
-            ra, dec, dist = target_app.radec(epoch="date")
+            moon_app = earth.at(t).observe(moon_body).apparent()
+            ra, dec, dist = moon_app.radec(epoch="date")
+            moon_ar = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / dist.au)
+            return ra.hours * 15.0, dec.degrees, dist.au, moon_ar
 
-            # Dynamic angular radius from physical radius and distance
-            angular_radius = _calc_planet_angular_radius(planet, dist.au)
-
-            return ra.hours * 15.0, dec.degrees, angular_radius
+        def _get_target_position(jd_calc: float) -> Tuple[float, float, float]:
+            if planet == 0:
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t_years = (jd_calc - 2451545.0) / 365.25
+                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                return ra_deg, dec_deg, 0.0001
+            else:
+                if planet not in _PLANET_MAP:
+                    raise ValueError(f"illegal planet number {planet}.")
+                target_name = _PLANET_MAP[planet]
+                target = get_planet_target(eph, target_name)
+                t = ts.ut1_jd(jd_calc)
+                target_app = earth.at(t).observe(target).apparent()
+                ra, dec, dist = target_app.radec(epoch="date")
+                angular_radius = _calc_planet_angular_radius(planet, dist.au)
+                return ra.hours * 15.0, dec.degrees, angular_radius
 
     def _angular_separation(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
         """Calculate angular separation between two points (in degrees)."""
@@ -7185,53 +7550,66 @@ def lun_occult_where(
 
     # Occultation is occurring - calculate where on Earth it's visible
 
-    # Get Skyfield time
-    t = ts.ut1_jd(jd)
+    # Calculate GMST for initial guess
+    _ts_ow = get_timescale()
+    _t_ow = _ts_ow.ut1_jd(jd)
+    gmst = _t_ow.gmst
+    gmst_deg = gmst * 15.0
 
-    # Calculate GMST (Greenwich Mean Sidereal Time)
-    gmst = t.gmst  # in hours
-    gmst_deg = gmst * 15.0  # Convert to degrees
-
-    # Initial guess: Sub-lunar point (where Moon is directly overhead)
-    # Longitude: where Moon's RA = Local Sidereal Time
-    # LST = GMST + longitude, so longitude = RA - GMST
     init_lon = moon_ra - gmst_deg
     init_lon = ((init_lon + 180) % 360) - 180
     init_lat = moon_dec
 
-    # Helper to get target position for topocentric calculations
-    def _get_target_for_observer(observer_at, time_obj):
-        """Get target apparent position from observer location."""
-        if planet == 0:
-            # Fixed star
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
-            star = FIXED_STARS[star_id]
-            t_years = (jd - 2451545.0) / 365.25
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+    if _reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import angular_separation as _ang_sep_ow
 
-            from skyfield.api import Star
+        def get_separation(lat: float, lon: float) -> float:
+            try:
+                _gp = (lon, lat, 0.0)
+                jd_tt = jd + swe_deltat(jd)
+                moon_pos = _topo_ecliptic(_reader, jd_tt, jd, SE_MOON, _gp, SEFLG_SPEED)
+                if planet == 0:
+                    from .fixed_stars import swe_fixstar_ut
+                    tgt_pos, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_SPEED)
+                else:
+                    tgt_pos = _topo_ecliptic(_reader, jd_tt, jd, planet, _gp, SEFLG_SPEED)
+                return _ang_sep_ow(moon_pos[0], moon_pos[1], tgt_pos[0], tgt_pos[1])
+            except (KeyError, ValueError, ArithmeticError, IndexError):
+                return 999.0
+    else:
+        ts = _ts_ow
+        t = _t_ow
+        earth = eph["earth"]
+        moon_body = eph["moon"]
 
-            star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-            return observer_at.at(time_obj).observe(star_obj).apparent()
-        else:
-            target_name = _PLANET_MAP[planet]
-            target = get_planet_target(eph, target_name)
-            return observer_at.at(time_obj).observe(target).apparent()
+        def _get_target_for_observer(observer_at, time_obj):
+            if planet == 0:
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t_years = (jd - 2451545.0) / 365.25
+                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                from skyfield.api import Star
+                star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                return observer_at.at(time_obj).observe(star_obj).apparent()
+            else:
+                target_name = _PLANET_MAP[planet]
+                target = get_planet_target(eph, target_name)
+                return observer_at.at(time_obj).observe(target).apparent()
 
-    # Function to calculate Moon-target separation at a given location
-    def get_separation(lat: float, lon: float) -> float:
-        """Get angular separation between Moon and target from observer location."""
-        try:
-            observer = wgs84.latlon(lat, lon, 0.0)
-            observer_at = earth + observer
-            moon_app = observer_at.at(t).observe(moon_body).apparent()
-            target_app = _get_target_for_observer(observer_at, t)
-            return moon_app.separation_from(target_app).degrees
-        except (ValueError, ArithmeticError, IndexError):
-            return 999.0  # Return large value on error
+        def get_separation(lat: float, lon: float) -> float:
+            try:
+                observer = wgs84.latlon(lat, lon, 0.0)
+                observer_at = earth + observer
+                moon_app = observer_at.at(t).observe(moon_body).apparent()
+                target_app = _get_target_for_observer(observer_at, t)
+                return moon_app.separation_from(target_app).degrees
+            except (KeyError, ValueError, ArithmeticError, IndexError):
+                return 999.0
 
     # Gradient descent to find minimum separation (occultation center)
     # This finds the point on Earth where Moon and target appear closest
@@ -7317,37 +7695,47 @@ def lun_occult_where(
 
     # Calculate attributes at central line
     try:
-        observer = wgs84.latlon(central_lat, central_lon, 0.0)
-        observer_at = earth + observer
+        if _reader is not None:
+            from .time_utils import swe_deltat
+            from .utils import azalt, SE_ECL2HOR
 
-        # Get apparent positions from observer
-        moon_app = observer_at.at(t).observe(moon_body).apparent()
-        target_app = _get_target_for_observer(observer_at, t)
+            _gp_c = (central_lon, central_lat, 0.0)
+            _jd_tt_c = jd + swe_deltat(jd)
+            _moon_c = _topo_ecliptic(_reader, _jd_tt_c, jd, SE_MOON, _gp_c, SEFLG_SPEED)
+            _moon_az_c, moon_altitude, apparent_alt = azalt(jd, SE_ECL2HOR, _gp_c, 1013.25, 15.0, _moon_c[:3])
+            moon_azimuth = _moon_az_c
 
-        # Get Moon altitude and azimuth at central line
-        moon_alt, moon_az, _ = moon_app.altaz()
-        moon_altitude = moon_alt.degrees
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        moon_azimuth = (moon_az.degrees + 180.0) % 360.0
-
-        # Calculate apparent altitude with refraction
-        if moon_altitude > -1.0:
-            if moon_altitude > 0:
-                # Bennett's formula for refraction
-                refraction = 1.0 / math.tan(
-                    math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
-                )
-                apparent_alt = moon_altitude + refraction / 60.0
+            if planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                _tgt_c, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_SPEED)
             else:
-                apparent_alt = moon_altitude + 0.58
+                _tgt_c = _topo_ecliptic(_reader, _jd_tt_c, jd, planet, _gp_c, SEFLG_SPEED)
+            local_separation = _ang_sep_ow(_moon_c[0], _moon_c[1], _tgt_c[0], _tgt_c[1])
+            local_moon_dist = _moon_c[2]
         else:
-            apparent_alt = moon_altitude
+            observer = wgs84.latlon(central_lat, central_lon, 0.0)
+            observer_at = earth + observer
 
-        # Calculate local angular separation
-        local_separation = moon_app.separation_from(target_app).degrees
+            moon_app = observer_at.at(t).observe(moon_body).apparent()
+            target_app = _get_target_for_observer(observer_at, t)
 
-        # Calculate local angular sizes
-        local_moon_dist = moon_app.distance().au
+            moon_alt, moon_az, _ = moon_app.altaz()
+            moon_altitude = moon_alt.degrees
+            moon_azimuth = (moon_az.degrees + 180.0) % 360.0
+
+            if moon_altitude > -1.0:
+                if moon_altitude > 0:
+                    refraction = 1.0 / math.tan(
+                        math.radians(moon_altitude + 7.31 / (moon_altitude + 4.4))
+                    )
+                    apparent_alt = moon_altitude + refraction / 60.0
+                else:
+                    apparent_alt = moon_altitude + 0.58
+            else:
+                apparent_alt = moon_altitude
+
+            local_separation = moon_app.separation_from(target_app).degrees
+            local_moon_dist = moon_app.distance().au
         local_moon_radius = MOON_MEAN_ANGULAR_RADIUS_DEG * (0.002569 / local_moon_dist)
         local_moon_diameter = 2 * local_moon_radius
         local_target_diameter = 2 * target_radius
@@ -7369,7 +7757,7 @@ def lun_occult_where(
         else:
             diameter_ratio = 999.0  # Moon much larger than star
 
-    except (ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError):
         # If calculation fails, use defaults
         moon_azimuth = 0.0
         moon_altitude = 0.0
@@ -7582,34 +7970,58 @@ def rise_trans(
             % rsmi
         )
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    earth = eph["earth"]
+    from .state import get_leb_reader as _get_leb_reader_rt
 
-    # Resolve target body (planet or fixed star)
-    if is_fixed_star:
-        from skyfield.api import Star as SkyfieldStar
-        from .fixed_stars import FIXED_STARS, _resolve_star_id
+    _reader_rt = _get_leb_reader_rt()
+    _use_leb_rt = _reader_rt is not None
 
-        star_id, err, _ = _resolve_star_id(body)
-        if err is not None:
-            raise ValueError(err)
-        star_entry = FIXED_STARS[star_id]
-        t_years = (jd_start - 2451545.0) / 365.25
-        ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
-        dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
-        target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-        planet = -1  # Sentinel for fixed star (no semi-diameter)
+    if _use_leb_rt:
+        try:
+            from . import fast_calc as _fc_rt
+            from .time_utils import swe_deltat as _sd_rt
+            if not is_fixed_star:
+                _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, SEFLG_SPEED)
+        except (KeyError, ValueError):
+            _use_leb_rt = False
+
+    if _use_leb_rt:
+        from .constants import SEFLG_EQUATORIAL
+
+        geopos_leb = (lon, lat, altitude)
+        if is_fixed_star:
+            planet = -1
+        else:
+            planet = body
+            if planet not in _PLANET_MAP:
+                raise ValueError("illegal planet number %d." % planet)
+        ts = get_timescale()
+        earth = None
+        target = None
+        observer = None
     else:
-        planet = body
-        if planet not in _PLANET_MAP:
-            raise ValueError("illegal planet number %d." % planet)
-        target_name = _PLANET_MAP[planet]
-        target = get_planet_target(eph, target_name)
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        if is_fixed_star:
+            from skyfield.api import Star as SkyfieldStar
+            from .fixed_stars import FIXED_STARS, _resolve_star_id
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+            star_id, err, _ = _resolve_star_id(body)
+            if err is not None:
+                raise ValueError(err)
+            star_entry = FIXED_STARS[star_id]
+            t_years = (jd_start - 2451545.0) / 365.25
+            ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
+            dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
+            target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+            planet = -1
+        else:
+            planet = body
+            if planet not in _PLANET_MAP:
+                raise ValueError("illegal planet number %d." % planet)
+            target_name = _PLANET_MAP[planet]
+            target = get_planet_target(eph, target_name)
+        observer = wgs84.latlon(lat, lon, altitude)
 
     # Handle atpress=0: estimate pressure from altitude (pyswisseph convention).
     # When atpress is 0, Swiss Ephemeris estimates pressure using the
@@ -7654,98 +8066,96 @@ def rise_trans(
     # Calculate semi-diameter dynamically based on body distance
     # Calculate actual angular size at observation time
     # We need to compute this at an initial estimate time
-    def _get_semi_diameter(jd: float, body: int) -> float:
-        """Calculate semi-diameter of Sun or Moon at given JD in degrees."""
-        if body == SE_SUN:
-            # Sun's mean semi-diameter at 1 AU is 959.63 arcsec (15.9939')
-            # Actual SD = mean_SD * (1 AU / distance)
-            t = ts.ut1_jd(jd)
-            sun_pos = earth.at(t).observe(eph["sun"])
-            distance_au = sun_pos.distance().au
-            # Mean semi-diameter at 1 AU
-            mean_sd_arcsec = 959.63
-            actual_sd_arcsec = mean_sd_arcsec / distance_au
-            return actual_sd_arcsec / 3600.0  # Convert to degrees
-        elif body == SE_MOON:
-            # Moon's mean semi-diameter at mean distance (384400 km) is 932.56 arcsec
-            # Moon radius = 1737.4 km
-            t = ts.ut1_jd(jd)
-            moon_pos = earth.at(t).observe(eph["moon"])
-            distance_km = moon_pos.distance().km
-            # Angular radius = atan(radius / distance) ≈ radius / distance (radians)
-            moon_radius_km = 1737.4
-            sd_rad = math.atan(moon_radius_km / distance_km)
-            return math.degrees(sd_rad)
-        else:
+    if _use_leb_rt:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
+
+        _AU_KM = 149597870.7
+
+        def _get_semi_diameter(jd: float, body: int) -> float:
+            if body == SE_SUN:
+                sun_pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+                return (959.63 / sun_pos[2]) / 3600.0
+            elif body == SE_MOON:
+                moon_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+                dist_km = moon_pos[2] * _AU_KM
+                return math.degrees(math.atan(1737.4 / dist_km))
             return 0.0
 
-    # Initial semi-diameter estimate (will be refined during iteration)
+        def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            if is_fixed_star:
+                from .fixed_stars import swe_fixstar_ut
+                star_pos, _, _ = swe_fixstar_ut(body, jd, SEFLG_SPEED)
+                az, alt_true, _ = azalt(jd, SE_ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
+            else:
+                pos = _topo_ecliptic(_reader_rt, jd_tt, jd, planet, geopos_leb, SEFLG_SPEED)
+                az, alt_true, _ = azalt(jd, SE_ECL2HOR, geopos_leb, 0, 0, pos[:3])
+            return alt_true, az
+
+        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            if is_fixed_star:
+                from .fixed_stars import swe_fixstar_ut
+                pos, _, _ = swe_fixstar_ut(body, jd, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return pos[0] / 15.0, pos[1]
+            else:
+                eq, _ = swe_calc_ut(jd, planet, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return eq[0] / 15.0, eq[1]
+    else:
+        def _get_semi_diameter(jd: float, body: int) -> float:
+            if body == SE_SUN:
+                t = ts.ut1_jd(jd)
+                sun_pos = earth.at(t).observe(eph["sun"])
+                distance_au = sun_pos.distance().au
+                return (959.63 / distance_au) / 3600.0
+            elif body == SE_MOON:
+                t = ts.ut1_jd(jd)
+                moon_pos = earth.at(t).observe(eph["moon"])
+                distance_km = moon_pos.distance().km
+                return math.degrees(math.atan(1737.4 / distance_km))
+            return 0.0
+
+        def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            body_app = observer_at.at(t).observe(target).apparent()
+            alt, az, _ = body_app.altaz()
+            return alt.degrees, (az.degrees + 180.0) % 360.0
+
+        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            body_app = earth.at(t).observe(target).apparent()
+            ra, dec, _ = body_app.radec(epoch="date")
+            return ra.hours, dec.degrees
+
     initial_sd = _get_semi_diameter(jd_start, planet)
 
-    # Account for disc semi-diameter
-    # Twilight modes use Sun's geometric center at the depression angle;
-    # disc semi-diameter is not applied (confirmed by independent testing:
-    # twilight with DISC_CENTER flag gives identical results to without).
     is_twilight = bool(
         rsmi & (SE_BIT_CIVIL_TWILIGHT | SE_BIT_NAUTIC_TWILIGHT | SE_BIT_ASTRO_TWILIGHT)
     )
     if is_twilight or (rsmi & SE_BIT_DISC_CENTER):
         disc_correction = 0.0
     elif rsmi & SE_BIT_DISC_BOTTOM:
-        # Lower limb: add semi-diameter (rises later, sets earlier)
         disc_correction = initial_sd
     else:
-        # Default: upper limb (subtract semi-diameter)
         disc_correction = -initial_sd
 
-    # Effective horizon altitude (negative means below geometric horizon)
     target_altitude = horizon_alt - refraction + disc_correction
 
-    def _get_body_altaz(jd: float) -> Tuple[float, float]:
-        """Get body's altitude and azimuth at given JD from observer location."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        body_app = observer_at.at(t).observe(target).apparent()
-        alt, az, _ = body_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
-
-    def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-        """Get body's RA and Dec at given JD (epoch of date)."""
-        t = ts.ut1_jd(jd)
-        body_app = earth.at(t).observe(target).apparent()
-        ra, dec, _ = body_app.radec(epoch="date")
-        return ra.hours, dec.degrees  # RA in hours, Dec in degrees
-
-    # Handle transit calculations
     if event_type in (SE_CALC_MTRANSIT, SE_CALC_ITRANSIT):
+        if _use_leb_rt:
+            return _calculate_transit_leb(
+                jd_start, lon, event_type, _get_body_ra_dec, SE_CALC_ITRANSIT,
+            )
         return _calculate_transit(
-            jd_start,
-            lat,
-            lon,
-            event_type,
-            ts,
-            earth,
-            target,
-            observer,
+            jd_start, lat, lon, event_type, ts, earth, target, observer,
             SE_CALC_ITRANSIT,
         )
 
-    # Handle rise/set calculations
     return _calculate_rise_set(
-        jd_start,
-        lat,
-        lon,
-        event_type,
-        target_altitude,
-        ts,
-        earth,
-        target,
-        observer,
-        _get_body_altaz,
-        _get_body_ra_dec,
-        SE_CALC_RISE,
-        SE_CALC_SET,
+        jd_start, lat, lon, event_type, target_altitude, ts, earth, target,
+        observer, _get_body_altaz, _get_body_ra_dec, SE_CALC_RISE, SE_CALC_SET,
         rsmi,
     )
 
@@ -7757,6 +8167,53 @@ def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
     (the Julian Day of the event). Remaining elements are always 0.0.
     """
     return (jd_event, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def _calculate_transit_leb(
+    jd_start: float,
+    lon: float,
+    event_type: int,
+    get_ra_dec,
+    SE_CALC_ITRANSIT: int,
+) -> Tuple[int, Tuple[float, ...]]:
+    """LEB version of _calculate_transit using a callable for RA/Dec."""
+
+    def _get_body_hour_angle(jd: float) -> float:
+        ra_hours, _ = get_ra_dec(jd)
+        ra_deg = ra_hours * 15.0
+        t = get_timescale().ut1_jd(jd)
+        gmst = t.gmst
+        lst = gmst + lon / 15.0
+        lst_deg = lst * 15.0
+        ha = (lst_deg - ra_deg) % 360.0
+        if ha > 180:
+            ha -= 360
+        return ha
+
+    ha = _get_body_hour_angle(jd_start)
+    if event_type == SE_CALC_ITRANSIT:
+        ha = (ha - 180) % 360
+        if ha > 180:
+            ha -= 360
+
+    sidereal_day = 0.99726957
+    if ha > 0:
+        dt = (360.0 - ha) / 360.0 * sidereal_day
+    else:
+        dt = (-ha) / 360.0 * sidereal_day
+
+    jd_guess = jd_start + dt
+    for _ in range(30):
+        ha = _get_body_hour_angle(jd_guess)
+        if event_type == SE_CALC_ITRANSIT:
+            ha = (ha - 180) % 360
+            if ha > 180:
+                ha -= 360
+        if abs(ha) < 1.0 / 3600.0:
+            return 0, _make_tret(jd_guess)
+        jd_guess -= ha / (360.0 / sidereal_day)
+
+    return 0, _make_tret(jd_guess)
 
 
 def _calculate_transit(
@@ -8105,34 +8562,58 @@ def rise_trans_true_hor(
             % rsmi
         )
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    earth = eph["earth"]
+    from .state import get_leb_reader as _get_leb_reader_rt
 
-    # Resolve target body (planet or fixed star)
-    if is_fixed_star:
-        from skyfield.api import Star as SkyfieldStar
-        from .fixed_stars import FIXED_STARS, _resolve_star_id
+    _reader_rt = _get_leb_reader_rt()
+    _use_leb_rt = _reader_rt is not None
 
-        star_id, err, _ = _resolve_star_id(body)
-        if err is not None:
-            raise ValueError(err)
-        star_entry = FIXED_STARS[star_id]
-        t_years = (jd_start - 2451545.0) / 365.25
-        ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
-        dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
-        target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-        planet = -1  # Sentinel for fixed star (no semi-diameter)
+    if _use_leb_rt:
+        try:
+            from . import fast_calc as _fc_rt
+            from .time_utils import swe_deltat as _sd_rt
+            if not is_fixed_star:
+                _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, SEFLG_SPEED)
+        except (KeyError, ValueError):
+            _use_leb_rt = False
+
+    if _use_leb_rt:
+        from .constants import SEFLG_EQUATORIAL
+
+        geopos_leb = (lon, lat, altitude)
+        if is_fixed_star:
+            planet = -1
+        else:
+            planet = body
+            if planet not in _PLANET_MAP:
+                raise ValueError("illegal planet number %d." % planet)
+        ts = get_timescale()
+        earth = None
+        target = None
+        observer = None
     else:
-        planet = body
-        if planet not in _PLANET_MAP:
-            raise ValueError("illegal planet number %d." % planet)
-        target_name = _PLANET_MAP[planet]
-        target = get_planet_target(eph, target_name)
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        if is_fixed_star:
+            from skyfield.api import Star as SkyfieldStar
+            from .fixed_stars import FIXED_STARS, _resolve_star_id
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+            star_id, err, _ = _resolve_star_id(body)
+            if err is not None:
+                raise ValueError(err)
+            star_entry = FIXED_STARS[star_id]
+            t_years = (jd_start - 2451545.0) / 365.25
+            ra_deg = star_entry.ra_j2000 + (star_entry.pm_ra * t_years) / 3600.0
+            dec_deg = star_entry.dec_j2000 + (star_entry.pm_dec * t_years) / 3600.0
+            target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+            planet = -1
+        else:
+            planet = body
+            if planet not in _PLANET_MAP:
+                raise ValueError("illegal planet number %d." % planet)
+            target_name = _PLANET_MAP[planet]
+            target = get_planet_target(eph, target_name)
+        observer = wgs84.latlon(lat, lon, altitude)
 
     # Handle atpress=0: estimate pressure from altitude (pyswisseph convention).
     # When atpress is 0, Swiss Ephemeris estimates pressure using the
@@ -8193,51 +8674,57 @@ def rise_trans_true_hor(
     # Effective horizon altitude (negative means below geometric horizon)
     target_altitude = horizon_alt - refraction + disc_correction
 
-    def _get_body_altaz(jd: float) -> Tuple[float, float]:
-        """Get body's altitude and azimuth at given JD from observer location."""
-        t = ts.ut1_jd(jd)
-        observer_at = earth + observer
-        body_app = observer_at.at(t).observe(target).apparent()
-        alt, az, _ = body_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
+    if _use_leb_rt:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-    def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
-        """Get body's RA and Dec at given JD (epoch of date)."""
-        t = ts.ut1_jd(jd)
-        body_app = earth.at(t).observe(target).apparent()
-        ra, dec, _ = body_app.radec(epoch="date")
-        return ra.hours, dec.degrees  # RA in hours, Dec in degrees
+        def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            if is_fixed_star:
+                from .fixed_stars import swe_fixstar_ut
+                star_pos, _, _ = swe_fixstar_ut(body, jd, SEFLG_SPEED)
+                az, alt_true, _ = azalt(jd, SE_ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
+            else:
+                pos = _topo_ecliptic(_reader_rt, jd_tt, jd, planet, geopos_leb, SEFLG_SPEED)
+                az, alt_true, _ = azalt(jd, SE_ECL2HOR, geopos_leb, 0, 0, pos[:3])
+            return alt_true, az
 
-    # Handle transit calculations
+        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            if is_fixed_star:
+                from .fixed_stars import swe_fixstar_ut
+                pos, _, _ = swe_fixstar_ut(body, jd, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return pos[0] / 15.0, pos[1]
+            else:
+                eq, _ = swe_calc_ut(jd, planet, SEFLG_EQUATORIAL | SEFLG_SPEED)
+                return eq[0] / 15.0, eq[1]
+    else:
+        def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            observer_at = earth + observer
+            body_app = observer_at.at(t).observe(target).apparent()
+            alt, az, _ = body_app.altaz()
+            return alt.degrees, (az.degrees + 180.0) % 360.0
+
+        def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            t = ts.ut1_jd(jd)
+            body_app = earth.at(t).observe(target).apparent()
+            ra, dec, _ = body_app.radec(epoch="date")
+            return ra.hours, dec.degrees
+
     if event_type in (SE_CALC_MTRANSIT, SE_CALC_ITRANSIT):
+        if _use_leb_rt:
+            return _calculate_transit_leb(
+                jd_start, lon, event_type, _get_body_ra_dec, SE_CALC_ITRANSIT,
+            )
         return _calculate_transit(
-            jd_start,
-            lat,
-            lon,
-            event_type,
-            ts,
-            earth,
-            target,
-            observer,
+            jd_start, lat, lon, event_type, ts, earth, target, observer,
             SE_CALC_ITRANSIT,
         )
 
-    # Handle rise/set calculations
     return _calculate_rise_set(
-        jd_start,
-        lat,
-        lon,
-        event_type,
-        target_altitude,
-        ts,
-        earth,
-        target,
-        observer,
-        _get_body_altaz,
-        _get_body_ra_dec,
-        SE_CALC_RISE,
-        SE_CALC_SET,
+        jd_start, lat, lon, event_type, target_altitude, ts, earth, target,
+        observer, _get_body_altaz, _get_body_ra_dec, SE_CALC_RISE, SE_CALC_SET,
         rsmi,
     )
 
@@ -8401,7 +8888,7 @@ def heliacal_ut(
         try:
             pheno = swe_pheno_ut(jd, body, flags)
             return pheno[2]  # Elongation
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             # Fallback: calculate elongation manually
             t = ts.ut1_jd(jd)
             sun_app = earth.at(t).observe(sun).apparent()
@@ -8413,7 +8900,7 @@ def heliacal_ut(
         try:
             pheno = swe_pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0.0  # Default to bright magnitude
 
     def _calculate_limiting_magnitude(sun_alt: float, body_alt: float) -> float:
@@ -8935,7 +9422,7 @@ def heliacal_pheno_ut(
         elongation = pheno[2]  # Elongation
         magnitude = pheno[4]  # Visual magnitude
         phase_angle = pheno[1]  # Phase angle
-    except (ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError):
         # Calculate elongation manually
         sun_geo = earth.at(t).observe(sun).apparent()
         elongation = body_geo.separation_from(sun_geo).degrees
@@ -9051,7 +9538,7 @@ def heliacal_pheno_ut(
             # L ≈ pi * D / 2 where D is diameter
             moon_diameter = 0.5  # Approximately 0.5 degrees
             l_moon = math.pi * moon_diameter / 2
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             pass
 
     # Yallop q-test (for lunar crescent visibility)
@@ -9337,7 +9824,7 @@ def vis_limit_mag(
             try:
                 star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            except (ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError):
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal
@@ -9380,7 +9867,7 @@ def vis_limit_mag(
             try:
                 pheno_result = swe_pheno_ut(jd, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
-            except (ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError):
                 obj_mag = 0.0  # Default bright
         else:
             raise ValueError(f"illegal planet number {body_id}.")
@@ -9482,7 +9969,7 @@ def vis_limit_mag(
             moon_pheno = swe_pheno_ut(jd_ut, SE_MOON, flags & 0xFF)
             phase_angle = moon_pheno[0]  # Phase angle in degrees
             illumination = (1 + math.cos(math.radians(phase_angle))) / 2.0
-        except (ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError):
             illumination = 0.5  # Assume half moon
 
         # Moon brightness increases with altitude and illumination
@@ -9698,33 +10185,47 @@ def calc_besselian_x(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # AU to km conversion
     AU_TO_KM = 149597870.7
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        # Get Earth, Sun, Moon
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    # These are geocentric equatorial coordinates (x toward vernal equinox,
-    # z toward north celestial pole, y completes right-handed system)
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
+        earth_at = earth.at(t)
+
+        # Geocentric apparent positions
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        # Get Cartesian positions in AU
+        sun_pos = sun_apparent.position.au  # [x, y, z] in AU
+        moon_pos = moon_apparent.position.au  # [x, y, z] in AU
 
     # Shadow axis direction: from Sun toward Moon
     # This is the direction of the shadow cone axis
@@ -9752,30 +10253,19 @@ def calc_besselian_x(jd: float, flags: int = SEFLG_SWIEPH) -> float:
     # This gives a vector pointing eastward, perpendicular to shadow axis.
 
     # Cross product of [0, 0, 1] × shadow_unit
-    # = [0*shadow_unit[2] - 1*shadow_unit[1],
-    #    1*shadow_unit[0] - 0*shadow_unit[2],
-    #    0*shadow_unit[1] - 0*shadow_unit[0]]
-    # = [-shadow_unit[1], shadow_unit[0], 0]
     x_axis_raw = [-shadow_unit[1], shadow_unit[0], 0.0]
 
     # Normalize x-axis
     x_axis_len = math.sqrt(x_axis_raw[0] ** 2 + x_axis_raw[1] ** 2)
 
     # Handle edge case where shadow axis is nearly parallel to z-axis
-    # (extremely rare for solar eclipses)
     if x_axis_len < 1e-10:
-        # Shadow axis nearly vertical - use y-axis as x instead
         x_axis = [1.0, 0.0, 0.0]
     else:
         x_axis = [x_axis_raw[0] / x_axis_len, x_axis_raw[1] / x_axis_len, 0.0]
 
     # Project Moon's position onto the fundamental plane
-    # The Moon's position in the fundamental plane coordinate system:
-    # - Find how far Moon is along the shadow axis from Earth's center
-    # - The projection onto the fundamental plane gives us the displacement
-
     # Dot product of Moon position with shadow axis unit vector
-    # This gives the component along the shadow axis
     moon_along_axis = (
         moon_pos[0] * shadow_unit[0]
         + moon_pos[1] * shadow_unit[1]
@@ -9858,36 +10348,44 @@ def calc_besselian_y(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # AU to km conversion
     AU_TO_KM = 149597870.7
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    # These are geocentric equatorial coordinates (x toward vernal equinox,
-    # z toward north celestial pole, y completes right-handed system)
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        earth_at = earth.at(t)
+
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        sun_pos = sun_apparent.position.au
+        moon_pos = moon_apparent.position.au
 
     # Shadow axis direction: from Sun toward Moon
-    # This is the direction of the shadow cone axis
     shadow_dir = [
         moon_pos[0] - sun_pos[0],
         moon_pos[1] - sun_pos[1],
@@ -9902,20 +10400,6 @@ def calc_besselian_y(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         shadow_dir[2] / shadow_len,
     ]
 
-    # The fundamental plane passes through Earth's center and is perpendicular
-    # to the shadow axis. We need to define an x-axis in this plane pointing
-    # eastward (in the direction of increasing RA).
-
-    # The conventional Besselian x-axis is perpendicular to the shadow axis
-    # and lies in the equatorial plane (or as close to it as possible).
-    # We use cross product: x_axis = k × shadow_axis (where k = [0, 0, 1])
-    # This gives a vector pointing eastward, perpendicular to shadow axis.
-
-    # Cross product of [0, 0, 1] × shadow_unit
-    # = [0*shadow_unit[2] - 1*shadow_unit[1],
-    #    1*shadow_unit[0] - 0*shadow_unit[2],
-    #    0*shadow_unit[1] - 0*shadow_unit[0]]
-    # = [-shadow_unit[1], shadow_unit[0], 0]
     x_axis_raw = [-shadow_unit[1], shadow_unit[0], 0.0]
 
     # Normalize x-axis
@@ -10025,33 +10509,41 @@ def calc_besselian_d(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    # These are geocentric equatorial coordinates (x toward vernal equinox,
-    # z toward north celestial pole, y completes right-handed system)
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        earth_at = earth.at(t)
+
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        sun_pos = sun_apparent.position.au
+        moon_pos = moon_apparent.position.au
 
     # Shadow axis direction: from Sun toward Moon
-    # This is the direction of the shadow cone axis
     shadow_dir = [
         moon_pos[0] - sun_pos[0],
         moon_pos[1] - sun_pos[1],
@@ -10148,33 +10640,44 @@ def calc_besselian_l1(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Physical constants
     AU_TO_KM = 149597870.7  # km per AU
     SUN_RADIUS_KM = 696000.0  # IAU nominal solar radius
     MOON_RADIUS_KM = 1737.4  # Mean lunar radius
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        earth_at = earth.at(t)
+
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        sun_pos = sun_apparent.position.au
+        moon_pos = moon_apparent.position.au
 
     # Calculate distances
     # Sun distance from Earth (geocentric)
@@ -10305,33 +10808,44 @@ def calc_besselian_l2(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Physical constants
     AU_TO_KM = 149597870.7  # km per AU
     SUN_RADIUS_KM = 696000.0  # IAU nominal solar radius
     MOON_RADIUS_KM = 1737.4  # Mean lunar radius
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        earth_at = earth.at(t)
+
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        sun_pos = sun_apparent.position.au
+        moon_pos = moon_apparent.position.au
 
     # Calculate distances
     # Moon distance from Earth (geocentric)
@@ -10453,30 +10967,39 @@ def calc_besselian_mu(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
+    reader = get_leb_reader()
+    _leb_ok = False
+    if reader is not None:
+        try:
+            from .fast_calc import _apparent_icrs_cartesian
+            from .time_utils import swe_deltat
 
-    # Get Earth, Sun, Moon
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
+            jd_tt = jd + swe_deltat(jd)
+            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_SUN)
+            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, SE_MOON)
+            _leb_ok = True
+        except (KeyError, ValueError):
+            pass
+    if not _leb_ok:
+        from .state import get_planets, get_timescale
 
-    # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-    earth_at = earth.at(t)
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
 
-    # Geocentric apparent positions
-    sun_apparent = earth_at.observe(sun).apparent()
-    moon_apparent = earth_at.observe(moon).apparent()
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
 
-    # Get Cartesian positions in AU
-    # These are geocentric equatorial coordinates (x toward vernal equinox,
-    # z toward north celestial pole, y completes right-handed system)
-    sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-    moon_pos = moon_apparent.position.au  # [x, y, z] in AU
+        earth_at = earth.at(t)
+
+        sun_apparent = earth_at.observe(sun).apparent()
+        moon_apparent = earth_at.observe(moon).apparent()
+
+        sun_pos = sun_apparent.position.au
+        moon_pos = moon_apparent.position.au
 
     # Shadow axis direction: from Moon toward Sun
     # This is the conventional Besselian axis direction (toward Earth/observer)
@@ -10498,9 +11021,11 @@ def calc_besselian_mu(jd: float, flags: int = SEFLG_SWIEPH) -> float:
         ra_deg += 360.0
 
     # Calculate Greenwich Apparent Sidereal Time (GAST)
-    # We need the nutation and obliquity for accurate GAST
-    # Use Skyfield's built-in calculation for accuracy
-    gast = t.gast  # Greenwich Apparent Sidereal Time in hours
+    from .state import get_timescale as _get_ts_mu
+
+    ts_mu = _get_ts_mu()
+    t_mu = ts_mu.ut1_jd(jd)
+    gast = t_mu.gast  # Greenwich Apparent Sidereal Time in hours
 
     # Convert GAST from hours to degrees (1 hour = 15 degrees)
     gast_deg = gast * 15.0
@@ -12645,23 +13170,12 @@ def calc_eclipse_path_width(
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
     # Constants
     AU_TO_KM = 149597870.7
     SUN_RADIUS_KM = 696340.0
     MOON_RADIUS_KM = 1737.4
-
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
-
-    # Get celestial bodies
-    earth = eph["earth"]
-    sun = eph["sun"]
-    moon = eph["moon"]
 
     # Determine the location for calculation
     if lat is not None and lon is not None:
@@ -12670,39 +13184,77 @@ def calc_eclipse_path_width(
         calc_lon = lon
     else:
         # Find central line location at this time using swe_sol_eclipse_where
-        ecl_type, geopos, attr = swe_sol_eclipse_where(jd, flags)
-        calc_lon = geopos[0]
-        calc_lat = geopos[1]
+        ecl_type, geopos_result, attr = swe_sol_eclipse_where(jd, flags)
+        calc_lon = geopos_result[0]
+        calc_lat = geopos_result[1]
 
         # Check if this is a central eclipse
         if not (ecl_type & SE_ECL_CENTRAL):
             return 0.0
 
-    # Create observer at the calculation location
-    try:
-        observer = wgs84.latlon(calc_lat, calc_lon, 0.0)
-        observer_at = earth + observer
-    except (ValueError, ArithmeticError, IndexError):
-        return 0.0
+    reader = get_leb_reader()
 
-    # Get Sun and Moon apparent positions from the observer
-    try:
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        return 0.0
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-    # Get Sun altitude
-    sun_alt, sun_az, _ = sun_app.altaz()
-    sun_altitude = sun_alt.degrees
+        _gp = (calc_lon, calc_lat, 0.0)
 
-    # If Sun is below horizon, no path width
-    if sun_altitude <= 0:
-        return 0.0
+        try:
+            jd_tt = jd + swe_deltat(jd)
+            sun_topo = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            moon_topo = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0.0
 
-    # Get distances
-    sun_dist_au = sun_app.distance().au
-    moon_dist_au = moon_app.distance().au
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_altitude = sun_alt_true
+
+        if sun_altitude <= 0:
+            return 0.0
+
+        sun_dist_au = sun_topo[2]
+        moon_dist_au = moon_topo[2]
+    else:
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
+
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
+        t = ts.ut1_jd(jd)
+
+        # Get celestial bodies
+        earth = eph["earth"]
+        sun = eph["sun"]
+        moon = eph["moon"]
+
+        # Create observer at the calculation location
+        try:
+            observer = wgs84.latlon(calc_lat, calc_lon, 0.0)
+            observer_at = earth + observer
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0.0
+
+        # Get Sun and Moon apparent positions from the observer
+        try:
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0.0
+
+        # Get Sun altitude
+        sun_alt, sun_az, _ = sun_app.altaz()
+        sun_altitude = sun_alt.degrees
+
+        # If Sun is below horizon, no path width
+        if sun_altitude <= 0:
+            return 0.0
+
+        # Get distances
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
 
     sun_dist_km = sun_dist_au * AU_TO_KM
     moon_dist_km = moon_dist_au * AU_TO_KM
@@ -12714,7 +13266,12 @@ def calc_eclipse_path_width(
     moon_sun_ratio = moon_angular_radius / sun_angular_radius
 
     # Check if Sun and Moon are close enough for central eclipse
-    separation = sun_app.separation_from(moon_app).degrees
+    if reader is not None:
+        from .utils import angular_separation as _ang_sep_pw
+
+        separation = _ang_sep_pw(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+    else:
+        separation = sun_app.separation_from(moon_app).degrees
     diff_radii = abs(moon_angular_radius - sun_angular_radius)
 
     if separation > diff_radii:
@@ -13654,49 +14211,77 @@ def sol_eclipse_magnitude_at_loc(
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Reference documentation
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        _gp = (lon, lat, altitude)
 
-    # Get Skyfield time
-    t = ts.ut1_jd(jd)
+        try:
+            jd_tt = jd + swe_deltat(jd)
+            sun_topo = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            moon_topo = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0.0
 
-    # Create observer position
-    observer_at = earth + observer
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_altitude = sun_alt_true
 
-    # Get apparent positions from observer (topocentric)
-    try:
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        # If calculation fails, return 0 magnitude
-        return 0.0
+        if sun_altitude < -1.0:
+            return 0.0
 
-    # Get Sun altitude to check visibility
-    sun_alt, _, _ = sun_app.altaz()
-    sun_altitude = sun_alt.degrees
+        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        sun_dist_au = sun_topo[2]
+        moon_dist_au = moon_topo[2]
+    else:
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
 
-    # If Sun is below horizon, no visible eclipse
-    if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return 0.0
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-    # Calculate angular separation between Sun and Moon
-    separation = sun_app.separation_from(moon_app).degrees
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
 
-    # Get distances for angular size calculations
-    sun_dist_au = sun_app.distance().au
-    moon_dist_au = moon_app.distance().au
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        # Get Skyfield time
+        t = ts.ut1_jd(jd)
+
+        # Create observer position
+        observer_at = earth + observer
+
+        # Get apparent positions from observer (topocentric)
+        try:
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            # If calculation fails, return 0 magnitude
+            return 0.0
+
+        # Get Sun altitude to check visibility
+        sun_alt, _, _ = sun_app.altaz()
+        sun_altitude = sun_alt.degrees
+
+        # If Sun is below horizon, no visible eclipse
+        if sun_altitude < -1.0:  # Allow for refraction near horizon
+            return 0.0
+
+        # Calculate angular separation between Sun and Moon
+        separation = sun_app.separation_from(moon_app).degrees
+
+        # Get distances for angular size calculations
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
 
     # Angular radii (in degrees)
     # Sun: mean radius 959.63" at 1 AU
@@ -13852,49 +14437,77 @@ def sol_eclipse_obscuration_at_loc(
         - Reference documentation
         - Intersection of two circles formula (computational geometry)
     """
-    from skyfield.api import wgs84
-    from .state import get_planets, get_timescale
+    from .state import get_leb_reader
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
+    reader = get_leb_reader()
 
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
+    if reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
-    # Get Sun and Moon objects
-    sun = eph["sun"]
-    moon = eph["moon"]
-    earth = eph["earth"]
+        _gp = (lon, lat, altitude)
 
-    # Get Skyfield time
-    t = ts.ut1_jd(jd)
+        try:
+            jd_tt = jd + swe_deltat(jd)
+            sun_topo = _topo_ecliptic(reader, jd_tt, jd, SE_SUN, _gp)
+            moon_topo = _topo_ecliptic(reader, jd_tt, jd, SE_MOON, _gp)
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            return 0.0
 
-    # Create observer position
-    observer_at = earth + observer
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, SE_ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_altitude = sun_alt_true
 
-    # Get apparent positions from observer (topocentric)
-    try:
-        sun_app = observer_at.at(t).observe(sun).apparent()
-        moon_app = observer_at.at(t).observe(moon).apparent()
-    except (ValueError, ArithmeticError, IndexError):
-        # If calculation fails, return 0 obscuration
-        return 0.0
+        if sun_altitude < -1.0:
+            return 0.0
 
-    # Get Sun altitude to check visibility
-    sun_alt, _, _ = sun_app.altaz()
-    sun_altitude = sun_alt.degrees
+        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        sun_dist_au = sun_topo[2]
+        moon_dist_au = moon_topo[2]
+    else:
+        from skyfield.api import wgs84
+        from .state import get_planets, get_timescale
 
-    # If Sun is below horizon, no visible eclipse
-    if sun_altitude < -1.0:  # Allow for refraction near horizon
-        return 0.0
+        # Get ephemeris and timescale
+        eph = get_planets()
+        ts = get_timescale()
 
-    # Calculate angular separation between Sun and Moon
-    separation = sun_app.separation_from(moon_app).degrees
+        # Create observer location
+        observer = wgs84.latlon(lat, lon, altitude)
 
-    # Get distances for angular size calculations
-    sun_dist_au = sun_app.distance().au
-    moon_dist_au = moon_app.distance().au
+        # Get Sun and Moon objects
+        sun = eph["sun"]
+        moon = eph["moon"]
+        earth = eph["earth"]
+
+        # Get Skyfield time
+        t = ts.ut1_jd(jd)
+
+        # Create observer position
+        observer_at = earth + observer
+
+        # Get apparent positions from observer (topocentric)
+        try:
+            sun_app = observer_at.at(t).observe(sun).apparent()
+            moon_app = observer_at.at(t).observe(moon).apparent()
+        except (KeyError, ValueError, ArithmeticError, IndexError):
+            # If calculation fails, return 0 obscuration
+            return 0.0
+
+        # Get Sun altitude to check visibility
+        sun_alt, _, _ = sun_app.altaz()
+        sun_altitude = sun_alt.degrees
+
+        # If Sun is below horizon, no visible eclipse
+        if sun_altitude < -1.0:  # Allow for refraction near horizon
+            return 0.0
+
+        # Calculate angular separation between Sun and Moon
+        separation = sun_app.separation_from(moon_app).degrees
+
+        # Get distances for angular size calculations
+        sun_dist_au = sun_app.distance().au
+        moon_dist_au = moon_app.distance().au
 
     # Angular radii (in degrees)
     # Sun: mean radius 959.63" at 1 AU
@@ -14485,11 +15098,7 @@ def planet_occult_when_glob(
     MAX_SEARCH_YEARS = 150
     MAX_ITERATIONS = int(MAX_SEARCH_YEARS * 365)  # Check roughly daily
 
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-
-    earth = eph["earth"]
+    from .constants import SEFLG_EQUATORIAL
 
     def _get_planet_position(
         jd: float, planet_id: int
@@ -14499,16 +15108,15 @@ def planet_occult_when_glob(
         if planet_id not in _PLANET_MAP:
             raise ValueError(f"Invalid planet ID: {planet_id}")
 
-        target_name = _PLANET_MAP[planet_id]
-        target = get_planet_target(eph, target_name)
+        # Use swe_calc_ut (LEB-aware) for equatorial positions
+        planet_eq, _ = swe_calc_ut(jd, planet_id, SEFLG_EQUATORIAL | SEFLG_SPEED)
+        ra_deg = planet_eq[0]
+        dec_deg = planet_eq[1]
+        dist_au = planet_eq[2]
 
-        t = ts.ut1_jd(jd)
-        target_app = earth.at(t).observe(target).apparent()
-        ra, dec, dist = target_app.radec(epoch="date")
+        angular_radius = _calc_planet_angular_radius(planet_id, dist_au)
 
-        angular_radius = _calc_planet_angular_radius(planet_id, dist.au)
-
-        return ra.hours * 15.0, dec.degrees, dist.au, angular_radius
+        return ra_deg, dec_deg, dist_au, angular_radius
 
     def _get_target_position(jd: float) -> Tuple[float, float, float]:
         """Get target (occulted) body's geocentric RA, Dec, and angular radius."""
@@ -14849,57 +15457,69 @@ def planet_occult_when_loc(
     MAX_SEARCH_YEARS = 150
     MAX_GLOBAL_SEARCHES = 100
 
-    eph = get_planets()
-    ts = get_timescale()
+    from .state import get_leb_reader
 
-    earth = eph["earth"]
-    observer = wgs84.latlon(lat, lon, altitude)
-    observer_at = earth + observer
+    _reader = get_leb_reader()
+    if _reader is not None:
+        from .fast_calc import _topo_ecliptic
+        from .time_utils import swe_deltat
+        from .utils import azalt, SE_ECL2HOR
 
-    def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
-        """Get planet's altitude and azimuth from observer location."""
-        from .planets import get_planet_target
+        geopos = (lon, lat, altitude)
 
-        target_name = _PLANET_MAP[planet_id]
-        target = get_planet_target(eph, target_name)
+        def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            pos = _topo_ecliptic(_reader, jd_tt, jd, planet_id, geopos, SEFLG_SPEED)
+            az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, pos[:3])
+            return alt_true, az
 
-        t = ts.ut1_jd(jd)
-        target_app = observer_at.at(t).observe(target).apparent()
-        alt, az, _ = target_app.altaz()
+        def _get_target_altitude(jd: float) -> Tuple[float, float]:
+            jd_tt = jd + swe_deltat(jd)
+            if occulted_planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                star_pos, _, _ = swe_fixstar_ut(star_name, jd, SEFLG_SPEED)
+                az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, star_pos[:3])
+            else:
+                pos = _topo_ecliptic(_reader, jd_tt, jd, occulted_planet, geopos, SEFLG_SPEED)
+                az, alt_true, _alt_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, pos[:3])
+            return alt_true, az
+    else:
+        eph = get_planets()
+        ts = get_timescale()
+        earth = eph["earth"]
+        observer = wgs84.latlon(lat, lon, altitude)
+        observer_at = earth + observer
 
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
-
-    def _get_target_altitude(jd: float) -> Tuple[float, float]:
-        """Get target body's altitude and azimuth from observer location."""
-        from .planets import get_planet_target
-
-        t = ts.ut1_jd(jd)
-
-        if occulted_planet == 0:
-            # Fixed star
-            star_id, err, _ = _resolve_star_id(star_name)
-            if err is not None:
-                raise ValueError(err)
-
-            star = FIXED_STARS[star_id]
-
-            t_years = (jd - 2451545.0) / 365.25
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-
-            from skyfield.api import Star
-
-            star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-            target_app = observer_at.at(t).observe(star_obj).apparent()
-        else:
-            target_name = _PLANET_MAP[occulted_planet]
+        def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
+            from .planets import get_planet_target
+            target_name = _PLANET_MAP[planet_id]
             target = get_planet_target(eph, target_name)
+            t = ts.ut1_jd(jd)
             target_app = observer_at.at(t).observe(target).apparent()
+            alt, az, _ = target_app.altaz()
+            return alt.degrees, (az.degrees + 180.0) % 360.0
 
-        alt, az, _ = target_app.altaz()
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        return alt.degrees, (az.degrees + 180.0) % 360.0
+        def _get_target_altitude(jd: float) -> Tuple[float, float]:
+            from .planets import get_planet_target
+            t = ts.ut1_jd(jd)
+            if occulted_planet == 0:
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t_years = (jd - 2451545.0) / 365.25
+                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                from skyfield.api import Star
+                star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                target_app = observer_at.at(t).observe(star_obj).apparent()
+            else:
+                target_name = _PLANET_MAP[occulted_planet]
+                target = get_planet_target(eph, target_name)
+                target_app = observer_at.at(t).observe(target).apparent()
+            alt, az, _ = target_app.altaz()
+            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _is_visible_at_location(jd: float) -> bool:
         """Check if both bodies are above horizon at given time."""
@@ -14942,44 +15562,55 @@ def planet_occult_when_loc(
                 visible_times.append(jd_max)
 
             if visible:
-                # Calculate attributes at maximum
-                from .planets import get_planet_target
-
-                t = ts.ut1_jd(jd_max)
-
                 occ_alt, occ_az = _get_body_altitude(jd_max, occulting_planet)
                 target_alt, target_az = _get_target_altitude(jd_max)
 
-                # Get angular separation at maximum
-                target_name = _PLANET_MAP[occulting_planet]
-                occ_body = get_planet_target(eph, target_name)
-                occ_app = observer_at.at(t).observe(occ_body).apparent()
+                if _reader is not None:
+                    from .fast_calc import _topo_ecliptic as _tp_occ
+                    from .time_utils import swe_deltat as _sd_occ
+                    from .utils import angular_separation as _ang_sep_occ
 
-                if occulted_planet == 0:
-                    star_id, _, _ = _resolve_star_id(star_name)
-                    star = FIXED_STARS[star_id]
-                    t_years = (jd_max - 2451545.0) / 365.25
-                    ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-                    dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-                    from skyfield.api import Star
-
-                    target_body = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                    _jd_tt_occ = jd_max + _sd_occ(jd_max)
+                    _gp_occ = (lon, lat, altitude)
+                    occ_pos = _tp_occ(_reader, _jd_tt_occ, jd_max, occulting_planet, _gp_occ, SEFLG_SPEED)
+                    if occulted_planet == 0:
+                        from .fixed_stars import swe_fixstar_ut
+                        tgt_pos, _, _ = swe_fixstar_ut(star_name, jd_max, SEFLG_SPEED)
+                        target_radius = 0.0001
+                    else:
+                        tgt_pos = _tp_occ(_reader, _jd_tt_occ, jd_max, occulted_planet, _gp_occ, SEFLG_SPEED)
+                        target_radius = _calc_planet_angular_radius(occulted_planet, tgt_pos[2])
+                    separation = _ang_sep_occ(occ_pos[0], occ_pos[1], tgt_pos[0], tgt_pos[1])
+                    occ_dist = occ_pos[2]
+                    occ_radius = _calc_planet_angular_radius(occulting_planet, occ_dist)
                 else:
-                    target_body = get_planet_target(eph, _PLANET_MAP[occulted_planet])
+                    from .planets import get_planet_target
 
-                target_app = observer_at.at(t).observe(target_body).apparent()
-                separation = occ_app.separation_from(target_app).degrees
-
-                # Calculate magnitude (simplified)
-                occ_dist = occ_app.distance().au
-                occ_radius = _calc_planet_angular_radius(occulting_planet, occ_dist)
-                if occulted_planet == 0:
-                    target_radius = 0.0001
-                else:
-                    target_dist = target_app.distance().au
-                    target_radius = _calc_planet_angular_radius(
-                        occulted_planet, target_dist
-                    )
+                    t = ts.ut1_jd(jd_max)
+                    target_name = _PLANET_MAP[occulting_planet]
+                    occ_body = get_planet_target(eph, target_name)
+                    occ_app = observer_at.at(t).observe(occ_body).apparent()
+                    if occulted_planet == 0:
+                        star_id, _, _ = _resolve_star_id(star_name)
+                        star = FIXED_STARS[star_id]
+                        t_years = (jd_max - 2451545.0) / 365.25
+                        ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                        dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+                        from skyfield.api import Star
+                        target_body = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                    else:
+                        target_body = get_planet_target(eph, _PLANET_MAP[occulted_planet])
+                    target_app = observer_at.at(t).observe(target_body).apparent()
+                    separation = occ_app.separation_from(target_app).degrees
+                    occ_dist = occ_app.distance().au
+                    occ_radius = _calc_planet_angular_radius(occulting_planet, occ_dist)
+                    if occulted_planet == 0:
+                        target_radius = 0.0001
+                    else:
+                        target_dist = target_app.distance().au
+                        target_radius = _calc_planet_angular_radius(
+                            occulted_planet, target_dist
+                        )
 
                 if target_radius > 0:
                     magnitude = max(0, 1.0 - separation / (occ_radius + target_radius))
