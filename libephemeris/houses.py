@@ -2393,17 +2393,6 @@ def _houses_campanus(
     cusps[2] = _cusp_from_pv_offset(-30.0)
     cusps[3] = _cusp_from_pv_offset(-60.0)
 
-    # Within the polar circle the Ascendant can flip to the western hemisphere.
-    # When that happens (AC − MC normalised to ±180° is negative) all non-IC
-    # cusps must be rotated by 180° to preserve clockwise house ordering.
-    if abs(lat) >= 90.0 - eps:
-        ac_mc = (asc - mc + 180.0) % 360.0 - 180.0  # normalise to −180..+180
-        if ac_mc < 0:
-            cusps[1] = (cusps[1] + 180.0) % 360.0  # ASC
-            cusps[10] = (cusps[10] + 180.0) % 360.0  # MC
-            for i in (11, 12, 2, 3):
-                cusps[i] = (cusps[i] + 180.0) % 360.0
-
     _set_opposite_cusps(cusps)
 
     return cusps
