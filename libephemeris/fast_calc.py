@@ -1894,6 +1894,8 @@ def _fast_calc_core(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ECLIPTIC:
+        if iflag & SEFLG_TOPOCTR:
+            raise KeyError("SEFLG_TOPOCTR not supported for ecliptic-direct bodies")
         # Pipeline B: ecliptic direct
         #
         # For all ecliptic-direct bodies with SID+J2K (no EQ), defer J2000
@@ -1921,6 +1923,8 @@ def _fast_calc_core(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_HELIO_ECL:
+        if iflag & SEFLG_TOPOCTR:
+            raise KeyError("SEFLG_TOPOCTR not supported for heliocentric bodies")
         # Pipeline C: heliocentric
         lon, lat, dist, dlon, dlat, ddist = _pipeline_helio(reader, jd_tt, ipl, iflag)
         if not (iflag & SEFLG_SPEED):
