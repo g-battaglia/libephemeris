@@ -382,3 +382,259 @@ class TestFallbackEdgeCases:
         jd_far = swe_julday(1800, 6, 15, 12.0)
         result, _ = heliacal_pheno_ut(jd_far, 41.9, 12.5, body=SE_VENUS)
         assert isinstance(result, tuple)
+
+
+# =========================================================================
+# 8. Lunar Eclipse LEB vs Skyfield
+# =========================================================================
+
+
+class TestLunarEclipseRegression:
+
+    def test_lun_eclipse_when(self):
+        from libephemeris.eclipse import lun_eclipse_when
+
+        jd = swe_julday(2024, 1, 1, 0.0)
+        type_leb, tret_leb = _run_leb(lun_eclipse_when, jd)
+        type_sf, tret_sf = _run_skyfield(lun_eclipse_when, jd)
+        assert type_leb == type_sf
+        diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400
+        assert diff_sec < 0.1, f"Lunar eclipse max diff: {diff_sec:.3f}s"
+
+    def test_lun_eclipse_how(self):
+        from libephemeris.eclipse import lun_eclipse_how, lun_eclipse_when
+
+        _, tret = lun_eclipse_when(swe_julday(2024, 1, 1, 0.0))
+        jd_max = tret[0]
+        r_leb = _run_leb(lun_eclipse_how, jd_max, 41.9, 12.5)
+        r_sf = _run_skyfield(lun_eclipse_how, jd_max, 41.9, 12.5)
+        assert r_leb[0] == r_sf[0]  # same type
+
+
+# =========================================================================
+# 9. Multi-Planet Pheno
+# =========================================================================
+
+
+class TestPhenoAllPlanets:
+
+    @pytest.mark.parametrize("planet,name", [
+        (SE_VENUS, "Venus"),
+        (SE_MARS, "Mars"),
+        (4, "Jupiter"),  # SE_JUPITER
+        (5, "Saturn"),   # SE_SATURN
+    ])
+    def test_pheno_planet(self, planet, name):
+        r_leb = _run_leb(swe_pheno_ut, JD_TEST, planet, 0)
+        r_sf = _run_skyfield(swe_pheno_ut, JD_TEST, planet, 0)
+        assert abs(r_leb[0] - r_sf[0]) < 0.1, f"{name} phase angle"
+        assert abs(r_leb[2] - r_sf[2]) < 0.1, f"{name} elongation"
+
+
+# =========================================================================
+# 10. SEFLG_HELCTR / SEFLG_BARYCTR
+# =========================================================================
+
+
+class TestHelioBaryCentric:
+
+    def test_helctr_sun(self):
+        from libephemeris.constants import SEFLG_HELCTR
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MARS, SEFLG_HELCTR | SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MARS, SEFLG_HELCTR | SEFLG_SPEED)
+        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
+
+    def test_baryctr(self):
+        from libephemeris.constants import SEFLG_BARYCTR
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MARS, SEFLG_BARYCTR | SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MARS, SEFLG_BARYCTR | SEFLG_SPEED)
+        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
+
+
+# =========================================================================
+# 11. TOPOCTR Multiple Bodies
+# =========================================================================
+
+
+class TestTopocentricMultipleBodies:
+
+    @pytest.mark.parametrize("body,name", [
+        (SE_SUN, "Sun"),
+        (SE_MOON, "Moon"),
+        (SE_MARS, "Mars"),
+        (SE_VENUS, "Venus"),
+    ])
+    def test_topoctr_body(self, body, name):
+        libephemeris.set_topo(*GEOPOS_ROME)
+        try:
+            flags = SEFLG_TOPOCTR | SEFLG_SPEED
+            pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, body, flags)
+            pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, body, flags)
+            tol = 1.0 if body == SE_MOON else 0.1  # Moon has larger parallax
+            assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < tol, f"{name} lon"
+            assert _arcsec(abs(pos_leb[1] - pos_sf[1])) < tol, f"{name} lat"
+        finally:
+            from libephemeris import state
+            state._TOPO = None
+
+
+# =========================================================================
+# 12. Stars with Sidereal
+# =========================================================================
+
+
+class TestStarsSidereal:
+
+    def test_star_sidereal_lahiri(self):
+        from libephemeris.fixed_stars import swe_fixstar_ut
+
+        libephemeris.set_sid_mode(1)  # Lahiri
+        try:
+            flags = SEFLG_SIDEREAL | SEFLG_SPEED
+            pos_leb, _, _ = _run_leb(swe_fixstar_ut, "Spica", JD_TEST, flags)
+            pos_sf, _, _ = _run_skyfield(swe_fixstar_ut, "Spica", JD_TEST, flags)
+            diff = abs(pos_leb[0] - pos_sf[0]) * 3600
+            assert diff < 0.1, f"Sidereal star diff: {diff}\""
+        finally:
+            libephemeris.set_sid_mode(0)
+
+    def test_star_nogdefl(self):
+        from libephemeris.fixed_stars import swe_fixstar_ut
+
+        pos_leb, _, _ = _run_leb(swe_fixstar_ut, "Regulus", JD_TEST, SEFLG_NOGDEFL)
+        pos_sf, _, _ = _run_skyfield(swe_fixstar_ut, "Regulus", JD_TEST, SEFLG_NOGDEFL)
+        diff = abs(pos_leb[0] - pos_sf[0]) * 3600
+        assert diff < 0.1
+
+
+# =========================================================================
+# 13. Multi-Date Precision Stability
+# =========================================================================
+
+
+class TestMultiDatePrecision:
+
+    @pytest.mark.parametrize("year", [1900, 1950, 2000, 2024, 2050, 2100])
+    def test_sun_precision_across_centuries(self, year):
+        jd = swe_julday(year, 6, 15, 12.0)
+        pos_leb, _ = _run_leb(swe_calc_ut, jd, SE_SUN, SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, jd, SE_SUN, SEFLG_SPEED)
+        diff = _arcsec(abs(pos_leb[0] - pos_sf[0]))
+        assert diff < 0.001, f"Year {year}: Sun lon diff {diff}\""
+
+    @pytest.mark.parametrize("year", [1900, 1950, 2000, 2024, 2050, 2100])
+    def test_moon_precision_across_centuries(self, year):
+        jd = swe_julday(year, 6, 15, 12.0)
+        pos_leb, _ = _run_leb(swe_calc_ut, jd, SE_MOON, SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, jd, SE_MOON, SEFLG_SPEED)
+        diff = _arcsec(abs(pos_leb[0] - pos_sf[0]))
+        assert diff < 0.001, f"Year {year}: Moon lon diff {diff}\""
+
+
+# =========================================================================
+# 14. Rise/Trans Multiple Locations
+# =========================================================================
+
+
+class TestRiseTransLocations:
+
+    @pytest.mark.parametrize("name,geopos", [
+        ("Rome", [12.5, 41.9, 0]),
+        ("New York", [-74.0, 40.7, 10]),
+        ("Tokyo", [139.7, 35.7, 40]),
+        ("Cape Town", [18.4, -33.9, 0]),
+    ])
+    def test_sunrise_location(self, name, geopos):
+        from libephemeris.constants import SE_CALC_RISE
+        from libephemeris.eclipse import rise_trans
+
+        _, tret_leb = _run_leb(rise_trans, JD_TEST, SE_SUN, SE_CALC_RISE, geopos)
+        _, tret_sf = _run_skyfield(rise_trans, JD_TEST, SE_SUN, SE_CALC_RISE, geopos)
+        diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400
+        assert diff_sec < 1.0, f"{name} sunrise diff: {diff_sec:.3f}s"
+
+    def test_moon_rise(self):
+        from libephemeris.constants import SE_CALC_RISE
+        from libephemeris.eclipse import rise_trans
+
+        _, tret_leb = _run_leb(rise_trans, JD_TEST, SE_MOON, SE_CALC_RISE, [12.5, 41.9, 0])
+        _, tret_sf = _run_skyfield(rise_trans, JD_TEST, SE_MOON, SE_CALC_RISE, [12.5, 41.9, 0])
+        diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400
+        assert diff_sec < 2.0, f"Moon rise diff: {diff_sec:.3f}s"
+
+    def test_star_rise(self):
+        from libephemeris.constants import SE_CALC_RISE
+        from libephemeris.eclipse import rise_trans
+
+        _, tret_leb = _run_leb(rise_trans, JD_TEST, "Sirius", SE_CALC_RISE, [12.5, 41.9, 0])
+        _, tret_sf = _run_skyfield(rise_trans, JD_TEST, "Sirius", SE_CALC_RISE, [12.5, 41.9, 0])
+        diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400
+        assert diff_sec < 2.0, f"Sirius rise diff: {diff_sec:.3f}s"
+
+
+# =========================================================================
+# 15. Eclipse How/Where
+# =========================================================================
+
+
+class TestEclipseHowWhere:
+
+    def test_sol_eclipse_how(self):
+        from libephemeris.eclipse import swe_sol_eclipse_how
+
+        r_leb, attr_leb = _run_leb(swe_sol_eclipse_how, JD_ECLIPSE, [0.0, 45.0, 0.0])
+        r_sf, attr_sf = _run_skyfield(swe_sol_eclipse_how, JD_ECLIPSE, [0.0, 45.0, 0.0])
+        # Both should agree on eclipse type at this location
+        assert r_leb == r_sf or (r_leb == 0 and r_sf == 0)
+
+    def test_sol_eclipse_where(self):
+        from libephemeris.eclipse import swe_sol_eclipse_where
+
+        r_leb = _run_leb(swe_sol_eclipse_where, JD_ECLIPSE)
+        r_sf = _run_skyfield(swe_sol_eclipse_where, JD_ECLIPSE)
+        # Compare central line latitude/longitude
+        if r_leb[1][0] != 0 and r_sf[1][0] != 0:
+            assert abs(r_leb[1][0] - r_sf[1][0]) < 0.1, "Central lat"
+            assert abs(r_leb[1][1] - r_sf[1][1]) < 0.1, "Central lon"
+
+
+# =========================================================================
+# 16. NONUT for Moon and Pipeline B
+# =========================================================================
+
+
+class TestNonutExtended:
+
+    def test_nonut_moon(self):
+        flags = SEFLG_NONUT | SEFLG_SPEED
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MOON, flags)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MOON, flags)
+        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
+
+    def test_nonut_mean_node(self):
+        flags = SEFLG_NONUT | SEFLG_SPEED
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MEAN_NODE, flags)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MEAN_NODE, flags)
+        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
+
+    def test_nonut_true_node(self):
+        from libephemeris.constants import SE_TRUE_NODE
+        flags = SEFLG_NONUT | SEFLG_SPEED
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_TRUE_NODE, flags)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_TRUE_NODE, flags)
+        assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
+
+
+# =========================================================================
+# 17. XYZ for Pipeline C (Uranians)
+# =========================================================================
+
+
+class TestXYZUranian:
+
+    def test_xyz_cupido(self):
+        from libephemeris.constants import SE_CUPIDO
+        pos_xyz, _ = _run_leb(swe_calc_ut, JD_TEST, SE_CUPIDO, SEFLG_XYZ)
+        pos_sph, _ = _run_leb(swe_calc_ut, JD_TEST, SE_CUPIDO, SEFLG_SPEED)
+        r = math.sqrt(pos_xyz[0] ** 2 + pos_xyz[1] ** 2 + pos_xyz[2] ** 2)
+        assert abs(r - pos_sph[2]) < 0.01, f"Cupido XYZ r={r}, sph dist={pos_sph[2]}"
