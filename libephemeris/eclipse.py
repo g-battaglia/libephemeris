@@ -3916,10 +3916,14 @@ def swe_sol_eclipse_how_details(
             return sun_angular_radius, moon_angular_radius
 
         def _calc_position_angle(jd: float) -> float:
-            """Calculate position angle of Moon relative to Sun (ICRS frame)."""
+            """Calculate position angle of Moon relative to Sun (topocentric ICRS)."""
             from .constants import SEFLG_EQUATORIAL as _EQ_PA, SEFLG_J2000 as _J2K_PA
-            sun_eq, _ = swe_calc_ut(jd, SE_SUN, _EQ_PA | _J2K_PA | SEFLG_SPEED)
-            moon_eq, _ = swe_calc_ut(jd, SE_MOON, _EQ_PA | _J2K_PA | SEFLG_SPEED)
+            from .constants import SEFLG_TOPOCTR as _TP_PA
+            import libephemeris as _le_pa
+            _le_pa.set_topo(_gp[0], _gp[1], _gp[2])
+            _pa_flags = _EQ_PA | _J2K_PA | _TP_PA | SEFLG_SPEED
+            sun_eq, _ = swe_calc_ut(jd, SE_SUN, _pa_flags)
+            moon_eq, _ = swe_calc_ut(jd, SE_MOON, _pa_flags)
             sun_ra_rad = math.radians(sun_eq[0])
             sun_dec_rad = math.radians(sun_eq[1])
             moon_ra_rad = math.radians(moon_eq[0])

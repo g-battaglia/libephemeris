@@ -1961,8 +1961,8 @@ def _fast_calc_core(
             # LibEphemeris intentionally fixes this: when J2000 is requested,
             # mean ayanamsha is always used, for all bodies.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
-            _eff_j2000 = bool(iflag & SEFLG_J2000)
-            if _eff_j2000:
+            _eff_mean_aya = bool(iflag & (SEFLG_J2000 | SEFLG_NONUT))
+            if _eff_mean_aya:
                 aya = mean_aya
             else:
                 try:

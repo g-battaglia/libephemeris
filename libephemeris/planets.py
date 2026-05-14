@@ -5255,11 +5255,10 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         """Call fast_calc directly — no Skyfield fallback."""
         return fast_calc.fast_calc_ut(reader, jd, body, flags)
 
-    # Always use apparent positions internally, matching _calc_pheno().
-    # Correction flags (TRUEPOS/NOABERR/NOGDEFL) are handled by the
-    # Skyfield path's .observe()/.apparent() distinction; the LEB path
-    # uses default apparent coordinates for consistency.
-    base_flags = SEFLG_SPEED
+    # Preserve SEFLG_TRUEPOS to match _calc_pheno() which uses geometric
+    # positions when TRUEPOS is set.  NOABERR/NOGDEFL are NOT propagated
+    # because their semantics differ between fast_calc and Skyfield.
+    base_flags = SEFLG_SPEED | (iflag & SEFLG_TRUEPOS)
 
     # Unsupported bodies (nodes, apogees, etc.) — match _calc_pheno() behavior
     _PHENO_SUPPORTED = {SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS,
