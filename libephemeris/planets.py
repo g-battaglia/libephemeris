@@ -5423,8 +5423,9 @@ def swe_pheno_ut(
     # --- LEB fast path ---
     from .state import get_leb_reader
 
+    _unsupported_pheno_flags = SEFLG_NOABERR | SEFLG_NOGDEFL
     reader = get_leb_reader()
-    if reader is not None:
+    if reader is not None and not (flags & _unsupported_pheno_flags):
         try:
             return _calc_pheno_leb(tjdut, planet, flags)
         except KeyError:
@@ -5463,8 +5464,9 @@ def swe_pheno(
     # --- LEB fast path ---
     from .state import get_leb_reader
 
+    _unsupported_pheno_flags_tt = SEFLG_NOABERR | SEFLG_NOGDEFL
     reader = get_leb_reader()
-    if reader is not None:
+    if reader is not None and not (flags & _unsupported_pheno_flags_tt):
         try:
             from .time_utils import swe_deltat
 
