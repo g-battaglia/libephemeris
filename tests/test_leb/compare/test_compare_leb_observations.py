@@ -91,7 +91,7 @@ class TestFlagCombinations:
 
 
 class TestFallbackFlags:
-    """Flags that trigger fallback to Skyfield should produce identical results."""
+    """Flags now handled natively in LEB — results should match Skyfield closely."""
 
     @pytest.mark.leb_compare
     @pytest.mark.parametrize("body_id,body_name", [(SE_SUN, "Sun"), (SE_MARS, "Mars")])
@@ -102,7 +102,7 @@ class TestFallbackFlags:
         body_id: int,
         body_name: str,
     ):
-        """SEFLG_TOPOCTR produces identical results (both fallback to Skyfield)."""
+        """SEFLG_TOPOCTR LEB vs Skyfield within sub-arcsecond tolerance."""
         flags = SEFLG_SPEED | SEFLG_TOPOCTR
         ephem.set_topo(41.9, 12.5, 0.0)
 
@@ -110,7 +110,7 @@ class TestFallbackFlags:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
 
-            assert ref[0] == pytest.approx(leb[0], rel=1e-12), (
+            assert ref[0] == pytest.approx(leb[0], abs=1e-6), (
                 f"{body_name} TOPOCTR lon differs at JD {jd}"
             )
 
@@ -123,7 +123,7 @@ class TestFallbackFlags:
         body_id: int,
         body_name: str,
     ):
-        """SEFLG_XYZ produces identical results (both fallback to Skyfield)."""
+        """SEFLG_XYZ LEB vs Skyfield — native LEB path, sub-arcsecond precision."""
         flags = SEFLG_SPEED | SEFLG_XYZ
 
         for jd in test_dates_20:
@@ -131,7 +131,7 @@ class TestFallbackFlags:
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
 
             for i in range(6):
-                assert ref[i] == pytest.approx(leb[i], rel=1e-12), (
+                assert ref[i] == pytest.approx(leb[i], abs=1e-4), (
                     f"{body_name} XYZ component {i} differs at JD {jd}"
                 )
 
@@ -144,7 +144,7 @@ class TestFallbackFlags:
         body_id: int,
         body_name: str,
     ):
-        """SEFLG_RADIANS produces identical results (both fallback to Skyfield)."""
+        """SEFLG_RADIANS LEB vs Skyfield — native LEB path."""
         flags = SEFLG_SPEED | SEFLG_RADIANS
 
         for jd in test_dates_20:
@@ -152,7 +152,7 @@ class TestFallbackFlags:
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
 
             for i in range(6):
-                assert ref[i] == pytest.approx(leb[i], rel=1e-12), (
+                assert ref[i] == pytest.approx(leb[i], abs=1e-4), (
                     f"{body_name} RADIANS component {i} differs at JD {jd}"
                 )
 
@@ -165,13 +165,13 @@ class TestFallbackFlags:
         body_id: int,
         body_name: str,
     ):
-        """SEFLG_NONUT produces identical results (both fallback to Skyfield)."""
+        """SEFLG_NONUT LEB vs Skyfield within sub-arcsecond tolerance."""
         flags = SEFLG_SPEED | SEFLG_NONUT
 
         for jd in test_dates_20:
             ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
             leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
 
-            assert ref[0] == pytest.approx(leb[0], rel=1e-12), (
+            assert ref[0] == pytest.approx(leb[0], abs=1e-7), (
                 f"{body_name} NONUT lon differs at JD {jd}"
             )

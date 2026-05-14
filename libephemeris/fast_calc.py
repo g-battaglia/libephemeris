@@ -1586,7 +1586,7 @@ def _pipeline_helio(
         # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
         # so it uses true obliquity of date on J2000 ecliptic coords.
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
-        if iflag & SEFLG_SIDEREAL:
+        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
@@ -1612,7 +1612,7 @@ def _pipeline_helio(
         # Equatorial of date: precess J2000 → date, then ecliptic → equatorial.
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
         lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
-        if iflag & SEFLG_SIDEREAL:
+        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
