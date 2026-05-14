@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-05-14
+
+### Added
+
+- **LEB fast path for eclipse, fixed stars, and heliacal modules.**
+  When a LEB binary ephemeris is active, `get_planets()` is never called
+  — eliminating DE kernel loading (up to 3.1 GB for DE441) and delivering
+  ~25x speedup for eclipse search operations.
+- **SEFLG flag support in LEB mode:** `SEFLG_XYZ`, `SEFLG_TOPOCTR`,
+  `SEFLG_RADIANS`, `SEFLG_NONUT`, and `SEFLG_ICRS` (fallback) are now
+  handled natively in the LEB fast-calc pipeline.
+- **`_topocentric_offset()`** helper using ERFA `c2t06a` for WGS84→ICRS
+  observer position and velocity (including diurnal aberration).
+- **`_topo_ecliptic()`** helper for topocentric ecliptic positions
+  without mutating global `_TOPO` state.
+- **`_apparent_icrs_cartesian()`** helper for Besselian shadow geometry.
+- **`_calc_pheno_leb()`** calling `fast_calc_ut()` directly with 3D
+  vector phase-angle computation for all bodies.
+- **`angular_separation()`** utility using the Vincenty formula for
+  numerical stability at all separations.
+- **117 LEB vs Skyfield regression tests** covering fixed stars, flag
+  combinations, pheno, heliacal, eclipse, velocity, rise/transit,
+  angular separation, and fallback edge cases.
+- **20 no-kernel-load tests** verifying `get_planets()` is never called
+  in LEB mode across all modules.
+
+### Fixed
+
+- **Pre-existing bug in Skyfield `heliacal_pheno_ut` path:** Moon pheno
+  indices were swapped — `moon_pheno[0]` (phase angle) was read as
+  illuminated fraction and vice versa. Both paths now use correct indices.
+- **SEFLG_NONUT + SEFLG_SIDEREAL** now uses mean ayanamsha (was using
+  true ayanamsha, adding ~1" nutation offset).
+- **Pipeline B/C bodies with SEFLG_NONUT** now strip nutation from
+  longitude for True Node, Osculating Apogee, and interpolated bodies.
+
+### Changed
+
+- `_calc_penumbra_limit()` and `_calc_umbra_limit()` now use
+  `swe_calc_ut()` (LEB-aware) instead of direct Skyfield calls.
+- Eclipse functions that use `set_topo()` now save/restore the previous
+  `_TOPO` state via `try/finally`.
+- `swe_pheno_ut()`/`swe_pheno()` skip the LEB path when `SEFLG_NOABERR`
+  or `SEFLG_NOGDEFL` is set (unsupported in LEB pheno).
+
+### Known Limitations
+
+- Eclipse search closures don't fall back mid-loop when LEB range is
+  exceeded during iterative search (issue #19). Only affects custom LEB
+  files shorter than the search window.
+- `lun_occult_when_glob()` loads the DE kernel for its vectorized batch
+  scan even in LEB mode (documented exception).
+
 ## [1.4.0] - 2026-05-08
 
 ### Added
