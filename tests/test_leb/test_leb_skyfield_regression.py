@@ -889,3 +889,153 @@ class TestStarsEdgeCases:
             if diff > 648000:
                 diff = 1296000 - diff
             assert diff < 1.0, f"{name}: diff {diff}\""
+
+
+# =========================================================================
+# 24. Velocity Precision LEB vs Skyfield
+# =========================================================================
+
+
+class TestVelocityPrecision:
+
+    @pytest.mark.parametrize("body,name,tol", [
+        (SE_SUN, "Sun", 0.0001),
+        (SE_MOON, "Moon", 0.002),
+        (SE_MARS, "Mars", 0.0001),
+        (SE_VENUS, "Venus", 0.0001),
+    ])
+    def test_velocity_ecliptic(self, body, name, tol):
+        """Compare ecliptic velocity (dlon, dlat) LEB vs Skyfield."""
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, body, SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, body, SEFLG_SPEED)
+        assert abs(pos_leb[3] - pos_sf[3]) < tol, f"{name} dlon: {abs(pos_leb[3]-pos_sf[3])}"
+        assert abs(pos_leb[4] - pos_sf[4]) < tol, f"{name} dlat: {abs(pos_leb[4]-pos_sf[4])}"
+
+    def test_velocity_xyz_sun(self):
+        """XYZ velocity components should match Skyfield."""
+        flags = SEFLG_XYZ | SEFLG_SPEED
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_SUN, flags)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_SUN, flags)
+        for i in range(3, 6):
+            assert abs(pos_leb[i] - pos_sf[i]) < 5e-6, f"vxyz[{i-3}]: {abs(pos_leb[i]-pos_sf[i])}"
+
+    def test_velocity_xyz_moon(self):
+        flags = SEFLG_XYZ | SEFLG_SPEED
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MOON, flags)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MOON, flags)
+        for i in range(3, 6):
+            assert abs(pos_leb[i] - pos_sf[i]) < 1e-5, f"Moon vxyz[{i-3}]: {abs(pos_leb[i]-pos_sf[i])}"
+
+    def test_velocity_mean_node(self):
+        """Pipeline B velocity should match."""
+        pos_leb, _ = _run_leb(swe_calc_ut, JD_TEST, SE_MEAN_NODE, SEFLG_SPEED)
+        pos_sf, _ = _run_skyfield(swe_calc_ut, JD_TEST, SE_MEAN_NODE, SEFLG_SPEED)
+        assert abs(pos_leb[3] - pos_sf[3]) < 0.0001, f"MeanNode dlon"
+
+    def test_velocity_star(self):
+        """Fixed star velocity (from finite difference) should match."""
+        from libephemeris.fixed_stars import swe_fixstar_ut
+        pos_leb, _, _ = _run_leb(swe_fixstar_ut, "Regulus", JD_TEST, SEFLG_SPEED)
+        pos_sf, _, _ = _run_skyfield(swe_fixstar_ut, "Regulus", JD_TEST, SEFLG_SPEED)
+        assert abs(pos_leb[3] - pos_sf[3]) < 0.001, f"Star dlon"
+        assert abs(pos_leb[4] - pos_sf[4]) < 0.001, f"Star dlat"
+
+
+# =========================================================================
+# 25. Local Eclipse LEB vs Skyfield
+# =========================================================================
+
+
+class TestLocalEclipseRegression:
+
+    @pytest.mark.slow
+    def test_sol_eclipse_when_loc_rome(self):
+        """Local solar eclipse search from Rome."""
+        from libephemeris.eclipse import sol_eclipse_when_loc
+
+        jd = swe_julday(2024, 1, 1, 0.0)
+        type_leb, tret_leb, attr_leb = _run_leb(sol_eclipse_when_loc, jd, 41.9, 12.5)
+        type_sf, tret_sf, attr_sf = _run_skyfield(sol_eclipse_when_loc, jd, 41.9, 12.5)
+        # Same eclipse type
+        assert type_leb == type_sf, f"Type: LEB={type_leb} SF={type_sf}"
+        # Maximum time within 1 second
+        if tret_leb[0] > 0 and tret_sf[0] > 0:
+            diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400
+            assert diff_sec < 1.0, f"Local eclipse max diff: {diff_sec:.3f}s"
+
+    @pytest.mark.slow
+    def test_lun_eclipse_when_loc(self):
+        """Local lunar eclipse search."""
+        from libephemeris.eclipse import lun_eclipse_when_loc
+
+        jd = swe_julday(2024, 1, 1, 0.0)
+        type_leb, tret_leb, attr_leb = _run_leb(lun_eclipse_when_loc, jd, 41.9, 12.5)
+        type_sf, tret_sf, attr_sf = _run_skyfield(lun_eclipse_when_loc, jd, 41.9, 12.5)
+        assert type_leb == type_sf, f"Type: LEB={type_leb} SF={type_sf}"
+
+    @pytest.mark.slow
+    def test_swe_sol_eclipse_when_loc(self):
+        """swe_ API local solar eclipse."""
+        from libephemeris.eclipse import swe_sol_eclipse_when_loc
+
+        jd = swe_julday(2024, 1, 1, 0.0)
+        r_leb = _run_leb(swe_sol_eclipse_when_loc, jd, [12.5, 41.9, 0])
+        r_sf = _run_skyfield(swe_sol_eclipse_when_loc, jd, [12.5, 41.9, 0])
+        # Compare eclipse type flags
+        assert r_leb[0] == r_sf[0], f"Type: LEB={r_leb[0]} SF={r_sf[0]}"
+
+
+# =========================================================================
+# 26. vis_limit_mag LEB vs Skyfield
+# =========================================================================
+
+
+class TestVisLimitMagRegression:
+
+    def test_vis_limit_mag_venus(self):
+        from libephemeris.heliacal import vis_limit_mag
+
+        geopos = [12.5, 41.9, 0]
+        atmo = [1013.25, 15.0, 50.0, 0.25]
+        observer = [25, 1.0, 1.0, 1.0, 0.0, 0.0]
+
+        r_leb, dret_leb = _run_leb(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Venus", 0
+        )
+        r_sf, dret_sf = _run_skyfield(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Venus", 0
+        )
+        assert r_leb == r_sf, f"Return flag: LEB={r_leb} SF={r_sf}"
+        # dret[0] = limiting magnitude
+        if dret_leb[0] != 0 and dret_sf[0] != 0:
+            assert abs(dret_leb[0] - dret_sf[0]) < 1.0, f"Lim mag diff: {abs(dret_leb[0]-dret_sf[0])}"
+
+    def test_vis_limit_mag_star(self):
+        from libephemeris.heliacal import vis_limit_mag
+
+        geopos = [12.5, 41.9, 0]
+        atmo = [1013.25, 15.0, 50.0, 0.25]
+        observer = [25, 1.0, 1.0, 1.0, 0.0, 0.0]
+
+        r_leb, dret_leb = _run_leb(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Sirius", 0
+        )
+        r_sf, dret_sf = _run_skyfield(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Sirius", 0
+        )
+        assert r_leb == r_sf, f"Return flag: LEB={r_leb} SF={r_sf}"
+
+    def test_vis_limit_mag_moon(self):
+        from libephemeris.heliacal import vis_limit_mag
+
+        geopos = [12.5, 41.9, 0]
+        atmo = [1013.25, 15.0, 50.0, 0.25]
+        observer = [25, 1.0, 1.0, 1.0, 0.0, 0.0]
+
+        r_leb, dret_leb = _run_leb(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Moon", 0
+        )
+        r_sf, dret_sf = _run_skyfield(
+            vis_limit_mag, JD_TEST, geopos, atmo, observer, "Moon", 0
+        )
+        assert r_leb == r_sf, f"Return flag: LEB={r_leb} SF={r_sf}"
