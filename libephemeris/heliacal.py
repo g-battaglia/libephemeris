@@ -3277,13 +3277,13 @@ def heliacal_pheno_ut(
         # Calculate Moon phase and crescent geometry
         try:
             moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
-            phase = moon_pheno[0]  # Phase 0-1
-            illumination = phase * 100.0  # Percentage
+            phase_angle_deg = moon_pheno[0]  # [0] = phase angle in degrees
+            illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
             # Crescent width approximation (Danjon's formula)
             # W = 15 * (1 - cos(phase_angle/2)) arcminutes (approximate)
-            if len(moon_pheno) > 1:
-                pa_rad = math.radians(moon_pheno[1])  # Phase angle in radians
+            if phase_angle_deg > 0:
+                pa_rad = math.radians(phase_angle_deg)
                 w_moon = 15.0 * (1 - math.cos(pa_rad / 2)) / 60.0  # In degrees
 
             # Crescent length (semicircle approximation)
