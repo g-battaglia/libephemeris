@@ -6770,7 +6770,7 @@ def lun_occult_when_loc(
     if reader is not None:
         from .fast_calc import _topo_ecliptic
         from .time_utils import swe_deltat
-        from .utils import azalt, SE_ECL2HOR
+        from .utils import azalt, SE_ECL2HOR, angular_separation
 
         geopos = (lon, lat, altitude)
 
@@ -6809,6 +6809,29 @@ def lun_occult_when_loc(
             target_pos, _ = swe_calc_ut(jd, planet, SEFLG_SPEED)
             dist = target_pos[2]
             return 2 * _calc_planet_angular_radius(planet, dist)
+
+        def _angular_separation_at_jd(jd_check: float) -> float:
+            """Topocentric angular separation between Moon and target (LEB path).
+
+            Uses observer's actual position to account for lunar parallax,
+            which can be up to ~1 degree and significantly affects timing.
+            """
+            jd_tt = jd_check + swe_deltat(jd_check)
+            moon_ecl = _topo_ecliptic(
+                reader, jd_tt, jd_check, SE_MOON, geopos, SEFLG_SPEED
+            )
+            if planet == 0:
+                from .fixed_stars import swe_fixstar_ut
+                star_pos, _, _ = swe_fixstar_ut(star_name, jd_check, SEFLG_SPEED)
+                target_lon, target_lat = star_pos[0], star_pos[1]
+            else:
+                target_ecl = _topo_ecliptic(
+                    reader, jd_tt, jd_check, planet, geopos, SEFLG_SPEED
+                )
+                target_lon, target_lat = target_ecl[0], target_ecl[1]
+            return angular_separation(
+                moon_ecl[0], moon_ecl[1], target_lon, target_lat
+            )
     else:
         eph = get_planets()
         ts = get_timescale()
@@ -6873,6 +6896,37 @@ def lun_occult_when_loc(
             target_app = observer_at.at(t).observe(target).apparent()
             dist = target_app.distance().au
             return 2 * _calc_planet_angular_radius(planet, dist)
+
+        def _angular_separation_at_jd(jd_check: float) -> float:
+            """Topocentric angular separation between Moon and target (Skyfield path).
+
+            Uses observer's actual position to account for lunar parallax,
+            which can be up to ~1 degree and significantly affects timing.
+            """
+            t = ts.ut1_jd(jd_check)
+            observer_at = earth + observer
+            moon_app = observer_at.at(t).observe(moon_body).apparent()
+
+            if planet == 0:
+                star_id, err, _ = _resolve_star_id(star_name)
+                if err is not None:
+                    raise ValueError(err)
+                star = FIXED_STARS[star_id]
+                t_years = (jd_check - 2451545.0) / 365.25
+                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
+                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
+
+                from skyfield.api import Star
+
+                star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
+                target_app = observer_at.at(t).observe(star_obj).apparent()
+            else:
+                target_name = _PLANET_MAP[planet]
+                target = get_planet_target(eph, target_name)
+                target_app = observer_at.at(t).observe(target).apparent()
+
+            sep = moon_app.separation_from(target_app)
+            return sep.degrees
 
     jd = jd_start
 
@@ -6945,39 +6999,6 @@ def lun_occult_when_loc(
             continue
 
         # Occultation visible! Calculate local circumstances with topocentric parallax
-
-        # Calculate angular separation at any time using topocentric positions
-        def _angular_separation_at_jd(jd_check: float) -> float:
-            """Calculate topocentric angular separation between Moon and target.
-
-            Uses observer's actual position to account for lunar parallax,
-            which can be up to ~1 degree and significantly affects timing.
-            """
-            t = ts.ut1_jd(jd_check)
-            observer_at = earth + observer
-            moon_app = observer_at.at(t).observe(moon_body).apparent()
-
-            if planet == 0:
-                # Fixed star
-                star_id, err, _ = _resolve_star_id(star_name)
-                if err is not None:
-                    raise ValueError(err)
-                star = FIXED_STARS[star_id]
-                t_years = (jd_check - 2451545.0) / 365.25
-                ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-                dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-
-                from skyfield.api import Star
-
-                star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-                target_app = observer_at.at(t).observe(star_obj).apparent()
-            else:
-                target_name = _PLANET_MAP[planet]
-                target = get_planet_target(eph, target_name)
-                target_app = observer_at.at(t).observe(target).apparent()
-
-            sep = moon_app.separation_from(target_app)
-            return sep.degrees
 
         # Find local maximum using golden section search with topocentric positions
         def _find_local_maximum(

@@ -1,5 +1,30 @@
 # Release Notes
 
+## 1.6.0 - 2026-05-14
+
+LibEphemeris 1.6.0 fixes critical bugs in the LEB fast path introduced
+in v1.5.0 that caused crashes in `lun_occult_when_loc()` and when
+reusing the library after `close()` or `set_leb_file()`.
+
+### Fixed
+
+- `lun_occult_when_loc()` crashed with `NameError: ts` in LEB mode.
+  Added LEB-native `_angular_separation_at_jd` closure.
+- `close()` left stale `_active_reader` in `fast_calc.py`, causing
+  `TypeError` on next calculation. Now reset in `close()` and bound
+  in `_pipeline_icrs()`.
+- `set_leb_file()` did not reset `_active_reader` or clear caches.
+- `clear_caches()` did not clear `_leb_frame_cache` or refraction cache.
+- `__version__` was `"1.4.0"` while `pyproject.toml` declared `1.5.0`.
+
+### Compatibility
+
+Fully backward-compatible. No API changes.
+
+See [release-notes/v1.6.0.md](release-notes/v1.6.0.md) for details.
+
+---
+
 ## 1.4.0 - 2026-05-08
 
 LibEphemeris 1.4.0 adds page cache management APIs for containerised

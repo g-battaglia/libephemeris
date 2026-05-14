@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-05-14
+
+### Fixed
+
+- **`lun_occult_when_loc()` crashed in LEB mode with `NameError: ts`.**
+  The `_angular_separation_at_jd` closure referenced Skyfield variables
+  (`ts`, `earth`, `observer`, `moon_body`) that were only defined in the
+  Skyfield branch. Added a LEB-native implementation using
+  `_topo_ecliptic()` and `angular_separation()`, matching the pattern
+  already used in `heliacal.py`.
+- **`close()` left stale `_active_reader` in `fast_calc.py`.**
+  After `close()`, the module-level `_active_reader` still pointed to
+  the closed LEB reader (whose mmap was released), causing
+  `TypeError: a bytes-like object is required, not 'NoneType'` on the
+  next calculation. Fixed by resetting `_active_reader` in `close()` and
+  binding it at the start of `_pipeline_icrs()` (belt-and-suspenders).
+- **`set_leb_file()` did not reset `_active_reader` or clear
+  `_leb_frame_cache`.** Switching LEB files could serve stale frame data
+  from the previous reader. Now applies the same cleanup as `close()`.
+- **`clear_caches()` did not clear `_leb_frame_cache` or refraction
+  cache.** Both are now included in `clear_caches()` for clean-state
+  guarantees after `close()` or ephemeris file changes.
+- **`__version__` was `"1.4.0"` while `pyproject.toml` declared
+  `1.5.0`.** Aligned to the canonical version.
+
 ## [1.5.0] - 2026-05-14
 
 ### Added

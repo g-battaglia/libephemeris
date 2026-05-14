@@ -727,10 +727,23 @@ def _get_leb_precession_matrix(
 
 
 # Module-level reference to the active reader for frame data dispatch.
-# Set by _fast_calc_core() at the start of each calculation. This avoids
-# threading the reader argument through every coordinate-transform helper.
+# Set by _fast_calc_core() and _pipeline_icrs() at the start of each
+# calculation. This avoids threading the reader argument through every
+# coordinate-transform helper. Reset by close() via _reset_active_reader()
+# to avoid stale references after the LEB reader is closed.
 _active_reader: Optional["LEBReader"] = None
 _active_reader_has_nutation: bool = False
+
+
+def _reset_active_reader() -> None:
+    """Clear the module-level active reader reference.
+
+    Called by state.close() to avoid stale references to a closed
+    LEB reader (whose mmap has been released).
+    """
+    global _active_reader, _active_reader_has_nutation
+    _active_reader = None
+    _active_reader_has_nutation = False
 
 
 def _frame_data(
@@ -1114,6 +1127,16 @@ def _pipeline_icrs(
         (lon_deg, lat_deg, dist_au) or
         (lon_deg, lat_deg, dist_au, dlon_deg_day, dlat_deg_day, ddist_au_day)
     """
+    # Bind the active reader for _frame_data / _prec_matrix dispatch.
+    # Callers like _topo_ecliptic enter this pipeline without going through
+    # _fast_calc_core, so the module-level reference must be refreshed here
+    # to avoid using a stale (closed) reader after state.close().
+    global _active_reader, _active_reader_has_nutation
+    _active_reader = reader
+    _active_reader_has_nutation = (
+        hasattr(reader, "has_nutation") and reader.has_nutation()
+    )
+
     # 1. Get body position (and velocity if needed)
     target_pos, target_vel = reader.eval_body(ipl, jd_tt)
 

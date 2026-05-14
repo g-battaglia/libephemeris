@@ -296,7 +296,14 @@ def set_leb_file(filepath: Optional[str]) -> None:
             except (AttributeError, OSError):
                 get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
         _LEB_FILE = filepath
-    _LEB_READER = None  # force re-creation on next access
+        _LEB_READER = None  # force re-creation on next access
+
+        # Same cleanup as _close_inner(): stale _active_reader and caches
+        # would otherwise serve data from the old reader.
+        from . import fast_calc as _fast_calc
+
+        _fast_calc._reset_active_reader()
+        _fast_calc._leb_frame_cache.clear()
 
 
 def _discover_leb_file() -> Optional[str]:
@@ -1641,6 +1648,13 @@ def _close_inner() -> None:
     _LEB_FILE = None
     _LEB_READER = None
     _CALC_MODE = None
+
+    # Clear fast_calc's cached reference to the closed LEB reader. Without
+    # this, helpers like _frame_data() would still dispatch through a stale
+    # _active_reader whose mmap is now None.
+    from . import fast_calc as _fast_calc
+
+    _fast_calc._reset_active_reader()
 
     # Close the SPK kernel file handles if loaded
     if _PLANETS is not None:

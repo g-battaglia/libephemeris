@@ -238,10 +238,29 @@ def clear_caches() -> None:
 
     # Clear fast_calc frame-data caches (imported lazily to avoid circular deps)
     try:
-        from .fast_calc import _get_skyfield_frame_data, _get_precession_matrix
+        from .fast_calc import (
+            _get_skyfield_frame_data,
+            _get_precession_matrix,
+            _leb_frame_cache,
+        )
 
         _get_skyfield_frame_data.cache_clear()
         _get_precession_matrix.cache_clear()
+        # LEB frame data is keyed by jd_tt but depends on the reader's
+        # nutation table; clear on close to avoid serving stale values
+        # if the active ephemeris is swapped.
+        _leb_frame_cache.clear()
+    except ImportError:
+        pass
+
+    # Clear the refraction atmosphere-profile cache. The cached profile is
+    # keyed by (altitude, pressure, temperature, lapse_rate); clearing on
+    # close ensures a clean baseline for the next session.
+    try:
+        from . import refraction as _refraction
+
+        _refraction._refr_cache_key = ()
+        _refraction._refr_cache_func = None
     except ImportError:
         pass
 
