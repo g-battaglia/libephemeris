@@ -1988,10 +1988,19 @@ def sol_eclipse_when_loc(
 
             # Get Moon/Sun topocentric distances at local maximum
             from .constants import SEFLG_TOPOCTR as _TOPOCTR_LOC
+            from .state import get_topo as _gt_loc
             import libephemeris as _le_loc
+            _saved_topo_loc = _gt_loc()
             _le_loc.set_topo(lon, lat, altitude)
-            sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, SEFLG_SPEED | _TOPOCTR_LOC)
-            moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, SEFLG_SPEED | _TOPOCTR_LOC)
+            try:
+                sun_pos, _ = swe_calc_ut(jd_local_max, SE_SUN, SEFLG_SPEED | _TOPOCTR_LOC)
+                moon_pos, _ = swe_calc_ut(jd_local_max, SE_MOON, SEFLG_SPEED | _TOPOCTR_LOC)
+            finally:
+                from libephemeris import state as _st_loc
+                if _saved_topo_loc is not None:
+                    _le_loc.set_topo(_saved_topo_loc.longitude.degrees, _saved_topo_loc.latitude.degrees, _saved_topo_loc.elevation.m)
+                else:
+                    _st_loc._TOPO = None
             sun_dist_au = sun_pos[2]
             moon_dist_au = moon_pos[2]
 
@@ -3919,11 +3928,20 @@ def swe_sol_eclipse_how_details(
             """Calculate position angle of Moon relative to Sun (topocentric ICRS)."""
             from .constants import SEFLG_EQUATORIAL as _EQ_PA, SEFLG_J2000 as _J2K_PA
             from .constants import SEFLG_TOPOCTR as _TP_PA
+            from .state import get_topo as _gt_pa
             import libephemeris as _le_pa
+            _saved_topo_pa = _gt_pa()
             _le_pa.set_topo(_gp[0], _gp[1], _gp[2])
-            _pa_flags = _EQ_PA | _J2K_PA | _TP_PA | SEFLG_SPEED
-            sun_eq, _ = swe_calc_ut(jd, SE_SUN, _pa_flags)
-            moon_eq, _ = swe_calc_ut(jd, SE_MOON, _pa_flags)
+            try:
+                _pa_flags = _EQ_PA | _J2K_PA | _TP_PA | SEFLG_SPEED
+                sun_eq, _ = swe_calc_ut(jd, SE_SUN, _pa_flags)
+                moon_eq, _ = swe_calc_ut(jd, SE_MOON, _pa_flags)
+            finally:
+                from libephemeris import state as _st_pa
+                if _saved_topo_pa is not None:
+                    _le_pa.set_topo(_saved_topo_pa.longitude.degrees, _saved_topo_pa.latitude.degrees, _saved_topo_pa.elevation.m)
+                else:
+                    _st_pa._TOPO = None
             sun_ra_rad = math.radians(sun_eq[0])
             sun_dec_rad = math.radians(sun_eq[1])
             moon_ra_rad = math.radians(moon_eq[0])
@@ -6400,13 +6418,17 @@ def lun_occult_when_glob(
         return jd_first, jd_second, jd_third, jd_fourth
 
     # --- Vectorized batch search (~20-50x speedup) ---
-    # The batch search uses Skyfield vectorized calls (earth.at(t_array))
-    # which always need the DE kernel. The scalar position helpers above
-    # use LEB when available; the batch scan always uses Skyfield.
-    eph = get_planets()
-    ts = get_timescale()
-    earth = eph["earth"]
-    moon_body = eph["moon"]
+    # The batch search uses Skyfield vectorized calls (earth.at(t_array)).
+    # When reader is None (Skyfield-only), eph/ts/earth/moon_body are
+    # already defined from the dispatch above.  When reader is not None,
+    # we need them for the batch scan.
+    if reader is not None:
+        # Batch scan requires Skyfield; load only if not already loaded
+        from .state import get_planets as _gp_batch
+        eph = _gp_batch()
+        ts = get_timescale()
+        earth = eph["earth"]
+        moon_body = eph["moon"]
 
     # Pre-resolve target once for batch computation
     if planet != 0 and planet not in _PLANET_MAP:
