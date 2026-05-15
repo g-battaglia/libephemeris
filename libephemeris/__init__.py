@@ -581,16 +581,8 @@ from .planetary_moons import (  # Planetary moons (Galilean moons, Titan, etc.)
 )
 
 # =============================================================================
-# REFERENCE API-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
+# date_conversion wrapper (reference-API return shape)
 # =============================================================================
-# Reference API uses function names without the swe_ prefix
-# These aliases provide 100% API compatibility with the reference API
-
-# Time functions
-julday = julday
-revjul = revjul
-deltat = deltat
-deltat_ex = deltat_ex
 
 
 def date_conversion(
@@ -602,7 +594,7 @@ def date_conversion(
 ) -> "tuple[bool, float, tuple[int, int, int, float]]":
     """Convert and validate a calendar date, returning Julian Day number.
 
-    Wrapper matching pyswisseph's ``date_conversion`` return convention:
+    Wrapper matching the reference ``date_conversion`` return convention:
     ``(valid, jd, (year, month, day, hour))``.
 
     Args:
@@ -630,126 +622,6 @@ def date_conversion(
     y2, m2, d2, h2 = revjul(jd, cal_flag)
     valid = y2 == year and m2 == month and d2 == day
     return (valid, jd, (y2, m2, d2, h2))
-
-
-# Make date_conversion an alias of date_conversion for pyswisseph compat.
-# The old calendar-conversion helper is still available as _date_conversion_calendars.
-date_conversion = date_conversion
-
-day_of_week = day_of_week
-utc_to_jd = utc_to_jd
-jdet_to_utc = jdet_to_utc
-jdut1_to_utc = jdut1_to_utc
-utc_time_zone = utc_time_zone
-time_equ = time_equ
-lat_to_lmt = lat_to_lmt
-lmt_to_lat = lmt_to_lat
-sidtime = sidtime
-sidtime0 = sidtime0
-
-# Planet calculation
-calc_ut = calc_ut
-calc = calc
-calc_pctr = calc_pctr
-nod_aps = nod_aps
-nod_aps_ut = nod_aps_ut
-get_orbital_elements = get_orbital_elements
-get_orbital_elements_ut = get_orbital_elements_ut
-orbit_max_min_true_distance = orbit_max_min_true_distance
-pheno = pheno
-pheno_ut = pheno_ut
-
-# Houses
-houses = houses
-houses_armc = houses_armc
-houses_armc_ex2 = houses_armc_ex2
-houses_ex = houses_ex
-houses_ex2 = houses_ex2
-house_name = house_name
-# _house_pos_pythonic is already the main function name (matching reference API)
-
-# Ayanamsa (sidereal)
-get_ayanamsa_ut = get_ayanamsa_ut
-get_ayanamsa = get_ayanamsa
-get_ayanamsa_ex = get_ayanamsa_ex
-get_ayanamsa_ex_ut = get_ayanamsa_ex_ut
-get_ayanamsa_name = get_ayanamsa_name
-set_sid_mode = set_sid_mode
-
-# Observer location
-set_topo = set_topo
-set_ephe_path = set_ephe_path
-set_ephemeris_file = set_ephemeris_file
-set_jpl_file = set_jpl_file
-
-# Tidal acceleration for Delta T
-set_tid_acc = set_tid_acc
-get_tid_acc = get_tid_acc
-
-# User-defined Delta T
-set_delta_t_userdef = set_delta_t_userdef
-get_delta_t_userdef = get_delta_t_userdef
-
-# Lapse rate for refraction calculations
-set_lapse_rate = set_lapse_rate
-get_lapse_rate = get_lapse_rate
-
-# Library path
-get_library_path = get_library_path
-
-# Current file data
-get_current_file_data = get_current_file_data
-
-# Close and cleanup
-close = close
-
-# Fixed Stars
-fixstar_ut = fixstar_ut
-fixstar = fixstar
-fixstar2 = fixstar2
-fixstar2_ut = fixstar2_ut
-batch_fixstars_ut = batch_fixstars_ut
-fixstar_mag = fixstar_mag
-fixstar2_mag = fixstar2_mag
-
-# Crossings
-solcross_ut = solcross_ut
-solcross = solcross
-mooncross_ut = mooncross_ut
-mooncross = mooncross
-mooncross_node_ut = mooncross_node_ut
-mooncross_node = mooncross_node
-helio_cross_ut = helio_cross_ut
-helio_cross = helio_cross
-find_station_ut = find_station_ut
-next_retrograde_ut = next_retrograde_ut
-
-# pyswisseph swe_ prefixed aliases for utility functions
-cotrans = cotrans
-cotrans_sp = cotrans_sp
-azalt = azalt
-azalt_rev = azalt_rev
-refrac = refrac
-refrac_extended = refrac_extended
-split_deg = split_deg
-degnorm = degnorm
-radnorm = radnorm
-difdeg2n = difdeg2n
-difdegn = difdegn
-difrad2n = difrad2n
-difcs2n = difcs2n
-difcsn = difcsn
-csnorm = csnorm
-csroundsec = csroundsec
-cs2degstr = cs2degstr
-cs2lonlatstr = cs2lonlatstr
-cs2timestr = cs2timestr
-d2l = d2l
-deg_midp = deg_midp
-rad_midp = rad_midp
-get_planet_name = get_planet_name
-
-
 
 
 # Helper for Arabic parts

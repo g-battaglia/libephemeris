@@ -49,6 +49,7 @@ from typing import Any as _Any
 from .. import calc_ut as _calc_ut
 from .. import julday as _julday
 from .. import revjul as _revjul
+from .. import FLG_SPEED as _FLG_SPEED
 
 calc_ut = _calc_ut
 julday = _julday
@@ -527,7 +528,11 @@ def saturn_4_stars(jd: float) -> tuple[float, float, float, float]:
 
     Uses the canonical ``fixstar_ut`` to obtain ecliptic longitude
     of each star."""
+    import logging as _logging
+
     from .. import fixstar_ut as _fixstar_ut
+
+    _logger = _logging.getLogger("libephemeris.contrib")
 
     out: list[float] = []
     for name in ("Aldebaran", "Regulus", "Antares", "Fomalhaut"):
@@ -535,7 +540,13 @@ def saturn_4_stars(jd: float) -> tuple[float, float, float, float]:
             # fixstar_ut returns (pos, resolved_name, retflag)
             pos, _resolved, _retflag = _fixstar_ut(name, jd)
             out.append(float(pos[0]))
-        except Exception:
+        except Exception as exc:
+            # Log unexpected failure so callers can debug; the NaN return
+            # remains the documented signal for "value unavailable".
+            _logger.debug(
+                "saturn_4_stars: fixstar_ut(%r) failed at jd=%.6f: %s",
+                name, jd, exc,
+            )
             out.append(_math.nan)
     return tuple(out)  # type: ignore[return-value]
 
@@ -729,7 +740,7 @@ def _walk_until_aspect(
     longitude. For two moving bodies, see next_aspect_with."""
     t = jd
     while t - jd < max_days:
-        pos, _ = _calc_ut(t, body_a, 256)
+        pos, _ = _calc_ut(t, body_a, _FLG_SPEED)
         delta = abs(_angular_separation(pos[0], body_b_lon) - aspect)
         if delta <= orb:
             return t, delta
@@ -748,6 +759,16 @@ def next_aspect(
 
     Returns (jd_when, exact_orb). Returns (nan, inf) if not found
     within ~3 years.
+
+    Precision note:
+        Uses a fixed 0.5-day step; the result is the first sample
+        whose orb is within ``orb`` degrees of the target aspect, not
+        the bisected moment of exact match. For fast-moving bodies
+        (Moon, inner planets near a station) a small ``orb`` together
+        with the coarse step can skip past the in-orb window: pick
+        ``orb`` larger than ``body_speed * 0.5`` if exact-match timing
+        matters, or post-process the returned JD with a bisection of
+        your own.
     """
     return _walk_until_aspect(
         jd_start, body, target_lon, aspect, orb, 0.5, 365.25 * 3
@@ -795,12 +816,17 @@ def next_aspect_with(
     """Next time bodies `body_a` and `body_b` form `aspect`.
 
     Both bodies move; steps forward by 0.5 days until match or 3 years.
+
+    Precision note:
+        Same coarse-step limitation as :func:`next_aspect`. For
+        sub-hour timing accuracy (e.g. Moon-Sun conjunction), bisect
+        around the returned JD or pass a generous ``orb``.
     """
     t = jd_start
     end = jd_start + 365.25 * 3
     while t < end:
-        pos_a, _ = _calc_ut(t, body_a, 256)
-        pos_b, _ = _calc_ut(t, body_b, 256)
+        pos_a, _ = _calc_ut(t, body_a, _FLG_SPEED)
+        pos_b, _ = _calc_ut(t, body_b, _FLG_SPEED)
         delta = abs(_angular_separation(pos_a[0], pos_b[0]) - aspect)
         if delta <= orb:
             return t, delta
@@ -833,8 +859,14 @@ def next_retro(
     A body is retrograde when its ecliptic-longitude speed is negative.
     Steps forward by 0.5 days; returns the JD where the speed first
     becomes negative. Returns NaN if not found within `max_days`.
+
+    Precision note:
+        With a fixed 0.5-day step, fast-moving stations (Mercury) can
+        be detected up to ~12 hours late. For sub-day station timing,
+        bisect the returned JD against ``calc_ut(..., FLG_SPEED)`` to
+        refine to the speed zero-crossing.
     """
-    SPEED_FLAG = 256  # FLG_SPEED
+    SPEED_FLAG = _FLG_SPEED
     t = jd_start
     last_speed: float | None = None
     while t - jd_start < max_days:

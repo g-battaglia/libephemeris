@@ -1189,8 +1189,12 @@ ASTNAMFILE: str = "seasnam.txt"
 EPHE_PATH: str = ".:/users/ephe2/:/users/ephe/"
 FICTFILE: str = "seorbel.txt"
 FNAME_DE431: str = "de431.eph"
-# pyswisseph exposes this same value also under the SE_-prefixed name
-# (the only SE_-prefixed name they ship). Mirrored here for parity.
+# IMPORTANT — DO NOT REMOVE during another cleanup pass.
+# The upstream reference distribution exports this single value under
+# the SE_-prefixed name, so we mirror it for 1:1 parity. This is the
+# one intentional exception to the "no SE_/SEFLG_/swe_ prefix" rule
+# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of
+# tests/test_api_compat/test_api_surface.py.
 SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"
