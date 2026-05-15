@@ -28,22 +28,22 @@ from datetime import datetime
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
-    SE_MEAN_NODE,
-    SE_MEAN_APOG,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
+    MEAN_NODE,
+    MEAN_APOG,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
 )
 
 
@@ -209,30 +209,30 @@ def generate_random_jds(n: int, seed: int = 42) -> List[float]:
 # Planets with their tolerances (in arcseconds)
 # Based on documented precision in docs/PRECISION.md
 PLANET_TOLERANCES = {
-    SE_SUN: ("Sun", 1.0),
-    SE_MOON: ("Moon", 5.0),
-    SE_MERCURY: ("Mercury", 1.0),
-    SE_VENUS: ("Venus", 1.0),
-    SE_MARS: ("Mars", 2.0),
-    SE_JUPITER: ("Jupiter", 5.0),
-    SE_SATURN: ("Saturn", 5.0),
-    SE_URANUS: ("Uranus", 5.0),
-    SE_NEPTUNE: ("Neptune", 5.0),
-    SE_PLUTO: ("Pluto", 5.0),
+    SUN: ("Sun", 1.0),
+    MOON: ("Moon", 5.0),
+    MERCURY: ("Mercury", 1.0),
+    VENUS: ("Venus", 1.0),
+    MARS: ("Mars", 2.0),
+    JUPITER: ("Jupiter", 5.0),
+    SATURN: ("Saturn", 5.0),
+    URANUS: ("Uranus", 5.0),
+    NEPTUNE: ("Neptune", 5.0),
+    PLUTO: ("Pluto", 5.0),
 }
 
 # Latitude tolerances differ from longitude for some planets
 LATITUDE_TOLERANCES = {
-    SE_SUN: 1.0,
-    SE_MOON: 5.0,
-    SE_MERCURY: 1.0,
-    SE_VENUS: 5.0,  # Venus latitude can have larger differences
-    SE_MARS: 2.0,
-    SE_JUPITER: 5.0,
-    SE_SATURN: 5.0,
-    SE_URANUS: 5.0,
-    SE_NEPTUNE: 5.0,
-    SE_PLUTO: 5.0,
+    SUN: 1.0,
+    MOON: 5.0,
+    MERCURY: 1.0,
+    VENUS: 5.0,  # Venus latitude can have larger differences
+    MARS: 2.0,
+    JUPITER: 5.0,
+    SATURN: 5.0,
+    URANUS: 5.0,
+    NEPTUNE: 5.0,
+    PLUTO: 5.0,
 }
 
 # House systems to test
@@ -287,8 +287,8 @@ def measure_planetary_precision(
 
         for jd in jds:
             try:
-                pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+                pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
 
                 # Longitude diff in arcseconds
                 lon_diff = angular_diff(pos_swe[0], pos_lib[0]) * 3600
@@ -317,10 +317,10 @@ def measure_velocity_precision(
 
     # Test only a subset of planets for velocity
     velocity_planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
     ]
 
     for planet_id, planet_name in velocity_planets:
@@ -333,9 +333,9 @@ def measure_velocity_precision(
 
         for jd in jds:
             try:
-                pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-                pos_lib, _ = ephem.swe_calc_ut(
-                    jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+                pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
+                pos_lib, _ = ephem.calc_ut(
+                    jd, planet_id, FLG_SWIEPH | FLG_SPEED
                 )
 
                 vel_diff = abs(pos_swe[3] - pos_lib[3])
@@ -381,7 +381,7 @@ def measure_house_precision(
                 cusps_swe, ascmc_swe = swe.houses(
                     jd, test_lat, test_lon, hsys_code.encode()
                 )
-                cusps_lib, ascmc_lib = ephem.swe_houses(
+                cusps_lib, ascmc_lib = ephem.houses(
                     jd, test_lat, test_lon, ord(hsys_code)
                 )
 
@@ -424,8 +424,8 @@ def measure_ayanamsha_precision(
                 swe.set_sid_mode(aya_id)
                 aya_swe = swe.get_ayanamsa_ut(jd)
 
-                ephem.swe_set_sid_mode(aya_id, 0, 0)
-                aya_lib = ephem.swe_get_ayanamsa_ut(jd)
+                ephem.set_sid_mode(aya_id, 0, 0)
+                aya_lib = ephem.get_ayanamsa_ut(jd)
 
                 aya_diff = abs(aya_swe - aya_lib)
                 aya_stats.add_diff(aya_diff)
@@ -474,20 +474,20 @@ def measure_lunar_node_precision(
     for jd in jds:
         try:
             # Mean Node
-            pos_swe, _ = swe.calc_ut(jd, SE_MEAN_NODE, SEFLG_SWIEPH)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SWIEPH)
+            pos_swe, _ = swe.calc_ut(jd, MEAN_NODE, FLG_SWIEPH)
+            pos_lib, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SWIEPH)
             diff = angular_diff(pos_swe[0], pos_lib[0]) * 3600
             mean_node_stats.add_diff(diff)
 
             # True Node
-            pos_swe, _ = swe.calc_ut(jd, SE_TRUE_NODE, SEFLG_SWIEPH)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SWIEPH)
+            pos_swe, _ = swe.calc_ut(jd, TRUE_NODE, FLG_SWIEPH)
+            pos_lib, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SWIEPH)
             diff = angular_diff(pos_swe[0], pos_lib[0]) * 3600
             true_node_stats.add_diff(diff)
 
             # Mean Lilith
-            pos_swe, _ = swe.calc_ut(jd, SE_MEAN_APOG, SEFLG_SWIEPH)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_SWIEPH)
+            pos_swe, _ = swe.calc_ut(jd, MEAN_APOG, FLG_SWIEPH)
+            pos_lib, _ = ephem.calc_ut(jd, MEAN_APOG, FLG_SWIEPH)
             diff = angular_diff(pos_swe[0], pos_lib[0]) * 3600
             mean_lilith_stats.add_diff(diff)
 
@@ -509,10 +509,10 @@ def measure_heliocentric_precision(
     results = []
 
     helio_planets = [
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
     ]
 
     for planet_id, planet_name in helio_planets:
@@ -525,9 +525,9 @@ def measure_heliocentric_precision(
 
         for jd in jds:
             try:
-                pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_HELCTR)
-                pos_lib, _ = ephem.swe_calc_ut(
-                    jd, planet_id, SEFLG_SWIEPH | SEFLG_HELCTR
+                pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_HELCTR)
+                pos_lib, _ = ephem.calc_ut(
+                    jd, planet_id, FLG_SWIEPH | FLG_HELCTR
                 )
 
                 diff = angular_diff(pos_swe[0], pos_lib[0]) * 3600
@@ -571,13 +571,13 @@ def measure_time_precision(
         try:
             # Delta T (difference in seconds)
             dt_swe = swe.deltat(jd) * 86400  # Convert to seconds
-            dt_lib = ephem.swe_deltat(jd) * 86400
+            dt_lib = ephem.deltat(jd) * 86400
             deltat_stats.add_diff(abs(dt_swe - dt_lib))
 
             # Test Julian Day round-trip
             year, month, day, hour = swe.revjul(jd)
             jd_swe = swe.julday(year, month, day, hour)
-            jd_lib = ephem.swe_julday(year, month, day, hour)
+            jd_lib = ephem.julday(year, month, day, hour)
             # Difference in microseconds (1 JD = 86400 seconds = 86400e6 microseconds)
             jd_diff_usec = abs(jd_swe - jd_lib) * 86400e6
             julday_stats.add_diff(jd_diff_usec)

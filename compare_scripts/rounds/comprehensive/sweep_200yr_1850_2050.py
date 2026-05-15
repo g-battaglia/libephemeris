@@ -12,9 +12,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 BODIES = [
     (0, "Sun"),
     (1, "Moon"),
@@ -49,8 +49,8 @@ def main():
     while jd <= end_jd:
         for body_id, name in BODIES:
             try:
-                se = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)[0]
+                se = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le = ephem.calc_ut(jd, body_id, FLG_SPEED)[0]
             except Exception:
                 continue
 

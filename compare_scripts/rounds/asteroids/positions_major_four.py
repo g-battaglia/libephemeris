@@ -35,12 +35,12 @@ _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
 # Major asteroids use dedicated constants in libephemeris
-# SE uses either SE_AST_OFFSET+N or dedicated IDs; LE uses dedicated IDs only
+# SE uses either AST_OFFSET+N or dedicated IDs; LE uses dedicated IDs only
 ASTEROIDS = [
-    (SE_CERES, "Ceres"),
-    (SE_PALLAS, "Pallas"),
-    (SE_JUNO, "Juno"),
-    (SE_VESTA, "Vesta"),
+    (CERES, "Ceres"),
+    (PALLAS, "Pallas"),
+    (JUNO, "Juno"),
+    (VESTA, "Vesta"),
 ]
 
 EPOCHS = [
@@ -132,11 +132,11 @@ def run_part1():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in ASTEROIDS:
-            flags = SEFLG_SPEED
+            flags = FLG_SPEED
             label = f"{epoch_name} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -154,11 +154,11 @@ def run_part2():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in ASTEROIDS:
-            flags = SEFLG_SPEED | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_EQUATORIAL
             label = f"{epoch_name} {body_name} EQ"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -176,11 +176,11 @@ def run_part3():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in ASTEROIDS:
-            flags = SEFLG_SPEED | SEFLG_J2000
+            flags = FLG_SPEED | FLG_J2000
             label = f"{epoch_name} {body_name} J2K"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -198,11 +198,11 @@ def run_part4():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in ASTEROIDS:
-            flags = SEFLG_SPEED | SEFLG_HELCTR
+            flags = FLG_SPEED | FLG_HELCTR
             label = f"{epoch_name} {body_name} HELIO"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -220,12 +220,12 @@ def run_part5():
     dt = 1.0 / 86400.0  # 1 second
 
     for body_id, body_name in ASTEROIDS:
-        flags = SEFLG_SPEED
+        flags = FLG_SPEED
         label = f"{body_name}"
         try:
-            le_r = ephem.swe_calc_ut(jd, body_id, flags)
-            le_before = ephem.swe_calc_ut(jd - dt, body_id, 0)
-            le_after = ephem.swe_calc_ut(jd + dt, body_id, 0)
+            le_r = ephem.calc_ut(jd, body_id, flags)
+            le_before = ephem.calc_ut(jd - dt, body_id, 0)
+            le_after = ephem.calc_ut(jd + dt, body_id, 0)
 
             for i, comp in enumerate(["lon", "lat", "dist"]):
                 reported = le_r[0][i + 3]
@@ -259,11 +259,11 @@ def run_part6():
     for y in range(1900, 2101, 10):
         jd = swe.julday(y, 6, 21, 12.0)
         for body_id, body_name in ASTEROIDS:
-            flags = SEFLG_SPEED
+            flags = FLG_SPEED
             label = f"{y} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label, check_speed=False)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -278,23 +278,23 @@ def run_part7():
 
     r = R("P7: Asteroids sidereal")
 
-    swe.set_sid_mode(SE_SIDM_LAHIRI)
-    ephem.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0)
+    swe.set_sid_mode(SIDM_LAHIRI)
+    ephem.set_sid_mode(SIDM_LAHIRI, 0, 0)
 
     jd = swe.julday(2024, 3, 20, 15.5)
     for body_id, body_name in ASTEROIDS:
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         label = f"{body_name} SID"
         try:
             se_r = swe.calc_ut(jd, body_id, flags)
-            le_r = ephem.swe_calc_ut(jd, body_id, flags)
+            le_r = ephem.calc_ut(jd, body_id, flags)
             compare_pos(r, se_r, le_r, label)
         except Exception as e:
             r.skip(f"{label}: {e}")
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     return r.summary(), r
 

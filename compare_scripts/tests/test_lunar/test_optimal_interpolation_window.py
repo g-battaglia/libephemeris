@@ -201,7 +201,7 @@ class TestSwissEphemerisComparison:
 
         diffs = []
         for jd in test_jds:
-            # Swiss Ephemeris interpolated apogee (SE_INTP_APOG = 21)
+            # Swiss Ephemeris interpolated apogee (INTP_APOG = 21)
             se_result = swisseph.calc_ut(jd, 21)
             se_lon = se_result[0][0]
 

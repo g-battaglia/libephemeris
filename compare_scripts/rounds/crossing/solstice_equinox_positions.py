@@ -13,44 +13,44 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_CHIRON,
-    SE_CERES,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    CHIRON,
+    CERES,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
-    SE_URANUS: "Uranus",
-    SE_NEPTUNE: "Neptune",
-    SE_PLUTO: "Pluto",
-    SE_CHIRON: "Chiron",
-    SE_CERES: "Ceres",
-    SE_MEAN_NODE: "MeanNode",
-    SE_TRUE_NODE: "TrueNode",
-    SE_MEAN_APOG: "MeanApog",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
+    URANUS: "Uranus",
+    NEPTUNE: "Neptune",
+    PLUTO: "Pluto",
+    CHIRON: "Chiron",
+    CERES: "Ceres",
+    MEAN_NODE: "MeanNode",
+    TRUE_NODE: "TrueNode",
+    MEAN_APOG: "MeanApog",
 }
 
 # Approximate JDs for solstices/equinoxes 1950-2050
@@ -102,7 +102,7 @@ EVENTS = [
     (2470162.0, "WS 2050"),
 ]
 
-flags = SEFLG_SWIEPH | SEFLG_SPEED
+flags = FLG_SWIEPH | FLG_SPEED
 COMP_NAMES = ["lon", "lat", "dist", "lon_spd", "lat_spd", "dist_spd"]
 
 passed = 0
@@ -114,7 +114,7 @@ for jd, event_name in EVENTS:
     for body, bname in BODIES.items():
         try:
             se_result = swe.calc_ut(jd, body, flags)
-            le_result = ephem.swe_calc_ut(jd, body, flags)
+            le_result = ephem.calc_ut(jd, body, flags)
 
             for i, comp in enumerate(COMP_NAMES):
                 total += 1
@@ -127,9 +127,9 @@ for jd, event_name in EVENTS:
                     is_pass = diff < tol
                 else:
                     diff_arcsec = diff * 3600.0
-                    if body in (SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG):
+                    if body in (MEAN_NODE, TRUE_NODE, MEAN_APOG):
                         tol = 30.0
-                    elif body == SE_MOON:
+                    elif body == MOON:
                         tol = 3.0
                     else:
                         tol = 2.0

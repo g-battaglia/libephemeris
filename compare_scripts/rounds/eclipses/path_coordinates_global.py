@@ -20,19 +20,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SE_ECL_CENTRAL = 1
-SE_ECL_NONCENTRAL = 2
-SE_ECL_TOTAL = 4
-SE_ECL_ANNULAR = 8
-SE_ECL_PARTIAL = 16
-SE_ECL_ANNULAR_TOTAL = 32  # hybrid
-SE_ECL_PENUMBRAL = 64
+ECL_CENTRAL = 1
+ECL_NONCENTRAL = 2
+ECL_TOTAL = 4
+ECL_ANNULAR = 8
+ECL_PARTIAL = 16
+ECL_ANNULAR_TOTAL = 32  # hybrid
+ECL_PENUMBRAL = 64
 
 
 def run_test(label, condition, detail=""):
@@ -65,7 +65,7 @@ while se_jd < jd_end and eclipse_count < 30:
         se_tmax = se_times[0]
 
         # LE
-        le_result = ephem.swe_sol_eclipse_when_glob(le_jd, 0, 0, "forward")
+        le_result = ephem.sol_eclipse_when_glob(le_jd, 0, 0, "forward")
         le_retflag = le_result[0]
         le_times = le_result[1]
         le_tmax = le_times[0]
@@ -83,10 +83,10 @@ while se_jd < jd_end and eclipse_count < 30:
 
         # Compare eclipse type (basic: total/annular/partial)
         se_type = se_retflag & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
         le_type = le_retflag & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
 
         run_test(
@@ -137,8 +137,8 @@ for year, month, day, hour, lat, lon, desc in eclipse_locations:
         se_retflag = se_result[0]
         se_attr = se_result[1]
 
-        # LE: swe_sol_eclipse_how(tjd, ifl, geopos)
-        le_result = ephem.swe_sol_eclipse_how(jd, 0, geopos)
+        # LE: sol_eclipse_how(tjd, ifl, geopos)
+        le_result = ephem.sol_eclipse_how(jd, 0, geopos)
         le_retflag = le_result[0]
         le_attr = le_result[1]
 
@@ -190,7 +190,7 @@ while se_jd < jd_end and eclipse_count < 30:
         se_times = se_result[1]
         se_tmax = se_times[0]
 
-        le_result = ephem.swe_lun_eclipse_when(le_jd, 0, 0)
+        le_result = ephem.lun_eclipse_when(le_jd, 0, 0)
         le_retflag = le_result[0]
         le_times = le_result[1]
         le_tmax = le_times[0]
@@ -205,8 +205,8 @@ while se_jd < jd_end and eclipse_count < 30:
         )
 
         # Type comparison
-        se_type = se_retflag & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
-        le_type = le_retflag & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
+        se_type = se_retflag & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
+        le_type = le_retflag & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
 
         run_test(
             f"P3 lun_eclipse#{eclipse_count} type",
@@ -241,14 +241,14 @@ for i in range(5):
         se_result = swe.lun_eclipse_when(jd_start, 0, 0, False)
         se_tmax = se_result[1][0]
 
-        le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+        le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
         le_tmax = le_result[1][0]
 
         # Test how at eclipse maximum
         geopos = [0.0, 45.0, 0.0]  # generic location
 
         se_how = swe.lun_eclipse_how(se_tmax, geopos, 0)
-        le_how = ephem.swe_lun_eclipse_how(le_tmax, 0, geopos)
+        le_how = ephem.lun_eclipse_how(le_tmax, 0, geopos)
 
         # Umbral magnitude (attr[0])
         se_umag = se_how[1][0]
@@ -292,7 +292,7 @@ for i in range(10):
         se_result = swe.sol_eclipse_when_glob(jd_start, 0, 0, False)
         se_times = se_result[1]
 
-        le_result = ephem.swe_sol_eclipse_when_glob(jd_start, 0, 0, "forward")
+        le_result = ephem.sol_eclipse_when_glob(jd_start, 0, 0, "forward")
         le_times = le_result[1]
 
         # Compare each contact time (indices 0-4)
@@ -339,7 +339,7 @@ for i in range(10):
         se_result = swe.lun_eclipse_when(jd_start, 0, 0, False)
         se_times = se_result[1]
 
-        le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+        le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
         le_times = le_result[1]
 
         contact_names = [
@@ -392,7 +392,7 @@ for i in range(5):
         se_result = swe.sol_eclipse_when_glob(jd_start, 0, 0, True)
         se_tmax = se_result[1][0]
 
-        le_result = ephem.swe_sol_eclipse_when_glob(jd_start, 0, 0, "backward")
+        le_result = ephem.sol_eclipse_when_glob(jd_start, 0, 0, "backward")
         le_tmax = le_result[1][0]
 
         diff_min = abs(se_tmax - le_tmax) * 1440
@@ -416,7 +416,7 @@ for i in range(5):
         se_result = swe.lun_eclipse_when(jd_start, 0, 0, True)
         se_tmax = se_result[1][0]
 
-        le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+        le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
         le_tmax = le_result[1][0]
 
         diff_min = abs(se_tmax - le_tmax) * 1440
@@ -444,14 +444,14 @@ print("\n=== P8: Eclipse attributes sanity ===")
 jd_start = swe.julday(2020, 1, 1, 0.0)
 for i in range(15):
     try:
-        le_result = ephem.swe_sol_eclipse_when_glob(jd_start, 0, 0, "forward")
+        le_result = ephem.sol_eclipse_when_glob(jd_start, 0, 0, "forward")
         le_tmax = le_result[1][0]
         le_retflag = le_result[0]
 
         # Check retflag has at least one eclipse type
         has_type = (
             le_retflag
-            & (SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL)
+            & (ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL)
         ) != 0
         run_test(f"P8 sol#{i} has_type", has_type, f"retflag={le_retflag}")
 
@@ -466,12 +466,12 @@ for i in range(15):
 jd_start = swe.julday(2020, 1, 1, 0.0)
 for i in range(15):
     try:
-        le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+        le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
         le_tmax = le_result[1][0]
         le_retflag = le_result[0]
 
         has_type = (
-            le_retflag & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
+            le_retflag & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
         ) != 0
         run_test(f"P8 lun#{i} has_type", has_type, f"retflag={le_retflag}")
 

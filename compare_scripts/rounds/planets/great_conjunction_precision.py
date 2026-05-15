@@ -16,14 +16,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Great conjunctions and notable planetary alignments
 EVENTS = [
@@ -31,70 +31,70 @@ EVENTS = [
     (
         "J-S 2020 Dec 21",
         2459204.5,
-        [(ephem.SE_JUPITER, swe.JUPITER), (ephem.SE_SATURN, swe.SATURN)],
+        [(ephem.JUPITER, swe.JUPITER), (ephem.SATURN, swe.SATURN)],
     ),
     (
         "J-S 2000 May 28",
         2451693.5,
-        [(ephem.SE_JUPITER, swe.JUPITER), (ephem.SE_SATURN, swe.SATURN)],
+        [(ephem.JUPITER, swe.JUPITER), (ephem.SATURN, swe.SATURN)],
     ),
     (
         "J-S 1981 Jan 1",
         2444606.5,
-        [(ephem.SE_JUPITER, swe.JUPITER), (ephem.SE_SATURN, swe.SATURN)],
+        [(ephem.JUPITER, swe.JUPITER), (ephem.SATURN, swe.SATURN)],
     ),
     (
         "J-S 1961 Feb 18",
         2437382.5,
-        [(ephem.SE_JUPITER, swe.JUPITER), (ephem.SE_SATURN, swe.SATURN)],
+        [(ephem.JUPITER, swe.JUPITER), (ephem.SATURN, swe.SATURN)],
     ),
     (
         "J-S 1940 Aug 8",
         2429856.5,
-        [(ephem.SE_JUPITER, swe.JUPITER), (ephem.SE_SATURN, swe.SATURN)],
+        [(ephem.JUPITER, swe.JUPITER), (ephem.SATURN, swe.SATURN)],
     ),
     # Venus-Jupiter conjunctions
     (
         "V-J 2015 Jul 1",
         2457204.5,
-        [(ephem.SE_VENUS, swe.VENUS), (ephem.SE_JUPITER, swe.JUPITER)],
+        [(ephem.VENUS, swe.VENUS), (ephem.JUPITER, swe.JUPITER)],
     ),
     (
         "V-J 2023 Mar 2",
         2460005.5,
-        [(ephem.SE_VENUS, swe.VENUS), (ephem.SE_JUPITER, swe.JUPITER)],
+        [(ephem.VENUS, swe.VENUS), (ephem.JUPITER, swe.JUPITER)],
     ),
     # Mars-Jupiter
     (
         "M-J 2020 Mar 20",
         2458928.5,
-        [(ephem.SE_MARS, swe.MARS), (ephem.SE_JUPITER, swe.JUPITER)],
+        [(ephem.MARS, swe.MARS), (ephem.JUPITER, swe.JUPITER)],
     ),
     # Mercury-Venus
     (
         "Me-V 2020 May 22",
         2458991.5,
-        [(ephem.SE_MERCURY, swe.MERCURY), (ephem.SE_VENUS, swe.VENUS)],
+        [(ephem.MERCURY, swe.MERCURY), (ephem.VENUS, swe.VENUS)],
     ),
     # All planets close together
     (
         "Stellium 2000 May",
         2451693.5,
         [
-            (ephem.SE_SUN, swe.SUN),
-            (ephem.SE_MOON, swe.MOON),
-            (ephem.SE_MERCURY, swe.MERCURY),
-            (ephem.SE_VENUS, swe.VENUS),
-            (ephem.SE_MARS, swe.MARS),
-            (ephem.SE_JUPITER, swe.JUPITER),
-            (ephem.SE_SATURN, swe.SATURN),
+            (ephem.SUN, swe.SUN),
+            (ephem.MOON, swe.MOON),
+            (ephem.MERCURY, swe.MERCURY),
+            (ephem.VENUS, swe.VENUS),
+            (ephem.MARS, swe.MARS),
+            (ephem.JUPITER, swe.JUPITER),
+            (ephem.SATURN, swe.SATURN),
         ],
     ),
     # Outer planet conjunctions
     (
         "U-N 1993 Feb",
         2448990.5,
-        [(ephem.SE_URANUS, swe.URANUS), (ephem.SE_NEPTUNE, swe.NEPTUNE)],
+        [(ephem.URANUS, swe.URANUS), (ephem.NEPTUNE, swe.NEPTUNE)],
     ),
 ]
 
@@ -104,7 +104,7 @@ def compare_at_event(label, jd, body_pairs):
 
     for le_body, se_body in body_pairs:
         try:
-            le_r = ephem.swe_calc_ut(jd, le_body, FLAGS)
+            le_r = ephem.calc_ut(jd, le_body, FLAGS)
             se_r = swe.calc_ut(jd, se_body, swe.FLG_SWIEPH | swe.FLG_SPEED)
         except Exception:
             continue
@@ -128,7 +128,7 @@ def compare_at_event(label, jd, body_pairs):
         if lon_diff > 180:
             lon_diff = 360 - lon_diff
         lon_as = lon_diff * 3600
-        tol = 1.0 if le_body == ephem.SE_MOON else 0.5
+        tol = 1.0 if le_body == ephem.MOON else 0.5
         if lon_as <= tol:
             passed += 1
         else:
@@ -147,7 +147,7 @@ def compare_at_event(label, jd, body_pairs):
         # Speed
         total += 1
         spd_as = abs(le_r[0][3] - se_r[0][3]) * 3600
-        spd_tol = 5.0 if le_body == ephem.SE_MOON else 2.0
+        spd_tol = 5.0 if le_body == ephem.MOON else 2.0
         if spd_as <= spd_tol:
             passed += 1
         else:
@@ -156,7 +156,7 @@ def compare_at_event(label, jd, body_pairs):
 
         # Also test with J2000
         try:
-            le_j = ephem.swe_calc_ut(jd, le_body, FLAGS | ephem.SEFLG_J2000)
+            le_j = ephem.calc_ut(jd, le_body, FLAGS | ephem.FLG_J2000)
             se_j = swe.calc_ut(
                 jd, se_body, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000
             )
@@ -176,7 +176,7 @@ def compare_at_event(label, jd, body_pairs):
 
         # Equatorial
         try:
-            le_e = ephem.swe_calc_ut(jd, le_body, FLAGS | ephem.SEFLG_EQUATORIAL)
+            le_e = ephem.calc_ut(jd, le_body, FLAGS | ephem.FLG_EQUATORIAL)
             se_e = swe.calc_ut(
                 jd, se_body, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL
             )

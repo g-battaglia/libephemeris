@@ -11,10 +11,10 @@ Parts:
   P1: Main planets (Sun-Pluto) longitude/latitude/distance at 50-year intervals
   P2: Lunar nodes (mean & true) across centuries
   P3: Mean & True Lilith (Mean Apogee, Osculating Apogee) across centuries
-  P4: Planet speeds across epochs (SEFLG_SPEED)
-  P5: Equatorial coordinates (SEFLG_EQUATORIAL) across epochs
-  P6: Heliocentric positions (SEFLG_HELCTR) across epochs
-  P7: J2000 ecliptic (SEFLG_J2000) across epochs — isolate precession from ephemeris
+  P4: Planet speeds across epochs (FLG_SPEED)
+  P5: Equatorial coordinates (FLG_EQUATORIAL) across epochs
+  P6: Heliocentric positions (FLG_HELCTR) across epochs
+  P7: J2000 ecliptic (FLG_J2000) across epochs — isolate precession from ephemeris
   P8: Dense sweep 1900-2100 at 1-year intervals for Moon (most sensitive body)
 """
 
@@ -39,26 +39,26 @@ swe.set_ephe_path(_EPHE_PATH)
 
 # Body definitions
 MAIN_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 NODE_BODIES = [
-    (SE_MEAN_NODE, "Mean Node"),
-    (SE_TRUE_NODE, "True Node"),
+    (MEAN_NODE, "Mean Node"),
+    (TRUE_NODE, "True Node"),
 ]
 
 LILITH_BODIES = [
-    (SE_MEAN_APOG, "Mean Lilith"),
-    (SE_OSCU_APOG, "Oscu Lilith"),
+    (MEAN_APOG, "Mean Lilith"),
+    (OSCU_APOG, "Oscu Lilith"),
 ]
 
 # Epoch definitions
@@ -123,7 +123,7 @@ def compare_body_at_epoch(
 
     try:
         se_pos, se_flag = swe.calc_ut(jd, body_id, flags)
-        le_pos, le_flag = ephem.swe_calc_ut(jd, body_id, flags)
+        le_pos, le_flag = ephem.calc_ut(jd, body_id, flags)
     except Exception as e:
         r.fail(f"{label}: EXCEPTION {e}")
         return None
@@ -173,7 +173,7 @@ def run_part1():
     print("=" * 70)
 
     r = R("P1: Multi-Epoch Planets")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     # Tolerances vary by body and epoch distance from J2000
     for body_id, body_name in MAIN_PLANETS:
@@ -188,7 +188,7 @@ def run_part1():
 
             # Moon uses DE440 while SE uses its own lunar theory — drift
             # is ~0.75"/century from J2000, reaching ~3" at 400 years.
-            if body_id == SE_MOON:
+            if body_id == MOON:
                 tol_lon = 0.5 + dist_from_j2000 * 0.03  # ~3"/century
                 tol_lat = 0.5 + dist_from_j2000 * 0.01
 
@@ -221,7 +221,7 @@ def run_part2():
     print("=" * 70)
 
     r = R("P2: Lunar Nodes Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for body_id, body_name in NODE_BODIES:
         drifts = []
@@ -260,7 +260,7 @@ def run_part3():
     print("=" * 70)
 
     r = R("P3: Lilith Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for body_id, body_name in LILITH_BODIES:
         drifts = []
@@ -271,7 +271,7 @@ def run_part3():
             # Mean Lilith latitude differs ~15-20" due to different
             # computation models (lunar theory vs geometric mean).
             # Osculating Lilith latitude is more consistent.
-            tol_lat = 25.0 if body_id == SE_MEAN_APOG else 5.0
+            tol_lat = 25.0 if body_id == MEAN_APOG else 5.0
 
             result = compare_body_at_epoch(
                 body_id,
@@ -303,7 +303,7 @@ def run_part4():
     print("=" * 70)
 
     r = R("P4: Speed Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for body_id, body_name in MAIN_PLANETS:
         max_speed_diff = 0.0
@@ -315,7 +315,7 @@ def run_part4():
 
             try:
                 se_pos, _ = swe.calc_ut(jd, body_id, flags)
-                le_pos, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                le_pos, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -353,7 +353,7 @@ def run_part5():
     print("=" * 70)
 
     r = R("P5: Equatorial Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+    flags = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
     epochs = list(range(1700, 2101, 100))
 
     for body_id, body_name in MAIN_PLANETS:
@@ -364,7 +364,7 @@ def run_part5():
 
             try:
                 se_pos, _ = swe.calc_ut(jd, body_id, flags)
-                le_pos, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                le_pos, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -411,11 +411,11 @@ def run_part6():
     print("=" * 70)
 
     r = R("P6: Heliocentric Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR
+    flags = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR
     epochs = list(range(1700, 2101, 100))
 
     # Skip Sun (heliocentric Sun is always 0) and Moon (not valid heliocentric)
-    helio_planets = [p for p in MAIN_PLANETS if p[0] not in (SE_SUN, SE_MOON)]
+    helio_planets = [p for p in MAIN_PLANETS if p[0] not in (SUN, MOON)]
 
     for body_id, body_name in helio_planets:
         max_lon_diff = 0.0
@@ -425,7 +425,7 @@ def run_part6():
 
             try:
                 se_pos, _ = swe.calc_ut(jd, body_id, flags)
-                le_pos, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                le_pos, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -471,7 +471,7 @@ def run_part7():
     print("=" * 70)
 
     r = R("P7: J2000 Multi-Epoch")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT
+    flags = FLG_SWIEPH | FLG_SPEED | FLG_J2000 | FLG_NONUT
     epochs = list(range(1700, 2101, 100))
 
     for body_id, body_name in MAIN_PLANETS:
@@ -482,7 +482,7 @@ def run_part7():
 
             try:
                 se_pos, _ = swe.calc_ut(jd, body_id, flags)
-                le_pos, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                le_pos, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -498,9 +498,9 @@ def run_part7():
             dist_from_j2000 = abs(year - 2000)
             # J2000 frame removes precession but ephemeris model
             # differences remain. Moon and Pluto need wider margin.
-            if body_id == SE_MOON:
+            if body_id == MOON:
                 tol = 0.5 + dist_from_j2000 * 0.02
-            elif body_id == SE_PLUTO:
+            elif body_id == PLUTO:
                 tol = 0.5 + dist_from_j2000 * 0.005
             else:
                 tol = 0.3 + dist_from_j2000 * 0.003
@@ -534,7 +534,7 @@ def run_part8():
     print("=" * 70)
 
     r = R("P8: Moon Dense Sweep")
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     lon_diffs = []
     for year in EPOCHS_DENSE:
@@ -542,8 +542,8 @@ def run_part8():
         label = f"Moon {year}"
 
         try:
-            se_pos, _ = swe.calc_ut(jd, SE_MOON, flags)
-            le_pos, _ = ephem.swe_calc_ut(jd, SE_MOON, flags)
+            se_pos, _ = swe.calc_ut(jd, MOON, flags)
+            le_pos, _ = ephem.calc_ut(jd, MOON, flags)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue

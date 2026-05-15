@@ -14,7 +14,7 @@ class TestFixedStars:
 
     def test_regulus_j2000(self, standard_jd):
         """Test Regulus position at J2000."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_REGULUS, 0)
+        pos, _ = ephem.calc_ut(standard_jd, REGULUS, 0)
 
         # Regulus at ~149-150° at J2000
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f}°"
@@ -23,7 +23,7 @@ class TestFixedStars:
 
     def test_spica_j2000(self, standard_jd):
         """Test Spica position at J2000."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_SPICA_STAR, 0)
+        pos, _ = ephem.calc_ut(standard_jd, SPICA_STAR, 0)
 
         # Spica at ~203-204° at J2000
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f}°"
@@ -32,7 +32,7 @@ class TestFixedStars:
 
     def test_regulus_vs_swisseph(self, standard_jd):
         """Compare Regulus with SwissEph."""
-        pos_py, _ = ephem.swe_calc_ut(standard_jd, SE_REGULUS, 0)
+        pos_py, _ = ephem.calc_ut(standard_jd, REGULUS, 0)
 
         # SwissEph fixed star by name
         try:
@@ -62,7 +62,7 @@ class TestFixedStars:
 
     def test_spica_vs_swisseph(self, standard_jd):
         """Compare Spica with SwissEph."""
-        pos_py, _ = ephem.swe_calc_ut(standard_jd, SE_SPICA_STAR, 0)
+        pos_py, _ = ephem.calc_ut(standard_jd, SPICA_STAR, 0)
 
         try:
             pos_swe, name_swe, err_swe = swe.fixstar_ut("Spica", standard_jd, 0)
@@ -82,11 +82,11 @@ class TestFixedStars:
 
     def test_proper_motion(self):
         """Test that fixed stars move due to proper motion."""
-        jd1 = ephem.swe_julday(2000, 1, 1, 12.0)
-        jd2 = ephem.swe_julday(2050, 1, 1, 12.0)  # 50 years later
+        jd1 = ephem.julday(2000, 1, 1, 12.0)
+        jd2 = ephem.julday(2050, 1, 1, 12.0)  # 50 years later
 
-        pos1, _ = ephem.swe_calc_ut(jd1, SE_REGULUS, 0)
-        pos2, _ = ephem.swe_calc_ut(jd2, SE_REGULUS, 0)
+        pos1, _ = ephem.calc_ut(jd1, REGULUS, 0)
+        pos2, _ = ephem.calc_ut(jd2, REGULUS, 0)
 
         # Regulus has small proper motion, should move slightly
         diff = abs(pos2[0] - pos1[0])
@@ -100,35 +100,35 @@ class TestAngles:
 
     def test_ascendant_basic(self):
         """Test basic Ascendant calculation."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964  # Rome
 
-        ephem.swe_set_topo(lon, lat, 0)
+        ephem.set_topo(lon, lat, 0)
 
-        asc, _ = ephem.swe_calc_ut(jd, SE_ASCENDANT, 0)
+        asc, _ = ephem.calc_ut(jd, ASCENDANT, 0)
 
         assert 0 <= asc[0] < 360, "Invalid Ascendant"
 
     def test_mc_basic(self):
         """Test basic MC calculation."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_set_topo(lon, lat, 0)
+        ephem.set_topo(lon, lat, 0)
 
-        mc, _ = ephem.swe_calc_ut(jd, SE_MC, 0)
+        mc, _ = ephem.calc_ut(jd, _MC_ANGLE_ID, 0)
 
         assert 0 <= mc[0] < 360, "Invalid MC"
 
     def test_descendant_opposite_ascendant(self):
         """Test Descendant is opposite Ascendant."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_set_topo(lon, lat, 0)
+        ephem.set_topo(lon, lat, 0)
 
-        asc, _ = ephem.swe_calc_ut(jd, SE_ASCENDANT, 0)
-        desc, _ = ephem.swe_calc_ut(jd, SE_DESCENDANT, 0)
+        asc, _ = ephem.calc_ut(jd, ASCENDANT, 0)
+        desc, _ = ephem.calc_ut(jd, DESCENDANT, 0)
 
         expected_desc = (asc[0] + 180.0) % 360.0
         diff = abs(desc[0] - expected_desc)
@@ -137,13 +137,13 @@ class TestAngles:
 
     def test_ic_opposite_mc(self):
         """Test IC is opposite MC."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_set_topo(lon, lat, 0)
+        ephem.set_topo(lon, lat, 0)
 
-        mc, _ = ephem.swe_calc_ut(jd, SE_MC, 0)
-        ic, _ = ephem.swe_calc_ut(jd, SE_IC, 0)
+        mc, _ = ephem.calc_ut(jd, _MC_ANGLE_ID, 0)
+        ic, _ = ephem.calc_ut(jd, IC, 0)
 
         expected_ic = (mc[0] + 180.0) % 360.0
         diff = abs(ic[0] - expected_ic)
@@ -152,18 +152,18 @@ class TestAngles:
 
     def test_vertex(self):
         """Test Vertex calculation."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_set_topo(lon, lat, 0)
+        ephem.set_topo(lon, lat, 0)
 
-        vertex, _ = ephem.swe_calc_ut(jd, SE_VERTEX, 0)
+        vertex, _ = ephem.calc_ut(jd, _VERTEX_ANGLE_ID, 0)
 
         assert 0 <= vertex[0] < 360, "Invalid Vertex"
 
     def test_angles_require_location(self):
         """Test that angles fail without location set."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
 
         # Reset state (no location)
         from libephemeris import state
@@ -171,7 +171,7 @@ class TestAngles:
         state._TOPO = None
 
         with pytest.raises(ValueError, match="observer location"):
-            ephem.swe_calc_ut(jd, SE_ASCENDANT, 0)
+            ephem.calc_ut(jd, ASCENDANT, 0)
 
 
 @pytest.mark.unit
@@ -180,37 +180,37 @@ class TestArabicParts:
 
     def test_pars_fortunae(self):
         """Test Part of Fortune."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
         # Pre-calculate
-        ephem.swe_calc_angles(jd, lat, lon)
+        ephem.calc_angles(jd, lat, lon)
 
-        pf, _ = ephem.swe_calc_ut(jd, SE_PARS_FORTUNAE, 0)
+        pf, _ = ephem.calc_ut(jd, PARS_FORTUNAE, 0)
 
         assert 0 <= pf[0] < 360, "Invalid Part of Fortune"
 
     def test_all_arabic_parts(self):
         """Test all 4 Arabic parts."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_calc_angles(jd, lat, lon)
+        ephem.calc_angles(jd, lat, lon)
 
         parts = [
-            (SE_PARS_FORTUNAE, "Fortune"),
-            (SE_PARS_SPIRITUS, "Spirit"),
-            (SE_PARS_AMORIS, "Love"),
-            (SE_PARS_FIDEI, "Faith"),
+            (PARS_FORTUNAE, "Fortune"),
+            (PARS_SPIRITUS, "Spirit"),
+            (PARS_AMORIS, "Love"),
+            (PARS_FIDEI, "Faith"),
         ]
 
         for part_id, name in parts:
-            pos, _ = ephem.swe_calc_ut(jd, part_id, 0)
+            pos, _ = ephem.calc_ut(jd, part_id, 0)
             assert 0 <= pos[0] < 360, f"Invalid {name}"
 
     def test_arabic_parts_require_precalc(self):
         """Test that Arabic parts require pre-calculation."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
 
         # Clear cache
         from libephemeris import state
@@ -218,4 +218,4 @@ class TestArabicParts:
         state.clear_angles_cache()
 
         with pytest.raises(ValueError, match="pre-calculated"):
-            ephem.swe_calc_ut(jd, SE_PARS_FORTUNAE, 0)
+            ephem.calc_ut(jd, PARS_FORTUNAE, 0)

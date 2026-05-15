@@ -66,12 +66,12 @@ class TestSubArcsecondPrecision:
     @pytest.mark.unit
     def test_solcross_sub_milliarcsecond_precision(self):
         """Sun crossing should achieve sub-milliarcsecond precision (0.001 arcsec)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 45.0
-        jd_cross = ephem.swe_solcross_ut(target, jd_start, 0)
+        jd_cross = ephem.solcross_ut(target, jd_start, 0)
 
         # Check Sun position at crossing
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+        pos, _ = ephem.calc_ut(jd_cross, SUN, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -86,11 +86,11 @@ class TestSubArcsecondPrecision:
     @pytest.mark.unit
     def test_mooncross_sub_arcsecond_precision(self):
         """Moon crossing should achieve sub-arcsecond precision (0.05 arcsec)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 123.456
-        jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_cross = ephem.mooncross_ut(target, jd_start, 0)
 
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -105,11 +105,11 @@ class TestSubArcsecondPrecision:
     @pytest.mark.unit
     def test_mooncross_node_sub_arcsecond_precision(self):
         """Moon node crossing should achieve sub-arcsecond precision (0.05 arcsec)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
+        jd_cross, xlon, xlat = ephem.mooncross_node_ut(jd_start, 0)
 
         # Check Moon latitude at crossing (should be ~0)
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
 
         # Latitude should be within 0.05 arcsecond of zero (Moon tolerance)
         lat_arcsec = abs(pos[1]) * 3600.0
@@ -120,12 +120,12 @@ class TestSubArcsecondPrecision:
     @pytest.mark.unit
     def test_cross_ut_sub_arcsecond_precision(self):
         """Generic planet crossing should achieve sub-arcsecond precision."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 30.0
 
-        jd_cross = ephem.swe_cross_ut(SE_MARS, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(MARS, target, jd_start, 0)
 
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MARS, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MARS, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -140,12 +140,12 @@ class TestSubArcsecondPrecision:
     @pytest.mark.unit
     def test_helio_cross_sub_arcsecond_precision(self):
         """Heliocentric crossing should achieve sub-arcsecond precision."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 90.0
 
-        jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(EARTH, target, jd_start, 0)
 
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_EARTH, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd_cross, EARTH, FLG_HELCTR)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -160,14 +160,14 @@ class TestSubArcsecondPrecision:
     @pytest.mark.comparison
     def test_solcross_vs_pyswisseph_sub_milliarcsecond(self):
         """Verify libephemeris matches pyswisseph and achieves sub-milliarcsecond precision."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 0.0  # Vernal equinox
 
-        jd_lib = ephem.swe_solcross_ut(target, jd_start, 0)
+        jd_lib = ephem.solcross_ut(target, jd_start, 0)
         jd_swe = swe.solcross_ut(target, jd_start, 0)
 
         # Get positions at both crossing times
-        pos_lib, _ = ephem.swe_calc_ut(jd_lib, SE_SUN, 0)
+        pos_lib, _ = ephem.calc_ut(jd_lib, SUN, 0)
         pos_swe = swe.calc_ut(jd_swe, swe.SUN)[0]
 
         # Both should be very close to target (handle 0/360 wraparound)
@@ -197,14 +197,14 @@ class TestSubArcsecondPrecision:
     @pytest.mark.comparison
     def test_mooncross_vs_pyswisseph_sub_arcsecond(self):
         """Verify Moon crossing matches pyswisseph within sub-arcsecond tolerance (0.05 arcsec)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 180.0
 
-        jd_lib = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_lib = ephem.mooncross_ut(target, jd_start, 0)
         jd_swe = swe.mooncross_ut(target, jd_start, 0)
 
         # Get positions at both crossing times
-        pos_lib, _ = ephem.swe_calc_ut(jd_lib, SE_MOON, 0)
+        pos_lib, _ = ephem.calc_ut(jd_lib, MOON, 0)
 
         # Both should be very close to target
         diff_lib = abs(pos_lib[0] - target)
@@ -228,10 +228,10 @@ class TestSubArcsecondPrecision:
     )
     def test_solcross_all_signs_sub_milliarcsecond(self, target):
         """All zodiac sign ingresses should achieve sub-milliarcsecond precision (0.001 arcsec)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_cross = ephem.swe_solcross_ut(float(target), jd_start, 0)
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+        jd_cross = ephem.solcross_ut(float(target), jd_start, 0)
+        pos, _ = ephem.calc_ut(jd_cross, SUN, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -249,11 +249,11 @@ class TestSolcrossBasic:
     @pytest.mark.unit
     def test_solcross_vernal_equinox(self):
         """Find when Sun crosses 0° (vernal equinox)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = ephem.swe_solcross_ut(0.0, jd_start, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
+        jd_cross = ephem.solcross_ut(0.0, jd_start, 0)
 
         # Should be around March 20, 2024
-        year, month, day, hour = ephem.swe_revjul(jd_cross)
+        year, month, day, hour = ephem.revjul(jd_cross)
         assert year == 2024
         assert month == 3
         assert 19 <= day <= 21
@@ -261,10 +261,10 @@ class TestSolcrossBasic:
     @pytest.mark.unit
     def test_solcross_summer_solstice(self):
         """Find when Sun crosses 90° (summer solstice)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = ephem.swe_solcross_ut(90.0, jd_start, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
+        jd_cross = ephem.solcross_ut(90.0, jd_start, 0)
 
-        year, month, day, hour = ephem.swe_revjul(jd_cross)
+        year, month, day, hour = ephem.revjul(jd_cross)
         assert year == 2024
         assert month == 6
         assert 20 <= day <= 22
@@ -272,12 +272,12 @@ class TestSolcrossBasic:
     @pytest.mark.unit
     def test_solcross_precision(self):
         """Sun should be very close to target at crossing time."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 45.0
-        jd_cross = ephem.swe_solcross_ut(target, jd_start, 0)
+        jd_cross = ephem.solcross_ut(target, jd_start, 0)
 
         # Check Sun position at crossing
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+        pos, _ = ephem.calc_ut(jd_cross, SUN, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -287,23 +287,23 @@ class TestSolcrossBasic:
 
 
 class TestSolcrossTT:
-    """Tests for swe_solcross (TT version)."""
+    """Tests for solcross (TT version)."""
 
     @pytest.mark.unit
     def test_solcross_tt_vernal_equinox(self):
         """Find when Sun crosses 0° (vernal equinox) using TT."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
         # Convert to TT (approximately, for starting point)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_solcross(0.0, jd_start_tt, 0)
+        jd_cross_tt = ephem.solcross(0.0, jd_start_tt, 0)
 
         # Should be around March 20, 2024
         # Convert back to UT for date check
-        delta_t_cross = ephem.swe_deltat(jd_cross_tt)
+        delta_t_cross = ephem.deltat(jd_cross_tt)
         jd_cross_ut = jd_cross_tt - delta_t_cross
-        year, month, day, hour = ephem.swe_revjul(jd_cross_ut)
+        year, month, day, hour = ephem.revjul(jd_cross_ut)
         assert year == 2024
         assert month == 3
         assert 19 <= day <= 21
@@ -311,15 +311,15 @@ class TestSolcrossTT:
     @pytest.mark.unit
     def test_solcross_tt_precision(self):
         """Sun should be very close to target at crossing time (TT)."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         target = 45.0
-        jd_cross_tt = ephem.swe_solcross(target, jd_start_tt, 0)
+        jd_cross_tt = ephem.solcross(target, jd_start_tt, 0)
 
         # Check Sun position at crossing (using TT version of calc)
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_SUN, 0)
+        pos, _ = ephem.calc(jd_cross_tt, SUN, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -330,20 +330,20 @@ class TestSolcrossTT:
     @pytest.mark.unit
     def test_solcross_tt_vs_ut_consistency(self):
         """TT and UT versions should give consistent results."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_ut)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         target = 90.0  # Summer solstice
 
         # Get crossing time in UT
-        jd_cross_ut = ephem.swe_solcross_ut(target, jd_ut, 0)
+        jd_cross_ut = ephem.solcross_ut(target, jd_ut, 0)
 
         # Get crossing time in TT
-        jd_cross_tt = ephem.swe_solcross(target, jd_tt, 0)
+        jd_cross_tt = ephem.solcross(target, jd_tt, 0)
 
         # Convert UT result to TT for comparison
-        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        delta_t_cross = ephem.deltat(jd_cross_ut)
         jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
 
         # They should be very close (within seconds)
@@ -356,14 +356,14 @@ class TestSolcrossTT:
     )
     def test_solcross_tt_all_signs(self, target):
         """All zodiac sign ingresses should work with TT version."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_solcross(float(target), jd_start_tt, 0)
+        jd_cross_tt = ephem.solcross(float(target), jd_start_tt, 0)
 
         # Verify Sun is at target
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_SUN, 0)
+        pos, _ = ephem.calc(jd_cross_tt, SUN, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -374,13 +374,13 @@ class TestSolcrossTT:
     @pytest.mark.comparison
     def test_solcross_tt_vs_pyswisseph(self):
         """TT version should match pyswisseph solcross()."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
         delta_t = swe.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         target = 0.0
 
-        jd_lib = ephem.swe_solcross(target, jd_tt, 0)
+        jd_lib = ephem.solcross(target, jd_tt, 0)
         jd_swe = swe.solcross(target, jd_tt, 0)
 
         # Difference should be less than 1 minute
@@ -390,12 +390,12 @@ class TestSolcrossTT:
     @pytest.mark.edge_case
     def test_solcross_tt_target_360_equals_0(self):
         """360° should be same as 0° for TT version."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_360 = ephem.swe_solcross(360.0, jd_start_tt, 0)
-        jd_0 = ephem.swe_solcross(0.0, jd_start_tt, 0)
+        jd_360 = ephem.solcross(360.0, jd_start_tt, 0)
+        jd_0 = ephem.solcross(0.0, jd_start_tt, 0)
 
         # Should be the same crossing
         assert abs(jd_360 - jd_0) < 0.001
@@ -407,9 +407,9 @@ class TestSolcrossVsPyswisseph:
     @pytest.mark.comparison
     def test_solcross_equinox_timing(self):
         """Crossing time should match pyswisseph."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_lib = ephem.swe_solcross_ut(0.0, jd_start, 0)
+        jd_lib = ephem.solcross_ut(0.0, jd_start, 0)
         jd_swe = swe.solcross_ut(0.0, jd_start, 0)
 
         # Difference should be less than 1 minute
@@ -422,9 +422,9 @@ class TestSolcrossVsPyswisseph:
     )
     def test_solcross_all_signs(self, target):
         """All zodiac sign ingresses should match."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_lib = ephem.swe_solcross_ut(float(target), jd_start, 0)
+        jd_lib = ephem.solcross_ut(float(target), jd_start, 0)
         jd_swe = swe.solcross_ut(float(target), jd_start, 0)
 
         diff_seconds = abs(jd_lib - jd_swe) * 86400
@@ -437,9 +437,9 @@ class TestMooncrossBasic:
     @pytest.mark.unit
     def test_mooncross_basic(self):
         """Moon crossing should return valid JD."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 90.0
-        jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_cross = ephem.mooncross_ut(target, jd_start, 0)
 
         assert jd_cross > jd_start
         # Should be within one lunar orbit (~27 days)
@@ -448,11 +448,11 @@ class TestMooncrossBasic:
     @pytest.mark.unit
     def test_mooncross_precision(self):
         """Moon should be close to target at crossing."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 123.456
-        jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_cross = ephem.mooncross_ut(target, jd_start, 0)
 
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -462,17 +462,17 @@ class TestMooncrossBasic:
 
 
 class TestMooncrossTT:
-    """Tests for swe_mooncross (TT version)."""
+    """Tests for mooncross (TT version)."""
 
     @pytest.mark.unit
     def test_mooncross_tt_basic(self):
         """Moon crossing should return valid JD using TT."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         target = 90.0
-        jd_cross_tt = ephem.swe_mooncross(target, jd_start_tt, 0)
+        jd_cross_tt = ephem.mooncross(target, jd_start_tt, 0)
 
         assert jd_cross_tt > jd_start_tt
         # Should be within one lunar orbit (~27 days)
@@ -481,15 +481,15 @@ class TestMooncrossTT:
     @pytest.mark.unit
     def test_mooncross_tt_precision(self):
         """Moon should be close to target at crossing time (TT)."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         target = 123.456
-        jd_cross_tt = ephem.swe_mooncross(target, jd_start_tt, 0)
+        jd_cross_tt = ephem.mooncross(target, jd_start_tt, 0)
 
         # Check Moon position at crossing (using TT version of calc)
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MOON, 0)
+        pos, _ = ephem.calc(jd_cross_tt, MOON, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -500,20 +500,20 @@ class TestMooncrossTT:
     @pytest.mark.unit
     def test_mooncross_tt_vs_ut_consistency(self):
         """TT and UT versions should give consistent results."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_ut)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         target = 180.0
 
         # Get crossing time in UT
-        jd_cross_ut = ephem.swe_mooncross_ut(target, jd_ut, 0)
+        jd_cross_ut = ephem.mooncross_ut(target, jd_ut, 0)
 
         # Get crossing time in TT
-        jd_cross_tt = ephem.swe_mooncross(target, jd_tt, 0)
+        jd_cross_tt = ephem.mooncross(target, jd_tt, 0)
 
         # Convert UT result to TT for comparison
-        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        delta_t_cross = ephem.deltat(jd_cross_ut)
         jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
 
         # They should be very close (within seconds)
@@ -526,14 +526,14 @@ class TestMooncrossTT:
     )
     def test_mooncross_tt_all_signs(self, target):
         """All zodiac sign ingresses should work with TT version."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_mooncross(float(target), jd_start_tt, 0)
+        jd_cross_tt = ephem.mooncross(float(target), jd_start_tt, 0)
 
         # Verify Moon is at target
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MOON, 0)
+        pos, _ = ephem.calc(jd_cross_tt, MOON, 0)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -544,13 +544,13 @@ class TestMooncrossTT:
     @pytest.mark.comparison
     def test_mooncross_tt_vs_pyswisseph(self):
         """TT version should match pyswisseph mooncross()."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
         delta_t = swe.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         target = 180.0
 
-        jd_lib = ephem.swe_mooncross(target, jd_tt, 0)
+        jd_lib = ephem.mooncross(target, jd_tt, 0)
         jd_swe = swe.mooncross(target, jd_tt, 0)
 
         # Difference should be less than 3 minutes (Moon moves fast)
@@ -560,12 +560,12 @@ class TestMooncrossTT:
     @pytest.mark.edge_case
     def test_mooncross_tt_target_360_equals_0(self):
         """360° should be same as 0° for TT version."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_360 = ephem.swe_mooncross(360.0, jd_start_tt, 0)
-        jd_0 = ephem.swe_mooncross(0.0, jd_start_tt, 0)
+        jd_360 = ephem.mooncross(360.0, jd_start_tt, 0)
+        jd_0 = ephem.mooncross(0.0, jd_start_tt, 0)
 
         # Should be the same crossing
         assert abs(jd_360 - jd_0) < 0.001
@@ -577,10 +577,10 @@ class TestMooncrossVsPyswisseph:
     @pytest.mark.comparison
     def test_mooncross_timing(self):
         """Moon crossing should match pyswisseph."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 180.0
 
-        jd_lib = ephem.swe_mooncross_ut(target, jd_start, 0)
+        jd_lib = ephem.mooncross_ut(target, jd_start, 0)
         jd_swe = swe.mooncross_ut(target, jd_start, 0)
 
         diff_seconds = abs(jd_lib - jd_swe) * 86400
@@ -593,25 +593,25 @@ class TestCrossingConsecutive:
     @pytest.mark.unit
     def test_consecutive_sun_crossings(self):
         """Should find 12 consecutive Sun crossings in a year."""
-        jd = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd = ephem.julday(2024, 1, 1, 0.0)
         crossings = []
 
         for target in range(0, 360, 30):
-            jd_cross = ephem.swe_solcross_ut(float(target), jd, 0)
+            jd_cross = ephem.solcross_ut(float(target), jd, 0)
             crossings.append(jd_cross)
 
         # All should be in chronological order (after accounting for year wrap)
         # First 0° crossing should be in March
-        assert crossings[0] > ephem.swe_julday(2024, 3, 1, 0.0)
+        assert crossings[0] > ephem.julday(2024, 3, 1, 0.0)
 
     @pytest.mark.unit
     def test_12_moon_crossings_in_month(self):
         """Should find ~12 crossings in 28 days."""
-        jd = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd = ephem.julday(2024, 1, 1, 0.0)
         crossings = []
 
         for target in range(0, 360, 30):
-            jd_cross = ephem.swe_mooncross_ut(float(target), jd, 0)
+            jd_cross = ephem.mooncross_ut(float(target), jd, 0)
             if jd_cross < jd + 28:
                 crossings.append(jd_cross)
 
@@ -625,10 +625,10 @@ class TestCrossingEdgeCases:
     @pytest.mark.edge_case
     def test_target_360_equals_0(self):
         """360° should be same as 0°."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_360 = ephem.swe_solcross_ut(360.0, jd_start, 0)
-        jd_0 = ephem.swe_solcross_ut(0.0, jd_start, 0)
+        jd_360 = ephem.solcross_ut(360.0, jd_start, 0)
+        jd_0 = ephem.solcross_ut(0.0, jd_start, 0)
 
         # Should be the same crossing
         assert abs(jd_360 - jd_0) < 0.001
@@ -636,10 +636,10 @@ class TestCrossingEdgeCases:
     @pytest.mark.edge_case
     def test_target_negative_normalized(self):
         """Negative target should be normalized."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_neg = ephem.swe_solcross_ut(-30.0, jd_start, 0)  # = 330°
-        jd_pos = ephem.swe_solcross_ut(330.0, jd_start, 0)
+        jd_neg = ephem.solcross_ut(-30.0, jd_start, 0)  # = 330°
+        jd_pos = ephem.solcross_ut(330.0, jd_start, 0)
 
         assert abs(jd_neg - jd_pos) < 0.001
 
@@ -650,15 +650,15 @@ class TestCrossUtGeneric:
     @pytest.mark.unit
     def test_cross_ut_mercury(self):
         """Should work for Mercury."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 0.0
 
-        jd_cross = ephem.swe_cross_ut(SE_MERCURY, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(MERCURY, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Check Mercury position at crossing
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MERCURY, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MERCURY, 0)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -671,8 +671,8 @@ class TestMooncrossNodeBasic:
     @pytest.mark.unit
     def test_mooncross_node_basic(self):
         """Moon node crossing should return valid JD."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
+        jd_cross, xlon, xlat = ephem.mooncross_node_ut(jd_start, 0)
 
         assert jd_cross > jd_start
         # Should be within ~14 days (half the nodal month)
@@ -681,11 +681,11 @@ class TestMooncrossNodeBasic:
     @pytest.mark.unit
     def test_mooncross_node_latitude_near_zero(self):
         """Moon latitude should be near zero at node crossing."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
-        jd_cross, xlon, xlat = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
+        jd_cross, xlon, xlat = ephem.mooncross_node_ut(jd_start, 0)
 
         # Check Moon latitude at crossing
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
 
         # Latitude should be very close to 0
         assert abs(pos[1]) < 0.01, f"Moon latitude at node crossing: {pos[1]}"
@@ -693,13 +693,13 @@ class TestMooncrossNodeBasic:
     @pytest.mark.unit
     def test_mooncross_node_consecutive_crossings(self):
         """Should find consecutive node crossings ~13.6 days apart."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find first node crossing
-        jd_first, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_first, _, _ = ephem.mooncross_node_ut(jd_start, 0)
 
         # Find second node crossing by starting just after first
-        jd_second, _, _ = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
+        jd_second, _, _ = ephem.mooncross_node_ut(jd_first + 0.5, 0)
 
         # Should be roughly 13.6 days apart (half the nodal month)
         diff_days = jd_second - jd_first
@@ -708,15 +708,15 @@ class TestMooncrossNodeBasic:
     @pytest.mark.unit
     def test_mooncross_node_ascending_vs_descending(self):
         """Can determine ascending vs descending node from latitude velocity."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find first crossing
-        jd_first, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
-        pos_first, _ = ephem.swe_calc_ut(jd_first, SE_MOON, SEFLG_SPEED)
+        jd_first, _, _ = ephem.mooncross_node_ut(jd_start, 0)
+        pos_first, _ = ephem.calc_ut(jd_first, MOON, FLG_SPEED)
 
         # Find second crossing
-        jd_second, _, _ = ephem.swe_mooncross_node_ut(jd_first + 0.5, 0)
-        pos_second, _ = ephem.swe_calc_ut(jd_second, SE_MOON, SEFLG_SPEED)
+        jd_second, _, _ = ephem.mooncross_node_ut(jd_first + 0.5, 0)
+        pos_second, _ = ephem.calc_ut(jd_second, MOON, FLG_SPEED)
 
         # Latitude velocities should have opposite signs
         # (one ascending, one descending)
@@ -734,16 +734,16 @@ class TestMooncrossNodeBasic:
 
 
 class TestMooncrossNodeTT:
-    """Tests for swe_mooncross_node (TT version)."""
+    """Tests for mooncross_node (TT version)."""
 
     @pytest.mark.unit
     def test_mooncross_node_tt_basic(self):
         """Moon node crossing should return valid JD using TT."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt, xlon, xlat = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_cross_tt, xlon, xlat = ephem.mooncross_node(jd_start_tt, 0)
 
         assert jd_cross_tt > jd_start_tt
         # Should be within ~14 days
@@ -752,14 +752,14 @@ class TestMooncrossNodeTT:
     @pytest.mark.unit
     def test_mooncross_node_tt_precision(self):
         """Moon latitude should be near zero at node crossing (TT)."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt, xlon, xlat = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_cross_tt, xlon, xlat = ephem.mooncross_node(jd_start_tt, 0)
 
         # Check Moon latitude at crossing (using TT version of calc)
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MOON, 0)
+        pos, _ = ephem.calc(jd_cross_tt, MOON, 0)
 
         # Latitude should be very close to 0
         assert abs(pos[1]) < 0.01, f"Moon latitude at node crossing: {pos[1]}"
@@ -767,18 +767,18 @@ class TestMooncrossNodeTT:
     @pytest.mark.unit
     def test_mooncross_node_tt_vs_ut_consistency(self):
         """TT and UT versions should give consistent results."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_ut)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         # Get crossing time in UT
-        jd_cross_ut, _, _ = ephem.swe_mooncross_node_ut(jd_ut, 0)
+        jd_cross_ut, _, _ = ephem.mooncross_node_ut(jd_ut, 0)
 
         # Get crossing time in TT
-        jd_cross_tt, _, _ = ephem.swe_mooncross_node(jd_tt, 0)
+        jd_cross_tt, _, _ = ephem.mooncross_node(jd_tt, 0)
 
         # Convert UT result to TT for comparison
-        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        delta_t_cross = ephem.deltat(jd_cross_ut)
         jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
 
         # They should be very close (within seconds)
@@ -792,9 +792,9 @@ class TestMooncrossNodeVsPyswisseph:
     @pytest.mark.comparison
     def test_mooncross_node_vs_pyswisseph(self):
         """Moon node crossing should match pyswisseph."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_lib, xlon_lib, xlat_lib = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_lib, xlon_lib, xlat_lib = ephem.mooncross_node_ut(jd_start, 0)
         # pyswisseph returns (jd_cross, xlon, xlat)
         result_swe = swe.mooncross_node_ut(jd_start, 0)
         jd_swe = result_swe[0]
@@ -806,11 +806,11 @@ class TestMooncrossNodeVsPyswisseph:
     @pytest.mark.comparison
     def test_mooncross_node_tt_vs_pyswisseph(self):
         """TT version should match pyswisseph mooncross_node()."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
         delta_t = swe.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
-        jd_lib, xlon_lib, xlat_lib = ephem.swe_mooncross_node(jd_tt, 0)
+        jd_lib, xlon_lib, xlat_lib = ephem.mooncross_node(jd_tt, 0)
         # pyswisseph returns (jd_cross, xlon, xlat)
         result_swe = swe.mooncross_node(jd_tt, 0)
         jd_swe = result_swe[0]
@@ -822,10 +822,10 @@ class TestMooncrossNodeVsPyswisseph:
     @pytest.mark.comparison
     def test_mooncross_node_multiple_crossings(self):
         """Multiple consecutive crossings should match pyswisseph."""
-        jd = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd = ephem.julday(2024, 1, 1, 0.0)
 
         for i in range(4):
-            jd_lib, _, _ = ephem.swe_mooncross_node_ut(jd, 0)
+            jd_lib, _, _ = ephem.mooncross_node_ut(jd, 0)
             # pyswisseph returns (jd_cross, xlon, xlat)
             result_swe = swe.mooncross_node_ut(jd, 0)
             jd_swe = result_swe[0]
@@ -843,10 +843,10 @@ class TestHelioCrossBasic:
     @pytest.mark.unit
     def test_helio_cross_ut_mars_basic(self):
         """Heliocentric Mars crossing should return valid JD."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 0.0
 
-        jd_cross = ephem.swe_helio_cross_ut(SE_MARS, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(MARS, target, jd_start, 0)
 
         assert jd_cross > jd_start
         # Mars completes one heliocentric orbit in ~687 days
@@ -855,13 +855,13 @@ class TestHelioCrossBasic:
     @pytest.mark.unit
     def test_helio_cross_ut_precision(self):
         """Planet should be very close to target at heliocentric crossing."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 45.0
 
-        jd_cross = ephem.swe_helio_cross_ut(SE_MARS, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(MARS, target, jd_start, 0)
 
         # Check Mars heliocentric position at crossing
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MARS, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd_cross, MARS, FLG_HELCTR)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -872,17 +872,17 @@ class TestHelioCrossBasic:
     @pytest.mark.unit
     def test_helio_cross_ut_earth(self):
         """Should work for Earth (heliocentric view of Earth from Sun)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 90.0
 
-        jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(EARTH, target, jd_start, 0)
 
         assert jd_cross > jd_start
         # Earth completes one heliocentric orbit in ~365 days
         assert jd_cross < jd_start + 366
 
         # Verify position
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_EARTH, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd_cross, EARTH, FLG_HELCTR)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -892,24 +892,24 @@ class TestHelioCrossBasic:
     @pytest.mark.parametrize(
         "planet,max_days",
         [
-            (SE_MERCURY, 90),  # Mercury helio period ~88 days
-            (SE_VENUS, 230),  # Venus helio period ~225 days
-            (SE_EARTH, 370),  # Earth helio period ~365 days
-            (SE_MARS, 700),  # Mars helio period ~687 days
+            (MERCURY, 90),  # Mercury helio period ~88 days
+            (VENUS, 230),  # Venus helio period ~225 days
+            (EARTH, 370),  # Earth helio period ~365 days
+            (MARS, 700),  # Mars helio period ~687 days
         ],
     )
     def test_helio_cross_ut_multiple_planets(self, planet, max_days):
         """Should work for various planets."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 180.0
 
-        jd_cross = ephem.swe_helio_cross_ut(planet, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(planet, target, jd_start, 0)
 
         assert jd_cross > jd_start
         assert jd_cross < jd_start + max_days
 
         # Verify position
-        pos, _ = ephem.swe_calc_ut(jd_cross, planet, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd_cross, planet, FLG_HELCTR)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -917,17 +917,17 @@ class TestHelioCrossBasic:
 
 
 class TestHelioCrossTT:
-    """Tests for swe_helio_cross (TT version)."""
+    """Tests for helio_cross (TT version)."""
 
     @pytest.mark.unit
     def test_helio_cross_tt_basic(self):
         """Heliocentric crossing should return valid JD using TT."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         target = 90.0
-        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_start_tt, 0)
+        jd_cross_tt = ephem.helio_cross(MARS, target, jd_start_tt, 0)
 
         assert jd_cross_tt > jd_start_tt
         assert jd_cross_tt < jd_start_tt + 700
@@ -935,15 +935,15 @@ class TestHelioCrossTT:
     @pytest.mark.unit
     def test_helio_cross_tt_precision(self):
         """Planet should be very close to target at crossing time (TT)."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         target = 123.456
-        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_start_tt, 0)
+        jd_cross_tt = ephem.helio_cross(MARS, target, jd_start_tt, 0)
 
         # Check position (using TT version of calc)
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_MARS, SEFLG_HELCTR)
+        pos, _ = ephem.calc(jd_cross_tt, MARS, FLG_HELCTR)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -954,20 +954,20 @@ class TestHelioCrossTT:
     @pytest.mark.unit
     def test_helio_cross_tt_vs_ut_consistency(self):
         """TT and UT versions should give consistent results."""
-        jd_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_ut)
+        jd_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         target = 180.0
 
         # Get crossing time in UT
-        jd_cross_ut = ephem.swe_helio_cross_ut(SE_MARS, target, jd_ut, 0)
+        jd_cross_ut = ephem.helio_cross_ut(MARS, target, jd_ut, 0)
 
         # Get crossing time in TT
-        jd_cross_tt = ephem.swe_helio_cross(SE_MARS, target, jd_tt, 0)
+        jd_cross_tt = ephem.helio_cross(MARS, target, jd_tt, 0)
 
         # Convert UT result to TT for comparison
-        delta_t_cross = ephem.swe_deltat(jd_cross_ut)
+        delta_t_cross = ephem.deltat(jd_cross_ut)
         jd_cross_ut_as_tt = jd_cross_ut + delta_t_cross
 
         # They should be very close (within seconds)
@@ -980,14 +980,14 @@ class TestHelioCrossTT:
     )
     def test_helio_cross_tt_all_signs(self, target):
         """All zodiac sign ingresses should work with TT version."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
-        jd_cross_tt = ephem.swe_helio_cross(SE_EARTH, float(target), jd_start_tt, 0)
+        jd_cross_tt = ephem.helio_cross(EARTH, float(target), jd_start_tt, 0)
 
         # Verify position
-        pos, _ = ephem.swe_calc(jd_cross_tt, SE_EARTH, SEFLG_HELCTR)
+        pos, _ = ephem.calc(jd_cross_tt, EARTH, FLG_HELCTR)
 
         diff = abs(pos[0] - target)
         if diff > 180:
@@ -1002,10 +1002,10 @@ class TestHelioCrossEdgeCases:
     @pytest.mark.edge_case
     def test_helio_cross_target_360_equals_0(self):
         """360° should be same as 0°."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_360 = ephem.swe_helio_cross_ut(SE_MARS, 360.0, jd_start, 0)
-        jd_0 = ephem.swe_helio_cross_ut(SE_MARS, 0.0, jd_start, 0)
+        jd_360 = ephem.helio_cross_ut(MARS, 360.0, jd_start, 0)
+        jd_0 = ephem.helio_cross_ut(MARS, 0.0, jd_start, 0)
 
         # Should be the same crossing
         assert abs(jd_360 - jd_0) < 0.001
@@ -1013,22 +1013,22 @@ class TestHelioCrossEdgeCases:
     @pytest.mark.edge_case
     def test_helio_cross_target_negative_normalized(self):
         """Negative target should be normalized."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        jd_neg = ephem.swe_helio_cross_ut(SE_MARS, -30.0, jd_start, 0)  # = 330°
-        jd_pos = ephem.swe_helio_cross_ut(SE_MARS, 330.0, jd_start, 0)
+        jd_neg = ephem.helio_cross_ut(MARS, -30.0, jd_start, 0)  # = 330°
+        jd_pos = ephem.helio_cross_ut(MARS, 330.0, jd_start, 0)
 
         assert abs(jd_neg - jd_pos) < 0.001
 
     @pytest.mark.edge_case
     def test_helio_cross_consecutive_crossings(self):
         """Should find consecutive crossings for a full orbit."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         crossings = []
 
         # Find Earth crossing each 30° for a full year
         for target in range(0, 360, 30):
-            jd_cross = ephem.swe_helio_cross_ut(SE_EARTH, float(target), jd_start, 0)
+            jd_cross = ephem.helio_cross_ut(EARTH, float(target), jd_start, 0)
             crossings.append(jd_cross)
 
         # All crossings should be within one year
@@ -1041,13 +1041,13 @@ class TestHelioCrossVsGeocentricConcept:
     @pytest.mark.unit
     def test_helio_no_retrograde(self):
         """Heliocentric planets should not show retrograde behavior."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find several consecutive crossings for Mars
         crossings = []
         jd = jd_start
         for _ in range(4):
-            jd_cross = ephem.swe_helio_cross_ut(SE_MARS, 90.0, jd, 0)
+            jd_cross = ephem.helio_cross_ut(MARS, 90.0, jd, 0)
             crossings.append(jd_cross)
             jd = jd_cross + 1  # Move past this crossing
 
@@ -1060,13 +1060,13 @@ class TestHelioCrossVsGeocentricConcept:
     @pytest.mark.unit
     def test_helio_vs_geocentric_different_positions(self):
         """Heliocentric and geocentric positions should generally differ."""
-        jd = ephem.swe_julday(2024, 6, 15, 12.0)
+        jd = ephem.julday(2024, 6, 15, 12.0)
 
         # Get geocentric Mars position
-        geo_pos, _ = ephem.swe_calc_ut(jd, SE_MARS, 0)
+        geo_pos, _ = ephem.calc_ut(jd, MARS, 0)
 
         # Get heliocentric Mars position
-        helio_pos, _ = ephem.swe_calc_ut(jd, SE_MARS, SEFLG_HELCTR)
+        helio_pos, _ = ephem.calc_ut(jd, MARS, FLG_HELCTR)
 
         # Positions should be different (unless Mars is in opposition)
         diff = abs(geo_pos[0] - helio_pos[0])
@@ -1086,15 +1086,15 @@ class TestMooncrossNodeEclipseRelevance:
     def test_eclipse_proximity_to_node(self):
         """Eclipses occur when Sun is near a lunar node."""
         # Start from a known solar eclipse date: April 8, 2024
-        jd_eclipse = ephem.swe_julday(2024, 4, 8, 18.0)
+        jd_eclipse = ephem.julday(2024, 4, 8, 18.0)
 
         # Find the nearest node crossing
         # Check both before and after
         jd_before = jd_eclipse - 7  # Week before
-        jd_cross_before, _, _ = ephem.swe_mooncross_node_ut(jd_before, 0)
+        jd_cross_before, _, _ = ephem.mooncross_node_ut(jd_before, 0)
 
         jd_after = jd_eclipse - 0.5
-        jd_cross_after, _, _ = ephem.swe_mooncross_node_ut(jd_after, 0)
+        jd_cross_after, _, _ = ephem.mooncross_node_ut(jd_after, 0)
 
         # The eclipse should be close to a node crossing (within a few days)
         diff_before = abs(jd_eclipse - jd_cross_before)
@@ -1156,7 +1156,7 @@ class TestAdaptiveIterations:
 
     @pytest.mark.unit
     def test_pluto_typical_speed_configured(self):
-        """Verify Pluto typical speed is configured in swe_cross_ut.
+        """Verify Pluto typical speed is configured in cross_ut.
 
         Pluto moves very slowly (~0.004°/day) compared to other planets.
         Without this configuration, the algorithm would use 0.5°/day default
@@ -1165,10 +1165,10 @@ class TestAdaptiveIterations:
         # Import the crossing module to inspect the implementation
         # We verify this by checking that Pluto crossing works correctly
         # even when starting from a retrograde position where speed could be 0
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get Pluto's actual speed
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, PLUTO, FLG_SPEED)
         actual_speed = abs(pos[3])
 
         # Pluto's typical speed should be ~0.004°/day
@@ -1179,10 +1179,10 @@ class TestAdaptiveIterations:
 
         # Now verify crossing works (this would fail with bad speed estimate)
         target = (pos[0] + 1) % 360
-        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(PLUTO, target, jd_start, 0)
 
         # Verify Pluto is at target with good precision
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, PLUTO, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1194,16 +1194,16 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_pluto_crossing_converges(self):
         """Pluto crossing should converge with adaptive iteration limits."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 300.0
 
         # This should not raise "Maximum iterations reached"
-        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(PLUTO, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Verify Pluto is at target
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        pos, _ = ephem.calc_ut(jd_cross, PLUTO, 0)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1212,16 +1212,16 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_pluto_helio_crossing_converges(self):
         """Pluto heliocentric crossing should converge with adaptive iteration limits."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 300.0
 
         # This should not raise "Maximum iterations reached"
-        jd_cross = ephem.swe_helio_cross_ut(SE_PLUTO, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(PLUTO, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Verify Pluto is at target (heliocentric)
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd_cross, PLUTO, FLG_HELCTR)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1230,17 +1230,17 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_neptune_crossing_converges(self):
         """Neptune crossing (very slow ~0.006°/day) should converge."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         # Neptune is around 355° in early 2024, heading towards 0° (Aries)
         # Target slightly ahead at 356°
         target = 356.0
 
-        jd_cross = ephem.swe_cross_ut(SE_NEPTUNE, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(NEPTUNE, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Verify Neptune is at target
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_NEPTUNE, 0)
+        pos, _ = ephem.calc_ut(jd_cross, NEPTUNE, 0)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1249,17 +1249,17 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_uranus_crossing_converges(self):
         """Uranus crossing (~0.012°/day) should converge."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         # Uranus is around 49° in early 2024 and retrograde, so it will eventually
         # turn direct and cross 50°
         target = 50.0
 
-        jd_cross = ephem.swe_cross_ut(SE_URANUS, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(URANUS, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Verify Uranus is at target
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_URANUS, 0)
+        pos, _ = ephem.calc_ut(jd_cross, URANUS, 0)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1268,16 +1268,16 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_saturn_crossing_converges(self):
         """Saturn crossing (~0.034°/day) should converge."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         # Saturn is around 333° in early 2024, heading towards 334°
         target = 334.0
 
-        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(SATURN, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
         # Verify Saturn is at target
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        pos, _ = ephem.calc_ut(jd_cross, SATURN, 0)
         diff = abs(pos[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1286,13 +1286,13 @@ class TestAdaptiveIterations:
     @pytest.mark.unit
     def test_slow_planet_multiple_crossings(self):
         """Test that slow planets can find multiple consecutive crossings."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find 3 consecutive crossings for Saturn (starting at 333°)
         crossings = []
         jd = jd_start
         for target in [334.0, 335.0, 336.0]:
-            jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd, 0)
+            jd_cross = ephem.cross_ut(SATURN, target, jd, 0)
             crossings.append(jd_cross)
             jd = jd_cross + 1
 
@@ -1301,7 +1301,7 @@ class TestAdaptiveIterations:
 
         # Verify each crossing is accurate
         for i, target in enumerate([334.0, 335.0, 336.0]):
-            pos, _ = ephem.swe_calc_ut(crossings[i], SE_SATURN, 0)
+            pos, _ = ephem.calc_ut(crossings[i], SATURN, 0)
             diff = abs(pos[0] - target)
             if diff > 180:
                 diff = 360 - diff
@@ -1320,33 +1320,33 @@ class TestMoonNodeEdgeCases:
     @pytest.mark.unit
     def test_mooncross_node_when_starting_very_close_to_node(self):
         """Test convergence when starting very close to a node crossing."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # First find a node crossing
-        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.mooncross_node_ut(jd_start, 0)
 
         # Now start very close to it (1 hour before) - tests edge case
         jd_near_node = jd_node - 1 / 24  # 1 hour before
-        jd_next, _, _ = ephem.swe_mooncross_node_ut(jd_near_node, 0)
+        jd_next, _, _ = ephem.mooncross_node_ut(jd_near_node, 0)
 
         # Should find the same node (or the next one if we're past it)
-        pos, _ = ephem.swe_calc_ut(jd_next, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_next, MOON, 0)
         lat_arcsec = abs(pos[1]) * 3600.0
         assert lat_arcsec < 0.05, f"Latitude at node: {lat_arcsec:.4f} arcsec"
 
     @pytest.mark.unit
     def test_mooncross_node_multiple_consecutive_near_nodes(self):
         """Test finding multiple consecutive node crossings (6 crossings = ~81 days)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         crossings = []
 
         jd = jd_start
         for i in range(6):
-            jd_cross, _, _ = ephem.swe_mooncross_node_ut(jd, 0)
+            jd_cross, _, _ = ephem.mooncross_node_ut(jd, 0)
             crossings.append(jd_cross)
 
             # Verify latitude is near zero
-            pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+            pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
             lat_arcsec = abs(pos[1]) * 3600.0
             assert lat_arcsec < 0.05, (
                 f"Crossing {i + 1}: latitude {lat_arcsec:.4f} arcsec"
@@ -1366,13 +1366,13 @@ class TestMoonNodeEdgeCases:
         This is the hardest case for Newton-Raphson convergence.
         At node crossings, latitude speed is approximately 1°/day.
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find a node crossing
-        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.mooncross_node_ut(jd_start, 0)
 
         # Verify we got good convergence
-        pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_node, MOON, FLG_SPEED)
         lat_arcsec = abs(pos[1]) * 3600.0
 
         # Latitude should be within tolerance
@@ -1389,17 +1389,17 @@ class TestMoonNodeEdgeCases:
         When Moon is at its true node, latitude is ~0 and this is
         an edge case for longitude crossing calculations.
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get true node position
-        node_pos, _ = ephem.swe_calc_ut(jd_start, SE_TRUE_NODE, 0)
+        node_pos, _ = ephem.calc_ut(jd_start, TRUE_NODE, 0)
         node_lon = node_pos[0]
 
         # Find when Moon crosses the true node longitude
-        jd_cross = ephem.swe_mooncross_ut(node_lon, jd_start, 0)
+        jd_cross = ephem.mooncross_ut(node_lon, jd_start, 0)
 
         # Verify Moon is at target longitude
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
         diff = abs(pos[0] - node_lon)
         if diff > 180:
             diff = 360 - diff
@@ -1412,19 +1412,19 @@ class TestMoonNodeEdgeCases:
     @pytest.mark.unit
     def test_mooncross_node_tt_edge_case_near_node(self):
         """Test TT version convergence when starting near a node."""
-        jd_start_ut = ephem.swe_julday(2024, 1, 1, 0.0)
-        delta_t = ephem.swe_deltat(jd_start_ut)
+        jd_start_ut = ephem.julday(2024, 1, 1, 0.0)
+        delta_t = ephem.deltat(jd_start_ut)
         jd_start_tt = jd_start_ut + delta_t
 
         # Find node crossing in TT
-        jd_node_tt, _, _ = ephem.swe_mooncross_node(jd_start_tt, 0)
+        jd_node_tt, _, _ = ephem.mooncross_node(jd_start_tt, 0)
 
         # Start very close to it (30 minutes before)
         jd_near = jd_node_tt - 0.5 / 24
-        jd_next_tt, _, _ = ephem.swe_mooncross_node(jd_near, 0)
+        jd_next_tt, _, _ = ephem.mooncross_node(jd_near, 0)
 
         # Verify convergence
-        pos, _ = ephem.swe_calc(jd_next_tt, SE_MOON, 0)
+        pos, _ = ephem.calc(jd_next_tt, MOON, 0)
         lat_arcsec = abs(pos[1]) * 3600.0
         assert lat_arcsec < 0.05, f"Latitude: {lat_arcsec:.4f} arcsec"
 
@@ -1436,11 +1436,11 @@ class TestMoonNodeEdgeCases:
         The true node position oscillates ±1.5° around mean node,
         so testing different years covers different orbital phases.
         """
-        jd_start = ephem.swe_julday(year, 6, 15, 0.0)  # Mid-year
+        jd_start = ephem.julday(year, 6, 15, 0.0)  # Mid-year
 
-        jd_node, _, _ = ephem.swe_mooncross_node_ut(jd_start, 0)
+        jd_node, _, _ = ephem.mooncross_node_ut(jd_start, 0)
 
-        pos, _ = ephem.swe_calc_ut(jd_node, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd_node, MOON, 0)
         lat_arcsec = abs(pos[1]) * 3600.0
         assert lat_arcsec < 0.05, f"Year {year}: latitude {lat_arcsec:.4f} arcsec"
 
@@ -1563,23 +1563,23 @@ class TestStationDetectionAndBrentsFallback:
         # - Nov-Dec 2024: Stations around Nov 25 and Dec 15
 
         # Start near a Mercury station (early January 2024)
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get Mercury's current position
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_MERCURY, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, MERCURY, FLG_SPEED)
         current_lon = pos[0]
 
         # Target a degree ahead (should work even if near station)
         target = (current_lon + 5) % 360
 
         # This should not raise even if near station
-        jd_cross = ephem.swe_cross_ut(SE_MERCURY, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(MERCURY, target, jd_start, 0)
 
         # Verify the crossing was found
         assert jd_cross > jd_start
 
         # Verify Mercury is at target at crossing time
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_MERCURY, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, MERCURY, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1592,20 +1592,20 @@ class TestStationDetectionAndBrentsFallback:
         Saturn is a slow planet that can trigger the station detection
         logic even during normal motion.
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get Saturn's current position
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_SATURN, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, SATURN, FLG_SPEED)
         current_lon = pos[0]
 
         # Target 2° ahead
         target = (current_lon + 2) % 360
 
-        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(SATURN, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, SATURN, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1618,10 +1618,10 @@ class TestStationDetectionAndBrentsFallback:
         Pluto is a slow planet that benefits from the robust station handling,
         even when not at a true station.
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get Pluto's current position
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, PLUTO, FLG_SPEED)
         current_lon = pos[0]
         current_speed = pos[3]
 
@@ -1631,11 +1631,11 @@ class TestStationDetectionAndBrentsFallback:
         # Target 1° ahead
         target = (current_lon + 1) % 360
 
-        jd_cross = ephem.swe_cross_ut(SE_PLUTO, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(PLUTO, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, PLUTO, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1649,19 +1649,19 @@ class TestStationDetectionAndBrentsFallback:
         its speed approaches 0°/day.
         """
         # Venus was retrograde in late 2023 (Oct 25 - Nov 4 station)
-        jd_start = ephem.swe_julday(2024, 3, 1, 0.0)
+        jd_start = ephem.julday(2024, 3, 1, 0.0)
 
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_VENUS, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, VENUS, FLG_SPEED)
         current_lon = pos[0]
 
         # Target 10° ahead
         target = (current_lon + 10) % 360
 
-        jd_cross = ephem.swe_cross_ut(SE_VENUS, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(VENUS, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_VENUS, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, VENUS, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1670,19 +1670,19 @@ class TestStationDetectionAndBrentsFallback:
     @pytest.mark.unit
     def test_helio_cross_with_slow_planet(self):
         """Test heliocentric crossing with Pluto (very slow)."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_PLUTO, SEFLG_HELCTR | SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, PLUTO, FLG_HELCTR | FLG_SPEED)
         current_lon = pos[0]
 
         # Target 0.5° ahead
         target = (current_lon + 0.5) % 360
 
-        jd_cross = ephem.swe_helio_cross_ut(SE_PLUTO, target, jd_start, 0)
+        jd_cross = ephem.helio_cross_ut(PLUTO, target, jd_start, 0)
 
         assert jd_cross > jd_start
 
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_PLUTO, SEFLG_HELCTR)
+        pos_cross, _ = ephem.calc_ut(jd_cross, PLUTO, FLG_HELCTR)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1691,24 +1691,24 @@ class TestStationDetectionAndBrentsFallback:
     @pytest.mark.unit
     def test_multiple_planets_near_stations(self):
         """Test that multiple slow planets converge correctly."""
-        jd_start = ephem.swe_julday(2024, 6, 1, 0.0)
+        jd_start = ephem.julday(2024, 6, 1, 0.0)
 
         # Use smaller offsets for very slow planets, and avoid planets that might be retrograde
         slow_planets = [
-            (SE_JUPITER, 5),  # Jupiter, target 5° ahead
-            (SE_SATURN, 3),  # Saturn, target 3° ahead
-            (SE_URANUS, 2),  # Uranus, target 2° ahead
+            (JUPITER, 5),  # Jupiter, target 5° ahead
+            (SATURN, 3),  # Saturn, target 3° ahead
+            (URANUS, 2),  # Uranus, target 2° ahead
         ]
 
         for planet_id, offset in slow_planets:
-            pos, _ = ephem.swe_calc_ut(jd_start, planet_id, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd_start, planet_id, FLG_SPEED)
             target = (pos[0] + offset) % 360
 
-            jd_cross = ephem.swe_cross_ut(planet_id, target, jd_start, 0)
+            jd_cross = ephem.cross_ut(planet_id, target, jd_start, 0)
 
             assert jd_cross > jd_start
 
-            pos_cross, _ = ephem.swe_calc_ut(jd_cross, planet_id, 0)
+            pos_cross, _ = ephem.calc_ut(jd_cross, planet_id, 0)
             diff = abs(pos_cross[0] - target)
             if diff > 180:
                 diff = 360 - diff
@@ -1717,15 +1717,15 @@ class TestStationDetectionAndBrentsFallback:
     @pytest.mark.unit
     def test_crossing_accuracy_preserved_with_brent(self):
         """Verify that Brent's method achieves the same precision as Newton-Raphson."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Test with Saturn (slow but not quite at station)
-        pos, _ = ephem.swe_calc_ut(jd_start, SE_SATURN, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd_start, SATURN, FLG_SPEED)
         target = (pos[0] + 5) % 360
 
-        jd_cross = ephem.swe_cross_ut(SE_SATURN, target, jd_start, 0)
+        jd_cross = ephem.cross_ut(SATURN, target, jd_start, 0)
 
-        pos_cross, _ = ephem.swe_calc_ut(jd_cross, SE_SATURN, 0)
+        pos_cross, _ = ephem.calc_ut(jd_cross, SATURN, 0)
         diff = abs(pos_cross[0] - target)
         if diff > 180:
             diff = 360 - diff
@@ -1771,13 +1771,13 @@ class TestKnownAstronomicalEvents:
         Swiss Ephemeris: March 20, 2024 at 03:06:24.243 UTC
         """
         # Start search from beginning of 2024
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find when Sun crosses 0° (vernal equinox)
-        jd_cross = ephem.swe_solcross_ut(0.0, jd_start, 0)
+        jd_cross = ephem.solcross_ut(0.0, jd_start, 0)
 
         # Swiss Ephemeris reference: March 20, 2024 at 03:06:24.243 UTC
-        jd_known = ephem.swe_julday(2024, 3, 20, self._time_to_hours(3, 6, 24.243))
+        jd_known = ephem.julday(2024, 3, 20, self._time_to_hours(3, 6, 24.243))
 
         # Difference should be less than 1 second
         diff_seconds = abs(jd_cross - jd_known) * 86400.0
@@ -1793,13 +1793,13 @@ class TestKnownAstronomicalEvents:
 
         Swiss Ephemeris: June 20, 2024 at 20:51:00.170 UTC
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find when Sun crosses 90° (summer solstice)
-        jd_cross = ephem.swe_solcross_ut(90.0, jd_start, 0)
+        jd_cross = ephem.solcross_ut(90.0, jd_start, 0)
 
         # Swiss Ephemeris reference: June 20, 2024 at 20:51:00.170 UTC
-        jd_known = ephem.swe_julday(2024, 6, 20, self._time_to_hours(20, 51, 0.170))
+        jd_known = ephem.julday(2024, 6, 20, self._time_to_hours(20, 51, 0.170))
 
         diff_seconds = abs(jd_cross - jd_known) * 86400.0
         assert diff_seconds < 1.0, (
@@ -1814,13 +1814,13 @@ class TestKnownAstronomicalEvents:
 
         Swiss Ephemeris: September 22, 2024 at 12:43:39.036 UTC
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find when Sun crosses 180° (autumnal equinox)
-        jd_cross = ephem.swe_solcross_ut(180.0, jd_start, 0)
+        jd_cross = ephem.solcross_ut(180.0, jd_start, 0)
 
         # Swiss Ephemeris reference: September 22, 2024 at 12:43:39.036 UTC
-        jd_known = ephem.swe_julday(2024, 9, 22, self._time_to_hours(12, 43, 39.036))
+        jd_known = ephem.julday(2024, 9, 22, self._time_to_hours(12, 43, 39.036))
 
         diff_seconds = abs(jd_cross - jd_known) * 86400.0
         assert diff_seconds < 1.0, (
@@ -1835,13 +1835,13 @@ class TestKnownAstronomicalEvents:
 
         Swiss Ephemeris: December 21, 2024 at 09:20:34.132 UTC
         """
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Find when Sun crosses 270° (winter solstice)
-        jd_cross = ephem.swe_solcross_ut(270.0, jd_start, 0)
+        jd_cross = ephem.solcross_ut(270.0, jd_start, 0)
 
         # Swiss Ephemeris reference: December 21, 2024 at 09:20:34.132 UTC
-        jd_known = ephem.swe_julday(2024, 12, 21, self._time_to_hours(9, 20, 34.132))
+        jd_known = ephem.julday(2024, 12, 21, self._time_to_hours(9, 20, 34.132))
 
         diff_seconds = abs(jd_cross - jd_known) * 86400.0
         assert diff_seconds < 1.0, (
@@ -1882,13 +1882,13 @@ class TestKnownAstronomicalEvents:
         verifies the core algorithm matches pyswisseph within 1 second.
         """
         # Start search from beginning of the year
-        jd_start = ephem.swe_julday(year, 1, 1, 0.0)
+        jd_start = ephem.julday(year, 1, 1, 0.0)
 
         # Find crossing
-        jd_cross = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+        jd_cross = ephem.solcross_ut(target_lon, jd_start, 0)
 
         # Swiss Ephemeris reference time
-        jd_known = ephem.swe_julday(
+        jd_known = ephem.julday(
             year, month, day, self._time_to_hours(hour, minute, second)
         )
 
@@ -1906,19 +1906,19 @@ class TestKnownAstronomicalEvents:
         At new moon, Moon longitude equals Sun longitude.
         """
         # Start of January 2024
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Get Sun position and find when Moon crosses that longitude
-        sun_pos, _ = ephem.swe_calc_ut(jd_start, SE_SUN, 0)
+        sun_pos, _ = ephem.calc_ut(jd_start, SUN, 0)
         sun_lon = sun_pos[0]
 
         # Find when Moon crosses the Sun's longitude (approximately new moon)
         # Note: For precise new moon, we'd need to track Sun's motion too,
         # but this test verifies mooncross_ut precision
-        jd_new_moon = ephem.swe_mooncross_ut(sun_lon, jd_start, 0)
+        jd_new_moon = ephem.mooncross_ut(sun_lon, jd_start, 0)
 
         # Verify Moon is at target position with sub-arcsecond precision
-        moon_pos, _ = ephem.swe_calc_ut(jd_new_moon, SE_MOON, 0)
+        moon_pos, _ = ephem.calc_ut(jd_new_moon, MOON, 0)
         diff = abs(moon_pos[0] - sun_lon)
         if diff > 180:
             diff = 360 - diff
@@ -1936,18 +1936,18 @@ class TestKnownAstronomicalEvents:
         At full moon, Moon longitude = Sun longitude + 180°.
         """
         # After new moon, find full moon
-        jd_start = ephem.swe_julday(2024, 1, 12, 0.0)  # Day after new moon
+        jd_start = ephem.julday(2024, 1, 12, 0.0)  # Day after new moon
 
         # Get Sun position at start
-        sun_pos, _ = ephem.swe_calc_ut(jd_start, SE_SUN, 0)
+        sun_pos, _ = ephem.calc_ut(jd_start, SUN, 0)
         # Full moon target: opposite the Sun
         target_lon = (sun_pos[0] + 180.0) % 360.0
 
         # Find when Moon crosses the opposite point
-        jd_full_moon = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+        jd_full_moon = ephem.mooncross_ut(target_lon, jd_start, 0)
 
         # Verify Moon is at target position
-        moon_pos, _ = ephem.swe_calc_ut(jd_full_moon, SE_MOON, 0)
+        moon_pos, _ = ephem.calc_ut(jd_full_moon, MOON, 0)
         diff = abs(moon_pos[0] - target_lon)
         if diff > 180:
             diff = 360 - diff
@@ -1958,7 +1958,7 @@ class TestKnownAstronomicalEvents:
         )
 
         # Verify the date is in late January 2024
-        year, month, day, hour = ephem.swe_revjul(jd_full_moon)
+        year, month, day, hour = ephem.revjul(jd_full_moon)
         assert year == 2024
         assert month == 1
         assert 24 <= day <= 26  # Full moon around Jan 25
@@ -1966,16 +1966,16 @@ class TestKnownAstronomicalEvents:
     @pytest.mark.unit
     def test_mooncross_longitude_precision_multiple_targets(self):
         """Verify mooncross_ut achieves sub-arcsecond precision for various longitudes."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         # Test multiple target longitudes
         targets = [0, 45, 90, 135, 180, 225, 270, 315]
 
         for target in targets:
-            jd_cross = ephem.swe_mooncross_ut(float(target), jd_start, 0)
+            jd_cross = ephem.mooncross_ut(float(target), jd_start, 0)
 
             # Verify Moon is at target
-            moon_pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+            moon_pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
             diff = abs(moon_pos[0] - target)
             if diff > 180:
                 diff = 360 - diff
@@ -1988,10 +1988,10 @@ class TestKnownAstronomicalEvents:
     @pytest.mark.unit
     def test_solcross_matches_pyswisseph_for_known_events(self):
         """Verify libephemeris matches pyswisseph for known astronomical events."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         for target in [0.0, 90.0, 180.0, 270.0]:
-            jd_lib = ephem.swe_solcross_ut(target, jd_start, 0)
+            jd_lib = ephem.solcross_ut(target, jd_start, 0)
             jd_swe = swe.solcross_ut(target, jd_start, 0)
 
             # Should match within 1 second

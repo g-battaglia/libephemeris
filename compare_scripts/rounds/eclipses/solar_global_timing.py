@@ -73,17 +73,17 @@ class R:
 def ecl_type_str(ecl_type):
     """Convert eclipse type flags to string."""
     parts = []
-    if ecl_type & SE_ECL_TOTAL:
+    if ecl_type & ECL_TOTAL:
         parts.append("TOTAL")
-    if ecl_type & SE_ECL_ANNULAR:
+    if ecl_type & ECL_ANNULAR:
         parts.append("ANNULAR")
-    if ecl_type & SE_ECL_PARTIAL:
+    if ecl_type & ECL_PARTIAL:
         parts.append("PARTIAL")
-    if ecl_type & SE_ECL_ANNULAR_TOTAL:
+    if ecl_type & ECL_ANNULAR_TOTAL:
         parts.append("HYBRID")
-    if ecl_type & SE_ECL_CENTRAL:
+    if ecl_type & ECL_CENTRAL:
         parts.append("CENTRAL")
-    if ecl_type & SE_ECL_NONCENTRAL:
+    if ecl_type & ECL_NONCENTRAL:
         parts.append("NONCENTRAL")
     return "|".join(parts) if parts else f"0x{ecl_type:x}"
 
@@ -112,7 +112,7 @@ def run_part1():
             se_times = se_result[1]
             se_max_jd = se_times[0]
 
-            le_result = ephem.swe_sol_eclipse_when_glob(jd_start, 0, 0)
+            le_result = ephem.sol_eclipse_when_glob(jd_start, 0, 0)
             le_type = le_result[0]
             le_times = le_result[1]
             le_max_jd = le_times[0]
@@ -158,10 +158,10 @@ def run_part2(eclipses_se, eclipses_le):
 
         # Compare main type (TOTAL/ANNULAR/PARTIAL/HYBRID)
         se_main = se_type & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
         le_main = le_type & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
 
         if se_main != le_main:
@@ -190,7 +190,7 @@ def run_part3(eclipses_se, eclipses_le):
         # geopos = (0, 0, 0) for sub-solar point approximation
         try:
             se_how = swe.sol_eclipse_how(se_times[0], (0.0, 0.0, 0.0), 0)
-            le_how = ephem.swe_sol_eclipse_how(le_times[0], 0, (0.0, 0.0, 0.0))
+            le_how = ephem.sol_eclipse_how(le_times[0], 0, (0.0, 0.0, 0.0))
         except Exception as e:
             r.skip(f"{label}: {e}")
             continue
@@ -279,7 +279,7 @@ def run_part5():
 
         try:
             se_result = swe.sol_eclipse_when_glob(jd_start, 0, 0)
-            le_result = ephem.swe_sol_eclipse_when_glob(jd_start, 0, 0)
+            le_result = ephem.sol_eclipse_when_glob(jd_start, 0, 0)
 
             se_max = se_result[1][0]
             le_max = le_result[1][0]

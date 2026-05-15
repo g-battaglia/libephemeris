@@ -24,33 +24,33 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_SWIEPH = 2
 
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_URANUS = 7
-SE_NEPTUNE = 8
-SE_PLUTO = 9
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
+URANUS = 7
+NEPTUNE = 8
+PLUTO = 9
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Tolerances
@@ -78,7 +78,7 @@ def run_tests():
     p1_fail = 0
 
     base_jd = 2451545.0  # J2000
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for month_offset in range(240):  # 20 years monthly
         jd = base_jd + month_offset * 30.4375  # ~monthly
@@ -88,7 +88,7 @@ def run_tests():
 
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 errors += 1
                 continue
@@ -124,26 +124,26 @@ def run_tests():
     p2_fail = 0
 
     OUTER_PLANETS = [
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
     ]
-    INNER_PLANETS = [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]
+    INNER_PLANETS = [(MERCURY, "Mercury"), (VENUS, "Venus")]
 
     for week in range(520):  # 10 years weekly
         jd = base_jd + week * 7.0
 
-        se_sun = swe.calc_ut(jd, SE_SUN, flags)[0]
-        le_sun = ephem.swe_calc_ut(jd, SE_SUN, flags)[0]
+        se_sun = swe.calc_ut(jd, SUN, flags)[0]
+        le_sun = ephem.calc_ut(jd, SUN, flags)[0]
 
         for body_id, body_name in OUTER_PLANETS + INNER_PLANETS:
             total += 1
 
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 errors += 1
                 continue
@@ -182,15 +182,15 @@ def run_tests():
     for day in range(365):  # 1 year daily
         jd = base_jd + day
 
-        se_moon = swe.calc_ut(jd, SE_MOON, flags)[0]
-        le_moon = ephem.swe_calc_ut(jd, SE_MOON, flags)[0]
+        se_moon = swe.calc_ut(jd, MOON, flags)[0]
+        le_moon = ephem.calc_ut(jd, MOON, flags)[0]
 
         for body_id, body_name in PLANETS[2:]:  # Mercury through Pluto
             total += 1
 
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 errors += 1
                 continue
@@ -253,7 +253,7 @@ def run_tests():
 
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 errors += 1
                 continue

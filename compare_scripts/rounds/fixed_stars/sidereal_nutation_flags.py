@@ -23,34 +23,34 @@ import swisseph as swe
 import libephemeris as ephem
 
 # --- Constants ---
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
-SEFLG_NONUT = 64
-SEFLG_J2000 = 32
-SEFLG_EQUATORIAL = 2048
-SEFLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
+FLG_NONUT = 64
+FLG_J2000 = 32
+FLG_EQUATORIAL = 2048
+FLG_SWIEPH = 2
 
-SE_SIDM_LAHIRI = 1
-SE_SIDM_FAGAN_BRADLEY = 0
-SE_SIDM_RAMAN = 3
-SE_SIDM_KRISHNAMURTI = 5
-SE_SIDM_DELUCE = 2
-SE_SIDM_DJWHAL_KHUL = 4
+SIDM_LAHIRI = 1
+SIDM_FAGAN_BRADLEY = 0
+SIDM_RAMAN = 3
+SIDM_KRISHNAMURTI = 5
+SIDM_DELUCE = 2
+SIDM_DJWHAL_KHUL = 4
 SE_SIDM_YUKTESWAR = 7
-SE_SIDM_JN_BHASIN = 8
-SE_SIDM_BABYL_KUGLER1 = 9
-SE_SIDM_BABYL_KUGLER2 = 10
-SE_SIDM_BABYL_KUGLER3 = 11
-SE_SIDM_BABYL_HUBER = 12
-SE_SIDM_ALDEBARAN_15TAU = 14
-SE_SIDM_HIPPARCHOS = 15
-SE_SIDM_SASSANIAN = 16
-SE_SIDM_GALCENT_0SAG = 17
-SE_SIDM_TRUE_CITRA = 27
-SE_SIDM_TRUE_REVATI = 28
-SE_SIDM_TRUE_PUSHYA = 29
-SE_SIDM_TRUE_MULA = 35
-SE_SIDM_ARYABHATA = 19
+SIDM_JN_BHASIN = 8
+SIDM_BABYL_KUGLER1 = 9
+SIDM_BABYL_KUGLER2 = 10
+SIDM_BABYL_KUGLER3 = 11
+SIDM_BABYL_HUBER = 12
+SIDM_ALDEBARAN_15TAU = 14
+SIDM_HIPPARCHOS = 15
+SIDM_SASSANIAN = 16
+SIDM_GALCENT_0SAG = 17
+SIDM_TRUE_CITRA = 27
+SIDM_TRUE_REVATI = 28
+SIDM_TRUE_PUSHYA = 29
+SIDM_TRUE_MULA = 35
+SIDM_ARYABHATA = 19
 
 # Stars to test - mix of bright and navigational stars
 STARS = [
@@ -78,19 +78,19 @@ STARS = [
 
 # Ayanamsha modes to test
 SIDEREAL_MODES = [
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_KRISHNAMURTI, "KP"),
-    (SE_SIDM_DELUCE, "DeLuce"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_KRISHNAMURTI, "KP"),
+    (SIDM_DELUCE, "DeLuce"),
     (SE_SIDM_YUKTESWAR, "Yukteswar"),
-    (SE_SIDM_JN_BHASIN, "JN_Bhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "Babyl_Kugler1"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran_15Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_TRUE_CITRA, "True_Citra"),
-    (SE_SIDM_TRUE_REVATI, "True_Revati"),
-    (SE_SIDM_TRUE_PUSHYA, "True_Pushya"),
+    (SIDM_JN_BHASIN, "JN_Bhasin"),
+    (SIDM_BABYL_KUGLER1, "Babyl_Kugler1"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran_15Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_TRUE_CITRA, "True_Citra"),
+    (SIDM_TRUE_REVATI, "True_Revati"),
+    (SIDM_TRUE_PUSHYA, "True_Pushya"),
 ]
 
 # Test epochs
@@ -103,7 +103,7 @@ EPOCHS = [
     2470000.0,  # 2050
 ]
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 
 def se_fixstar(star, jd, flags):
@@ -119,7 +119,7 @@ def se_fixstar(star, jd, flags):
 def le_fixstar(star, jd, flags):
     """Get fixed star position from libephemeris."""
     try:
-        result = ephem.swe_fixstar2_ut(star, jd, flags)
+        result = ephem.fixstar2_ut(star, jd, flags)
         # result = (pos_tuple, starname, retflag)
         return result[0], result[1]
     except Exception as e:
@@ -153,10 +153,10 @@ def run_tests():
 
     for sid_mode, sid_name in SIDEREAL_MODES:
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0.0, 0.0)
+        ephem.set_sid_mode(sid_mode, 0.0, 0.0)
 
         for jd in EPOCHS:
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
 
             for star in STARS:
                 total += 1
@@ -201,10 +201,10 @@ def run_tests():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0.0, 0.0)
+    ephem.set_sid_mode(0, 0.0, 0.0)
 
     for jd in EPOCHS:
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_NONUT
 
         for star in STARS:
             total += 1
@@ -247,7 +247,7 @@ def run_tests():
     p3_err = 0
 
     for jd in EPOCHS:
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_J2000 | FLG_NONUT
 
         for star in STARS:
             total += 1
@@ -290,7 +290,7 @@ def run_tests():
     p4_err = 0
 
     for jd in EPOCHS:
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
 
         for star in STARS:
             total += 1
@@ -339,8 +339,8 @@ def run_tests():
         for star in STARS[:10]:  # Top 10 stars
             total += 1
 
-            flags_nut = SEFLG_SWIEPH | SEFLG_SPEED
-            flags_nonut = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT
+            flags_nut = FLG_SWIEPH | FLG_SPEED
+            flags_nonut = FLG_SWIEPH | FLG_SPEED | FLG_NONUT
 
             se_nut, _ = se_fixstar(star, jd, flags_nut)
             se_nonut, _ = se_fixstar(star, jd, flags_nonut)
@@ -393,17 +393,17 @@ def run_tests():
     p6_err = 0
 
     MODES_P6 = [
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-        (SE_SIDM_TRUE_CITRA, "True_Citra"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+        (SIDM_TRUE_CITRA, "True_Citra"),
     ]
 
     for sid_mode, sid_name in MODES_P6:
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0.0, 0.0)
+        ephem.set_sid_mode(sid_mode, 0.0, 0.0)
 
         for jd in EPOCHS[:3]:  # J2000, 2023, 1968
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
 
             for star in STARS[:10]:
                 total += 1
@@ -435,7 +435,7 @@ def run_tests():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0.0, 0.0)
+    ephem.set_sid_mode(0, 0.0, 0.0)
 
     print(f"  Part 6 Results: {p6_pass} passed, {p6_fail} failed, {p6_err} errors")
 
@@ -448,16 +448,16 @@ def run_tests():
     p7_err = 0
 
     MODES_P7 = [
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
     ]
 
     for sid_mode, sid_name in MODES_P7:
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0.0, 0.0)
+        ephem.set_sid_mode(sid_mode, 0.0, 0.0)
 
         for jd in EPOCHS[:3]:
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
 
             for star in STARS[:10]:
                 total += 1
@@ -496,7 +496,7 @@ def run_tests():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0.0, 0.0)
+    ephem.set_sid_mode(0, 0.0, 0.0)
 
     print(f"  Part 7 Results: {p7_pass} passed, {p7_fail} failed, {p7_err} errors")
 

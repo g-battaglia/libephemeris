@@ -21,26 +21,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_MEAN_NODE,
-    SE_MEAN_APOG,
-    SE_ECL_NUT,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SEFLG_TOPOCTR,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    MEAN_NODE,
+    MEAN_APOG,
+    ECL_NUT,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    FLG_TOPOCTR,
 )
 from libephemeris.utils import (
-    SE_ECL2HOR,
-    SE_EQU2HOR,
-    SE_HOR2EQU,
-    SE_TRUE_TO_APP,
-    SE_APP_TO_TRUE,
+    ECL2HOR,
+    EQU2HOR,
+    HOR2EQU,
+    TRUE_TO_APP,
+    APP_TO_TRUE,
 )
 from libephemeris.horizons_backend import horizons_calc_ut
 
@@ -74,7 +74,7 @@ for body_id, name in [
     (47, "Poseidon"),
 ]:
     try:
-        result = horizons_calc_ut(None, JD, body_id, SEFLG_SWIEPH | SEFLG_HELCTR)
+        result = horizons_calc_ut(None, JD, body_id, FLG_SWIEPH | FLG_HELCTR)
         data = result[0]
         check(f"{name} returns 6 values", len(data) == 6, f"got {len(data)}")
         check(f"{name} lon in [0,360)", 0.0 <= data[0] < 360.0, f"lon={data[0]}")
@@ -84,14 +84,14 @@ for body_id, name in [
 
 # Verify Uranian geocentric raises (expected)
 try:
-    horizons_calc_ut(None, JD, 40, SEFLG_SWIEPH)
+    horizons_calc_ut(None, JD, 40, FLG_SWIEPH)
     check("Uranian geocentric raises KeyError", False, "did not raise")
 except KeyError:
     check("Uranian geocentric raises KeyError", True)
 
 # TOPOCTR raises
 try:
-    horizons_calc_ut(None, JD, 0, SEFLG_TOPOCTR)
+    horizons_calc_ut(None, JD, 0, FLG_TOPOCTR)
     check("TOPOCTR raises KeyError", False, "did not raise")
 except KeyError:
     check("TOPOCTR raises KeyError", True)
@@ -99,23 +99,23 @@ except KeyError:
 # ── Horizons analytical: Mean Node, Mean Apogee ──
 print("\n=== Horizons analytical bodies ===")
 for body_id, name in [(10, "Mean Node"), (12, "Mean Apogee")]:
-    result = horizons_calc_ut(None, JD, body_id, SEFLG_SWIEPH | SEFLG_SPEED)
+    result = horizons_calc_ut(None, JD, body_id, FLG_SWIEPH | FLG_SPEED)
     data = result[0]
-    ref, _ = swe.calc_ut(JD, body_id, SEFLG_SWIEPH | SEFLG_SPEED)
+    ref, _ = swe.calc_ut(JD, body_id, FLG_SWIEPH | FLG_SPEED)
     diff = abs(data[0] - ref[0])
     check(f"{name} horizons vs skyfield < 0.01°", diff < 0.01, f"diff={diff:.6f}°")
     check(f"{name} lon in [0,360)", 0.0 <= data[0] < 360.0)
 
 # Mean Node speed should be negative (retrograde)
-result = horizons_calc_ut(None, JD, 10, SEFLG_SWIEPH | SEFLG_SPEED)
+result = horizons_calc_ut(None, JD, 10, FLG_SWIEPH | FLG_SPEED)
 check("Mean Node speed negative", result[0][3] < 0, f"speed={result[0][3]}")
 
 # ── 360° wrap-around ──
 print("\n=== 360° wrap-around ===")
-for body in [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_MEAN_NODE]:
+for body in [SUN, MOON, MARS, JUPITER, MEAN_NODE]:
     for i in range(20):
         jd = JD + i * 18.25
-        r, _ = swe.calc_ut(jd, body, SEFLG_SWIEPH)
+        r, _ = swe.calc_ut(jd, body, FLG_SWIEPH)
         check(
             f"body {body} JD+{i * 18.25:.0f} in [0,360)",
             0.0 <= r[0] < 360.0,
@@ -124,19 +124,19 @@ for body in [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_MEAN_NODE]:
 
 # solcross near 0°
 jd_cross = swe.solcross_ut(0.0, JD, 0)
-r, _ = swe.calc_ut(jd_cross, SE_SUN, SEFLG_SWIEPH)
+r, _ = swe.calc_ut(jd_cross, SUN, FLG_SWIEPH)
 check("solcross 0° Sun near 0°", r[0] < 0.01 or r[0] > 359.99, f"lon={r[0]}")
 
 # Sidereal range
 swe.set_sid_mode(1)
-for body in [SE_SUN, SE_MOON, SE_MARS]:
-    r, _ = swe.calc_ut(JD, body, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+for body in [SUN, MOON, MARS]:
+    r, _ = swe.calc_ut(JD, body, FLG_SWIEPH | FLG_SIDEREAL)
     check(f"sidereal body {body} in [0,360)", 0.0 <= r[0] < 360.0, f"lon={r[0]}")
 swe.set_sid_mode(0)
 
 # ── ECL_NUT ──
 print("\n=== ECL_NUT special body ===")
-r, _ = swe.calc_ut(JD, SE_ECL_NUT, SEFLG_SWIEPH)
+r, _ = swe.calc_ut(JD, ECL_NUT, FLG_SWIEPH)
 check("ECL_NUT 6 values", len(r) == 6)
 check("ECL_NUT true obl ~23.4°", 23.0 < r[0] < 24.0, f"true_obl={r[0]}")
 check("ECL_NUT mean obl ~23.4°", 23.0 < r[1] < 24.0, f"mean_obl={r[1]}")
@@ -147,20 +147,20 @@ check("ECL_NUT [5]=0", r[5] == 0.0)
 
 # ── azalt / azalt_rev / refrac ──
 print("\n=== azalt / azalt_rev / refrac ===")
-sun, _ = swe.calc_ut(JD, SE_SUN, SEFLG_SWIEPH)
+sun, _ = swe.calc_ut(JD, SUN, FLG_SWIEPH)
 az, true_alt, app_alt = swe.azalt(
-    JD, SE_ECL2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun[0], sun[1], sun[2])
+    JD, ECL2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun[0], sun[1], sun[2])
 )
 check("azalt az in [0,360)", 0.0 <= az < 360.0, f"az={az}")
 check("azalt true_alt in [-90,90]", -90 <= true_alt <= 90, f"alt={true_alt}")
 check("azalt all finite", all(math.isfinite(v) for v in [az, true_alt, app_alt]))
 
 # azalt_rev round-trip
-sun_eq, _ = swe.calc_ut(JD, SE_SUN, SEFLG_SWIEPH | SEFLG_EQUATORIAL)
+sun_eq, _ = swe.calc_ut(JD, SUN, FLG_SWIEPH | FLG_EQUATORIAL)
 az2, ta2, _ = swe.azalt(
-    JD, SE_EQU2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun_eq[0], sun_eq[1], sun_eq[2])
+    JD, EQU2HOR, (12.5, 41.9, 50.0), 1013.25, 15.0, (sun_eq[0], sun_eq[1], sun_eq[2])
 )
-ra_out, dec_out = swe.azalt_rev(JD, 1, (12.5, 41.9, 50.0), az2, ta2)  # SE_HOR2EQU=1
+ra_out, dec_out = swe.azalt_rev(JD, 1, (12.5, 41.9, 50.0), az2, ta2)  # HOR2EQU=1
 ra_diff = abs(ra_out - sun_eq[0])
 if ra_diff > 180:
     ra_diff = 360 - ra_diff
@@ -169,8 +169,8 @@ check("azalt round-trip Dec < 0.05°", abs(dec_out - sun_eq[1]) < 0.05)
 
 # refrac round-trip
 for alt in [0.0, 5.0, 15.0, 30.0, 60.0, 85.0]:
-    app = swe.refrac(alt, 1013.25, 15.0, SE_TRUE_TO_APP)
-    recovered = swe.refrac(app, 1013.25, 15.0, SE_APP_TO_TRUE)
+    app = swe.refrac(alt, 1013.25, 15.0, TRUE_TO_APP)
+    recovered = swe.refrac(app, 1013.25, 15.0, APP_TO_TRUE)
     check(
         f"refrac round-trip alt={alt}°",
         abs(recovered - alt) < 0.02,
@@ -178,7 +178,7 @@ for alt in [0.0, 5.0, 15.0, 30.0, 60.0, 85.0]:
     )
 
 # Horizon refraction ~34'
-ref_horizon = swe.refrac(0.0, 1013.25, 15.0, SE_TRUE_TO_APP)
+ref_horizon = swe.refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
 check("horizon refraction ~0.57°", 0.4 < ref_horizon < 0.7, f"ref={ref_horizon}")
 
 # ── TAI time functions ──

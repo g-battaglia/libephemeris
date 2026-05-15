@@ -21,32 +21,32 @@ from __future__ import annotations
 import libephemeris as eph
 from libephemeris.constants import (
     # Planet IDs
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
     # Rise/Set/Transit event types
-    SE_CALC_RISE,
-    SE_CALC_SET,
-    SE_CALC_MTRANSIT,
-    SE_CALC_ITRANSIT,
+    CALC_RISE,
+    CALC_SET,
+    CALC_MTRANSIT,
+    CALC_ITRANSIT,
     # Calculation modifiers
-    SE_BIT_DISC_CENTER,
-    SE_BIT_NO_REFRACTION,
-    SE_BIT_CIVIL_TWILIGHT,
-    SE_BIT_NAUTIC_TWILIGHT,
-    SE_BIT_ASTRO_TWILIGHT,
+    BIT_DISC_CENTER,
+    BIT_NO_REFRACTION,
+    BIT_CIVIL_TWILIGHT,
+    BIT_NAUTIC_TWILIGHT,
+    BIT_ASTRO_TWILIGHT,
     # Flags
-    SEFLG_SWIEPH,
+    FLG_SWIEPH,
 )
 
 
 def jd_to_time_string(jd: float) -> str:
     """Convert Julian Day to time string (HH:MM)."""
-    year, month, day, hour = eph.swe_revjul(jd)
+    year, month, day, hour = eph.revjul(jd)
     hours = int(hour)
     minutes = int((hour - hours) * 60)
     return f"{hours:02d}:{minutes:02d}"
@@ -54,7 +54,7 @@ def jd_to_time_string(jd: float) -> str:
 
 def jd_to_datetime_string(jd: float) -> str:
     """Convert Julian Day to datetime string."""
-    year, month, day, hour = eph.swe_revjul(jd)
+    year, month, day, hour = eph.revjul(jd)
     hours = int(hour)
     minutes = int((hour - hours) * 60)
     return f"{year}-{month:02d}-{day:02d} {hours:02d}:{minutes:02d}"
@@ -72,26 +72,26 @@ def example_sunrise_sunset() -> None:
     altitude = 16.0  # meters above sea level
 
     # Date: Summer solstice 2024
-    jd_start = eph.swe_julday(2024, 6, 21, 0.0)
+    jd_start = eph.julday(2024, 6, 21, 0.0)
 
     print(f"\nLocation: San Francisco ({latitude}°N, {longitude}°W)")
     print("Date: 2024-06-21 (Summer Solstice)\n")
 
     # Calculate sunrise
     flag_rise, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_RISE, [longitude, latitude, altitude]
+        jd_start, SUN, CALC_RISE, [longitude, latitude, altitude]
     )
     jd_rise = tret[0]
 
     # Calculate sunset
     flag_set, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_SET, [longitude, latitude, altitude]
+        jd_start, SUN, CALC_SET, [longitude, latitude, altitude]
     )
     jd_set = tret[0]
 
     # Calculate upper meridian transit (solar noon)
     flag_transit, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_MTRANSIT, [longitude, latitude, altitude]
+        jd_start, SUN, CALC_MTRANSIT, [longitude, latitude, altitude]
     )
     jd_transit = tret[0]
 
@@ -117,7 +117,7 @@ def example_twilight_times() -> None:
     latitude = 51.5074
     longitude = -0.1278
 
-    jd_start = eph.swe_julday(2024, 3, 20, 0.0)  # Spring equinox
+    jd_start = eph.julday(2024, 3, 20, 0.0)  # Spring equinox
 
     print(f"\nLocation: London ({latitude}°N, {longitude}°W)")
     print("Date: 2024-03-20 (Spring Equinox)\n")
@@ -128,8 +128,8 @@ def example_twilight_times() -> None:
     # Astronomical dawn (Sun at -18°)
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_RISE | SE_BIT_ASTRO_TWILIGHT,
+        SUN,
+        CALC_RISE | BIT_ASTRO_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_astro_dawn = tret[0]
@@ -138,8 +138,8 @@ def example_twilight_times() -> None:
     # Nautical dawn (Sun at -12°)
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_RISE | SE_BIT_NAUTIC_TWILIGHT,
+        SUN,
+        CALC_RISE | BIT_NAUTIC_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_naut_dawn = tret[0]
@@ -148,15 +148,15 @@ def example_twilight_times() -> None:
     # Civil dawn (Sun at -6°)
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_RISE | SE_BIT_CIVIL_TWILIGHT,
+        SUN,
+        CALC_RISE | BIT_CIVIL_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_civil_dawn = tret[0]
     print(f"  Civil dawn (-6°):         {jd_to_time_string(jd_civil_dawn)} UT")
 
     # Sunrise
-    _, tret = eph.rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [longitude, latitude, 0.0])
+    _, tret = eph.rise_trans(jd_start, SUN, CALC_RISE, [longitude, latitude, 0.0])
     jd_sunrise = tret[0]
     print(f"  Sunrise (0°):             {jd_to_time_string(jd_sunrise)} UT")
 
@@ -164,15 +164,15 @@ def example_twilight_times() -> None:
     print("-" * 40)
 
     # Sunset
-    _, tret = eph.rise_trans(jd_start, SE_SUN, SE_CALC_SET, [longitude, latitude, 0.0])
+    _, tret = eph.rise_trans(jd_start, SUN, CALC_SET, [longitude, latitude, 0.0])
     jd_sunset = tret[0]
     print(f"  Sunset (0°):              {jd_to_time_string(jd_sunset)} UT")
 
     # Civil dusk
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_SET | SE_BIT_CIVIL_TWILIGHT,
+        SUN,
+        CALC_SET | BIT_CIVIL_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_civil_dusk = tret[0]
@@ -181,8 +181,8 @@ def example_twilight_times() -> None:
     # Nautical dusk
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_SET | SE_BIT_NAUTIC_TWILIGHT,
+        SUN,
+        CALC_SET | BIT_NAUTIC_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_naut_dusk = tret[0]
@@ -191,8 +191,8 @@ def example_twilight_times() -> None:
     # Astronomical dusk
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_SET | SE_BIT_ASTRO_TWILIGHT,
+        SUN,
+        CALC_SET | BIT_ASTRO_TWILIGHT,
         [longitude, latitude, 0.0],
     )
     jd_astro_dusk = tret[0]
@@ -209,24 +209,24 @@ def example_moonrise_moonset() -> None:
     latitude = 35.6762
     longitude = 139.6503
 
-    jd_start = eph.swe_julday(2024, 4, 8, 0.0)  # Total solar eclipse date
+    jd_start = eph.julday(2024, 4, 8, 0.0)  # Total solar eclipse date
 
     print(f"\nLocation: Tokyo ({latitude}°N, {longitude}°E)")
     print("Date: 2024-04-08\n")
 
     # Calculate moonrise
     flag, tret = eph.rise_trans(
-        jd_start, SE_MOON, SE_CALC_RISE, [longitude, latitude, 0.0]
+        jd_start, MOON, CALC_RISE, [longitude, latitude, 0.0]
     )
     jd_moonrise = tret[0]
 
     # Calculate moonset
-    _, tret = eph.rise_trans(jd_start, SE_MOON, SE_CALC_SET, [longitude, latitude, 0.0])
+    _, tret = eph.rise_trans(jd_start, MOON, CALC_SET, [longitude, latitude, 0.0])
     jd_moonset = tret[0]
 
     # Calculate moon transit
     _, tret = eph.rise_trans(
-        jd_start, SE_MOON, SE_CALC_MTRANSIT, [longitude, latitude, 0.0]
+        jd_start, MOON, CALC_MTRANSIT, [longitude, latitude, 0.0]
     )
     jd_transit = tret[0]
 
@@ -248,16 +248,16 @@ def example_planet_visibility() -> None:
     latitude = -33.8688
     longitude = 151.2093
 
-    jd_start = eph.swe_julday(2024, 7, 15, 0.0)
+    jd_start = eph.julday(2024, 7, 15, 0.0)
 
     print(f"\nLocation: Sydney ({abs(latitude)}°S, {longitude}°E)")
     print("Date: 2024-07-15\n")
 
     planets = [
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     print(f"{'Planet':<10}{'Rise':>10}{'Transit':>10}{'Set':>10}")
@@ -266,17 +266,17 @@ def example_planet_visibility() -> None:
     for planet_id, name in planets:
         try:
             flag_rise, tret = eph.rise_trans(
-                jd_start, planet_id, SE_CALC_RISE, [longitude, latitude, 0.0]
+                jd_start, planet_id, CALC_RISE, [longitude, latitude, 0.0]
             )
             jd_rise = tret[0]
 
             _, tret = eph.rise_trans(
-                jd_start, planet_id, SE_CALC_MTRANSIT, [longitude, latitude, 0.0]
+                jd_start, planet_id, CALC_MTRANSIT, [longitude, latitude, 0.0]
             )
             jd_transit = tret[0]
 
             _, tret = eph.rise_trans(
-                jd_start, planet_id, SE_CALC_SET, [longitude, latitude, 0.0]
+                jd_start, planet_id, CALC_SET, [longitude, latitude, 0.0]
             )
             jd_set = tret[0]
 
@@ -311,12 +311,12 @@ def example_week_of_sunrise() -> None:
     print("-" * 48)
 
     for day_offset in range(7):
-        jd = eph.swe_julday(start_year, start_month, start_day + day_offset, 0.0)
-        year, month, day, _ = eph.swe_revjul(jd)
+        jd = eph.julday(start_year, start_month, start_day + day_offset, 0.0)
+        year, month, day, _ = eph.revjul(jd)
 
-        _, tret = eph.rise_trans(jd, SE_SUN, SE_CALC_RISE, [longitude, latitude, 0.0])
+        _, tret = eph.rise_trans(jd, SUN, CALC_RISE, [longitude, latitude, 0.0])
         jd_rise = tret[0]
-        _, tret = eph.rise_trans(jd, SE_SUN, SE_CALC_SET, [longitude, latitude, 0.0])
+        _, tret = eph.rise_trans(jd, SUN, CALC_SET, [longitude, latitude, 0.0])
         jd_set = tret[0]
 
         rise_str = jd_to_time_string(jd_rise)
@@ -343,7 +343,7 @@ def example_no_refraction() -> None:
     longitude = -104.9903
     altitude = 1609.0  # Mile high city
 
-    jd_start = eph.swe_julday(2024, 1, 1, 0.0)
+    jd_start = eph.julday(2024, 1, 1, 0.0)
 
     print(f"\nLocation: Denver ({latitude}°N, {longitude}°W, {altitude}m altitude)")
     print("Date: 2024-01-01\n")
@@ -353,26 +353,26 @@ def example_no_refraction() -> None:
 
     # With refraction (default)
     _, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_RISE, [longitude, latitude, altitude]
+        jd_start, SUN, CALC_RISE, [longitude, latitude, altitude]
     )
     jd_rise_refr = tret[0]
     _, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_SET, [longitude, latitude, altitude]
+        jd_start, SUN, CALC_SET, [longitude, latitude, altitude]
     )
     jd_set_refr = tret[0]
 
     # Without refraction
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_RISE | SE_BIT_NO_REFRACTION,
+        SUN,
+        CALC_RISE | BIT_NO_REFRACTION,
         [longitude, latitude, altitude],
     )
     jd_rise_no_refr = tret[0]
     _, tret = eph.rise_trans(
         jd_start,
-        SE_SUN,
-        SE_CALC_SET | SE_BIT_NO_REFRACTION,
+        SUN,
+        CALC_SET | BIT_NO_REFRACTION,
         [longitude, latitude, altitude],
     )
     jd_set_no_refr = tret[0]
@@ -402,18 +402,18 @@ def example_disc_center_vs_limb() -> None:
     latitude = 45.0
     longitude = 0.0
 
-    jd_start = eph.swe_julday(2024, 3, 20, 0.0)
+    jd_start = eph.julday(2024, 3, 20, 0.0)
 
     print("\nThe Sun and Moon are not point sources. By default,")
     print("rise/set is calculated for the upper limb (edge) of the disc.\n")
 
     # Upper limb (default)
-    _, tret = eph.rise_trans(jd_start, SE_SUN, SE_CALC_RISE, [longitude, latitude, 0.0])
+    _, tret = eph.rise_trans(jd_start, SUN, CALC_RISE, [longitude, latitude, 0.0])
     jd_rise_limb = tret[0]
 
     # Disc center
     _, tret = eph.rise_trans(
-        jd_start, SE_SUN, SE_CALC_RISE | SE_BIT_DISC_CENTER, [longitude, latitude, 0.0]
+        jd_start, SUN, CALC_RISE | BIT_DISC_CENTER, [longitude, latitude, 0.0]
     )
     jd_rise_center = tret[0]
 

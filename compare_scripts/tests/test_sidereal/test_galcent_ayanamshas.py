@@ -2,10 +2,10 @@
 Tests for Galactic Center based ayanamshas.
 
 This module tests the four Galactic Center based ayanamsha modes:
-- SE_SIDM_GALCENT_0SAG (17): Galactic Center at 0° Sagittarius
-- SE_SIDM_GALCENT_RGILBRAND (30): Galactic Center (Gil Brand)
-- SE_SIDM_GALCENT_MULA_WILHELM (36): Galactic Center at Mula (Wilhelm)
-- SE_SIDM_GALCENT_COCHRANE (40): Galactic Center at 0° Capricorn (Cochrane)
+- SIDM_GALCENT_0SAG (17): Galactic Center at 0° Sagittarius
+- SIDM_GALCENT_RGILBRAND (30): Galactic Center (Gil Brand)
+- SIDM_GALCENT_MULA_WILHELM (36): Galactic Center at Mula (Wilhelm)
+- SIDM_GALCENT_COCHRANE (40): Galactic Center at 0° Capricorn (Cochrane)
 
 The Galactic Center coordinates used are from Reid & Brunthaler (2004, ApJ 616, 872):
 - RA = 17h 45m 40.0409s = 266.41683708°
@@ -20,12 +20,12 @@ Proper motion from Reid & Brunthaler (2020, ApJ 892, 39):
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SUN,
-    SEFLG_SIDEREAL,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
+    SUN,
+    FLG_SIDEREAL,
 )
 
 try:
@@ -96,18 +96,18 @@ class TestGalcentAyanamshaValues:
     """Test Galactic Center ayanamsha values at different epochs."""
 
     GALCENT_MODES = [
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
-        (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
-        (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
-        (SE_SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
+        (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+        (SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+        (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
     ]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES)
     def test_ayanamsha_is_positive(self, sid_mode, name):
         """All Galactic Center ayanamshas should be positive at J2000."""
-        ephem.swe_set_sid_mode(sid_mode)
-        ayan = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(sid_mode)
+        ayan = ephem.get_ayanamsa_ut(JD_J2000)
 
         assert ayan > 0, f"{name} ayanamsha {ayan} should be positive"
 
@@ -115,8 +115,8 @@ class TestGalcentAyanamshaValues:
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES[:3])  # Exclude Cochrane
     def test_ayanamsha_reasonable_range(self, sid_mode, name):
         """Galactic Center ayanamshas should be in reasonable range at J2000."""
-        ephem.swe_set_sid_mode(sid_mode)
-        ayan = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(sid_mode)
+        ayan = ephem.get_ayanamsa_ut(JD_J2000)
 
         # All should be roughly between 20° and 35° at J2000
         assert 20.0 < ayan < 35.0, (
@@ -126,8 +126,8 @@ class TestGalcentAyanamshaValues:
     @pytest.mark.unit
     def test_cochrane_ayanamsha_range(self):
         """Cochrane ayanamsha is special - GC at 0° Cap means ~-3° to +5° ayanamsha."""
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_COCHRANE)
-        ayan = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_COCHRANE)
+        ayan = ephem.get_ayanamsa_ut(JD_J2000)
 
         # Cochrane places GC at 0° Capricorn (270°)
         # At J2000, GC tropical longitude is ~266.8°
@@ -142,11 +142,11 @@ class TestGalcentAyanamshaValues:
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES)
     def test_ayanamsha_increases_over_time(self, sid_mode, name):
         """Ayanamsha should increase with time due to precession."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        ayan_1900 = ephem.swe_get_ayanamsa_ut(JD_1900)
-        ayan_2000 = ephem.swe_get_ayanamsa_ut(JD_J2000)
-        ayan_2100 = ephem.swe_get_ayanamsa_ut(JD_2100)
+        ayan_1900 = ephem.get_ayanamsa_ut(JD_1900)
+        ayan_2000 = ephem.get_ayanamsa_ut(JD_J2000)
+        ayan_2100 = ephem.get_ayanamsa_ut(JD_2100)
 
         assert ayan_2000 > ayan_1900, (
             f"{name}: Ayanamsha should increase from 1900 to 2000"
@@ -159,10 +159,10 @@ class TestGalcentAyanamshaValues:
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES)
     def test_ayanamsha_precession_rate(self, sid_mode, name):
         """Ayanamsha should increase ~50 arcsec/year (precession rate)."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        ayan_1900 = ephem.swe_get_ayanamsa_ut(JD_1900)
-        ayan_2000 = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ayan_1900 = ephem.get_ayanamsa_ut(JD_1900)
+        ayan_2000 = ephem.get_ayanamsa_ut(JD_J2000)
 
         # 100 years × 50"/year = 5000" = ~1.39°
         diff = ayan_2000 - ayan_1900
@@ -177,11 +177,11 @@ class TestGalcentAyanamshaRelationships:
     @pytest.mark.unit
     def test_0sag_and_cochrane_differ_by_30_degrees(self):
         """0 Sag and Cochrane should differ by ~30° (one sign), accounting for wrap."""
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_0SAG)
-        ayan_0sag = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_0SAG)
+        ayan_0sag = ephem.get_ayanamsa_ut(JD_J2000)
 
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_COCHRANE)
-        ayan_cochrane = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_COCHRANE)
+        ayan_cochrane = ephem.get_ayanamsa_ut(JD_J2000)
 
         # Cochrane places GC at 0° Capricorn (270°), 0SAG at 0° Sagittarius (240°)
         # So Cochrane ayanamsha should be 30° less, but may wrap around 360°
@@ -192,14 +192,14 @@ class TestGalcentAyanamshaRelationships:
     @pytest.mark.unit
     def test_ayanamsha_ordering_excluding_cochrane(self):
         """Test expected ordering of non-wrapping Galactic Center ayanamshas."""
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_0SAG)
-        ayan_0sag = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_0SAG)
+        ayan_0sag = ephem.get_ayanamsa_ut(JD_J2000)
 
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_RGILBRAND)
-        ayan_rgilbrand = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_RGILBRAND)
+        ayan_rgilbrand = ephem.get_ayanamsa_ut(JD_J2000)
 
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_MULA_WILHELM)
-        ayan_mula_wilhelm = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_MULA_WILHELM)
+        ayan_mula_wilhelm = ephem.get_ayanamsa_ut(JD_J2000)
 
         # Expected order from highest to lowest ayanamsha (for non-wrapping):
         # 0 Sag = GC at 240°, offset = gc_lon - 240 (highest ayanamsha)
@@ -219,10 +219,10 @@ class TestGalcentVsPyswisseph:
     """Compare Galactic Center ayanamshas with pyswisseph."""
 
     GALCENT_MODES = [
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
-        (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
-        (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
-        (SE_SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
+        (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+        (SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+        (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
     ]
 
     TEST_DATES = [
@@ -240,10 +240,10 @@ class TestGalcentVsPyswisseph:
     @pytest.mark.parametrize("jd,epoch_name", TEST_DATES)
     def test_ayanamsha_vs_pyswisseph(self, sid_mode, name, jd, epoch_name):
         """Compare Galactic Center ayanamsha with pyswisseph."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         diff = angle_diff(ayan_lib, ayan_swe)
@@ -258,11 +258,11 @@ class TestGalcentVsPyswisseph:
     @pytest.mark.parametrize("sid_mode,name", GALCENT_MODES)
     def test_sidereal_sun_vs_pyswisseph(self, sid_mode, name):
         """Compare sidereal Sun position with pyswisseph for GC ayanamshas."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        pos_lib, _ = ephem.swe_calc_ut(JD_J2000, SE_SUN, SEFLG_SIDEREAL)
-        pos_swe, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SIDEREAL)
+        pos_lib, _ = ephem.calc_ut(JD_J2000, SUN, FLG_SIDEREAL)
+        pos_swe, _ = swe.calc_ut(JD_J2000, SUN, FLG_SIDEREAL)
 
         diff = angle_diff(pos_lib[0], pos_swe[0])
 
@@ -283,8 +283,8 @@ class TestGalacticCenterSiderealPosition:
         # by definition, so tropical_gc_lon - ayanamsha ≈ 240°
         from libephemeris.planets import _get_star_position_ecliptic, STARS
 
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_0SAG)
-        ayan = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_0SAG)
+        ayan = ephem.get_ayanamsa_ut(JD_J2000)
 
         # Get GC tropical ecliptic longitude at J2000
         # We need to compute this manually using the internal function
@@ -302,8 +302,8 @@ class TestGalacticCenterSiderealPosition:
         # So ayanamsha = tropical_gc_lon - 270
         # If GC is at ~266.8° tropical, ayanamsha ≈ -3.2° (mod 360) = 356.8°
 
-        ephem.swe_set_sid_mode(SE_SIDM_GALCENT_COCHRANE)
-        ayan = ephem.swe_get_ayanamsa_ut(JD_J2000)
+        ephem.set_sid_mode(SIDM_GALCENT_COCHRANE)
+        ayan = ephem.get_ayanamsa_ut(JD_J2000)
 
         # Cochrane ayanamsha wraps around 360°
         # Valid range: 350° to 360° (near 0° when wrapped)

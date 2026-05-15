@@ -128,7 +128,7 @@ def generate_lunar_phase_dates(count: int = NUM_TEST_DATES, seed: int = 42) -> l
             phase = "Waning Crescent"
 
         # Convert JD back to calendar for reporting
-        year, month, day, hour = ephem.swe_revjul(jd, ephem.SE_GREG_CAL)
+        year, month, day, hour = ephem.revjul(jd, ephem.GREG_CAL)
         dates.append((year, month, day, hour, jd, phase))
 
     return dates
@@ -231,7 +231,7 @@ class TestInterpolatedApogeeVsPyswisseph:
 
         # Print comprehensive report
         print(f"\n{'=' * 80}")
-        print("INTERPOLATED APOGEE (SE_INTP_APOG) PRECISION REPORT")
+        print("INTERPOLATED APOGEE (INTP_APOG) PRECISION REPORT")
         print(f"{'=' * 80}")
         print(f"Dates tested: {len(errors)}")
         print(f"Dates skipped: {skipped}")
@@ -421,7 +421,7 @@ class TestInterpolatedPerigeeVsPyswisseph:
 
         # Print comprehensive report
         print(f"\n{'=' * 80}")
-        print("INTERPOLATED PERIGEE (SE_INTP_PERG) PRECISION REPORT")
+        print("INTERPOLATED PERIGEE (INTP_PERG) PRECISION REPORT")
         print(f"{'=' * 80}")
         print(f"Dates tested: {len(errors)}")
         print(f"Dates skipped: {skipped}")
@@ -652,8 +652,8 @@ class TestInterpolatedVsOsculatingComparison:
                 jd = base_jd + day
 
                 # Get osculating (True Lilith) and interpolated positions
-                oscu_result, _ = ephem.swe_calc_ut(jd, ephem.SE_OSCU_APOG, 0)
-                intp_result, _ = ephem.swe_calc_ut(jd, ephem.SE_INTP_APOG, 0)
+                oscu_result, _ = ephem.calc_ut(jd, ephem.OSCU_APOG, 0)
+                intp_result, _ = ephem.calc_ut(jd, ephem.INTP_APOG, 0)
 
                 oscu_lon = oscu_result[0]
                 intp_lon = intp_result[0]
@@ -707,8 +707,8 @@ class TestInterpolatedVsOsculatingComparison:
             jd = base_jd + day
 
             # Get osculating and interpolated perigee positions
-            oscu_result, _ = ephem.swe_calc_ut(jd, ephem.SE_OSCU_APOG, 0)
-            intp_result, _ = ephem.swe_calc_ut(jd, ephem.SE_INTP_PERG, 0)
+            oscu_result, _ = ephem.calc_ut(jd, ephem.OSCU_APOG, 0)
+            intp_result, _ = ephem.calc_ut(jd, ephem.INTP_PERG, 0)
 
             # Osculating perigee = osculating apogee + 180
             oscu_lon = (oscu_result[0] + 180) % 360

@@ -10,7 +10,7 @@ Phases:
   P3: Stars near ecliptic poles (stress test for coordinate transforms)
   P4: Star speed (proper motion rate) comparison
   P5: fixstar2_ut vs fixstar_ut consistency
-  P6: Stars with SEFLG_J2000 flag
+  P6: Stars with FLG_J2000 flag
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -89,7 +89,7 @@ def safe_fixstar2(name, jd, iflag=0):
         return None
 
     try:
-        le_result = ephem.swe_fixstar2_ut(name, jd, iflag)
+        le_result = ephem.fixstar2_ut(name, jd, iflag)
         # libephemeris: (pos_tuple, starname_str, retflag)
         le_pos = le_result[0]
     except Exception:
@@ -252,8 +252,8 @@ def phase4():
 
     for star in speed_stars:
         try:
-            # Get with SEFLG_SPEED
-            iflag = ephem.SEFLG_SPEED
+            # Get with FLG_SPEED
+            iflag = ephem.FLG_SPEED
             result = safe_fixstar2(star, jd, iflag)
             if result is None:
                 continue
@@ -298,7 +298,7 @@ def phase5():
         try:
             # fixstar2_ut
             try:
-                le2 = ephem.swe_fixstar2_ut(star, jd, 0)
+                le2 = ephem.fixstar2_ut(star, jd, 0)
                 # Returns (pos_tuple, starname, retflag)
                 le2_pos = le2[0]
             except Exception:
@@ -306,7 +306,7 @@ def phase5():
 
             # fixstar_ut
             try:
-                le1 = ephem.swe_fixstar_ut(star, jd, 0)
+                le1 = ephem.fixstar_ut(star, jd, 0)
                 # Returns (pos_tuple, starname, retflag)
                 le1_pos = le1[0]
             except Exception:
@@ -328,9 +328,9 @@ def phase5():
 
 
 def phase6():
-    """Stars with SEFLG_J2000 flag."""
+    """Stars with FLG_J2000 flag."""
     global errors
-    print("\n=== P6: Stars with SEFLG_J2000 ===")
+    print("\n=== P6: Stars with FLG_J2000 ===")
 
     test_stars = BRIGHT_STARS[:10]
 
@@ -342,7 +342,7 @@ def phase6():
             ("2100", 2488070.0),
         ]:
             try:
-                iflag = ephem.SEFLG_J2000
+                iflag = ephem.FLG_J2000
                 result = safe_fixstar2(star, jd, iflag)
                 if result is None:
                     continue

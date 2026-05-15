@@ -29,8 +29,8 @@ import numpy as np
 from numpy.polynomial.chebyshev import chebfit, chebval
 
 sys.path.insert(0, ".")
-from libephemeris import set_calc_mode, swe_calc
-from libephemeris.constants import SEFLG_SPEED, SEFLG_HELCTR
+from libephemeris import set_calc_mode, calc
+from libephemeris.constants import FLG_SPEED, FLG_HELCTR
 from libephemeris.leb_format import (
     BODY_PARAMS,
     COORD_ECLIPTIC,
@@ -53,10 +53,10 @@ _ICRS_BODIES = {
 
 
 def _calc_flags(body_id: int) -> int:
-    """Return swe_calc flags appropriate for this body type."""
+    """Return calc flags appropriate for this body type."""
     if body_id in _HELIO_BODIES:
-        return SEFLG_SPEED | SEFLG_HELCTR
-    return SEFLG_SPEED
+        return FLG_SPEED | FLG_HELCTR
+    return FLG_SPEED
 
 
 # Base tier JD range (1850-2150)
@@ -163,7 +163,7 @@ def _test_segment(
     # Evaluate at Chebyshev nodes
     values = np.zeros((degree + 1, 3))
     for i, jd in enumerate(jd_nodes):
-        result, _ = swe_calc(float(jd), body_id, _calc_flags(body_id))
+        result, _ = calc(float(jd), body_id, _calc_flags(body_id))
         values[i] = [result[0], result[1], result[2]]
 
     # Unwrap longitude to remove 360 deg jumps before fitting
@@ -186,7 +186,7 @@ def _test_segment(
         jd = seg_start + frac * (seg_end - seg_start)
         tau = (jd - mid) / half
 
-        ref, _ = swe_calc(float(jd), body_id, _calc_flags(body_id))
+        ref, _ = calc(float(jd), body_id, _calc_flags(body_id))
 
         # Longitude error
         fitted_lon = float(chebval(tau, coeffs[0])) % 360.0

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Round 33: Radians Output Mode (SEFLG_RADIANS)
+Round 33: Radians Output Mode (FLG_RADIANS)
 ===============================================
 
 Tests radians output mode for all major bodies across multiple flag combos.
-SEFLG_RADIANS converts lon/lat/speed output from degrees to radians.
+FLG_RADIANS converts lon/lat/speed output from degrees to radians.
 
 Parts:
   P1: Radians ecliptic — all planets, 3 epochs
@@ -35,28 +35,28 @@ _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_CHIRON, "Chiron"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanLilith"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (CHIRON, "Chiron"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanLilith"),
 ]
 
 HELIO_BODIES = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 EPOCHS = [
@@ -122,7 +122,7 @@ def compare_rad(r, se_result, le_result, label, body_id):
 
     # Latitude
     lat_diff = abs(se_pos[1] - le_pos[1])
-    lat_tol = TOL_MEANLILITH_LAT_RAD if body_id == SE_MEAN_APOG else TOL_RAD
+    lat_tol = TOL_MEANLILITH_LAT_RAD if body_id == MEAN_APOG else TOL_RAD
 
     # Distance
     dist_diff = abs(se_pos[2] - le_pos[2])
@@ -157,11 +157,11 @@ def run_part1():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_RADIANS
+            flags = FLG_SPEED | FLG_RADIANS
             label = f"{epoch_name} {body_name} RAD"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_rad(r, se_r, le_r, label, body_id)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -179,11 +179,11 @@ def run_part2():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_RADIANS | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_RADIANS | FLG_EQUATORIAL
             label = f"{epoch_name} {body_name} RAD+EQ"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_rad(r, se_r, le_r, label, body_id)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -201,11 +201,11 @@ def run_part3():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_RADIANS | SEFLG_J2000
+            flags = FLG_SPEED | FLG_RADIANS | FLG_J2000
             label = f"{epoch_name} {body_name} RAD+J2K"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_rad(r, se_r, le_r, label, body_id)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -223,11 +223,11 @@ def run_part4():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in HELIO_BODIES:
-            flags = SEFLG_SPEED | SEFLG_RADIANS | SEFLG_HELCTR
+            flags = FLG_SPEED | FLG_RADIANS | FLG_HELCTR
             label = f"{epoch_name} {body_name} RAD+HELIO"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_rad(r, se_r, le_r, label, body_id)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -248,8 +248,8 @@ def run_part5():
         label = f"{body_name}"
 
         try:
-            deg_r = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-            rad_r = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_RADIANS)
+            deg_r = ephem.calc_ut(jd, body_id, FLG_SPEED)
+            rad_r = ephem.calc_ut(jd, body_id, FLG_SPEED | FLG_RADIANS)
 
             # lon: deg → rad
             expected_lon_rad = deg_r[0][0] * math.pi / 180.0
@@ -306,8 +306,8 @@ def run_part6():
         label = f"{body_name}"
 
         try:
-            deg_r = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-            rad_r = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_RADIANS)
+            deg_r = ephem.calc_ut(jd, body_id, FLG_SPEED)
+            rad_r = ephem.calc_ut(jd, body_id, FLG_SPEED | FLG_RADIANS)
 
             # Speed components 3,4 should be deg→rad, 5 (dist speed) unchanged
             for i, comp in enumerate(["lon_spd", "lat_spd", "dist_spd"]):
@@ -335,7 +335,7 @@ def run_part6():
 
 def main():
     print("=" * 70)
-    print("ROUND 33: Radians Output Mode (SEFLG_RADIANS)")
+    print("ROUND 33: Radians Output Mode (FLG_RADIANS)")
     print("=" * 70)
 
     start = time.time()

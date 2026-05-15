@@ -19,8 +19,8 @@ class TestSubArcsecondPrecision:
         jd = 2451545.0
         arcsecond = 1 / 3600  # ~0.000278 degrees
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
-        pos_swe, _ = swe.calc_ut(jd, SE_SUN, 0)
+        pos_lib, _ = ephem.calc_ut(jd, SUN, 0)
+        pos_swe, _ = swe.calc_ut(jd, SUN, 0)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
         if lon_diff > 180:
@@ -36,8 +36,8 @@ class TestSubArcsecondPrecision:
         jd = 2451545.0
         arcsecond = 1 / 3600
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_MOON, 0)
-        pos_swe, _ = swe.calc_ut(jd, SE_MOON, 0)
+        pos_lib, _ = ephem.calc_ut(jd, MOON, 0)
+        pos_swe, _ = swe.calc_ut(jd, MOON, 0)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
         if lon_diff > 180:
@@ -53,7 +53,7 @@ class TestSubArcsecondPrecision:
         jd = 2451545.0
         arcsecond = 1 / 3600
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, 41.9, 12.5, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, 41.9, 12.5, b"P")
 
         asc_diff = abs(ascmc_lib[0] - ascmc_swe[0])
@@ -76,16 +76,16 @@ class TestMassiveComparisonPlanets:
         """Test all planets at 100 dates."""
         dates = random_dates_in_de421_range(100)
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
         max_diff = 0
@@ -96,7 +96,7 @@ class TestMassiveComparisonPlanets:
         iteration = 0
         for _, _, _, _, jd in dates:
             for planet in planets:
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet, 0)
+                pos_lib, _ = ephem.calc_ut(jd, planet, 0)
                 pos_swe, _ = swe.calc_ut(jd, planet, 0)
 
                 diff = abs(pos_lib[0] - pos_swe[0])
@@ -135,7 +135,7 @@ class TestMassiveComparisonHouses:
                 continue
 
             try:
-                cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, ord("P"))
+                cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, ord("P"))
                 cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b"P")
 
                 asc_diff = abs(ascmc_lib[0] - ascmc_swe[0])
@@ -173,10 +173,10 @@ class TestMassiveComparisonAyanamsha:
         for sid_mode in modes:
             for jd in dates:
                 try:
-                    ephem.swe_set_sid_mode(sid_mode)
+                    ephem.set_sid_mode(sid_mode)
                     swe.set_sid_mode(sid_mode)
 
-                    ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+                    ayan_lib = ephem.get_ayanamsa_ut(jd)
                     ayan_swe = swe.get_ayanamsa_ut(jd)
 
                     diff = abs(ayan_lib - ayan_swe)
@@ -205,7 +205,7 @@ class TestJulianDayPrecision:
         for year in range(1900, 2051, 10):
             for month in [1, 6, 12]:
                 for hour in [0.0, 12.0, 23.999]:
-                    jd_lib = ephem.swe_julday(year, month, 15, hour)
+                    jd_lib = ephem.julday(year, month, 15, hour)
                     jd_swe = swe.julday(year, month, 15, hour)
 
                     diff = abs(jd_lib - jd_swe)
@@ -218,10 +218,10 @@ class TestCrossingPrecision:
     @pytest.mark.precision
     def test_solcross_minute_precision(self):
         """Sun crossing should be within 1 minute of pyswisseph."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         for target in range(0, 360, 30):
-            jd_lib = ephem.swe_solcross_ut(float(target), jd_start, 0)
+            jd_lib = ephem.solcross_ut(float(target), jd_start, 0)
             jd_swe = swe.solcross_ut(float(target), jd_start, 0)
 
             diff_seconds = abs(jd_lib - jd_swe) * 86400

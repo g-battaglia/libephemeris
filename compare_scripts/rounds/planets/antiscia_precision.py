@@ -15,46 +15,46 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = [
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 ]
 BODY_NAMES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
-    SE_URANUS: "Uranus",
-    SE_NEPTUNE: "Neptune",
-    SE_PLUTO: "Pluto",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
+    URANUS: "Uranus",
+    NEPTUNE: "Neptune",
+    PLUTO: "Pluto",
 }
 
 TEST_JDS = [
@@ -78,7 +78,7 @@ TEST_JDS = [
     2469807.5,
 ]
 
-flags = SEFLG_SWIEPH | SEFLG_SPEED
+flags = FLG_SWIEPH | FLG_SPEED
 
 passed = 0
 failed = 0
@@ -91,7 +91,7 @@ for jd in TEST_JDS:
 
         try:
             se_result = swe.calc_ut(jd, body, flags)
-            le_result = ephem.swe_calc_ut(jd, body, flags)
+            le_result = ephem.calc_ut(jd, body, flags)
 
             se_lon = se_result[0][0]
             le_lon = le_result[0][0]
@@ -121,7 +121,7 @@ for jd in TEST_JDS:
                 contra_diff = 1296000 - contra_diff
 
             tol = 2.0  # 2" — same as longitude tolerance
-            if body == SE_MOON:
+            if body == MOON:
                 tol = 3.0
 
             if antiscia_diff < tol and contra_diff < tol:
@@ -149,7 +149,7 @@ for body in BODIES:
     total += 1
     try:
         se_result = swe.calc_ut(jd, body, flags)
-        le_result = ephem.swe_calc_ut(jd, body, flags)
+        le_result = ephem.calc_ut(jd, body, flags)
         all_se_lons[body] = se_result[0][0]
         all_le_lons[body] = le_result[0][0]
 

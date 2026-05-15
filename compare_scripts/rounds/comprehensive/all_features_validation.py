@@ -28,57 +28,57 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_SIDEREAL = 65536
-SEFLG_HELCTR = 8
-SEFLG_TOPOCTR = 32768
-SEFLG_XYZ = 4096
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_SIDEREAL = 65536
+FLG_HELCTR = 8
+FLG_TOPOCTR = 32768
+FLG_XYZ = 4096
 
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_URANUS = 7
-SE_NEPTUNE = 8
-SE_PLUTO = 9
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
-SE_MEAN_APOG = 12
-SE_OSCU_APOG = 13
-SE_CHIRON = 15
-SE_CERES = 17
-SE_PALLAS = 18
-SE_JUNO = 19
-SE_VESTA = 20
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
+URANUS = 7
+NEPTUNE = 8
+PLUTO = 9
+MEAN_NODE = 10
+TRUE_NODE = 11
+MEAN_APOG = 12
+OSCU_APOG = 13
+CHIRON = 15
+CERES = 17
+PALLAS = 18
+JUNO = 19
+VESTA = 20
 
 ALL_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanApog"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_CHIRON, "Chiron"),
-    (SE_CERES, "Ceres"),
-    (SE_PALLAS, "Pallas"),
-    (SE_JUNO, "Juno"),
-    (SE_VESTA, "Vesta"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanApog"),
+    (OSCU_APOG, "OscuApog"),
+    (CHIRON, "Chiron"),
+    (CERES, "Ceres"),
+    (PALLAS, "Pallas"),
+    (JUNO, "Juno"),
+    (VESTA, "Vesta"),
 ]
 
 TEST_JDS = [
@@ -147,8 +147,8 @@ def main():
     for jd in TEST_JDS:
         for body_id, body_name in ALL_BODIES:
             try:
-                se_pos = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)[0]
+                se_pos = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le_pos = ephem.calc_ut(jd, body_id, FLG_SPEED)[0]
             except Exception:
                 continue
 
@@ -167,10 +167,10 @@ def main():
     print("\n--- Section 2: Equatorial positions ---")
     for jd in TEST_JDS[:5]:
         for body_id, body_name in ALL_BODIES[:10]:
-            flags = SEFLG_SPEED | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_EQUATORIAL
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -191,10 +191,10 @@ def main():
     print("\n--- Section 3: J2000 positions ---")
     for jd in TEST_JDS[:5]:
         for body_id, body_name in ALL_BODIES[:10]:
-            flags = SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT
+            flags = FLG_SPEED | FLG_J2000 | FLG_NONUT
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -217,14 +217,14 @@ def main():
         (b, n)
         for b, n in ALL_BODIES
         if b
-        not in (SE_SUN, SE_MOON, SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG, SE_OSCU_APOG)
+        not in (SUN, MOON, MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG)
     ]
     for jd in TEST_JDS[:5]:
         for body_id, body_name in helio_bodies:
-            flags = SEFLG_SPEED | SEFLG_HELCTR
+            flags = FLG_SPEED | FLG_HELCTR
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -244,18 +244,18 @@ def main():
     # ===== Section 5: Topocentric =====
     print("\n--- Section 5: Topocentric positions ---")
     swe.set_topo(12.5, 41.9, 50.0)  # Rome
-    ephem.swe_set_topo(12.5, 41.9, 50.0)
+    ephem.set_topo(12.5, 41.9, 50.0)
 
     for jd in TEST_JDS[:5]:
         for body_id, body_name in [
-            (SE_MOON, "Moon"),
-            (SE_SUN, "Sun"),
-            (SE_MARS, "Mars"),
+            (MOON, "Moon"),
+            (SUN, "Sun"),
+            (MARS, "Mars"),
         ]:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SPEED | FLG_TOPOCTR
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -292,13 +292,13 @@ def main():
     for star in stars:
         for jd in TEST_JDS[:5]:
             try:
-                se_res = swe.fixstar2(star, jd, SEFLG_SPEED)
+                se_res = swe.fixstar2(star, jd, FLG_SPEED)
                 se_pos = se_res[0]
             except Exception:
                 continue
 
             try:
-                le_res = ephem.swe_fixstar2_ut(star, jd, SEFLG_SPEED)
+                le_res = ephem.fixstar2_ut(star, jd, FLG_SPEED)
                 le_pos = le_res[0]  # (pos_tuple, star_name, retflag)
             except Exception:
                 continue
@@ -336,8 +336,8 @@ def main():
                     continue
 
                 try:
-                    le_result = ephem.swe_houses_ex2(
-                        jd, lat, lon, ord(hsys), SEFLG_SPEED
+                    le_result = ephem.houses_ex2(
+                        jd, lat, lon, ord(hsys), FLG_SPEED
                     )
                     le_cusps = le_result[0]
                 except Exception:
@@ -365,11 +365,11 @@ def main():
     print("\n--- Section 8: Ayanamsha values ---")
     for mode in [0, 1, 3, 27]:
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode, 0, 0)
+        ephem.set_sid_mode(mode, 0, 0)
 
         for jd in TEST_JDS:
             se_aya = swe.get_ayanamsa_ut(jd)
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
             diff_as = abs(le_aya - se_aya) * 3600
             tol = 20.0
             total_tests += 1
@@ -381,14 +381,14 @@ def main():
                     failures.append(f'  S8 Aya mode={mode} JD={jd}: {diff_as:.2f}"')
 
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     # ===== Section 9: Time functions =====
     print("\n--- Section 9: Time functions ---")
     for jd in TEST_JDS:
         # Delta-T
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff_s = abs(le_dt - se_dt) * 86400
         tol_s = 3.0
         total_tests += 1
@@ -401,7 +401,7 @@ def main():
 
         # Sidereal time
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         diff_st = abs(le_st - se_st) * 3600  # seconds of time
         if diff_st > 43200:
             diff_st = 86400 - diff_st
@@ -428,7 +428,7 @@ def main():
 
     for year, month, day, hour, gregflag in test_dates:
         se_jd = swe.julday(year, month, day, hour, gregflag)
-        le_jd = ephem.swe_julday(year, month, day, hour, gregflag)
+        le_jd = ephem.julday(year, month, day, hour, gregflag)
         diff = abs(le_jd - se_jd)
         total_tests += 1
         if diff < 1e-10:
@@ -442,7 +442,7 @@ def main():
 
     for jd in TEST_JDS[:5]:
         se_rev = swe.revjul(jd, 1)
-        le_rev = ephem.swe_revjul(jd, 1)
+        le_rev = ephem.revjul(jd, 1)
         total_tests += 1
         if se_rev[0] == le_rev[0] and se_rev[1] == le_rev[1] and se_rev[2] == le_rev[2]:
             total_pass += 1
@@ -490,14 +490,14 @@ def main():
     print("\n--- Section 12: Planetary phenomena ---")
     for jd in TEST_JDS[:4]:
         for body_id, body_name in [
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_VENUS, "Venus"),
-            (SE_JUPITER, "Jupiter"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (VENUS, "Venus"),
+            (JUPITER, "Jupiter"),
         ]:
             try:
                 se_res = swe.pheno_ut(jd, body_id, 0)
-                le_res = ephem.swe_pheno_ut(jd, body_id, 0)
+                le_res = ephem.pheno_ut(jd, body_id, 0)
                 le_attr = le_res[0]
             except Exception:
                 continue
@@ -538,16 +538,16 @@ def main():
     # ===== Section 13: House position =====
     print("\n--- Section 13: House position ---")
     for jd in TEST_JDS[:4]:
-        armc = ephem.swe_sidtime(jd) * 15.0
+        armc = ephem.sidtime(jd) * 15.0
         obl = 23.44
 
         for body_id, body_name in [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ]:
             try:
-                pos = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)[0]
+                pos = ephem.calc_ut(jd, body_id, FLG_SPEED)[0]
                 plon = pos[0]
                 plat = pos[1]
             except Exception:
@@ -558,7 +558,7 @@ def main():
                     se_hp = swe.house_pos(
                         armc, 41.9, obl, (plon, plat), se_hsys(hsys_ch)
                     )
-                    le_hp = ephem.swe_house_pos(
+                    le_hp = ephem.house_pos(
                         armc, 41.9, obl, ord(hsys_ch), plon, plat
                     )
                 except Exception:
@@ -580,10 +580,10 @@ def main():
     print("\n--- Section 14: XYZ output ---")
     for jd in TEST_JDS[:3]:
         for body_id, body_name in ALL_BODIES[:10]:
-            flags = SEFLG_SPEED | SEFLG_XYZ
+            flags = FLG_SPEED | FLG_XYZ
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -616,8 +616,8 @@ def main():
     for jd in TEST_JDS[:5]:
         for body_id, body_name in hypo_bodies:
             try:
-                se_pos = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)[0]
+                se_pos = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le_pos = ephem.calc_ut(jd, body_id, FLG_SPEED)[0]
             except Exception:
                 continue
 

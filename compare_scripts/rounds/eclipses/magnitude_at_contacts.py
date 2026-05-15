@@ -15,9 +15,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 
 # Known eclipse dates and locations
 # (jd_approx, lat, lon, alt, description)
@@ -27,7 +27,7 @@ eclipse_cases = []
 jd = 2451545.0  # J2000
 for i in range(30):  # Find 30 eclipses
     try:
-        se_r = swe.sol_eclipse_when_glob(jd, SEFLG_SPEED, 0, False)
+        se_r = swe.sol_eclipse_when_glob(jd, FLG_SPEED, 0, False)
         t_max = se_r[1][0]
         if t_max > 0:
             # Test at several locations
@@ -77,8 +77,8 @@ print("=" * 90)
 
 for t_max, lat, lon, alt, desc in eclipse_cases:
     try:
-        se_r = swe.sol_eclipse_how(t_max, [lon, lat, alt], SEFLG_SPEED)
-        le_r = ephem.swe_sol_eclipse_how(t_max, SEFLG_SPEED, [lon, lat, alt])
+        se_r = swe.sol_eclipse_how(t_max, [lon, lat, alt], FLG_SPEED)
+        le_r = ephem.sol_eclipse_how(t_max, FLG_SPEED, [lon, lat, alt])
 
         se_retflag = se_r[0]
         le_retflag = le_r[0]

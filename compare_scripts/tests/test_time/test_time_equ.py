@@ -29,7 +29,7 @@ class TestTimeEquBasicValues:
     def test_time_equ_february_minimum(self):
         """Equation of Time around Feb 11 should be at minimum (~-14 minutes)."""
         # Feb 11, 2000
-        jd = ephem.swe_julday(2000, 2, 11, 12.0)
+        jd = ephem.julday(2000, 2, 11, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # February minimum is around -14 to -15 minutes
@@ -41,7 +41,7 @@ class TestTimeEquBasicValues:
     def test_time_equ_november_maximum(self):
         """Equation of Time around Nov 3 should be at maximum (~+16 minutes)."""
         # Nov 3, 2000
-        jd = ephem.swe_julday(2000, 11, 3, 12.0)
+        jd = ephem.julday(2000, 11, 3, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # November maximum is around +16 minutes
@@ -53,7 +53,7 @@ class TestTimeEquBasicValues:
     def test_time_equ_april_zero(self):
         """Equation of Time around mid-April should be near zero."""
         # April 15, 2000
-        jd = ephem.swe_julday(2000, 4, 15, 12.0)
+        jd = ephem.julday(2000, 4, 15, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # Should be close to zero (within 1-2 minutes)
@@ -65,7 +65,7 @@ class TestTimeEquBasicValues:
     def test_time_equ_june_zero(self):
         """Equation of Time around mid-June should be near zero."""
         # June 13, 2000
-        jd = ephem.swe_julday(2000, 6, 13, 12.0)
+        jd = ephem.julday(2000, 6, 13, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # Should be close to zero (within 1-2 minutes)
@@ -77,7 +77,7 @@ class TestTimeEquBasicValues:
     def test_time_equ_september_zero(self):
         """Equation of Time around early September should be near zero."""
         # Sept 1, 2000
-        jd = ephem.swe_julday(2000, 9, 1, 12.0)
+        jd = ephem.julday(2000, 9, 1, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # Should be close to zero (within 2-3 minutes)
@@ -100,7 +100,7 @@ class TestTimeEquProperties:
     def test_time_equ_in_valid_range(self):
         """Equation of Time should be within ±17 minutes for any date."""
         for month in range(1, 13):
-            jd = ephem.swe_julday(2000, month, 15, 12.0)
+            jd = ephem.julday(2000, month, 15, 12.0)
             eot = ephem.time_equ(jd)
             eot_minutes = eot * 1440
             assert -17 < eot_minutes < 17, (
@@ -110,7 +110,7 @@ class TestTimeEquProperties:
     @pytest.mark.unit
     def test_time_equ_continuous(self):
         """Equation of Time should change smoothly (no large jumps)."""
-        jd_start = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_start = ephem.julday(2000, 1, 1, 12.0)
         prev_eot = ephem.time_equ(jd_start)
 
         for i in range(1, 366):
@@ -126,8 +126,8 @@ class TestTimeEquProperties:
     @pytest.mark.unit
     def test_time_equ_periodic(self):
         """Equation of Time should be approximately the same after one year."""
-        jd_2000 = ephem.swe_julday(2000, 6, 15, 12.0)
-        jd_2001 = ephem.swe_julday(2001, 6, 15, 12.0)
+        jd_2000 = ephem.julday(2000, 6, 15, 12.0)
+        jd_2001 = ephem.julday(2001, 6, 15, 12.0)
 
         eot_2000 = ephem.time_equ(jd_2000)
         eot_2001 = ephem.time_equ(jd_2001)
@@ -171,7 +171,7 @@ class TestTimeEquVsPyswisseph:
     )
     def test_time_equ_key_dates_match_swe(self, month, day):
         """Equation of Time should match pyswisseph for key dates."""
-        jd = ephem.swe_julday(2000, month, day, 12.0)
+        jd = ephem.julday(2000, month, day, 12.0)
         eot_lib = ephem.time_equ(jd)
         eot_swe = swe.time_equ(jd)
         # pyswisseph time_equ returns (E, serr) tuple where E is in days
@@ -209,7 +209,7 @@ class TestTimeEquEdgeCases:
     @pytest.mark.edge_case
     def test_time_equ_de421_range_start(self):
         """Equation of Time at DE421 range start (1900)."""
-        jd = ephem.swe_julday(1900, 1, 1, 12.0)
+        jd = ephem.julday(1900, 1, 1, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # Should be within valid range
@@ -218,7 +218,7 @@ class TestTimeEquEdgeCases:
     @pytest.mark.edge_case
     def test_time_equ_de421_range_end(self):
         """Equation of Time at DE421 range end (2050)."""
-        jd = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd = ephem.julday(2050, 1, 1, 12.0)
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # Should be within valid range
@@ -228,7 +228,7 @@ class TestTimeEquEdgeCases:
     def test_time_equ_various_years(self):
         """Equation of Time should work for various years."""
         for year in [1920, 1960, 2000, 2020, 2040]:
-            jd = ephem.swe_julday(year, 6, 15, 12.0)
+            jd = ephem.julday(year, 6, 15, 12.0)
             eot = ephem.time_equ(jd)
             eot_minutes = eot * 1440
             assert -17 < eot_minutes < 17, (
@@ -250,7 +250,7 @@ class TestTimeEquOutputFormat:
     @pytest.mark.unit
     def test_conversion_to_minutes(self):
         """Multiplying by 1440 should give minutes."""
-        jd = ephem.swe_julday(2000, 11, 3, 12.0)  # November maximum
+        jd = ephem.julday(2000, 11, 3, 12.0)  # November maximum
         eot = ephem.time_equ(jd)
         eot_minutes = eot * 1440
         # November maximum is around +16 minutes
@@ -259,7 +259,7 @@ class TestTimeEquOutputFormat:
     @pytest.mark.unit
     def test_conversion_to_seconds(self):
         """Multiplying by 86400 should give seconds."""
-        jd = ephem.swe_julday(2000, 11, 3, 12.0)  # November maximum
+        jd = ephem.julday(2000, 11, 3, 12.0)  # November maximum
         eot = ephem.time_equ(jd)
         eot_seconds = eot * 86400
         # November maximum is around +16 minutes = ~960 seconds

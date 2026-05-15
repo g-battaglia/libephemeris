@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 215: Transpluto deep verification.
 
-Tests SE_ISIS (Transpluto) positions across multiple dates, flag combinations,
+Tests ISIS (Transpluto) positions across multiple dates, flag combinations,
 and coordinate systems. Includes sidereal, equatorial, J2000, heliocentric.
 """
 
@@ -16,15 +16,15 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-LE_BODY = ephem.SE_ISIS  # Transpluto
-SE_BODY = swe.ISIS if hasattr(swe, "ISIS") else 15  # SE_ISIS = 15
+LE_BODY = ephem.ISIS  # Transpluto
+SE_BODY = swe.ISIS if hasattr(swe, "ISIS") else 15  # ISIS = 15
 
 DATES = [
     2415020.0,  # 1900
@@ -40,35 +40,35 @@ DATES = [
 ]
 
 FLAG_COMBOS = [
-    ("Default", ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED, swe.FLG_SWIEPH | swe.FLG_SPEED),
+    ("Default", ephem.FLG_SWIEPH | ephem.FLG_SPEED, swe.FLG_SWIEPH | swe.FLG_SPEED),
     (
         "J2000",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_J2000,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_J2000,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000,
     ),
     (
         "Equatorial",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_EQUATORIAL,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_EQUATORIAL,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL,
     ),
     (
         "NONUT",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_NONUT,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_NONUT,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT,
     ),
     (
         "NOABERR",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_NOABERR,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_NOABERR,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NOABERR,
     ),
     (
         "TRUEPOS",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_TRUEPOS,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_TRUEPOS,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS,
     ),
     (
         "Heliocentric",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_HELCTR,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_HELCTR,
         swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_HELCTR,
     ),
 ]
@@ -81,13 +81,13 @@ def compare_transpluto(flag_name, le_flags, se_flags, jd, sid_mode=None):
 
     if sid_mode is not None:
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0, 0)
+        ephem.set_sid_mode(sid_mode, 0, 0)
         label = f"Transpluto {flag_name} sid={sid_mode} JD={jd:.1f}"
     else:
         label = f"Transpluto {flag_name} JD={jd:.1f}"
 
     try:
-        le_r = ephem.swe_calc_ut(jd, LE_BODY, le_flags)
+        le_r = ephem.calc_ut(jd, LE_BODY, le_flags)
         se_r = swe.calc_ut(jd, SE_BODY, se_flags)
     except Exception as e:
         return
@@ -132,7 +132,7 @@ def compare_transpluto(flag_name, le_flags, se_flags, jd, sid_mode=None):
 
     if sid_mode is not None:
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0, 0, 0)
+        ephem.set_sid_mode(0, 0, 0)
 
 
 if __name__ == "__main__":
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
     # Sidereal mode tests
     for sid_mode in SIDEREAL_MODES:
-        le_sid_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+        le_sid_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL
         se_sid_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
         print(f"\n--- Sidereal mode {sid_mode} ---")
         for jd in DATES:

@@ -29,12 +29,12 @@ import random
 import sys
 import time
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 random.seed(42)
 
@@ -42,17 +42,17 @@ random.seed(42)
 JD_J2000 = 2451545.0  # J2000.0
 JD_1900 = 2415020.5
 JD_2050 = 2469807.5
-SEFLG_SWIEPH = 2
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
-SE_CALC_RISE = 1
-SE_CALC_SET = 2
-SE_BIT_CIVIL_TWILIGHT = 1024
-SE_BIT_NAUTIC_TWILIGHT = 2048
-SE_BIT_ASTRO_TWILIGHT = 4096
+FLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
+CALC_RISE = 1
+CALC_SET = 2
+BIT_CIVIL_TWILIGHT = 1024
+BIT_NAUTIC_TWILIGHT = 2048
+BIT_ASTRO_TWILIGHT = 4096
 
-SE_SUN = 0
-SE_MOON = 1
+SUN = 0
+MOON = 1
 
 # ---------- counters ----------
 passed = 0
@@ -263,7 +263,7 @@ for mode in SELECTED_MODES:
         for jd in DATES_SID:
             lib.set_sid_mode(mode)
             swe_ref.set_sid_mode(mode)
-            flags = SEFLG_SPEED | SEFLG_SIDEREAL
+            flags = FLG_SPEED | FLG_SIDEREAL
 
             lib_pos = safe(lib.calc_ut, jd, body, flags)
             ref_pos = safe(swe_ref.calc_ut, jd, body, flags)
@@ -334,7 +334,7 @@ for mode in extra_modes:
     for body in BODIES:
         lib.set_sid_mode(mode)
         swe_ref.set_sid_mode(mode)
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         lib_pos = safe(lib.calc_ut, JD_J2000, body, flags)
         if lib_pos is not None:
             spd = lib_pos[0][3]  # speed in longitude
@@ -352,7 +352,7 @@ for mode in extra_modes:
 for mode in [0, 1, 5, 14, 30]:
     lib.set_sid_mode(mode)
     swe_ref.set_sid_mode(mode)
-    flags = SEFLG_SPEED | SEFLG_SIDEREAL
+    flags = FLG_SPEED | FLG_SIDEREAL
     for body in BODIES:
         lib_pos = safe(lib.calc_ut, JD_J2000, body, flags)
         ref_pos = safe(swe_ref.calc_ut, JD_J2000, body, flags)
@@ -392,10 +392,10 @@ for year in range(2000, 2011):
     for _ in range(5):
         try:
             retflag_lib, tret_lib = lib.sol_eclipse_when_glob(
-                jd_search, SEFLG_SWIEPH, 0
+                jd_search, FLG_SWIEPH, 0
             )
             retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
-                jd_search, SEFLG_SWIEPH, 0
+                jd_search, FLG_SWIEPH, 0
             )
         except Exception:
             break
@@ -533,7 +533,7 @@ for year in range(2000, 2011):
     jd_s = jd_start
     for _ in range(5):
         try:
-            rf, tr = lib.lun_eclipse_when(jd_s, SEFLG_SWIEPH, 0)
+            rf, tr = lib.lun_eclipse_when(jd_s, FLG_SWIEPH, 0)
         except Exception:
             break
         if tr[0] > jd_end:
@@ -546,7 +546,7 @@ for year in range(2000, 2011):
     jd_s = jd_start
     for _ in range(5):
         try:
-            rf, tr = swe_ref.lun_eclipse_when(jd_s, SEFLG_SWIEPH, 0)
+            rf, tr = swe_ref.lun_eclipse_when(jd_s, FLG_SWIEPH, 0)
         except Exception:
             break
         if tr[0] > jd_end:
@@ -617,7 +617,7 @@ KNOWN_SOLAR_ECLIPSES_JD = []
 for year in [2001, 2003, 2005, 2008, 2010, 2012, 2015, 2017, 2019, 2024]:
     jd_start = lib.julday(year, 1, 1, 0)
     try:
-        retflag, tret = swe_ref.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, 0)
+        retflag, tret = swe_ref.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0)
         KNOWN_SOLAR_ECLIPSES_JD.append(tret[0])
     except Exception:
         pass
@@ -777,11 +777,11 @@ for loc in LOCATIONS:
     for jd in DATES_20:
         # Rise
         compare_rise_set(
-            SE_SUN, SE_CALC_RISE, jd, geopos, f"Sun rise {loc_name} JD {jd:.1f}"
+            SUN, CALC_RISE, jd, geopos, f"Sun rise {loc_name} JD {jd:.1f}"
         )
         # Set
         compare_rise_set(
-            SE_SUN, SE_CALC_SET, jd, geopos, f"Sun set {loc_name} JD {jd:.1f}"
+            SUN, CALC_SET, jd, geopos, f"Sun set {loc_name} JD {jd:.1f}"
         )
 
 print(f"  {current_section}: {section_stats[current_section]}")
@@ -796,11 +796,11 @@ for loc in LOCATIONS_MOON:
     for jd in DATES_25:
         # Rise
         compare_rise_set(
-            SE_MOON, SE_CALC_RISE, jd, geopos, f"Moon rise {loc_name} JD {jd:.1f}"
+            MOON, CALC_RISE, jd, geopos, f"Moon rise {loc_name} JD {jd:.1f}"
         )
         # Set
         compare_rise_set(
-            SE_MOON, SE_CALC_SET, jd, geopos, f"Moon set {loc_name} JD {jd:.1f}"
+            MOON, CALC_SET, jd, geopos, f"Moon set {loc_name} JD {jd:.1f}"
         )
 
 print(f"  {current_section}: {section_stats[current_section]}")
@@ -819,7 +819,7 @@ for planet in PLANET_IDS:
         # Rise
         compare_rise_set(
             planet,
-            SE_CALC_RISE,
+            CALC_RISE,
             jd,
             geopos_default,
             f"{PLANET_NAMES[planet]} rise JD {jd:.1f}",
@@ -827,7 +827,7 @@ for planet in PLANET_IDS:
         # Set
         compare_rise_set(
             planet,
-            SE_CALC_SET,
+            CALC_SET,
             jd,
             geopos_default,
             f"{PLANET_NAMES[planet]} set JD {jd:.1f}",
@@ -840,9 +840,9 @@ set_section("G07.04")
 print(f"\n--- {current_section}: Twilight (civil, nautical, astronomical) ---")
 
 TWILIGHT_FLAGS = [
-    (SE_BIT_CIVIL_TWILIGHT, "civil"),
-    (SE_BIT_NAUTIC_TWILIGHT, "nautical"),
-    (SE_BIT_ASTRO_TWILIGHT, "astronomical"),
+    (BIT_CIVIL_TWILIGHT, "civil"),
+    (BIT_NAUTIC_TWILIGHT, "nautical"),
+    (BIT_ASTRO_TWILIGHT, "astronomical"),
 ]
 
 # Use 2 locations x ~8 dates x 3 twilight types x 1 (dawn) = ~48 checks + extras
@@ -858,13 +858,13 @@ for loc in twilight_locations:
     for jd in twilight_dates:
         for twi_flag, twi_name in TWILIGHT_FLAGS:
             # Dawn (rise with twilight flag)
-            rsmi_dawn = SE_CALC_RISE | twi_flag
+            rsmi_dawn = CALC_RISE | twi_flag
             try:
                 res_lib, tret_lib = lib.rise_trans(
-                    jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15
+                    jd, SUN, rsmi_dawn, geopos, 1013.25, 15
                 )
                 res_ref, tret_ref = swe_ref.rise_trans(
-                    jd, SE_SUN, rsmi_dawn, geopos, 1013.25, 15
+                    jd, SUN, rsmi_dawn, geopos, 1013.25, 15
                 )
 
                 if (
@@ -892,13 +892,13 @@ for loc in twilight_locations[:1]:  # Just Rome
     loc_name = loc[3]
     for jd in twilight_dates[:1]:
         for twi_flag, twi_name in TWILIGHT_FLAGS:
-            rsmi_dusk = SE_CALC_SET | twi_flag
+            rsmi_dusk = CALC_SET | twi_flag
             try:
                 res_lib, tret_lib = lib.rise_trans(
-                    jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15
+                    jd, SUN, rsmi_dusk, geopos, 1013.25, 15
                 )
                 res_ref, tret_ref = swe_ref.rise_trans(
-                    jd, SE_SUN, rsmi_dusk, geopos, 1013.25, 15
+                    jd, SUN, rsmi_dusk, geopos, 1013.25, 15
                 )
 
                 if (

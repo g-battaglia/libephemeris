@@ -16,27 +16,27 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 PAIRS = [
-    ("Sun-Moon", ephem.SE_SUN, swe.SUN, ephem.SE_MOON, swe.MOON, 5.0),
-    ("Sun-Mercury", ephem.SE_SUN, swe.SUN, ephem.SE_MERCURY, swe.MERCURY, 10.0),
-    ("Sun-Venus", ephem.SE_SUN, swe.SUN, ephem.SE_VENUS, swe.VENUS, 10.0),
-    ("Sun-Mars", ephem.SE_SUN, swe.SUN, ephem.SE_MARS, swe.MARS, 15.0),
-    ("Sun-Jupiter", ephem.SE_SUN, swe.SUN, ephem.SE_JUPITER, swe.JUPITER, 20.0),
-    ("Mars-Jupiter", ephem.SE_MARS, swe.MARS, ephem.SE_JUPITER, swe.JUPITER, 20.0),
+    ("Sun-Moon", ephem.SUN, swe.SUN, ephem.MOON, swe.MOON, 5.0),
+    ("Sun-Mercury", ephem.SUN, swe.SUN, ephem.MERCURY, swe.MERCURY, 10.0),
+    ("Sun-Venus", ephem.SUN, swe.SUN, ephem.VENUS, swe.VENUS, 10.0),
+    ("Sun-Mars", ephem.SUN, swe.SUN, ephem.MARS, swe.MARS, 15.0),
+    ("Sun-Jupiter", ephem.SUN, swe.SUN, ephem.JUPITER, swe.JUPITER, 20.0),
+    ("Mars-Jupiter", ephem.MARS, swe.MARS, ephem.JUPITER, swe.JUPITER, 20.0),
     (
         "Jupiter-Saturn",
-        ephem.SE_JUPITER,
+        ephem.JUPITER,
         swe.JUPITER,
-        ephem.SE_SATURN,
+        ephem.SATURN,
         swe.SATURN,
         30.0,
     ),
@@ -97,9 +97,9 @@ def find_conjunctions(se_b1, se_b2, step, max_count=6):
 def compare_at_event(label, le_b1, se_b1, le_b2, se_b2, jd):
     global passed, failed, total
     try:
-        le1 = ephem.swe_calc_ut(jd, le_b1, FLAGS)
+        le1 = ephem.calc_ut(jd, le_b1, FLAGS)
         se1 = swe.calc_ut(jd, se_b1, swe.FLG_SWIEPH | swe.FLG_SPEED)
-        le2 = ephem.swe_calc_ut(jd, le_b2, FLAGS)
+        le2 = ephem.calc_ut(jd, le_b2, FLAGS)
         se2 = swe.calc_ut(jd, se_b2, swe.FLG_SWIEPH | swe.FLG_SPEED)
     except Exception:
         return

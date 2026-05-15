@@ -16,11 +16,11 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
-SE_GREG_CAL = 1
-SE_JUL_CAL = 0
+GREG_CAL = 1
+JUL_CAL = 0
 
 passed = 0
 failed = 0
@@ -31,35 +31,35 @@ print("=== Test 1: julday -> revjul -> julday round-trip ===")
 
 test_dates = [
     # (year, month, day, hour, gregflag, label)
-    (-4712, 1, 1, 12.0, SE_JUL_CAL, "JD epoch"),
-    (-3000, 6, 15, 6.5, SE_JUL_CAL, "3001 BCE"),
-    (-1000, 3, 21, 12.0, SE_JUL_CAL, "1001 BCE vernal equinox"),
-    (-500, 12, 31, 23.99, SE_JUL_CAL, "501 BCE year end"),
-    (-1, 1, 1, 0.0, SE_JUL_CAL, "2 BCE"),
-    (0, 1, 1, 0.0, SE_JUL_CAL, "1 BCE astronomical"),
-    (1, 1, 1, 0.0, SE_JUL_CAL, "1 CE start"),
-    (100, 7, 4, 18.0, SE_JUL_CAL, "100 CE"),
-    (325, 6, 20, 12.0, SE_JUL_CAL, "Council of Nicaea"),
-    (1000, 1, 1, 0.0, SE_JUL_CAL, "1000 CE Julian"),
-    (1582, 10, 4, 12.0, SE_JUL_CAL, "Last Julian day"),
-    (1582, 10, 15, 12.0, SE_GREG_CAL, "First Gregorian day"),
-    (1582, 10, 15, 0.0, SE_GREG_CAL, "Gregorian midnight"),
-    (1600, 2, 29, 12.0, SE_GREG_CAL, "Gregorian leap day"),
-    (1700, 2, 28, 12.0, SE_GREG_CAL, "Not leap in Gregorian"),
-    (1900, 1, 1, 0.0, SE_GREG_CAL, "1900 start"),
-    (1900, 2, 28, 12.0, SE_GREG_CAL, "1900 not leap"),
-    (1969, 12, 31, 23.999, SE_GREG_CAL, "Pre-Unix epoch"),
-    (1970, 1, 1, 0.0, SE_GREG_CAL, "Unix epoch"),
-    (2000, 1, 1, 12.0, SE_GREG_CAL, "J2000"),
-    (2000, 2, 29, 0.0, SE_GREG_CAL, "Y2K leap day"),
-    (2024, 3, 20, 3.06, SE_GREG_CAL, "Vernal equinox 2024"),
-    (2024, 6, 15, 12.0, SE_GREG_CAL, "Current epoch"),
-    (2100, 2, 28, 12.0, SE_GREG_CAL, "2100 not leap"),
-    (3000, 12, 31, 23.999, SE_GREG_CAL, "Year 3000"),
+    (-4712, 1, 1, 12.0, JUL_CAL, "JD epoch"),
+    (-3000, 6, 15, 6.5, JUL_CAL, "3001 BCE"),
+    (-1000, 3, 21, 12.0, JUL_CAL, "1001 BCE vernal equinox"),
+    (-500, 12, 31, 23.99, JUL_CAL, "501 BCE year end"),
+    (-1, 1, 1, 0.0, JUL_CAL, "2 BCE"),
+    (0, 1, 1, 0.0, JUL_CAL, "1 BCE astronomical"),
+    (1, 1, 1, 0.0, JUL_CAL, "1 CE start"),
+    (100, 7, 4, 18.0, JUL_CAL, "100 CE"),
+    (325, 6, 20, 12.0, JUL_CAL, "Council of Nicaea"),
+    (1000, 1, 1, 0.0, JUL_CAL, "1000 CE Julian"),
+    (1582, 10, 4, 12.0, JUL_CAL, "Last Julian day"),
+    (1582, 10, 15, 12.0, GREG_CAL, "First Gregorian day"),
+    (1582, 10, 15, 0.0, GREG_CAL, "Gregorian midnight"),
+    (1600, 2, 29, 12.0, GREG_CAL, "Gregorian leap day"),
+    (1700, 2, 28, 12.0, GREG_CAL, "Not leap in Gregorian"),
+    (1900, 1, 1, 0.0, GREG_CAL, "1900 start"),
+    (1900, 2, 28, 12.0, GREG_CAL, "1900 not leap"),
+    (1969, 12, 31, 23.999, GREG_CAL, "Pre-Unix epoch"),
+    (1970, 1, 1, 0.0, GREG_CAL, "Unix epoch"),
+    (2000, 1, 1, 12.0, GREG_CAL, "J2000"),
+    (2000, 2, 29, 0.0, GREG_CAL, "Y2K leap day"),
+    (2024, 3, 20, 3.06, GREG_CAL, "Vernal equinox 2024"),
+    (2024, 6, 15, 12.0, GREG_CAL, "Current epoch"),
+    (2100, 2, 28, 12.0, GREG_CAL, "2100 not leap"),
+    (3000, 12, 31, 23.999, GREG_CAL, "Year 3000"),
     # Proleptic Gregorian
-    (100, 1, 1, 12.0, SE_GREG_CAL, "100 CE proleptic Greg"),
-    (-500, 6, 15, 12.0, SE_GREG_CAL, "501 BCE proleptic Greg"),
-    (-4000, 1, 1, 0.0, SE_GREG_CAL, "4001 BCE proleptic Greg"),
+    (100, 1, 1, 12.0, GREG_CAL, "100 CE proleptic Greg"),
+    (-500, 6, 15, 12.0, GREG_CAL, "501 BCE proleptic Greg"),
+    (-4000, 1, 1, 0.0, GREG_CAL, "4001 BCE proleptic Greg"),
 ]
 
 for year, month, day, hour, gregflag, label in test_dates:
@@ -71,9 +71,9 @@ for year, month, day, hour, gregflag, label in test_dates:
         se_jd2 = swe.julday(se_rev[0], se_rev[1], se_rev[2], se_rev[3], gregflag)
 
         # LE round-trip
-        le_jd = ephem.swe_julday(year, month, day, hour, gregflag)
-        le_rev = ephem.swe_revjul(le_jd, gregflag)
-        le_jd2 = ephem.swe_julday(le_rev[0], le_rev[1], le_rev[2], le_rev[3], gregflag)
+        le_jd = ephem.julday(year, month, day, hour, gregflag)
+        le_rev = ephem.revjul(le_jd, gregflag)
+        le_jd2 = ephem.julday(le_rev[0], le_rev[1], le_rev[2], le_rev[3], gregflag)
 
         # Check JD match
         jd_diff = abs(se_jd - le_jd)
@@ -141,14 +141,14 @@ for _ in range(50):
     test_jds.append(random.uniform(0.0, 3000000.0))
 
 for jd in test_jds:
-    for gregflag in [SE_GREG_CAL, SE_JUL_CAL]:
+    for gregflag in [GREG_CAL, JUL_CAL]:
         total += 1
         try:
             se_rev = swe.revjul(jd, gregflag)
             se_jd2 = swe.julday(se_rev[0], se_rev[1], se_rev[2], se_rev[3], gregflag)
 
-            le_rev = ephem.swe_revjul(jd, gregflag)
-            le_jd2 = ephem.swe_julday(
+            le_rev = ephem.revjul(jd, gregflag)
+            le_jd2 = ephem.julday(
                 le_rev[0], le_rev[1], le_rev[2], le_rev[3], gregflag
             )
 
@@ -206,7 +206,7 @@ for jd in deltat_jds:
     total += 1
     try:
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff_sec = abs(se_dt - le_dt) * 86400.0  # convert days to seconds
 
         if diff_sec < 1.0:  # 1 second tolerance

@@ -8,9 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256 | 65536  # SEFLG_SPEED | SEFLG_SIDEREAL
+FLAGS = 256 | 65536  # FLG_SPEED | FLG_SIDEREAL
 
 NAMES = {
     0: "Sun",
@@ -37,14 +37,14 @@ print("=" * 70)
 
 for sid_mode in SID_MODES:
     swe.set_sid_mode(sid_mode)
-    ephem.swe_set_sid_mode(sid_mode)
+    ephem.set_sid_mode(sid_mode)
     mode_pass = mode_fail = 0
 
     for jd in DATES:
         for body in range(10):
             try:
                 se = swe.calc_ut(jd, body, FLAGS)
-                le = ephem.swe_calc_ut(jd, body, FLAGS)
+                le = ephem.calc_ut(jd, body, FLAGS)
                 # Longitude
                 diff_lon = abs(se[0][0] - le[0][0])
                 if diff_lon > 180:
@@ -67,7 +67,7 @@ for sid_mode in SID_MODES:
 
 # Reset sidereal mode
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0)
+ephem.set_sid_mode(0)
 
 print(f"\n{'=' * 70}")
 total = passed + failed

@@ -25,13 +25,13 @@ import swisseph as swe
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_BARYCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_TRUEPOS,
-    SEFLG_XYZ,
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_TRUEPOS,
+    FLG_XYZ,
 )
 
 
@@ -76,13 +76,13 @@ def angular_diff(a: float, b: float) -> float:
 
 
 class TestHeliocentric:
-    """Heliocentric coordinate comparison (SEFLG_HELCTR).
+    """Heliocentric coordinate comparison (FLG_HELCTR).
 
     Sun and Moon are excluded because SE does not support heliocentric
     for them (Sun IS the center; Moon has no direct heliocentric segment).
     """
 
-    HELIO_FLAGS = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR
+    HELIO_FLAGS = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR
 
     # Tolerances: position < 0.001° (3.6"), speed < 0.01°/day, dist < 0.0001 AU
     POS_TOL = 0.001  # degrees
@@ -98,7 +98,7 @@ class TestHeliocentric:
     )
     def test_heliocentric_position(self, year, jd, body_id):
         """Test heliocentric ecliptic position for planets 2-9."""
-        le = ephem.swe_calc_ut(jd, body_id, self.HELIO_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.HELIO_FLAGS)
         se = swe.calc_ut(jd, body_id, self.HELIO_FLAGS)
 
         le_vals = le[0]
@@ -128,7 +128,7 @@ class TestHeliocentric:
     )
     def test_heliocentric_speed(self, year, jd, body_id):
         """Test heliocentric speed for planets 2-9."""
-        le = ephem.swe_calc_ut(jd, body_id, self.HELIO_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.HELIO_FLAGS)
         se = swe.calc_ut(jd, body_id, self.HELIO_FLAGS)
 
         le_vals = le[0]
@@ -152,7 +152,7 @@ class TestHeliocentric:
 
 
 class TestBarycentric:
-    """Barycentric coordinate comparison (SEFLG_BARYCTR).
+    """Barycentric coordinate comparison (FLG_BARYCTR).
 
     The barycentric Sun shows large angular differences (up to 138") because
     the Sun-SSB distance is very small (~0.001-0.009 AU). This amplifies
@@ -162,7 +162,7 @@ class TestBarycentric:
     All other bodies (Moon-Pluto) show sub-arcsecond agreement.
     """
 
-    BARY_FLAGS = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_BARYCTR
+    BARY_FLAGS = FLG_SWIEPH | FLG_SPEED | FLG_BARYCTR
 
     # Standard planet tolerances
     POS_TOL = 0.001  # degrees
@@ -185,7 +185,7 @@ class TestBarycentric:
     )
     def test_barycentric_position(self, year, jd, body_id):
         """Test barycentric ecliptic position for planets 1-9 (excl. Sun)."""
-        le = ephem.swe_calc_ut(jd, body_id, self.BARY_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.BARY_FLAGS)
         se = swe.calc_ut(jd, body_id, self.BARY_FLAGS)
 
         le_vals = le[0]
@@ -219,7 +219,7 @@ class TestBarycentric:
 
         libephemeris is verified to be closer to raw Skyfield/JPL DE440.
         """
-        le = ephem.swe_calc_ut(jd, 0, self.BARY_FLAGS)
+        le = ephem.calc_ut(jd, 0, self.BARY_FLAGS)
         se = swe.calc_ut(jd, 0, self.BARY_FLAGS)
 
         le_vals = le[0]
@@ -248,9 +248,9 @@ class TestBarycentric:
         between libephemeris and SE is negligible, even though the angular
         difference appears large due to the tiny Sun-SSB distance.
         """
-        flags_xyz = self.BARY_FLAGS | SEFLG_XYZ
+        flags_xyz = self.BARY_FLAGS | FLG_XYZ
 
-        le = ephem.swe_calc_ut(jd, 0, flags_xyz)
+        le = ephem.calc_ut(jd, 0, flags_xyz)
         se = swe.calc_ut(jd, 0, flags_xyz)
 
         le_vals = le[0]
@@ -276,7 +276,7 @@ class TestBarycentric:
         The Sun orbits the SSB at ~0.005-0.01 AU due to gas giant gravity.
         If the distance is ~1 AU, the BARYCTR flag is being silently ignored.
         """
-        le = ephem.swe_calc_ut(jd, 0, self.BARY_FLAGS)
+        le = ephem.calc_ut(jd, 0, self.BARY_FLAGS)
         dist = le[0][2]
 
         assert dist < 0.02, (
@@ -295,12 +295,12 @@ class TestBarycentric:
 
 
 class TestEquatorial:
-    """Equatorial coordinate comparison (SEFLG_EQUATORIAL).
+    """Equatorial coordinate comparison (FLG_EQUATORIAL).
 
     Tests RA/Dec output for representative bodies (Sun, Moon, Mars, Jupiter).
     """
 
-    EQUAT_FLAGS = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+    EQUAT_FLAGS = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
 
     POS_TOL = 0.001  # degrees (3.6")
     SPEED_TOL = 0.01  # degrees/day
@@ -317,7 +317,7 @@ class TestEquatorial:
     )
     def test_equatorial_position(self, year, jd, body_id):
         """Test equatorial RA/Dec for Sun, Moon, Mars, Jupiter."""
-        le = ephem.swe_calc_ut(jd, body_id, self.EQUAT_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.EQUAT_FLAGS)
         se = swe.calc_ut(jd, body_id, self.EQUAT_FLAGS)
 
         le_vals = le[0]
@@ -348,7 +348,7 @@ class TestEquatorial:
     )
     def test_equatorial_speed(self, year, jd, body_id):
         """Test equatorial speed for Sun, Moon, Mars, Jupiter."""
-        le = ephem.swe_calc_ut(jd, body_id, self.EQUAT_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.EQUAT_FLAGS)
         se = swe.calc_ut(jd, body_id, self.EQUAT_FLAGS)
 
         le_vals = le[0]
@@ -372,14 +372,14 @@ class TestEquatorial:
 
 
 class TestXYZCartesian:
-    """XYZ Cartesian coordinate comparison (SEFLG_XYZ).
+    """XYZ Cartesian coordinate comparison (FLG_XYZ).
 
     All values are in AU (position) or AU/day (velocity). No angular wrapping.
     Pluto and Neptune show slightly larger differences (~0.00003 AU) which
     correspond to sub-arcsecond angular differences at their distances.
     """
 
-    XYZ_FLAGS = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ
+    XYZ_FLAGS = FLG_SWIEPH | FLG_SPEED | FLG_XYZ
 
     # Position tolerance: 0.00005 AU (covers Neptune/Pluto; ~0.001" angular at 30 AU)
     POS_TOL = 0.00005  # AU
@@ -394,7 +394,7 @@ class TestXYZCartesian:
     )
     def test_xyz_position(self, year, jd, body_id):
         """Test XYZ Cartesian position for all bodies."""
-        le = ephem.swe_calc_ut(jd, body_id, self.XYZ_FLAGS)
+        le = ephem.calc_ut(jd, body_id, self.XYZ_FLAGS)
         se = swe.calc_ut(jd, body_id, self.XYZ_FLAGS)
 
         le_vals = le[0]
@@ -441,9 +441,9 @@ class TestCombinedFlags:
         if body_id == 0:
             pytest.skip("Sun heliocentric is trivial (zero)")
 
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR | FLG_EQUATORIAL
 
-        le = ephem.swe_calc_ut(jd, body_id, flags)
+        le = ephem.calc_ut(jd, body_id, flags)
         se = swe.calc_ut(jd, body_id, flags)
 
         le_vals = le[0]
@@ -465,9 +465,9 @@ class TestCombinedFlags:
     )
     def test_helio_xyz(self, year, jd, body_id):
         """Test heliocentric + XYZ combination."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR | SEFLG_XYZ
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR | FLG_XYZ
 
-        le = ephem.swe_calc_ut(jd, body_id, flags)
+        le = ephem.calc_ut(jd, body_id, flags)
         se = swe.calc_ut(jd, body_id, flags)
 
         le_vals = le[0]
@@ -492,9 +492,9 @@ class TestCombinedFlags:
     )
     def test_bary_equatorial(self, year, jd, body_id):
         """Test barycentric + equatorial combination."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_BARYCTR | FLG_EQUATORIAL
 
-        le = ephem.swe_calc_ut(jd, body_id, flags)
+        le = ephem.calc_ut(jd, body_id, flags)
         se = swe.calc_ut(jd, body_id, flags)
 
         le_vals = le[0]
@@ -516,9 +516,9 @@ class TestCombinedFlags:
     )
     def test_bary_xyz(self, year, jd, body_id):
         """Test barycentric + XYZ combination."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_XYZ
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_BARYCTR | FLG_XYZ
 
-        le = ephem.swe_calc_ut(jd, body_id, flags)
+        le = ephem.calc_ut(jd, body_id, flags)
         se = swe.calc_ut(jd, body_id, flags)
 
         le_vals = le[0]
@@ -545,40 +545,40 @@ class TestReturnFlags:
 
     @pytest.mark.comparison
     def test_helio_flag_preserved(self):
-        """SEFLG_HELCTR should be set in return flags."""
+        """FLG_HELCTR should be set in return flags."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR
-        _, retflag = ephem.swe_calc_ut(jd, 4, flags)
-        assert retflag & SEFLG_HELCTR, (
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR
+        _, retflag = ephem.calc_ut(jd, 4, flags)
+        assert retflag & FLG_HELCTR, (
             f"HELCTR not set in retflag: {retflag} (0x{retflag:04X})"
         )
 
     @pytest.mark.comparison
     def test_bary_flag_preserved(self):
-        """SEFLG_BARYCTR should be set in return flags."""
+        """FLG_BARYCTR should be set in return flags."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_BARYCTR
-        _, retflag = ephem.swe_calc_ut(jd, 0, flags)
-        assert retflag & SEFLG_BARYCTR, (
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_BARYCTR
+        _, retflag = ephem.calc_ut(jd, 0, flags)
+        assert retflag & FLG_BARYCTR, (
             f"BARYCTR not set in retflag: {retflag} (0x{retflag:04X})"
         )
 
     @pytest.mark.comparison
     def test_equatorial_flag_preserved(self):
-        """SEFLG_EQUATORIAL should be set in return flags."""
+        """FLG_EQUATORIAL should be set in return flags."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
-        _, retflag = ephem.swe_calc_ut(jd, 0, flags)
-        assert retflag & SEFLG_EQUATORIAL, (
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
+        _, retflag = ephem.calc_ut(jd, 0, flags)
+        assert retflag & FLG_EQUATORIAL, (
             f"EQUATORIAL not set in retflag: {retflag} (0x{retflag:04X})"
         )
 
     @pytest.mark.comparison
     def test_xyz_flag_preserved(self):
-        """SEFLG_XYZ should be set in return flags."""
+        """FLG_XYZ should be set in return flags."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ
-        _, retflag = ephem.swe_calc_ut(jd, 0, flags)
-        assert retflag & SEFLG_XYZ, (
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ
+        _, retflag = ephem.calc_ut(jd, 0, flags)
+        assert retflag & FLG_XYZ, (
             f"XYZ not set in retflag: {retflag} (0x{retflag:04X})"
         )

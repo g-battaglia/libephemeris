@@ -28,7 +28,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -48,24 +48,24 @@ def record(phase, label, ok, detail=""):
 
 # Body constants
 PLANETS = {
-    "Sun": ephem.SE_SUN,
-    "Moon": ephem.SE_MOON,
-    "Mercury": ephem.SE_MERCURY,
-    "Venus": ephem.SE_VENUS,
-    "Mars": ephem.SE_MARS,
-    "Jupiter": ephem.SE_JUPITER,
-    "Saturn": ephem.SE_SATURN,
-    "Uranus": ephem.SE_URANUS,
-    "Neptune": ephem.SE_NEPTUNE,
-    "Pluto": ephem.SE_PLUTO,
+    "Sun": ephem.SUN,
+    "Moon": ephem.MOON,
+    "Mercury": ephem.MERCURY,
+    "Venus": ephem.VENUS,
+    "Mars": ephem.MARS,
+    "Jupiter": ephem.JUPITER,
+    "Saturn": ephem.SATURN,
+    "Uranus": ephem.URANUS,
+    "Neptune": ephem.NEPTUNE,
+    "Pluto": ephem.PLUTO,
 }
 
 ASTEROIDS = {
-    "Ceres": ephem.SE_CERES,
-    "Pallas": ephem.SE_PALLAS,
-    "Juno": ephem.SE_JUNO,
-    "Vesta": ephem.SE_VESTA,
-    "Chiron": ephem.SE_CHIRON,
+    "Ceres": ephem.CERES,
+    "Pallas": ephem.PALLAS,
+    "Juno": ephem.JUNO,
+    "Vesta": ephem.VESTA,
+    "Chiron": ephem.CHIRON,
 }
 
 # Date grid spanning 4 centuries
@@ -103,7 +103,7 @@ def safe_pheno(jd, ipl, iflag=0):
         return None
 
     try:
-        le_result = ephem.swe_pheno_ut(jd, ipl, iflag)
+        le_result = ephem.pheno_ut(jd, ipl, iflag)
         le_attr = le_result[0]
     except Exception:
         return None
@@ -214,7 +214,7 @@ def phase2():
     # Moon tolerances — magnitude less precise at extreme phase angles
     for phase_name, jd in moon_phases.items():
         try:
-            result = safe_pheno(jd, ephem.SE_MOON)
+            result = safe_pheno(jd, ephem.MOON)
             if result is None:
                 continue
             se_attr, le_attr = result
@@ -246,7 +246,7 @@ def phase3():
         jd = base_jd + i * 365.25
         year = 2000 + i
         try:
-            result = safe_pheno(jd, ephem.SE_SATURN)
+            result = safe_pheno(jd, ephem.SATURN)
             if result is None:
                 continue
             se_attr, le_attr = result
@@ -284,7 +284,7 @@ def phase4():
 
     for epoch_name, jd in mercury_epochs.items():
         try:
-            result = safe_pheno(jd, ephem.SE_MERCURY)
+            result = safe_pheno(jd, ephem.MERCURY)
             if result is None:
                 continue
             se_attr, le_attr = result
@@ -315,7 +315,7 @@ def phase4():
 
     for epoch_name, jd in venus_epochs.items():
         try:
-            result = safe_pheno(jd, ephem.SE_VENUS)
+            result = safe_pheno(jd, ephem.VENUS)
             if result is None:
                 continue
             se_attr, le_attr = result
@@ -338,16 +338,16 @@ def phase5():
     print("\n=== P5: Flag combinations ===")
 
     flag_combos = {
-        "TRUEPOS": ephem.SEFLG_TRUEPOS,
-        "NOABERR": ephem.SEFLG_NOABERR,
-        "TRUEPOS+NOABERR": ephem.SEFLG_TRUEPOS | ephem.SEFLG_NOABERR,
+        "TRUEPOS": ephem.FLG_TRUEPOS,
+        "NOABERR": ephem.FLG_NOABERR,
+        "TRUEPOS+NOABERR": ephem.FLG_TRUEPOS | ephem.FLG_NOABERR,
     }
 
     test_bodies = {
-        "Moon": ephem.SE_MOON,
-        "Mars": ephem.SE_MARS,
-        "Jupiter": ephem.SE_JUPITER,
-        "Venus": ephem.SE_VENUS,
+        "Moon": ephem.MOON,
+        "Mars": ephem.MARS,
+        "Jupiter": ephem.JUPITER,
+        "Venus": ephem.VENUS,
     }
 
     test_dates = {
@@ -378,11 +378,11 @@ def phase5():
 
     # Heliocentric — separate because tolerances differ
     for body_name, ipl in test_bodies.items():
-        if ipl == ephem.SE_MOON:
+        if ipl == ephem.MOON:
             continue  # Moon heliocentric pheno is unusual
         for date_name, jd in test_dates.items():
             try:
-                iflag = ephem.SEFLG_HELCTR
+                iflag = ephem.FLG_HELCTR
                 result = safe_pheno(jd, ipl, iflag)
                 if result is None:
                     continue
@@ -482,11 +482,11 @@ def phase7():
 
     # Only test major planets (available in DE440)
     hist_bodies = {
-        "Sun": ephem.SE_SUN,
-        "Moon": ephem.SE_MOON,
-        "Mars": ephem.SE_MARS,
-        "Jupiter": ephem.SE_JUPITER,
-        "Saturn": ephem.SE_SATURN,
+        "Sun": ephem.SUN,
+        "Moon": ephem.MOON,
+        "Mars": ephem.MARS,
+        "Jupiter": ephem.JUPITER,
+        "Saturn": ephem.SATURN,
     }
 
     for body_name, ipl in hist_bodies.items():
@@ -527,9 +527,9 @@ def phase8():
         test_jd = jd + delta
         # Outer planets: Mars, Jupiter, Saturn — check phase angle
         for name, ipl in [
-            ("Mars", ephem.SE_MARS),
-            ("Jupiter", ephem.SE_JUPITER),
-            ("Saturn", ephem.SE_SATURN),
+            ("Mars", ephem.MARS),
+            ("Jupiter", ephem.JUPITER),
+            ("Saturn", ephem.SATURN),
         ]:
             test_cases.append((name, ipl, test_jd))
 
@@ -598,7 +598,7 @@ def phase8():
     # Also test Mercury/Venus at high phase angles (near inferior conjunction)
     for delta in range(0, 365 * 3, 5):
         test_jd = jd + delta
-        for name, ipl in [("Mercury", ephem.SE_MERCURY), ("Venus", ephem.SE_VENUS)]:
+        for name, ipl in [("Mercury", ephem.MERCURY), ("Venus", ephem.VENUS)]:
             try:
                 result = safe_pheno(test_jd, ipl)
                 if result is None:

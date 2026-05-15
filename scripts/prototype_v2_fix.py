@@ -3,7 +3,7 @@
 
 Simulates the runtime _pipeline_icrs from fast_calc.py with Skyfield-sourced
 positions (eliminating Chebyshev error), then measures the ecliptic output
-against swe_calc(). Tests with:
+against calc(). Tests with:
   A) Current pipeline: no deflection, first-order aberration
   B) +Deflection: full PPN deflection by Sun/Jupiter/Saturn
   C) +Full SR aberration: Skyfield's relativistic formula
@@ -22,7 +22,7 @@ import numpy as np
 sys.path.insert(0, ".")
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.state import get_planets, get_timescale
 
 
@@ -291,8 +291,8 @@ def main():
         worst_jd_A = 0.0
 
         for jd_tt in test_jds:
-            # Reference: swe_calc
-            ref, _ = ephem.swe_calc(jd_tt, body_id, SEFLG_SPEED)
+            # Reference: calc
+            ref, _ = ephem.calc(jd_tt, body_id, FLG_SPEED)
 
             # A: current pipeline (no defl, 1st-order aber)
             lon_a, lat_a, _ = simulate_pipeline(

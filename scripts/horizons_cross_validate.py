@@ -55,32 +55,32 @@ from astroquery.jplhorizons import Horizons  # noqa: E402
 
 PLANETARY_BODIES: dict[str, tuple[str, int, str]] = {
     # name: (horizons_id, swe_body_id, id_type)
-    "Sun": ("10", swe.SE_SUN, "majorbody"),
-    "Moon": ("301", swe.SE_MOON, "majorbody"),
-    "Mercury": ("199", swe.SE_MERCURY, "majorbody"),
-    "Venus": ("299", swe.SE_VENUS, "majorbody"),
-    "Mars": ("499", swe.SE_MARS, "majorbody"),
-    "Jupiter": ("599", swe.SE_JUPITER, "majorbody"),
-    "Saturn": ("699", swe.SE_SATURN, "majorbody"),
-    "Uranus": ("799", swe.SE_URANUS, "majorbody"),
-    "Neptune": ("899", swe.SE_NEPTUNE, "majorbody"),
-    "Pluto": ("999", swe.SE_PLUTO, "majorbody"),
+    "Sun": ("10", swe.SUN, "majorbody"),
+    "Moon": ("301", swe.MOON, "majorbody"),
+    "Mercury": ("199", swe.MERCURY, "majorbody"),
+    "Venus": ("299", swe.VENUS, "majorbody"),
+    "Mars": ("499", swe.MARS, "majorbody"),
+    "Jupiter": ("599", swe.JUPITER, "majorbody"),
+    "Saturn": ("699", swe.SATURN, "majorbody"),
+    "Uranus": ("799", swe.URANUS, "majorbody"),
+    "Neptune": ("899", swe.NEPTUNE, "majorbody"),
+    "Pluto": ("999", swe.PLUTO, "majorbody"),
 }
 
 MINOR_BODIES: dict[str, tuple[str, int, str]] = {
-    "Chiron": ("2060", swe.SE_CHIRON, "smallbody"),
-    "Ceres": ("Ceres", swe.SE_CERES, "smallbody"),
-    "Pallas": ("Pallas", swe.SE_PALLAS, "smallbody"),
-    "Juno": ("Juno", swe.SE_JUNO, "smallbody"),
-    "Vesta": ("Vesta", swe.SE_VESTA, "smallbody"),
+    "Chiron": ("2060", swe.CHIRON, "smallbody"),
+    "Ceres": ("Ceres", swe.CERES, "smallbody"),
+    "Pallas": ("Pallas", swe.PALLAS, "smallbody"),
+    "Juno": ("Juno", swe.JUNO, "smallbody"),
+    "Vesta": ("Vesta", swe.VESTA, "smallbody"),
 }
 
 COB_BODIES: dict[str, tuple[str, str, int]] = {
     # name: (body_center_id, barycenter_id, swe_body_id)
-    "Jupiter": ("599", "5", swe.SE_JUPITER),
-    "Saturn": ("699", "6", swe.SE_SATURN),
-    "Neptune": ("899", "8", swe.SE_NEPTUNE),
-    "Pluto": ("999", "9", swe.SE_PLUTO),
+    "Jupiter": ("599", "5", swe.JUPITER),
+    "Saturn": ("699", "6", swe.SATURN),
+    "Neptune": ("899", "8", swe.NEPTUNE),
+    "Pluto": ("999", "9", swe.PLUTO),
 }
 
 

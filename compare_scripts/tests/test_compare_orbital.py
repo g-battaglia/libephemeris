@@ -16,12 +16,12 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 
 
@@ -56,11 +56,11 @@ class OrbitalTolerance:
 
 # Planets for orbital element tests
 TEST_PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Method types for nod_aps
@@ -98,7 +98,7 @@ class TestNodAps:
         """
         # SwissEphemeris
         try:
-            ret_swe = swe.nod_aps_ut(jd, body_id, SEFLG_SWIEPH, method)
+            ret_swe = swe.nod_aps_ut(jd, body_id, FLG_SWIEPH, method)
             nasc_swe = ret_swe[0]
             ndesc_swe = ret_swe[1]
             peri_swe = ret_swe[2]
@@ -108,7 +108,7 @@ class TestNodAps:
 
         # LibEphemeris
         try:
-            ret_py = pyephem.nod_aps_ut(jd, body_id, SEFLG_SWIEPH, method)
+            ret_py = pyephem.nod_aps_ut(jd, body_id, FLG_SWIEPH, method)
             nasc_py = ret_py[0]
             ndesc_py = ret_py[1]
             peri_py = ret_py[2]
@@ -134,7 +134,7 @@ class TestNodAps:
         # perihelion directions, so use the relaxed PERI_ANGLE_DEGREES tolerance
         apse_tol = (
             OrbitalTolerance.PERI_ANGLE_DEGREES
-            if body_id in (SE_JUPITER, SE_SATURN)
+            if body_id in (JUPITER, SATURN)
             else OrbitalTolerance.ANGLE_DEGREES
         )
 
@@ -158,7 +158,7 @@ class TestOrbitalElements:
         """Test Keplerian orbital elements calculations."""
         # SwissEphemeris
         try:
-            ret_swe = swe.get_orbital_elements(jd, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.get_orbital_elements(jd, body_id, FLG_SWIEPH)
             a_swe = ret_swe[0]  # Semi-major axis
             e_swe = ret_swe[1]  # Eccentricity
             i_swe = ret_swe[2]  # Inclination
@@ -169,7 +169,7 @@ class TestOrbitalElements:
 
         # LibEphemeris
         try:
-            ret_py = pyephem.get_orbital_elements(jd, body_id, SEFLG_SWIEPH)
+            ret_py = pyephem.get_orbital_elements(jd, body_id, FLG_SWIEPH)
             a_py = ret_py[0]
             e_py = ret_py[1]
             i_py = ret_py[2]
@@ -219,7 +219,7 @@ class TestOrbitalDistance:
 
         # SwissEphemeris
         try:
-            ret_swe = swe.orbit_max_min_true_distance(jd, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.orbit_max_min_true_distance(jd, body_id, FLG_SWIEPH)
             dmax_swe = ret_swe[0]
             dmin_swe = ret_swe[1]
             dtrue_swe = ret_swe[2]
@@ -228,7 +228,7 @@ class TestOrbitalDistance:
 
         # LibEphemeris
         try:
-            ret_py = pyephem.orbit_max_min_true_distance(jd, body_id, SEFLG_SWIEPH)
+            ret_py = pyephem.orbit_max_min_true_distance(jd, body_id, FLG_SWIEPH)
             dmax_py = ret_py[0]
             dmin_py = ret_py[1]
             dtrue_py = ret_py[2]
@@ -259,7 +259,7 @@ class TestOrbitalConsistency:
         """Test that orbital elements satisfy physical constraints."""
         jd = swe.julday(2024, 1, 1, 0)
 
-        ret_py = pyephem.get_orbital_elements(jd, body_id, SEFLG_SWIEPH)
+        ret_py = pyephem.get_orbital_elements(jd, body_id, FLG_SWIEPH)
         a = ret_py[0]  # Semi-major axis
         e = ret_py[1]  # Eccentricity
         i = ret_py[2]  # Inclination
@@ -276,7 +276,7 @@ class TestOrbitalConsistency:
 
         for body_id, body_name in TEST_PLANETS:
             try:
-                ret = pyephem.orbit_max_min_true_distance(jd, body_id, SEFLG_SWIEPH)
+                ret = pyephem.orbit_max_min_true_distance(jd, body_id, FLG_SWIEPH)
                 dmax = ret[0]
                 dmin = ret[1]
                 dtrue = ret[2]

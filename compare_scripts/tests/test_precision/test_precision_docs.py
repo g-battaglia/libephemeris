@@ -10,27 +10,27 @@ import random
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_CHIRON,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_GALCENT_0SAG,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    CHIRON,
+    FLG_SPEED,
+    FLG_HELCTR,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_TRUE_CITRA,
+    SIDM_GALCENT_0SAG,
 )
 from libephemeris.crossing import (
     NR_TOLERANCE,
@@ -61,7 +61,7 @@ def generate_random_jd(n: int = 100, seed: int = 42) -> list:
         month = random.randint(1, 12)
         day = random.randint(1, 28)
         hour = random.uniform(0, 24)
-        jd = ephem.swe_julday(year, month, day, hour)
+        jd = ephem.julday(year, month, day, hour)
         jds.append(jd)
     return jds
 
@@ -73,16 +73,16 @@ def generate_random_jd(n: int = 100, seed: int = 42) -> list:
 
 # From PRECISION.md - Planetary longitude tolerances in arcseconds
 PLANET_TOLERANCE_ARCSEC = {
-    SE_SUN: 1.0,
-    SE_MOON: 5.0,
-    SE_MERCURY: 1.0,
-    SE_VENUS: 1.0,
-    SE_MARS: 2.0,
-    SE_JUPITER: 5.0,
-    SE_SATURN: 5.0,
-    SE_URANUS: 5.0,
-    SE_NEPTUNE: 5.0,
-    SE_PLUTO: 5.0,
+    SUN: 1.0,
+    MOON: 5.0,
+    MERCURY: 1.0,
+    VENUS: 1.0,
+    MARS: 2.0,
+    JUPITER: 5.0,
+    SATURN: 5.0,
+    URANUS: 5.0,
+    NEPTUNE: 5.0,
+    PLUTO: 5.0,
 }
 
 # From PRECISION.md - House cusp tolerance
@@ -99,10 +99,10 @@ CROSSING_PLANET_TOLERANCE_ARCSEC = 0.001
 
 # From PRECISION.md - Lunar points tolerances (vary by point type)
 LUNAR_POINT_TOLERANCE_DEG = {
-    SE_MEAN_NODE: 0.01,  # High precision
-    SE_TRUE_NODE: 2.0,  # Different oscillation model
-    SE_MEAN_APOG: 0.2,  # Minor formula differences
-    SE_OSCU_APOG: 0.1,  # Eccentricity vector method (~235 arcsec max)
+    MEAN_NODE: 0.01,  # High precision
+    TRUE_NODE: 2.0,  # Different oscillation model
+    MEAN_APOG: 0.2,  # Minor formula differences
+    OSCU_APOG: 0.1,  # Eccentricity vector method (~235 arcsec max)
 }
 
 # From PRECISION.md - Julian Day tolerance
@@ -121,13 +121,13 @@ class TestDocumentedPlanetaryPrecision:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_documented_planet_longitude_tolerance(self, planet_id, planet_name):
@@ -142,7 +142,7 @@ class TestDocumentedPlanetaryPrecision:
 
         max_diff_arcsec = 0.0
         for jd in jds:
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
             pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
             diff = angle_diff(pos_lib[0], pos_swe[0])
@@ -160,14 +160,14 @@ class TestDocumentedPlanetaryPrecision:
         jd = 2451545.0  # J2000
 
         # Sun latitude should be < 1 arcsec
-        sun_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
-        sun_swe, _ = swe.calc_ut(jd, SE_SUN, 0)
+        sun_lib, _ = ephem.calc_ut(jd, SUN, 0)
+        sun_swe, _ = swe.calc_ut(jd, SUN, 0)
         sun_lat_diff = abs(sun_lib[1] - sun_swe[1]) * 3600
         assert sun_lat_diff < 1.0, f"Sun latitude diff {sun_lat_diff:.4f} arcsec"
 
         # Moon latitude should be < 5 arcsec
-        moon_lib, _ = ephem.swe_calc_ut(jd, SE_MOON, 0)
-        moon_swe, _ = swe.calc_ut(jd, SE_MOON, 0)
+        moon_lib, _ = ephem.calc_ut(jd, MOON, 0)
+        moon_swe, _ = swe.calc_ut(jd, MOON, 0)
         moon_lat_diff = abs(moon_lib[1] - moon_swe[1]) * 3600
         assert moon_lat_diff < 5.0, f"Moon latitude diff {moon_lat_diff:.4f} arcsec"
 
@@ -176,8 +176,8 @@ class TestDocumentedPlanetaryPrecision:
         """Verify distance precision < 0.0001 AU as documented."""
         jd = 2451545.0
 
-        for planet_id in [SE_SUN, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+        for planet_id in [SUN, MERCURY, VENUS, MARS, JUPITER]:
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
             pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
             dist_diff = abs(pos_lib[2] - pos_swe[2])
@@ -194,9 +194,9 @@ class TestDocumentedHeliocentricPrecision:
         """Verify heliocentric tolerance is <= 0.03 degrees as documented."""
         jd = 2451545.0
 
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_HELCTR)
-            pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_HELCTR)
+        for planet_id in [MERCURY, VENUS, MARS, JUPITER]:
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_HELCTR)
+            pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_HELCTR)
 
             diff = angle_diff(pos_lib[0], pos_swe[0])
             assert diff < 0.03, (
@@ -223,7 +223,7 @@ class TestDocumentedHousePrecision:
         jd = 2451545.0
         lat, lon = 41.9, 12.5  # Rome
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
 
         # Check all 12 cusps (both are 0-indexed)
@@ -258,7 +258,7 @@ class TestDocumentedHousePrecision:
 
         # Should not raise an error - falls back gracefully
         try:
-            cusps_lib, ascmc_lib = ephem.swe_houses(jd, polar_lat, lon, ord("P"))
+            cusps_lib, ascmc_lib = ephem.houses(jd, polar_lat, lon, ord("P"))
             # Values should be returned (fallback to Porphyry)
             assert len(cusps_lib) == 12
             assert len(ascmc_lib) >= 2
@@ -276,18 +276,18 @@ class TestDocumentedAyanamshaPrecision:
     @pytest.mark.parametrize(
         "sid_mode,name",
         [
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-            (SE_SIDM_LAHIRI, "Lahiri"),
+            (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+            (SIDM_LAHIRI, "Lahiri"),
         ],
     )
     def test_standard_ayanamsha_tolerance(self, sid_mode, name):
         """Verify standard ayanamsha tolerance <= 0.01 degrees."""
         jd = 2451545.0
 
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         diff = abs(ayan_lib - ayan_swe)
@@ -299,18 +299,18 @@ class TestDocumentedAyanamshaPrecision:
     @pytest.mark.parametrize(
         "sid_mode,name",
         [
-            (SE_SIDM_TRUE_CITRA, "True Citra"),
-            (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+            (SIDM_TRUE_CITRA, "True Citra"),
+            (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
         ],
     )
     def test_star_based_ayanamsha_tolerance(self, sid_mode, name):
         """Verify star-based ayanamsha tolerance <= 0.06 degrees."""
         jd = 2451545.0
 
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         diff = abs(ayan_lib - ayan_swe)
@@ -346,11 +346,11 @@ class TestDocumentedCrossingPrecision:
     @pytest.mark.precision
     def test_sun_crossing_sub_milliarcsecond(self):
         """Verify Sun crossing achieves 0.001 arcsec precision as documented."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 0.0  # Aries ingress
 
-        jd_cross = ephem.swe_solcross_ut(target, jd_start, 0)
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_SUN, 0)
+        jd_cross = ephem.solcross_ut(target, jd_start, 0)
+        pos, _ = ephem.calc_ut(jd_cross, SUN, 0)
 
         diff = angle_diff(pos[0], target)
         diff_arcsec = diff * 3600
@@ -362,11 +362,11 @@ class TestDocumentedCrossingPrecision:
     @pytest.mark.precision
     def test_moon_crossing_sub_arcsecond(self):
         """Verify Moon crossing achieves 0.05 arcsec precision as documented."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         target = 0.0  # Aries ingress
 
-        jd_cross = ephem.swe_mooncross_ut(target, jd_start, 0)
-        pos, _ = ephem.swe_calc_ut(jd_cross, SE_MOON, 0)
+        jd_cross = ephem.mooncross_ut(target, jd_start, 0)
+        pos, _ = ephem.calc_ut(jd_cross, MOON, 0)
 
         diff = angle_diff(pos[0], target)
         diff_arcsec = diff * 3600
@@ -383,17 +383,17 @@ class TestDocumentedLunarPointsPrecision:
     @pytest.mark.parametrize(
         "point_id,name",
         [
-            (SE_MEAN_NODE, "Mean Node"),
-            (SE_TRUE_NODE, "True Node"),
-            (SE_MEAN_APOG, "Mean Lilith"),
-            (SE_OSCU_APOG, "True Lilith"),
+            (MEAN_NODE, "Mean Node"),
+            (TRUE_NODE, "True Node"),
+            (MEAN_APOG, "Mean Lilith"),
+            (OSCU_APOG, "True Lilith"),
         ],
     )
     def test_lunar_point_tolerance(self, point_id, name):
         """Verify lunar points tolerance matches documented values."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, point_id, 0)
+        pos_lib, _ = ephem.calc_ut(jd, point_id, 0)
         pos_swe, _ = swe.calc_ut(jd, point_id, 0)
 
         diff = angle_diff(pos_lib[0], pos_swe[0])
@@ -414,7 +414,7 @@ class TestDocumentedTimePrecision:
         ]
 
         for year, month, day, hour in test_dates:
-            jd_lib = ephem.swe_julday(year, month, day, hour)
+            jd_lib = ephem.julday(year, month, day, hour)
             jd_swe = swe.julday(year, month, day, hour)
 
             diff = abs(jd_lib - jd_swe)
@@ -431,9 +431,9 @@ class TestDocumentedVelocityPrecision:
         """Verify angular velocity tolerance < 0.01 degrees/day as documented."""
         jd = 2451545.0
 
-        for planet_id in [SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS]:
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
-            pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
+        for planet_id in [SUN, MOON, MERCURY, VENUS, MARS]:
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
+            pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SPEED)
 
             # Longitude speed (degrees/day)
             lon_speed_diff = abs(pos_lib[3] - pos_swe[3])
@@ -458,11 +458,11 @@ class TestDocumentedAsteroidPrecision:
         """
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_CHIRON, 0)
+        pos_lib, _ = ephem.calc_ut(jd, CHIRON, 0)
 
         # Try to get pyswisseph result, but skip if asteroid files not available
         try:
-            pos_swe, _ = swe.calc_ut(jd, SE_CHIRON, 0)
+            pos_swe, _ = swe.calc_ut(jd, CHIRON, 0)
         except Exception as e:
             if "not found" in str(e).lower() or "seas" in str(e).lower():
                 pytest.skip(f"Swiss Ephemeris asteroid files not available: {e}")
@@ -487,7 +487,7 @@ class TestDocumentedLimitations:
         jd = 2451545.0
 
         # fixstar_ut returns (position, star_name, retflag) — raises Error on failure
-        result = ephem.swe_fixstar_ut("Regulus", jd, SEFLG_SPEED)
+        result = ephem.fixstar_ut("Regulus", jd, FLG_SPEED)
         pos = result[0]  # First element is the position tuple
 
         # Fixed stars have small non-zero velocities due to precession of equinoxes
@@ -504,12 +504,12 @@ class TestDocumentedLimitations:
         lon = 0.0
 
         # Equal houses should work
-        cusps_equal, ascmc_equal = ephem.swe_houses(jd, polar_lat, lon, ord("E"))
+        cusps_equal, ascmc_equal = ephem.houses(jd, polar_lat, lon, ord("E"))
         assert len(cusps_equal) == 12
         assert 0 <= ascmc_equal[0] < 360
 
         # Whole Sign houses should work
-        cusps_ws, ascmc_ws = ephem.swe_houses(jd, polar_lat, lon, ord("W"))
+        cusps_ws, ascmc_ws = ephem.houses(jd, polar_lat, lon, ord("W"))
         assert len(cusps_ws) == 12
         assert 0 <= ascmc_ws[0] < 360
 

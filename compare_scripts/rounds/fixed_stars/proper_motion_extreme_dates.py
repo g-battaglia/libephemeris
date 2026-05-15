@@ -21,17 +21,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+FLG_SIDEREAL = 65536
 
 # Major stars to test
 STARS = [
@@ -70,14 +70,14 @@ def run_test(label, condition, detail=""):
         print(f"  FAIL {label}: {detail}")
 
 
-def get_star_pos(star_name, jd, flags=SEFLG_SPEED):
+def get_star_pos(star_name, jd, flags=FLG_SPEED):
     """Get star position from both SE and LE."""
     # SE: fixstar2(name, jd, flags) -> (pos_tuple, starname, retflag)
     se_result = swe.fixstar2(star_name, jd, flags)
     se_pos = se_result[0]  # (lon, lat, dist, lon_spd, lat_spd, dist_spd)
 
-    # LE: swe_fixstar2_ut(name, jd, flags) -> (pos_tuple, starname, retflag)
-    le_result = ephem.swe_fixstar2_ut(star_name, jd, flags)
+    # LE: fixstar2_ut(name, jd, flags) -> (pos_tuple, starname, retflag)
+    le_result = ephem.fixstar2_ut(star_name, jd, flags)
     le_pos = le_result[0]  # (lon, lat, dist, lon_spd, lat_spd, dist_spd)
 
     return se_pos, le_pos
@@ -181,11 +181,11 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P3: Stars with different flags ===")
 
 FLAG_COMBOS = [
-    (SEFLG_SPEED, "default"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "EQUATORIAL"),
-    (SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT, "J2000"),
-    (SEFLG_SPEED | SEFLG_NONUT, "NONUT"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_NONUT, "EQUAT+J2000"),
+    (FLG_SPEED, "default"),
+    (FLG_SPEED | FLG_EQUATORIAL, "EQUATORIAL"),
+    (FLG_SPEED | FLG_J2000 | FLG_NONUT, "J2000"),
+    (FLG_SPEED | FLG_NONUT, "NONUT"),
+    (FLG_SPEED | FLG_EQUATORIAL | FLG_J2000 | FLG_NONUT, "EQUAT+J2000"),
 ]
 
 TEST_STARS = ["Sirius", "Regulus", "Spica", "Aldebaran", "Vega"]
@@ -323,7 +323,7 @@ ALL_STARS = STARS + [
 jd = 2451545.0
 for star in ALL_STARS:
     try:
-        le_result = ephem.swe_fixstar2_ut(star, jd, SEFLG_SPEED)
+        le_result = ephem.fixstar2_ut(star, jd, FLG_SPEED)
         le_name = le_result[1]
         le_pos = le_result[0]
 

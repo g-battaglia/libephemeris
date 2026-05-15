@@ -11,8 +11,8 @@ Parts:
   P2: True Node — 20 dates across 1900-2100
   P3: Mean Lilith (Mean Apogee) — 20 dates
   P4: Osc Lilith (True/Osculating Apogee) — 20 dates
-  P5: Node/Lilith with SEFLG_J2000
-  P6: Node/Lilith with SEFLG_EQUATORIAL
+  P5: Node/Lilith with FLG_J2000
+  P6: Node/Lilith with FLG_EQUATORIAL
   P7: Speed comparison for all 4 bodies
   P8: 18.6-year nodal cycle verification
 """
@@ -116,12 +116,12 @@ def run_body_sweep(part_name, body_id, body_name, flags, tol_lon, tol_lat):
         yr = int(swe.revjul(jd)[0])
         label = f"{body_name} {yr}"
         try:
-            se_xx = swe.calc_ut(jd, body_id, flags | SEFLG_SPEED)[0]
+            se_xx = swe.calc_ut(jd, body_id, flags | FLG_SPEED)[0]
         except Exception:
             r.skip(f"{label}: SE error")
             continue
         try:
-            le_xx, _ = ephem.swe_calc_ut(jd, body_id, flags | SEFLG_SPEED)
+            le_xx, _ = ephem.calc_ut(jd, body_id, flags | FLG_SPEED)
         except Exception:
             r.skip(f"{label}: LE error")
             continue
@@ -143,14 +143,14 @@ def run_part1():
     print(f"\n{'=' * 70}")
     print(f"PART 1: Mean Node — 20 dates")
     print(f"{'=' * 70}")
-    return run_body_sweep("P1: Mean Node", SE_MEAN_NODE, "MeanNode", 0, 5.0, 5.0)
+    return run_body_sweep("P1: Mean Node", MEAN_NODE, "MeanNode", 0, 5.0, 5.0)
 
 
 def run_part2():
     print(f"\n{'=' * 70}")
     print(f"PART 2: True Node — 20 dates")
     print(f"{'=' * 70}")
-    return run_body_sweep("P2: True Node", SE_TRUE_NODE, "TrueNode", 0, 5.0, 5.0)
+    return run_body_sweep("P2: True Node", TRUE_NODE, "TrueNode", 0, 5.0, 5.0)
 
 
 def run_part3():
@@ -158,33 +158,33 @@ def run_part3():
     print(f"PART 3: Mean Lilith — 20 dates")
     print(f"{'=' * 70}")
     # Wider lat tolerance for Mean Lilith (known ~19" lat model difference)
-    return run_body_sweep("P3: Mean Lilith", SE_MEAN_APOG, "MeanLilith", 0, 5.0, 25.0)
+    return run_body_sweep("P3: Mean Lilith", MEAN_APOG, "MeanLilith", 0, 5.0, 25.0)
 
 
 def run_part4():
     print(f"\n{'=' * 70}")
     print(f"PART 4: Osc Lilith — 20 dates")
     print(f"{'=' * 70}")
-    return run_body_sweep("P4: Osc Lilith", SE_OSCU_APOG, "OscLilith", 0, 60.0, 60.0)
+    return run_body_sweep("P4: Osc Lilith", OSCU_APOG, "OscLilith", 0, 60.0, 60.0)
 
 
 def run_part5():
     print(f"\n{'=' * 70}")
-    print(f"PART 5: Node/Lilith with SEFLG_J2000")
+    print(f"PART 5: Node/Lilith with FLG_J2000")
     print(f"{'=' * 70}")
     r = R("P5: J2000")
     bodies = [
-        (SE_MEAN_NODE, "MeanNode", 5.0),
-        (SE_TRUE_NODE, "TrueNode", 5.0),
-        (SE_MEAN_APOG, "MeanLilith", 25.0),
+        (MEAN_NODE, "MeanNode", 5.0),
+        (TRUE_NODE, "TrueNode", 5.0),
+        (MEAN_APOG, "MeanLilith", 25.0),
     ]
     for jd in DATES_20[:10]:
         yr = int(swe.revjul(jd)[0])
         for body_id, body_name, tol in bodies:
             label = f"{body_name} J2000 {yr}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, SEFLG_J2000 | SEFLG_SPEED)[0]
-                le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_J2000 | SEFLG_SPEED)
+                se_xx = swe.calc_ut(jd, body_id, FLG_J2000 | FLG_SPEED)[0]
+                le_xx, _ = ephem.calc_ut(jd, body_id, FLG_J2000 | FLG_SPEED)
             except Exception:
                 r.skip(f"{label}")
                 continue
@@ -201,22 +201,22 @@ def run_part5():
 
 def run_part6():
     print(f"\n{'=' * 70}")
-    print(f"PART 6: Node/Lilith with SEFLG_EQUATORIAL")
+    print(f"PART 6: Node/Lilith with FLG_EQUATORIAL")
     print(f"{'=' * 70}")
     r = R("P6: Equatorial")
     bodies = [
-        (SE_MEAN_NODE, "MeanNode", 5.0),
-        (SE_TRUE_NODE, "TrueNode", 5.0),
-        (SE_MEAN_APOG, "MeanLilith", 25.0),
+        (MEAN_NODE, "MeanNode", 5.0),
+        (TRUE_NODE, "TrueNode", 5.0),
+        (MEAN_APOG, "MeanLilith", 25.0),
     ]
     for jd in DATES_20[:10]:
         yr = int(swe.revjul(jd)[0])
         for body_id, body_name, tol in bodies:
             label = f"{body_name} EQU {yr}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, SEFLG_EQUATORIAL | SEFLG_SPEED)[0]
-                le_xx, _ = ephem.swe_calc_ut(
-                    jd, body_id, SEFLG_EQUATORIAL | SEFLG_SPEED
+                se_xx = swe.calc_ut(jd, body_id, FLG_EQUATORIAL | FLG_SPEED)[0]
+                le_xx, _ = ephem.calc_ut(
+                    jd, body_id, FLG_EQUATORIAL | FLG_SPEED
                 )
             except Exception:
                 r.skip(f"{label}")
@@ -238,16 +238,16 @@ def run_part7():
     print(f"{'=' * 70}")
     r = R("P7: Speed")
     bodies = [
-        (SE_MEAN_NODE, "MeanNode"),
-        (SE_TRUE_NODE, "TrueNode"),
-        (SE_MEAN_APOG, "MeanLilith"),
-        (SE_OSCU_APOG, "OscLilith"),
+        (MEAN_NODE, "MeanNode"),
+        (TRUE_NODE, "TrueNode"),
+        (MEAN_APOG, "MeanLilith"),
+        (OSCU_APOG, "OscLilith"),
     ]
     jd = swe.julday(2024, 3, 20, 12.0)
     for body_id, body_name in bodies:
         try:
-            se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-            le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+            le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
         except Exception:
             r.skip(f"{body_name}")
             continue
@@ -272,10 +272,10 @@ def run_part8():
     r = R("P8: Nodal Cycle")
     # Verify Mean Node completes ~360° in ~18.6 years
     jd_start = swe.julday(2000, 1, 1, 12.0)
-    le_start, _ = ephem.swe_calc_ut(jd_start, SE_MEAN_NODE, 0)
+    le_start, _ = ephem.calc_ut(jd_start, MEAN_NODE, 0)
     # After ~18.6 years, node should return to roughly same position
     jd_end = jd_start + 18.6 * 365.25
-    le_end, _ = ephem.swe_calc_ut(jd_end, SE_MEAN_NODE, 0)
+    le_end, _ = ephem.calc_ut(jd_end, MEAN_NODE, 0)
     cycle_diff = angle_diff(le_start[0], le_end[0])
     # Should be within ~5° (it's approximate)
     if cycle_diff < 10.0:
@@ -287,7 +287,7 @@ def run_part8():
         r.fail(f"18.6yr cycle: diff={cycle_diff:.2f}°")
 
     # Also verify node is retrograde (negative speed)
-    le_xx, _ = ephem.swe_calc_ut(jd_start, SE_MEAN_NODE, SEFLG_SPEED)
+    le_xx, _ = ephem.calc_ut(jd_start, MEAN_NODE, FLG_SPEED)
     if le_xx[3] < 0:
         r.ok(0.0, "Node retrograde")
         print(f"  Mean Node speed: {le_xx[3]:.6f}°/d (retrograde: OK)")
@@ -295,7 +295,7 @@ def run_part8():
         r.fail(f"Node speed positive: {le_xx[3]:.6f}")
 
     # Verify Mean Lilith is direct (positive speed)
-    le_lil, _ = ephem.swe_calc_ut(jd_start, SE_MEAN_APOG, SEFLG_SPEED)
+    le_lil, _ = ephem.calc_ut(jd_start, MEAN_APOG, FLG_SPEED)
     if le_lil[3] > 0:
         r.ok(0.0, "Lilith direct")
         print(f"  Mean Lilith speed: {le_lil[3]:.6f}°/d (direct: OK)")

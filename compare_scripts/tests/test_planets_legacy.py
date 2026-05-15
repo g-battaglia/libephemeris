@@ -14,7 +14,7 @@ class TestGeocentricPositions:
 
     def test_sun_position_j2000(self, standard_jd, compare_with_swisseph):
         """Test Sun position at J2000.0."""
-        passed, diffs, _ = compare_with_swisseph(standard_jd, SE_SUN, SEFLG_SWIEPH)
+        passed, diffs, _ = compare_with_swisseph(standard_jd, SUN, FLG_SWIEPH)
         assert passed, f"Sun position diff: {diffs}"
 
     def test_all_planets_geocentric(
@@ -23,14 +23,14 @@ class TestGeocentricPositions:
         """Test all major planets in geocentric mode."""
         for planet_id, planet_name in all_planets:
             passed, diffs, _ = compare_with_swisseph(
-                standard_jd, planet_id, SEFLG_SWIEPH
+                standard_jd, planet_id, FLG_SWIEPH
             )
             assert passed, f"{planet_name} position diff: {diffs}"
 
     def test_moon_high_precision(self, standard_jd):
         """Test Moon position with high precision."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_MOON, SEFLG_SWIEPH)
-        res_py, _ = ephem.swe_calc_ut(standard_jd, SE_MOON, SEFLG_SWIEPH)
+        res_swe, _ = swe.calc_ut(standard_jd, MOON, FLG_SWIEPH)
+        res_py, _ = ephem.calc_ut(standard_jd, MOON, FLG_SWIEPH)
 
         lon_diff = abs(res_swe[0] - res_py[0])
         if lon_diff > 180:
@@ -50,12 +50,12 @@ class TestTopocentric:
 
         # Set topocentric location
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
         # Calculate topocentric position
-        res_swe, _ = swe.calc_ut(standard_jd, SE_MOON, SEFLG_SWIEPH | SEFLG_TOPOCTR)
-        res_py, _ = ephem.swe_calc_ut(
-            standard_jd, SE_MOON, SEFLG_SWIEPH | SEFLG_TOPOCTR
+        res_swe, _ = swe.calc_ut(standard_jd, MOON, FLG_SWIEPH | FLG_TOPOCTR)
+        res_py, _ = ephem.calc_ut(
+            standard_jd, MOON, FLG_SWIEPH | FLG_TOPOCTR
         )
 
         lon_diff = abs(res_swe[0] - res_py[0])
@@ -70,11 +70,11 @@ class TestSiderealMode:
         """Test sidereal Sun position."""
         # Set Lahiri ayanamsha
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
-        res_py, _ = ephem.swe_calc_ut(
-            standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL
+        res_swe, _ = swe.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
+        res_py, _ = ephem.calc_ut(
+            standard_jd, SUN, FLG_SWIEPH | FLG_SIDEREAL
         )
 
         lon_diff = abs(res_swe[0] - res_py[0])
@@ -86,13 +86,13 @@ class TestSiderealMode:
     def test_sidereal_velocity(self, standard_jd):
         """Test sidereal velocity calculation."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
         res_swe, _ = swe.calc_ut(
-            standard_jd, SE_MARS, SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+            standard_jd, MARS, FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
         )
-        res_py, _ = ephem.swe_calc_ut(
-            standard_jd, SE_MARS, SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        res_py, _ = ephem.calc_ut(
+            standard_jd, MARS, FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
         )
 
         # Velocity should match within 0.01 deg/day
@@ -106,8 +106,8 @@ class TestVelocityCalculations:
 
     def test_sun_velocity(self, standard_jd):
         """Test Sun velocity calculation."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
-        res_py, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+        res_swe, _ = swe.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_SPEED)
+        res_py, _ = ephem.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_SPEED)
 
         # Sun longitude speed ~1 deg/day
         assert 0.9 < res_py[3] < 1.1
@@ -116,9 +116,9 @@ class TestVelocityCalculations:
     def test_all_planets_velocity(self, standard_jd, all_planets):
         """Test velocity for all planets."""
         for planet_id, planet_name in all_planets:
-            res_swe, _ = swe.calc_ut(standard_jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            res_py, _ = ephem.swe_calc_ut(
-                standard_jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+            res_swe, _ = swe.calc_ut(standard_jd, planet_id, FLG_SWIEPH | FLG_SPEED)
+            res_py, _ = ephem.calc_ut(
+                standard_jd, planet_id, FLG_SWIEPH | FLG_SPEED
             )
 
             speed_diff = abs(res_swe[3] - res_py[3])
@@ -131,17 +131,17 @@ class TestCoordinateFrames:
 
     def test_j2000_coordinates(self, standard_jd):
         """Test J2000 coordinate frame."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_J2000)
-        res_py, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_J2000)
+        res_swe, _ = swe.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_J2000)
+        res_py, _ = ephem.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_J2000)
 
         lon_diff = abs(res_swe[0] - res_py[0])
         assert lon_diff < 0.001
 
     def test_equatorial_coordinates(self, standard_jd):
         """Test equatorial (RA/Dec) coordinates."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_EQUATORIAL)
-        res_py, _ = ephem.swe_calc_ut(
-            standard_jd, SE_SUN, SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        res_swe, _ = swe.calc_ut(standard_jd, SUN, FLG_SWIEPH | FLG_EQUATORIAL)
+        res_py, _ = ephem.calc_ut(
+            standard_jd, SUN, FLG_SWIEPH | FLG_EQUATORIAL
         )
 
         ra_diff = abs(res_swe[0] - res_py[0])

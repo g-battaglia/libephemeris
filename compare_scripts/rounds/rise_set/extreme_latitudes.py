@@ -94,13 +94,13 @@ def se_rise_trans(jd, body, geopos, rsmi, atpress=1013.25, attemp=15.0):
 
 
 def le_rise_trans(jd, body, geopos, rsmi, atpress=1013.25, attemp=15.0):
-    """Call libephemeris swe_rise_trans.
+    """Call libephemeris rise_trans.
 
     libephemeris sig: (tjdut, body, rsmi, geopos, atpress, attemp, flags)
     Returns: (retflag, tret) where retflag=-2 means circumpolar, tret[0] = JD
     """
     try:
-        retflag, tret = ephem.swe_rise_trans(
+        retflag, tret = ephem.rise_trans(
             jd, body, rsmi, list(geopos), atpress, attemp
         )
         if retflag == -2 or tret[0] == 0.0:
@@ -131,13 +131,13 @@ def se_rise_trans_true_hor(
 def le_rise_trans_true_hor(
     jd, body, geopos, rsmi, horiz_alt=0.0, atpress=1013.25, attemp=15.0
 ):
-    """Call libephemeris swe_rise_trans_true_hor.
+    """Call libephemeris rise_trans_true_hor.
 
     libephemeris sig: (tjdut, body, rsmi, geopos, atpress, attemp, horhgt, flags)
     Returns: (retflag, tret) where tret[0] = JD
     """
     try:
-        retflag, tret = ephem.swe_rise_trans_true_hor(
+        retflag, tret = ephem.rise_trans_true_hor(
             jd, body, rsmi, list(geopos), atpress, attemp, horiz_alt
         )
         if retflag == -2 or tret[0] == 0.0:
@@ -148,16 +148,16 @@ def le_rise_trans_true_hor(
 
 
 # RSMI flags (from SE docs)
-SE_CALC_RISE = 1
-SE_CALC_SET = 2
-SE_CALC_MTRANSIT = 4
-SE_CALC_ITRANSIT = 8
-SE_BIT_DISC_CENTER = 256
-SE_BIT_DISC_BOTTOM = 8192
-SE_BIT_NO_REFRACTION = 512
-SE_BIT_CIVIL_TWILIGHT = 1024
-SE_BIT_NAUTIC_TWILIGHT = 2048
-SE_BIT_ASTRO_TWILIGHT = 4096
+CALC_RISE = 1
+CALC_SET = 2
+CALC_MTRANSIT = 4
+CALC_ITRANSIT = 8
+BIT_DISC_CENTER = 256
+BIT_DISC_BOTTOM = 8192
+BIT_NO_REFRACTION = 512
+BIT_CIVIL_TWILIGHT = 1024
+BIT_NAUTIC_TWILIGHT = 2048
+BIT_ASTRO_TWILIGHT = 4096
 
 
 # ============================================================
@@ -185,12 +185,12 @@ def run_part1():
             geopos = (0.0, lat, 0.0)
 
             for rsmi, evname in [
-                (SE_CALC_RISE, "Rise"),
-                (SE_CALC_SET, "Set"),
+                (CALC_RISE, "Rise"),
+                (CALC_SET, "Set"),
             ]:
                 label = f"Sun {evname} lat={lat}° {dname}"
-                se_val = se_rise_trans(jd, SE_SUN, geopos, rsmi)
-                le_val = le_rise_trans(jd, SE_SUN, geopos, rsmi)
+                se_val = se_rise_trans(jd, SUN, geopos, rsmi)
+                le_val = le_rise_trans(jd, SUN, geopos, rsmi)
 
                 if se_val is None and le_val is None:
                     r.skip(f"{label}: both None (circumpolar?)")
@@ -238,12 +238,12 @@ def run_part2():
             geopos = (25.0, lat, 0.0)  # Use longitude 25° (Finland area)
 
             for rsmi, evname in [
-                (SE_CALC_RISE, "Rise"),
-                (SE_CALC_SET, "Set"),
+                (CALC_RISE, "Rise"),
+                (CALC_SET, "Set"),
             ]:
                 label = f"Sun {evname} lat={lat}° {season}"
-                se_val = se_rise_trans(jd, SE_SUN, geopos, rsmi)
-                le_val = le_rise_trans(jd, SE_SUN, geopos, rsmi)
+                se_val = se_rise_trans(jd, SUN, geopos, rsmi)
+                le_val = le_rise_trans(jd, SUN, geopos, rsmi)
 
                 if se_val is None and le_val is None:
                     r.skip(f"{label}: both circumpolar/never-rise")
@@ -267,10 +267,10 @@ def run_part2():
     jd_june = swe.julday(2024, 6, 21, 0.0)
     for lat in [-64.0, -66.0, -66.5, -67.0, -68.0]:
         geopos = (0.0, lat, 0.0)
-        for rsmi, evname in [(SE_CALC_RISE, "Rise"), (SE_CALC_SET, "Set")]:
+        for rsmi, evname in [(CALC_RISE, "Rise"), (CALC_SET, "Set")]:
             label = f"Sun {evname} lat={lat}° S-Winter"
-            se_val = se_rise_trans(jd_june, SE_SUN, geopos, rsmi)
-            le_val = le_rise_trans(jd_june, SE_SUN, geopos, rsmi)
+            se_val = se_rise_trans(jd_june, SUN, geopos, rsmi)
+            le_val = le_rise_trans(jd_june, SUN, geopos, rsmi)
 
             if se_val is None and le_val is None:
                 r.skip(f"{label}: both circumpolar")
@@ -317,12 +317,12 @@ def run_part3():
             geopos = (0.0, lat, 0.0)
 
             for rsmi, evname in [
-                (SE_CALC_RISE, "Rise"),
-                (SE_CALC_SET, "Set"),
+                (CALC_RISE, "Rise"),
+                (CALC_SET, "Set"),
             ]:
                 label = f"Moon {evname} lat={lat}° {dname}"
-                se_val = se_rise_trans(jd, SE_MOON, geopos, rsmi)
-                le_val = le_rise_trans(jd, SE_MOON, geopos, rsmi)
+                se_val = se_rise_trans(jd, MOON, geopos, rsmi)
+                le_val = le_rise_trans(jd, MOON, geopos, rsmi)
 
                 if se_val is None and le_val is None:
                     r.skip(f"{label}: both None")
@@ -357,11 +357,11 @@ def run_part4():
 
     jd = swe.julday(2024, 6, 21, 0.0)
     planets = [
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
     latitudes = [0.0, 30.0, 50.0, 60.0, 65.0]
 
@@ -369,8 +369,8 @@ def run_part4():
         geopos = (0.0, lat, 0.0)
         for body_id, body_name in planets:
             for rsmi, evname in [
-                (SE_CALC_RISE, "Rise"),
-                (SE_CALC_SET, "Set"),
+                (CALC_RISE, "Rise"),
+                (CALC_SET, "Set"),
             ]:
                 label = f"{body_name} {evname} lat={lat}°"
                 se_val = se_rise_trans(jd, body_id, geopos, rsmi)
@@ -409,17 +409,17 @@ def run_part5():
 
     latitudes = [0.0, 20.0, 40.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]
     bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
     ]
 
     for lat in latitudes:
         geopos = (15.0, lat, 0.0)
         for body_id, body_name in bodies:
             for rsmi, evname in [
-                (SE_CALC_MTRANSIT, "UpperTr"),
-                (SE_CALC_ITRANSIT, "LowerTr"),
+                (CALC_MTRANSIT, "UpperTr"),
+                (CALC_ITRANSIT, "LowerTr"),
             ]:
                 label = f"{body_name} {evname} lat={lat}°"
                 se_val = se_rise_trans(jd, body_id, geopos, rsmi)
@@ -459,23 +459,23 @@ def run_part6():
     latitudes = [0.0, 30.0, 50.0, 60.0, 63.0, 65.0]
 
     twilight_flags = [
-        (SE_BIT_CIVIL_TWILIGHT, "Civil"),
-        (SE_BIT_NAUTIC_TWILIGHT, "Nautical"),
-        (SE_BIT_ASTRO_TWILIGHT, "Astronomical"),
+        (BIT_CIVIL_TWILIGHT, "Civil"),
+        (BIT_NAUTIC_TWILIGHT, "Nautical"),
+        (BIT_ASTRO_TWILIGHT, "Astronomical"),
     ]
 
     for lat in latitudes:
         geopos = (0.0, lat, 0.0)
         for tw_flag, tw_name in twilight_flags:
             for rsmi_base, evname in [
-                (SE_CALC_RISE, "Begin"),
-                (SE_CALC_SET, "End"),
+                (CALC_RISE, "Begin"),
+                (CALC_SET, "End"),
             ]:
                 rsmi = rsmi_base | tw_flag
                 label = f"{tw_name} {evname} lat={lat}°"
 
-                se_val = se_rise_trans(jd, SE_SUN, geopos, rsmi)
-                le_val = le_rise_trans(jd, SE_SUN, geopos, rsmi)
+                se_val = se_rise_trans(jd, SUN, geopos, rsmi)
+                le_val = le_rise_trans(jd, SUN, geopos, rsmi)
 
                 if se_val is None and le_val is None:
                     r.skip(f"{label}: both None (no twilight?)")
@@ -500,14 +500,14 @@ def run_part6():
         geopos = (0.0, lat, 0.0)
         for tw_flag, tw_name in twilight_flags:
             for rsmi_base, evname in [
-                (SE_CALC_RISE, "Begin"),
-                (SE_CALC_SET, "End"),
+                (CALC_RISE, "Begin"),
+                (CALC_SET, "End"),
             ]:
                 rsmi = rsmi_base | tw_flag
                 label = f"{tw_name} {evname} lat={lat}° Summer"
 
-                se_val = se_rise_trans(jd_summer, SE_SUN, geopos, rsmi)
-                le_val = le_rise_trans(jd_summer, SE_SUN, geopos, rsmi)
+                se_val = se_rise_trans(jd_summer, SUN, geopos, rsmi)
+                le_val = le_rise_trans(jd_summer, SUN, geopos, rsmi)
 
                 if se_val is None and le_val is None:
                     r.skip(f"{label}: no twilight (white night)")
@@ -555,12 +555,12 @@ def run_part7():
     for lon, lat, alt, horiz_alt, desc in test_cases:
         geopos = (lon, lat, alt)
         for rsmi, evname in [
-            (SE_CALC_RISE, "Rise"),
-            (SE_CALC_SET, "Set"),
+            (CALC_RISE, "Rise"),
+            (CALC_SET, "Set"),
         ]:
             label = f"Sun {evname} {desc}"
-            se_val = se_rise_trans_true_hor(jd, SE_SUN, geopos, rsmi, horiz_alt)
-            le_val = le_rise_trans_true_hor(jd, SE_SUN, geopos, rsmi, horiz_alt)
+            se_val = se_rise_trans_true_hor(jd, SUN, geopos, rsmi, horiz_alt)
+            le_val = le_rise_trans_true_hor(jd, SUN, geopos, rsmi, horiz_alt)
 
             if se_val is None and le_val is None:
                 r.skip(f"{label}: both None")

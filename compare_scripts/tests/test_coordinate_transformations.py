@@ -2,10 +2,10 @@
 Tests for coordinate transformation flags.
 
 This module verifies that all coordinate transformation flags work correctly:
-- SEFLG_EQUATORIAL: Equatorial coordinates (RA/Dec) instead of ecliptic
-- SEFLG_J2000: J2000.0 reference frame (aequinox of J2000)
-- SEFLG_ICRS: International Celestial Reference System
-- SEFLG_SIDEREAL: Sidereal zodiac (requires ayanamsha mode to be set)
+- FLG_EQUATORIAL: Equatorial coordinates (RA/Dec) instead of ecliptic
+- FLG_J2000: J2000.0 reference frame (aequinox of J2000)
+- FLG_ICRS: International Celestial Reference System
+- FLG_SIDEREAL: Sidereal zodiac (requires ayanamsha mode to be set)
 - Ecliptic of date (default): True ecliptic and equinox of date
 
 Each test compares libephemeris results with pyswisseph to ensure 1:1 compatibility.
@@ -16,24 +16,24 @@ import math
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_ICRS,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_ICRS,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -50,16 +50,16 @@ TEST_DATES = [
 # Note: Mars center (499) may not be available in all DE440 variants
 # The fallback mechanism uses barycenter (4) when planet center is unavailable
 ALL_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
     # Skip Mars - planet center (499) not available in standard DE440
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
@@ -78,10 +78,10 @@ class TestEclipticOfDate:
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS)
     def test_ecliptic_of_date_vs_swisseph(self, jd, planet_id, planet_name):
         """Test ecliptic coordinates (default) match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare longitude
         lon_diff = angle_diff(res_swe[0], res_lib[0])
@@ -106,9 +106,9 @@ class TestEclipticOfDate:
 
     def test_ecliptic_sun_velocity(self, standard_jd):
         """Test that Sun's ecliptic velocity is ~1 deg/day."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, flags)
+        res_lib, _ = ephem.calc_ut(standard_jd, SUN, flags)
 
         # Sun moves approximately 1 degree per day
         assert 0.9 < res_lib[3] < 1.1, (
@@ -117,16 +117,16 @@ class TestEclipticOfDate:
 
 
 class TestEquatorialCoordinates:
-    """Tests for SEFLG_EQUATORIAL (RA/Dec instead of ecliptic lon/lat)."""
+    """Tests for FLG_EQUATORIAL (RA/Dec instead of ecliptic lon/lat)."""
 
     @pytest.mark.parametrize("jd", TEST_DATES)
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS)
     def test_equatorial_coordinates_vs_swisseph(self, jd, planet_id, planet_name):
         """Test equatorial (RA/Dec) coordinates match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare Right Ascension (stored in position[0])
         ra_diff = angle_diff(res_swe[0], res_lib[0])
@@ -150,30 +150,30 @@ class TestEquatorialCoordinates:
 
     def test_equatorial_ra_range(self, standard_jd):
         """Test that RA values are in valid range [0, 360)."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         for planet_id, planet_name in ALL_PLANETS:
-            res_lib, _ = ephem.swe_calc_ut(standard_jd, planet_id, flags)
+            res_lib, _ = ephem.calc_ut(standard_jd, planet_id, flags)
             ra = res_lib[0]
             assert 0 <= ra < 360, f"{planet_name} RA {ra} out of range [0, 360)"
 
     def test_equatorial_dec_range(self, standard_jd):
         """Test that Dec values are in valid range [-90, 90]."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         for planet_id, planet_name in ALL_PLANETS:
-            res_lib, _ = ephem.swe_calc_ut(standard_jd, planet_id, flags)
+            res_lib, _ = ephem.calc_ut(standard_jd, planet_id, flags)
             dec = res_lib[1]
             assert -90 <= dec <= 90, f"{planet_name} Dec {dec} out of range [-90, 90]"
 
     def test_equatorial_differs_from_ecliptic(self, standard_jd):
         """Test that equatorial and ecliptic coordinates are different."""
-        ecliptic_flags = SEFLG_SWIEPH
-        equatorial_flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        ecliptic_flags = FLG_SWIEPH
+        equatorial_flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         # Jupiter should have noticeably different coords in the two systems
-        res_ecl, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, ecliptic_flags)
-        res_equ, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, equatorial_flags)
+        res_ecl, _ = ephem.calc_ut(standard_jd, JUPITER, ecliptic_flags)
+        res_equ, _ = ephem.calc_ut(standard_jd, JUPITER, equatorial_flags)
 
         # The coordinates should differ (unless planet is at a special point)
         # Using a relaxed check since at certain positions they could be close
@@ -187,16 +187,16 @@ class TestEquatorialCoordinates:
 
 
 class TestJ2000Coordinates:
-    """Tests for SEFLG_J2000 (J2000.0 reference frame)."""
+    """Tests for FLG_J2000 (J2000.0 reference frame)."""
 
     @pytest.mark.parametrize("jd", TEST_DATES)
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS)
     def test_j2000_ecliptic_vs_swisseph(self, jd, planet_id, planet_name):
         """Test J2000 ecliptic coordinates match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_J2000 | FLG_SPEED
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare longitude
         lon_diff = angle_diff(res_swe[0], res_lib[0])
@@ -215,10 +215,10 @@ class TestJ2000Coordinates:
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS)
     def test_j2000_equatorial_vs_swisseph(self, jd, planet_id, planet_name):
         """Test J2000 equatorial coordinates (ICRS-like) match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL | FLG_SPEED
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare RA
         ra_diff = angle_diff(res_swe[0], res_lib[0])
@@ -238,11 +238,11 @@ class TestJ2000Coordinates:
         # Use a date far from J2000 to see precession effect
         jd_2100 = 2488070.0  # ~2100
 
-        date_flags = SEFLG_SWIEPH
-        j2000_flags = SEFLG_SWIEPH | SEFLG_J2000
+        date_flags = FLG_SWIEPH
+        j2000_flags = FLG_SWIEPH | FLG_J2000
 
-        res_date, _ = ephem.swe_calc_ut(jd_2100, SE_SUN, date_flags)
-        res_j2000, _ = ephem.swe_calc_ut(jd_2100, SE_SUN, j2000_flags)
+        res_date, _ = ephem.calc_ut(jd_2100, SUN, date_flags)
+        res_j2000, _ = ephem.calc_ut(jd_2100, SUN, j2000_flags)
 
         # Due to precession, coordinates should differ by ~1.4 deg/century
         # Over 100 years, expect ~1.4 degree difference
@@ -256,11 +256,11 @@ class TestJ2000Coordinates:
         """Test that at J2000.0 epoch, J2000 coords approximately equal date coords."""
         jd_j2000 = 2451545.0  # J2000.0 epoch
 
-        date_flags = SEFLG_SWIEPH
-        j2000_flags = SEFLG_SWIEPH | SEFLG_J2000
+        date_flags = FLG_SWIEPH
+        j2000_flags = FLG_SWIEPH | FLG_J2000
 
-        res_date, _ = ephem.swe_calc_ut(jd_j2000, SE_SUN, date_flags)
-        res_j2000, _ = ephem.swe_calc_ut(jd_j2000, SE_SUN, j2000_flags)
+        res_date, _ = ephem.calc_ut(jd_j2000, SUN, date_flags)
+        res_j2000, _ = ephem.calc_ut(jd_j2000, SUN, j2000_flags)
 
         # At J2000.0, the difference should be minimal (only nutation)
         lon_diff = angle_diff(res_date[0], res_j2000[0])
@@ -271,16 +271,16 @@ class TestJ2000Coordinates:
 
 
 class TestICRSCoordinates:
-    """Tests for SEFLG_ICRS (International Celestial Reference System)."""
+    """Tests for FLG_ICRS (International Celestial Reference System)."""
 
     @pytest.mark.parametrize("jd", TEST_DATES)
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS[:5])  # Test subset
     def test_icrs_vs_swisseph(self, jd, planet_id, planet_name):
         """Test ICRS coordinates match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_ICRS | FLG_EQUATORIAL
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare RA
         ra_diff = angle_diff(res_swe[0], res_lib[0])
@@ -302,12 +302,12 @@ class TestICRSCoordinates:
         jd1 = 2451545.0  # J2000.0
         jd2 = 2488070.0  # ~2100
 
-        icrs_flags = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_EQUATORIAL
+        icrs_flags = FLG_SWIEPH | FLG_ICRS | FLG_EQUATORIAL
 
         # For a star-like distant object, ICRS coords should barely change
         # Using Neptune as a "slow" object
-        res1, _ = ephem.swe_calc_ut(jd1, SE_NEPTUNE, icrs_flags)
-        res2, _ = ephem.swe_calc_ut(jd2, SE_NEPTUNE, icrs_flags)
+        res1, _ = ephem.calc_ut(jd1, NEPTUNE, icrs_flags)
+        res2, _ = ephem.calc_ut(jd2, NEPTUNE, icrs_flags)
 
         # Neptune moves slowly; in ICRS, the frame doesn't precess
         # The position change is due to Neptune's orbital motion, not precession
@@ -318,7 +318,7 @@ class TestICRSCoordinates:
 
 
 class TestSiderealCoordinates:
-    """Tests for SEFLG_SIDEREAL (sidereal zodiac)."""
+    """Tests for FLG_SIDEREAL (sidereal zodiac)."""
 
     @pytest.mark.parametrize("jd", TEST_DATES)
     @pytest.mark.parametrize("planet_id,planet_name", ALL_PLANETS)
@@ -326,12 +326,12 @@ class TestSiderealCoordinates:
         """Test sidereal (Lahiri) coordinates match pyswisseph."""
         # Set Lahiri ayanamsha
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare sidereal longitude
         lon_diff = angle_diff(res_swe[0], res_lib[0])
@@ -350,12 +350,12 @@ class TestSiderealCoordinates:
     def test_sidereal_fagan_bradley_vs_swisseph(self, jd):
         """Test sidereal (Fagan-Bradley) coordinates match pyswisseph."""
         swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
-        ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ephem.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
 
-        res_swe, _ = swe.calc_ut(jd, SE_SUN, flags)
-        res_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, flags)
+        res_swe, _ = swe.calc_ut(jd, SUN, flags)
+        res_lib, _ = ephem.calc_ut(jd, SUN, flags)
 
         lon_diff = angle_diff(res_swe[0], res_lib[0])
         assert lon_diff < 0.01, (
@@ -364,13 +364,13 @@ class TestSiderealCoordinates:
 
     def test_sidereal_differs_from_tropical(self, standard_jd):
         """Test that sidereal coordinates differ from tropical by ~24 degrees."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        tropical_flags = SEFLG_SWIEPH
-        sidereal_flags = SEFLG_SWIEPH | SEFLG_SIDEREAL
+        tropical_flags = FLG_SWIEPH
+        sidereal_flags = FLG_SWIEPH | FLG_SIDEREAL
 
-        res_trop, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, tropical_flags)
-        res_sid, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, sidereal_flags)
+        res_trop, _ = ephem.calc_ut(standard_jd, SUN, tropical_flags)
+        res_sid, _ = ephem.calc_ut(standard_jd, SUN, sidereal_flags)
 
         # Lahiri ayanamsha at J2000 is ~23.85 degrees
         lon_diff = angle_diff(res_trop[0], res_sid[0])
@@ -380,13 +380,13 @@ class TestSiderealCoordinates:
 
     def test_sidereal_velocity_matches_tropical(self, standard_jd):
         """Test that sidereal velocity approximately matches tropical velocity."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        tropical_flags = SEFLG_SWIEPH | SEFLG_SPEED
-        sidereal_flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        tropical_flags = FLG_SWIEPH | FLG_SPEED
+        sidereal_flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
 
-        res_trop, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, tropical_flags)
-        res_sid, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, sidereal_flags)
+        res_trop, _ = ephem.calc_ut(standard_jd, JUPITER, tropical_flags)
+        res_sid, _ = ephem.calc_ut(standard_jd, JUPITER, sidereal_flags)
 
         # Velocity should be nearly the same (ayanamsha rate is ~50"/century)
         vel_diff = abs(res_trop[3] - res_sid[3])
@@ -400,10 +400,10 @@ class TestCombinedFlags:
 
     def test_j2000_equatorial(self, standard_jd):
         """Test J2000 + EQUATORIAL flags work together."""
-        flags = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL | FLG_SPEED
 
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SUN, flags)
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, flags)
+        res_swe, _ = swe.calc_ut(standard_jd, SUN, flags)
+        res_lib, _ = ephem.calc_ut(standard_jd, SUN, flags)
 
         ra_diff = angle_diff(res_swe[0], res_lib[0])
         dec_diff = abs(res_swe[1] - res_lib[1])
@@ -413,13 +413,13 @@ class TestCombinedFlags:
 
     def test_sidereal_with_speed(self, standard_jd):
         """Test SIDEREAL + SPEED flags work together."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
 
-        res_swe, _ = swe.calc_ut(standard_jd, SE_JUPITER, flags)
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, flags)
+        res_swe, _ = swe.calc_ut(standard_jd, JUPITER, flags)
+        res_lib, _ = ephem.calc_ut(standard_jd, JUPITER, flags)
 
         # Check position
         lon_diff = angle_diff(res_swe[0], res_lib[0])
@@ -431,10 +431,10 @@ class TestCombinedFlags:
 
     def test_equatorial_with_speed(self, standard_jd):
         """Test EQUATORIAL + SPEED flags work together."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED
 
-        res_swe, _ = swe.calc_ut(standard_jd, SE_MOON, flags)
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_MOON, flags)
+        res_swe, _ = swe.calc_ut(standard_jd, MOON, flags)
+        res_lib, _ = ephem.calc_ut(standard_jd, MOON, flags)
 
         # Check position
         ra_diff = angle_diff(res_swe[0], res_lib[0])
@@ -451,10 +451,10 @@ class TestEdgeCases:
     def test_pole_coordinates(self):
         """Test that coordinates near poles don't cause errors."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         # Calculate position of Pluto (can have high declination)
-        res_lib, _ = ephem.swe_calc_ut(jd, SE_PLUTO, flags)
+        res_lib, _ = ephem.calc_ut(jd, PLUTO, flags)
 
         # Should return valid coordinates
         assert -90 <= res_lib[1] <= 90, f"Declination {res_lib[1]} out of range"
@@ -463,16 +463,16 @@ class TestEdgeCases:
     def test_all_flags_return_tuples(self, standard_jd):
         """Test that all flag combinations return proper 6-element tuples."""
         flag_combos = [
-            SEFLG_SWIEPH,
-            SEFLG_SWIEPH | SEFLG_EQUATORIAL,
-            SEFLG_SWIEPH | SEFLG_J2000,
-            SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_EQUATORIAL,
-            SEFLG_SWIEPH | SEFLG_SPEED,
-            SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED,
+            FLG_SWIEPH,
+            FLG_SWIEPH | FLG_EQUATORIAL,
+            FLG_SWIEPH | FLG_J2000,
+            FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL,
+            FLG_SWIEPH | FLG_SPEED,
+            FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED,
         ]
 
         for flags in flag_combos:
-            res, retflag = ephem.swe_calc_ut(standard_jd, SE_SUN, flags)
+            res, retflag = ephem.calc_ut(standard_jd, SUN, flags)
             assert len(res) == 6, f"Result should have 6 elements for flags {flags}"
             assert all(isinstance(x, float) for x in res), (
                 "All elements should be floats"
@@ -487,9 +487,9 @@ class TestEdgeCases:
         ]
 
         for jd in dates:
-            for flags in [SEFLG_SWIEPH, SEFLG_SWIEPH | SEFLG_J2000]:
-                res_swe, _ = swe.calc_ut(jd, SE_SUN, flags)
-                res_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, flags)
+            for flags in [FLG_SWIEPH, FLG_SWIEPH | FLG_J2000]:
+                res_swe, _ = swe.calc_ut(jd, SUN, flags)
+                res_lib, _ = ephem.calc_ut(jd, SUN, flags)
 
                 lon_diff = angle_diff(res_swe[0], res_lib[0])
                 assert lon_diff < 0.01, (
@@ -498,27 +498,27 @@ class TestEdgeCases:
 
 
 class TestCalcFunction:
-    """Tests for swe_calc (TT input) vs swe_calc_ut (UT input)."""
+    """Tests for calc (TT input) vs calc_ut (UT input)."""
 
     def test_calc_vs_calc_ut(self, standard_jd):
-        """Test that swe_calc and swe_calc_ut give consistent results."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        """Test that calc and calc_ut give consistent results."""
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
-        # swe_calc takes TT, swe_calc_ut takes UT
+        # calc takes TT, calc_ut takes UT
         # At J2000.0, the difference is small (~64 seconds)
-        res_ut, _ = ephem.swe_calc_ut(standard_jd, SE_SUN, flags)
-        res_tt, _ = ephem.swe_calc(standard_jd, SE_SUN, flags)
+        res_ut, _ = ephem.calc_ut(standard_jd, SUN, flags)
+        res_tt, _ = ephem.calc(standard_jd, SUN, flags)
 
         # Should be very close (difference due to Delta T is small in position)
         lon_diff = angle_diff(res_ut[0], res_tt[0])
         assert lon_diff < 0.01, f"calc vs calc_ut diff {lon_diff} >= 0.01"
 
     def test_calc_with_j2000_flag(self, standard_jd):
-        """Test swe_calc with J2000 flag."""
-        flags = SEFLG_SWIEPH | SEFLG_J2000
+        """Test calc with J2000 flag."""
+        flags = FLG_SWIEPH | FLG_J2000
 
-        res_swe, _ = swe.calc(standard_jd, SE_JUPITER, flags)
-        res_lib, _ = ephem.swe_calc(standard_jd, SE_JUPITER, flags)
+        res_swe, _ = swe.calc(standard_jd, JUPITER, flags)
+        res_lib, _ = ephem.calc(standard_jd, JUPITER, flags)
 
         lon_diff = angle_diff(res_swe[0], res_lib[0])
         assert lon_diff < 0.001, f"calc J2000 lon diff {lon_diff} >= 0.001"

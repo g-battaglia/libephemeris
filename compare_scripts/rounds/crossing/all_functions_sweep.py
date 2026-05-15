@@ -2,12 +2,12 @@
 """Round 79: Crossing Functions Deep Sweep
 
 Tests all crossing functions comprehensively:
-- swe_solcross_ut: Sun crossing specific longitudes
-- swe_mooncross_ut: Moon crossing specific longitudes
-- swe_mooncross_node_ut: Moon crossing its own nodes
-- swe_cross_ut: Generic planet crossing longitudes
-- swe_helio_cross_ut: Heliocentric crossing
-- swe_find_station_ut: Planetary stations (retrograde/direct)
+- solcross_ut: Sun crossing specific longitudes
+- mooncross_ut: Moon crossing specific longitudes
+- mooncross_node_ut: Moon crossing its own nodes
+- cross_ut: Generic planet crossing longitudes
+- helio_cross_ut: Heliocentric crossing
+- find_station_ut: Planetary stations (retrograde/direct)
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -65,7 +65,7 @@ for year_offset in range(10):
         label = f"solcross y+{year_offset} lon={target_lon}"
         try:
             se_jd = swe.solcross_ut(target_lon, jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_solcross_ut(target_lon, jd, 2)
+            le_jd = ephem.solcross_ut(target_lon, jd, 2)
             # Verify the Sun is actually at the target longitude
             check(label, se_jd, le_jd, 2.0, is_time=True)  # 2 second tolerance
         except Exception as e:
@@ -87,7 +87,7 @@ for month in range(24):  # 2 years monthly
         label = f"mooncross m={month} lon={target_lon}"
         try:
             se_jd = swe.mooncross_ut(target_lon, jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_mooncross_ut(target_lon, jd, 2)
+            le_jd = ephem.mooncross_ut(target_lon, jd, 2)
             check(label, se_jd, le_jd, 1.0, is_time=True)  # 1 second tolerance
         except Exception as e:
             errors += 1
@@ -112,7 +112,7 @@ for i in range(50):  # ~50 node crossings over ~2 years
         se_lon = se_result[1]
         se_lat = se_result[2]
 
-        le_result = ephem.swe_mooncross_node_ut(jd, 2)
+        le_result = ephem.mooncross_node_ut(jd, 2)
         le_jd = le_result[0]
         le_lon = le_result[1]
         le_lat = le_result[2]
@@ -164,7 +164,7 @@ for body_id, name in planets:
         label = f"cross_ut {name} y+{year_offset} lon={target_lon:.1f}"
         try:
             se_jd = swe.cross_ut(body_id, target_lon, jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_cross_ut(body_id, target_lon, jd, 2)
+            le_jd = ephem.cross_ut(body_id, target_lon, jd, 2)
             check(label, se_jd, le_jd, 5.0, is_time=True)  # 5 second tolerance
         except Exception as e:
             errors += 1
@@ -187,7 +187,7 @@ for body_id, name in planets:
         label = f"helio_cross {name} y+{year_offset} lon={target_lon:.1f}"
         try:
             se_jd = swe.helio_cross_ut(body_id, target_lon, jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_helio_cross_ut(body_id, target_lon, jd, 2)
+            le_jd = ephem.helio_cross_ut(body_id, target_lon, jd, 2)
             check(
                 label, se_jd, le_jd, 10.0, is_time=True
             )  # 10 second tolerance (helio slower convergence)
@@ -231,9 +231,9 @@ for body_id, name in station_planets:
                 if se_result is None or se_result == 0:
                     continue
 
-                # LE API: swe_find_station_ut(body, jd_start, flags, direction)
+                # LE API: find_station_ut(body, jd_start, flags, direction)
                 # direction: 0=retrograde station, 1=direct station
-                le_result = ephem.swe_find_station_ut(body_id, jd, 2, direction)
+                le_result = ephem.find_station_ut(body_id, jd, 2, direction)
 
                 if isinstance(se_result, (int, float)):
                     se_jd = float(se_result)
@@ -269,9 +269,9 @@ for target_lon in [0, 90, 180, 270]:
         jd = jd_start + year_offset * 365.25
         label = f"solcross_verify y+{year_offset} lon={target_lon}"
         try:
-            le_jd = ephem.swe_solcross_ut(target_lon, jd, 2)
+            le_jd = ephem.solcross_ut(target_lon, jd, 2)
             # Verify Sun is actually at target longitude
-            le_pos = ephem.swe_calc_ut(le_jd, 0)  # Sun
+            le_pos = ephem.calc_ut(le_jd, 0)  # Sun
             actual_lon = le_pos[0]
             diff_arcsec = abs(actual_lon - target_lon) * 3600.0
             # Handle wraparound
@@ -300,8 +300,8 @@ for month in range(12):
     for target_lon in [0, 90, 180, 270]:
         label = f"mooncross_verify m={month} lon={target_lon}"
         try:
-            le_jd = ephem.swe_mooncross_ut(target_lon, jd, 2)
-            le_pos = ephem.swe_calc_ut(le_jd, 1)  # Moon
+            le_jd = ephem.mooncross_ut(target_lon, jd, 2)
+            le_pos = ephem.calc_ut(le_jd, 1)  # Moon
             actual_lon = le_pos[0]
             diff_arcsec = abs(actual_lon - target_lon) * 3600.0
             if diff_arcsec > 180 * 3600:
@@ -341,7 +341,7 @@ for body_id, name in inner_planets:
         label = f"cross_ut {name} m={month} lon={target_lon:.1f}"
         try:
             se_jd = swe.cross_ut(body_id, target_lon, jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_cross_ut(body_id, target_lon, jd, 2)
+            le_jd = ephem.cross_ut(body_id, target_lon, jd, 2)
             check(label, se_jd, le_jd, 5.0, is_time=True)
         except Exception as e:
             errors += 1
@@ -360,7 +360,7 @@ for year_offset in range(5):
     label = f"solcross_0deg y+{year_offset}"
     try:
         se_jd = swe.solcross_ut(0.0, jd, swe.FLG_SWIEPH)
-        le_jd = ephem.swe_solcross_ut(0.0, jd, 2)
+        le_jd = ephem.solcross_ut(0.0, jd, 2)
         check(label, se_jd, le_jd, 2.0, is_time=True)
     except Exception as e:
         errors += 1
@@ -370,7 +370,7 @@ for year_offset in range(5):
     label = f"mooncross_359.99 y+{year_offset}"
     try:
         se_jd = swe.mooncross_ut(359.99, jd, swe.FLG_SWIEPH)
-        le_jd = ephem.swe_mooncross_ut(359.99, jd, 2)
+        le_jd = ephem.mooncross_ut(359.99, jd, 2)
         check(label, se_jd, le_jd, 1.0, is_time=True)
     except Exception as e:
         errors += 1

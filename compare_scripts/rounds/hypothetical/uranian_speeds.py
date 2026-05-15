@@ -13,33 +13,33 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_HELCTR,
-    SE_CUPIDO,
-    SE_HADES,
-    SE_ZEUS,
-    SE_KRONOS,
-    SE_APOLLON,
-    SE_ADMETOS,
-    SE_VULKANUS,
-    SE_POSEIDON,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_HELCTR,
+    CUPIDO,
+    HADES,
+    ZEUS,
+    KRONOS,
+    APOLLON,
+    ADMETOS,
+    VULKANUS,
+    POSEIDON,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    SE_CUPIDO: "Cupido",
-    SE_HADES: "Hades",
-    SE_ZEUS: "Zeus",
-    SE_KRONOS: "Kronos",
-    SE_APOLLON: "Apollon",
-    SE_ADMETOS: "Admetos",
-    SE_VULKANUS: "Vulkanus",
-    SE_POSEIDON: "Poseidon",
+    CUPIDO: "Cupido",
+    HADES: "Hades",
+    ZEUS: "Zeus",
+    KRONOS: "Kronos",
+    APOLLON: "Apollon",
+    ADMETOS: "Admetos",
+    VULKANUS: "Vulkanus",
+    POSEIDON: "Poseidon",
 }
 
 TEST_JDS = [
@@ -59,10 +59,10 @@ TEST_JDS = [
 ]
 
 FLAG_COMBOS = {
-    "default": SEFLG_SWIEPH | SEFLG_SPEED,
-    "J2000": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000,
-    "NONUT": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT,
-    "HELCTR": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR,
+    "default": FLG_SWIEPH | FLG_SPEED,
+    "J2000": FLG_SWIEPH | FLG_SPEED | FLG_J2000,
+    "NONUT": FLG_SWIEPH | FLG_SPEED | FLG_NONUT,
+    "HELCTR": FLG_SWIEPH | FLG_SPEED | FLG_HELCTR,
 }
 
 COMP_NAMES = ["lon", "lat", "dist", "lon_spd", "lat_spd", "dist_spd"]
@@ -77,7 +77,7 @@ for jd in TEST_JDS:
         for flag_name, flags in FLAG_COMBOS.items():
             try:
                 se_result = swe.calc_ut(jd, body, flags)
-                le_result = ephem.swe_calc_ut(jd, body, flags)
+                le_result = ephem.calc_ut(jd, body, flags)
 
                 for i, comp in enumerate(COMP_NAMES):
                     total += 1

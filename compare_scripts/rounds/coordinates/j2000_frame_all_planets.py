@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 156: J2000 frame all planets deep sweep.
 
-Compare positions with SEFLG_J2000 flag for all planets across many epochs.
+Compare positions with FLG_J2000 flag for all planets across many epochs.
 J2000 returns ecliptic coordinates in the J2000 reference frame (no precession).
 """
 
@@ -14,10 +14,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_J2000 = 32
+FLG_SPEED = 256
+FLG_J2000 = 32
 
 BODIES = {
     0: "Sun",
@@ -64,8 +64,8 @@ print("=" * 90)
 for label, jd in test_dates:
     for body, bname in BODIES.items():
         try:
-            se_r = swe.calc_ut(jd, body, SEFLG_SPEED | SEFLG_J2000)[0]
-            le_r = ephem.swe_calc_ut(jd, body, SEFLG_SPEED | SEFLG_J2000)[0]
+            se_r = swe.calc_ut(jd, body, FLG_SPEED | FLG_J2000)[0]
+            le_r = ephem.calc_ut(jd, body, FLG_SPEED | FLG_J2000)[0]
             comps = [
                 ("lon", 3600, TOL_LON),
                 ("lat", 3600, TOL_LAT),

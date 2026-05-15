@@ -17,14 +17,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Stars with significant proper motion
 STARS = [
@@ -65,7 +65,7 @@ def compare_star(star_name, jd):
     label = f"{star_name} JD={jd:.1f}"
 
     try:
-        le_r = ephem.swe_fixstar2_ut(star_name, jd, FLAGS)
+        le_r = ephem.fixstar2_ut(star_name, jd, FLAGS)
         # Returns (pos_tuple, starname, retflag)
         le_name = le_r[1]
         le_pos = le_r[0]
@@ -133,7 +133,7 @@ def compare_star(star_name, jd):
         total += 1
         # Get J2000 position for reference
         try:
-            le_j2000 = ephem.swe_fixstar2_ut(star_name, 2451545.0, FLAGS)
+            le_j2000 = ephem.fixstar2_ut(star_name, 2451545.0, FLAGS)
             expected_drift = (jd - 2451545.0) * le_j2000[0][3]  # days * speed deg/day
             actual_drift = le_pos[0] - le_j2000[0][0]
             if actual_drift > 180:

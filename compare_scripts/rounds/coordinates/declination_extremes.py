@@ -16,26 +16,26 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_EQUATORIAL
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_EQUATORIAL
 
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN, 0.5),
-    ("Moon", ephem.SE_MOON, swe.MOON, 1.0),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY, 0.5),
-    ("Venus", ephem.SE_VENUS, swe.VENUS, 0.5),
-    ("Mars", ephem.SE_MARS, swe.MARS, 0.5),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER, 0.5),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN, 0.5),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS, 0.5),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE, 0.5),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO, 1.0),
+    ("Sun", ephem.SUN, swe.SUN, 0.5),
+    ("Moon", ephem.MOON, swe.MOON, 1.0),
+    ("Mercury", ephem.MERCURY, swe.MERCURY, 0.5),
+    ("Venus", ephem.VENUS, swe.VENUS, 0.5),
+    ("Mars", ephem.MARS, swe.MARS, 0.5),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER, 0.5),
+    ("Saturn", ephem.SATURN, swe.SATURN, 0.5),
+    ("Uranus", ephem.URANUS, swe.URANUS, 0.5),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE, 0.5),
+    ("Pluto", ephem.PLUTO, swe.PLUTO, 1.0),
 ]
 
 # Scan for declination extremes across 25 years
@@ -80,7 +80,7 @@ def compare_at(label, le_body, se_body, jd, tol):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, le_body, FLAGS)
+        le_r = ephem.calc_ut(jd, le_body, FLAGS)
         se_r = swe.calc_ut(
             jd, se_body, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL
         )
@@ -149,7 +149,7 @@ if __name__ == "__main__":
         2460657.5,  # 2024
     ]
     for jd in solstice_jds:
-        compare_at(f"Sun solstice JD={jd:.1f}", ephem.SE_SUN, swe.SUN, jd, 0.5)
+        compare_at(f"Sun solstice JD={jd:.1f}", ephem.SUN, swe.SUN, jd, 0.5)
 
     print(f"\n{'=' * 70}")
     print(

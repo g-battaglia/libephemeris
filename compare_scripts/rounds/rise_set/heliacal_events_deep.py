@@ -3,9 +3,9 @@
 Round 7: Deep Heliacal Events Audit
 ====================================
 Compares libephemeris heliacal functions against pyswisseph:
-  - swe_heliacal_ut: timing of heliacal events (rising/setting/evening first/morning last)
-  - swe_heliacal_pheno_ut: detailed heliacal phenomena (50-element array)
-  - swe_vis_limit_mag: visual limiting magnitude
+  - heliacal_ut: timing of heliacal events (rising/setting/evening first/morning last)
+  - heliacal_pheno_ut: detailed heliacal phenomena (50-element array)
+  - vis_limit_mag: visual limiting magnitude
 
 Tests multiple planets, stars, locations, and event types.
 """
@@ -115,14 +115,14 @@ def record_error(test_name, error_msg):
 
 
 # ============================================================================
-# PART 1: swe_heliacal_ut - Event Timing
+# PART 1: heliacal_ut - Event Timing
 # ============================================================================
 
 
 def test_part1_heliacal_ut():
     """Test heliacal_ut event timing for planets and stars."""
     print("\n" + "=" * 70)
-    print("PART 1: swe_heliacal_ut — Event Timing")
+    print("PART 1: heliacal_ut — Event Timing")
     print("=" * 70)
 
     # Tolerances
@@ -163,7 +163,7 @@ def test_part1_heliacal_ut():
                             continue
 
                         # libephemeris
-                        ret_le = ephem.swe_heliacal_ut(
+                        ret_le = ephem.heliacal_ut(
                             jd_start,
                             geopos,
                             STANDARD_ATMO,
@@ -233,7 +233,7 @@ def test_part1_heliacal_ut():
                             continue
 
                         # libephemeris
-                        ret_le = ephem.swe_heliacal_ut(
+                        ret_le = ephem.heliacal_ut(
                             jd_start,
                             geopos,
                             STANDARD_ATMO,
@@ -263,14 +263,14 @@ def test_part1_heliacal_ut():
 
 
 # ============================================================================
-# PART 2: swe_heliacal_pheno_ut — Phenomena Details
+# PART 2: heliacal_pheno_ut — Phenomena Details
 # ============================================================================
 
 
 def test_part2_heliacal_pheno():
     """Test heliacal_pheno_ut return values."""
     print("\n" + "=" * 70)
-    print("PART 2: swe_heliacal_pheno_ut — Phenomena Details")
+    print("PART 2: heliacal_pheno_ut — Phenomena Details")
     print("=" * 70)
 
     # Use a specific date and location for detailed comparison
@@ -345,7 +345,7 @@ def test_part2_heliacal_pheno():
                 data_se = ret_se  # flat tuple
 
                 # libephemeris - returns (50-tuple, retflag)
-                ret_le = ephem.swe_heliacal_pheno_ut(
+                ret_le = ephem.heliacal_pheno_ut(
                     jd,
                     geopos,
                     STANDARD_ATMO,
@@ -406,14 +406,14 @@ def test_part2_heliacal_pheno():
 
 
 # ============================================================================
-# PART 3: swe_vis_limit_mag — Visual Limiting Magnitude
+# PART 3: vis_limit_mag — Visual Limiting Magnitude
 # ============================================================================
 
 
 def test_part3_vis_limit_mag():
     """Test vis_limit_mag return values."""
     print("\n" + "=" * 70)
-    print("PART 3: swe_vis_limit_mag — Visual Limiting Magnitude")
+    print("PART 3: vis_limit_mag — Visual Limiting Magnitude")
     print("=" * 70)
 
     # Test at different times of night
@@ -445,7 +445,7 @@ def test_part3_vis_limit_mag():
                     dret_se = ret_se[1]
 
                     # libephemeris
-                    ret_le = ephem.swe_vis_limit_mag(
+                    ret_le = ephem.vis_limit_mag(
                         jd,
                         geopos,
                         STANDARD_ATMO,
@@ -534,20 +534,20 @@ def test_part4_flag_constants():
 
     # Mapping of our constants to pyswisseph constants
     flag_checks = [
-        ("HELIACAL_RISING", ephem.SE_HELIACAL_RISING, swe.HELIACAL_RISING),
-        ("HELIACAL_SETTING", ephem.SE_HELIACAL_SETTING, swe.HELIACAL_SETTING),
-        ("EVENING_FIRST", ephem.SE_EVENING_FIRST, swe.EVENING_FIRST),
-        ("MORNING_LAST", ephem.SE_MORNING_LAST, swe.MORNING_LAST),
+        ("HELIACAL_RISING", ephem.HELIACAL_RISING, swe.HELIACAL_RISING),
+        ("HELIACAL_SETTING", ephem.HELIACAL_SETTING, swe.HELIACAL_SETTING),
+        ("EVENING_FIRST", ephem.EVENING_FIRST, swe.EVENING_FIRST),
+        ("MORNING_LAST", ephem.MORNING_LAST, swe.MORNING_LAST),
         (
             "HELFLAG_OPTICAL_PARAMS",
-            ephem.SE_HELFLAG_OPTICAL_PARAMS,
+            ephem.HELFLAG_OPTICAL_PARAMS,
             swe.HELFLAG_OPTICAL_PARAMS,
         ),
-        ("HELFLAG_NO_DETAILS", ephem.SE_HELFLAG_NO_DETAILS, swe.HELFLAG_NO_DETAILS),
-        ("HELFLAG_VISLIM_DARK", ephem.SE_HELFLAG_VISLIM_DARK, swe.HELFLAG_VISLIM_DARK),
+        ("HELFLAG_NO_DETAILS", ephem.HELFLAG_NO_DETAILS, swe.HELFLAG_NO_DETAILS),
+        ("HELFLAG_VISLIM_DARK", ephem.HELFLAG_VISLIM_DARK, swe.HELFLAG_VISLIM_DARK),
         (
             "HELFLAG_VISLIM_NOMOON",
-            ephem.SE_HELFLAG_VISLIM_NOMOON,
+            ephem.HELFLAG_VISLIM_NOMOON,
             swe.HELFLAG_VISLIM_NOMOON,
         ),
     ]
@@ -601,7 +601,7 @@ def test_part5_api_shape():
     geopos = (0.0, 30.0, 0)
 
     # --- heliacal_ut ---
-    print("\n  --- swe_heliacal_ut ---")
+    print("\n  --- heliacal_ut ---")
     try:
         ret_se = swe.heliacal_ut(
             jd_start,
@@ -612,7 +612,7 @@ def test_part5_api_shape():
             HELIACAL_RISING,
             0,
         )
-        ret_le = ephem.swe_heliacal_ut(
+        ret_le = ephem.heliacal_ut(
             jd_start,
             geopos,
             STANDARD_ATMO,
@@ -658,7 +658,7 @@ def test_part5_api_shape():
         record_error("P5/heliacal_ut", str(e))
 
     # --- heliacal_pheno_ut ---
-    print("\n  --- swe_heliacal_pheno_ut ---")
+    print("\n  --- heliacal_pheno_ut ---")
     jd_pheno = swe.julday(2024, 6, 15, 12.0)
     try:
         ret_se = swe.heliacal_pheno_ut(
@@ -670,7 +670,7 @@ def test_part5_api_shape():
             HELIACAL_RISING,
             0,
         )
-        ret_le = ephem.swe_heliacal_pheno_ut(
+        ret_le = ephem.heliacal_pheno_ut(
             jd_pheno,
             geopos,
             STANDARD_ATMO,
@@ -705,7 +705,7 @@ def test_part5_api_shape():
         record_error("P5/heliacal_pheno_ut", str(e))
 
     # --- vis_limit_mag ---
-    print("\n  --- swe_vis_limit_mag ---")
+    print("\n  --- vis_limit_mag ---")
     jd_night = swe.julday(2024, 8, 15, 22.0)
     geopos_vlm = (12.5, 41.9, 0)  # Rome
     try:
@@ -717,7 +717,7 @@ def test_part5_api_shape():
             "Jupiter",
             0,
         )
-        ret_le = ephem.swe_vis_limit_mag(
+        ret_le = ephem.vis_limit_mag(
             jd_night,
             geopos_vlm,
             STANDARD_ATMO,
@@ -769,8 +769,8 @@ def test_part6_edge_cases():
     )
     record(
         "P6/LE_MORNING_LAST_value",
-        ephem.SE_MORNING_LAST == 4,
-        f"libephemeris SE_MORNING_LAST = {ephem.SE_MORNING_LAST}",
+        ephem.MORNING_LAST == 4,
+        f"libephemeris MORNING_LAST = {ephem.MORNING_LAST}",
     )
 
     # 6b: Test high latitude (Tromsø 69.6°N) — may fail for polar regions
@@ -786,7 +786,7 @@ def test_part6_edge_cases():
             HELIACAL_RISING,
             0,
         )
-        ret_le = ephem.swe_heliacal_ut(
+        ret_le = ephem.heliacal_ut(
             jd_start,
             geopos_tromso,
             STANDARD_ATMO,
@@ -821,7 +821,7 @@ def test_part6_edge_cases():
             HELIACAL_RISING,
             0,
         )
-        ret_le = ephem.swe_heliacal_ut(
+        ret_le = ephem.heliacal_ut(
             jd_start,
             geopos_cairo,
             STANDARD_ATMO,
@@ -857,7 +857,7 @@ def test_part6_edge_cases():
             HELIACAL_RISING,
             no_details_flag,
         )
-        ret_le = ephem.swe_heliacal_ut(
+        ret_le = ephem.heliacal_ut(
             jd_start,
             geopos_rome,
             STANDARD_ATMO,

@@ -16,14 +16,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Test dates (spanning 20 years)
 JD_START = 2451545.0  # J2000
@@ -100,7 +100,7 @@ def compare_at_extreme(label, jd):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, ephem.SE_MOON, FLAGS)
+        le_r = ephem.calc_ut(jd, ephem.MOON, FLAGS)
         se_r = swe.calc_ut(jd, swe.MOON, swe.FLG_SWIEPH | swe.FLG_SPEED)
     except Exception:
         return

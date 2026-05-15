@@ -1,9 +1,9 @@
 """Round 5: Rise/Transit/Set Deep Audit
 
 Comprehensive comparison of libephemeris vs pyswisseph for:
-- swe_rise_trans: Sun/Moon/planets rise, set, upper/lower transit
-- swe_rise_trans_true_hor: with custom horizon altitude
-- swe_pheno_ut / swe_pheno: planetary phenomena (phase, elongation, magnitude)
+- rise_trans: Sun/Moon/planets rise, set, upper/lower transit
+- rise_trans_true_hor: with custom horizon altitude
+- pheno_ut / pheno: planetary phenomena (phase, elongation, magnitude)
 - Multiple locations, dates, bodies, and flag combinations
 
 Run with: env LIBEPHEMERIS_MODE=skyfield python3 compare_scripts/round5_rise_transit_deep.py
@@ -19,8 +19,8 @@ import swisseph as swe
 sys.path.insert(0, ".")
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 issues = []
 stats = {}
@@ -441,11 +441,11 @@ print(
 )
 
 # ============================================================================
-# PART 5: swe_pheno_ut — Planetary phenomena
+# PART 5: pheno_ut — Planetary phenomena
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 5: swe_pheno_ut — Planetary phenomena (phase, elongation, magnitude)")
+print("PART 5: pheno_ut — Planetary phenomena (phase, elongation, magnitude)")
 print("=" * 80)
 
 part5_pass = 0
@@ -488,7 +488,7 @@ for body_id, body_name in PHENO_BODIES:
             se_ret = swe.pheno_ut(jd_date, body_id)
             se_attr = se_ret[0] if isinstance(se_ret[0], (list, tuple)) else se_ret
 
-            le_ret = ephem.swe_pheno_ut(jd_date, body_id, 0)
+            le_ret = ephem.pheno_ut(jd_date, body_id, 0)
             le_attr = le_ret[0]
         except Exception as e:
             continue

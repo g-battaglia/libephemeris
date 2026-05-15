@@ -75,7 +75,7 @@ def find_moon_phase_se(jd_start, phase_angle):
     """Find next time Moon-Sun elongation = phase_angle using SE mooncross."""
     # Moon longitude = Sun longitude + phase_angle
     # We find when Moon crosses Sun_lon + phase_angle
-    sun = swe.calc_ut(jd_start, SE_SUN, 0)[0]
+    sun = swe.calc_ut(jd_start, SUN, 0)[0]
     target_lon = (sun[0] + phase_angle) % 360
 
     # Use mooncross to find when Moon reaches target longitude
@@ -83,7 +83,7 @@ def find_moon_phase_se(jd_start, phase_angle):
 
     # Iterate: Sun moves ~1°/day, so refine
     for _ in range(5):
-        sun = swe.calc_ut(jd, SE_SUN, 0)[0]
+        sun = swe.calc_ut(jd, SUN, 0)[0]
         target_lon = (sun[0] + phase_angle) % 360
         jd = swe.mooncross_ut(target_lon, jd - 0.5, 0)
 
@@ -92,15 +92,15 @@ def find_moon_phase_se(jd_start, phase_angle):
 
 def find_moon_phase_le(jd_start, phase_angle):
     """Find next time Moon-Sun elongation = phase_angle using LE mooncross."""
-    sun = ephem.swe_calc_ut(jd_start, SE_SUN, 0)[0]
+    sun = ephem.calc_ut(jd_start, SUN, 0)[0]
     target_lon = (sun[0] + phase_angle) % 360
 
-    jd = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+    jd = ephem.mooncross_ut(target_lon, jd_start, 0)
 
     for _ in range(5):
-        sun = ephem.swe_calc_ut(jd, SE_SUN, 0)[0]
+        sun = ephem.calc_ut(jd, SUN, 0)[0]
         target_lon = (sun[0] + phase_angle) % 360
-        jd = ephem.swe_mooncross_ut(target_lon, jd - 0.5, 0)
+        jd = ephem.mooncross_ut(target_lon, jd - 0.5, 0)
 
     return jd
 
@@ -289,8 +289,8 @@ def run_part6():
             le_jd = find_moon_phase_le(jd_start, phase)
 
             # Compute actual elongation at this time
-            sun = ephem.swe_calc_ut(le_jd, SE_SUN, 0)[0]
-            moon = ephem.swe_calc_ut(le_jd, SE_MOON, 0)[0]
+            sun = ephem.calc_ut(le_jd, SUN, 0)[0]
+            moon = ephem.calc_ut(le_jd, MOON, 0)[0]
             elong = (moon[0] - sun[0]) % 360
 
             # For New Moon, elongation should be ~0° (or ~360°)

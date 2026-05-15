@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 63: Barycentric Positions Deep Sweep
 
-Compare barycentric (solar system barycenter) positions (SEFLG_BARYCTR).
+Compare barycentric (solar system barycenter) positions (FLG_BARYCTR).
 Tests lon, lat, distance for all planets. Also BARYCTR+J2000, BARYCTR+EQUATORIAL.
 """
 
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 BODIES = {
@@ -27,10 +27,10 @@ BODIES = {
     8: "Neptune",
     9: "Pluto",
 }
-SEFLG_SPEED = 256
-SEFLG_BARYCTR = 4
-SEFLG_J2000 = 32
-SEFLG_EQUATORIAL = 2048
+FLG_SPEED = 256
+FLG_BARYCTR = 4
+FLG_J2000 = 32
+FLG_EQUATORIAL = 2048
 
 print("=" * 70)
 print("ROUND 63: Barycentric Positions Deep Sweep")
@@ -38,14 +38,14 @@ print("=" * 70)
 
 # P1: Barycentric ecliptic, monthly 2000-2025
 print("\n=== P1: Barycentric ecliptic positions ===")
-FLAGS = SEFLG_SPEED | SEFLG_BARYCTR
+FLAGS = FLG_SPEED | FLG_BARYCTR
 jd0 = 2451545.0
 for m in range(0, 25 * 12, 2):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d
@@ -68,7 +68,7 @@ for m in range(0, 10 * 12, 3):
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_spd = abs(se[3] - le[3])
             lat_spd = abs(se[4] - le[4])
             if lon_spd < 0.001 and lat_spd < 0.001:
@@ -85,13 +85,13 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 
 # P3: Barycentric + J2000
 print("\n=== P3: Barycentric + J2000 ===")
-FLAGS_J = SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_J2000
+FLAGS_J = FLG_SPEED | FLG_BARYCTR | FLG_J2000
 for m in range(0, 25 * 12, 6):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS_J)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS_J)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS_J)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d
@@ -109,13 +109,13 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 
 # P4: Barycentric + Equatorial
 print("\n=== P4: Barycentric + Equatorial ===")
-FLAGS_EQ = SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_EQUATORIAL
+FLAGS_EQ = FLG_SPEED | FLG_BARYCTR | FLG_EQUATORIAL
 for m in range(0, 25 * 12, 6):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS_EQ)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS_EQ)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS_EQ)[0]
             ra_d = abs(se[0] - le[0]) * 3600
             if ra_d > 180 * 3600:
                 ra_d = 360 * 3600 - ra_d
@@ -137,7 +137,7 @@ for yr in range(2000, 2026):
     jd = swe.julday(yr, 6, 15, 12.0)
     try:
         se = swe.calc_ut(jd, 0, FLAGS)[0]
-        le = ephem.swe_calc_ut(jd, 0, FLAGS)[0]
+        le = ephem.calc_ut(jd, 0, FLAGS)[0]
         lon_d = abs(se[0] - le[0]) * 3600
         if lon_d > 180 * 3600:
             lon_d = 360 * 3600 - lon_d
@@ -162,7 +162,7 @@ for yr in range(1900, 2101, 10):
         name = BODIES[bid]
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d
@@ -184,7 +184,7 @@ for m in range(0, 10 * 12, 6):
         name = BODIES[bid]
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             dist_d = abs(se[2] - le[2])
             tol = 1e-6
             if dist_d < tol:

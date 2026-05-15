@@ -5,7 +5,7 @@ Validates planetary moon calculations in libephemeris, comparing with pyswisseph
 where supported and documenting libephemeris-specific behavior.
 
 IMPORTANT: Swiss Ephemeris and pyswisseph DO support planetary moons (since SE 2.10+)
-using the same body IDs (SE_MOON_OFFSET + moon_number = 9000+). However, both
+using the same body IDs (MOON_OFFSET + moon_number = 9000+). However, both
 libraries require satellite SPK kernel files from JPL NAIF to compute accurate
 positions:
 - jup365.bsp for Jupiter's moons (Io, Europa, Ganymede, Callisto)
@@ -33,24 +33,24 @@ import swisseph as swe
 import libephemeris as eph
 from libephemeris import planetary_moons
 from libephemeris.constants import (
-    SE_SUN,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_NEPTUNE,
-    SE_MOON_OFFSET,
-    SE_MOON_IO,
-    SE_MOON_EUROPA,
-    SE_MOON_GANYMEDE,
-    SE_MOON_CALLISTO,
-    SE_MOON_TITAN,
-    SE_MOON_ENCELADUS,
-    SE_MOON_TRITON,
-    SE_MOON_PHOBOS,
-    SE_MOON_DEIMOS,
-    SE_MOON_CHARON,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
+    SUN,
+    JUPITER,
+    SATURN,
+    NEPTUNE,
+    MOON_OFFSET,
+    MOON_IO,
+    MOON_EUROPA,
+    MOON_GANYMEDE,
+    MOON_CALLISTO,
+    MOON_TITAN,
+    MOON_ENCELADUS,
+    MOON_TRITON,
+    MOON_PHOBOS,
+    MOON_DEIMOS,
+    MOON_CHARON,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
 )
 
 
@@ -60,24 +60,24 @@ from libephemeris.constants import (
 
 # Galilean moons (Jupiter I-IV)
 GALILEAN_MOONS = [
-    (SE_MOON_IO, "Io", 501),  # NAIF ID 501
-    (SE_MOON_EUROPA, "Europa", 502),
-    (SE_MOON_GANYMEDE, "Ganymede", 503),
-    (SE_MOON_CALLISTO, "Callisto", 504),
+    (MOON_IO, "Io", 501),  # NAIF ID 501
+    (MOON_EUROPA, "Europa", 502),
+    (MOON_GANYMEDE, "Ganymede", 503),
+    (MOON_CALLISTO, "Callisto", 504),
 ]
 
 # Saturn's major moons
 SATURN_MOONS = [
-    (SE_MOON_TITAN, "Titan", 606),
-    (SE_MOON_ENCELADUS, "Enceladus", 602),
+    (MOON_TITAN, "Titan", 606),
+    (MOON_ENCELADUS, "Enceladus", 602),
 ]
 
 # Other planetary moons
 OTHER_MOONS = [
-    (SE_MOON_TRITON, "Triton", 801),  # Neptune I
-    (SE_MOON_PHOBOS, "Phobos", 401),  # Mars I
-    (SE_MOON_DEIMOS, "Deimos", 402),  # Mars II
-    (SE_MOON_CHARON, "Charon", 901),  # Pluto I
+    (MOON_TRITON, "Triton", 801),  # Neptune I
+    (MOON_PHOBOS, "Phobos", 401),  # Mars I
+    (MOON_DEIMOS, "Deimos", 402),  # Mars II
+    (MOON_CHARON, "Charon", 901),  # Pluto I
 ]
 
 ALL_MOONS = GALILEAN_MOONS + SATURN_MOONS + OTHER_MOONS
@@ -125,18 +125,18 @@ class TestPyswissephMoonSupport:
     """Document and verify pyswisseph planetary moon support behavior.
 
     These tests confirm that pyswisseph uses the same body ID scheme as
-    libephemeris (SE_MOON_OFFSET = 9000 + moon number) but requires
+    libephemeris (MOON_OFFSET = 9000 + moon number) but requires
     satellite SPK files for accurate calculations.
     """
 
     @pytest.mark.comparison
     def test_pyswisseph_moon_offset_matches(self):
-        """Verify pyswisseph uses the same SE_MOON_OFFSET (9000) as libephemeris."""
+        """Verify pyswisseph uses the same MOON_OFFSET (9000) as libephemeris."""
         assert hasattr(swe, "PLMOON_OFFSET"), (
             "pyswisseph should have PLMOON_OFFSET constant"
         )
-        assert swe.PLMOON_OFFSET == SE_MOON_OFFSET == 9000, (
-            f"Moon offset mismatch: swe={swe.PLMOON_OFFSET}, lib={SE_MOON_OFFSET}"
+        assert swe.PLMOON_OFFSET == MOON_OFFSET == 9000, (
+            f"Moon offset mismatch: swe={swe.PLMOON_OFFSET}, lib={MOON_OFFSET}"
         )
 
     @pytest.mark.comparison
@@ -150,7 +150,7 @@ class TestPyswissephMoonSupport:
         - Ganymede: 9003 (NAIF 503)
         - Callisto: 9004 (NAIF 504)
         """
-        expected_id = SE_MOON_OFFSET + (naif_id - 500)
+        expected_id = MOON_OFFSET + (naif_id - 500)
         assert moon_id == expected_id, (
             f"{moon_name} ID mismatch: expected {expected_id}, got {moon_id}"
         )
@@ -169,7 +169,7 @@ class TestPyswissephMoonSupport:
         sun_pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH)
 
         # Try calculating Io
-        io_pos, flags = swe.calc_ut(jd, SE_MOON_IO, swe.FLG_SWIEPH)
+        io_pos, flags = swe.calc_ut(jd, MOON_IO, swe.FLG_SWIEPH)
 
         # Without SPK files, pyswisseph should return something close to Sun
         # (it returns the Sun's position as a fallback)
@@ -195,7 +195,7 @@ class TestPyswissephMoonSupport:
         """
         jd = 2451545.0
 
-        io_pos, _ = swe.calc_ut(jd, SE_MOON_IO, swe.FLG_SWIEPH)
+        io_pos, _ = swe.calc_ut(jd, MOON_IO, swe.FLG_SWIEPH)
         moon_pos, _ = swe.calc_ut(jd, moon_id, swe.FLG_SWIEPH)
 
         # All moons should return the same fallback position
@@ -234,7 +234,7 @@ class TestLibephemerisWithoutSpk:
         This is different from pyswisseph which returns Sun position.
         """
         jd = 2451545.0
-        pos, _ = eph.calc_ut(jd, moon_id, SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, moon_id, FLG_SPEED)
 
         assert pos[0] == 0.0, f"{moon_name} longitude should be 0.0 when unregistered"
         assert pos[1] == 0.0, f"{moon_name} latitude should be 0.0 when unregistered"
@@ -250,10 +250,10 @@ class TestLibephemerisWithoutSpk:
         jd = 2451545.0
 
         # libephemeris returns zeros
-        lib_pos, _ = eph.calc_ut(jd, SE_MOON_IO, SEFLG_SPEED)
+        lib_pos, _ = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
 
         # pyswisseph returns Sun position
-        swe_pos, _ = swe.calc_ut(jd, SE_MOON_IO, swe.FLG_SWIEPH)
+        swe_pos, _ = swe.calc_ut(jd, MOON_IO, swe.FLG_SWIEPH)
         sun_pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH)
 
         # Verify behavioral difference
@@ -265,11 +265,11 @@ class TestLibephemerisWithoutSpk:
     @pytest.mark.comparison
     def test_is_planetary_moon_correct(self):
         """Verify is_planetary_moon() correctly identifies moon IDs."""
-        assert planetary_moons.is_planetary_moon(SE_MOON_IO) is True
-        assert planetary_moons.is_planetary_moon(SE_MOON_TITAN) is True
-        assert planetary_moons.is_planetary_moon(SE_MOON_TRITON) is True
-        assert planetary_moons.is_planetary_moon(SE_SUN) is False
-        assert planetary_moons.is_planetary_moon(SE_JUPITER) is False
+        assert planetary_moons.is_planetary_moon(MOON_IO) is True
+        assert planetary_moons.is_planetary_moon(MOON_TITAN) is True
+        assert planetary_moons.is_planetary_moon(MOON_TRITON) is True
+        assert planetary_moons.is_planetary_moon(SUN) is False
+        assert planetary_moons.is_planetary_moon(JUPITER) is False
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("moon_id,moon_name,naif_id", ALL_MOONS)
@@ -324,7 +324,7 @@ class TestGalileanMoonsWithSpk:
         - Distance: approximately Jupiter's distance (~4-6 AU)
         """
         jd = eph.julday(year, month, day, hour)
-        pos, _ = eph.calc_ut(jd, moon_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, moon_id, FLG_SWIEPH | FLG_SPEED)
 
         # Validate longitude is in valid range
         assert 0 <= pos[0] < 360, (
@@ -337,7 +337,7 @@ class TestGalileanMoonsWithSpk:
         )
 
         # Validate distance is approximately Jupiter's distance from Earth
-        jupiter_pos, _ = eph.calc_ut(jd, SE_JUPITER, SEFLG_SWIEPH)
+        jupiter_pos, _ = eph.calc_ut(jd, JUPITER, FLG_SWIEPH)
         jupiter_dist = jupiter_pos[2]
 
         # Moon should be within ~0.05 AU of Jupiter's distance
@@ -358,7 +358,7 @@ class TestGalileanMoonsWithSpk:
         - Callisto: ~16.69 days
         """
         jd = 2460000.0  # 2023
-        pos, _ = eph.calc_ut(jd, moon_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, moon_id, FLG_SWIEPH | FLG_SPEED)
 
         # Velocity should be non-zero
         assert pos[3] != 0.0, f"{moon_name} should have non-zero longitude velocity"
@@ -378,8 +378,8 @@ class TestGalileanMoonsWithSpk:
         jd1 = 2460000.0
         jd2 = 2460001.0  # 1 day later
 
-        pos1, _ = eph.calc_ut(jd1, moon_id, SEFLG_SWIEPH)
-        pos2, _ = eph.calc_ut(jd2, moon_id, SEFLG_SWIEPH)
+        pos1, _ = eph.calc_ut(jd1, moon_id, FLG_SWIEPH)
+        pos2, _ = eph.calc_ut(jd2, moon_id, FLG_SWIEPH)
 
         # Position should change over 1 day
         lon_diff = abs(pos2[0] - pos1[0])
@@ -426,7 +426,7 @@ class TestTitanWithSpk:
         Distance should be approximately Saturn's distance (~8-11 AU).
         """
         jd = eph.julday(year, month, day, hour)
-        pos, _ = eph.calc_ut(jd, SE_MOON_TITAN, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, MOON_TITAN, FLG_SWIEPH | FLG_SPEED)
 
         # Validate longitude in range
         assert 0 <= pos[0] < 360, (
@@ -434,7 +434,7 @@ class TestTitanWithSpk:
         )
 
         # Validate distance is approximately Saturn's distance
-        saturn_pos, _ = eph.calc_ut(jd, SE_SATURN, SEFLG_SWIEPH)
+        saturn_pos, _ = eph.calc_ut(jd, SATURN, FLG_SWIEPH)
         saturn_dist = saturn_pos[2]
 
         assert abs(pos[2] - saturn_dist) < 0.1, (
@@ -446,7 +446,7 @@ class TestTitanWithSpk:
     def test_titan_velocity(self):
         """Validate Titan velocity calculation."""
         jd = 2460000.0
-        pos, _ = eph.calc_ut(jd, SE_MOON_TITAN, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, MOON_TITAN, FLG_SWIEPH | FLG_SPEED)
 
         # Titan should have measurable motion
         assert pos[3] != 0.0, "Titan should have non-zero longitude velocity"
@@ -461,12 +461,12 @@ class TestTitanWithSpk:
         jd1 = 2460000.0
         jd2 = jd1 + 16.0  # ~1 Titan orbital period
 
-        pos1, _ = eph.calc_ut(jd1, SE_MOON_TITAN, SEFLG_SWIEPH)
-        pos2, _ = eph.calc_ut(jd2, SE_MOON_TITAN, SEFLG_SWIEPH)
+        pos1, _ = eph.calc_ut(jd1, MOON_TITAN, FLG_SWIEPH)
+        pos2, _ = eph.calc_ut(jd2, MOON_TITAN, FLG_SWIEPH)
 
         # Get Saturn positions to compare relative motion
-        sat1, _ = eph.calc_ut(jd1, SE_SATURN, SEFLG_SWIEPH)
-        sat2, _ = eph.calc_ut(jd2, SE_SATURN, SEFLG_SWIEPH)
+        sat1, _ = eph.calc_ut(jd1, SATURN, FLG_SWIEPH)
+        sat2, _ = eph.calc_ut(jd2, SATURN, FLG_SWIEPH)
 
         # Titan-Saturn angular separation should be similar after 1 period
         sep1 = pos1[0] - sat1[0]
@@ -534,12 +534,12 @@ class TestCrossValidation:
         from libephemeris.planetary_moons import MOON_NAIF_MAP
 
         # Verify NAIF ID mappings
-        assert MOON_NAIF_MAP[SE_MOON_IO] == 501
-        assert MOON_NAIF_MAP[SE_MOON_EUROPA] == 502
-        assert MOON_NAIF_MAP[SE_MOON_GANYMEDE] == 503
-        assert MOON_NAIF_MAP[SE_MOON_CALLISTO] == 504
-        assert MOON_NAIF_MAP[SE_MOON_TITAN] == 606
-        assert MOON_NAIF_MAP[SE_MOON_TRITON] == 801
+        assert MOON_NAIF_MAP[MOON_IO] == 501
+        assert MOON_NAIF_MAP[MOON_EUROPA] == 502
+        assert MOON_NAIF_MAP[MOON_GANYMEDE] == 503
+        assert MOON_NAIF_MAP[MOON_CALLISTO] == 504
+        assert MOON_NAIF_MAP[MOON_TITAN] == 606
+        assert MOON_NAIF_MAP[MOON_TRITON] == 801
 
     @pytest.mark.comparison
     def test_spk_files_documented(self):
@@ -602,8 +602,8 @@ class TestReferenceData:
 
         jd = 2451545.0  # J2000.0
 
-        jupiter_pos, _ = eph.calc_ut(jd, SE_JUPITER, SEFLG_SWIEPH)
-        io_pos, _ = eph.calc_ut(jd, SE_MOON_IO, SEFLG_SWIEPH)
+        jupiter_pos, _ = eph.calc_ut(jd, JUPITER, FLG_SWIEPH)
+        io_pos, _ = eph.calc_ut(jd, MOON_IO, FLG_SWIEPH)
 
         # Jupiter should be approximately 4.5-5.5 AU at this time
         assert 4.0 < jupiter_pos[2] < 6.0, (
@@ -646,7 +646,7 @@ class TestEdgeCases:
     @pytest.mark.comparison
     def test_moon_coverage_unregistered(self):
         """Test get_moon_coverage returns None for unregistered moons."""
-        coverage = planetary_moons.get_moon_coverage(SE_MOON_IO)
+        coverage = planetary_moons.get_moon_coverage(MOON_IO)
         assert coverage is None
 
     @pytest.mark.comparison

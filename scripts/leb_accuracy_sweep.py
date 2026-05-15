@@ -2,7 +2,7 @@
 """LEB Accuracy Sweep — comprehensive LEB vs Skyfield validation.
 
 Tests all LEB bodies across random dates, flag combinations, and boundary
-conditions.  Compares LEB (fast_calc) against Skyfield (swe_calc) to verify
+conditions.  Compares LEB (fast_calc) against Skyfield (calc) to verify
 documented tolerances.
 
 Validation Plan v2, Section 2.
@@ -33,18 +33,18 @@ os.environ.pop("LIBEPHEMERIS_LEB", None)
 
 import libephemeris as ephem  # noqa: E402
 from libephemeris.constants import (  # noqa: E402
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_NONUT,
-    SEFLG_RADIANS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_XYZ,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_NONUT,
+    FLG_RADIANS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    FLG_TRUEPOS,
+    FLG_XYZ,
 )
 from libephemeris.leb_format import BODY_PARAMS  # noqa: E402
 
@@ -56,7 +56,7 @@ try:
 except ImportError:
     pass
 
-# Force skyfield mode globally so swe_calc never auto-discovers LEB
+# Force skyfield mode globally so calc never auto-discovers LEB
 ephem.set_calc_mode("skyfield")
 
 BODY_NAMES = {
@@ -183,11 +183,11 @@ def sweep_position_accuracy(reader, tier: str, n_samples: int = 1000) -> dict:
         for jd in jds:
             jd_f = float(jd)
             try:
-                ref, _ = ephem.swe_calc(jd_f, body_id, SEFLG_SPEED)
+                ref, _ = ephem.calc(jd_f, body_id, FLG_SPEED)
             except Exception:
                 continue
             try:
-                leb, _ = fast_calc_tt(reader, jd_f, body_id, SEFLG_SPEED)
+                leb, _ = fast_calc_tt(reader, jd_f, body_id, FLG_SPEED)
             except Exception:
                 continue
 
@@ -258,23 +258,23 @@ def sweep_flag_combinations(reader) -> dict:
 
     # Flags that LEB should handle natively
     native_flags = {
-        "SPEED": SEFLG_SPEED,
-        "EQUATORIAL": SEFLG_SPEED | SEFLG_EQUATORIAL,
-        "J2000": SEFLG_SPEED | SEFLG_J2000,
-        "TRUEPOS": SEFLG_SPEED | SEFLG_TRUEPOS,
-        "NOABERR": SEFLG_SPEED | SEFLG_NOABERR,
-        "NOGDEFL": SEFLG_SPEED | SEFLG_NOGDEFL,
-        "ASTROMETRIC": SEFLG_SPEED | SEFLG_NOABERR | SEFLG_NOGDEFL,
-        "HELCTR": SEFLG_SPEED | SEFLG_HELCTR,
-        "SIDEREAL": SEFLG_SPEED | SEFLG_SIDEREAL,
+        "SPEED": FLG_SPEED,
+        "EQUATORIAL": FLG_SPEED | FLG_EQUATORIAL,
+        "J2000": FLG_SPEED | FLG_J2000,
+        "TRUEPOS": FLG_SPEED | FLG_TRUEPOS,
+        "NOABERR": FLG_SPEED | FLG_NOABERR,
+        "NOGDEFL": FLG_SPEED | FLG_NOGDEFL,
+        "ASTROMETRIC": FLG_SPEED | FLG_NOABERR | FLG_NOGDEFL,
+        "HELCTR": FLG_SPEED | FLG_HELCTR,
+        "SIDEREAL": FLG_SPEED | FLG_SIDEREAL,
     }
 
     # Flags that should trigger Skyfield fallback
     fallback_flags = {
-        "TOPOCTR": SEFLG_TOPOCTR,
-        "XYZ": SEFLG_XYZ,
-        "RADIANS": SEFLG_RADIANS,
-        "NONUT": SEFLG_NONUT,
+        "TOPOCTR": FLG_TOPOCTR,
+        "XYZ": FLG_XYZ,
+        "RADIANS": FLG_RADIANS,
+        "NONUT": FLG_NONUT,
     }
 
     results: dict = {"native": {}, "fallback": {}}
@@ -290,7 +290,7 @@ def sweep_flag_combinations(reader) -> dict:
             if not reader.has_body(body_id):
                 continue
             try:
-                ref, _ = ephem.swe_calc(test_jd, body_id, flags)
+                ref, _ = ephem.calc(test_jd, body_id, flags)
             except Exception:
                 continue
             try:
@@ -330,7 +330,7 @@ def sweep_flag_combinations(reader) -> dict:
                 continue
             n_total += 1
             try:
-                fast_calc_tt(reader, test_jd, body_id, flags | SEFLG_SPEED)
+                fast_calc_tt(reader, test_jd, body_id, flags | FLG_SPEED)
                 # If it didn't raise, fallback didn't trigger
             except KeyError:
                 n_fallback += 1
@@ -356,7 +356,7 @@ def sweep_flag_combinations(reader) -> dict:
         for body_id in [0, 1, 4]:
             try:
                 # Pure Skyfield (calc_mode already set to skyfield)
-                ref, _ = ephem.swe_calc(test_jd, body_id, flags | SEFLG_SPEED)
+                ref, _ = ephem.calc(test_jd, body_id, flags | FLG_SPEED)
                 # The caller in planets.py catches KeyError and falls back
                 # We just verify Skyfield can handle these flags
                 if ref[0] != 0.0 or body_id != 0:  # non-trivial result
@@ -407,12 +407,12 @@ def sweep_boundary_conditions(reader) -> dict:
                 if jd < entry.jd_start or jd >= entry.jd_end:
                     continue
                 try:
-                    ref, _ = ephem.swe_calc(jd, body_id, SEFLG_SPEED)
+                    ref, _ = ephem.calc(jd, body_id, FLG_SPEED)
                 except Exception:
                     n_seg_skip += 1
                     continue
                 try:
-                    leb, _ = fast_calc_tt(reader, jd, body_id, SEFLG_SPEED)
+                    leb, _ = fast_calc_tt(reader, jd, body_id, FLG_SPEED)
                 except Exception:
                     n_seg_skip += 1
                     continue
@@ -452,12 +452,12 @@ def sweep_boundary_conditions(reader) -> dict:
             entry.jd_end - entry.interval_days * 0.5,
         ]:
             try:
-                ref, _ = ephem.swe_calc(jd, body_id, SEFLG_SPEED)
+                ref, _ = ephem.calc(jd, body_id, FLG_SPEED)
             except Exception:
                 n_range_skip += 1
                 continue
             try:
-                leb, _ = fast_calc_tt(reader, jd, body_id, SEFLG_SPEED)
+                leb, _ = fast_calc_tt(reader, jd, body_id, FLG_SPEED)
             except Exception:
                 n_range_skip += 1
                 continue
@@ -491,7 +491,7 @@ def sweep_boundary_conditions(reader) -> dict:
         for jd in [entry.jd_start - 100, entry.jd_end + 100]:
             n_total += 1
             try:
-                fast_calc_tt(reader, jd, body_id, SEFLG_SPEED)
+                fast_calc_tt(reader, jd, body_id, FLG_SPEED)
             except (ValueError, KeyError):
                 n_fallback += 1
             except Exception:
@@ -526,8 +526,8 @@ def sweep_performance(reader) -> dict:
 
     # Warm up caches
     for _ in range(10):
-        ephem.swe_calc(test_jd, 0, SEFLG_SPEED)
-        fast_calc_tt(reader, test_jd, 0, SEFLG_SPEED)
+        ephem.calc(test_jd, 0, FLG_SPEED)
+        fast_calc_tt(reader, test_jd, 0, FLG_SPEED)
 
     # Speedup targets:
     # - JPL-backed bodies (planets) require BSP file reads in Skyfield,
@@ -553,13 +553,13 @@ def sweep_performance(reader) -> dict:
         # Benchmark Skyfield
         t0 = time.perf_counter()
         for i in range(n_iter):
-            ephem.swe_calc(test_jd + i * 0.01, body_id, SEFLG_SPEED)
+            ephem.calc(test_jd + i * 0.01, body_id, FLG_SPEED)
         sky_time = (time.perf_counter() - t0) / n_iter * 1e6  # microseconds
 
         # Benchmark LEB
         t0 = time.perf_counter()
         for i in range(n_iter):
-            fast_calc_tt(reader, test_jd + i * 0.01, body_id, SEFLG_SPEED)
+            fast_calc_tt(reader, test_jd + i * 0.01, body_id, FLG_SPEED)
         leb_time = (time.perf_counter() - t0) / n_iter * 1e6
 
         speedup = sky_time / leb_time if leb_time > 0 else float("inf")

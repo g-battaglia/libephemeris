@@ -534,7 +534,7 @@ print(f"Directory dati: {ephem.get_library_path()}")
 ```
 
 ```
-Directory dati: /Users/giacomo/.libephemeris
+Directory dati: ~/.libephemeris
 ```
 
 ### Reset completo

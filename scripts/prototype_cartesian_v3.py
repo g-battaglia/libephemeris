@@ -20,7 +20,7 @@ from numpy.polynomial.chebyshev import chebfit, chebval
 sys.path.insert(0, ".")
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.state import get_planets, get_timescale
 
 
@@ -55,11 +55,11 @@ def eval_apparent_ecliptic_cartesian(body_id, jds):
 
 
 def eval_apparent_ecliptic_spherical(body_id, jds):
-    """Evaluate swe_calc at given TT JDs → (lon, lat, dist)."""
+    """Evaluate calc at given TT JDs → (lon, lat, dist)."""
     ephem.set_calc_mode("skyfield")
     results = np.zeros((len(jds), 3))
     for i, jd in enumerate(jds):
-        ref, _ = ephem.swe_calc(float(jd), body_id, SEFLG_SPEED)
+        ref, _ = ephem.calc(float(jd), body_id, FLG_SPEED)
         results[i] = [ref[0], ref[1], ref[2]]
     return results
 

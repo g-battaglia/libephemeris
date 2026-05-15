@@ -34,16 +34,16 @@ _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 LOCATIONS = [
@@ -106,9 +106,9 @@ def se_gauquelin(jd, body, method, geopos, atpress=1013.25, attemp=15.0):
 
 
 def le_gauquelin(jd, body, method, geopos, atpress=1013.25, attemp=15.0):
-    """Call libephemeris swe_gauquelin_sector."""
+    """Call libephemeris gauquelin_sector."""
     try:
-        return ephem.swe_gauquelin_sector(jd, body, method, geopos, atpress, attemp)
+        return ephem.gauquelin_sector(jd, body, method, geopos, atpress, attemp)
     except Exception:
         return None
 
@@ -201,7 +201,7 @@ def run_part3():
         label_base = f"Cusps @ {loc_name}"
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"G")
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, ord("G"))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, ord("G"))
         except Exception as e:
             r.fail(f"{label_base}: {e}")
             continue
@@ -272,8 +272,8 @@ def run_part4():
         jd = jd_start + i / 48.0
         label = f"Step {i}"
 
-        se_val = se_gauquelin(jd, SE_SUN, 0, geopos)
-        le_val = le_gauquelin(jd, SE_SUN, 0, geopos)
+        se_val = se_gauquelin(jd, SUN, 0, geopos)
+        le_val = le_gauquelin(jd, SUN, 0, geopos)
 
         if se_val is None or le_val is None:
             r.skip(f"{label}")
@@ -327,8 +327,8 @@ def run_part5():
         jd = swe.julday(y, m, d, h)
         label = f"Mars {y}-{m:02d}-{d:02d}"
 
-        se_val = se_gauquelin(jd, SE_MARS, 0, geopos)
-        le_val = le_gauquelin(jd, SE_MARS, 0, geopos)
+        se_val = se_gauquelin(jd, MARS, 0, geopos)
+        le_val = le_gauquelin(jd, MARS, 0, geopos)
 
         if se_val is None or le_val is None:
             r.skip(f"{label}")
@@ -374,9 +374,9 @@ def run_part6():
     for lon, lat, alt, loc_name in edge_locations:
         geopos = (lon, lat, alt)
         for body_id, body_name in [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ]:
             label = f"{body_name} @ {loc_name}"
             se_val = se_gauquelin(jd, body_id, 0, geopos)

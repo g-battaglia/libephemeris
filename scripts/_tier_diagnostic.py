@@ -24,41 +24,41 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import libephemeris as eph  # noqa: E402
 from libephemeris import state  # noqa: E402
 from libephemeris.constants import (  # noqa: E402
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_VARUNA,
-    SE_NESSUS,
-    SE_ASBOLUS,
-    SE_CHARIKLO,
-    SE_GONGGONG,
-    SE_APOPHIS,
-    SE_HYGIEA,
-    SE_EROS,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    VARUNA,
+    NESSUS,
+    ASBOLUS,
+    CHARIKLO,
+    GONGGONG,
+    APOPHIS,
+    HYGIEA,
+    EROS,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
 )
 from libephemeris.spk_auto import discover_local_spks  # noqa: E402
 from libephemeris.state import TIERS, set_precision_tier  # noqa: E402
@@ -72,56 +72,56 @@ from libephemeris.state import TIERS, set_precision_tier  # noqa: E402
 # category: "major", "lunar", "minor"
 BODIES: list[tuple[int, str, str]] = [
     # Major planets
-    (SE_SUN, "Sun", "major"),
-    (SE_MOON, "Moon", "major"),
-    (SE_MERCURY, "Mercury", "major"),
-    (SE_VENUS, "Venus", "major"),
-    (SE_MARS, "Mars", "major"),
-    (SE_JUPITER, "Jupiter", "major"),
-    (SE_SATURN, "Saturn", "major"),
-    (SE_URANUS, "Uranus", "major"),
-    (SE_NEPTUNE, "Neptune", "major"),
-    (SE_PLUTO, "Pluto", "major"),
+    (SUN, "Sun", "major"),
+    (MOON, "Moon", "major"),
+    (MERCURY, "Mercury", "major"),
+    (VENUS, "Venus", "major"),
+    (MARS, "Mars", "major"),
+    (JUPITER, "Jupiter", "major"),
+    (SATURN, "Saturn", "major"),
+    (URANUS, "Uranus", "major"),
+    (NEPTUNE, "Neptune", "major"),
+    (PLUTO, "Pluto", "major"),
     # Lunar points
-    (SE_MEAN_NODE, "Mean Node", "lunar"),
-    (SE_TRUE_NODE, "True Node", "lunar"),
+    (MEAN_NODE, "Mean Node", "lunar"),
+    (TRUE_NODE, "True Node", "lunar"),
     # Minor bodies (from SPK_BODY_NAME_MAP)
-    (SE_CHIRON, "Chiron", "minor"),
-    (SE_PHOLUS, "Pholus", "minor"),
-    (SE_CERES, "Ceres", "minor"),
-    (SE_PALLAS, "Pallas", "minor"),
-    (SE_JUNO, "Juno", "minor"),
-    (SE_VESTA, "Vesta", "minor"),
-    (SE_ERIS, "Eris", "minor"),
-    (SE_SEDNA, "Sedna", "minor"),
-    (SE_HAUMEA, "Haumea", "minor"),
-    (SE_MAKEMAKE, "Makemake", "minor"),
-    (SE_IXION, "Ixion", "minor"),
-    (SE_ORCUS, "Orcus", "minor"),
-    (SE_QUAOAR, "Quaoar", "minor"),
-    (SE_VARUNA, "Varuna", "minor"),
-    (SE_NESSUS, "Nessus", "minor"),
-    (SE_ASBOLUS, "Asbolus", "minor"),
-    (SE_CHARIKLO, "Chariklo", "minor"),
-    (SE_GONGGONG, "Gonggong", "minor"),
-    (SE_APOPHIS, "Apophis", "minor"),
-    (SE_HYGIEA, "Hygiea", "minor"),
-    (SE_EROS, "Eros", "minor"),
+    (CHIRON, "Chiron", "minor"),
+    (PHOLUS, "Pholus", "minor"),
+    (CERES, "Ceres", "minor"),
+    (PALLAS, "Pallas", "minor"),
+    (JUNO, "Juno", "minor"),
+    (VESTA, "Vesta", "minor"),
+    (ERIS, "Eris", "minor"),
+    (SEDNA, "Sedna", "minor"),
+    (HAUMEA, "Haumea", "minor"),
+    (MAKEMAKE, "Makemake", "minor"),
+    (IXION, "Ixion", "minor"),
+    (ORCUS, "Orcus", "minor"),
+    (QUAOAR, "Quaoar", "minor"),
+    (VARUNA, "Varuna", "minor"),
+    (NESSUS, "Nessus", "minor"),
+    (ASBOLUS, "Asbolus", "minor"),
+    (CHARIKLO, "Chariklo", "minor"),
+    (GONGGONG, "Gonggong", "minor"),
+    (APOPHIS, "Apophis", "minor"),
+    (HYGIEA, "Hygiea", "minor"),
+    (EROS, "Eros", "minor"),
 ]
 
 MAJOR_IPLS = {
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 }
-LUNAR_IPLS = {SE_MEAN_NODE, SE_TRUE_NODE}
+LUNAR_IPLS = {MEAN_NODE, TRUE_NODE}
 
 # Default dates per tier (label, year, month, day, hour)
 # Extended to cover full SPK date ranges with regular milestones
@@ -265,7 +265,7 @@ def _parse_spk_date(date_str: str) -> float:
     year = int(parts[0])
     month = int(parts[1])
     day = int(parts[2])
-    return eph.swe_julday(year, month, day, 0.0)
+    return eph.julday(year, month, day, 0.0)
 
 
 def _get_source(ipl: int, tier_name: str, jd: float) -> str:
@@ -315,7 +315,7 @@ def _calc_body(jd: float, ipl: int) -> dict:
 
     # Ecliptic coordinates + speed
     try:
-        pos_ecl, _ = eph.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+        pos_ecl, _ = eph.calc_ut(jd, ipl, FLG_SPEED)
         result["ecl"] = pos_ecl
     except Exception as e:
         result["error"] = str(e)[:60]
@@ -323,7 +323,7 @@ def _calc_body(jd: float, ipl: int) -> dict:
 
     # Equatorial coordinates + speed
     try:
-        pos_equ, _ = eph.swe_calc_ut(jd, ipl, SEFLG_SPEED | SEFLG_EQUATORIAL)
+        pos_equ, _ = eph.calc_ut(jd, ipl, FLG_SPEED | FLG_EQUATORIAL)
         result["equ"] = pos_equ
     except Exception:
         # Equatorial may fail for some bodies; ecliptic is still valid
@@ -507,7 +507,7 @@ def run_diagnostic(tier_name: str) -> None:
         if args.dates:
             for d in args.dates:
                 info = _parse_date_str(d)
-                jd = eph.swe_julday(info[1], info[2], info[3], info[4])
+                jd = eph.julday(info[1], info[2], info[3], info[4])
                 dates.append((info[0], jd))
         if args.jd:
             for jd_val in args.jd:
@@ -515,7 +515,7 @@ def run_diagnostic(tier_name: str) -> None:
     else:
         # Default dates for this tier
         for label, y, m, d, h in DEFAULT_DATES[tier_name]:
-            jd = eph.swe_julday(y, m, d, h)
+            jd = eph.julday(y, m, d, h)
             dates.append((label, jd))
 
     # Setup

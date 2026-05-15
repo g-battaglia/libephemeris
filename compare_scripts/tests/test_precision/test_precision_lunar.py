@@ -7,7 +7,7 @@ Validates that the True Node precision comparison function works correctly.
 import sys
 import pytest
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class TestCompareLunarScript:

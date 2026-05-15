@@ -24,22 +24,22 @@ import swisseph as swe
 import libephemeris as ephem
 
 # SE ephemeris path
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # Constants
-SE_MOON = 1
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
-SE_MEAN_APOG = 12  # Mean Lilith
-SE_OSCU_APOG = 13  # Osculating Lilith
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_NOABERR = 1024
-SEFLG_TRUEPOS = 16
-SEFLG_TOPOCTR = 32768
-SEFLG_SIDEREAL = 65536
+MOON = 1
+MEAN_NODE = 10
+TRUE_NODE = 11
+MEAN_APOG = 12  # Mean Lilith
+OSCU_APOG = 13  # Osculating Lilith
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_NOABERR = 1024
+FLG_TRUEPOS = 16
+FLG_TOPOCTR = 32768
+FLG_SIDEREAL = 65536
 
 
 def se_hsys(ch):
@@ -53,8 +53,8 @@ def find_moon_perigees_apogees(start_jd, count=50):
     step = 0.5  # half-day steps
 
     # Get initial distance
-    prev_dist = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][2]
-    prev_prev_dist = swe.calc_ut(jd - step, SE_MOON, SEFLG_SPEED)[0][2]
+    prev_dist = swe.calc_ut(jd, MOON, FLG_SPEED)[0][2]
+    prev_prev_dist = swe.calc_ut(jd - step, MOON, FLG_SPEED)[0][2]
 
     jd += step
     found = 0
@@ -63,7 +63,7 @@ def find_moon_perigees_apogees(start_jd, count=50):
 
     while found < count and iterations < max_iter:
         iterations += 1
-        curr_dist = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][2]
+        curr_dist = swe.calc_ut(jd, MOON, FLG_SPEED)[0][2]
 
         # Check for local minimum (perigee) or maximum (apogee)
         if prev_dist < prev_prev_dist and prev_dist < curr_dist:
@@ -94,8 +94,8 @@ def _refine_extremum(jd_approx, window, is_minimum=False, is_maximum=False):
         c = b - (b - a) / gr
         d = a + (b - a) / gr
 
-        fc = swe.calc_ut(c, SE_MOON, SEFLG_SPEED)[0][2]
-        fd = swe.calc_ut(d, SE_MOON, SEFLG_SPEED)[0][2]
+        fc = swe.calc_ut(c, MOON, FLG_SPEED)[0][2]
+        fd = swe.calc_ut(d, MOON, FLG_SPEED)[0][2]
 
         if is_minimum:
             if fc < fd:
@@ -116,7 +116,7 @@ def compare_moon_at_event(jd, event_type, flags_list):
     results = []
 
     for flags in flags_list:
-        flag_val = SEFLG_SPEED
+        flag_val = FLG_SPEED
         flag_names = ["SPEED"]
         for fname, fval in flags:
             flag_val |= fval
@@ -125,14 +125,14 @@ def compare_moon_at_event(jd, event_type, flags_list):
         flag_str = "|".join(flag_names)
 
         try:
-            se_result = swe.calc_ut(jd, SE_MOON, flag_val)
+            se_result = swe.calc_ut(jd, MOON, flag_val)
             se_pos = se_result[0]
         except Exception as e:
             results.append((flag_str, "SE_ERROR", str(e)))
             continue
 
         try:
-            le_result = ephem.swe_calc_ut(jd, SE_MOON, flag_val)
+            le_result = ephem.calc_ut(jd, MOON, flag_val)
             le_pos = le_result[0]
         except Exception as e:
             results.append((flag_str, "LE_ERROR", str(e)))
@@ -140,7 +140,7 @@ def compare_moon_at_event(jd, event_type, flags_list):
 
         # Compare all 6 components
         labels = ["lon", "lat", "dist", "lon_spd", "lat_spd", "dist_spd"]
-        if flag_val & SEFLG_EQUATORIAL:
+        if flag_val & FLG_EQUATORIAL:
             labels = ["ra", "dec", "dist", "ra_spd", "dec_spd", "dist_spd"]
 
         for i, label in enumerate(labels):
@@ -149,7 +149,7 @@ def compare_moon_at_event(jd, event_type, flags_list):
             diff = le_val - se_val
 
             # Wrap longitude/RA differences
-            if i == 0 and not (flag_val & SEFLG_EQUATORIAL):
+            if i == 0 and not (flag_val & FLG_EQUATORIAL):
                 if diff > 180:
                     diff -= 360
                 elif diff < -180:
@@ -215,22 +215,22 @@ def compare_analytical_bodies(jd, event_type):
     """Compare Mean Node, True Node, Mean Apogee, Oscu Apogee at perigee/apogee times."""
     results = []
     bodies = [
-        (SE_MEAN_NODE, "MeanNode"),
-        (SE_TRUE_NODE, "TrueNode"),
-        (SE_MEAN_APOG, "MeanApog"),
-        (SE_OSCU_APOG, "OscuApog"),
+        (MEAN_NODE, "MeanNode"),
+        (TRUE_NODE, "TrueNode"),
+        (MEAN_APOG, "MeanApog"),
+        (OSCU_APOG, "OscuApog"),
     ]
 
     for body_id, body_name in bodies:
         try:
-            se_result = swe.calc_ut(jd, body_id, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, body_id, FLG_SPEED)
             se_pos = se_result[0]
         except Exception as e:
             results.append((body_name, "SE_ERROR", str(e)))
             continue
 
         try:
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
             le_pos = le_result[0]
         except Exception as e:
             results.append((body_name, "LE_ERROR", str(e)))
@@ -320,13 +320,13 @@ def main():
     # Flag combinations to test
     flag_combos = [
         [],  # Default (ecliptic of date)
-        [("EQUATORIAL", SEFLG_EQUATORIAL)],
-        [("J2000", SEFLG_J2000)],
-        [("NONUT", SEFLG_NONUT)],
-        [("NOABERR", SEFLG_NOABERR)],
-        [("TRUEPOS", SEFLG_TRUEPOS)],
-        [("J2000", SEFLG_J2000), ("NONUT", SEFLG_NONUT)],
-        [("EQUATORIAL", SEFLG_EQUATORIAL), ("J2000", SEFLG_J2000)],
+        [("EQUATORIAL", FLG_EQUATORIAL)],
+        [("J2000", FLG_J2000)],
+        [("NONUT", FLG_NONUT)],
+        [("NOABERR", FLG_NOABERR)],
+        [("TRUEPOS", FLG_TRUEPOS)],
+        [("J2000", FLG_J2000), ("NONUT", FLG_NONUT)],
+        [("EQUATORIAL", FLG_EQUATORIAL), ("J2000", FLG_J2000)],
     ]
 
     total_tests = 0
@@ -385,8 +385,8 @@ def main():
     max_apogee_dist_le = 0
 
     for event_type, jd in events:
-        se_dist = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][2]
-        le_dist = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][2]
+        se_dist = swe.calc_ut(jd, MOON, FLG_SPEED)[0][2]
+        le_dist = ephem.calc_ut(jd, MOON, FLG_SPEED)[0][2]
 
         if event_type == "perigee":
             min_perigee_dist_se = min(min_perigee_dist_se, se_dist)
@@ -410,8 +410,8 @@ def main():
     min_speed_le = 999
 
     for event_type, jd in events:
-        se_spd = abs(swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][3])
-        le_spd = abs(ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][3])
+        se_spd = abs(swe.calc_ut(jd, MOON, FLG_SPEED)[0][3])
+        le_spd = abs(ephem.calc_ut(jd, MOON, FLG_SPEED)[0][3])
 
         if event_type == "perigee":
             max_speed_se = max(max_speed_se, se_spd)
@@ -438,20 +438,20 @@ def main():
 
     for loc_lon, loc_lat, loc_alt, loc_name in locations:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         # Test first 5 perigees
         for event_type, jd in perigees[:5]:
-            flags_topo = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags_topo = FLG_SPEED | FLG_TOPOCTR
 
             try:
-                se_result = swe.calc_ut(jd, SE_MOON, flags_topo)
+                se_result = swe.calc_ut(jd, MOON, flags_topo)
                 se_pos = se_result[0]
             except Exception:
                 continue
 
             try:
-                le_result = ephem.swe_calc_ut(jd, SE_MOON, flags_topo)
+                le_result = ephem.calc_ut(jd, MOON, flags_topo)
                 le_pos = le_result[0]
             except Exception:
                 continue
@@ -496,19 +496,19 @@ def main():
     # Test with sidereal mode at perigee/apogee
     print("\n--- Testing sidereal Moon at perigee/apogee ---")
     swe.set_sid_mode(0)  # Fagan-Bradley
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     for event_type, jd in events[:20]:  # First 20 events
-        flags_sid = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags_sid = FLG_SPEED | FLG_SIDEREAL
 
         try:
-            se_result = swe.calc_ut(jd, SE_MOON, flags_sid)
+            se_result = swe.calc_ut(jd, MOON, flags_sid)
             se_pos = se_result[0]
         except Exception:
             continue
 
         try:
-            le_result = ephem.swe_calc_ut(jd, SE_MOON, flags_sid)
+            le_result = ephem.calc_ut(jd, MOON, flags_sid)
             le_pos = le_result[0]
         except Exception:
             continue
@@ -539,7 +539,7 @@ def main():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     # Summary
     print("\n" + "=" * 80)

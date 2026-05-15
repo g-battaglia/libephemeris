@@ -277,7 +277,7 @@ class TestRefracExtended:
             altitude, 0.0, 1013.25, 15.0, 0.0065, swe.TRUE_TO_APP
         )
         result_py = ephem.refrac_extended(
-            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         # Compare returned altitude
@@ -306,7 +306,7 @@ class TestRefracExtended:
             altitude, 0.0, pressure, 15.0, 0.0065, swe.TRUE_TO_APP
         )
         result_py = ephem.refrac_extended(
-            altitude, 0.0, pressure, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            altitude, 0.0, pressure, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         # Compare refraction values
@@ -332,7 +332,7 @@ class TestRefracExtended:
             altitude, 0.0, 1013.25, temperature, 0.0065, swe.TRUE_TO_APP
         )
         result_py = ephem.refrac_extended(
-            altitude, 0.0, 1013.25, temperature, 0.0065, ephem.SE_TRUE_TO_APP
+            altitude, 0.0, 1013.25, temperature, 0.0065, ephem.TRUE_TO_APP
         )
 
         # Compare refraction values
@@ -356,7 +356,7 @@ class TestRefracExtended:
             0.0, geoalt, 1013.25, 15.0, 0.0065, swe.TRUE_TO_APP
         )
         result_py = ephem.refrac_extended(
-            0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         # Compare dip values (most important for elevated observers)
@@ -382,7 +382,7 @@ class TestRefracExtended:
             0.0, 1000.0, 1013.25, 15.0, lapse_rate, swe.TRUE_TO_APP
         )
         result_py = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, lapse_rate, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, lapse_rate, ephem.TRUE_TO_APP
         )
 
         # Compare dip values (affected by lapse rate)
@@ -402,7 +402,7 @@ class TestRefracExtended:
                 altitude, 0.0, 1013.25, 15.0, 0.0065, swe.APP_TO_TRUE
             )
             result_py = ephem.refrac_extended(
-                altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_APP_TO_TRUE
+                altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.APP_TO_TRUE
             )
 
             # Compare returned true altitude
@@ -429,7 +429,7 @@ class TestRefracExtended:
             10.0, 3000.0, 700.0, -5.0, 0.0065, swe.TRUE_TO_APP
         )
         mountain_py = ephem.refrac_extended(
-            10.0, 3000.0, 700.0, -5.0, 0.0065, ephem.SE_TRUE_TO_APP
+            10.0, 3000.0, 700.0, -5.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         diff_dip = abs(mountain_swe[1][3] - mountain_py[1][3])
@@ -446,7 +446,7 @@ class TestRefracExtended:
             10.0, 0.0, 1020.0, 30.0, 0.0065, swe.TRUE_TO_APP
         )
         tropical_py = ephem.refrac_extended(
-            10.0, 0.0, 1020.0, 30.0, 0.0065, ephem.SE_TRUE_TO_APP
+            10.0, 0.0, 1020.0, 30.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         diff_refrac = abs(tropical_swe[1][2] - tropical_py[1][2])
@@ -460,7 +460,7 @@ class TestRefracExtended:
         """Test that zero pressure disables refraction in both implementations."""
         result_swe = swe.refrac_extended(30.0, 0.0, 0.0, 15.0, 0.0065, swe.TRUE_TO_APP)
         result_py = ephem.refrac_extended(
-            30.0, 0.0, 0.0, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            30.0, 0.0, 0.0, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
 
         # With zero pressure, libephemeris returns input altitude exactly

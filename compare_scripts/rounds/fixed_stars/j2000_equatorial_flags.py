@@ -14,13 +14,13 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_J2000 = 32
-SEFLG_EQUATORIAL = 2048
-SEFLG_NONUT = 64
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_J2000 = 32
+FLG_EQUATORIAL = 2048
+FLG_NONUT = 64
+FLG_SIDEREAL = 65536
 
 STARS = [
     "Aldebaran",
@@ -42,12 +42,12 @@ STARS = [
 ]
 
 FLAG_COMBOS = [
-    (SEFLG_SPEED, "default"),
-    (SEFLG_SPEED | SEFLG_J2000, "J2000"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "EQUATORIAL"),
-    (SEFLG_SPEED | SEFLG_J2000 | SEFLG_EQUATORIAL, "J2000+EQUAT"),
-    (SEFLG_SPEED | SEFLG_NONUT, "NONUT"),
-    (SEFLG_SPEED | SEFLG_NONUT | SEFLG_EQUATORIAL, "NONUT+EQUAT"),
+    (FLG_SPEED, "default"),
+    (FLG_SPEED | FLG_J2000, "J2000"),
+    (FLG_SPEED | FLG_EQUATORIAL, "EQUATORIAL"),
+    (FLG_SPEED | FLG_J2000 | FLG_EQUATORIAL, "J2000+EQUAT"),
+    (FLG_SPEED | FLG_NONUT, "NONUT"),
+    (FLG_SPEED | FLG_NONUT | FLG_EQUATORIAL, "NONUT+EQUAT"),
 ]
 
 test_dates = []
@@ -75,7 +75,7 @@ for label, jd in test_dates:
                 se_r = swe.fixstar2(star_name, jd, flags)
                 se_d = se_r[0]
 
-                le_r = ephem.swe_fixstar2_ut(star_name, jd, flags)
+                le_r = ephem.fixstar2_ut(star_name, jd, flags)
                 le_d = le_r[0]  # (pos_tuple, star_name, retflag)
 
                 for i, (cn, mult, tol) in enumerate(

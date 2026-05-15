@@ -2,7 +2,7 @@
 """
 Fast LEB2 vs LEB1 precision test.
 
-Compares swe_calc_ut() results between LEB2 and LEB1 files across all 31 bodies,
+Compares calc_ut() results between LEB2 and LEB1 files across all 31 bodies,
 6 flag combinations, and N random dates. Fails if any comparison exceeds 0.001".
 
 Usage:
@@ -62,12 +62,12 @@ ALL_BODIES = sorted(BODY_NAMES.keys())
 HELIO_ONLY = {40, 41, 42, 43, 44, 45, 46, 47, 48}
 
 FLAGS = [
-    (swe.SEFLG_SPEED, "default"),
-    (swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL, "sidereal"),
-    (swe.SEFLG_SPEED | swe.SEFLG_EQUATORIAL, "equatorial"),
-    (swe.SEFLG_SPEED | swe.SEFLG_J2000, "J2000"),
-    (swe.SEFLG_SPEED | swe.SEFLG_NOABERR, "no_aberr"),
-    (swe.SEFLG_SPEED | swe.SEFLG_HELCTR, "heliocentric"),
+    (swe.FLG_SPEED, "default"),
+    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
+    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
+    (swe.FLG_SPEED | swe.FLG_J2000, "J2000"),
+    (swe.FLG_SPEED | swe.FLG_NOABERR, "no_aberr"),
+    (swe.FLG_SPEED | swe.FLG_HELCTR, "heliocentric"),
 ]
 
 TIER_CONFIG = {
@@ -127,15 +127,15 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
     for jd in jds:
         for bid in test_bodies:
             for fl, _ in FLAGS:
-                if bid in HELIO_ONLY and not (fl & swe.SEFLG_HELCTR):
+                if bid in HELIO_ONLY and not (fl & swe.FLG_HELCTR):
                     continue
                 try:
-                    ref[(float(jd), bid, fl)] = swe.swe_calc_ut(float(jd), bid, fl)[0][
+                    ref[(float(jd), bid, fl)] = swe.calc_ut(float(jd), bid, fl)[0][
                         :3
                     ]
                 except Exception:
                     pass
-    swe.swe_close()
+    swe.close()
 
     # Phase 2: LEB2 compare
     swe.set_leb_file(cfg["leb2"])
@@ -151,7 +151,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    v2 = swe.swe_calc_ut(float(jd), bid, fl)[0][:3]
+                    v2 = swe.calc_ut(float(jd), bid, fl)[0][:3]
                     v1 = ref[k]
                     ld = abs(v2[0] - v1[0])
                     if ld > 180:
@@ -166,7 +166,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                         body_max[bid] = (err, fn)
                 except Exception:
                     pass
-    swe.swe_close()
+    swe.close()
     elapsed = time.time() - t0
 
     # Report

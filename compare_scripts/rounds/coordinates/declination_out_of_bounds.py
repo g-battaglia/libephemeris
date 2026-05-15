@@ -8,9 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256 | 2048  # SEFLG_SPEED | SEFLG_EQUATORIAL
+FLAGS = 256 | 2048  # FLG_SPEED | FLG_EQUATORIAL
 
 NAMES = {
     0: "Sun",
@@ -37,7 +37,7 @@ for body in range(10):
     for jd in DATES:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             se_dec = se[0][1]
             le_dec = le[0][1]
             diff = abs(se_dec - le_dec) * 3600
@@ -62,7 +62,7 @@ for body in range(10):
     for jd in DATES:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             se_oob = abs(se[0][1]) > obliquity
             le_oob = abs(le[0][1]) > obliquity
             if se_oob or le_oob:
@@ -85,7 +85,7 @@ for body in range(10):
     for jd in DATES[:120]:  # 10 years
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -103,7 +103,7 @@ for body in range(10):
     for jd in DATES[:60]:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][4] - le[0][4])
             if diff < 0.001:
                 passed += 1
@@ -121,7 +121,7 @@ for i in range(6935):  # ~19 years (one nodal cycle) daily
     jd = 2451545.0 + i
     try:
         se = swe.calc_ut(jd, 1, FLAGS)
-        le = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le = ephem.calc_ut(jd, 1, FLAGS)
         max_se_dec = max(max_se_dec, abs(se[0][1]))
         max_le_dec = max(max_le_dec, abs(le[0][1]))
     except:
@@ -143,7 +143,7 @@ max_venus = 0
 for i in range(2920):  # 8 years
     jd = 2451545.0 + i
     try:
-        le = ephem.swe_calc_ut(jd, 3, FLAGS)
+        le = ephem.calc_ut(jd, 3, FLAGS)
         max_venus = max(max_venus, abs(le[0][1]))
     except:
         pass

@@ -22,7 +22,7 @@ class TestRefracExtendedBasic:
     def test_refrac_extended_returns_tuple(self):
         """Test that refrac_extended returns a tuple of (float, tuple)."""
         result = ephem.refrac_extended(
-            30.0, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            30.0, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -33,7 +33,7 @@ class TestRefracExtendedBasic:
     def test_refrac_extended_detail_tuple_contents(self):
         """Test that detail tuple contains expected values."""
         alt, (true_alt, app_alt, refrac, dip) = ephem.refrac_extended(
-            30.0, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            30.0, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert isinstance(true_alt, float)
         assert isinstance(app_alt, float)
@@ -43,20 +43,20 @@ class TestRefracExtendedBasic:
     def test_refrac_extended_zero_pressure_returns_input(self):
         """Test that refrac_extended returns input altitude when pressure is 0."""
         alt, (true_alt, app_alt, refrac, dip) = ephem.refrac_extended(
-            30.0, 0.0, 0.0, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            30.0, 0.0, 0.0, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert alt == 30.0
         assert refrac == 0.0
 
 
 class TestRefracExtendedTrueToApp:
-    """Tests for SE_TRUE_TO_APP mode."""
+    """Tests for TRUE_TO_APP mode."""
 
     def test_refrac_extended_true_to_app_returns_higher_altitude(self):
         """Test that apparent altitude is higher than true altitude."""
         true_alt_input = 0.0
         alt, _ = ephem.refrac_extended(
-            true_alt_input, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            true_alt_input, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert alt > true_alt_input
 
@@ -64,7 +64,7 @@ class TestRefracExtendedTrueToApp:
         """Test that detail tuple values are consistent for TRUE_TO_APP."""
         input_alt = 10.0
         alt, (true_alt, app_alt, refrac, dip) = ephem.refrac_extended(
-            input_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            input_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         # For TRUE_TO_APP: true_alt should equal input, app_alt equals returned alt
         assert true_alt == input_alt
@@ -76,13 +76,13 @@ class TestRefracExtendedTrueToApp:
 
 
 class TestRefracExtendedAppToTrue:
-    """Tests for SE_APP_TO_TRUE mode."""
+    """Tests for APP_TO_TRUE mode."""
 
     def test_refrac_extended_app_to_true_returns_lower_altitude(self):
         """Test that true altitude is lower than apparent altitude."""
         app_alt_input = 10.0
         alt, _ = ephem.refrac_extended(
-            app_alt_input, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_APP_TO_TRUE
+            app_alt_input, 0.0, 1013.25, 15.0, 0.0065, ephem.APP_TO_TRUE
         )
         assert alt < app_alt_input
 
@@ -90,7 +90,7 @@ class TestRefracExtendedAppToTrue:
         """Test that detail tuple values are consistent for APP_TO_TRUE."""
         input_alt = 10.0
         alt, (true_alt, app_alt, refrac, dip) = ephem.refrac_extended(
-            input_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_APP_TO_TRUE
+            input_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.APP_TO_TRUE
         )
         # For APP_TO_TRUE: app_alt should equal input, true_alt equals returned alt
         assert app_alt == input_alt
@@ -105,14 +105,14 @@ class TestRefracExtendedDip:
     def test_dip_zero_at_sea_level(self):
         """Test that dip is zero at sea level."""
         _, (_, _, _, dip) = ephem.refrac_extended(
-            0.0, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            0.0, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert dip == 0.0
 
     def test_dip_negative_at_elevation(self):
         """Test that dip is negative for elevated observers."""
         _, (_, _, _, dip) = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert dip < 0
 
@@ -121,7 +121,7 @@ class TestRefracExtendedDip:
         dips = []
         for geoalt in [100, 500, 1000, 5000]:
             _, (_, _, _, dip) = ephem.refrac_extended(
-                0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+                0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
             )
             dips.append(dip)
 
@@ -132,10 +132,10 @@ class TestRefracExtendedDip:
     def test_dip_affected_by_lapse_rate(self):
         """Test that lapse rate affects the dip calculation."""
         _, (_, _, _, dip_low_lapse) = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, 0.003, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, 0.003, ephem.TRUE_TO_APP
         )
         _, (_, _, _, dip_high_lapse) = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, 0.010, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, 0.010, ephem.TRUE_TO_APP
         )
         # Higher lapse rate -> more refraction correction -> less negative dip
         # (dip_high_lapse is closer to 0 than dip_low_lapse)
@@ -149,7 +149,7 @@ class TestRefracExtendedVsSwisseph:
     def test_dip_matches_swisseph(self, geoalt):
         """Test that dip calculation matches pyswisseph."""
         result_lib = ephem.refrac_extended(
-            0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            0.0, geoalt, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         result_swe = swe.refrac_extended(
             0.0, geoalt, 1013.25, 15.0, 0.0065, swe.TRUE_TO_APP
@@ -168,7 +168,7 @@ class TestRefracExtendedVsSwisseph:
     def test_dip_lapse_rate_matches_swisseph(self, lapse_rate):
         """Test that dip calculation matches pyswisseph at various lapse rates."""
         result_lib = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, lapse_rate, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, lapse_rate, ephem.TRUE_TO_APP
         )
         result_swe = swe.refrac_extended(
             0.0, 1000.0, 1013.25, 15.0, lapse_rate, swe.TRUE_TO_APP
@@ -184,7 +184,7 @@ class TestRefracExtendedVsSwisseph:
     def test_refrac_true_to_app_close_to_swisseph(self, altitude):
         """Test that refraction values are reasonably close to pyswisseph."""
         result_lib = ephem.refrac_extended(
-            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         result_swe = swe.refrac_extended(
             altitude, 0.0, 1013.25, 15.0, 0.0065, swe.TRUE_TO_APP
@@ -202,7 +202,7 @@ class TestRefracExtendedVsSwisseph:
     def test_refrac_app_to_true_close_to_swisseph(self, altitude):
         """Test that APP_TO_TRUE values are reasonably close to pyswisseph."""
         result_lib = ephem.refrac_extended(
-            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_APP_TO_TRUE
+            altitude, 0.0, 1013.25, 15.0, 0.0065, ephem.APP_TO_TRUE
         )
         result_swe = swe.refrac_extended(
             altitude, 0.0, 1013.25, 15.0, 0.0065, swe.APP_TO_TRUE
@@ -223,7 +223,7 @@ class TestRefracExtendedEdgeCases:
     def test_negative_altitude(self):
         """Test refraction for negative altitudes (below horizon)."""
         alt, (true_alt, app_alt, refrac, dip) = ephem.refrac_extended(
-            -1.0, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            -1.0, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert isinstance(alt, float)
         assert not math.isnan(alt)
@@ -232,7 +232,7 @@ class TestRefracExtendedEdgeCases:
     def test_very_high_altitude_observer(self):
         """Test with very high observer altitude."""
         alt, (_, _, _, dip) = ephem.refrac_extended(
-            0.0, 10000.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            0.0, 10000.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert isinstance(alt, float)
         assert dip < -2.0  # Should be significant dip
@@ -240,7 +240,7 @@ class TestRefracExtendedEdgeCases:
     def test_zero_lapse_rate(self):
         """Test with zero lapse rate (isothermal atmosphere)."""
         _, (_, _, _, dip) = ephem.refrac_extended(
-            0.0, 1000.0, 1013.25, 15.0, 0.0, ephem.SE_TRUE_TO_APP
+            0.0, 1000.0, 1013.25, 15.0, 0.0, ephem.TRUE_TO_APP
         )
         assert isinstance(dip, float)
         # With zero lapse rate, should get pure geometric dip
@@ -260,7 +260,7 @@ class TestRefracExtendedEdgeCases:
     def test_zenith_refraction(self):
         """Test that refraction at zenith is essentially zero."""
         alt, (_, _, refrac, _) = ephem.refrac_extended(
-            90.0, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            90.0, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         assert abs(refrac) < 0.01  # Less than 0.01 degrees at zenith
 
@@ -269,11 +269,11 @@ class TestRefracExtendedEdgeCases:
         original = 30.0
         # Convert to apparent
         app_alt, _ = ephem.refrac_extended(
-            original, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_TRUE_TO_APP
+            original, 0.0, 1013.25, 15.0, 0.0065, ephem.TRUE_TO_APP
         )
         # Convert back to true
         recovered, _ = ephem.refrac_extended(
-            app_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.SE_APP_TO_TRUE
+            app_alt, 0.0, 1013.25, 15.0, 0.0065, ephem.APP_TO_TRUE
         )
         assert abs(recovered - original) < 0.01, (
             f"Roundtrip: {original} -> {app_alt} -> {recovered}"

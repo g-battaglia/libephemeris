@@ -18,14 +18,14 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MARS,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MARS,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -37,18 +37,18 @@ class TestPlanetCenters:
     def gas_giants(self):
         """Gas giant planets that have significant barycenter offset."""
         return [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ]
 
     def test_jupiter_position_matches_swisseph(self, standard_jd):
         """Test that Jupiter position matches SwissEph (which uses planet center)."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_JUPITER, SEFLG_SWIEPH)
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_JUPITER, SEFLG_SWIEPH)
+        res_swe, _ = swe.calc_ut(standard_jd, JUPITER, FLG_SWIEPH)
+        res_lib, _ = ephem.calc_ut(standard_jd, JUPITER, FLG_SWIEPH)
 
         lon_diff = abs(res_swe[0] - res_lib[0])
         if lon_diff > 180:
@@ -62,8 +62,8 @@ class TestPlanetCenters:
 
     def test_saturn_position_matches_swisseph(self, standard_jd):
         """Test that Saturn position matches SwissEph (which uses planet center)."""
-        res_swe, _ = swe.calc_ut(standard_jd, SE_SATURN, SEFLG_SWIEPH)
-        res_lib, _ = ephem.swe_calc_ut(standard_jd, SE_SATURN, SEFLG_SWIEPH)
+        res_swe, _ = swe.calc_ut(standard_jd, SATURN, FLG_SWIEPH)
+        res_lib, _ = ephem.calc_ut(standard_jd, SATURN, FLG_SWIEPH)
 
         lon_diff = abs(res_swe[0] - res_lib[0])
         if lon_diff > 180:
@@ -76,8 +76,8 @@ class TestPlanetCenters:
     def test_all_gas_giants_positions(self, standard_jd, gas_giants):
         """Test all gas giant positions against SwissEph."""
         for planet_id, planet_name in gas_giants:
-            res_swe, _ = swe.calc_ut(standard_jd, planet_id, SEFLG_SWIEPH)
-            res_lib, _ = ephem.swe_calc_ut(standard_jd, planet_id, SEFLG_SWIEPH)
+            res_swe, _ = swe.calc_ut(standard_jd, planet_id, FLG_SWIEPH)
+            res_lib, _ = ephem.calc_ut(standard_jd, planet_id, FLG_SWIEPH)
 
             lon_diff = abs(res_swe[0] - res_lib[0])
             if lon_diff > 180:
@@ -88,11 +88,11 @@ class TestPlanetCenters:
             )
 
     def test_gas_giants_with_speed(self, standard_jd, gas_giants):
-        """Test gas giant positions and velocities with SEFLG_SPEED."""
+        """Test gas giant positions and velocities with FLG_SPEED."""
         for planet_id, planet_name in gas_giants:
-            res_swe, _ = swe.calc_ut(standard_jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            res_lib, _ = ephem.swe_calc_ut(
-                standard_jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+            res_swe, _ = swe.calc_ut(standard_jd, planet_id, FLG_SWIEPH | FLG_SPEED)
+            res_lib, _ = ephem.calc_ut(
+                standard_jd, planet_id, FLG_SWIEPH | FLG_SPEED
             )
 
             lon_diff = abs(res_swe[0] - res_lib[0])
@@ -115,8 +115,8 @@ class TestPlanetCenters:
 
         for jd in test_dates:
             for planet_id, planet_name in gas_giants:
-                res_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH)
-                res_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+                res_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH)
+                res_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
 
                 lon_diff = abs(res_swe[0] - res_lib[0])
                 if lon_diff > 180:
@@ -146,12 +146,12 @@ class TestPlanetMapContents:
         from libephemeris.planets import _PLANET_MAP
 
         expected = {
-            SE_MARS: "mars",
-            SE_JUPITER: "jupiter",
-            SE_SATURN: "saturn",
-            SE_URANUS: "uranus",
-            SE_NEPTUNE: "neptune",
-            SE_PLUTO: "pluto",
+            MARS: "mars",
+            JUPITER: "jupiter",
+            SATURN: "saturn",
+            URANUS: "uranus",
+            NEPTUNE: "neptune",
+            PLUTO: "pluto",
         }
 
         for planet_id, expected_name in expected.items():

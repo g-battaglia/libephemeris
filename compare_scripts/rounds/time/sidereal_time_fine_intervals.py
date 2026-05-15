@@ -12,7 +12,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     jd = start_jd
     while jd <= end_jd:
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
 
         diff_s = abs(le_st - se_st) * 3600  # seconds of time
         if diff_s > 43200:
@@ -51,14 +51,14 @@ def main():
         jd += step
 
     # Also test sidtime0 (sidereal time at Greenwich)
-    print("\n--- Testing swe_sidtime0 ---")
+    print("\n--- Testing sidtime0 ---")
     test_jds = [2451545.0, 2455197.5, 2459580.5, 2440587.5, 2444239.5]
     for jd in test_jds:
         eps = 23.44  # approximate obliquity
         dpsi = -0.004  # approximate nutation in longitude (degrees)
         try:
             se_st0 = swe.sidtime0(jd, eps, dpsi)
-            le_st0 = ephem.swe_sidtime0(jd, eps, dpsi)
+            le_st0 = ephem.sidtime0(jd, eps, dpsi)
             diff_s = abs(le_st0 - se_st0) * 3600
             if diff_s > 43200:
                 diff_s = 86400 - diff_s

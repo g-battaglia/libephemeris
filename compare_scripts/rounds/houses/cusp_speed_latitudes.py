@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 219: House cusp speed at various latitudes.
 
-Tests house cusp speeds (from swe_houses_ex2) across multiple house systems,
+Tests house cusp speeds (from houses_ex2) across multiple house systems,
 latitudes, and dates. Compares LE vs SE cusp speed values.
 """
 
@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -45,7 +45,7 @@ DATES = [
 ]
 
 LON = 0.0
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Known buggy SE cusp speeds for Porphyry cusps 5,6,11,12
 PORPHYRY_BAD_CUSPS = {4, 5, 10, 11}  # 0-indexed
@@ -57,7 +57,7 @@ def compare_cusp_speeds(hsys_ch, lat, jd):
     label_base = f"{hsys_ch} lat={lat:.1f} JD={jd:.1f}"
 
     try:
-        le_result = ephem.swe_houses_ex2(jd, lat, LON, le_hsys(hsys_ch), FLAGS)
+        le_result = ephem.houses_ex2(jd, lat, LON, le_hsys(hsys_ch), FLAGS)
         # Returns (cusps, ascmc, cusp_speeds, ascmc_speeds)
         le_cusps = le_result[0]
         le_ascmc = le_result[1]

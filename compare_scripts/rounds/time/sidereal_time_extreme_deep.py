@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -70,7 +70,7 @@ def test_sidtime():
 
     for label, jd in TEST_JDS:
         try:
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
             se_st = swe.sidtime(jd)
         except Exception as e:
             continue
@@ -106,11 +106,11 @@ def test_sidtime():
             continue
         try:
             # Get obliquity and nutation
-            ecl_nut = ephem.swe_calc_ut(jd, -1, 0)
+            ecl_nut = ephem.calc_ut(jd, -1, 0)
             eps = ecl_nut[0][0]  # true obliquity
             nut_lon = ecl_nut[0][2]  # nutation in longitude
 
-            le_st0 = ephem.swe_sidtime0(jd, eps, nut_lon)
+            le_st0 = ephem.sidtime0(jd, eps, nut_lon)
             se_st0 = swe.sidtime0(jd, eps, nut_lon)
         except Exception:
             continue
@@ -141,7 +141,7 @@ def test_sidtime_at_greenwich_noon():
     for year_offset in range(0, 50):
         jd = 2451545.0 + year_offset * 365.25  # approximate yearly
         try:
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
             se_st = swe.sidtime(jd)
         except Exception:
             continue

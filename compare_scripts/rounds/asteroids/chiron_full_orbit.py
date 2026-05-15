@@ -110,15 +110,15 @@ def run_part1():
     print("=" * 70)
 
     r = R("P1: Chiron full orbit")
-    flags = SEFLG_SPEED
+    flags = FLG_SPEED
 
     for y in range(1970, 2021):
         for m in [1, 7]:
             jd = swe.julday(y, m, 1, 12.0)
             label = f"{y}-{m:02d} Chiron"
             try:
-                se_r = swe.calc_ut(jd, SE_CHIRON, flags)
-                le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+                se_r = swe.calc_ut(jd, CHIRON, flags)
+                le_r = ephem.calc_ut(jd, CHIRON, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -132,7 +132,7 @@ def run_part2():
     print("=" * 70)
 
     r = R("P2: Perihelion/Aphelion")
-    flags = SEFLG_SPEED
+    flags = FLG_SPEED
 
     # Chiron perihelion ~Feb 1996 (q≈8.45 AU)
     # Chiron aphelion ~1970 (Q≈18.8 AU)
@@ -151,8 +151,8 @@ def run_part2():
         jd = swe.julday(y, m, d, 12.0)
         label = f"Chiron {desc}"
         try:
-            se_r = swe.calc_ut(jd, SE_CHIRON, flags)
-            le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se_r = swe.calc_ut(jd, CHIRON, flags)
+            le_r = ephem.calc_ut(jd, CHIRON, flags)
             compare_pos(r, se_r, le_r, label)
             print(
                 f"  {desc}: lon={le_r[0][0]:.4f}° dist={le_r[0][2]:.4f} AU spd={le_r[0][3]:.6f}°/d"
@@ -169,14 +169,14 @@ def run_part3():
     print("=" * 70)
 
     r = R("P3: Chiron heliocentric")
-    flags = SEFLG_SPEED | SEFLG_HELCTR
+    flags = FLG_SPEED | FLG_HELCTR
 
     for y in range(1970, 2021, 2):
         jd = swe.julday(y, 6, 21, 12.0)
         label = f"{y} Chiron HELIO"
         try:
-            se_r = swe.calc_ut(jd, SE_CHIRON, flags)
-            le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se_r = swe.calc_ut(jd, CHIRON, flags)
+            le_r = ephem.calc_ut(jd, CHIRON, flags)
             compare_pos(r, se_r, le_r, label)
         except Exception as e:
             r.skip(f"{label}: {e}")
@@ -202,19 +202,19 @@ def run_part4():
         jd = swe.julday(y, m, d, h)
 
         # Equatorial
-        flags_eq = SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags_eq = FLG_SPEED | FLG_EQUATORIAL
         try:
-            se_r = swe.calc_ut(jd, SE_CHIRON, flags_eq)
-            le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags_eq)
+            se_r = swe.calc_ut(jd, CHIRON, flags_eq)
+            le_r = ephem.calc_ut(jd, CHIRON, flags_eq)
             compare_pos(r, se_r, le_r, f"{y} Chiron EQ")
         except Exception as e:
             r.skip(f"{y} Chiron EQ: {e}")
 
         # J2000
-        flags_j2k = SEFLG_SPEED | SEFLG_J2000
+        flags_j2k = FLG_SPEED | FLG_J2000
         try:
-            se_r = swe.calc_ut(jd, SE_CHIRON, flags_j2k)
-            le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags_j2k)
+            se_r = swe.calc_ut(jd, CHIRON, flags_j2k)
+            le_r = ephem.calc_ut(jd, CHIRON, flags_j2k)
             compare_pos(r, se_r, le_r, f"{y} Chiron J2K")
         except Exception as e:
             r.skip(f"{y} Chiron J2K: {e}")
@@ -233,8 +233,8 @@ def run_part5():
     jd_peri = swe.julday(1996, 2, 14, 12.0)
     jd_aph = swe.julday(1970, 7, 1, 12.0)
 
-    peri_r = ephem.swe_calc_ut(jd_peri, SE_CHIRON, SEFLG_SPEED | SEFLG_HELCTR)
-    aph_r = ephem.swe_calc_ut(jd_aph, SE_CHIRON, SEFLG_SPEED | SEFLG_HELCTR)
+    peri_r = ephem.calc_ut(jd_peri, CHIRON, FLG_SPEED | FLG_HELCTR)
+    aph_r = ephem.calc_ut(jd_aph, CHIRON, FLG_SPEED | FLG_HELCTR)
 
     peri_spd = abs(peri_r[0][3])
     aph_spd = abs(aph_r[0][3])
@@ -253,8 +253,8 @@ def run_part5():
         r.ok(0, f"speed ratio {ratio:.2f}x")
 
     # Also validate against SE
-    se_peri = swe.calc_ut(jd_peri, SE_CHIRON, SEFLG_SPEED | SEFLG_HELCTR)
-    se_aph = swe.calc_ut(jd_aph, SE_CHIRON, SEFLG_SPEED | SEFLG_HELCTR)
+    se_peri = swe.calc_ut(jd_peri, CHIRON, FLG_SPEED | FLG_HELCTR)
+    se_aph = swe.calc_ut(jd_aph, CHIRON, FLG_SPEED | FLG_HELCTR)
 
     peri_diff = abs(se_peri[0][3] - peri_r[0][3])
     aph_diff = abs(se_aph[0][3] - aph_r[0][3])
@@ -276,14 +276,14 @@ def run_part6():
     print("=" * 70)
 
     r = R("P6: Chiron extended")
-    flags = SEFLG_SPEED
+    flags = FLG_SPEED
 
     for y in range(1900, 2101, 5):
         jd = swe.julday(y, 6, 21, 12.0)
         label = f"{y} Chiron"
         try:
-            se_r = swe.calc_ut(jd, SE_CHIRON, flags)
-            le_r = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se_r = swe.calc_ut(jd, CHIRON, flags)
+            le_r = ephem.calc_ut(jd, CHIRON, flags)
             compare_pos(r, se_r, le_r, label, check_speed=False)
         except Exception as e:
             r.skip(f"{label}: {e}")

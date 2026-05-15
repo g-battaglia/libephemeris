@@ -7,10 +7,10 @@ leb/precision branch.  Uses pyswisseph as the reference standard.
 Bug 1 (64b8367): Pipeline A SID+EQ used nutation matrix instead of mean equator.
 Bug 2 (e6555ed): Pipeline B/C dpsi nutation handling wrong for SID+EQ.
 Bug 3 (9f0fde7): J2000 suppression for non-mean SID bodies — NOW FIXED.
-    pyswisseph silently ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog,
-    IntpPerg when SEFLG_SIDEREAL is set.  This is a behavioral bug (ayanamsha
+    pyswisseph silently ignores FLG_J2000 for TrueNode, OscuApog, IntpApog,
+    IntpPerg when FLG_SIDEREAL is set.  This is a behavioral bug (ayanamsha
     and J2000 ecliptic precession are geometrically distinct operations).
-    LibEphemeris intentionally fixes this: SEFLG_J2000 is honored for ALL bodies.
+    LibEphemeris intentionally fixes this: FLG_J2000 is honored for ALL bodies.
     Tests in TestBug3J2kIntentionalDivergence verify the expected divergence.
     See docs/reference/se-bug-sidereal-j2000-nodes.md
 Bug 4 (b816be0): (a) Frame bias in _get_precession_matrix, (b) SID+J2K
@@ -27,24 +27,24 @@ import swisseph as swe
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
 )
 
 
@@ -67,27 +67,27 @@ def arcsec(deg: float) -> float:
 
 # Pipeline A bodies (ICRS barycentric)
 PIPELINE_A_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Pipeline B bodies (ecliptic direct) — mean vs true distinction matters
 PIPELINE_B_MEAN_BODIES = [
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_MEAN_APOG, "MeanApog"),
+    (MEAN_NODE, "MeanNode"),
+    (MEAN_APOG, "MeanApog"),
 ]
 
 PIPELINE_B_TRUE_BODIES = [
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_OSCU_APOG, "OscuApog"),
+    (TRUE_NODE, "TrueNode"),
+    (OSCU_APOG, "OscuApog"),
 ]
 
 PIPELINE_B_INTERP_BODIES = [
-    (SE_INTP_APOG, "IntpApog"),
-    (SE_INTP_PERG, "IntpPerg"),
+    (INTP_APOG, "IntpApog"),
+    (INTP_PERG, "IntpPerg"),
 ]
 
 ALL_PIPELINE_B_BODIES = (
@@ -117,9 +117,9 @@ PIPELINE_B_SID_EQ_TRUE_TOL = 0.015  # True bodies
 INTP_LON_TOL = 5.5  # IntpApog/IntpPerg: intentional algorithm deviation (see docs)
 
 SID_MODES = [
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (SE_SIDM_RAMAN, "Raman"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (SIDM_RAMAN, "Raman"),
 ]
 
 
@@ -143,11 +143,11 @@ class TestBug1PipelineASidEq:
     ):
         """Pipeline A SID+EQ RA/Dec matches pyswisseph."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
         dec_diff = abs(float(pos_swe[1]) - float(pos_py[1]))
@@ -175,11 +175,11 @@ class TestBug1PipelineASidJ2k:
     def test_sid_j2k_position(self, body_id, body_name, jd, date_desc):
         """Pipeline A SID+J2K lon matches pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -199,11 +199,11 @@ class TestBug1PipelineASidEqJ2k:
     def test_sid_eq_j2k_position(self, body_id, body_name, jd, date_desc):
         """Pipeline A SID+EQ+J2K RA matches pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -234,13 +234,13 @@ class TestBug2PipelineBSidEq:
     def test_sid_eq_all_bodies(self, body_id, body_name, jd, date_desc):
         """All Pipeline B bodies SID+EQ match pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
-        if body_id in (SE_INTP_APOG, SE_INTP_PERG):
+        if body_id in (INTP_APOG, INTP_PERG):
             tol = INTP_LON_TOL
         else:
             tol = PIPELINE_B_SID_EQ_TOL
@@ -262,11 +262,11 @@ class TestBug2PipelineBSidEq:
     ):
         """Mean ecliptic bodies SID+EQ across multiple ayanamshas."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -281,13 +281,13 @@ class TestBug2PipelineBSidEq:
     def test_true_body_sid_eq_speed(self, body_id, body_name, jd, date_desc):
         """True ecliptic bodies SID+EQ velocity matches pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
-        speed_tol = 0.05 if body_id == SE_OSCU_APOG else 0.005
+        speed_tol = 0.05 if body_id == OSCU_APOG else 0.005
         speed_diff = abs(float(pos_swe[3]) - float(pos_py[3]))
 
         assert speed_diff < speed_tol, (
@@ -303,12 +303,12 @@ class TestBug2PipelineBSidEq:
 class TestBug3J2kIntentionalDivergence:
     """LibEphemeris intentionally diverges from pyswisseph here.
 
-    pyswisseph silently ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog,
-    IntpPerg when SEFLG_SIDEREAL is set.  This is a behavioral bug: ayanamsha
+    pyswisseph silently ignores FLG_J2000 for TrueNode, OscuApog, IntpApog,
+    IntpPerg when FLG_SIDEREAL is set.  This is a behavioral bug: ayanamsha
     (1D longitude zero-point shift) and J2000 ecliptic precession (3D plane
     rotation) are geometrically distinct, composable operations.
 
-    LibEphemeris honors SEFLG_J2000 for ALL bodies uniformly.  These tests
+    LibEphemeris honors FLG_J2000 for ALL bodies uniformly.  These tests
     verify the intentional divergence and document the expected delta.
 
     See docs/reference/se-bug-sidereal-j2000-nodes.md
@@ -326,14 +326,14 @@ class TestBug3J2kIntentionalDivergence:
         The delta should be consistent with the ecliptic precession angle.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
         # pyswisseph: still ignores J2K for these bodies
         pos_swe, _ = swe.calc_ut(jd, body_id, flags_sid_j2k)
         # libephemeris: now honors J2K
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags_sid_j2k)
 
         divergence = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -362,13 +362,13 @@ class TestBug3J2kIntentionalDivergence:
         If they are identical, J2000 precession is NOT being applied.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
-        flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid = FLG_SIDEREAL | FLG_SPEED
+        flags_sid_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+        pos_sid, _ = ephem.calc_ut(jd, body_id, flags_sid)
+        pos_j2k, _ = ephem.calc_ut(jd, body_id, flags_sid_j2k)
 
         diff = angular_diff(float(pos_sid[0]), float(pos_j2k[0]))
 
@@ -384,13 +384,13 @@ class TestBug3J2kIntentionalDivergence:
     def test_interp_body_j2k_actually_applied(self, body_id, body_name, jd, date_desc):
         """IntpApog/IntpPerg: SID+J2K must differ from SID alone."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
-        flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid = FLG_SIDEREAL | FLG_SPEED
+        flags_sid_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+        pos_sid, _ = ephem.calc_ut(jd, body_id, flags_sid)
+        pos_j2k, _ = ephem.calc_ut(jd, body_id, flags_sid_j2k)
 
         diff = angular_diff(float(pos_sid[0]), float(pos_j2k[0]))
 
@@ -410,10 +410,10 @@ class TestBug3J2kIntentionalDivergence:
         If identical, J2K is being incorrectly suppressed for mean bodies.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
-        flags_sid_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid = FLG_SIDEREAL | FLG_SPEED
+        flags_sid_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
         # pyswisseph reference
         pos_swe_sid, _ = swe.calc_ut(jd, body_id, flags_sid)
@@ -422,8 +422,8 @@ class TestBug3J2kIntentionalDivergence:
         swe_diff = angular_diff(float(pos_swe_sid[0]), float(pos_swe_j2k[0]))
 
         # libephemeris
-        pos_py_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_py_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_sid_j2k)
+        pos_py_sid, _ = ephem.calc_ut(jd, body_id, flags_sid)
+        pos_py_j2k, _ = ephem.calc_ut(jd, body_id, flags_sid_j2k)
 
         py_diff = angular_diff(float(pos_py_sid[0]), float(pos_py_j2k[0]))
 
@@ -441,11 +441,11 @@ class TestBug3J2kIntentionalDivergence:
     def test_mean_body_sid_j2k_matches_swe(self, body_id, body_name, jd, date_desc):
         """MeanNode/MeanApog SID+J2K lon matches pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -475,11 +475,11 @@ class TestBug4FrameBiasAndPrecessionOrder:
         Bug 4b error grows with distance from J2000, up to 28" at extreme dates.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -495,11 +495,11 @@ class TestBug4FrameBiasAndPrecessionOrder:
     def test_mean_body_sid_eq_j2k_combined(self, body_id, body_name, jd, date_desc):
         """MeanNode/MeanApog SID+EQ+J2K: triple combo matches pyswisseph."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -518,11 +518,11 @@ class TestBug4FrameBiasAndPrecessionOrder:
         (which includes ICRS bias) with mean_equator rotation.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 
@@ -545,10 +545,10 @@ class TestSidEqComprehensive:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_MEAN_NODE, "MeanNode"),
-            (SE_TRUE_NODE, "TrueNode"),
-            (SE_MEAN_APOG, "MeanApog"),
-            (SE_OSCU_APOG, "OscuApog"),
+            (MEAN_NODE, "MeanNode"),
+            (TRUE_NODE, "TrueNode"),
+            (MEAN_APOG, "MeanApog"),
+            (OSCU_APOG, "OscuApog"),
         ],
     )
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
@@ -558,11 +558,11 @@ class TestSidEqComprehensive:
     ):
         """All primary Pipeline B bodies SID+EQ across ayanamshas."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = PIPELINE_B_SID_EQ_TOL
         ra_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
@@ -591,19 +591,19 @@ class TestSidJ2kComprehensive:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_MEAN_NODE, "MeanNode"),
-            (SE_MEAN_APOG, "MeanApog"),
+            (MEAN_NODE, "MeanNode"),
+            (MEAN_APOG, "MeanApog"),
         ],
     )
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
     def test_mean_body_sid_j2k_matches_swe(self, body_id, body_name, jd, date_desc):
         """Mean bodies SID+J2K still match pyswisseph (no divergence)."""
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = PIPELINE_B_SID_J2K_TOL
         lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
@@ -617,8 +617,8 @@ class TestSidJ2kComprehensive:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_TRUE_NODE, "TrueNode"),
-            (SE_OSCU_APOG, "OscuApog"),
+            (TRUE_NODE, "TrueNode"),
+            (OSCU_APOG, "OscuApog"),
         ],
     )
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES[:4])
@@ -628,15 +628,15 @@ class TestSidJ2kComprehensive:
         """True/osculating bodies SID+J2K: verify expected SE divergence.
 
         LibEphemeris intentionally diverges from pyswisseph here because SE
-        silently ignores SEFLG_J2000 for these bodies when SEFLG_SIDEREAL
+        silently ignores FLG_J2000 for these bodies when FLG_SIDEREAL
         is set.  The divergence should match the ecliptic precession angle.
         """
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         lon_diff = angular_diff(float(pos_swe[0]), float(pos_py[0]))
 

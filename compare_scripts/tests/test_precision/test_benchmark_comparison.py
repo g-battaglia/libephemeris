@@ -19,22 +19,22 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SPEED,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_KRISHNAMURTI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SPEED,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
+    SIDM_TRUE_CITRA,
+    SIDM_KRISHNAMURTI,
 )
 
 
@@ -120,22 +120,22 @@ def run_benchmark(
 
 
 class TestCalcUtBenchmark:
-    """Benchmarks for swe_calc_ut (planetary position calculations)."""
+    """Benchmarks for calc_ut (planetary position calculations)."""
 
     @pytest.fixture
     def planets(self):
         """All major planets for benchmarking."""
         return [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
     @pytest.fixture
@@ -177,13 +177,13 @@ class TestCalcUtBenchmark:
         # Warmup
         for jd in benchmark_dates[:10]:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, 0)
+                ephem.calc_ut(jd, planet, 0)
 
         # Benchmark libephemeris
         lib_start = time.perf_counter()
         for jd in benchmark_dates:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, 0)
+                ephem.calc_ut(jd, planet, 0)
         lib_elapsed = time.perf_counter() - lib_start
 
         slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -210,7 +210,7 @@ class TestCalcUtBenchmark:
     @pytest.mark.slow
     def test_calc_ut_with_speed(self, planets, benchmark_dates, progress_reporter):
         """
-        Benchmark calc_ut with SEFLG_SPEED flag.
+        Benchmark calc_ut with FLG_SPEED flag.
 
         This tests velocity calculations which are computationally more expensive.
         """
@@ -236,13 +236,13 @@ class TestCalcUtBenchmark:
         # Warmup
         for jd in benchmark_dates[:10]:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                ephem.calc_ut(jd, planet, FLG_SPEED)
 
         # Benchmark libephemeris
         lib_start = time.perf_counter()
         for jd in benchmark_dates:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                ephem.calc_ut(jd, planet, FLG_SPEED)
         lib_elapsed = time.perf_counter() - lib_start
 
         slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -252,7 +252,7 @@ class TestCalcUtBenchmark:
         progress.done()
 
         print(f"\n{'=' * 70}")
-        print(f"BENCHMARK: calc_ut + SEFLG_SPEED - {num_calculations} calculations")
+        print(f"BENCHMARK: calc_ut + FLG_SPEED - {num_calculations} calculations")
         print(f"{'=' * 70}")
         print(f"pyswisseph (C):     {swe_elapsed:.4f}s ({swe_rate:.0f} calc/s)")
         print(f"libephemeris (Py):  {lib_elapsed:.4f}s ({lib_rate:.0f} calc/s)")
@@ -261,7 +261,7 @@ class TestCalcUtBenchmark:
 
 
 class TestHousesBenchmark:
-    """Benchmarks for swe_houses (house cusp calculations)."""
+    """Benchmarks for houses (house cusp calculations)."""
 
     @pytest.fixture
     def house_systems(self):
@@ -327,14 +327,14 @@ class TestHousesBenchmark:
         for jd in benchmark_dates[:5]:
             for _, lat, lon in locations:
                 for hsys_bytes, hsys_ord, _ in house_systems:
-                    ephem.swe_houses(jd, lat, lon, hsys_ord)
+                    ephem.houses(jd, lat, lon, hsys_ord)
 
         # Benchmark libephemeris
         lib_start = time.perf_counter()
         for jd in benchmark_dates:
             for _, lat, lon in locations:
                 for hsys_bytes, hsys_ord, _ in house_systems:
-                    ephem.swe_houses(jd, lat, lon, hsys_ord)
+                    ephem.houses(jd, lat, lon, hsys_ord)
         lib_elapsed = time.perf_counter() - lib_start
 
         slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -392,7 +392,7 @@ class TestHousesBenchmark:
             lib_start = time.perf_counter()
             for jd in benchmark_dates:
                 for _, lat, lon in locations:
-                    ephem.swe_houses(jd, lat, lon, hsys_ord)
+                    ephem.houses(jd, lat, lon, hsys_ord)
             lib_elapsed = time.perf_counter() - lib_start
 
             slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -419,17 +419,17 @@ class TestHousesBenchmark:
 
 
 class TestAyanamsaBenchmark:
-    """Benchmarks for swe_get_ayanamsa_ut (ayanamsa calculations)."""
+    """Benchmarks for get_ayanamsa_ut (ayanamsa calculations)."""
 
     @pytest.fixture
     def ayanamsha_modes(self):
         """Common ayanamsha modes for benchmarking."""
         return [
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_RAMAN, "Raman"),
-            (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-            (SE_SIDM_TRUE_CITRA, "True Citra"),
+            (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_RAMAN, "Raman"),
+            (SIDM_KRISHNAMURTI, "Krishnamurti"),
+            (SIDM_TRUE_CITRA, "True Citra"),
         ]
 
     @pytest.fixture
@@ -470,16 +470,16 @@ class TestAyanamsaBenchmark:
 
         # Warmup
         for mode, _ in ayanamsha_modes:
-            ephem.swe_set_sid_mode(mode)
+            ephem.set_sid_mode(mode)
             for jd in benchmark_dates[:10]:
-                ephem.swe_get_ayanamsa_ut(jd)
+                ephem.get_ayanamsa_ut(jd)
 
         # Benchmark libephemeris
         lib_start = time.perf_counter()
         for mode, _ in ayanamsha_modes:
-            ephem.swe_set_sid_mode(mode)
+            ephem.set_sid_mode(mode)
             for jd in benchmark_dates:
-                ephem.swe_get_ayanamsa_ut(jd)
+                ephem.get_ayanamsa_ut(jd)
         lib_elapsed = time.perf_counter() - lib_start
 
         slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -532,10 +532,10 @@ class TestAyanamsaBenchmark:
             swe_elapsed = time.perf_counter() - swe_start
 
             # Benchmark libephemeris
-            ephem.swe_set_sid_mode(mode)
+            ephem.set_sid_mode(mode)
             lib_start = time.perf_counter()
             for jd in benchmark_dates:
-                ephem.swe_get_ayanamsa_ut(jd)
+                ephem.get_ayanamsa_ut(jd)
             lib_elapsed = time.perf_counter() - lib_start
 
             slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -585,16 +585,16 @@ class TestComprehensiveBenchmark:
         dates = [jd_start + i for i in range(500)]
 
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
         progress = progress_reporter("Comprehensive benchmark", 3)
@@ -612,7 +612,7 @@ class TestComprehensiveBenchmark:
         lib_start = time.perf_counter()
         for jd in dates:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, 0)
+                ephem.calc_ut(jd, planet, 0)
         lib_calc_time = time.perf_counter() - lib_start
 
         results.append(
@@ -647,7 +647,7 @@ class TestComprehensiveBenchmark:
         for jd in dates_houses:
             for lat, lon in locations:
                 for hsys in house_systems_lib:
-                    ephem.swe_houses(jd, lat, lon, hsys)
+                    ephem.houses(jd, lat, lon, hsys)
         lib_houses_time = time.perf_counter() - lib_start
 
         results.append(
@@ -665,9 +665,9 @@ class TestComprehensiveBenchmark:
         # 3. get_ayanamsa benchmark
         progress.update(2, "get_ayanamsa_ut")
         ayanamsha_modes = [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
         ]
         num_ayan = len(ayanamsha_modes) * len(dates)
 
@@ -680,9 +680,9 @@ class TestComprehensiveBenchmark:
 
         lib_start = time.perf_counter()
         for mode in ayanamsha_modes:
-            ephem.swe_set_sid_mode(mode)
+            ephem.set_sid_mode(mode)
             for jd in dates:
-                ephem.swe_get_ayanamsa_ut(jd)
+                ephem.get_ayanamsa_ut(jd)
         lib_ayan_time = time.perf_counter() - lib_start
 
         results.append(

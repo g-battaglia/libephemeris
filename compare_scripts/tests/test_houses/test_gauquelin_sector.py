@@ -1,5 +1,5 @@
 """
-Tests for gauquelin_sector and swe_gauquelin_sector functions.
+Tests for gauquelin_sector and gauquelin_sector functions.
 
 Tests the calculation of Gauquelin sectors (1-36) for celestial bodies.
 Verifies the implementation correctly divides diurnal and nocturnal arcs
@@ -11,12 +11,12 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 from libephemeris.houses import _houses_gauquelin
 
@@ -31,7 +31,7 @@ class TestGauquelinSectorBasic:
         lat = 48.85  # Paris
         lon = 2.35
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert isinstance(result, float)
 
@@ -42,7 +42,7 @@ class TestGauquelinSectorBasic:
         lat = 48.85
         lon = 2.35
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -53,22 +53,22 @@ class TestGauquelinSectorBasic:
         lat = 48.85
         lon = 2.35
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
         sector_num = int(result)
 
         assert 1 <= sector_num <= 36
 
     @pytest.mark.unit
     def test_gauquelin_sector_alias_matches(self):
-        """swe_gauquelin_sector should give same result as gauquelin_sector."""
+        """gauquelin_sector should give same result as gauquelin_sector."""
         jd = 2451545.0
         lat = 48.85
         lon = 2.35
 
-        result1 = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
-        # swe_gauquelin_sector uses SE-compatible signature: (jd, body, method, geopos)
+        result1 = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
+        # gauquelin_sector uses SE-compatible signature: (jd, body, method, geopos)
         geopos = (lon, lat, 0.0)
-        result2 = ephem.swe_gauquelin_sector(jd, SE_MARS, 0, geopos)
+        result2 = ephem.gauquelin_sector(jd, MARS, 0, geopos)
 
         assert result1 == result2
 
@@ -76,7 +76,7 @@ class TestGauquelinSectorBasic:
 class TestGauquelinSectorMultiplePlanets:
     """Test gauquelin_sector with different planets."""
 
-    PLANETS = [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_SATURN]
+    PLANETS = [SUN, MOON, MARS, JUPITER, SATURN]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("planet", PLANETS)
@@ -102,7 +102,7 @@ class TestGauquelinSectorMethods:
         lat = 48.85
         lon = 2.35
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, method, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, method, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -113,8 +113,8 @@ class TestGauquelinSectorMethods:
         lat = 48.85
         lon = 2.35
 
-        result_with_lat = ephem.gauquelin_sector(jd, SE_MOON, 0, (lon, lat, 0.0))
-        result_without_lat = ephem.gauquelin_sector(jd, SE_MOON, 1, (lon, lat, 0.0))
+        result_with_lat = ephem.gauquelin_sector(jd, MOON, 0, (lon, lat, 0.0))
+        result_without_lat = ephem.gauquelin_sector(jd, MOON, 1, (lon, lat, 0.0))
 
         # They should both be valid
         assert 1.0 <= result_with_lat < 37.0
@@ -127,15 +127,15 @@ class TestGauquelinSectorComparisonWithSwisseph:
     # Test cases: (jd, planet, lat, lon, method)
     TEST_CASES = [
         # Paris, Mars at J2000
-        (2451545.0, SE_MARS, 48.85, 2.35, 0),
+        (2451545.0, MARS, 48.85, 2.35, 0),
         # Rome, Sun at different time
-        (2451600.0, SE_SUN, 41.9, 12.5, 0),
+        (2451600.0, SUN, 41.9, 12.5, 0),
         # London, Moon
-        (2451550.0, SE_MOON, 51.5, -0.12, 0),
+        (2451550.0, MOON, 51.5, -0.12, 0),
         # New York, Jupiter
-        (2451545.0, SE_JUPITER, 40.7, -74.0, 0),
+        (2451545.0, JUPITER, 40.7, -74.0, 0),
         # Southern hemisphere, Saturn
-        (2451545.0, SE_SATURN, -33.9, 151.2, 0),
+        (2451545.0, SATURN, -33.9, 151.2, 0),
     ]
 
     @pytest.mark.unit
@@ -150,7 +150,7 @@ class TestGauquelinSectorComparisonWithSwisseph:
         # Get result from Swiss Ephemeris
         geopos = (lon, lat, 0.0)  # (lon, lat, alt)
         result_swe = swe.gauquelin_sector(
-            jd, planet, method, geopos, 0.0, 0.0, SEFLG_SWIEPH
+            jd, planet, method, geopos, 0.0, 0.0, FLG_SWIEPH
         )
 
         # Compare sector numbers
@@ -180,7 +180,7 @@ class TestGauquelinSectorEdgeCases:
         lat = 0.0  # Equator
         lon = 0.0
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -191,7 +191,7 @@ class TestGauquelinSectorEdgeCases:
         lat = 65.0  # Near Arctic circle
         lon = 25.0
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -202,7 +202,7 @@ class TestGauquelinSectorEdgeCases:
         lat = -45.0
         lon = 170.0
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -213,7 +213,7 @@ class TestGauquelinSectorEdgeCases:
         lat = 40.7
         lon = -74.0  # New York
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
 
         assert 1.0 <= result < 37.0
 
@@ -232,7 +232,7 @@ class TestGauquelinSectorSectorDistribution:
         sectors = []
         for i in range(6):
             jd = 2451545.0 + i * 0.1  # ~2.4 hours apart
-            sector = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, 0.0))
             sectors.append(int(sector))
 
         # At least some of the sectors should be different
@@ -252,7 +252,7 @@ class TestGauquelinSectorSectorDistribution:
         sectors = set()
         for i in range(24):
             jd = jd_start + i / 24.0
-            sector = ephem.gauquelin_sector(jd, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd, SUN, 0, (lon, lat, 0.0))
             sectors.add(int(sector))
 
         # Sun should appear in at least 20 different sectors in 24 hours
@@ -272,7 +272,7 @@ class TestGauquelinSectorAtmosphericParameters:
         lon = 2.35
         altitude = 1000.0  # 1km altitude
 
-        result = ephem.gauquelin_sector(jd, SE_MARS, 0, (lon, lat, altitude))
+        result = ephem.gauquelin_sector(jd, MARS, 0, (lon, lat, altitude))
 
         assert 1.0 <= result < 37.0
 
@@ -284,7 +284,7 @@ class TestGauquelinSectorAtmosphericParameters:
         lon = 2.35
 
         result = ephem.gauquelin_sector(
-            jd, SE_MARS, 0, (lon, lat, 0.0), atpress=1000.0, attemp=20.0
+            jd, MARS, 0, (lon, lat, 0.0), atpress=1000.0, attemp=20.0
         )
 
         assert 1.0 <= result < 37.0
@@ -306,7 +306,7 @@ class TestGauquelinSectorDivision:
 
         for i in range(48):  # Sample every 30 minutes
             jd_sample = jd + i / 48.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_MARS, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, MARS, 0, (lon, lat, 0.0))
             sector_int = int(sector)
 
             if 1 <= sector_int <= 18:
@@ -333,7 +333,7 @@ class TestGauquelinSectorDivision:
         all_sectors = []
         for i in range(24):
             jd_sample = jd + i / 24.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, SUN, 0, (lon, lat, 0.0))
             all_sectors.append((i, int(sector)))
 
         # The Sun should spend part of day in diurnal sectors and part in nocturnal
@@ -373,7 +373,7 @@ class TestGauquelinSectorDivision:
         all_sectors = []
         for i in range(72):  # Every 20 minutes for 24 hours
             jd_sample = jd + i / 72.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, SUN, 0, (lon, lat, 0.0))
             all_sectors.append(int(sector))
 
         # Count sectors in each range
@@ -398,7 +398,7 @@ class TestGauquelinSectorDivision:
         found_19_to_36 = False
         for i in range(48):
             jd_sample = jd + i / 48.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, SUN, 0, (lon, lat, 0.0))
             if 19 <= int(sector) <= 36:
                 found_19_to_36 = True
                 break
@@ -488,7 +488,7 @@ class TestGauquelinHousesFunction:
 
         for i in range(36):  # Sample every 40 minutes
             jd_sample = jd + i / 36.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, SUN, 0, (lon, lat, 0.0))
             if 1 <= sector < 19:
                 diurnal_samples.append(sector)
             else:
@@ -522,7 +522,7 @@ class TestGauquelinHousesFunction:
         sectors = []
         for i in range(144):  # Every 10 minutes
             jd_sample = jd + i / 144.0
-            sector = ephem.gauquelin_sector(jd_sample, SE_SUN, 0, (lon, lat, 0.0))
+            sector = ephem.gauquelin_sector(jd_sample, SUN, 0, (lon, lat, 0.0))
             sectors.append(sector)
 
         # Check that sectors progress (mostly) monotonically or wrap around

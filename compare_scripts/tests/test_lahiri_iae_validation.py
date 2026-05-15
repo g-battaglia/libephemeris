@@ -27,7 +27,7 @@ References:
 import pytest
 import math
 import libephemeris as leph
-from libephemeris.constants import SE_SIDM_LAHIRI
+from libephemeris.constants import SIDM_LAHIRI
 
 
 # Helper function to convert DMS to decimal degrees
@@ -39,7 +39,7 @@ def dms_to_deg(deg: int, minutes: int, seconds: float) -> float:
 # Helper function to calculate Julian Day for a date
 def calculate_jd(year: int, month: int, day: int, hour: float = 0.0) -> float:
     """Calculate Julian Day for a given date using the library's function."""
-    return leph.swe_julday(year, month, day, hour)
+    return leph.julday(year, month, day, hour)
 
 
 class TestIAEMeanAyanamshaValues:
@@ -49,7 +49,7 @@ class TestIAEMeanAyanamshaValues:
     Mean ayanamsha = True ayanamsha - Nutation in longitude
 
     The IAE provides mean ayanamsha values at specific epochs. These can be
-    compared with libephemeris by using swe_get_ayanamsa_ut() which returns
+    compared with libephemeris by using get_ayanamsa_ut() which returns
     the mean ayanamsha.
 
     According to Appendix E, the mean ayanamsha values in IAE 2019, p. 429
@@ -88,13 +88,13 @@ class TestIAEMeanAyanamshaValues:
         self, year, month, day, hour, deg, minutes, sec, tolerance
     ):
         """Test mean ayanamsha against IAE 2019 official values."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         # Calculate Julian Day
         jd = calculate_jd(year, month, day, hour)
 
         # Get mean ayanamsha from libephemeris
-        ayanamsha = leph.swe_get_ayanamsa_ut(jd)
+        ayanamsha = leph.get_ayanamsa_ut(jd)
 
         # Convert expected value to decimal degrees
         expected = dms_to_deg(deg, minutes, sec)
@@ -119,7 +119,7 @@ class TestLahiriReferenceEpochs:
     2. IAE 1985 correction: 23 deg 15' 00".658 (true ayanamsha, with nutation)
 
     Note: The original definition is for TRUE ayanamsha (including nutation),
-    but swe_get_ayanamsa_ut returns MEAN ayanamsha. The difference is the
+    but get_ayanamsa_ut returns MEAN ayanamsha. The difference is the
     nutation in longitude, which was about 16" on that date.
     """
 
@@ -133,13 +133,13 @@ class TestLahiriReferenceEpochs:
         According to Swiss Ephemeris, nutation on this date was about 16".
         So mean ayanamsha should be approximately 23 deg 15' 00" - 16" = 23 deg 14' 44".
         """
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         # 21 March 1956, 0:00 TT (definition epoch)
         jd_definition = calculate_jd(1956, 3, 21, 0.0)
 
         # Get mean ayanamsha
-        mean_ayanamsha = leph.swe_get_ayanamsa_ut(jd_definition)
+        mean_ayanamsha = leph.get_ayanamsa_ut(jd_definition)
 
         # Expected mean ayanamsha (true value 23 deg 15' 00".658 minus nutation ~16")
         # The exact value depends on the nutation model used
@@ -160,11 +160,11 @@ class TestLahiriReferenceEpochs:
 
         IAE 2019 gives mean ayanamsha: 23 deg 51' 25".53
         """
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         jd_j2000 = 2451545.0  # J2000.0 epoch
 
-        ayanamsha = leph.swe_get_ayanamsa_ut(jd_j2000)
+        ayanamsha = leph.get_ayanamsa_ut(jd_j2000)
 
         # IAE 2019 value: 23 deg 51' 25".53 = 23.857092 degrees
         expected = dms_to_deg(23, 51, 25.53)
@@ -191,13 +191,13 @@ class TestLahiriPrecessionRate:
 
     def test_precession_rate_one_century(self):
         """Test precession rate over one Julian century."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         jd_j2000 = 2451545.0  # J2000.0
         jd_j2100 = jd_j2000 + 36525  # J2100.0 (one Julian century later)
 
-        ayanamsha_2000 = leph.swe_get_ayanamsa_ut(jd_j2000)
-        ayanamsha_2100 = leph.swe_get_ayanamsa_ut(jd_j2100)
+        ayanamsha_2000 = leph.get_ayanamsa_ut(jd_j2000)
+        ayanamsha_2100 = leph.get_ayanamsa_ut(jd_j2100)
 
         change = ayanamsha_2100 - ayanamsha_2000
 
@@ -215,13 +215,13 @@ class TestLahiriPrecessionRate:
 
     def test_precession_rate_one_year(self):
         """Test precession rate over one year."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         jd_2000 = calculate_jd(2000, 1, 1, 12.0)
         jd_2001 = calculate_jd(2001, 1, 1, 12.0)
 
-        ayanamsha_2000 = leph.swe_get_ayanamsa_ut(jd_2000)
-        ayanamsha_2001 = leph.swe_get_ayanamsa_ut(jd_2001)
+        ayanamsha_2000 = leph.get_ayanamsa_ut(jd_2000)
+        ayanamsha_2001 = leph.get_ayanamsa_ut(jd_2001)
 
         change_arcsec = (ayanamsha_2001 - ayanamsha_2000) * 3600
 
@@ -269,10 +269,10 @@ class TestHistoricalICRCValues:
         self, description, year, month, day, deg, minutes, sec, tolerance
     ):
         """Test against historical reference values from ICRC and Rashtriya Panchang."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         jd = calculate_jd(year, month, day, 0.0)
-        ayanamsha = leph.swe_get_ayanamsa_ut(jd)
+        ayanamsha = leph.get_ayanamsa_ut(jd)
 
         expected = dms_to_deg(deg, minutes, sec)
 
@@ -300,7 +300,7 @@ class TestIAEConsistency:
 
     def test_ayanamsha_increases_over_time(self):
         """Ayanamsha should always increase over time (precession is positive)."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         dates = [
             calculate_jd(1900, 1, 1, 0.0),
@@ -310,7 +310,7 @@ class TestIAEConsistency:
             calculate_jd(2100, 1, 1, 0.0),
         ]
 
-        values = [leph.swe_get_ayanamsa_ut(jd) for jd in dates]
+        values = [leph.get_ayanamsa_ut(jd) for jd in dates]
 
         for i in range(len(values) - 1):
             assert values[i] < values[i + 1], (
@@ -320,7 +320,7 @@ class TestIAEConsistency:
 
     def test_ayanamsha_reasonable_range(self):
         """Ayanamsha should be in a reasonable range for modern dates."""
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         # Test various dates from 1900 to 2100
         test_cases = [
@@ -333,7 +333,7 @@ class TestIAEConsistency:
 
         for year, min_val, max_val in test_cases:
             jd = calculate_jd(year, 1, 1, 12.0)
-            ayanamsha = leph.swe_get_ayanamsa_ut(jd)
+            ayanamsha = leph.get_ayanamsa_ut(jd)
 
             assert min_val < ayanamsha < max_val, (
                 f"Ayanamsha for year {year} out of expected range:\n"
@@ -348,11 +348,11 @@ class TestIAEConsistency:
         The Lahiri ayanamsha is based on Spica at 180 degrees, which
         implies the tropical and sidereal zodiacs coincided around 285 CE.
         """
-        leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        leph.set_sid_mode(SIDM_LAHIRI)
 
         # Get ayanamsha at J2000
         jd_j2000 = 2451545.0
-        ayanamsha_j2000 = leph.swe_get_ayanamsa_ut(jd_j2000)
+        ayanamsha_j2000 = leph.get_ayanamsa_ut(jd_j2000)
 
         # Calculate years from J2000 to zero epoch
         rate_per_year = 5027.8 / 3600.0 / 100.0  # degrees per year
@@ -398,12 +398,12 @@ class TestComparisonWithSwissEphemeris:
             jd = swe.julday(year, 1, 1, 12.0)
 
             # Swiss Ephemeris value
-            swe.set_sid_mode(SE_SIDM_LAHIRI)
+            swe.set_sid_mode(SIDM_LAHIRI)
             swe_value = swe.get_ayanamsa_ut(jd)
 
             # libephemeris value
-            leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
-            leph_value = leph.swe_get_ayanamsa_ut(jd)
+            leph.set_sid_mode(SIDM_LAHIRI)
+            leph_value = leph.get_ayanamsa_ut(jd)
 
             diff_arcsec = abs(swe_value - leph_value) * 3600
 
@@ -422,7 +422,7 @@ if __name__ == "__main__":
     print("LAHIRI AYANAMSHA VALIDATION AGAINST IAE")
     print("=" * 70)
 
-    leph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+    leph.set_sid_mode(SIDM_LAHIRI)
 
     # Test key dates
     test_dates = [
@@ -437,7 +437,7 @@ if __name__ == "__main__":
 
     for desc, year, month, day, hour in test_dates:
         jd = calculate_jd(year, month, day, hour)
-        ayanamsha = leph.swe_get_ayanamsa_ut(jd)
+        ayanamsha = leph.get_ayanamsa_ut(jd)
 
         # Convert to DMS
         d = int(ayanamsha)

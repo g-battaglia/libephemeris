@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -65,12 +65,12 @@ def compare_sidereal_houses(ayanamsha_name, ayanamsha_id, hsys_ch, lat, jd):
 
     # Set sidereal mode
     swe.set_sid_mode(ayanamsha_id)
-    ephem.swe_set_sid_mode(ayanamsha_id, 0, 0)
+    ephem.set_sid_mode(ayanamsha_id, 0, 0)
 
-    flags = ephem.SEFLG_SIDEREAL | ephem.SEFLG_SWIEPH
+    flags = ephem.FLG_SIDEREAL | ephem.FLG_SWIEPH
 
     try:
-        le_cusps, le_ascmc = ephem.swe_houses_ex(jd, lat, LON, le_hsys(hsys_ch), flags)
+        le_cusps, le_ascmc = ephem.houses_ex(jd, lat, LON, le_hsys(hsys_ch), flags)
         se_cusps, se_ascmc = swe.houses_ex(
             jd, lat, LON, se_hsys(hsys_ch), swe.FLG_SIDEREAL | swe.FLG_SWIEPH
         )
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     print(f"\n{'=' * 70}")
     print(

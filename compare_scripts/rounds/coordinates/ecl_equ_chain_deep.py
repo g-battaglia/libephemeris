@@ -15,14 +15,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Sun": (swe.SUN, ephem.SE_SUN),
-    "Moon": (swe.MOON, ephem.SE_MOON),
-    "Mars": (swe.MARS, ephem.SE_MARS),
-    "Jupiter": (swe.JUPITER, ephem.SE_JUPITER),
-    "Saturn": (swe.SATURN, ephem.SE_SATURN),
+    "Sun": (swe.SUN, ephem.SUN),
+    "Moon": (swe.MOON, ephem.MOON),
+    "Mars": (swe.MARS, ephem.MARS),
+    "Jupiter": (swe.JUPITER, ephem.JUPITER),
+    "Saturn": (swe.SATURN, ephem.SATURN),
 }
 
 FLAGS_ECL = swe.FLG_SPEED
@@ -52,11 +52,11 @@ for date_str, jd in TEST_DATES:
         try:
             # Get ecliptic position from both
             se_ecl = swe.calc_ut(jd, se_id, FLAGS_ECL)[0]
-            le_ecl = ephem.swe_calc_ut(jd, le_id, FLAGS_ECL)[0]
+            le_ecl = ephem.calc_ut(jd, le_id, FLAGS_ECL)[0]
 
             # Get equatorial position from both
             se_eq = swe.calc_ut(jd, se_id, FLAGS_EQ)[0]
-            le_eq = ephem.swe_calc_ut(jd, le_id, FLAGS_EQ)[0]
+            le_eq = ephem.calc_ut(jd, le_id, FLAGS_EQ)[0]
         except Exception:
             continue
 

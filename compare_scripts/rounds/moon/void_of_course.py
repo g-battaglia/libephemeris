@@ -14,7 +14,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 F = 2
@@ -33,7 +33,7 @@ def get_moon_sign(jd, use_se=True):
         r = swe.calc_ut(jd, swe.MOON, F | S)
         return int(r[0][0] / 30.0) % 12
     else:
-        r = ephem.swe_calc_ut(jd, 1, F | S)
+        r = ephem.calc_ut(jd, 1, F | S)
         return int(r[0][0] / 30.0) % 12
 
 
@@ -53,7 +53,7 @@ def get_planet_positions(jd, use_se=True):
             r = swe.calc_ut(jd, pid, F | S)
             positions[name] = r[0][0]
         else:
-            r = ephem.swe_calc_ut(jd, pid, F | S)
+            r = ephem.calc_ut(jd, pid, F | S)
             positions[name] = r[0][0]
     return positions
 
@@ -81,7 +81,7 @@ for i in range(288):  # ~2 years of Moon ingresses
         label = f"Moon ingress {target}° #{i}"
         try:
             se_jd = swe.mooncross_ut(float(target), jd, F)
-            le_jd = ephem.swe_mooncross_ut(float(target), jd, F)
+            le_jd = ephem.mooncross_ut(float(target), jd, F)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 1.0:
                 passed += 1
@@ -112,7 +112,7 @@ for hour in range(720):  # 30 days * 24 hours
             sign_mismatch += 1
             if sign_mismatch <= 3:
                 se_r = swe.calc_ut(jd, swe.MOON, F | S)
-                le_r = ephem.swe_calc_ut(jd, 1, F | S)
+                le_r = ephem.calc_ut(jd, 1, F | S)
                 print(
                     f"  FAIL sign h={hour}: SE_sign={se_sign} LE_sign={le_sign} SE_lon={se_r[0][0]:.6f} LE_lon={le_r[0][0]:.6f}"
                 )
@@ -138,7 +138,7 @@ for day in range(90):  # 90 days, check every 2 hours
         try:
             # Get Moon position from both
             se_moon = swe.calc_ut(jd, swe.MOON, F | S)[0][0]
-            le_moon = ephem.swe_calc_ut(jd, 1, F | S)[0][0]
+            le_moon = ephem.calc_ut(jd, 1, F | S)[0][0]
 
             # Get planet positions
             se_planets = get_planet_positions(jd, True)
@@ -175,12 +175,12 @@ voc_match = 0
 for i in range(24):  # 24 consecutive Moon ingresses
     # Find next ingress from current position
     try:
-        le_moon = ephem.swe_calc_ut(jd, 1, F | S)
+        le_moon = ephem.calc_ut(jd, 1, F | S)
         current_sign = int(le_moon[0][0] / 30.0) % 12
         next_boundary = float(((current_sign + 1) % 12) * 30)
 
         se_ingress = swe.mooncross_ut(next_boundary, jd, F)
-        le_ingress = ephem.swe_mooncross_ut(next_boundary, jd, F)
+        le_ingress = ephem.mooncross_ut(next_boundary, jd, F)
 
         # Both should find ingress within ~3 days
         if abs(se_ingress - le_ingress) * 86400.0 < 2.0:

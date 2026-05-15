@@ -17,14 +17,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 TEST_JDS = [
     2451545.0,  # J2000
@@ -37,19 +37,19 @@ TEST_JDS = [
 ]
 
 ALL_BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN, 0.5),
-    ("Moon", ephem.SE_MOON, swe.MOON, 1.0),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY, 0.5),
-    ("Venus", ephem.SE_VENUS, swe.VENUS, 0.5),
-    ("Mars", ephem.SE_MARS, swe.MARS, 0.5),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER, 0.5),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN, 0.5),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS, 0.5),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE, 0.5),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO, 1.0),
-    ("Chiron", ephem.SE_CHIRON, swe.CHIRON, 0.5),
-    ("MeanNode", ephem.SE_MEAN_NODE, swe.MEAN_NODE, 0.5),
-    ("TrueNode", ephem.SE_TRUE_NODE, swe.TRUE_NODE, 0.5),
+    ("Sun", ephem.SUN, swe.SUN, 0.5),
+    ("Moon", ephem.MOON, swe.MOON, 1.0),
+    ("Mercury", ephem.MERCURY, swe.MERCURY, 0.5),
+    ("Venus", ephem.VENUS, swe.VENUS, 0.5),
+    ("Mars", ephem.MARS, swe.MARS, 0.5),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER, 0.5),
+    ("Saturn", ephem.SATURN, swe.SATURN, 0.5),
+    ("Uranus", ephem.URANUS, swe.URANUS, 0.5),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE, 0.5),
+    ("Pluto", ephem.PLUTO, swe.PLUTO, 1.0),
+    ("Chiron", ephem.CHIRON, swe.CHIRON, 0.5),
+    ("MeanNode", ephem.MEAN_NODE, swe.MEAN_NODE, 0.5),
+    ("TrueNode", ephem.TRUE_NODE, swe.TRUE_NODE, 0.5),
 ]
 
 
@@ -63,7 +63,7 @@ def test_all_bodies():
     for jd in TEST_JDS:
         for bname, le_b, se_b, tol in ALL_BODIES:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, FLAGS)
+                le_r = ephem.calc_ut(jd, le_b, FLAGS)
                 se_r = swe.calc_ut(jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue
@@ -78,12 +78,12 @@ def test_all_bodies():
                 failures.append(f'  {bname} JD={jd:.1f}: diff={d * 3600:.4f}"')
 
     print("\n--- Equatorial ---")
-    eq_flags_le = FLAGS | ephem.SEFLG_EQUATORIAL
+    eq_flags_le = FLAGS | ephem.FLG_EQUATORIAL
     eq_flags_se = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL
     for jd in TEST_JDS[:3]:
         for bname, le_b, se_b, tol in ALL_BODIES[:7]:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, eq_flags_le)
+                le_r = ephem.calc_ut(jd, le_b, eq_flags_le)
                 se_r = swe.calc_ut(jd, se_b, eq_flags_se)
             except Exception:
                 continue
@@ -102,7 +102,7 @@ def test_all_bodies():
     for jd in TEST_JDS[:3]:
         for lat, lon in locs:
             try:
-                le_r = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), 0)
+                le_r = ephem.houses_ex2(jd, lat, lon, ord("P"), 0)
                 se_r = swe.houses_ex(jd, lat, lon, b"P")
             except Exception:
                 continue
@@ -122,7 +122,7 @@ def test_all_bodies():
     print("\n--- Sidereal Time ---")
     for jd in TEST_JDS:
         total += 1
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         se_st = swe.sidtime(jd)
         d = abs(le_st - se_st)
         if d > 12:
@@ -138,7 +138,7 @@ def test_all_bodies():
     for jd in TEST_JDS[:2]:
         for star in stars:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+                le_r = ephem.fixstar2_ut(star, jd, FLAGS)
                 se_r = swe.fixstar2(star, jd, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue
@@ -155,7 +155,7 @@ def test_all_bodies():
     print("\n--- Nutation ---")
     for jd in TEST_JDS:
         try:
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
         except Exception:
             continue
@@ -171,7 +171,7 @@ def test_all_bodies():
     print("\n--- Delta-T ---")
     for jd in TEST_JDS:
         total += 1
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         se_dt = swe.deltat(jd)
         d = abs(le_dt - se_dt) * 86400
         if d <= 1.0:

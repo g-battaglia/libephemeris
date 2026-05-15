@@ -97,7 +97,7 @@
   ```python
   import libephemeris as swe
   import swisseph
-  swisseph.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+  swisseph.set_ephe_path(os.environ["REF_EPHE_PATH"])
   swe.set_calc_mode("skyfield")
   jd = 2451545.0
   lib = swe.houses(jd, 41.9, 12.5, ord('J'))

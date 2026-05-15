@@ -14,7 +14,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 
@@ -51,7 +51,7 @@ for ny, nm, nd in natal_dates:
         label = f"solar_return {ny}-{nm:02d}-{nd:02d} +{year_offset}yr"
         try:
             se_jd = swe.solcross_ut(natal_lon, search_jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_solcross_ut(natal_lon, search_jd, 2)
+            le_jd = ephem.solcross_ut(natal_lon, search_jd, 2)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 2.0:  # 2 second tolerance
                 passed += 1
@@ -78,7 +78,7 @@ for ny, nm, nd in natal_dates[:5]:
         label = f"lunar_return {ny}-{nm:02d}-{nd:02d} +{month_offset}m"
         try:
             se_jd = swe.mooncross_ut(natal_moon_lon, search_jd, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_mooncross_ut(natal_moon_lon, search_jd, 2)
+            le_jd = ephem.mooncross_ut(natal_moon_lon, search_jd, 2)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 1.0:  # 1 second tolerance (Moon moves fast)
                 passed += 1
@@ -104,8 +104,8 @@ for ny, nm, nd in natal_dates[:5]:
         search_jd = natal_jd + year_offset * 365.0
         label = f"sr_pos {ny} +{year_offset}yr"
         try:
-            le_jd = ephem.swe_solcross_ut(natal_lon, search_jd, 2)
-            le_pos = ephem.swe_calc_ut(le_jd, 0, 2 | 256)
+            le_jd = ephem.solcross_ut(natal_lon, search_jd, 2)
+            le_pos = ephem.calc_ut(le_jd, 0, 2 | 256)
             actual_lon = le_pos[0][0]
             diff_arcsec = abs(actual_lon - natal_lon) * 3600.0
             if diff_arcsec > 180 * 3600:
@@ -136,8 +136,8 @@ for ny, nm, nd in natal_dates[:5]:
         search_jd = natal_jd + month_offset * 27.3
         label = f"lr_pos {ny} +{month_offset}m"
         try:
-            le_jd = ephem.swe_mooncross_ut(natal_moon_lon, search_jd, 2)
-            le_pos = ephem.swe_calc_ut(le_jd, 1, 2 | 256)
+            le_jd = ephem.mooncross_ut(natal_moon_lon, search_jd, 2)
+            le_pos = ephem.calc_ut(le_jd, 1, 2 | 256)
             actual_lon = le_pos[0][0]
             diff_arcsec = abs(actual_lon - natal_moon_lon) * 3600.0
             if diff_arcsec > 180 * 3600:
@@ -168,7 +168,7 @@ for year_offset in range(1, 31):
     search_jd = natal_jd + year_offset * 365.0
     label = f"sr_interval +{year_offset}yr"
     try:
-        le_jd = ephem.swe_solcross_ut(natal_lon, search_jd, 2)
+        le_jd = ephem.solcross_ut(natal_lon, search_jd, 2)
         if prev_jd is not None:
             interval = le_jd - prev_jd
             # Tropical year is ~365.2422 days, but varies slightly

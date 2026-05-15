@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Round 52: Sidereal Time at Extreme Dates.
 
-Tests swe_sidtime() and swe_sidtime0() across a wide range of dates,
+Tests sidtime() and sidtime0() across a wide range of dates,
 comparing libephemeris against pyswisseph.
 
 Phases:
-  P1: swe_sidtime at 50 dates spanning 1800-2200
-  P2: swe_sidtime0 with varying obliquity/nutation
+  P1: sidtime at 50 dates spanning 1800-2200
+  P2: sidtime0 with varying obliquity/nutation
   P3: Sidereal time consistency (sidtime vs sidtime0)
   P4: Deep historical dates (1000-1800 CE)
   P5: Sub-second precision at modern dates
@@ -24,7 +24,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -43,9 +43,9 @@ def record(phase, label, ok, detail=""):
 
 
 def phase1():
-    """swe_sidtime at 50 dates spanning 1800-2200."""
+    """sidtime at 50 dates spanning 1800-2200."""
     global errors
-    print("\n=== P1: swe_sidtime 1800-2200 ===")
+    print("\n=== P1: sidtime 1800-2200 ===")
 
     base_jd = 2378497.0  # 1800 Jan 1
     for i in range(50):
@@ -53,7 +53,7 @@ def phase1():
         year = 1800 + i * 8
         try:
             se_st = swe.sidtime(jd)
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             # Sidereal time in hours (0-24)
             diff_h = abs(se_st - le_st)
@@ -74,9 +74,9 @@ def phase1():
 
 
 def phase2():
-    """swe_sidtime0 with varying obliquity/nutation."""
+    """sidtime0 with varying obliquity/nutation."""
     global errors
-    print("\n=== P2: swe_sidtime0 ===")
+    print("\n=== P2: sidtime0 ===")
 
     test_dates = [
         ("J2000", 2451545.0),
@@ -99,7 +99,7 @@ def phase2():
         for eps, nut, desc in obliquity_nutation_pairs:
             try:
                 se_st0 = swe.sidtime0(jd, eps, nut)
-                le_st0 = ephem.swe_sidtime0(jd, eps, nut)
+                le_st0 = ephem.sidtime0(jd, eps, nut)
 
                 diff_h = abs(se_st0 - le_st0)
                 if diff_h > 12:
@@ -130,14 +130,14 @@ def phase3():
     for date_name, jd in test_dates:
         try:
             # Get sidereal time from both methods
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             # Get obliquity and nutation for this date
-            eps_true = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
+            eps_true = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
             eps = eps_true[0]  # true obliquity
             nut = eps_true[2]  # nutation in longitude (degrees)
 
-            le_st0 = ephem.swe_sidtime0(jd, eps, nut)
+            le_st0 = ephem.sidtime0(jd, eps, nut)
 
             diff_h = abs(le_st - le_st0)
             if diff_h > 12:
@@ -162,10 +162,10 @@ def phase4():
 
     for year in range(1000, 1800, 50):
         try:
-            jd = ephem.swe_julday(year, 1, 1, 12.0)
+            jd = ephem.julday(year, 1, 1, 12.0)
 
             se_st = swe.sidtime(jd)
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             diff_h = abs(se_st - le_st)
             if diff_h > 12:
@@ -194,7 +194,7 @@ def phase5():
         jd = jd_base + hour / 24.0
         try:
             se_st = swe.sidtime(jd)
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             diff_h = abs(se_st - le_st)
             if diff_h > 12:
@@ -222,7 +222,7 @@ def phase5():
     for name, jd in precision_dates:
         try:
             se_st = swe.sidtime(jd)
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             diff_h = abs(se_st - le_st)
             if diff_h > 12:
@@ -246,10 +246,10 @@ def phase6():
 
     for year in range(2200, 2501, 25):
         try:
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
+            jd = ephem.julday(year, 7, 1, 12.0)
 
             se_st = swe.sidtime(jd)
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
 
             diff_h = abs(se_st - le_st)
             if diff_h > 12:

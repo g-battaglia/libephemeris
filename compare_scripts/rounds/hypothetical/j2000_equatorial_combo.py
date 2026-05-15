@@ -15,7 +15,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -23,32 +23,32 @@ total = 0
 failures = []
 
 URANIANS = [
-    ("Cupido", ephem.SE_CUPIDO, swe.CUPIDO),
-    ("Hades", ephem.SE_HADES, swe.HADES),
-    ("Zeus", ephem.SE_ZEUS, swe.ZEUS),
-    ("Kronos", ephem.SE_KRONOS, swe.KRONOS),
-    ("Apollon", ephem.SE_APOLLON, swe.APOLLON),
-    ("Admetos", ephem.SE_ADMETOS, swe.ADMETOS),
-    ("Vulkanus", ephem.SE_VULKANUS, swe.VULKANUS),
-    ("Poseidon", ephem.SE_POSEIDON, swe.POSEIDON),
+    ("Cupido", ephem.CUPIDO, swe.CUPIDO),
+    ("Hades", ephem.HADES, swe.HADES),
+    ("Zeus", ephem.ZEUS, swe.ZEUS),
+    ("Kronos", ephem.KRONOS, swe.KRONOS),
+    ("Apollon", ephem.APOLLON, swe.APOLLON),
+    ("Admetos", ephem.ADMETOS, swe.ADMETOS),
+    ("Vulkanus", ephem.VULKANUS, swe.VULKANUS),
+    ("Poseidon", ephem.POSEIDON, swe.POSEIDON),
 ]
 
 FLAG_COMBOS = [
-    ("default+SPEED", ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED),
-    ("J2000+SPEED", ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_J2000),
+    ("default+SPEED", ephem.FLG_SWIEPH | ephem.FLG_SPEED),
+    ("J2000+SPEED", ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_J2000),
     (
         "EQUATORIAL+SPEED",
-        ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_EQUATORIAL,
+        ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_EQUATORIAL,
     ),
     (
         "J2000+EQ+SPEED",
-        ephem.SEFLG_SWIEPH
-        | ephem.SEFLG_SPEED
-        | ephem.SEFLG_J2000
-        | ephem.SEFLG_EQUATORIAL,
+        ephem.FLG_SWIEPH
+        | ephem.FLG_SPEED
+        | ephem.FLG_J2000
+        | ephem.FLG_EQUATORIAL,
     ),
-    ("NONUT+SPEED", ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_NONUT),
-    ("HELCTR+SPEED", ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_HELCTR),
+    ("NONUT+SPEED", ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_NONUT),
+    ("HELCTR+SPEED", ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_HELCTR),
 ]
 
 TEST_JDS = [2451545.0, 2455197.5, 2458849.5, 2460310.5]
@@ -58,7 +58,7 @@ def compare(label, le_body, se_body, jd, flags, tol=60.0):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, le_body, flags)
+        le_r = ephem.calc_ut(jd, le_body, flags)
         se_r = swe.calc_ut(jd, se_body, flags)
     except Exception:
         return

@@ -14,9 +14,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 
 HOUSE_SYSTEMS = [
     ("P", "Placidus"),
@@ -56,18 +56,18 @@ for jd, lat, lon, label in test_configs:
     for hsys_ch, hsys_name in HOUSE_SYSTEMS:
         try:
             # Method 1: houses_ex (computes ARMC internally)
-            le_r1 = ephem.swe_houses_ex(jd, lat, lon, le_hsys(hsys_ch), SEFLG_SPEED)
+            le_r1 = ephem.houses_ex(jd, lat, lon, le_hsys(hsys_ch), FLG_SPEED)
             cusps1 = le_r1[0]
             ascmc1 = le_r1[1]
             armc = ascmc1[2]  # ARMC from houses_ex
 
             # Get obliquity
-            ecl_nut = ephem.swe_calc_ut(jd, -1, 0)
+            ecl_nut = ephem.calc_ut(jd, -1, 0)
             eps = ecl_nut[0][0]  # true obliquity
 
             # Method 2: houses_armc_ex2 (using ARMC from method 1)
-            le_r2 = ephem.swe_houses_armc_ex2(
-                armc, lat, eps, le_hsys(hsys_ch), SEFLG_SPEED
+            le_r2 = ephem.houses_armc_ex2(
+                armc, lat, eps, le_hsys(hsys_ch), FLG_SPEED
             )
             cusps2 = le_r2[0]
 

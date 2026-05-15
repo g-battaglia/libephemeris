@@ -23,21 +23,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_BARYCTR = 4
-SEFLG_TRUEPOS = 16
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_NOABERR = 1024
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_BARYCTR = 4
+FLG_TRUEPOS = 16
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_NOABERR = 1024
 
-SE_AST_OFFSET = 10000
+AST_OFFSET = 10000
 
 BODIES = {
     0: "Sun",
@@ -54,10 +54,10 @@ BODIES = {
 }
 
 SE_ASTEROID_MAP = {
-    17: SE_AST_OFFSET + 1,
-    18: SE_AST_OFFSET + 2,
-    19: SE_AST_OFFSET + 3,
-    20: SE_AST_OFFSET + 4,
+    17: AST_OFFSET + 1,
+    18: AST_OFFSET + 2,
+    19: AST_OFFSET + 3,
+    20: AST_OFFSET + 4,
 }
 
 
@@ -108,8 +108,8 @@ for year, month, day, body_id, body_name, event in opposition_dates:
         jd = jd_center + offset_days
         try:
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -164,8 +164,8 @@ for year, month, day, body_id, body_name, event in inner_events:
         jd = jd_center + offset_days
         try:
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -209,19 +209,19 @@ for jd, epoch_label in test_jds:
     for body_id, body_name in BODIES.items():
         try:
             # LE analytical speed
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
             le_dist_speed = le_result[0][5]  # AU/day
 
             # LE numerical speed via finite difference
-            le_minus = ephem.swe_calc_ut(jd - DT, body_id, SEFLG_SPEED)
-            le_plus = ephem.swe_calc_ut(jd + DT, body_id, SEFLG_SPEED)
+            le_minus = ephem.calc_ut(jd - DT, body_id, FLG_SPEED)
+            le_plus = ephem.calc_ut(jd + DT, body_id, FLG_SPEED)
             num_speed = (le_plus[0][2] - le_minus[0][2]) / (2 * DT)
 
             diff = abs(le_dist_speed - num_speed)
 
             # Also check SE analytical speed
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
             se_dist_speed = se_result[0][5]
 
             # For Moon, speed is ~1e-3 AU/day; for Sun ~1e-4; for planets ~1e-3
@@ -251,7 +251,7 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 # P4: Barycentric distances for all planets
 # ============================================================
 print("\n=== P4: Barycentric distances ===")
-BARY_FLAG = SEFLG_SPEED | SEFLG_BARYCTR
+BARY_FLAG = FLG_SPEED | FLG_BARYCTR
 
 bary_epochs = [
     (swe.julday(2000, 1, 1, 12.0), "J2000"),
@@ -270,7 +270,7 @@ for jd, epoch_label in bary_epochs:
         try:
             se_body = get_se_body(body_id)
             se_result = swe.calc_ut(jd, se_body, BARY_FLAG)
-            le_result = ephem.swe_calc_ut(jd, body_id, BARY_FLAG)
+            le_result = ephem.calc_ut(jd, body_id, BARY_FLAG)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -306,7 +306,7 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 # P5: Heliocentric distances at perihelion/aphelion
 # ============================================================
 print("\n=== P5: Heliocentric distances at perihelion/aphelion ===")
-HELIO_FLAG = SEFLG_SPEED | SEFLG_HELCTR
+HELIO_FLAG = FLG_SPEED | FLG_HELCTR
 
 # Approximate perihelion/aphelion dates and expected distances
 perihelion_aphelion = [
@@ -329,12 +329,12 @@ for year, month, day, body_id, body_name, event, expected_dist in perihelion_aph
         try:
             if body_id == 0:
                 # Earth helio dist = Sun geocentric dist
-                se_result = swe.calc_ut(jd_test, 0, SEFLG_SPEED)
-                le_result = ephem.swe_calc_ut(jd_test, 0, SEFLG_SPEED)
+                se_result = swe.calc_ut(jd_test, 0, FLG_SPEED)
+                le_result = ephem.calc_ut(jd_test, 0, FLG_SPEED)
             else:
                 se_body = get_se_body(body_id)
                 se_result = swe.calc_ut(jd_test, se_body, HELIO_FLAG)
-                le_result = ephem.swe_calc_ut(jd_test, body_id, HELIO_FLAG)
+                le_result = ephem.calc_ut(jd_test, body_id, HELIO_FLAG)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -370,15 +370,15 @@ for year in [2000, 2010, 2020, 2024]:
         for body_id, body_name in OUTER.items():
             try:
                 # Geocentric distance
-                le_geo = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                le_geo = ephem.calc_ut(jd, body_id, FLG_SPEED)
                 geo_dist = le_geo[0][2]
 
                 # Heliocentric distance of planet
-                le_helio = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_HELCTR)
+                le_helio = ephem.calc_ut(jd, body_id, FLG_SPEED | FLG_HELCTR)
                 helio_dist = le_helio[0][2]
 
                 # Earth-Sun distance (= helio distance of Earth)
-                le_sun = ephem.swe_calc_ut(jd, 0, SEFLG_SPEED)
+                le_sun = ephem.calc_ut(jd, 0, FLG_SPEED)
                 earth_sun_dist = le_sun[0][2]
 
                 # Triangle inequality: |helio - earth_sun| <= geo <= helio + earth_sun
@@ -410,8 +410,8 @@ jd_start = swe.julday(2023, 1, 1, 0.0)
 for i in range(730):  # 2 years
     jd = jd_start + i
     try:
-        se_result = swe.calc_ut(jd, 1, SEFLG_SPEED)
-        le_result = ephem.swe_calc_ut(jd, 1, SEFLG_SPEED)
+        se_result = swe.calc_ut(jd, 1, FLG_SPEED)
+        le_result = ephem.calc_ut(jd, 1, FLG_SPEED)
 
         se_dist = se_result[0][2]
         le_dist = le_result[0][2]
@@ -451,8 +451,8 @@ for body_id, body_name in HOURLY_BODIES.items():
         jd = jd_j2000 + hour / 24.0
         try:
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -479,7 +479,7 @@ print(f"  After P8: {passed} passed, {failed} failed, {errors} errors")
 # P9: TRUEPOS distances (geometric, no light-time correction)
 # ============================================================
 print("\n=== P9: TRUEPOS (geometric) distances ===")
-TRUEPOS_FLAG = SEFLG_SPEED | SEFLG_TRUEPOS
+TRUEPOS_FLAG = FLG_SPEED | FLG_TRUEPOS
 
 truepos_epochs = [
     (swe.julday(2000, 1, 1, 12.0), "J2000"),
@@ -493,7 +493,7 @@ for jd, epoch_label in truepos_epochs:
         try:
             se_body = get_se_body(body_id)
             se_result = swe.calc_ut(jd, se_body, TRUEPOS_FLAG)
-            le_result = ephem.swe_calc_ut(jd, body_id, TRUEPOS_FLAG)
+            le_result = ephem.calc_ut(jd, body_id, TRUEPOS_FLAG)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]
@@ -525,7 +525,7 @@ print(f"  After P9: {passed} passed, {failed} failed, {errors} errors")
 # P10: J2000 frame distances (should match default)
 # ============================================================
 print("\n=== P10: J2000 frame distances ===")
-J2000_FLAG = SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT
+J2000_FLAG = FLG_SPEED | FLG_J2000 | FLG_NONUT
 
 j2000_epochs = [
     (swe.julday(2000, 1, 1, 12.0), "J2000"),
@@ -537,11 +537,11 @@ for jd, epoch_label in j2000_epochs:
     for body_id, body_name in BODIES.items():
         try:
             # Default frame distance
-            le_default = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            le_default = ephem.calc_ut(jd, body_id, FLG_SPEED)
             default_dist = le_default[0][2]
 
             # J2000 frame distance
-            le_j2000 = ephem.swe_calc_ut(jd, body_id, J2000_FLAG)
+            le_j2000 = ephem.calc_ut(jd, body_id, J2000_FLAG)
             j2000_dist = le_j2000[0][2]
 
             # Distances should be identical regardless of frame
@@ -577,12 +577,12 @@ sign_epochs = [
 for jd, epoch_label in sign_epochs:
     for body_id, body_name in BODIES.items():
         try:
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
             le_dist = le_result[0][2]
             le_dspeed = le_result[0][5]
 
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
             se_dspeed = se_result[0][5]
 
             # Check sign consistency
@@ -627,8 +627,8 @@ for year in range(1850, 2151, 25):
     for body_id, body_name in SWEEP_BODIES.items():
         try:
             se_body = get_se_body(body_id)
-            se_result = swe.calc_ut(jd, se_body, SEFLG_SPEED)
-            le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, se_body, FLG_SPEED)
+            le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]

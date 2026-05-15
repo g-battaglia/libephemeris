@@ -24,17 +24,17 @@ class TestAzaltBasic:
 
     def test_azalt_constants_exported(self):
         """Test that azalt constants are exported."""
-        assert hasattr(ephem, "SE_ECL2HOR")
-        assert hasattr(ephem, "SE_EQU2HOR")
-        assert ephem.SE_ECL2HOR == 0
-        assert ephem.SE_EQU2HOR == 1
+        assert hasattr(ephem, "ECL2HOR")
+        assert hasattr(ephem, "EQU2HOR")
+        assert ephem.ECL2HOR == 0
+        assert ephem.EQU2HOR == 1
 
     def test_azalt_returns_tuple(self):
         """Test that azalt returns a tuple of three elements."""
         jd = ephem.julday(2024, 6, 15, 12.0)
         geopos = (12.5, 41.9, 0)  # lon, lat, alt
         coord = (90.0, 23.5, 1.0)
-        result = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord)
+        result = ephem.azalt(jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -52,7 +52,7 @@ class TestAzaltBasic:
 
         for coord in coords:
             az, alt_true, alt_app = ephem.azalt(
-                jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
+                jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord
             )
             assert 0.0 <= az < 360.0, f"Azimuth {az} out of range for coord {coord}"
 
@@ -62,7 +62,7 @@ class TestAzaltBasic:
         geopos = (12.5, 41.9, 0)
         coord = (90.0, 23.5, 1.0)
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
+            jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         assert -90.0 <= alt_true <= 90.0
@@ -79,7 +79,7 @@ class TestAzaltNoRefraction:
         coord = (90.0, 30.0, 1.0)
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 0.0, 15, coord
+            jd, ephem.EQU2HOR, geopos, 0.0, 15, coord
         )
 
         assert abs(alt_true - alt_app) < 1e-10, (
@@ -97,7 +97,7 @@ class TestAzaltRefraction:
         coord = (90.0, 30.0, 1.0)
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
+            jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         # Objects should appear higher due to refraction (for positive altitudes)
@@ -116,10 +116,10 @@ class TestAzaltRefraction:
         coord_high = (90.0, 60.0, 1.0)  # Higher
 
         _, alt_low_true, alt_low_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord_low
+            jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord_low
         )
         _, alt_high_true, alt_high_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord_high
+            jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord_high
         )
 
         refraction_low = alt_low_app - alt_low_true
@@ -140,7 +140,7 @@ class TestAzaltVsSwisseph:
     @pytest.mark.parametrize(
         "coord,calc_flag",
         [
-            ((0.0, 0.0, 1.0), 1),  # SE_EQU2HOR
+            ((0.0, 0.0, 1.0), 1),  # EQU2HOR
             ((90.0, 0.0, 1.0), 1),
             ((180.0, 0.0, 1.0), 1),
             ((270.0, 0.0, 1.0), 1),
@@ -192,7 +192,7 @@ class TestAzaltVsSwisseph:
         geopos = (12.5, 41.9, 0.0)  # lon, lat, alt_m
         pressure = 1013.25
         temp = 15.0
-        calc_flag = ephem.SE_ECL2HOR  # Ecliptic to horizontal
+        calc_flag = ephem.ECL2HOR  # Ecliptic to horizontal
 
         result_lib = ephem.azalt(jd, calc_flag, geopos, pressure, temp, coord)
         result_swe = swe.azalt(jd, calc_flag, geopos, pressure, temp, coord)
@@ -232,7 +232,7 @@ class TestAzaltDifferentLocations:
         coord = (90.0, 23.5, 1.0)  # Near summer solstice declination
 
         az, alt_true, alt_app = ephem.azalt(
-            jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15, coord
+            jd, ephem.EQU2HOR, geopos, 1013.25, 15, coord
         )
 
         # Basic sanity checks
@@ -260,7 +260,7 @@ class TestAzaltNoRefractionVsSwisseph:
         pressure = 0.0  # No refraction
         temp = 10.0
 
-        result_lib = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, pressure, temp, coord)
+        result_lib = ephem.azalt(jd, ephem.EQU2HOR, geopos, pressure, temp, coord)
         result_swe = swe.azalt(jd, 1, geopos, pressure, temp, coord)
 
         # Without refraction in our library, true and apparent should be equal

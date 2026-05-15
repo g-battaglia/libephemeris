@@ -9,12 +9,12 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 
 
@@ -48,11 +48,11 @@ PHENO_MAGNITUDE = 4
 
 # Planets for phenomena tests (visible from Earth)
 PHENO_PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Test dates covering different planetary configurations
@@ -72,9 +72,9 @@ INNER_PLANET_DATES = [
 
 # Opposition dates for outer planets
 OPPOSITION_DATES = [
-    (2025, 1, 16, SE_MARS, "Mars opposition 2025"),
-    (2024, 12, 7, SE_JUPITER, "Jupiter opposition 2024"),
-    (2024, 9, 8, SE_SATURN, "Saturn opposition 2024"),
+    (2025, 1, 16, MARS, "Mars opposition 2025"),
+    (2024, 12, 7, JUPITER, "Jupiter opposition 2024"),
+    (2024, 9, 8, SATURN, "Saturn opposition 2024"),
 ]
 
 
@@ -106,7 +106,7 @@ class TestPhenoUt:
 
         # SwissEphemeris
         try:
-            ret_swe = swe.pheno_ut(jd, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.pheno_ut(jd, body_id, FLG_SWIEPH)
             attr_swe = (
                 ret_swe[1]
                 if isinstance(ret_swe, tuple) and len(ret_swe) > 1
@@ -121,7 +121,7 @@ class TestPhenoUt:
 
         # LibEphemeris
         try:
-            ret_py = pyephem.pheno_ut(jd, body_id, SEFLG_SWIEPH)
+            ret_py = pyephem.pheno_ut(jd, body_id, FLG_SWIEPH)
             attr_py = (
                 ret_py[1] if isinstance(ret_py, tuple) and len(ret_py) > 1 else ret_py
             )
@@ -164,7 +164,7 @@ class TestPheno:
 
         # SwissEphemeris
         try:
-            ret_swe = swe.pheno(jd_et, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.pheno(jd_et, body_id, FLG_SWIEPH)
             attr_swe = (
                 ret_swe[1]
                 if isinstance(ret_swe, tuple) and len(ret_swe) > 1
@@ -179,7 +179,7 @@ class TestPheno:
 
         # LibEphemeris
         try:
-            ret_py = pyephem.pheno(jd_et, body_id, SEFLG_SWIEPH)
+            ret_py = pyephem.pheno(jd_et, body_id, FLG_SWIEPH)
             attr_py = (
                 ret_py[1] if isinstance(ret_py, tuple) and len(ret_py) > 1 else ret_py
             )
@@ -212,8 +212,8 @@ class TestInnerPlanetElongations:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_VENUS, "Venus"),
-            (SE_MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MERCURY, "Mercury"),
         ],
     )
     def test_inner_planet_elongation(self, year, month, day, desc, body_id, body_name):
@@ -221,8 +221,8 @@ class TestInnerPlanetElongations:
         jd = swe.julday(year, month, day, 12.0)
 
         try:
-            ret_swe = swe.pheno_ut(jd, body_id, SEFLG_SWIEPH)
-            ret_py = pyephem.pheno_ut(jd, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.pheno_ut(jd, body_id, FLG_SWIEPH)
+            ret_py = pyephem.pheno_ut(jd, body_id, FLG_SWIEPH)
 
             attr_swe = ret_swe[1] if isinstance(ret_swe, tuple) else ret_swe
             attr_py = ret_py[1] if isinstance(ret_py, tuple) else ret_py
@@ -252,8 +252,8 @@ class TestOuterPlanetOppositions:
         body_name = desc.split()[0]
 
         try:
-            ret_swe = swe.pheno_ut(jd, body_id, SEFLG_SWIEPH)
-            ret_py = pyephem.pheno_ut(jd, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.pheno_ut(jd, body_id, FLG_SWIEPH)
+            ret_py = pyephem.pheno_ut(jd, body_id, FLG_SWIEPH)
 
             attr_swe = ret_swe[1] if isinstance(ret_swe, tuple) else ret_swe
             attr_py = ret_py[1] if isinstance(ret_py, tuple) else ret_py
@@ -279,7 +279,7 @@ class TestPhenomenaConsistency:
     @pytest.mark.parametrize("body_id,body_name", PHENO_PLANETS)
     def test_phenomena_physical_constraints(self, jd_standard, body_id, body_name):
         """Test that phenomena values satisfy physical constraints."""
-        ret_py = pyephem.pheno_ut(jd_standard, body_id, SEFLG_SWIEPH)
+        ret_py = pyephem.pheno_ut(jd_standard, body_id, FLG_SWIEPH)
         # libephemeris returns (attr_tuple, retflag), pyswisseph returns just attr_tuple
         if (
             isinstance(ret_py, tuple)
@@ -304,8 +304,8 @@ class TestPhenomenaConsistency:
     @pytest.mark.comparison
     def test_inner_planet_elongation_limits(self, jd_standard):
         """Test that inner planets have limited elongation."""
-        for body_id, body_name in [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]:
-            ret_py = pyephem.pheno_ut(jd_standard, body_id, SEFLG_SWIEPH)
+        for body_id, body_name in [(MERCURY, "Mercury"), (VENUS, "Venus")]:
+            ret_py = pyephem.pheno_ut(jd_standard, body_id, FLG_SWIEPH)
             # libephemeris returns (attr_tuple, retflag), pyswisseph returns just attr_tuple
             if (
                 isinstance(ret_py, tuple)
@@ -319,7 +319,7 @@ class TestPhenomenaConsistency:
             elongation = attr[PHENO_ELONGATION]
 
             # Inner planets can't be more than ~47° (Venus) or ~28° (Mercury) from Sun
-            max_elong = 50 if body_id == SE_VENUS else 30
+            max_elong = 50 if body_id == VENUS else 30
             assert elongation <= max_elong, (
                 f"{body_name}: elongation {elongation}° exceeds physical limit"
             )

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Round 31: Barycentric Positions (SEFLG_BARYCTR)
+Round 31: Barycentric Positions (FLG_BARYCTR)
 ================================================
 
 Tests barycentric position output for all major planets across multiple epochs.
@@ -33,22 +33,22 @@ from libephemeris.constants import *
 _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
-# SEFLG_BARYCTR
-SEFLG_BARYCTR = 4
+# FLG_BARYCTR
+FLG_BARYCTR = 4
 
 # Bodies valid for barycentric (no nodes/Lilith/analytical)
 BARY_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_CHIRON, "Chiron"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (CHIRON, "Chiron"),
 ]
 
 EPOCHS = [
@@ -140,11 +140,11 @@ def run_part1():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BARY_BODIES:
-            flags = SEFLG_SPEED | SEFLG_BARYCTR
+            flags = FLG_SPEED | FLG_BARYCTR
             label = f"{epoch_name} {body_name} BARY"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -162,11 +162,11 @@ def run_part2():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BARY_BODIES:
-            flags = SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_BARYCTR | FLG_EQUATORIAL
             label = f"{epoch_name} {body_name} BARY+EQ"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -184,11 +184,11 @@ def run_part3():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BARY_BODIES:
-            flags = SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_J2000
+            flags = FLG_SPEED | FLG_BARYCTR | FLG_J2000
             label = f"{epoch_name} {body_name} BARY+J2000"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -206,11 +206,11 @@ def run_part4():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BARY_BODIES:
-            flags = SEFLG_SPEED | SEFLG_BARYCTR | SEFLG_NONUT | SEFLG_NOABERR
+            flags = FLG_SPEED | FLG_BARYCTR | FLG_NONUT | FLG_NOABERR
             label = f"{epoch_name} {body_name} BARY+NN+NA"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -229,12 +229,12 @@ def run_part5():
     dt = 1.0 / 86400.0  # 1 second
 
     for body_id, body_name in BARY_BODIES:
-        flags = SEFLG_SPEED | SEFLG_BARYCTR
+        flags = FLG_SPEED | FLG_BARYCTR
         label = f"{body_name} BARY speed"
 
         try:
             se_r = swe.calc_ut(jd, body_id, flags)
-            le_r = ephem.swe_calc_ut(jd, body_id, flags)
+            le_r = ephem.calc_ut(jd, body_id, flags)
 
             # Compare reported speeds
             se_spd = se_r[0][3]
@@ -248,8 +248,8 @@ def run_part5():
                 r.ok(diff * 3600, f"{label} lon_spd")
 
             # Validate LE speed with finite difference
-            le_before = ephem.swe_calc_ut(jd - dt, body_id, SEFLG_BARYCTR)
-            le_after = ephem.swe_calc_ut(jd + dt, body_id, SEFLG_BARYCTR)
+            le_before = ephem.calc_ut(jd - dt, body_id, FLG_BARYCTR)
+            le_after = ephem.calc_ut(jd + dt, body_id, FLG_BARYCTR)
             fd_spd = (le_after[0][0] - le_before[0][0]) / (2 * dt)
             # Handle wraparound
             if fd_spd > 180:
@@ -278,15 +278,15 @@ def run_part6():
     r = R("P6: Multi-epoch Bary")
 
     sweep_bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (PLUTO, "Pluto"),
     ]
 
-    flags = SEFLG_SPEED | SEFLG_BARYCTR
+    flags = FLG_SPEED | FLG_BARYCTR
 
     for y in range(1800, 2101, 25):
         jd = swe.julday(y, 6, 21, 12.0)
@@ -294,7 +294,7 @@ def run_part6():
             label = f"{y} {body_name} BARY"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label, check_speed=False)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -304,7 +304,7 @@ def run_part6():
 
 def main():
     print("=" * 70)
-    print("ROUND 31: Barycentric Positions (SEFLG_BARYCTR)")
+    print("ROUND 31: Barycentric Positions (FLG_BARYCTR)")
     print("=" * 70)
 
     start = time.time()

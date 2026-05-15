@@ -12,12 +12,12 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED, SEFLG_SWIEPH, SE_MARS
+from libephemeris.constants import FLG_SPEED, FLG_SWIEPH, MARS
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
-flags = SEFLG_SWIEPH | SEFLG_SPEED
+flags = FLG_SWIEPH | FLG_SPEED
 
 # Mars retrograde periods (approximate JD ranges around station/retrograde)
 # Each is (start_jd, end_jd, label) covering ~4 months around opposition
@@ -50,8 +50,8 @@ for start_jd, end_jd, label in RETRO_PERIODS:
     while jd <= end_jd:
         total += 1
         try:
-            se_result = swe.calc_ut(jd, SE_MARS, flags)
-            le_result = ephem.swe_calc_ut(jd, SE_MARS, flags)
+            se_result = swe.calc_ut(jd, MARS, flags)
+            le_result = ephem.calc_ut(jd, MARS, flags)
 
             se_lon, se_lat = se_result[0][0], se_result[0][1]
             le_lon, le_lat = le_result[0][0], le_result[0][1]

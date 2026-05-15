@@ -53,7 +53,7 @@ def year_to_jd(year: float, month: int = 1, day: int = 1, hour: float = 12.0) ->
     Note: For historical dates, year 0 = 1 BCE, year -1 = 2 BCE, etc.
     (Astronomical year numbering)
     """
-    return ephem.swe_julday(int(year), month, day, hour)
+    return ephem.julday(int(year), month, day, hour)
 
 
 # ============================================================================

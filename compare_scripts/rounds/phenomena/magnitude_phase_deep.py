@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 111: Planetary Magnitude/Phase Deep
 
-Deep test of swe_pheno_ut for all planets across multiple epochs.
+Deep test of pheno_ut for all planets across multiple epochs.
 P1: Phase angle for all planets at multiple epochs
 P2: Elongation for all planets
 P3: Apparent diameter for all planets
@@ -24,15 +24,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SE_AST_OFFSET = 10000
+FLG_SPEED = 256
+FLG_HELCTR = 8
+AST_OFFSET = 10000
 
 BODIES = {
     0: "Sun",
@@ -48,10 +48,10 @@ BODIES = {
 }
 
 SE_ASTEROID_MAP = {
-    17: SE_AST_OFFSET + 1,
-    18: SE_AST_OFFSET + 2,
-    19: SE_AST_OFFSET + 3,
-    20: SE_AST_OFFSET + 4,
+    17: AST_OFFSET + 1,
+    18: AST_OFFSET + 2,
+    19: AST_OFFSET + 3,
+    20: AST_OFFSET + 4,
 }
 
 
@@ -86,7 +86,7 @@ def get_pheno(jd, body_id):
     se_body = get_se_body(body_id)
 
     # SE: returns flat tuple of 20 values
-    se_raw = swe.pheno_ut(jd, se_body, SEFLG_SPEED)
+    se_raw = swe.pheno_ut(jd, se_body, FLG_SPEED)
     se_phase_angle = se_raw[0]
     se_phase = se_raw[1]
     se_elongation = se_raw[2]
@@ -94,7 +94,7 @@ def get_pheno(jd, body_id):
     se_magnitude = se_raw[4]
 
     # LE: returns ((phase_angle, phase, elongation, diameter, magnitude), retflag)
-    le_result = ephem.swe_pheno_ut(jd, body_id, SEFLG_SPEED)
+    le_result = ephem.pheno_ut(jd, body_id, FLG_SPEED)
     le_vals = le_result[0]
     le_phase_angle = le_vals[0]
     le_phase = le_vals[1]
@@ -400,7 +400,7 @@ print("\n=== P8: Phase sanity checks ===")
 for jd, epoch_label in TEST_EPOCHS[:4]:
     for body_id, body_name in BODIES.items():
         try:
-            le_result = ephem.swe_pheno_ut(jd, body_id, SEFLG_SPEED)
+            le_result = ephem.pheno_ut(jd, body_id, FLG_SPEED)
             le_vals = le_result[0]
 
             pa = le_vals[0]  # phase angle

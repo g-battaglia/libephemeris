@@ -2,22 +2,22 @@
 Comprehensive Lunar Nodes & Lilith Comparison Tests.
 
 Exhaustive comparison between pyswisseph and libephemeris for:
-- SE_MEAN_NODE  (10) — Mean North Node
-- SE_TRUE_NODE  (11) — True (Osculating) North Node
-- SE_MEAN_APOG  (12) — Mean Lilith (Black Moon)
-- SE_OSCU_APOG  (13) — True Lilith (Osculating Apogee)
-- SE_INTP_APOG  (21) — Interpolated Apogee
-- SE_INTP_PERG  (22) — Interpolated Perigee
+- MEAN_NODE  (10) — Mean North Node
+- TRUE_NODE  (11) — True (Osculating) North Node
+- MEAN_APOG  (12) — Mean Lilith (Black Moon)
+- OSCU_APOG  (13) — True Lilith (Osculating Apogee)
+- INTP_APOG  (21) — Interpolated Apogee
+- INTP_PERG  (22) — Interpolated Perigee
 
 Covers all dimensions:
 - Tropical longitude (no flags)
 - All 6 output components (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-- Velocity (SEFLG_SPEED)
-- Sidereal mode (SEFLG_SIDEREAL) with all 43 ayanamshas
-- Equatorial coordinates (SEFLG_EQUATORIAL)
-- J2000 frame (SEFLG_J2000)
-- No-nutation (SEFLG_NONUT)
-- Topocentric (SEFLG_TOPOCTR) with multiple geographic locations
+- Velocity (FLG_SPEED)
+- Sidereal mode (FLG_SIDEREAL) with all 43 ayanamshas
+- Equatorial coordinates (FLG_EQUATORIAL)
+- J2000 frame (FLG_J2000)
+- No-nutation (FLG_NONUT)
+- Topocentric (FLG_TOPOCTR) with multiple geographic locations
 - Combined flags (SIDEREAL|SPEED, EQUATORIAL|SPEED, etc.)
 - Extended date ranges (1550–2650 DE440 coverage)
 - Statistical precision analysis (mean/max/RMS/percentiles)
@@ -30,61 +30,61 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_TOPOCTR,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_DELUCE,
-    SE_SIDM_RAMAN,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_BABYL_KUGLER2,
-    SE_SIDM_BABYL_KUGLER3,
-    SE_SIDM_BABYL_HUBER,
-    SE_SIDM_BABYL_ETPSC,
-    SE_SIDM_ALDEBARAN_15TAU,
-    SE_SIDM_HIPPARCHOS,
-    SE_SIDM_SASSANIAN,
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_J2000,
-    SE_SIDM_J1900,
-    SE_SIDM_B1950,
-    SE_SIDM_SURYASIDDHANTA,
-    SE_SIDM_SURYASIDDHANTA_MSUN,
-    SE_SIDM_ARYABHATA,
-    SE_SIDM_ARYABHATA_MSUN,
-    SE_SIDM_SS_REVATI,
-    SE_SIDM_SS_CITRA,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALEQU_IAU1958,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALALIGN_MARDYKS,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_ARYABHATA_522,
-    SE_SIDM_BABYL_BRITTON,
-    SE_SIDM_TRUE_SHEORAN,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_FIORENZA,
-    SE_SIDM_VALENS_MOON,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_TOPOCTR,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_GALCENT_0SAG,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_ARYABHATA_522,
+    SIDM_BABYL_BRITTON,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_VALENS_MOON,
 )
 
 
@@ -129,16 +129,16 @@ def percentile(values: list, pct: float) -> float:
 
 # Primary bodies (nodes + Lilith)
 PRIMARY_BODIES = [
-    (SE_MEAN_NODE, "Mean Node"),
-    (SE_TRUE_NODE, "True Node"),
-    (SE_MEAN_APOG, "Mean Lilith"),
-    (SE_OSCU_APOG, "True Lilith"),
+    (MEAN_NODE, "Mean Node"),
+    (TRUE_NODE, "True Node"),
+    (MEAN_APOG, "Mean Lilith"),
+    (OSCU_APOG, "True Lilith"),
 ]
 
 # Interpolated apogee/perigee
 INTERPOLATED_BODIES = [
-    (SE_INTP_APOG, "Interpolated Apogee"),
-    (SE_INTP_PERG, "Interpolated Perigee"),
+    (INTP_APOG, "Interpolated Apogee"),
+    (INTP_PERG, "Interpolated Perigee"),
 ]
 
 ALL_BODIES = PRIMARY_BODIES + INTERPOLATED_BODIES
@@ -150,62 +150,62 @@ ALL_BODIES = PRIMARY_BODIES + INTERPOLATED_BODIES
 
 # Longitude tolerance in degrees
 LON_TOL = {
-    SE_MEAN_NODE: 0.001,  # ~3.6 arcsec
-    SE_TRUE_NODE: 0.001,  # ~3.6 arcsec (verified <0.01" vs JPL Horizons)
-    SE_MEAN_APOG: 0.01,  # ~36 arcsec (SE-compatible algorithm)
-    SE_OSCU_APOG: 0.001,  # ~3.6 arcsec (verified <0.5" vs SE in 200-date dense comparison)
-    SE_INTP_APOG: 0.6,  # ~2160 arcsec (ELP2000-82B series, max observed ~0.59°)
-    SE_INTP_PERG: 5.5,  # Intentional deviation: LibEphemeris interpolates actual JPL DE440 physical passages, while Swiss Ephemeris uses truncated ELP2000 theory (up to 5° diff). See docs/methodology_lunar_apsides.md
+    MEAN_NODE: 0.001,  # ~3.6 arcsec
+    TRUE_NODE: 0.001,  # ~3.6 arcsec (verified <0.01" vs JPL Horizons)
+    MEAN_APOG: 0.01,  # ~36 arcsec (SE-compatible algorithm)
+    OSCU_APOG: 0.001,  # ~3.6 arcsec (verified <0.5" vs SE in 200-date dense comparison)
+    INTP_APOG: 0.6,  # ~2160 arcsec (ELP2000-82B series, max observed ~0.59°)
+    INTP_PERG: 5.5,  # Intentional deviation: LibEphemeris interpolates actual JPL DE440 physical passages, while Swiss Ephemeris uses truncated ELP2000 theory (up to 5° diff). See docs/methodology_lunar_apsides.md
 }
 
 # Latitude tolerance in degrees
 LAT_TOL = {
-    SE_MEAN_NODE: 0.001,  # Mean Node has 0 latitude by definition
-    SE_TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified via direct comparison)
-    SE_MEAN_APOG: 0.01,  # Mean Lilith latitude: max ~20" diff (formula coefficients)
-    SE_OSCU_APOG: 0.001,  # True Lilith latitude: <0.02" diff (verified via direct comparison)
-    SE_INTP_APOG: 1.5,  # Interpolated apogee: genuine algorithm difference (~1.1°)
-    SE_INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~1.3°)
+    MEAN_NODE: 0.001,  # Mean Node has 0 latitude by definition
+    TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified via direct comparison)
+    MEAN_APOG: 0.01,  # Mean Lilith latitude: max ~20" diff (formula coefficients)
+    OSCU_APOG: 0.001,  # True Lilith latitude: <0.02" diff (verified via direct comparison)
+    INTP_APOG: 1.5,  # Interpolated apogee: genuine algorithm difference (~1.1°)
+    INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~1.3°)
 }
 
 # Distance tolerance in AU
 DIST_TOL = {
-    SE_MEAN_NODE: 0.1,  # Distance often ~0 for nodes
-    SE_TRUE_NODE: 0.01,  # True Node has distance
-    SE_MEAN_APOG: 0.1,  # Mean Lilith distance
-    SE_OSCU_APOG: 0.001,  # True Lilith uses eccentricity
-    SE_INTP_APOG: 0.01,  # Interpolated apogee distance
-    SE_INTP_PERG: 0.01,  # Interpolated perigee distance
+    MEAN_NODE: 0.1,  # Distance often ~0 for nodes
+    TRUE_NODE: 0.01,  # True Node has distance
+    MEAN_APOG: 0.1,  # Mean Lilith distance
+    OSCU_APOG: 0.001,  # True Lilith uses eccentricity
+    INTP_APOG: 0.01,  # Interpolated apogee distance
+    INTP_PERG: 0.01,  # Interpolated perigee distance
 }
 
 # Speed (longitude velocity) tolerance in degrees/day
 SPEED_LON_TOL = {
-    SE_MEAN_NODE: 0.001,  # Mean Node: max 0.00005 deg/day (verified)
-    SE_TRUE_NODE: 0.005,  # True Node: max 0.0007 deg/day (verified)
-    SE_MEAN_APOG: 0.001,  # Mean Lilith: max 0.00005 deg/day (verified)
-    SE_OSCU_APOG: 0.05,  # True Lilith: max 0.015 deg/day (verified)
-    SE_INTP_APOG: 0.5,  # Interpolated apogee: genuine algorithm difference
-    SE_INTP_PERG: 0.5,  # Interpolated perigee: genuine algorithm difference
+    MEAN_NODE: 0.001,  # Mean Node: max 0.00005 deg/day (verified)
+    TRUE_NODE: 0.005,  # True Node: max 0.0007 deg/day (verified)
+    MEAN_APOG: 0.001,  # Mean Lilith: max 0.00005 deg/day (verified)
+    OSCU_APOG: 0.05,  # True Lilith: max 0.015 deg/day (verified)
+    INTP_APOG: 0.5,  # Interpolated apogee: genuine algorithm difference
+    INTP_PERG: 0.5,  # Interpolated perigee: genuine algorithm difference
 }
 
 # Speed (latitude velocity) tolerance in degrees/day
 SPEED_LAT_TOL = {
-    SE_MEAN_NODE: 0.001,  # Mean Node: always 0 (no latitude)
-    SE_TRUE_NODE: 0.001,  # True Node: always 0 (no latitude)
-    SE_MEAN_APOG: 0.001,  # Mean Lilith: max 0.00002 deg/day (verified)
-    SE_OSCU_APOG: 0.005,  # True Lilith: max 0.0004 deg/day (verified)
-    SE_INTP_APOG: 0.2,  # Interpolated apogee: genuine algorithm difference
-    SE_INTP_PERG: 0.2,  # Interpolated perigee: genuine algorithm difference
+    MEAN_NODE: 0.001,  # Mean Node: always 0 (no latitude)
+    TRUE_NODE: 0.001,  # True Node: always 0 (no latitude)
+    MEAN_APOG: 0.001,  # Mean Lilith: max 0.00002 deg/day (verified)
+    OSCU_APOG: 0.005,  # True Lilith: max 0.0004 deg/day (verified)
+    INTP_APOG: 0.2,  # Interpolated apogee: genuine algorithm difference
+    INTP_PERG: 0.2,  # Interpolated perigee: genuine algorithm difference
 }
 
 # Speed (distance velocity) tolerance in AU/day
 SPEED_DIST_TOL = {
-    SE_MEAN_NODE: 0.01,
-    SE_TRUE_NODE: 0.01,
-    SE_MEAN_APOG: 0.01,
-    SE_OSCU_APOG: 0.001,
-    SE_INTP_APOG: 0.01,
-    SE_INTP_PERG: 0.01,
+    MEAN_NODE: 0.01,
+    TRUE_NODE: 0.01,
+    MEAN_APOG: 0.01,
+    OSCU_APOG: 0.001,
+    INTP_APOG: 0.01,
+    INTP_PERG: 0.01,
 }
 
 # Sidereal tolerance multiplier (sidereal adds ayanamsha uncertainty)
@@ -214,32 +214,32 @@ SIDEREAL_LON_MULTIPLIER = 1.5
 # J2000 frame tolerance in degrees (precession model differences: IAU 2006 vs older)
 # The ~0.004° systematic offset is from frame transformation, not body calculation
 J2000_LON_TOL = {
-    SE_MEAN_NODE: 0.006,  # ~22 arcsec (precession model difference)
-    SE_TRUE_NODE: 0.006,  # ~22 arcsec (precession model difference)
-    SE_MEAN_APOG: 0.015,  # ~54 arcsec
-    SE_OSCU_APOG: 0.006,  # ~22 arcsec (precession model difference)
-    SE_INTP_APOG: 0.6,  # interpolated bodies have larger spread
-    SE_INTP_PERG: 5.5,  # intentional deviation
+    MEAN_NODE: 0.006,  # ~22 arcsec (precession model difference)
+    TRUE_NODE: 0.006,  # ~22 arcsec (precession model difference)
+    MEAN_APOG: 0.015,  # ~54 arcsec
+    OSCU_APOG: 0.006,  # ~22 arcsec (precession model difference)
+    INTP_APOG: 0.6,  # interpolated bodies have larger spread
+    INTP_PERG: 5.5,  # intentional deviation
 }
 
 # Extended date range tolerance in degrees (accuracy degrades far from J2000)
 EXTENDED_LON_TOL = {
-    SE_MEAN_NODE: 0.002,  # ~7 arcsec
-    SE_TRUE_NODE: 0.002,  # ~7 arcsec
-    SE_MEAN_APOG: 0.02,  # ~72 arcsec
-    SE_OSCU_APOG: 0.02,  # ~72 arcsec (True Lilith diverges near DE440 edges)
-    SE_INTP_APOG: 1.2,  # interpolated bodies
-    SE_INTP_PERG: 11.0,  # intentional deviation
+    MEAN_NODE: 0.002,  # ~7 arcsec
+    TRUE_NODE: 0.002,  # ~7 arcsec
+    MEAN_APOG: 0.02,  # ~72 arcsec
+    OSCU_APOG: 0.02,  # ~72 arcsec (True Lilith diverges near DE440 edges)
+    INTP_APOG: 1.2,  # interpolated bodies
+    INTP_PERG: 11.0,  # intentional deviation
 }
 
 # Equatorial coordinate tolerance in degrees (transformation adds some error)
 EQUATORIAL_TOL = {
-    SE_MEAN_NODE: 0.001,  # Mean Node: 0.0" diff (verified)
-    SE_TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified)
-    SE_MEAN_APOG: 0.01,  # Mean Lilith: max ~20" (formula coefficients)
-    SE_OSCU_APOG: 0.001,  # True Lilith: <0.2" diff (verified)
-    SE_INTP_APOG: 1.2,  # Interpolated apogee: genuine algorithm difference (~0.4° RA, ~1.1° Dec)
-    SE_INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~0.7° RA, ~1.3° Dec)
+    MEAN_NODE: 0.001,  # Mean Node: 0.0" diff (verified)
+    TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified)
+    MEAN_APOG: 0.01,  # Mean Lilith: max ~20" (formula coefficients)
+    OSCU_APOG: 0.001,  # True Lilith: <0.2" diff (verified)
+    INTP_APOG: 1.2,  # Interpolated apogee: genuine algorithm difference (~0.4° RA, ~1.1° Dec)
+    INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~0.7° RA, ~1.3° Dec)
 }
 
 
@@ -296,63 +296,63 @@ CORE_DATES = [
 # ============================================================================
 
 FORMULA_BASED_AYANAMSHAS = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_DELUCE, "De Luce"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_USHASHASHI, "Ushashashi"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (SE_SIDM_JN_BHASIN, "JN Bhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
-    (SE_SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
-    (SE_SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
-    (SE_SIDM_BABYL_HUBER, "Babylonian Huber"),
-    (SE_SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_SASSANIAN, "Sassanian"),
-    (SE_SIDM_J2000, "J2000"),
-    (SE_SIDM_J1900, "J1900"),
-    (SE_SIDM_B1950, "B1950"),
-    (SE_SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
-    (SE_SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta Mean Sun"),
-    (SE_SIDM_ARYABHATA, "Aryabhata"),
-    (SE_SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
-    (SE_SIDM_SS_REVATI, "SS Revati"),
-    (SE_SIDM_SS_CITRA, "SS Citra"),
-    (SE_SIDM_ARYABHATA_522, "Aryabhata 522"),
-    (SE_SIDM_BABYL_BRITTON, "Babylonian Britton"),
+    (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_DELUCE, "De Luce"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_USHASHASHI, "Ushashashi"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_JN_BHASIN, "JN Bhasin"),
+    (SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
+    (SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
+    (SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
+    (SIDM_BABYL_HUBER, "Babylonian Huber"),
+    (SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_SASSANIAN, "Sassanian"),
+    (SIDM_J2000, "J2000"),
+    (SIDM_J1900, "J1900"),
+    (SIDM_B1950, "B1950"),
+    (SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
+    (SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta Mean Sun"),
+    (SIDM_ARYABHATA, "Aryabhata"),
+    (SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
+    (SIDM_SS_REVATI, "SS Revati"),
+    (SIDM_SS_CITRA, "SS Citra"),
+    (SIDM_ARYABHATA_522, "Aryabhata 522"),
+    (SIDM_BABYL_BRITTON, "Babylonian Britton"),
 ]
 
 STAR_BASED_AYANAMSHAS = [
-    (SE_SIDM_TRUE_CITRA, "True Citra"),
-    (SE_SIDM_TRUE_REVATI, "True Revati"),
-    (SE_SIDM_TRUE_PUSHYA, "True Pushya"),
-    (SE_SIDM_TRUE_MULA, "True Mula"),
-    (SE_SIDM_TRUE_SHEORAN, "True Sheoran"),
-    (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
-    (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
-    (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
-    (SE_SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
-    (SE_SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
-    (SE_SIDM_GALEQU_TRUE, "Galactic Equator True"),
-    (SE_SIDM_GALEQU_MULA, "Galactic Equator Mula"),
-    (SE_SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
-    (SE_SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
-    (SE_SIDM_VALENS_MOON, "Valens Moon"),
+    (SIDM_TRUE_CITRA, "True Citra"),
+    (SIDM_TRUE_REVATI, "True Revati"),
+    (SIDM_TRUE_PUSHYA, "True Pushya"),
+    (SIDM_TRUE_MULA, "True Mula"),
+    (SIDM_TRUE_SHEORAN, "True Sheoran"),
+    (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+    (SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+    (SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+    (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
+    (SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
+    (SIDM_GALEQU_TRUE, "Galactic Equator True"),
+    (SIDM_GALEQU_MULA, "Galactic Equator Mula"),
+    (SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
+    (SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
+    (SIDM_VALENS_MOON, "Valens Moon"),
 ]
 
 ALL_AYANAMSHAS = FORMULA_BASED_AYANAMSHAS + STAR_BASED_AYANAMSHAS
 
 # Major ayanamshas for heavier combinatorial tests
 MAJOR_AYANAMSHAS = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_TRUE_CITRA, "True Citra"),
+    (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_TRUE_CITRA, "True Citra"),
 ]
 
 # Sidereal tolerance: formula-based vs star-based
@@ -400,7 +400,7 @@ class TestTropicalLongitude:
     def test_primary_body_longitude(self, body_id, body_name, jd, date_desc):
         """Test primary body longitude matches within tolerance."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
         tol = LON_TOL[body_id]
@@ -417,7 +417,7 @@ class TestTropicalLongitude:
     def test_interpolated_body_longitude(self, body_id, body_name, jd, date_desc):
         """Test interpolated apogee/perigee longitude matches within tolerance."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
         tol = LON_TOL[body_id]
@@ -434,7 +434,7 @@ class TestTropicalLongitude:
     def test_eclipse_date_longitude(self, body_id, body_name, jd, date_desc):
         """Test body longitude at eclipse dates (nodal region stress test)."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
         tol = LON_TOL[body_id]
@@ -452,9 +452,9 @@ class TestTropicalAllComponents:
     @pytest.mark.parametrize("body_id,body_name", ALL_BODIES)
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES)
     def test_all_components_no_speed(self, body_id, body_name, jd, date_desc):
-        """Test all position components (without SEFLG_SPEED)."""
+        """Test all position components (without FLG_SPEED)."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         # Longitude
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -481,9 +481,9 @@ class TestTropicalAllComponents:
     @pytest.mark.parametrize("body_id,body_name", ALL_BODIES)
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES)
     def test_all_components_with_speed(self, body_id, body_name, jd, date_desc):
-        """Test all 6 components with SEFLG_SPEED."""
+        """Test all 6 components with FLG_SPEED."""
         pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         # Longitude
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -534,7 +534,7 @@ class TestVelocity:
     def test_longitude_speed(self, body_id, body_name, jd, date_desc):
         """Test longitude velocity for all primary bodies across dates."""
         pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         diff = abs(pos_swe[3] - pos_py[3])
 
@@ -547,7 +547,7 @@ class TestVelocity:
     def test_mean_node_always_retrograde(self):
         """Verify Mean Node speed is always retrograde (negative)."""
         for jd, desc in TEST_DATES:
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+            pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SPEED)
 
             assert pos_py[3] < 0, (
@@ -562,7 +562,7 @@ class TestVelocity:
     def test_interpolated_speed(self, body_id, body_name, jd, date_desc):
         """Test interpolated apogee/perigee speed."""
         pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         diff = abs(pos_swe[3] - pos_py[3])
 
@@ -583,11 +583,11 @@ class TestSiderealFormulaBasedAllAyanamshas:
     ):
         """Test sidereal longitude with formula-based ayanamsha."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -607,11 +607,11 @@ class TestSiderealFormulaBasedAllAyanamshas:
     ):
         """Test interpolated body sidereal longitude with formula-based ayanamsha."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -633,11 +633,11 @@ class TestSiderealStarBasedAllAyanamshas:
     ):
         """Test sidereal longitude with star-based ayanamsha (relaxed tolerance)."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -650,7 +650,7 @@ class TestSiderealStarBasedAllAyanamshas:
 
 
 class TestSiderealWithSpeed:
-    """Test sidereal mode combined with SEFLG_SPEED."""
+    """Test sidereal mode combined with FLG_SPEED."""
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PRIMARY_BODIES)
@@ -661,11 +661,11 @@ class TestSiderealWithSpeed:
     ):
         """Test sidereal mode with velocity for major ayanamshas."""
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         # Longitude
         tol = _sidereal_tol(body_id, sid_mode)
@@ -686,16 +686,16 @@ class TestSiderealWithSpeed:
 
 
 class TestEquatorialCoordinates:
-    """Test equatorial coordinate transformation (SEFLG_EQUATORIAL)."""
+    """Test equatorial coordinate transformation (FLG_EQUATORIAL)."""
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PRIMARY_BODIES)
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES)
     def test_equatorial_position(self, body_id, body_name, jd, date_desc):
         """Test equatorial coordinates (RA, Dec)."""
-        flags = SEFLG_EQUATORIAL
+        flags = FLG_EQUATORIAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = EQUATORIAL_TOL[body_id]
 
@@ -718,9 +718,9 @@ class TestEquatorialCoordinates:
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES[:2])
     def test_equatorial_with_speed(self, body_id, body_name, jd, date_desc):
         """Test equatorial coordinates with velocity."""
-        flags = SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_EQUATORIAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = EQUATORIAL_TOL[body_id]
 
@@ -741,16 +741,16 @@ class TestEquatorialCoordinates:
 
 
 class TestJ2000Frame:
-    """Test J2000 reference frame (SEFLG_J2000)."""
+    """Test J2000 reference frame (FLG_J2000)."""
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PRIMARY_BODIES)
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES)
     def test_j2000_position(self, body_id, body_name, jd, date_desc):
         """Test J2000 frame positions."""
-        flags = SEFLG_J2000
+        flags = FLG_J2000
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = J2000_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -765,9 +765,9 @@ class TestJ2000Frame:
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES[:2])
     def test_j2000_with_speed(self, body_id, body_name, jd, date_desc):
         """Test J2000 frame with velocity."""
-        flags = SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = J2000_LON_TOL[body_id]
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -782,16 +782,16 @@ class TestJ2000Frame:
 
 
 class TestNoNutation:
-    """Test no-nutation mode (SEFLG_NONUT)."""
+    """Test no-nutation mode (FLG_NONUT)."""
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PRIMARY_BODIES)
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES)
     def test_nonut_position(self, body_id, body_name, jd, date_desc):
         """Test no-nutation positions."""
-        flags = SEFLG_NONUT
+        flags = FLG_NONUT
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = LON_TOL[body_id] * 1.5
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -812,10 +812,10 @@ class TestNoNutation:
         """
         jd = 2451545.0
 
-        pos_normal, _ = ephem.swe_calc_ut(jd, body_id, 0)
-        pos_nonut, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_NONUT)
+        pos_normal, _ = ephem.calc_ut(jd, body_id, 0)
+        pos_nonut, _ = ephem.calc_ut(jd, body_id, FLG_NONUT)
 
-        if body_id in (SE_TRUE_NODE, SE_OSCU_APOG):
+        if body_id in (TRUE_NODE, OSCU_APOG):
             # Just verify the flag is accepted without error.
             # The difference may be zero if the implementation does not
             # apply nutation to these analytical bodies.
@@ -833,9 +833,9 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES[:2])
     def test_equatorial_j2000(self, body_id, body_name, jd, date_desc):
         """Test EQUATORIAL | J2000 combined."""
-        flags = SEFLG_EQUATORIAL | SEFLG_J2000
+        flags = FLG_EQUATORIAL | FLG_J2000
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         # J2000 precession model difference dominates over equatorial transform
         tol = J2000_LON_TOL[body_id]
@@ -850,9 +850,9 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd,date_desc", CORE_DATES[:2])
     def test_equatorial_j2000_speed(self, body_id, body_name, jd, date_desc):
         """Test EQUATORIAL | J2000 | SPEED combined."""
-        flags = SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         # J2000 precession model difference dominates
         tol = J2000_LON_TOL[body_id]
@@ -873,11 +873,11 @@ class TestCombinedFlags:
         """Test SIDEREAL | EQUATORIAL combined."""
         jd = 2451545.0
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SIDEREAL | FLG_EQUATORIAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         # Sidereal+equatorial uses mean equator (same pipeline as J2000/NONUT),
         # so precession model differences dominate
@@ -894,9 +894,9 @@ class TestCombinedFlags:
     def test_nonut_equatorial(self, body_id, body_name):
         """Test NONUT | EQUATORIAL combined."""
         jd = 2451545.0
-        flags = SEFLG_NONUT | SEFLG_EQUATORIAL
+        flags = FLG_NONUT | FLG_EQUATORIAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = EQUATORIAL_TOL[body_id] * 1.5
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -908,14 +908,14 @@ class TestCombinedFlags:
     def test_sidereal_speed_multi_ayanamsha(self, body_id, body_name):
         """Test SIDEREAL | SPEED across multiple ayanamshas at J2000."""
         jd = 2451545.0
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_SPEED
 
         for sid_mode, sid_name in MAJOR_AYANAMSHAS:
             swe.set_sid_mode(sid_mode)
-            ephem.swe_set_sid_mode(sid_mode)
+            ephem.set_sid_mode(sid_mode)
 
             pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
             tol = _sidereal_tol(body_id, sid_mode)
             diff = angular_diff(pos_swe[0], pos_py[0])
@@ -926,7 +926,7 @@ class TestCombinedFlags:
 
 
 class TestTopocentric:
-    """Test topocentric mode (SEFLG_TOPOCTR) with various locations.
+    """Test topocentric mode (FLG_TOPOCTR) with various locations.
 
     Lunar nodes and Lilith are geometrically defined points, not physical
     bodies. Topocentric correction may or may not be applied by the
@@ -944,11 +944,11 @@ class TestTopocentric:
         jd = 2451545.0
 
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
-        flags = SEFLG_TOPOCTR
+        flags = FLG_TOPOCTR
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = LON_TOL[body_id] * 2.0
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -965,11 +965,11 @@ class TestTopocentric:
         jd = 2451545.0
 
         swe.set_topo(12.4964, 41.9028, 0)  # Rome
-        ephem.swe_set_topo(12.4964, 41.9028, 0)
+        ephem.set_topo(12.4964, 41.9028, 0)
 
-        flags = SEFLG_TOPOCTR | SEFLG_SPEED
+        flags = FLG_TOPOCTR | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = LON_TOL[body_id] * 2.0
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -982,13 +982,13 @@ class TestTopocentric:
         jd = 2451545.0
 
         swe.set_topo(12.4964, 41.9028, 0)
-        ephem.swe_set_topo(12.4964, 41.9028, 0)
+        ephem.set_topo(12.4964, 41.9028, 0)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_TOPOCTR | SEFLG_SIDEREAL
+        flags = FLG_TOPOCTR | FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = LON_TOL[body_id] * 2.0 + SIDEREAL_STRICT_TOL
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1005,13 +1005,13 @@ class TestTopocentric:
         jd = 2460000.5  # 2023
 
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
-        flags = SEFLG_TOPOCTR
-        pos_swe, _ = swe.calc_ut(jd, SE_MEAN_NODE, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+        flags = FLG_TOPOCTR
+        pos_swe, _ = swe.calc_ut(jd, MEAN_NODE, flags)
+        pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, flags)
 
-        tol = LON_TOL[SE_MEAN_NODE] * 2.0
+        tol = LON_TOL[MEAN_NODE] * 2.0
         diff = angular_diff(pos_swe[0], pos_py[0])
 
         assert diff < tol, (
@@ -1032,11 +1032,11 @@ class TestTopocentric:
         jd = 2460000.5
 
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
-        flags = SEFLG_TOPOCTR
+        flags = FLG_TOPOCTR
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = LON_TOL[body_id] * 2.0
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1067,7 +1067,7 @@ class TestStatisticalPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
             errors_lon.append(angular_diff(pos_swe[0], pos_py[0]))
             errors_lat.append(abs(pos_swe[1] - pos_py[1]))
@@ -1110,7 +1110,7 @@ class TestStatisticalPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            pos_py, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
             errors_speed.append(abs(pos_swe[3] - pos_py[3]))
 
@@ -1142,7 +1142,7 @@ class TestStatisticalPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
             errors_lon.append(angular_diff(pos_swe[0], pos_py[0]))
 
@@ -1164,10 +1164,10 @@ class TestStatisticalPrecision:
         """Test sidereal precision across 200 random dates with Lahiri."""
         random.seed(99)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
         errors = []
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
 
         for _ in range(200):
             year = random.randint(1900, 2100)
@@ -1177,14 +1177,14 @@ class TestStatisticalPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
             errors.append(angular_diff(pos_swe[0], pos_py[0]))
 
         max_err = max(errors)
         mean_err = sum(errors) / len(errors)
 
-        tol = _sidereal_tol(body_id, SE_SIDM_LAHIRI)
+        tol = _sidereal_tol(body_id, SIDM_LAHIRI)
 
         print(f"\n  {body_name} sidereal Lahiri stats (200 dates):")
         print(f"    Max:  {max_err:.6f}°")
@@ -1205,7 +1205,7 @@ class TestExtendedDateRange:
     def test_extended_range_primary(self, body_id, body_name, jd, date_desc):
         """Test primary bodies at extended date range."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         tol = EXTENDED_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1225,7 +1225,7 @@ class TestExtendedDateRange:
     def test_extended_range_with_speed(self, body_id, body_name, jd, date_desc):
         """Test velocity at extended date range."""
         pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_speed = abs(pos_swe[3] - pos_py[3])
@@ -1249,7 +1249,7 @@ class TestExtendedDateRange:
     def test_extended_range_interpolated(self, body_id, body_name, jd, date_desc):
         """Test interpolated bodies at extended date range."""
         pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(jd, body_id, 0)
 
         tol = EXTENDED_LON_TOL[body_id]
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1264,7 +1264,7 @@ class TestEdgeCases:
     def test_mean_node_latitude_is_zero(self):
         """Mean Node latitude should be 0 by definition."""
         for jd, desc in CORE_DATES:
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+            pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
             pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, 0)
 
             assert abs(pos_py[1]) < 0.001, (
@@ -1279,7 +1279,7 @@ class TestEdgeCases:
         """All longitudes should be in [0, 360) range."""
         for body_id, body_name in ALL_BODIES:
             for jd, desc in CORE_DATES:
-                pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+                pos_py, _ = ephem.calc_ut(jd, body_id, 0)
                 assert 0.0 <= pos_py[0] < 360.0, (
                     f"{body_name} longitude {pos_py[0]} out of range at {desc}"
                 )
@@ -1288,8 +1288,8 @@ class TestEdgeCases:
     def test_true_vs_mean_node_difference(self):
         """True Node should differ from Mean Node (oscillation)."""
         for jd, desc in CORE_DATES:
-            pos_mean, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
-            pos_true, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+            pos_mean, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
+            pos_true, _ = ephem.calc_ut(jd, TRUE_NODE, 0)
 
             diff = angular_diff(pos_mean[0], pos_true[0])
 
@@ -1302,8 +1302,8 @@ class TestEdgeCases:
     def test_true_vs_mean_lilith_difference(self):
         """True Lilith should differ from Mean Lilith."""
         for jd, desc in CORE_DATES:
-            pos_mean, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, 0)
-            pos_true, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_mean, _ = ephem.calc_ut(jd, MEAN_APOG, 0)
+            pos_true, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff = angular_diff(pos_mean[0], pos_true[0])
 
@@ -1328,10 +1328,10 @@ class TestEdgeCases:
             lon = pos_swe[0]
 
             if lon < 2.0 or lon > 358.0:
-                pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+                pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
                 diff = angular_diff(pos_swe[0], pos_py[0])
 
-                assert diff < LON_TOL[SE_MEAN_NODE], (
+                assert diff < LON_TOL[MEAN_NODE], (
                     f"Mean Node near wrap-around: diff {diff:.6f}° at "
                     f"swe={pos_swe[0]:.4f}°, lib={pos_py[0]:.4f}°"
                 )
@@ -1350,7 +1350,7 @@ class TestEdgeCases:
 
             for i in range(30):
                 jd = jd_start + i
-                pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+                pos_py, _ = ephem.calc_ut(jd, body_id, 0)
                 positions_py.append(pos_py[0])
 
             # Check that day-to-day changes are smooth (no jumps > 5°)
@@ -1365,16 +1365,16 @@ class TestEdgeCases:
     @pytest.mark.comparison
     @pytest.mark.parametrize("body_id,body_name", PRIMARY_BODIES)
     def test_same_result_both_api_styles(self, body_id, body_name):
-        """Verify swe_calc_ut and calc_ut aliases return identical results."""
+        """Verify calc_ut and calc_ut aliases return identical results."""
         jd = 2451545.0
 
-        pos1, flag1 = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-        pos2, flag2 = ephem.calc_ut(jd, body_id, SEFLG_SPEED)
+        pos1, flag1 = ephem.calc_ut(jd, body_id, FLG_SPEED)
+        pos2, flag2 = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         for i in range(6):
             assert pos1[i] == pos2[i], (
                 f"{body_name} API alias mismatch at index {i}: "
-                f"swe_calc_ut={pos1[i]}, calc_ut={pos2[i]}"
+                f"calc_ut={pos1[i]}, calc_ut={pos2[i]}"
             )
 
     @pytest.mark.comparison
@@ -1382,10 +1382,10 @@ class TestEdgeCases:
         """Interpolated apogee and perigee should produce valid results."""
         jd = 2451545.0
 
-        pos_mean, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, 0)
-        pos_true, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
-        pos_intp, _ = ephem.swe_calc_ut(jd, SE_INTP_APOG, 0)
-        pos_perg, _ = ephem.swe_calc_ut(jd, SE_INTP_PERG, 0)
+        pos_mean, _ = ephem.calc_ut(jd, MEAN_APOG, 0)
+        pos_true, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
+        pos_intp, _ = ephem.calc_ut(jd, INTP_APOG, 0)
+        pos_perg, _ = ephem.calc_ut(jd, INTP_PERG, 0)
 
         for pos, name in [
             (pos_mean, "Mean Lilith"),
@@ -1401,13 +1401,13 @@ class TestEdgeCases:
         jd = 2451545.0
 
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         for body_id, body_name in PRIMARY_BODIES:
-            pos_trop, _ = ephem.swe_calc_ut(jd, body_id, 0)
-            pos_sid, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SIDEREAL)
+            pos_trop, _ = ephem.calc_ut(jd, body_id, 0)
+            pos_sid, _ = ephem.calc_ut(jd, body_id, FLG_SIDEREAL)
 
             # The sidereal position should be tropical - ayanamsha (mod 360)
             expected_sid = (pos_trop[0] - ayan) % 360.0
@@ -1434,11 +1434,11 @@ class TestSiderealComprehensive:
         jd = 2451545.0
 
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1458,11 +1458,11 @@ class TestSiderealComprehensive:
         jd = 2415020.5
 
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1483,11 +1483,11 @@ class TestSiderealComprehensive:
         jd = 2451545.0
 
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])
@@ -1508,11 +1508,11 @@ class TestSiderealComprehensive:
         jd = 2451545.0
 
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_SPEED
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
 
@@ -1538,11 +1538,11 @@ class TestSiderealComprehensive:
         jd = 2460000.5
 
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         tol = _sidereal_tol(body_id, sid_mode)
         diff = angular_diff(pos_swe[0], pos_py[0])

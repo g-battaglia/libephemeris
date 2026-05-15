@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 105: Sidereal Time at Geographic Locations
 
-Tests swe_sidtime() and swe_sidtime0() across epochs and locations.
+Tests sidtime() and sidtime0() across epochs and locations.
 Compares GMST and LST values between SE and LE.
 """
 
@@ -14,7 +14,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 EPOCHS = [2451545.0 + i * 365.25 for i in range(50)]  # 50 years
 LONGITUDES = [
@@ -45,15 +45,15 @@ def run_tests():
     print("ROUND 105: Sidereal Time at Geographic Locations")
     print("=" * 80)
 
-    # PART 1: swe_sidtime (GMST)
-    print("\n--- PART 1: swe_sidtime (GMST) ---")
+    # PART 1: sidtime (GMST)
+    print("\n--- PART 1: sidtime (GMST) ---")
     p1_pass = 0
     p1_fail = 0
 
     for jd in EPOCHS:
         total += 1
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         diff_sec = abs(se_st - le_st) * 3600  # hours -> seconds
 
         if diff_sec <= TOL_SECONDS:
@@ -69,20 +69,20 @@ def run_tests():
 
     print(f"  Part 1: {p1_pass}/{p1_pass + p1_fail} passed")
 
-    # PART 2: swe_sidtime0 (with obliquity and nutation)
-    print("\n--- PART 2: swe_sidtime0 (with eps/dpsi) ---")
+    # PART 2: sidtime0 (with obliquity and nutation)
+    print("\n--- PART 2: sidtime0 (with eps/dpsi) ---")
     p2_pass = 0
     p2_fail = 0
 
     for jd in EPOCHS[:20]:
         total += 1
         # Get obliquity and nutation from SE
-        nut = swe.calc_ut(jd, -1, 2)  # SEFLG_SWIEPH
+        nut = swe.calc_ut(jd, -1, 2)  # FLG_SWIEPH
         eps = nut[0][0]  # true obliquity
         dpsi = nut[0][2]  # nutation in longitude (degrees)
 
         se_st0 = swe.sidtime0(jd, eps, dpsi)
-        le_st0 = ephem.swe_sidtime0(jd, eps, dpsi)
+        le_st0 = ephem.sidtime0(jd, eps, dpsi)
         diff_sec = abs(se_st0 - le_st0) * 3600
 
         if diff_sec <= TOL_SECONDS:
@@ -105,7 +105,7 @@ def run_tests():
 
     for jd in EPOCHS[:20]:
         se_gmst = swe.sidtime(jd)
-        le_gmst = ephem.swe_sidtime(jd)
+        le_gmst = ephem.sidtime(jd)
 
         for lon in LONGITUDES:
             total += 1
@@ -137,7 +137,7 @@ def run_tests():
 
             try:
                 se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"P")
-                le_result = ephem.swe_houses(jd, lat, lon, ord("P"))
+                le_result = ephem.houses(jd, lat, lon, ord("P"))
                 le_ascmc = le_result[1]
 
                 # ARMC is ascmc[2]

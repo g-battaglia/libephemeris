@@ -23,17 +23,17 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
 )
 
 
@@ -115,20 +115,20 @@ COMPOSITE_TEST_PAIRS = [
 
 # Planets for composite calculation (excluding TrueNode for main tests)
 COMPOSITE_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # TrueNode tested separately with relaxed tolerance
-TRUE_NODE = (SE_TRUE_NODE, "TrueNode")
+TRUE_NODE = (TRUE_NODE, "TrueNode")
 
 # Planets most affected by precision issues per KR_FIX.md #9
 SENSITIVE_PLANETS = ["Moon", "Jupiter", "Uranus", "Sun"]
@@ -207,15 +207,15 @@ class TestCompositeExpectedData:
         """
         p1, p2 = pair["person1"], pair["person2"]
 
-        jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-        jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+        jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+        jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
         errors = []
 
         for planet_id, planet_name in COMPOSITE_PLANETS:
             # Calculate positions with libephemeris
-            pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-            pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+            pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+            pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
             # Calculate positions with Swiss Ephemeris
             pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
@@ -251,14 +251,14 @@ class TestCompositeExpectedData:
         """
         p1, p2 = pair["person1"], pair["person2"]
 
-        jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-        jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+        jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+        jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
         planet_id, planet_name = TRUE_NODE
 
         # Calculate positions with libephemeris
-        pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-        pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+        pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+        pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
         # Calculate positions with Swiss Ephemeris
         pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
@@ -287,8 +287,8 @@ class TestCompositeExpectedData:
         """
         p1, p2 = pair["person1"], pair["person2"]
 
-        jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-        jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+        jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+        jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
         max_diff = 0.0
         max_planet = None
@@ -298,8 +298,8 @@ class TestCompositeExpectedData:
                 continue
 
             # Calculate positions with libephemeris
-            pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-            pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+            pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+            pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
             # Calculate positions with Swiss Ephemeris
             pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
@@ -331,13 +331,13 @@ class TestCompositeExpectedData:
         """
         p1, p2 = pair["person1"], pair["person2"]
 
-        jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-        jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+        jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+        jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
         for planet_id, planet_name in COMPOSITE_PLANETS:
             # Calculate positions with libephemeris
-            pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-            pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+            pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+            pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
             # Use libephemeris deg_midp function
             composite_lib = ephem.deg_midp(pos1_lib[0], pos2_lib[0])
@@ -373,13 +373,13 @@ class TestCompositeStatistics:
         for pair in COMPOSITE_TEST_PAIRS:
             p1, p2 = pair["person1"], pair["person2"]
 
-            jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-            jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+            jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+            jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
             # Test planets
             for planet_id, planet_name in COMPOSITE_PLANETS:
-                pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-                pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+                pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+                pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
                 pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
                 pos2_swe, _ = swe.calc_ut(jd2, planet_id, 0)
@@ -392,8 +392,8 @@ class TestCompositeStatistics:
 
             # Test TrueNode
             planet_id, planet_name = TRUE_NODE
-            pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-            pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+            pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+            pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
             pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
             pos2_swe, _ = swe.calc_ut(jd2, planet_id, 0)
             composite_lib = deg_midpoint(pos1_lib[0], pos2_lib[0])
@@ -449,12 +449,12 @@ class TestCompositeStatistics:
         for pair in COMPOSITE_TEST_PAIRS:
             p1, p2 = pair["person1"], pair["person2"]
 
-            jd1 = ephem.swe_julday(p1["year"], p1["month"], p1["day"], p1["hour"])
-            jd2 = ephem.swe_julday(p2["year"], p2["month"], p2["day"], p2["hour"])
+            jd1 = ephem.julday(p1["year"], p1["month"], p1["day"], p1["hour"])
+            jd2 = ephem.julday(p2["year"], p2["month"], p2["day"], p2["hour"])
 
             for planet_id, planet_name in COMPOSITE_PLANETS:
-                pos1_lib, _ = ephem.swe_calc_ut(jd1, planet_id, 0)
-                pos2_lib, _ = ephem.swe_calc_ut(jd2, planet_id, 0)
+                pos1_lib, _ = ephem.calc_ut(jd1, planet_id, 0)
+                pos2_lib, _ = ephem.calc_ut(jd2, planet_id, 0)
 
                 pos1_swe, _ = swe.calc_ut(jd1, planet_id, 0)
                 pos2_swe, _ = swe.calc_ut(jd2, planet_id, 0)

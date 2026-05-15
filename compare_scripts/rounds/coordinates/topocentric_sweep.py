@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Round 34: Topocentric Positions Deep Sweep (SEFLG_TOPOCTR)
+Round 34: Topocentric Positions Deep Sweep (FLG_TOPOCTR)
 ===========================================================
 
 Tests topocentric position calculations across multiple geographic locations,
@@ -35,19 +35,19 @@ from libephemeris.constants import *
 _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
-SEFLG_TOPOCTR = 32768  # 0x8000
+FLG_TOPOCTR = 32768  # 0x8000
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Locations: (lat, lon, alt_m, name)
@@ -148,7 +148,7 @@ def compare_pos(r, se_result, le_result, label):
 
 def set_topo(lat, lon, alt_m):
     swe.set_topo(lon, lat, alt_m)
-    ephem.swe_set_topo(lon, lat, alt_m)
+    ephem.set_topo(lon, lat, alt_m)
 
 
 def run_part1():
@@ -162,11 +162,11 @@ def run_part1():
     for lat, lon, alt, city in CITIES:
         set_topo(lat, lon, alt)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SPEED | FLG_TOPOCTR
             label = f"{city} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -185,11 +185,11 @@ def run_part2():
     for lat, lon, alt, loc_name in EXTREME_LATS:
         set_topo(lat, lon, alt)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SPEED | FLG_TOPOCTR
             label = f"{loc_name} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -208,11 +208,11 @@ def run_part3():
     for lat, lon, alt, loc_name in HIGH_ALT:
         set_topo(lat, lon, alt)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SPEED | FLG_TOPOCTR
             label = f"{loc_name} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -231,11 +231,11 @@ def run_part4():
     for lat, lon, alt, city in CITIES[:3]:  # London, NewYork, Tokyo
         set_topo(lat, lon, alt)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_TOPOCTR | FLG_EQUATORIAL
             label = f"{city} {body_name} EQ"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -254,11 +254,11 @@ def run_part5():
     for lat, lon, alt, city in CITIES[:3]:
         set_topo(lat, lon, alt)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_J2000
+            flags = FLG_SPEED | FLG_TOPOCTR | FLG_J2000
             label = f"{city} {body_name} J2K"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -278,9 +278,9 @@ def run_part6():
         set_topo(lat, lon, alt)
 
         # Geocentric Moon
-        geo = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        geo = ephem.calc_ut(jd, MOON, FLG_SPEED)
         # Topocentric Moon
-        topo = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_TOPOCTR)
+        topo = ephem.calc_ut(jd, MOON, FLG_SPEED | FLG_TOPOCTR)
 
         lon_diff = abs(geo[0][0] - topo[0][0])
         if lon_diff > 180:
@@ -300,8 +300,8 @@ def run_part6():
             )
 
         # Also check Sun parallax is much smaller (< 30")
-        geo_sun = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
-        topo_sun = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_TOPOCTR)
+        geo_sun = ephem.calc_ut(jd, SUN, FLG_SPEED)
+        topo_sun = ephem.calc_ut(jd, SUN, FLG_SPEED | FLG_TOPOCTR)
         sun_lon_diff = abs(geo_sun[0][0] - topo_sun[0][0])
         if sun_lon_diff > 180:
             sun_lon_diff = 360 - sun_lon_diff
@@ -327,21 +327,21 @@ def run_part7():
     set_topo(51.5074, -0.1278, 11)  # London
 
     sweep_bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     for y in range(1900, 2101, 20):
         jd = swe.julday(y, 6, 21, 12.0)
         for body_id, body_name in sweep_bodies:
-            flags = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SPEED | FLG_TOPOCTR
             label = f"{y} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_pos(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")

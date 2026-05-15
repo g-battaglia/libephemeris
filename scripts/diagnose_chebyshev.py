@@ -15,7 +15,7 @@ from numpy.polynomial.chebyshev import chebfit, chebval
 sys.path.insert(0, ".")
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.state import get_planets, get_timescale
 
 # Saturn params: interval=2d, degree=15
@@ -66,11 +66,11 @@ def eval_pipeline_at_jds(jds_array):
 
 
 def eval_swe_calc_at_jds(jds_array):
-    """Evaluate swe_calc at given JDs."""
+    """Evaluate calc at given JDs."""
     ephem.set_calc_mode("skyfield")
     results = np.zeros((len(jds_array), 3))
     for i, jd in enumerate(jds_array):
-        ref, _ = ephem.swe_calc(float(jd), BODY_ID, SEFLG_SPEED)
+        ref, _ = ephem.calc(float(jd), BODY_ID, FLG_SPEED)
         results[i] = [ref[0], ref[1], ref[2]]
     return results
 
@@ -102,10 +102,10 @@ def main():
     # Method A: Generator pipeline (vectorized)
     pipeline_vals = eval_pipeline_at_jds(node_jds)
 
-    # Method B: swe_calc (scalar, reference)
+    # Method B: calc (scalar, reference)
     swe_vals = eval_swe_calc_at_jds(node_jds)
 
-    print("\nNode-by-node comparison (pipeline vs swe_calc):")
+    print("\nNode-by-node comparison (pipeline vs calc):")
     for i in range(DEGREE + 1):
         lon_err = ang_diff(pipeline_vals[i, 0], swe_vals[i, 0]) * 3600
         lat_err = abs(pipeline_vals[i, 1] - swe_vals[i, 1]) * 3600
@@ -122,7 +122,7 @@ def main():
     for c in range(3):
         coeffs_pipe[c] = chebfit(nodes_01, pipe_fit[:, c], DEGREE)
 
-    # Fit Chebyshev to swe_calc values
+    # Fit Chebyshev to calc values
     swe_fit = swe_vals.copy()
     swe_fit[:, 0] = np.degrees(np.unwrap(np.radians(swe_fit[:, 0])))
     coeffs_swe = np.zeros((3, DEGREE + 1))
@@ -145,8 +145,8 @@ def main():
         jd_test = seg_start + frac * (seg_end - seg_start)
         tau = (jd_test - mid) / half
 
-        # Reference: swe_calc at this point
-        ref, _ = ephem.swe_calc(float(jd_test), BODY_ID, SEFLG_SPEED)
+        # Reference: calc at this point
+        ref, _ = ephem.calc(float(jd_test), BODY_ID, FLG_SPEED)
 
         # Pipeline reference at this point
         pipe_ref = eval_pipeline_at_jds([jd_test])[0]
@@ -173,8 +173,8 @@ def main():
 
     print("\nMax errors:")
     print(f'  Pipeline fit vs pipeline ref:  {max_pipe_err:.6f}"')
-    print(f'  swe_calc fit vs swe_calc ref:  {max_swe_err:.6f}"')
-    print(f'  Pipeline fit vs swe_calc ref:  {max_cross_err:.6f}"')
+    print(f'  calc fit vs calc ref:  {max_swe_err:.6f}"')
+    print(f'  Pipeline fit vs calc ref:  {max_cross_err:.6f}"')
 
     # Also test: what does the LEB file give?
     from libephemeris.leb_reader import LEBReader
@@ -184,10 +184,10 @@ def main():
         dt = reader.delta_t(TARGET_JD)
         jd_tt = TARGET_JD + dt
         (leb_lon, leb_lat, leb_dist), _ = reader.eval_body(BODY_ID, jd_tt)
-        ref, _ = ephem.swe_calc(float(jd_tt), BODY_ID, SEFLG_SPEED)
+        ref, _ = ephem.calc(float(jd_tt), BODY_ID, FLG_SPEED)
         print(f"\nLEB file read at JD_TT={jd_tt:.12f}:")
         print(
-            f"  LEB lon: {leb_lon:.10f}°  swe_calc lon: {ref[0]:.10f}°  "
+            f"  LEB lon: {leb_lon:.10f}°  calc lon: {ref[0]:.10f}°  "
             f'error: {ang_diff(leb_lon, ref[0]) * 3600:.6f}"'
         )
         reader.close()

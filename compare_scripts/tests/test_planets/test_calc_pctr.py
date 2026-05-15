@@ -1,5 +1,5 @@
 """
-Tests for planet-centric position calculations (swe_calc_pctr / calc_pctr).
+Tests for planet-centric position calculations (calc_pctr / calc_pctr).
 
 Tests cover:
 - Basic planet-centric position calculations
@@ -21,7 +21,7 @@ class TestCalcPctrBasicPositions:
     def test_moon_from_mars_j2000(self):
         """Moon position as seen from Mars at J2000 epoch."""
         jd = 2451545.0  # J2000
-        pos, flags = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos, flags = ephem.calc_pctr(jd, MOON, MARS, 0)
 
         # Longitude should be in valid range
         assert 0 <= pos[0] < 360, f"Moon longitude {pos[0]} out of range"
@@ -34,7 +34,7 @@ class TestCalcPctrBasicPositions:
     def test_sun_from_jupiter_j2000(self):
         """Sun position as seen from Jupiter at J2000 epoch."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+        pos, flags = ephem.calc_pctr(jd, SUN, JUPITER, 0)
 
         # Longitude should be in valid range
         assert 0 <= pos[0] < 360
@@ -47,7 +47,7 @@ class TestCalcPctrBasicPositions:
     def test_venus_from_mercury(self):
         """Venus position as seen from Mercury."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_pctr(jd, SE_VENUS, SE_MERCURY, 0)
+        pos, flags = ephem.calc_pctr(jd, VENUS, MERCURY, 0)
 
         # Both inner planets, distance should be < 2 AU
         assert 0 <= pos[0] < 360
@@ -57,17 +57,17 @@ class TestCalcPctrBasicPositions:
     @pytest.mark.parametrize(
         "target_id,target_name,center_id,center_name",
         [
-            (SE_SUN, "Sun", SE_MARS, "Mars"),
-            (SE_MOON, "Moon", SE_SATURN, "Saturn"),
-            (SE_EARTH, "Earth", SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter", SE_SATURN, "Saturn"),
-            (SE_MERCURY, "Mercury", SE_VENUS, "Venus"),
+            (SUN, "Sun", MARS, "Mars"),
+            (MOON, "Moon", SATURN, "Saturn"),
+            (EARTH, "Earth", MARS, "Mars"),
+            (JUPITER, "Jupiter", SATURN, "Saturn"),
+            (MERCURY, "Mercury", VENUS, "Venus"),
         ],
     )
     def test_various_planet_pairs(self, target_id, target_name, center_id, center_name):
         """Various planet pairs should return valid positions."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_pctr(jd, target_id, center_id, 0)
+        pos, flags = ephem.calc_pctr(jd, target_id, center_id, 0)
 
         # Longitude in valid range
         assert 0 <= pos[0] < 360, (
@@ -89,27 +89,27 @@ class TestCalcPctrReturnStructure:
     @pytest.mark.unit
     def test_return_is_tuple(self):
         """calc_pctr should return a tuple."""
-        result = ephem.swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, 0)
+        result = ephem.calc_pctr(2451545.0, MOON, MARS, 0)
         assert isinstance(result, tuple)
         assert len(result) == 2
 
     @pytest.mark.unit
     def test_position_is_6_element_tuple(self):
         """Position should be a 6-element tuple."""
-        pos, flags = ephem.swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos, flags = ephem.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         assert len(pos) == 6
 
     @pytest.mark.unit
     def test_position_elements_are_floats(self):
         """All position elements should be floats."""
-        pos, flags = ephem.swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos, flags = ephem.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         for i, val in enumerate(pos):
             assert isinstance(val, float), f"Element {i} is {type(val)}, expected float"
 
     @pytest.mark.unit
     def test_flags_is_int(self):
         """Return flags should be an integer."""
-        pos, flags = ephem.swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, 0)
+        pos, flags = ephem.calc_pctr(2451545.0, MOON, MARS, 0)
         assert isinstance(flags, int)
 
 
@@ -118,17 +118,17 @@ class TestCalcPctrFlags:
 
     @pytest.mark.unit
     def test_flag_speed(self):
-        """SEFLG_SPEED should return velocity values."""
-        pos, flags = ephem.swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+        """FLG_SPEED should return velocity values."""
+        pos, flags = ephem.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         # Velocity should be non-zero (Moon and Mars are both moving)
         assert pos[3] != 0, "Longitude velocity should be non-zero"
 
     @pytest.mark.unit
     def test_flag_equatorial(self):
-        """SEFLG_EQUATORIAL should return RA/Dec."""
-        pos_ecl, _ = ephem.swe_calc_pctr(2451545.0, SE_SUN, SE_JUPITER, 0)
-        pos_equ, _ = ephem.swe_calc_pctr(
-            2451545.0, SE_SUN, SE_JUPITER, SEFLG_EQUATORIAL
+        """FLG_EQUATORIAL should return RA/Dec."""
+        pos_ecl, _ = ephem.calc_pctr(2451545.0, SUN, JUPITER, 0)
+        pos_equ, _ = ephem.calc_pctr(
+            2451545.0, SUN, JUPITER, FLG_EQUATORIAL
         )
 
         # Should be in valid RA range
@@ -136,11 +136,11 @@ class TestCalcPctrFlags:
 
     @pytest.mark.unit
     def test_flag_sidereal(self):
-        """SEFLG_SIDEREAL should apply ayanamsha correction."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        """FLG_SIDEREAL should apply ayanamsha correction."""
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        pos_trop, _ = ephem.swe_calc_pctr(2451545.0, SE_SUN, SE_MARS, 0)
-        pos_sid, _ = ephem.swe_calc_pctr(2451545.0, SE_SUN, SE_MARS, SEFLG_SIDEREAL)
+        pos_trop, _ = ephem.calc_pctr(2451545.0, SUN, MARS, 0)
+        pos_sid, _ = ephem.calc_pctr(2451545.0, SUN, MARS, FLG_SIDEREAL)
 
         # Difference should equal ayanamsha (~23-24 degrees for Lahiri)
         diff = pos_trop[0] - pos_sid[0]
@@ -158,8 +158,8 @@ class TestCalcPctrVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.01  # degrees (10 arcsec tolerance for different ephemeris)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
-        pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, 0)
+        pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, 0)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
         if lon_diff > 180:
@@ -175,9 +175,9 @@ class TestCalcPctrVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.01
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, JUPITER, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, JUPITER, 0)
         except Exception:
             # pyswisseph may require external ephemeris files for this calculation
             pytest.skip("pyswisseph ephemeris files not available for comparison")
@@ -194,13 +194,13 @@ class TestCalcPctrVsPyswisseph:
     @pytest.mark.parametrize(
         "target_id,target_name,center_id,center_name",
         [
-            (SE_MOON, "Moon", SE_MARS, "Mars"),
-            (SE_MERCURY, "Mercury", SE_VENUS, "Venus"),
-            (SE_VENUS, "Venus", SE_EARTH, "Earth"),
-            (SE_EARTH, "Earth", SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter", SE_SATURN, "Saturn"),
-            (SE_SATURN, "Saturn", SE_JUPITER, "Jupiter"),
-            (SE_URANUS, "Uranus", SE_NEPTUNE, "Neptune"),
+            (MOON, "Moon", MARS, "Mars"),
+            (MERCURY, "Mercury", VENUS, "Venus"),
+            (VENUS, "Venus", EARTH, "Earth"),
+            (EARTH, "Earth", MARS, "Mars"),
+            (JUPITER, "Jupiter", SATURN, "Saturn"),
+            (SATURN, "Saturn", JUPITER, "Jupiter"),
+            (URANUS, "Uranus", NEPTUNE, "Neptune"),
         ],
     )
     def test_planet_pairs_match_swisseph(
@@ -210,7 +210,7 @@ class TestCalcPctrVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.01  # degrees
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, 0)
         try:
             pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, 0)
         except Exception:
@@ -240,8 +240,8 @@ class TestCalcPctrVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.1  # degrees/day tolerance for velocity
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
-        pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, FLG_SPEED)
+        pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, FLG_SPEED)
 
         # Velocity should be reasonably close
         vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -259,9 +259,9 @@ class TestCalcPctrGeometricConsistency:
         jd = 2451545.0
 
         # Earth as seen from Mars
-        pos_earth_from_mars, _ = ephem.swe_calc_pctr(jd, SE_EARTH, SE_MARS, 0)
+        pos_earth_from_mars, _ = ephem.calc_pctr(jd, EARTH, MARS, 0)
         # Mars as seen from Earth (geocentric)
-        pos_mars_from_earth, _ = ephem.swe_calc_ut(jd, SE_MARS, 0)
+        pos_mars_from_earth, _ = ephem.calc_ut(jd, MARS, 0)
 
         # The longitudes should differ by roughly 180 degrees
         # (not exactly due to different reference frames)
@@ -279,7 +279,7 @@ class TestCalcPctrGeometricConsistency:
         """Observing a body from itself should give distance ~0."""
         jd = 2451545.0
 
-        pos, _ = ephem.swe_calc_pctr(jd, SE_MARS, SE_MARS, 0)
+        pos, _ = ephem.calc_pctr(jd, MARS, MARS, 0)
 
         # Distance should be essentially zero
         assert pos[2] < 0.0001, f"Self-observation distance {pos[2]} should be ~0"
@@ -295,11 +295,11 @@ class TestCalcPctrAlias:
 
     @pytest.mark.unit
     def test_calc_pctr_alias_works(self):
-        """calc_pctr alias should return same results as swe_calc_pctr."""
+        """calc_pctr alias should return same results as calc_pctr."""
         jd = 2451545.0
 
-        pos1, flags1 = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
-        pos2, flags2 = ephem.calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos1, flags1 = ephem.calc_pctr(jd, MOON, MARS, 0)
+        pos2, flags2 = ephem.calc_pctr(jd, MOON, MARS, 0)
 
         assert pos1[0] == pos2[0]
         assert pos1[1] == pos2[1]

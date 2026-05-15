@@ -14,10 +14,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
 
 # Test crossing functions in tropical mode (sidereal crossing not directly supported
 # by SE's crossing API, so we test tropical crossings and verify positions at those times)
@@ -52,10 +52,10 @@ for cross_type, target_lon, jd_start in test_cases:
     try:
         if cross_type == "solcross":
             se_jd = swe.solcross_ut(target_lon, jd_start, 0)
-            le_jd = ephem.swe_solcross_ut(target_lon, jd_start, 0)
+            le_jd = ephem.solcross_ut(target_lon, jd_start, 0)
         else:
             se_jd = swe.mooncross_ut(target_lon, jd_start, 0)
-            le_jd = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+            le_jd = ephem.mooncross_ut(target_lon, jd_start, 0)
 
         total += 1
         diff_sec = abs(le_jd - se_jd) * 86400.0

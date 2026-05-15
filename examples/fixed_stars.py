@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import libephemeris as eph
 from libephemeris.constants import (
-    SE_SUN,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    SUN,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -75,7 +75,7 @@ def example_star_positions() -> None:
     print("Example 1: Fixed Star Positions")
     print("=" * 70)
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
     print(f"\nFixed star positions at JD {jd} (January 1, 2024):\n")
     print(f"{'Star':<14}{'Longitude':>18}{'Latitude':>12}{'Mag':>6}")
@@ -84,10 +84,10 @@ def example_star_positions() -> None:
     for star_name, description in NOTABLE_STARS[:10]:
         try:
             # Get star position
-            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            pos, _, retflag = eph.fixstar_ut(star_name, jd, FLG_SWIEPH)
 
             # Get magnitude (returns tuple of (magnitude, star_name))
-            mag, _ = eph.swe_fixstar_mag(star_name)
+            mag, _ = eph.fixstar_mag(star_name)
 
             formatted = format_zodiac(pos[0])
             print(f"{star_name:<14}{formatted:>18}{pos[1]:>11.4f}°{mag:>6.2f}")
@@ -101,16 +101,16 @@ def example_star_lookup() -> None:
     print("Example 2: Star Lookup by Name")
     print("=" * 70)
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
-    print("\nLooking up stars with partial names (swe_fixstar2_ut):\n")
+    print("\nLooking up stars with partial names (fixstar2_ut):\n")
 
     # Partial names to search
     search_terms = ["Reg", "Spic", "Sir", "Alp"]
 
     for term in search_terms:
         try:
-            pos, full_name, retflag = eph.swe_fixstar2_ut(term, jd, SEFLG_SWIEPH)
+            pos, full_name, retflag = eph.fixstar2_ut(term, jd, FLG_SWIEPH)
 
             print(f"  Search '{term}' -> {full_name}")
             print(f"    Position: {format_zodiac(pos[0])}")
@@ -144,7 +144,7 @@ def example_star_magnitude() -> None:
     star_mags = []
     for star_name in bright_stars:
         try:
-            mag, _resolved_name = eph.swe_fixstar_mag(star_name)
+            mag, _resolved_name = eph.fixstar_mag(star_name)
             star_mags.append((star_name, mag))
         except Exception:
             pass
@@ -189,9 +189,9 @@ def example_proper_motion() -> None:
 
         positions = []
         for year in years:
-            jd = eph.swe_julday(year, 1, 1, 0.0)
+            jd = eph.julday(year, 1, 1, 0.0)
             try:
-                pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+                pos, _, retflag = eph.fixstar_ut(star_name, jd, FLG_SWIEPH)
                 positions.append((year, pos[0], pos[1]))
                 print(f"  {year}: {pos[0]:>10.6f}° lon, {pos[1]:>10.6f}° lat")
             except Exception:
@@ -219,10 +219,10 @@ def example_conjunction_with_planet() -> None:
     print("Example 5: Stars Near Planetary Position")
     print("=" * 70)
 
-    jd = eph.swe_julday(2024, 8, 15, 0.0)
+    jd = eph.julday(2024, 8, 15, 0.0)
 
     # Get Sun's position
-    sun_pos, _ = eph.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+    sun_pos, _ = eph.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SPEED)
     sun_lon = sun_pos[0]
 
     print(f"\nSun position on Aug 15, 2024: {format_zodiac(sun_lon)}")
@@ -232,7 +232,7 @@ def example_conjunction_with_planet() -> None:
 
     for star_name, description in NOTABLE_STARS:
         try:
-            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            pos, _, retflag = eph.fixstar_ut(star_name, jd, FLG_SWIEPH)
             # Calculate angular separation
             diff = abs(pos[0] - sun_lon)
             if diff > 180:
@@ -274,14 +274,14 @@ def example_royal_stars() -> None:
         ("Fomalhaut", "Watcher of the South", "Archangel Gabriel"),
     ]
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
     print(f"{'Star':<12}{'Guardian':<22}{'Archangel':<18}{'Position':>18}")
     print("-" * 72)
 
     for star_name, title, archangel in royal_stars:
         try:
-            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            pos, _, retflag = eph.fixstar_ut(star_name, jd, FLG_SWIEPH)
             formatted = format_zodiac(pos[0])
             print(f"{star_name:<12}{title:<22}{archangel:<18}{formatted:>18}")
         except Exception as e:
@@ -316,14 +316,14 @@ def example_behenian_stars() -> None:
         ("Deneb", "Venus/Mercury"),
     ]
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
     print(f"{'Star':<12}{'Planets':<16}{'Position':>22}")
     print("-" * 52)
 
     for star_name, planets in behenian_stars:
         try:
-            pos, _, retflag = eph.swe_fixstar_ut(star_name, jd, SEFLG_SWIEPH)
+            pos, _, retflag = eph.fixstar_ut(star_name, jd, FLG_SWIEPH)
             formatted = format_zodiac(pos[0])
             print(f"{star_name:<12}{planets:<16}{formatted:>22}")
         except Exception:

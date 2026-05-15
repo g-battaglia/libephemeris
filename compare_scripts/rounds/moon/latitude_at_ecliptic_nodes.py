@@ -21,18 +21,18 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Moon": (ephem.SE_MOON, swe.MOON),
-    "Mercury": (ephem.SE_MERCURY, swe.MERCURY),
-    "Venus": (ephem.SE_VENUS, swe.VENUS),
-    "Mars": (ephem.SE_MARS, swe.MARS),
-    "Jupiter": (ephem.SE_JUPITER, swe.JUPITER),
-    "Saturn": (ephem.SE_SATURN, swe.SATURN),
+    "Moon": (ephem.MOON, swe.MOON),
+    "Mercury": (ephem.MERCURY, swe.MERCURY),
+    "Venus": (ephem.VENUS, swe.VENUS),
+    "Mars": (ephem.MARS, swe.MARS),
+    "Jupiter": (ephem.JUPITER, swe.JUPITER),
+    "Saturn": (ephem.SATURN, swe.SATURN),
 }
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Test dates spanning 2000-2025
 BASE_JD = 2451545.0  # J2000.0
@@ -93,7 +93,7 @@ def compare_at_jd(body_name, le_body, se_body, jd, flags_le, flags_se, label):
     global passed, failed, total
 
     try:
-        le_result = ephem.swe_calc_ut(jd, le_body, flags_le)
+        le_result = ephem.calc_ut(jd, le_body, flags_le)
         le_lon, le_lat, le_dist = le_result[0][0], le_result[0][1], le_result[0][2]
         le_lon_spd, le_lat_spd = le_result[0][3], le_result[0][4]
     except Exception as e:
@@ -206,9 +206,9 @@ def test_at_node_crossings():
                     f"{body_name} crossing#{i + 1}+{offset:+.1f}d",
                 )
 
-        # Also test with SEFLG_J2000
+        # Also test with FLG_J2000
         print(f"  Testing J2000 frame at node crossings...")
-        flags_le_j2k = FLAGS | ephem.SEFLG_J2000
+        flags_le_j2k = FLAGS | ephem.FLG_J2000
         flags_se_j2k = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000
         for i, jd_cross in enumerate(crossings[:4]):
             compare_at_jd(
@@ -221,9 +221,9 @@ def test_at_node_crossings():
                 f"{body_name} J2000 crossing#{i + 1}",
             )
 
-        # Test with SEFLG_NONUT
+        # Test with FLG_NONUT
         print(f"  Testing NONUT at node crossings...")
-        flags_le_nn = FLAGS | ephem.SEFLG_NONUT
+        flags_le_nn = FLAGS | ephem.FLG_NONUT
         flags_se_nn = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT
         for i, jd_cross in enumerate(crossings[:4]):
             compare_at_jd(
@@ -252,12 +252,12 @@ def test_equatorial_at_nodes():
             body_name, le_body, se_body, jd_start, jd_end, step
         )
 
-        flags_le = FLAGS | ephem.SEFLG_EQUATORIAL
+        flags_le = FLAGS | ephem.FLG_EQUATORIAL
         flags_se = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL
 
         for i, jd_cross in enumerate(crossings[:4]):
             try:
-                le_result = ephem.swe_calc_ut(jd_cross, le_body, flags_le)
+                le_result = ephem.calc_ut(jd_cross, le_body, flags_le)
                 se_result = swe.calc_ut(jd_cross, se_body, flags_se)
 
                 # RA comparison

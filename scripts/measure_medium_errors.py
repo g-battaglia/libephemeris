@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import libephemeris as ephem
-from libephemeris.time_utils import swe_julday
+from libephemeris.time_utils import julday
 
 import argparse
 
@@ -26,14 +26,14 @@ LEB_PATH = os.path.join(
 LEB_PATH = os.path.abspath(LEB_PATH)
 
 # Constants
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_J2000 = 32
-SEFLG_HELCTR = 8
-SEFLG_BARYCTR = 16384
-SEFLG_TRUEPOS = 16
-SEFLG_NOABERR = 1024
-SEFLG_SIDEREAL = 64 * 1024
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_J2000 = 32
+FLG_HELCTR = 8
+FLG_BARYCTR = 16384
+FLG_TRUEPOS = 16
+FLG_NOABERR = 1024
+FLG_SIDEREAL = 64 * 1024
 
 MAIN_PLANETS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 14]
 ECLIPTIC_BODIES = [10, 11, 12, 13, 21, 22]
@@ -91,24 +91,24 @@ def generate_dates(
     return [s + i * step for i in range(n)]
 
 
-def skyfield_calc(body: int, jd: float, flags: int = SEFLG_SPEED):
+def skyfield_calc(body: int, jd: float, flags: int = FLG_SPEED):
     ephem.state._LEB_FILE = None
     ephem.state._LEB_READER = None
     ephem.set_precision_tier(TIER)
     ephem.set_calc_mode("skyfield")
     try:
-        result, _ = ephem.swe_calc(jd, body, flags)
+        result, _ = ephem.calc(jd, body, flags)
         return result
     finally:
         ephem.set_calc_mode(None)
 
 
-def leb_calc(body: int, jd: float, flags: int = SEFLG_SPEED):
+def leb_calc(body: int, jd: float, flags: int = FLG_SPEED):
     ephem.state._LEB_FILE = LEB_PATH
     ephem.state._LEB_READER = None
     ephem.set_calc_mode("auto")
     try:
-        result, _ = ephem.swe_calc(jd, body, flags)
+        result, _ = ephem.calc(jd, body, flags)
         return result
     finally:
         ephem.state._LEB_FILE = None
@@ -123,11 +123,11 @@ _TIER_RANGES = {
     "extended": (-4990, 4990),  # de441: -13200 to +17191 (test subset)
 }
 _yr_start, _yr_end = _TIER_RANGES[TIER]
-JD_START = swe_julday(_yr_start, 1, 1, 0.0)
-JD_END = swe_julday(_yr_end, 1, 1, 0.0)
+JD_START = julday(_yr_start, 1, 1, 0.0)
+JD_END = julday(_yr_end, 1, 1, 0.0)
 # Asteroid SPK coverage
-AST_JD_START = swe_julday(1901, 1, 1, 0.0)
-AST_JD_END = swe_julday(2099, 1, 1, 0.0)
+AST_JD_START = julday(1901, 1, 1, 0.0)
+AST_JD_END = julday(2099, 1, 1, 0.0)
 
 N_SAMPLES = 100  # Fast but representative
 
@@ -222,7 +222,7 @@ def measure_speed(bodies, dates, label):
 
 def measure_flags(dates, label, extra_flags):
     """Measure position errors with non-default flags."""
-    flags = SEFLG_SPEED | extra_flags
+    flags = FLG_SPEED | extra_flags
     test_bodies = [0, 1, 4, 5]  # Sun, Moon, Mars, Jupiter
     max_err = 0.0
     max_body = ""
@@ -270,11 +270,11 @@ def measure_sidereal(dates):
     """Measure sidereal position errors (mode 0 = Fagan-Bradley)."""
     print("\n--- Sidereal (mode 0, Fagan-Bradley) ---")
     test_bodies = [0, 1, 4, 5]
-    flags = SEFLG_SPEED | SEFLG_SIDEREAL
+    flags = FLG_SPEED | FLG_SIDEREAL
     max_err = 0.0
     max_body = ""
 
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
     for bid in test_bodies:
         for jd in dates:
             try:
@@ -324,8 +324,8 @@ def main():
 
     # 7. Flag tests
     print("\n--- Flag tests ---")
-    eq_err = measure_flags(dates, "EQUATORIAL", SEFLG_EQUATORIAL)
-    j2k_err = measure_flags(dates, "J2000", SEFLG_J2000)
+    eq_err = measure_flags(dates, "EQUATORIAL", FLG_EQUATORIAL)
+    j2k_err = measure_flags(dates, "J2000", FLG_J2000)
 
     # 8. Sidereal
     sid_err = measure_sidereal(dates)

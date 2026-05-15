@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 102: Lilith Positions Deep — All Flags & Modes
 
-Tests Mean Lilith (SE_MEAN_APOG=12) and Osculating Lilith (SE_OSCU_APOG=13)
+Tests Mean Lilith (MEAN_APOG=12) and Osculating Lilith (OSCU_APOG=13)
 with various flag combinations: J2000, NONUT, EQUATORIAL, SIDEREAL, HELCTR.
 """
 
@@ -14,27 +14,27 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+FLG_SIDEREAL = 65536
 
-SE_MEAN_APOG = 12
-SE_OSCU_APOG = 13
+MEAN_APOG = 12
+OSCU_APOG = 13
 
 EPOCHS = [2415020.0 + i * 1826.25 for i in range(40)]  # 5-year steps, 200 years
 
 FLAG_COMBOS = [
-    (SEFLG_SWIEPH | SEFLG_SPEED, "default"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000, "J2000"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT, "NONUT"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL, "EQUATORIAL"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT, "J2000+NONUT"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000 | SEFLG_EQUATORIAL, "J2000+EQ"),
+    (FLG_SWIEPH | FLG_SPEED, "default"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_J2000, "J2000"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_NONUT, "NONUT"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL, "EQUATORIAL"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_J2000 | FLG_NONUT, "J2000+NONUT"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_J2000 | FLG_EQUATORIAL, "J2000+EQ"),
 ]
 
 LON_TOL = 1.5  # arcsec
@@ -53,8 +53,8 @@ def run_tests():
     print("=" * 80)
 
     for body_id, body_name in [
-        (SE_MEAN_APOG, "MeanLilith"),
-        (SE_OSCU_APOG, "OscuLilith"),
+        (MEAN_APOG, "MeanLilith"),
+        (OSCU_APOG, "OscuLilith"),
     ]:
         for flags, flag_name in FLAG_COMBOS:
             f_pass = 0
@@ -64,7 +64,7 @@ def run_tests():
                 total += 1
                 try:
                     se = swe.calc_ut(jd, body_id, flags)[0]
-                    le = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                    le = ephem.calc_ut(jd, body_id, flags)[0]
                 except Exception as e:
                     errors += 1
                     continue
@@ -95,16 +95,16 @@ def run_tests():
     print("\n  --- Sidereal Modes ---")
     for sid_mode, sid_name in [(1, "Lahiri"), (0, "Fagan")]:
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0.0, 0.0)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+        ephem.set_sid_mode(sid_mode, 0.0, 0.0)
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
         f_pass = 0
         f_fail = 0
 
         for jd in EPOCHS:
             total += 1
             try:
-                se = swe.calc_ut(jd, SE_MEAN_APOG, flags)[0]
-                le = ephem.swe_calc_ut(jd, SE_MEAN_APOG, flags)[0]
+                se = swe.calc_ut(jd, MEAN_APOG, flags)[0]
+                le = ephem.calc_ut(jd, MEAN_APOG, flags)[0]
             except Exception:
                 errors += 1
                 continue
@@ -126,7 +126,7 @@ def run_tests():
         )
 
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0.0, 0.0)
+    ephem.set_sid_mode(0, 0.0, 0.0)
 
     print()
     if fail_details:

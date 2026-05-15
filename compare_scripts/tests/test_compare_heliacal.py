@@ -139,7 +139,7 @@ class TestPlanetHeliacalRising:
 
         # LibEphemeris
         try:
-            result_py = pyephem.swe_heliacal_ut(
+            result_py = pyephem.heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -186,7 +186,7 @@ class TestPlanetHeliacalSetting:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
         try:
-            result_py = pyephem.swe_heliacal_ut(
+            result_py = pyephem.heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -233,7 +233,7 @@ class TestStarHeliacal:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
         try:
-            result_py = pyephem.swe_heliacal_ut(
+            result_py = pyephem.heliacal_ut(
                 jd_start,
                 geopos,
                 STANDARD_ATMO,
@@ -327,7 +327,7 @@ class TestHeliacalPheno:
             pytest.skip(f"SwissEphemeris failed: {e}")
 
         try:
-            ret_py, _ = pyephem.swe_heliacal_pheno_ut(
+            ret_py, _ = pyephem.heliacal_pheno_ut(
                 jd,
                 geopos,
                 STANDARD_ATMO,

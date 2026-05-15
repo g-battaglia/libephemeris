@@ -11,14 +11,14 @@ import sys
 import time
 import traceback
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 from libephemeris.state import get_topo, get_sid_mode
 
 import swisseph as swe_ref
 
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 random.seed(42)
 
@@ -381,8 +381,8 @@ except Exception as e:
 
 # Version still works after close
 lib.close()
-v = lib.swe_version()
-check(len(v) > 0, f"swe_version after close: '{v}'")
+v = lib.version()
+check(len(v) > 0, f"version after close: '{v}'")
 
 # get_library_path after close
 lib.close()
@@ -494,9 +494,9 @@ for i in range(15):
 # ── G14.04: Environment/version (50 checks) ───────────────────────────
 set_section("G14.04 environment/version")
 
-v = lib.swe_version()
-check(len(v) > 0, f"swe_version non-empty: '{v}'")
-check(isinstance(v, str), f"swe_version is str: {type(v).__name__}")
+v = lib.version()
+check(len(v) > 0, f"version non-empty: '{v}'")
+check(isinstance(v, str), f"version is str: {type(v).__name__}")
 
 p = lib.get_library_path()
 check(isinstance(p, str), f"get_library_path is str: {type(p).__name__}")
@@ -511,7 +511,7 @@ check("." in lib.__version__, "version contains dot separator")
 
 # Multiple version calls are consistent
 for _ in range(10):
-    check(lib.swe_version() == v, "swe_version consistent across calls")
+    check(lib.version() == v, "version consistent across calls")
 
 # Library path consistent
 for _ in range(10):
@@ -519,7 +519,7 @@ for _ in range(10):
 
 # Remaining padding
 for _ in range(20):
-    check(isinstance(lib.swe_version(), str), "swe_version always returns str")
+    check(isinstance(lib.version(), str), "version always returns str")
 
 
 # ========================================================================
@@ -530,38 +530,38 @@ for _ in range(20):
 set_section("G15.01 body constants")
 
 BODY_CONST_MAP = {
-    "SE_SUN": ("SUN", 0),
-    "SE_MOON": ("MOON", 1),
-    "SE_MERCURY": ("MERCURY", 2),
-    "SE_VENUS": ("VENUS", 3),
-    "SE_MARS": ("MARS", 4),
-    "SE_JUPITER": ("JUPITER", 5),
-    "SE_SATURN": ("SATURN", 6),
-    "SE_URANUS": ("URANUS", 7),
-    "SE_NEPTUNE": ("NEPTUNE", 8),
-    "SE_PLUTO": ("PLUTO", 9),
-    "SE_MEAN_NODE": ("MEAN_NODE", 10),
-    "SE_TRUE_NODE": ("TRUE_NODE", 11),
-    "SE_MEAN_APOG": ("MEAN_APOG", 12),
-    "SE_OSCU_APOG": ("OSCU_APOG", 13),
-    "SE_EARTH": ("EARTH", 14),
-    "SE_CHIRON": ("CHIRON", 15),
-    "SE_PHOLUS": ("PHOLUS", 16),
-    "SE_CERES": ("CERES", 17),
-    "SE_PALLAS": ("PALLAS", 18),
-    "SE_JUNO": ("JUNO", 19),
-    "SE_VESTA": ("VESTA", 20),
-    "SE_INTP_APOG": ("INTP_APOG", 21),
-    "SE_INTP_PERG": ("INTP_PERG", 22),
-    "SE_CUPIDO": ("CUPIDO", 40),
-    "SE_HADES": ("HADES", 41),
-    "SE_ZEUS": ("ZEUS", 42),
-    "SE_KRONOS": ("KRONOS", 43),
-    "SE_APOLLON": ("APOLLON", 44),
-    "SE_ADMETOS": ("ADMETOS", 45),
-    "SE_VULKANUS": ("VULKANUS", 46),
-    "SE_POSEIDON": ("POSEIDON", 47),
-    "SE_ISIS": ("ISIS", 48),
+    "SUN": ("SUN", 0),
+    "MOON": ("MOON", 1),
+    "MERCURY": ("MERCURY", 2),
+    "VENUS": ("VENUS", 3),
+    "MARS": ("MARS", 4),
+    "JUPITER": ("JUPITER", 5),
+    "SATURN": ("SATURN", 6),
+    "URANUS": ("URANUS", 7),
+    "NEPTUNE": ("NEPTUNE", 8),
+    "PLUTO": ("PLUTO", 9),
+    "MEAN_NODE": ("MEAN_NODE", 10),
+    "TRUE_NODE": ("TRUE_NODE", 11),
+    "MEAN_APOG": ("MEAN_APOG", 12),
+    "OSCU_APOG": ("OSCU_APOG", 13),
+    "EARTH": ("EARTH", 14),
+    "CHIRON": ("CHIRON", 15),
+    "PHOLUS": ("PHOLUS", 16),
+    "CERES": ("CERES", 17),
+    "PALLAS": ("PALLAS", 18),
+    "JUNO": ("JUNO", 19),
+    "VESTA": ("VESTA", 20),
+    "INTP_APOG": ("INTP_APOG", 21),
+    "INTP_PERG": ("INTP_PERG", 22),
+    "CUPIDO": ("CUPIDO", 40),
+    "HADES": ("HADES", 41),
+    "ZEUS": ("ZEUS", 42),
+    "KRONOS": ("KRONOS", 43),
+    "APOLLON": ("APOLLON", 44),
+    "ADMETOS": ("ADMETOS", 45),
+    "VULKANUS": ("VULKANUS", 46),
+    "POSEIDON": ("POSEIDON", 47),
+    "ISIS": ("ISIS", 48),
 }
 
 for lib_name, (swe_name, expected_val) in BODY_CONST_MAP.items():
@@ -584,24 +584,24 @@ for lib_name, (swe_name, expected_val) in BODY_CONST_MAP.items():
 set_section("G15.02 flag constants")
 
 FLAG_CONST_MAP = {
-    "SEFLG_JPLEPH": ("FLG_JPLEPH", 1),
-    "SEFLG_SWIEPH": ("FLG_SWIEPH", 2),
-    "SEFLG_MOSEPH": ("FLG_MOSEPH", 4),
-    "SEFLG_HELCTR": ("FLG_HELCTR", 8),
-    "SEFLG_TRUEPOS": ("FLG_TRUEPOS", 16),
-    "SEFLG_J2000": ("FLG_J2000", 32),
-    "SEFLG_NONUT": ("FLG_NONUT", 64),
-    "SEFLG_SPEED3": ("FLG_SPEED3", 128),
-    "SEFLG_SPEED": ("FLG_SPEED", 256),
-    "SEFLG_NOGDEFL": ("FLG_NOGDEFL", 512),
-    "SEFLG_NOABERR": ("FLG_NOABERR", 1024),
-    "SEFLG_EQUATORIAL": ("FLG_EQUATORIAL", 2048),
-    "SEFLG_XYZ": ("FLG_XYZ", 4096),
-    "SEFLG_RADIANS": ("FLG_RADIANS", 8192),
-    "SEFLG_BARYCTR": ("FLG_BARYCTR", 16384),
-    "SEFLG_TOPOCTR": ("FLG_TOPOCTR", 32768),
-    "SEFLG_SIDEREAL": ("FLG_SIDEREAL", 65536),
-    "SEFLG_ICRS": ("FLG_ICRS", 131072),
+    "FLG_JPLEPH": ("FLG_JPLEPH", 1),
+    "FLG_SWIEPH": ("FLG_SWIEPH", 2),
+    "FLG_MOSEPH": ("FLG_MOSEPH", 4),
+    "FLG_HELCTR": ("FLG_HELCTR", 8),
+    "FLG_TRUEPOS": ("FLG_TRUEPOS", 16),
+    "FLG_J2000": ("FLG_J2000", 32),
+    "FLG_NONUT": ("FLG_NONUT", 64),
+    "FLG_SPEED3": ("FLG_SPEED3", 128),
+    "FLG_SPEED": ("FLG_SPEED", 256),
+    "FLG_NOGDEFL": ("FLG_NOGDEFL", 512),
+    "FLG_NOABERR": ("FLG_NOABERR", 1024),
+    "FLG_EQUATORIAL": ("FLG_EQUATORIAL", 2048),
+    "FLG_XYZ": ("FLG_XYZ", 4096),
+    "FLG_RADIANS": ("FLG_RADIANS", 8192),
+    "FLG_BARYCTR": ("FLG_BARYCTR", 16384),
+    "FLG_TOPOCTR": ("FLG_TOPOCTR", 32768),
+    "FLG_SIDEREAL": ("FLG_SIDEREAL", 65536),
+    "FLG_ICRS": ("FLG_ICRS", 131072),
 }
 
 for lib_name, (swe_name, expected_val) in FLAG_CONST_MAP.items():
@@ -623,105 +623,105 @@ set_section("G15.03 function aliases")
 # swe_ prefix aliases: the swe_ version and the bare version should be the
 # same object (identity) or produce the same result.
 ALIAS_PAIRS = [
-    ("swe_calc_ut", "calc_ut"),
-    ("swe_calc", "calc"),
-    ("swe_calc_pctr", "calc_pctr"),
-    ("swe_nod_aps", "nod_aps"),
-    ("swe_nod_aps_ut", "nod_aps_ut"),
-    ("swe_get_orbital_elements", "get_orbital_elements"),
-    ("swe_get_orbital_elements_ut", "get_orbital_elements_ut"),
-    ("swe_orbit_max_min_true_distance", "orbit_max_min_true_distance"),
-    ("swe_pheno", "pheno"),
-    ("swe_pheno_ut", "pheno_ut"),
-    ("swe_houses", "houses"),
-    ("swe_houses_armc", "houses_armc"),
-    ("swe_houses_armc_ex2", "houses_armc_ex2"),
-    ("swe_houses_ex", "houses_ex"),
-    ("swe_houses_ex2", "houses_ex2"),
-    ("swe_house_name", "house_name"),
-    # NOTE: swe_house_pos and house_pos are different wrappers (not identity)
-    ("swe_set_sid_mode", "set_sid_mode"),
-    ("swe_get_ayanamsa_ut", "get_ayanamsa_ut"),
-    ("swe_get_ayanamsa", "get_ayanamsa"),
-    ("swe_get_ayanamsa_ex", "get_ayanamsa_ex"),
-    ("swe_get_ayanamsa_ex_ut", "get_ayanamsa_ex_ut"),
-    ("swe_get_ayanamsa_name", "get_ayanamsa_name"),
-    ("swe_set_topo", "set_topo"),
-    ("swe_set_ephe_path", "set_ephe_path"),
-    ("swe_set_ephemeris_file", "set_ephemeris_file"),
-    ("swe_set_jpl_file", "set_jpl_file"),
-    ("swe_set_tid_acc", "set_tid_acc"),
-    ("swe_get_tid_acc", "get_tid_acc"),
-    ("swe_set_delta_t_userdef", "set_delta_t_userdef"),
-    ("swe_get_delta_t_userdef", "get_delta_t_userdef"),
-    ("swe_set_lapse_rate", "set_lapse_rate"),
-    ("swe_get_lapse_rate", "get_lapse_rate"),
-    ("swe_get_library_path", "get_library_path"),
-    ("swe_get_current_file_data", "get_current_file_data"),
-    ("swe_close", "close"),
-    ("swe_julday", "julday"),
-    ("swe_revjul", "revjul"),
-    ("swe_deltat", "deltat"),
-    ("swe_deltat_ex", "deltat_ex"),
-    ("swe_day_of_week", "day_of_week"),
-    ("swe_utc_to_jd", "utc_to_jd"),
-    ("swe_jdet_to_utc", "jdet_to_utc"),
-    ("swe_jdut1_to_utc", "jdut1_to_utc"),
-    ("swe_utc_time_zone", "utc_time_zone"),
-    ("swe_time_equ", "time_equ"),
-    ("swe_lat_to_lmt", "lat_to_lmt"),
-    ("swe_lmt_to_lat", "lmt_to_lat"),
-    ("swe_sidtime", "sidtime"),
-    ("swe_sidtime0", "sidtime0"),
-    ("swe_fixstar_ut", "fixstar_ut"),
-    ("swe_fixstar", "fixstar"),
-    ("swe_fixstar2", "fixstar2"),
-    ("swe_fixstar2_ut", "fixstar2_ut"),
-    ("swe_fixstar_mag", "fixstar_mag"),
-    ("swe_fixstar2_mag", "fixstar2_mag"),
-    ("swe_solcross_ut", "solcross_ut"),
-    ("swe_solcross", "solcross"),
-    ("swe_mooncross_ut", "mooncross_ut"),
-    ("swe_mooncross", "mooncross"),
-    ("swe_mooncross_node_ut", "mooncross_node_ut"),
-    ("swe_mooncross_node", "mooncross_node"),
-    ("swe_helio_cross_ut", "helio_cross_ut"),
-    ("swe_helio_cross", "helio_cross"),
-    ("swe_find_station_ut", "find_station_ut"),
-    ("swe_next_retrograde_ut", "next_retrograde_ut"),
-    ("swe_cotrans", "cotrans"),
-    ("swe_cotrans_sp", "cotrans_sp"),
-    ("swe_azalt", "azalt"),
-    ("swe_azalt_rev", "azalt_rev"),
-    ("swe_refrac", "refrac"),
-    ("swe_refrac_extended", "refrac_extended"),
-    ("swe_split_deg", "split_deg"),
-    ("swe_degnorm", "degnorm"),
-    ("swe_radnorm", "radnorm"),
-    ("swe_difdeg2n", "difdeg2n"),
-    ("swe_difdegn", "difdegn"),
-    ("swe_difrad2n", "difrad2n"),
-    ("swe_difcs2n", "difcs2n"),
-    ("swe_difcsn", "difcsn"),
-    ("swe_csnorm", "csnorm"),
-    ("swe_csroundsec", "csroundsec"),
-    ("swe_cs2degstr", "cs2degstr"),
-    ("swe_cs2lonlatstr", "cs2lonlatstr"),
-    ("swe_cs2timestr", "cs2timestr"),
-    ("swe_d2l", "d2l"),
-    ("swe_deg_midp", "deg_midp"),
-    ("swe_rad_midp", "rad_midp"),
-    ("swe_get_planet_name", "get_planet_name"),
-    ("swe_gauquelin_sector", "gauquelin_sector"),
-    ("swe_sol_eclipse_when_glob", "sol_eclipse_when_glob"),
-    ("swe_sol_eclipse_when_loc", "sol_eclipse_when_loc"),
-    ("swe_sol_eclipse_where", "sol_eclipse_where"),
-    ("swe_sol_eclipse_how", "sol_eclipse_how"),
-    ("swe_lun_eclipse_when", "lun_eclipse_when"),
-    ("swe_lun_eclipse_when_loc", "lun_eclipse_when_loc"),
-    ("swe_lun_eclipse_how", "lun_eclipse_how"),
-    ("swe_heliacal_ut", "heliacal_ut"),
-    ("swe_heliacal_pheno_ut", "heliacal_pheno_ut"),
+    ("calc_ut", "calc_ut"),
+    ("calc", "calc"),
+    ("calc_pctr", "calc_pctr"),
+    ("nod_aps", "nod_aps"),
+    ("nod_aps_ut", "nod_aps_ut"),
+    ("get_orbital_elements", "get_orbital_elements"),
+    ("get_orbital_elements_ut", "get_orbital_elements_ut"),
+    ("orbit_max_min_true_distance", "orbit_max_min_true_distance"),
+    ("pheno", "pheno"),
+    ("pheno_ut", "pheno_ut"),
+    ("houses", "houses"),
+    ("houses_armc", "houses_armc"),
+    ("houses_armc_ex2", "houses_armc_ex2"),
+    ("houses_ex", "houses_ex"),
+    ("houses_ex2", "houses_ex2"),
+    ("house_name", "house_name"),
+    # NOTE: house_pos and house_pos are different wrappers (not identity)
+    ("set_sid_mode", "set_sid_mode"),
+    ("get_ayanamsa_ut", "get_ayanamsa_ut"),
+    ("get_ayanamsa", "get_ayanamsa"),
+    ("get_ayanamsa_ex", "get_ayanamsa_ex"),
+    ("get_ayanamsa_ex_ut", "get_ayanamsa_ex_ut"),
+    ("get_ayanamsa_name", "get_ayanamsa_name"),
+    ("set_topo", "set_topo"),
+    ("set_ephe_path", "set_ephe_path"),
+    ("set_ephemeris_file", "set_ephemeris_file"),
+    ("set_jpl_file", "set_jpl_file"),
+    ("set_tid_acc", "set_tid_acc"),
+    ("get_tid_acc", "get_tid_acc"),
+    ("set_delta_t_userdef", "set_delta_t_userdef"),
+    ("get_delta_t_userdef", "get_delta_t_userdef"),
+    ("set_lapse_rate", "set_lapse_rate"),
+    ("get_lapse_rate", "get_lapse_rate"),
+    ("get_library_path", "get_library_path"),
+    ("get_current_file_data", "get_current_file_data"),
+    ("close", "close"),
+    ("julday", "julday"),
+    ("revjul", "revjul"),
+    ("deltat", "deltat"),
+    ("deltat_ex", "deltat_ex"),
+    ("day_of_week", "day_of_week"),
+    ("utc_to_jd", "utc_to_jd"),
+    ("jdet_to_utc", "jdet_to_utc"),
+    ("jdut1_to_utc", "jdut1_to_utc"),
+    ("utc_time_zone", "utc_time_zone"),
+    ("time_equ", "time_equ"),
+    ("lat_to_lmt", "lat_to_lmt"),
+    ("lmt_to_lat", "lmt_to_lat"),
+    ("sidtime", "sidtime"),
+    ("sidtime0", "sidtime0"),
+    ("fixstar_ut", "fixstar_ut"),
+    ("fixstar", "fixstar"),
+    ("fixstar2", "fixstar2"),
+    ("fixstar2_ut", "fixstar2_ut"),
+    ("fixstar_mag", "fixstar_mag"),
+    ("fixstar2_mag", "fixstar2_mag"),
+    ("solcross_ut", "solcross_ut"),
+    ("solcross", "solcross"),
+    ("mooncross_ut", "mooncross_ut"),
+    ("mooncross", "mooncross"),
+    ("mooncross_node_ut", "mooncross_node_ut"),
+    ("mooncross_node", "mooncross_node"),
+    ("helio_cross_ut", "helio_cross_ut"),
+    ("helio_cross", "helio_cross"),
+    ("find_station_ut", "find_station_ut"),
+    ("next_retrograde_ut", "next_retrograde_ut"),
+    ("cotrans", "cotrans"),
+    ("cotrans_sp", "cotrans_sp"),
+    ("azalt", "azalt"),
+    ("azalt_rev", "azalt_rev"),
+    ("refrac", "refrac"),
+    ("refrac_extended", "refrac_extended"),
+    ("split_deg", "split_deg"),
+    ("degnorm", "degnorm"),
+    ("radnorm", "radnorm"),
+    ("difdeg2n", "difdeg2n"),
+    ("difdegn", "difdegn"),
+    ("difrad2n", "difrad2n"),
+    ("difcs2n", "difcs2n"),
+    ("difcsn", "difcsn"),
+    ("csnorm", "csnorm"),
+    ("csroundsec", "csroundsec"),
+    ("cs2degstr", "cs2degstr"),
+    ("cs2lonlatstr", "cs2lonlatstr"),
+    ("cs2timestr", "cs2timestr"),
+    ("d2l", "d2l"),
+    ("deg_midp", "deg_midp"),
+    ("rad_midp", "rad_midp"),
+    ("get_planet_name", "get_planet_name"),
+    ("gauquelin_sector", "gauquelin_sector"),
+    ("sol_eclipse_when_glob", "sol_eclipse_when_glob"),
+    ("sol_eclipse_when_loc", "sol_eclipse_when_loc"),
+    ("sol_eclipse_where", "sol_eclipse_where"),
+    ("sol_eclipse_how", "sol_eclipse_how"),
+    ("lun_eclipse_when", "lun_eclipse_when"),
+    ("lun_eclipse_when_loc", "lun_eclipse_when_loc"),
+    ("lun_eclipse_how", "lun_eclipse_how"),
+    ("heliacal_ut", "heliacal_ut"),
+    ("heliacal_pheno_ut", "heliacal_pheno_ut"),
 ]
 
 for swe_name, bare_name in ALIAS_PAIRS:
@@ -742,46 +742,46 @@ set_section("G15.04 calendar/eclipse/rise constants")
 
 CAL_ECL_RISE = {
     # Calendar
-    "SE_GREG_CAL": ("GREG_CAL", 1),
-    "SE_JUL_CAL": ("JUL_CAL", 0),
+    "GREG_CAL": ("GREG_CAL", 1),
+    "JUL_CAL": ("JUL_CAL", 0),
     # Eclipse
-    "SE_ECL_CENTRAL": ("ECL_CENTRAL", 1),
-    "SE_ECL_NONCENTRAL": ("ECL_NONCENTRAL", 2),
-    "SE_ECL_TOTAL": ("ECL_TOTAL", 4),
-    "SE_ECL_ANNULAR": ("ECL_ANNULAR", 8),
-    "SE_ECL_PARTIAL": ("ECL_PARTIAL", 16),
-    "SE_ECL_ANNULAR_TOTAL": ("ECL_ANNULAR_TOTAL", 32),
-    "SE_ECL_PENUMBRAL": ("ECL_PENUMBRAL", 64),
-    "SE_ECL_VISIBLE": ("ECL_VISIBLE", 128),
-    "SE_ECL_MAX_VISIBLE": ("ECL_MAX_VISIBLE", 256),
-    "SE_ECL_1ST_VISIBLE": ("ECL_1ST_VISIBLE", 512),
-    "SE_ECL_2ND_VISIBLE": ("ECL_2ND_VISIBLE", 1024),
-    "SE_ECL_3RD_VISIBLE": ("ECL_3RD_VISIBLE", 2048),
-    "SE_ECL_4TH_VISIBLE": ("ECL_4TH_VISIBLE", 4096),
-    "SE_ECL_ONE_TRY": ("ECL_ONE_TRY", 32768),
+    "ECL_CENTRAL": ("ECL_CENTRAL", 1),
+    "ECL_NONCENTRAL": ("ECL_NONCENTRAL", 2),
+    "ECL_TOTAL": ("ECL_TOTAL", 4),
+    "ECL_ANNULAR": ("ECL_ANNULAR", 8),
+    "ECL_PARTIAL": ("ECL_PARTIAL", 16),
+    "ECL_ANNULAR_TOTAL": ("ECL_ANNULAR_TOTAL", 32),
+    "ECL_PENUMBRAL": ("ECL_PENUMBRAL", 64),
+    "ECL_VISIBLE": ("ECL_VISIBLE", 128),
+    "ECL_MAX_VISIBLE": ("ECL_MAX_VISIBLE", 256),
+    "ECL_1ST_VISIBLE": ("ECL_1ST_VISIBLE", 512),
+    "ECL_2ND_VISIBLE": ("ECL_2ND_VISIBLE", 1024),
+    "ECL_3RD_VISIBLE": ("ECL_3RD_VISIBLE", 2048),
+    "ECL_4TH_VISIBLE": ("ECL_4TH_VISIBLE", 4096),
+    "ECL_ONE_TRY": ("ECL_ONE_TRY", 32768),
     # Rise/set/transit
-    "SE_CALC_RISE": ("CALC_RISE", 1),
-    "SE_CALC_SET": ("CALC_SET", 2),
-    "SE_CALC_MTRANSIT": ("CALC_MTRANSIT", 4),
-    "SE_CALC_ITRANSIT": ("CALC_ITRANSIT", 8),
-    "SE_BIT_DISC_CENTER": ("BIT_DISC_CENTER", 256),
-    "SE_BIT_DISC_BOTTOM": ("BIT_DISC_BOTTOM", 8192),
-    "SE_BIT_NO_REFRACTION": ("BIT_NO_REFRACTION", 512),
-    "SE_BIT_CIVIL_TWILIGHT": ("BIT_CIVIL_TWILIGHT", 1024),
-    "SE_BIT_NAUTIC_TWILIGHT": ("BIT_NAUTIC_TWILIGHT", 2048),
-    "SE_BIT_ASTRO_TWILIGHT": ("BIT_ASTRO_TWILIGHT", 4096),
+    "CALC_RISE": ("CALC_RISE", 1),
+    "CALC_SET": ("CALC_SET", 2),
+    "CALC_MTRANSIT": ("CALC_MTRANSIT", 4),
+    "CALC_ITRANSIT": ("CALC_ITRANSIT", 8),
+    "BIT_DISC_CENTER": ("BIT_DISC_CENTER", 256),
+    "BIT_DISC_BOTTOM": ("BIT_DISC_BOTTOM", 8192),
+    "BIT_NO_REFRACTION": ("BIT_NO_REFRACTION", 512),
+    "BIT_CIVIL_TWILIGHT": ("BIT_CIVIL_TWILIGHT", 1024),
+    "BIT_NAUTIC_TWILIGHT": ("BIT_NAUTIC_TWILIGHT", 2048),
+    "BIT_ASTRO_TWILIGHT": ("BIT_ASTRO_TWILIGHT", 4096),
     # Nodal
-    "SE_NODBIT_MEAN": ("NODBIT_MEAN", 1),
-    "SE_NODBIT_OSCU": ("NODBIT_OSCU", 2),
-    "SE_NODBIT_OSCU_BAR": ("NODBIT_OSCU_BAR", 4),
-    "SE_NODBIT_FOPOINT": ("NODBIT_FOPOINT", 256),
+    "NODBIT_MEAN": ("NODBIT_MEAN", 1),
+    "NODBIT_OSCU": ("NODBIT_OSCU", 2),
+    "NODBIT_OSCU_BAR": ("NODBIT_OSCU_BAR", 4),
+    "NODBIT_FOPOINT": ("NODBIT_FOPOINT", 256),
     # Heliacal
-    "SE_HELIACAL_RISING": ("HELIACAL_RISING", 1),
-    "SE_HELIACAL_SETTING": ("HELIACAL_SETTING", 2),
-    "SE_MORNING_FIRST": ("MORNING_FIRST", 1),
-    "SE_EVENING_LAST": ("EVENING_LAST", 2),
-    "SE_EVENING_FIRST": ("EVENING_FIRST", 3),
-    "SE_MORNING_LAST": ("MORNING_LAST", 4),
+    "HELIACAL_RISING": ("HELIACAL_RISING", 1),
+    "HELIACAL_SETTING": ("HELIACAL_SETTING", 2),
+    "MORNING_FIRST": ("MORNING_FIRST", 1),
+    "EVENING_LAST": ("EVENING_LAST", 2),
+    "EVENING_FIRST": ("EVENING_FIRST", 3),
+    "MORNING_LAST": ("MORNING_LAST", 4),
 }
 
 for lib_name, (swe_name, expected_val) in CAL_ECL_RISE.items():
@@ -969,7 +969,7 @@ for i in range(50):
 # ── G17.01: LEB vs Skyfield (200 checks) ──────────────────────────────
 set_section("G17.01 LEB vs Skyfield")
 
-LEB_FILE = "/Users/giacomo/.libephemeris/leb/ephemeris_medium.leb"
+LEB_FILE = os.path.join(os.path.expanduser("~"), ".libephemeris", "leb", "ephemeris_medium.leb")
 leb_available = False
 try:
     import os
@@ -1011,10 +1011,10 @@ else:
 set_section("G17.02 LEB flag fallback")
 
 FALLBACK_FLAGS = [
-    lib.SEFLG_TOPOCTR | lib.SEFLG_SPEED,
-    lib.SEFLG_XYZ | lib.SEFLG_SPEED,
-    lib.SEFLG_RADIANS | lib.SEFLG_SPEED,
-    lib.SEFLG_NONUT | lib.SEFLG_SPEED,
+    lib.FLG_TOPOCTR | lib.FLG_SPEED,
+    lib.FLG_XYZ | lib.FLG_SPEED,
+    lib.FLG_RADIANS | lib.FLG_SPEED,
+    lib.FLG_NONUT | lib.FLG_SPEED,
 ]
 
 if leb_available:
@@ -1459,7 +1459,7 @@ set_section("G18.05 special bodies")
 ecl_nut_dates = [JD_J2000 + random.uniform(-10000, 10000) for _ in range(20)]
 for jd in ecl_nut_dates:
     try:
-        r, f = lib.calc_ut(jd, lib.SE_ECL_NUT, 0)
+        r, f = lib.calc_ut(jd, lib.ECL_NUT, 0)
         # Returns nutation and obliquity
         check(len(r) >= 4, f"ECL_NUT at {jd:.0f}: returns >= 4 values")
         # True obliquity should be around 23.4 degrees
@@ -1493,7 +1493,7 @@ for jd in ecl_nut_dates:
 # Earth geocentric should be essentially zeros (or very small)
 for jd in ecl_nut_dates[:5]:
     try:
-        r, f = lib.calc_ut(jd, lib.SE_EARTH, 256)
+        r, f = lib.calc_ut(jd, lib.EARTH, 256)
         # Geocentric Earth: all coordinates should be essentially zero
         check(
             abs(r[0]) < 1e-6 or abs(r[0] - 0.0) < 1e-6,
@@ -1510,7 +1510,7 @@ for jd in ecl_nut_dates[:5]:
 # Sun heliocentric should be essentially zero
 for jd in ecl_nut_dates[:5]:
     try:
-        r, f = lib.calc_ut(jd, lib.SE_SUN, lib.SEFLG_HELCTR | 256)
+        r, f = lib.calc_ut(jd, lib.SUN, lib.FLG_HELCTR | 256)
         check(
             abs(r[2]) < 1e-6,
             f"Sun heliocentric dist at {jd:.0f}: {r[2]}",

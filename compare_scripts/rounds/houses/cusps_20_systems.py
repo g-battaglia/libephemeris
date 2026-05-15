@@ -123,7 +123,7 @@ def test_part1_houses_ex2():
                 )
 
                 # libephemeris
-                cusps_le, ascmc_le, cuspspeed_le, ascmcspeed_le = ephem.swe_houses_ex2(
+                cusps_le, ascmc_le, cuspspeed_le, ascmcspeed_le = ephem.houses_ex2(
                     jd, lat, lon, le_hsys(hsys_ch), flags
                 )
 
@@ -197,7 +197,7 @@ def test_part2_asc_mc():
         test_name = f"P2/asc_mc/{epoch_name}"
         try:
             cusps_se, ascmc_se, _, _ = swe.houses_ex2(jd, lat, lon, se_hsys("P"), flags)
-            cusps_le, ascmc_le, _, _ = ephem.swe_houses_ex2(
+            cusps_le, ascmc_le, _, _ = ephem.houses_ex2(
                 jd, lat, lon, le_hsys("P"), flags
             )
 
@@ -274,7 +274,7 @@ def test_part3_extreme_lat():
                 cusps_se, ascmc_se, _, _ = swe.houses_ex2(
                     jd, lat, lon, se_hsys(hsys_ch), flags
                 )
-                cusps_le, ascmc_le, _, _ = ephem.swe_houses_ex2(
+                cusps_le, ascmc_le, _, _ = ephem.houses_ex2(
                     jd, lat, lon, le_hsys(hsys_ch), flags
                 )
 
@@ -330,7 +330,7 @@ def test_part4_houses_armc():
                 cusps_se, ascmc_se, cspd_se, aspd_se = swe.houses_armc_ex2(
                     armc, lat, eps, se_hsys(hsys_ch), flags
                 )
-                cusps_le, ascmc_le, cspd_le, aspd_le = ephem.swe_houses_armc_ex2(
+                cusps_le, ascmc_le, cspd_le, aspd_le = ephem.houses_armc_ex2(
                     armc, lat, eps, le_hsys(hsys_ch), flags
                 )
 
@@ -378,7 +378,7 @@ def test_part5_vertex():
         test_name = f"P5/vertex/{loc_name}"
         try:
             _, ascmc_se, _, _ = swe.houses_ex2(jd, lat, lon, se_hsys("P"), flags)
-            _, ascmc_le, _, _ = ephem.swe_houses_ex2(jd, lat, lon, le_hsys("P"), flags)
+            _, ascmc_le, _, _ = ephem.houses_ex2(jd, lat, lon, le_hsys("P"), flags)
 
             # ascmc: [Asc, MC, ARMC, Vertex, EquatAsc, co-Asc Koch, co-Asc Munkasey, polar Asc]
             labels = [
@@ -439,7 +439,7 @@ def test_part6_sweep():
         jd = swe.julday(year, 1, 1, 12.0)
 
         cusps_se, ascmc_se, _, _ = swe.houses_ex2(jd, lat, lon, se_hsys("P"), flags)
-        cusps_le, ascmc_le, _, _ = ephem.swe_houses_ex2(
+        cusps_le, ascmc_le, _, _ = ephem.houses_ex2(
             jd, lat, lon, le_hsys("P"), flags
         )
 

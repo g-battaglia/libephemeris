@@ -15,12 +15,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_TOPOCTR = 32768
-SEFLG_NONUT = 64
-SEFLG_NOABERR = 1024
+FLG_SPEED = 256
+FLG_TOPOCTR = 32768
+FLG_NONUT = 64
+FLG_NOABERR = 1024
 
 BODIES = {
     0: "Sun",
@@ -33,10 +33,10 @@ BODIES = {
 }
 
 FLAG_COMBOS = [
-    (SEFLG_SPEED | SEFLG_TOPOCTR, "TOPO"),
-    (SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_NONUT, "TOPO+NONUT"),
-    (SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_NOABERR, "TOPO+NOABERR"),
-    (SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_NONUT | SEFLG_NOABERR, "TOPO+NONUT+NOABERR"),
+    (FLG_SPEED | FLG_TOPOCTR, "TOPO"),
+    (FLG_SPEED | FLG_TOPOCTR | FLG_NONUT, "TOPO+NONUT"),
+    (FLG_SPEED | FLG_TOPOCTR | FLG_NOABERR, "TOPO+NOABERR"),
+    (FLG_SPEED | FLG_TOPOCTR | FLG_NONUT | FLG_NOABERR, "TOPO+NONUT+NOABERR"),
 ]
 
 LOCATIONS = [
@@ -68,14 +68,14 @@ print("=" * 90)
 
 for lat, lon, alt, loc_name in LOCATIONS:
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     for label, jd in test_dates:
         for body, bname in BODIES.items():
             for flags, fname in FLAG_COMBOS:
                 try:
                     se_r = swe.calc_ut(jd, body, flags)[0]
-                    le_r = ephem.swe_calc_ut(jd, body, flags)[0]
+                    le_r = ephem.calc_ut(jd, body, flags)[0]
                     for i, (cn, mult, tol) in enumerate(
                         [
                             ("lon", 3600, TOL_LON),

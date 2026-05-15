@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 86: Radians Output Mode
 
-Tests SEFLG_RADIANS flag which outputs positions in radians instead of degrees.
+Tests FLG_RADIANS flag which outputs positions in radians instead of degrees.
 Verifies consistency with degree output and across flag combinations.
 """
 
@@ -17,18 +17,18 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SWIEPH = 2
-SEFLG_SPEED = 256
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SEFLG_RADIANS = 8192
+FLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+FLG_RADIANS = 8192
 
 print("=" * 70)
 print("ROUND 86: Radians Output Mode")
@@ -53,13 +53,13 @@ test_jds = [(y, swe.julday(y, 1, 15, 12.0)) for y in range(1980, 2030, 2)]
 # P1: Radians SE vs LE comparison
 # ============================================================
 print("\n=== P1: Radians ecliptic SE vs LE ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS
+flags = FLG_SWIEPH | FLG_SPEED | FLG_RADIANS
 for body_id, name in bodies:
     for year, jd in test_jds:
         label = f"{name} {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             for i, coord in enumerate(["lon", "lat", "dist"]):
                 if i < 2:
                     diff = abs(se[0][i] - le[0][i])
@@ -99,9 +99,9 @@ for body_id, name in bodies:
     for year, jd in test_jds[:10]:
         label = f"{name} {year}"
         try:
-            le_deg = ephem.swe_calc_ut(jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            le_rad = ephem.swe_calc_ut(
-                jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS
+            le_deg = ephem.calc_ut(jd, body_id, FLG_SWIEPH | FLG_SPEED)
+            le_rad = ephem.calc_ut(
+                jd, body_id, FLG_SWIEPH | FLG_SPEED | FLG_RADIANS
             )
             for i, coord in enumerate(["lon", "lat"]):
                 expected_rad = math.radians(le_deg[0][i])
@@ -136,9 +136,9 @@ for body_id, name in [(swe.SUN, "Sun"), (swe.MOON, "Moon"), (swe.MARS, "Mars")]:
     for year, jd in test_jds[:10]:
         label = f"{name} {year}"
         try:
-            le_deg = ephem.swe_calc_ut(jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            le_rad = ephem.swe_calc_ut(
-                jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS
+            le_deg = ephem.calc_ut(jd, body_id, FLG_SWIEPH | FLG_SPEED)
+            le_rad = ephem.calc_ut(
+                jd, body_id, FLG_SWIEPH | FLG_SPEED | FLG_RADIANS
             )
             for i, coord in enumerate(["lon_spd", "lat_spd"]):
                 expected_rad_spd = math.radians(le_deg[0][3 + i])
@@ -159,7 +159,7 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 # P4: Radians + equatorial
 # ============================================================
 print("\n=== P4: Radians + equatorial ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS | SEFLG_EQUATORIAL
+flags = FLG_SWIEPH | FLG_SPEED | FLG_RADIANS | FLG_EQUATORIAL
 for body_id, name in [
     (swe.SUN, "Sun"),
     (swe.MOON, "Moon"),
@@ -170,7 +170,7 @@ for body_id, name in [
         label = f"{name} eq {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             for i, coord in enumerate(["RA", "Dec"]):
                 diff = abs(se[0][i] - le[0][i])
                 if diff > math.pi:
@@ -191,13 +191,13 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 # P5: Radians + J2000
 # ============================================================
 print("\n=== P5: Radians + J2000 ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS | SEFLG_J2000 | SEFLG_NONUT
+flags = FLG_SWIEPH | FLG_SPEED | FLG_RADIANS | FLG_J2000 | FLG_NONUT
 for body_id, name in [(swe.SUN, "Sun"), (swe.MOON, "Moon"), (swe.MARS, "Mars")]:
     for year, jd in test_jds:
         label = f"{name} J2000 {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             for i, coord in enumerate(["lon", "lat"]):
                 diff = abs(se[0][i] - le[0][i])
                 if diff > math.pi:
@@ -220,8 +220,8 @@ for body_id, name in bodies:
     for year, jd in test_jds[:5]:
         label = f"{name} {year}"
         try:
-            le = ephem.swe_calc_ut(
-                jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_RADIANS
+            le = ephem.calc_ut(
+                jd, body_id, FLG_SWIEPH | FLG_SPEED | FLG_RADIANS
             )
             lon_rad = le[0][0]
             lat_rad = le[0][1]

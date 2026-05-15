@@ -4,7 +4,7 @@ Build Star Catalog from Hipparcos using astroquery.vizier.
 
 This script fetches astrologically relevant stars from the Hipparcos I/239/hip_main
 catalog via VizieR and generates StarCatalogEntry data compatible with
-swe_fixstar/swe_fixstar2 functions in libephemeris.
+fixstar/fixstar2 functions in libephemeris.
 
 The selection criteria for ~800-1000 stars:
 1. All stars brighter than magnitude 4.0 (~900 stars) - naked-eye visible
@@ -22,7 +22,7 @@ Usage:
     python scripts/build_star_catalog.py --verbose          # Show progress details
 
 Output Format (StarCatalogEntry):
-    - id: Internal star ID (SE_FIXSTAR_OFFSET + index)
+    - id: Internal star ID (FIXSTAR_OFFSET + index)
     - name: Traditional star name or Bayer designation
     - nomenclature: Abbreviated Bayer designation (e.g., "alLeo")
     - hip_number: Hipparcos catalog number
@@ -63,7 +63,7 @@ except ImportError:
     u = None  # type: ignore
 
 # Fixed star ID offset (from constants.py)
-SE_FIXSTAR_OFFSET = 1000000
+FIXSTAR_OFFSET = 1000000
 
 # IAU official star names with Hipparcos numbers
 # Source: https://www.iau.org/public/themes/naming_stars/
@@ -598,14 +598,14 @@ def output_python_catalog(stars: list[StarCatalogData], verbose: bool = False) -
         '"""',
         "",
         "from libephemeris.fixed_stars import StarData, StarCatalogEntry",
-        "from libephemeris.constants import SE_FIXSTAR_OFFSET",
+        "from libephemeris.constants import FIXSTAR_OFFSET",
         "",
         "# Auto-generated star catalog entries",
         "HIPPARCOS_STAR_CATALOG: list[StarCatalogEntry] = [",
     ]
 
     for i, star in enumerate(sorted(stars, key=lambda s: s.hip_number)):
-        star_id = SE_FIXSTAR_OFFSET + 1000 + i  # Use offset to avoid conflicts
+        star_id = FIXSTAR_OFFSET + 1000 + i  # Use offset to avoid conflicts
         lines.append("    StarCatalogEntry(")
         lines.append(f"        id={star_id},")
         lines.append(f'        name="{star.name}",')

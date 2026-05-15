@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 150: Houses across all 15+ systems at fine latitude intervals.
 
-Compare house cusps from swe_houses_ex between libephemeris and pyswisseph
+Compare house cusps from houses_ex between libephemeris and pyswisseph
 across all supported house systems at fine latitude intervals (every 5°).
 """
 
@@ -14,9 +14,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 
 # All house systems to test
 HOUSE_SYSTEMS = [
@@ -74,8 +74,8 @@ for jd, lon, config_label in test_configs:
     for lat in LATITUDES:
         for hsys_ch, hsys_name in HOUSE_SYSTEMS:
             try:
-                se_r = swe.houses_ex(jd, lat, lon, se_hsys(hsys_ch), SEFLG_SPEED)
-                le_r = ephem.swe_houses_ex(jd, lat, lon, le_hsys(hsys_ch), SEFLG_SPEED)
+                se_r = swe.houses_ex(jd, lat, lon, se_hsys(hsys_ch), FLG_SPEED)
+                le_r = ephem.houses_ex(jd, lat, lon, le_hsys(hsys_ch), FLG_SPEED)
 
                 se_cusps = se_r[0]
                 le_cusps = le_r[0]

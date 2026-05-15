@@ -16,10 +16,10 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_ALLTYPES_SOLAR,
-    SE_ECL_ALLTYPES_LUNAR,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_ALLTYPES_SOLAR,
+    ECL_ALLTYPES_LUNAR,
 )
 
 
@@ -45,13 +45,13 @@ class TestSolarEclipseTimingVsPyswisseph:
         jd_start = swe.julday(2017, 8, 1, 0.0)
 
         # Get eclipse time from pyswisseph
-        ret_swe = swe.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        ret_swe = swe.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse time from libephemeris
         # Returns (ecl_type, times) tuple
         ecl_type_py, times_py = ephem.sol_eclipse_when_glob(
-            jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL
+            jd_start, FLG_SWIEPH, ECL_TOTAL
         )
         jd_max_py = times_py[0]
 
@@ -82,13 +82,13 @@ class TestSolarEclipseTimingVsPyswisseph:
         jd_start = swe.julday(2024, 4, 1, 0.0)
 
         # Get eclipse time from pyswisseph
-        ret_swe = swe.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        ret_swe = swe.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse time from libephemeris
         # Returns (ecl_type, times) tuple
         ecl_type_py, times_py = ephem.sol_eclipse_when_glob(
-            jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL
+            jd_start, FLG_SWIEPH, ECL_TOTAL
         )
         jd_max_py = times_py[0]
 
@@ -114,11 +114,11 @@ class TestSolarEclipseTimingVsPyswisseph:
 
         for i in range(3):
             # Get eclipse from pyswisseph
-            ret_swe = swe.sol_eclipse_when_glob(jd, SEFLG_SWIEPH, SE_ECL_ALLTYPES_SOLAR)
+            ret_swe = swe.sol_eclipse_when_glob(jd, FLG_SWIEPH, ECL_ALLTYPES_SOLAR)
             jd_max_swe = ret_swe[1][0]
 
             # Get eclipse from libephemeris (returns (ecl_type, times))
-            _, times_py = ephem.sol_eclipse_when_glob(jd, SEFLG_SWIEPH, 0)
+            _, times_py = ephem.sol_eclipse_when_glob(jd, FLG_SWIEPH, 0)
             jd_max_py = times_py[0]
 
             # Calculate time difference
@@ -148,12 +148,12 @@ class TestLunarEclipseTimingVsPyswisseph:
         jd_start = swe.julday(2018, 1, 1, 0.0)
 
         # Get eclipse time from pyswisseph
-        ret_swe = swe.lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        ret_swe = swe.lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse time from libephemeris (returns (ecl_type, times))
         ecl_type_py, times_py = ephem.lun_eclipse_when(
-            jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL
+            jd_start, FLG_SWIEPH, ECL_TOTAL
         )
         jd_max_py = times_py[0]
 
@@ -183,12 +183,12 @@ class TestLunarEclipseTimingVsPyswisseph:
         jd_start = swe.julday(2022, 11, 1, 0.0)
 
         # Get eclipse time from pyswisseph
-        ret_swe = swe.lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        ret_swe = swe.lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse time from libephemeris (returns (ecl_type, times))
         ecl_type_py, times_py = ephem.lun_eclipse_when(
-            jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL
+            jd_start, FLG_SWIEPH, ECL_TOTAL
         )
         jd_max_py = times_py[0]
 
@@ -214,11 +214,11 @@ class TestLunarEclipseTimingVsPyswisseph:
 
         for i in range(3):
             # Get eclipse from pyswisseph
-            ret_swe = swe.lun_eclipse_when(jd, SEFLG_SWIEPH, SE_ECL_ALLTYPES_LUNAR)
+            ret_swe = swe.lun_eclipse_when(jd, FLG_SWIEPH, ECL_ALLTYPES_LUNAR)
             jd_max_swe = ret_swe[1][0]
 
             # Get eclipse from libephemeris (returns (ecl_type, times))
-            _, times_py = ephem.lun_eclipse_when(jd, SEFLG_SWIEPH, 0)
+            _, times_py = ephem.lun_eclipse_when(jd, FLG_SWIEPH, 0)
             jd_max_py = times_py[0]
 
             # Calculate time difference
@@ -239,8 +239,8 @@ class TestEclipseTimingSummary:
     @pytest.mark.parametrize(
         "year,month,day,eclipse_type,description",
         [
-            (2017, 8, 1, SE_ECL_TOTAL, "Aug 2017 Total Solar"),
-            (2024, 4, 1, SE_ECL_TOTAL, "Apr 2024 Total Solar"),
+            (2017, 8, 1, ECL_TOTAL, "Aug 2017 Total Solar"),
+            (2024, 4, 1, ECL_TOTAL, "Apr 2024 Total Solar"),
         ],
     )
     def test_solar_eclipses_parametrized(
@@ -250,11 +250,11 @@ class TestEclipseTimingSummary:
         jd_start = swe.julday(year, month, day, 0.0)
 
         # Get eclipse from pyswisseph
-        ret_swe = swe.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, eclipse_type)
+        ret_swe = swe.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, eclipse_type)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse from libephemeris (returns (ecl_type, times))
-        _, times_py = ephem.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, eclipse_type)
+        _, times_py = ephem.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, eclipse_type)
         jd_max_py = times_py[0]
 
         diff_seconds = time_diff_seconds(jd_max_py, jd_max_swe)
@@ -266,8 +266,8 @@ class TestEclipseTimingSummary:
     @pytest.mark.parametrize(
         "year,month,day,eclipse_type,description",
         [
-            (2018, 1, 1, SE_ECL_TOTAL, "Jan 2018 Total Lunar"),
-            (2022, 11, 1, SE_ECL_TOTAL, "Nov 2022 Total Lunar"),
+            (2018, 1, 1, ECL_TOTAL, "Jan 2018 Total Lunar"),
+            (2022, 11, 1, ECL_TOTAL, "Nov 2022 Total Lunar"),
         ],
     )
     def test_lunar_eclipses_parametrized(
@@ -277,11 +277,11 @@ class TestEclipseTimingSummary:
         jd_start = swe.julday(year, month, day, 0.0)
 
         # Get eclipse from pyswisseph
-        ret_swe = swe.lun_eclipse_when(jd_start, SEFLG_SWIEPH, eclipse_type)
+        ret_swe = swe.lun_eclipse_when(jd_start, FLG_SWIEPH, eclipse_type)
         jd_max_swe = ret_swe[1][0]
 
         # Get eclipse from libephemeris (returns (ecl_type, times))
-        _, times_py = ephem.lun_eclipse_when(jd_start, SEFLG_SWIEPH, eclipse_type)
+        _, times_py = ephem.lun_eclipse_when(jd_start, FLG_SWIEPH, eclipse_type)
         jd_max_py = times_py[0]
 
         diff_seconds = time_diff_seconds(jd_max_py, jd_max_swe)

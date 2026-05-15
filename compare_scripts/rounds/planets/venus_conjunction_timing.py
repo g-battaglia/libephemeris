@@ -19,16 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SE_SUN = 0
-SE_MERCURY = 2
-SE_VENUS = 3
-FLAGS = 256  # SEFLG_SPEED
+SUN = 0
+MERCURY = 2
+VENUS = 3
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 57: Venus Inferior/Superior Conjunction Timing")
@@ -38,11 +38,11 @@ print("=" * 70)
 def elongation(jd, body_id, use_se=False):
     """Calculate elongation of a body from the Sun."""
     if use_se:
-        sun = swe.calc_ut(jd, SE_SUN, FLAGS)[0]
+        sun = swe.calc_ut(jd, SUN, FLAGS)[0]
         body = swe.calc_ut(jd, body_id, FLAGS)[0]
     else:
-        sun = ephem.swe_calc_ut(jd, SE_SUN, FLAGS)[0]
-        body = ephem.swe_calc_ut(jd, body_id, FLAGS)[0]
+        sun = ephem.calc_ut(jd, SUN, FLAGS)[0]
+        body = ephem.calc_ut(jd, body_id, FLAGS)[0]
 
     diff = body[0] - sun[0]
     if diff > 180:
@@ -66,13 +66,13 @@ def find_conjunctions(body_id, jd_start, jd_end, step=1.0):
                     # Crossed 0 going negative
                     conj_jd = _bisect_conjunction(body_id, jd - step, jd)
                     # Check if inferior (retrograde) or superior (direct)
-                    result = ephem.swe_calc_ut(conj_jd, body_id, FLAGS)
+                    result = ephem.calc_ut(conj_jd, body_id, FLAGS)
                     speed = result[0][3]
                     ctype = "inf" if speed < 0 else "sup"
                     conjunctions.append((ctype, conj_jd))
                 elif prev_elong < 0 and elong > 0:
                     conj_jd = _bisect_conjunction(body_id, jd - step, jd)
-                    result = ephem.swe_calc_ut(conj_jd, body_id, FLAGS)
+                    result = ephem.calc_ut(conj_jd, body_id, FLAGS)
                     speed = result[0][3]
                     ctype = "inf" if speed < 0 else "sup"
                     conjunctions.append((ctype, conj_jd))
@@ -146,8 +146,8 @@ print("\n=== P1: Venus conjunction timing 2020-2030 ===")
 jd_2020 = swe.julday(2020, 1, 1, 0.0)
 jd_2030 = swe.julday(2030, 1, 1, 0.0)
 
-le_venus = find_conjunctions(SE_VENUS, jd_2020, jd_2030, step=0.5)
-se_venus = find_conjunctions_se(SE_VENUS, jd_2020, jd_2030, step=0.5)
+le_venus = find_conjunctions(VENUS, jd_2020, jd_2030, step=0.5)
+se_venus = find_conjunctions_se(VENUS, jd_2020, jd_2030, step=0.5)
 
 print(f"  LE found {len(le_venus)} Venus conjunctions, SE found {len(se_venus)}")
 
@@ -204,8 +204,8 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P3: Mercury conjunction timing 2020-2030 ===")
 
-le_merc = find_conjunctions(SE_MERCURY, jd_2020, jd_2030, step=0.5)
-se_merc = find_conjunctions_se(SE_MERCURY, jd_2020, jd_2030, step=0.5)
+le_merc = find_conjunctions(MERCURY, jd_2020, jd_2030, step=0.5)
+se_merc = find_conjunctions_se(MERCURY, jd_2020, jd_2030, step=0.5)
 
 print(f"  LE found {len(le_merc)} Mercury conjunctions, SE found {len(se_merc)}")
 
@@ -264,8 +264,8 @@ jd_start = swe.julday(2024, 1, 1, 0.0)
 for day in range(365):
     jd = jd_start + day
     try:
-        le_elong = elongation(jd, SE_VENUS)
-        se_elong = elongation(jd, SE_VENUS, use_se=True)
+        le_elong = elongation(jd, VENUS)
+        se_elong = elongation(jd, VENUS, use_se=True)
 
         diff_arcsec = abs(le_elong - se_elong) * 3600
         if diff_arcsec < 0.5:
@@ -291,8 +291,8 @@ print("\n=== P6: Mercury elongation precision (daily for 2024) ===")
 for day in range(365):
     jd = jd_start + day
     try:
-        le_elong = elongation(jd, SE_MERCURY)
-        se_elong = elongation(jd, SE_MERCURY, use_se=True)
+        le_elong = elongation(jd, MERCURY)
+        se_elong = elongation(jd, MERCURY, use_se=True)
 
         diff_arcsec = abs(le_elong - se_elong) * 3600
         if diff_arcsec < 0.5:
@@ -322,7 +322,7 @@ prev_elong = None
 prev_abs_elong = None
 while jd < jd_2030:
     try:
-        elong = elongation(jd, SE_VENUS)
+        elong = elongation(jd, VENUS)
         abs_elong = abs(elong)
         if prev_abs_elong is not None and prev_elong is not None:
             # Local max when derivative changes sign
@@ -358,8 +358,8 @@ print("\n=== P8: Venus longitude at conjunction ===")
 
 for i, (ctype, conj_jd) in enumerate(le_venus):
     try:
-        le_sun = ephem.swe_calc_ut(conj_jd, SE_SUN, FLAGS)[0]
-        le_venus_pos = ephem.swe_calc_ut(conj_jd, SE_VENUS, FLAGS)[0]
+        le_sun = ephem.calc_ut(conj_jd, SUN, FLAGS)[0]
+        le_venus_pos = ephem.calc_ut(conj_jd, VENUS, FLAGS)[0]
 
         diff = abs(le_venus_pos[0] - le_sun[0])
         if diff > 180:

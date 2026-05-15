@@ -60,7 +60,7 @@ EphemerisContext
    >>> ctx = EphemerisContext()
    >>> ctx.set_topo(12.5, 41.9, 0)  # Rome coordinates
    >>> ctx.set_sid_mode(1)  # Lahiri ayanamsha
-   >>> pos, flags = ctx.calc_ut(2451545.0, SE_MARS, SEFLG_SIDEREAL)
+   >>> pos, flags = ctx.calc_ut(2451545.0, MARS, FLG_SIDEREAL)
    >>> print(f"Mars at {pos[0]:.2f} sidereal longitude")
 
    **Thread Safety:**
@@ -105,7 +105,7 @@ EphemerisContext
 
       Set the sidereal mode (ayanamsha system) for calculations.
 
-      :param mode: Sidereal mode ID (SE_SIDM_*) or 255 for custom
+      :param mode: Sidereal mode ID (SIDM_*) or 255 for custom
       :type mode: int
       :param t0: Reference epoch (Julian Day) for custom ayanamsha (default: J2000.0)
       :type t0: float
@@ -127,9 +127,9 @@ EphemerisContext
 
       :param tjd_ut: Julian Day in Universal Time (UT1)
       :type tjd_ut: float
-      :param ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+      :param ipl: Planet/body ID (SUN, MOON, etc.)
       :type ipl: int
-      :param iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+      :param iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
       :type iflag: int
       :returns: Tuple of (position_tuple, return_flag) where position_tuple is
                 (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
@@ -141,9 +141,9 @@ EphemerisContext
 
       :param tjd: Julian Day in Terrestrial Time (TT/ET)
       :type tjd: float
-      :param ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
+      :param ipl: Planet/body ID (SUN, MOON, etc.)
       :type ipl: int
-      :param iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+      :param iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
       :type iflag: int
       :returns: Tuple of (position_tuple, return_flag)
       :rtype: tuple
@@ -179,10 +179,10 @@ EphemerisContext
 Time Functions
 --------------
 
-swe_julday / julday
+julday / julday
 ~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_julday(year, month, day, hour, gregflag=SE_GREG_CAL)
+.. function:: julday(year, month, day, hour, gregflag=GREG_CAL)
 
    Convert calendar date to Julian Day number.
 
@@ -194,14 +194,14 @@ swe_julday / julday
    :type day: int
    :param hour: Decimal hour (0.0-23.999...)
    :type hour: float
-   :param gregflag: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+   :param gregflag: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
    :type gregflag: int
    :returns: Julian Day number (days since JD 0.0 = noon Jan 1, 4713 BCE)
    :rtype: float
 
    **Example:**
 
-   >>> jd = swe_julday(2000, 1, 1, 12.0)  # J2000.0 epoch
+   >>> jd = julday(2000, 1, 1, 12.0)  # J2000.0 epoch
    >>> print(jd)
    2451545.0
 
@@ -211,31 +211,31 @@ swe_julday / julday
    JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
 
 
-swe_revjul / revjul
+revjul / revjul
 ~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_revjul(jd, gregflag=SE_GREG_CAL)
+.. function:: revjul(jd, gregflag=GREG_CAL)
 
    Convert Julian Day number to calendar date.
 
    :param jd: Julian Day number
    :type jd: float
-   :param gregflag: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+   :param gregflag: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
    :type gregflag: int
    :returns: Tuple of (year, month, day, hour)
    :rtype: tuple[int, int, int, float]
 
    **Example:**
 
-   >>> year, month, day, hour = swe_revjul(2451545.0)
+   >>> year, month, day, hour = revjul(2451545.0)
    >>> print(f"{year}-{month:02d}-{day:02d} {hour:.1f}h")
    2000-01-01 12.0h
 
 
-swe_deltat / deltat
+deltat / deltat
 ~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_deltat(tjd)
+.. function:: deltat(tjd)
 
    Calculate Delta T (TT - UT1) for a given Julian Day.
 
@@ -254,23 +254,23 @@ swe_deltat / deltat
    - For historical dates: Calculated from polynomial models
 
 
-swe_deltat_ex / deltat_ex
+deltat_ex / deltat_ex
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_deltat_ex(tjd, ephe_flag=SEFLG_SWIEPH)
+.. function:: deltat_ex(tjd, ephe_flag=FLG_SWIEPH)
 
    Calculate Delta T with explicit ephemeris source specification.
 
    :param tjd: Julian Day number in UT1
    :type tjd: float
-   :param ephe_flag: Ephemeris selection flag (SEFLG_SWIEPH, SEFLG_JPLEPH). Note: SEFLG_MOSEPH is accepted for compatibility but silently ignored — all calculations use JPL DE440/DE441.
+   :param ephe_flag: Ephemeris selection flag (FLG_SWIEPH, FLG_JPLEPH). Note: FLG_MOSEPH is accepted for compatibility but silently ignored — all calculations use JPL DE440/DE441.
    :type ephe_flag: int
    :returns: Tuple of (delta_t, error_message)
    :rtype: tuple[float, str]
 
    **Example:**
 
-   >>> dt, err = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
+   >>> dt, err = deltat_ex(2451545.0, FLG_SWIEPH)
    >>> print(f"Delta T: {dt * 86400:.2f} seconds")
    Delta T: 63.83 seconds
 
@@ -319,7 +319,7 @@ day_of_week
 utc_to_jd
 ~~~~~~~~~
 
-.. function:: utc_to_jd(year, month, day, hour, minute, second, gregflag=SE_GREG_CAL)
+.. function:: utc_to_jd(year, month, day, hour, minute, second, gregflag=GREG_CAL)
 
    Convert UTC date/time to Julian Day numbers.
 
@@ -335,7 +335,7 @@ utc_to_jd
    :type minute: int
    :param second: Second (0-59, can include fractional part)
    :type second: float
-   :param gregflag: Calendar flag (SE_GREG_CAL or SE_JUL_CAL)
+   :param gregflag: Calendar flag (GREG_CAL or JUL_CAL)
    :type gregflag: int
    :returns: Tuple of (jd_et, jd_ut) - Julian Days in ET and UT
    :rtype: tuple[float, float]
@@ -383,10 +383,10 @@ time_equ
 Planet Calculation Functions
 ----------------------------
 
-swe_calc_ut / calc_ut
+calc_ut / calc_ut
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_calc_ut(tjd_ut, ipl, iflag)
+.. function:: calc_ut(tjd_ut, ipl, iflag)
 
    Calculate planetary position for Universal Time.
 
@@ -394,7 +394,7 @@ swe_calc_ut / calc_ut
 
    :param tjd_ut: Julian Day in Universal Time (UT1)
    :type tjd_ut: float
-   :param ipl: Planet/body ID (SE_SUN=0, SE_MOON=1, SE_MERCURY=2, etc.)
+   :param ipl: Planet/body ID (SUN=0, MOON=1, MERCURY=2, etc.)
    :type ipl: int
    :param iflag: Calculation flags (bitwise OR of SEFLG_* constants)
    :type iflag: int
@@ -412,29 +412,29 @@ swe_calc_ut / calc_ut
 
    **Calculation Flags:**
 
-   - ``SEFLG_SPEED``: Include velocity (always calculated)
-   - ``SEFLG_HELCTR``: Heliocentric instead of geocentric
-   - ``SEFLG_TOPOCTR``: Topocentric (requires swe_set_topo)
-   - ``SEFLG_SIDEREAL``: Sidereal zodiac (requires swe_set_sid_mode)
-   - ``SEFLG_EQUATORIAL``: Return RA/Dec instead of lon/lat
-   - ``SEFLG_J2000``: J2000.0 reference frame
-   - ``SEFLG_TRUEPOS``: True geometric position (no light time)
+   - ``FLG_SPEED``: Include velocity (always calculated)
+   - ``FLG_HELCTR``: Heliocentric instead of geocentric
+   - ``FLG_TOPOCTR``: Topocentric (requires set_topo)
+   - ``FLG_SIDEREAL``: Sidereal zodiac (requires set_sid_mode)
+   - ``FLG_EQUATORIAL``: Return RA/Dec instead of lon/lat
+   - ``FLG_J2000``: J2000.0 reference frame
+   - ``FLG_TRUEPOS``: True geometric position (no light time)
 
    **Example:**
 
-   >>> pos, retflag = swe_calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
+   >>> pos, retflag = calc_ut(2451545.0, MARS, FLG_SPEED)
    >>> lon, lat, dist = pos[0], pos[1], pos[2]
    >>> print(f"Mars: {lon:.4f} lon, {lat:.4f} lat, {dist:.6f} AU")
 
 
-swe_calc / calc
+calc / calc
 ~~~~~~~~~~~~~~~
 
-.. function:: swe_calc(tjd, ipl, iflag)
+.. function:: calc(tjd, ipl, iflag)
 
    Calculate planetary position for Ephemeris Time (ET/TT).
 
-   Similar to swe_calc_ut() but takes Terrestrial Time instead of Universal Time.
+   Similar to calc_ut() but takes Terrestrial Time instead of Universal Time.
 
    :param tjd: Julian Day in Terrestrial Time (TT/ET)
    :type tjd: float
@@ -449,13 +449,13 @@ swe_calc / calc
 
    TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
    which varies from ~32 seconds (year 2000) to minutes (historical times).
-   For most astrological applications, use swe_calc_ut() instead.
+   For most astrological applications, use calc_ut() instead.
 
 
-swe_calc_pctr / calc_pctr
+calc_pctr / calc_pctr
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_calc_pctr(tjd_ut, ipl, iplctr, iflag)
+.. function:: calc_pctr(tjd_ut, ipl, iplctr, iflag)
 
    Calculate planetary position as seen from another planet (planet-centric).
 
@@ -473,7 +473,7 @@ swe_calc_pctr / calc_pctr
    **Example:**
 
    >>> # Position of Moon as seen from Mars
-   >>> pos, retflag = swe_calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+   >>> pos, retflag = calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
    >>> print(f"Moon longitude from Mars: {pos[0]:.2f} degrees")
 
 
@@ -484,7 +484,7 @@ get_planet_name
 
    Get the human-readable name of a planet given its ID.
 
-   :param planet_id: Planet/body ID (SE_SUN, SE_MOON, etc.)
+   :param planet_id: Planet/body ID (SUN, MOON, etc.)
    :type planet_id: int
    :returns: Human-readable planet name, or "Unknown (ID)" for unrecognized IDs
    :rtype: str
@@ -500,10 +500,10 @@ get_planet_name
 Orbital Elements
 ----------------
 
-swe_nod_aps / nod_aps
+nod_aps / nod_aps
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_nod_aps(tjd, ipl, iflag, method)
+.. function:: nod_aps(tjd, ipl, iflag, method)
 
    Calculate nodes and apsides of a planetary orbit.
 
@@ -513,17 +513,17 @@ swe_nod_aps / nod_aps
    :type ipl: int
    :param iflag: Calculation flags
    :type iflag: int
-   :param method: Method flag (SE_NODBIT_MEAN, SE_NODBIT_OSCU, etc.)
+   :param method: Method flag (NODBIT_MEAN, NODBIT_OSCU, etc.)
    :type method: int
    :returns: Tuple of four position tuples (ascending_node, descending_node,
              perihelion, aphelion)
    :rtype: tuple
 
 
-swe_get_orbital_elements / get_orbital_elements
+get_orbital_elements / get_orbital_elements
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_orbital_elements(tjd, ipl, iflag)
+.. function:: get_orbital_elements(tjd, ipl, iflag)
 
    Get Keplerian orbital elements for a planet.
 
@@ -540,10 +540,10 @@ swe_get_orbital_elements / get_orbital_elements
 Planetary Phenomena
 -------------------
 
-swe_pheno / pheno
+pheno / pheno
 ~~~~~~~~~~~~~~~~~
 
-.. function:: swe_pheno(tjd, ipl, iflag)
+.. function:: pheno(tjd, ipl, iflag)
 
    Calculate planetary phenomena (phase angle, elongation, etc.).
 
@@ -557,10 +557,10 @@ swe_pheno / pheno
    :rtype: tuple
 
 
-swe_pheno_ut / pheno_ut
+pheno_ut / pheno_ut
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_pheno_ut(tjd_ut, ipl, iflag)
+.. function:: pheno_ut(tjd_ut, ipl, iflag)
 
    Calculate planetary phenomena for Universal Time.
 
@@ -577,10 +577,10 @@ swe_pheno_ut / pheno_ut
 House Functions
 ---------------
 
-swe_houses / houses
+houses / houses
 ~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_houses(tjd_ut, lat, lon, hsys)
+.. function:: houses(tjd_ut, lat, lon, hsys)
 
    Calculate house cusps and angles (ASCMC).
 
@@ -617,21 +617,21 @@ swe_houses / houses
 
    **Example:**
 
-   >>> cusps, ascmc = swe_houses(2451545.0, 41.9, 12.5, ord('P'))
+   >>> cusps, ascmc = houses(2451545.0, 41.9, 12.5, ord('P'))
    >>> print(f"Ascendant: {ascmc[0]:.2f} degrees")
    >>> print(f"House 1 cusp: {cusps[0]:.2f} degrees")
 
 
-swe_houses_ex / houses_ex
+houses_ex / houses_ex
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_houses_ex(tjd_ut, iflag, lat, lon, hsys)
+.. function:: houses_ex(tjd_ut, iflag, lat, lon, hsys)
 
    Extended house calculation with sidereal support.
 
    :param tjd_ut: Julian Day in Universal Time
    :type tjd_ut: float
-   :param iflag: Calculation flags (SEFLG_SIDEREAL for sidereal)
+   :param iflag: Calculation flags (FLG_SIDEREAL for sidereal)
    :type iflag: int
    :param lat: Geographic latitude in degrees
    :type lat: float
@@ -643,10 +643,10 @@ swe_houses_ex / houses_ex
    :rtype: tuple
 
 
-swe_houses_ex2 / houses_ex2
+houses_ex2 / houses_ex2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_houses_ex2(tjd_ut, iflag, lat, lon, hsys)
+.. function:: houses_ex2(tjd_ut, iflag, lat, lon, hsys)
 
    Extended house calculation with velocities.
 
@@ -664,10 +664,10 @@ swe_houses_ex2 / houses_ex2
    :rtype: tuple
 
 
-swe_house_pos / house_pos
+house_pos / house_pos
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_house_pos(armc, geolat, eps, hsys, lon, lat)
+.. function:: house_pos(armc, geolat, eps, hsys, lon, lat)
 
    Calculate house position of a celestial point.
 
@@ -687,10 +687,10 @@ swe_house_pos / house_pos
    :rtype: float
 
 
-swe_house_name / house_name
+house_name / house_name
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_house_name(hsys)
+.. function:: house_name(hsys)
 
    Get the name of a house system.
 
@@ -700,7 +700,7 @@ swe_house_name / house_name
    :rtype: str
 
 
-gauquelin_sector / swe_gauquelin_sector
+gauquelin_sector / gauquelin_sector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: gauquelin_sector(tjd_ut, ipl, iflag, imeth, geolon, geolat, geoalt, atpress, attemp)
@@ -732,14 +732,14 @@ gauquelin_sector / swe_gauquelin_sector
 Ayanamsha (Sidereal) Functions
 ------------------------------
 
-swe_set_sid_mode / set_sid_mode
+set_sid_mode / set_sid_mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_sid_mode(sid_mode, t0=0.0, ayan_t0=0.0)
+.. function:: set_sid_mode(sid_mode, t0=0.0, ayan_t0=0.0)
 
    Set the sidereal mode (ayanamsha system).
 
-   :param sid_mode: Sidereal mode ID (SE_SIDM_* constants)
+   :param sid_mode: Sidereal mode ID (SIDM_* constants)
    :type sid_mode: int
    :param t0: Reference epoch for custom ayanamsha (Julian Day)
    :type t0: float
@@ -748,23 +748,23 @@ swe_set_sid_mode / set_sid_mode
 
    **Common Ayanamsha Systems:**
 
-   - ``SE_SIDM_FAGAN_BRADLEY`` (0): Fagan-Bradley (Western sidereal)
-   - ``SE_SIDM_LAHIRI`` (1): Lahiri (Indian standard)
-   - ``SE_SIDM_RAMAN`` (3): B.V. Raman
-   - ``SE_SIDM_KRISHNAMURTI`` (5): KP system
-   - ``SE_SIDM_TRUE_CITRA`` (27): True position of Spica
-   - ``SE_SIDM_USER`` (255): Custom user-defined
+   - ``SIDM_FAGAN_BRADLEY`` (0): Fagan-Bradley (Western sidereal)
+   - ``SIDM_LAHIRI`` (1): Lahiri (Indian standard)
+   - ``SIDM_RAMAN`` (3): B.V. Raman
+   - ``SIDM_KRISHNAMURTI`` (5): KP system
+   - ``SIDM_TRUE_CITRA`` (27): True position of Spica
+   - ``SIDM_USER`` (255): Custom user-defined
 
    **Example:**
 
-   >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
-   >>> pos, _ = swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+   >>> set_sid_mode(SIDM_LAHIRI)
+   >>> pos, _ = calc_ut(jd, SUN, FLG_SIDEREAL)
 
 
-swe_get_ayanamsa_ut / get_ayanamsa_ut
+get_ayanamsa_ut / get_ayanamsa_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_ayanamsa_ut(tjd_ut)
+.. function:: get_ayanamsa_ut(tjd_ut)
 
    Get the ayanamsha value for Universal Time.
 
@@ -775,14 +775,14 @@ swe_get_ayanamsa_ut / get_ayanamsa_ut
 
    **Example:**
 
-   >>> ayan = swe_get_ayanamsa_ut(2451545.0)
+   >>> ayan = get_ayanamsa_ut(2451545.0)
    >>> print(f"Ayanamsha at J2000: {ayan:.4f} degrees")
 
 
-swe_get_ayanamsa / get_ayanamsa
+get_ayanamsa / get_ayanamsa
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_ayanamsa(tjd)
+.. function:: get_ayanamsa(tjd)
 
    Get the ayanamsha value for Ephemeris Time.
 
@@ -792,10 +792,10 @@ swe_get_ayanamsa / get_ayanamsa
    :rtype: float
 
 
-swe_get_ayanamsa_ex / get_ayanamsa_ex
+get_ayanamsa_ex / get_ayanamsa_ex
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_ayanamsa_ex(tjd, iflag)
+.. function:: get_ayanamsa_ex(tjd, iflag)
 
    Extended ayanamsha calculation with flags.
 
@@ -807,10 +807,10 @@ swe_get_ayanamsa_ex / get_ayanamsa_ex
    :rtype: tuple
 
 
-swe_get_ayanamsa_name / get_ayanamsa_name
+get_ayanamsa_name / get_ayanamsa_name
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_ayanamsa_name(sid_mode)
+.. function:: get_ayanamsa_name(sid_mode)
 
    Get the name of an ayanamsha system.
 
@@ -823,10 +823,10 @@ swe_get_ayanamsa_name / get_ayanamsa_name
 Fixed Star Functions
 --------------------
 
-swe_fixstar_ut / fixstar_ut
+fixstar_ut / fixstar_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_fixstar_ut(star, tjd_ut, iflag)
+.. function:: fixstar_ut(star, tjd_ut, iflag)
 
    Calculate fixed star position for Universal Time.
 
@@ -842,14 +842,14 @@ swe_fixstar_ut / fixstar_ut
 
    **Example:**
 
-   >>> name, pos, flag = swe_fixstar_ut("Regulus", 2451545.0, 0)
+   >>> name, pos, flag = fixstar_ut("Regulus", 2451545.0, 0)
    >>> print(f"{name}: {pos[0]:.4f} longitude")
 
 
-swe_fixstar / fixstar
+fixstar / fixstar
 ~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_fixstar(star, tjd, iflag)
+.. function:: fixstar(star, tjd, iflag)
 
    Calculate fixed star position for Ephemeris Time.
 
@@ -863,10 +863,10 @@ swe_fixstar / fixstar
    :rtype: tuple
 
 
-swe_fixstar2 / fixstar2
+fixstar2 / fixstar2
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_fixstar2(star, tjd, iflag)
+.. function:: fixstar2(star, tjd, iflag)
 
    Enhanced fixed star lookup with catalog information.
 
@@ -880,10 +880,10 @@ swe_fixstar2 / fixstar2
    :rtype: tuple
 
 
-swe_fixstar_mag / fixstar_mag
+fixstar_mag / fixstar_mag
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_fixstar_mag(star)
+.. function:: fixstar_mag(star)
 
    Get the visual magnitude of a fixed star.
 
@@ -896,10 +896,10 @@ swe_fixstar_mag / fixstar_mag
 Crossing Event Functions
 ------------------------
 
-swe_solcross_ut / solcross_ut
+solcross_ut / solcross_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_solcross_ut(x2cross, jd_start, iflag)
+.. function:: solcross_ut(x2cross, jd_start, iflag)
 
    Find when the Sun crosses a specific ecliptic longitude.
 
@@ -915,13 +915,13 @@ swe_solcross_ut / solcross_ut
    **Example:**
 
    >>> # Find next vernal equinox (Sun at 0 Aries)
-   >>> jd_equinox = swe_solcross_ut(0.0, 2451545.0, 0)
+   >>> jd_equinox = solcross_ut(0.0, 2451545.0, 0)
 
 
-swe_mooncross_ut / mooncross_ut
+mooncross_ut / mooncross_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_mooncross_ut(x2cross, jd_start, iflag)
+.. function:: mooncross_ut(x2cross, jd_start, iflag)
 
    Find when the Moon crosses a specific ecliptic longitude.
 
@@ -935,10 +935,10 @@ swe_mooncross_ut / mooncross_ut
    :rtype: float
 
 
-swe_mooncross_node_ut / mooncross_node_ut
+mooncross_node_ut / mooncross_node_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_mooncross_node_ut(jd_start, iflag)
+.. function:: mooncross_node_ut(jd_start, iflag)
 
    Find when the Moon crosses its ascending node.
 
@@ -950,10 +950,10 @@ swe_mooncross_node_ut / mooncross_node_ut
    :rtype: tuple
 
 
-swe_cross_ut
+cross_ut
 ~~~~~~~~~~~~
 
-.. function:: swe_cross_ut(ipl, x2cross, jd_start, iflag)
+.. function:: cross_ut(ipl, x2cross, jd_start, iflag)
 
    Find when a planet crosses a specific ecliptic longitude.
 
@@ -969,10 +969,10 @@ swe_cross_ut
    :rtype: float
 
 
-swe_helio_cross_ut / helio_cross_ut
+helio_cross_ut / helio_cross_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_helio_cross_ut(ipl, x2cross, jd_start, iflag)
+.. function:: helio_cross_ut(ipl, x2cross, jd_start, iflag)
 
    Find when a planet crosses a heliocentric longitude.
 
@@ -991,7 +991,7 @@ swe_helio_cross_ut / helio_cross_ut
 Eclipse Functions
 -----------------
 
-sol_eclipse_when_glob / swe_sol_eclipse_when_glob
+sol_eclipse_when_glob / sol_eclipse_when_glob
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: sol_eclipse_when_glob(jd_start, iflag, ifltype)
@@ -1002,7 +1002,7 @@ sol_eclipse_when_glob / swe_sol_eclipse_when_glob
    :type jd_start: float
    :param iflag: Calculation flags
    :type iflag: int
-   :param ifltype: Eclipse type filter (SE_ECL_TOTAL, SE_ECL_ANNULAR, etc.)
+   :param ifltype: Eclipse type filter (ECL_TOTAL, ECL_ANNULAR, etc.)
    :type ifltype: int
    :returns: Tuple of (return_flag, time_array) with eclipse type and times
    :rtype: tuple
@@ -1016,7 +1016,7 @@ sol_eclipse_when_glob / swe_sol_eclipse_when_glob
    - [4]: Time of fourth contact (partial phase ends)
 
 
-sol_eclipse_when_loc / swe_sol_eclipse_when_loc
+sol_eclipse_when_loc / sol_eclipse_when_loc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: sol_eclipse_when_loc(jd_start, iflag, lon, lat, alt)
@@ -1037,7 +1037,7 @@ sol_eclipse_when_loc / swe_sol_eclipse_when_loc
    :rtype: tuple
 
 
-sol_eclipse_where / swe_sol_eclipse_where
+sol_eclipse_where / sol_eclipse_where
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: sol_eclipse_where(jd, iflag)
@@ -1052,7 +1052,7 @@ sol_eclipse_where / swe_sol_eclipse_where
    :rtype: tuple
 
 
-sol_eclipse_how / swe_sol_eclipse_how
+sol_eclipse_how / sol_eclipse_how
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: sol_eclipse_how(jd, iflag, lon, lat, alt)
@@ -1073,7 +1073,7 @@ sol_eclipse_how / swe_sol_eclipse_how
    :rtype: tuple
 
 
-lun_eclipse_when / swe_lun_eclipse_when
+lun_eclipse_when / lun_eclipse_when
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: lun_eclipse_when(jd_start, iflag, ifltype)
@@ -1084,7 +1084,7 @@ lun_eclipse_when / swe_lun_eclipse_when
    :type jd_start: float
    :param iflag: Calculation flags
    :type iflag: int
-   :param ifltype: Eclipse type filter (SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_PENUMBRAL)
+   :param ifltype: Eclipse type filter (ECL_TOTAL, ECL_PARTIAL, ECL_PENUMBRAL)
    :type ifltype: int
    :returns: Tuple of (return_flag, time_array)
    :rtype: tuple
@@ -1093,7 +1093,7 @@ lun_eclipse_when / swe_lun_eclipse_when
 Rise/Set/Transit Functions
 --------------------------
 
-rise_trans / swe_rise_trans
+rise_trans / rise_trans
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: rise_trans(jd_ut, ipl, starname, rsmi, lon, lat, alt, atpress, attemp)
@@ -1106,7 +1106,7 @@ rise_trans / swe_rise_trans
    :type ipl: int
    :param starname: Star name (if ipl=-1) or empty string
    :type starname: str
-   :param rsmi: Event type flags (SE_CALC_RISE, SE_CALC_SET, SE_CALC_MTRANSIT)
+   :param rsmi: Event type flags (CALC_RISE, CALC_SET, CALC_MTRANSIT)
    :type rsmi: int
    :param lon: Geographic longitude in degrees
    :type lon: float
@@ -1122,7 +1122,7 @@ rise_trans / swe_rise_trans
    :rtype: tuple
 
 
-rise_trans_true_hor / swe_rise_trans_true_hor
+rise_trans_true_hor / rise_trans_true_hor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: rise_trans_true_hor(jd_ut, ipl, starname, rsmi, lon, lat, alt, atpress, attemp, horone)
@@ -1156,7 +1156,7 @@ rise_trans_true_hor / swe_rise_trans_true_hor
 Heliacal Events
 ---------------
 
-heliacal_ut / swe_heliacal_ut
+heliacal_ut / heliacal_ut
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: heliacal_ut(jd_start, geolon, geolat, geoalt, atm, obs, objname, event_type, helflag)
@@ -1177,7 +1177,7 @@ heliacal_ut / swe_heliacal_ut
    :type obs: tuple
    :param objname: Object name (planet name or star)
    :type objname: str
-   :param event_type: Event type (SE_HELIACAL_RISING, SE_HELIACAL_SETTING, etc.)
+   :param event_type: Event type (HELIACAL_RISING, HELIACAL_SETTING, etc.)
    :type event_type: int
    :param helflag: Heliacal calculation flags
    :type helflag: int
@@ -1185,7 +1185,7 @@ heliacal_ut / swe_heliacal_ut
    :rtype: tuple
 
 
-vis_limit_mag / swe_vis_limit_mag
+vis_limit_mag / vis_limit_mag
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. function:: vis_limit_mag(jd_ut, geolon, geolat, geoalt, atm, obs, objname, helflag)
@@ -1215,10 +1215,10 @@ vis_limit_mag / swe_vis_limit_mag
 State Management Functions
 --------------------------
 
-swe_set_topo / set_topo
+set_topo / set_topo
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_topo(lon, lat, alt)
+.. function:: set_topo(lon, lat, alt)
 
    Set observer's topocentric location.
 
@@ -1231,14 +1231,14 @@ swe_set_topo / set_topo
 
    **Note:**
 
-   Required for topocentric calculations (SEFLG_TOPOCTR),
+   Required for topocentric calculations (FLG_TOPOCTR),
    angles (Ascendant, MC), and Arabic parts.
 
 
-swe_set_ephe_path / set_ephe_path
+set_ephe_path / set_ephe_path
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_ephe_path(path)
+.. function:: set_ephe_path(path)
 
    Set the path to ephemeris files.
 
@@ -1246,10 +1246,10 @@ swe_set_ephe_path / set_ephe_path
    :type path: str
 
 
-swe_set_jpl_file / set_jpl_file
+set_jpl_file / set_jpl_file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_jpl_file(filename)
+.. function:: set_jpl_file(filename)
 
    Set the JPL ephemeris file to use.
 
@@ -1298,10 +1298,10 @@ get_precision_tier
    :rtype: str
 
 
-swe_set_tid_acc / set_tid_acc
+set_tid_acc / set_tid_acc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_tid_acc(acc)
+.. function:: set_tid_acc(acc)
 
    Set tidal acceleration value for Delta T calculations.
 
@@ -1309,10 +1309,10 @@ swe_set_tid_acc / set_tid_acc
    :type acc: float
 
 
-swe_get_tid_acc / get_tid_acc
+get_tid_acc / get_tid_acc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_get_tid_acc()
+.. function:: get_tid_acc()
 
    Get current tidal acceleration value.
 
@@ -1320,10 +1320,10 @@ swe_get_tid_acc / get_tid_acc
    :rtype: float
 
 
-swe_set_delta_t_userdef / set_delta_t_userdef
+set_delta_t_userdef / set_delta_t_userdef
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. function:: swe_set_delta_t_userdef(dt)
+.. function:: set_delta_t_userdef(dt)
 
    Set a user-defined Delta T value.
 
@@ -1331,10 +1331,10 @@ swe_set_delta_t_userdef / set_delta_t_userdef
    :type dt: float or None
 
 
-swe_close / close
+close / close
 ~~~~~~~~~~~~~~~~~
 
-.. function:: swe_close()
+.. function:: close()
 
    Close ephemeris files and release resources.
 
@@ -1369,9 +1369,9 @@ start_tracing
    **Example:**
 
    >>> import libephemeris as swe
-   >>> from libephemeris.constants import SE_SUN, SEFLG_SPEED
+   >>> from libephemeris.constants import SUN, FLG_SPEED
    >>> token = swe.start_tracing()
-   >>> swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+   >>> swe.calc_ut(2451545.0, SUN, FLG_SPEED)
    >>> traces = swe.get_trace_results()  # {0: "LEB"}
    >>> token.var.reset(token)  # deactivate tracing
 
@@ -1496,7 +1496,7 @@ Horizontal Coordinates
 
    :param jd: Julian Day in Universal Time
    :type jd: float
-   :param calc_flag: SE_ECL2HOR (ecliptic) or SE_EQU2HOR (equatorial)
+   :param calc_flag: ECL2HOR (ecliptic) or EQU2HOR (equatorial)
    :type calc_flag: int
    :param lat: Geographic latitude
    :type lat: float
@@ -1519,7 +1519,7 @@ Horizontal Coordinates
 
    :param jd: Julian Day in Universal Time
    :type jd: float
-   :param calc_flag: SE_HOR2ECL or SE_HOR2EQU
+   :param calc_flag: HOR2ECL or HOR2EQU
    :type calc_flag: int
    :param lat: Geographic latitude
    :type lat: float
@@ -1546,9 +1546,9 @@ Atmospheric Refraction
    :type atpress: float
    :param attemp: Temperature in Celsius
    :type attemp: float
-   :param calc_flag: SE_TRUE_TO_APP or SE_APP_TO_TRUE
+   :param calc_flag: TRUE_TO_APP or APP_TO_TRUE
    :type calc_flag: int
-   :returns: Apparent altitude (or true altitude if calc_flag=SE_APP_TO_TRUE)
+   :returns: Apparent altitude (or true altitude if calc_flag=APP_TO_TRUE)
    :rtype: float
 
 
@@ -1600,119 +1600,119 @@ Constants
 Planet IDs
 ~~~~~~~~~~
 
-.. data:: SE_SUN
+.. data:: SUN
    :value: 0
 
-.. data:: SE_MOON
+.. data:: MOON
    :value: 1
 
-.. data:: SE_MERCURY
+.. data:: MERCURY
    :value: 2
 
-.. data:: SE_VENUS
+.. data:: VENUS
    :value: 3
 
-.. data:: SE_MARS
+.. data:: MARS
    :value: 4
 
-.. data:: SE_JUPITER
+.. data:: JUPITER
    :value: 5
 
-.. data:: SE_SATURN
+.. data:: SATURN
    :value: 6
 
-.. data:: SE_URANUS
+.. data:: URANUS
    :value: 7
 
-.. data:: SE_NEPTUNE
+.. data:: NEPTUNE
    :value: 8
 
-.. data:: SE_PLUTO
+.. data:: PLUTO
    :value: 9
 
-.. data:: SE_MEAN_NODE
+.. data:: MEAN_NODE
    :value: 10
 
    Mean lunar ascending node (Dragon's Head)
 
-.. data:: SE_TRUE_NODE
+.. data:: TRUE_NODE
    :value: 11
 
    True (osculating) lunar ascending node
 
-.. data:: SE_MEAN_APOG
+.. data:: MEAN_APOG
    :value: 12
 
    Mean lunar apogee (Black Moon Lilith)
 
-.. data:: SE_OSCU_APOG
+.. data:: OSCU_APOG
    :value: 13
 
    Osculating (true) lunar apogee
 
-.. data:: SE_EARTH
+.. data:: EARTH
    :value: 14
 
-.. data:: SE_CHIRON
+.. data:: CHIRON
    :value: 15
 
-.. data:: SE_CERES
+.. data:: CERES
    :value: 17
 
-.. data:: SE_PALLAS
+.. data:: PALLAS
    :value: 18
 
-.. data:: SE_JUNO
+.. data:: JUNO
    :value: 19
 
-.. data:: SE_VESTA
+.. data:: VESTA
    :value: 20
 
 
 Calculation Flags
 ~~~~~~~~~~~~~~~~~
 
-.. data:: SEFLG_SPEED
+.. data:: FLG_SPEED
    :value: 256
 
    Calculate velocity
 
-.. data:: SEFLG_HELCTR
+.. data:: FLG_HELCTR
    :value: 8
 
    Heliocentric position
 
-.. data:: SEFLG_TOPOCTR
+.. data:: FLG_TOPOCTR
    :value: 32768
 
    Topocentric position (requires set_topo)
 
-.. data:: SEFLG_SIDEREAL
+.. data:: FLG_SIDEREAL
    :value: 65536
 
    Sidereal zodiac positions
 
-.. data:: SEFLG_EQUATORIAL
+.. data:: FLG_EQUATORIAL
    :value: 2048
 
    Equatorial coordinates (RA/Dec)
 
-.. data:: SEFLG_J2000
+.. data:: FLG_J2000
    :value: 32
 
    J2000.0 reference frame
 
-.. data:: SEFLG_TRUEPOS
+.. data:: FLG_TRUEPOS
    :value: 16
 
    True geometric position (no light time)
 
-.. data:: SEFLG_NOABERR
+.. data:: FLG_NOABERR
    :value: 1024
 
    No aberration
 
-.. data:: SEFLG_NOGDEFL
+.. data:: FLG_NOGDEFL
    :value: 512
 
    No gravitational deflection
@@ -1721,34 +1721,34 @@ Calculation Flags
 Sidereal Modes
 ~~~~~~~~~~~~~~
 
-.. data:: SE_SIDM_FAGAN_BRADLEY
+.. data:: SIDM_FAGAN_BRADLEY
    :value: 0
 
-.. data:: SE_SIDM_LAHIRI
+.. data:: SIDM_LAHIRI
    :value: 1
 
-.. data:: SE_SIDM_RAMAN
+.. data:: SIDM_RAMAN
    :value: 3
 
-.. data:: SE_SIDM_KRISHNAMURTI
+.. data:: SIDM_KRISHNAMURTI
    :value: 5
 
-.. data:: SE_SIDM_TRUE_CITRA
+.. data:: SIDM_TRUE_CITRA
    :value: 27
 
-.. data:: SE_SIDM_USER
+.. data:: SIDM_USER
    :value: 255
 
 
 Calendar Flags
 ~~~~~~~~~~~~~~
 
-.. data:: SE_GREG_CAL
+.. data:: GREG_CAL
    :value: 1
 
    Gregorian calendar
 
-.. data:: SE_JUL_CAL
+.. data:: JUL_CAL
    :value: 0
 
    Julian calendar
@@ -1757,34 +1757,34 @@ Calendar Flags
 Eclipse Flags
 ~~~~~~~~~~~~~
 
-.. data:: SE_ECL_TOTAL
+.. data:: ECL_TOTAL
    :value: 4
 
-.. data:: SE_ECL_ANNULAR
+.. data:: ECL_ANNULAR
    :value: 8
 
-.. data:: SE_ECL_PARTIAL
+.. data:: ECL_PARTIAL
    :value: 16
 
-.. data:: SE_ECL_PENUMBRAL
+.. data:: ECL_PENUMBRAL
    :value: 64
 
 
 Rise/Set Flags
 ~~~~~~~~~~~~~~
 
-.. data:: SE_CALC_RISE
+.. data:: CALC_RISE
    :value: 1
 
-.. data:: SE_CALC_SET
+.. data:: CALC_SET
    :value: 2
 
-.. data:: SE_CALC_MTRANSIT
+.. data:: CALC_MTRANSIT
    :value: 4
 
    Upper culmination (meridian transit)
 
-.. data:: SE_CALC_ITRANSIT
+.. data:: CALC_ITRANSIT
    :value: 8
 
    Lower transit (anti-culmination)
@@ -1829,7 +1829,7 @@ register_spk_body
    After registration, ``calc_ut()`` will use the SPK kernel for this body
    instead of Keplerian approximations.
 
-   :param ipl: LibEphemeris body ID (e.g., SE_CHIRON)
+   :param ipl: LibEphemeris body ID (e.g., CHIRON)
    :type ipl: int
    :param spk_file: Path to the SPK file
    :type spk_file: str
@@ -1969,25 +1969,25 @@ Minor Body IDs
 Centaurs
 ^^^^^^^^
 
-.. data:: SE_CHIRON
+.. data:: CHIRON
    :value: 15
 
    Chiron (2060)
 
-.. data:: SE_PHOLUS
+.. data:: PHOLUS
    :value: 16
 
    Pholus (5145)
 
-.. data:: SE_NESSUS
+.. data:: NESSUS
 
    Nessus (7066) - Centaur
 
-.. data:: SE_ASBOLUS
+.. data:: ASBOLUS
 
    Asbolus (8405) - Centaur
 
-.. data:: SE_CHARIKLO
+.. data:: CHARIKLO
 
    Chariklo (10199) - Largest known centaur, has ring system
 
@@ -1995,35 +1995,35 @@ Centaurs
 Trans-Neptunian Objects (TNOs)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. data:: SE_ORCUS
+.. data:: ORCUS
 
    Orcus (90482) - Plutino
 
-.. data:: SE_IXION
+.. data:: IXION
 
    Ixion (28978) - Plutino
 
-.. data:: SE_HAUMEA
+.. data:: HAUMEA
 
    Haumea (136108) - Dwarf planet
 
-.. data:: SE_QUAOAR
+.. data:: QUAOAR
 
    Quaoar (50000) - Classical Kuiper belt object
 
-.. data:: SE_MAKEMAKE
+.. data:: MAKEMAKE
 
    Makemake (136472) - Dwarf planet
 
-.. data:: SE_GONGGONG
+.. data:: GONGGONG
 
    Gonggong (225088) - TNO, dwarf planet candidate
 
-.. data:: SE_ERIS
+.. data:: ERIS
 
    Eris (136199) - Largest known dwarf planet
 
-.. data:: SE_SEDNA
+.. data:: SEDNA
 
    Sedna (90377) - Detached TNO
 
@@ -2093,8 +2093,8 @@ Minor Body Resonance Detection
    **Example:**
 
    >>> from libephemeris.minor_bodies import detect_mean_motion_resonance, MINOR_BODY_ELEMENTS
-    >>> from libephemeris.constants import SE_IXION
-    >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
+    >>> from libephemeris.constants import IXION
+    >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[IXION])
     >>> if result:
     ...     print(f"{result.resonance.name}: {result.resonance.p}:{result.resonance.q}")
 
@@ -2449,7 +2449,7 @@ Moon Calculations
 
    :param jd_ut: Julian Day in Universal Time
    :type jd_ut: float
-   :param moon_id: Moon ID (SE_MOON_IO, SE_MOON_TITAN, etc.)
+   :param moon_id: Moon ID (MOON_IO, MOON_TITAN, etc.)
    :type moon_id: int
    :param iflag: Calculation flags
    :type iflag: int
@@ -2459,7 +2459,7 @@ Moon Calculations
    **Example:**
 
    >>> register_moon_spk("jup365.bsp")
-   >>> pos, _ = calc_moon_position(2451545.0, NAIF_IO, SEFLG_SPEED)
+   >>> pos, _ = calc_moon_position(2451545.0, NAIF_IO, FLG_SPEED)
    >>> print(f"Io longitude: {pos[0]:.4f}")
 
 
@@ -2758,7 +2758,7 @@ Generic Hypothetical Functions
 
    :param jd_ut: Julian Day in Universal Time
    :type jd_ut: float
-   :param planet_id: Uranian planet ID (SE_CUPIDO through SE_POSEIDON)
+   :param planet_id: Uranian planet ID (CUPIDO through POSEIDON)
    :type planet_id: int
    :param iflag: Calculation flags
    :type iflag: int
@@ -2872,7 +2872,7 @@ Polar Latitude House Handling
 Special handling for house calculations at extreme latitudes where
 some house systems fail.
 
-.. function:: swe_houses_with_fallback(tjd_ut, lat, lon, hsys, fallback_hsys=ord('W'))
+.. function:: houses_with_fallback(tjd_ut, lat, lon, hsys, fallback_hsys=ord('W'))
 
    Calculate houses with automatic fallback for polar latitudes.
 
@@ -2890,7 +2890,7 @@ some house systems fail.
    :rtype: tuple
 
 
-.. function:: swe_houses_armc_with_fallback(armc, lat, eps, hsys, fallback_hsys=ord('W'))
+.. function:: houses_armc_with_fallback(armc, lat, eps, hsys, fallback_hsys=ord('W'))
 
    Calculate houses from ARMC with fallback.
 
@@ -2937,10 +2937,10 @@ PolarCircleError
    **Example:**
 
    >>> try:
-   ...     cusps, ascmc = swe_houses(jd, 85.0, 0, ord('P'))  # Placidus at 85°N
+   ...     cusps, ascmc = houses(jd, 85.0, 0, ord('P'))  # Placidus at 85°N
    ... except PolarCircleError as e:
    ...     print(f"Polar error: {e}")
-   ...     cusps, ascmc = swe_houses(jd, 85.0, 0, ord('W'))  # Use Whole Sign
+   ...     cusps, ascmc = houses(jd, 85.0, 0, ord('W'))  # Use Whole Sign
 
 
 Eclipse Additional Functions

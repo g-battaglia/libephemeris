@@ -12,29 +12,29 @@ import math
 
 from libephemeris.hypothetical import (
     # Body IDs
-    SE_CUPIDO,
-    SE_HADES,
-    SE_ZEUS,
-    SE_KRONOS,
-    SE_APOLLON,
-    SE_ADMETOS,
-    SE_VULKANUS,
-    SE_POSEIDON,
-    SE_ISIS,
-    SE_TRANSPLUTO,
-    SE_WHITE_MOON,
-    SE_WALDEMATH,
-    SE_VULCAN,
-    SE_PROSERPINA,
-    SE_PLANET_X_LEVERRIER,
+    CUPIDO,
+    HADES,
+    ZEUS,
+    KRONOS,
+    APOLLON,
+    ADMETOS,
+    VULKANUS,
+    POSEIDON,
+    ISIS,
+    TRANSPLUTO,
+    WHITE_MOON,
+    WALDEMATH,
+    VULCAN,
+    PROSERPINA,
+    PLANET_X_LEVERRIER,
     SE_NEPTUNE_LEVERRIER,
     PLANET_X_LEVERRIER,
-    SE_PLANET_X_ADAMS,
+    PLANET_X_ADAMS,
     SE_NEPTUNE_ADAMS,
     PLANET_X_ADAMS,
-    SE_PLANET_X_LOWELL,
     PLANET_X_LOWELL,
-    SE_PLANET_X_PICKERING,
+    PLANET_X_LOWELL,
+    PLANET_X_PICKERING,
     PLANET_X_PICKERING,
     # Functions
     is_hypothetical_body,
@@ -80,7 +80,7 @@ from libephemeris.hypothetical import (
     LOWELL_PLANET_X_ELEMENTS,  # Lowell's Planet X orbital elements
     PICKERING_PLANET_X_ELEMENTS,  # Pickering's Planet O/X orbital elements
 )
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_FICT_OFFSET
+from libephemeris.constants import SUN, MOON, MARS, FICT_OFFSET
 
 
 class TestBodyIdentification:
@@ -89,14 +89,14 @@ class TestBodyIdentification:
     def test_is_hypothetical_body_uranian_planets(self):
         """Test that Uranian planets are identified as hypothetical."""
         uranian_ids = [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ]
         for body_id in uranian_ids:
             assert is_hypothetical_body(body_id), (
@@ -105,7 +105,7 @@ class TestBodyIdentification:
 
     def test_is_hypothetical_body_other(self):
         """Test that other hypothetical bodies are identified correctly."""
-        other_ids = [SE_ISIS, SE_WHITE_MOON, SE_WALDEMATH, SE_VULCAN, SE_PROSERPINA]
+        other_ids = [ISIS, WHITE_MOON, WALDEMATH, VULCAN, PROSERPINA]
         for body_id in other_ids:
             assert is_hypothetical_body(body_id), (
                 f"Body ID {body_id} should be hypothetical"
@@ -113,49 +113,49 @@ class TestBodyIdentification:
 
     def test_is_hypothetical_body_real_planets(self):
         """Test that real planets are NOT identified as hypothetical."""
-        real_ids = [SE_SUN, SE_MOON, SE_MARS, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        real_ids = [SUN, MOON, MARS, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         for body_id in real_ids:
             assert not is_hypothetical_body(body_id), (
                 f"Body ID {body_id} should NOT be hypothetical"
             )
 
     def test_transpluto_isis_alias(self):
-        """Test that SE_TRANSPLUTO and SE_ISIS are the same."""
-        assert SE_TRANSPLUTO == SE_ISIS
+        """Test that TRANSPLUTO and ISIS are the same."""
+        assert TRANSPLUTO == ISIS
 
     def test_planet_x_leverrier_alias(self):
-        """Test that SE_PLANET_X_LEVERRIER is an alias for SE_NEPTUNE_LEVERRIER."""
-        assert SE_PLANET_X_LEVERRIER == SE_NEPTUNE_LEVERRIER
-        assert SE_PLANET_X_LEVERRIER == SE_FICT_OFFSET + 11
-        assert SE_PLANET_X_LEVERRIER == 51
+        """Test that PLANET_X_LEVERRIER is an alias for SE_NEPTUNE_LEVERRIER."""
+        assert PLANET_X_LEVERRIER == SE_NEPTUNE_LEVERRIER
+        assert PLANET_X_LEVERRIER == FICT_OFFSET + 11
+        assert PLANET_X_LEVERRIER == 51
 
     def test_planet_x_leverrier_pyswisseph_alias(self):
         """Test that PLANET_X_LEVERRIER alias works."""
-        assert PLANET_X_LEVERRIER == SE_PLANET_X_LEVERRIER
+        assert PLANET_X_LEVERRIER == PLANET_X_LEVERRIER
 
     def test_planet_x_leverrier_is_hypothetical(self):
-        """Test that SE_PLANET_X_LEVERRIER is identified as hypothetical."""
-        assert is_hypothetical_body(SE_PLANET_X_LEVERRIER)
+        """Test that PLANET_X_LEVERRIER is identified as hypothetical."""
+        assert is_hypothetical_body(PLANET_X_LEVERRIER)
 
     def test_planet_x_adams_alias(self):
-        """Test that SE_PLANET_X_ADAMS is an alias for SE_NEPTUNE_ADAMS."""
-        assert SE_PLANET_X_ADAMS == SE_NEPTUNE_ADAMS
-        assert SE_PLANET_X_ADAMS == SE_FICT_OFFSET + 12
-        assert SE_PLANET_X_ADAMS == 52
+        """Test that PLANET_X_ADAMS is an alias for SE_NEPTUNE_ADAMS."""
+        assert PLANET_X_ADAMS == SE_NEPTUNE_ADAMS
+        assert PLANET_X_ADAMS == FICT_OFFSET + 12
+        assert PLANET_X_ADAMS == 52
 
     def test_planet_x_adams_pyswisseph_alias(self):
         """Test that PLANET_X_ADAMS alias works."""
-        assert PLANET_X_ADAMS == SE_PLANET_X_ADAMS
+        assert PLANET_X_ADAMS == PLANET_X_ADAMS
 
     def test_planet_x_adams_is_hypothetical(self):
-        """Test that SE_PLANET_X_ADAMS is identified as hypothetical."""
-        assert is_hypothetical_body(SE_PLANET_X_ADAMS)
+        """Test that PLANET_X_ADAMS is identified as hypothetical."""
+        assert is_hypothetical_body(PLANET_X_ADAMS)
 
     def test_fict_offset_correct(self):
         """Test that body IDs use correct offset."""
-        assert SE_CUPIDO == SE_FICT_OFFSET + 0
-        assert SE_HADES == SE_FICT_OFFSET + 1
-        assert SE_POSEIDON == SE_FICT_OFFSET + 7
+        assert CUPIDO == FICT_OFFSET + 0
+        assert HADES == FICT_OFFSET + 1
+        assert POSEIDON == FICT_OFFSET + 7
 
 
 class TestBodyNames:
@@ -163,20 +163,20 @@ class TestBodyNames:
 
     def test_get_hypothetical_name_uranian(self):
         """Test getting names of Uranian planets."""
-        assert get_hypothetical_name(SE_CUPIDO) == "Cupido"
-        assert get_hypothetical_name(SE_HADES) == "Hades"
-        assert get_hypothetical_name(SE_ZEUS) == "Zeus"
-        assert get_hypothetical_name(SE_KRONOS) == "Kronos"
-        assert get_hypothetical_name(SE_APOLLON) == "Apollon"
-        assert get_hypothetical_name(SE_ADMETOS) == "Admetos"
-        assert get_hypothetical_name(SE_VULKANUS) == "Vulkanus"
-        assert get_hypothetical_name(SE_POSEIDON) == "Poseidon"
+        assert get_hypothetical_name(CUPIDO) == "Cupido"
+        assert get_hypothetical_name(HADES) == "Hades"
+        assert get_hypothetical_name(ZEUS) == "Zeus"
+        assert get_hypothetical_name(KRONOS) == "Kronos"
+        assert get_hypothetical_name(APOLLON) == "Apollon"
+        assert get_hypothetical_name(ADMETOS) == "Admetos"
+        assert get_hypothetical_name(VULKANUS) == "Vulkanus"
+        assert get_hypothetical_name(POSEIDON) == "Poseidon"
 
     def test_get_hypothetical_name_other(self):
         """Test getting names of other hypothetical bodies."""
-        assert get_hypothetical_name(SE_ISIS) == "Transpluto"
-        assert get_hypothetical_name(SE_WHITE_MOON) == "White Moon (Selena)"
-        assert get_hypothetical_name(SE_WALDEMATH) == "Waldemath"
+        assert get_hypothetical_name(ISIS) == "Transpluto"
+        assert get_hypothetical_name(WHITE_MOON) == "White Moon (Selena)"
+        assert get_hypothetical_name(WALDEMATH) == "Waldemath"
 
     def test_get_hypothetical_name_unknown(self):
         """Test that unknown body ID returns descriptive string."""
@@ -188,9 +188,9 @@ class TestBodyNames:
         bodies = list_hypothetical_bodies()
         assert isinstance(bodies, dict)
         assert len(bodies) > 0
-        assert SE_CUPIDO in bodies
-        assert SE_ISIS in bodies
-        assert bodies[SE_CUPIDO] == "Cupido"
+        assert CUPIDO in bodies
+        assert ISIS in bodies
+        assert bodies[CUPIDO] == "Cupido"
 
 
 class TestUranianElements:
@@ -199,14 +199,14 @@ class TestUranianElements:
     def test_all_uranian_planets_have_elements(self):
         """Test that all Uranian planets have orbital elements defined."""
         uranian_ids = [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ]
         for body_id in uranian_ids:
             assert body_id in URANIAN_ELEMENTS, (
@@ -289,7 +289,7 @@ class TestUranianLongitudeCalculations:
     def test_calc_uranian_longitude_invalid_body(self):
         """Test that invalid body ID raises ValueError."""
         with pytest.raises(ValueError):
-            calc_uranian_longitude(SE_SUN, self.J2000)  # Not a Uranian planet
+            calc_uranian_longitude(SUN, self.J2000)  # Not a Uranian planet
 
 
 class TestUranianPositionCalculations:
@@ -299,7 +299,7 @@ class TestUranianPositionCalculations:
 
     def test_calc_uranian_position_returns_tuple(self):
         """Test that position returns correct tuple format."""
-        pos = calc_uranian_position(SE_CUPIDO, self.J2000)
+        pos = calc_uranian_position(CUPIDO, self.J2000)
         assert isinstance(pos, tuple)
         assert len(pos) == 6
         lon, lat, dist, dlon, dlat, ddist = pos
@@ -346,7 +346,7 @@ class TestUranianPositionCalculations:
     def test_calc_uranian_position_invalid_body(self):
         """Test that invalid body ID raises ValueError."""
         with pytest.raises(ValueError):
-            calc_uranian_position(SE_MOON, self.J2000)
+            calc_uranian_position(MOON, self.J2000)
 
 
 class TestTransplutoCalculations:
@@ -524,22 +524,22 @@ class TestWhiteMoonCalculations:
         assert len(pos) == 6
 
     def test_se_white_moon_in_constants(self):
-        """Test that SE_WHITE_MOON is defined in constants.py."""
+        """Test that WHITE_MOON is defined in constants.py."""
         from libephemeris import constants
 
-        assert hasattr(constants, "SE_WHITE_MOON")
-        assert constants.SE_WHITE_MOON == 56  # SE_FICT_OFFSET + 16
+        assert hasattr(constants, "WHITE_MOON")
+        assert constants.WHITE_MOON == 56  # FICT_OFFSET + 16
 
     def test_white_moon_aliases_in_constants(self):
         """Test that White Moon aliases are defined in constants.py."""
         from libephemeris import constants
 
         assert hasattr(constants, "WHITE_MOON")
-        assert hasattr(constants, "SE_SELENA")
         assert hasattr(constants, "SELENA")
-        assert constants.WHITE_MOON == constants.SE_WHITE_MOON
-        assert constants.SE_SELENA == constants.SE_WHITE_MOON
-        assert constants.SELENA == constants.SE_WHITE_MOON
+        assert hasattr(constants, "SELENA")
+        assert constants.WHITE_MOON == constants.WHITE_MOON
+        assert constants.SELENA == constants.WHITE_MOON
+        assert constants.SELENA == constants.WHITE_MOON
 
     def test_calc_white_moon_default_uses_mean(self):
         """Test that default behavior uses Mean Lilith."""
@@ -670,32 +670,32 @@ class TestMainCalculationFunction:
 
     def test_calc_hypothetical_position_uranian(self):
         """Test that main function routes Uranian planets correctly via calc_uranian_planet."""
-        pos1 = calc_hypothetical_position(SE_CUPIDO, self.J2000)
-        pos2 = calc_uranian_planet(SE_CUPIDO, self.J2000)
+        pos1 = calc_hypothetical_position(CUPIDO, self.J2000)
+        pos2 = calc_uranian_planet(CUPIDO, self.J2000)
         assert pos1 == pos2
 
     def test_calc_hypothetical_position_transpluto(self):
         """Test that main function routes Transpluto correctly."""
-        pos1 = calc_hypothetical_position(SE_ISIS, self.J2000)
+        pos1 = calc_hypothetical_position(ISIS, self.J2000)
         pos2 = calc_transpluto_position(self.J2000)
         assert pos1 == pos2
 
     def test_calc_hypothetical_position_white_moon(self):
         """Test that main function routes White Moon correctly."""
-        pos1 = calc_hypothetical_position(SE_WHITE_MOON, self.J2000)
+        pos1 = calc_hypothetical_position(WHITE_MOON, self.J2000)
         pos2 = calc_white_moon_position(self.J2000)
         assert pos1 == pos2
 
     def test_calc_hypothetical_position_waldemath(self):
         """Test that main function routes Waldemath correctly."""
-        pos1 = calc_hypothetical_position(SE_WALDEMATH, self.J2000)
+        pos1 = calc_hypothetical_position(WALDEMATH, self.J2000)
         pos2 = calc_waldemath_position(self.J2000)
         assert pos1 == pos2
 
     def test_calc_hypothetical_position_invalid_body(self):
         """Test that invalid body ID raises ValueError."""
         with pytest.raises(ValueError):
-            calc_hypothetical_position(SE_SUN, self.J2000)
+            calc_hypothetical_position(SUN, self.J2000)
 
     def test_calc_hypothetical_position_all_supported_bodies(self):
         """Test that all named hypothetical bodies can be calculated."""
@@ -717,7 +717,7 @@ class TestPositionConsistency:
         jd1 = self.J2000
         jd2 = self.J2000 + 36525  # 100 years
 
-        for body_id in [SE_CUPIDO, SE_POSEIDON, SE_ISIS]:
+        for body_id in [CUPIDO, POSEIDON, ISIS]:
             pos1 = calc_hypothetical_position(body_id, jd1)
             pos2 = calc_hypothetical_position(body_id, jd2)
             assert pos1[0] != pos2[0], (
@@ -726,7 +726,7 @@ class TestPositionConsistency:
 
     def test_positions_continuous(self):
         """Test that positions change smoothly (no jumps except at 360/0)."""
-        body_id = SE_KRONOS
+        body_id = KRONOS
         jd = self.J2000
         prev_lon = calc_hypothetical_position(body_id, jd)[0]
 
@@ -746,7 +746,7 @@ class TestHypotheticalElements:
 
     def test_hypothetical_elements_have_transpluto(self):
         """Test that HYPOTHETICAL_ELEMENTS contains Transpluto."""
-        assert SE_ISIS in HYPOTHETICAL_ELEMENTS
+        assert ISIS in HYPOTHETICAL_ELEMENTS
 
     def test_hypothetical_elements_fields(self):
         """Test that elements have required fields."""
@@ -800,7 +800,7 @@ class TestCalcCupido:
     def test_calc_cupido_latitude_zero(self):
         """Test that Cupido latitude matches orbital inclination model."""
         pos = calc_cupido(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         if elements.i == 0.0:
             assert pos[1] == 0.0, "Cupido should have zero latitude for i=0"
         else:
@@ -812,7 +812,7 @@ class TestCalcCupido:
     def test_calc_cupido_distance_correct(self):
         """Test that Cupido distance is close to semi-major axis."""
         pos = calc_cupido(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         # For nearly circular orbit (e=0.0046), distance ~ semi-major axis
         # Max deviation = a * e = 40.99837 * 0.0046 = 0.189 AU
         assert abs(pos[2] - elements.a) < 0.2, (
@@ -836,7 +836,7 @@ class TestCalcCupido:
     def test_calc_cupido_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_cupido(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         # Velocity computed via central-difference numerical differentiation
         # may differ slightly from mean motion for eccentric orbits
         assert abs(pos[3] - elements.n) < elements.n * 0.1, (
@@ -846,7 +846,7 @@ class TestCalcCupido:
     def test_calc_cupido_latitude_velocity_small(self):
         """Test that latitude and distance velocities are small."""
         pos = calc_cupido(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         # Cupido has i=1.0833, so latitude velocity can be non-zero
         assert abs(pos[4]) < 0.01, (
             f"Latitude velocity should be small, got {pos[4]}"
@@ -863,7 +863,7 @@ class TestCalcCupido:
         # to J2000 frame, so it won't exactly match any simple L0.
         # Just verify it's in valid range and roughly consistent.
         assert 0.0 <= pos[0] < 360.0, f"At epoch, longitude should be valid, got {pos[0]}"
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         # The longitude involves precession from J1900 equinox to J2000,
         # so allow generous tolerance
         expected_approx = (elements.M0 + elements.omega + elements.Omega) % 360.0
@@ -881,7 +881,7 @@ class TestCalcCupido:
         pos2 = calc_cupido(self.J2000 + 365.25)  # 1 year later
 
         # Calculate expected motion in 1 year using URANIAN_KEPLERIAN_ELEMENTS
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -897,7 +897,7 @@ class TestCalcCupido:
 
     def test_calc_cupido_orbital_period(self):
         """Test that Cupido completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -936,7 +936,7 @@ class TestCalcCupido:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_cupido(self.J2000)
-        uranian_pos = calc_uranian_position(SE_CUPIDO, self.J2000)
+        uranian_pos = calc_uranian_position(CUPIDO, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -950,9 +950,9 @@ class TestCalcCupido:
         assert uranian_pos[3] > 0, "Uranian motion should be prograde"
 
     def test_se_cupido_constant_value(self):
-        """Test that SE_CUPIDO has correct value (SE_FICT_OFFSET + 0 = 40)."""
-        assert SE_CUPIDO == 40
-        assert SE_CUPIDO == SE_FICT_OFFSET + 0
+        """Test that CUPIDO has correct value (FICT_OFFSET + 0 = 40)."""
+        assert CUPIDO == 40
+        assert CUPIDO == FICT_OFFSET + 0
 
     def test_calc_cupido_exportable_from_main_module(self):
         """Test that calc_cupido is exported from main libephemeris module."""
@@ -1061,7 +1061,7 @@ class TestCalcHades:
 
     def test_calc_hades_orbital_period(self):
         """Test that Hades completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_HADES]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[HADES]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -1103,7 +1103,7 @@ class TestCalcHades:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_hades(self.J2000)
-        uranian_pos = calc_uranian_position(SE_HADES, self.J2000)
+        uranian_pos = calc_uranian_position(HADES, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -1114,9 +1114,9 @@ class TestCalcHades:
         assert uranian_pos[3] > 0, "Uranian motion should be prograde"
 
     def test_se_hades_constant_value(self):
-        """Test that SE_HADES has correct value (SE_FICT_OFFSET + 1 = 41)."""
-        assert SE_HADES == 41
-        assert SE_HADES == SE_FICT_OFFSET + 1
+        """Test that HADES has correct value (FICT_OFFSET + 1 = 41)."""
+        assert HADES == 41
+        assert HADES == FICT_OFFSET + 1
 
     def test_calc_hades_exportable_from_main_module(self):
         """Test that calc_hades is exported from main libephemeris module."""
@@ -1198,7 +1198,7 @@ class TestCalcZeus:
     def test_calc_zeus_distance_correct(self):
         """Test that Zeus distance is close to semi-major axis."""
         pos = calc_zeus(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         # Zeus has e=0.0012, so distance ~ a within a*e = 0.071 AU
         assert abs(pos[2] - elements.a) < 0.1, (
             f"Zeus distance should be ~{elements.a} AU, got {pos[2]}"
@@ -1221,7 +1221,7 @@ class TestCalcZeus:
     def test_calc_zeus_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_zeus(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         # Velocity computed via central-difference numerical differentiation
         assert abs(pos[3] - elements.n) < elements.n * 0.1, (
             f"Daily motion should be ~{elements.n}, got {pos[3]}"
@@ -1240,7 +1240,7 @@ class TestCalcZeus:
         pos = calc_zeus(self.J1900)
         assert 0.0 <= pos[0] < 360.0, f"At epoch, longitude should be valid, got {pos[0]}"
         # Longitude involves precession from J1900 to J2000, so allow generous tolerance
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         expected_approx = (elements.M0 + elements.omega) % 360.0
         diff = abs(pos[0] - expected_approx)
         if diff > 180:
@@ -1255,7 +1255,7 @@ class TestCalcZeus:
         pos2 = calc_zeus(self.J2000 + 365.25)  # 1 year later
 
         # Calculate expected motion in 1 year using URANIAN_KEPLERIAN_ELEMENTS
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -1271,7 +1271,7 @@ class TestCalcZeus:
 
     def test_calc_zeus_orbital_period(self):
         """Test that Zeus completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -1310,7 +1310,7 @@ class TestCalcZeus:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_zeus(self.J2000)
-        uranian_pos = calc_uranian_position(SE_ZEUS, self.J2000)
+        uranian_pos = calc_uranian_position(ZEUS, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -1323,9 +1323,9 @@ class TestCalcZeus:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_zeus_constant_value(self):
-        """Test that SE_ZEUS has correct value (SE_FICT_OFFSET + 2 = 42)."""
-        assert SE_ZEUS == 42
-        assert SE_ZEUS == SE_FICT_OFFSET + 2
+        """Test that ZEUS has correct value (FICT_OFFSET + 2 = 42)."""
+        assert ZEUS == 42
+        assert ZEUS == FICT_OFFSET + 2
 
     def test_calc_zeus_exportable_from_main_module(self):
         """Test that calc_zeus is exported from main libephemeris module."""
@@ -1391,7 +1391,7 @@ class TestCalcKronos:
     def test_calc_kronos_distance_correct(self):
         """Test that Kronos distance is close to semi-major axis."""
         pos = calc_kronos(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         # Kronos has e=0.00305, so distance ~ a within a*e = 0.198 AU
         assert abs(pos[2] - elements.a) < 0.3, (
             f"Kronos distance should be ~{elements.a} AU, got {pos[2]}"
@@ -1414,7 +1414,7 @@ class TestCalcKronos:
     def test_calc_kronos_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_kronos(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         assert abs(pos[3] - elements.n) < elements.n * 0.1, (
             f"Daily motion should be ~{elements.n}, got {pos[3]}"
         )
@@ -1431,7 +1431,7 @@ class TestCalcKronos:
         """Test that longitude at J1900.0 is in valid range."""
         pos = calc_kronos(self.J1900)
         assert 0.0 <= pos[0] < 360.0, f"At epoch, longitude should be valid, got {pos[0]}"
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         expected_approx = (elements.M0 + elements.omega) % 360.0
         diff = abs(pos[0] - expected_approx)
         if diff > 180:
@@ -1445,7 +1445,7 @@ class TestCalcKronos:
         pos1 = calc_kronos(self.J2000)
         pos2 = calc_kronos(self.J2000 + 365.25)  # 1 year later
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -1461,7 +1461,7 @@ class TestCalcKronos:
 
     def test_calc_kronos_orbital_period(self):
         """Test that Kronos completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -1499,7 +1499,7 @@ class TestCalcKronos:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_kronos(self.J2000)
-        uranian_pos = calc_uranian_position(SE_KRONOS, self.J2000)
+        uranian_pos = calc_uranian_position(KRONOS, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -1512,9 +1512,9 @@ class TestCalcKronos:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_kronos_constant_value(self):
-        """Test that SE_KRONOS has correct value (SE_FICT_OFFSET + 3 = 43)."""
-        assert SE_KRONOS == 43
-        assert SE_KRONOS == SE_FICT_OFFSET + 3
+        """Test that KRONOS has correct value (FICT_OFFSET + 3 = 43)."""
+        assert KRONOS == 43
+        assert KRONOS == FICT_OFFSET + 3
 
     def test_calc_kronos_exportable_from_main_module(self):
         """Test that calc_kronos is exported from main libephemeris module."""
@@ -1582,7 +1582,7 @@ class TestCalcApollon:
     def test_calc_apollon_distance_correct(self):
         """Test that Apollon distance matches semi-major axis (circular orbit)."""
         pos = calc_apollon(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[APOLLON]
         assert abs(pos[2] - elements.a) < 0.001, (
             f"Apollon distance should be ~{elements.a} AU, got {pos[2]}"
         )
@@ -1601,7 +1601,7 @@ class TestCalcApollon:
     def test_calc_apollon_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_apollon(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[APOLLON]
         # Velocity computed via central-difference numerical differentiation
         # For truly circular orbit, should be very close but not necessarily exact
         # due to precession effect on ecliptic longitude
@@ -1620,7 +1620,7 @@ class TestCalcApollon:
     def test_calc_apollon_at_epoch(self):
         """Test that longitude at J1900.0 is close to M0 (circular orbit)."""
         pos = calc_apollon(self.J1900)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[APOLLON]
         # For circular orbit with omega=0, Omega=0, longitude ~ M0 + precession offset
         diff = abs(pos[0] - elements.M0)
         if diff > 180:
@@ -1634,7 +1634,7 @@ class TestCalcApollon:
         pos1 = calc_apollon(self.J2000)
         pos2 = calc_apollon(self.J2000 + 365.25)  # 1 year later
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[APOLLON]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -1650,7 +1650,7 @@ class TestCalcApollon:
 
     def test_calc_apollon_orbital_period(self):
         """Test that Apollon completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_APOLLON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[APOLLON]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -1688,7 +1688,7 @@ class TestCalcApollon:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_apollon(self.J2000)
-        uranian_pos = calc_uranian_position(SE_APOLLON, self.J2000)
+        uranian_pos = calc_uranian_position(APOLLON, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -1701,9 +1701,9 @@ class TestCalcApollon:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_apollon_constant_value(self):
-        """Test that SE_APOLLON has correct value (SE_FICT_OFFSET + 4 = 44)."""
-        assert SE_APOLLON == 44
-        assert SE_APOLLON == SE_FICT_OFFSET + 4
+        """Test that APOLLON has correct value (FICT_OFFSET + 4 = 44)."""
+        assert APOLLON == 44
+        assert APOLLON == FICT_OFFSET + 4
 
     def test_calc_apollon_exportable_from_main_module(self):
         """Test that calc_apollon is exported from main libephemeris module."""
@@ -1770,7 +1770,7 @@ class TestCalcAdmetos:
     def test_calc_admetos_distance_correct(self):
         """Test that Admetos distance matches semi-major axis (circular orbit)."""
         pos = calc_admetos(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ADMETOS]
         assert abs(pos[2] - elements.a) < 0.001, (
             f"Admetos distance should be ~{elements.a} AU, got {pos[2]}"
         )
@@ -1789,7 +1789,7 @@ class TestCalcAdmetos:
     def test_calc_admetos_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_admetos(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ADMETOS]
         assert abs(pos[3] - elements.n) < elements.n * 0.01, (
             f"Daily motion should be ~{elements.n}, got {pos[3]}"
         )
@@ -1803,7 +1803,7 @@ class TestCalcAdmetos:
     def test_calc_admetos_at_epoch(self):
         """Test that longitude at J1900.0 is close to M0 (circular orbit)."""
         pos = calc_admetos(self.J1900)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ADMETOS]
         diff = abs(pos[0] - elements.M0)
         if diff > 180:
             diff = 360 - diff
@@ -1816,7 +1816,7 @@ class TestCalcAdmetos:
         pos1 = calc_admetos(self.J2000)
         pos2 = calc_admetos(self.J2000 + 365.25)  # 1 year later
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ADMETOS]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -1832,7 +1832,7 @@ class TestCalcAdmetos:
 
     def test_calc_admetos_orbital_period(self):
         """Test that Admetos completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ADMETOS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[ADMETOS]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -1870,7 +1870,7 @@ class TestCalcAdmetos:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_admetos(self.J2000)
-        uranian_pos = calc_uranian_position(SE_ADMETOS, self.J2000)
+        uranian_pos = calc_uranian_position(ADMETOS, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -1883,9 +1883,9 @@ class TestCalcAdmetos:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_admetos_constant_value(self):
-        """Test that SE_ADMETOS has correct value (SE_FICT_OFFSET + 5 = 45)."""
-        assert SE_ADMETOS == 45
-        assert SE_ADMETOS == SE_FICT_OFFSET + 5
+        """Test that ADMETOS has correct value (FICT_OFFSET + 5 = 45)."""
+        assert ADMETOS == 45
+        assert ADMETOS == FICT_OFFSET + 5
 
     def test_calc_admetos_exportable_from_main_module(self):
         """Test that calc_admetos is exported from main libephemeris module."""
@@ -1954,7 +1954,7 @@ class TestCalcVulkanus:
     def test_calc_vulkanus_distance_correct(self):
         """Test that Vulkanus distance matches semi-major axis (circular orbit)."""
         pos = calc_vulkanus(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[VULKANUS]
         assert abs(pos[2] - elements.a) < 0.001, (
             f"Vulkanus distance should be ~{elements.a} AU, got {pos[2]}"
         )
@@ -1978,7 +1978,7 @@ class TestCalcVulkanus:
     def test_calc_vulkanus_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_vulkanus(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[VULKANUS]
         assert abs(pos[3] - elements.n) < elements.n * 0.01, (
             f"Daily motion should be ~{elements.n}, got {pos[3]}"
         )
@@ -1992,7 +1992,7 @@ class TestCalcVulkanus:
     def test_calc_vulkanus_at_epoch(self):
         """Test that longitude at J1900.0 is close to M0 (circular orbit)."""
         pos = calc_vulkanus(self.J1900)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[VULKANUS]
         diff = abs(pos[0] - elements.M0)
         if diff > 180:
             diff = 360 - diff
@@ -2005,7 +2005,7 @@ class TestCalcVulkanus:
         pos1 = calc_vulkanus(self.J2000)
         pos2 = calc_vulkanus(self.J2000 + 365.25)  # 1 year later
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[VULKANUS]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -2021,7 +2021,7 @@ class TestCalcVulkanus:
 
     def test_calc_vulkanus_orbital_period(self):
         """Test that Vulkanus completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_VULKANUS]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[VULKANUS]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -2059,7 +2059,7 @@ class TestCalcVulkanus:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_vulkanus(self.J2000)
-        uranian_pos = calc_uranian_position(SE_VULKANUS, self.J2000)
+        uranian_pos = calc_uranian_position(VULKANUS, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -2072,9 +2072,9 @@ class TestCalcVulkanus:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_vulkanus_constant_value(self):
-        """Test that SE_VULKANUS has correct value (SE_FICT_OFFSET + 6 = 46)."""
-        assert SE_VULKANUS == 46
-        assert SE_VULKANUS == SE_FICT_OFFSET + 6
+        """Test that VULKANUS has correct value (FICT_OFFSET + 6 = 46)."""
+        assert VULKANUS == 46
+        assert VULKANUS == FICT_OFFSET + 6
 
     def test_calc_vulkanus_exportable_from_main_module(self):
         """Test that calc_vulkanus is exported from main libephemeris module."""
@@ -2143,7 +2143,7 @@ class TestCalcPoseidon:
     def test_calc_poseidon_distance_correct(self):
         """Test that Poseidon distance matches semi-major axis (circular orbit)."""
         pos = calc_poseidon(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[POSEIDON]
         assert abs(pos[2] - elements.a) < 0.001, (
             f"Poseidon distance should be ~{elements.a} AU, got {pos[2]}"
         )
@@ -2165,7 +2165,7 @@ class TestCalcPoseidon:
     def test_calc_poseidon_velocity_reasonable(self):
         """Test that velocity is close to mean motion from URANIAN_KEPLERIAN_ELEMENTS."""
         pos = calc_poseidon(self.J2000)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[POSEIDON]
         assert abs(pos[3] - elements.n) < elements.n * 0.01, (
             f"Daily motion should be ~{elements.n}, got {pos[3]}"
         )
@@ -2179,7 +2179,7 @@ class TestCalcPoseidon:
     def test_calc_poseidon_at_epoch(self):
         """Test that longitude at J1900.0 is close to M0 (circular orbit)."""
         pos = calc_poseidon(self.J1900)
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[POSEIDON]
         diff = abs(pos[0] - elements.M0)
         if diff > 180:
             diff = 360 - diff
@@ -2192,7 +2192,7 @@ class TestCalcPoseidon:
         pos1 = calc_poseidon(self.J2000)
         pos2 = calc_poseidon(self.J2000 + 365.25)  # 1 year later
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[POSEIDON]
         expected_motion = elements.n * 365.25
 
         # Calculate actual motion (handle wrap-around)
@@ -2208,7 +2208,7 @@ class TestCalcPoseidon:
 
     def test_calc_poseidon_orbital_period(self):
         """Test that Poseidon completes one orbit in expected period."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_POSEIDON]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[POSEIDON]
         period_days = 360.0 / elements.n
         expected_period_years = period_days / 365.25
 
@@ -2246,7 +2246,7 @@ class TestCalcPoseidon:
         that progress at similar rates over time.
         """
         keplerian_pos = calc_poseidon(self.J2000)
-        uranian_pos = calc_uranian_position(SE_POSEIDON, self.J2000)
+        uranian_pos = calc_uranian_position(POSEIDON, self.J2000)
 
         # Both should be in valid range
         assert 0.0 <= keplerian_pos[0] < 360.0
@@ -2259,9 +2259,9 @@ class TestCalcPoseidon:
         assert abs(uranian_pos[3]) < 1.0, "Uranian velocity should be small"
 
     def test_se_poseidon_constant_value(self):
-        """Test that SE_POSEIDON has correct value (SE_FICT_OFFSET + 7 = 47)."""
-        assert SE_POSEIDON == 47
-        assert SE_POSEIDON == SE_FICT_OFFSET + 7
+        """Test that POSEIDON has correct value (FICT_OFFSET + 7 = 47)."""
+        assert POSEIDON == 47
+        assert POSEIDON == FICT_OFFSET + 7
 
     def test_calc_poseidon_exportable_from_main_module(self):
         """Test that calc_poseidon is exported from main libephemeris module."""
@@ -2300,14 +2300,14 @@ class TestCalcUranianPlanet:
 
     # All Uranian body IDs
     URANIAN_BODY_IDS = [
-        SE_CUPIDO,
-        SE_HADES,
-        SE_ZEUS,
-        SE_KRONOS,
-        SE_APOLLON,
-        SE_ADMETOS,
-        SE_VULKANUS,
-        SE_POSEIDON,
+        CUPIDO,
+        HADES,
+        ZEUS,
+        KRONOS,
+        APOLLON,
+        ADMETOS,
+        VULKANUS,
+        POSEIDON,
     ]
 
     def test_calc_uranian_planet_returns_tuple(self):
@@ -2341,10 +2341,10 @@ class TestCalcUranianPlanet:
     def test_calc_uranian_planet_invalid_body(self):
         """Test that invalid body ID raises ValueError."""
         with pytest.raises(ValueError):
-            calc_uranian_planet(0, self.J2000)  # SE_SUN is not a Uranian planet
+            calc_uranian_planet(0, self.J2000)  # SUN is not a Uranian planet
 
         with pytest.raises(ValueError):
-            calc_uranian_planet(48, self.J2000)  # SE_ISIS is not a Uranian planet
+            calc_uranian_planet(48, self.J2000)  # ISIS is not a Uranian planet
 
         with pytest.raises(ValueError):
             calc_uranian_planet(999, self.J2000)
@@ -2352,42 +2352,42 @@ class TestCalcUranianPlanet:
     def test_calc_uranian_planet_matches_individual_functions(self):
         """Test that generic function matches individual calc_* functions."""
         # Test that calc_uranian_planet matches calc_cupido
-        generic = calc_uranian_planet(SE_CUPIDO, self.J2000)
+        generic = calc_uranian_planet(CUPIDO, self.J2000)
         individual = calc_cupido(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_cupido"
 
         # Test that calc_uranian_planet matches calc_hades
-        generic = calc_uranian_planet(SE_HADES, self.J2000)
+        generic = calc_uranian_planet(HADES, self.J2000)
         individual = calc_hades(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_hades"
 
         # Test that calc_uranian_planet matches calc_zeus
-        generic = calc_uranian_planet(SE_ZEUS, self.J2000)
+        generic = calc_uranian_planet(ZEUS, self.J2000)
         individual = calc_zeus(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_zeus"
 
         # Test that calc_uranian_planet matches calc_kronos
-        generic = calc_uranian_planet(SE_KRONOS, self.J2000)
+        generic = calc_uranian_planet(KRONOS, self.J2000)
         individual = calc_kronos(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_kronos"
 
         # Test that calc_uranian_planet matches calc_apollon
-        generic = calc_uranian_planet(SE_APOLLON, self.J2000)
+        generic = calc_uranian_planet(APOLLON, self.J2000)
         individual = calc_apollon(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_apollon"
 
         # Test that calc_uranian_planet matches calc_admetos
-        generic = calc_uranian_planet(SE_ADMETOS, self.J2000)
+        generic = calc_uranian_planet(ADMETOS, self.J2000)
         individual = calc_admetos(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_admetos"
 
         # Test that calc_uranian_planet matches calc_vulkanus
-        generic = calc_uranian_planet(SE_VULKANUS, self.J2000)
+        generic = calc_uranian_planet(VULKANUS, self.J2000)
         individual = calc_vulkanus(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_vulkanus"
 
         # Test that calc_uranian_planet matches calc_poseidon
-        generic = calc_uranian_planet(SE_POSEIDON, self.J2000)
+        generic = calc_uranian_planet(POSEIDON, self.J2000)
         individual = calc_poseidon(self.J2000)
         assert generic == individual, "calc_uranian_planet should match calc_poseidon"
 
@@ -2473,7 +2473,7 @@ class TestCalcUranianPlanet:
         import libephemeris
 
         assert hasattr(libephemeris, "calc_uranian_planet")
-        pos = libephemeris.calc_uranian_planet(SE_CUPIDO, self.J2000)
+        pos = libephemeris.calc_uranian_planet(CUPIDO, self.J2000)
         assert len(pos) == 6
 
     def test_uranian_keplerian_elements_exportable(self):
@@ -2481,7 +2481,7 @@ class TestCalcUranianPlanet:
         import libephemeris
 
         assert hasattr(libephemeris, "URANIAN_KEPLERIAN_ELEMENTS")
-        assert SE_CUPIDO in libephemeris.URANIAN_KEPLERIAN_ELEMENTS
+        assert CUPIDO in libephemeris.URANIAN_KEPLERIAN_ELEMENTS
 
     def test_calc_uranian_planet_circular_orbits_have_near_constant_velocity(self):
         """Test that circular orbit bodies have velocity close to mean motion."""
@@ -2506,11 +2506,11 @@ class TestCalcUranianPlanet:
 
     def test_calc_uranian_planet_hades_has_elliptic_orbit(self):
         """Test that Hades has small but non-zero eccentricity."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_HADES]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[HADES]
         assert elements.e > 0, "Hades should have non-zero eccentricity"
         assert elements.e < 0.01, "Hades eccentricity should be small"
 
-        pos = calc_uranian_planet(SE_HADES, self.J2000)
+        pos = calc_uranian_planet(HADES, self.J2000)
         # Hades should have small latitude due to inclination
         assert abs(pos[1]) <= elements.i + 0.1, (
             f"Hades latitude {pos[1]} should be within inclination {elements.i}"
@@ -2524,13 +2524,13 @@ class TestCalcUranianPlanet:
             distances[body_id] = pos[2]
 
         # Cupido < Hades < Zeus < Kronos < Apollon < Admetos < Vulkanus < Poseidon
-        assert distances[SE_CUPIDO] < distances[SE_HADES]
-        assert distances[SE_HADES] < distances[SE_ZEUS]
-        assert distances[SE_ZEUS] < distances[SE_KRONOS]
-        assert distances[SE_KRONOS] < distances[SE_APOLLON]
-        assert distances[SE_APOLLON] < distances[SE_ADMETOS]
-        assert distances[SE_ADMETOS] < distances[SE_VULKANUS]
-        assert distances[SE_VULKANUS] < distances[SE_POSEIDON]
+        assert distances[CUPIDO] < distances[HADES]
+        assert distances[HADES] < distances[ZEUS]
+        assert distances[ZEUS] < distances[KRONOS]
+        assert distances[KRONOS] < distances[APOLLON]
+        assert distances[APOLLON] < distances[ADMETOS]
+        assert distances[ADMETOS] < distances[VULKANUS]
+        assert distances[VULKANUS] < distances[POSEIDON]
 
     def test_calc_uranian_planet_bodies_ordered_by_velocity(self):
         """Test that bodies are in correct order by velocity (faster = closer)."""
@@ -2540,25 +2540,25 @@ class TestCalcUranianPlanet:
             velocities[body_id] = pos[3]
 
         # Poseidon < Vulkanus < Admetos < Apollon < Kronos < Zeus < Hades < Cupido
-        assert velocities[SE_POSEIDON] < velocities[SE_VULKANUS]
-        assert velocities[SE_VULKANUS] < velocities[SE_ADMETOS]
-        assert velocities[SE_ADMETOS] < velocities[SE_APOLLON]
-        assert velocities[SE_APOLLON] < velocities[SE_KRONOS]
-        assert velocities[SE_KRONOS] < velocities[SE_ZEUS]
-        assert velocities[SE_ZEUS] < velocities[SE_HADES]
-        assert velocities[SE_HADES] < velocities[SE_CUPIDO]
+        assert velocities[POSEIDON] < velocities[VULKANUS]
+        assert velocities[VULKANUS] < velocities[ADMETOS]
+        assert velocities[ADMETOS] < velocities[APOLLON]
+        assert velocities[APOLLON] < velocities[KRONOS]
+        assert velocities[KRONOS] < velocities[ZEUS]
+        assert velocities[ZEUS] < velocities[HADES]
+        assert velocities[HADES] < velocities[CUPIDO]
 
     @pytest.mark.parametrize(
         "body_id,expected_name",
         [
-            (SE_CUPIDO, "Cupido"),
-            (SE_HADES, "Hades"),
-            (SE_ZEUS, "Zeus"),
-            (SE_KRONOS, "Kronos"),
-            (SE_APOLLON, "Apollon"),
-            (SE_ADMETOS, "Admetos"),
-            (SE_VULKANUS, "Vulkanus"),
-            (SE_POSEIDON, "Poseidon"),
+            (CUPIDO, "Cupido"),
+            (HADES, "Hades"),
+            (ZEUS, "Zeus"),
+            (KRONOS, "Kronos"),
+            (APOLLON, "Apollon"),
+            (ADMETOS, "Admetos"),
+            (VULKANUS, "Vulkanus"),
+            (POSEIDON, "Poseidon"),
         ],
     )
     def test_calc_uranian_planet_elements_have_correct_names(
@@ -2580,29 +2580,29 @@ class TestCalcUranianPlanet:
 
 
 class TestUranianIntegrationWithPlanets:
-    """Tests for Uranian planet integration with planets.py swe_calc_ut()."""
+    """Tests for Uranian planet integration with planets.py calc_ut()."""
 
     J2000 = 2451545.0
 
     # All Uranian body IDs (40-47)
     URANIAN_BODY_IDS = [
-        SE_CUPIDO,
-        SE_HADES,
-        SE_ZEUS,
-        SE_KRONOS,
-        SE_APOLLON,
-        SE_ADMETOS,
-        SE_VULKANUS,
-        SE_POSEIDON,
+        CUPIDO,
+        HADES,
+        ZEUS,
+        KRONOS,
+        APOLLON,
+        ADMETOS,
+        VULKANUS,
+        POSEIDON,
     ]
 
     def test_swe_calc_ut_routes_uranian_planets(self):
-        """Test that swe_calc_ut correctly routes Uranian planet body IDs."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        """Test that calc_ut correctly routes Uranian planet body IDs."""
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
         for body_id in self.URANIAN_BODY_IDS:
-            result, flags = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            result, flags = calc_ut(self.J2000, body_id, FLG_SPEED)
             assert isinstance(result, tuple), f"Body {body_id} should return tuple"
             assert len(result) == 6, f"Body {body_id} should return 6 elements"
 
@@ -2613,15 +2613,15 @@ class TestUranianIntegrationWithPlanets:
             assert dist > 0, f"Body {body_id} distance should be positive"
 
     def test_swe_calc_ut_matches_hypothetical_module(self):
-        """Test that swe_calc_ut results match hypothetical.calc_uranian_planet."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        """Test that calc_ut results match hypothetical.calc_uranian_planet."""
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
         for body_id in self.URANIAN_BODY_IDS:
-            swe_result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            swe_result, _ = calc_ut(self.J2000, body_id, FLG_SPEED)
             hypo_result = calc_uranian_planet(body_id, self.J2000)
 
-            # swe_calc_ut converts UT to TT internally, so results may differ
+            # calc_ut converts UT to TT internally, so results may differ
             # slightly from direct TT-based calc_uranian_planet.
             # Longitude tolerance: ~1 degree accounts for delta-T correction
             assert abs(swe_result[0] - hypo_result[0]) < 1.0, (
@@ -2642,11 +2642,11 @@ class TestUranianIntegrationWithPlanets:
 
     def test_swe_calc_uranian_planets_have_valid_positions(self):
         """Test that Uranian planets have valid astronomical positions."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
         for body_id in self.URANIAN_BODY_IDS:
-            result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            result, _ = calc_ut(self.J2000, body_id, FLG_SPEED)
             lon, lat, dist, dlon, dlat, ddist = result
 
             # All Uranian planets are beyond Neptune (~30 AU)
@@ -2659,24 +2659,24 @@ class TestUranianIntegrationWithPlanets:
 
     def test_swe_calc_ut_body_id_range(self):
         """Test that exactly body IDs 40-47 are routed to hypothetical module."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED, SE_FICT_OFFSET
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED, FICT_OFFSET
 
         # Body IDs 40-47 should work (Uranian planets)
         for i in range(8):
-            body_id = SE_FICT_OFFSET + i
-            result, _ = swe_calc_ut(self.J2000, body_id, SEFLG_SPEED)
+            body_id = FICT_OFFSET + i
+            result, _ = calc_ut(self.J2000, body_id, FLG_SPEED)
             assert isinstance(result, tuple), f"Body ID {body_id} should work"
 
     def test_se_cupido_through_swe_calc_ut(self):
-        """Test Cupido (SE_FICT_OFFSET + 0 = 40) via swe_calc_ut."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        """Test Cupido (FICT_OFFSET + 0 = 40) via calc_ut."""
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
-        result, _ = swe_calc_ut(self.J2000, SE_CUPIDO, SEFLG_SPEED)
+        result, _ = calc_ut(self.J2000, CUPIDO, FLG_SPEED)
         lon, lat, dist, dlon, dlat, ddist = result
 
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
         if elements.i == 0.0:
             assert lat == 0.0, "Cupido should be on ecliptic (zero latitude)"
         else:
@@ -2687,11 +2687,11 @@ class TestUranianIntegrationWithPlanets:
         assert dlon > 0, "Cupido should have prograde motion"
 
     def test_se_poseidon_through_swe_calc_ut(self):
-        """Test Poseidon (SE_FICT_OFFSET + 7 = 47) via swe_calc_ut."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        """Test Poseidon (FICT_OFFSET + 7 = 47) via calc_ut."""
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
-        result, _ = swe_calc_ut(self.J2000, SE_POSEIDON, SEFLG_SPEED)
+        result, _ = calc_ut(self.J2000, POSEIDON, FLG_SPEED)
         lon, lat, dist, dlon, dlat, ddist = result
 
         # Poseidon specific assertions
@@ -2702,13 +2702,13 @@ class TestUranianIntegrationWithPlanets:
         assert dist > 80.0, "Poseidon distance should be > 80 AU"
         assert dlon > 0, "Poseidon should have prograde motion"
         # Poseidon should be slowest Uranian planet
-        # swe_calc_ut applies UT-to-TT conversion which affects velocity slightly
+        # calc_ut applies UT-to-TT conversion which affects velocity slightly
         assert dlon < 0.01, "Poseidon should move very slowly"
 
     def test_swe_calc_uranian_different_dates(self):
         """Test Uranian planets at different dates."""
-        from libephemeris import swe_calc_ut
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris import calc_ut
+        from libephemeris.constants import FLG_SPEED
 
         test_dates = [
             self.J2000 - 36525,  # 100 years before
@@ -2718,7 +2718,7 @@ class TestUranianIntegrationWithPlanets:
 
         for jd in test_dates:
             for body_id in self.URANIAN_BODY_IDS:
-                result, _ = swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                result, _ = calc_ut(jd, body_id, FLG_SPEED)
                 assert 0.0 <= result[0] < 360.0, (
                     f"Body {body_id} at JD {jd} longitude out of range"
                 )
@@ -2830,10 +2830,10 @@ class TestCalcTranspluto:
         assert 0 < elements.n < 0.01, "Mean motion should be small but positive"
 
     def test_se_transpluto_constant_value(self):
-        """Test that SE_TRANSPLUTO has correct value (SE_FICT_OFFSET + 8 = 48)."""
-        assert SE_TRANSPLUTO == 48
-        assert SE_TRANSPLUTO == SE_FICT_OFFSET + 8
-        assert SE_ISIS == SE_TRANSPLUTO  # Alias
+        """Test that TRANSPLUTO has correct value (FICT_OFFSET + 8 = 48)."""
+        assert TRANSPLUTO == 48
+        assert TRANSPLUTO == FICT_OFFSET + 8
+        assert ISIS == TRANSPLUTO  # Alias
 
     def test_calc_transpluto_exportable_from_main_module(self):
         """Test that calc_transpluto is exported from main libephemeris module."""
@@ -2945,37 +2945,37 @@ class TestCalcTranspluto:
         )
 
     def test_transpluto_via_swe_calc_ut(self):
-        """Test that Transpluto can be calculated via swe_calc_ut() API.
+        """Test that Transpluto can be calculated via calc_ut() API.
 
-        This verifies that SE_ISIS (48) is properly routed to calc_transpluto()
-        through the main swe_calc_ut() function in planets.py.
+        This verifies that ISIS (48) is properly routed to calc_transpluto()
+        through the main calc_ut() function in planets.py.
         """
-        from libephemeris import swe_calc_ut, SE_ISIS, SEFLG_SPEED, SEFLG_HELCTR
+        from libephemeris import calc_ut, ISIS, FLG_SPEED, FLG_HELCTR
 
         # Calculate Transpluto position at J2000
-        pos, flag = swe_calc_ut(self.J2000, SE_ISIS, SEFLG_SPEED | SEFLG_HELCTR)
+        pos, flag = calc_ut(self.J2000, ISIS, FLG_SPEED | FLG_HELCTR)
 
         # Verify position matches direct calc_transpluto call
         direct_pos = calc_transpluto(self.J2000)
 
         # Longitude should match exactly
         assert abs(pos[0] - direct_pos[0]) < 0.0001, (
-            f"swe_calc_ut longitude {pos[0]:.6f} should match "
+            f"calc_ut longitude {pos[0]:.6f} should match "
             f"calc_transpluto {direct_pos[0]:.6f}"
         )
 
         # Distance should match
         assert abs(pos[2] - direct_pos[2]) < 0.001, (
-            f"swe_calc_ut distance {pos[2]:.6f} should match "
+            f"calc_ut distance {pos[2]:.6f} should match "
             f"calc_transpluto {direct_pos[2]:.6f}"
         )
 
     def test_transpluto_via_swe_calc_ut_using_alias(self):
-        """Test that SE_TRANSPLUTO alias also works via swe_calc_ut()."""
-        from libephemeris import swe_calc_ut, SE_TRANSPLUTO, SEFLG_SPEED, SEFLG_HELCTR
+        """Test that TRANSPLUTO alias also works via calc_ut()."""
+        from libephemeris import calc_ut, TRANSPLUTO, FLG_SPEED, FLG_HELCTR
 
-        # SE_TRANSPLUTO is alias for SE_ISIS (both = 48)
-        pos, flag = swe_calc_ut(self.J2000, SE_TRANSPLUTO, SEFLG_SPEED | SEFLG_HELCTR)
+        # TRANSPLUTO is alias for ISIS (both = 48)
+        pos, flag = calc_ut(self.J2000, TRANSPLUTO, FLG_SPEED | FLG_HELCTR)
 
         # Should return valid position
         assert 0 <= pos[0] < 360, f"Longitude should be valid: {pos[0]}"
@@ -3147,34 +3147,34 @@ class TestCalcVulcan:
         assert 0.0 <= pos2[0] < 360.0
 
     def test_se_vulcan_constant_value(self):
-        """Test that SE_VULCAN has correct value (SE_FICT_OFFSET + 15 = 55)."""
-        assert SE_VULCAN == 55
-        assert SE_VULCAN == SE_FICT_OFFSET + 15
+        """Test that VULCAN has correct value (FICT_OFFSET + 15 = 55)."""
+        assert VULCAN == 55
+        assert VULCAN == FICT_OFFSET + 15
 
     def test_calc_vulcan_via_calc_hypothetical_position(self):
         """Test that calc_hypothetical_position routes Vulcan correctly."""
-        pos1 = calc_hypothetical_position(SE_VULCAN, self.J2000)
+        pos1 = calc_hypothetical_position(VULCAN, self.J2000)
         pos2 = calc_vulcan(self.J2000)
         assert pos1 == pos2
 
     def test_vulcan_name_in_hypothetical_names(self):
         """Test that Vulcan is in HYPOTHETICAL_NAMES dictionary."""
-        assert SE_VULCAN in HYPOTHETICAL_NAMES
-        assert HYPOTHETICAL_NAMES[SE_VULCAN] == "Vulcan"
+        assert VULCAN in HYPOTHETICAL_NAMES
+        assert HYPOTHETICAL_NAMES[VULCAN] == "Vulcan"
 
     def test_vulcan_identified_as_hypothetical(self):
         """Test that Vulcan is identified as a hypothetical body."""
-        assert is_hypothetical_body(SE_VULCAN)
+        assert is_hypothetical_body(VULCAN)
 
     def test_vulcan_name_via_get_hypothetical_name(self):
         """Test that get_hypothetical_name returns correct name for Vulcan."""
-        assert get_hypothetical_name(SE_VULCAN) == "Vulcan"
+        assert get_hypothetical_name(VULCAN) == "Vulcan"
 
     def test_vulcan_different_from_vulkanus(self):
         """Test that Vulcan (intramercurial) is different from Vulkanus (Uranian)."""
-        # Vulcan is SE_FICT_OFFSET + 15 = 55
-        # Vulkanus is SE_FICT_OFFSET + 6 = 46
-        assert SE_VULCAN != SE_VULKANUS
+        # Vulcan is FICT_OFFSET + 15 = 55
+        # Vulkanus is FICT_OFFSET + 6 = 46
+        assert VULCAN != VULKANUS
 
         vulcan_pos = calc_vulcan(self.J2000)
         vulkanus_pos = calc_vulkanus(self.J2000)
@@ -3258,7 +3258,7 @@ class TestProserpina:
     def test_calc_proserpina_orbital_period(self):
         """Test that Proserpina has approximately 729 year orbital period."""
         # From Kepler's 3rd law: Period = a^1.5 years = 81^1.5 = 729.3 years
-        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
         period_days = 360.0 / elements.n
         period_years = period_days / 365.25
 
@@ -3273,7 +3273,7 @@ class TestProserpina:
         pos2 = calc_proserpina(self.J2000 + 365.25)  # 1 year later
 
         # Calculate expected motion in 1 year
-        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
         expected_motion = elements.n * 365.25  # ~0.49 deg/year
 
         # Calculate actual motion
@@ -3286,33 +3286,33 @@ class TestProserpina:
         )
 
     def test_se_proserpina_constant_value(self):
-        """Test that SE_PROSERPINA has correct value (SE_FICT_OFFSET + 17 = 57)."""
-        assert SE_PROSERPINA == 57
-        assert SE_PROSERPINA == SE_FICT_OFFSET + 17
+        """Test that PROSERPINA has correct value (FICT_OFFSET + 17 = 57)."""
+        assert PROSERPINA == 57
+        assert PROSERPINA == FICT_OFFSET + 17
 
     def test_calc_proserpina_via_calc_hypothetical_position(self):
         """Test that calc_hypothetical_position routes Proserpina correctly."""
-        pos1 = calc_hypothetical_position(SE_PROSERPINA, self.J2000)
+        pos1 = calc_hypothetical_position(PROSERPINA, self.J2000)
         pos2 = calc_proserpina(self.J2000)
         assert pos1 == pos2
 
     def test_proserpina_name_in_hypothetical_names(self):
         """Test that Proserpina is in HYPOTHETICAL_NAMES dictionary."""
-        assert SE_PROSERPINA in HYPOTHETICAL_NAMES
-        assert HYPOTHETICAL_NAMES[SE_PROSERPINA] == "Proserpina"
+        assert PROSERPINA in HYPOTHETICAL_NAMES
+        assert HYPOTHETICAL_NAMES[PROSERPINA] == "Proserpina"
 
     def test_proserpina_identified_as_hypothetical(self):
         """Test that Proserpina is identified as a hypothetical body."""
-        assert is_hypothetical_body(SE_PROSERPINA)
+        assert is_hypothetical_body(PROSERPINA)
 
     def test_proserpina_name_via_get_hypothetical_name(self):
         """Test that get_hypothetical_name returns correct name for Proserpina."""
-        assert get_hypothetical_name(SE_PROSERPINA) == "Proserpina"
+        assert get_hypothetical_name(PROSERPINA) == "Proserpina"
 
     def test_proserpina_in_hypothetical_elements(self):
         """Test that Proserpina has orbital elements defined."""
-        assert SE_PROSERPINA in HYPOTHETICAL_ELEMENTS
-        elements = HYPOTHETICAL_ELEMENTS[SE_PROSERPINA]
+        assert PROSERPINA in HYPOTHETICAL_ELEMENTS
+        elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
         assert elements.name == "Proserpina"
         assert abs(elements.a - 81.0) < 0.001, "Semi-major axis should be 81 AU"
         assert elements.e == 0.0, "Eccentricity should be 0 (circular orbit)"
@@ -3320,8 +3320,8 @@ class TestProserpina:
 
     def test_proserpina_different_from_transpluto(self):
         """Test that Proserpina is different from Transpluto (Isis)."""
-        assert SE_PROSERPINA != SE_ISIS
-        assert SE_PROSERPINA != SE_TRANSPLUTO
+        assert PROSERPINA != ISIS
+        assert PROSERPINA != TRANSPLUTO
 
         proserpina_pos = calc_proserpina(self.J2000)
         transpluto_pos = calc_transpluto(self.J2000)
@@ -3416,30 +3416,30 @@ class TestPlanetXLowell:
         )
 
     def test_se_planet_x_lowell_constant_value(self):
-        """Test that SE_PLANET_X_LOWELL has correct value (SE_FICT_OFFSET + 13 = 53)."""
-        assert SE_PLANET_X_LOWELL == 53
-        assert SE_PLANET_X_LOWELL == SE_FICT_OFFSET + 13
+        """Test that PLANET_X_LOWELL has correct value (FICT_OFFSET + 13 = 53)."""
+        assert PLANET_X_LOWELL == 53
+        assert PLANET_X_LOWELL == FICT_OFFSET + 13
 
     def test_planet_x_lowell_pyswisseph_alias(self):
         """Test that PLANET_X_LOWELL alias works."""
-        assert PLANET_X_LOWELL == SE_PLANET_X_LOWELL
+        assert PLANET_X_LOWELL == PLANET_X_LOWELL
 
     def test_planet_x_lowell_identified_as_hypothetical(self):
         """Test that Planet X Lowell is identified as a hypothetical body."""
-        assert is_hypothetical_body(SE_PLANET_X_LOWELL)
+        assert is_hypothetical_body(PLANET_X_LOWELL)
 
     def test_planet_x_lowell_name(self):
         """Test that get_hypothetical_name returns correct name."""
-        name = get_hypothetical_name(SE_PLANET_X_LOWELL)
+        name = get_hypothetical_name(PLANET_X_LOWELL)
         assert "Planet X" in name or "Lowell" in name
 
     def test_planet_x_lowell_in_hypothetical_names(self):
         """Test that Planet X Lowell is in HYPOTHETICAL_NAMES dictionary."""
-        assert SE_PLANET_X_LOWELL in HYPOTHETICAL_NAMES
+        assert PLANET_X_LOWELL in HYPOTHETICAL_NAMES
 
     def test_calc_planet_x_lowell_via_calc_hypothetical_position(self):
         """Test that calc_hypothetical_position routes Planet X Lowell correctly."""
-        pos1 = calc_hypothetical_position(SE_PLANET_X_LOWELL, self.J2000)
+        pos1 = calc_hypothetical_position(PLANET_X_LOWELL, self.J2000)
         pos2 = calc_planet_x_lowell(self.J2000)
         assert pos1 == pos2
 
@@ -3564,30 +3564,30 @@ class TestPlanetXPickering:
         )
 
     def test_se_planet_x_pickering_constant_value(self):
-        """Test that SE_PLANET_X_PICKERING has correct value (SE_FICT_OFFSET + 14 = 54)."""
-        assert SE_PLANET_X_PICKERING == 54
-        assert SE_PLANET_X_PICKERING == SE_FICT_OFFSET + 14
+        """Test that PLANET_X_PICKERING has correct value (FICT_OFFSET + 14 = 54)."""
+        assert PLANET_X_PICKERING == 54
+        assert PLANET_X_PICKERING == FICT_OFFSET + 14
 
     def test_planet_x_pickering_pyswisseph_alias(self):
         """Test that PLANET_X_PICKERING alias works."""
-        assert PLANET_X_PICKERING == SE_PLANET_X_PICKERING
+        assert PLANET_X_PICKERING == PLANET_X_PICKERING
 
     def test_planet_x_pickering_identified_as_hypothetical(self):
         """Test that Planet X Pickering is identified as a hypothetical body."""
-        assert is_hypothetical_body(SE_PLANET_X_PICKERING)
+        assert is_hypothetical_body(PLANET_X_PICKERING)
 
     def test_planet_x_pickering_name(self):
         """Test that get_hypothetical_name returns correct name."""
-        name = get_hypothetical_name(SE_PLANET_X_PICKERING)
+        name = get_hypothetical_name(PLANET_X_PICKERING)
         assert "Planet X" in name or "Pickering" in name
 
     def test_planet_x_pickering_in_hypothetical_names(self):
         """Test that Planet X Pickering is in HYPOTHETICAL_NAMES dictionary."""
-        assert SE_PLANET_X_PICKERING in HYPOTHETICAL_NAMES
+        assert PLANET_X_PICKERING in HYPOTHETICAL_NAMES
 
     def test_calc_planet_x_pickering_via_calc_hypothetical_position(self):
         """Test that calc_hypothetical_position routes Planet X Pickering correctly."""
-        pos1 = calc_hypothetical_position(SE_PLANET_X_PICKERING, self.J2000)
+        pos1 = calc_hypothetical_position(PLANET_X_PICKERING, self.J2000)
         pos2 = calc_planet_x_pickering(self.J2000)
         assert pos1 == pos2
 

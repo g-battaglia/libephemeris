@@ -89,19 +89,19 @@ def le_hsys(ch):
 
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_CHIRON, "Chiron"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (CHIRON, "Chiron"),
 ]
 
 # Famous birth chart data: (year, month, day, hour_ut, lat, lon, name)
@@ -132,8 +132,8 @@ def run_part1():
         for body_id, body_name in PLANETS:
             label = f"{name}/{body_name}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
             except Exception as e:
                 r.skip(f"{label}: {e}")
                 continue
@@ -150,7 +150,7 @@ def run_part1():
         # Houses (Placidus)
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"P")
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, ord("P"))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, ord("P"))
         except Exception as e:
             r.fail(f"{name}/Houses: {e}")
             continue
@@ -205,7 +205,7 @@ def run_part2():
         label = f"Houses-{hsys_name}"
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, se_hsys(hsys))
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, le_hsys(hsys))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, le_hsys(hsys))
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -259,7 +259,7 @@ def run_part3():
 
     # Get Placidus cusps from both
     se_cusps, _ = swe.houses(jd, lat, lon, b"P")
-    le_cusps, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+    le_cusps, _ = ephem.houses(jd, lat, lon, ord("P"))
 
     def get_house(lon_planet, cusps):
         """Determine which house a planet is in given cusps."""
@@ -277,8 +277,8 @@ def run_part3():
     for body_id, body_name in PLANETS[:10]:  # Main 10 planets
         label = f"{body_name} house"
         try:
-            se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-            le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+            le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
         except Exception:
             r.skip(f"{label}")
             continue
@@ -321,7 +321,7 @@ def run_part4():
 
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"P")
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, ord("P"))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, ord("P"))
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -365,7 +365,7 @@ def run_part5():
 
     for hsys in systems:
         try:
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, le_hsys(hsys))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, le_hsys(hsys))
         except Exception:
             r.skip(f"LE houses {hsys}")
             continue
@@ -425,8 +425,8 @@ def run_part6():
         for body_id, body_name in PLANETS[:10]:
             label = f"{ename}/{body_name}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
             except Exception:
                 r.skip(f"{label}")
                 continue
@@ -441,7 +441,7 @@ def run_part6():
         # Houses
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"P")
-            le_cusps, le_ascmc = ephem.swe_houses(jd, lat, lon, ord("P"))
+            le_cusps, le_ascmc = ephem.houses(jd, lat, lon, ord("P"))
 
             max_cusp_d = 0.0
             for i in range(12):

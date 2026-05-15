@@ -13,17 +13,17 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SWIEPH,
 )
 
 
@@ -87,21 +87,21 @@ def calculate_elongation_from_positions(planet_lon: float, sun_lon: float) -> fl
 
 # All planets that can have elongation from the Sun
 ELONGATION_PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MOON, "Moon"),
 ]
 
 # Inner planets (most important for morning/evening star classification)
 INNER_PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
 ]
 
 # Test dates covering different planetary configurations
@@ -119,13 +119,13 @@ TEST_DATES = [
 # These dates are verified against actual pyswisseph calculations
 KNOWN_ELONGATION_DATES = [
     # Venus western elongation (morning star) - Venus is west of Sun in early 2024
-    (2024, 3, 22, 12.0, SE_VENUS, "Venus western elongation", "morning"),
+    (2024, 3, 22, 12.0, VENUS, "Venus western elongation", "morning"),
     # Mercury eastern elongation (evening star) - Mercury east of Sun in July 2024
-    (2024, 7, 15, 12.0, SE_MERCURY, "Mercury eastern elongation", "evening"),
+    (2024, 7, 15, 12.0, MERCURY, "Mercury eastern elongation", "evening"),
     # Mercury western elongation (morning star) - Mercury west of Sun in May 2024
-    (2024, 5, 15, 12.0, SE_MERCURY, "Mercury western elongation", "morning"),
+    (2024, 5, 15, 12.0, MERCURY, "Mercury western elongation", "morning"),
     # Venus eastern elongation (evening star) - Venus is east of Sun in late 2024
-    (2024, 10, 15, 12.0, SE_VENUS, "Venus eastern elongation", "evening"),
+    (2024, 10, 15, 12.0, VENUS, "Venus eastern elongation", "evening"),
 ]
 
 
@@ -159,8 +159,8 @@ class TestGetElongationFromSun:
 
         # Calculate positions using pyswisseph
         try:
-            planet_pos, _ = swe.calc_ut(jd, body_id, SEFLG_SWIEPH)
-            sun_pos, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+            planet_pos, _ = swe.calc_ut(jd, body_id, FLG_SWIEPH)
+            sun_pos, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
             planet_lon = planet_pos[0]
             sun_lon = sun_pos[0]
         except Exception as e:
@@ -173,7 +173,7 @@ class TestGetElongationFromSun:
         # Get libephemeris result
         try:
             elongation, is_evening = pyephem.get_elongation_from_sun(
-                jd, body_id, SEFLG_SWIEPH
+                jd, body_id, FLG_SWIEPH
             )
         except Exception as e:
             pytest.fail(f"libephemeris get_elongation_from_sun failed: {e}")
@@ -197,11 +197,11 @@ class TestGetElongationFromSun:
     def test_elongation_range_for_inner_planets(self, jd_standard, body_id, body_name):
         """Test that inner planets have elongation within physical limits."""
         elongation, _ = pyephem.get_elongation_from_sun(
-            jd_standard, body_id, SEFLG_SWIEPH
+            jd_standard, body_id, FLG_SWIEPH
         )
 
         # Mercury max elongation ~28°, Venus max ~47°
-        max_elong = 30 if body_id == SE_MERCURY else 50
+        max_elong = 30 if body_id == MERCURY else 50
 
         assert abs(elongation) <= max_elong, (
             f"{body_name}: elongation {abs(elongation):.1f}° "
@@ -212,7 +212,7 @@ class TestGetElongationFromSun:
     def test_sun_returns_zero_elongation(self, jd_standard):
         """Test that Sun has zero elongation from itself."""
         elongation, is_evening = pyephem.get_elongation_from_sun(
-            jd_standard, SE_SUN, SEFLG_SWIEPH
+            jd_standard, SUN, FLG_SWIEPH
         )
 
         assert abs(elongation) < ElongationTolerance.ANGLE_DEGREES, (
@@ -240,14 +240,14 @@ class TestIsMorningStar:
         # Get elongation to determine expected result
         try:
             elongation, is_evening = pyephem.get_elongation_from_sun(
-                jd, body_id, SEFLG_SWIEPH
+                jd, body_id, FLG_SWIEPH
             )
         except Exception as e:
             pytest.skip(f"get_elongation_from_sun failed: {e}")
 
         # Get is_morning_star result
         try:
-            is_morning = pyephem.is_morning_star(jd, body_id, SEFLG_SWIEPH)
+            is_morning = pyephem.is_morning_star(jd, body_id, FLG_SWIEPH)
         except Exception as e:
             pytest.fail(f"is_morning_star failed: {e}")
 
@@ -262,7 +262,7 @@ class TestIsMorningStar:
     @pytest.mark.comparison
     def test_sun_is_not_morning_star(self, jd_standard):
         """Test that Sun cannot be a morning star."""
-        is_morning = pyephem.is_morning_star(jd_standard, SE_SUN, SEFLG_SWIEPH)
+        is_morning = pyephem.is_morning_star(jd_standard, SUN, FLG_SWIEPH)
         assert is_morning is False, "Sun should never be classified as morning star"
 
     @pytest.mark.comparison
@@ -276,7 +276,7 @@ class TestIsMorningStar:
         """Test morning star classification at known elongation dates."""
         jd = swe.julday(year, month, day, hour)
 
-        is_morning = pyephem.is_morning_star(jd, body_id, SEFLG_SWIEPH)
+        is_morning = pyephem.is_morning_star(jd, body_id, FLG_SWIEPH)
         expected_morning = expected_type == "morning"
 
         assert is_morning == expected_morning, (
@@ -304,14 +304,14 @@ class TestIsEveningStar:
         # Get elongation to determine expected result
         try:
             elongation, expected_evening = pyephem.get_elongation_from_sun(
-                jd, body_id, SEFLG_SWIEPH
+                jd, body_id, FLG_SWIEPH
             )
         except Exception as e:
             pytest.skip(f"get_elongation_from_sun failed: {e}")
 
         # Get is_evening_star result
         try:
-            is_evening = pyephem.is_evening_star(jd, body_id, SEFLG_SWIEPH)
+            is_evening = pyephem.is_evening_star(jd, body_id, FLG_SWIEPH)
         except Exception as e:
             pytest.fail(f"is_evening_star failed: {e}")
 
@@ -323,7 +323,7 @@ class TestIsEveningStar:
     @pytest.mark.comparison
     def test_sun_is_not_evening_star(self, jd_standard):
         """Test that Sun cannot be an evening star."""
-        is_evening = pyephem.is_evening_star(jd_standard, SE_SUN, SEFLG_SWIEPH)
+        is_evening = pyephem.is_evening_star(jd_standard, SUN, FLG_SWIEPH)
         assert is_evening is False, "Sun should never be classified as evening star"
 
     @pytest.mark.comparison
@@ -337,7 +337,7 @@ class TestIsEveningStar:
         """Test evening star classification at known elongation dates."""
         jd = swe.julday(year, month, day, hour)
 
-        is_evening = pyephem.is_evening_star(jd, body_id, SEFLG_SWIEPH)
+        is_evening = pyephem.is_evening_star(jd, body_id, FLG_SWIEPH)
         expected_evening = expected_type == "evening"
 
         assert is_evening == expected_evening, (
@@ -365,14 +365,14 @@ class TestGetElongationType:
         # Get elongation to determine expected result
         try:
             elongation, is_evening = pyephem.get_elongation_from_sun(
-                jd, body_id, SEFLG_SWIEPH
+                jd, body_id, FLG_SWIEPH
             )
         except Exception as e:
             pytest.skip(f"get_elongation_from_sun failed: {e}")
 
         # Get elongation type result
         try:
-            elong_type = pyephem.get_elongation_type(jd, body_id, SEFLG_SWIEPH)
+            elong_type = pyephem.get_elongation_type(jd, body_id, FLG_SWIEPH)
         except Exception as e:
             pytest.fail(f"get_elongation_type failed: {e}")
 
@@ -388,7 +388,7 @@ class TestGetElongationType:
     @pytest.mark.comparison
     def test_sun_returns_none_type(self, jd_standard):
         """Test that Sun returns 'none' elongation type."""
-        elong_type = pyephem.get_elongation_type(jd_standard, SE_SUN, SEFLG_SWIEPH)
+        elong_type = pyephem.get_elongation_type(jd_standard, SUN, FLG_SWIEPH)
         assert elong_type == "none", (
             f"Sun should return 'none' elongation type, got '{elong_type}'"
         )
@@ -404,7 +404,7 @@ class TestGetElongationType:
         """Test elongation type at known configuration dates."""
         jd = swe.julday(year, month, day, hour)
 
-        elong_type = pyephem.get_elongation_type(jd, body_id, SEFLG_SWIEPH)
+        elong_type = pyephem.get_elongation_type(jd, body_id, FLG_SWIEPH)
 
         # morning star = western elongation, evening star = eastern elongation
         expected_type = "western" if expected_star_type == "morning" else "eastern"
@@ -418,8 +418,8 @@ class TestGetElongationType:
         """Test that elongation type returns only valid values."""
         valid_types = {"eastern", "western", "none"}
 
-        for body_id, body_name in ELONGATION_PLANETS + [(SE_SUN, "Sun")]:
-            elong_type = pyephem.get_elongation_type(jd_standard, body_id, SEFLG_SWIEPH)
+        for body_id, body_name in ELONGATION_PLANETS + [(SUN, "Sun")]:
+            elong_type = pyephem.get_elongation_type(jd_standard, body_id, FLG_SWIEPH)
             assert elong_type in valid_types, (
                 f"{body_name}: got invalid type '{elong_type}', "
                 f"expected one of {valid_types}"
@@ -443,11 +443,11 @@ class TestElongationConsistency:
         """Test that a planet cannot be both morning and evening star."""
         jd = swe.julday(year, month, day, hour)
 
-        is_morning = pyephem.is_morning_star(jd, body_id, SEFLG_SWIEPH)
-        is_evening = pyephem.is_evening_star(jd, body_id, SEFLG_SWIEPH)
+        is_morning = pyephem.is_morning_star(jd, body_id, FLG_SWIEPH)
+        is_evening = pyephem.is_evening_star(jd, body_id, FLG_SWIEPH)
 
         # Cannot be both or neither (except for Sun)
-        if body_id != SE_SUN:
+        if body_id != SUN:
             assert is_morning != is_evening, (
                 f"{body_name} @ {date_desc}: must be either morning OR evening star, "
                 f"got is_morning={is_morning}, is_evening={is_evening}"
@@ -462,9 +462,9 @@ class TestElongationConsistency:
         """Test that elongation type is consistent with morning/evening functions."""
         jd = swe.julday(year, month, day, hour)
 
-        is_morning = pyephem.is_morning_star(jd, body_id, SEFLG_SWIEPH)
-        is_evening = pyephem.is_evening_star(jd, body_id, SEFLG_SWIEPH)
-        elong_type = pyephem.get_elongation_type(jd, body_id, SEFLG_SWIEPH)
+        is_morning = pyephem.is_morning_star(jd, body_id, FLG_SWIEPH)
+        is_evening = pyephem.is_evening_star(jd, body_id, FLG_SWIEPH)
+        elong_type = pyephem.get_elongation_type(jd, body_id, FLG_SWIEPH)
 
         if elong_type == "western":
             assert is_morning is True and is_evening is False, (
@@ -480,10 +480,10 @@ class TestElongationConsistency:
     def test_signed_elongation_consistency(self, jd_standard, body_id, body_name):
         """Test that get_signed_elongation matches get_elongation_from_sun."""
         elongation_from_sun, _ = pyephem.get_elongation_from_sun(
-            jd_standard, body_id, SEFLG_SWIEPH
+            jd_standard, body_id, FLG_SWIEPH
         )
         signed_elongation = pyephem.get_signed_elongation(
-            jd_standard, body_id, SEFLG_SWIEPH
+            jd_standard, body_id, FLG_SWIEPH
         )
 
         diff = abs(elongation_from_sun - signed_elongation)
@@ -505,11 +505,11 @@ class TestElongationVsPheno:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     @pytest.mark.parametrize("year,month,day,hour,date_desc", TEST_DATES)
@@ -521,13 +521,13 @@ class TestElongationVsPheno:
 
         # Get elongation from helper
         try:
-            elongation, _ = pyephem.get_elongation_from_sun(jd, body_id, SEFLG_SWIEPH)
+            elongation, _ = pyephem.get_elongation_from_sun(jd, body_id, FLG_SWIEPH)
         except Exception as e:
             pytest.skip(f"get_elongation_from_sun failed: {e}")
 
         # Get elongation from pheno_ut
         try:
-            ret = pyephem.pheno_ut(jd, body_id, SEFLG_SWIEPH)
+            ret = pyephem.pheno_ut(jd, body_id, FLG_SWIEPH)
             attr = ret[1] if isinstance(ret, tuple) and len(ret) > 1 else ret
             pheno_elongation = attr[2]  # PHENO_ELONGATION index
         except Exception as e:
@@ -560,7 +560,7 @@ class TestElongationEdgeCases:
         # Mercury inferior conjunction ~Feb 28, 2024
         jd = swe.julday(2024, 2, 28, 12.0)
 
-        elongation, _ = pyephem.get_elongation_from_sun(jd, SE_MERCURY, SEFLG_SWIEPH)
+        elongation, _ = pyephem.get_elongation_from_sun(jd, MERCURY, FLG_SWIEPH)
 
         # Near conjunction, elongation should be small
         assert abs(elongation) < 10, (
@@ -574,7 +574,7 @@ class TestElongationEdgeCases:
         # Jupiter opposition ~Dec 7, 2024
         jd = swe.julday(2024, 12, 7, 12.0)
 
-        elongation, _ = pyephem.get_elongation_from_sun(jd, SE_JUPITER, SEFLG_SWIEPH)
+        elongation, _ = pyephem.get_elongation_from_sun(jd, JUPITER, FLG_SWIEPH)
 
         # Near opposition, elongation should be close to 180° (or -180°)
         assert abs(abs(elongation) - 180) < 10, (
@@ -590,10 +590,10 @@ class TestElongationEdgeCases:
         results = {}
         for body_id, body_name in ELONGATION_PLANETS:
             elongation, is_evening = pyephem.get_elongation_from_sun(
-                jd, body_id, SEFLG_SWIEPH
+                jd, body_id, FLG_SWIEPH
             )
-            is_morning = pyephem.is_morning_star(jd, body_id, SEFLG_SWIEPH)
-            elong_type = pyephem.get_elongation_type(jd, body_id, SEFLG_SWIEPH)
+            is_morning = pyephem.is_morning_star(jd, body_id, FLG_SWIEPH)
+            elong_type = pyephem.get_elongation_type(jd, body_id, FLG_SWIEPH)
 
             results[body_name] = {
                 "elongation": elongation,
@@ -618,7 +618,7 @@ class TestElongationEdgeCases:
         """Test elongation with different calculation flags."""
         flags_to_test = [
             0,  # Default
-            SEFLG_SWIEPH,  # Swiss Ephemeris
+            FLG_SWIEPH,  # Swiss Ephemeris
         ]
 
         results = []

@@ -12,12 +12,12 @@ from libephemeris.constants import *
 def all_asteroids():
     """All main belt asteroids."""
     return [
-        (SE_CHIRON, "Chiron", swe.CHIRON),
-        (SE_PHOLUS, "Pholus", swe.PHOLUS),
-        (SE_CERES, "Ceres", swe.CERES),
-        (SE_PALLAS, "Pallas", swe.PALLAS),
-        (SE_JUNO, "Juno", swe.JUNO),
-        (SE_VESTA, "Vesta", swe.VESTA),
+        (CHIRON, "Chiron", swe.CHIRON),
+        (PHOLUS, "Pholus", swe.PHOLUS),
+        (CERES, "Ceres", swe.CERES),
+        (PALLAS, "Pallas", swe.PALLAS),
+        (JUNO, "Juno", swe.JUNO),
+        (VESTA, "Vesta", swe.VESTA),
     ]
 
 
@@ -25,13 +25,13 @@ def all_asteroids():
 def all_tnos():
     """All Trans-Neptunian Objects."""
     return [
-        (SE_ERIS, "Eris"),
-        (SE_SEDNA, "Sedna"),
-        (SE_HAUMEA, "Haumea"),
-        (SE_MAKEMAKE, "Makemake"),
-        (SE_IXION, "Ixion"),
-        (SE_ORCUS, "Orcus"),
-        (SE_QUAOAR, "Quaoar"),
+        (ERIS, "Eris"),
+        (SEDNA, "Sedna"),
+        (HAUMEA, "Haumea"),
+        (MAKEMAKE, "Makemake"),
+        (IXION, "Ixion"),
+        (ORCUS, "Orcus"),
+        (QUAOAR, "Quaoar"),
     ]
 
 
@@ -41,7 +41,7 @@ class TestAsteroids:
 
     def test_chiron_position(self, standard_jd):
         """Test Chiron position at J2000."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_CHIRON, 0)
+        pos, _ = ephem.calc_ut(standard_jd, CHIRON, 0)
 
         # Should have valid position
         assert 0 <= pos[0] < 360, "Invalid longitude"
@@ -51,7 +51,7 @@ class TestAsteroids:
     def test_all_asteroids_valid(self, standard_jd, all_asteroids):
         """Test all asteroids return valid positions."""
         for body_id, name, _ in all_asteroids:
-            pos, _ = ephem.swe_calc_ut(standard_jd, body_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, body_id, 0)
 
             assert 0 <= pos[0] < 360, f"{name}: Invalid longitude"
             assert -90 <= pos[1] <= 90, f"{name}: Invalid latitude"
@@ -60,14 +60,14 @@ class TestAsteroids:
     @pytest.mark.parametrize(
         "body_id,name,swe_id",
         [
-            (SE_CHIRON, "Chiron", swe.CHIRON),
-            (SE_CERES, "Ceres", swe.CERES),
-            (SE_PALLAS, "Pallas", swe.PALLAS),
+            (CHIRON, "Chiron", swe.CHIRON),
+            (CERES, "Ceres", swe.CERES),
+            (PALLAS, "Pallas", swe.PALLAS),
         ],
     )
     def test_asteroid_vs_swisseph(self, standard_jd, body_id, name, swe_id):
         """Compare asteroid positions with SwissEph."""
-        pos_py, _ = ephem.swe_calc_ut(standard_jd, body_id, 0)
+        pos_py, _ = ephem.calc_ut(standard_jd, body_id, 0)
 
         try:
             pos_swe, _ = swe.calc_ut(standard_jd, swe_id, 0)
@@ -95,7 +95,7 @@ class TestAsteroids:
 
         for body_id, name, _ in all_asteroids:
             # Use Heliocentric distance for orbital range checks
-            pos, _ = ephem.swe_calc_ut(standard_jd, body_id, SEFLG_HELCTR)
+            pos, _ = ephem.calc_ut(standard_jd, body_id, FLG_HELCTR)
             dist = pos[2]
 
             min_dist, max_dist = expected_ranges[name]
@@ -110,7 +110,7 @@ class TestTNOs:
 
     def test_eris_position(self, standard_jd):
         """Test Eris position at J2000."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_ERIS, 0)
+        pos, _ = ephem.calc_ut(standard_jd, ERIS, 0)
 
         assert 0 <= pos[0] < 360, "Invalid longitude"
         assert -90 <= pos[1] <= 90, "Invalid latitude"
@@ -119,7 +119,7 @@ class TestTNOs:
     def test_all_tnos_valid(self, standard_jd, all_tnos):
         """Test all TNOs return valid positions."""
         for body_id, name in all_tnos:
-            pos, _ = ephem.swe_calc_ut(standard_jd, body_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, body_id, 0)
 
             assert 0 <= pos[0] < 360, f"{name}: Invalid longitude"
             assert -90 <= pos[1] <= 90, f"{name}: Invalid latitude"
@@ -138,7 +138,7 @@ class TestTNOs:
         }
 
         for body_id, name in all_tnos:
-            pos, _ = ephem.swe_calc_ut(standard_jd, body_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, body_id, 0)
             dist = pos[2]
 
             min_dist = expected_min_dist[name]
@@ -157,10 +157,10 @@ class TestTNOs:
     )
     def test_tnos_over_time(self, year, month, day, all_tnos):
         """Test TNOs at different dates."""
-        jd = ephem.swe_julday(year, month, day, 0.0)
+        jd = ephem.julday(year, month, day, 0.0)
 
         for body_id, name in all_tnos:
-            pos, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos, _ = ephem.calc_ut(jd, body_id, 0)
 
             # All should return valid data
             assert 0 <= pos[0] < 360, f"{name}: Invalid lon at {year}"
@@ -174,7 +174,7 @@ class TestMinorBodiesIntegration:
     def test_heliocentric_mode(self, standard_jd, all_asteroids):
         """Test asteroids in heliocentric mode."""
         for body_id, name, _ in all_asteroids:
-            pos, _ = ephem.swe_calc_ut(standard_jd, body_id, SEFLG_HELCTR)
+            pos, _ = ephem.calc_ut(standard_jd, body_id, FLG_HELCTR)
 
             # Heliocentric should still return valid coordinates
             assert 0 <= pos[0] < 360, f"{name}: Invalid heliocentric lon"
@@ -182,11 +182,11 @@ class TestMinorBodiesIntegration:
 
     def test_minor_body_consistency(self):
         """Test position consistency over short time intervals."""
-        jd1 = ephem.swe_julday(2000, 1, 1, 0.0)
-        jd2 = ephem.swe_julday(2000, 1, 2, 0.0)  # 1 day later
+        jd1 = ephem.julday(2000, 1, 1, 0.0)
+        jd2 = ephem.julday(2000, 1, 2, 0.0)  # 1 day later
 
-        pos1, _ = ephem.swe_calc_ut(jd1, SE_CHIRON, 0)
-        pos2, _ = ephem.swe_calc_ut(jd2, SE_CHIRON, 0)
+        pos1, _ = ephem.calc_ut(jd1, CHIRON, 0)
+        pos2, _ = ephem.calc_ut(jd2, CHIRON, 0)
 
         # Position should change slightly but reasonably
         diff = abs(pos2[0] - pos1[0])

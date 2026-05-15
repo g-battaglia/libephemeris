@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 197: OscuLilith (Oscillating Lilith) deep sweep.
 
-Tests SE_OSCU_APOG positions at various dates comparing LE vs SE.
+Tests OSCU_APOG positions at various dates comparing LE vs SE.
 OscuLilith uses osculating orbital elements and has larger inherent
 speed differences due to rapidly oscillating elements.
 """
@@ -17,14 +17,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 JD_BASE = 2451545.0
 
 # Daily samples for 3 years
@@ -33,9 +33,9 @@ TEST_JDS = [JD_BASE + i * 3 for i in range(365)]  # every 3 days for 3 years
 # Also test with various flags
 FLAG_COMBOS = [
     ("default", FLAGS),
-    ("J2000", FLAGS | ephem.SEFLG_J2000),
-    ("NONUT", FLAGS | ephem.SEFLG_NONUT),
-    ("EQUATORIAL", FLAGS | ephem.SEFLG_EQUATORIAL),
+    ("J2000", FLAGS | ephem.FLG_J2000),
+    ("NONUT", FLAGS | ephem.FLG_NONUT),
+    ("EQUATORIAL", FLAGS | ephem.FLG_EQUATORIAL),
 ]
 
 
@@ -43,7 +43,7 @@ def compare(label, jd, le_flags, se_flags):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, ephem.SE_OSCU_APOG, le_flags)
+        le_r = ephem.calc_ut(jd, ephem.OSCU_APOG, le_flags)
         se_r = swe.calc_ut(jd, swe.OSCU_APOG, se_flags)
     except Exception:
         return

@@ -15,9 +15,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 
 BODIES = {
     0: "Sun",
@@ -92,8 +92,8 @@ print("=" * 90)
 
 for label, jd, body in test_cases:
     try:
-        se_r = swe.calc_ut(jd, body, SEFLG_SPEED)
-        le_r = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)
+        se_r = swe.calc_ut(jd, body, FLG_SPEED)
+        le_r = ephem.calc_ut(jd, body, FLG_SPEED)
 
         se_data = se_r[0]
         le_data = le_r[0]

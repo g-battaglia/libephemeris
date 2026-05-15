@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 62: Heliocentric Positions Deep Sweep
 
-Compare heliocentric ecliptic positions (SEFLG_HELCTR) for all planets.
+Compare heliocentric ecliptic positions (FLG_HELCTR) for all planets.
 Heliocentric = as seen from Sun center. No light-time, no aberration.
 Tests longitude, latitude, distance, and speeds.
 Also tests HELCTR + J2000, HELCTR + EQUATORIAL combinations.
@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 BODIES = {
@@ -28,10 +28,10 @@ BODIES = {
     8: "Neptune",
     9: "Pluto",
 }
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_J2000 = 32
-SEFLG_EQUATORIAL = 2048
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_J2000 = 32
+FLG_EQUATORIAL = 2048
 
 print("=" * 70)
 print("ROUND 62: Heliocentric Positions Deep Sweep")
@@ -39,14 +39,14 @@ print("=" * 70)
 
 # P1: Heliocentric ecliptic lon/lat, monthly 2000-2025
 print("\n=== P1: Heliocentric ecliptic positions ===")
-FLAGS = SEFLG_SPEED | SEFLG_HELCTR
+FLAGS = FLG_SPEED | FLG_HELCTR
 jd0 = 2451545.0
 for m in range(0, 25 * 12, 2):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d
@@ -68,7 +68,7 @@ for m in range(0, 10 * 12, 3):
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_spd = abs(se[3] - le[3])
             lat_spd = abs(se[4] - le[4])
             if lon_spd < 0.001 and lat_spd < 0.001:
@@ -85,13 +85,13 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 
 # P3: Heliocentric + J2000
 print("\n=== P3: Heliocentric + J2000 ===")
-FLAGS_J = SEFLG_SPEED | SEFLG_HELCTR | SEFLG_J2000
+FLAGS_J = FLG_SPEED | FLG_HELCTR | FLG_J2000
 for m in range(0, 25 * 12, 6):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS_J)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS_J)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS_J)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d
@@ -110,13 +110,13 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 
 # P4: Heliocentric + Equatorial
 print("\n=== P4: Heliocentric + Equatorial ===")
-FLAGS_EQ = SEFLG_SPEED | SEFLG_HELCTR | SEFLG_EQUATORIAL
+FLAGS_EQ = FLG_SPEED | FLG_HELCTR | FLG_EQUATORIAL
 for m in range(0, 25 * 12, 6):
     jd = jd0 + m * 30.4375
     for bid, name in BODIES.items():
         try:
             se = swe.calc_ut(jd, bid, FLAGS_EQ)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS_EQ)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS_EQ)[0]
             ra_d = abs(se[0] - le[0]) * 3600
             if ra_d > 180 * 3600:
                 ra_d = 360 * 3600 - ra_d
@@ -133,17 +133,17 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 
 # P5: Earth heliocentric = reversed Sun geocentric
 print("\n=== P5: Earth helio consistency ===")
-# swe_calc_ut with HELCTR for Earth (body=14 in SE, or use Sun geocentric + 180°)
+# calc_ut with HELCTR for Earth (body=14 in SE, or use Sun geocentric + 180°)
 for yr in range(2000, 2026):
     jd = swe.julday(yr, 6, 15, 12.0)
     try:
-        sun_geo = ephem.swe_calc_ut(jd, 0, SEFLG_SPEED)[0]
+        sun_geo = ephem.calc_ut(jd, 0, FLG_SPEED)[0]
         # Earth helio lon should be Sun geo lon + 180°
         earth_lon = (sun_geo[0] + 180.0) % 360.0
         # Earth helio lat should be ~ -Sun geo lat
         earth_lat = -sun_geo[1]
         # Verify with Mercury helio (just sanity check Earth position)
-        merc_helio = ephem.swe_calc_ut(jd, 2, FLAGS)[0]
+        merc_helio = ephem.calc_ut(jd, 2, FLAGS)[0]
         # Mercury helio lon should be between 0-360
         if 0 <= merc_helio[0] < 360 and 0 <= earth_lon < 360:
             passed += 1
@@ -161,7 +161,7 @@ for yr in range(1900, 2101, 10):
         name = BODIES[bid]
         try:
             se = swe.calc_ut(jd, bid, FLAGS)[0]
-            le = ephem.swe_calc_ut(jd, bid, FLAGS)[0]
+            le = ephem.calc_ut(jd, bid, FLAGS)[0]
             lon_d = abs(se[0] - le[0]) * 3600
             if lon_d > 180 * 3600:
                 lon_d = 360 * 3600 - lon_d

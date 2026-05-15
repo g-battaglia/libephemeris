@@ -1,7 +1,7 @@
 """
 Tests for sidereal Sunshine (Makransky) house system.
 
-Verifies that Sunshine houses work correctly with SEFLG_SIDEREAL flag,
+Verifies that Sunshine houses work correctly with FLG_SIDEREAL flag,
 producing proper sidereal cusps that are distinct from:
 1. Tropical Sunshine cusps shifted by ayanamsa (incorrect method)
 2. Tropical Sunshine cusps (should differ by ~ayanamsa amount)
@@ -9,7 +9,7 @@ producing proper sidereal cusps that are distinct from:
 
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SIDEREAL
+from libephemeris.constants import FLG_SIDEREAL
 
 
 def angular_diff(val1: float, val2: float) -> float:
@@ -38,9 +38,9 @@ TEST_DATES = [
 
 # Sidereal modes to test
 SIDEREAL_MODES = [
-    (ephem.SE_SIDM_LAHIRI, "Lahiri"),
-    (ephem.SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (ephem.SE_SIDM_RAMAN, "Raman"),
+    (ephem.SIDM_LAHIRI, "Lahiri"),
+    (ephem.SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (ephem.SIDM_RAMAN, "Raman"),
 ]
 
 
@@ -55,18 +55,18 @@ class TestSunshineSidereal:
     ):
         """Test that sidereal Sunshine differs from tropical by approximately ayanamsa."""
         # Set sidereal mode
-        ephem.swe_set_sid_mode(sidm)
+        ephem.set_sid_mode(sidm)
 
         # Calculate tropical Sunshine
-        cusps_trop, ascmc_trop = ephem.swe_houses(jd, lat, lon, ord("I"))
+        cusps_trop, ascmc_trop = ephem.houses(jd, lat, lon, ord("I"))
 
         # Calculate sidereal Sunshine
-        cusps_sid, ascmc_sid = ephem.swe_houses_ex(
-            jd, lat, lon, ord("I"), SEFLG_SIDEREAL
+        cusps_sid, ascmc_sid = ephem.houses_ex(
+            jd, lat, lon, ord("I"), FLG_SIDEREAL
         )
 
         # Get ayanamsa for this time
-        ayanamsa = ephem.swe_get_ayanamsa_ut(jd)
+        ayanamsa = ephem.get_ayanamsa_ut(jd)
 
         # The difference should be roughly equal to ayanamsa (within a few degrees)
         # Note: for Sunshine, it's not exactly ayanamsa because the recalculation
@@ -84,10 +84,10 @@ class TestSunshineSidereal:
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES)
     def test_sidereal_sunshine_I_matches_i(self, name, lat, lon, jd, date_desc):
         """Test that sidereal 'I' and 'i' produce identical results."""
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
-        cusps_I, ascmc_I = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
-        cusps_i, ascmc_i = ephem.swe_houses_ex(jd, lat, lon, ord("i"), SEFLG_SIDEREAL)
+        cusps_I, ascmc_I = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
+        cusps_i, ascmc_i = ephem.houses_ex(jd, lat, lon, ord("i"), FLG_SIDEREAL)
 
         for i in range(12):
             diff = angular_diff(cusps_I[i], cusps_i[i])
@@ -108,19 +108,19 @@ class TestSunshineSidereal:
         subtracted ayanamsa. Proper calculation should use sidereal Asc/MC and
         recalculate the house cusps, which produces slightly different results.
         """
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
         # Calculate tropical Sunshine
-        cusps_trop, _ = ephem.swe_houses(jd, lat, lon, ord("I"))
+        cusps_trop, _ = ephem.houses(jd, lat, lon, ord("I"))
 
         # Get ayanamsa
-        ayanamsa = ephem.swe_get_ayanamsa_ut(jd)
+        ayanamsa = ephem.get_ayanamsa_ut(jd)
 
         # Calculate what the wrong method would produce (simple shift)
         cusps_wrong = tuple([(c - ayanamsa) % 360.0 for c in cusps_trop])
 
         # Calculate sidereal Sunshine (correct method)
-        cusps_correct, _ = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
+        cusps_correct, _ = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
 
         # The correct method should differ from the simple shift
         # (not by much, but they shouldn't be identical)
@@ -141,9 +141,9 @@ class TestSunshineSidereal:
     def test_sidereal_sunshine_ascendant_matches(self, name, lat, lon):
         """Verify the sidereal Ascendant in Sunshine matches the ascmc value."""
         jd = 2451545.0  # J2000
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
-        cusps, ascmc = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
+        cusps, ascmc = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
 
         # House 1 cusp (index 0) should equal the Ascendant (ascmc index 0)
         diff = angular_diff(cusps[0], ascmc[0])
@@ -155,9 +155,9 @@ class TestSunshineSidereal:
     def test_sidereal_sunshine_cusps_ordered_correctly(self, name, lat, lon):
         """Verify sidereal Sunshine cusps are in proper order (monotonically increasing with wrap)."""
         jd = 2451545.0
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
-        cusps, _ = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
+        cusps, _ = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
 
         # Check that cusps progress around the zodiac
         # (each subsequent cusp should be further along, accounting for 360° wrap)
@@ -183,10 +183,10 @@ class TestSunshineSiderealDifferentSystems:
     def test_sidereal_sunshine_differs_from_placidus(self, name, lat, lon):
         """Verify sidereal Sunshine differs from sidereal Placidus."""
         jd = 2451545.0
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
-        cusps_sunshine, _ = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
-        cusps_placidus, _ = ephem.swe_houses_ex(jd, lat, lon, ord("P"), SEFLG_SIDEREAL)
+        cusps_sunshine, _ = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
+        cusps_placidus, _ = ephem.houses_ex(jd, lat, lon, ord("P"), FLG_SIDEREAL)
 
         # They should differ significantly
         total_diff = sum(
@@ -202,10 +202,10 @@ class TestSunshineSiderealDifferentSystems:
     def test_sidereal_sunshine_differs_from_equal(self, name, lat, lon):
         """Verify sidereal Sunshine differs from sidereal Equal houses."""
         jd = 2451545.0
-        ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
-        cusps_sunshine, _ = ephem.swe_houses_ex(jd, lat, lon, ord("I"), SEFLG_SIDEREAL)
-        cusps_equal, _ = ephem.swe_houses_ex(jd, lat, lon, ord("E"), SEFLG_SIDEREAL)
+        cusps_sunshine, _ = ephem.houses_ex(jd, lat, lon, ord("I"), FLG_SIDEREAL)
+        cusps_equal, _ = ephem.houses_ex(jd, lat, lon, ord("E"), FLG_SIDEREAL)
 
         # House 1 should match (both start from Asc)
         diff_h1 = angular_diff(cusps_sunshine[0], cusps_equal[0])

@@ -14,25 +14,25 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-LE_FLAGS_H = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_HELCTR
+LE_FLAGS_H = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_HELCTR
 SE_FLAGS_H = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_HELCTR
-LE_FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+LE_FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 SE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
 
 BODIES = [
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY, 10.0, 20),
-    ("Venus", ephem.SE_VENUS, swe.VENUS, 20.0, 12),
-    ("Mars", ephem.SE_MARS, swe.MARS, 30.0, 8),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER, 100.0, 6),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN, 200.0, 4),
-    ("Earth", ephem.SE_EARTH, swe.EARTH, 5.0, 10),
+    ("Mercury", ephem.MERCURY, swe.MERCURY, 10.0, 20),
+    ("Venus", ephem.VENUS, swe.VENUS, 20.0, 12),
+    ("Mars", ephem.MARS, swe.MARS, 30.0, 8),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER, 100.0, 6),
+    ("Saturn", ephem.SATURN, swe.SATURN, 200.0, 4),
+    ("Earth", ephem.EARTH, swe.EARTH, 5.0, 10),
 ]
 
 JD_START = 2451545.0
@@ -67,7 +67,7 @@ def compare_at(label, le_b, se_b, jd):
         ("Geo", LE_FLAGS, SE_FLAGS),
     ]:
         try:
-            le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+            le_r = ephem.calc_ut(jd, le_b, le_f)
             se_r = swe.calc_ut(jd, se_b, se_f)
         except:
             continue

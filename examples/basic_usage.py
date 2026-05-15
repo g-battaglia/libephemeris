@@ -22,21 +22,21 @@ from __future__ import annotations
 import libephemeris as eph
 from libephemeris.constants import (
     # Planet IDs
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
-    SE_CHIRON,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
+    CHIRON,
     # Calculation flags
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -48,21 +48,21 @@ def example_julian_day() -> None:
 
     # Convert a date to Julian Day
     # Format: year, month, day, hour (decimal)
-    jd = eph.swe_julday(2000, 1, 1, 12.0)  # J2000.0 epoch
+    jd = eph.julday(2000, 1, 1, 12.0)  # J2000.0 epoch
     print(f"January 1, 2000 at noon = JD {jd}")
 
     # Convert back to calendar date
-    year, month, day, hour = eph.swe_revjul(jd)
+    year, month, day, hour = eph.revjul(jd)
     print(
         f"JD {jd} = {year}-{month:02d}-{day:02d} {int(hour):02d}:{int((hour % 1) * 60):02d}"
     )
 
     # Current moment (example with specific date)
-    jd_now = eph.swe_julday(2024, 6, 21, 12.0)  # Summer solstice 2024
+    jd_now = eph.julday(2024, 6, 21, 12.0)  # Summer solstice 2024
     print(f"June 21, 2024 at noon = JD {jd_now}")
 
     # Get Delta T (difference between TT and UT)
-    delta_t = eph.swe_deltat(jd_now)
+    delta_t = eph.deltat(jd_now)
     print(f"Delta T at JD {jd_now}: {delta_t * 86400:.2f} seconds")
 
 
@@ -73,27 +73,27 @@ def example_planetary_positions() -> None:
     print("=" * 60)
 
     # Julian Day for calculation
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
     print(f"\nPlanetary positions at JD {jd} (January 1, 2024, noon UT):\n")
 
     # List of planets to calculate
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
-        (SE_TRUE_NODE, "True Node"),
-        (SE_CHIRON, "Chiron"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
+        (TRUE_NODE, "True Node"),
+        (CHIRON, "Chiron"),
     ]
 
     # Calculate with speed
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     print(
         f"{'Planet':<12} {'Longitude':>12} {'Latitude':>10} {'Distance':>10} {'Speed':>10}"
@@ -101,9 +101,9 @@ def example_planetary_positions() -> None:
     print("-" * 56)
 
     for planet_id, name in planets:
-        # swe_calc_ut returns (position_tuple, flags_used)
+        # calc_ut returns (position_tuple, flags_used)
         # position_tuple = (longitude, latitude, distance, lon_speed, lat_speed, dist_speed)
-        pos, _ = eph.swe_calc_ut(jd, planet_id, flags)
+        pos, _ = eph.calc_ut(jd, planet_id, flags)
 
         longitude = pos[0]
         latitude = pos[1]
@@ -129,16 +129,16 @@ def example_house_cusps() -> None:
     longitude = 12.4964
 
     # Time: January 1, 2024 at noon
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     print(f"\nHouse cusps for Rome ({latitude}°N, {longitude}°E)")
     print(f"at JD {jd}\n")
 
     # Calculate houses using Placidus system
-    # swe_houses returns (cusps, ascmc)
+    # houses returns (cusps, ascmc)
     # cusps = tuple of 12 house cusp longitudes
     # ascmc = (Asc, MC, ARMC, Vertex, EquatorialAsc, Co-Asc Koch, Co-Asc Munkasey, Polar Asc)
-    cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord("P"))  # P = Placidus
+    cusps, ascmc = eph.houses(jd, latitude, longitude, ord("P"))  # P = Placidus
 
     print("Placidus House Cusps:")
     for i in range(12):
@@ -162,7 +162,7 @@ def example_house_cusps() -> None:
     ]
 
     for code, name in systems:
-        cusps_sys, ascmc_sys = eph.swe_houses(jd, latitude, longitude, ord(code))
+        cusps_sys, ascmc_sys = eph.houses(jd, latitude, longitude, ord(code))
         print(f"  {name:15} ASC: {ascmc_sys[0]:>10.4f}°  MC: {ascmc_sys[1]:>10.4f}°")
 
 
@@ -196,20 +196,20 @@ def example_zodiac_formatting() -> None:
         seconds = int(((pos_in_sign - degrees) * 60 - minutes) * 60)
         return f"{degrees:02d}° {minutes:02d}' {seconds:02d}\" {signs[sign_num]}"
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     print("\nPlanetary positions in zodiac notation:\n")
 
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
     ]
 
     for planet_id, name in planets:
-        pos, _ = eph.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
         formatted = format_zodiac(pos[0])
         retro = " (Retrograde)" if pos[3] < 0 else ""
         print(f"  {name:10} {formatted}{retro}")
@@ -221,30 +221,30 @@ def example_ayanamsha() -> None:
     print("Example 5: Ayanamsha Values")
     print("=" * 60)
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     print(f"\nAyanamsha values at JD {jd}:\n")
 
     # Common sidereal modes
     from libephemeris.constants import (
-        SE_SIDM_FAGAN_BRADLEY,
-        SE_SIDM_LAHIRI,
-        SE_SIDM_RAMAN,
-        SE_SIDM_TRUE_CITRA,
-        SE_SIDM_KRISHNAMURTI,
+        SIDM_FAGAN_BRADLEY,
+        SIDM_LAHIRI,
+        SIDM_RAMAN,
+        SIDM_TRUE_CITRA,
+        SIDM_KRISHNAMURTI,
     )
 
     modes = [
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_RAMAN, "Raman"),
-        (SE_SIDM_TRUE_CITRA, "True Citra"),
-        (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
+        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_RAMAN, "Raman"),
+        (SIDM_TRUE_CITRA, "True Citra"),
+        (SIDM_KRISHNAMURTI, "Krishnamurti"),
     ]
 
     for mode, name in modes:
-        eph.swe_set_sid_mode(mode)
-        ayanamsha = eph.swe_get_ayanamsa_ut(jd)
+        eph.set_sid_mode(mode)
+        ayanamsha = eph.get_ayanamsa_ut(jd)
         print(f"  {name:20} {ayanamsha:>10.6f}°")
 
 
@@ -257,18 +257,18 @@ def example_planet_name() -> None:
     print("\nPlanet IDs and their names:\n")
 
     planet_ids = [
-        SE_SUN,
-        SE_MOON,
-        SE_MERCURY,
-        SE_VENUS,
-        SE_MARS,
-        SE_JUPITER,
-        SE_SATURN,
-        SE_URANUS,
-        SE_NEPTUNE,
-        SE_PLUTO,
-        SE_TRUE_NODE,
-        SE_CHIRON,
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+        TRUE_NODE,
+        CHIRON,
     ]
 
     for pid in planet_ids:

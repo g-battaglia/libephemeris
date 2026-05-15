@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import os
+
 """
 Validation script for TNO position precision after Uranus/Neptune perturbations.
 
@@ -21,22 +23,22 @@ import math
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_ERIS, SE_MAKEMAKE, SE_IXION, SE_ORCUS
+from libephemeris.constants import ERIS, MAKEMAKE, IXION, ORCUS
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS
 from comparison_utils import angular_diff, format_status
 
 
 # TNO definitions: (libephemeris_id, swisseph_ast_number, name, resonance_info)
 TNOS = [
-    (SE_ERIS, 136199, "Eris", "scattered disk, ~68 AU"),
-    (SE_MAKEMAKE, 136472, "Makemake", "classical KBO, ~45 AU"),
-    (SE_IXION, 28978, "Ixion", "plutino (2:3 resonance), ~39 AU"),
-    (SE_ORCUS, 90482, "Orcus", "plutino (2:3 resonance), ~39 AU"),
+    (ERIS, 136199, "Eris", "scattered disk, ~68 AU"),
+    (MAKEMAKE, 136472, "Makemake", "classical KBO, ~45 AU"),
+    (IXION, 28978, "Ixion", "plutino (2:3 resonance), ~39 AU"),
+    (ORCUS, 90482, "Orcus", "plutino (2:3 resonance), ~39 AU"),
 ]
 
 # Time span: 2000-2050 (50 years)
@@ -138,12 +140,12 @@ def calc_libeph_tno_position(jd: float, body_id: int) -> tuple:
 
     Args:
         jd: Julian Day (UT)
-        body_id: libephemeris body ID (e.g., SE_ERIS)
+        body_id: libephemeris body ID (e.g., ERIS)
 
     Returns:
         (lon, lat, dist) tuple
     """
-    pos, _ = ephem.swe_calc_ut(jd, body_id, 0)
+    pos, _ = ephem.calc_ut(jd, body_id, 0)
     return pos[0], pos[1], pos[2]
 
 

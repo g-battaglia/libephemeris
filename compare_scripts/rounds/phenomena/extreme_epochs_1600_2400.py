@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 148: Pheno at extreme dates (far past/future).
 
-Compare swe_pheno_ut results for all major planets at dates spanning
+Compare pheno_ut results for all major planets at dates spanning
 1600 CE to 2400 CE, testing phase angle, phase, elongation, diameter, magnitude.
 """
 
@@ -14,9 +14,9 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 BODIES = {
     0: "Sun",
     1: "Moon",
@@ -78,8 +78,8 @@ print("=" * 90)
 for label, jd in test_dates:
     for body, bname in BODIES.items():
         try:
-            se_r = swe.pheno_ut(jd, body, SEFLG_SPEED)
-            le_r = ephem.swe_pheno_ut(jd, body, SEFLG_SPEED)
+            se_r = swe.pheno_ut(jd, body, FLG_SPEED)
+            le_r = ephem.pheno_ut(jd, body, FLG_SPEED)
             le_data = le_r[0]  # LE returns (tuple, retflag)
 
             for i, pname in enumerate(PHENO_LABELS):

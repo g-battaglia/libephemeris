@@ -10,16 +10,16 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
-    SEFLG_SIDEREAL,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
+    FLG_SIDEREAL,
+    FLG_SWIEPH,
 )
 
 
@@ -75,9 +75,9 @@ RELAXED_TOLERANCE_SYSTEMS = {
 }
 
 SIDEREAL_MODES = [
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-    (SE_SIDM_RAMAN, "Raman"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+    (SIDM_RAMAN, "Raman"),
 ]
 
 
@@ -159,7 +159,7 @@ class TestHousesExSidereal:
         swe.set_sid_mode(sid_mode)
         pyephem.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
 
         # SwissEphemeris
         cusps_swe, ascmc_swe = swe.houses_ex(
@@ -192,9 +192,9 @@ class TestHousePos:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     @pytest.mark.parametrize("hsys", HOUSE_SYSTEMS[:4])
@@ -203,7 +203,7 @@ class TestHousePos:
         lat, lon = 45.0, 0.0
 
         # Get planet position
-        pos, _ = swe.calc_ut(jd_standard, body_id, SEFLG_SWIEPH)
+        pos, _ = swe.calc_ut(jd_standard, body_id, FLG_SWIEPH)
         planet_lon = pos[0]
         planet_lat = pos[1]
 
@@ -245,11 +245,11 @@ class TestGauquelinSector:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_gauquelin_sector(self, jd_standard, body_id, body_name):
@@ -262,7 +262,7 @@ class TestGauquelinSector:
         # SwissEphemeris
         try:
             ret_swe = swe.gauquelin_sector(
-                jd_standard, body_id, "", SEFLG_SWIEPH, 0, geopos, atpress, attemp
+                jd_standard, body_id, "", FLG_SWIEPH, 0, geopos, atpress, attemp
             )
             sector_swe = ret_swe[0] if isinstance(ret_swe, tuple) else ret_swe
         except Exception as e:
@@ -271,7 +271,7 @@ class TestGauquelinSector:
         # LibEphemeris
         try:
             ret_py = pyephem.gauquelin_sector(
-                jd_standard, body_id, 0, geopos, atpress, attemp, SEFLG_SWIEPH
+                jd_standard, body_id, 0, geopos, atpress, attemp, FLG_SWIEPH
             )
             sector_py = ret_py[0] if isinstance(ret_py, tuple) else ret_py
         except Exception as e:

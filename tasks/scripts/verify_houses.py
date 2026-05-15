@@ -17,16 +17,16 @@ import sys
 import time
 from collections import Counter
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
 # Point pyswisseph at its ephemeris files
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 # Ensure libephemeris uses Skyfield backend (no LEB)
-lib.swe_close()
+lib.close()
 lib.set_calc_mode("skyfield")
 
 # ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ print(f"  3.1-3.2 done: {time.time() - t0:.1f}s  (passed={passed} failed={failed
 # =========================================================================
 print("Section 3.3: houses_ex with sidereal flag...")
 
-SEFLG_SIDEREAL = 65536
+FLG_SIDEREAL = 65536
 SID_SYSTEMS = ["P", "K", "E", "W", "B"]
 AYANAMSHAS = [0, 1, 27]  # Fagan-Bradley, Lahiri, True Citra
 
@@ -205,7 +205,7 @@ for hsys_char in SID_SYSTEMS:
             # --- libephemeris ---
             try:
                 lib.set_sid_mode(ayan_id)
-                lib_result = lib.houses_ex(jd, 41.9, 12.5, hsys_int, SEFLG_SIDEREAL)
+                lib_result = lib.houses_ex(jd, 41.9, 12.5, hsys_int, FLG_SIDEREAL)
                 lib_cusps = lib_result[0]
                 lib_ascmc = lib_result[1]
                 lib.set_sid_mode(0)  # reset
@@ -217,7 +217,7 @@ for hsys_char in SID_SYSTEMS:
             try:
                 swe_ref.set_sid_mode(ayan_id)
                 ref_result = swe_ref.houses_ex(
-                    jd, 41.9, 12.5, hsys_bytes, SEFLG_SIDEREAL
+                    jd, 41.9, 12.5, hsys_bytes, FLG_SIDEREAL
                 )
                 ref_cusps = ref_result[0]
                 ref_ascmc = ref_result[1]
@@ -386,7 +386,7 @@ for jd in JDS_5:
     try:
         ref_houses_result = swe_ref.houses(jd, HPOS_LAT, 12.5, b"P")
         armc = float(ref_houses_result[1][2])  # ascmc[2] = ARMC
-        # Get obliquity from calc_ut with SE_ECL_NUT (-1)
+        # Get obliquity from calc_ut with ECL_NUT (-1)
         ref_ecl = swe_ref.calc_ut(jd, -1, 0)
         eps = float(ref_ecl[0][0])  # (tuple_of_6, retflags) -> true obliquity
     except Exception as e:
@@ -565,10 +565,10 @@ text = "\n".join(report)
 print(text)
 
 # Write report to file
-os.makedirs("/Users/giacomo/dev/libephemeris/tasks/results", exist_ok=True)
-with open("/Users/giacomo/dev/libephemeris/tasks/results/verify_houses.txt", "w") as f:
+os.makedirs(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results"), exist_ok=True)
+with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results", "verify_houses.txt"), "w") as f:
     f.write(text + "\n")
 
 # Cleanup
-lib.swe_close()
+lib.close()
 swe_ref.close()

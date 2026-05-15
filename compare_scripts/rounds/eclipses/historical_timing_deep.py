@@ -17,7 +17,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -77,7 +77,7 @@ def test_eclipse_timing():
 
         # libephemeris: returns (ecl_type_int, tret_tuple)
         try:
-            le_result = ephem.swe_sol_eclipse_when_glob(search_jd, FLAGS)
+            le_result = ephem.sol_eclipse_when_glob(search_jd, FLAGS)
             le_ecl_type = le_result[0]  # int eclipse type flags
             le_tret = le_result[1]  # tuple of times
         except Exception as e:
@@ -174,7 +174,7 @@ def test_lunar_eclipse_timing():
 
         # libephemeris: returns (ecl_type_int, tret_tuple)
         try:
-            le_result = ephem.swe_lun_eclipse_when(search_jd, FLAGS, 0)
+            le_result = ephem.lun_eclipse_when(search_jd, FLAGS, 0)
             le_ecl_type = le_result[0]
             le_tret = le_result[1]
         except Exception as e:

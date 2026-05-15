@@ -2,16 +2,16 @@
 Deep Validation Suite 4: Final coverage of remaining untested swe_* functions.
 
 This test suite covers all functions NOT covered by suites 1-3:
-- swe_houses_with_fallback / swe_houses_armc_with_fallback (polar fallback)
-- swe_sol_eclipse_max_time (precise maximum eclipse timing)
-- swe_sol_eclipse_how_details (detailed eclipse circumstances)
-- swe_sol_eclipse_obscuration_at_loc vs pyswisseph sol_eclipse_how
-- swe_lun_occult_when_loc vs pyswisseph
-- swe_planet_occult_when_glob / swe_planet_occult_when_loc (self-consistency)
-- swe_heliacal_pheno_ut vs pyswisseph
-- swe_calc_angles (self-consistency)
+- houses_with_fallback / houses_armc_with_fallback (polar fallback)
+- sol_eclipse_max_time (precise maximum eclipse timing)
+- sol_eclipse_how_details (detailed eclipse circumstances)
+- sol_eclipse_obscuration_at_loc vs pyswisseph sol_eclipse_how
+- lun_occult_when_loc vs pyswisseph
+- planet_occult_when_glob / planet_occult_when_loc (self-consistency)
+- heliacal_pheno_ut vs pyswisseph
+- calc_angles (self-consistency)
 - State functions: set/get_tid_acc, set/get_delta_t_userdef, set/get_lapse_rate
-- swe_get_library_path, swe_get_current_file_data, swe_close
+- get_library_path, get_current_file_data, close
 
 All tests use Skyfield mode only (not LEB).
 """
@@ -45,9 +45,9 @@ def jd_diff_seconds(jd1: float, jd2: float) -> float:
 
 # Known eclipse dates for testing
 # April 8, 2024 total solar eclipse
-ECLIPSE_2024_04 = ephem.swe_julday(2024, 4, 8, 18.0)
+ECLIPSE_2024_04 = ephem.julday(2024, 4, 8, 18.0)
 # October 14, 2023 annular solar eclipse
-ECLIPSE_2023_10 = ephem.swe_julday(2023, 10, 14, 18.0)
+ECLIPSE_2023_10 = ephem.julday(2023, 10, 14, 18.0)
 
 
 # ============================================================================
@@ -56,7 +56,7 @@ ECLIPSE_2023_10 = ephem.swe_julday(2023, 10, 14, 18.0)
 
 
 class TestHousesWithFallback:
-    """Test swe_houses_with_fallback — polar-safe house calculation."""
+    """Test houses_with_fallback — polar-safe house calculation."""
 
     @pytest.mark.parametrize(
         "hsys_char",
@@ -64,15 +64,15 @@ class TestHousesWithFallback:
     )
     def test_non_polar_matches_regular_houses(self, hsys_char):
         """At non-polar latitudes, fallback should produce same cusps as regular."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9, 12.5  # Rome
         hsys = ord(hsys_char)
 
         # Regular houses
-        cusps_reg, ascmc_reg = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_reg, ascmc_reg = ephem.houses(jd, lat, lon, hsys)
 
         # With fallback
-        cusps_fb, ascmc_fb, did_fallback, msg = ephem.swe_houses_with_fallback(
+        cusps_fb, ascmc_fb, did_fallback, msg = ephem.houses_with_fallback(
             jd, lat, lon, hsys
         )
 
@@ -94,12 +94,12 @@ class TestHousesWithFallback:
     )
     def test_polar_latitude_does_not_crash(self, hsys_char):
         """At polar latitudes, should return valid cusps (possibly with fallback)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat = 72.0  # Polar region
         lon = 18.0
         hsys = ord(hsys_char)
 
-        cusps, ascmc, did_fallback, msg = ephem.swe_houses_with_fallback(
+        cusps, ascmc, did_fallback, msg = ephem.houses_with_fallback(
             jd, lat, lon, hsys
         )
 
@@ -114,8 +114,8 @@ class TestHousesWithFallback:
 
     def test_return_structure(self):
         """Return should be (cusps, ascmc, did_fallback, message)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        result = ephem.swe_houses_with_fallback(jd, 45.0, 10.0, ord("P"))
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        result = ephem.houses_with_fallback(jd, 45.0, 10.0, ord("P"))
         assert len(result) == 4
         cusps, ascmc, did_fallback, msg = result
         assert isinstance(cusps, tuple)
@@ -129,7 +129,7 @@ class TestHousesWithFallback:
 
 
 class TestHousesArmcWithFallback:
-    """Test swe_houses_armc_with_fallback — ARMC-based polar-safe houses."""
+    """Test houses_armc_with_fallback — ARMC-based polar-safe houses."""
 
     @pytest.mark.parametrize(
         "hsys_char",
@@ -142,8 +142,8 @@ class TestHousesArmcWithFallback:
         eps = 23.44  # Obliquity
         hsys = ord(hsys_char)
 
-        cusps_reg, ascmc_reg = ephem.swe_houses_armc(armc, lat, eps, hsys)
-        cusps_fb, ascmc_fb, did_fallback, msg = ephem.swe_houses_armc_with_fallback(
+        cusps_reg, ascmc_reg = ephem.houses_armc(armc, lat, eps, hsys)
+        cusps_fb, ascmc_fb, did_fallback, msg = ephem.houses_armc_with_fallback(
             armc, lat, eps, hsys
         )
 
@@ -164,7 +164,7 @@ class TestHousesArmcWithFallback:
         eps = 23.44
         hsys = ord("P")
 
-        cusps, ascmc, did_fallback, msg = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, did_fallback, msg = ephem.houses_armc_with_fallback(
             armc, lat, eps, hsys
         )
 
@@ -176,7 +176,7 @@ class TestHousesArmcWithFallback:
 
     def test_return_structure(self):
         """Return should be (cusps, ascmc, did_fallback, message)."""
-        result = ephem.swe_houses_armc_with_fallback(150.0, 45.0, 23.44, ord("P"))
+        result = ephem.houses_armc_with_fallback(150.0, 45.0, 23.44, ord("P"))
         assert len(result) == 4
         cusps, ascmc, did_fallback, msg = result
         assert isinstance(cusps, tuple)
@@ -190,19 +190,19 @@ class TestHousesArmcWithFallback:
 
 
 class TestSolEclipseMaxTime:
-    """Test swe_sol_eclipse_max_time — precise maximum eclipse timing."""
+    """Test sol_eclipse_max_time — precise maximum eclipse timing."""
 
     def test_max_time_during_known_eclipse(self):
         """Max time should be near known eclipse maximum for April 2024."""
         # Find eclipse first
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         ecl_type, times = ret
         jd_max_glob = times[0]  # Maximum of global eclipse
 
         # Now find max time near this eclipse
-        jd_max, magnitude = ephem.swe_sol_eclipse_max_time(jd_max_glob)
+        jd_max, magnitude = ephem.sol_eclipse_max_time(jd_max_glob)
 
         # Should be very close to the global maximum
         diff_sec = jd_diff_seconds(jd_max, jd_max_glob)
@@ -213,15 +213,15 @@ class TestSolEclipseMaxTime:
 
     def test_max_time_returns_two_values(self):
         """Should return (jd_max, magnitude)."""
-        jd_approx = ephem.swe_julday(2024, 4, 8, 18.0)
+        jd_approx = ephem.julday(2024, 4, 8, 18.0)
 
         # Find eclipse first
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         jd_max_glob = ret[1][0]
 
-        result = ephem.swe_sol_eclipse_max_time(jd_max_glob)
+        result = ephem.sol_eclipse_max_time(jd_max_glob)
         assert len(result) == 2, f"Expected 2 values, got {len(result)}: {result}"
 
         jd_max, magnitude = result
@@ -231,13 +231,13 @@ class TestSolEclipseMaxTime:
     def test_max_time_at_location(self):
         """Max time at specific location should work."""
         # Find eclipse
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         jd_max_glob = ret[1][0]
 
         # Austin, TX (in totality path of April 2024 eclipse)
-        jd_max, magnitude = ephem.swe_sol_eclipse_max_time(
+        jd_max, magnitude = ephem.sol_eclipse_max_time(
             jd_max_glob, lat=30.27, lon=-97.74
         )
 
@@ -251,29 +251,29 @@ class TestSolEclipseMaxTime:
 
 
 class TestSolEclipseHowDetails:
-    """Test swe_sol_eclipse_how_details — comprehensive eclipse circumstances."""
+    """Test sol_eclipse_how_details — comprehensive eclipse circumstances."""
 
     def test_details_during_eclipse(self):
         """Should return a dict with expected keys during an eclipse."""
         # Find eclipse
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         jd_max_glob = ret[1][0]
 
         # Dallas, TX (in totality path)
         geopos = [32.78, -96.80, 0.0]
-        details = ephem.swe_sol_eclipse_how_details(jd_max_glob, geopos, SEFLG_SWIEPH)
+        details = ephem.sol_eclipse_how_details(jd_max_glob, geopos, FLG_SWIEPH)
 
         assert isinstance(details, dict), f"Expected dict, got {type(details)}"
 
     def test_details_no_eclipse(self):
         """Should handle non-eclipse times gracefully."""
-        jd = ephem.swe_julday(2024, 6, 1, 12.0)  # No eclipse
+        jd = ephem.julday(2024, 6, 1, 12.0)  # No eclipse
         geopos = [45.0, 10.0, 0.0]
 
         # Should not crash
-        details = ephem.swe_sol_eclipse_how_details(jd, geopos, SEFLG_SWIEPH)
+        details = ephem.sol_eclipse_how_details(jd, geopos, FLG_SWIEPH)
         assert isinstance(details, dict)
 
 
@@ -283,21 +283,21 @@ class TestSolEclipseHowDetails:
 
 
 class TestSolEclipseObscurationAtLoc:
-    """Test swe_sol_eclipse_obscuration_at_loc vs pyswisseph sol_eclipse_how."""
+    """Test sol_eclipse_obscuration_at_loc vs pyswisseph sol_eclipse_how."""
 
     def test_obscuration_during_eclipse_vs_pyswisseph(self):
         """Obscuration should be consistent with pyswisseph sol_eclipse_how."""
         # Find eclipse
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         jd_max_glob = ret[1][0]
 
         # Location in partial eclipse zone (New York)
         geopos = [40.71, -74.01, 0.0]
 
-        lib_obsc = ephem.swe_sol_eclipse_obscuration_at_loc(
-            jd_max_glob, geopos, SEFLG_SWIEPH
+        lib_obsc = ephem.sol_eclipse_obscuration_at_loc(
+            jd_max_glob, geopos, FLG_SWIEPH
         )
 
         # pyswisseph sol_eclipse_how(tjd_ut, geopos, flags) returns attr array
@@ -319,10 +319,10 @@ class TestSolEclipseObscurationAtLoc:
 
     def test_obscuration_no_eclipse(self):
         """Obscuration should be 0 when no eclipse."""
-        jd = ephem.swe_julday(2024, 6, 1, 12.0)
+        jd = ephem.julday(2024, 6, 1, 12.0)
         geopos = [45.0, 10.0, 0.0]
 
-        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd, geopos, SEFLG_SWIEPH)
+        obsc = ephem.sol_eclipse_obscuration_at_loc(jd, geopos, FLG_SWIEPH)
         assert obsc == 0.0 or obsc < 0.01, f"Expected ~0 obscuration, got {obsc}"
 
 
@@ -332,16 +332,16 @@ class TestSolEclipseObscurationAtLoc:
 
 
 class TestLunOccultWhenLoc:
-    """Test swe_lun_occult_when_loc vs pyswisseph lun_occult_when_loc."""
+    """Test lun_occult_when_loc vs pyswisseph lun_occult_when_loc."""
 
     def test_venus_occultation_structure(self):
         """Should return (type, times, attrs) tuple."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         geopos = [45.0, 10.0, 0.0]
 
         try:
-            result = ephem.swe_lun_occult_when_loc(
-                jd_start, SE_VENUS, geopos, SEFLG_SWIEPH
+            result = ephem.lun_occult_when_loc(
+                jd_start, VENUS, geopos, FLG_SWIEPH
             )
             assert len(result) == 3, f"Expected 3-tuple, got {len(result)}"
             ecl_type, times, attrs = result
@@ -353,12 +353,12 @@ class TestLunOccultWhenLoc:
 
     def test_star_occultation(self):
         """Should handle star occultation search."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
         geopos = [45.0, 10.0, 0.0]
 
         try:
-            result = ephem.swe_lun_occult_when_loc(
-                jd_start, "Regulus", geopos, SEFLG_SWIEPH
+            result = ephem.lun_occult_when_loc(
+                jd_start, "Regulus", geopos, FLG_SWIEPH
             )
             if result[0] > 0:  # Found occultation
                 assert result[1][0] > jd_start, "Occultation should be after start"
@@ -372,14 +372,14 @@ class TestLunOccultWhenLoc:
 
 
 class TestPlanetOccultWhenGlob:
-    """Test swe_planet_occult_when_glob — planet-planet occultation search."""
+    """Test planet_occult_when_glob — planet-planet occultation search."""
 
     def test_return_structure(self):
         """Should return (type, times) tuple."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         try:
-            result = ephem.swe_planet_occult_when_glob(jd_start, SE_VENUS, SE_JUPITER)
+            result = ephem.planet_occult_when_glob(jd_start, VENUS, JUPITER)
             assert len(result) == 2, f"Expected 2-tuple, got {len(result)}"
             ecl_type, times = result
             assert isinstance(ecl_type, int)
@@ -389,14 +389,14 @@ class TestPlanetOccultWhenGlob:
 
     def test_does_not_crash_with_various_planets(self):
         """Should handle various planet pairs without crashing."""
-        jd_start = ephem.swe_julday(2020, 1, 1, 0.0)
+        jd_start = ephem.julday(2020, 1, 1, 0.0)
         pairs = [
-            (SE_VENUS, SE_MARS),
-            (SE_MARS, SE_JUPITER),
+            (VENUS, MARS),
+            (MARS, JUPITER),
         ]
         for p1, p2 in pairs:
             try:
-                result = ephem.swe_planet_occult_when_glob(jd_start, p1, p2)
+                result = ephem.planet_occult_when_glob(jd_start, p1, p2)
                 # Just verify it returns without crashing
                 assert len(result) >= 2
             except Exception:
@@ -409,15 +409,15 @@ class TestPlanetOccultWhenGlob:
 
 
 class TestPlanetOccultWhenLoc:
-    """Test swe_planet_occult_when_loc — local planet occultation search."""
+    """Test planet_occult_when_loc — local planet occultation search."""
 
     def test_return_structure(self):
         """Should return (type, times, attrs) tuple."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0.0)
+        jd_start = ephem.julday(2024, 1, 1, 0.0)
 
         try:
-            result = ephem.swe_planet_occult_when_loc(
-                jd_start, SE_VENUS, SE_MARS, lat=45.0, lon=10.0
+            result = ephem.planet_occult_when_loc(
+                jd_start, VENUS, MARS, lat=45.0, lon=10.0
             )
             assert len(result) == 3, f"Expected 3-tuple, got {len(result)}"
             ecl_type, times, attrs = result
@@ -432,30 +432,30 @@ class TestPlanetOccultWhenLoc:
 
 
 class TestHeliacalPhenoUt:
-    """Test swe_heliacal_pheno_ut vs pyswisseph heliacal_pheno_ut."""
+    """Test heliacal_pheno_ut vs pyswisseph heliacal_pheno_ut."""
 
     def test_return_structure(self):
         """Should return a flat tuple of 50 floats."""
-        jd = ephem.swe_julday(2024, 3, 21, 0.0)
+        jd = ephem.julday(2024, 3, 21, 0.0)
         geopos = (10.0, 45.0, 0.0)
         atmo = (1013.25, 15.0, 40.0, 0.0)
         observer = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
-        result = ephem.swe_heliacal_pheno_ut(
-            jd, geopos, atmo, observer, "Venus", 1, SEFLG_SWIEPH
+        result = ephem.heliacal_pheno_ut(
+            jd, geopos, atmo, observer, "Venus", 1, FLG_SWIEPH
         )
         assert isinstance(result, tuple), f"Expected tuple, got {type(result)}"
         assert len(result) == 50, f"Expected 50-element tuple, got {len(result)}"
 
     def test_vs_pyswisseph(self):
         """Compare heliacal_pheno_ut output against pyswisseph."""
-        jd = ephem.swe_julday(2024, 3, 21, 0.0)
+        jd = ephem.julday(2024, 3, 21, 0.0)
         lat, lon, alt = 45.0, 10.0, 0.0
 
         geopos = (lon, lat, alt)
         atmo = (1013.25, 15.0, 40.0, 0.0)
         observer = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
-        lib_result = ephem.swe_heliacal_pheno_ut(
-            jd, geopos, atmo, observer, "Venus", 1, SEFLG_SWIEPH
+        lib_result = ephem.heliacal_pheno_ut(
+            jd, geopos, atmo, observer, "Venus", 1, FLG_SWIEPH
         )
 
         try:
@@ -488,18 +488,18 @@ class TestHeliacalPhenoUt:
 
 
 class TestCalcAngles:
-    """Test swe_calc_angles — pre-calculated angles for Arabic parts."""
+    """Test calc_angles — pre-calculated angles for Arabic parts."""
 
     def test_return_is_dict(self):
         """Should return a dict."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        result = ephem.swe_calc_angles(jd, 45.0, 10.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        result = ephem.calc_angles(jd, 45.0, 10.0)
         assert isinstance(result, dict), f"Expected dict, got {type(result)}"
 
     def test_contains_expected_keys(self):
         """Should contain ASC and MC angles at minimum."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        result = ephem.swe_calc_angles(jd, 45.0, 10.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        result = ephem.calc_angles(jd, 45.0, 10.0)
 
         # Check for common angle keys
         has_asc = any("asc" in str(k).lower() for k in result.keys())
@@ -510,11 +510,11 @@ class TestCalcAngles:
 
     def test_asc_consistent_with_houses(self):
         """ASC from calc_angles should match ASC from houses."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 45.0, 10.0
 
-        angles = ephem.swe_calc_angles(jd, lat, lon)
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("P"))
+        angles = ephem.calc_angles(jd, lat, lon)
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("P"))
 
         houses_asc = ascmc[0]  # ASC from houses
 
@@ -548,8 +548,8 @@ class TestCalcAngles:
     )
     def test_does_not_crash_at_various_locations(self, lat, lon):
         """Should work at various latitudes without crashing."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        result = ephem.swe_calc_angles(jd, lat, lon)
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        result = ephem.calc_angles(jd, lat, lon)
         assert isinstance(result, dict)
         assert len(result) > 0, "Should return at least some data"
 
@@ -560,28 +560,28 @@ class TestCalcAngles:
 
 
 class TestTidAcc:
-    """Test swe_set_tid_acc / swe_get_tid_acc."""
+    """Test set_tid_acc / get_tid_acc."""
 
     def test_set_and_get_round_trip(self):
         """Setting and getting tidal acceleration should round-trip."""
         # Save original
-        original = ephem.swe_get_tid_acc()
+        original = ephem.get_tid_acc()
 
         try:
             # Set a custom value
             test_value = -25.8
-            ephem.swe_set_tid_acc(test_value)
-            result = ephem.swe_get_tid_acc()
+            ephem.set_tid_acc(test_value)
+            result = ephem.get_tid_acc()
             assert abs(result - test_value) < 0.001, (
                 f"set/get round trip failed: set={test_value}, got={result}"
             )
         finally:
             # Restore original (set to 0 to reset to auto)
-            ephem.swe_set_tid_acc(original)
+            ephem.set_tid_acc(original)
 
     def test_default_is_reasonable(self):
         """Default tidal acceleration should be in reasonable range."""
-        val = ephem.swe_get_tid_acc()
+        val = ephem.get_tid_acc()
         # Tidal acceleration is typically around -25 to -26 "/cy²
         assert isinstance(val, (int, float)), f"Expected numeric, got {type(val)}"
 
@@ -592,40 +592,40 @@ class TestTidAcc:
 
 
 class TestDeltaTUserdef:
-    """Test swe_set_delta_t_userdef / swe_get_delta_t_userdef."""
+    """Test set_delta_t_userdef / get_delta_t_userdef."""
 
     def test_set_and_get_round_trip(self):
         """Setting and getting user-defined Delta T should round-trip."""
         # Save original
-        original = ephem.swe_get_delta_t_userdef()
+        original = ephem.get_delta_t_userdef()
 
         try:
-            # Set a custom value in DAYS (same unit as swe_deltat returns)
+            # Set a custom value in DAYS (same unit as deltat returns)
             # 69.184 seconds = 69.184 / 86400 days
             test_value_sec = 69.184
             test_value_days = test_value_sec / 86400.0
-            ephem.swe_set_delta_t_userdef(test_value_days)
-            result = ephem.swe_get_delta_t_userdef()
+            ephem.set_delta_t_userdef(test_value_days)
+            result = ephem.get_delta_t_userdef()
             assert result is not None
             assert abs(result - test_value_days) < 1e-10, (
                 f"set/get round trip failed: set={test_value_days}, got={result}"
             )
 
-            # When set, swe_deltat should use this value
-            jd = ephem.swe_julday(2024, 6, 21, 12.0)
-            dt = ephem.swe_deltat(jd)
+            # When set, deltat should use this value
+            jd = ephem.julday(2024, 6, 21, 12.0)
+            dt = ephem.deltat(jd)
             # Should be the user-defined value (in days)
             assert abs(dt - test_value_days) < 1e-10, (
                 f"deltat should use userdef: expected {test_value_days}, got {dt}"
             )
         finally:
             # Reset to None (auto computation)
-            ephem.swe_set_delta_t_userdef(None)
+            ephem.set_delta_t_userdef(None)
 
     def test_reset_to_none(self):
         """Setting to None should restore automatic computation."""
-        ephem.swe_set_delta_t_userdef(None)
-        result = ephem.swe_get_delta_t_userdef()
+        ephem.set_delta_t_userdef(None)
+        result = ephem.get_delta_t_userdef()
         assert result is None, f"Expected None after reset, got {result}"
 
 
@@ -635,25 +635,25 @@ class TestDeltaTUserdef:
 
 
 class TestLapseRate:
-    """Test swe_set_lapse_rate / swe_get_lapse_rate."""
+    """Test set_lapse_rate / get_lapse_rate."""
 
     def test_set_and_get_round_trip(self):
         """Setting and getting lapse rate should round-trip."""
-        original = ephem.swe_get_lapse_rate()
+        original = ephem.get_lapse_rate()
 
         try:
             test_value = 0.0065  # Standard atmosphere lapse rate
-            ephem.swe_set_lapse_rate(test_value)
-            result = ephem.swe_get_lapse_rate()
+            ephem.set_lapse_rate(test_value)
+            result = ephem.get_lapse_rate()
             assert abs(result - test_value) < 0.0001, (
                 f"set/get round trip failed: set={test_value}, got={result}"
             )
         finally:
-            ephem.swe_set_lapse_rate(original)
+            ephem.set_lapse_rate(original)
 
     def test_default_is_reasonable(self):
         """Default lapse rate should be in reasonable range."""
-        val = ephem.swe_get_lapse_rate()
+        val = ephem.get_lapse_rate()
         assert isinstance(val, (int, float))
         # Typical lapse rate: 0.0065 K/m or similar
         assert val >= 0, f"Lapse rate should be non-negative, got {val}"
@@ -665,16 +665,16 @@ class TestLapseRate:
 
 
 class TestGetLibraryPath:
-    """Test swe_get_library_path."""
+    """Test get_library_path."""
 
     def test_returns_string(self):
         """Should return a string."""
-        path = ephem.swe_get_library_path()
+        path = ephem.get_library_path()
         assert isinstance(path, str), f"Expected str, got {type(path)}"
 
     def test_path_is_non_empty(self):
         """Should return a non-empty path."""
-        path = ephem.swe_get_library_path()
+        path = ephem.get_library_path()
         assert len(path) > 0, "Library path should not be empty"
 
 
@@ -684,14 +684,14 @@ class TestGetLibraryPath:
 
 
 class TestGetCurrentFileData:
-    """Test swe_get_current_file_data."""
+    """Test get_current_file_data."""
 
     def test_returns_correct_structure(self):
         """Should return (filename, start_jd, end_jd, denum)."""
         # First ensure ephemeris is loaded by doing a calculation
-        ephem.swe_calc_ut(ephem.swe_julday(2024, 1, 1, 12.0), SE_SUN, SEFLG_SWIEPH)
+        ephem.calc_ut(ephem.julday(2024, 1, 1, 12.0), SUN, FLG_SWIEPH)
 
-        result = ephem.swe_get_current_file_data()
+        result = ephem.get_current_file_data()
         assert len(result) == 4, f"Expected 4-tuple, got {len(result)}: {result}"
 
         filename, start_jd, end_jd, denum = result
@@ -704,9 +704,9 @@ class TestGetCurrentFileData:
 
     def test_file_data_has_valid_range(self):
         """Start JD should be before end JD."""
-        ephem.swe_calc_ut(ephem.swe_julday(2024, 1, 1, 12.0), SE_SUN, SEFLG_SWIEPH)
+        ephem.calc_ut(ephem.julday(2024, 1, 1, 12.0), SUN, FLG_SWIEPH)
 
-        filename, start_jd, end_jd, denum = ephem.swe_get_current_file_data()
+        filename, start_jd, end_jd, denum = ephem.get_current_file_data()
         if start_jd != 0 and end_jd != 0:
             assert start_jd < end_jd, (
                 f"start_jd ({start_jd}) should be < end_jd ({end_jd})"
@@ -719,24 +719,24 @@ class TestGetCurrentFileData:
 
 
 class TestClose:
-    """Test swe_close — close ephemeris and release resources."""
+    """Test close — close ephemeris and release resources."""
 
     def test_close_does_not_crash(self):
         """Calling close should not crash."""
-        ephem.swe_close()
+        ephem.close()
         # Should still be able to do calculations after close
         # (it reopens files as needed)
-        pos, flags = ephem.swe_calc_ut(
-            ephem.swe_julday(2024, 1, 1, 12.0), SE_SUN, SEFLG_SWIEPH
+        pos, flags = ephem.calc_ut(
+            ephem.julday(2024, 1, 1, 12.0), SUN, FLG_SWIEPH
         )
         assert pos[0] > 0, "Should still work after close"
 
     def test_close_twice_does_not_crash(self):
         """Calling close multiple times should be safe."""
-        ephem.swe_close()
-        ephem.swe_close()
-        pos, flags = ephem.swe_calc_ut(
-            ephem.swe_julday(2024, 1, 1, 12.0), SE_SUN, SEFLG_SWIEPH
+        ephem.close()
+        ephem.close()
+        pos, flags = ephem.calc_ut(
+            ephem.julday(2024, 1, 1, 12.0), SUN, FLG_SWIEPH
         )
         assert pos[0] > 0
 
@@ -751,13 +751,13 @@ class TestCrossFunctionConsistency:
 
     def test_houses_ex2_cusp_speeds_vs_pyswisseph(self):
         """houses_ex2 cusp speeds should be close to pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9, 12.5
 
         # Test systems with compatible derivatives (< 2 deg/day difference)
         for hsys_code in ["P", "R", "C", "E", "M", "B", "T", "W"]:
-            _, _, lib_cspeeds, lib_aspeeds = ephem.swe_houses_ex2(
-                jd, lat, lon, ord(hsys_code), SEFLG_SPEED | SEFLG_SWIEPH
+            _, _, lib_cspeeds, lib_aspeeds = ephem.houses_ex2(
+                jd, lat, lon, ord(hsys_code), FLG_SPEED | FLG_SWIEPH
             )
             _, _, swe_cspeeds, swe_aspeeds = swe.houses_ex2(
                 jd, lat, lon, hsys_code.encode(), swe.FLG_SPEED | swe.FLG_SWIEPH
@@ -780,11 +780,11 @@ class TestCrossFunctionConsistency:
 
     def test_houses_ex2_cusp_speeds_koch(self):
         """Koch cusp speeds — wider tolerance due to nested trig sensitivity."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9, 12.5
 
-        _, _, lib_cspeeds, lib_aspeeds = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("K"), SEFLG_SPEED | SEFLG_SWIEPH
+        _, _, lib_cspeeds, lib_aspeeds = ephem.houses_ex2(
+            jd, lat, lon, ord("K"), FLG_SPEED | FLG_SWIEPH
         )
         _, _, swe_cspeeds, swe_aspeeds = swe.houses_ex2(
             jd, lat, lon, b"K", swe.FLG_SPEED | swe.FLG_SWIEPH
@@ -802,11 +802,11 @@ class TestCrossFunctionConsistency:
         for opposite cusps (5,6,11,12). Our formula is mathematically correct
         (verified numerically); pyswisseph uses incorrect coefficients for
         opposite-cusp derivatives."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9, 12.5
 
-        _, _, lib_cspeeds, lib_aspeeds = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("O"), SEFLG_SPEED | SEFLG_SWIEPH
+        _, _, lib_cspeeds, lib_aspeeds = ephem.houses_ex2(
+            jd, lat, lon, ord("O"), FLG_SPEED | FLG_SWIEPH
         )
         _, _, swe_cspeeds, swe_aspeeds = swe.houses_ex2(
             jd, lat, lon, b"O", swe.FLG_SPEED | swe.FLG_SWIEPH
@@ -831,12 +831,12 @@ class TestCrossFunctionConsistency:
 
     def test_houses_with_fallback_consistent_with_houses_ex(self):
         """houses_with_fallback cusps should match houses_ex at normal latitudes."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9, 12.5
         hsys = ord("P")
 
-        cusps_fb, ascmc_fb, _, _ = ephem.swe_houses_with_fallback(jd, lat, lon, hsys)
-        cusps_ex, ascmc_ex = ephem.swe_houses_ex(jd, lat, lon, hsys)
+        cusps_fb, ascmc_fb, _, _ = ephem.houses_with_fallback(jd, lat, lon, hsys)
+        cusps_ex, ascmc_ex = ephem.houses_ex(jd, lat, lon, hsys)
 
         # Compare cusps 1-12 (use min length to avoid index errors)
         n_cusps = min(len(cusps_fb), len(cusps_ex), 13)
@@ -849,17 +849,17 @@ class TestCrossFunctionConsistency:
     def test_eclipse_obscuration_consistent_with_eclipse_how(self):
         """Obscuration from obscuration_at_loc should match eclipse_how attr[2]."""
         # Find eclipse
-        ret = ephem.swe_sol_eclipse_when_glob(
-            ephem.swe_julday(2024, 1, 1, 0.0), SEFLG_SWIEPH
+        ret = ephem.sol_eclipse_when_glob(
+            ephem.julday(2024, 1, 1, 0.0), FLG_SWIEPH
         )
         jd_max = ret[1][0]
 
         geopos = [40.71, -74.01, 0.0]  # New York
 
-        obsc = ephem.swe_sol_eclipse_obscuration_at_loc(jd_max, geopos, SEFLG_SWIEPH)
+        obsc = ephem.sol_eclipse_obscuration_at_loc(jd_max, geopos, FLG_SWIEPH)
 
         # eclipse_how returns attr tuple where attr[2] = fraction of disc covered
-        how_result = ephem.swe_sol_eclipse_how(jd_max, geopos, SEFLG_SWIEPH)
+        how_result = ephem.sol_eclipse_how(jd_max, geopos, FLG_SWIEPH)
         if isinstance(how_result, tuple) and len(how_result) >= 2:
             attrs = how_result[1] if len(how_result) > 1 else how_result[0]
             if isinstance(attrs, (tuple, list)) and len(attrs) > 2:
@@ -873,18 +873,18 @@ class TestCrossFunctionConsistency:
 
     def test_delta_t_userdef_affects_calc(self):
         """User-defined Delta T should affect calculation results."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         # Get auto Delta T
-        ephem.swe_set_delta_t_userdef(None)
-        dt_auto = ephem.swe_deltat(jd)
+        ephem.set_delta_t_userdef(None)
+        dt_auto = ephem.deltat(jd)
 
         # Set a very different Delta T
-        ephem.swe_set_delta_t_userdef(120.0)  # 120 seconds
-        dt_user = ephem.swe_deltat(jd)
+        ephem.set_delta_t_userdef(120.0)  # 120 seconds
+        dt_user = ephem.deltat(jd)
 
         # Reset
-        ephem.swe_set_delta_t_userdef(None)
+        ephem.set_delta_t_userdef(None)
 
         # The two should be different
         diff_sec = abs(dt_auto - dt_user) * 86400.0
@@ -904,8 +904,8 @@ class TestEdgeCases:
 
     def test_houses_with_fallback_equator(self):
         """Should work at the equator without fallback."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        cusps, ascmc, did_fallback, msg = ephem.swe_houses_with_fallback(
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        cusps, ascmc, did_fallback, msg = ephem.houses_with_fallback(
             jd, 0.0, 0.0, ord("P")
         )
         assert did_fallback is False
@@ -913,8 +913,8 @@ class TestEdgeCases:
 
     def test_houses_with_fallback_extreme_polar(self):
         """Should handle extreme polar latitude (89°)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        cusps, ascmc, did_fallback, msg = ephem.swe_houses_with_fallback(
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        cusps, ascmc, did_fallback, msg = ephem.houses_with_fallback(
             jd, 89.0, 0.0, ord("P")
         )
         assert len(cusps) >= 12
@@ -924,26 +924,26 @@ class TestEdgeCases:
     def test_calc_angles_multiple_dates(self):
         """calc_angles should work across different dates."""
         dates = [
-            ephem.swe_julday(2000, 1, 1, 12.0),
-            ephem.swe_julday(2024, 6, 21, 12.0),
-            ephem.swe_julday(1980, 7, 15, 0.0),
+            ephem.julday(2000, 1, 1, 12.0),
+            ephem.julday(2024, 6, 21, 12.0),
+            ephem.julday(1980, 7, 15, 0.0),
         ]
         for jd in dates:
-            result = ephem.swe_calc_angles(jd, 45.0, 10.0)
+            result = ephem.calc_angles(jd, 45.0, 10.0)
             assert isinstance(result, dict)
             assert len(result) > 0
 
     def test_close_and_recalculate(self):
         """After close, calculations should still work (auto-reopen)."""
-        ephem.swe_close()
+        ephem.close()
 
         # These should all work after close
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        pos, flags = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        pos, flags = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
         assert pos[0] > 0
 
-        cusps, ascmc = ephem.swe_houses(jd, 45.0, 10.0, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 45.0, 10.0, ord("P"))
         assert len(cusps) >= 12
 
-        dt = ephem.swe_deltat(jd)
+        dt = ephem.deltat(jd)
         assert dt > 0

@@ -71,11 +71,11 @@ class R:
 
 def ecl_type_str(ecl_type):
     parts = []
-    if ecl_type & SE_ECL_TOTAL:
+    if ecl_type & ECL_TOTAL:
         parts.append("TOTAL")
-    if ecl_type & SE_ECL_PARTIAL:
+    if ecl_type & ECL_PARTIAL:
         parts.append("PARTIAL")
-    if ecl_type & SE_ECL_PENUMBRAL:
+    if ecl_type & ECL_PENUMBRAL:
         parts.append("PENUMBRAL")
     return "|".join(parts) if parts else f"0x{ecl_type:x}"
 
@@ -104,7 +104,7 @@ def run_part1():
             se_times = se_result[1]
             se_max_jd = se_times[0]
 
-            le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+            le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
             le_type = le_result[0]
             le_times = le_result[1]
             le_max_jd = le_times[0]
@@ -147,8 +147,8 @@ def run_part2(eclipses_se, eclipses_le):
         le_type = le_data[0]
         label = f"LunEcl #{i + 1}"
 
-        se_main = se_type & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
-        le_main = le_type & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
+        se_main = se_type & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
+        le_main = le_type & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
 
         if se_main != le_main:
             r.fail(f"{label}: SE={ecl_type_str(se_main)} LE={ecl_type_str(le_main)}")
@@ -172,7 +172,7 @@ def run_part3(eclipses_se, eclipses_le):
 
         try:
             se_how = swe.lun_eclipse_how(se_times[0], (0.0, 0.0, 0.0), 0)
-            le_how = ephem.swe_lun_eclipse_how(le_times[0], 0, (0.0, 0.0, 0.0))
+            le_how = ephem.lun_eclipse_how(le_times[0], 0, (0.0, 0.0, 0.0))
 
             se_attr = se_how[1]
             le_attr = le_how[1]
@@ -273,7 +273,7 @@ def run_part5():
 
         try:
             se_result = swe.lun_eclipse_when(jd_start, 0, 0)
-            le_result = ephem.swe_lun_eclipse_when(jd_start, 0, 0)
+            le_result = ephem.lun_eclipse_when(jd_start, 0, 0)
 
             se_max = se_result[1][0]
             le_max = le_result[1][0]

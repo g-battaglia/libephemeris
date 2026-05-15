@@ -19,15 +19,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
-FLAGS = 256  # SEFLG_SPEED
+MEAN_NODE = 10
+TRUE_NODE = 11
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 55: Moon Node Regression Cycle (18.6 yr)")
@@ -42,8 +42,8 @@ jd_start = 2451545.0  # J2000.0
 for i in range(0, 37 * 12, 1):  # Monthly for 37 years
     jd = jd_start + i * 30.4375  # ~1 month
     try:
-        se_result = swe.calc_ut(jd, SE_MEAN_NODE, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, SE_MEAN_NODE, FLAGS)
+        se_result = swe.calc_ut(jd, MEAN_NODE, FLAGS)
+        le_result = ephem.calc_ut(jd, MEAN_NODE, FLAGS)
 
         se_lon = se_result[0][0]
         le_lon = le_result[0][0]
@@ -78,8 +78,8 @@ print("\n=== P2: True node position (2000-2037) ===")
 for i in range(0, 37 * 12, 1):
     jd = jd_start + i * 30.4375
     try:
-        se_result = swe.calc_ut(jd, SE_TRUE_NODE, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, SE_TRUE_NODE, FLAGS)
+        se_result = swe.calc_ut(jd, TRUE_NODE, FLAGS)
+        le_result = ephem.calc_ut(jd, TRUE_NODE, FLAGS)
 
         se_lon = se_result[0][0]
         le_lon = le_result[0][0]
@@ -113,8 +113,8 @@ print("\n=== P3: Mean node speed ===")
 for i in range(0, 37 * 4, 1):  # Quarterly
     jd = jd_start + i * 91.3125
     try:
-        se_result = swe.calc_ut(jd, SE_MEAN_NODE, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, SE_MEAN_NODE, FLAGS)
+        se_result = swe.calc_ut(jd, MEAN_NODE, FLAGS)
+        le_result = ephem.calc_ut(jd, MEAN_NODE, FLAGS)
 
         se_speed = se_result[0][3]  # lon speed
         le_speed = le_result[0][3]
@@ -157,8 +157,8 @@ print("\n=== P4: True node speed ===")
 for i in range(0, 37 * 4, 1):
     jd = jd_start + i * 91.3125
     try:
-        se_result = swe.calc_ut(jd, SE_TRUE_NODE, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, SE_TRUE_NODE, FLAGS)
+        se_result = swe.calc_ut(jd, TRUE_NODE, FLAGS)
+        le_result = ephem.calc_ut(jd, TRUE_NODE, FLAGS)
 
         se_speed = se_result[0][3]
         le_speed = le_result[0][3]
@@ -190,7 +190,7 @@ print("\n=== P5: Regression cycle period ===")
 # Track mean node through full 360° regression
 # Starting from J2000.0, find when mean node returns to same longitude
 try:
-    start_result = ephem.swe_calc_ut(jd_start, SE_MEAN_NODE, FLAGS)
+    start_result = ephem.calc_ut(jd_start, MEAN_NODE, FLAGS)
     start_lon = start_result[0][0]
 
     # Expected period: 6798.38 days = 18.6134 years
@@ -198,7 +198,7 @@ try:
 
     # Check position at expected_period
     jd_end = jd_start + expected_period
-    end_result = ephem.swe_calc_ut(jd_end, SE_MEAN_NODE, FLAGS)
+    end_result = ephem.calc_ut(jd_end, MEAN_NODE, FLAGS)
     end_lon = end_result[0][0]
 
     diff_lon = abs(end_lon - start_lon)
@@ -216,7 +216,7 @@ try:
 
     # Check half cycle (~180° regression)
     jd_half = jd_start + expected_period / 2
-    half_result = ephem.swe_calc_ut(jd_half, SE_MEAN_NODE, FLAGS)
+    half_result = ephem.calc_ut(jd_half, MEAN_NODE, FLAGS)
     half_lon = half_result[0][0]
 
     half_diff = abs(half_lon - start_lon)
@@ -233,7 +233,7 @@ try:
         )
 
     # SE should give same result
-    se_end = swe.calc_ut(jd_end, SE_MEAN_NODE, FLAGS)
+    se_end = swe.calc_ut(jd_end, MEAN_NODE, FLAGS)
     se_end_lon = se_end[0][0]
     diff_se = abs(se_end_lon - end_lon) * 3600
     if diff_se < 1.0:
@@ -260,8 +260,8 @@ max_diff = 0.0
 for i in range(0, 37 * 12, 1):
     jd = jd_start + i * 30.4375
     try:
-        le_mean = ephem.swe_calc_ut(jd, SE_MEAN_NODE, FLAGS)[0][0]
-        le_true = ephem.swe_calc_ut(jd, SE_TRUE_NODE, FLAGS)[0][0]
+        le_mean = ephem.calc_ut(jd, MEAN_NODE, FLAGS)[0][0]
+        le_true = ephem.calc_ut(jd, TRUE_NODE, FLAGS)[0][0]
 
         diff = le_true - le_mean
         if diff > 180:
@@ -295,8 +295,8 @@ print("\n=== P7: Mean node latitude (should be 0) ===")
 for i in range(0, 20):
     jd = jd_start + i * 365.25
     try:
-        le_result = ephem.swe_calc_ut(jd, SE_MEAN_NODE, FLAGS)[0]
-        se_result = swe.calc_ut(jd, SE_MEAN_NODE, FLAGS)[0]
+        le_result = ephem.calc_ut(jd, MEAN_NODE, FLAGS)[0]
+        se_result = swe.calc_ut(jd, MEAN_NODE, FLAGS)[0]
 
         le_lat = le_result[1]
         se_lat = se_result[1]
@@ -328,8 +328,8 @@ for year in range(1900, 2101, 5):
 
 for jd, label in historical_epochs:
     try:
-        se_result = swe.calc_ut(jd, SE_MEAN_NODE, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, SE_MEAN_NODE, FLAGS)
+        se_result = swe.calc_ut(jd, MEAN_NODE, FLAGS)
+        le_result = ephem.calc_ut(jd, MEAN_NODE, FLAGS)
 
         diff_arcsec = abs(se_result[0][0] - le_result[0][0]) * 3600.0
         if diff_arcsec > 180 * 3600:

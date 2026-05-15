@@ -13,7 +13,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 F = 2
@@ -67,7 +67,7 @@ for year, jd in test_jds:
     for pid, name in planets:
         try:
             se = swe.calc_ut(jd, pid, F | S)
-            le = ephem.swe_calc_ut(jd, pid, F | S)
+            le = ephem.calc_ut(jd, pid, F | S)
             se_lons[pid] = se[0][0]
             le_lons[pid] = le[0][0]
         except:
@@ -116,7 +116,7 @@ for year, jd in test_jds:
     for pid, name in planets:
         try:
             se = swe.calc_ut(jd, pid, F | S)
-            le = ephem.swe_calc_ut(jd, pid, F | S)
+            le = ephem.calc_ut(jd, pid, F | S)
             se_lons[pid] = se[0][0]
             le_lons[pid] = le[0][0]
         except:
@@ -178,9 +178,9 @@ for year, jd in test_jds[:8]:
             pid2, n2 = planets[j]
             try:
                 se = swe.calc_ut(jd, pid1, F | S)
-                le = ephem.swe_calc_ut(jd, pid1, F | S)
+                le = ephem.calc_ut(jd, pid1, F | S)
                 se2 = swe.calc_ut(jd, pid2, F | S)
-                le2 = ephem.swe_calc_ut(jd, pid2, F | S)
+                le2 = ephem.calc_ut(jd, pid2, F | S)
 
                 se_sep = (se2[0][0] - se[0][0]) % 360.0
                 le_sep = (le2[0][0] - le[0][0]) % 360.0
@@ -225,8 +225,8 @@ for year, jd in test_jds[:8]:
             try:
                 se1 = swe.calc_ut(jd, pid1, F | S)
                 se2 = swe.calc_ut(jd, pid2, F | S)
-                le1 = ephem.swe_calc_ut(jd, pid1, F | S)
-                le2 = ephem.swe_calc_ut(jd, pid2, F | S)
+                le1 = ephem.calc_ut(jd, pid1, F | S)
+                le2 = ephem.calc_ut(jd, pid2, F | S)
 
                 se_sep = (se2[0][0] - se1[0][0]) % 360.0
                 le_sep = (le2[0][0] - le1[0][0]) % 360.0
@@ -265,8 +265,8 @@ for year, jd in test_jds[:8]:
             try:
                 se1 = swe.calc_ut(jd, pid1, F | S)
                 se2 = swe.calc_ut(jd, pid2, F | S)
-                le1 = ephem.swe_calc_ut(jd, pid1, F | S)
-                le2 = ephem.swe_calc_ut(jd, pid2, F | S)
+                le1 = ephem.calc_ut(jd, pid1, F | S)
+                le2 = ephem.calc_ut(jd, pid2, F | S)
 
                 # Midpoint calculation
                 se_mid = (se1[0][0] + se2[0][0]) / 2.0

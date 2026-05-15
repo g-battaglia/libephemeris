@@ -19,13 +19,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 58: Jupiter-Saturn Great Conjunction Precision")
@@ -35,7 +35,7 @@ print("=" * 70)
 def get_lon(jd, body, use_se=False):
     if use_se:
         return swe.calc_ut(jd, body, FLAGS)[0][0]
-    return ephem.swe_calc_ut(jd, body, FLAGS)[0][0]
+    return ephem.calc_ut(jd, body, FLAGS)[0][0]
 
 
 def angular_sep(lon1, lon2):
@@ -195,8 +195,8 @@ print("\n=== P2: 2020-12-21 Great Conjunction ===")
 jd_2020gc = swe.julday(2020, 12, 21, 18.33)
 
 try:
-    le_jup = ephem.swe_calc_ut(jd_2020gc, 5, FLAGS)[0]
-    le_sat = ephem.swe_calc_ut(jd_2020gc, 6, FLAGS)[0]
+    le_jup = ephem.calc_ut(jd_2020gc, 5, FLAGS)[0]
+    le_sat = ephem.calc_ut(jd_2020gc, 6, FLAGS)[0]
     se_jup = swe.calc_ut(jd_2020gc, 5, FLAGS)[0]
     se_sat = swe.calc_ut(jd_2020gc, 6, FLAGS)[0]
 
@@ -357,7 +357,7 @@ for day in range(int(jd_end - jd_start)):
     jd = jd_start + day
     try:
         for body_id, name in [(5, "Jup"), (6, "Sat")]:
-            le = ephem.swe_calc_ut(jd, body_id, FLAGS)[0]
+            le = ephem.calc_ut(jd, body_id, FLAGS)[0]
             se = swe.calc_ut(jd, body_id, FLAGS)[0]
 
             lon_diff = abs(le[0] - se[0]) * 3600

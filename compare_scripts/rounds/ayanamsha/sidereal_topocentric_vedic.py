@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 205: Sidereal+Topocentric combo.
 
-Tests planet positions with both SEFLG_SIDEREAL and SEFLG_TOPOCTR flags
+Tests planet positions with both FLG_SIDEREAL and FLG_TOPOCTR flags
 set simultaneously — a common real-world use case for Vedic astrology.
 """
 
@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -24,12 +24,12 @@ total = 0
 failures = []
 
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
-    ("MeanNode", ephem.SE_MEAN_NODE, swe.MEAN_NODE),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
+    ("MeanNode", ephem.MEAN_NODE, swe.MEAN_NODE),
 ]
 
 LOCATIONS = [
@@ -57,18 +57,18 @@ def test_sidereal_topo():
 
     for sid_name, sid_mode in SID_MODES:
         print(f"\n--- {sid_name} (mode {sid_mode}) ---")
-        ephem.swe_set_sid_mode(sid_mode, 0.0, 0.0)
+        ephem.set_sid_mode(sid_mode, 0.0, 0.0)
         swe.set_sid_mode(sid_mode, 0.0, 0.0)
 
         for loc_name, lat, lon, alt in LOCATIONS:
-            ephem.swe_set_topo(lon, lat, alt)
+            ephem.set_topo(lon, lat, alt)
             swe.set_topo(lon, lat, alt)
 
             flags_le = (
-                ephem.SEFLG_SWIEPH
-                | ephem.SEFLG_SPEED
-                | ephem.SEFLG_SIDEREAL
-                | ephem.SEFLG_TOPOCTR
+                ephem.FLG_SWIEPH
+                | ephem.FLG_SPEED
+                | ephem.FLG_SIDEREAL
+                | ephem.FLG_TOPOCTR
             )
             flags_se = (
                 swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL | swe.FLG_TOPOCTR
@@ -77,7 +77,7 @@ def test_sidereal_topo():
             for jd in TEST_JDS:
                 for bname, le_b, se_b in BODIES:
                     try:
-                        le_r = ephem.swe_calc_ut(jd, le_b, flags_le)
+                        le_r = ephem.calc_ut(jd, le_b, flags_le)
                         se_r = swe.calc_ut(jd, se_b, flags_se)
                     except Exception:
                         continue
@@ -99,7 +99,7 @@ def test_sidereal_topo():
                         )
 
     # Reset
-    ephem.swe_set_sid_mode(0, 0.0, 0.0)
+    ephem.set_sid_mode(0, 0.0, 0.0)
     swe.set_sid_mode(0, 0.0, 0.0)
 
 

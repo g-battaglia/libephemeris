@@ -2,7 +2,7 @@
 """Round 54: Ecliptic Obliquity at Historical Dates
 
 Compare mean and true obliquity across wide date ranges.
-Tests swe_calc_ut with SE_ECL_NUT body (special body returning nutation/obliquity).
+Tests calc_ut with ECL_NUT body (special body returning nutation/obliquity).
 Also tests the internal obliquity computation consistency.
 """
 
@@ -17,14 +17,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-# SE_ECL_NUT = -1 in pyswisseph
-SE_ECL_NUT = -1
+# ECL_NUT = -1 in pyswisseph
+ECL_NUT = -1
 
 # Test epochs spanning 3000 years
 TEST_EPOCHS = []
@@ -41,21 +41,21 @@ TEST_EPOCHS.append((2460000.0, "JD2460000"))
 FLAGS = 0
 
 # ============================================================
-# P1: True obliquity via SE_ECL_NUT across epochs
+# P1: True obliquity via ECL_NUT across epochs
 # ============================================================
 print("=" * 70)
 print("ROUND 54: Ecliptic Obliquity at Historical Dates")
 print("=" * 70)
 
-print("\n=== P1: True obliquity via SE_ECL_NUT (1000-2800) ===")
+print("\n=== P1: True obliquity via ECL_NUT (1000-2800) ===")
 
 for jd, epoch_label in TEST_EPOCHS:
     try:
-        # SE: swe.calc_ut(jd, SE_ECL_NUT, 0) returns [true_obl, mean_obl, dpsi, deps, 0, 0]
-        se_result = swe.calc_ut(jd, SE_ECL_NUT, 0)
+        # SE: swe.calc_ut(jd, ECL_NUT, 0) returns [true_obl, mean_obl, dpsi, deps, 0, 0]
+        se_result = swe.calc_ut(jd, ECL_NUT, 0)
         se_pos = se_result[0] if isinstance(se_result, tuple) else se_result
 
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)
         le_pos = le_result[0] if isinstance(le_result, tuple) else le_result
 
         se_true_obl = se_pos[0]  # true obliquity
@@ -80,16 +80,16 @@ print(f"  After P1: {passed} passed, {failed} failed, {errors} errors")
 
 
 # ============================================================
-# P2: Mean obliquity via SE_ECL_NUT
+# P2: Mean obliquity via ECL_NUT
 # ============================================================
-print("\n=== P2: Mean obliquity via SE_ECL_NUT (1000-2800) ===")
+print("\n=== P2: Mean obliquity via ECL_NUT (1000-2800) ===")
 
 for jd, epoch_label in TEST_EPOCHS:
     try:
-        se_result = swe.calc_ut(jd, SE_ECL_NUT, 0)
+        se_result = swe.calc_ut(jd, ECL_NUT, 0)
         se_pos = se_result[0]
 
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)
         le_pos = le_result[0]
 
         se_mean_obl = se_pos[1]  # mean obliquity
@@ -114,16 +114,16 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 
 
 # ============================================================
-# P3: Nutation in longitude (dpsi) via SE_ECL_NUT
+# P3: Nutation in longitude (dpsi) via ECL_NUT
 # ============================================================
 print("\n=== P3: Nutation in longitude (dpsi) ===")
 
 for jd, epoch_label in TEST_EPOCHS:
     try:
-        se_result = swe.calc_ut(jd, SE_ECL_NUT, 0)
+        se_result = swe.calc_ut(jd, ECL_NUT, 0)
         se_pos = se_result[0]
 
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)
         le_pos = le_result[0]
 
         se_dpsi = se_pos[2]  # nutation in longitude
@@ -148,16 +148,16 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 
 
 # ============================================================
-# P4: Nutation in obliquity (deps) via SE_ECL_NUT
+# P4: Nutation in obliquity (deps) via ECL_NUT
 # ============================================================
 print("\n=== P4: Nutation in obliquity (deps) ===")
 
 for jd, epoch_label in TEST_EPOCHS:
     try:
-        se_result = swe.calc_ut(jd, SE_ECL_NUT, 0)
+        se_result = swe.calc_ut(jd, ECL_NUT, 0)
         se_pos = se_result[0]
 
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)
         le_pos = le_result[0]
 
         se_deps = se_pos[3]  # nutation in obliquity
@@ -193,9 +193,9 @@ jd_2100 = swe.julday(2100, 1, 1, 12.0)
 jd_1900 = swe.julday(1900, 1, 1, 12.0)
 
 try:
-    le_2000 = ephem.swe_calc_ut(jd_2000, SE_ECL_NUT, 0)[0][1]
-    le_2100 = ephem.swe_calc_ut(jd_2100, SE_ECL_NUT, 0)[0][1]
-    le_1900 = ephem.swe_calc_ut(jd_1900, SE_ECL_NUT, 0)[0][1]
+    le_2000 = ephem.calc_ut(jd_2000, ECL_NUT, 0)[0][1]
+    le_2100 = ephem.calc_ut(jd_2100, ECL_NUT, 0)[0][1]
+    le_1900 = ephem.calc_ut(jd_1900, ECL_NUT, 0)[0][1]
 
     # Rate from 2000 to 2100
     rate_forward = (le_2100 - le_2000) * 3600.0  # arcsec per century
@@ -231,7 +231,7 @@ print("\n=== P6: true_obl - mean_obl = deps consistency ===")
 
 for jd, epoch_label in TEST_EPOCHS[:30]:  # First 30 epochs
     try:
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)[0]
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)[0]
 
         true_obl = le_result[0]
         mean_obl = le_result[1]
@@ -266,8 +266,8 @@ print("\n=== P7: Obliquity at well-known epochs ===")
 jd_j2000 = 2451545.0
 
 try:
-    le_result = ephem.swe_calc_ut(jd_j2000, SE_ECL_NUT, 0)[0]
-    se_result = swe.calc_ut(jd_j2000, SE_ECL_NUT, 0)[0]
+    le_result = ephem.calc_ut(jd_j2000, ECL_NUT, 0)[0]
+    se_result = swe.calc_ut(jd_j2000, ECL_NUT, 0)[0]
 
     le_mean = le_result[1]
     se_mean = se_result[1]
@@ -319,8 +319,8 @@ jd_start = swe.julday(2024, 6, 1, 0.0)
 for day in range(30):
     jd = jd_start + day
     try:
-        se_result = swe.calc_ut(jd, SE_ECL_NUT, 0)[0]
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)[0]
+        se_result = swe.calc_ut(jd, ECL_NUT, 0)[0]
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)[0]
 
         # Check all 4 components
         labels = ["true_obl", "mean_obl", "dpsi", "deps"]

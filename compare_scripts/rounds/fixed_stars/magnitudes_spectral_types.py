@@ -8,8 +8,8 @@ Phases:
   P1: Bright navigational stars — position, magnitude, spectral type
   P2: All named stars sweep — position comparison at J2000
   P3: Proper motion over centuries — position drift verification
-  P4: Fixed star with SEFLG_SPEED — velocity components
-  P5: swe_fixstar2 vs swe_fixstar — API compatibility
+  P4: Fixed star with FLG_SPEED — velocity components
+  P5: fixstar2 vs fixstar — API compatibility
   P6: Star search by name fragments
 """
 
@@ -25,7 +25,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -155,18 +155,18 @@ def safe_fixstar(name, jd, flags=0):
 
 
 def safe_le_fixstar(name, jd, flags=0):
-    """Call LE swe_fixstar2_ut, return (pos, retflag, starname) or None.
+    """Call LE fixstar2_ut, return (pos, retflag, starname) or None.
 
     libephemeris fixstar2_ut returns: (pos_tuple, starname_str, retflag_int)
     We normalize to: (pos_tuple, retflag, starname)
     """
     try:
-        result = ephem.swe_fixstar2_ut(name, jd, flags)
+        result = ephem.fixstar2_ut(name, jd, flags)
         # LE returns (pos, starname, retflag) -> normalize to (pos, retflag, starname)
         return (result[0], result[2], result[1])
     except Exception:
         try:
-            result = ephem.swe_fixstar_ut(name, jd, flags)
+            result = ephem.fixstar_ut(name, jd, flags)
             # fixstar_ut returns (pos, starname, retflag)
             return (result[0], result[2], result[1])
         except Exception:
@@ -184,7 +184,7 @@ def phase1():
     for star in BRIGHT_STARS:
         try:
             se_result = safe_fixstar(star, jd, swe.FLG_SWIEPH)
-            le_result = safe_le_fixstar(star, jd, ephem.SEFLG_SWIEPH)
+            le_result = safe_le_fixstar(star, jd, ephem.FLG_SWIEPH)
 
             if se_result is None and le_result is None:
                 record("P1", star, True, "both not found (OK)")
@@ -234,7 +234,7 @@ def phase2():
     for star in sorted(all_stars):
         try:
             se_result = safe_fixstar(star, jd, swe.FLG_SWIEPH)
-            le_result = safe_le_fixstar(star, jd, ephem.SEFLG_SWIEPH)
+            le_result = safe_le_fixstar(star, jd, ephem.FLG_SWIEPH)
 
             if se_result is None or le_result is None:
                 continue
@@ -300,7 +300,7 @@ def phase3():
         for epoch_name, jd in epochs.items():
             try:
                 se_result = safe_fixstar(star, jd, swe.FLG_SWIEPH)
-                le_result = safe_le_fixstar(star, jd, ephem.SEFLG_SWIEPH)
+                le_result = safe_le_fixstar(star, jd, ephem.FLG_SWIEPH)
 
                 if se_result is None or le_result is None:
                     continue
@@ -330,7 +330,7 @@ def phase3():
 
 
 def phase4():
-    """Fixed star with SEFLG_SPEED — velocity components."""
+    """Fixed star with FLG_SPEED — velocity components."""
     global errors
     print("\n=== P4: Fixed star speeds ===")
 
@@ -352,7 +352,7 @@ def phase4():
         try:
             se_result = safe_fixstar(star, jd, swe.FLG_SWIEPH | swe.FLG_SPEED)
             le_result = safe_le_fixstar(
-                star, jd, ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+                star, jd, ephem.FLG_SWIEPH | ephem.FLG_SPEED
             )
 
             if se_result is None or le_result is None:
@@ -381,7 +381,7 @@ def phase4():
 
 
 def phase5():
-    """swe_fixstar2 vs swe_fixstar API compatibility."""
+    """fixstar2 vs fixstar API compatibility."""
     global errors
     print("\n=== P5: fixstar2 vs fixstar API ===")
 
@@ -392,13 +392,13 @@ def phase5():
         try:
             # Test fixstar_ut
             try:
-                le1 = ephem.swe_fixstar_ut(star, jd, ephem.SEFLG_SWIEPH)
+                le1 = ephem.fixstar_ut(star, jd, ephem.FLG_SWIEPH)
             except Exception:
                 le1 = None
 
             # Test fixstar2_ut
             try:
-                le2 = ephem.swe_fixstar2_ut(star, jd, ephem.SEFLG_SWIEPH)
+                le2 = ephem.fixstar2_ut(star, jd, ephem.FLG_SWIEPH)
             except Exception:
                 le2 = None
 
@@ -442,7 +442,7 @@ def phase6():
             # Equatorial coordinates
             se_eq = safe_fixstar(star, jd, swe.FLG_SWIEPH | swe.FLG_EQUATORIAL)
             le_eq = safe_le_fixstar(
-                star, jd, ephem.SEFLG_SWIEPH | ephem.SEFLG_EQUATORIAL
+                star, jd, ephem.FLG_SWIEPH | ephem.FLG_EQUATORIAL
             )
 
             if se_eq is None or le_eq is None:
@@ -466,7 +466,7 @@ def phase6():
 
             # J2000 coordinates
             se_j2k = safe_fixstar(star, jd, swe.FLG_SWIEPH | swe.FLG_J2000)
-            le_j2k = safe_le_fixstar(star, jd, ephem.SEFLG_SWIEPH | ephem.SEFLG_J2000)
+            le_j2k = safe_le_fixstar(star, jd, ephem.FLG_SWIEPH | ephem.FLG_J2000)
 
             if se_j2k is not None and le_j2k is not None:
                 se_p2 = se_j2k[0]

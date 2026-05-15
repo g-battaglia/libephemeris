@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 155: Aberration correction magnitude verification.
 
-Compare positions with and without SEFLG_NOABERR to verify that the
+Compare positions with and without FLG_NOABERR to verify that the
 aberration correction magnitude (~20.5" for annual aberration) is
 consistent between libephemeris and pyswisseph.
 """
@@ -15,10 +15,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_NOABERR = 1024
+FLG_SPEED = 256
+FLG_NOABERR = 1024
 
 BODIES = {
     0: "Sun",
@@ -52,12 +52,12 @@ for label, jd in test_dates:
     for body, bname in BODIES.items():
         try:
             # With aberration (default)
-            se_with = swe.calc_ut(jd, body, SEFLG_SPEED)[0]
-            le_with = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)[0]
+            se_with = swe.calc_ut(jd, body, FLG_SPEED)[0]
+            le_with = ephem.calc_ut(jd, body, FLG_SPEED)[0]
 
             # Without aberration
-            se_without = swe.calc_ut(jd, body, SEFLG_SPEED | SEFLG_NOABERR)[0]
-            le_without = ephem.swe_calc_ut(jd, body, SEFLG_SPEED | SEFLG_NOABERR)[0]
+            se_without = swe.calc_ut(jd, body, FLG_SPEED | FLG_NOABERR)[0]
+            le_without = ephem.calc_ut(jd, body, FLG_SPEED | FLG_NOABERR)[0]
 
             # Aberration correction = position_with - position_without
             se_aberr_lon = (se_with[0] - se_without[0]) * 3600.0

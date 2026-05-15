@@ -28,14 +28,14 @@ from typing import Any
 import libephemeris as eph
 from libephemeris import EphemerisContext
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -50,15 +50,15 @@ def example_basic_context() -> None:
     # Create a context
     ctx = EphemerisContext()
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Calculate using context methods
-    pos, flags = ctx.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+    pos, flags = ctx.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SPEED)
 
     print(f"Sun position using context: {pos[0]:.6f}°")
 
     # Compare with global function
-    pos_global, _ = eph.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+    pos_global, _ = eph.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SPEED)
 
     print(f"Sun position using global:  {pos_global[0]:.6f}°")
     print(f"Difference: {abs(pos[0] - pos_global[0]):.10f}°")
@@ -72,23 +72,23 @@ def example_independent_sidereal_modes() -> None:
 
     print("\nEach context can have its own sidereal mode setting.\n")
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Context 1: Lahiri ayanamsha
     ctx_lahiri = EphemerisContext()
-    ctx_lahiri.set_sid_mode(SE_SIDM_LAHIRI)
+    ctx_lahiri.set_sid_mode(SIDM_LAHIRI)
 
     # Context 2: Fagan-Bradley ayanamsha
     ctx_fagan = EphemerisContext()
-    ctx_fagan.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    ctx_fagan.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
     # Note: get_ayanamsa_ut is not available on context, but sidereal calculations work
     print("Context 1: Lahiri mode set")
     print("Context 2: Fagan-Bradley mode set")
 
     # Calculate sidereal Sun position - each context uses its own mode
-    pos_lahiri, _ = ctx_lahiri.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
-    pos_fagan, _ = ctx_fagan.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+    pos_lahiri, _ = ctx_lahiri.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
+    pos_fagan, _ = ctx_fagan.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
 
     print(f"\nSun sidereal position (Lahiri mode):       {pos_lahiri[0]:.6f}°")
     print(f"Sun sidereal position (Fagan-Bradley mode): {pos_fagan[0]:.6f}°")
@@ -103,9 +103,9 @@ def example_topocentric_settings() -> None:
 
     print("\nEach context can have its own observer location.\n")
 
-    from libephemeris.constants import SEFLG_TOPOCTR
+    from libephemeris.constants import FLG_TOPOCTR
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Context for New York
     ctx_ny = EphemerisContext()
@@ -116,11 +116,11 @@ def example_topocentric_settings() -> None:
     ctx_sydney.set_topo(lon=151.2093, lat=-33.8688, alt=58)
 
     # Calculate topocentric Moon position (most affected by parallax)
-    pos_ny, _ = ctx_ny.calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_TOPOCTR)
-    pos_sydney, _ = ctx_sydney.calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_TOPOCTR)
+    pos_ny, _ = ctx_ny.calc_ut(jd, MOON, FLG_SWIEPH | FLG_TOPOCTR)
+    pos_sydney, _ = ctx_sydney.calc_ut(jd, MOON, FLG_SWIEPH | FLG_TOPOCTR)
 
     # Geocentric for comparison
-    pos_geo, _ = eph.swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH)
+    pos_geo, _ = eph.calc_ut(jd, MOON, FLG_SWIEPH)
 
     print("Moon position (topocentric):")
     print(f"  From New York:   {pos_ny[0]:.6f}° lon, {pos_ny[1]:.6f}° lat")
@@ -136,7 +136,7 @@ def worker_function(
 ) -> dict[str, Any]:
     """Worker function for threaded calculations."""
     # Each thread uses its own context
-    pos, _ = context.calc_ut(jd, planet, SEFLG_SWIEPH | SEFLG_SPEED)
+    pos, _ = context.calc_ut(jd, planet, FLG_SWIEPH | FLG_SPEED)
 
     return {
         "thread": thread_name,
@@ -155,13 +155,13 @@ def example_multithreaded_calculations() -> None:
 
     print("\nUsing separate contexts for concurrent calculations.\n")
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Create tasks with different planets and contexts
     tasks = [
-        (EphemerisContext(), jd, SE_SUN, "Sun"),
-        (EphemerisContext(), jd, SE_MOON, "Moon"),
-        (EphemerisContext(), jd, SE_MARS, "Mars"),
+        (EphemerisContext(), jd, SUN, "Sun"),
+        (EphemerisContext(), jd, MOON, "Moon"),
+        (EphemerisContext(), jd, MARS, "Mars"),
     ]
 
     results = []
@@ -196,18 +196,18 @@ def example_context_isolation() -> None:
 
     print("\nChanges in one context don't affect others.\n")
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Create two contexts
     ctx1 = EphemerisContext()
     ctx2 = EphemerisContext()
 
     # Set sidereal mode only in ctx1
-    ctx1.set_sid_mode(SE_SIDM_LAHIRI)
+    ctx1.set_sid_mode(SIDM_LAHIRI)
 
     # Calculate in both contexts with sidereal flag
-    pos1, _ = ctx1.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
-    pos2, _ = ctx2.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+    pos1, _ = ctx1.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
+    pos2, _ = ctx2.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
 
     print("Context 1 (Lahiri set):")
     print(f"  Sun sidereal position: {pos1[0]:.6f}°")
@@ -228,7 +228,7 @@ def example_house_calculations() -> None:
 
     print("\nContexts can be used for house calculations too.\n")
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
     latitude = 51.5074  # London
     longitude = -0.1278
 
@@ -256,7 +256,7 @@ def example_sidereal_houses() -> None:
     print("Example 7: Sidereal Houses with Context")
     print("=" * 60)
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
     latitude = 13.0827  # Chennai
     longitude = 80.2707
 
@@ -264,19 +264,19 @@ def example_sidereal_houses() -> None:
 
     # Context for sidereal calculations
     ctx = EphemerisContext()
-    ctx.set_sid_mode(SE_SIDM_LAHIRI)
+    ctx.set_sid_mode(SIDM_LAHIRI)
 
     # Get ayanamsha using global function
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    aya = eph.swe_get_ayanamsa_ut(jd)
+    eph.set_sid_mode(SIDM_LAHIRI)
+    aya = eph.get_ayanamsa_ut(jd)
     print(f"Lahiri Ayanamsha: {aya:.6f}°")
 
     # Calculate tropical houses using context
     cusps_trop, ascmc_trop = ctx.houses(jd, latitude, longitude, ord("W"))
 
     # Calculate sidereal houses using global function with sidereal flag
-    cusps_sid, ascmc_sid = eph.swe_houses_ex(
-        jd, latitude, longitude, ord("W"), SEFLG_SIDEREAL
+    cusps_sid, ascmc_sid = eph.houses_ex(
+        jd, latitude, longitude, ord("W"), FLG_SIDEREAL
     )
 
     print("\nWhole Sign Houses (1st house cusp = Lagna):")
@@ -296,20 +296,20 @@ def example_context_reuse() -> None:
     ctx = EphemerisContext()
 
     # Set up context once
-    ctx.set_sid_mode(SE_SIDM_LAHIRI)
+    ctx.set_sid_mode(SIDM_LAHIRI)
     ctx.set_topo(lon=77.2090, lat=28.6139, alt=216)  # New Delhi
 
     print("Calculating planets for a full year (monthly samples):")
     print("-" * 50)
 
-    planets = [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")]
+    planets = [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")]
 
     for month in [1, 4, 7, 10]:  # Quarterly samples
-        jd = eph.swe_julday(2024, month, 1, 12.0)
+        jd = eph.julday(2024, month, 1, 12.0)
         print(f"\n2024-{month:02d}-01:")
 
         for planet_id, name in planets:
-            pos, _ = ctx.calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+            pos, _ = ctx.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SIDEREAL)
             print(f"  {name:8} {pos[0]:>10.4f}° (sidereal)")
 
 

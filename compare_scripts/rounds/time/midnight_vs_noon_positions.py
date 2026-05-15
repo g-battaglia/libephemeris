@@ -18,23 +18,23 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Sun": (swe.SUN, ephem.SE_SUN),
-    "Moon": (swe.MOON, ephem.SE_MOON),
-    "Mercury": (swe.MERCURY, ephem.SE_MERCURY),
-    "Venus": (swe.VENUS, ephem.SE_VENUS),
-    "Mars": (swe.MARS, ephem.SE_MARS),
-    "Jupiter": (swe.JUPITER, ephem.SE_JUPITER),
-    "Saturn": (swe.SATURN, ephem.SE_SATURN),
-    "Uranus": (swe.URANUS, ephem.SE_URANUS),
-    "Neptune": (swe.NEPTUNE, ephem.SE_NEPTUNE),
-    "Pluto": (swe.PLUTO, ephem.SE_PLUTO),
-    "MeanNode": (swe.MEAN_NODE, ephem.SE_MEAN_NODE),
-    "TrueNode": (swe.TRUE_NODE, ephem.SE_TRUE_NODE),
-    "MeanLilith": (swe.MEAN_APOG, ephem.SE_MEAN_APOG),
-    "Chiron": (swe.CHIRON, ephem.SE_CHIRON),
+    "Sun": (swe.SUN, ephem.SUN),
+    "Moon": (swe.MOON, ephem.MOON),
+    "Mercury": (swe.MERCURY, ephem.MERCURY),
+    "Venus": (swe.VENUS, ephem.VENUS),
+    "Mars": (swe.MARS, ephem.MARS),
+    "Jupiter": (swe.JUPITER, ephem.JUPITER),
+    "Saturn": (swe.SATURN, ephem.SATURN),
+    "Uranus": (swe.URANUS, ephem.URANUS),
+    "Neptune": (swe.NEPTUNE, ephem.NEPTUNE),
+    "Pluto": (swe.PLUTO, ephem.PLUTO),
+    "MeanNode": (swe.MEAN_NODE, ephem.MEAN_NODE),
+    "TrueNode": (swe.TRUE_NODE, ephem.TRUE_NODE),
+    "MeanLilith": (swe.MEAN_APOG, ephem.MEAN_APOG),
+    "Chiron": (swe.CHIRON, ephem.CHIRON),
 }
 
 # Test dates spanning 500 years, both midnight and noon
@@ -97,7 +97,7 @@ for y, m, d, h in TEST_DATES:
             continue
 
         try:
-            le_result = ephem.swe_calc_ut(jd, le_id, FLAGS)
+            le_result = ephem.calc_ut(jd, le_id, FLAGS)
             le_pos = le_result[0]
         except Exception:
             continue

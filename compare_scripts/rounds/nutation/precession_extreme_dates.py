@@ -14,7 +14,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 F = 2
@@ -35,9 +35,9 @@ for year in range(1950, 2051, 5):
     jd = swe.julday(year, 1, 1, 12.0)
     try:
         # LE: ecliptic of date
-        le_date = ephem.swe_calc_ut(jd, 0, F | S)
+        le_date = ephem.calc_ut(jd, 0, F | S)
         # LE: J2000
-        le_j2k = ephem.swe_calc_ut(jd, 0, F | S | J | N)
+        le_j2k = ephem.calc_ut(jd, 0, F | S | J | N)
 
         prec_offset = (le_date[0][0] - le_j2k[0][0]) * 3600.0  # arcsec
         years_from_j2000 = year - 2000.0
@@ -69,8 +69,8 @@ for body, name in [(0, "Sun"), (4, "Mars"), (5, "Jupiter"), (6, "Saturn")]:
         try:
             se_date = swe.calc_ut(jd, body, F | S)
             se_j2k = swe.calc_ut(jd, body, F | S | J | N)
-            le_date = ephem.swe_calc_ut(jd, body, F | S)
-            le_j2k = ephem.swe_calc_ut(jd, body, F | S | J | N)
+            le_date = ephem.calc_ut(jd, body, F | S)
+            le_j2k = ephem.calc_ut(jd, body, F | S | J | N)
 
             se_prec = (se_date[0][0] - se_j2k[0][0]) * 3600.0
             le_prec = (le_date[0][0] - le_j2k[0][0]) * 3600.0
@@ -97,12 +97,12 @@ print("\n=== P3: Obliquity (mean and true) ===")
 for year in range(1800, 2201, 10):
     jd = swe.julday(year, 1, 1, 12.0)
     try:
-        # Get obliquity via calc of SE_ECL_NUT (body=-1 in some APIs)
+        # Get obliquity via calc of ECL_NUT (body=-1 in some APIs)
         # Use nutation values from both
         se_nut = swe.calc_ut(jd, swe.ECL_NUT, 0)
 
         # LE uses internal nutation
-        le_nut_result = ephem.swe_calc_ut(jd, -1, 0)  # SE_ECL_NUT = -1
+        le_nut_result = ephem.calc_ut(jd, -1, 0)  # ECL_NUT = -1
 
         # Compare true obliquity (index 0)
         se_true_obl = se_nut[0][0]
@@ -139,7 +139,7 @@ for year in range(1950, 2051, 2):
     jd = swe.julday(year, 1, 1, 12.0)
     try:
         se_nut = swe.calc_ut(jd, swe.ECL_NUT, 0)
-        le_nut = ephem.swe_calc_ut(jd, -1, 0)
+        le_nut = ephem.calc_ut(jd, -1, 0)
 
         # Nutation in longitude (index 2)
         se_dpsi = se_nut[0][2]
@@ -176,7 +176,7 @@ for year in range(1950, 2051, 2):
     jd = swe.julday(year, 1, 1, 12.0)
     try:
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         diff_s = abs(se_st - le_st) * 3600.0  # hours to seconds
         if diff_s < 0.1:  # 0.1 second
             passed += 1
@@ -201,7 +201,7 @@ for hour in range(0, 24, 3):
     jd = jd_base + hour / 24.0
     try:
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         diff_s = abs(se_st - le_st) * 3600.0
         if diff_s < 0.1:
             passed += 1

@@ -12,7 +12,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 
 def main():
@@ -43,7 +43,7 @@ def main():
 
     for ecl_type, se_times in solar_eclipses:
         try:
-            le_res = ephem.swe_sol_eclipse_when_glob(se_times[0] - 15, 0, 0)
+            le_res = ephem.sol_eclipse_when_glob(se_times[0] - 15, 0, 0)
             le_times = le_res[1]
         except Exception:
             continue
@@ -82,7 +82,7 @@ def main():
 
     for ecl_type, se_times in lunar_eclipses:
         try:
-            le_res = ephem.swe_lun_eclipse_when(se_times[0] - 15, 0, 0)
+            le_res = ephem.lun_eclipse_when(se_times[0] - 15, 0, 0)
             le_times = le_res[1]
         except Exception:
             continue

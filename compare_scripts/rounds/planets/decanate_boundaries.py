@@ -15,7 +15,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 FLAGS = swe.FLG_SPEED
 
@@ -51,7 +51,7 @@ errors = []
 for date_str, jd_start in TEST_STARTS:
     for target_lon in MOON_CROSS_LONS:
         try:
-            le_cross_jd = ephem.swe_mooncross_ut(float(target_lon), jd_start, 0)
+            le_cross_jd = ephem.mooncross_ut(float(target_lon), jd_start, 0)
         except Exception:
             skipped += 1
             continue
@@ -63,7 +63,7 @@ for date_str, jd_start in TEST_STARTS:
         try:
             se_r = swe.calc_ut(le_cross_jd, swe.MOON, FLAGS)
             se_pos = se_r[0] if isinstance(se_r[0], (list, tuple)) else se_r
-            le_r = ephem.swe_calc_ut(le_cross_jd, ephem.SE_MOON, FLAGS)
+            le_r = ephem.calc_ut(le_cross_jd, ephem.MOON, FLAGS)
             le_pos = le_r[0]
         except Exception:
             skipped += 1
@@ -106,7 +106,7 @@ for year in [2000, 2010, 2020, 2025]:
     jd_start = swe.julday(year, 1, 1, 0.0)
     for target_lon in MOON_CROSS_LONS:
         try:
-            le_cross_jd = ephem.swe_solcross_ut(float(target_lon), jd_start, 0)
+            le_cross_jd = ephem.solcross_ut(float(target_lon), jd_start, 0)
         except Exception:
             skipped += 1
             continue
@@ -116,7 +116,7 @@ for year in [2000, 2010, 2020, 2025]:
         try:
             se_r = swe.calc_ut(le_cross_jd, swe.SUN, FLAGS)
             se_pos = se_r[0] if isinstance(se_r[0], (list, tuple)) else se_r
-            le_r = ephem.swe_calc_ut(le_cross_jd, ephem.SE_SUN, FLAGS)
+            le_r = ephem.calc_ut(le_cross_jd, ephem.SUN, FLAGS)
             le_pos = le_r[0]
         except Exception:
             skipped += 1

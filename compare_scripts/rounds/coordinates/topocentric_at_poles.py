@@ -14,13 +14,13 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Sun": (swe.SUN, ephem.SE_SUN),
-    "Moon": (swe.MOON, ephem.SE_MOON),
-    "Mars": (swe.MARS, ephem.SE_MARS),
-    "Jupiter": (swe.JUPITER, ephem.SE_JUPITER),
+    "Sun": (swe.SUN, ephem.SUN),
+    "Moon": (swe.MOON, ephem.MOON),
+    "Mars": (swe.MARS, ephem.MARS),
+    "Jupiter": (swe.JUPITER, ephem.JUPITER),
 }
 
 # Extreme latitude locations
@@ -33,7 +33,7 @@ LOCATIONS = [
     ("Vostok", -78.5, 106.8, 3488),
 ]
 
-FLAGS = swe.FLG_SPEED | 32768  # SEFLG_TOPOCTR
+FLAGS = swe.FLG_SPEED | 32768  # FLG_TOPOCTR
 
 TEST_DATES = []
 for year in [2000, 2010, 2020, 2025]:
@@ -54,7 +54,7 @@ for date_str, jd in TEST_DATES:
     for loc_name, lat, lon, alt in LOCATIONS:
         # Set topocentric location
         swe.set_topo(lon, lat, float(alt))
-        ephem.swe_set_topo(lon, lat, float(alt))
+        ephem.set_topo(lon, lat, float(alt))
 
         for bname, (se_id, le_id) in BODIES.items():
             try:
@@ -65,7 +65,7 @@ for date_str, jd in TEST_DATES:
                 continue
 
             try:
-                le_r = ephem.swe_calc_ut(jd, le_id, FLAGS)
+                le_r = ephem.calc_ut(jd, le_id, FLAGS)
                 le_pos = le_r[0]
             except Exception:
                 skipped += 1

@@ -12,12 +12,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SE_SUN = 0
-SE_MERCURY = 2
-SE_VENUS = 3
+FLG_SPEED = 256
+SUN = 0
+MERCURY = 2
+VENUS = 3
 
 
 def find_conjunctions(body_id, start_jd, count=20):
@@ -27,8 +27,8 @@ def find_conjunctions(body_id, start_jd, count=20):
     step = 1.0
 
     def elong(j):
-        s = swe.calc_ut(j, SE_SUN, SEFLG_SPEED)[0][0]
-        p = swe.calc_ut(j, body_id, SEFLG_SPEED)[0][0]
+        s = swe.calc_ut(j, SUN, FLG_SPEED)[0][0]
+        p = swe.calc_ut(j, body_id, FLG_SPEED)[0][0]
         e = p - s
         while e > 180:
             e -= 360
@@ -55,8 +55,8 @@ def find_conjunctions(body_id, start_jd, count=20):
                     b = mid
             conj_jd = (a + b) / 2
             # Determine inferior vs superior by distance
-            dist = swe.calc_ut(conj_jd, body_id, SEFLG_SPEED)[0][2]
-            sun_dist = swe.calc_ut(conj_jd, SE_SUN, SEFLG_SPEED)[0][2]
+            dist = swe.calc_ut(conj_jd, body_id, FLG_SPEED)[0][2]
+            sun_dist = swe.calc_ut(conj_jd, SUN, FLG_SPEED)[0][2]
             ctype = "inferior" if dist < sun_dist else "superior"
             events.append((ctype, conj_jd))
             found += 1
@@ -74,7 +74,7 @@ def main():
     total_fail = 0
     failures = []
 
-    for body_id, name in [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]:
+    for body_id, name in [(MERCURY, "Mercury"), (VENUS, "Venus")]:
         events = find_conjunctions(body_id, 2451545.0, 25)
         print(f"  Found {len(events)} conjunctions for {name}")
 
@@ -82,8 +82,8 @@ def main():
             for offset in [-0.05, 0.0, 0.05]:
                 tj = jd + offset
                 try:
-                    se = swe.calc_ut(tj, body_id, SEFLG_SPEED)[0]
-                    le = ephem.swe_calc_ut(tj, body_id, SEFLG_SPEED)[0]
+                    se = swe.calc_ut(tj, body_id, FLG_SPEED)[0]
+                    le = ephem.calc_ut(tj, body_id, FLG_SPEED)[0]
                 except Exception:
                     continue
 

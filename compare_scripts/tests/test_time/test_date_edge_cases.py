@@ -14,7 +14,7 @@ All tests verify compatibility with pyswisseph.
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 
 
 class TestGregorianJulianTransition:
@@ -28,15 +28,15 @@ class TestGregorianJulianTransition:
     @pytest.mark.comparison
     def test_last_julian_day_oct_4_1582(self):
         """October 4, 1582 was the last day of the Julian calendar."""
-        jd_lib = ephem.swe_julday(1582, 10, 4, 12.0, SE_GREG_CAL)
-        jd_swe = swe.julday(1582, 10, 4, 12.0, SE_GREG_CAL)
+        jd_lib = ephem.julday(1582, 10, 4, 12.0, GREG_CAL)
+        jd_swe = swe.julday(1582, 10, 4, 12.0, GREG_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_first_gregorian_day_oct_15_1582(self):
         """October 15, 1582 was the first day of the Gregorian calendar."""
-        jd_lib = ephem.swe_julday(1582, 10, 15, 12.0, SE_GREG_CAL)
-        jd_swe = swe.julday(1582, 10, 15, 12.0, SE_GREG_CAL)
+        jd_lib = ephem.julday(1582, 10, 15, 12.0, GREG_CAL)
+        jd_swe = swe.julday(1582, 10, 15, 12.0, GREG_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
@@ -51,8 +51,8 @@ class TestGregorianJulianTransition:
         These dates are technically invalid in the Gregorian calendar but the function
         should still return consistent results matching pyswisseph.
         """
-        jd_lib = ephem.swe_julday(1582, 10, day, 12.0, SE_GREG_CAL)
-        jd_swe = swe.julday(1582, 10, day, 12.0, SE_GREG_CAL)
+        jd_lib = ephem.julday(1582, 10, day, 12.0, GREG_CAL)
+        jd_swe = swe.julday(1582, 10, day, 12.0, GREG_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
@@ -62,15 +62,15 @@ class TestGregorianJulianTransition:
     )
     def test_julian_calendar_oct_1582(self, day):
         """October 5-15, 1582 exist normally in the Julian calendar."""
-        jd_lib = ephem.swe_julday(1582, 10, day, 12.0, SE_JUL_CAL)
-        jd_swe = swe.julday(1582, 10, day, 12.0, SE_JUL_CAL)
+        jd_lib = ephem.julday(1582, 10, day, 12.0, JUL_CAL)
+        jd_swe = swe.julday(1582, 10, day, 12.0, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_transition_day_difference(self):
         """Oct 15 Gregorian should be Oct 5 Julian (10 day difference)."""
-        jd_greg = ephem.swe_julday(1582, 10, 15, 12.0, SE_GREG_CAL)
-        jd_jul = ephem.swe_julday(1582, 10, 5, 12.0, SE_JUL_CAL)
+        jd_greg = ephem.julday(1582, 10, 15, 12.0, GREG_CAL)
+        jd_jul = ephem.julday(1582, 10, 5, 12.0, JUL_CAL)
         # Same astronomical moment
         assert jd_greg == pytest.approx(jd_jul, abs=1e-10)
 
@@ -79,8 +79,8 @@ class TestGregorianJulianTransition:
         """Test revjul around the transition using Gregorian calendar."""
         # JD 2299160.5 = October 15, 1582 00:00 Gregorian
         jd = 2299160.5
-        result_lib = ephem.swe_revjul(jd, SE_GREG_CAL)
-        result_swe = swe.revjul(jd, SE_GREG_CAL)
+        result_lib = ephem.revjul(jd, GREG_CAL)
+        result_swe = swe.revjul(jd, GREG_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -91,8 +91,8 @@ class TestGregorianJulianTransition:
         """Test revjul around the transition using Julian calendar."""
         # JD 2299160.5 = October 5, 1582 00:00 Julian
         jd = 2299160.5
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -110,29 +110,29 @@ class TestYearZero:
     @pytest.mark.comparison
     def test_year_zero_jan_1(self):
         """Year 0 (1 BCE) January 1 should match pyswisseph."""
-        jd_lib = ephem.swe_julday(0, 1, 1, 12.0, SE_JUL_CAL)
-        jd_swe = swe.julday(0, 1, 1, 12.0, SE_JUL_CAL)
+        jd_lib = ephem.julday(0, 1, 1, 12.0, JUL_CAL)
+        jd_swe = swe.julday(0, 1, 1, 12.0, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_year_zero_mid_year(self):
         """Year 0 mid-year should match pyswisseph."""
-        jd_lib = ephem.swe_julday(0, 6, 15, 12.0, SE_JUL_CAL)
-        jd_swe = swe.julday(0, 6, 15, 12.0, SE_JUL_CAL)
+        jd_lib = ephem.julday(0, 6, 15, 12.0, JUL_CAL)
+        jd_swe = swe.julday(0, 6, 15, 12.0, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_year_zero_dec_31(self):
         """Year 0 December 31 should match pyswisseph."""
-        jd_lib = ephem.swe_julday(0, 12, 31, 12.0, SE_JUL_CAL)
-        jd_swe = swe.julday(0, 12, 31, 12.0, SE_JUL_CAL)
+        jd_lib = ephem.julday(0, 12, 31, 12.0, JUL_CAL)
+        jd_swe = swe.julday(0, 12, 31, 12.0, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_transition_year_minus_1_to_year_0(self):
         """Transition from year -1 to year 0 should be 1 year."""
-        jd_minus1 = ephem.swe_julday(-1, 1, 1, 12.0, SE_JUL_CAL)
-        jd_zero = ephem.swe_julday(0, 1, 1, 12.0, SE_JUL_CAL)
+        jd_minus1 = ephem.julday(-1, 1, 1, 12.0, JUL_CAL)
+        jd_zero = ephem.julday(0, 1, 1, 12.0, JUL_CAL)
         # Should be approximately 365 or 366 days
         days_diff = jd_zero - jd_minus1
         assert 365 <= days_diff <= 366
@@ -140,8 +140,8 @@ class TestYearZero:
     @pytest.mark.comparison
     def test_transition_year_0_to_year_1(self):
         """Transition from year 0 to year 1 should be 1 year."""
-        jd_zero = ephem.swe_julday(0, 1, 1, 12.0, SE_JUL_CAL)
-        jd_one = ephem.swe_julday(1, 1, 1, 12.0, SE_JUL_CAL)
+        jd_zero = ephem.julday(0, 1, 1, 12.0, JUL_CAL)
+        jd_one = ephem.julday(1, 1, 1, 12.0, JUL_CAL)
         days_diff = jd_one - jd_zero
         assert 365 <= days_diff <= 366
 
@@ -149,9 +149,9 @@ class TestYearZero:
     def test_revjul_year_zero(self):
         """Revjul should return year 0 for appropriate JD."""
         # First, get JD for year 0
-        jd = ephem.swe_julday(0, 6, 15, 12.0, SE_JUL_CAL)
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        jd = ephem.julday(0, 6, 15, 12.0, JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -184,8 +184,8 @@ class TestNegativeYearsBCE:
     )
     def test_negative_years_match_pyswisseph_julian(self, year, month, day, hour):
         """Negative years (BCE) should match pyswisseph using Julian calendar."""
-        jd_lib = ephem.swe_julday(year, month, day, hour, SE_JUL_CAL)
-        jd_swe = swe.julday(year, month, day, hour, SE_JUL_CAL)
+        jd_lib = ephem.julday(year, month, day, hour, JUL_CAL)
+        jd_swe = swe.julday(year, month, day, hour, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
@@ -195,9 +195,9 @@ class TestNegativeYearsBCE:
     )
     def test_negative_years_revjul_roundtrip(self, year):
         """Negative years should roundtrip correctly."""
-        jd = ephem.swe_julday(year, 6, 15, 12.0, SE_JUL_CAL)
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        jd = ephem.julday(year, 6, 15, 12.0, JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -206,9 +206,9 @@ class TestNegativeYearsBCE:
     @pytest.mark.comparison
     def test_chronological_order_bce(self):
         """Earlier BCE dates should have smaller JD values."""
-        jd_500bce = ephem.swe_julday(-499, 1, 1, 12.0, SE_JUL_CAL)  # 500 BCE
-        jd_100bce = ephem.swe_julday(-99, 1, 1, 12.0, SE_JUL_CAL)  # 100 BCE
-        jd_1bce = ephem.swe_julday(0, 1, 1, 12.0, SE_JUL_CAL)  # 1 BCE = year 0
+        jd_500bce = ephem.julday(-499, 1, 1, 12.0, JUL_CAL)  # 500 BCE
+        jd_100bce = ephem.julday(-99, 1, 1, 12.0, JUL_CAL)  # 100 BCE
+        jd_1bce = ephem.julday(0, 1, 1, 12.0, JUL_CAL)  # 1 BCE = year 0
         assert jd_500bce < jd_100bce < jd_1bce
 
 
@@ -230,16 +230,16 @@ class TestVeryAncientDates:
     )
     def test_ancient_dates_match_pyswisseph(self, year, month, day, hour):
         """Very ancient dates should match pyswisseph."""
-        jd_lib = ephem.swe_julday(year, month, day, hour, SE_JUL_CAL)
-        jd_swe = swe.julday(year, month, day, hour, SE_JUL_CAL)
+        jd_lib = ephem.julday(year, month, day, hour, JUL_CAL)
+        jd_swe = swe.julday(year, month, day, hour, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
     def test_jd_epoch_origin(self):
         """JD 0.0 should correspond to noon on Nov 24, 4713 BCE (Julian)."""
         # -4712 in astronomical year numbering = 4713 BCE
-        jd_lib = ephem.swe_julday(-4712, 1, 1, 12.0, SE_JUL_CAL)
-        jd_swe = swe.julday(-4712, 1, 1, 12.0, SE_JUL_CAL)
+        jd_lib = ephem.julday(-4712, 1, 1, 12.0, JUL_CAL)
+        jd_swe = swe.julday(-4712, 1, 1, 12.0, JUL_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
         # JD should be small positive number near the epoch
         assert jd_lib < 100
@@ -251,9 +251,9 @@ class TestVeryAncientDates:
     )
     def test_ancient_dates_revjul_roundtrip(self, year):
         """Ancient dates should roundtrip correctly."""
-        jd = ephem.swe_julday(year, 6, 15, 12.0, SE_JUL_CAL)
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        jd = ephem.julday(year, 6, 15, 12.0, JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -262,8 +262,8 @@ class TestVeryAncientDates:
     @pytest.mark.comparison
     def test_ancient_consecutive_days(self):
         """Consecutive days in ancient times should differ by 1."""
-        jd1 = ephem.swe_julday(-3000, 6, 15, 12.0, SE_JUL_CAL)
-        jd2 = ephem.swe_julday(-3000, 6, 16, 12.0, SE_JUL_CAL)
+        jd1 = ephem.julday(-3000, 6, 15, 12.0, JUL_CAL)
+        jd2 = ephem.julday(-3000, 6, 16, 12.0, JUL_CAL)
         assert jd2 - jd1 == pytest.approx(1.0, abs=1e-10)
 
 
@@ -285,8 +285,8 @@ class TestVeryFutureDates:
     )
     def test_future_dates_match_pyswisseph(self, year, month, day, hour):
         """Very future dates should match pyswisseph."""
-        jd_lib = ephem.swe_julday(year, month, day, hour, SE_GREG_CAL)
-        jd_swe = swe.julday(year, month, day, hour, SE_GREG_CAL)
+        jd_lib = ephem.julday(year, month, day, hour, GREG_CAL)
+        jd_swe = swe.julday(year, month, day, hour, GREG_CAL)
         assert jd_lib == pytest.approx(jd_swe, abs=1e-10)
 
     @pytest.mark.comparison
@@ -296,9 +296,9 @@ class TestVeryFutureDates:
     )
     def test_future_dates_revjul_roundtrip(self, year):
         """Future dates should roundtrip correctly."""
-        jd = ephem.swe_julday(year, 6, 15, 12.0, SE_GREG_CAL)
-        result_lib = ephem.swe_revjul(jd, SE_GREG_CAL)
-        result_swe = swe.revjul(jd, SE_GREG_CAL)
+        jd = ephem.julday(year, 6, 15, 12.0, GREG_CAL)
+        result_lib = ephem.revjul(jd, GREG_CAL)
+        result_swe = swe.revjul(jd, GREG_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -307,24 +307,24 @@ class TestVeryFutureDates:
     @pytest.mark.comparison
     def test_future_consecutive_days(self):
         """Consecutive days in the future should differ by 1."""
-        jd1 = ephem.swe_julday(3000, 6, 15, 12.0, SE_GREG_CAL)
-        jd2 = ephem.swe_julday(3000, 6, 16, 12.0, SE_GREG_CAL)
+        jd1 = ephem.julday(3000, 6, 15, 12.0, GREG_CAL)
+        jd2 = ephem.julday(3000, 6, 16, 12.0, GREG_CAL)
         assert jd2 - jd1 == pytest.approx(1.0, abs=1e-10)
 
     @pytest.mark.comparison
     def test_future_leap_year_3000(self):
         """Year 3000 is NOT a leap year (divisible by 100 but not 400)."""
-        jd_feb28 = ephem.swe_julday(3000, 2, 28, 12.0, SE_GREG_CAL)
-        jd_mar1 = ephem.swe_julday(3000, 3, 1, 12.0, SE_GREG_CAL)
+        jd_feb28 = ephem.julday(3000, 2, 28, 12.0, GREG_CAL)
+        jd_mar1 = ephem.julday(3000, 3, 1, 12.0, GREG_CAL)
         # Should be 1 day apart (no Feb 29)
         assert jd_mar1 - jd_feb28 == pytest.approx(1.0, abs=1e-10)
 
     @pytest.mark.comparison
     def test_future_leap_year_3200(self):
         """Year 3200 IS a leap year (divisible by 400)."""
-        jd_feb28 = ephem.swe_julday(3200, 2, 28, 12.0, SE_GREG_CAL)
-        jd_feb29 = ephem.swe_julday(3200, 2, 29, 12.0, SE_GREG_CAL)
-        jd_mar1 = ephem.swe_julday(3200, 3, 1, 12.0, SE_GREG_CAL)
+        jd_feb28 = ephem.julday(3200, 2, 28, 12.0, GREG_CAL)
+        jd_feb29 = ephem.julday(3200, 2, 29, 12.0, GREG_CAL)
+        jd_mar1 = ephem.julday(3200, 3, 1, 12.0, GREG_CAL)
         assert jd_feb29 - jd_feb28 == pytest.approx(1.0, abs=1e-10)
         assert jd_mar1 - jd_feb29 == pytest.approx(1.0, abs=1e-10)
 
@@ -335,12 +335,12 @@ class TestExtremeRanges:
     @pytest.mark.comparison
     def test_full_range_chronological_order(self):
         """Dates across the full range should be in chronological order."""
-        jd_ancient = ephem.swe_julday(-4000, 1, 1, 12.0, SE_JUL_CAL)
-        jd_bce = ephem.swe_julday(-500, 1, 1, 12.0, SE_JUL_CAL)
-        jd_year0 = ephem.swe_julday(0, 1, 1, 12.0, SE_JUL_CAL)
-        jd_ce = ephem.swe_julday(500, 1, 1, 12.0, SE_JUL_CAL)
-        jd_modern = ephem.swe_julday(2000, 1, 1, 12.0, SE_GREG_CAL)
-        jd_future = ephem.swe_julday(4000, 1, 1, 12.0, SE_GREG_CAL)
+        jd_ancient = ephem.julday(-4000, 1, 1, 12.0, JUL_CAL)
+        jd_bce = ephem.julday(-500, 1, 1, 12.0, JUL_CAL)
+        jd_year0 = ephem.julday(0, 1, 1, 12.0, JUL_CAL)
+        jd_ce = ephem.julday(500, 1, 1, 12.0, JUL_CAL)
+        jd_modern = ephem.julday(2000, 1, 1, 12.0, GREG_CAL)
+        jd_future = ephem.julday(4000, 1, 1, 12.0, GREG_CAL)
 
         assert jd_ancient < jd_bce < jd_year0 < jd_ce < jd_modern < jd_future
 
@@ -358,8 +358,8 @@ class TestExtremeRanges:
     )
     def test_round_jd_values_match_pyswisseph(self, jd):
         """Round JD values should match pyswisseph for revjul."""
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -368,8 +368,8 @@ class TestExtremeRanges:
     @pytest.mark.comparison
     def test_jd_zero_revjul(self):
         """JD 0.0 should return the correct date (Julian calendar)."""
-        result_lib = ephem.swe_revjul(0.0, SE_JUL_CAL)
-        result_swe = swe.revjul(0.0, SE_JUL_CAL)
+        result_lib = ephem.revjul(0.0, JUL_CAL)
+        result_swe = swe.revjul(0.0, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day
@@ -379,8 +379,8 @@ class TestExtremeRanges:
     def test_negative_jd_values(self):
         """Negative JD values (before the epoch) should match pyswisseph."""
         jd = -1000.0
-        result_lib = ephem.swe_revjul(jd, SE_JUL_CAL)
-        result_swe = swe.revjul(jd, SE_JUL_CAL)
+        result_lib = ephem.revjul(jd, JUL_CAL)
+        result_swe = swe.revjul(jd, JUL_CAL)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
         assert result_lib[2] == result_swe[2]  # day

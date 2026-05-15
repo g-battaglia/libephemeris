@@ -25,13 +25,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 
 
 def se_hsys(ch):
@@ -118,7 +118,7 @@ for jd, epoch_label in TEST_JDS:
         lon = 0.0
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("P"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("P"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("P"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -143,7 +143,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 11.25  # Rome-ish
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("K"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("K"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("K"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -167,7 +167,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = -73.97  # NYC
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("R"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("R"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("R"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -191,7 +191,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 139.69  # Tokyo
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("C"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("C"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("C"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -214,7 +214,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 0.0
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("E"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("E"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("E"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -240,7 +240,7 @@ for jd, epoch_label in TEST_JDS:
         for hsys_ch, hsys_name in HSYS_LIST:
             try:
                 se_result = swe.houses_ex(jd, lat, 0.0, se_hsys(hsys_ch))
-                le_result = ephem.swe_houses_ex(jd, lat, 0.0, le_hsys(hsys_ch), 0)
+                le_result = ephem.houses_ex(jd, lat, 0.0, le_hsys(hsys_ch), 0)
 
                 se_cusps, se_ascmc = se_result[0], se_result[1]
                 le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -269,7 +269,7 @@ prev_cusps = None
 for lat_10 in range(350, 551):  # 35.0 to 55.0 in 0.1° steps
     lat = lat_10 / 10.0
     try:
-        le_result = ephem.swe_houses_ex(jd, lat, 0.0, le_hsys("P"), 0)
+        le_result = ephem.houses_ex(jd, lat, 0.0, le_hsys("P"), 0)
         le_cusps = le_result[0]
 
         if prev_cusps is not None:
@@ -312,7 +312,7 @@ for lat in [0, 30, 45, 52, -33]:
                 se_result = swe.houses_armc(
                     float(armc), float(lat), obliquity, se_hsys(hsys_ch)
                 )
-                le_result = ephem.swe_houses_armc(
+                le_result = ephem.houses_armc(
                     float(armc), float(lat), obliquity, le_hsys(hsys_ch)
                 )
 
@@ -343,7 +343,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 0.0
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("O"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("O"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("O"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -370,7 +370,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 0.0
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("M"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("M"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("M"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]
@@ -397,7 +397,7 @@ for jd, epoch_label in TEST_JDS[:2]:
         lon = 0.0
         try:
             se_result = swe.houses_ex(jd, lat, lon, se_hsys("W"))
-            le_result = ephem.swe_houses_ex(jd, lat, lon, le_hsys("W"), 0)
+            le_result = ephem.houses_ex(jd, lat, lon, le_hsys("W"), 0)
 
             se_cusps, se_ascmc = se_result[0], se_result[1]
             le_cusps, le_ascmc = le_result[0], le_result[1]

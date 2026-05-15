@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 
@@ -69,7 +69,7 @@ for jd in DATES:
         for body in BODIES:
             try:
                 se_result = swe.gauquelin_sector(jd, body, 0, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 0, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -100,7 +100,7 @@ for jd in DATES:
         for body in BODIES:
             try:
                 se_result = swe.gauquelin_sector(jd, body, 1, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 1, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -132,7 +132,7 @@ for jd in DATES:
         for body in [0, 1, 4]:  # Sun, Moon, Mars
             try:
                 se_result = swe.gauquelin_sector(jd, body, 2, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 2, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -164,7 +164,7 @@ for jd in DATES:
         for body in [0, 1, 4]:
             try:
                 se_result = swe.gauquelin_sector(jd, body, 3, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 3, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -196,7 +196,7 @@ for jd in DATES:
         for body in [0, 1]:
             try:
                 se_result = swe.gauquelin_sector(jd, body, 4, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 4, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -228,7 +228,7 @@ for jd in DATES:
         for body in [0, 1]:
             try:
                 se_result = swe.gauquelin_sector(jd, body, 5, geopos, 1013.25, 15.0)
-                le_result = ephem.swe_gauquelin_sector(
+                le_result = ephem.gauquelin_sector(
                     jd, body, 5, geopos, 1013.25, 15.0
                 )
                 diff = abs(se_result - le_result)
@@ -260,7 +260,7 @@ for method in range(6):
             geopos = (lon, lat, alt)
             for body in [0, 1, 2, 4]:
                 try:
-                    result = ephem.swe_gauquelin_sector(
+                    result = ephem.gauquelin_sector(
                         jd, body, method, geopos, 1013.25, 15.0
                     )
                     if 1.0 <= result < 37.0:
@@ -284,8 +284,8 @@ for jd in DATES:
         geopos = (lon, lat, alt)
         for body in BODIES:
             try:
-                le_m0 = ephem.swe_gauquelin_sector(jd, body, 0, geopos, 1013.25, 15.0)
-                le_m1 = ephem.swe_gauquelin_sector(jd, body, 1, geopos, 1013.25, 15.0)
+                le_m0 = ephem.gauquelin_sector(jd, body, 0, geopos, 1013.25, 15.0)
+                le_m1 = ephem.gauquelin_sector(jd, body, 1, geopos, 1013.25, 15.0)
                 se_m0 = swe.gauquelin_sector(jd, body, 0, geopos, 1013.25, 15.0)
                 se_m1 = swe.gauquelin_sector(jd, body, 1, geopos, 1013.25, 15.0)
                 # The differences between method 0/1 should be the same in both
@@ -316,7 +316,7 @@ for i in range(48):  # 48 half-hours = 1 full day
     jd = jd_base + i / 48.0
     try:
         se_result = swe.gauquelin_sector(jd, 0, 0, geopos, 1013.25, 15.0)
-        le_result = ephem.swe_gauquelin_sector(jd, 0, 0, geopos, 1013.25, 15.0)
+        le_result = ephem.gauquelin_sector(jd, 0, 0, geopos, 1013.25, 15.0)
         diff = abs(se_result - le_result)
         if diff > 18:
             diff = 36 - diff

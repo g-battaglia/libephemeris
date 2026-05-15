@@ -1373,7 +1373,7 @@ def _eval_body_icrs_vectorized(
     runtime behavior of _SpkCenterTarget: SPK center offsets are used for
     JDs within the planet_centers.bsp coverage, and analytical COB corrections
     are used for JDs outside that range. This ensures the stored Chebyshev
-    data matches what swe_calc() produces at runtime.
+    data matches what calc() produces at runtime.
 
     JDs that extend beyond the SPK ephemeris range (from last-segment
     overshoot) are linearly extrapolated using position + velocity at
@@ -1738,7 +1738,7 @@ def generate_body_ecliptic(
         calc_interpolated_apogee,
         calc_interpolated_perigee,
     )
-    from libephemeris.time_utils import swe_deltat
+    from libephemeris.time_utils import deltat
 
     # Map body_id to evaluation function
     eval_funcs = {
@@ -1783,7 +1783,7 @@ def generate_body_helio(
     """
     from libephemeris.hypothetical import calc_uranian_planet, calc_transpluto
 
-    if body_id == 48:  # SE_ISIS / Transpluto
+    if body_id == 48:  # ISIS / Transpluto
 
         def eval_func(jd: float) -> np.ndarray:
             result = calc_transpluto(jd)
@@ -2036,23 +2036,23 @@ def generate_delta_t(
 ) -> List[Tuple[float, float]]:
     """Generate Delta-T sparse table.
 
-    Samples swe_deltat() every DELTA_T_INTERVAL days.
+    Samples deltat() every DELTA_T_INTERVAL days.
 
     Returns:
         List of (jd, delta_t_days) tuples.
     """
-    from libephemeris.time_utils import swe_deltat
+    from libephemeris.time_utils import deltat
 
     table = []
     jd = jd_start
     while jd <= jd_end:
-        dt = swe_deltat(jd)
+        dt = deltat(jd)
         table.append((jd, dt))
         jd += DELTA_T_INTERVAL
 
     # Ensure we include the end point
     if table[-1][0] < jd_end:
-        table.append((jd_end, swe_deltat(jd_end)))
+        table.append((jd_end, deltat(jd_end)))
 
     return table
 
@@ -2095,9 +2095,9 @@ def generate_star_catalog() -> List[StarEntry]:
 
 def _year_to_jd(year: int) -> float:
     """Convert a year to Julian Day (January 1.0)."""
-    from libephemeris.time_utils import swe_julday
+    from libephemeris.time_utils import julday
 
-    return swe_julday(year, 1, 1, 0.0)
+    return julday(year, 1, 1, 0.0)
 
 
 def generate_single_body(
@@ -2214,7 +2214,7 @@ def assemble_leb(
     # Asteroids may have SPK coverage narrower than the tier range.
     # Instead of excluding them, we include them with their actual SPK range.
     # The LEB format already supports per-body jd_start/jd_end, and the
-    # reader raises ValueError for out-of-range JDs, which swe_calc_ut()
+    # reader raises ValueError for out-of-range JDs, which calc_ut()
     # catches to fall through to Skyfield.
     asteroid_bodies = [b for b in bodies if b in _ASTEROID_NAIF]
     excluded_asteroids: List[int] = []

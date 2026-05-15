@@ -23,16 +23,16 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
 
-SE_SUN = 0
-SE_MOON = 1
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
+SUN = 0
+MOON = 1
+MARS = 4
+JUPITER = 5
+SATURN = 6
 
 # All ayanamsha modes to test
 AYANAMSHA_MODES = [
@@ -106,18 +106,18 @@ def main():
     ]
 
     bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     # Test 1: get_ayanamsa_ut for all modes
     print("\n--- Test 1: get_ayanamsa_ut for all modes ---")
     for mode_id, mode_name in AYANAMSHA_MODES:
         swe.set_sid_mode(mode_id)
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
+        ephem.set_sid_mode(mode_id, 0, 0)
 
         for jd in test_jds:
             try:
@@ -126,7 +126,7 @@ def main():
                 continue
 
             try:
-                le_aya = ephem.swe_get_ayanamsa_ut(jd)
+                le_aya = ephem.get_ayanamsa_ut(jd)
             except Exception as e:
                 total_tests += 1
                 total_fail += 1
@@ -159,11 +159,11 @@ def main():
     print("\n--- Test 2: Sidereal planet positions for all modes ---")
     for mode_id, mode_name in AYANAMSHA_MODES:
         swe.set_sid_mode(mode_id)
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
+        ephem.set_sid_mode(mode_id, 0, 0)
 
         for jd in test_jds[:3]:  # Subset for speed
             for body_id, body_name in bodies:
-                flags = SEFLG_SPEED | SEFLG_SIDEREAL
+                flags = FLG_SPEED | FLG_SIDEREAL
 
                 try:
                     se_result = swe.calc_ut(jd, body_id, flags)
@@ -172,7 +172,7 @@ def main():
                     continue
 
                 try:
-                    le_result = ephem.swe_calc_ut(jd, body_id, flags)
+                    le_result = ephem.calc_ut(jd, body_id, flags)
                     le_lon = le_result[0][0]
                 except Exception as e:
                     total_tests += 1
@@ -209,22 +209,22 @@ def main():
 
     # Get reference positions with Fagan-Bradley
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
-    ref_se = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)[0][0]
-    ref_le = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)[0][0]
+    ephem.set_sid_mode(0, 0, 0)
+    ref_se = swe.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)[0][0]
+    ref_le = ephem.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)[0][0]
 
     # Switch through several modes
     for mode_id in [1, 3, 5, 17, 27, 42]:
         swe.set_sid_mode(mode_id)
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
-        _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)
-        _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)
+        ephem.set_sid_mode(mode_id, 0, 0)
+        _ = swe.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)
+        _ = ephem.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)
 
     # Switch back to Fagan-Bradley
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
-    check_se = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)[0][0]
-    check_le = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED | SEFLG_SIDEREAL)[0][0]
+    ephem.set_sid_mode(0, 0, 0)
+    check_se = swe.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)[0][0]
+    check_le = ephem.calc_ut(jd, MOON, FLG_SPEED | FLG_SIDEREAL)[0][0]
 
     total_tests += 2
     if abs(ref_se - check_se) < 1e-10:
@@ -251,10 +251,10 @@ def main():
             results_tropical = []
             for mode_id in [0, 1, 3, 17, 27, 42]:
                 swe.set_sid_mode(mode_id)
-                ephem.swe_set_sid_mode(mode_id, 0, 0)
+                ephem.set_sid_mode(mode_id, 0, 0)
 
-                # Without SEFLG_SIDEREAL, result should be identical regardless of mode
-                le_result = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                # Without FLG_SIDEREAL, result should be identical regardless of mode
+                le_result = ephem.calc_ut(jd, body_id, FLG_SPEED)
                 results_tropical.append(le_result[0][0])
 
             # All should be identical
@@ -277,7 +277,7 @@ def main():
     custom_ayan_rate = 50.3 / 3600  # degrees per year (approximately)
 
     swe.set_sid_mode(255, custom_t0, custom_ayan_t0)
-    ephem.swe_set_sid_mode(255, custom_t0, custom_ayan_t0)
+    ephem.set_sid_mode(255, custom_t0, custom_ayan_t0)
 
     for jd in test_jds:
         try:
@@ -286,7 +286,7 @@ def main():
             continue
 
         try:
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
         except Exception:
             total_tests += 1
             total_fail += 1
@@ -310,13 +310,13 @@ def main():
     monotonic_modes = [0, 1, 3, 5, 14, 21]  # Standard modes should be monotonic
 
     for mode_id in monotonic_modes:
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
+        ephem.set_sid_mode(mode_id, 0, 0)
 
         prev_aya = None
         jds_sorted = sorted(test_jds)
 
         for jd in jds_sorted:
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
 
             if prev_aya is not None:
                 total_tests += 1
@@ -336,14 +336,14 @@ def main():
     # Lahiri - Fagan should be approximately the same across dates
     for jd in test_jds:
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0, 0, 0)
+        ephem.set_sid_mode(0, 0, 0)
         se_fb = swe.get_ayanamsa_ut(jd)
-        le_fb = ephem.swe_get_ayanamsa_ut(jd)
+        le_fb = ephem.get_ayanamsa_ut(jd)
 
         swe.set_sid_mode(1)
-        ephem.swe_set_sid_mode(1, 0, 0)
+        ephem.set_sid_mode(1, 0, 0)
         se_lah = swe.get_ayanamsa_ut(jd)
-        le_lah = ephem.swe_get_ayanamsa_ut(jd)
+        le_lah = ephem.get_ayanamsa_ut(jd)
 
         se_diff = se_lah - se_fb
         le_diff = le_lah - le_fb
@@ -364,21 +364,21 @@ def main():
     print("\n--- Test 8: Sidereal house cusps ---")
     for mode_id, mode_name in [(0, "FB"), (1, "LAH"), (27, "TRUE_CITRA")]:
         swe.set_sid_mode(mode_id)
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
+        ephem.set_sid_mode(mode_id, 0, 0)
 
         for jd in test_jds[:3]:
             for lat in [0.0, 45.0, -33.0]:
                 lon = 12.5
                 try:
                     se_cusps, se_ascmc = swe.houses_ex(
-                        jd, lat, lon, b"P", SEFLG_SIDEREAL
+                        jd, lat, lon, b"P", FLG_SIDEREAL
                     )
                 except Exception:
                     continue
 
                 try:
-                    le_result = ephem.swe_houses_ex2(
-                        jd, lat, lon, ord("P"), SEFLG_SIDEREAL | SEFLG_SPEED
+                    le_result = ephem.houses_ex2(
+                        jd, lat, lon, ord("P"), FLG_SIDEREAL | FLG_SPEED
                     )
                     le_cusps = le_result[0]
                 except Exception:
@@ -407,7 +407,7 @@ def main():
 
     # Reset
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     # Summary
     print("\n" + "=" * 80)

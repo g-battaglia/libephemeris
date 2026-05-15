@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -26,46 +26,46 @@ failures = []
 
 # All major bodies
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO),
-    ("MeanNode", ephem.SE_MEAN_NODE, swe.MEAN_NODE),
-    ("TrueNode", ephem.SE_TRUE_NODE, swe.TRUE_NODE),
-    ("MeanLilith", ephem.SE_MEAN_APOG, swe.MEAN_APOG),
-    ("Chiron", ephem.SE_CHIRON, swe.CHIRON),
-    ("Ceres", ephem.SE_CERES, 17),
-    ("Pallas", ephem.SE_PALLAS, 18),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
+    ("Uranus", ephem.URANUS, swe.URANUS),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE),
+    ("Pluto", ephem.PLUTO, swe.PLUTO),
+    ("MeanNode", ephem.MEAN_NODE, swe.MEAN_NODE),
+    ("TrueNode", ephem.TRUE_NODE, swe.TRUE_NODE),
+    ("MeanLilith", ephem.MEAN_APOG, swe.MEAN_APOG),
+    ("Chiron", ephem.CHIRON, swe.CHIRON),
+    ("Ceres", ephem.CERES, 17),
+    ("Pallas", ephem.PALLAS, 18),
 ]
 
 # Flag combinations to test
 FLAG_COMBOS = [
     ("default", 0),
-    ("SPEED", ephem.SEFLG_SPEED),
-    ("J2000", ephem.SEFLG_J2000),
-    ("J2000+SPEED", ephem.SEFLG_J2000 | ephem.SEFLG_SPEED),
-    ("NONUT", ephem.SEFLG_NONUT),
-    ("NONUT+SPEED", ephem.SEFLG_NONUT | ephem.SEFLG_SPEED),
-    ("EQUATORIAL", ephem.SEFLG_EQUATORIAL),
-    ("EQ+SPEED", ephem.SEFLG_EQUATORIAL | ephem.SEFLG_SPEED),
-    ("EQ+J2000", ephem.SEFLG_EQUATORIAL | ephem.SEFLG_J2000),
-    ("EQ+J2000+SPEED", ephem.SEFLG_EQUATORIAL | ephem.SEFLG_J2000 | ephem.SEFLG_SPEED),
-    ("NOABERR", ephem.SEFLG_NOABERR),
-    ("NOABERR+SPEED", ephem.SEFLG_NOABERR | ephem.SEFLG_SPEED),
-    ("TRUEPOS", ephem.SEFLG_TRUEPOS),
-    ("TRUEPOS+SPEED", ephem.SEFLG_TRUEPOS | ephem.SEFLG_SPEED),
-    ("XYZ", ephem.SEFLG_XYZ),
-    ("XYZ+SPEED", ephem.SEFLG_XYZ | ephem.SEFLG_SPEED),
-    ("RADIANS", ephem.SEFLG_RADIANS),
-    ("RADIANS+SPEED", ephem.SEFLG_RADIANS | ephem.SEFLG_SPEED),
-    ("NONUT+NOABERR", ephem.SEFLG_NONUT | ephem.SEFLG_NOABERR),
-    ("TRUEPOS+EQ", ephem.SEFLG_TRUEPOS | ephem.SEFLG_EQUATORIAL),
+    ("SPEED", ephem.FLG_SPEED),
+    ("J2000", ephem.FLG_J2000),
+    ("J2000+SPEED", ephem.FLG_J2000 | ephem.FLG_SPEED),
+    ("NONUT", ephem.FLG_NONUT),
+    ("NONUT+SPEED", ephem.FLG_NONUT | ephem.FLG_SPEED),
+    ("EQUATORIAL", ephem.FLG_EQUATORIAL),
+    ("EQ+SPEED", ephem.FLG_EQUATORIAL | ephem.FLG_SPEED),
+    ("EQ+J2000", ephem.FLG_EQUATORIAL | ephem.FLG_J2000),
+    ("EQ+J2000+SPEED", ephem.FLG_EQUATORIAL | ephem.FLG_J2000 | ephem.FLG_SPEED),
+    ("NOABERR", ephem.FLG_NOABERR),
+    ("NOABERR+SPEED", ephem.FLG_NOABERR | ephem.FLG_SPEED),
+    ("TRUEPOS", ephem.FLG_TRUEPOS),
+    ("TRUEPOS+SPEED", ephem.FLG_TRUEPOS | ephem.FLG_SPEED),
+    ("XYZ", ephem.FLG_XYZ),
+    ("XYZ+SPEED", ephem.FLG_XYZ | ephem.FLG_SPEED),
+    ("RADIANS", ephem.FLG_RADIANS),
+    ("RADIANS+SPEED", ephem.FLG_RADIANS | ephem.FLG_SPEED),
+    ("NONUT+NOABERR", ephem.FLG_NONUT | ephem.FLG_NOABERR),
+    ("TRUEPOS+EQ", ephem.FLG_TRUEPOS | ephem.FLG_EQUATORIAL),
 ]
 
 # Skip heliocentric for Moon, nodes, Lilith
@@ -86,7 +86,7 @@ def compare_pos(
     global passed, failed, total, errors
 
     try:
-        le_r = ephem.swe_calc_ut(jd, le_body, le_flags | ephem.SEFLG_SWIEPH)
+        le_r = ephem.calc_ut(jd, le_body, le_flags | ephem.FLG_SWIEPH)
     except Exception as e:
         errors += 1
         return
@@ -149,12 +149,12 @@ if __name__ == "__main__":
 
         for flag_name, flag_val in FLAG_COMBOS:
             # Skip heliocentric-like for Moon/nodes
-            is_helio = flag_val & ephem.SEFLG_HELCTR
+            is_helio = flag_val & ephem.FLG_HELCTR
             if is_helio and body_name in HELIO_SKIP:
                 continue
 
-            is_xyz = bool(flag_val & ephem.SEFLG_XYZ)
-            is_radians = bool(flag_val & ephem.SEFLG_RADIANS)
+            is_xyz = bool(flag_val & ephem.FLG_XYZ)
+            is_radians = bool(flag_val & ephem.FLG_RADIANS)
 
             le_flags = flag_val
             se_flags = flag_val  # flags are numerically identical
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     # Also test heliocentric for planets
     print("\n--- Heliocentric ---")
-    helio_flag = ephem.SEFLG_HELCTR | ephem.SEFLG_SPEED
+    helio_flag = ephem.FLG_HELCTR | ephem.FLG_SPEED
     for body_name, le_body, se_body in BODIES:
         if body_name in HELIO_SKIP:
             continue
@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
     # Barycentric
     print("--- Barycentric ---")
-    bary_flag = ephem.SEFLG_BARYCTR | ephem.SEFLG_SPEED
+    bary_flag = ephem.FLG_BARYCTR | ephem.FLG_SPEED
     for body_name, le_body, se_body in BODIES:
         if body_name in {"MeanNode", "TrueNode", "MeanLilith"}:
             continue

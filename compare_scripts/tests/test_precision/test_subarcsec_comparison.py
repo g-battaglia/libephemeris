@@ -18,13 +18,13 @@ import random
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
 )
 
 
@@ -57,26 +57,26 @@ DE421_END_YEAR = 2050
 
 # Planet definitions with individual tolerances
 PLANET_TOLERANCES = {
-    SE_SUN: SUN_TOLERANCE_ARCSEC,
-    SE_MOON: MOON_TOLERANCE_ARCSEC,
-    SE_MERCURY: MERCURY_TOLERANCE_ARCSEC,
-    SE_VENUS: VENUS_TOLERANCE_ARCSEC,
-    SE_MARS: MARS_TOLERANCE_ARCSEC,
-    SE_JUPITER: JUPITER_TOLERANCE_ARCSEC,
-    SE_SATURN: SATURN_TOLERANCE_ARCSEC,
+    SUN: SUN_TOLERANCE_ARCSEC,
+    MOON: MOON_TOLERANCE_ARCSEC,
+    MERCURY: MERCURY_TOLERANCE_ARCSEC,
+    VENUS: VENUS_TOLERANCE_ARCSEC,
+    MARS: MARS_TOLERANCE_ARCSEC,
+    JUPITER: JUPITER_TOLERANCE_ARCSEC,
+    SATURN: SATURN_TOLERANCE_ARCSEC,
 }
 
 INNER_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
 ]
 
 OUTER_PLANETS = [
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 
@@ -124,7 +124,7 @@ def generate_random_dates(n: int, seed: int = 42) -> list:
         month = random.randint(1, 12)
         day = random.randint(1, 28)  # Safe for all months
         hour = random.uniform(0, 24)
-        jd = ephem.swe_julday(year, month, day, hour)
+        jd = ephem.julday(year, month, day, hour)
         dates.append((year, month, day, hour, jd))
     return dates
 
@@ -140,7 +140,7 @@ def calculate_planet_position(jd: float, planet_id: int) -> tuple:
     Returns:
         Tuple of (lib_longitude, swe_longitude, diff_arcsec)
     """
-    pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+    pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
     pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
     lon_diff = angle_diff(pos_lib[0], pos_swe[0])
@@ -279,13 +279,13 @@ class TestAllTargetPlanetsCombined:
 
         # All planets with their tolerances
         all_planets = [
-            (SE_SUN, "Sun", PLANET_TOLERANCES[SE_SUN]),
-            (SE_MOON, "Moon", PLANET_TOLERANCES[SE_MOON]),
-            (SE_MERCURY, "Mercury", PLANET_TOLERANCES[SE_MERCURY]),
-            (SE_VENUS, "Venus", PLANET_TOLERANCES[SE_VENUS]),
-            (SE_MARS, "Mars", PLANET_TOLERANCES[SE_MARS]),
-            (SE_JUPITER, "Jupiter", PLANET_TOLERANCES[SE_JUPITER]),
-            (SE_SATURN, "Saturn", PLANET_TOLERANCES[SE_SATURN]),
+            (SUN, "Sun", PLANET_TOLERANCES[SUN]),
+            (MOON, "Moon", PLANET_TOLERANCES[MOON]),
+            (MERCURY, "Mercury", PLANET_TOLERANCES[MERCURY]),
+            (VENUS, "Venus", PLANET_TOLERANCES[VENUS]),
+            (MARS, "Mars", PLANET_TOLERANCES[MARS]),
+            (JUPITER, "Jupiter", PLANET_TOLERANCES[JUPITER]),
+            (SATURN, "Saturn", PLANET_TOLERANCES[SATURN]),
         ]
 
         # Track maximum differences per planet
@@ -355,13 +355,13 @@ class TestStatisticalAnalysis:
         dates = generate_random_dates(NUM_RANDOM_DATES)
 
         all_planets = [
-            (SE_SUN, "Sun", PLANET_TOLERANCES[SE_SUN]),
-            (SE_MOON, "Moon", PLANET_TOLERANCES[SE_MOON]),
-            (SE_MERCURY, "Mercury", PLANET_TOLERANCES[SE_MERCURY]),
-            (SE_VENUS, "Venus", PLANET_TOLERANCES[SE_VENUS]),
-            (SE_MARS, "Mars", PLANET_TOLERANCES[SE_MARS]),
-            (SE_JUPITER, "Jupiter", PLANET_TOLERANCES[SE_JUPITER]),
-            (SE_SATURN, "Saturn", PLANET_TOLERANCES[SE_SATURN]),
+            (SUN, "Sun", PLANET_TOLERANCES[SUN]),
+            (MOON, "Moon", PLANET_TOLERANCES[MOON]),
+            (MERCURY, "Mercury", PLANET_TOLERANCES[MERCURY]),
+            (VENUS, "Venus", PLANET_TOLERANCES[VENUS]),
+            (MARS, "Mars", PLANET_TOLERANCES[MARS]),
+            (JUPITER, "Jupiter", PLANET_TOLERANCES[JUPITER]),
+            (SATURN, "Saturn", PLANET_TOLERANCES[SATURN]),
         ]
 
         # Collect all differences per planet
@@ -449,7 +449,7 @@ class TestEdgeCaseDates:
         """
         Test precision at edge case dates.
         """
-        jd = ephem.swe_julday(year, month, day, hour)
+        jd = ephem.julday(year, month, day, hour)
         _, _, diff_arcsec = calculate_planet_position(jd, planet_id)
 
         # Use per-planet tolerance
@@ -479,13 +479,13 @@ class TestLatitudeAndDistancePrecision:
         dates = generate_random_dates(100, seed=123)  # Different seed for variety
 
         all_planets = [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ]
 
         # Latitude tolerances (Moon needs relaxed tolerance for lunar theory)
@@ -509,7 +509,7 @@ class TestLatitudeAndDistancePrecision:
         iteration = 0
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in all_planets:
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
                 pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
                 lat_diff = angle_diff(pos_lib[1], pos_swe[1]) * 3600  # arcsec

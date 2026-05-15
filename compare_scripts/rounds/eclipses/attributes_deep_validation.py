@@ -23,16 +23,16 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SE_ECL_CENTRAL = 1
-SE_ECL_NONCENTRAL = 2
-SE_ECL_TOTAL = 4
-SE_ECL_ANNULAR = 8
-SE_ECL_PARTIAL = 16
-SE_ECL_ANNULAR_TOTAL = 32
-SE_ECL_PENUMBRAL = 64
+FLG_SPEED = 256
+ECL_CENTRAL = 1
+ECL_NONCENTRAL = 2
+ECL_TOTAL = 4
+ECL_ANNULAR = 8
+ECL_PARTIAL = 16
+ECL_ANNULAR_TOTAL = 32
+ECL_PENUMBRAL = 64
 
 
 def find_solar_eclipses(start_jd, count=25):
@@ -70,19 +70,19 @@ def find_lunar_eclipses(start_jd, count=25):
 def classify_eclipse(ecl_type):
     """Return human-readable eclipse type."""
     parts = []
-    if ecl_type & SE_ECL_TOTAL:
+    if ecl_type & ECL_TOTAL:
         parts.append("TOTAL")
-    if ecl_type & SE_ECL_ANNULAR:
+    if ecl_type & ECL_ANNULAR:
         parts.append("ANNULAR")
-    if ecl_type & SE_ECL_PARTIAL:
+    if ecl_type & ECL_PARTIAL:
         parts.append("PARTIAL")
-    if ecl_type & SE_ECL_ANNULAR_TOTAL:
+    if ecl_type & ECL_ANNULAR_TOTAL:
         parts.append("HYBRID")
-    if ecl_type & SE_ECL_PENUMBRAL:
+    if ecl_type & ECL_PENUMBRAL:
         parts.append("PENUMBRAL")
-    if ecl_type & SE_ECL_CENTRAL:
+    if ecl_type & ECL_CENTRAL:
         parts.append("CENTRAL")
-    if ecl_type & SE_ECL_NONCENTRAL:
+    if ecl_type & ECL_NONCENTRAL:
         parts.append("NONCENTRAL")
     return "|".join(parts) if parts else f"TYPE={ecl_type}"
 
@@ -104,8 +104,8 @@ def compare_solar_eclipse_how(tmax, locations):
             continue
 
         try:
-            # libephemeris: swe_sol_eclipse_how(tjd, ifl, geopos)
-            le_res = ephem.swe_sol_eclipse_how(tmax, 0, geopos)
+            # libephemeris: sol_eclipse_how(tjd, ifl, geopos)
+            le_res = ephem.sol_eclipse_how(tmax, 0, geopos)
             le_type = le_res[0]
             le_attr = le_res[1]
         except Exception as e:
@@ -197,8 +197,8 @@ def compare_lunar_eclipse_how(tmax):
             continue
 
         try:
-            # libephemeris: swe_lun_eclipse_how(tjd, ifl, geopos)
-            le_res = ephem.swe_lun_eclipse_how(tmax, 0, geopos)
+            # libephemeris: lun_eclipse_how(tjd, ifl, geopos)
+            le_res = ephem.lun_eclipse_how(tmax, 0, geopos)
             le_type = le_res[0]
             le_attr = le_res[1]
         except Exception as e:
@@ -328,7 +328,7 @@ def main():
         # Take first total/annular eclipse
         test_ecl = None
         for ecl_type, tmax in solar_eclipses:
-            if ecl_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR):
+            if ecl_type & (ECL_TOTAL | ECL_ANNULAR):
                 test_ecl = (ecl_type, tmax)
                 break
 
@@ -369,7 +369,7 @@ def main():
     if lunar_eclipses:
         test_ecl = None
         for ecl_type, tmax in lunar_eclipses:
-            if ecl_type & SE_ECL_TOTAL:
+            if ecl_type & ECL_TOTAL:
                 test_ecl = (ecl_type, tmax)
                 break
 
@@ -412,16 +412,16 @@ def main():
             se_res = swe.sol_eclipse_how(tmax, geopos, 0)
             se_type_how = se_res[0]
 
-            le_res = ephem.swe_sol_eclipse_how(tmax, 0, geopos)
+            le_res = ephem.sol_eclipse_how(tmax, 0, geopos)
             le_type_how = le_res[0]
 
             total_tests += 1
             # Check that both agree on the major eclipse type
             se_major = se_type_how & (
-                SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+                ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
             )
             le_major = le_type_how & (
-                SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+                ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
             )
 
             if se_major == le_major or se_major == 0 or le_major == 0:

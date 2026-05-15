@@ -16,14 +16,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 
 def year_to_jd(year):
@@ -45,10 +45,10 @@ for y in [2200, 2300, 2400, 2450, 2500, 2540]:
 # Flag combos
 FLAG_COMBOS = [
     ("default", FLAGS),
-    ("J2000", FLAGS | ephem.SEFLG_J2000),
-    ("NONUT", FLAGS | ephem.SEFLG_NONUT),
-    ("EQUATORIAL", FLAGS | ephem.SEFLG_EQUATORIAL),
-    ("HELIO", FLAGS | ephem.SEFLG_HELCTR),
+    ("J2000", FLAGS | ephem.FLG_J2000),
+    ("NONUT", FLAGS | ephem.FLG_NONUT),
+    ("EQUATORIAL", FLAGS | ephem.FLG_EQUATORIAL),
+    ("HELIO", FLAGS | ephem.FLG_HELCTR),
 ]
 
 
@@ -56,7 +56,7 @@ def compare(label, jd, le_flags, se_flags):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, ephem.SE_CHIRON, le_flags)
+        le_r = ephem.calc_ut(jd, ephem.CHIRON, le_flags)
         se_r = swe.calc_ut(jd, swe.CHIRON, se_flags)
     except Exception:
         return

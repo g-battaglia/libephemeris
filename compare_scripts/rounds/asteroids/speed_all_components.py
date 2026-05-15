@@ -15,30 +15,30 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_NOABERR,
-    SEFLG_EQUATORIAL,
-    SEFLG_SWIEPH,
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_TRUEPOS,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_NOABERR,
+    FLG_EQUATORIAL,
+    FLG_SWIEPH,
+    CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    SE_CERES: "Ceres",
-    SE_PALLAS: "Pallas",
-    SE_JUNO: "Juno",
-    SE_VESTA: "Vesta",
-    SE_CHIRON: "Chiron",
+    CERES: "Ceres",
+    PALLAS: "Pallas",
+    JUNO: "Juno",
+    VESTA: "Vesta",
+    CHIRON: "Chiron",
 }
 
 # Valid range: ~1930-2070 for asteroids in DE440
@@ -73,13 +73,13 @@ TEST_JDS = [
 COMP_NAMES = ["lon", "lat", "dist", "lon_speed", "lat_speed", "dist_speed"]
 
 FLAG_COMBOS = {
-    "default": SEFLG_SWIEPH | SEFLG_SPEED,
-    "J2000": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000,
-    "NONUT": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT,
-    "TRUEPOS": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TRUEPOS,
-    "NOABERR": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOABERR,
-    "HELCTR": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR,
-    "EQUATORIAL": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL,
+    "default": FLG_SWIEPH | FLG_SPEED,
+    "J2000": FLG_SWIEPH | FLG_SPEED | FLG_J2000,
+    "NONUT": FLG_SWIEPH | FLG_SPEED | FLG_NONUT,
+    "TRUEPOS": FLG_SWIEPH | FLG_SPEED | FLG_TRUEPOS,
+    "NOABERR": FLG_SWIEPH | FLG_SPEED | FLG_NOABERR,
+    "HELCTR": FLG_SWIEPH | FLG_SPEED | FLG_HELCTR,
+    "EQUATORIAL": FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL,
 }
 
 passed = 0
@@ -93,7 +93,7 @@ for jd in TEST_JDS:
         for flag_name, flags in FLAG_COMBOS.items():
             try:
                 se_result = swe.calc_ut(jd, body, flags)
-                le_result = ephem.swe_calc_ut(jd, body, flags)
+                le_result = ephem.calc_ut(jd, body, flags)
 
                 for i, comp in enumerate(COMP_NAMES):
                     total += 1

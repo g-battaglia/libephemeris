@@ -70,18 +70,18 @@ def safe(fn, label: str):
 # Constants
 # ---------------------------------------------------------------------------
 JD_J2000 = 2451545.0  # 2000-Jan-1.5 TT
-SEFLG_SWIEPH = 2
-SEFLG_SIDEREAL = 65536
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_CALC_RISE = 1
-SE_CALC_SET = 2
-SE_CALC_MTRANSIT = 4
+FLG_SWIEPH = 2
+FLG_SIDEREAL = 65536
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
+CALC_RISE = 1
+CALC_SET = 2
+CALC_MTRANSIT = 4
 GREG_CAL = 1
 
 # 20 test dates spread across 2000-2025
@@ -230,7 +230,7 @@ def test_ayanamsha_modes():
         for jd in [JD_J2000, lib.julday(2020, 1, 1, 12.0)]:
             try:
                 lib.set_sid_mode(mode)
-                retflag_lib, ayan_lib = lib.swe_get_ayanamsa_ex_ut(jd, SEFLG_SWIEPH)
+                retflag_lib, ayan_lib = lib.get_ayanamsa_ex_ut(jd, FLG_SWIEPH)
 
                 swe_ref.set_sid_mode(mode)
                 retflag_ref, ayan_ref = swe_ref.get_ayanamsa_ex_ut(
@@ -265,12 +265,12 @@ def test_sidereal_positions():
     print("\n=== Section 2: Sidereal positions ===")
     selected_modes = [0, 1, 2, 3, 5, 7, 10, 20, 30, 40]
     bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_VENUS, "Venus"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (VENUS, "Venus"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
     # Modes 20 has borderline discrepancies (~2.3"), modes 30 (Suryasiddhanta)
     # and 40 (Galactic Center) have larger discrepancies of up to ~41" due to
@@ -296,7 +296,7 @@ def test_sidereal_positions():
             for jd in sid_dates:
                 try:
                     lib.set_sid_mode(mode)
-                    result_lib = lib.calc_ut(jd, body_id, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+                    result_lib = lib.calc_ut(jd, body_id, FLG_SWIEPH | FLG_SIDEREAL)
                     lon_lib = result_lib[0][0]
 
                     swe_ref.set_sid_mode(mode)
@@ -335,7 +335,7 @@ def test_solar_eclipses():
     for year in range(2000, 2026):
         jd_start = lib.julday(year, 1, 1, 0.0)
         try:
-            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_start, SEFLG_SWIEPH, 0)
+            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_start, FLG_SWIEPH, 0)
             retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
                 jd_start, swe_ref.FLG_SWIEPH, 0
             )
@@ -386,7 +386,7 @@ def test_solar_eclipses():
     for year in range(2000, 2026):
         jd_mid = lib.julday(year, 7, 1, 0.0)
         try:
-            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_mid, SEFLG_SWIEPH, 0)
+            retflag_lib, tret_lib = lib.sol_eclipse_when_glob(jd_mid, FLG_SWIEPH, 0)
             retflag_ref, tret_ref = swe_ref.sol_eclipse_when_glob(
                 jd_mid, swe_ref.FLG_SWIEPH, 0
             )
@@ -413,7 +413,7 @@ def test_lunar_eclipses():
     for year in range(2000, 2026):
         jd_start = lib.julday(year, 1, 1, 0.0)
         try:
-            retflag_lib, tret_lib = lib.lun_eclipse_when(jd_start, SEFLG_SWIEPH, 0)
+            retflag_lib, tret_lib = lib.lun_eclipse_when(jd_start, FLG_SWIEPH, 0)
             retflag_ref, tret_ref = swe_ref.lun_eclipse_when(
                 jd_start, swe_ref.FLG_SWIEPH, 0
             )
@@ -489,7 +489,7 @@ def test_lunar_eclipses():
     for year in range(2000, 2026):
         jd_mid = lib.julday(year, 7, 1, 0.0)
         try:
-            retflag_lib, tret_lib = lib.lun_eclipse_when(jd_mid, SEFLG_SWIEPH, 0)
+            retflag_lib, tret_lib = lib.lun_eclipse_when(jd_mid, FLG_SWIEPH, 0)
             retflag_ref, tret_ref = swe_ref.lun_eclipse_when(
                 jd_mid, swe_ref.FLG_SWIEPH, 0
             )
@@ -528,14 +528,14 @@ def test_rise_set():
     ]
 
     bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
     ]
 
     event_types = [
-        (SE_CALC_RISE, swe_ref.CALC_RISE, "rise"),
-        (SE_CALC_SET, swe_ref.CALC_SET, "set"),
-        (SE_CALC_MTRANSIT, swe_ref.CALC_MTRANSIT, "transit"),
+        (CALC_RISE, swe_ref.CALC_RISE, "rise"),
+        (CALC_SET, swe_ref.CALC_SET, "set"),
+        (CALC_MTRANSIT, swe_ref.CALC_MTRANSIT, "transit"),
     ]
 
     for body_id, body_name in bodies:
@@ -545,7 +545,7 @@ def test_rise_set():
                 for rsmi_lib, rsmi_ref, event_name in event_types:
                     try:
                         res_lib, tret_lib = lib.rise_trans(
-                            jd, body_id, rsmi_lib, geopos, 1013.25, 15.0, SEFLG_SWIEPH
+                            jd, body_id, rsmi_lib, geopos, 1013.25, 15.0, FLG_SWIEPH
                         )
                         res_ref, tret_ref = swe_ref.rise_trans(
                             jd,
@@ -606,7 +606,7 @@ def test_fixed_stars():
     for star in STARS:
         for jd in star_dates:
             try:
-                xx_lib, name_lib, retflag_lib = lib.fixstar2_ut(star, jd, SEFLG_SWIEPH)
+                xx_lib, name_lib, retflag_lib = lib.fixstar2_ut(star, jd, FLG_SWIEPH)
                 xx_ref, name_ref, retflag_ref = swe_ref.fixstar2_ut(
                     star, jd, swe_ref.FLG_SWIEPH
                 )

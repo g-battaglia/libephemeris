@@ -16,14 +16,14 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 JD = 2451545.0
 
 HOUSE_SYSTEMS = [
@@ -47,13 +47,13 @@ LOCATIONS = [
 ]
 
 PLANETS = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
 ]
 
 
@@ -68,13 +68,13 @@ def test_house_pos():
         for hsys_name, le_hsys, se_hsys in HOUSE_SYSTEMS:
             # Get ARMC and obliquity
             try:
-                le_houses = ephem.swe_houses_ex2(JD, lat, lon, ord("P"), 0)
+                le_houses = ephem.houses_ex2(JD, lat, lon, ord("P"), 0)
                 armc = le_houses[1][2]  # ARMC
                 eps = le_houses[1][4] if len(le_houses[1]) > 4 else 23.4393
             except Exception:
                 # Fallback obliquity
                 try:
-                    ecl = ephem.swe_calc_ut(JD, -1, 0)
+                    ecl = ephem.calc_ut(JD, -1, 0)
                     eps = ecl[0][0]
                 except Exception:
                     eps = 23.4393
@@ -82,14 +82,14 @@ def test_house_pos():
 
             # Get obliquity from ECL_NUT
             try:
-                ecl = ephem.swe_calc_ut(JD, -1, 0)
+                ecl = ephem.calc_ut(JD, -1, 0)
                 eps = ecl[0][0]  # true obliquity
             except Exception:
                 eps = 23.4393
 
             for pname, le_body, se_body in PLANETS:
                 try:
-                    le_pos = ephem.swe_calc_ut(JD, le_body, FLAGS)
+                    le_pos = ephem.calc_ut(JD, le_body, FLAGS)
                     plon = le_pos[0][0]
                     plat = le_pos[0][1]
                 except Exception:
@@ -97,7 +97,7 @@ def test_house_pos():
 
                 # libephemeris house_pos
                 try:
-                    le_hp = ephem.swe_house_pos(armc, lat, eps, le_hsys, plon, plat)
+                    le_hp = ephem.house_pos(armc, lat, eps, le_hsys, plon, plat)
                 except Exception as e:
                     le_hp = None
 

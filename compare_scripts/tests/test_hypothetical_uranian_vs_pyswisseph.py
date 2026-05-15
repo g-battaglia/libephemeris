@@ -7,14 +7,14 @@ implementations use orbital propagation from the same elements
 (from Swiss Ephemeris seorbel.txt).
 
 The 8 Uranian planets tested:
-1. Cupido (SE_CUPIDO = 40) - circular orbit, e=0
-2. Hades (SE_HADES = 41) - elliptic orbit, e=0.00245, i=1.05 deg
-3. Zeus (SE_ZEUS = 42) - circular orbit, e=0
-4. Kronos (SE_KRONOS = 43) - circular orbit, e=0
-5. Apollon (SE_APOLLON = 44) - circular orbit, e=0
-6. Admetos (SE_ADMETOS = 45) - circular orbit, e=0
-7. Vulkanus (SE_VULKANUS = 46) - circular orbit, e=0
-8. Poseidon (SE_POSEIDON = 47) - circular orbit, e=0
+1. Cupido (CUPIDO = 40) - circular orbit, e=0
+2. Hades (HADES = 41) - elliptic orbit, e=0.00245, i=1.05 deg
+3. Zeus (ZEUS = 42) - circular orbit, e=0
+4. Kronos (KRONOS = 43) - circular orbit, e=0
+5. Apollon (APOLLON = 44) - circular orbit, e=0
+6. Admetos (ADMETOS = 45) - circular orbit, e=0
+7. Vulkanus (VULKANUS = 46) - circular orbit, e=0
+8. Poseidon (POSEIDON = 47) - circular orbit, e=0
 
 Test strategy:
 - Generate 50 random Julian dates within the DE421 valid range (1900-2050)
@@ -149,7 +149,7 @@ class TestCircularOrbitPlanets:
         jd = 2451545.0  # J2000.0
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-        pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
         diff = angle_diff(pos_swe[0], pos_lib[0])
         assert diff < self.TOLERANCE, (
@@ -166,7 +166,7 @@ class TestCircularOrbitPlanets:
 
         for jd in random_dates_50:
             pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
             diff = angle_diff(pos_swe[0], pos_lib[0])
             max_diff = max(max_diff, diff)
@@ -200,7 +200,7 @@ class TestHadesEllipticOrbit:
         jd = 2451545.0  # J2000.0
 
         pos_swe, _ = swe.calc_ut(jd, swe.HADES, swe.FLG_SPEED)
-        pos_lib, _ = ephem.swe_calc_ut(jd, swe.HADES, ephem.SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, swe.HADES, ephem.FLG_SPEED)
 
         diff = angle_diff(pos_swe[0], pos_lib[0])
         assert diff < self.TOLERANCE, (
@@ -216,7 +216,7 @@ class TestHadesEllipticOrbit:
 
         for jd in random_dates_50:
             pos_swe, _ = swe.calc_ut(jd, swe.HADES, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, swe.HADES, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, swe.HADES, ephem.FLG_SPEED)
 
             diff = angle_diff(pos_swe[0], pos_lib[0])
             max_diff = max(max_diff, diff)
@@ -238,7 +238,7 @@ class TestHadesEllipticOrbit:
         # Hades has i=1.05 degrees, so latitude should be within this range
         for jd in random_dates_50[:10]:
             pos_swe, _ = swe.calc_ut(jd, swe.HADES, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, swe.HADES, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, swe.HADES, ephem.FLG_SPEED)
 
             # Both should have non-zero latitude due to inclination
             assert abs(pos_swe[1]) <= 1.5, f"SWE latitude out of range: {pos_swe[1]}"
@@ -271,7 +271,7 @@ class TestAllUranianPlanetsComprehensive:
 
             for jd in random_dates_50:
                 pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
                 diff = angle_diff(pos_swe[0], pos_lib[0])
                 planet_max_diff = max(planet_max_diff, diff)
@@ -321,7 +321,7 @@ class TestUranianPlanetLatitudeAndDistance:
         """Test that latitudes are within reasonable range."""
         for jd in random_dates_50[:10]:
             pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
             diff = abs(pos_swe[1] - pos_lib[1])
             assert diff < self.LATITUDE_TOLERANCE, (
@@ -334,7 +334,7 @@ class TestUranianPlanetLatitudeAndDistance:
         """Test that distances are within reasonable range."""
         for jd in random_dates_50[:10]:
             pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
             diff = abs(pos_swe[2] - pos_lib[2])
             assert diff < self.DISTANCE_TOLERANCE, (
@@ -357,7 +357,7 @@ class TestUranianPlanetVelocity:
 
         for jd in random_dates_50[:10]:
             pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, ephem.SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, ephem.FLG_SPEED)
 
             diff = abs(pos_swe[3] - pos_lib[3])
             assert diff < tolerance, (
@@ -381,29 +381,29 @@ class TestUranianPlanetConstants:
         assert swe.POSEIDON == 47
 
         from libephemeris.constants import (
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         )
 
-        assert SE_CUPIDO == swe.CUPIDO
-        assert SE_HADES == swe.HADES
-        assert SE_ZEUS == swe.ZEUS
-        assert SE_KRONOS == swe.KRONOS
-        assert SE_APOLLON == swe.APOLLON
-        assert SE_ADMETOS == swe.ADMETOS
-        assert SE_VULKANUS == swe.VULKANUS
-        assert SE_POSEIDON == swe.POSEIDON
+        assert CUPIDO == swe.CUPIDO
+        assert HADES == swe.HADES
+        assert ZEUS == swe.ZEUS
+        assert KRONOS == swe.KRONOS
+        assert APOLLON == swe.APOLLON
+        assert ADMETOS == swe.ADMETOS
+        assert VULKANUS == swe.VULKANUS
+        assert POSEIDON == swe.POSEIDON
 
     @pytest.mark.unit
     def test_fict_offset_matches(self):
         """Verify that the fictitious body offset matches."""
-        from libephemeris.constants import SE_FICT_OFFSET
+        from libephemeris.constants import FICT_OFFSET
 
-        assert SE_FICT_OFFSET == 40
-        assert swe.CUPIDO == SE_FICT_OFFSET
+        assert FICT_OFFSET == 40
+        assert swe.CUPIDO == FICT_OFFSET

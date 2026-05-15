@@ -30,13 +30,13 @@ from collections import defaultdict
 
 import numpy as np
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
 # Point pyswisseph to its data files
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 # ---------------------------------------------------------------------------
 # Counters and helpers
@@ -97,13 +97,13 @@ JD_MIN = 2415020.5  # ~1900
 JD_MAX = 2488069.5  # ~2100
 JD_J2000 = 2451545.0  # J2000.0
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_HELCTR = 8
-SEFLG_J2000 = 32
-SEFLG_NOABERR = 1024
-SEFLG_EQUATORIAL = 2048
-SEFLG_SIDEREAL = 65536
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_HELCTR = 8
+FLG_J2000 = 32
+FLG_NOABERR = 1024
+FLG_EQUATORIAL = 2048
+FLG_SIDEREAL = 65536
 
 # Bodies for Sec 1.3 / 1.4: Sun(0)-Pluto(9), MeanNode(10), TrueNode(11),
 # MeanApog(12), Chiron(15)
@@ -204,7 +204,7 @@ def run_section_1_3() -> None:
     DIST_TOL = 1e-7  # AU
 
     jds = random_jds(N_DATES)
-    flags = SEFLG_SPEED | SEFLG_SWIEPH
+    flags = FLG_SPEED | FLG_SWIEPH
 
     for body_id in LEB_BODIES:
         bname = LEB_BODY_NAMES[body_id]
@@ -274,10 +274,10 @@ def run_section_1_4() -> None:
 
     # Four flag modes: SIDEREAL(Lahiri), EQUATORIAL, J2000, NOABERR
     flag_modes = [
-        ("SIDEREAL(Lahiri)", SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_SIDEREAL, True),
-        ("EQUATORIAL", SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_EQUATORIAL, False),
-        ("J2000", SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_J2000, False),
-        ("NOABERR", SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_NOABERR, False),
+        ("SIDEREAL(Lahiri)", FLG_SPEED | FLG_SWIEPH | FLG_SIDEREAL, True),
+        ("EQUATORIAL", FLG_SPEED | FLG_SWIEPH | FLG_EQUATORIAL, False),
+        ("J2000", FLG_SPEED | FLG_SWIEPH | FLG_J2000, False),
+        ("NOABERR", FLG_SPEED | FLG_SWIEPH | FLG_NOABERR, False),
     ]
 
     for mode_name, flags, needs_sid in flag_modes:
@@ -360,7 +360,7 @@ def run_section_13() -> None:
     # --- 13a: Geocentric ---
     N_GEO = 50
     jds_geo = random_jds(N_GEO)
-    flags_geo = SEFLG_SPEED | SEFLG_SWIEPH
+    flags_geo = FLG_SPEED | FLG_SWIEPH
 
     for body_id in URANIAN_BODIES:
         bname = URANIAN_NAMES[body_id]
@@ -400,7 +400,7 @@ def run_section_13() -> None:
     # --- 13b: Heliocentric ---
     N_HELIO = 30
     jds_helio = random_jds(N_HELIO)
-    flags_helio = SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_HELCTR
+    flags_helio = FLG_SPEED | FLG_SWIEPH | FLG_HELCTR
 
     for body_id in URANIAN_BODIES:
         bname = URANIAN_NAMES[body_id]
@@ -449,7 +449,7 @@ def run_section_13() -> None:
         lib.set_sid_mode(ayan_mode)
         swe_ref.set_sid_mode(ayan_mode)
 
-        flags_sid = SEFLG_SPEED | SEFLG_SWIEPH | SEFLG_SIDEREAL
+        flags_sid = FLG_SPEED | FLG_SWIEPH | FLG_SIDEREAL
 
         for body_id in SIDEREAL_URANIANS:
             bname = URANIAN_NAMES[body_id]
@@ -517,7 +517,7 @@ def run_section_14() -> None:
     DIST_TOL = 1e-4  # AU
 
     jds = random_jds(N_DATES)
-    flags = SEFLG_SPEED | SEFLG_SWIEPH
+    flags = FLG_SPEED | FLG_SWIEPH
 
     for body_id in ASTEROID_BODIES:
         bname = ASTEROID_NAMES[body_id]
@@ -555,9 +555,9 @@ def run_section_14() -> None:
             )
 
     # --- AST_OFFSET mapping checks ---
-    # SE_AST_OFFSET + 1 = 10001 should correspond to Ceres (asteroid #1)
+    # AST_OFFSET + 1 = 10001 should correspond to Ceres (asteroid #1)
     # In pyswisseph: body id 10001 = asteroid #1 = Ceres
-    # Compare with SE_CERES (17) for a few dates
+    # Compare with CERES (17) for a few dates
     ast_jds = random_jds(3)
     for jd in ast_jds:
         try:
@@ -603,7 +603,7 @@ def run_section_16() -> None:
         for jd in jds:
             # --- Orbital elements ---
             try:
-                elems = lib.get_orbital_elements_ut(jd, body_id, SEFLG_SWIEPH)
+                elems = lib.get_orbital_elements_ut(jd, body_id, FLG_SWIEPH)
             except Exception as e:
                 for _ in range(6):
                     check(False, f"{bname} orbital_elements crash jd={jd:.2f}: {e}")
@@ -645,7 +645,7 @@ def run_section_16() -> None:
             # --- orbit_max_min_true_distance ---
             try:
                 dmax, dmin, dcur = lib.orbit_max_min_true_distance(
-                    jd + lib.swe_deltat(jd), body_id, SEFLG_SWIEPH
+                    jd + lib.deltat(jd), body_id, FLG_SWIEPH
                 )
             except Exception as e:
                 check(False, f"{bname} orbit_max_min crash jd={jd:.2f}: {e}")
@@ -685,14 +685,14 @@ def run_section_18() -> None:
     # --- 18a: Equinoxes (Vernal equinox, Sun crossing 0 deg) ---
     # 2000-2025, one per year = 26 checks
     for year in range(2000, 2026):
-        jd_start = lib.swe_julday(year, 1, 1, 0.0)
+        jd_start = lib.julday(year, 1, 1, 0.0)
         try:
-            lib_jd = lib.solcross_ut(0.0, jd_start, SEFLG_SWIEPH)
+            lib_jd = lib.solcross_ut(0.0, jd_start, FLG_SWIEPH)
         except Exception as e:
             check(False, f"Vernal equinox {year} lib crash: {e}")
             continue
         try:
-            ref_jd = swe_ref.solcross_ut(0.0, jd_start, SEFLG_SWIEPH)
+            ref_jd = swe_ref.solcross_ut(0.0, jd_start, FLG_SWIEPH)
         except Exception as e:
             check(False, f"Vernal equinox {year} ref crash: {e}")
             continue
@@ -706,12 +706,12 @@ def run_section_18() -> None:
 
     # --- 18b: Solstices (90 and 270 degrees) ---
     for year in range(2000, 2026):
-        jd_start = lib.swe_julday(year, 1, 1, 0.0)
+        jd_start = lib.julday(year, 1, 1, 0.0)
 
         # Summer solstice (90 deg)
         try:
-            lib_jd = lib.solcross_ut(90.0, jd_start, SEFLG_SWIEPH)
-            ref_jd = swe_ref.solcross_ut(90.0, jd_start, SEFLG_SWIEPH)
+            lib_jd = lib.solcross_ut(90.0, jd_start, FLG_SWIEPH)
+            ref_jd = swe_ref.solcross_ut(90.0, jd_start, FLG_SWIEPH)
             diff_sec = abs(lib_jd - ref_jd) * SECONDS_PER_DAY
             track_max("18|solstice_summer|sec", diff_sec)
             check(
@@ -723,8 +723,8 @@ def run_section_18() -> None:
 
         # Winter solstice (270 deg)
         try:
-            lib_jd = lib.solcross_ut(270.0, jd_start, SEFLG_SWIEPH)
-            ref_jd = swe_ref.solcross_ut(270.0, jd_start, SEFLG_SWIEPH)
+            lib_jd = lib.solcross_ut(270.0, jd_start, FLG_SWIEPH)
+            ref_jd = swe_ref.solcross_ut(270.0, jd_start, FLG_SWIEPH)
             diff_sec = abs(lib_jd - ref_jd) * SECONDS_PER_DAY
             track_max("18|solstice_winter|sec", diff_sec)
             check(
@@ -739,13 +739,13 @@ def run_section_18() -> None:
     jd_moon_start = JD_J2000
     for target_deg in range(0, 360, 30):
         try:
-            lib_jd = lib.mooncross_ut(float(target_deg), jd_moon_start, SEFLG_SWIEPH)
+            lib_jd = lib.mooncross_ut(float(target_deg), jd_moon_start, FLG_SWIEPH)
         except Exception as e:
             check(False, f"Moon cross {target_deg}deg lib crash: {e}")
             continue
         try:
             ref_jd = swe_ref.mooncross_ut(
-                float(target_deg), jd_moon_start, SEFLG_SWIEPH
+                float(target_deg), jd_moon_start, FLG_SWIEPH
             )
         except Exception as e:
             check(False, f"Moon cross {target_deg}deg ref crash: {e}")
@@ -773,7 +773,7 @@ def run_section_18() -> None:
 
             # Verify speed near zero at the station
             try:
-                flags_spd = SEFLG_SPEED | SEFLG_SWIEPH
+                flags_spd = FLG_SPEED | FLG_SWIEPH
                 res, _ = lib.calc_ut(jd_station, planet_id, flags_spd)
                 speed_lon = res[3]  # speed in longitude (deg/day)
 

@@ -2,11 +2,11 @@
 """Round 109: Ayanamsha Rate of Change Deep
 
 Tests ayanamsha values AND their time derivatives across all sidereal modes.
-P1: swe_get_ayanamsa_ex_ut for all modes at multiple epochs
+P1: get_ayanamsa_ex_ut for all modes at multiple epochs
 P2: Ayanamsha rate via finite difference vs analytical (where available)
 P3: Ayanamsha continuity (no jumps across year boundaries)
 P4: Ayanamsha monotonicity (should be monotonically increasing for most modes)
-P5: swe_get_ayanamsa_ex_ut with different flags (J2000, NONUT)
+P5: get_ayanamsa_ex_ut with different flags (J2000, NONUT)
 P6: Sidereal position consistency (planet_sidereal = planet_tropical - ayanamsha)
 P7: All 43+ ayanamsha modes comparison at J2000
 """
@@ -22,16 +22,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
+FLG_J2000 = 32
+FLG_NONUT = 64
 
 # All ayanamsha modes (0-42+)
 AYANAMSHA_MODES = {
@@ -110,10 +110,10 @@ for mode_id, mode_name in AYANAMSHA_MODES.items():
     for jd, epoch_label in test_epochs:
         try:
             swe.set_sid_mode(mode_id)
-            ephem.swe_set_sid_mode(mode_id, 0, 0)
+            ephem.set_sid_mode(mode_id, 0, 0)
 
             se_aya = swe.get_ayanamsa_ut(jd)
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
 
             diff = abs(se_aya - le_aya)
             diff_arcsec = diff * 3600
@@ -170,7 +170,7 @@ for mode_id, mode_name in RATE_MODES.items():
     for jd, epoch_label in rate_epochs:
         try:
             swe.set_sid_mode(mode_id)
-            ephem.swe_set_sid_mode(mode_id, 0, 0)
+            ephem.set_sid_mode(mode_id, 0, 0)
 
             # SE rate via finite diff
             se_minus = swe.get_ayanamsa_ut(jd - DT)
@@ -178,8 +178,8 @@ for mode_id, mode_name in RATE_MODES.items():
             se_rate = (se_plus - se_minus) / (2 * DT)  # deg/day
 
             # LE rate via finite diff
-            le_minus = ephem.swe_get_ayanamsa_ut(jd - DT)
-            le_plus = ephem.swe_get_ayanamsa_ut(jd + DT)
+            le_minus = ephem.get_ayanamsa_ut(jd - DT)
+            le_plus = ephem.get_ayanamsa_ut(jd + DT)
             le_rate = (le_plus - le_minus) / (2 * DT)  # deg/day
 
             # Convert to arcsec/year for readability
@@ -217,14 +217,14 @@ print("\n=== P3: Ayanamsha continuity across year boundaries ===")
 CONT_MODES = {0: "FAGAN_BRADLEY", 1: "LAHIRI", 27: "TRUE_CITRA"}
 
 for mode_id, mode_name in CONT_MODES.items():
-    ephem.swe_set_sid_mode(mode_id, 0, 0)
+    ephem.set_sid_mode(mode_id, 0, 0)
 
     for year in range(1990, 2031):
         jd_end = swe.julday(year, 12, 31, 23.0)
         jd_start = swe.julday(year + 1, 1, 1, 1.0)
         try:
-            le_end = ephem.swe_get_ayanamsa_ut(jd_end)
-            le_start = ephem.swe_get_ayanamsa_ut(jd_start)
+            le_end = ephem.get_ayanamsa_ut(jd_end)
+            le_start = ephem.get_ayanamsa_ut(jd_start)
 
             # 2 hours apart, rate ~50"/yr → expected change ~0.011"
             expected_max_change = 0.001  # degrees (~3.6")
@@ -260,7 +260,7 @@ MONO_MODES = {
 }
 
 for mode_id, mode_name in MONO_MODES.items():
-    ephem.swe_set_sid_mode(mode_id, 0, 0)
+    ephem.set_sid_mode(mode_id, 0, 0)
 
     prev_aya = None
     monotonic = True
@@ -269,7 +269,7 @@ for mode_id, mode_name in MONO_MODES.items():
     for year in range(1900, 2101, 5):
         jd = swe.julday(year, 1, 1, 12.0)
         try:
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
             if prev_aya is not None:
                 if le_aya <= prev_aya:
                     monotonic = False
@@ -286,14 +286,14 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 
 
 # ============================================================
-# P5: Ayanamsha with different flags (swe_get_ayanamsa_ex_ut)
+# P5: Ayanamsha with different flags (get_ayanamsa_ex_ut)
 # ============================================================
-print("\n=== P5: Ayanamsha with flags (swe_get_ayanamsa_ex_ut) ===")
+print("\n=== P5: Ayanamsha with flags (get_ayanamsa_ex_ut) ===")
 
 FLAG_COMBOS = [
     (0, "default"),
-    (SEFLG_J2000 | SEFLG_NONUT, "J2000+NONUT"),
-    (SEFLG_NONUT, "NONUT"),
+    (FLG_J2000 | FLG_NONUT, "J2000+NONUT"),
+    (FLG_NONUT, "NONUT"),
 ]
 
 ex_modes = {0: "FAGAN_BRADLEY", 1: "LAHIRI", 27: "TRUE_CITRA", 18: "J2000"}
@@ -303,7 +303,7 @@ for mode_id, mode_name in ex_modes.items():
         for jd, epoch_label in test_epochs:
             try:
                 swe.set_sid_mode(mode_id)
-                ephem.swe_set_sid_mode(mode_id, 0, 0)
+                ephem.set_sid_mode(mode_id, 0, 0)
 
                 # SE: swe.get_ayanamsa_ex_ut(jd, flags) returns (retflag, aya)
                 se_result = swe.get_ayanamsa_ex_ut(jd, flags)
@@ -313,7 +313,7 @@ for mode_id, mode_name in ex_modes.items():
                     se_aya = se_result
 
                 # LE
-                le_result = ephem.swe_get_ayanamsa_ex_ut(jd, flags)
+                le_result = ephem.get_ayanamsa_ex_ut(jd, flags)
                 if isinstance(le_result, tuple):
                     le_aya = le_result[1] if len(le_result) >= 2 else le_result[0]
                 else:
@@ -351,18 +351,18 @@ for mode_id, mode_name in CONSIST_MODES.items():
     for jd, epoch_label in test_epochs[:4]:
         for body_id, body_name in CONSIST_BODIES.items():
             try:
-                ephem.swe_set_sid_mode(mode_id, 0, 0)
+                ephem.set_sid_mode(mode_id, 0, 0)
 
                 # Tropical position
-                le_trop = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                le_trop = ephem.calc_ut(jd, body_id, FLG_SPEED)
                 trop_lon = le_trop[0][0]
 
                 # Sidereal position
-                le_sid = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_SIDEREAL)
+                le_sid = ephem.calc_ut(jd, body_id, FLG_SPEED | FLG_SIDEREAL)
                 sid_lon = le_sid[0][0]
 
                 # Ayanamsha
-                le_aya = ephem.swe_get_ayanamsa_ut(jd)
+                le_aya = ephem.get_ayanamsa_ut(jd)
 
                 # Compute expected sidereal
                 expected_sid = (trop_lon - le_aya) % 360.0
@@ -398,10 +398,10 @@ jd_j2000 = 2451545.0
 for mode_id, mode_name in AYANAMSHA_MODES.items():
     try:
         swe.set_sid_mode(mode_id)
-        ephem.swe_set_sid_mode(mode_id, 0, 0)
+        ephem.set_sid_mode(mode_id, 0, 0)
 
         se_aya = swe.get_ayanamsa_ut(jd_j2000)
-        le_aya = ephem.swe_get_ayanamsa_ut(jd_j2000)
+        le_aya = ephem.get_ayanamsa_ut(jd_j2000)
 
         diff_arcsec = abs(se_aya - le_aya) * 3600
 
@@ -431,7 +431,7 @@ print("\n=== P8: Ayanamsha rate smoothness ===")
 SMOOTH_MODES = {0: "FAGAN_BRADLEY", 1: "LAHIRI", 14: "ALDEBARAN_15TAU"}
 
 for mode_id, mode_name in SMOOTH_MODES.items():
-    ephem.swe_set_sid_mode(mode_id, 0, 0)
+    ephem.set_sid_mode(mode_id, 0, 0)
     swe.set_sid_mode(mode_id)
 
     prev_rate = None
@@ -442,8 +442,8 @@ for mode_id, mode_name in SMOOTH_MODES.items():
         try:
             # LE rate via finite diff
             dt = 5.0
-            le_m = ephem.swe_get_ayanamsa_ut(jd - dt)
-            le_p = ephem.swe_get_ayanamsa_ut(jd + dt)
+            le_m = ephem.get_ayanamsa_ut(jd - dt)
+            le_p = ephem.get_ayanamsa_ut(jd + dt)
             le_rate = (le_p - le_m) / (2 * dt) * 3600 * 365.25  # arcsec/yr
 
             # SE rate
@@ -494,13 +494,13 @@ CENTURY_MODES = {0: "FAGAN_BRADLEY", 1: "LAHIRI", 18: "J2000"}
 
 for mode_id, mode_name in CENTURY_MODES.items():
     swe.set_sid_mode(mode_id)
-    ephem.swe_set_sid_mode(mode_id, 0, 0)
+    ephem.set_sid_mode(mode_id, 0, 0)
 
     for year in range(1600, 2601, 100):
         jd = swe.julday(year, 1, 1, 12.0)
         try:
             se_aya = swe.get_ayanamsa_ut(jd)
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
 
             diff_arcsec = abs(se_aya - le_aya) * 3600
 
@@ -529,14 +529,14 @@ print(f"  After P9: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P10: Lahiri daily precision 2024 ===")
 
 swe.set_sid_mode(1)
-ephem.swe_set_sid_mode(1, 0, 0)
+ephem.set_sid_mode(1, 0, 0)
 
 jd_start = swe.julday(2024, 1, 1, 0.0)
 for day in range(365):
     jd = jd_start + day
     try:
         se_aya = swe.get_ayanamsa_ut(jd)
-        le_aya = ephem.swe_get_ayanamsa_ut(jd)
+        le_aya = ephem.get_ayanamsa_ut(jd)
 
         diff_arcsec = abs(se_aya - le_aya) * 3600
 

@@ -14,7 +14,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 
@@ -49,7 +49,7 @@ for year in range(1980, 2026):
         label = f"Sun->{sign_names[i]} {year}"
         try:
             se_jd = swe.solcross_ut(float(target), jd_start, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_solcross_ut(float(target), jd_start, 2)
+            le_jd = ephem.solcross_ut(float(target), jd_start, 2)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 2.0:
                 passed += 1
@@ -73,7 +73,7 @@ for month in range(24):
         label = f"Moon->{sign_names[i]} m={month}"
         try:
             se_jd = swe.mooncross_ut(float(target), jd_start, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_mooncross_ut(float(target), jd_start, 2)
+            le_jd = ephem.mooncross_ut(float(target), jd_start, 2)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 1.0:
                 passed += 1
@@ -96,8 +96,8 @@ for year in range(2000, 2026):
     for target in [0, 90, 180, 270]:
         label = f"Sun@{target}° {year}"
         try:
-            le_jd = ephem.swe_solcross_ut(float(target), jd_start, 2)
-            le_pos = ephem.swe_calc_ut(le_jd, 0, 2 | 256)
+            le_jd = ephem.solcross_ut(float(target), jd_start, 2)
+            le_pos = ephem.calc_ut(le_jd, 0, 2 | 256)
             actual = le_pos[0][0]
             diff = abs(actual - target) * 3600.0
             if diff > 180 * 3600:
@@ -122,8 +122,8 @@ for month in range(12):
     for target in [0, 90, 180, 270]:
         label = f"Moon@{target}° m={month}"
         try:
-            le_jd = ephem.swe_mooncross_ut(float(target), jd_start, 2)
-            le_pos = ephem.swe_calc_ut(le_jd, 1, 2 | 256)
+            le_jd = ephem.mooncross_ut(float(target), jd_start, 2)
+            le_pos = ephem.calc_ut(le_jd, 1, 2 | 256)
             actual = le_pos[0][0]
             diff = abs(actual - target) * 3600.0
             if diff > 180 * 3600:
@@ -149,7 +149,7 @@ for year in range(1950, 2051):
         label = f"{name} {year}"
         try:
             se_jd = swe.solcross_ut(float(target), jd_start, swe.FLG_SWIEPH)
-            le_jd = ephem.swe_solcross_ut(float(target), jd_start, 2)
+            le_jd = ephem.solcross_ut(float(target), jd_start, 2)
             diff_s = abs(se_jd - le_jd) * 86400.0
             if diff_s < 2.0:
                 passed += 1
@@ -173,7 +173,7 @@ for i in range(36):  # 36 consecutive ingresses = ~3 months
     target = (i * 30) % 360
     label = f"Moon spacing #{i}"
     try:
-        le_jd = ephem.swe_mooncross_ut(float(target), jd, 2)
+        le_jd = ephem.mooncross_ut(float(target), jd, 2)
         if prev_jd is not None:
             spacing = le_jd - prev_jd
             if 1.5 < spacing < 3.5:  # Moon spends ~2.3 days per sign

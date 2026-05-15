@@ -1,7 +1,7 @@
 """
 Tests for Co-Ascendant (Walter Koch) and related angle calculations.
 
-Tests the ascmc[4] through ascmc[7] outputs from swe_houses_ex2:
+Tests the ascmc[4] through ascmc[7] outputs from houses_ex2:
 - ascmc[4]: Equatorial Ascendant (East Point)
 - ascmc[5]: Co-Ascendant (Walter Koch formula)
 - ascmc[6]: Co-Ascendant (Michael Munkasey formula)
@@ -24,7 +24,7 @@ class TestCoAscendantBasic:
     def test_ascmc_has_8_elements(self):
         """ascmc should have 8 elements including Co-Ascendants."""
         jd = 2451545.0
-        cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord("P"))
 
         assert len(ascmc) == 8, f"ascmc has {len(ascmc)} elements, expected 8"
 
@@ -32,7 +32,7 @@ class TestCoAscendantBasic:
     def test_coascendant_indices(self):
         """Verify the indices of Co-Ascendant values in ascmc."""
         jd = 2451545.0
-        cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord("P"))
 
         # ascmc[4] = Equatorial Ascendant
         # ascmc[5] = Co-Ascendant W. Koch
@@ -47,7 +47,7 @@ class TestCoAscendantBasic:
     def test_coascendant_non_zero(self):
         """Co-Ascendants should not be zero for typical locations."""
         jd = 2451545.0
-        cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord("P"))
 
         # All should be non-zero for typical latitudes
         assert ascmc[4] != 0.0, "Equatorial Ascendant should not be 0"
@@ -65,7 +65,7 @@ class TestCoAscendantVsPyswisseph:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b"P")
 
         # Compare all 8 ascmc elements
@@ -105,7 +105,7 @@ class TestCoAscendantVsPyswisseph:
         """Co-Ascendants should match pyswisseph for various locations."""
         jd = 2451545.0
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b"P")
 
         # Compare Co-Ascendants (indices 5 and 6)
@@ -125,7 +125,7 @@ class TestCoAscendantVsPyswisseph:
         lat = 45.0
         eps = 23.44
 
-        cusps_lib, ascmc_lib = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses_armc(armc, lat, eps, ord("P"))
         cusps_swe, ascmc_swe = swe.houses_armc(armc, lat, eps, b"P")
 
         # Compare all Co-Ascendant values
@@ -137,16 +137,16 @@ class TestCoAscendantVsPyswisseph:
 
 
 class TestCoAscendantHousesArmc:
-    """Test Co-Ascendants from swe_houses_armc."""
+    """Test Co-Ascendants from houses_armc."""
 
     @pytest.mark.comparison
     def test_houses_armc_coascendant(self):
-        """swe_houses_armc should return correct Co-Ascendants."""
+        """houses_armc should return correct Co-Ascendants."""
         armc = 292.957072438026
         lat = 41.9
         eps = 23.43767671605485
 
-        cusps_lib, ascmc_lib = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses_armc(armc, lat, eps, ord("P"))
         cusps_swe, ascmc_swe = swe.houses_armc(armc, lat, eps, b"P")
 
         # Compare all 8 ascmc elements
@@ -158,17 +158,17 @@ class TestCoAscendantHousesArmc:
 
 
 class TestCoAscendantHousesArmcEx2:
-    """Test Co-Ascendants from swe_houses_armc_ex2."""
+    """Test Co-Ascendants from houses_armc_ex2."""
 
     @pytest.mark.comparison
     def test_houses_armc_ex2_coascendant(self):
-        """swe_houses_armc_ex2 should return correct Co-Ascendants and velocities when SEFLG_SPEED is set."""
+        """houses_armc_ex2 should return correct Co-Ascendants and velocities when FLG_SPEED is set."""
         armc = 292.957072438026
         lat = 41.9
         eps = 23.43767671605485
 
         cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = (
-            ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"), SEFLG_SPEED)
+            ephem.houses_armc_ex2(armc, lat, eps, ord("P"), FLG_SPEED)
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
             armc, lat, eps, b"P"
@@ -193,19 +193,19 @@ class TestCoAscendantHousesArmcEx2:
 
 
 class TestCoAscendantHousesEx2:
-    """Test Co-Ascendants from swe_houses_ex2."""
+    """Test Co-Ascendants from houses_ex2."""
 
     @pytest.mark.comparison
     def test_houses_ex2_coascendant(self):
-        """swe_houses_ex2 should return correct Co-Ascendant positions."""
+        """houses_ex2 should return correct Co-Ascendant positions."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_ex2(
-            jd, lat, lon, b"P", SEFLG_SPEED
+            jd, lat, lon, b"P", FLG_SPEED
         )
 
         # Compare Co-Ascendant positions
@@ -225,7 +225,7 @@ class TestCoAscendantEdgeCases:
         jd = 2451545.0
         lat = 0.0  # Equator
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, 0.0, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, 0.0, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, lat, 0.0, b"P")
 
         # At equator, Co-Ascendant Munkasey (index 6) is undefined
@@ -240,7 +240,7 @@ class TestCoAscendantEdgeCases:
         """Co-Ascendants should work at high latitudes (below polar circle)."""
         jd = 2451545.0
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, 0.0, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, 0.0, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, lat, 0.0, b"P")
 
         for i in [4, 5, 6, 7]:
@@ -255,7 +255,7 @@ class TestCoAscendantEdgeCases:
         jd = 2451545.0
         lat = -33.9  # Sydney
 
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, 151.2, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, 151.2, ord("P"))
         cusps_swe, ascmc_swe = swe.houses(jd, lat, 151.2, b"P")
 
         for i in [4, 5, 6, 7]:
@@ -275,7 +275,7 @@ class TestCoAscendantFormulas:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Get Co-Asc Koch (index 5)
         co_asc_koch = ascmc[5]
@@ -297,7 +297,7 @@ class TestCoAscendantFormulas:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Equatorial Ascendant (East Point) at index 4
         equ_asc = ascmc[4]
@@ -327,8 +327,8 @@ class TestCoAscendantWithHouseSystems:
         jd = 2451545.0
         lat, lon = 45.0, 0.0
 
-        cusps_p, ascmc_p = ephem.swe_houses(jd, lat, lon, ord("P"))
-        cusps_h, ascmc_h = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_p, ascmc_p = ephem.houses(jd, lat, lon, ord("P"))
+        cusps_h, ascmc_h = ephem.houses(jd, lat, lon, hsys)
 
         # Co-Ascendants (indices 4-7) should be identical
         for i in [4, 5, 6, 7]:

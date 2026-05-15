@@ -3,10 +3,10 @@
 
 Tests speed (velocity) values for lunar nodes and Lilith across epochs.
 Verifies both position and speed agreement for:
-1. SE_TRUE_NODE (11) — true node position + speed
-2. SE_MEAN_NODE (10) — mean node position + speed
-3. SE_MEAN_APOG (12) — mean Lilith/apogee position + speed
-4. SE_OSCU_APOG (13) — osculating Lilith position + speed
+1. TRUE_NODE (11) — true node position + speed
+2. MEAN_NODE (10) — mean node position + speed
+3. MEAN_APOG (12) — mean Lilith/apogee position + speed
+4. OSCU_APOG (13) — osculating Lilith position + speed
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_SWIEPH = 2
 
 BODIES = [
     (10, "MeanNode"),
@@ -44,7 +44,7 @@ def run_tests():
     failed = 0
     total = 0
     fail_details = []
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     print("=" * 80)
     print("ROUND 101: Mean/True Node & Lilith Speed Precision")
@@ -60,7 +60,7 @@ def run_tests():
             total += 1
             try:
                 se = swe.calc_ut(jd, body_id, flags)[0]
-                le = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception as e:
                 failed += 1
                 b_fail += 1

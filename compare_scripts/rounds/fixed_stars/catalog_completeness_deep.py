@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -24,7 +24,7 @@ total = 0
 skipped = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 JD = 2451545.0  # J2000
 
 # Comprehensive star list
@@ -132,7 +132,7 @@ def test_star_catalog():
         se_ok = False
 
         try:
-            le_r = ephem.swe_fixstar2_ut(star, JD, FLAGS)
+            le_r = ephem.fixstar2_ut(star, JD, FLAGS)
             le_lon = le_r[0][0]
             le_lat = le_r[0][1]
             le_ok = True
@@ -182,17 +182,17 @@ def test_star_catalog():
     flag_combos = [
         (
             "J2000",
-            FLAGS | ephem.SEFLG_J2000,
+            FLAGS | ephem.FLG_J2000,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000,
         ),
         (
             "NONUT",
-            FLAGS | ephem.SEFLG_NONUT,
+            FLAGS | ephem.FLG_NONUT,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT,
         ),
         (
             "EQUATORIAL",
-            FLAGS | ephem.SEFLG_EQUATORIAL,
+            FLAGS | ephem.FLG_EQUATORIAL,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL,
         ),
     ]
@@ -200,7 +200,7 @@ def test_star_catalog():
     for star in STARS[:20]:
         for fname, le_f, se_f in flag_combos:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, JD, le_f)
+                le_r = ephem.fixstar2_ut(star, JD, le_f)
                 se_r = swe.fixstar2(star, JD, se_f)
             except Exception:
                 continue

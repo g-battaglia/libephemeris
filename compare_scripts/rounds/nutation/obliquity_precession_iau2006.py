@@ -32,7 +32,7 @@ from libephemeris.cache import (
     get_cached_nutation,
 )
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -307,7 +307,7 @@ def phase7():
     for jd in test_dates:
         try:
             # Compare sidereal time
-            le_sidtime = ephem.swe_sidtime(jd)
+            le_sidtime = ephem.sidtime(jd)
             se_sidtime = swe.sidtime(jd)
 
             diff_sec = abs(le_sidtime - se_sidtime) * 3600  # hours to seconds
@@ -320,7 +320,7 @@ def phase7():
 
             # Also compare sidtime0 (for 0h UT)
             jd_0h = math.floor(jd - 0.5) + 0.5  # 0h UT
-            le_sid0 = ephem.swe_sidtime0(jd_0h, 23.4393, -17.2 / 3600.0)
+            le_sid0 = ephem.sidtime0(jd_0h, 23.4393, -17.2 / 3600.0)
             se_sid0 = swe.sidtime0(jd_0h, 23.4393, -17.2 / 3600.0)
             diff0 = abs(le_sid0 - se_sid0) * 3600
             ok0 = diff0 < 0.015

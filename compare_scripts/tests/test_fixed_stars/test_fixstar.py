@@ -1,7 +1,7 @@
 """
-Unit tests for swe_fixstar (TT-based fixed star calculation).
+Unit tests for fixstar (TT-based fixed star calculation).
 
-Tests the new swe_fixstar() function that takes Terrestrial Time (TT)
+Tests the new fixstar() function that takes Terrestrial Time (TT)
 instead of Universal Time (UT).
 """
 
@@ -12,11 +12,11 @@ import libephemeris as ephem
 
 @pytest.mark.unit
 class TestFixstarTT:
-    """Tests for swe_fixstar() with Terrestrial Time."""
+    """Tests for fixstar() with Terrestrial Time."""
 
     def test_fixstar_basic_regulus(self, standard_jd):
         """Test basic Regulus calculation with TT."""
-        pos, name, retflag = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos, name, retflag = ephem.fixstar("Regulus", standard_jd, 0)
 
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
         assert -1 < pos[1] < 2, f"Regulus lat: {pos[1]:.2f} out of range"
@@ -24,7 +24,7 @@ class TestFixstarTT:
 
     def test_fixstar_basic_spica(self, standard_jd):
         """Test basic Spica calculation with TT."""
-        pos, name, retflag = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos, name, retflag = ephem.fixstar("Spica", standard_jd, 0)
 
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.2f} out of range"
         assert -3 < pos[1] < -1, f"Spica lat: {pos[1]:.2f} out of range"
@@ -35,13 +35,13 @@ class TestFixstarTT:
         from libephemeris.exceptions import Error
 
         with pytest.raises(Error, match="could not find star name"):
-            ephem.swe_fixstar("UnknownStar", standard_jd, 0)
+            ephem.fixstar("UnknownStar", standard_jd, 0)
 
     def test_fixstar_case_insensitive(self, standard_jd):
         """Test that star name lookup is case insensitive."""
-        pos_upper, _, _ = ephem.swe_fixstar("REGULUS", standard_jd, 0)
-        pos_lower, _, _ = ephem.swe_fixstar("regulus", standard_jd, 0)
-        pos_mixed, _, _ = ephem.swe_fixstar("ReGuLuS", standard_jd, 0)
+        pos_upper, _, _ = ephem.fixstar("REGULUS", standard_jd, 0)
+        pos_lower, _, _ = ephem.fixstar("regulus", standard_jd, 0)
+        pos_mixed, _, _ = ephem.fixstar("ReGuLuS", standard_jd, 0)
 
         assert pos_upper[0] == pos_lower[0] == pos_mixed[0]
 
@@ -55,8 +55,8 @@ class TestFixstarTT:
         """
         jd = standard_jd
 
-        pos_tt, _, _ = ephem.swe_fixstar("Regulus", jd, 0)
-        pos_ut, _, _ = ephem.swe_fixstar_ut("Regulus", jd, 0)
+        pos_tt, _, _ = ephem.fixstar("Regulus", jd, 0)
+        pos_ut, _, _ = ephem.fixstar_ut("Regulus", jd, 0)
 
         # The positions should be slightly different because of Delta T
         # For J2000, Delta T is about 63.83 seconds
@@ -69,7 +69,7 @@ class TestFixstarTT:
 
     def test_fixstar_vs_swisseph_regulus(self, standard_jd):
         """Compare Regulus with SwissEph fixstar."""
-        pos_py, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos_py, _, _ = ephem.fixstar("Regulus", standard_jd, 0)
 
         try:
             # SwissEph fixstar (TT version)
@@ -87,7 +87,7 @@ class TestFixstarTT:
 
     def test_fixstar_vs_swisseph_spica(self, standard_jd):
         """Compare Spica with SwissEph fixstar."""
-        pos_py, _, _ = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos_py, _, _ = ephem.fixstar("Spica", standard_jd, 0)
 
         try:
             pos_swe, name_swe, err_swe = swe.fixstar("Spica", standard_jd, 0)
@@ -103,8 +103,8 @@ class TestFixstarTT:
         assert diff_lon < 0.1, f"Spica diff: {diff_lon}"
 
     def test_fixstar_return_structure(self, standard_jd):
-        """Test the return structure of swe_fixstar."""
-        result = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        """Test the return structure of fixstar."""
+        result = ephem.fixstar("Regulus", standard_jd, 0)
 
         # Should return a 3-tuple (pos, star_name, retflag)
         assert len(result) == 3, "Should return 3-tuple (pos, star_name, retflag)"
@@ -132,8 +132,8 @@ class TestFixstarTT:
         assert isinstance(retflag, int), "retflag should be int"
 
     def test_fixstar_alias(self, standard_jd):
-        """Test that fixstar is an alias for swe_fixstar."""
-        pos1, name1, flag1 = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        """Test that fixstar is an alias for fixstar."""
+        pos1, name1, flag1 = ephem.fixstar("Regulus", standard_jd, 0)
         pos2, name2, flag2 = ephem.fixstar("Regulus", standard_jd, 0)
 
         assert pos1 == pos2
@@ -142,11 +142,11 @@ class TestFixstarTT:
 
     def test_fixstar_multiple_dates(self):
         """Test fixstar at different dates to verify proper motion."""
-        jd_2000 = ephem.swe_julday(2000, 1, 1, 12.0)
-        jd_2050 = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd_2000 = ephem.julday(2000, 1, 1, 12.0)
+        jd_2050 = ephem.julday(2050, 1, 1, 12.0)
 
-        pos_2000, _, _ = ephem.swe_fixstar("Regulus", jd_2000, 0)
-        pos_2050, _, _ = ephem.swe_fixstar("Regulus", jd_2050, 0)
+        pos_2000, _, _ = ephem.fixstar("Regulus", jd_2000, 0)
+        pos_2050, _, _ = ephem.fixstar("Regulus", jd_2050, 0)
 
         # Star should have moved due to proper motion + precession
         diff = abs(pos_2050[0] - pos_2000[0])
@@ -157,14 +157,14 @@ class TestFixstarTT:
     def test_fixstar_with_comma_in_name(self, standard_jd):
         """Test star name with comma (common in catalogs)."""
         # Some catalog formats use "Regulus,alLeo" style
-        pos, _, _ = ephem.swe_fixstar("Regulus,alLeo", standard_jd, 0)
+        pos, _, _ = ephem.fixstar("Regulus,alLeo", standard_jd, 0)
 
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f}"
 
     def test_fixstar_whitespace_in_name(self, standard_jd):
         """Test star name with extra whitespace."""
-        pos1, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
-        pos2, _, _ = ephem.swe_fixstar("  Regulus  ", standard_jd, 0)
+        pos1, _, _ = ephem.fixstar("Regulus", standard_jd, 0)
+        pos2, _, _ = ephem.fixstar("  Regulus  ", standard_jd, 0)
 
         assert pos1[0] == pos2[0], "Should handle whitespace in name"
 
@@ -180,15 +180,15 @@ class TestFixstarAndFixstarUtConsistency:
         If we calculate a JD in UT, then convert to TT by adding Delta T,
         calling fixstar(jd_tt) should give the same result as fixstar_ut(jd_ut).
         """
-        jd_ut = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_ut = ephem.julday(2000, 1, 1, 12.0)
 
         # Get Delta T for this date
-        delta_t = ephem.swe_deltat(jd_ut)  # Returns Delta T in days
+        delta_t = ephem.deltat(jd_ut)  # Returns Delta T in days
         jd_tt = jd_ut + delta_t
 
         # Calculate positions
-        pos_from_ut, _, _ = ephem.swe_fixstar_ut("Regulus", jd_ut, 0)
-        pos_from_tt, _, _ = ephem.swe_fixstar("Regulus", jd_tt, 0)
+        pos_from_ut, _, _ = ephem.fixstar_ut("Regulus", jd_ut, 0)
+        pos_from_tt, _, _ = ephem.fixstar("Regulus", jd_tt, 0)
 
         # These should be very close (within floating point precision)
         diff = abs(pos_from_ut[0] - pos_from_tt[0])
@@ -198,8 +198,8 @@ class TestFixstarAndFixstarUtConsistency:
 
     def test_both_functions_work(self, standard_jd):
         """Test that both fixstar and fixstar_ut work correctly."""
-        pos_tt, name_tt, retflag_tt = ephem.swe_fixstar("Spica", standard_jd, 0)
-        pos_ut, name_ut, retflag_ut = ephem.swe_fixstar_ut("Spica", standard_jd, 0)
+        pos_tt, name_tt, retflag_tt = ephem.fixstar("Spica", standard_jd, 0)
+        pos_ut, name_ut, retflag_ut = ephem.fixstar_ut("Spica", standard_jd, 0)
 
         assert isinstance(name_tt, str)
         assert isinstance(name_ut, str)

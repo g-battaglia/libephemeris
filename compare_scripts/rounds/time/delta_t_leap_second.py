@@ -3,7 +3,7 @@
 
 Tests Delta-T computation precisely at and around leap second insertion times.
 Verifies continuity of Delta-T across leap second boundaries and consistency
-with IERS data. Also tests swe_deltat at historical leap seconds (1972-2017).
+with IERS data. Also tests deltat at historical leap seconds (1972-2017).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -69,7 +69,7 @@ for year, month, day in leap_seconds:
     label = f"deltat {year}-{month:02d}-{day:02d}"
     try:
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff_ms = abs(se_dt - le_dt) * 86400000.0  # days to milliseconds
         if diff_ms < 50.0:  # 50ms tolerance
             passed += 1
@@ -101,7 +101,7 @@ for year, month, day in leap_seconds:
         label = f"continuity {year}-{month:02d}-{day:02d} {offset_name}"
         try:
             se_dt = swe.deltat(jd_test)
-            le_dt = ephem.swe_deltat(jd_test)
+            le_dt = ephem.deltat(jd_test)
             diff_ms = abs(se_dt - le_dt) * 86400000.0
             if diff_ms < 50.0:
                 passed += 1
@@ -126,7 +126,7 @@ monotonic_pass = 0
 monotonic_fail = 0
 for year in range(1972, 2018):
     jd = swe.julday(year, 7, 1, 12.0)
-    le_dt = ephem.swe_deltat(jd)
+    le_dt = ephem.deltat(jd)
     if prev_dt is not None:
         if le_dt >= prev_dt - 0.000001:  # Allow tiny rounding
             monotonic_pass += 1
@@ -166,7 +166,7 @@ for year, month, day, expected_dt_s in known_dt:
     jd = swe.julday(year, month, day, 0.0)
     label = f"IERS {year}-{month:02d}-{day:02d} (expected {expected_dt_s:.2f}s)"
     try:
-        le_dt_s = ephem.swe_deltat(jd) * 86400.0
+        le_dt_s = ephem.deltat(jd) * 86400.0
         diff_s = abs(le_dt_s - expected_dt_s)
         if diff_s < 1.0:  # Within 1 second of IERS value
             passed += 1
@@ -191,7 +191,7 @@ for year in range(1970, 2026):
         jd = swe.julday(year, month, 15, 12.0)
         try:
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
             diff_ms = abs(se_dt - le_dt) * 86400000.0
             # Modern era should be very close
             if diff_ms < 100.0:  # 100ms tolerance
@@ -223,7 +223,7 @@ for year in range(1800, 1972, 10):
     jd = swe.julday(year, 1, 1, 12.0)
     try:
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff_s = abs(se_dt - le_dt) * 86400.0
         # Historical Delta-T can differ more between models
         if diff_s < 20.0:  # 20 second tolerance for pre-1972
@@ -252,7 +252,7 @@ for year in range(2025, 2051):
     jd = swe.julday(year, 7, 1, 12.0)
     try:
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff_s = abs(se_dt - le_dt) * 86400.0
         # Future predictions can diverge — allow up to 30s
         if diff_s < 30.0:
@@ -281,7 +281,7 @@ for year, month, day in leap_seconds[-5:]:  # Last 5 leap seconds
         label = f"{name} {year}-{month:02d}-{day:02d}"
         try:
             se_pos = swe.calc_ut(jd, body, swe.FLG_SWIEPH | swe.FLG_SPEED)
-            le_pos = ephem.swe_calc_ut(jd, body, 2 | 256)
+            le_pos = ephem.calc_ut(jd, body, 2 | 256)
             diff_arcsec = abs(se_pos[0][0] - le_pos[0]) * 3600.0
             if diff_arcsec > 180 * 3600:
                 diff_arcsec = 360 * 3600 - diff_arcsec

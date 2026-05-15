@@ -12,24 +12,24 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_BARYCTR,
-    SEFLG_ICRS,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NONUT,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_BARYCTR,
+    FLG_ICRS,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NONUT,
 )
 
 
@@ -38,23 +38,23 @@ from libephemeris.constants import (
 # ============================================================================
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 CALC_MODES = [
-    (SEFLG_SWIEPH, "Geocentric"),
-    (SEFLG_SWIEPH | SEFLG_SPEED, "Geocentric+Speed"),
-    (SEFLG_SWIEPH | SEFLG_HELCTR, "Heliocentric"),
-    (SEFLG_SWIEPH | SEFLG_BARYCTR, "Barycentric"),
+    (FLG_SWIEPH, "Geocentric"),
+    (FLG_SWIEPH | FLG_SPEED, "Geocentric+Speed"),
+    (FLG_SWIEPH | FLG_HELCTR, "Heliocentric"),
+    (FLG_SWIEPH | FLG_BARYCTR, "Barycentric"),
 ]
 
 TEST_DATES = [
@@ -100,10 +100,10 @@ class TestPlanetaryPositions:
     ):
         """Test geocentric planetary positions match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH
+        flag = FLG_SWIEPH
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -127,10 +127,10 @@ class TestPlanetaryPositions:
     ):
         """Test geocentric positions with velocity calculations."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         # Position checks
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -172,14 +172,14 @@ class TestPlanetaryPositions:
     ):
         """Test heliocentric planetary positions match pyswisseph."""
         # Skip Sun for heliocentric (meaningless)
-        if planet_id == SE_SUN:
+        if planet_id == SUN:
             pytest.skip("Sun position is not meaningful in heliocentric coordinates")
 
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_HELCTR
+        flag = FLG_SWIEPH | FLG_HELCTR
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -203,10 +203,10 @@ class TestPlanetaryPositions:
     ):
         """Test barycentric planetary positions match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_BARYCTR
+        flag = FLG_SWIEPH | FLG_BARYCTR
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -227,11 +227,11 @@ class TestInnerPlanets:
     """Specific tests for inner planets (faster moving, more precision needed)."""
 
     INNER_PLANETS = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
     ]
 
     @pytest.mark.comparison
@@ -239,17 +239,17 @@ class TestInnerPlanets:
     def test_inner_planet_daily_motion(self, planet_id, planet_name):
         """Test that daily motion (velocity) matches for inner planets."""
         jd = swe.julday(2024, 6, 15, 12.0)
-        flag = SEFLG_SWIEPH | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_speed = abs(pos_swe[3] - pos_py[3])
 
         # Moon uses a wider tolerance because it moves ~13°/day, amplifying
         # the sub-arcsecond position difference between DE440 (Skyfield) and
         # Swiss Ephemeris through numerical differentiation (KI-010).
-        tol = 0.002 if planet_id == SE_MOON else 0.001
+        tol = 0.002 if planet_id == MOON else 0.001
         assert diff_speed < tol, (
             f"{planet_name} daily motion diff {diff_speed:.6f}°/day exceeds tight tolerance"
         )
@@ -259,11 +259,11 @@ class TestOuterPlanets:
     """Specific tests for outer planets (slower moving)."""
 
     OUTER_PLANETS = [
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
     @pytest.mark.comparison
@@ -278,8 +278,8 @@ class TestOuterPlanets:
         ]
 
         for jd in dates:
-            pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH)
-            pos_py, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+            pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH)
+            pos_py, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
 
             diff_lon = angular_diff(pos_swe[0], pos_py[0])
 
@@ -297,8 +297,8 @@ class TestEdgeCases:
         """Test exact J2000.0 epoch positions."""
         jd = 2451545.0  # J2000.0
 
-        pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
 
@@ -311,8 +311,8 @@ class TestEdgeCases:
         """Test Moon position at midnight (common use case)."""
         jd = swe.julday(2024, 1, 1, 0.0)
 
-        pos_swe, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos_swe, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH | FLG_SPEED)
+        pos_py, _ = ephem.calc_ut(jd, MOON, FLG_SWIEPH | FLG_SPEED)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_speed = abs(pos_swe[3] - pos_py[3])
@@ -330,8 +330,8 @@ class TestEdgeCases:
         # 2024 vernal equinox approximately March 20, 03:06 UT
         jd = swe.julday(2024, 3, 20, 3.1)
 
-        pos_swe, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+        pos_swe, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+        pos_py, _ = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
 
         # Sun should be near 0° (Aries ingress)
         assert pos_swe[0] < 1.0 or pos_swe[0] > 359.0, (
@@ -348,12 +348,12 @@ class TestICRSPositions:
     """Compare ICRS (International Celestial Reference System) calculations.
 
     ICRS is a fixed reference frame aligned with distant quasars, not subject
-    to precession or nutation. When used with SEFLG_EQUATORIAL, positions in
+    to precession or nutation. When used with FLG_EQUATORIAL, positions in
     ICRS should differ from J2000 equatorial by an amount corresponding to
     precession+nutation accumulated since J2000.0.
 
-    Note: SEFLG_ICRS primarily affects equatorial coordinates. In ecliptic
-    mode without SEFLG_EQUATORIAL, the flag has minimal effect.
+    Note: FLG_ICRS primarily affects equatorial coordinates. In ecliptic
+    mode without FLG_EQUATORIAL, the flag has minimal effect.
     """
 
     # Expected precession from J2000.0 is approximately 50.3 arcsec/year
@@ -372,10 +372,10 @@ class TestICRSPositions:
     ):
         """Test ICRS planetary positions match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_ICRS
+        flag = FLG_SWIEPH | FLG_ICRS
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -390,7 +390,7 @@ class TestICRSPositions:
 
         # Pluto at extreme dates needs relaxed distance tolerance
         dist_tolerance = (
-            self.DISTANCE_PLUTO_RELAXED if planet_id == SE_PLUTO else DISTANCE_STRICT
+            self.DISTANCE_PLUTO_RELAXED if planet_id == PLUTO else DISTANCE_STRICT
         )
         assert diff_dist < dist_tolerance, (
             f"{planet_name} ICRS at {date_desc}: distance diff {diff_dist:.8f} AU exceeds tolerance"
@@ -404,10 +404,10 @@ class TestICRSPositions:
     ):
         """Test ICRS positions with velocity calculations match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_ICRS | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         # Position checks
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -423,7 +423,7 @@ class TestICRSPositions:
 
         # Pluto at extreme dates needs relaxed distance tolerance
         dist_tolerance = (
-            self.DISTANCE_PLUTO_RELAXED if planet_id == SE_PLUTO else DISTANCE_STRICT
+            self.DISTANCE_PLUTO_RELAXED if planet_id == PLUTO else DISTANCE_STRICT
         )
         assert diff_dist < dist_tolerance, (
             f"{planet_name} ICRS+Speed at {date_desc}: distance diff {diff_dist:.8f} AU exceeds tolerance"
@@ -452,7 +452,7 @@ class TestICRSPositions:
         """Verify that ICRS flag produces consistent results with pyswisseph.
 
         Swiss Ephemeris internally uses the ICRS frame as its fundamental reference.
-        The SEFLG_ICRS flag ensures explicit ICRS frame output. This test validates
+        The FLG_ICRS flag ensures explicit ICRS frame output. This test validates
         that libephemeris handles the flag correctly and produces results matching
         pyswisseph for both ecliptic and equatorial coordinate requests.
         """
@@ -460,9 +460,9 @@ class TestICRSPositions:
         jd_j2000 = 2451545.0
 
         # Test ICRS with ecliptic coordinates
-        icrs_ecliptic_flags = SEFLG_SWIEPH | SEFLG_ICRS
+        icrs_ecliptic_flags = FLG_SWIEPH | FLG_ICRS
         pos_swe_ecl, _ = swe.calc_ut(jd_j2000, planet_id, icrs_ecliptic_flags)
-        pos_py_ecl, _ = ephem.swe_calc_ut(jd_j2000, planet_id, icrs_ecliptic_flags)
+        pos_py_ecl, _ = ephem.calc_ut(jd_j2000, planet_id, icrs_ecliptic_flags)
 
         diff_ecl = angular_diff(pos_swe_ecl[0], pos_py_ecl[0])
         assert diff_ecl < 0.0001, (
@@ -470,9 +470,9 @@ class TestICRSPositions:
         )
 
         # Test ICRS with equatorial coordinates
-        icrs_equatorial_flags = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_EQUATORIAL
+        icrs_equatorial_flags = FLG_SWIEPH | FLG_ICRS | FLG_EQUATORIAL
         pos_swe_eq, _ = swe.calc_ut(jd_j2000, planet_id, icrs_equatorial_flags)
-        pos_py_eq, _ = ephem.swe_calc_ut(jd_j2000, planet_id, icrs_equatorial_flags)
+        pos_py_eq, _ = ephem.calc_ut(jd_j2000, planet_id, icrs_equatorial_flags)
 
         diff_ra = angular_diff(pos_swe_eq[0], pos_py_eq[0])
         diff_dec = abs(pos_swe_eq[1] - pos_py_eq[1])
@@ -486,7 +486,7 @@ class TestICRSPositions:
         # Test at a different date (2024)
         jd_2024 = swe.julday(2024, 6, 15, 12.0)
         pos_swe_2024, _ = swe.calc_ut(jd_2024, planet_id, icrs_equatorial_flags)
-        pos_py_2024, _ = ephem.swe_calc_ut(jd_2024, planet_id, icrs_equatorial_flags)
+        pos_py_2024, _ = ephem.calc_ut(jd_2024, planet_id, icrs_equatorial_flags)
 
         diff_ra_2024 = angular_diff(pos_swe_2024[0], pos_py_2024[0])
         assert diff_ra_2024 < 0.001, (
@@ -502,11 +502,11 @@ class TestICRSPositions:
             swe.julday(2024, 6, 15, 12.0),  # 2024
             swe.julday(1950, 6, 15, 12.0),  # 1950
         ]
-        flag = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_ICRS | FLG_EQUATORIAL | FLG_SPEED
 
         for jd in test_jds:
             pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-            pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+            pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
             diff_ra = angular_diff(pos_swe[0], pos_py[0])
             diff_dec = abs(pos_swe[1] - pos_py[1])
@@ -522,11 +522,11 @@ class TestICRSPositions:
     def test_icrs_consistency_with_pyswisseph(self):
         """Verify ICRS implementation matches pyswisseph across all planets at J2000."""
         jd = 2451545.0  # J2000.0
-        flag = SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_ICRS | FLG_SPEED
 
         for planet_id, planet_name in PLANETS:
             pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-            pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+            pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
             diff_lon = angular_diff(pos_swe[0], pos_py[0])
 
@@ -539,7 +539,7 @@ class TestICRSPositions:
 class TestJ2000Positions:
     """Compare J2000 reference frame calculations between swisseph and libephemeris.
 
-    SEFLG_J2000 computes planetary positions referred to the equinox of J2000.0,
+    FLG_J2000 computes planetary positions referred to the equinox of J2000.0,
     rather than the equinox of the date. This is critical for modern astronomical
     software that uses J2000 as a fixed reference frame.
 
@@ -569,12 +569,12 @@ class TestJ2000Positions:
     def test_j2000_positions_match_pyswisseph(
         self, planet_id, planet_name, year, month, day, hour, date_desc
     ):
-        """Test SEFLG_J2000 planetary positions match pyswisseph at various epochs."""
+        """Test FLG_J2000 planetary positions match pyswisseph at various epochs."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_J2000
+        flag = FLG_SWIEPH | FLG_J2000
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -591,7 +591,7 @@ class TestJ2000Positions:
 
         # Pluto at extreme dates needs relaxed distance tolerance
         dist_tolerance = (
-            self.DISTANCE_PLUTO_RELAXED if planet_id == SE_PLUTO else DISTANCE_STRICT
+            self.DISTANCE_PLUTO_RELAXED if planet_id == PLUTO else DISTANCE_STRICT
         )
         assert diff_dist < dist_tolerance, (
             f"{planet_name} J2000 at {date_desc}: distance diff {diff_dist:.8f} AU "
@@ -604,12 +604,12 @@ class TestJ2000Positions:
     def test_j2000_with_speed_match_pyswisseph(
         self, planet_id, planet_name, year, month, day, hour, date_desc
     ):
-        """Test SEFLG_J2000 with velocity calculations match pyswisseph."""
+        """Test FLG_J2000 with velocity calculations match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_J2000 | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         # Position checks
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -627,7 +627,7 @@ class TestJ2000Positions:
 
         # Pluto at extreme dates needs relaxed distance tolerance
         dist_tolerance = (
-            self.DISTANCE_PLUTO_RELAXED if planet_id == SE_PLUTO else DISTANCE_STRICT
+            self.DISTANCE_PLUTO_RELAXED if planet_id == PLUTO else DISTANCE_STRICT
         )
         assert diff_dist < dist_tolerance, (
             f"{planet_name} J2000+Speed at {date_desc}: distance diff {diff_dist:.8f} AU "
@@ -658,12 +658,12 @@ class TestJ2000Positions:
     def test_j2000_equatorial_match_pyswisseph(
         self, planet_id, planet_name, year, month, day, hour, date_desc
     ):
-        """Test SEFLG_J2000 equatorial coordinates (RA/Dec) match pyswisseph."""
+        """Test FLG_J2000 equatorial coordinates (RA/Dec) match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_ra = angular_diff(pos_swe[0], pos_py[0])
         diff_dec = abs(pos_swe[1] - pos_py[1])
@@ -689,11 +689,11 @@ class TestJ2000Positions:
         # Expected precession: ~100 * 0.01397 = ~1.4 degrees
         jd_2100 = swe.julday(2100, 1, 1, 12.0)
 
-        date_flags = SEFLG_SWIEPH
-        j2000_flags = SEFLG_SWIEPH | SEFLG_J2000
+        date_flags = FLG_SWIEPH
+        j2000_flags = FLG_SWIEPH | FLG_J2000
 
-        pos_date, _ = ephem.swe_calc_ut(jd_2100, planet_id, date_flags)
-        pos_j2000, _ = ephem.swe_calc_ut(jd_2100, planet_id, j2000_flags)
+        pos_date, _ = ephem.calc_ut(jd_2100, planet_id, date_flags)
+        pos_j2000, _ = ephem.calc_ut(jd_2100, planet_id, j2000_flags)
 
         diff = angular_diff(pos_date[0], pos_j2000[0])
 
@@ -717,11 +717,11 @@ class TestJ2000Positions:
         """
         jd_j2000 = 2451545.0  # J2000.0 epoch
 
-        date_flags = SEFLG_SWIEPH
-        j2000_flags = SEFLG_SWIEPH | SEFLG_J2000
+        date_flags = FLG_SWIEPH
+        j2000_flags = FLG_SWIEPH | FLG_J2000
 
-        pos_date, _ = ephem.swe_calc_ut(jd_j2000, planet_id, date_flags)
-        pos_j2000, _ = ephem.swe_calc_ut(jd_j2000, planet_id, j2000_flags)
+        pos_date, _ = ephem.calc_ut(jd_j2000, planet_id, date_flags)
+        pos_j2000, _ = ephem.calc_ut(jd_j2000, planet_id, j2000_flags)
 
         diff = angular_diff(pos_date[0], pos_j2000[0])
 
@@ -733,13 +733,13 @@ class TestJ2000Positions:
 
     @pytest.mark.comparison
     def test_j2000_reference_frame_consistency(self):
-        """Verify that SEFLG_J2000 provides a consistent reference frame.
+        """Verify that FLG_J2000 provides a consistent reference frame.
 
         The same planet observed at different dates should show different
         positions (due to orbital motion), but both libephemeris and pyswisseph
         should agree precisely on those positions in the J2000 frame.
         """
-        flag = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_J2000 | FLG_SPEED
         test_jds = [
             swe.julday(1900, 1, 1, 12.0),
             swe.julday(2000, 1, 1, 12.0),
@@ -749,7 +749,7 @@ class TestJ2000Positions:
         for planet_id, planet_name in PLANETS:
             for jd in test_jds:
                 pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-                pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+                pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
                 diff_lon = angular_diff(pos_swe[0], pos_py[0])
 
@@ -760,9 +760,9 @@ class TestJ2000Positions:
 
     @pytest.mark.comparison
     def test_j2000_critical_for_distant_epochs(self):
-        """Demonstrate the critical importance of SEFLG_J2000 for distant epochs.
+        """Demonstrate the critical importance of FLG_J2000 for distant epochs.
 
-        Without SEFLG_J2000, software using date coordinates for epochs far from
+        Without FLG_J2000, software using date coordinates for epochs far from
         J2000 would get positions that differ from J2000-referenced software by
         the accumulated precession, potentially causing significant errors.
         """
@@ -773,12 +773,12 @@ class TestJ2000Positions:
         ]
 
         for jd, epoch_name in epochs:
-            date_flags = SEFLG_SWIEPH
-            j2000_flags = SEFLG_SWIEPH | SEFLG_J2000
+            date_flags = FLG_SWIEPH
+            j2000_flags = FLG_SWIEPH | FLG_J2000
 
-            pos_date_swe, _ = swe.calc_ut(jd, SE_SUN, date_flags)
-            pos_j2000_swe, _ = swe.calc_ut(jd, SE_SUN, j2000_flags)
-            pos_j2000_py, _ = ephem.swe_calc_ut(jd, SE_SUN, j2000_flags)
+            pos_date_swe, _ = swe.calc_ut(jd, SUN, date_flags)
+            pos_j2000_swe, _ = swe.calc_ut(jd, SUN, j2000_flags)
+            pos_j2000_py, _ = ephem.calc_ut(jd, SUN, j2000_flags)
 
             # The precession difference between date and J2000
             precession_diff = angular_diff(pos_date_swe[0], pos_j2000_swe[0])
@@ -799,9 +799,9 @@ class TestJ2000Positions:
 
 
 class TestNoNutationPositions:
-    """Compare SEFLG_NONUT (no nutation) calculations between swisseph and libephemeris.
+    """Compare FLG_NONUT (no nutation) calculations between swisseph and libephemeris.
 
-    SEFLG_NONUT excludes nutation from the calculation, giving mean positions
+    FLG_NONUT excludes nutation from the calculation, giving mean positions
     rather than true (apparent) positions. Nutation is a periodic oscillation
     of Earth's axis with a principal term of ~9.2 arcseconds (0.00256 degrees)
     and an 18.6-year period.
@@ -823,7 +823,7 @@ class TestNoNutationPositions:
     # Relaxed tolerance for NONUT comparison (accounts for nutation ~10 arcsec)
     NONUT_LONGITUDE_TOLERANCE = 0.005  # degrees (~18 arcsec)
 
-    # Test dates for SEFLG_NONUT validation
+    # Test dates for FLG_NONUT validation
     NONUT_TEST_DATES = [
         (2024, 6, 15, 12.0, "Mid-2024"),
         (2024, 11, 15, 0.0, "Late 2024"),
@@ -838,16 +838,16 @@ class TestNoNutationPositions:
     def test_nonut_positions_match_pyswisseph(
         self, planet_id, planet_name, year, month, day, hour, date_desc
     ):
-        """Test SEFLG_NONUT planetary positions match pyswisseph.
+        """Test FLG_NONUT planetary positions match pyswisseph.
 
-        Compares libephemeris and pyswisseph when SEFLG_NONUT flag is set.
+        Compares libephemeris and pyswisseph when FLG_NONUT flag is set.
         Uses relaxed tolerance to account for nutation-related differences.
         """
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_NONUT
+        flag = FLG_SWIEPH | FLG_NONUT
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_lat = abs(pos_swe[1] - pos_py[1])
@@ -872,12 +872,12 @@ class TestNoNutationPositions:
     def test_nonut_with_speed_match_pyswisseph(
         self, planet_id, planet_name, year, month, day, hour, date_desc
     ):
-        """Test SEFLG_NONUT with velocity calculations match pyswisseph."""
+        """Test FLG_NONUT with velocity calculations match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        flag = SEFLG_SWIEPH | SEFLG_NONUT | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_NONUT | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         # Position checks with relaxed tolerance
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
@@ -918,16 +918,16 @@ class TestNoNutationPositions:
     @pytest.mark.comparison
     @pytest.mark.parametrize("planet_id,planet_name", PLANETS[:5])  # Test subset
     def test_nonut_pyswisseph_produces_different_position(self, planet_id, planet_name):
-        """Verify pyswisseph SEFLG_NONUT produces different positions than default.
+        """Verify pyswisseph FLG_NONUT produces different positions than default.
 
         The difference should be in the order of arcseconds, corresponding to
         the nutation effect (~9 arcsec principal term). This validates that
-        pyswisseph properly implements the SEFLG_NONUT flag.
+        pyswisseph properly implements the FLG_NONUT flag.
         """
         jd = swe.julday(2024, 6, 15, 12.0)
 
-        with_nut_flags = SEFLG_SWIEPH
-        no_nut_flags = SEFLG_SWIEPH | SEFLG_NONUT
+        with_nut_flags = FLG_SWIEPH
+        no_nut_flags = FLG_SWIEPH | FLG_NONUT
 
         pos_with_nut, _ = swe.calc_ut(jd, planet_id, with_nut_flags)
         pos_no_nut, _ = swe.calc_ut(jd, planet_id, no_nut_flags)
@@ -950,12 +950,12 @@ class TestNoNutationPositions:
     @pytest.mark.comparison
     @pytest.mark.parametrize("planet_id,planet_name", PLANETS[:5])  # Test subset
     def test_nonut_equatorial_match_pyswisseph(self, planet_id, planet_name):
-        """Test SEFLG_NONUT with equatorial coordinates matches pyswisseph."""
+        """Test FLG_NONUT with equatorial coordinates matches pyswisseph."""
         jd = swe.julday(2024, 6, 15, 12.0)
-        flag = SEFLG_SWIEPH | SEFLG_NONUT | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_NONUT | FLG_EQUATORIAL | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-        pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+        pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
         diff_ra = angular_diff(pos_swe[0], pos_py[0])
         diff_dec = abs(pos_swe[1] - pos_py[1])
@@ -973,7 +973,7 @@ class TestNoNutationPositions:
         """Test that pyswisseph nutation effect is in expected range.
 
         Verify that pyswisseph correctly computes the nutation effect
-        (difference between with/without SEFLG_NONUT) across different dates.
+        (difference between with/without FLG_NONUT) across different dates.
         """
         # Test dates
         test_dates = [
@@ -984,12 +984,12 @@ class TestNoNutationPositions:
             swe.julday(2026, 1, 1, 12.0),
         ]
 
-        with_nut_flags = SEFLG_SWIEPH
-        no_nut_flags = SEFLG_SWIEPH | SEFLG_NONUT
+        with_nut_flags = FLG_SWIEPH
+        no_nut_flags = FLG_SWIEPH | FLG_NONUT
 
         for jd in test_dates:
-            pos_swe_with, _ = swe.calc_ut(jd, SE_SUN, with_nut_flags)
-            pos_swe_no, _ = swe.calc_ut(jd, SE_SUN, no_nut_flags)
+            pos_swe_with, _ = swe.calc_ut(jd, SUN, with_nut_flags)
+            pos_swe_no, _ = swe.calc_ut(jd, SUN, no_nut_flags)
 
             diff_swe = angular_diff(pos_swe_with[0], pos_swe_no[0]) * 3600
 
@@ -1001,13 +1001,13 @@ class TestNoNutationPositions:
 
     @pytest.mark.comparison
     def test_nonut_consistency_all_planets(self):
-        """Verify SEFLG_NONUT positions for all planets across implementations."""
+        """Verify FLG_NONUT positions for all planets across implementations."""
         jd = swe.julday(2025, 1, 1, 12.0)
-        flag = SEFLG_SWIEPH | SEFLG_NONUT | SEFLG_SPEED
+        flag = FLG_SWIEPH | FLG_NONUT | FLG_SPEED
 
         for planet_id, planet_name in PLANETS:
             pos_swe, _ = swe.calc_ut(jd, planet_id, flag)
-            pos_py, _ = ephem.swe_calc_ut(jd, planet_id, flag)
+            pos_py, _ = ephem.calc_ut(jd, planet_id, flag)
 
             diff_lon = angular_diff(pos_swe[0], pos_py[0])
 

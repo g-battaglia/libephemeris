@@ -26,7 +26,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -87,22 +87,22 @@ SIDM_NAMES = {
 }
 
 # Bodies to test
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
 
 BODY_NAMES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
 }
 
 # Epochs
@@ -148,8 +148,8 @@ def phase1():
             swe.set_sid_mode(se_sidm(mode_id))
             se_aya = swe.get_ayanamsa_ut(jd)
 
-            ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
-            le_aya = ephem.swe_get_ayanamsa_ex_ut(jd, ephem.SEFLG_SIDEREAL)[1]
+            ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
+            le_aya = ephem.get_ayanamsa_ex_ut(jd, ephem.FLG_SIDEREAL)[1]
 
             diff = abs(se_aya - le_aya)
             diff_arcsec = diff * 3600
@@ -178,8 +178,8 @@ def phase2():
                 swe.set_sid_mode(se_sidm(mode_id))
                 se_aya = swe.get_ayanamsa_ut(jd)
 
-                ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
-                le_aya = ephem.swe_get_ayanamsa_ex_ut(jd, ephem.SEFLG_SIDEREAL)[1]
+                ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
+                le_aya = ephem.get_ayanamsa_ex_ut(jd, ephem.FLG_SIDEREAL)[1]
 
                 diff = abs(se_aya - le_aya)
                 diff_arcsec = diff * 3600
@@ -205,19 +205,19 @@ def phase3():
     print("\n=== P3: Sidereal positions Sun/Moon/Merc J2000, all modes ===")
 
     jd = J2000
-    bodies = [SE_SUN, SE_MOON, SE_MERCURY]
+    bodies = [SUN, MOON, MERCURY]
     flags_se = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
-    flags_le = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+    flags_le = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL
 
     for mode_id, mode_name in sorted(SIDM_NAMES.items()):
         swe.set_sid_mode(se_sidm(mode_id))
-        ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
+        ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
 
         for body in bodies:
             body_name = BODY_NAMES[body]
             try:
                 se_result = swe.calc_ut(jd, body, flags_se)
-                le_result = ephem.swe_calc_ut(jd, body, flags_le)
+                le_result = ephem.calc_ut(jd, body, flags_le)
 
                 se_pos = se_result[0]
                 le_pos = (
@@ -252,22 +252,22 @@ def phase4():
     global errors
     print("\n=== P4: Sidereal positions multi-epoch ===")
 
-    bodies = [SE_SUN, SE_MOON]
+    bodies = [SUN, MOON]
     test_modes = [0, 1, 5, 14, 27, 35, 42, 46]
     flags_se = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
-    flags_le = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+    flags_le = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL
 
     for mode_id in test_modes:
         mode_name = SIDM_NAMES[mode_id]
         swe.set_sid_mode(se_sidm(mode_id))
-        ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
+        ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
 
         for epoch_name, jd in sorted(EPOCHS.items()):
             for body in bodies:
                 body_name = BODY_NAMES[body]
                 try:
                     se_result = swe.calc_ut(jd, body, flags_se)
-                    le_result = ephem.swe_calc_ut(jd, body, flags_le)
+                    le_result = ephem.calc_ut(jd, body, flags_le)
 
                     se_pos = se_result[0]
                     le_pos = (
@@ -311,7 +311,7 @@ def phase5():
     jd = J2000
     test_modes = [0, 1, 3, 5, 14, 18, 21, 27, 28, 29, 35, 39, 42, 46]
     flags_se = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
-    flags_le = ephem.SEFLG_SWIEPH | ephem.SEFLG_SIDEREAL
+    flags_le = ephem.FLG_SWIEPH | ephem.FLG_SIDEREAL
 
     for mode_id in test_modes:
         mode_name = SIDM_NAMES[mode_id]
@@ -324,9 +324,9 @@ def phase5():
             se_aya2 = swe.get_ayanamsa_ut(jd + dt / 2)
             se_speed = (se_aya2 - se_aya1) / dt  # deg/day
 
-            ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
-            le_aya1 = ephem.swe_get_ayanamsa_ex_ut(jd - dt / 2, flags_le)[1]
-            le_aya2 = ephem.swe_get_ayanamsa_ex_ut(jd + dt / 2, flags_le)[1]
+            ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
+            le_aya1 = ephem.get_ayanamsa_ex_ut(jd - dt / 2, flags_le)[1]
+            le_aya2 = ephem.get_ayanamsa_ex_ut(jd + dt / 2, flags_le)[1]
             le_speed = (le_aya2 - le_aya1) / dt  # deg/day
 
             diff = abs(se_speed - le_speed)
@@ -359,7 +359,7 @@ def phase6():
 
     jd = J2000
     flags_se = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
-    flags_le = ephem.SEFLG_SWIEPH | ephem.SEFLG_SIDEREAL
+    flags_le = ephem.FLG_SWIEPH | ephem.FLG_SIDEREAL
 
     true_modes = [27, 28, 29, 35, 39]
 
@@ -373,8 +373,8 @@ def phase6():
                 swe.set_sid_mode(se_sidm(mode_id))
                 se_aya = swe.get_ayanamsa_ut(jd_test)
 
-                ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
-                le_aya = ephem.swe_get_ayanamsa_ex_ut(jd_test, flags_le)[1]
+                ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
+                le_aya = ephem.get_ayanamsa_ex_ut(jd_test, flags_le)[1]
 
                 diff = abs(se_aya - le_aya)
                 diff_arcsec = diff * 3600
@@ -400,18 +400,18 @@ def phase7():
     # i.e., tropical_lon - ayanamsha = sidereal_lon
 
     test_modes = [0, 1, 5, 14, 18, 21, 27, 35, 42, 46]
-    bodies = [SE_SUN, SE_MOON, SE_JUPITER]
+    bodies = [SUN, MOON, JUPITER]
 
     for mode_id in test_modes:
         mode_name = SIDM_NAMES[mode_id]
-        ephem.swe_set_sid_mode(le_sidm(mode_id), 0, 0)
+        ephem.set_sid_mode(le_sidm(mode_id), 0, 0)
 
         for body in bodies:
             body_name = BODY_NAMES[body]
             try:
                 # Get tropical position
-                le_trop = ephem.swe_calc_ut(
-                    jd, body, ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+                le_trop = ephem.calc_ut(
+                    jd, body, ephem.FLG_SWIEPH | ephem.FLG_SPEED
                 )
                 trop_lon = (
                     le_trop[0][0]
@@ -420,17 +420,17 @@ def phase7():
                 )
 
                 # Get sidereal position
-                le_sid = ephem.swe_calc_ut(
+                le_sid = ephem.calc_ut(
                     jd,
                     body,
-                    ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL,
+                    ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL,
                 )
                 sid_lon = (
                     le_sid[0][0] if isinstance(le_sid[0], (list, tuple)) else le_sid[0]
                 )
 
                 # Get ayanamsha
-                le_aya = ephem.swe_get_ayanamsa_ex_ut(jd, ephem.SEFLG_SIDEREAL)[1]
+                le_aya = ephem.get_ayanamsa_ex_ut(jd, ephem.FLG_SIDEREAL)[1]
 
                 # Check: tropical - ayanamsha ≈ sidereal (mod 360)
                 expected_sid = (trop_lon - le_aya) % 360.0

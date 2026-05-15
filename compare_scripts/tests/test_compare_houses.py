@@ -110,7 +110,7 @@ class TestHouseCusps:
         jd = swe.julday(year, month, day, hour)
 
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-        cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_py, ascmc_py = ephem.houses(jd, lat, lon, hsys)
 
         # Get tolerance for this system
         tolerance = RELAXED_SYSTEMS.get(hsys, HOUSE_CUSP_TOL)
@@ -138,7 +138,7 @@ class TestAscendantMC:
         jd = swe.julday(2000, 1, 1, 12.0)
 
         _, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-        _, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+        _, ascmc_py = ephem.houses(jd, lat, lon, hsys)
 
         # Ascendant (index 0)
         asc_diff = angular_diff(ascmc_swe[0], ascmc_py[0])
@@ -178,7 +178,7 @@ class TestRandomLocations:
 
             try:
                 cusps_swe, _ = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-                cusps_py, _ = ephem.swe_houses(jd, lat, lon, hsys)
+                cusps_py, _ = ephem.houses(jd, lat, lon, hsys)
 
                 max_diff = max(
                     angular_diff(cusps_swe[i], cusps_py[i]) for i in range(12)
@@ -213,7 +213,7 @@ class TestHighLatitudes:
         jd = swe.julday(2000, 1, 1, 12.0)
 
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-        cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_py, ascmc_py = ephem.houses(jd, lat, lon, hsys)
 
         max_diff = max(angular_diff(cusps_swe[i], cusps_py[i]) for i in range(12))
 
@@ -233,7 +233,7 @@ class TestSpecialCases:
 
         for hsys in ["P", "K", "E", "W"]:
             cusps_swe, _ = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-            cusps_py, _ = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, _ = ephem.houses(jd, lat, lon, hsys)
 
             max_diff = max(angular_diff(cusps_swe[i], cusps_py[i]) for i in range(12))
 
@@ -248,7 +248,7 @@ class TestSpecialCases:
         lat, lon = 51.5074, 0.0  # London area
 
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, "P")
+        cusps_py, _ = ephem.houses(jd, lat, lon, "P")
 
         max_diff = max(angular_diff(cusps_swe[i], cusps_py[i]) for i in range(12))
 
@@ -263,7 +263,7 @@ class TestSpecialCases:
         lat, lon = 35.0, 179.9  # Near date line
 
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, "P")
+        cusps_py, _ = ephem.houses(jd, lat, lon, "P")
 
         max_diff = max(angular_diff(cusps_swe[i], cusps_py[i]) for i in range(12))
 

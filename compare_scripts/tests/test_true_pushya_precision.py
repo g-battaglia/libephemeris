@@ -13,7 +13,7 @@ The improvement targets:
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_SIDM_TRUE_PUSHYA, SE_SUN, SEFLG_SIDEREAL
+from libephemeris.constants import SIDM_TRUE_PUSHYA, SUN, FLG_SIDEREAL
 
 
 class TestTruePushyaPrecision:
@@ -24,19 +24,19 @@ class TestTruePushyaPrecision:
         """Reset sidereal mode after each test."""
         yield
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0)
+        ephem.set_sid_mode(0)
 
     def test_true_pushya_at_j2000(self):
         """Test True Pushya ayanamsha at J2000.0 epoch."""
         jd = 2451545.0  # J2000.0
 
         # Swiss Ephemeris reference
-        swe.set_sid_mode(SE_SIDM_TRUE_PUSHYA)
+        swe.set_sid_mode(SIDM_TRUE_PUSHYA)
         aya_swe = swe.get_ayanamsa_ut(jd)
 
         # LibEphemeris with improved Delta Cancri coordinates
-        ephem.swe_set_sid_mode(SE_SIDM_TRUE_PUSHYA)
-        aya_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_TRUE_PUSHYA)
+        aya_lib = ephem.get_ayanamsa_ut(jd)
 
         diff = abs(aya_swe - aya_lib)
 
@@ -60,11 +60,11 @@ class TestTruePushyaPrecision:
         for year, month, day, hour, label in test_dates:
             jd = swe.julday(year, month, day, hour)
 
-            swe.set_sid_mode(SE_SIDM_TRUE_PUSHYA)
+            swe.set_sid_mode(SIDM_TRUE_PUSHYA)
             aya_swe = swe.get_ayanamsa_ut(jd)
 
-            ephem.swe_set_sid_mode(SE_SIDM_TRUE_PUSHYA)
-            aya_lib = ephem.swe_get_ayanamsa_ut(jd)
+            ephem.set_sid_mode(SIDM_TRUE_PUSHYA)
+            aya_lib = ephem.get_ayanamsa_ut(jd)
 
             diff = abs(aya_swe - aya_lib)
             max_diff = max(max_diff, diff)
@@ -85,9 +85,9 @@ class TestTruePushyaPrecision:
         jd_1950 = swe.julday(1950, 1, 1, 12.0)
         jd_2050 = swe.julday(2050, 1, 1, 12.0)
 
-        ephem.swe_set_sid_mode(SE_SIDM_TRUE_PUSHYA)
-        aya_1950 = ephem.swe_get_ayanamsa_ut(jd_1950)
-        aya_2050 = ephem.swe_get_ayanamsa_ut(jd_2050)
+        ephem.set_sid_mode(SIDM_TRUE_PUSHYA)
+        aya_1950 = ephem.get_ayanamsa_ut(jd_1950)
+        aya_2050 = ephem.get_ayanamsa_ut(jd_2050)
 
         # Ayanamsha increases due to precession (~50.3"/year = ~1.397 deg/century)
         # Over 100 years: expect ~1.4 deg increase
@@ -105,13 +105,13 @@ class TestTruePushyaPrecision:
         jd = swe.julday(2024, 4, 14, 12.0)  # Sun in Aries (tropical)
 
         # Swiss Ephemeris
-        swe.set_sid_mode(SE_SIDM_TRUE_PUSHYA)
-        pos_swe, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_TRUE_PUSHYA)
+        pos_swe, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
         sun_swe = pos_swe[0]
 
         # LibEphemeris
-        ephem.swe_set_sid_mode(SE_SIDM_TRUE_PUSHYA)
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ephem.set_sid_mode(SIDM_TRUE_PUSHYA)
+        pos_lib, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
         sun_lib = pos_lib[0]
 
         diff = abs(sun_swe - sun_lib)

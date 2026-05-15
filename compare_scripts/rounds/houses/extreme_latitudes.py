@@ -23,7 +23,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # House systems to test
 HOUSE_SYSTEMS = [
@@ -117,7 +117,7 @@ def run_tests():
                         continue
 
                     try:
-                        le_result = ephem.swe_houses_armc(
+                        le_result = ephem.houses_armc(
                             armc, lat, OBLIQUITY, le_hsys(hsys_ch)
                         )
                         le_cusps = le_result[0]

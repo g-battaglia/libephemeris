@@ -32,7 +32,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 results = {}
 
@@ -68,18 +68,18 @@ DATES = [
     2465000.0,
 ]
 PLANETS = [
-    (ephem.SE_SUN, swe.SUN),
-    (ephem.SE_MOON, swe.MOON),
-    (ephem.SE_MERCURY, swe.MERCURY),
-    (ephem.SE_VENUS, swe.VENUS),
-    (ephem.SE_MARS, swe.MARS),
-    (ephem.SE_JUPITER, swe.JUPITER),
-    (ephem.SE_SATURN, swe.SATURN),
-    (ephem.SE_URANUS, swe.URANUS),
-    (ephem.SE_NEPTUNE, swe.NEPTUNE),
-    (ephem.SE_PLUTO, swe.PLUTO),
+    (ephem.SUN, swe.SUN),
+    (ephem.MOON, swe.MOON),
+    (ephem.MERCURY, swe.MERCURY),
+    (ephem.VENUS, swe.VENUS),
+    (ephem.MARS, swe.MARS),
+    (ephem.JUPITER, swe.JUPITER),
+    (ephem.SATURN, swe.SATURN),
+    (ephem.URANUS, swe.URANUS),
+    (ephem.NEPTUNE, swe.NEPTUNE),
+    (ephem.PLUTO, swe.PLUTO),
 ]
-LF = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+LF = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 SF = swe.FLG_SWIEPH | swe.FLG_SPEED
 
 
@@ -90,7 +90,7 @@ def test_256():  # Midnight vs noon
             jd = jd_base + offset
             for le_b, se_b in PLANETS:
                 try:
-                    lr = ephem.swe_calc_ut(jd, le_b, LF)
+                    lr = ephem.calc_ut(jd, le_b, LF)
                     sr = swe.calc_ut(jd, se_b, SF)
                 except:
                     continue
@@ -109,8 +109,8 @@ def test_257():  # Ecliptic->equatorial->ecliptic round-trip
     for le_b, se_b in PLANETS[:7]:
         for jd in DATES[:6]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
-                nut = ephem.swe_calc_ut(jd, -1, 0)
+                lr = ephem.calc_ut(jd, le_b, LF)
+                nut = ephem.calc_ut(jd, -1, 0)
                 eps = nut[0][0]
                 ecl = (lr[0][0], lr[0][1], lr[0][2])
                 eq = ephem.cotrans(ecl, -eps)
@@ -139,7 +139,7 @@ def test_258():  # All house systems at equator
     for hs in ["P", "K", "O", "R", "C", "E", "W", "B", "M", "X", "A"]:
         for jd in [2451545.0, 2460000.0, 2440000.0, 2455000.0]:
             try:
-                lc, la = ephem.swe_houses_ex(jd, 0.0, 0.0, ord(hs), LF)
+                lc, la = ephem.houses_ex(jd, 0.0, 0.0, ord(hs), LF)
                 sc, sa = swe.houses_ex(jd, 0.0, 0.0, hs.encode(), SF)
             except:
                 continue
@@ -158,14 +158,14 @@ def test_258():  # All house systems at equator
 def test_259():  # Planet distance extremes
     p, f, t, fails = 0, 0, 0, []
     for le_b, se_b in [
-        (ephem.SE_VENUS, swe.VENUS),
-        (ephem.SE_MARS, swe.MARS),
-        (ephem.SE_JUPITER, swe.JUPITER),
-        (ephem.SE_MERCURY, swe.MERCURY),
+        (ephem.VENUS, swe.VENUS),
+        (ephem.MARS, swe.MARS),
+        (ephem.JUPITER, swe.JUPITER),
+        (ephem.MERCURY, swe.MERCURY),
     ]:
         for jd in DATES[:8]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
+                lr = ephem.calc_ut(jd, le_b, LF)
                 sr = swe.calc_ut(jd, se_b, SF)
             except:
                 continue
@@ -193,12 +193,12 @@ def test_260():  # Fixed stars NOABERR
         "Canopus",
         "Procyon",
     ]
-    lf = LF | ephem.SEFLG_NOABERR
+    lf = LF | ephem.FLG_NOABERR
     sf = SF | swe.FLG_NOABERR
     for star in stars:
         for jd in [2451545.0, 2460000.0, 2440000.0]:
             try:
-                lr = ephem.swe_fixstar2_ut(star, jd, lf)
+                lr = ephem.fixstar2_ut(star, jd, lf)
                 sr = swe.fixstar2(star, jd, sf)
             except:
                 continue
@@ -217,7 +217,7 @@ def test_261():  # Moon 30-day sweep
     for day in range(30):
         jd = 2460000.0 + day
         try:
-            lr = ephem.swe_calc_ut(jd, ephem.SE_MOON, LF)
+            lr = ephem.calc_ut(jd, ephem.MOON, LF)
             sr = swe.calc_ut(jd, swe.MOON, SF)
         except:
             continue
@@ -249,14 +249,14 @@ def test_262():  # Sidereal houses Krishnamurti+Yukteshwar
     p, f, t, fails = 0, 0, 0, []
     for sid in [5, 7]:
         swe.set_sid_mode(sid)
-        ephem.swe_set_sid_mode(sid, 0, 0)
-        lsf = LF | ephem.SEFLG_SIDEREAL
+        ephem.set_sid_mode(sid, 0, 0)
+        lsf = LF | ephem.FLG_SIDEREAL
         ssf = SF | swe.FLG_SIDEREAL
         for hs in ["P", "K", "O", "R", "C", "E"]:
             for lat in [0.0, 30.0, 51.5, -33.87]:
                 for jd in [2451545.0, 2460000.0, 2440000.0]:
                     try:
-                        lc, la = ephem.swe_houses_ex(jd, lat, 0.0, ord(hs), lsf)
+                        lc, la = ephem.houses_ex(jd, lat, 0.0, ord(hs), lsf)
                         sc, sa = swe.houses_ex(jd, lat, 0.0, hs.encode(), ssf)
                     except:
                         continue
@@ -268,27 +268,27 @@ def test_262():  # Sidereal houses Krishnamurti+Yukteshwar
                         f += 1
                         fails.append(f'  sid={sid} {hs} lat={lat} ASC diff={d:.2f}"')
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0, 0, 0)
+        ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
 def test_263():  # Hypothetical heliocentric
     p, f, t, fails = 0, 0, 0, []
-    lhf = LF | ephem.SEFLG_HELCTR
+    lhf = LF | ephem.FLG_HELCTR
     shf = SF | swe.FLG_HELCTR
     for le_b, se_b in [
-        (ephem.SE_CUPIDO, 40),
-        (ephem.SE_HADES, 41),
-        (ephem.SE_ZEUS, 42),
-        (ephem.SE_KRONOS, 43),
-        (ephem.SE_APOLLON, 44),
-        (ephem.SE_ADMETOS, 45),
-        (ephem.SE_VULKANUS, 46),
-        (ephem.SE_POSEIDON, 47),
+        (ephem.CUPIDO, 40),
+        (ephem.HADES, 41),
+        (ephem.ZEUS, 42),
+        (ephem.KRONOS, 43),
+        (ephem.APOLLON, 44),
+        (ephem.ADMETOS, 45),
+        (ephem.VULKANUS, 46),
+        (ephem.POSEIDON, 47),
     ]:
         for jd in DATES[:7]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, lhf)
+                lr = ephem.calc_ut(jd, le_b, lhf)
                 sr = swe.calc_ut(jd, se_b, shf)
             except:
                 continue
@@ -307,7 +307,7 @@ def test_264():  # Planet speed sign changes
     for le_b, se_b in PLANETS[2:8]:
         for jd in DATES[:7]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
+                lr = ephem.calc_ut(jd, le_b, LF)
                 sr = swe.calc_ut(jd, se_b, SF)
             except:
                 continue
@@ -334,7 +334,7 @@ def test_265():  # Delta-T modern fine grid
     for i in range(100):
         jd = 2451545.0 + i * 36.525  # every ~36.5 days over 10 years
         try:
-            ld = ephem.swe_deltat(jd)
+            ld = ephem.deltat(jd)
             sd = swe.deltat(jd)
         except:
             continue
@@ -362,7 +362,7 @@ def test_266():  # Southern hemisphere cities
         for hs in ["P", "K", "O", "R", "C", "E"]:
             for jd in [2451545.0, 2460000.0, 2455000.0]:
                 try:
-                    lc, la = ephem.swe_houses_ex(jd, lat, lon, ord(hs), LF)
+                    lc, la = ephem.houses_ex(jd, lat, lon, ord(hs), LF)
                     sc, sa = swe.houses_ex(jd, lat, lon, hs.encode(), SF)
                 except:
                     continue
@@ -406,12 +406,12 @@ def test_267():  # cotrans obliquity range
 
 def test_268():  # J2000+EQ+NONUT triple
     p, f, t, fails = 0, 0, 0, []
-    lf3 = LF | ephem.SEFLG_J2000 | ephem.SEFLG_EQUATORIAL | ephem.SEFLG_NONUT
+    lf3 = LF | ephem.FLG_J2000 | ephem.FLG_EQUATORIAL | ephem.FLG_NONUT
     sf3 = SF | swe.FLG_J2000 | swe.FLG_EQUATORIAL | swe.FLG_NONUT
     for le_b, se_b in PLANETS:
         for jd in DATES[:7]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, lf3)
+                lr = ephem.calc_ut(jd, le_b, lf3)
                 sr = swe.calc_ut(jd, se_b, sf3)
             except:
                 continue
@@ -434,12 +434,12 @@ def test_268():  # J2000+EQ+NONUT triple
 
 def test_269():  # Chiron heliocentric full orbit
     p, f, t, fails = 0, 0, 0, []
-    lhf = LF | ephem.SEFLG_HELCTR
+    lhf = LF | ephem.FLG_HELCTR
     shf = SF | swe.FLG_HELCTR
     for i in range(50):
         jd = 2440000.0 + i * 365.25  # ~50 years = Chiron orbit
         try:
-            lr = ephem.swe_calc_ut(jd, ephem.SE_CHIRON, lhf)
+            lr = ephem.calc_ut(jd, ephem.CHIRON, lhf)
             sr = swe.calc_ut(jd, swe.CHIRON, shf)
         except:
             continue
@@ -475,7 +475,7 @@ def test_270():  # Fixed stars at 2050
     ]
     for star in stars:
         try:
-            lr = ephem.swe_fixstar2_ut(star, jd_2050, LF)
+            lr = ephem.fixstar2_ut(star, jd_2050, LF)
             sr = swe.fixstar2(star, jd_2050, SF)
         except:
             continue
@@ -501,7 +501,7 @@ def test_271():  # Nutation deps
     for i in range(60):
         jd = 2440000.0 + i * 340.0
         try:
-            lr = ephem.swe_calc_ut(jd, -1, 0)
+            lr = ephem.calc_ut(jd, -1, 0)
             sr = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
         except:
             continue
@@ -520,7 +520,7 @@ def test_272():  # Planet lat_speed at nodes
     for le_b, se_b in PLANETS[2:8]:
         for jd in DATES[:7]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
+                lr = ephem.calc_ut(jd, le_b, LF)
                 sr = swe.calc_ut(jd, se_b, SF)
             except:
                 continue
@@ -550,7 +550,7 @@ def test_273():  # House cusps at various JDs (DST-like transitions)
             jd = jd_base + h
             for hs in ["P", "K", "O"]:
                 try:
-                    lc, la = ephem.swe_houses_ex(jd, 51.5, -0.1, ord(hs), LF)
+                    lc, la = ephem.houses_ex(jd, 51.5, -0.1, ord(hs), LF)
                     sc, sa = swe.houses_ex(jd, 51.5, -0.1, hs.encode(), SF)
                 except:
                     continue
@@ -566,13 +566,13 @@ def test_273():  # House cusps at various JDs (DST-like transitions)
 
 def test_274():  # Asteroid helio+sidereal
     p, f, t, fails = 0, 0, 0, []
-    asteroids = [(ephem.SE_CERES, swe.CERES), (ephem.SE_VESTA, swe.VESTA)]
-    lhf = LF | ephem.SEFLG_HELCTR
+    asteroids = [(ephem.CERES, swe.CERES), (ephem.VESTA, swe.VESTA)]
+    lhf = LF | ephem.FLG_HELCTR
     shf = SF | swe.FLG_HELCTR
     for le_b, se_b in asteroids:
         for jd in DATES[:7]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, lhf)
+                lr = ephem.calc_ut(jd, le_b, lhf)
                 sr = swe.calc_ut(jd, se_b, shf)
             except:
                 continue
@@ -586,13 +586,13 @@ def test_274():  # Asteroid helio+sidereal
     # Sidereal
     for sid in [1, 3]:
         swe.set_sid_mode(sid)
-        ephem.swe_set_sid_mode(sid, 0, 0)
-        lsf = LF | ephem.SEFLG_SIDEREAL
+        ephem.set_sid_mode(sid, 0, 0)
+        lsf = LF | ephem.FLG_SIDEREAL
         ssf = SF | swe.FLG_SIDEREAL
         for le_b, se_b in asteroids:
             for jd in DATES[:5]:
                 try:
-                    lr = ephem.swe_calc_ut(jd, le_b, lsf)
+                    lr = ephem.calc_ut(jd, le_b, lsf)
                     sr = swe.calc_ut(jd, se_b, ssf)
                 except:
                     continue
@@ -604,18 +604,18 @@ def test_274():  # Asteroid helio+sidereal
                     f += 1
                     fails.append(f'  Ast{se_b} sid={sid} jd={jd:.0f} diff={d:.2f}"')
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0, 0, 0)
+        ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
 def test_275():  # Moon equatorial sweep
     p, f, t, fails = 0, 0, 0, []
-    lef = LF | ephem.SEFLG_EQUATORIAL
+    lef = LF | ephem.FLG_EQUATORIAL
     sef = SF | swe.FLG_EQUATORIAL
     for i in range(60):
         jd = 2451545.0 + i * 122.0
         try:
-            lr = ephem.swe_calc_ut(jd, ephem.SE_MOON, lef)
+            lr = ephem.calc_ut(jd, ephem.MOON, lef)
             sr = swe.calc_ut(jd, swe.MOON, sef)
         except:
             continue

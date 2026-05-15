@@ -2,10 +2,10 @@
 """Comprehensive verification of house calculations against pyswisseph.
 
 Sections:
-  1: swe_houses — 24 systems × 8 locations × 12 dates (cusps + ALL 8 ASCMC)
-  2: swe_houses_armc — 24 systems × 12 ARMC × 4 latitudes (cusps + ALL 8 ASCMC)
-  3: swe_house_pos — 12 systems × 18 longitudes × 3 body latitudes × 4 dates
-  4: swe_houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates
+  1: houses — 24 systems × 8 locations × 12 dates (cusps + ALL 8 ASCMC)
+  2: houses_armc — 24 systems × 12 ARMC × 4 latitudes (cusps + ALL 8 ASCMC)
+  3: house_pos — 12 systems × 18 longitudes × 3 body latitudes × 4 dates
+  4: houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates
   5: Precision report — per-system max error table
 
 Target: ~90k+ checks, <30 seconds.
@@ -18,16 +18,16 @@ import sys
 import time
 from collections import Counter, defaultdict
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
 # Point pyswisseph at its ephemeris files
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 # Ensure libephemeris uses Skyfield backend (no LEB)
-lib.swe_close()
+lib.close()
 lib.set_calc_mode("skyfield")
 
 # ---------------------------------------------------------------------------
@@ -116,10 +116,10 @@ SIDEREAL_AYANAMSHAS = [0, 1, 27]  # Fagan-Bradley, Lahiri, True Citra
 t0 = time.time()
 
 # =========================================================================
-# Section 1: swe_houses — 24 systems × 8 locations × 12 dates
+# Section 1: houses — 24 systems × 8 locations × 12 dates
 # cusps (12) + ASCMC (8) = 20 values per combo
 # =========================================================================
-print("Section 1: swe_houses — 24 systems × 8 locations × 12 dates...")
+print("Section 1: houses — 24 systems × 8 locations × 12 dates...")
 
 for hsys_char in HOUSE_SYSTEMS:
     cusp_tol = CUSP_TOL.get(hsys_char, CUSP_TOL_DEFAULT)
@@ -184,9 +184,9 @@ print(f"  Section 1 done: {time.time() - t0:.1f}s  (passed={passed} failed={fail
 
 
 # =========================================================================
-# Section 2: swe_houses_armc — 24 systems × 12 ARMC × 4 latitudes
+# Section 2: houses_armc — 24 systems × 12 ARMC × 4 latitudes
 # =========================================================================
-print("Section 2: swe_houses_armc — 24 systems × 12 ARMC × 4 latitudes...")
+print("Section 2: houses_armc — 24 systems × 12 ARMC × 4 latitudes...")
 
 for hsys_char in HOUSE_SYSTEMS:
     cusp_tol = CUSP_TOL.get(hsys_char, CUSP_TOL_DEFAULT)
@@ -251,9 +251,9 @@ print(f"  Section 2 done: {time.time() - t0:.1f}s  (passed={passed} failed={fail
 
 
 # =========================================================================
-# Section 3: swe_house_pos — 12 systems × 18 longitudes × 3 body lats × 4 dates
+# Section 3: house_pos — 12 systems × 18 longitudes × 3 body lats × 4 dates
 # =========================================================================
-print("Section 3: swe_house_pos — 12 systems × 18 longitudes × 3 body lats × 4 dates...")
+print("Section 3: house_pos — 12 systems × 18 longitudes × 3 body lats × 4 dates...")
 
 GEO_LAT = 41.9
 
@@ -310,11 +310,11 @@ print(f"  Section 3 done: {time.time() - t0:.1f}s  (passed={passed} failed={fail
 
 
 # =========================================================================
-# Section 4: swe_houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates
+# Section 4: houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates
 # =========================================================================
-print("Section 4: swe_houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates...")
+print("Section 4: houses_ex sidereal — 8 systems × 3 ayanamshas × 6 dates...")
 
-SEFLG_SIDEREAL = 65536
+FLG_SIDEREAL = 65536
 
 for hsys_char in SIDEREAL_SYSTEMS:
     cusp_tol = SIDEREAL_CUSP_TOL
@@ -326,7 +326,7 @@ for hsys_char in SIDEREAL_SYSTEMS:
 
             try:
                 lib.set_sid_mode(ayan_id)
-                lib_cusps, lib_ascmc = lib.houses_ex(jd, 41.9, 12.5, ord(hsys_char), SEFLG_SIDEREAL)
+                lib_cusps, lib_ascmc = lib.houses_ex(jd, 41.9, 12.5, ord(hsys_char), FLG_SIDEREAL)
                 lib.set_sid_mode(0)
             except Exception:
                 lib_ok = False
@@ -334,7 +334,7 @@ for hsys_char in SIDEREAL_SYSTEMS:
 
             try:
                 swe_ref.set_sid_mode(ayan_id)
-                ref_cusps, ref_ascmc = swe_ref.houses_ex(jd, 41.9, 12.5, hsys_bytes, SEFLG_SIDEREAL)
+                ref_cusps, ref_ascmc = swe_ref.houses_ex(jd, 41.9, 12.5, hsys_bytes, FLG_SIDEREAL)
                 swe_ref.set_sid_mode(0)
             except Exception:
                 ref_ok = False
@@ -390,11 +390,11 @@ report.append(f"Failed: {failed}")
 report.append(f"Time:   {elapsed:.1f}s")
 report.append("")
 
-# --- Precision table: swe_houses cusps ---
+# --- Precision table: houses cusps ---
 all_systems = sorted(set(k[0] for k in max_errors))
 cusp_keys = [f"cusp{i}" for i in range(1, 13)]
 
-report.append("Max cusp error per system (swe_houses):")
+report.append("Max cusp error per system (houses):")
 report.append(f"  {'System':<8s} {'Max Cusp (°)':>14s} {'Worst':>8s}")
 report.append(f"  {'—' * 8} {'—' * 14} {'—' * 8}")
 for s in all_systems:
@@ -408,9 +408,9 @@ for s in all_systems:
     if mx > 0:
         report.append(f"  {s:<8s} {mx:>14.7f} {worst:>8s}")
 
-# --- Precision table: swe_houses ASCMC ---
+# --- Precision table: houses ASCMC ---
 report.append("")
-report.append("Max ASCMC error per system (swe_houses):")
+report.append("Max ASCMC error per system (houses):")
 header = f"  {'Sys':<5s}"
 for lbl in ASCMC_LABELS:
     header += f" {lbl:>12s}"
@@ -426,12 +426,12 @@ for s in all_systems:
             row += f" {'—':>12s}"
     report.append(row)
 
-# --- Precision table: swe_houses_armc cusps ---
+# --- Precision table: houses_armc cusps ---
 armc_cusp_keys = [f"armc_cusp{i}" for i in range(1, 13)]
 has_armc = any(max_errors.get((s, k), 0) > 0 for s in all_systems for k in armc_cusp_keys)
 if has_armc:
     report.append("")
-    report.append("Max cusp error per system (swe_houses_armc):")
+    report.append("Max cusp error per system (houses_armc):")
     report.append(f"  {'System':<8s} {'Max Cusp (°)':>14s}")
     report.append(f"  {'—' * 8} {'—' * 14}")
     for s in all_systems:
@@ -471,10 +471,10 @@ text = "\n".join(report)
 print(text)
 
 # Write report
-os.makedirs("/Users/giacomo/dev/libephemeris/tasks/results", exist_ok=True)
-with open("/Users/giacomo/dev/libephemeris/tasks/results/verify_houses_comprehensive.txt", "w") as f:
+os.makedirs(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tasks", "results"), exist_ok=True)
+with open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tasks", "results", "verify_houses_comprehensive.txt"), "w") as f:
     f.write(text + "\n")
 
 # Cleanup
-lib.swe_close()
+lib.close()
 swe_ref.close()

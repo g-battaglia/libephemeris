@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 173: Light-time iteration verification.
 
-Tests planet positions with SEFLG_TRUEPOS (geometric, no light-time) vs default
+Tests planet positions with FLG_TRUEPOS (geometric, no light-time) vs default
 (apparent, with light-time) to verify the light-time correction is consistent.
 The difference between TRUEPOS and default should match the expected light-travel
 time offset for each planet.
@@ -16,23 +16,23 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Sun": (swe.SUN, ephem.SE_SUN),
-    "Moon": (swe.MOON, ephem.SE_MOON),
-    "Mercury": (swe.MERCURY, ephem.SE_MERCURY),
-    "Venus": (swe.VENUS, ephem.SE_VENUS),
-    "Mars": (swe.MARS, ephem.SE_MARS),
-    "Jupiter": (swe.JUPITER, ephem.SE_JUPITER),
-    "Saturn": (swe.SATURN, ephem.SE_SATURN),
-    "Uranus": (swe.URANUS, ephem.SE_URANUS),
-    "Neptune": (swe.NEPTUNE, ephem.SE_NEPTUNE),
-    "Pluto": (swe.PLUTO, ephem.SE_PLUTO),
+    "Sun": (swe.SUN, ephem.SUN),
+    "Moon": (swe.MOON, ephem.MOON),
+    "Mercury": (swe.MERCURY, ephem.MERCURY),
+    "Venus": (swe.VENUS, ephem.VENUS),
+    "Mars": (swe.MARS, ephem.MARS),
+    "Jupiter": (swe.JUPITER, ephem.JUPITER),
+    "Saturn": (swe.SATURN, ephem.SATURN),
+    "Uranus": (swe.URANUS, ephem.URANUS),
+    "Neptune": (swe.NEPTUNE, ephem.NEPTUNE),
+    "Pluto": (swe.PLUTO, ephem.PLUTO),
 }
 
 FLAGS_DEFAULT = swe.FLG_SPEED
-FLAGS_TRUEPOS = swe.FLG_SPEED | 16  # SEFLG_TRUEPOS
+FLAGS_TRUEPOS = swe.FLG_SPEED | 16  # FLG_TRUEPOS
 
 TEST_DATES = []
 for year in range(1950, 2051, 10):
@@ -51,8 +51,8 @@ for date_str, jd in TEST_DATES:
         try:
             se_default = swe.calc_ut(jd, se_id, FLAGS_DEFAULT)[0]
             se_truepos = swe.calc_ut(jd, se_id, FLAGS_TRUEPOS)[0]
-            le_default = ephem.swe_calc_ut(jd, le_id, FLAGS_DEFAULT)[0]
-            le_truepos = ephem.swe_calc_ut(jd, le_id, FLAGS_TRUEPOS)[0]
+            le_default = ephem.calc_ut(jd, le_id, FLAGS_DEFAULT)[0]
+            le_truepos = ephem.calc_ut(jd, le_id, FLAGS_TRUEPOS)[0]
         except Exception:
             continue
 

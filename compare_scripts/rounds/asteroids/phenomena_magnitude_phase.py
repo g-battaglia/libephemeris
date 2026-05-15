@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 198: Asteroid phenomena (pheno_ut).
 
-Tests swe_pheno_ut for asteroids (Ceres, Pallas, Juno, Vesta) and
+Tests pheno_ut for asteroids (Ceres, Pallas, Juno, Vesta) and
 main planets comparing phase angles, elongations, and magnitudes.
 """
 
@@ -16,32 +16,32 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH
+FLAGS = ephem.FLG_SWIEPH
 
 # Main planets
 PLANET_BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
 ]
 
 # Asteroids
 ASTEROID_BODIES = [
-    ("Ceres", ephem.SE_CERES, 17),
-    ("Pallas", ephem.SE_PALLAS, 18),
-    ("Juno", ephem.SE_JUNO, 19),
-    ("Vesta", ephem.SE_VESTA, 20),
+    ("Ceres", ephem.CERES, 17),
+    ("Pallas", ephem.PALLAS, 18),
+    ("Juno", ephem.JUNO, 19),
+    ("Vesta", ephem.VESTA, 20),
 ]
 
 TEST_JDS = [
@@ -59,7 +59,7 @@ def compare_pheno(label, le_body, se_body, jd):
 
     # libephemeris: returns ((phase_angle, phase, elongation, diameter, magnitude), retflag)
     try:
-        le_r = ephem.swe_pheno_ut(jd, le_body, FLAGS)
+        le_r = ephem.pheno_ut(jd, le_body, FLAGS)
         le_pheno = le_r[0]  # 5-tuple
     except Exception as e:
         return

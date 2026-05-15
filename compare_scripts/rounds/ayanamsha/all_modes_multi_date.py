@@ -2,7 +2,7 @@
 """Round 214: All ayanamsha modes at multiple dates.
 
 Comprehensive test of all ayanamsha modes (0-42+) at multiple dates,
-comparing swe_get_ayanamsa_ex_ut results between LE and SE.
+comparing get_ayanamsa_ex_ut results between LE and SE.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -46,7 +46,7 @@ KNOWN_LARGE_DIFF_MODES = {
     40,  # TRUE_CITRA - known ~13.9" offset
 }
 
-FLAGS = ephem.SEFLG_SWIEPH
+FLAGS = ephem.FLG_SWIEPH
 
 
 def compare_ayanamsha(mode, jd):
@@ -54,12 +54,12 @@ def compare_ayanamsha(mode, jd):
 
     try:
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode, 0, 0)
+        ephem.set_sid_mode(mode, 0, 0)
     except Exception:
         return
 
     try:
-        le_aya = ephem.swe_get_ayanamsa_ex_ut(jd, FLAGS)
+        le_aya = ephem.get_ayanamsa_ex_ut(jd, FLAGS)
         # le_aya is (retflag, ayanamsa_value)
         if isinstance(le_aya, tuple):
             le_val = le_aya[1]
@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     # Reset
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     print(f"\n{'=' * 70}")
     if total > 0:

@@ -18,7 +18,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # Approximate equinox/solstice dates for 2000-2030
 ASTRO_DATES = [
@@ -62,14 +62,14 @@ LOCATIONS = [
 ]
 
 BODIES = [
-    ("Sun", swe.SUN, ephem.SE_SUN),
-    ("Moon", swe.MOON, ephem.SE_MOON),
-    ("Venus", swe.VENUS, ephem.SE_VENUS),
+    ("Sun", swe.SUN, ephem.SUN),
+    ("Moon", swe.MOON, ephem.MOON),
+    ("Venus", swe.VENUS, ephem.VENUS),
 ]
 
 # Rise/set event types
-RISE = 1  # SE_CALC_RISE
-SET = 2  # SE_CALC_SET
+RISE = 1  # CALC_RISE
+SET = 2  # CALC_SET
 
 TOL_SECONDS = 120  # 2 minutes
 
@@ -96,10 +96,10 @@ for y, m, d in ASTRO_DATES:
                     continue
 
                 try:
-                    le_result2 = ephem.swe_rise_trans(
+                    le_result2 = ephem.rise_trans(
                         jd_start, le_body, event, [lon, lat, float(alt)], 1013.25, 15.0
                     )
-                    # swe_rise_trans returns (retflag, tret) where tret[0] = JD of event
+                    # rise_trans returns (retflag, tret) where tret[0] = JD of event
                     le_jd = le_result2[1][0]
                 except Exception:
                     skipped += 1

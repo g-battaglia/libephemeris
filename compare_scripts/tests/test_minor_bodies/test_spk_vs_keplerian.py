@@ -19,25 +19,25 @@ import sys
 import os
 import tempfile
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SEFLG_HELCTR,
-    SEFLG_SPEED,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    HAUMEA,
+    MAKEMAKE,
+    FLG_HELCTR,
+    FLG_SPEED,
 )
 from libephemeris.minor_bodies import (
     MINOR_BODY_ELEMENTS,
@@ -64,40 +64,40 @@ except ImportError:
 
 # Test data - bodies with known asteroid numbers for SPK lookup
 TEST_BODIES = [
-    (SE_CHIRON, 2060, "Chiron"),
-    (SE_CERES, 1, "Ceres"),
-    (SE_PALLAS, 2, "Pallas"),
-    (SE_JUNO, 3, "Juno"),
-    (SE_VESTA, 4, "Vesta"),
-    (SE_PHOLUS, 5145, "Pholus"),
-    (SE_ERIS, 136199, "Eris"),
-    (SE_ORCUS, 90482, "Orcus"),
-    (SE_IXION, 28978, "Ixion"),
+    (CHIRON, 2060, "Chiron"),
+    (CERES, 1, "Ceres"),
+    (PALLAS, 2, "Pallas"),
+    (JUNO, 3, "Juno"),
+    (VESTA, 4, "Vesta"),
+    (PHOLUS, 5145, "Pholus"),
+    (ERIS, 136199, "Eris"),
+    (ORCUS, 90482, "Orcus"),
+    (IXION, 28978, "Ixion"),
 ]
 
 # TNOs for extended testing
 TNOS = [
-    (SE_ERIS, 136199, "Eris"),
-    (SE_SEDNA, 90377, "Sedna"),
-    (SE_HAUMEA, 136108, "Haumea"),
-    (SE_MAKEMAKE, 136472, "Makemake"),
-    (SE_IXION, 28978, "Ixion"),
-    (SE_ORCUS, 90482, "Orcus"),
-    (SE_QUAOAR, 50000, "Quaoar"),
+    (ERIS, 136199, "Eris"),
+    (SEDNA, 90377, "Sedna"),
+    (HAUMEA, 136108, "Haumea"),
+    (MAKEMAKE, 136472, "Makemake"),
+    (IXION, 28978, "Ixion"),
+    (ORCUS, 90482, "Orcus"),
+    (QUAOAR, 50000, "Quaoar"),
 ]
 
 # Main belt asteroids for testing
 MAIN_BELT = [
-    (SE_CERES, 1, "Ceres"),
-    (SE_PALLAS, 2, "Pallas"),
-    (SE_JUNO, 3, "Juno"),
-    (SE_VESTA, 4, "Vesta"),
+    (CERES, 1, "Ceres"),
+    (PALLAS, 2, "Pallas"),
+    (JUNO, 3, "Juno"),
+    (VESTA, 4, "Vesta"),
 ]
 
 # Centaurs for testing
 CENTAURS = [
-    (SE_CHIRON, 2060, "Chiron"),
-    (SE_PHOLUS, 5145, "Pholus"),
+    (CHIRON, 2060, "Chiron"),
+    (PHOLUS, 5145, "Pholus"),
 ]
 
 
@@ -244,14 +244,14 @@ class TestSPKRegistrationAndFallback:
     def test_unregistered_body_returns_none_from_spk(self):
         """calc_spk_body_position should return None for unregistered bodies."""
         # Ensure Ceres is unregistered
-        unregister_spk_body(SE_CERES)
+        unregister_spk_body(CERES)
 
         # Create a mock time object
         ts = ephem.state.get_timescale()
         jd = 2451545.0
         t = ts.tt_jd(jd)
 
-        result = calc_spk_body_position(t, SE_CERES, 0)
+        result = calc_spk_body_position(t, CERES, 0)
         assert result is None, "Unregistered body should return None from SPK"
 
     def test_list_spk_bodies_returns_dict(self):
@@ -262,19 +262,19 @@ class TestSPKRegistrationAndFallback:
     def test_get_spk_body_info_returns_none_for_unregistered(self):
         """get_spk_body_info should return None for unregistered bodies."""
         # Ensure body is unregistered
-        unregister_spk_body(SE_CERES)
+        unregister_spk_body(CERES)
 
-        info = get_spk_body_info(SE_CERES)
+        info = get_spk_body_info(CERES)
         assert info is None, "Unregistered body should have no SPK info"
 
     def test_fallback_to_keplerian_when_no_spk(self):
         """calc_ut should use Keplerian fallback when no SPK is registered."""
         # Unregister any SPK for Ceres
-        unregister_spk_body(SE_CERES)
+        unregister_spk_body(CERES)
 
         # Should still return a position (via Keplerian fallback)
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_CERES, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(jd, CERES, FLG_HELCTR)
 
         assert len(pos) >= 3, "Should return position tuple"
         assert math.isfinite(pos[0]), "Longitude should be finite"
@@ -307,7 +307,7 @@ class TestKeplerianPrecisionVsSwisseph:
         if swe_pos is None:
             pytest.skip(f"SwissEph data not available for {name}")
 
-        lib_pos, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        lib_pos, _ = ephem.calc_ut(jd, body_id, 0)
 
         lon_diff = angular_diff(swe_pos[0], lib_pos[0])
         lat_diff = abs(swe_pos[1] - lib_pos[1])
@@ -333,7 +333,7 @@ class TestKeplerianPrecisionVsSwisseph:
         if swe_pos is None:
             pytest.skip(f"SwissEph data not available for {name}")
 
-        lib_pos, _ = ephem.swe_calc_ut(jd, body_id, 0)
+        lib_pos, _ = ephem.calc_ut(jd, body_id, 0)
 
         lon_diff = angular_diff(swe_pos[0], lib_pos[0])
 
@@ -345,16 +345,16 @@ class TestKeplerianPrecisionVsSwisseph:
     def test_precision_improves_closer_to_epoch(self):
         """Keplerian precision should be better near the orbital elements epoch."""
         # Unregister any SPK
-        unregister_spk_body(SE_CERES)
+        unregister_spk_body(CERES)
 
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
 
         # Test at epoch
         swe_at_epoch = self.get_swe_position(elements.epoch, 1)
         if swe_at_epoch is None:
             pytest.skip("SwissEph data not available for Ceres at epoch")
 
-        lib_at_epoch, _ = ephem.swe_calc_ut(elements.epoch, SE_CERES, 0)
+        lib_at_epoch, _ = ephem.calc_ut(elements.epoch, CERES, 0)
         diff_at_epoch = angular_diff(swe_at_epoch[0], lib_at_epoch[0])
 
         # Test 25 years from epoch
@@ -363,7 +363,7 @@ class TestKeplerianPrecisionVsSwisseph:
         if swe_far is None:
             pytest.skip("SwissEph data not available for Ceres at far date")
 
-        lib_far, _ = ephem.swe_calc_ut(jd_far, SE_CERES, 0)
+        lib_far, _ = ephem.calc_ut(jd_far, CERES, 0)
         diff_far = angular_diff(swe_far[0], lib_far[0])
 
         # Error at epoch should generally be smaller than far from epoch
@@ -382,7 +382,7 @@ class TestKeplerianVelocityProvided:
         unregister_spk_body(body_id)
 
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
 
         # Keplerian fallback returns (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         assert len(pos) >= 6, "Should return 6-element tuple"
@@ -445,7 +445,7 @@ class TestPrecisionDocumentation:
             try:
                 swe_body = swe.AST_OFFSET + ast_num
                 swe_pos, _ = swe.calc_ut(2451545.0, swe_body, 0)
-                lib_pos, _ = ephem.swe_calc_ut(2451545.0, body_id, 0)
+                lib_pos, _ = ephem.calc_ut(2451545.0, body_id, 0)
 
                 lon_diff = angular_diff(swe_pos[0], lib_pos[0])
                 lat_diff = abs(swe_pos[1] - lib_pos[1])
@@ -534,7 +534,7 @@ class TestFallbackBehavior:
 
             # All should return positions via Keplerian fallback
             for body_id in MINOR_BODY_ELEMENTS:
-                pos, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+                pos, _ = ephem.calc_ut(jd, body_id, FLG_HELCTR)
 
                 assert len(pos) >= 3, f"Body {body_id} should return position"
                 assert math.isfinite(pos[0]), f"Body {body_id} longitude not finite"
@@ -549,17 +549,17 @@ class TestFallbackBehavior:
         ephem.set_strict_precision(False)
         try:
             # Unregister SPK to test Keplerian
-            unregister_spk_body(SE_CERES)
+            unregister_spk_body(CERES)
 
             jd = 2451545.0
 
             # Heliocentric
-            pos_hel, _ = ephem.swe_calc_ut(jd, SE_CERES, SEFLG_HELCTR)
+            pos_hel, _ = ephem.calc_ut(jd, CERES, FLG_HELCTR)
             assert math.isfinite(pos_hel[0]), "Heliocentric longitude not finite"
             assert math.isfinite(pos_hel[2]), "Heliocentric distance not finite"
 
             # Geocentric (default)
-            pos_geo, _ = ephem.swe_calc_ut(jd, SE_CERES, 0)
+            pos_geo, _ = ephem.calc_ut(jd, CERES, 0)
             assert math.isfinite(pos_geo[0]), "Geocentric longitude not finite"
             assert math.isfinite(pos_geo[2]), "Geocentric distance not finite"
 
@@ -585,10 +585,10 @@ class TestPeriodicPositions:
         period_days = 360.0 / elements.n
 
         # Get position at start
-        pos_start, _ = ephem.swe_calc_ut(jd_start, body_id, SEFLG_HELCTR)
+        pos_start, _ = ephem.calc_ut(jd_start, body_id, FLG_HELCTR)
 
         # Get position after one period
-        pos_after, _ = ephem.swe_calc_ut(jd_start + period_days, body_id, SEFLG_HELCTR)
+        pos_after, _ = ephem.calc_ut(jd_start + period_days, body_id, FLG_HELCTR)
 
         # Longitude should be similar (within perturbation effects)
         lon_diff = angular_diff(pos_start[0], pos_after[0])

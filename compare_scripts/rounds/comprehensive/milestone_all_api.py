@@ -16,35 +16,35 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 ALL_BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN, 0.5),
-    ("Moon", ephem.SE_MOON, swe.MOON, 1.0),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY, 0.5),
-    ("Venus", ephem.SE_VENUS, swe.VENUS, 0.5),
-    ("Mars", ephem.SE_MARS, swe.MARS, 0.5),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER, 0.5),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN, 0.5),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS, 0.5),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE, 0.5),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO, 1.0),
-    ("MeanNode", ephem.SE_MEAN_NODE, swe.MEAN_NODE, 0.5),
-    ("TrueNode", ephem.SE_TRUE_NODE, swe.TRUE_NODE, 0.5),
-    ("MeanLilith", ephem.SE_MEAN_APOG, swe.MEAN_APOG, 0.5),
-    ("OscuLilith", ephem.SE_OSCU_APOG, swe.OSCU_APOG, 120.0),
-    ("Chiron", ephem.SE_CHIRON, swe.CHIRON, 0.5),
-    ("Ceres", ephem.SE_CERES, 17, 0.5),
-    ("Pallas", ephem.SE_PALLAS, 18, 0.5),
-    ("Juno", ephem.SE_JUNO, 19, 0.5),
-    ("Vesta", ephem.SE_VESTA, 20, 0.5),
+    ("Sun", ephem.SUN, swe.SUN, 0.5),
+    ("Moon", ephem.MOON, swe.MOON, 1.0),
+    ("Mercury", ephem.MERCURY, swe.MERCURY, 0.5),
+    ("Venus", ephem.VENUS, swe.VENUS, 0.5),
+    ("Mars", ephem.MARS, swe.MARS, 0.5),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER, 0.5),
+    ("Saturn", ephem.SATURN, swe.SATURN, 0.5),
+    ("Uranus", ephem.URANUS, swe.URANUS, 0.5),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE, 0.5),
+    ("Pluto", ephem.PLUTO, swe.PLUTO, 1.0),
+    ("MeanNode", ephem.MEAN_NODE, swe.MEAN_NODE, 0.5),
+    ("TrueNode", ephem.TRUE_NODE, swe.TRUE_NODE, 0.5),
+    ("MeanLilith", ephem.MEAN_APOG, swe.MEAN_APOG, 0.5),
+    ("OscuLilith", ephem.OSCU_APOG, swe.OSCU_APOG, 120.0),
+    ("Chiron", ephem.CHIRON, swe.CHIRON, 0.5),
+    ("Ceres", ephem.CERES, 17, 0.5),
+    ("Pallas", ephem.PALLAS, 18, 0.5),
+    ("Juno", ephem.JUNO, 19, 0.5),
+    ("Vesta", ephem.VESTA, 20, 0.5),
 ]
 
 TEST_JDS = [
@@ -79,7 +79,7 @@ def test_planet_positions():
     for jd in TEST_JDS:
         for name, le_b, se_b, tol in ALL_BODIES:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, FLAGS)
+                le_r = ephem.calc_ut(jd, le_b, FLAGS)
                 se_r = swe.calc_ut(jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue
@@ -110,7 +110,7 @@ def test_house_cusps():
         for lat, lon in locations:
             for sys_name, le_sys, se_sys in systems:
                 try:
-                    le_r = ephem.swe_houses_ex2(jd, lat, lon, le_sys, 0)
+                    le_r = ephem.houses_ex2(jd, lat, lon, le_sys, 0)
                     se_r = swe.houses_ex(jd, lat, lon, se_sys)
                 except Exception:
                     continue
@@ -135,7 +135,7 @@ def test_nutation_obliquity():
     print("\n--- Nutation/Obliquity ---")
     for jd in TEST_JDS:
         try:
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
         except Exception:
             continue
@@ -161,7 +161,7 @@ def test_sidereal_time():
     print("\n--- Sidereal Time ---")
     for jd in TEST_JDS:
         total += 1
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         se_st = swe.sidtime(jd)
         diff = abs(le_st - se_st) * 3600  # seconds
         if diff <= 0.01:
@@ -178,7 +178,7 @@ def test_fixed_stars():
     for jd in TEST_JDS[:2]:
         for star in FIXED_STARS:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+                le_r = ephem.fixstar2_ut(star, jd, FLAGS)
                 le_lon = le_r[0][0]
 
                 se_r = swe.fixstar2(star, jd, swe.FLG_SWIEPH | swe.FLG_SPEED)
@@ -214,9 +214,9 @@ def test_ayanamsha():
     for jd in TEST_JDS:
         for name, mode in modes:
             try:
-                ephem.swe_set_sid_mode(mode, 0.0, 0.0)
+                ephem.set_sid_mode(mode, 0.0, 0.0)
                 swe.set_sid_mode(mode, 0.0, 0.0)
-                le_aya = ephem.swe_get_ayanamsa_ut(jd)
+                le_aya = ephem.get_ayanamsa_ut(jd)
                 se_aya = swe.get_ayanamsa_ut(jd)
             except Exception:
                 continue

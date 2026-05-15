@@ -8,9 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 NAMES = {
     2: "Mercury",
@@ -36,7 +36,7 @@ for body in range(2, 10):
         jd = jd0 + i
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][3] - le[0][3])
             tol = 0.0001 if body <= 6 else 0.001
             if diff < tol:
@@ -62,7 +62,7 @@ for body in [4, 5, 6, 7]:  # Mars-Uranus
         jd = jd0 + i
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             se_speed = se[0][3]
             le_speed = le[0][3]
             # Check if station (speed crosses zero)
@@ -90,7 +90,7 @@ for body in range(0, 10):
         jd = jd0 + i
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][4] - le[0][4])  # lat speed
             if diff < 0.001:
                 passed += 1
@@ -107,7 +107,7 @@ for body in range(0, 10):
         jd = jd0 + i
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][5] - le[0][5])  # dist speed
             if diff < 0.0001:
                 passed += 1

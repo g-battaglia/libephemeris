@@ -25,7 +25,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -92,8 +92,8 @@ def get_houses_ex2(jd, lat, lon, hsys_ch):
         return None
 
     try:
-        le_result = ephem.swe_houses_ex2(
-            jd, lat, lon, le_hsys(hsys_ch), ephem.SEFLG_SPEED
+        le_result = ephem.houses_ex2(
+            jd, lat, lon, le_hsys(hsys_ch), ephem.FLG_SPEED
         )
         # LE returns: (cusps, ascmc, cusp_speeds, ascmc_speeds)
         le_cusps = le_result[0]
@@ -366,15 +366,15 @@ def phase5():
             jd = J2000
             try:
                 # Get speeds from houses_ex2
-                le_result = ephem.swe_houses_ex2(
-                    jd, lat, lon, le_hsys(hsys_ch), ephem.SEFLG_SPEED
+                le_result = ephem.houses_ex2(
+                    jd, lat, lon, le_hsys(hsys_ch), ephem.FLG_SPEED
                 )
                 le_cusps = le_result[0]
                 le_cspeeds = le_result[2]
 
                 # Get cusps at jd +/- dt for FD (positions only, no speed needed)
-                le_minus = ephem.swe_houses_ex2(jd - dt, lat, lon, le_hsys(hsys_ch), 0)
-                le_plus = ephem.swe_houses_ex2(jd + dt, lat, lon, le_hsys(hsys_ch), 0)
+                le_minus = ephem.houses_ex2(jd - dt, lat, lon, le_hsys(hsys_ch), 0)
+                le_plus = ephem.houses_ex2(jd + dt, lat, lon, le_hsys(hsys_ch), 0)
 
                 max_diff = 0.0
                 worst_cusp = 0

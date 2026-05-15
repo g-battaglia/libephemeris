@@ -23,7 +23,7 @@ import swisseph as swe  # noqa: E402
 # Now import libephemeris
 import libephemeris as ephem  # noqa: E402
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -65,28 +65,28 @@ HOUSE_SYSTEMS = list("PKORCAEVXHTWMBDUNYIGFSQL")
 AYANAMSA_MODES = list(range(0, 47))
 
 # Flags
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_TRUEPOS = 16
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_SIDEREAL = 64 * 1024
-SEFLG_HELCTR = 8
-SEFLG_NOABERR = 128
-SEFLG_NOGDEFL = 512
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_TRUEPOS = 16
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_SIDEREAL = 64 * 1024
+FLG_HELCTR = 8
+FLG_NOABERR = 128
+FLG_NOGDEFL = 512
 
 FLAG_COMBOS = [
     0,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_EQUATORIAL | SEFLG_SPEED,
-    SEFLG_TRUEPOS,
-    SEFLG_TRUEPOS | SEFLG_SPEED,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_HELCTR,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_EQUATORIAL | FLG_SPEED,
+    FLG_TRUEPOS,
+    FLG_TRUEPOS | FLG_SPEED,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_HELCTR,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
 ]
 
 # Fixed stars
@@ -166,7 +166,7 @@ SPLIT_TEST_VALUES = [
 
 # Known divergence bodies/situations
 KNOWN_DIVERGENCE_BODIES = {21, 22}  # IntpApog, IntpPerg
-KNOWN_DIVERGENCE_BODY_9_FLAGS = {SEFLG_HELCTR}  # Pluto heliocentric
+KNOWN_DIVERGENCE_BODY_9_FLAGS = {FLG_HELCTR}  # Pluto heliocentric
 
 
 # ── Result tracking ───────────────────────────────────────────────────────────
@@ -317,10 +317,10 @@ def run_section_a():
     jds = JD_TEST
     flags = [
         0,
-        SEFLG_SPEED,
-        SEFLG_EQUATORIAL,
-        SEFLG_EQUATORIAL | SEFLG_SPEED,
-        SEFLG_TRUEPOS,
+        FLG_SPEED,
+        FLG_EQUATORIAL,
+        FLG_EQUATORIAL | FLG_SPEED,
+        FLG_TRUEPOS,
     ]
 
     for body in bodies:
@@ -336,7 +336,7 @@ def run_section_a():
                     continue
 
                 try:
-                    ep_r = ephem.swe_calc_ut(jd, body, flag)
+                    ep_r = ephem.calc_ut(jd, body, flag)
                     ep_pos = ep_r[0]
                 except Exception as e:
                     err_str = str(e)
@@ -420,7 +420,7 @@ def run_section_b():
                 test_id = f"B.houses({hsys},lat={lat},lon={lon},jd={jd:.1f})"
                 try:
                     swe_r = swe.houses(jd, lat, lon, hsys.encode())
-                    ep_r = ephem.swe_houses(jd, lat, lon, ord(hsys))
+                    ep_r = ephem.houses(jd, lat, lon, ord(hsys))
                     # Compare cusps — inherent ~0.003" divergence from different engines
                     ok_c, md_c, det_c = compare_tuples(swe_r[0], ep_r[0], 0.01, "cusps")
                     # Compare ascmc
@@ -438,7 +438,7 @@ def run_section_b():
                 test_id2 = f"B.houses_ex2({hsys},lat={lat},lon={lon},jd={jd:.1f})"
                 try:
                     swe_r2 = swe.houses_ex2(jd, lat, lon, hsys.encode())
-                    ep_r2 = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys))
+                    ep_r2 = ephem.houses_ex2(jd, lat, lon, ord(hsys))
                     ok_c2, md_c2, det_c2 = compare_tuples(
                         swe_r2[0], ep_r2[0], 0.01, "cusps"
                     )
@@ -474,7 +474,7 @@ def run_section_c():
                 test_id = f"C.houses_armc({hsys},armc={armc},lat={lat})"
                 try:
                     swe_r = swe.houses_armc(armc, lat, eps, hsys.encode())
-                    ep_r = ephem.swe_houses_armc(armc, lat, eps, ord(hsys))
+                    ep_r = ephem.houses_armc(armc, lat, eps, ord(hsys))
                     # Use angular comparison for cusps/ascmc (wrap 0°/360°)
                     ok_c, md_c, det_c = compare_tuples_angular(
                         swe_r[0], ep_r[0], 0.01, "cusps"
@@ -510,7 +510,7 @@ def run_section_d():
     print("\n[D] fixstar2_ut — fixed star positions")
     count = 0
     jds = [2451545.0, 2440587.5, 2460310.5]
-    flags = [0, SEFLG_SPEED]
+    flags = [0, FLG_SPEED]
 
     for star in STARS:
         for jd in jds:
@@ -518,7 +518,7 @@ def run_section_d():
                 test_id = f"D.fixstar2_ut({star},jd={jd:.1f},flag={flag})"
                 try:
                     swe_r = swe.fixstar2_ut(star, jd, flag)
-                    ep_r = ephem.swe_fixstar2_ut(star, jd, flag)
+                    ep_r = ephem.fixstar2_ut(star, jd, flag)
                     # Compare positions: lon/lat tight, dist/speeds loose
                     # Distance varies by date due to radial velocity model differences
                     # speed_dist differs due to annual parallax in central difference
@@ -559,7 +559,7 @@ def run_section_d():
         test_id_mag = f"D.fixstar2_mag({star})"
         try:
             swe_mag = swe.fixstar2_mag(star)
-            ep_mag = ephem.swe_fixstar2_mag(star)
+            ep_mag = ephem.fixstar2_mag(star)
             # Mag can differ due to catalog versions
             ok, diff = compare_float_raw(swe_mag[0], ep_mag[0], 0.5)
             status = "PASS" if ok else "KNOWN"
@@ -593,9 +593,9 @@ def run_section_e():
             test_id = f"E.ayanamsa(mode={mode},jd={jd:.1f})"
             try:
                 swe.set_sid_mode(mode)
-                ephem.swe_set_sid_mode(mode)
+                ephem.set_sid_mode(mode)
                 swe_aya = swe.get_ayanamsa_ut(jd)
-                ep_aya = ephem.swe_get_ayanamsa_ut(jd)
+                ep_aya = ephem.get_ayanamsa_ut(jd)
                 ok, diff = compare_float(swe_aya, ep_aya, 0.1)  # 0.1" tol
                 if ok:
                     report.add(TestResult("E", test_id, "PASS", max_diff=diff))
@@ -616,7 +616,7 @@ def run_section_e():
 
     # Reset to default
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
     print(f"  Ran {count} rounds")
 
 
@@ -633,7 +633,7 @@ def run_section_f():
             test_id = f"F.split_deg({val},flag={flag})"
             try:
                 swe_r = swe.split_deg(val, flag)
-                ep_r = ephem.swe_split_deg(val, flag)
+                ep_r = ephem.split_deg(val, flag)
                 # Compare all 6 elements
                 ok = True
                 detail = ""
@@ -675,7 +675,7 @@ def run_section_g():
                 test_id = f"G.nod_aps_ut(body={body},method={method},jd={jd:.1f})"
                 try:
                     swe_r = swe.nod_aps_ut(jd, body, method, 0)
-                    ep_r = ephem.swe_nod_aps_ut(jd, body, method, 0)
+                    ep_r = ephem.nod_aps_ut(jd, body, method, 0)
                     max_diff = 0.0
                     all_ok = True
                     for k in range(4):
@@ -716,7 +716,7 @@ def run_section_h():
         test_id = f"H.sol_eclipse_when_glob(jd={jd:.1f})"
         try:
             swe_r = swe.sol_eclipse_when_glob(jd)
-            ep_r = ephem.swe_sol_eclipse_when_glob(jd)
+            ep_r = ephem.sol_eclipse_when_glob(jd)
             # Compare tret[0] (max eclipse time)
             ok, diff = compare_float_raw(swe_r[1][0], ep_r[1][0], 1e-4)
             report.add(
@@ -736,7 +736,7 @@ def run_section_h():
         test_id2 = f"H.sol_eclipse_when_loc(jd={jd:.1f},Rome)"
         try:
             swe_r2 = swe.sol_eclipse_when_loc(jd, (12.5, 41.9, 0))
-            ep_r2 = ephem.swe_sol_eclipse_when_loc(jd, geopos=(12.5, 41.9, 0))
+            ep_r2 = ephem.sol_eclipse_when_loc(jd, geopos=(12.5, 41.9, 0))
             ok2, diff2 = compare_float_raw(swe_r2[1][0], ep_r2[1][0], 1e-3)
             report.add(
                 TestResult("H", test_id2, "PASS" if ok2 else "KNOWN", max_diff=diff2)
@@ -750,7 +750,7 @@ def run_section_h():
         try:
             ecl_jd = swe_r[1][0] if swe_r[1][0] > 0 else jd
             swe_r3 = swe.sol_eclipse_where(ecl_jd)
-            ep_r3 = ephem.swe_sol_eclipse_where(ecl_jd)
+            ep_r3 = ephem.sol_eclipse_where(ecl_jd)
             # Compare geopos[0:2] (lon, lat)
             ok_g, md_g, _ = compare_tuples(swe_r3[1][:2], ep_r3[1][:2], 1.0, "geopos")
             report.add(
@@ -765,7 +765,7 @@ def run_section_h():
         try:
             ecl_jd = swe_r[1][0] if swe_r[1][0] > 0 else jd
             swe_r4 = swe.sol_eclipse_how(ecl_jd, (12.5, 41.9, 0))
-            ep_r4 = ephem.swe_sol_eclipse_how(ecl_jd, geopos=(12.5, 41.9, 0))
+            ep_r4 = ephem.sol_eclipse_how(ecl_jd, geopos=(12.5, 41.9, 0))
             # retflag may differ slightly
             ok4 = swe_r4[0] == ep_r4[0]
             report.add(
@@ -797,7 +797,7 @@ def run_section_i():
         test_id = f"I.lun_eclipse_when(jd={jd:.1f})"
         try:
             swe_r = swe.lun_eclipse_when(jd)
-            ep_r = ephem.swe_lun_eclipse_when(jd)
+            ep_r = ephem.lun_eclipse_when(jd)
             ok, diff = compare_float_raw(swe_r[1][0], ep_r[1][0], 1e-4)
             report.add(
                 TestResult(
@@ -817,7 +817,7 @@ def run_section_i():
         try:
             ecl_jd = swe_r[1][0] if swe_r[1][0] > 0 else jd
             swe_r2 = swe.lun_eclipse_how(ecl_jd, (12.5, 41.9, 0))
-            ep_r2 = ephem.swe_lun_eclipse_how(ecl_jd, geopos=(12.5, 41.9, 0))
+            ep_r2 = ephem.lun_eclipse_how(ecl_jd, geopos=(12.5, 41.9, 0))
             ok2 = swe_r2[0] == ep_r2[0]
             report.add(
                 TestResult(
@@ -835,7 +835,7 @@ def run_section_i():
         test_id3 = f"I.lun_eclipse_when_loc(jd={jd:.1f})"
         try:
             swe_r3 = swe.lun_eclipse_when_loc(jd, (12.5, 41.9, 0))
-            ep_r3 = ephem.swe_lun_eclipse_when_loc(jd, geopos=(12.5, 41.9, 0))
+            ep_r3 = ephem.lun_eclipse_when_loc(jd, geopos=(12.5, 41.9, 0))
             ok3, diff3 = compare_float_raw(swe_r3[1][0], ep_r3[1][0], 1e-3)
             report.add(
                 TestResult("I", test_id3, "PASS" if ok3 else "KNOWN", max_diff=diff3)
@@ -862,7 +862,7 @@ def run_section_j():
             test_id = f"J.lun_occult_when_glob(body={body},jd={jd:.1f})"
             try:
                 swe_r = swe.lun_occult_when_glob(jd, body)
-                ep_r = ephem.swe_lun_occult_when_glob(jd, body)
+                ep_r = ephem.lun_occult_when_glob(jd, body)
                 ok, diff = compare_float_raw(swe_r[1][0], ep_r[1][0], 1e-3)
                 report.add(
                     TestResult("J", test_id, "PASS" if ok else "KNOWN", max_diff=diff)
@@ -908,7 +908,7 @@ def run_section_k():
     for v in test_vals:
         test_id = f"K.degnorm({v})"
         swe_r = swe.degnorm(v)
-        ep_r = ephem.swe_degnorm(v)
+        ep_r = ephem.degnorm(v)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -941,7 +941,7 @@ def run_section_k():
     for v in rad_vals:
         test_id = f"K.radnorm({v:.6f})"
         swe_r = swe.radnorm(v)
-        ep_r = ephem.swe_radnorm(v)
+        ep_r = ephem.radnorm(v)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -974,7 +974,7 @@ def run_section_k():
     for a, b in deg_pairs:
         test_id = f"K.difdeg2n({a},{b})"
         swe_r = swe.difdeg2n(a, b)
-        ep_r = ephem.swe_difdeg2n(a, b)
+        ep_r = ephem.difdeg2n(a, b)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -985,7 +985,7 @@ def run_section_k():
     for a, b in deg_pairs:
         test_id = f"K.difdegn({a},{b})"
         swe_r = swe.difdegn(a, b)
-        ep_r = ephem.swe_difdegn(a, b)
+        ep_r = ephem.difdegn(a, b)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1018,7 +1018,7 @@ def run_section_k():
     for a, b in rad_pairs:
         test_id = f"K.difrad2n({a:.4f},{b:.4f})"
         swe_r = swe.difrad2n(a, b)
-        ep_r = ephem.swe_difrad2n(a, b)
+        ep_r = ephem.difrad2n(a, b)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1029,7 +1029,7 @@ def run_section_k():
     for a, b in deg_pairs:
         test_id = f"K.deg_midp({a},{b})"
         swe_r = swe.deg_midp(a, b)
-        ep_r = ephem.swe_deg_midp(a, b)
+        ep_r = ephem.deg_midp(a, b)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1040,7 +1040,7 @@ def run_section_k():
     for a, b in rad_pairs:
         test_id = f"K.rad_midp({a:.4f},{b:.4f})"
         swe_r = swe.rad_midp(a, b)
-        ep_r = ephem.swe_rad_midp(a, b)
+        ep_r = ephem.rad_midp(a, b)
         ok = abs(swe_r - ep_r) < 1e-10
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1074,7 +1074,7 @@ def run_section_k():
     for v in cs_vals[:20]:
         test_id = f"K.csnorm({v})"
         swe_r = swe.csnorm(v)
-        ep_r = ephem.swe_csnorm(v)
+        ep_r = ephem.csnorm(v)
         ok = swe_r == ep_r
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1107,7 +1107,7 @@ def run_section_k():
     for v in cs_round_vals:
         test_id = f"K.csroundsec({v})"
         swe_r = swe.csroundsec(v)
-        ep_r = ephem.swe_csroundsec(v)
+        ep_r = ephem.csroundsec(v)
         ok = swe_r == ep_r
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1140,7 +1140,7 @@ def run_section_k():
     for a, b in cs_pairs:
         test_id = f"K.difcs2n({a},{b})"
         swe_r = swe.difcs2n(a, b)
-        ep_r = ephem.swe_difcs2n(a, b)
+        ep_r = ephem.difcs2n(a, b)
         ok = swe_r == ep_r
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1151,7 +1151,7 @@ def run_section_k():
     for a, b in cs_pairs:
         test_id = f"K.difcsn({a},{b})"
         swe_r = swe.difcsn(a, b)
-        ep_r = ephem.swe_difcsn(a, b)
+        ep_r = ephem.difcsn(a, b)
         ok = swe_r == ep_r
         report.add(
             TestResult("K", test_id, "PASS" if ok else "FAIL", f"swe={swe_r} ep={ep_r}")
@@ -1182,7 +1182,7 @@ def run_section_l():
                     swe_r = swe.rise_trans(
                         jd, body, rsmi, (lon, lat, alt), 1013.25, 15.0
                     )
-                    ep_r = ephem.swe_rise_trans(
+                    ep_r = ephem.rise_trans(
                         jd, body, rsmi, (lon, lat, alt), 1013.25, 15.0
                     )
                     ok, diff = compare_float_raw(swe_r[1][0], ep_r[1][0], 1e-4)
@@ -1217,7 +1217,7 @@ def run_section_m():
             test_id = f"M.pheno_ut(body={body},jd={jd:.1f})"
             try:
                 swe_r = swe.pheno_ut(jd, body)
-                ep_r = ephem.swe_pheno_ut(jd, body)
+                ep_r = ephem.pheno_ut(jd, body)
                 # Compare first 5 elements (phase_angle, phase, elongation, diam, mag)
                 # Phase angle diverges for outer planets due to different ephemeris
                 # engines (position differences amplified in angle calculations).
@@ -1265,7 +1265,7 @@ def run_section_n():
         try:
             cal = 1 if y >= 1582 and (m > 10 or (m == 10 and d >= 15)) else 0
             swe_jd = swe.julday(y, m, d, h, cal)
-            ep_jd = ephem.swe_julday(y, m, d, h, cal)
+            ep_jd = ephem.julday(y, m, d, h, cal)
             ok = abs(swe_jd - ep_jd) < 1e-10
             report.add(
                 TestResult(
@@ -1296,7 +1296,7 @@ def run_section_n():
         try:
             cal = 1 if jd >= 2299161.0 else 0
             swe_r = swe.revjul(jd, cal)
-            ep_r = ephem.swe_revjul(jd, cal)
+            ep_r = ephem.revjul(jd, cal)
             ok = swe_r[:3] == ep_r[:3] and abs(swe_r[3] - ep_r[3]) < 1e-8
             report.add(
                 TestResult(
@@ -1312,7 +1312,7 @@ def run_section_n():
         test_id = f"N.deltat({jd:.1f})"
         try:
             swe_dt = swe.deltat(jd)
-            ep_dt = ephem.swe_deltat(jd)
+            ep_dt = ephem.deltat(jd)
             # Future dates can have larger divergence
             tol = 1e-6 if jd < 2469807.5 else 0.0001  # 0.0001 day = 8.6 sec
             ok, diff = compare_float_raw(swe_dt, ep_dt, tol)
@@ -1331,7 +1331,7 @@ def run_section_n():
         test_id = f"N.sidtime({jd:.1f})"
         try:
             swe_st = swe.sidtime(jd)
-            ep_st = ephem.swe_sidtime(jd)
+            ep_st = ephem.sidtime(jd)
             # Future dates (>2050) diverge due to delta-T model differences
             tol = 1e-6 if jd < 2469000 else 1e-3
             ok, diff = compare_float_raw(swe_st, ep_st, tol)
@@ -1354,7 +1354,7 @@ def run_section_n():
         test_id = f"N.time_equ({jd:.1f})"
         try:
             swe_te = swe.time_equ(jd)
-            ep_te = ephem.swe_time_equ(jd)
+            ep_te = ephem.time_equ(jd)
             # Future dates diverge due to delta-T + Sun RA model differences
             tol = 1e-6 if jd < 2469000 else 1e-4
             ok, diff = compare_float_raw(swe_te, ep_te, tol)
@@ -1389,7 +1389,7 @@ def run_section_n():
         test_id = f"N.utc_to_jd({y},{m},{d},{h},{mi},{s})"
         try:
             swe_r = swe.utc_to_jd(y, m, d, h, mi, s, 1)  # gregorian
-            ep_r = ephem.swe_utc_to_jd(y, m, d, h, mi, s, 1)
+            ep_r = ephem.utc_to_jd(y, m, d, h, mi, s, 1)
             # Both ET and UT1 diverge due to different delta-T models.
             # ET diverges directly; UT1 diverges because utc_to_jd
             # internally computes UT1 = UTC + (UT1-UTC) which depends
@@ -1464,7 +1464,7 @@ def run_section_o():
         test_id = f"O.house_pos({hsys},armc={armc},lon={lon})"
         try:
             swe_r = swe.house_pos(armc, lat, eps, (lon, lat_b), hsys.encode())
-            ep_r = ephem.swe_house_pos(armc, lat, eps, ord(hsys), lon, lat_b)
+            ep_r = ephem.house_pos(armc, lat, eps, ord(hsys), lon, lat_b)
             # Alcabitius/Topocentric/Koch can diverge ~40" due to different
             # internal cusp interpolation between engines
             tol = 60.0 if hsys in LOOSE_HSYS else 0.01
@@ -1526,7 +1526,7 @@ def run_section_p():
             test_id = f"P.cotrans({coord[0]},{coord[1]},eps={eps})"
             try:
                 swe_r = swe.cotrans(coord, eps)
-                ep_r = ephem.swe_cotrans(coord, eps)
+                ep_r = ephem.cotrans(coord, eps)
                 ok, max_d, det = compare_tuples(swe_r, ep_r, 0.001, "cotrans")
                 report.add(
                     TestResult("P", test_id, "PASS" if ok else "FAIL", det, max_d)
@@ -1539,7 +1539,7 @@ def run_section_p():
             test_id2 = f"P.cotrans_rev({coord[0]},{coord[1]},eps=-{eps})"
             try:
                 swe_r2 = swe.cotrans(coord, -eps)
-                ep_r2 = ephem.swe_cotrans(coord, -eps)
+                ep_r2 = ephem.cotrans(coord, -eps)
                 ok2, max_d2, det2 = compare_tuples(swe_r2, ep_r2, 0.001, "cotrans")
                 report.add(
                     TestResult("P", test_id2, "PASS" if ok2 else "FAIL", det2, max_d2)
@@ -1565,7 +1565,7 @@ def run_section_q():
             test_id = f"Q.refrac(alt={alt},dir={direction})"
             try:
                 swe_r = swe.refrac(alt, 1013.25, 15.0, direction)
-                ep_r = ephem.swe_refrac(alt, 1013.25, 15.0, direction)
+                ep_r = ephem.refrac(alt, 1013.25, 15.0, direction)
                 # Known: up to 15" divergence
                 ok, diff = compare_float(swe_r, ep_r, 20.0)  # 20 arcsec tolerance
                 status = "PASS" if diff < 1.0 else ("KNOWN" if ok else "FAIL")
@@ -1600,12 +1600,12 @@ def run_section_r():
             test_id = f"R.azalt(body={body},lat={lat},lon={lon})"
             try:
                 # First get ecliptic position
-                swe_calc = swe.calc_ut(jd, body)
-                ep_calc = ephem.swe_calc_ut(jd, body)
-                ecl_pos = swe_calc[0][:3]
+                calc = swe.calc_ut(jd, body)
+                ep_calc = ephem.calc_ut(jd, body)
+                ecl_pos = calc[0][:3]
 
                 swe_r = swe.azalt(jd, 0, (lon, lat, alt), 1013.25, 15.0, ecl_pos)
-                ep_r = ephem.swe_azalt(jd, 0, (lon, lat, alt), 1013.25, 15.0, ecl_pos)
+                ep_r = ephem.azalt(jd, 0, (lon, lat, alt), 1013.25, 15.0, ecl_pos)
                 ok, max_d, det = compare_tuples(swe_r, ep_r, 20.0, "azalt")
                 # Below-horizon bodies have large refraction model divergence
                 # (different atmospheric models for negative apparent altitudes)
@@ -1635,7 +1635,7 @@ def run_section_r():
             test_id = f"R.azalt_rev(az={az},alt={alt_val},lat={lat})"
             try:
                 swe_r = swe.azalt_rev(jd, 0, (lon, lat, alt), az, alt_val)
-                ep_r = ephem.swe_azalt_rev(jd, 0, (lon, lat, alt), az, alt_val)
+                ep_r = ephem.azalt_rev(jd, 0, (lon, lat, alt), az, alt_val)
                 ok, max_d, det = compare_tuples(swe_r, ep_r, 20.0, "azalt_rev")
                 status = "PASS" if max_d < 1.0 else ("KNOWN" if ok else "FAIL")
                 report.add(TestResult("R", test_id, status, det, max_d))
@@ -1664,7 +1664,7 @@ def run_section_s():
             test_id = f"S.orbital_elements(body={body},jd={jd:.1f})"
             try:
                 swe_r = swe.get_orbital_elements(jd, body, 0)
-                ep_r = ephem.swe_get_orbital_elements(jd, body, 0)
+                ep_r = ephem.get_orbital_elements(jd, body, 0)
                 # Compare first 10 orbital elements
                 n = min(len(swe_r), len(ep_r), 10)
                 # Fictitious bodies: very loose tolerance (elements may differ
@@ -1708,7 +1708,7 @@ def run_section_t():
         test_id = f"T.solcross_ut(lon={lon})"
         try:
             swe_r = swe.solcross_ut(lon, 2451545.0, 0)
-            ep_r = ephem.swe_solcross_ut(lon, 2451545.0, 0)
+            ep_r = ephem.solcross_ut(lon, 2451545.0, 0)
             ok, diff = compare_float_raw(swe_r, ep_r, 1e-5)
             report.add(
                 TestResult(
@@ -1728,7 +1728,7 @@ def run_section_t():
         test_id = f"T.mooncross_ut(lon={lon})"
         try:
             swe_r = swe.mooncross_ut(lon, 2451545.0, 0)
-            ep_r = ephem.swe_mooncross_ut(lon, 2451545.0, 0)
+            ep_r = ephem.mooncross_ut(lon, 2451545.0, 0)
             ok, diff = compare_float_raw(swe_r, ep_r, 1e-4)
             report.add(
                 TestResult(
@@ -1748,7 +1748,7 @@ def run_section_t():
         test_id = f"T.mooncross_node_ut(jd={jd:.1f})"
         try:
             swe_r = swe.mooncross_node_ut(jd, 0)
-            ep_r = ephem.swe_mooncross_node_ut(jd, 0)
+            ep_r = ephem.mooncross_node_ut(jd, 0)
             # Known: up to ~69s divergence = ~0.0008 day
             ok, diff = compare_float_raw(swe_r[0], ep_r[0], 0.001)
             status = "PASS" if diff < 1e-5 else "KNOWN"
@@ -1779,7 +1779,7 @@ def run_section_u():
             test_id = f"U.heliacal_ut(body={body},jd={jd:.1f})"
             try:
                 swe_r = swe.heliacal_ut(jd, geopos, atm, obs, objname, 1, 0)
-                ep_r = ephem.swe_heliacal_ut(jd, geopos, atm, obs, objname, 1, 0)
+                ep_r = ephem.heliacal_ut(jd, geopos, atm, obs, objname, 1, 0)
                 # Known: up to ~2 days divergence
                 ok, diff = compare_float_raw(swe_r[0], ep_r[0], 3.0)
                 status = "PASS" if diff < 0.01 else "KNOWN"
@@ -1804,7 +1804,7 @@ def run_section_v():
         test_id = f"V.get_planet_name({body})"
         try:
             swe_r = swe.get_planet_name(body)
-            ep_r = ephem.swe_get_planet_name(body)
+            ep_r = ephem.get_planet_name(body)
             ok = swe_r == ep_r
             report.add(
                 TestResult(
@@ -1820,7 +1820,7 @@ def run_section_v():
         test_id = f"V.house_name({hsys})"
         try:
             swe_r = swe.house_name(hsys.encode())
-            ep_r = ephem.swe_house_name(ord(hsys))
+            ep_r = ephem.house_name(ord(hsys))
             ok = swe_r == ep_r
             report.add(
                 TestResult(
@@ -1836,7 +1836,7 @@ def run_section_v():
         test_id = f"V.get_ayanamsa_name({mode})"
         try:
             swe_r = swe.get_ayanamsa_name(mode)
-            ep_r = ephem.swe_get_ayanamsa_name(mode)
+            ep_r = ephem.get_ayanamsa_name(mode)
             ok = swe_r == ep_r
             report.add(
                 TestResult(
@@ -1850,18 +1850,18 @@ def run_section_v():
     print(f"  Ran {count} rounds")
 
 
-# ── Section W: SE_AST_OFFSET ─────────────────────────────────────────────────
+# ── Section W: AST_OFFSET ─────────────────────────────────────────────────
 
 
 def run_section_w():
-    """SE_AST_OFFSET remapping."""
-    print("\n[W] SE_AST_OFFSET — asteroid offset remapping")
+    """AST_OFFSET remapping."""
+    print("\n[W] AST_OFFSET — asteroid offset remapping")
     count = 0
     AST_OFFSET = 10000
     # Ceres=1, Pallas=2, Juno=3, Vesta=4, Chiron=2060, Pholus=5145
     ast_bodies = [(1, 17), (2, 18), (3, 19), (4, 20), (2060, 15), (5145, 16)]
     jds = [2451545.0, 2455197.5, 2460310.5]
-    flags = [0, SEFLG_SPEED]
+    flags = [0, FLG_SPEED]
 
     for ast_num, dedicated_id in ast_bodies:
         for jd in jds:
@@ -1871,7 +1871,7 @@ def run_section_w():
                     # pyswisseph: AST_OFFSET + N
                     swe_r = swe.calc_ut(jd, AST_OFFSET + ast_num, flag)
                     # libephemeris: should remap to dedicated body
-                    ep_r = ephem.swe_calc_ut(jd, AST_OFFSET + ast_num, flag)
+                    ep_r = ephem.calc_ut(jd, AST_OFFSET + ast_num, flag)
                     ok, max_d, det = compare_tuples(swe_r[0], ep_r[0], 1.0, "pos")
                     if max_d < 0.01:
                         status = "PASS"
@@ -1899,24 +1899,24 @@ def run_section_w():
 
 def run_section_x():
     """Sidereal planetary positions."""
-    print("\n[X] Sidereal positions — calc_ut with SEFLG_SIDEREAL")
+    print("\n[X] Sidereal positions — calc_ut with FLG_SIDEREAL")
     count = 0
     # Reset sidereal mode at entry in case a prior section left it dirty
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
     bodies = BODIES_CORE
     aya_modes = [0, 1, 3, 14, 27]  # Fagan, Lahiri, Raman, Bab/Aldebaran, True Citra
     jds = [2451545.0, 2460310.5]
 
     for aya in aya_modes:
         swe.set_sid_mode(aya)
-        ephem.swe_set_sid_mode(aya)
+        ephem.set_sid_mode(aya)
         for body in bodies:
             for jd in jds:
                 test_id = f"X.calc_ut_sid(aya={aya},body={body},jd={jd:.1f})"
                 try:
-                    swe_r = swe.calc_ut(jd, body, SEFLG_SIDEREAL | SEFLG_SPEED)
-                    ep_r = ephem.swe_calc_ut(jd, body, SEFLG_SIDEREAL | SEFLG_SPEED)
+                    swe_r = swe.calc_ut(jd, body, FLG_SIDEREAL | FLG_SPEED)
+                    ep_r = ephem.calc_ut(jd, body, FLG_SIDEREAL | FLG_SPEED)
                     ok, max_d, det = compare_tuples(swe_r[0], ep_r[0], 0.1, "pos")
                     # Moon sidereal positions diverge up to ~14" due to
                     # different lunar theories (Skyfield/DE440 vs Swiss Eph).
@@ -1933,7 +1933,7 @@ def run_section_x():
                 count += 1
 
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
     print(f"  Ran {count} rounds")
 
 
@@ -1955,7 +1955,7 @@ def run_section_y():
                 swe_r = swe.gauquelin_sector(
                     jd, body, 0, (lon, lat, alt), 1013.25, 15.0
                 )
-                ep_r = ephem.swe_gauquelin_sector(
+                ep_r = ephem.gauquelin_sector(
                     jd, body, 0, (lon, lat, alt), 1013.25, 15.0
                 )
                 ok, diff = compare_float_raw(swe_r, ep_r, 0.01)
@@ -2039,7 +2039,7 @@ def run_section_aa():
         test_id = f"AA.jdet_to_utc({jd:.1f})"
         try:
             swe_r = swe.jdet_to_utc(jd, 1)
-            ep_r = ephem.swe_jdet_to_utc(jd, 1)
+            ep_r = ephem.jdet_to_utc(jd, 1)
             # Delta-T divergence causes seconds differences, especially at
             # historical dates and future dates (>2050)
             sec_diff = abs(swe_r[5] - ep_r[5])
@@ -2061,7 +2061,7 @@ def run_section_aa():
         test_id = f"AA.jdut1_to_utc({jd:.1f})"
         try:
             swe_r = swe.jdut1_to_utc(jd, 1)
-            ep_r = ephem.swe_jdut1_to_utc(jd, 1)
+            ep_r = ephem.jdut1_to_utc(jd, 1)
             sec_diff = abs(swe_r[5] - ep_r[5])
             ok = (
                 swe_r[0] == ep_r[0]
@@ -2087,11 +2087,11 @@ def run_section_ab():
     count = 0
 
     for jd in JD_TEST:
-        for ephe_flag in [0, 2]:  # SEFLG_JPLEPH=1, SEFLG_SWIEPH=2
+        for ephe_flag in [0, 2]:  # FLG_JPLEPH=1, FLG_SWIEPH=2
             test_id = f"AB.deltat_ex({jd:.1f},flag={ephe_flag})"
             try:
                 swe_r = swe.deltat_ex(jd, ephe_flag)
-                ep_r = ephem.swe_deltat_ex(jd, ephe_flag)
+                ep_r = ephem.deltat_ex(jd, ephe_flag)
                 diff = abs(swe_r - ep_r)
                 # Delta-T model differences: <1e-6 day = PASS, <1e-3 day = KNOWN
                 if diff < 1e-6:
@@ -2129,7 +2129,7 @@ def run_section_ac():
         test_id = f"AC.day_of_week({jd:.1f})"
         try:
             swe_r = swe.day_of_week(jd)
-            ep_r = ephem.swe_day_of_week(jd)
+            ep_r = ephem.day_of_week(jd)
             ok = swe_r == ep_r
             report.add(
                 TestResult(
@@ -2157,7 +2157,7 @@ def run_section_ac():
         test_id = f"AC.date_conversion({y},{m},{d},{h})"
         try:
             swe_r = swe.date_conversion(y, m, d, h, b"g")
-            ep_r = ephem.swe_date_conversion(y, m, d, h, b"g")
+            ep_r = ephem.date_conversion(y, m, d, h, b"g")
             ok = abs(swe_r[1] - ep_r[1]) < 1e-10
             report.add(
                 TestResult(
@@ -2195,7 +2195,7 @@ def run_section_ac():
         test_id = f"AC.d2l({v})"
         try:
             swe_r = swe.d2l(v)
-            ep_r = ephem.swe_d2l(v)
+            ep_r = ephem.d2l(v)
             ok = swe_r == ep_r
             status = "PASS" if ok else ("KNOWN" if v < 0 else "FAIL")
             report.add(TestResult("AC", test_id, status, f"swe={swe_r} ep={ep_r}"))
@@ -2220,7 +2220,7 @@ def run_section_ac():
         test_id = f"AC.utc_time_zone({y},{m},{d},{h},{mi},{s},tz={tz})"
         try:
             swe_r = swe.utc_time_zone(y, m, d, h, mi, s, tz)
-            ep_r = ephem.swe_utc_time_zone(y, m, d, h, mi, s, tz)
+            ep_r = ephem.utc_time_zone(y, m, d, h, mi, s, tz)
             ok = (
                 swe_r[0] == ep_r[0]
                 and swe_r[1] == ep_r[1]
@@ -2266,7 +2266,7 @@ SECTIONS = {
     "T": run_section_t,  # crossings
     "U": run_section_u,  # heliacal
     "V": run_section_v,  # string formatting
-    "W": run_section_w,  # SE_AST_OFFSET
+    "W": run_section_w,  # AST_OFFSET
     "X": run_section_x,  # sidereal positions
     "Y": run_section_y,  # Gauquelin sectors
     "Z": run_section_z,  # names & constants

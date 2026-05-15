@@ -3,14 +3,14 @@
 Round 12: Deep Nutation / Obliquity / Coordinate Transformation Audit
 ======================================================================
 Compares libephemeris against pyswisseph:
-  P1: SE_ECL_NUT body — nutation and obliquity at multiple epochs
+  P1: ECL_NUT body — nutation and obliquity at multiple epochs
   P2: Obliquity sweep 1800-2200 — systematic drift detection
-  P3: SEFLG_NONUT — positions with nutation suppressed
+  P3: FLG_NONUT — positions with nutation suppressed
   P4: cotrans — ecliptic<->equatorial coordinate transformations
   P5: cotrans_sp — coordinate + speed transformations
   P6: sidtime / sidtime0 — sidereal time
-  P7: Nutation consistency — nutation in planet positions matches SE_ECL_NUT
-  P8: SE_ECL_NUT with swe_calc (TT input) vs swe_calc_ut (UT input)
+  P7: Nutation consistency — nutation in planet positions matches ECL_NUT
+  P8: ECL_NUT with calc (TT input) vs calc_ut (UT input)
 """
 
 from __future__ import annotations
@@ -53,13 +53,13 @@ def record(name, ok, detail=""):
 
 
 # ============================================================================
-# PART 1: SE_ECL_NUT — Nutation and Obliquity at Multiple Epochs
+# PART 1: ECL_NUT — Nutation and Obliquity at Multiple Epochs
 # ============================================================================
 
 
 def test_part1_ecl_nut():
     print("\n" + "=" * 70)
-    print("PART 1: SE_ECL_NUT — Nutation and Obliquity")
+    print("PART 1: ECL_NUT — Nutation and Obliquity")
     print("=" * 70)
 
     epochs = [
@@ -80,10 +80,10 @@ def test_part1_ecl_nut():
     for epoch_name, jd in epochs:
         test_name = f"P1/ecl_nut/{epoch_name}"
         try:
-            # pyswisseph: calc_ut with SE_ECL_NUT
+            # pyswisseph: calc_ut with ECL_NUT
             result_se, rflag_se = swe.calc_ut(jd, swe.ECL_NUT)
             # libephemeris
-            result_le, rflag_le = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)
+            result_le, rflag_le = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
             # result = (true_obl, mean_obl, nut_lon, nut_obl, 0, 0)
             labels = ["true_obl", "mean_obl", "nut_lon", "nut_obl"]
@@ -135,7 +135,7 @@ def test_part2_obliquity_sweep():
     for year in range(1800, 2201, 10):
         jd = swe.julday(year, 1, 1, 0.0)
         result_se, _ = swe.calc_ut(jd, swe.ECL_NUT)
-        result_le, _ = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)
+        result_le, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
         true_diff = abs(result_se[0] - result_le[0]) * 3600  # arcsec
         mean_diff = abs(result_se[1] - result_le[1]) * 3600
@@ -170,7 +170,7 @@ def test_part2_obliquity_sweep():
     for year in range(1800, 2201, 10):
         jd = swe.julday(year, 1, 1, 0.0)
         result_se, _ = swe.calc_ut(jd, swe.ECL_NUT)
-        result_le, _ = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)
+        result_le, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
         nut_lon_diff = abs(result_se[2] - result_le[2]) * 3600
         nut_obl_diff = abs(result_se[3] - result_le[3]) * 3600
@@ -198,13 +198,13 @@ def test_part2_obliquity_sweep():
 
 
 # ============================================================================
-# PART 3: SEFLG_NONUT — Positions Without Nutation
+# PART 3: FLG_NONUT — Positions Without Nutation
 # ============================================================================
 
 
 def test_part3_nonut():
     print("\n" + "=" * 70)
-    print("PART 3: SEFLG_NONUT — Positions Without Nutation")
+    print("PART 3: FLG_NONUT — Positions Without Nutation")
     print("=" * 70)
 
     jd = 2460310.5  # 2024-Jan-1
@@ -224,7 +224,7 @@ def test_part3_nonut():
         test_name = f"P3/nonut/{body_name}"
         try:
             result_se, _ = swe.calc_ut(jd, body_id, flags)
-            result_le, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            result_le, _ = ephem.calc_ut(jd, body_id, flags)
 
             lon_diff = abs(result_se[0] - result_le[0])
             if lon_diff > 180:
@@ -245,11 +245,11 @@ def test_part3_nonut():
         except Exception as e:
             record(test_name, False, f"ERROR: {e}")
 
-    # Also test SE_ECL_NUT with NONUT flag
+    # Also test ECL_NUT with NONUT flag
     test_name = "P3/nonut/ECL_NUT"
     try:
         result_se, _ = swe.calc_ut(jd, swe.ECL_NUT, flags)
-        result_le, _ = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, flags)
+        result_le, _ = ephem.calc_ut(jd, ephem.ECL_NUT, flags)
 
         # With NONUT, nutation components should be zero or close to zero
         # But obliquity should still be returned (mean obliquity only)
@@ -437,7 +437,7 @@ def test_part6_sidtime():
         test_name = f"P6/sidtime/{epoch_name}"
         try:
             st_se = swe.sidtime(jd)
-            st_le = ephem.swe_sidtime(jd)
+            st_le = ephem.sidtime(jd)
 
             diff_sec = abs(st_se - st_le) * 3600  # hours -> seconds
 
@@ -465,7 +465,7 @@ def test_part6_sidtime():
             dpsi = nut_se[2]
 
             st_se = swe.sidtime0(jd, eps_true, dpsi)
-            st_le = ephem.swe_sidtime0(jd, eps_true, dpsi)
+            st_le = ephem.sidtime0(jd, eps_true, dpsi)
 
             diff_sec = abs(st_se - st_le) * 3600
 
@@ -485,38 +485,38 @@ def test_part6_sidtime():
 
 
 # ============================================================================
-# PART 7: Nutation Consistency — Nutation in Positions Matches SE_ECL_NUT
+# PART 7: Nutation Consistency — Nutation in Positions Matches ECL_NUT
 # ============================================================================
 
 
 def test_part7_nutation_consistency():
     print("\n" + "=" * 70)
-    print("PART 7: Nutation Consistency — Planet Positions vs SE_ECL_NUT")
+    print("PART 7: Nutation Consistency — Planet Positions vs ECL_NUT")
     print("=" * 70)
 
     jd = 2460310.5
 
-    # Get nutation from SE_ECL_NUT
-    nut_le, _ = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)
+    # Get nutation from ECL_NUT
+    nut_le, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
     nut_lon_le = nut_le[2]  # nutation in longitude (degrees)
 
     # For each body, the difference between NONUT and default position
     # should approximately equal the nutation in longitude
     bodies = [
-        (ephem.SE_SUN, "Sun"),
-        (ephem.SE_MOON, "Moon"),
-        (ephem.SE_MARS, "Mars"),
-        (ephem.SE_JUPITER, "Jupiter"),
+        (ephem.SUN, "Sun"),
+        (ephem.MOON, "Moon"),
+        (ephem.MARS, "Mars"),
+        (ephem.JUPITER, "Jupiter"),
     ]
 
     for body_id, body_name in bodies:
         test_name = f"P7/consistency/{body_name}"
         try:
             # Default (with nutation)
-            pos_default, _ = ephem.swe_calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+            pos_default, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
             # Without nutation
-            pos_nonut, _ = ephem.swe_calc_ut(
-                jd, body_id, ephem.SEFLG_SPEED | ephem.SEFLG_NONUT
+            pos_nonut, _ = ephem.calc_ut(
+                jd, body_id, ephem.FLG_SPEED | ephem.FLG_NONUT
             )
 
             # Difference should be approximately equal to nutation in longitude
@@ -547,28 +547,28 @@ def test_part7_nutation_consistency():
 
 
 # ============================================================================
-# PART 8: SE_ECL_NUT with swe_calc (TT) vs swe_calc_ut (UT)
+# PART 8: ECL_NUT with calc (TT) vs calc_ut (UT)
 # ============================================================================
 
 
 def test_part8_ecl_nut_tt_ut():
     print("\n" + "=" * 70)
-    print("PART 8: SE_ECL_NUT — swe_calc (TT) vs swe_calc_ut (UT)")
+    print("PART 8: ECL_NUT — calc (TT) vs calc_ut (UT)")
     print("=" * 70)
 
-    # Test that swe_calc with TT and swe_calc_ut with UT give consistent results
+    # Test that calc with TT and calc_ut with UT give consistent results
     jd_ut = 2460310.5
-    dt = ephem.swe_deltat(jd_ut)
+    dt = ephem.deltat(jd_ut)
     jd_tt = jd_ut + dt
 
     test_name = "P8/ecl_nut/calc_vs_calc_ut"
     try:
-        # swe_calc_ut uses UT input
-        result_ut, _ = ephem.swe_calc_ut(jd_ut, ephem.SE_ECL_NUT, 0)
+        # calc_ut uses UT input
+        result_ut, _ = ephem.calc_ut(jd_ut, ephem.ECL_NUT, 0)
 
-        # swe_calc uses TT input — does it work for SE_ECL_NUT?
+        # calc uses TT input — does it work for ECL_NUT?
         try:
-            result_tt, _ = ephem.swe_calc(jd_tt, ephem.SE_ECL_NUT, 0)
+            result_tt, _ = ephem.calc(jd_tt, ephem.ECL_NUT, 0)
             # If it works, compare — they should give very similar results
             # (the tiny difference is because Delta-T shifts the epoch slightly)
             true_obl_diff = abs(result_ut[0] - result_tt[0]) * 3600
@@ -581,19 +581,19 @@ def test_part8_ecl_nut_tt_ut():
                 f'true_obl_diff={true_obl_diff:.6f}" nut_lon_diff={nut_lon_diff:.6f}"',
             )
         except Exception as e:
-            # swe_calc may not support SE_ECL_NUT — that's OK, note it
+            # calc may not support ECL_NUT — that's OK, note it
             record(
-                test_name, True, f"swe_calc does not support SE_ECL_NUT (expected): {e}"
+                test_name, True, f"calc does not support ECL_NUT (expected): {e}"
             )
 
     except Exception as e:
         record(test_name, False, f"ERROR: {e}")
 
-    # Cross-check: pyswisseph calc vs calc_ut for SE_ECL_NUT
+    # Cross-check: pyswisseph calc vs calc_ut for ECL_NUT
     test_name = "P8/ecl_nut/se_cross_check"
     try:
         result_ut_se, _ = swe.calc_ut(jd_ut, swe.ECL_NUT)
-        result_ut_le, _ = ephem.swe_calc_ut(jd_ut, ephem.SE_ECL_NUT, 0)
+        result_ut_le, _ = ephem.calc_ut(jd_ut, ephem.ECL_NUT, 0)
 
         # Also try pyswisseph calc (TT)
         dt_se = swe.deltat(jd_ut)

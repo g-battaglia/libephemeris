@@ -15,7 +15,7 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 FLAGS = swe.FLG_SPEED
 
@@ -37,7 +37,7 @@ for date_str, jd in TEST_DATES:
     try:
         se_r = swe.calc_ut(jd, swe.PLUTO, FLAGS)
         se_pos = se_r[0] if isinstance(se_r[0], (list, tuple)) else se_r
-        le_r = ephem.swe_calc_ut(jd, ephem.SE_PLUTO, FLAGS)
+        le_r = ephem.calc_ut(jd, ephem.PLUTO, FLAGS)
         le_pos = le_r[0]
     except Exception:
         continue
