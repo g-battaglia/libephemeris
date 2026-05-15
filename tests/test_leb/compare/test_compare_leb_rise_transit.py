@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Rise/Transit/Set.
 
-Validates rise/transit/set timing. These functions use swe_calc_ut
+Validates rise/transit/set timing. These functions use calc_ut
 in iterative position refinement loops.
 """
 
@@ -10,15 +10,15 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SE_SUN, SE_MOON, SE_VENUS
+from libephemeris.constants import SUN, MOON, VENUS
 
 from .conftest import TOLS, CompareHelper, year_to_jd
 
 
 RISE_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_VENUS, "Venus"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (VENUS, "Venus"),
 ]
 
 TEST_LOCATIONS = [
@@ -52,8 +52,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun rise timing matches within tolerance."""
-        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 1, (lon, lat, alt))
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 1, (lon, lat, alt))
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SUN, 1, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SUN, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -75,8 +75,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun set timing matches within tolerance."""
-        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 2, (lon, lat, alt))
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 2, (lon, lat, alt))
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SUN, 2, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SUN, 2, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -98,8 +98,8 @@ class TestSunRiseSet:
         date_name: str,
     ):
         """Sun transit timing matches within tolerance."""
-        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_SUN, 4, (lon, lat, alt))
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_SUN, 4, (lon, lat, alt))
+        ref_result = compare.skyfield(ephem.rise_trans, jd, SUN, 4, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, SUN, 4, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -125,8 +125,8 @@ class TestMoonRiseSet:
         date_name: str,
     ):
         """Moon rise timing matches within tolerance."""
-        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_MOON, 1, (lon, lat, alt))
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_MOON, 1, (lon, lat, alt))
+        ref_result = compare.skyfield(ephem.rise_trans, jd, MOON, 1, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, MOON, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -149,8 +149,8 @@ class TestMoonRiseSet:
         date_name: str,
     ):
         """Moon set timing matches within tolerance."""
-        ref_result = compare.skyfield(ephem.rise_trans, jd, SE_MOON, 2, (lon, lat, alt))
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_MOON, 2, (lon, lat, alt))
+        ref_result = compare.skyfield(ephem.rise_trans, jd, MOON, 2, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, MOON, 2, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
@@ -177,9 +177,9 @@ class TestVenusRise:
     ):
         """Venus rise timing matches within tolerance."""
         ref_result = compare.skyfield(
-            ephem.rise_trans, jd, SE_VENUS, 1, (lon, lat, alt)
+            ephem.rise_trans, jd, VENUS, 1, (lon, lat, alt)
         )
-        leb_result = compare.leb(ephem.rise_trans, jd, SE_VENUS, 1, (lon, lat, alt))
+        leb_result = compare.leb(ephem.rise_trans, jd, VENUS, 1, (lon, lat, alt))
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0

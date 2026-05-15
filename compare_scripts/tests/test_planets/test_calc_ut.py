@@ -1,5 +1,5 @@
 """
-Comprehensive tests for planetary position calculations (swe_calc_ut).
+Comprehensive tests for planetary position calculations (calc_ut).
 
 Tests cover:
 - All major planets (Sun through Pluto)
@@ -21,7 +21,7 @@ class TestCalcUtBasicPositions:
     def test_sun_position_j2000(self):
         """Sun position at J2000 epoch."""
         jd = 2451545.0  # J2000
-        pos, flags = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        pos, flags = ephem.calc_ut(jd, SUN, 0)
 
         # Sun should be around 280° (Capricorn) at J2000
         assert 270 < pos[0] < 290, f"Sun longitude {pos[0]} unexpected at J2000"
@@ -34,7 +34,7 @@ class TestCalcUtBasicPositions:
     def test_moon_position_j2000(self):
         """Moon position at J2000 epoch."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, SE_MOON, 0)
+        pos, flags = ephem.calc_ut(jd, MOON, 0)
 
         # Moon longitude valid range
         assert 0 <= pos[0] < 360
@@ -47,20 +47,20 @@ class TestCalcUtBasicPositions:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_all_planets_valid_positions(self, planet_id, planet_name):
         """All planets should return valid positions."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, planet_id, 0)
+        pos, flags = ephem.calc_ut(jd, planet_id, 0)
 
         # Longitude in valid range
         assert 0 <= pos[0] < 360, f"{planet_name} longitude {pos[0]} out of range"
@@ -76,27 +76,27 @@ class TestCalcUtReturnStructure:
     @pytest.mark.unit
     def test_return_is_tuple(self):
         """calc_ut should return a tuple."""
-        result = ephem.swe_calc_ut(2451545.0, SE_SUN, 0)
+        result = ephem.calc_ut(2451545.0, SUN, 0)
         assert isinstance(result, tuple)
         assert len(result) == 2
 
     @pytest.mark.unit
     def test_position_is_6_element_tuple(self):
         """Position should be a 6-element tuple/list."""
-        pos, flags = ephem.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(2451545.0, SUN, FLG_SPEED)
         assert len(pos) == 6
 
     @pytest.mark.unit
     def test_position_elements_are_floats(self):
         """All position elements should be floats."""
-        pos, flags = ephem.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(2451545.0, SUN, FLG_SPEED)
         for i, val in enumerate(pos):
             assert isinstance(val, float), f"Element {i} is {type(val)}, expected float"
 
     @pytest.mark.unit
     def test_flags_is_int(self):
         """Return flags should be an integer."""
-        pos, flags = ephem.swe_calc_ut(2451545.0, SE_SUN, 0)
+        pos, flags = ephem.calc_ut(2451545.0, SUN, 0)
         assert isinstance(flags, int)
 
 
@@ -105,16 +105,16 @@ class TestCalcUtFlags:
 
     @pytest.mark.unit
     def test_flag_speed(self):
-        """SEFLG_SPEED should return velocity values."""
-        pos, flags = ephem.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        """FLG_SPEED should return velocity values."""
+        pos, flags = ephem.calc_ut(2451545.0, SUN, FLG_SPEED)
         # Velocity should be non-zero
         assert pos[3] != 0, "Longitude velocity should be non-zero"
 
     @pytest.mark.unit
     def test_flag_equatorial(self):
-        """SEFLG_EQUATORIAL should return RA/Dec."""
-        pos_ecl, _ = ephem.swe_calc_ut(2451545.0, SE_SUN, 0)
-        pos_equ, _ = ephem.swe_calc_ut(2451545.0, SE_SUN, SEFLG_EQUATORIAL)
+        """FLG_EQUATORIAL should return RA/Dec."""
+        pos_ecl, _ = ephem.calc_ut(2451545.0, SUN, 0)
+        pos_equ, _ = ephem.calc_ut(2451545.0, SUN, FLG_EQUATORIAL)
 
         # RA and ecliptic longitude differ
         # (they're the same coordinate system rotated by obliquity)
@@ -123,9 +123,9 @@ class TestCalcUtFlags:
 
     @pytest.mark.unit
     def test_flag_j2000(self):
-        """SEFLG_J2000 should return J2000 frame coordinates."""
-        pos_date, _ = ephem.swe_calc_ut(2460000.0, SE_SUN, 0)  # 2023
-        pos_j2000, _ = ephem.swe_calc_ut(2460000.0, SE_SUN, SEFLG_J2000)
+        """FLG_J2000 should return J2000 frame coordinates."""
+        pos_date, _ = ephem.calc_ut(2460000.0, SUN, 0)  # 2023
+        pos_j2000, _ = ephem.calc_ut(2460000.0, SUN, FLG_J2000)
 
         # Should differ due to precession
         # Difference should be small but measurable
@@ -137,9 +137,9 @@ class TestCalcUtFlags:
 
     @pytest.mark.unit
     def test_flag_helctr(self):
-        """SEFLG_HELCTR should return heliocentric coordinates."""
-        pos_geo, _ = ephem.swe_calc_ut(2451545.0, SE_MARS, 0)
-        pos_hel, _ = ephem.swe_calc_ut(2451545.0, SE_MARS, SEFLG_HELCTR)
+        """FLG_HELCTR should return heliocentric coordinates."""
+        pos_geo, _ = ephem.calc_ut(2451545.0, MARS, 0)
+        pos_hel, _ = ephem.calc_ut(2451545.0, MARS, FLG_HELCTR)
 
         # Heliocentric and geocentric positions differ
         # (unless planet is at opposition/conjunction)
@@ -152,8 +152,8 @@ class TestCalcUtFlags:
     @pytest.mark.unit
     def test_combined_flags(self):
         """Multiple flags should work together."""
-        flags = SEFLG_SPEED | SEFLG_EQUATORIAL
-        pos, ret_flags = ephem.swe_calc_ut(2451545.0, SE_SUN, flags)
+        flags = FLG_SPEED | FLG_EQUATORIAL
+        pos, ret_flags = ephem.calc_ut(2451545.0, SUN, flags)
 
         # Should have velocity
         assert pos[3] != 0
@@ -167,16 +167,16 @@ class TestCalcUtVsPyswisseph:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_planets_match_swisseph(self, planet_id, planet_name):
@@ -184,7 +184,7 @@ class TestCalcUtVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.001  # degrees
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+        pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
         pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
@@ -210,7 +210,7 @@ class TestCalcUtVsPyswisseph:
         iteration = 0
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in all_planets:
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
                 pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
                 lon_diff = abs(pos_lib[0] - pos_swe[0])
@@ -237,11 +237,11 @@ class TestCalcUtTopocentric:
         jd = 2451545.0
 
         # Set observer location (Rome)
-        ephem.swe_set_topo(12.5, 41.9, 0)
+        ephem.set_topo(12.5, 41.9, 0)
         swe.set_topo(12.5, 41.9, 0)
 
-        pos_geo, _ = ephem.swe_calc_ut(jd, SE_MOON, 0)
-        pos_topo, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR)
+        pos_geo, _ = ephem.calc_ut(jd, MOON, 0)
+        pos_topo, _ = ephem.calc_ut(jd, MOON, FLG_TOPOCTR)
 
         # Moon parallax can be up to ~1°
         lon_diff = abs(pos_geo[0] - pos_topo[0])
@@ -257,11 +257,11 @@ class TestCalcUtTopocentric:
         jd = 2451545.0
 
         # Set same location in both
-        ephem.swe_set_topo(12.5, 41.9, 0)
+        ephem.set_topo(12.5, 41.9, 0)
         swe.set_topo(12.5, 41.9, 0)
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR)
-        pos_swe, _ = swe.calc_ut(jd, SE_MOON, SEFLG_TOPOCTR)
+        pos_lib, _ = ephem.calc_ut(jd, MOON, FLG_TOPOCTR)
+        pos_swe, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
         if lon_diff > 180:
@@ -278,11 +278,11 @@ class TestCalcUtSidereal:
         """Sidereal position should differ from tropical by ayanamsha."""
         jd = 2451545.0
 
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
 
-        pos_trop, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
-        pos_sid, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        pos_trop, _ = ephem.calc_ut(jd, SUN, 0)
+        pos_sid, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Difference should equal ayanamsha (~23-24° for Lahiri at J2000)
         diff = pos_trop[0] - pos_sid[0]
@@ -296,11 +296,11 @@ class TestCalcUtSidereal:
         """Sidereal should match pyswisseph."""
         jd = 2451545.0
 
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
-        pos_swe, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        pos_lib, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
+        pos_swe, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         lon_diff = abs(pos_lib[0] - pos_swe[0])
         if lon_diff > 180:

@@ -2,7 +2,7 @@
 LEB vs Skyfield Comparison: Nutation Values.
 
 Validates that LEB nutation (dpsi, deps) matches Skyfield reference
-across the medium tier range. Uses swe_calc_ut with SE_ECL_NUT.
+across the medium tier range. Uses calc_ut with ECL_NUT.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SE_ECL_NUT
+from libephemeris.constants import ECL_NUT
 
 from .conftest import (
     TOLS,
@@ -27,7 +27,7 @@ def nutation_dates() -> list[float]:
 
 
 class TestNutationValues:
-    """Direct nutation comparison via SE_ECL_NUT."""
+    """Direct nutation comparison via ECL_NUT."""
 
     @pytest.mark.leb_compare
     @pytest.mark.slow
@@ -41,8 +41,8 @@ class TestNutationValues:
         worst_jd = 0.0
 
         for jd in nutation_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, ECL_NUT, 0)
+            leb, _ = compare.leb(ephem.calc_ut, jd, ECL_NUT, 0)
 
             # result[2] = nutation in longitude (degrees)
             err = abs(ref[2] - leb[2]) * 3600.0  # to arcsec
@@ -66,8 +66,8 @@ class TestNutationValues:
         worst_jd = 0.0
 
         for jd in nutation_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, ECL_NUT, 0)
+            leb, _ = compare.leb(ephem.calc_ut, jd, ECL_NUT, 0)
 
             # result[3] = nutation in obliquity (degrees)
             err = abs(ref[3] - leb[3]) * 3600.0  # to arcsec
@@ -91,8 +91,8 @@ class TestNutationValues:
         worst_jd = 0.0
 
         for jd in nutation_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, ECL_NUT, 0)
+            leb, _ = compare.leb(ephem.calc_ut, jd, ECL_NUT, 0)
 
             # result[0] = true obliquity (degrees)
             err = abs(ref[0] - leb[0]) * 3600.0  # to arcsec
@@ -116,8 +116,8 @@ class TestNutationValues:
         worst_jd = 0.0
 
         for jd in nutation_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, ECL_NUT, 0)
+            leb, _ = compare.leb(ephem.calc_ut, jd, ECL_NUT, 0)
 
             # result[1] = mean obliquity (degrees)
             err = abs(ref[1] - leb[1]) * 3600.0  # to arcsec
@@ -145,8 +145,8 @@ class TestNutationAllComponents:
         max_errs = [0.0] * 4
 
         for jd in nutation_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_ECL_NUT, 0)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, ECL_NUT, 0)
+            leb, _ = compare.leb(ephem.calc_ut, jd, ECL_NUT, 0)
 
             for i in range(4):
                 err = abs(ref[i] - leb[i]) * 3600.0

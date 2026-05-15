@@ -28,11 +28,11 @@ from docs.cookbook import (
     find_retrograde_periods,
 )
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_MARS,
-    SE_ECL_TOTAL,
+    SUN,
+    MOON,
+    MERCURY,
+    MARS,
+    ECL_TOTAL,
 )
 
 
@@ -244,34 +244,34 @@ class TestTransitFinding:
 
     def test_find_vernal_equinox(self):
         """Should find vernal equinox correctly."""
-        result = find_next_transit(SE_SUN, 0.0, 2024, 1, 1)
+        result = find_next_transit(SUN, 0.0, 2024, 1, 1)
 
         assert result["planet"] == "Sun"
         assert "2024-03" in result["date"]  # Should be in March
 
     def test_find_summer_solstice(self):
         """Should find summer solstice (90° Cancer)."""
-        result = find_next_transit(SE_SUN, 90.0, 2024, 1, 1)
+        result = find_next_transit(SUN, 90.0, 2024, 1, 1)
 
         assert "2024-06" in result["date"]  # Should be in June
 
     def test_moon_transit(self):
         """Should find Moon transits within lunar month."""
-        result = find_next_transit(SE_MOON, 180.0, 2024, 1, 1)
+        result = find_next_transit(MOON, 180.0, 2024, 1, 1)
 
         # Moon should cross 180° within about 27 days
         assert result["crossing_jd"] > 0
 
     def test_planet_transit(self):
         """Should find Mars transit."""
-        result = find_next_transit(SE_MARS, 0.0, 2024, 1, 1)
+        result = find_next_transit(MARS, 0.0, 2024, 1, 1)
 
         assert result["planet"] == "Mars"
         assert result["crossing_jd"] > 0
 
     def test_transit_precision(self):
         """Transit should be accurate to target longitude."""
-        result = find_next_transit(SE_SUN, 45.0, 2024, 1, 1)
+        result = find_next_transit(SUN, 45.0, 2024, 1, 1)
 
         actual_lon = result["planet_position"]["longitude"]
         target_lon = 45.0
@@ -288,7 +288,7 @@ class TestPlanetaryReturn:
 
     def test_solar_return(self):
         """Should find solar return."""
-        result = find_planetary_return(SE_SUN, 135.0, 2024)  # 15° Leo
+        result = find_planetary_return(SUN, 135.0, 2024)  # 15° Leo
 
         assert result["planet"] == "Sun"
         # Should be in August (Leo month)
@@ -300,7 +300,7 @@ class TestSignIngresses:
 
     def test_sun_ingresses_count(self):
         """Should find 12 Sun ingresses in a year."""
-        ingresses = find_sign_ingresses(SE_SUN, 2024)
+        ingresses = find_sign_ingresses(SUN, 2024)
 
         # Should find approximately 12 ingresses
         # (might be 11-13 depending on year boundaries)
@@ -308,7 +308,7 @@ class TestSignIngresses:
 
     def test_ingresses_in_order(self):
         """Ingresses should be in chronological order."""
-        ingresses = find_sign_ingresses(SE_SUN, 2024)
+        ingresses = find_sign_ingresses(SUN, 2024)
 
         for i in range(1, len(ingresses)):
             assert ingresses[i]["crossing_jd"] > ingresses[i - 1]["crossing_jd"]
@@ -379,7 +379,7 @@ class TestEclipseSearch:
 
     def test_find_total_solar_eclipse(self):
         """Should find a total solar eclipse when filtered."""
-        eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+        eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
 
         assert "Total" in eclipse["type"]
 
@@ -390,7 +390,7 @@ class TestEclipseSearch:
         # Maximum JD should be after start date
         import libephemeris as ephem
 
-        start_jd = ephem.swe_julday(2024, 1, 1, 0.0)
+        start_jd = ephem.julday(2024, 1, 1, 0.0)
         assert eclipse["maximum_jd"] > start_jd
 
     def test_find_lunar_eclipse(self):
@@ -407,7 +407,7 @@ class TestEclipseVisibility:
 
     def test_visibility_data_structure(self):
         """Should return proper visibility data."""
-        eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+        eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
         visibility = find_eclipse_visibility(eclipse["maximum_jd"], 32.7767, -96.7970)
 
         assert "visible" in visibility
@@ -417,7 +417,7 @@ class TestEclipseVisibility:
 
     def test_magnitude_range(self):
         """Magnitude should be in valid range when visible."""
-        eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+        eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
         visibility = find_eclipse_visibility(eclipse["maximum_jd"], 32.7767, -96.7970)
 
         if visibility["visible"]:
@@ -486,14 +486,14 @@ class TestRetrogradePeriods:
 
     def test_mercury_retrogrades(self):
         """Mercury should have multiple retrograde periods per year."""
-        retrogrades = find_retrograde_periods(2024, SE_MERCURY)
+        retrogrades = find_retrograde_periods(2024, MERCURY)
 
         # Mercury typically has 3-4 retrograde periods per year
         assert len(retrogrades) >= 2
 
     def test_retrograde_period_structure(self):
         """Retrograde period should have required fields."""
-        retrogrades = find_retrograde_periods(2024, SE_MERCURY)
+        retrogrades = find_retrograde_periods(2024, MERCURY)
 
         if retrogrades:
             period = retrogrades[0]
@@ -505,7 +505,7 @@ class TestRetrogradePeriods:
 
     def test_retrograde_duration_reasonable(self):
         """Retrograde periods should have reasonable durations."""
-        retrogrades = find_retrograde_periods(2024, SE_MERCURY)
+        retrogrades = find_retrograde_periods(2024, MERCURY)
 
         # Count full retrograde periods (excluding partial ones at year boundaries)
         full_periods = [p for p in retrogrades if p["duration_days"] >= 15]

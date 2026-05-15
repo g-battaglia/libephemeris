@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 # Uranian body IDs: 40-48 (Cupido through Proserpina) + 50-57 (Hamburg school)
 URANIANS = list(range(40, 49))
@@ -40,7 +44,7 @@ for body in URANIANS:
     for jd in DATES:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -71,7 +75,7 @@ for body in URANIANS:
     for jd in DATES[:10]:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff_lat = abs(se[0][1] - le[0][1]) * 3600
             if diff_lat < 60:
                 passed += 1
@@ -87,7 +91,7 @@ for body in URANIANS:
     for jd in DATES[:10]:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff_spd = abs(se[0][3] - le[0][3])
             if diff_spd < 0.01:  # 0.01 deg/day
                 passed += 1
@@ -104,7 +108,7 @@ for body in URANIANS:
     for jd in DATES[:10]:
         try:
             se = swe.calc_ut(jd, body, J2000_FLAGS)
-            le = ephem.swe_calc_ut(jd, body, J2000_FLAGS)
+            le = ephem.calc_ut(jd, body, J2000_FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -123,7 +127,7 @@ for body in URANIANS:
     for jd in DATES[:10]:
         try:
             se = swe.calc_ut(jd, body, HELIO_FLAGS)
-            le = ephem.swe_calc_ut(jd, body, HELIO_FLAGS)
+            le = ephem.calc_ut(jd, body, HELIO_FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff

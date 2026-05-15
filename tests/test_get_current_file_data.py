@@ -9,10 +9,9 @@ import os
 import pytest
 from libephemeris import (
     get_current_file_data,
-    swe_get_current_file_data,
-    swe_calc_ut,
-    SE_SUN,
-    SEFLG_SPEED,
+    calc_ut,
+    SUN,
+    FLG_SPEED,
     set_ephemeris_file,
     set_ephe_path,
     close,
@@ -23,7 +22,7 @@ from libephemeris import (
 def reset_state(monkeypatch):
     """Reset ephemeris state before and after each test.
 
-    Disables LEB so swe_calc_ut goes through Skyfield and populates _PLANETS.
+    Disables LEB so calc_ut goes through Skyfield and populates _PLANETS.
     """
     # Disable LEB env vars
     monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
@@ -56,7 +55,7 @@ def test_get_current_file_data_before_loading():
 def test_get_current_file_data_after_loading():
     """Test that get_current_file_data returns valid data after ephemeris is loaded."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path, start, end, denum = get_current_file_data(0)
 
@@ -77,7 +76,7 @@ def test_get_current_file_data_after_loading():
 def test_get_current_file_data_ifno_0_and_1_same():
     """Test that ifno=0 (planets) and ifno=1 (moon) return same data for JPL files."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path0, start0, end0, denum0 = get_current_file_data(0)
     path1, start1, end1, denum1 = get_current_file_data(1)
@@ -92,7 +91,7 @@ def test_get_current_file_data_ifno_0_and_1_same():
 def test_get_current_file_data_ifno_2_not_applicable():
     """Test that ifno=2 (asteroids) returns empty data."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path, start, end, denum = get_current_file_data(2)
 
@@ -105,7 +104,7 @@ def test_get_current_file_data_ifno_2_not_applicable():
 def test_get_current_file_data_ifno_3_not_applicable():
     """Test that ifno=3 (other asteroids) returns empty data."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path, start, end, denum = get_current_file_data(3)
 
@@ -118,7 +117,7 @@ def test_get_current_file_data_ifno_3_not_applicable():
 def test_get_current_file_data_ifno_4_not_applicable():
     """Test that ifno=4 (stars) returns empty data."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path, start, end, denum = get_current_file_data(4)
 
@@ -130,7 +129,7 @@ def test_get_current_file_data_ifno_4_not_applicable():
 
 def test_get_current_file_data_returns_tuple():
     """Test that get_current_file_data returns a tuple of the correct types."""
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     result = get_current_file_data(0)
 
@@ -145,11 +144,11 @@ def test_get_current_file_data_returns_tuple():
 
 
 def test_swe_get_current_file_data_alias():
-    """Test that swe_get_current_file_data is an alias for get_current_file_data."""
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    """Test that get_current_file_data is an alias for get_current_file_data."""
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     result1 = get_current_file_data(0)
-    result2 = swe_get_current_file_data(0)
+    result2 = get_current_file_data(0)
 
     assert result1 == result2
 
@@ -157,7 +156,7 @@ def test_swe_get_current_file_data_alias():
 def test_get_current_file_data_after_close():
     """Test that get_current_file_data returns empty data after close()."""
     # Trigger ephemeris loading
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     # Verify data is available
     path, start, end, denum = get_current_file_data(0)
@@ -176,7 +175,7 @@ def test_get_current_file_data_after_close():
 
 def test_get_current_file_data_date_range_valid():
     """Test that the date range returned is sensible."""
-    swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+    calc_ut(2451545.0, SUN, FLG_SPEED)
 
     path, start, end, denum = get_current_file_data(0)
 

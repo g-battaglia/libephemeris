@@ -14,49 +14,49 @@ FAMOUS_PEOPLE_AYANAMSHA = [
 
 # All 43 Ayanamsha modes
 AYANAMSHA_MODES = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_DELUCE, "De Luce"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_USHASHASHI, "Ushashashi"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (SE_SIDM_JN_BHASIN, "JN Bhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)"),
-    (SE_SIDM_BABYL_KUGLER2, "Babylonian (Kugler 2)"),
-    (SE_SIDM_BABYL_KUGLER3, "Babylonian (Kugler 3)"),
-    (SE_SIDM_BABYL_HUBER, "Babylonian (Huber)"),
-    (SE_SIDM_BABYL_ETPSC, "Babylonian (ETPSC)"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran at 15 Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_SASSANIAN, "Sassanian"),
-    (SE_SIDM_GALCENT_0SAG, "Galactic Center at 0 Sag"),
-    (SE_SIDM_J2000, "J2000"),
-    (SE_SIDM_J1900, "J1900"),
-    (SE_SIDM_B1950, "B1950"),
-    (SE_SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
-    (SE_SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta (mean Sun)"),
-    (SE_SIDM_ARYABHATA, "Aryabhata"),
-    (SE_SIDM_ARYABHATA_MSUN, "Aryabhata (mean Sun)"),
-    (SE_SIDM_SS_REVATI, "SS Revati"),
-    (SE_SIDM_SS_CITRA, "SS Citra"),
-    (SE_SIDM_TRUE_CITRA, "True Citra"),
-    (SE_SIDM_TRUE_REVATI, "True Revati"),
-    (SE_SIDM_TRUE_PUSHYA, "True Pushya"),
-    (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center (Gil Brand)"),
-    (SE_SIDM_GALEQU_IAU1958, "Galactic Equator (IAU 1958)"),
-    (SE_SIDM_GALEQU_TRUE, "Galactic Equator (True)"),
-    (SE_SIDM_GALEQU_MULA, "Galactic Equator at Mula"),
-    (SE_SIDM_GALALIGN_MARDYKS, "Galactic Alignment (Mardyks)"),
-    (SE_SIDM_TRUE_MULA, "True Mula"),
-    (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center at Mula (Wilhelm)"),
-    (SE_SIDM_ARYABHATA_522, "Aryabhata 522"),
-    (SE_SIDM_BABYL_BRITTON, "Babylonian (Britton)"),
-    (SE_SIDM_TRUE_SHEORAN, "True Sheoran"),
-    (SE_SIDM_GALCENT_COCHRANE, "Galactic Center (Cochrane)"),
-    (SE_SIDM_GALEQU_FIORENZA, "Galactic Equator (Fiorenza)"),
-    (SE_SIDM_VALENS_MOON, "Valens (Moon)"),
+    (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_DELUCE, "De Luce"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_USHASHASHI, "Ushashashi"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_JN_BHASIN, "JN Bhasin"),
+    (SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)"),
+    (SIDM_BABYL_KUGLER2, "Babylonian (Kugler 2)"),
+    (SIDM_BABYL_KUGLER3, "Babylonian (Kugler 3)"),
+    (SIDM_BABYL_HUBER, "Babylonian (Huber)"),
+    (SIDM_BABYL_ETPSC, "Babylonian (ETPSC)"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran at 15 Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_SASSANIAN, "Sassanian"),
+    (SIDM_GALCENT_0SAG, "Galactic Center at 0 Sag"),
+    (SIDM_J2000, "J2000"),
+    (SIDM_J1900, "J1900"),
+    (SIDM_B1950, "B1950"),
+    (SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
+    (SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta (mean Sun)"),
+    (SIDM_ARYABHATA, "Aryabhata"),
+    (SIDM_ARYABHATA_MSUN, "Aryabhata (mean Sun)"),
+    (SIDM_SS_REVATI, "SS Revati"),
+    (SIDM_SS_CITRA, "SS Citra"),
+    (SIDM_TRUE_CITRA, "True Citra"),
+    (SIDM_TRUE_REVATI, "True Revati"),
+    (SIDM_TRUE_PUSHYA, "True Pushya"),
+    (SIDM_GALCENT_RGILBRAND, "Galactic Center (Gil Brand)"),
+    (SIDM_GALEQU_IAU1958, "Galactic Equator (IAU 1958)"),
+    (SIDM_GALEQU_TRUE, "Galactic Equator (True)"),
+    (SIDM_GALEQU_MULA, "Galactic Equator at Mula"),
+    (SIDM_GALALIGN_MARDYKS, "Galactic Alignment (Mardyks)"),
+    (SIDM_TRUE_MULA, "True Mula"),
+    (SIDM_GALCENT_MULA_WILHELM, "Galactic Center at Mula (Wilhelm)"),
+    (SIDM_ARYABHATA_522, "Aryabhata 522"),
+    (SIDM_BABYL_BRITTON, "Babylonian (Britton)"),
+    (SIDM_TRUE_SHEORAN, "True Sheoran"),
+    (SIDM_GALCENT_COCHRANE, "Galactic Center (Cochrane)"),
+    (SIDM_GALEQU_FIORENZA, "Galactic Equator (Fiorenza)"),
+    (SIDM_VALENS_MOON, "Valens (Moon)"),
 ]
 
 
@@ -70,8 +70,8 @@ def test_ayanamsha_modes(sid_mode, mode_name):
     aya_swe = swe.get_ayanamsa_ut(jd)
 
     # Python Ephemeris
-    pyephem.swe_set_sid_mode(sid_mode)
-    aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+    pyephem.set_sid_mode(sid_mode)
+    aya_py = pyephem.get_ayanamsa_ut(jd)
 
     diff = abs(aya_swe - aya_py)
     print(
@@ -84,12 +84,12 @@ def test_ayanamsha_modes(sid_mode, mode_name):
         1.0
         if sid_mode
         in [
-            SE_SIDM_TRUE_CITRA,
-            SE_SIDM_TRUE_REVATI,
-            SE_SIDM_TRUE_PUSHYA,
-            SE_SIDM_TRUE_MULA,
-            SE_SIDM_GALCENT_0SAG,
-            SE_SIDM_GALCENT_RGILBRAND,
+            SIDM_TRUE_CITRA,
+            SIDM_TRUE_REVATI,
+            SIDM_TRUE_PUSHYA,
+            SIDM_TRUE_MULA,
+            SIDM_GALCENT_0SAG,
+            SIDM_GALCENT_RGILBRAND,
         ]
         else 0.1
     )
@@ -107,11 +107,11 @@ def test_sidereal_planets(name, year, month, day, hour, sid_mode, mode_name):
 
     # Swiss Ephemeris
     swe.set_sid_mode(sid_mode)
-    pos_swe_tuple, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+    pos_swe_tuple, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
 
     # Python Ephemeris
-    pyephem.swe_set_sid_mode(sid_mode)
-    pos_py, _ = pyephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+    pyephem.set_sid_mode(sid_mode)
+    pos_py, _ = pyephem.calc_ut(jd, SUN, FLG_SIDEREAL)
 
     # Extract longitudes (handle both tuple and array)
     lon_swe = float(pos_swe_tuple[0])
@@ -135,18 +135,18 @@ def test_tropical_vs_sidereal():
     jd = swe.julday(2000, 1, 1, 12.0)
 
     # Tropical - swe.calc_ut returns ((lon, lat, dist, speed_lon, speed_lat, speed_dist), flags)
-    pos_trop_swe_tuple, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-    pos_trop_py, _ = pyephem.swe_calc_ut(jd, SE_SUN, 0)
+    pos_trop_swe_tuple, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+    pos_trop_py, _ = pyephem.calc_ut(jd, SUN, 0)
 
     # Sidereal (Lahiri)
-    swe.set_sid_mode(SE_SIDM_LAHIRI)
-    pyephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    pos_sid_swe_tuple, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
-    pos_sid_py, _ = pyephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+    swe.set_sid_mode(SIDM_LAHIRI)
+    pyephem.set_sid_mode(SIDM_LAHIRI)
+    pos_sid_swe_tuple, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
+    pos_sid_py, _ = pyephem.calc_ut(jd, SUN, FLG_SIDEREAL)
 
     # Get ayanamsha
     aya_swe = swe.get_ayanamsa_ut(jd)
-    aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+    aya_py = pyephem.get_ayanamsa_ut(jd)
 
     # Check that tropical - sidereal = ayanamsha
     # Extract longitude from results (index 0 of the data tuple)
@@ -173,11 +173,11 @@ if __name__ == "__main__":
 
     # Test multiple ayanamsha modes
     test_modes = [
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-        (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-        (SE_SIDM_RAMAN, "Raman"),
-        (SE_SIDM_TRUE_CITRA, "True Citra"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+        (SIDM_KRISHNAMURTI, "Krishnamurti"),
+        (SIDM_RAMAN, "Raman"),
+        (SIDM_TRUE_CITRA, "True Citra"),
     ]
 
     jd = swe.julday(2000, 1, 1, 12.0)
@@ -194,8 +194,8 @@ if __name__ == "__main__":
         swe.set_sid_mode(mode)
         aya_swe = swe.get_ayanamsa_ut(jd)
 
-        pyephem.swe_set_sid_mode(mode)
-        aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+        pyephem.set_sid_mode(mode)
+        aya_py = pyephem.get_ayanamsa_ut(jd)
 
         diff = abs(aya_swe - aya_py)
         status = "✓" if diff < 0.1 else "✗"
@@ -207,17 +207,17 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # Tropical
-    pos_trop_swe_tuple, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-    pos_trop_py, _ = pyephem.swe_calc_ut(jd, SE_SUN, 0)
+    pos_trop_swe_tuple, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+    pos_trop_py, _ = pyephem.calc_ut(jd, SUN, 0)
 
     # Sidereal (Lahiri)
-    swe.set_sid_mode(SE_SIDM_LAHIRI)
-    pyephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    pos_sid_swe_tuple, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH | SEFLG_SIDEREAL)
-    pos_sid_py, _ = pyephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+    swe.set_sid_mode(SIDM_LAHIRI)
+    pyephem.set_sid_mode(SIDM_LAHIRI)
+    pos_sid_swe_tuple, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH | FLG_SIDEREAL)
+    pos_sid_py, _ = pyephem.calc_ut(jd, SUN, FLG_SIDEREAL)
 
     aya_swe = swe.get_ayanamsa_ut(jd)
-    aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+    aya_py = pyephem.get_ayanamsa_ut(jd)
 
     diff_swe = (pos_trop_swe_tuple[0] - pos_sid_swe_tuple[0]) % 360.0
     diff_py = (pos_trop_py[0] - pos_sid_py[0]) % 360.0
@@ -240,16 +240,16 @@ if __name__ == "__main__":
     print("=" * 80)
 
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
     for person_name, year, month, day, hour in FAMOUS_PEOPLE_AYANAMSHA:
@@ -268,8 +268,8 @@ if __name__ == "__main__":
 
         for planet_id, planet_name in planets:
             try:
-                pos_swe_tup, _ = swe.calc_ut(jd_person, planet_id, SEFLG_SWIEPH)
-                pos_py_trop, _ = pyephem.swe_calc_ut(jd_person, planet_id, 0)
+                pos_swe_tup, _ = swe.calc_ut(jd_person, planet_id, FLG_SWIEPH)
+                pos_py_trop, _ = pyephem.calc_ut(jd_person, planet_id, 0)
 
                 lon_swe = float(pos_swe_tup[0])
                 lon_py = float(pos_py_trop[0])
@@ -292,16 +292,16 @@ if __name__ == "__main__":
         )
         print("-" * 77)
 
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        pyephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        pyephem.set_sid_mode(SIDM_LAHIRI)
 
         for planet_id, planet_name in planets:
             try:
                 pos_swe_tup, _ = swe.calc_ut(
-                    jd_person, planet_id, SEFLG_SWIEPH | SEFLG_SIDEREAL
+                    jd_person, planet_id, FLG_SWIEPH | FLG_SIDEREAL
                 )
-                pos_py_sid, _ = pyephem.swe_calc_ut(
-                    jd_person, planet_id, SEFLG_SIDEREAL
+                pos_py_sid, _ = pyephem.calc_ut(
+                    jd_person, planet_id, FLG_SIDEREAL
                 )
 
                 lon_swe = float(pos_swe_tup[0])

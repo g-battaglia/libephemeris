@@ -7,9 +7,9 @@ Tests 50+ bright stars across multiple flag combinations and epochs.
 
 Parts:
   P1: Ecliptic of-date positions for 50 bright stars (2024)
-  P2: Equatorial coordinates (SEFLG_EQUATORIAL) for same stars
-  P3: J2000 frame (SEFLG_J2000|SEFLG_NONUT) — isolate proper motion
-  P4: Astrometric (SEFLG_NOABERR) — no annual aberration
+  P2: Equatorial coordinates (FLG_EQUATORIAL) for same stars
+  P3: J2000 frame (FLG_J2000|FLG_NONUT) — isolate proper motion
+  P4: Astrometric (FLG_NOABERR) — no annual aberration
   P5: Sidereal mode (Lahiri) for 20 astrologically important stars
   P6: Magnitude comparison for all catalog stars
   P7: Speed computation (proper motion rates)
@@ -158,8 +158,8 @@ def se_fixstar(star, jd, flags):
 
 
 def le_fixstar(star, jd, flags):
-    """Call libephemeris swe_fixstar_ut, return (lon, lat, dist, slon, slat, sdist)."""
-    result = ephem.swe_fixstar_ut(star, jd, flags)
+    """Call libephemeris fixstar_ut, return (lon, lat, dist, slon, slat, sdist)."""
+    result = ephem.fixstar_ut(star, jd, flags)
     # libephemeris returns (pos_tuple, star_name, retflag)
     return result[0]
 
@@ -174,7 +174,7 @@ def run_part1():
 
     r = R("P1: Ecliptic of-date")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH
+    flags = FLG_SWIEPH
 
     for star in BRIGHT_STARS:
         label = star
@@ -224,7 +224,7 @@ def run_part2():
 
     r = R("P2: Equatorial")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+    flags = FLG_SWIEPH | FLG_EQUATORIAL
 
     for star in BRIGHT_STARS:
         label = f"EQ {star}"
@@ -268,7 +268,7 @@ def run_part3():
 
     r = R("P3: J2000 Frame")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_NONUT
+    flags = FLG_SWIEPH | FLG_J2000 | FLG_NONUT
 
     for star in BRIGHT_STARS:
         label = f"J2000 {star}"
@@ -312,7 +312,7 @@ def run_part4():
 
     r = R("P4: Astrometric")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH | SEFLG_NOABERR
+    flags = FLG_SWIEPH | FLG_NOABERR
 
     for star in BRIGHT_STARS:
         label = f"Astro {star}"
@@ -356,11 +356,11 @@ def run_part5():
 
     r = R("P5: Sidereal Lahiri")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH | SEFLG_SIDEREAL
+    flags = FLG_SWIEPH | FLG_SIDEREAL
 
     # Set sidereal mode to Lahiri
-    swe.set_sid_mode(1)  # SE_SIDM_LAHIRI = 1
-    ephem.swe_set_sid_mode(1)
+    swe.set_sid_mode(1)  # SIDM_LAHIRI = 1
+    ephem.set_sid_mode(1)
 
     for star in ASTRO_STARS:
         label = f"Sid {star}"
@@ -396,7 +396,7 @@ def run_part5():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
 
     return r.summary(), r
 
@@ -415,7 +415,7 @@ def run_part6():
         label = f"Mag {star}"
         try:
             se_mag = swe.fixstar_mag(star)
-            le_mag = ephem.swe_fixstar_mag(star)
+            le_mag = ephem.fixstar_mag(star)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -452,7 +452,7 @@ def run_part7():
 
     r = R("P7: Speed/Proper Motion")
     jd = swe.julday(2024, 1, 1, 12.0)
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for star in BRIGHT_STARS:
         label = f"Speed {star}"
@@ -505,7 +505,7 @@ def run_part8():
 
     r = R("P8: Multi-Epoch Stars")
     epochs = [1900, 1950, 2000, 2050, 2100]
-    flags = SEFLG_SWIEPH
+    flags = FLG_SWIEPH
 
     # Test stars with high proper motion (most sensitive to PM errors)
     high_pm_stars = [

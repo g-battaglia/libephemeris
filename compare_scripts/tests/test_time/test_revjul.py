@@ -1,5 +1,5 @@
 """
-Comprehensive tests for reverse Julian Day conversion (swe_revjul).
+Comprehensive tests for reverse Julian Day conversion (revjul).
 
 Tests cover:
 - Roundtrip consistency with julday
@@ -10,7 +10,7 @@ Tests cover:
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_JUL_CAL
+from libephemeris.constants import JUL_CAL
 
 
 class TestRevjulStandardEpochs:
@@ -19,7 +19,7 @@ class TestRevjulStandardEpochs:
     @pytest.mark.unit
     def test_j2000_reverse(self):
         """JD 2451545.0 should give 2000-01-01 12:00."""
-        year, month, day, hour = ephem.swe_revjul(2451545.0)
+        year, month, day, hour = ephem.revjul(2451545.0)
         assert year == 2000
         assert month == 1
         assert day == 1
@@ -28,7 +28,7 @@ class TestRevjulStandardEpochs:
     @pytest.mark.unit
     def test_j1900_reverse(self):
         """JD 2415020.0 should give 1899-12-31 12:00."""
-        year, month, day, hour = ephem.swe_revjul(2415020.0)
+        year, month, day, hour = ephem.revjul(2415020.0)
         assert year == 1899
         assert month == 12
         assert day == 31
@@ -37,7 +37,7 @@ class TestRevjulStandardEpochs:
     @pytest.mark.unit
     def test_unix_epoch_reverse(self):
         """JD 2440587.5 should give 1970-01-01 00:00."""
-        year, month, day, hour = ephem.swe_revjul(2440587.5)
+        year, month, day, hour = ephem.revjul(2440587.5)
         assert year == 1970
         assert month == 1
         assert day == 1
@@ -50,23 +50,23 @@ class TestRevjulTimeOfDay:
     @pytest.mark.unit
     def test_midnight(self):
         """Test midnight extraction."""
-        jd = ephem.swe_julday(2000, 6, 15, 0.0)
-        year, month, day, hour = ephem.swe_revjul(jd)
+        jd = ephem.julday(2000, 6, 15, 0.0)
+        year, month, day, hour = ephem.revjul(jd)
         assert hour == pytest.approx(0.0, abs=1e-10)
 
     @pytest.mark.unit
     def test_noon(self):
         """Test noon extraction."""
-        jd = ephem.swe_julday(2000, 6, 15, 12.0)
-        year, month, day, hour = ephem.swe_revjul(jd)
+        jd = ephem.julday(2000, 6, 15, 12.0)
+        year, month, day, hour = ephem.revjul(jd)
         assert hour == pytest.approx(12.0, abs=1e-10)
 
     @pytest.mark.unit
     def test_fractional_hours(self):
         """Test fractional hour extraction."""
         # 6:30:45 = 6.5125 hours
-        jd = ephem.swe_julday(2000, 6, 15, 6.5125)
-        year, month, day, hour = ephem.swe_revjul(jd)
+        jd = ephem.julday(2000, 6, 15, 6.5125)
+        year, month, day, hour = ephem.revjul(jd)
         assert hour == pytest.approx(6.5125, abs=1e-8)
 
 
@@ -77,8 +77,8 @@ class TestRevjulRoundtrip:
     def test_roundtrip_j2000(self):
         """J2000 roundtrip should be exact."""
         original = (2000, 1, 1, 12.0)
-        jd = ephem.swe_julday(*original)
-        result = ephem.swe_revjul(jd)
+        jd = ephem.julday(*original)
+        result = ephem.revjul(jd)
         assert result[0] == original[0]  # year
         assert result[1] == original[1]  # month
         assert result[2] == original[2]  # day
@@ -99,8 +99,8 @@ class TestRevjulRoundtrip:
     )
     def test_roundtrip_various_dates(self, year, month, day, hour):
         """Various dates should roundtrip correctly."""
-        jd = ephem.swe_julday(year, month, day, hour)
-        result = ephem.swe_revjul(jd)
+        jd = ephem.julday(year, month, day, hour)
+        result = ephem.revjul(jd)
         assert result[0] == year
         assert result[1] == month
         assert result[2] == day
@@ -111,7 +111,7 @@ class TestRevjulRoundtrip:
         """100 random dates should all roundtrip correctly."""
         dates = random_dates_in_de421_range(100)
         for year, month, day, hour, jd in dates:
-            result = ephem.swe_revjul(jd)
+            result = ephem.revjul(jd)
             assert result[0] == year
             assert result[1] == month
             assert result[2] == day
@@ -124,7 +124,7 @@ class TestRevjulVsPyswisseph:
     @pytest.mark.comparison
     def test_j2000_matches_swe(self):
         """J2000 reverse should match pyswisseph."""
-        result_lib = ephem.swe_revjul(2451545.0)
+        result_lib = ephem.revjul(2451545.0)
         result_swe = swe.revjul(2451545.0)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
@@ -144,7 +144,7 @@ class TestRevjulVsPyswisseph:
     )
     def test_various_jd_match_swe(self, jd):
         """Various JD values should match pyswisseph."""
-        result_lib = ephem.swe_revjul(jd)
+        result_lib = ephem.revjul(jd)
         result_swe = swe.revjul(jd)
         assert result_lib[0] == result_swe[0]  # year
         assert result_lib[1] == result_swe[1]  # month
@@ -159,7 +159,7 @@ class TestRevjulEdgeCases:
     def test_very_small_jd(self):
         """Test very small (historical) JD values."""
         # JD 0 = November 24, 4714 BC (Julian calendar)
-        year, month, day, hour = ephem.swe_revjul(0.0, SE_JUL_CAL)
+        year, month, day, hour = ephem.revjul(0.0, JUL_CAL)
         # Should return a valid date
         assert isinstance(year, int)
         assert 1 <= month <= 12
@@ -170,7 +170,7 @@ class TestRevjulEdgeCases:
         """Test large (future) JD values."""
         # Far future date
         jd = 2500000.0  # Around year 2132
-        year, month, day, hour = ephem.swe_revjul(jd)
+        year, month, day, hour = ephem.revjul(jd)
         assert year > 2100
         assert 1 <= month <= 12
         assert 1 <= day <= 31
@@ -180,6 +180,6 @@ class TestRevjulEdgeCases:
         """Test that fractional day is preserved with high precision."""
         # Test sub-second precision
         original_hour = 12.000001  # About 0.0036 seconds past noon
-        jd = ephem.swe_julday(2000, 1, 1, original_hour)
-        _, _, _, result_hour = ephem.swe_revjul(jd)
+        jd = ephem.julday(2000, 1, 1, original_hour)
+        _, _, _, result_hour = ephem.revjul(jd)
         assert result_hour == pytest.approx(original_hour, abs=1e-5)

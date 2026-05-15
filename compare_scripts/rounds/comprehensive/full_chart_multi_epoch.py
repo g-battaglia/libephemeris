@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 
 def se_hsys(ch):
@@ -51,7 +55,7 @@ for jd, lat, lon, name in CHARTS:
     for body in range(10):
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -67,7 +71,7 @@ for jd, lat, lon, name in CHARTS:
     for body in [10, 11, 12, 13]:
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -83,7 +87,7 @@ for jd, lat, lon, name in CHARTS:
     for hsys in HOUSE_SYSTEMS:
         try:
             se_h = swe.houses_ex(jd, lat, lon, se_hsys(hsys))
-            le_h = ephem.swe_houses_ex(jd, lat, lon, le_hsys(hsys), 0)
+            le_h = ephem.houses_ex(jd, lat, lon, le_hsys(hsys), 0)
             for i in range(12):
                 diff = abs(se_h[0][i] - le_h[0][i])
                 if diff > 180:
@@ -105,7 +109,7 @@ print("\n=== P2: Asc/MC consistency ===")
 for jd, lat, lon, name in CHARTS:
     try:
         se_h = swe.houses_ex(jd, lat, lon, se_hsys("P"))
-        le_h = ephem.swe_houses_ex(jd, lat, lon, le_hsys("P"), 0)
+        le_h = ephem.houses_ex(jd, lat, lon, le_hsys("P"), 0)
         # ASC
         diff_asc = abs(se_h[1][0] - le_h[1][0])
         if diff_asc > 180:
@@ -133,7 +137,7 @@ print("\n=== P3: Sidereal time ===")
 for jd, lat, lon, name in CHARTS:
     try:
         se_st = swe.sidtime(jd)
-        le_st = ephem.swe_sidtime(jd)
+        le_st = ephem.sidtime(jd)
         diff = abs(se_st - le_st) * 3600  # hours to seconds
         if diff < 0.1:
             passed += 1
@@ -149,7 +153,7 @@ print("\n=== P4: Delta-T ===")
 for jd, lat, lon, name in CHARTS:
     try:
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
         diff = abs(se_dt - le_dt) * 86400  # days to seconds
         if diff < 5.0:  # within 5 seconds
             passed += 1
@@ -166,7 +170,7 @@ jd = 2451545.0
 for body in range(10):
     try:
         se = swe.calc_ut(jd, body, FLAGS)
-        le = ephem.swe_calc_ut(jd, body, FLAGS)
+        le = ephem.calc_ut(jd, body, FLAGS)
         for idx in range(6):
             diff = abs(se[0][idx] - le[0][idx])
             if idx == 0 and diff > 180:

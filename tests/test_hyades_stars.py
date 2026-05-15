@@ -8,11 +8,11 @@ These tests verify the 4 significant Hyades stars are correctly defined and calc
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_PRIMA_HYADUM,
-    SE_SECUNDA_HYADUM,
-    SE_THETA_TAURI,
-    SE_AIN,
-    SE_ALDEBARAN,
+    PRIMA_HYADUM,
+    SECUNDA_HYADUM,
+    THETA_TAURI,
+    AIN,
+    ALDEBARAN,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -25,10 +25,10 @@ from libephemeris.fixed_stars import (
 # All Hyades stars are located near ~65-70 degrees ecliptic longitude (in Taurus)
 HYADES_STARS = [
     # (constant, name, hip_number, magnitude)
-    (SE_PRIMA_HYADUM, "Prima Hyadum", 20205, 3.65),  # Gamma Tauri
-    (SE_SECUNDA_HYADUM, "Secunda Hyadum", 20455, 3.77),  # Delta^1 Tauri
-    (SE_THETA_TAURI, "Theta Tauri", 20894, 3.40),  # Theta^2 Tauri
-    (SE_AIN, "Ain", 20889, 3.53),  # Epsilon Tauri
+    (PRIMA_HYADUM, "Prima Hyadum", 20205, 3.65),  # Gamma Tauri
+    (SECUNDA_HYADUM, "Secunda Hyadum", 20455, 3.77),  # Delta^1 Tauri
+    (THETA_TAURI, "Theta Tauri", 20894, 3.40),  # Theta^2 Tauri
+    (AIN, "Ain", 20889, 3.53),  # Epsilon Tauri
 ]
 
 
@@ -55,7 +55,7 @@ class TestHyadesStarsCatalog:
         other_mags = []
 
         for star_id, name, _, mag in HYADES_STARS:
-            if star_id == SE_THETA_TAURI:
+            if star_id == THETA_TAURI:
                 theta_mag = mag
             else:
                 other_mags.append((name, mag))
@@ -108,7 +108,7 @@ class TestHyadesStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", HYADES_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each Hyades star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -123,7 +123,7 @@ class TestHyadesStarsCalculation:
         """Test that all Hyades stars are clustered together in the sky."""
         positions = []
         for star_id, name, _, _ in HYADES_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0], pos[1]))
 
         # All Hyades stars should be within ~10 degrees of each other
@@ -140,7 +140,7 @@ class TestHyadesStarsCalculation:
     def test_hyades_near_aldebaran(self, standard_jd):
         """Test that Hyades are located near Aldebaran region (~65-70 deg ecliptic)."""
         # Prima Hyadum is a good reference point for the Hyades
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_PRIMA_HYADUM, 0)
+        pos, _ = ephem.calc_ut(standard_jd, PRIMA_HYADUM, 0)
 
         # Should be near 65-70 degrees ecliptic (Taurus)
         assert 60 < pos[0] < 75, (
@@ -153,8 +153,8 @@ class TestHyadesStarsCalculation:
         Aldebaran appears in the same region of the sky but is actually
         much closer to Earth and not a member of the Hyades cluster.
         """
-        aldebaran_pos, _ = ephem.swe_calc_ut(standard_jd, SE_ALDEBARAN, 0)
-        prima_pos, _ = ephem.swe_calc_ut(standard_jd, SE_PRIMA_HYADUM, 0)
+        aldebaran_pos, _ = ephem.calc_ut(standard_jd, ALDEBARAN, 0)
+        prima_pos, _ = ephem.calc_ut(standard_jd, PRIMA_HYADUM, 0)
 
         # They should be in the same general region of the sky
         # Both in Taurus, within about 5 degrees of each other
@@ -171,32 +171,32 @@ class TestHyadesStarsNameResolution:
 
     def test_resolve_prima_hyadum(self):
         """Test Prima Hyadum name resolution."""
-        assert resolve_star_name("Prima Hyadum") == SE_PRIMA_HYADUM
-        assert resolve_star_name("Gamma Tauri") == SE_PRIMA_HYADUM
-        assert resolve_star_name("Gamma Tau") == SE_PRIMA_HYADUM
-        assert resolve_star_name("Hyadum I") == SE_PRIMA_HYADUM
-        assert resolve_star_name("First Hyad") == SE_PRIMA_HYADUM
+        assert resolve_star_name("Prima Hyadum") == PRIMA_HYADUM
+        assert resolve_star_name("Gamma Tauri") == PRIMA_HYADUM
+        assert resolve_star_name("Gamma Tau") == PRIMA_HYADUM
+        assert resolve_star_name("Hyadum I") == PRIMA_HYADUM
+        assert resolve_star_name("First Hyad") == PRIMA_HYADUM
 
     def test_resolve_secunda_hyadum(self):
         """Test Secunda Hyadum name resolution."""
-        assert resolve_star_name("Secunda Hyadum") == SE_SECUNDA_HYADUM
-        assert resolve_star_name("Delta Tauri") == SE_SECUNDA_HYADUM
-        assert resolve_star_name("Delta Tau") == SE_SECUNDA_HYADUM
-        assert resolve_star_name("Hyadum II") == SE_SECUNDA_HYADUM
-        assert resolve_star_name("Second Hyad") == SE_SECUNDA_HYADUM
+        assert resolve_star_name("Secunda Hyadum") == SECUNDA_HYADUM
+        assert resolve_star_name("Delta Tauri") == SECUNDA_HYADUM
+        assert resolve_star_name("Delta Tau") == SECUNDA_HYADUM
+        assert resolve_star_name("Hyadum II") == SECUNDA_HYADUM
+        assert resolve_star_name("Second Hyad") == SECUNDA_HYADUM
 
     def test_resolve_theta_tauri(self):
         """Test Theta Tauri name resolution."""
-        assert resolve_star_name("Theta Tauri") == SE_THETA_TAURI
-        assert resolve_star_name("Theta2 Tauri") == SE_THETA_TAURI
-        assert resolve_star_name("Theta2 Tau") == SE_THETA_TAURI
+        assert resolve_star_name("Theta Tauri") == THETA_TAURI
+        assert resolve_star_name("Theta2 Tauri") == THETA_TAURI
+        assert resolve_star_name("Theta2 Tau") == THETA_TAURI
 
     def test_resolve_ain(self):
         """Test Ain (Epsilon Tauri) name resolution."""
-        assert resolve_star_name("Ain") == SE_AIN
-        assert resolve_star_name("Epsilon Tauri") == SE_AIN
-        assert resolve_star_name("Epsilon Tau") == SE_AIN
-        assert resolve_star_name("Oculus Borealis") == SE_AIN
+        assert resolve_star_name("Ain") == AIN
+        assert resolve_star_name("Epsilon Tauri") == AIN
+        assert resolve_star_name("Epsilon Tau") == AIN
+        assert resolve_star_name("Oculus Borealis") == AIN
 
     @pytest.mark.parametrize("star_id,name,hip,mag", HYADES_STARS)
     def test_canonical_name_retrieval(self, star_id, name, hip, mag):
@@ -213,7 +213,7 @@ class TestHyadesStarsData:
         """Test Prima Hyadum (Gamma Tauri) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_PRIMA_HYADUM:
+            if e.id == PRIMA_HYADUM:
                 entry = e
                 break
 
@@ -229,7 +229,7 @@ class TestHyadesStarsData:
         """Test Secunda Hyadum (Delta^1 Tauri) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_SECUNDA_HYADUM:
+            if e.id == SECUNDA_HYADUM:
                 entry = e
                 break
 
@@ -245,7 +245,7 @@ class TestHyadesStarsData:
         """Test Theta Tauri (Theta^2 Tauri) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_THETA_TAURI:
+            if e.id == THETA_TAURI:
                 entry = e
                 break
 
@@ -261,7 +261,7 @@ class TestHyadesStarsData:
         """Test Ain (Epsilon Tauri) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_AIN:
+            if e.id == AIN:
                 entry = e
                 break
 

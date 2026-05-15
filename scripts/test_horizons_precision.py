@@ -2,7 +2,7 @@
 """
 Fast Horizons vs Skyfield precision test.
 
-Compares swe_calc_ut() results between Horizons API and Skyfield across
+Compares calc_ut() results between Horizons API and Skyfield across
 multiple bodies, dates, and flag combinations. Requires internet connection.
 
 Usage:
@@ -41,15 +41,15 @@ BODIES = [
 
 # Known bug: Sun heliocentric in Skyfield path returns wrong results
 # (documented in proposals/leb-optimization-findings.md)
-SKIP_COMBOS = {(0, swe.SEFLG_SPEED | swe.SEFLG_HELCTR)}
+SKIP_COMBOS = {(0, swe.FLG_SPEED | swe.FLG_HELCTR)}
 
 FLAGS = [
-    (swe.SEFLG_SPEED, "default"),
-    (swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL, "sidereal"),
-    (swe.SEFLG_SPEED | swe.SEFLG_EQUATORIAL, "equatorial"),
-    (swe.SEFLG_SPEED | swe.SEFLG_J2000, "J2000"),
-    (swe.SEFLG_SPEED | swe.SEFLG_NOABERR, "no_aberr"),
-    (swe.SEFLG_SPEED | swe.SEFLG_HELCTR, "heliocentric"),
+    (swe.FLG_SPEED, "default"),
+    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
+    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
+    (swe.FLG_SPEED | swe.FLG_J2000, "J2000"),
+    (swe.FLG_SPEED | swe.FLG_NOABERR, "no_aberr"),
+    (swe.FLG_SPEED | swe.FLG_HELCTR, "heliocentric"),
 ]
 
 # Thresholds (arcseconds)
@@ -75,11 +75,11 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 if (bid, fl) in SKIP_COMBOS:
                     continue
                 try:
-                    r = swe.swe_calc_ut(float(jd), bid, fl)
+                    r = swe.calc_ut(float(jd), bid, fl)
                     ref[(float(jd), bid, fl)] = r[0][:3]
                 except Exception:
                     pass
-    swe.swe_close()
+    swe.close()
 
     # Phase 2: Horizons
     swe.set_calc_mode("horizons")
@@ -95,7 +95,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    r = swe.swe_calc_ut(float(jd), bid, fl)
+                    r = swe.calc_ut(float(jd), bid, fl)
                     v2 = r[0][:3]
                     v1 = ref[k]
 
@@ -109,7 +109,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
 
                     threshold = (
                         HELIOCENTRIC_THRESHOLD
-                        if fl & swe.SEFLG_HELCTR
+                        if fl & swe.FLG_HELCTR
                         else GEOCENTRIC_THRESHOLD
                     )
                     if err >= threshold:
@@ -121,7 +121,7 @@ def run_test(n_dates: int = 200, seed: int = 42) -> bool:
                 except Exception:
                     pass
 
-    swe.swe_close()
+    swe.close()
     elapsed = time.time() - t0
 
     # Report

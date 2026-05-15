@@ -1,10 +1,10 @@
 """
-Planetocentric Calculations Comparison Tests (swe_calc_pctr / calc_pctr).
+Planetocentric Calculations Comparison Tests (calc_pctr / calc_pctr).
 
 Validates planetocentric position calculations between pyswisseph and libephemeris:
 - Position of a target body as observed from another planet's center
 - Various target/center combinations (Moon from Mars, Sun from Jupiter, etc.)
-- Multiple calculation flags (SEFLG_SPEED, SEFLG_EQUATORIAL, SEFLG_SIDEREAL)
+- Multiple calculation flags (FLG_SPEED, FLG_EQUATORIAL, FLG_SIDEREAL)
 - Multiple time periods for validation
 
 Use cases:
@@ -17,22 +17,22 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_EARTH,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SEFLG_J2000,
-    SE_SIDM_LAHIRI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    EARTH,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    FLG_J2000,
+    SIDM_LAHIRI,
 )
 
 
@@ -42,67 +42,67 @@ from libephemeris.constants import (
 
 # All major planets for comprehensive testing
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_EARTH, "Earth"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (EARTH, "Earth"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Planet centers for observation (excluding Sun since that's heliocentric)
 CENTER_PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_EARTH, "Earth"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (EARTH, "Earth"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
 ]
 
 # Key target/center combinations for focused testing
 KEY_COMBINATIONS = [
     # Moon as seen from Mars - primary use case for Mars colonization astrology
-    (SE_MOON, "Moon", SE_MARS, "Mars"),
+    (MOON, "Moon", MARS, "Mars"),
     # Sun as seen from Jupiter - Jupiter-centric calculations
-    (SE_SUN, "Sun", SE_JUPITER, "Jupiter"),
+    (SUN, "Sun", JUPITER, "Jupiter"),
     # Earth as seen from Mars - Mars observer perspective
-    (SE_EARTH, "Earth", SE_MARS, "Mars"),
+    (EARTH, "Earth", MARS, "Mars"),
     # Sun as seen from Saturn - outer planet perspective
-    (SE_SUN, "Sun", SE_SATURN, "Saturn"),
+    (SUN, "Sun", SATURN, "Saturn"),
     # Venus as seen from Mercury - inner planet observation
-    (SE_VENUS, "Venus", SE_MERCURY, "Mercury"),
+    (VENUS, "Venus", MERCURY, "Mercury"),
     # Jupiter as seen from Saturn - gas giant mutual observation
-    (SE_JUPITER, "Jupiter", SE_SATURN, "Saturn"),
+    (JUPITER, "Jupiter", SATURN, "Saturn"),
     # Saturn as seen from Jupiter - reverse observation
-    (SE_SATURN, "Saturn", SE_JUPITER, "Jupiter"),
+    (SATURN, "Saturn", JUPITER, "Jupiter"),
     # Moon as seen from Venus - Venus observer
-    (SE_MOON, "Moon", SE_VENUS, "Venus"),
+    (MOON, "Moon", VENUS, "Venus"),
     # Sun as seen from Uranus - distant outer perspective
-    (SE_SUN, "Sun", SE_URANUS, "Uranus"),
+    (SUN, "Sun", URANUS, "Uranus"),
     # Earth as seen from Jupiter - far observer
-    (SE_EARTH, "Earth", SE_JUPITER, "Jupiter"),
+    (EARTH, "Earth", JUPITER, "Jupiter"),
 ]
 
 # Extended combinations for comprehensive coverage
 EXTENDED_COMBINATIONS = [
-    (SE_MERCURY, "Mercury", SE_VENUS, "Venus"),
-    (SE_MARS, "Mars", SE_EARTH, "Earth"),
-    (SE_PLUTO, "Pluto", SE_NEPTUNE, "Neptune"),
-    (SE_NEPTUNE, "Neptune", SE_URANUS, "Uranus"),
-    (SE_URANUS, "Uranus", SE_NEPTUNE, "Neptune"),
-    (SE_SUN, "Sun", SE_NEPTUNE, "Neptune"),
-    (SE_MOON, "Moon", SE_JUPITER, "Jupiter"),
-    (SE_VENUS, "Venus", SE_MARS, "Mars"),
-    (SE_MARS, "Mars", SE_VENUS, "Venus"),
-    (SE_SUN, "Sun", SE_PLUTO, "Pluto"),
+    (MERCURY, "Mercury", VENUS, "Venus"),
+    (MARS, "Mars", EARTH, "Earth"),
+    (PLUTO, "Pluto", NEPTUNE, "Neptune"),
+    (NEPTUNE, "Neptune", URANUS, "Uranus"),
+    (URANUS, "Uranus", NEPTUNE, "Neptune"),
+    (SUN, "Sun", NEPTUNE, "Neptune"),
+    (MOON, "Moon", JUPITER, "Jupiter"),
+    (VENUS, "Venus", MARS, "Mars"),
+    (MARS, "Mars", VENUS, "Venus"),
+    (SUN, "Sun", PLUTO, "Pluto"),
 ]
 
 # Test dates spanning different eras
@@ -144,8 +144,8 @@ class TestMoonFromMars:
     def test_moon_from_mars_j2000(self):
         """Moon from Mars at J2000 epoch."""
         jd = 2451545.0
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
-        pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, 0)
+        pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, 0)
 
         lon_diff = angular_diff(pos_lib[0], pos_swe[0])
         lat_diff = abs(pos_lib[1] - pos_swe[1])
@@ -163,9 +163,9 @@ class TestMoonFromMars:
         """Moon from Mars across multiple dates."""
         jd = swe.julday(year, month, day, hour)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, 0)
+            pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available for this date")
 
@@ -179,8 +179,8 @@ class TestMoonFromMars:
     def test_moon_from_mars_with_speed(self):
         """Moon from Mars with velocity calculations."""
         jd = 2451545.0
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
-        pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, FLG_SPEED)
+        pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, FLG_SPEED)
 
         lon_diff = angular_diff(pos_lib[0], pos_swe[0])
         vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -201,9 +201,9 @@ class TestSunFromJupiter:
         """Sun from Jupiter at J2000 epoch."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, JUPITER, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, JUPITER, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -223,9 +223,9 @@ class TestSunFromJupiter:
         """Sun from Jupiter across multiple dates."""
         jd = swe.julday(year, month, day, hour)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, JUPITER, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, SE_JUPITER, 0)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, JUPITER, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available for this date")
 
@@ -240,9 +240,9 @@ class TestSunFromJupiter:
         """Sun from Jupiter with velocity calculations."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, JUPITER, FLG_SPEED)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, SE_JUPITER, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, JUPITER, FLG_SPEED)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -271,7 +271,7 @@ class TestKeyCombinations:
         """Test key planetocentric combinations at J2000."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, 0)
         try:
             pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, 0)
         except Exception:
@@ -304,7 +304,7 @@ class TestKeyCombinations:
         """Test extended planetocentric combinations at J2000."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, 0)
         try:
             pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, 0)
         except Exception:
@@ -326,9 +326,9 @@ class TestAllPlanetCenters:
         """Sun as seen from all planet centers."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, center_id, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, center_id, 0)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, center_id, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -344,9 +344,9 @@ class TestAllPlanetCenters:
         """Moon as seen from inner planet centers."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, center_id, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_MOON, center_id, 0)
+            pos_swe, _ = swe.calc_pctr(jd, MOON, center_id, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -370,12 +370,12 @@ class TestCalcPctrFlags:
         "target_id,target_name,center_id,center_name", KEY_COMBINATIONS[:3]
     )
     def test_with_speed_flag(self, target_id, target_name, center_id, center_name):
-        """Test SEFLG_SPEED flag for planetocentric calculations."""
+        """Test FLG_SPEED flag for planetocentric calculations."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, FLG_SPEED)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, FLG_SPEED)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -394,12 +394,12 @@ class TestCalcPctrFlags:
         "target_id,target_name,center_id,center_name", KEY_COMBINATIONS[:3]
     )
     def test_with_equatorial_flag(self, target_id, target_name, center_id, center_name):
-        """Test SEFLG_EQUATORIAL flag for planetocentric calculations."""
+        """Test FLG_EQUATORIAL flag for planetocentric calculations."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, SEFLG_EQUATORIAL)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, FLG_EQUATORIAL)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, SEFLG_EQUATORIAL)
+            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, FLG_EQUATORIAL)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -418,16 +418,16 @@ class TestCalcPctrFlags:
 
     @pytest.mark.comparison
     def test_with_sidereal_flag(self):
-        """Test SEFLG_SIDEREAL flag for planetocentric calculations."""
+        """Test FLG_SIDEREAL flag for planetocentric calculations."""
         jd = 2451545.0
 
         # Set sidereal mode
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SIDEREAL)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, FLG_SIDEREAL)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SIDEREAL)
+            pos_swe, _ = swe.calc_pctr(jd, MOON, MARS, FLG_SIDEREAL)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -440,12 +440,12 @@ class TestCalcPctrFlags:
 
     @pytest.mark.comparison
     def test_with_j2000_flag(self):
-        """Test SEFLG_J2000 flag for planetocentric calculations."""
+        """Test FLG_J2000 flag for planetocentric calculations."""
         jd = swe.julday(2024, 6, 15, 12.0)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, SE_JUPITER, SEFLG_J2000)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, JUPITER, FLG_J2000)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, SE_JUPITER, SEFLG_J2000)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, JUPITER, FLG_J2000)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -484,7 +484,7 @@ class TestMultipleDates:
         """Test key combinations across multiple dates."""
         jd = swe.julday(year, month, day, hour)
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, 0)
         try:
             pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, 0)
         except Exception:
@@ -516,7 +516,7 @@ class TestGeometricConsistency:
         jd = 2451545.0
 
         # libephemeris behavior
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MARS, SE_MARS, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, MARS, MARS, 0)
 
         # Distance should be essentially zero
         assert pos_lib[2] < 0.0001, (
@@ -525,7 +525,7 @@ class TestGeometricConsistency:
 
         # pyswisseph raises an error for self-observation
         with pytest.raises(Exception):
-            swe.calc_pctr(jd, SE_MARS, SE_MARS, 0)
+            swe.calc_pctr(jd, MARS, MARS, 0)
 
     @pytest.mark.comparison
     def test_earth_mars_symmetry(self):
@@ -533,12 +533,12 @@ class TestGeometricConsistency:
         jd = 2451545.0
 
         # Earth as seen from Mars
-        pos_earth_from_mars, _ = ephem.swe_calc_pctr(jd, SE_EARTH, SE_MARS, 0)
+        pos_earth_from_mars, _ = ephem.calc_pctr(jd, EARTH, MARS, 0)
         # Mars as seen from Earth (geocentric)
-        pos_mars_from_earth, _ = ephem.swe_calc_ut(jd, SE_MARS, 0)
+        pos_mars_from_earth, _ = ephem.calc_ut(jd, MARS, 0)
 
         # Compare with pyswisseph
-        pos_earth_from_mars_swe, _ = swe.calc_pctr(jd, SE_EARTH, SE_MARS, 0)
+        pos_earth_from_mars_swe, _ = swe.calc_pctr(jd, EARTH, MARS, 0)
 
         lon_diff = angular_diff(pos_earth_from_mars[0], pos_earth_from_mars_swe[0])
         assert lon_diff < LONGITUDE_TOLERANCE
@@ -549,9 +549,9 @@ class TestGeometricConsistency:
         """Sun distance from various planets should match known values."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_SUN, center_id, 0)
+        pos_lib, _ = ephem.calc_pctr(jd, SUN, center_id, 0)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, SE_SUN, center_id, 0)
+            pos_swe, _ = swe.calc_pctr(jd, SUN, center_id, 0)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -582,9 +582,9 @@ class TestVelocityCalculations:
         """Velocity calculations should match pyswisseph."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, target_id, center_id, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, target_id, center_id, FLG_SPEED)
         try:
-            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_pctr(jd, target_id, center_id, FLG_SPEED)
         except Exception:
             pytest.skip("pyswisseph ephemeris not available")
 
@@ -620,8 +620,8 @@ class TestReturnValueStructure:
         """Return should be (6-tuple, int) like pyswisseph."""
         jd = 2451545.0
 
-        result_lib = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
-        result_swe = swe.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
+        result_lib = ephem.calc_pctr(jd, MOON, MARS, FLG_SPEED)
+        result_swe = swe.calc_pctr(jd, MOON, MARS, FLG_SPEED)
 
         # Both should return (positions, flags)
         assert len(result_lib) == 2
@@ -640,7 +640,7 @@ class TestReturnValueStructure:
         """All position elements should be floats."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_pctr(jd, MOON, MARS, FLG_SPEED)
 
         for i, val in enumerate(pos_lib):
             assert isinstance(val, float), f"Element {i} is {type(val)}, expected float"
@@ -656,11 +656,11 @@ class TestAliases:
 
     @pytest.mark.comparison
     def test_calc_pctr_alias_matches_swe_calc_pctr(self):
-        """calc_pctr should return same results as swe_calc_pctr."""
+        """calc_pctr should return same results as calc_pctr."""
         jd = 2451545.0
 
-        pos1, flags1 = ephem.swe_calc_pctr(jd, SE_MOON, SE_MARS, 0)
-        pos2, flags2 = ephem.calc_pctr(jd, SE_MOON, SE_MARS, 0)
+        pos1, flags1 = ephem.calc_pctr(jd, MOON, MARS, 0)
+        pos2, flags2 = ephem.calc_pctr(jd, MOON, MARS, 0)
 
         assert pos1[0] == pos2[0]
         assert pos1[1] == pos2[1]

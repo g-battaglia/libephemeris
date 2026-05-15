@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 import sys, os, math
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
 
 BODIES = list(range(1, 10))  # Moon-Pluto (skip Sun)
@@ -37,7 +41,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.pheno_ut(jd, body, FLAGS)  # flat tuple
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)  # (tuple, flag)
+            le = ephem.pheno_ut(jd, body, FLAGS)  # (tuple, flag)
             diff = abs(se[2] - le[0][2])
             if diff < 0.01:
                 passed += 1
@@ -56,7 +60,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.pheno_ut(jd, body, FLAGS)
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)
+            le = ephem.pheno_ut(jd, body, FLAGS)
             diff = abs(se[0] - le[0][0])
             if diff < 0.5:
                 passed += 1
@@ -75,7 +79,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.pheno_ut(jd, body, FLAGS)
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)
+            le = ephem.pheno_ut(jd, body, FLAGS)
             diff = abs(se[1] - le[0][1])
             if diff < 0.005:
                 passed += 1
@@ -94,7 +98,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.pheno_ut(jd, body, FLAGS)
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)
+            le = ephem.pheno_ut(jd, body, FLAGS)
             if se[3] > 0 and le[0][3] > 0:
                 ratio = le[0][3] / se[3]
                 if 0.95 < ratio < 1.05:
@@ -116,7 +120,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.pheno_ut(jd, body, FLAGS)
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)
+            le = ephem.pheno_ut(jd, body, FLAGS)
             diff = abs(se[4] - le[0][4])
             if diff < 0.5:
                 passed += 1
@@ -134,8 +138,8 @@ print("\n=== P6: Manual elongation cross-check ===")
 for jd in DATES[:10]:
     for body in [1, 2, 3, 4, 5]:
         try:
-            sun = ephem.swe_calc_ut(jd, 0, FLAGS)[0]
-            bdy = ephem.swe_calc_ut(jd, body, FLAGS)[0]
+            sun = ephem.calc_ut(jd, 0, FLAGS)[0]
+            bdy = ephem.calc_ut(jd, body, FLAGS)[0]
             dlon = math.radians(bdy[0] - sun[0])
             cos_e = math.sin(math.radians(sun[1])) * math.sin(
                 math.radians(bdy[1])
@@ -143,7 +147,7 @@ for jd in DATES[:10]:
                 math.radians(bdy[1])
             ) * math.cos(dlon)
             manual = math.degrees(math.acos(max(-1.0, min(1.0, cos_e))))
-            le = ephem.swe_pheno_ut(jd, body, FLAGS)
+            le = ephem.pheno_ut(jd, body, FLAGS)
             diff = abs(manual - le[0][2])
             if diff < 0.1:
                 passed += 1

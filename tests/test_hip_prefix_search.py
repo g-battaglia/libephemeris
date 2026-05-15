@@ -2,7 +2,7 @@
 Unit tests for HIP prefix search functionality in star lookup.
 
 Tests the ability to search for stars using "HIP NNNNN" format,
-which is required for pyswisseph swe_fixstar2 compatibility.
+which is required for pyswisseph fixstar2 compatibility.
 
 Examples:
     - "HIP 49669" -> Regulus
@@ -11,7 +11,7 @@ Examples:
 """
 
 import pytest
-from libephemeris.fixed_stars import _resolve_star2, swe_fixstar2_ut
+from libephemeris.fixed_stars import _resolve_star2, fixstar2_ut
 
 
 @pytest.mark.unit
@@ -90,26 +90,26 @@ class TestHipPrefixSearch:
 
 @pytest.mark.unit
 class TestHipPrefixWithFixstar2:
-    """Tests for HIP prefix search via swe_fixstar2_ut."""
+    """Tests for HIP prefix search via fixstar2_ut."""
 
     def test_swe_fixstar2_ut_hip_prefix_regulus(self):
-        """Test swe_fixstar2_ut with HIP 49669 returns Regulus."""
+        """Test fixstar2_ut with HIP 49669 returns Regulus."""
         jd = 2451545.0  # J2000.0
-        pos, name, retflag = swe_fixstar2_ut("HIP 49669", jd, 0)
+        pos, name, retflag = fixstar2_ut("HIP 49669", jd, 0)
         assert "Regulus" in name
         assert pos[0] > 0  # Longitude should be positive
 
     def test_swe_fixstar2_ut_hip_prefix_spica(self):
-        """Test swe_fixstar2_ut with HIP 65474 returns Spica."""
+        """Test fixstar2_ut with HIP 65474 returns Spica."""
         jd = 2451545.0  # J2000.0
-        pos, name, retflag = swe_fixstar2_ut("HIP 65474", jd, 0)
+        pos, name, retflag = fixstar2_ut("HIP 65474", jd, 0)
         assert "Spica" in name
         assert pos[0] > 0
 
     def test_swe_fixstar2_ut_hip_prefix_no_space(self):
-        """Test swe_fixstar2_ut with HIP65474 (no space) returns Spica."""
+        """Test fixstar2_ut with HIP65474 (no space) returns Spica."""
         jd = 2451545.0  # J2000.0
-        pos, name, retflag = swe_fixstar2_ut("HIP65474", jd, 0)
+        pos, name, retflag = fixstar2_ut("HIP65474", jd, 0)
         assert "Spica" in name
 
 

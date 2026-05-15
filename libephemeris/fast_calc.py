@@ -18,30 +18,30 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from .constants import (
-    SE_EARTH,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SE_MEAN_APOG,
-    SE_MEAN_NODE,
-    SE_MOON,
-    SE_OSCU_APOG,
-    SE_SUN,
-    SE_TRUE_NODE,
-    SEFLG_BARYCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_ICRS,
-    SEFLG_J2000,
-    SEFLG_MOSEPH,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_NONUT,
-    SEFLG_RADIANS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_XYZ,
+    EARTH,
+    INTP_APOG,
+    INTP_PERG,
+    MEAN_APOG,
+    MEAN_NODE,
+    MOON,
+    OSCU_APOG,
+    SUN,
+    TRUE_NODE,
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_ICRS,
+    FLG_J2000,
+    FLG_MOSEPH,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_NONUT,
+    FLG_RADIANS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    FLG_TRUEPOS,
+    FLG_XYZ,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
     _MOON_MEAN_ECC,
@@ -277,14 +277,14 @@ _AU_M = 149597870700  # 1 AU in metres
 
 # Deflector reciprocal masses (solar mass / deflector mass)
 _DEFLECTORS: Tuple[Tuple[int, float], ...] = (
-    (SE_SUN, 1.0),  # Sun
+    (SUN, 1.0),  # Sun
     (5, 1047.3486),  # Jupiter barycenter
     (6, 3497.898),  # Saturn barycenter
 )
 
 # Body IDs in the LEB file for deflector barycenters
 # (Jupiter=5, Saturn=6 map to body_ids 5, 6 in LEB — their barycentric ICRS)
-_DEFLECTOR_LEB_IDS = {SE_SUN: SE_SUN, 5: 5, 6: 6}
+_DEFLECTOR_LEB_IDS = {SUN: SUN, 5: 5, 6: 6}
 
 # =============================================================================
 # CENTER-OF-BODY (COB) CORRECTION FOR SYSTEM BARYCENTERS
@@ -846,35 +846,35 @@ _PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
 # Star-based / galactic modes have (0.0) placeholders and require Skyfield.
 # These values mirror the ayanamsha_data dict in planets._calc_ayanamsa().
 _AYANAMSHA_J2000: Dict[int, float] = {
-    0: 24.740300,  # SE_SIDM_FAGAN_BRADLEY
-    1: 23.857092,  # SE_SIDM_LAHIRI
-    2: 27.815753,  # SE_SIDM_DELUCE
-    3: 22.410791,  # SE_SIDM_RAMAN
-    4: 20.057541,  # SE_SIDM_USHASHASHI
-    5: 23.760240,  # SE_SIDM_KRISHNAMURTI
-    6: 28.359679,  # SE_SIDM_DJWHAL_KHUL
-    7: 22.478803,  # SE_SIDM_YUKTESHWAR
-    8: 22.762137,  # SE_SIDM_JN_BHASIN
-    9: 23.533640,  # SE_SIDM_BABYL_KUGLER1
-    10: 24.933640,  # SE_SIDM_BABYL_KUGLER2
-    11: 25.783640,  # SE_SIDM_BABYL_KUGLER3
-    12: 24.733640,  # SE_SIDM_BABYL_HUBER
-    13: 24.522528,  # SE_SIDM_BABYL_ETPSC
-    14: 24.758924,  # SE_SIDM_ALDEBARAN_15TAU
-    15: 20.247788,  # SE_SIDM_HIPPARCHOS
-    16: 19.992959,  # SE_SIDM_SASSANIAN
-    18: 0.0,  # SE_SIDM_J2000
-    19: 1.396581,  # SE_SIDM_J1900
-    20: 0.698370,  # SE_SIDM_B1950
-    21: 20.895059,  # SE_SIDM_SURYASIDDHANTA
-    22: 20.680425,  # SE_SIDM_SURYASIDDHANTA_MSUN
-    23: 20.895060,  # SE_SIDM_ARYABHATA
-    24: 20.657427,  # SE_SIDM_ARYABHATA_MSUN
-    25: 20.103388,  # SE_SIDM_SS_REVATI
-    26: 23.005763,  # SE_SIDM_SS_CITRA
-    37: 20.575847,  # SE_SIDM_ARYABHATA_522
-    38: 24.615753,  # SE_SIDM_BABYL_BRITTON
-    41: 25.000019,  # SE_SIDM_GALEQU_FIORENZA
+    0: 24.740300,  # SIDM_FAGAN_BRADLEY
+    1: 23.857092,  # SIDM_LAHIRI
+    2: 27.815753,  # SIDM_DELUCE
+    3: 22.410791,  # SIDM_RAMAN
+    4: 20.057541,  # SIDM_USHASHASHI
+    5: 23.760240,  # SIDM_KRISHNAMURTI
+    6: 28.359679,  # SIDM_DJWHAL_KHUL
+    7: 22.478803,  # SIDM_YUKTESHWAR
+    8: 22.762137,  # SIDM_JN_BHASIN
+    9: 23.533640,  # SIDM_BABYL_KUGLER1
+    10: 24.933640,  # SIDM_BABYL_KUGLER2
+    11: 25.783640,  # SIDM_BABYL_KUGLER3
+    12: 24.733640,  # SIDM_BABYL_HUBER
+    13: 24.522528,  # SIDM_BABYL_ETPSC
+    14: 24.758924,  # SIDM_ALDEBARAN_15TAU
+    15: 20.247788,  # SIDM_HIPPARCHOS
+    16: 19.992959,  # SIDM_SASSANIAN
+    18: 0.0,  # SIDM_J2000
+    19: 1.396581,  # SIDM_J1900
+    20: 0.698370,  # SIDM_B1950
+    21: 20.895059,  # SIDM_SURYASIDDHANTA
+    22: 20.680425,  # SIDM_SURYASIDDHANTA_MSUN
+    23: 20.895060,  # SIDM_ARYABHATA
+    24: 20.657427,  # SIDM_ARYABHATA_MSUN
+    25: 20.103388,  # SIDM_SS_REVATI
+    26: 23.005763,  # SIDM_SS_CITRA
+    37: 20.575847,  # SIDM_ARYABHATA_522
+    38: 24.615753,  # SIDM_BABYL_BRITTON
+    41: 25.000019,  # SIDM_GALEQU_FIORENZA
 }
 
 # Star-based modes that cannot be computed without Skyfield
@@ -929,7 +929,7 @@ def _calc_ayanamsa_from_leb(
         raise KeyError(f"Star-based sidereal mode {mode} requires Skyfield")
 
     if mode == 255:
-        # SE_SIDM_USER: custom user-defined ayanamsha
+        # SIDM_USER: custom user-defined ayanamsha
         ayan_t0 = sid_ayan_t0 if sid_ayan_t0 is not None else 0.0
         t0 = sid_t0 if sid_t0 is not None else J2000
         T0 = (t0 - J2000) / 36525.0
@@ -946,7 +946,7 @@ def _calc_ayanamsa_from_leb(
     else:
         raise KeyError(f"Unknown sidereal mode {mode}")
 
-    # Mean ayanamsa (without nutation) - swe_get_ayanamsa_ut() returns mean value
+    # Mean ayanamsa (without nutation) - get_ayanamsa_ut() returns mean value
     return mean_aya % 360.0
 
 
@@ -1035,13 +1035,13 @@ def _topo_ecliptic(
         reader: Open LEB reader.
         jd_tt: Julian Day TT.
         jd_ut1: Julian Day UT1.
-        ipl: Body ID (SE_SUN, SE_MOON, etc.)
+        ipl: Body ID (SUN, MOON, etc.)
         geopos: (longitude_deg, latitude_deg, altitude_m)
-        iflag: Additional flags (SEFLG_SPEED, etc.). SEFLG_TOPOCTR is implied.
+        iflag: Additional flags (FLG_SPEED, etc.). FLG_TOPOCTR is implied.
     """
     obs_pos, obs_vel = _topocentric_offset(geopos, jd_tt, jd_ut1, reader)
 
-    want_velocity = bool(iflag & SEFLG_SPEED)
+    want_velocity = bool(iflag & FLG_SPEED)
 
     # Check if body is a system barycenter (needs COB correction)
     _is_sys_bary = False
@@ -1053,7 +1053,7 @@ def _topo_ecliptic(
         reader,
         jd_tt,
         ipl,
-        iflag & ~SEFLG_TOPOCTR,
+        iflag & ~FLG_TOPOCTR,
         want_velocity=want_velocity,
         is_system_bary=_is_sys_bary,
         topo_offset=(obs_pos, obs_vel),
@@ -1081,7 +1081,7 @@ def _apparent_icrs_cartesian(
         reader,
         jd_tt,
         ipl,
-        SEFLG_EQUATORIAL | SEFLG_J2000,
+        FLG_EQUATORIAL | FLG_J2000,
         want_velocity=False,
         want_xyz=True,
     )
@@ -1144,7 +1144,7 @@ def _pipeline_icrs(
     #     For normal path, COB is deferred until after light-time iteration
     #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
     #     iterate light-time on barycenter, apply COB once at retarded time.
-    if is_system_bary and (iflag & SEFLG_TRUEPOS):
+    if is_system_bary and (iflag & FLG_TRUEPOS):
         target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
 
     # Pre-initialize velocity variables to satisfy type checker.
@@ -1153,18 +1153,18 @@ def _pipeline_icrs(
     dlon = dlat = ddist = 0.0
 
     # 2. Observer selection (defer Earth fetch for helio/bary)
-    if iflag & SEFLG_HELCTR:
-        sun_pos, sun_vel = reader.eval_body(SE_SUN, jd_tt)
+    if iflag & FLG_HELCTR:
+        sun_pos, sun_vel = reader.eval_body(SUN, jd_tt)
         observer = sun_pos
         observer_vel = sun_vel
         earth_vel = (0.0, 0.0, 0.0)  # Not needed (aberration skipped)
-    elif iflag & SEFLG_BARYCTR:
+    elif iflag & FLG_BARYCTR:
         observer = (0.0, 0.0, 0.0)
         observer_vel = (0.0, 0.0, 0.0)
         earth_vel = (0.0, 0.0, 0.0)  # Not needed (aberration skipped)
     else:
         # Geocentric (default) — need Earth position and velocity
-        earth_pos, earth_vel = reader.eval_body(SE_EARTH, jd_tt)
+        earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
         if topo_offset is not None:
             topo_pos, topo_vel = topo_offset
             observer = (
@@ -1185,7 +1185,7 @@ def _pipeline_icrs(
     # 3. Geometric vector
     geo = _vec3_sub(target_pos, observer)
 
-    # 4. Light-time correction (unless SEFLG_TRUEPOS)
+    # 4. Light-time correction (unless FLG_TRUEPOS)
     #    For system barycenters: iterate on raw barycenter positions (smooth),
     #    then apply COB once after convergence at OBSERVER time. This matches
     #    Skyfield's _SpkCenterTarget._observe_from_bcrs() which:
@@ -1196,7 +1196,7 @@ def _pipeline_icrs(
     #    We must match this: COB offset evaluated at jd_tt (observer time).
     retarded_vel = target_vel
     lt = 0.0
-    if not (iflag & SEFLG_TRUEPOS):
+    if not (iflag & FLG_TRUEPOS):
         for _ in range(3):  # Fixed-point iterations
             dist = _vec3_dist(geo)
             if dist == 0.0:
@@ -1225,16 +1225,16 @@ def _pipeline_icrs(
     #    ~0.0026 AU, deflection < 0.000001").
     if not (
         iflag
-        & (SEFLG_NOABERR | SEFLG_NOGDEFL | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)
+        & (FLG_NOABERR | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)
     ):
-        if ipl != SE_MOON and lt > 0.0:
+        if ipl != MOON and lt > 0.0:
             geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
 
     # 6. Aberration (full special-relativistic, matching Skyfield).
     #    For velocity: the aberration correction depends on Earth's velocity
     #    which changes slowly (~0.017 deg/day²). The velocity component of
     #    aberration is ~1e-8 deg/day — negligible. We skip it.
-    if not (iflag & (SEFLG_NOABERR | SEFLG_HELCTR | SEFLG_BARYCTR | SEFLG_TRUEPOS)):
+    if not (iflag & (FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)):
         geo = _apply_aberration(geo, earth_vel, lt)
 
     # 6. Coordinate transform — apply the same transform to velocity
@@ -1244,12 +1244,12 @@ def _pipeline_icrs(
     #   SID+EQ+J2K: same as non-sidereal EQ+J2K (ICRS ≡ J2000 equatorial)
     #   SID only: output ecliptic-of-date, ayanamsha subtracted in _fast_calc_core
     #   SID+J2K: output J2000 ecliptic, ayanamsha subtracted in _fast_calc_core
-    _is_sidereal = bool(iflag & SEFLG_SIDEREAL)
-    _want_nonut = bool(iflag & SEFLG_NONUT)
+    _is_sidereal = bool(iflag & FLG_SIDEREAL)
+    _want_nonut = bool(iflag & FLG_NONUT)
 
-    _want_xyz = want_xyz or bool(iflag & SEFLG_XYZ)
+    _want_xyz = want_xyz or bool(iflag & FLG_XYZ)
 
-    if (iflag & SEFLG_EQUATORIAL) and (iflag & SEFLG_J2000):
+    if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
         # ICRS J2000 equatorial -- geo is already in this frame
         if _want_xyz:
             lon_deg, lat_deg, dist = geo[0], geo[1], geo[2]
@@ -1264,7 +1264,7 @@ def _pipeline_icrs(
                     geo_vel[0], geo_vel[1], geo_vel[2],
                 )
 
-    elif (iflag & SEFLG_EQUATORIAL) and _is_sidereal:
+    elif (iflag & FLG_EQUATORIAL) and _is_sidereal:
         p_mat = _prec_matrix(jd_tt)
         geo_eq = _mat3_vec3(p_mat, geo)
         if _want_xyz:
@@ -1283,7 +1283,7 @@ def _pipeline_icrs(
                     vel_eq[0], vel_eq[1], vel_eq[2],
                 )
 
-    elif iflag & SEFLG_EQUATORIAL:
+    elif iflag & FLG_EQUATORIAL:
         # NONUT: use P matrix (mean equator), else PNM (true equator)
         if _want_nonut:
             _eq_mat = _prec_matrix(jd_tt)
@@ -1306,7 +1306,7 @@ def _pipeline_icrs(
                     vel_eq[0], vel_eq[1], vel_eq[2],
                 )
 
-    elif iflag & SEFLG_J2000:
+    elif iflag & FLG_J2000:
         ecl = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
         if _want_xyz:
             lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
@@ -1326,7 +1326,7 @@ def _pipeline_icrs(
 
     else:
         # TRUE ECLIPTIC OF DATE (default) -- most common path
-        # SEFLG_NONUT: mean ecliptic (P matrix only, no nutation)
+        # FLG_NONUT: mean ecliptic (P matrix only, no nutation)
         if _want_nonut:
             _rot_mat = _prec_matrix(jd_tt)
             eps_rad = math.radians(_mean_obliquity_iau2006(jd_tt))
@@ -1385,17 +1385,17 @@ def _pipeline_ecliptic(
     # LEB stores pre-computed Chebyshev coefficients that may use older
     # models.  These overrides compute values analytically at runtime
     # for better match with pyswisseph.
-    if ipl == SE_MEAN_NODE:
+    if ipl == MEAN_NODE:
         # LEB stores 0 for dist; pyswisseph returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
-    elif ipl == SE_TRUE_NODE:
+    elif ipl == TRUE_NODE:
         # LEB stores h_mag proxy for dist. The full osculating orbit
         # calculation (calc_true_lunar_node) would be more precise but
         # requires Skyfield/DE kernel, defeating the purpose of LEB mode.
         # The LEB distance value is sufficient — True Node distance is
         # not used in astrological calculations.
         pass  # keep dist from LEB
-    elif ipl == SE_MEAN_APOG:
+    elif ipl == MEAN_APOG:
         # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
         # Override with 3-harmonic model fitted to pyswisseph output:
         #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
@@ -1414,19 +1414,19 @@ def _pipeline_ecliptic(
     # When SIDEREAL+EQUATORIAL: pyswisseph outputs mean ecliptic (no nutation)
     # Nutation handling for ecliptic-direct bodies.
     # Mean bodies are stored without nutation; true bodies include it.
-    # SEFLG_NONUT: output on mean ecliptic (no nutation).
+    # FLG_NONUT: output on mean ecliptic (no nutation).
     # Velocity is NOT corrected — the Skyfield path also computes
     # velocity from the un-nutated polynomial.
-    _sid_eq = bool(iflag & SEFLG_SIDEREAL) and bool(iflag & SEFLG_EQUATORIAL)
-    _want_nonut_b = bool(iflag & SEFLG_NONUT)
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    _want_nonut_b = bool(iflag & FLG_NONUT)
 
-    if ipl in (SE_MEAN_NODE, SE_MEAN_APOG):
+    if ipl in (MEAN_NODE, MEAN_APOG):
         # Mean bodies stored without nutation. Add dpsi for true ecliptic,
         # UNLESS NONUT or sidereal+equatorial (both want mean ecliptic).
         if not _sid_eq and not _want_nonut_b:
             _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon + math.degrees(dpsi_rad)) % 360.0
-    elif ipl in (SE_TRUE_NODE, SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG):
+    elif ipl in (TRUE_NODE, OSCU_APOG, INTP_APOG, INTP_PERG):
         # True/osculating bodies include nutation. Strip dpsi when NONUT
         # or sidereal+equatorial (both want mean ecliptic).
         if _sid_eq or _want_nonut_b:
@@ -1436,15 +1436,15 @@ def _pipeline_ecliptic(
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
     #
-    # SEFLG_J2000 is honored for ALL bodies, including TrueNode, OscuApog,
+    # FLG_J2000 is honored for ALL bodies, including TrueNode, OscuApog,
     # IntpApog, and IntpPerg.  pyswisseph silently ignores J2000 for these
-    # four bodies when SEFLG_SIDEREAL is set — this is a behavioral bug
+    # four bodies when FLG_SIDEREAL is set — this is a behavioral bug
     # (ayanamsha and J2000 ecliptic precession are geometrically distinct
     # and composable operations).  LibEphemeris intentionally fixes this.
     # See docs/reference/se-bug-sidereal-j2000-nodes.md
-    _effective_j2000 = bool(iflag & SEFLG_J2000)
+    _effective_j2000 = bool(iflag & FLG_J2000)
 
-    if (iflag & SEFLG_EQUATORIAL) and _effective_j2000:
+    if (iflag & FLG_EQUATORIAL) and _effective_j2000:
         # J2000 equatorial: precess ecliptic-of-date -> J2000 ecliptic,
         # then rotate J2000 ecliptic -> J2000 equatorial.
         eps = OBLIQUITY_J2000_DEG
@@ -1469,10 +1469,10 @@ def _pipeline_ecliptic(
         lon = eq_now_lon
         lat = eq_now_lat
 
-    elif iflag & SEFLG_EQUATORIAL:
+    elif iflag & FLG_EQUATORIAL:
         # Equatorial of date: rotate ecliptic-of-date → equatorial-of-date.
         # Sidereal/NONUT modes use mean obliquity (no nutation).
-        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
+        if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
@@ -1536,7 +1536,7 @@ def _pipeline_helio(
     Returns:
         (lon, lat, dist, dlon, dlat, ddist)
     """
-    is_helio = bool(iflag & SEFLG_HELCTR)
+    is_helio = bool(iflag & FLG_HELCTR)
 
     if is_helio:
         # Heliocentric: LEB data is already heliocentric J2000 ecliptic
@@ -1560,14 +1560,14 @@ def _pipeline_helio(
             # Apply light-time correction to match Skyfield's .observe():
             # the reference path uses sun.at(t).observe(earth) which evaluates
             # Earth at the retarded time (t - light_time_earth_sun).
-            earth_pos, _ = reader.eval_body(SE_EARTH, jd)
-            sun_pos, _ = reader.eval_body(SE_SUN, jd)
+            earth_pos, _ = reader.eval_body(EARTH, jd)
+            sun_pos, _ = reader.eval_body(SUN, jd)
             ex0 = earth_pos[0] - sun_pos[0]
             ey0 = earth_pos[1] - sun_pos[1]
             ez0 = earth_pos[2] - sun_pos[2]
             r_es = math.sqrt(ex0 * ex0 + ey0 * ey0 + ez0 * ez0)
             lt_es = r_es / C_LIGHT_AU_DAY
-            earth_ret, _ = reader.eval_body(SE_EARTH, jd - lt_es)
+            earth_ret, _ = reader.eval_body(EARTH, jd - lt_es)
             ex = earth_ret[0] - sun_pos[0]
             ey = earth_ret[1] - sun_pos[1]
             ez = earth_ret[2] - sun_pos[2]
@@ -1602,14 +1602,14 @@ def _pipeline_helio(
     # The Skyfield reference path precesses J2000 → ecliptic of date ONLY when
     # the J2000 flag is NOT set.  For EQ+J2000, it converts J2000 ecliptic to
     # equatorial using obliquity of date (not J2000).  We must match this.
-    is_j2000 = bool(iflag & SEFLG_J2000)
-    is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+    is_j2000 = bool(iflag & FLG_J2000)
+    is_equatorial = bool(iflag & FLG_EQUATORIAL)
 
     if is_equatorial and is_j2000:
         # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
         # so it uses true obliquity of date on J2000 ecliptic coords.
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
-        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
+        if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
@@ -1635,7 +1635,7 @@ def _pipeline_helio(
         # Equatorial of date: precess J2000 → date, then ecliptic → equatorial.
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
         lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
-        if (iflag & SEFLG_SIDEREAL) or (iflag & SEFLG_NONUT):
+        if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = _mean_obliquity_iau2006(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
@@ -1683,39 +1683,39 @@ def fast_calc_ut(
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
-    """Fast equivalent of swe_calc_ut() using precomputed .leb data.
+    """Fast equivalent of calc_ut() using precomputed .leb data.
 
     Args:
         reader: An open LEBReader instance.
         tjd_ut: Julian Day in Universal Time (UT1).
-        ipl: Planet/body ID (SE_SUN, SE_MOON, etc.).
-        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.).
+        ipl: Planet/body ID (SUN, MOON, etc.).
+        iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.).
         sid_mode: Sidereal mode override (for thread-safe context calls).
         sid_t0: Sidereal reference epoch override.
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
 
     Returns:
-        Same as swe_calc_ut(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
+        Same as calc_ut(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
 
     Raises:
         KeyError: If body is not in the .leb file (caller should fall back).
         ValueError: If JD is outside the .leb file's range.
     """
-    # SEFLG_ICRS: not yet implemented in LEB — fall back to Skyfield
-    if iflag & SEFLG_ICRS:
-        raise KeyError("SEFLG_ICRS not supported in LEB mode")
+    # FLG_ICRS: not yet implemented in LEB — fall back to Skyfield
+    if iflag & FLG_ICRS:
+        raise KeyError("FLG_ICRS not supported in LEB mode")
 
-    # Strip SEFLG_MOSEPH (always ignored)
-    iflag = iflag & ~SEFLG_MOSEPH
+    # Strip FLG_MOSEPH (always ignored)
+    iflag = iflag & ~FLG_MOSEPH
 
-    # SEFLG_TOPOCTR: resolve observer position from global state
+    # FLG_TOPOCTR: resolve observer position from global state
     topo_offset = None
-    if iflag & SEFLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR:
         from .state import get_topo
 
         topo = get_topo()
         if topo is None:
-            raise ValueError("swe_set_topo() must be called before SEFLG_TOPOCTR")
+            raise ValueError("set_topo() must be called before FLG_TOPOCTR")
         topo_geopos = (
             float(topo.longitude.degrees),
             float(topo.latitude.degrees),
@@ -1723,7 +1723,7 @@ def fast_calc_ut(
         )
 
     # Snapshot sidereal state once at entry (thread-safe)
-    if sid_mode is None and (iflag & SEFLG_SIDEREAL):
+    if sid_mode is None and (iflag & FLG_SIDEREAL):
         from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
 
         sid_mode = _SIDEREAL_MODE
@@ -1731,12 +1731,12 @@ def fast_calc_ut(
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
     # Delta-T conversion: UT -> TT
-    from .time_utils import swe_deltat
+    from .time_utils import deltat
 
-    delta_t = swe_deltat(tjd_ut)
+    delta_t = deltat(tjd_ut)
     jd_tt = tjd_ut + delta_t
 
-    if iflag & SEFLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR:
         topo_offset = _topocentric_offset(topo_geopos, jd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
 
     return _fast_calc_core(
@@ -1762,7 +1762,7 @@ def fast_calc_tt(
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
-    """Fast equivalent of swe_calc() using precomputed .leb data.
+    """Fast equivalent of calc() using precomputed .leb data.
 
     Args:
         reader: An open LEBReader instance.
@@ -1774,31 +1774,31 @@ def fast_calc_tt(
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
 
     Returns:
-        Same as swe_calc(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
+        Same as calc(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
 
     Raises:
         KeyError: If body is not in the .leb file.
         ValueError: If JD is outside the .leb file's range.
     """
-    if iflag & SEFLG_ICRS:
-        raise KeyError("SEFLG_ICRS not supported in LEB mode")
+    if iflag & FLG_ICRS:
+        raise KeyError("FLG_ICRS not supported in LEB mode")
 
-    iflag = iflag & ~SEFLG_MOSEPH
+    iflag = iflag & ~FLG_MOSEPH
 
     topo_offset = None
-    if iflag & SEFLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR:
         from .state import get_topo
 
         topo = get_topo()
         if topo is None:
-            raise ValueError("swe_set_topo() must be called before SEFLG_TOPOCTR")
+            raise ValueError("set_topo() must be called before FLG_TOPOCTR")
         topo_geopos = (
             float(topo.longitude.degrees),
             float(topo.latitude.degrees),
             float(topo.elevation.m),
         )
 
-    if sid_mode is None and (iflag & SEFLG_SIDEREAL):
+    if sid_mode is None and (iflag & FLG_SIDEREAL):
         from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
 
         sid_mode = _SIDEREAL_MODE
@@ -1807,7 +1807,7 @@ def fast_calc_tt(
 
     tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
 
-    if iflag & SEFLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR:
         topo_offset = _topocentric_offset(topo_geopos, tjd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
 
     return _fast_calc_core(
@@ -1877,12 +1877,12 @@ def _fast_calc_core(
     # When XYZ+SIDEREAL, force Pipeline A to return spherical so the
     # shared sidereal correction (longitude subtraction) can run first;
     # XYZ conversion then happens in the post-processing stage.
-    _xyz_sid = bool(iflag & SEFLG_XYZ) and bool(iflag & SEFLG_SIDEREAL)
-    _pipe_iflag = (iflag & ~SEFLG_XYZ) if _xyz_sid else iflag
+    _xyz_sid = bool(iflag & FLG_XYZ) and bool(iflag & FLG_SIDEREAL)
+    _pipe_iflag = (iflag & ~FLG_XYZ) if _xyz_sid else iflag
 
     if body.coord_type == COORD_ICRS_BARY:
         _pipeline_a = not _xyz_sid
-        if iflag & SEFLG_SPEED:
+        if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
                 reader, jd_tt, ipl, _pipe_iflag, want_velocity=True,
                 topo_offset=topo_offset,
@@ -1895,7 +1895,7 @@ def _fast_calc_core(
 
     elif body.coord_type == COORD_ICRS_BARY_SYSTEM:
         _pipeline_a = not _xyz_sid
-        if iflag & SEFLG_SPEED:
+        if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
                 reader,
                 jd_tt,
@@ -1917,8 +1917,8 @@ def _fast_calc_core(
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_ECLIPTIC:
-        if iflag & SEFLG_TOPOCTR:
-            raise KeyError("SEFLG_TOPOCTR not supported for ecliptic-direct bodies")
+        if iflag & FLG_TOPOCTR:
+            raise KeyError("FLG_TOPOCTR not supported for ecliptic-direct bodies")
         # Pipeline B: ecliptic direct
         #
         # For all ecliptic-direct bodies with SID+J2K (no EQ), defer J2000
@@ -1934,23 +1934,23 @@ def _fast_calc_core(
         # is set) — LibEphemeris intentionally corrects this behavioral bug.
         # See docs/reference/se-bug-sidereal-j2000-nodes.md
         _deferred_sid_j2k = (
-            bool(iflag & SEFLG_SIDEREAL)
-            and bool(iflag & SEFLG_J2000)
-            and not bool(iflag & SEFLG_EQUATORIAL)
+            bool(iflag & FLG_SIDEREAL)
+            and bool(iflag & FLG_J2000)
+            and not bool(iflag & FLG_EQUATORIAL)
         )
-        _pipe_flags = (iflag & ~SEFLG_J2000) if _deferred_sid_j2k else iflag
+        _pipe_flags = (iflag & ~FLG_J2000) if _deferred_sid_j2k else iflag
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
             reader, jd_tt, ipl, _pipe_flags
         )
-        if not (iflag & SEFLG_SPEED):
+        if not (iflag & FLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     elif body.coord_type == COORD_HELIO_ECL:
-        if iflag & SEFLG_TOPOCTR:
-            raise KeyError("SEFLG_TOPOCTR not supported for heliocentric bodies")
+        if iflag & FLG_TOPOCTR:
+            raise KeyError("FLG_TOPOCTR not supported for heliocentric bodies")
         # Pipeline C: heliocentric
         lon, lat, dist, dlon, dlat, ddist = _pipeline_helio(reader, jd_tt, ipl, iflag)
-        if not (iflag & SEFLG_SPEED):
+        if not (iflag & FLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
     else:
@@ -1968,9 +1968,9 @@ def _fast_calc_core(
     #
     # For J2000 output, coordinates are already in J2000 ecliptic (no nutation),
     # so we use mean ayanamsha; for ecliptic of date we use true ayanamsha.
-    _skip_sidereal = bool(iflag & SEFLG_EQUATORIAL)
+    _skip_sidereal = bool(iflag & FLG_EQUATORIAL)
 
-    if (iflag & SEFLG_SIDEREAL) and not _skip_sidereal:
+    if (iflag & FLG_SIDEREAL) and not _skip_sidereal:
         try:
             mean_aya = _calc_ayanamsa_from_leb(
                 reader,
@@ -1984,11 +1984,11 @@ def _fast_calc_core(
             #
             # This applies uniformly to ALL bodies.  pyswisseph uses true
             # ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even when
-            # SEFLG_J2000 is set (because it skips J2000 precession for them).
+            # FLG_J2000 is set (because it skips J2000 precession for them).
             # LibEphemeris intentionally fixes this: when J2000 is requested,
             # mean ayanamsha is always used, for all bodies.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
-            _eff_mean_aya = bool(iflag & (SEFLG_J2000 | SEFLG_NONUT))
+            _eff_mean_aya = bool(iflag & (FLG_J2000 | FLG_NONUT))
             if _eff_mean_aya:
                 aya = mean_aya
             else:
@@ -2014,7 +2014,7 @@ def _fast_calc_core(
             raise
 
     # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
-    # The pipeline was run without SEFLG_J2000 so ayanamsha could be
+    # The pipeline was run without FLG_J2000 so ayanamsha could be
     # subtracted in ecliptic-of-date first.  Now precess the sidereal-
     # corrected coords to J2000.  This applies to ALL ecliptic-direct
     # bodies uniformly (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog,
@@ -2035,9 +2035,9 @@ def _fast_calc_core(
         lon = j_now_lon
         lat = j_now_lat
 
-    # SEFLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
+    # FLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
     # Pipeline A handles XYZ internally via _pipeline_icrs; skip here.
-    if (iflag & SEFLG_XYZ) and not _pipeline_a:
+    if (iflag & FLG_XYZ) and not _pipeline_a:
         _lon_r = math.radians(lon)
         _lat_r = math.radians(lat)
         _cos_lat = math.cos(_lat_r)
@@ -2059,9 +2059,9 @@ def _fast_calc_core(
             vx = vy = vz = 0.0
         return (x, y, z, vx, vy, vz), iflag
 
-    # SEFLG_RADIANS: convert angular output from degrees to radians
+    # FLG_RADIANS: convert angular output from degrees to radians
     # Skip when XYZ is active — values are Cartesian AU, not angles
-    if (iflag & SEFLG_RADIANS) and not (iflag & SEFLG_XYZ):
+    if (iflag & FLG_RADIANS) and not (iflag & FLG_XYZ):
         _d2r = math.pi / 180.0
         lon = lon * _d2r
         lat = lat * _d2r

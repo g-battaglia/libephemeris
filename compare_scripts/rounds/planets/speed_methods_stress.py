@@ -7,9 +7,9 @@ Tests speed (velocity) values across various flag combinations and bodies.
 
 Parts:
   P1: Ecliptic speed (default) — all planets, 10 dates
-  P2: Equatorial speed — all planets with SEFLG_EQUATORIAL
-  P3: J2000 speed — all planets with SEFLG_J2000
-  P4: Heliocentric speed — all planets with SEFLG_HELCTR
+  P2: Equatorial speed — all planets with FLG_EQUATORIAL
+  P3: J2000 speed — all planets with FLG_J2000
+  P4: Heliocentric speed — all planets with FLG_HELCTR
   P5: Speed near stations (speed ≈ 0) — Mercury & Mars
   P6: Moon speed (fast-moving, latitude speed important)
   P7: Speed finite-difference validation (compare analytical vs FD)
@@ -71,16 +71,16 @@ class R:
 
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 DATES_JD = [
@@ -114,12 +114,12 @@ def compare_speed(
     """Compare speed values for a body at given flags."""
     label = f"{body_name} {label_suffix}"
     try:
-        se_xx = swe.calc_ut(jd, body_id, flags | SEFLG_SPEED)[0]
+        se_xx = swe.calc_ut(jd, body_id, flags | FLG_SPEED)[0]
     except Exception:
         r.skip(f"{label}: SE error")
         return
     try:
-        le_xx, _ = ephem.swe_calc_ut(jd, body_id, flags | SEFLG_SPEED)
+        le_xx, _ = ephem.calc_ut(jd, body_id, flags | FLG_SPEED)
     except Exception:
         r.skip(f"{label}: LE error")
         return
@@ -158,7 +158,7 @@ def run_part2():
     for jd in DATES_JD:
         for body_id, body_name in PLANETS:
             compare_speed(
-                r, body_id, body_name, jd, SEFLG_EQUATORIAL, f"equ JD={jd:.0f}"
+                r, body_id, body_name, jd, FLG_EQUATORIAL, f"equ JD={jd:.0f}"
             )
     print(f"  Tested {r.passed + r.failed} speed comparisons")
     return r.summary(), r
@@ -171,7 +171,7 @@ def run_part3():
     r = R("P3: J2000 Speed")
     for jd in DATES_JD:
         for body_id, body_name in PLANETS:
-            compare_speed(r, body_id, body_name, jd, SEFLG_J2000, f"j2k JD={jd:.0f}")
+            compare_speed(r, body_id, body_name, jd, FLG_J2000, f"j2k JD={jd:.0f}")
     print(f"  Tested {r.passed + r.failed} speed comparisons")
     return r.summary(), r
 
@@ -181,7 +181,7 @@ def run_part4():
     print("PART 4: Heliocentric speed — planets × 10 dates")
     print("=" * 70)
     r = R("P4: Helio Speed")
-    helio_planets = [(b, n) for b, n in PLANETS if b not in (SE_SUN,)]
+    helio_planets = [(b, n) for b, n in PLANETS if b not in (SUN,)]
     for jd in DATES_JD:
         for body_id, body_name in helio_planets:
             compare_speed(
@@ -189,7 +189,7 @@ def run_part4():
                 body_id,
                 body_name,
                 jd,
-                SEFLG_HELCTR,
+                FLG_HELCTR,
                 f"helio JD={jd:.0f}",
                 tol_lon=0.01,
                 tol_lat=0.01,
@@ -223,7 +223,7 @@ def run_part5():
         for dt in [-0.5, -0.1, 0.0, 0.1, 0.5]:
             compare_speed(
                 r,
-                SE_MERCURY,
+                MERCURY,
                 "Mercury",
                 jd + dt,
                 0,
@@ -235,7 +235,7 @@ def run_part5():
         for dt in [-0.5, -0.1, 0.0, 0.1, 0.5]:
             compare_speed(
                 r,
-                SE_MARS,
+                MARS,
                 "Mars",
                 jd + dt,
                 0,
@@ -263,8 +263,8 @@ def run_part6():
     for i in range(n_samples):
         jd = jd_start + i * 0.25
         try:
-            se_xx = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0]
-            le_xx, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+            se_xx = swe.calc_ut(jd, MOON, FLG_SPEED)[0]
+            le_xx, _ = ephem.calc_ut(jd, MOON, FLG_SPEED)
         except Exception:
             r.skip(f"Moon sample {i}")
             continue
@@ -301,9 +301,9 @@ def run_part7():
 
     for body_id, body_name in PLANETS:
         try:
-            le_xx0, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-            le_xx_m, _ = ephem.swe_calc_ut(jd - dt, body_id, 0)
-            le_xx_p, _ = ephem.swe_calc_ut(jd + dt, body_id, 0)
+            le_xx0, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
+            le_xx_m, _ = ephem.calc_ut(jd - dt, body_id, 0)
+            le_xx_p, _ = ephem.calc_ut(jd + dt, body_id, 0)
         except Exception:
             r.skip(f"{body_name}: calc error")
             continue

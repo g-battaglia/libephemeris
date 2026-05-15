@@ -55,7 +55,7 @@ class TestSetDeltaTUserdef:
 
 
 class TestDeltatWithUserdef:
-    """Test swe_deltat when user-defined value is set."""
+    """Test deltat when user-defined value is set."""
 
     @pytest.fixture(autouse=True)
     def reset_delta_t(self):
@@ -66,17 +66,17 @@ class TestDeltatWithUserdef:
 
     @pytest.mark.unit
     def test_swe_deltat_returns_userdef_value(self):
-        """swe_deltat should return user-defined value when set."""
+        """deltat should return user-defined value when set."""
         dt_value = 0.00075  # ~65 seconds in days
         ephem.set_delta_t_userdef(dt_value)
 
         jd = 2451545.0  # J2000
-        result = ephem.swe_deltat(jd)
+        result = ephem.deltat(jd)
         assert result == dt_value
 
     @pytest.mark.unit
     def test_swe_deltat_ignores_jd_when_userdef_set(self):
-        """swe_deltat should return same value regardless of JD when userdef is set."""
+        """deltat should return same value regardless of JD when userdef is set."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
 
@@ -84,24 +84,24 @@ class TestDeltatWithUserdef:
         jd2 = 2460000.0  # A future date
         jd3 = 2400000.0  # A past date
 
-        assert ephem.swe_deltat(jd1) == dt_value
-        assert ephem.swe_deltat(jd2) == dt_value
-        assert ephem.swe_deltat(jd3) == dt_value
+        assert ephem.deltat(jd1) == dt_value
+        assert ephem.deltat(jd2) == dt_value
+        assert ephem.deltat(jd3) == dt_value
 
     @pytest.mark.unit
     def test_swe_deltat_uses_computed_when_cleared(self):
-        """swe_deltat should use computed value after clearing userdef."""
+        """deltat should use computed value after clearing userdef."""
         dt_userdef = 0.00075
         ephem.set_delta_t_userdef(dt_userdef)
 
         jd = 2451545.0  # J2000
-        assert ephem.swe_deltat(jd) == dt_userdef
+        assert ephem.deltat(jd) == dt_userdef
 
         # Clear the user-defined value
         ephem.set_delta_t_userdef(None)
 
         # Now should get computed value (not equal to our arbitrary value)
-        computed_dt = ephem.swe_deltat(jd)
+        computed_dt = ephem.deltat(jd)
         assert computed_dt != dt_userdef
         # Should be approximately 63-64 seconds at J2000
         dt_seconds = computed_dt * 86400
@@ -109,14 +109,14 @@ class TestDeltatWithUserdef:
 
     @pytest.mark.unit
     def test_swe_deltat_userdef_zero_returns_zero(self):
-        """swe_deltat should return exactly 0.0 when userdef is set to 0."""
+        """deltat should return exactly 0.0 when userdef is set to 0."""
         ephem.set_delta_t_userdef(0.0)
         jd = 2451545.0  # J2000
-        assert ephem.swe_deltat(jd) == 0.0
+        assert ephem.deltat(jd) == 0.0
 
 
 class TestDeltatExWithUserdef:
-    """Test swe_deltat_ex when user-defined value is set."""
+    """Test deltat_ex when user-defined value is set."""
 
     @pytest.fixture(autouse=True)
     def reset_delta_t(self):
@@ -127,25 +127,25 @@ class TestDeltatExWithUserdef:
 
     @pytest.mark.unit
     def test_swe_deltat_ex_returns_userdef_value(self):
-        """swe_deltat_ex should return user-defined value when set."""
+        """deltat_ex should return user-defined value when set."""
         dt_value = 0.00075  # ~65 seconds in days
         ephem.set_delta_t_userdef(dt_value)
 
         jd = 2451545.0  # J2000
-        result = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        result = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
         assert result == dt_value
 
     @pytest.mark.unit
     def test_swe_deltat_ex_userdef_ignores_flag(self):
-        """swe_deltat_ex should return userdef regardless of ephemeris flag."""
+        """deltat_ex should return userdef regardless of ephemeris flag."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
 
         jd = 2451545.0
 
-        result_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        result_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
-        result_moseph = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
+        result_swieph = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
+        result_jpleph = ephem.deltat_ex(jd, ephem.FLG_JPLEPH)
+        result_moseph = ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
 
         # All should return the user-defined value
         assert result_swieph == dt_value
@@ -154,13 +154,13 @@ class TestDeltatExWithUserdef:
 
     @pytest.mark.unit
     def test_swe_deltat_ex_matches_swe_deltat_with_userdef(self):
-        """swe_deltat and swe_deltat_ex should match when userdef is set."""
+        """deltat and deltat_ex should match when userdef is set."""
         dt_value = 0.00075
         ephem.set_delta_t_userdef(dt_value)
 
         jd = 2451545.0
-        dt = ephem.swe_deltat(jd)
-        dt_ex = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+        dt = ephem.deltat(jd)
+        dt_ex = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
 
         assert dt == dt_ex == dt_value
 
@@ -177,13 +177,13 @@ class TestDeltaTUserdefAliases:
 
     @pytest.mark.unit
     def test_swe_set_delta_t_userdef_exists(self):
-        """swe_set_delta_t_userdef alias should exist."""
-        assert hasattr(ephem, "swe_set_delta_t_userdef")
+        """set_delta_t_userdef alias should exist."""
+        assert hasattr(ephem, "set_delta_t_userdef")
 
     @pytest.mark.unit
     def test_swe_get_delta_t_userdef_exists(self):
-        """swe_get_delta_t_userdef alias should exist."""
-        assert hasattr(ephem, "swe_get_delta_t_userdef")
+        """get_delta_t_userdef alias should exist."""
+        assert hasattr(ephem, "get_delta_t_userdef")
 
     @pytest.mark.unit
     def test_set_delta_t_userdef_exists(self):
@@ -198,8 +198,6 @@ class TestDeltaTUserdefAliases:
     @pytest.mark.unit
     def test_aliases_are_same_function(self):
         """swe_ and non-prefixed aliases should be the same function."""
-        assert ephem.swe_set_delta_t_userdef is ephem.set_delta_t_userdef
-        assert ephem.swe_get_delta_t_userdef is ephem.get_delta_t_userdef
 
 
 class TestDeltaTUserdefUseCases:
@@ -220,8 +218,8 @@ class TestDeltaTUserdefUseCases:
         large_dt = 3.0 / 24.0  # 3 hours in days
         ephem.set_delta_t_userdef(large_dt)
 
-        jd_ancient = ephem.swe_julday(-2000, 1, 1, 12.0)
-        dt = ephem.swe_deltat(jd_ancient)
+        jd_ancient = ephem.julday(-2000, 1, 1, 12.0)
+        dt = ephem.deltat(jd_ancient)
 
         assert dt == large_dt
         assert dt * 24 == 3.0  # Verify it's 3 hours
@@ -235,7 +233,7 @@ class TestDeltaTUserdefUseCases:
         ephem.set_delta_t_userdef(fixed_dt)
 
         # Multiple calls should always return the same value
-        results = [ephem.swe_deltat(2451545.0 + i) for i in range(10)]
+        results = [ephem.deltat(2451545.0 + i) for i in range(10)]
         assert all(r == fixed_dt for r in results)
 
     @pytest.mark.unit
@@ -244,20 +242,20 @@ class TestDeltaTUserdefUseCases:
         jd = 2451545.0  # J2000
 
         # Get computed value
-        computed = ephem.swe_deltat(jd)
+        computed = ephem.deltat(jd)
 
         # Set user-defined value
         fixed_dt = 0.001
         ephem.set_delta_t_userdef(fixed_dt)
-        assert ephem.swe_deltat(jd) == fixed_dt
+        assert ephem.deltat(jd) == fixed_dt
 
         # Toggle back to computed
         ephem.set_delta_t_userdef(None)
-        assert ephem.swe_deltat(jd) == computed
+        assert ephem.deltat(jd) == computed
 
         # Toggle to user-defined again
         ephem.set_delta_t_userdef(fixed_dt)
-        assert ephem.swe_deltat(jd) == fixed_dt
+        assert ephem.deltat(jd) == fixed_dt
 
     @pytest.mark.unit
     def test_future_date_uncertainty(self):
@@ -266,8 +264,8 @@ class TestDeltaTUserdefUseCases:
         future_dt = 500.0 / 86400.0  # 500 seconds in days
         ephem.set_delta_t_userdef(future_dt)
 
-        jd_future = ephem.swe_julday(3000, 1, 1, 12.0)
-        dt = ephem.swe_deltat(jd_future)
+        jd_future = ephem.julday(3000, 1, 1, 12.0)
+        dt = ephem.deltat(jd_future)
 
         assert dt == future_dt
         assert dt * 86400 == pytest.approx(500.0)

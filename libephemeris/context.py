@@ -9,10 +9,10 @@ location, sidereal mode, angles cache) while sharing expensive resources
 (ephemeris files, timescale data) globally in a thread-safe way.
 
 Usage:
-    >>> from libephemeris import EphemerisContext, SE_SUN
+    >>> from libephemeris import EphemerisContext, SUN
     >>> ctx = EphemerisContext()
     >>> ctx.set_topo(12.5, 41.9, 0)  # Rome
-    >>> pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+    >>> pos, _ = ctx.calc_ut(2451545.0, SUN, 0)
 
 Thread Safety:
     Multiple EphemerisContext instances can be used concurrently in different
@@ -65,7 +65,7 @@ class EphemerisContext:
         >>> ctx = EphemerisContext()
         >>> ctx.set_topo(12.5, 41.9, 0)  # Rome coordinates
         >>> ctx.set_sid_mode(1)  # Lahiri ayanamsha
-        >>> pos, flags = ctx.calc_ut(2451545.0, SE_MARS, SEFLG_SIDEREAL)
+        >>> pos, flags = ctx.calc_ut(2451545.0, MARS, FLG_SIDEREAL)
         >>> print(f"Mars at {pos[0]:.2f}° sidereal longitude")
 
     Thread Safety:
@@ -87,7 +87,7 @@ class EphemerisContext:
         """
         # Instance-specific state (NOT shared between contexts)
         self.topo: Optional[Topos] = None
-        self.sidereal_mode: int = 1  # Default: Lahiri (SE_SIDM_LAHIRI)
+        self.sidereal_mode: int = 1  # Default: Lahiri (SIDM_LAHIRI)
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
         self._angles_cache: dict[str, float] = {}
@@ -237,7 +237,7 @@ class EphemerisContext:
                             longitude is outside [-180, 180]
 
         Note:
-            Required for topocentric calculations (SEFLG_TOPOCTR),
+            Required for topocentric calculations (FLG_TOPOCTR),
             angles (Ascendant, MC), and Arabic parts.
 
         Example:
@@ -263,13 +263,13 @@ class EphemerisContext:
         Set the sidereal mode (ayanamsha system) for calculations.
 
         Args:
-            mode: Sidereal mode ID (SE_SIDM_*) or 255 for custom
+            mode: Sidereal mode ID (SIDM_*) or 255 for custom
             t0: Reference epoch (Julian Day) for custom ayanamsha (default: J2000.0)
             ayan_t0: Ayanamsha value at t0 in degrees (for custom mode)
 
         Note:
-            Affects all position calculations when SEFLG_SIDEREAL is set.
-            Default is Lahiri (SE_SIDM_LAHIRI = 1) if never set.
+            Affects all position calculations when FLG_SIDEREAL is set.
+            Default is Lahiri (SIDM_LAHIRI = 1) if never set.
         """
         self.sidereal_mode = mode
         self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0
@@ -343,7 +343,7 @@ class EphemerisContext:
         performed through this context instance.
 
         Args:
-            ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+            ipl: libephemeris body ID (e.g., CHIRON, ERIS)
             spk_file: Path to the SPK file, or filename if in library path
             naif_id: NAIF ID of the body in the SPK kernel
 
@@ -353,7 +353,7 @@ class EphemerisContext:
 
         Example:
             >>> ctx = EphemerisContext()
-            >>> ctx.register_spk_body(SE_CHIRON, "chiron.bsp", 2002060)
+            >>> ctx.register_spk_body(CHIRON, "chiron.bsp", 2002060)
         """
         from . import state
 
@@ -401,7 +401,7 @@ class EphemerisContext:
         Remove SPK registration for a body from this context.
 
         Args:
-            ipl: libephemeris body ID (e.g., SE_CHIRON)
+            ipl: libephemeris body ID (e.g., CHIRON)
         """
         if ipl in self._spk_body_map:
             del self._spk_body_map[ipl]
@@ -460,8 +460,8 @@ class EphemerisContext:
 
         Args:
             tjd_ut: Julian Day in Universal Time (UT1)
-            ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-            iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+            ipl: Planet/body ID (SUN, MOON, etc.)
+            iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
 
         Returns:
             Tuple containing:
@@ -470,7 +470,7 @@ class EphemerisContext:
                 - Return flag: iflag value on success
 
         Example:
-            >>> pos, retflag = ctx.calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
+            >>> pos, retflag = ctx.calc_ut(2451545.0, MARS, FLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
         # --- LEB fast path: try binary ephemeris first ---
@@ -530,8 +530,8 @@ class EphemerisContext:
 
         Args:
             tjd: Julian Day in Terrestrial Time (TT/ET)
-            ipl: Planet/body ID (SE_SUN, SE_MOON, etc.)
-            iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+            ipl: Planet/body ID (SUN, MOON, etc.)
+            iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
 
         Returns:
             Tuple containing:
@@ -604,9 +604,9 @@ class EphemerisContext:
                 - cusps: List of 12 house cusp longitudes [1-12]
                 - ascmc: List of angles [ASC, MC, ARMC, Vertex, ...]
         """
-        from .houses import _swe_houses_with_context
+        from .houses import _houses_with_context
 
-        return _swe_houses_with_context(tjd_ut, lat, lon, hsys, self)
+        return _houses_with_context(tjd_ut, lat, lon, hsys, self)
 
     def calc_pctr(
         self, tjd_ut: float, ipl: int, iplctr: int, iflag: int
@@ -618,9 +618,9 @@ class EphemerisContext:
 
         Args:
             tjd_ut: Julian Day in Universal Time (UT1)
-            ipl: Target planet/body ID (SE_SUN, SE_MOON, etc.)
+            ipl: Target planet/body ID (SUN, MOON, etc.)
             iplctr: Observer/center planet ID (body from which to observe)
-            iflag: Calculation flags (SEFLG_SPEED, etc.)
+            iflag: Calculation flags (FLG_SPEED, etc.)
 
         Returns:
             Tuple containing:
@@ -630,7 +630,7 @@ class EphemerisContext:
 
         Example:
             >>> # Position of Moon as seen from Mars
-            >>> pos, retflag = ctx.calc_pctr(2451545.0, SE_MOON, SE_MARS, SEFLG_SPEED)
+            >>> pos, retflag = ctx.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         """
         from .planets import _calc_body_pctr_with_context
 
@@ -659,9 +659,9 @@ class EphemerisContext:
 
         Example:
             >>> ctx = EphemerisContext()
-            >>> pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)  # Loads ephemeris
+            >>> pos, _ = ctx.calc_ut(2451545.0, SUN, 0)  # Loads ephemeris
             >>> EphemerisContext.close()  # Close shared files
-            >>> pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
+            >>> pos, _ = ctx.calc_ut(2451545.0, SUN, 0)  # Reloads ephemeris
         """
         global _SHARED_LOADER, _SHARED_PLANETS, _SHARED_TS
         global _SHARED_EPHE_PATH, _SHARED_EPHE_FILE

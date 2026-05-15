@@ -12,9 +12,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
 
 
 def se_hsys(ch):
@@ -40,27 +43,27 @@ def main():
             for lat in latitudes:
                 # Get cusps from houses_ex2
                 try:
-                    le_ex2 = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys), SEFLG_SPEED)
+                    le_ex2 = ephem.houses_ex2(jd, lat, lon, ord(hsys), FLG_SPEED)
                     cusps_ex2 = le_ex2[0]
                 except Exception:
                     continue
 
                 # Compute ARMC from sidereal time
-                armc = ephem.swe_sidtime(jd) * 15.0 + lon
+                armc = ephem.sidtime(jd) * 15.0 + lon
                 if armc >= 360:
                     armc -= 360
 
                 # Get obliquity
                 try:
-                    nut = ephem.swe_calc_ut(jd, -1, 0)
+                    nut = ephem.calc_ut(jd, -1, 0)
                     eps = nut[0][0]  # true obliquity
                 except Exception:
                     continue
 
                 # Get cusps from houses_armc_ex2
                 try:
-                    le_armc = ephem.swe_houses_armc_ex2(
-                        armc, lat, eps, ord(hsys), SEFLG_SPEED
+                    le_armc = ephem.houses_armc_ex2(
+                        armc, lat, eps, ord(hsys), FLG_SPEED
                     )
                     cusps_armc = le_armc[0]
                 except Exception:
@@ -102,8 +105,8 @@ def main():
                 eps_se = swe.calc_ut(jd, -1, 0)[0][0]
 
                 try:
-                    le_armc = ephem.swe_houses_armc_ex2(
-                        armc, lat, eps_se, ord(hsys), SEFLG_SPEED
+                    le_armc = ephem.houses_armc_ex2(
+                        armc, lat, eps_se, ord(hsys), FLG_SPEED
                     )
                     le_cusps = le_armc[0]
                 except Exception:

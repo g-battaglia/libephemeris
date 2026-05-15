@@ -12,11 +12,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SE_MOON = 1
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+MOON = 1
 
 
 def find_lat_extremes(start_jd, count=40):
@@ -24,14 +27,14 @@ def find_lat_extremes(start_jd, count=40):
     events = []
     jd = start_jd
     step = 0.5
-    prev_lat = swe.calc_ut(jd - step, SE_MOON, SEFLG_SPEED)[0][1]
-    curr_lat = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][1]
+    prev_lat = swe.calc_ut(jd - step, MOON, FLG_SPEED)[0][1]
+    curr_lat = swe.calc_ut(jd, MOON, FLG_SPEED)[0][1]
     found = 0
     for _ in range(20000):
         if found >= count:
             break
         jd += step
-        next_lat = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)[0][1]
+        next_lat = swe.calc_ut(jd, MOON, FLG_SPEED)[0][1]
         if (curr_lat > prev_lat and curr_lat > next_lat) or (
             curr_lat < prev_lat and curr_lat < next_lat
         ):
@@ -40,8 +43,8 @@ def find_lat_extremes(start_jd, count=40):
             for _ in range(40):
                 m1 = a + (b - a) / 3
                 m2 = a + 2 * (b - a) / 3
-                l1 = swe.calc_ut(m1, SE_MOON, SEFLG_SPEED)[0][1]
-                l2 = swe.calc_ut(m2, SE_MOON, SEFLG_SPEED)[0][1]
+                l1 = swe.calc_ut(m1, MOON, FLG_SPEED)[0][1]
+                l2 = swe.calc_ut(m2, MOON, FLG_SPEED)[0][1]
                 if curr_lat > prev_lat:  # maximum
                     if l1 > l2:
                         b = m2
@@ -53,7 +56,7 @@ def find_lat_extremes(start_jd, count=40):
                     else:
                         a = m1
             refined_jd = (a + b) / 2
-            refined_lat = swe.calc_ut(refined_jd, SE_MOON, SEFLG_SPEED)[0][1]
+            refined_lat = swe.calc_ut(refined_jd, MOON, FLG_SPEED)[0][1]
             etype = "max_lat" if refined_lat > 0 else "min_lat"
             events.append((etype, refined_jd, refined_lat))
             found += 1
@@ -78,15 +81,15 @@ def main():
     print(f"Max |latitude| found: {max_lat_se:.4f}°")
 
     flags_list = [
-        ("default", SEFLG_SPEED),
-        ("equatorial", SEFLG_SPEED | SEFLG_EQUATORIAL),
+        ("default", FLG_SPEED),
+        ("equatorial", FLG_SPEED | FLG_EQUATORIAL),
     ]
 
     for etype, jd, se_ref_lat in events:
         for flag_name, flags in flags_list:
             try:
-                se_pos = swe.calc_ut(jd, SE_MOON, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, SE_MOON, flags)[0]
+                se_pos = swe.calc_ut(jd, MOON, flags)[0]
+                le_pos = ephem.calc_ut(jd, MOON, flags)[0]
             except Exception:
                 continue
 

@@ -12,9 +12,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
 
 
 def se_hsys(ch):
@@ -55,15 +58,15 @@ def main():
                 # Get SE cusps and speeds
                 try:
                     se_cusps, se_ascmc = swe.houses_ex(
-                        jd, lat, lon, se_hsys(hsys), SEFLG_SPEED
+                        jd, lat, lon, se_hsys(hsys), FLG_SPEED
                     )
                 except Exception:
                     continue
 
                 # Get LE cusps and speeds
                 try:
-                    le_result = ephem.swe_houses_ex2(
-                        jd, lat, lon, ord(hsys), SEFLG_SPEED
+                    le_result = ephem.houses_ex2(
+                        jd, lat, lon, ord(hsys), FLG_SPEED
                     )
                     le_cusps = le_result[0]
                     le_cusp_speeds = le_result[1]
@@ -91,7 +94,7 @@ def main():
 
                 # Compare cusp speeds (where available)
                 if le_cusp_speeds is not None and len(le_cusp_speeds) >= 12:
-                    # SE returns speeds in houses_ex with SEFLG_SPEED via houses_ex2
+                    # SE returns speeds in houses_ex with FLG_SPEED via houses_ex2
                     # For comparison, use LE's finite-difference speeds
                     # SE speeds from houses_ex are NOT available — SE only returns speeds via houses_ex2
                     # We just verify LE speeds are reasonable (non-zero, reasonable magnitude)
@@ -114,7 +117,7 @@ def main():
     for jd in test_jds[:3]:
         for lat in [0.0, 30.0, 45.0, 60.0]:
             try:
-                le_result = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), SEFLG_SPEED)
+                le_result = ephem.houses_ex2(jd, lat, lon, ord("P"), FLG_SPEED)
                 le_ascmc = le_result[2] if len(le_result) > 2 else None
                 le_ascmc_speeds = le_result[3] if len(le_result) > 3 else None
             except Exception:

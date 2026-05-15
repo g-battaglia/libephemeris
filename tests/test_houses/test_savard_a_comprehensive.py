@@ -29,7 +29,7 @@ class TestSavardABasic:
     def test_savard_a_returns_12_cusps(self):
         """Savard-A returns exactly 12 cusps."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord("J"))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord("J"))
         assert len(cusps) >= 12
         for i in range(12):
             assert 0 <= cusps[i] < 360, f"Cusp {i + 1} = {cusps[i]}"
@@ -38,7 +38,7 @@ class TestSavardABasic:
     def test_savard_a_ascmc_valid(self):
         """Savard-A returns valid ASC and MC."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord("J"))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord("J"))
         asc, mc = ascmc[0], ascmc[1]
         assert 0 <= asc < 360
         assert 0 <= mc < 360
@@ -48,8 +48,8 @@ class TestSavardABasic:
         """Savard-A cusps should differ from Placidus (BUG-003 was fallthrough)."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
-        cusps_j, _ = swe.swe_houses(jd, lat, lon, ord("J"))
-        cusps_p, _ = swe.swe_houses(jd, lat, lon, ord("P"))
+        cusps_j, _ = swe.houses(jd, lat, lon, ord("J"))
+        cusps_p, _ = swe.houses(jd, lat, lon, ord("P"))
 
         # At least some cusps should differ
         differences = 0
@@ -65,7 +65,7 @@ class TestSavardABasic:
     def test_savard_a_cusps_ascending(self):
         """Savard-A cusps should be in ascending order."""
         jd = 2451545.0
-        cusps, _ = swe.swe_houses(jd, 41.9, 12.5, ord("J"))
+        cusps, _ = swe.houses(jd, 41.9, 12.5, ord("J"))
         for i in range(11):
             diff = (cusps[i + 1] - cusps[i]) % 360
             assert diff > 0, (
@@ -75,8 +75,8 @@ class TestSavardABasic:
 
     @pytest.mark.unit
     def test_savard_a_house_name(self):
-        """swe_house_name should return correct name for 'J'."""
-        name = swe.swe_house_name(ord("J"))
+        """house_name should return correct name for 'J'."""
+        name = swe.house_name(ord("J"))
         assert name is not None
         assert len(name) > 0
         # Should contain "Savard" or similar
@@ -111,7 +111,7 @@ class TestSavardALatitudes:
     def test_savard_a_no_crash(self, lat: float, name: str):
         """Savard-A doesn't crash at various latitudes."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, lat, 0.0, ord("J"))
+        cusps, ascmc = swe.houses(jd, lat, 0.0, ord("J"))
         assert len(cusps) >= 12
         for i in range(12):
             assert 0 <= cusps[i] < 360, f"Savard-A @ {name}: cusp {i + 1}={cusps[i]}"
@@ -132,7 +132,7 @@ class TestSavardALatitudes:
     def test_savard_a_symmetric_hemisphere(self, lat: float, name: str):
         """Savard-A should produce some reasonable cusps at each latitude."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, lat, 12.5, ord("J"))
+        cusps, ascmc = swe.houses(jd, lat, 12.5, ord("J"))
         # Verify cusps span 360°
         min_c = min(cusps[:12])
         max_c = max(cusps[:12])
@@ -147,7 +147,7 @@ class TestSavardADates:
     @pytest.mark.parametrize("jd", _random_jds(50, seed=777))
     def test_savard_a_50_random_dates(self, jd: float):
         """Savard-A valid at 50 random dates."""
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord("J"))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord("J"))
         for i in range(12):
             assert 0 <= cusps[i] < 360
             assert math.isfinite(cusps[i])
@@ -159,7 +159,7 @@ class TestSavardADates:
         prev_cusps = None
         for i in range(48):  # 2-day intervals over ~3 months
             jd = jd_start + i * 2.0
-            cusps, _ = swe.swe_houses(jd, 41.9, 12.5, ord("J"))
+            cusps, _ = swe.houses(jd, 41.9, 12.5, ord("J"))
             if prev_cusps is not None:
                 for c in range(12):
                     diff = abs(cusps[c] - prev_cusps[c])
@@ -171,7 +171,7 @@ class TestSavardADates:
 
 
 class TestSavardAArmc:
-    """Test Savard-A via swe_houses_armc."""
+    """Test Savard-A via houses_armc."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -179,7 +179,7 @@ class TestSavardAArmc:
     )
     def test_savard_a_armc_all_angles(self, armc: int):
         """Savard-A via houses_armc works at all ARMC angles."""
-        cusps, ascmc = swe.swe_houses_armc(float(armc), 41.9, 23.44, ord("J"))
+        cusps, ascmc = swe.houses_armc(float(armc), 41.9, 23.44, ord("J"))
         for i in range(12):
             assert 0 <= cusps[i] < 360, f"ARMC={armc}: cusp {i + 1}={cusps[i]}"
 
@@ -187,7 +187,7 @@ class TestSavardAArmc:
     @pytest.mark.parametrize("lat", [0, 20, 40, 60, 80])
     def test_savard_a_armc_various_lats(self, lat: int):
         """Savard-A via houses_armc at various latitudes."""
-        cusps, ascmc = swe.swe_houses_armc(120.0, float(lat), 23.44, ord("J"))
+        cusps, ascmc = swe.houses_armc(120.0, float(lat), 23.44, ord("J"))
         for i in range(12):
             assert 0 <= cusps[i] < 360
             assert math.isfinite(cusps[i])
@@ -205,7 +205,7 @@ class TestSavardAHighVolume:
         lat = rng.uniform(-85, 85)
         lon = rng.uniform(-180, 180)
 
-        cusps, ascmc = swe.swe_houses(jd, lat, lon, ord("J"))
+        cusps, ascmc = swe.houses(jd, lat, lon, ord("J"))
         for i in range(12):
             assert 0 <= cusps[i] < 360, (
                 f"#{idx}: cusp {i + 1}={cusps[i]} (lat={lat:.1f})"

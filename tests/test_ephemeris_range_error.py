@@ -60,7 +60,7 @@ class TestEphemerisRangeErrorClass:
 
 
 class TestCalcUtRangeError:
-    """Test that swe_calc_ut raises EphemerisRangeError for out-of-range dates."""
+    """Test that calc_ut raises EphemerisRangeError for out-of-range dates."""
 
     def test_far_future_date_raises_error(self):
         """Calculation for far future date should raise EphemerisRangeError."""
@@ -68,12 +68,12 @@ class TestCalcUtRangeError:
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_future_jd, eph.SE_SUN, 0)
+            eph.calc_ut(far_future_jd, eph.SUN, 0)
 
         err = exc_info.value
         # Check that error contains useful information
         assert err.requested_jd == far_future_jd
-        assert err.body_id == eph.SE_SUN
+        assert err.body_id == eph.SUN
         assert err.body_name == "Sun"
         assert err.start_jd is not None
         assert err.end_jd is not None
@@ -85,11 +85,11 @@ class TestCalcUtRangeError:
         far_past_jd = 1000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_past_jd, eph.SE_MOON, 0)
+            eph.calc_ut(far_past_jd, eph.MOON, 0)
 
         err = exc_info.value
         assert err.requested_jd == far_past_jd
-        assert err.body_id == eph.SE_MOON
+        assert err.body_id == eph.MOON
         assert err.body_name == "Moon"
 
     def test_error_message_contains_jd_info(self):
@@ -97,7 +97,7 @@ class TestCalcUtRangeError:
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_future_jd, eph.SE_MARS, 0)
+            eph.calc_ut(far_future_jd, eph.MARS, 0)
 
         message = str(exc_info.value)
         # Check message contains key information
@@ -111,7 +111,7 @@ class TestCalcUtRangeError:
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_future_jd, eph.SE_SUN, 0)
+            eph.calc_ut(far_future_jd, eph.SUN, 0)
 
         message = str(exc_info.value)
         # Should contain calendar dates
@@ -123,7 +123,7 @@ class TestCalcUtRangeError:
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_future_jd, eph.SE_SUN, 0)
+            eph.calc_ut(far_future_jd, eph.SUN, 0)
 
         message = str(exc_info.value)
         # Should contain ephemeris file name
@@ -131,34 +131,34 @@ class TestCalcUtRangeError:
 
 
 class TestCalcRangeError:
-    """Test that swe_calc raises EphemerisRangeError for out-of-range dates."""
+    """Test that calc raises EphemerisRangeError for out-of-range dates."""
 
     def test_far_future_date_raises_error(self):
-        """swe_calc should also raise EphemerisRangeError."""
+        """calc should also raise EphemerisRangeError."""
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc(far_future_jd, eph.SE_JUPITER, 0)
+            eph.calc(far_future_jd, eph.JUPITER, 0)
 
         err = exc_info.value
         assert err.requested_jd == far_future_jd
-        assert err.body_id == eph.SE_JUPITER
+        assert err.body_id == eph.JUPITER
         assert err.body_name == "Jupiter"
 
 
 class TestCalcPctrRangeError:
-    """Test that swe_calc_pctr raises EphemerisRangeError for out-of-range dates."""
+    """Test that calc_pctr raises EphemerisRangeError for out-of-range dates."""
 
     def test_far_future_date_raises_error(self):
-        """swe_calc_pctr should also raise EphemerisRangeError."""
+        """calc_pctr should also raise EphemerisRangeError."""
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_pctr(far_future_jd, eph.SE_MOON, eph.SE_MARS, 0)
+            eph.calc_pctr(far_future_jd, eph.MOON, eph.MARS, 0)
 
         err = exc_info.value
         assert err.requested_jd == far_future_jd
-        assert err.body_id == eph.SE_MOON
+        assert err.body_id == eph.MOON
 
 
 class TestExceptionCanBeCaught:
@@ -168,7 +168,7 @@ class TestExceptionCanBeCaught:
         """Can catch as EphemerisRangeError."""
         caught = False
         try:
-            eph.calc_ut(3000000.0, eph.SE_SUN, 0)
+            eph.calc_ut(3000000.0, eph.SUN, 0)
         except EphemerisRangeError:
             caught = True
 
@@ -178,7 +178,7 @@ class TestExceptionCanBeCaught:
         """Can catch as Error (base class)."""
         caught = False
         try:
-            eph.calc_ut(3000000.0, eph.SE_SUN, 0)
+            eph.calc_ut(3000000.0, eph.SUN, 0)
         except eph.Error:
             caught = True
 
@@ -188,7 +188,7 @@ class TestExceptionCanBeCaught:
         """Can catch as Exception."""
         caught = False
         try:
-            eph.calc_ut(3000000.0, eph.SE_SUN, 0)
+            eph.calc_ut(3000000.0, eph.SUN, 0)
         except Exception:
             caught = True
 
@@ -203,7 +203,7 @@ class TestEdgeCases:
         # J2000.0 is well within DE440 range
         jd = 2451545.0  # 2000-01-01
 
-        pos, _ = eph.calc_ut(jd, eph.SE_SUN, 0)
+        pos, _ = eph.calc_ut(jd, eph.SUN, 0)
         assert 0 <= pos[0] < 360  # Valid longitude
 
     def test_various_planets_get_correct_names(self):
@@ -211,13 +211,13 @@ class TestEdgeCases:
         far_future_jd = 3000000.0
 
         test_cases = [
-            (eph.SE_SUN, "Sun"),
-            (eph.SE_MOON, "Moon"),
-            (eph.SE_MERCURY, "Mercury"),
-            (eph.SE_VENUS, "Venus"),
-            (eph.SE_MARS, "Mars"),
-            (eph.SE_JUPITER, "Jupiter"),
-            (eph.SE_SATURN, "Saturn"),
+            (eph.SUN, "Sun"),
+            (eph.MOON, "Moon"),
+            (eph.MERCURY, "Mercury"),
+            (eph.VENUS, "Venus"),
+            (eph.MARS, "Mars"),
+            (eph.JUPITER, "Jupiter"),
+            (eph.SATURN, "Saturn"),
         ]
 
         for body_id, expected_name in test_cases:

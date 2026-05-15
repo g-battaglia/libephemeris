@@ -1,7 +1,7 @@
 """
 Tests for rise/set/transit calculations.
 
-Verifies that swe_rise_trans returns valid results for various
+Verifies that rise_trans returns valid results for various
 bodies, locations, and edge cases including polar regions.
 """
 
@@ -13,26 +13,26 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_VENUS,
-    SE_MERCURY,
-    SE_CALC_RISE,
-    SE_CALC_SET,
-    SE_CALC_MTRANSIT,
-    SE_CALC_ITRANSIT,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    VENUS,
+    MERCURY,
+    CALC_RISE,
+    CALC_SET,
+    CALC_MTRANSIT,
+    CALC_ITRANSIT,
 )
 
 
 STANDARD_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_VENUS, "Venus"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (VENUS, "Venus"),
 ]
 
 STANDARD_LOCATIONS = [
@@ -54,7 +54,7 @@ class TestRiseTransBasic:
         """Rise calculation returns valid result."""
         jd = 2451545.0
         geopos = (41.9, 12.5, 0)
-        res, tret = swe.swe_rise_trans(jd, body_id, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, body_id, CALC_RISE, geopos)
         # res=0 means found, res=-2 means circumpolar
         assert res in (0, -2), f"{name}: unexpected result code {res}"
         if res == 0:
@@ -68,7 +68,7 @@ class TestRiseTransBasic:
         """Set calculation returns valid result."""
         jd = 2451545.0
         geopos = (41.9, 12.5, 0)
-        res, tret = swe.swe_rise_trans(jd, body_id, SE_CALC_SET, geopos)
+        res, tret = swe.rise_trans(jd, body_id, CALC_SET, geopos)
         assert res in (0, -2), f"{name}: unexpected result code {res}"
         if res == 0:
             set_jd = tret[0]
@@ -80,8 +80,8 @@ class TestRiseTransBasic:
         """Sun rise should occur before sun set on same day."""
         jd = 2451545.0  # Noon
         geopos = (41.9, 12.5, 0)
-        res_r, tret_r = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
-        res_s, tret_s = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res_r, tret_r = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
+        res_s, tret_s = swe.rise_trans(jd, SUN, CALC_SET, geopos)
         if res_r == 0 and res_s == 0:
             rise_jd = tret_r[0]
             set_jd = tret_s[0]
@@ -93,7 +93,7 @@ class TestRiseTransBasic:
         """Upper transit returns valid time."""
         jd = 2451545.0
         geopos = (41.9, 12.5, 0)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_MTRANSIT, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_MTRANSIT, geopos)
         assert res == 0, f"Transit not found, result={res}"
         transit_jd = tret[0]
         assert transit_jd > jd - 1
@@ -104,7 +104,7 @@ class TestRiseTransBasic:
         """Lower transit returns valid time."""
         jd = 2451545.0
         geopos = (41.9, 12.5, 0)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_ITRANSIT, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_ITRANSIT, geopos)
         assert res == 0, f"Lower transit not found, result={res}"
 
 
@@ -117,7 +117,7 @@ class TestRiseTransLocations:
         """Sun rise is found at standard locations."""
         jd = 2451545.0
         geopos = (lat, lon, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         assert res in (0, -2), f"{name}: result={res}"
 
     @pytest.mark.unit
@@ -126,7 +126,7 @@ class TestRiseTransLocations:
         """Moon rise is found at standard locations."""
         jd = 2451545.0
         geopos = (lat, lon, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_MOON, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, MOON, CALC_RISE, geopos)
         assert res in (0, -2), f"{name}: result={res}"
 
     @pytest.mark.unit
@@ -135,8 +135,8 @@ class TestRiseTransLocations:
         """Sun is above horizon for reasonable duration at J2000."""
         jd = 2451545.0  # Jan 1
         geopos = (float(lat), 0.0, 0)
-        res_r, tret_r = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
-        res_s, tret_s = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res_r, tret_r = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
+        res_s, tret_s = swe.rise_trans(jd, SUN, CALC_SET, geopos)
         if res_r == 0 and res_s == 0:
             daylight_hours = (tret_s[0] - tret_r[0]) * 24
             if daylight_hours < 0:
@@ -153,9 +153,9 @@ class TestRiseTransPolar:
     def test_sun_rise_polar_summer(self, lat: float):
         """Sun may be circumpolar in polar summer."""
         # June solstice
-        jd = swe.swe_julday(2000, 6, 21, 12.0)
+        jd = swe.julday(2000, 6, 21, 12.0)
         geopos = (lat, 0.0, 0)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         # At extreme latitudes in summer, res=-2 (circumpolar)
         assert res in (0, -2), f"Lat {lat}: unexpected result {res}"
 
@@ -164,9 +164,9 @@ class TestRiseTransPolar:
     def test_sun_rise_polar_winter(self, lat: float):
         """Sun may not rise in polar winter."""
         # December solstice
-        jd = swe.swe_julday(2000, 12, 21, 12.0)
+        jd = swe.julday(2000, 12, 21, 12.0)
         geopos = (lat, 0.0, 0)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         assert res in (0, -2), f"Lat {lat}: unexpected result {res}"
 
 
@@ -181,7 +181,7 @@ class TestRiseTransConsecutiveDays:
         rise_times = []
         for i in range(7):
             jd = jd_start + i
-            res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+            res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
             if res == 0:
                 rise_times.append(tret[0])
 
@@ -200,7 +200,7 @@ class TestRiseTransConsecutiveDays:
         rise_times = []
         for i in range(7):
             jd = jd_start + i
-            res, tret = swe.swe_rise_trans(jd, SE_MOON, SE_CALC_RISE, geopos)
+            res, tret = swe.rise_trans(jd, MOON, CALC_RISE, geopos)
             if res == 0:
                 rise_times.append(tret[0])
 

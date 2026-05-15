@@ -5,18 +5,22 @@ Nodes/Apsides/Elements, Crossings & Stations.
 Target: >= 2300 checks.
 """
 
+import os
 import math
 import random
 import sys
 import time
 import traceback
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
 random.seed(42)
 
@@ -44,28 +48,28 @@ def section(name):
 
 
 J2000 = 2451545.0  # 2000-Jan-1.5 TT
-SEFLG = 2  # SEFLG_SWIEPH
-SEFLG_SPD = 2 | 256  # SEFLG_SWIEPH | SEFLG_SPEED
+SEFLG = 2  # FLG_SWIEPH
+SEFLG_SPD = 2 | 256  # FLG_SWIEPH | FLG_SPEED
 
 # ── Body IDs ──
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_URANUS = 7
-SE_NEPTUNE = 8
-SE_PLUTO = 9
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
+URANUS = 7
+NEPTUNE = 8
+PLUTO = 9
+MEAN_NODE = 10
+TRUE_NODE = 11
 
 # ── Refrac flags ──
-SE_TRUE_TO_APP = 0
-SE_APP_TO_TRUE = 1
-SE_ECL2HOR = 0
-SE_EQU2HOR = 1
+TRUE_TO_APP = 0
+APP_TO_TRUE = 1
+ECL2HOR = 0
+EQU2HOR = 1
 
 # ────────────────────────────────────────────────────────────────────────
 # G08: FIXED STARS (400 checks)
@@ -112,7 +116,7 @@ for star in STARS_20:
     for jd in DATES_5:
         label_base = f"G08.01 {star} JD={jd:.1f}"
         try:
-            pos_lib, name_lib, _ = lib.swe_fixstar2_ut(star, jd, SEFLG)
+            pos_lib, name_lib, _ = lib.fixstar2_ut(star, jd, SEFLG)
             pos_ref, name_ref, *_ = swe_ref.fixstar2_ut(star, jd, SEFLG)
 
             dlon = abs(pos_lib[0] - pos_ref[0])
@@ -137,7 +141,7 @@ print("\nG08.02: Star magnitudes")
 for star in STARS_20:
     label = f"G08.02 {star} mag"
     try:
-        mag_lib, name_lib = lib.swe_fixstar2_mag(star)
+        mag_lib, name_lib = lib.fixstar2_mag(star)
         mag_ref, name_ref = swe_ref.fixstar2_mag(star)
         check(
             math.isfinite(mag_lib) and abs(mag_lib - mag_ref) < 0.3,
@@ -151,7 +155,7 @@ print("\nG08.02b: fixstar2 TT variant (10 stars x 3 checks)")
 for star in STARS_20[:10]:
     label_base = f"G08.02b {star} TT"
     try:
-        pos_lib, name_lib, _ = lib.swe_fixstar2(star, J2000, SEFLG)
+        pos_lib, name_lib, _ = lib.fixstar2(star, J2000, SEFLG)
         pos_ref, name_ref, *_ = swe_ref.fixstar2(star, J2000, SEFLG)
         dlon = abs(pos_lib[0] - pos_ref[0])
         if dlon > 180:
@@ -186,8 +190,8 @@ jd_j2100 = J2000 + 100 * 365.25  # ~J2100
 for star in HIGH_PM_STARS:
     label = f"G08.03 {star} proper_motion"
     try:
-        pos_2000, _, _ = lib.swe_fixstar2_ut(star, jd_j2000, SEFLG)
-        pos_2100, _, _ = lib.swe_fixstar2_ut(star, jd_j2100, SEFLG)
+        pos_2000, _, _ = lib.fixstar2_ut(star, jd_j2000, SEFLG)
+        pos_2100, _, _ = lib.fixstar2_ut(star, jd_j2100, SEFLG)
         dlon = abs(pos_2100[0] - pos_2000[0])
         if dlon > 180:
             dlon = 360 - dlon
@@ -202,8 +206,8 @@ for star in HIGH_PM_STARS:
 for star in HIGH_PM_STARS:
     label = f"G08.03b {star} pm_direction"
     try:
-        pos_lib_a, _, _ = lib.swe_fixstar2_ut(star, jd_j2000, SEFLG)
-        pos_lib_b, _, _ = lib.swe_fixstar2_ut(star, jd_j2100, SEFLG)
+        pos_lib_a, _, _ = lib.fixstar2_ut(star, jd_j2000, SEFLG)
+        pos_lib_b, _, _ = lib.fixstar2_ut(star, jd_j2100, SEFLG)
         pos_ref_a, _, *_ = swe_ref.fixstar2_ut(star, jd_j2000, SEFLG)
         pos_ref_b, _, *_ = swe_ref.fixstar2_ut(star, jd_j2100, SEFLG)
         dlon_lib = pos_lib_b[0] - pos_lib_a[0]
@@ -330,16 +334,16 @@ TEST_DATES_10 = [J2000 + i * 365.25 for i in range(10)]
 
 for loc in LOCATIONS:
     for jd in TEST_DATES_10:
-        for body in [SE_SUN, SE_MOON]:
+        for body in [SUN, MOON]:
             label = f"G09.03 loc={loc[0]:.0f},{loc[1]:.0f} JD={jd:.0f} body={body}"
             try:
-                pos = lib.swe_calc_ut(jd, body, SEFLG_SPD)
+                pos = lib.calc_ut(jd, body, SEFLG_SPD)
                 ecl_lon = pos[0][0]
                 ecl_lat = pos[0][1]
                 ecl_dist = pos[0][2]
                 eq = lib.cotrans((ecl_lon, ecl_lat, ecl_dist), -23.44)
                 xin = (eq[0], eq[1], eq[2])
-                result = lib.azalt(jd, SE_EQU2HOR, loc, 1013.25, 15.0, xin)
+                result = lib.azalt(jd, EQU2HOR, loc, 1013.25, 15.0, xin)
                 az, alt_true, alt_app = result
                 check(0 <= az < 360, f"{label} az={az:.2f} in [0,360)")
                 check(
@@ -360,9 +364,9 @@ for _ in range(25):
     label = f"G09.04 JD={jd:.1f} az={az_in:.1f} alt={alt_in:.1f}"
     try:
         # azalt_rev: horizon -> equatorial
-        ra_dec = lib.azalt_rev(jd, SE_EQU2HOR, loc, az_in, alt_in)
+        ra_dec = lib.azalt_rev(jd, EQU2HOR, loc, az_in, alt_in)
         # Then azalt: equatorial -> horizon (no refraction: press=0)
-        result = lib.azalt(jd, SE_EQU2HOR, loc, 0.0, 0.0, (ra_dec[0], ra_dec[1], 1.0))
+        result = lib.azalt(jd, EQU2HOR, loc, 0.0, 0.0, (ra_dec[0], ra_dec[1], 1.0))
         daz = abs(result[0] - az_in)
         if daz > 180:
             daz = 360 - daz
@@ -388,8 +392,8 @@ for alt in altitudes:
     for press, temp in conditions:
         label = f"G09.05 alt={alt} P={press} T={temp}"
         try:
-            app = lib.refrac(float(alt), press, temp, SE_TRUE_TO_APP)
-            true_back = lib.refrac(app, press, temp, SE_APP_TO_TRUE)
+            app = lib.refrac(float(alt), press, temp, TRUE_TO_APP)
+            true_back = lib.refrac(app, press, temp, APP_TO_TRUE)
             diff = abs(true_back - alt)
             check(diff < 0.02, f"{label} round-trip diff={diff:.4f}")
         except Exception as e:
@@ -399,7 +403,7 @@ for alt in altitudes:
 # which differs from Bennett (~34'). Accept range 25'-40'.
 label = "G09.05 horizon refraction"
 try:
-    app_0 = lib.refrac(0.0, 1013.25, 15.0, SE_TRUE_TO_APP)
+    app_0 = lib.refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
     refr_arcmin = (app_0 - 0.0) * 60
     check(25 < refr_arcmin < 40, f"{label} = {refr_arcmin:.1f}' (expect 25-40')")
 except Exception as e:
@@ -408,7 +412,7 @@ except Exception as e:
 # Zenith refraction < 0.01 deg
 label = "G09.05 zenith refraction"
 try:
-    app_89 = lib.refrac(89.0, 1013.25, 15.0, SE_TRUE_TO_APP)
+    app_89 = lib.refrac(89.0, 1013.25, 15.0, TRUE_TO_APP)
     refr = app_89 - 89.0
     check(refr < 0.01, f"{label} = {refr:.6f} deg")
 except Exception as e:
@@ -418,7 +422,7 @@ except Exception as e:
 for alt in [0, 10, 30, 60, 80]:
     label = f"G09.05 zero_press alt={alt}"
     try:
-        app = lib.refrac(float(alt), 0.0, 15.0, SE_TRUE_TO_APP)
+        app = lib.refrac(float(alt), 0.0, 15.0, TRUE_TO_APP)
         check(abs(app - alt) < 1e-10, f"{label} diff={abs(app - alt):.2e}")
     except Exception as e:
         check(False, f"{label} EXCEPTION: {e}")
@@ -429,7 +433,7 @@ for elev in elevations:
     label = f"G09.05 refrac_ext elev={elev}m"
     try:
         result = lib.refrac_extended(
-            10.0, float(elev), 1013.25, 15.0, 0.0065, SE_TRUE_TO_APP
+            10.0, float(elev), 1013.25, 15.0, 0.0065, TRUE_TO_APP
         )
         if isinstance(result, tuple) and len(result) == 2:
             details = result[1]
@@ -447,8 +451,8 @@ for elev in elevations:
 for alt in [0, 5, 15, 30, 45, 60, 75, 85]:
     label = f"G09.05 refrac_vs_ref alt={alt}"
     try:
-        r_lib = lib.refrac(float(alt), 1013.25, 15.0, SE_TRUE_TO_APP)
-        r_ref = swe_ref.refrac(float(alt), 1013.25, 15.0, SE_TRUE_TO_APP)
+        r_lib = lib.refrac(float(alt), 1013.25, 15.0, TRUE_TO_APP)
+        r_ref = swe_ref.refrac(float(alt), 1013.25, 15.0, TRUE_TO_APP)
         diff = abs(r_lib - r_ref)
         check(diff < 0.15, f"{label} diff={diff:.6f}")
     except Exception as e:
@@ -465,15 +469,15 @@ section("G10: Phenomena & Heliacal")
 # Use only planets where lib properly computes pheno (not Chiron which returns zeros)
 print("\nG10.01: pheno_ut -- 9 bodies x 10 dates x 4 checks + extras")
 PHENO_BODIES = [
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 ]
 PHENO_BODY_NAMES = {
     1: "Moon",
@@ -493,7 +497,7 @@ for body in PHENO_BODIES:
     for jd in PHENO_DATES:
         label_base = f"G10.01 {bname} JD={jd:.0f}"
         try:
-            p_lib = lib.swe_pheno_ut(jd, body, SEFLG)
+            p_lib = lib.pheno_ut(jd, body, SEFLG)
             p_ref = swe_ref.pheno_ut(jd, body, SEFLG)
 
             # [0] phase angle
@@ -526,7 +530,7 @@ print("\nG10.01b: pheno_ut Sun -- diameter and magnitude")
 for jd in PHENO_DATES:
     label = f"G10.01b Sun JD={jd:.0f}"
     try:
-        p = lib.swe_pheno_ut(jd, SE_SUN, SEFLG)
+        p = lib.pheno_ut(jd, SUN, SEFLG)
         # Sun diameter should be around 1920" (32'), magnitude around -26.7
         # Just check that the call succeeds and returns finite values
         check(math.isfinite(p[3]) and p[3] > 0, f"{label} diam={p[3]:.2f}")
@@ -539,8 +543,8 @@ print("\nG10.01c: pheno_ut diameter sanity")
 for jd in PHENO_DATES:
     label = f"G10.01c Moon diam JD={jd:.0f}"
     try:
-        p = lib.swe_pheno_ut(jd, SE_MOON, SEFLG)
-        p_ref = swe_ref.pheno_ut(jd, SE_MOON, SEFLG)
+        p = lib.pheno_ut(jd, MOON, SEFLG)
+        p_ref = swe_ref.pheno_ut(jd, MOON, SEFLG)
         diam_deg = p[3]
         diam_ref = p_ref[3]
         check(
@@ -553,8 +557,8 @@ for jd in PHENO_DATES:
 for jd in PHENO_DATES:
     label = f"G10.01c Jupiter diam JD={jd:.0f}"
     try:
-        p = lib.swe_pheno_ut(jd, SE_JUPITER, SEFLG)
-        p_ref = swe_ref.pheno_ut(jd, SE_JUPITER, SEFLG)
+        p = lib.pheno_ut(jd, JUPITER, SEFLG)
+        p_ref = swe_ref.pheno_ut(jd, JUPITER, SEFLG)
         diam_deg = p[3]
         diam_ref = p_ref[3]
         check(
@@ -572,8 +576,8 @@ ELONG_DATES = [J2000 + i * 36.525 for i in range(20)]  # 20 dates, ~0.1yr apart
 
 for jd in ELONG_DATES:
     for body, bname, max_elong in [
-        (SE_VENUS, "Venus", 47.5),
-        (SE_MERCURY, "Mercury", 28.5),
+        (VENUS, "Venus", 47.5),
+        (MERCURY, "Mercury", 28.5),
     ]:
         label_base = f"G10.02 {bname} JD={jd:.1f}"
         try:
@@ -597,8 +601,8 @@ for jd in ELONG_DATES:
 for jd in ELONG_DATES:
     label = f"G10.02b Venus JD={jd:.1f}"
     try:
-        is_m = lib.is_morning_star(jd, SE_VENUS)
-        is_e = lib.is_evening_star(jd, SE_VENUS)
+        is_m = lib.is_morning_star(jd, VENUS)
+        is_e = lib.is_evening_star(jd, VENUS)
         # They should be mutually exclusive (one True, one False)
         check(is_m != is_e, f"{label} morning={is_m} evening={is_e}")
     except Exception as e:
@@ -643,7 +647,7 @@ section("G11: Nodes, Apsides, Elements")
 
 # G11.01: nod_aps_ut (200 checks)
 print("\nG11.01: nod_aps_ut -- 5 bodies x 10 dates x 4 results")
-NAP_BODIES = [SE_MARS, SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]
+NAP_BODIES = [MARS, JUPITER, SATURN, URANUS, NEPTUNE]
 NAP_BODY_NAMES = {4: "Mars", 5: "Jupiter", 6: "Saturn", 7: "Uranus", 8: "Neptune"}
 NAP_DATES = [J2000 + i * 1000 for i in range(10)]
 NAMES_4 = ["asc_node", "dsc_node", "perihelion", "aphelion"]
@@ -651,11 +655,11 @@ NAMES_4 = ["asc_node", "dsc_node", "perihelion", "aphelion"]
 # Tolerance depends on planet: inner planets agree well, outer diverge more
 # because mean orbital elements are sensitive to ephemeris differences
 NAP_TOLERANCE = {
-    SE_MARS: 2.0,
-    SE_JUPITER: 5.0,
-    SE_SATURN: 8.0,
-    SE_URANUS: 15.0,
-    SE_NEPTUNE: 40.0,  # Neptune apsides are very sensitive
+    MARS: 2.0,
+    JUPITER: 5.0,
+    SATURN: 8.0,
+    URANUS: 15.0,
+    NEPTUNE: 40.0,  # Neptune apsides are very sensitive
 }
 
 for body in NAP_BODIES:
@@ -664,7 +668,7 @@ for body in NAP_BODIES:
     for jd in NAP_DATES:
         label_base = f"G11.01 {bname} JD={jd:.0f}"
         try:
-            n_lib = lib.swe_nod_aps_ut(jd, body, 1, SEFLG_SPD)  # SE_NODBIT_MEAN
+            n_lib = lib.nod_aps_ut(jd, body, 1, SEFLG_SPD)  # NODBIT_MEAN
             n_ref = swe_ref.nod_aps_ut(jd, body, 1, SEFLG_SPD)
             for i, name in enumerate(NAMES_4):
                 label = f"{label_base} {name}"
@@ -685,14 +689,14 @@ for body in NAP_BODIES:
 # Use only planets (not Chiron/Ceres which return zero elements in lib)
 print("\nG11.02: Orbital elements -- 8 planets x 10 dates x 2 checks + extras")
 ORB_BODIES_MAIN = [
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 ]
 ORB_BODY_NAMES = {
     2: "Mercury",
@@ -711,7 +715,7 @@ for body in ORB_BODIES_MAIN:
     for jd in ORB_DATES:
         label_base = f"G11.02 {bname} JD={jd:.0f}"
         try:
-            e_lib = lib.swe_get_orbital_elements_ut(jd, body, SEFLG)
+            e_lib = lib.get_orbital_elements_ut(jd, body, SEFLG)
             dt = swe_ref.deltat(jd)
             e_ref = swe_ref.get_orbital_elements(jd + dt, body, SEFLG)
 
@@ -736,7 +740,7 @@ for body in ORB_BODIES_MAIN[:5]:
     for jd in ORB_DATES[:8]:
         label = f"G11.02b {bname} incl JD={jd:.0f}"
         try:
-            e_lib = lib.swe_get_orbital_elements_ut(jd, body, SEFLG)
+            e_lib = lib.get_orbital_elements_ut(jd, body, SEFLG)
             incl = e_lib[2]
             check(0 <= incl <= 180, f"{label} incl={incl:.4f}")
         except Exception as e:
@@ -750,8 +754,8 @@ for body in ORB_BODIES_MAIN:
     for jd in ORB_DATES:
         label = f"G11.03 {bname} JD={jd:.0f}"
         try:
-            dt = lib.swe_deltat(jd)
-            dmax, dmin, dcur = lib.swe_orbit_max_min_true_distance(jd + dt, body, SEFLG)
+            dt = lib.deltat(jd)
+            dmax, dmin, dcur = lib.orbit_max_min_true_distance(jd + dt, body, SEFLG)
             check(
                 dmax > dmin > 0 and dcur > 0,
                 f"{label} max={dmax:.4f} min={dmin:.4f} cur={dcur:.4f}",
@@ -760,13 +764,13 @@ for body in ORB_BODIES_MAIN:
             check(False, f"{label} EXCEPTION: {e}")
 
 # Extra: max > current > 0 for all (20 checks)
-for body in [SE_MARS, SE_JUPITER]:
+for body in [MARS, JUPITER]:
     bname = ORB_BODY_NAMES[body]
     for jd in ORB_DATES:
         label = f"G11.03b {bname} cur_bound JD={jd:.0f}"
         try:
-            dt = lib.swe_deltat(jd)
-            dmax, dmin, dcur = lib.swe_orbit_max_min_true_distance(jd + dt, body, SEFLG)
+            dt = lib.deltat(jd)
+            dmax, dmin, dcur = lib.orbit_max_min_true_distance(jd + dt, body, SEFLG)
             # current should be between min and max (with some tolerance for
             # the fact that these are extremes over the full orbit)
             check(dcur > 0 and dmin > 0, f"{label} cur={dcur:.4f} min={dmin:.4f}")
@@ -781,7 +785,7 @@ for i in range(20):
     jd = J2000 + i * 365.25
     label = f"G11.04 MeanNode retrograde JD={jd:.0f}"
     try:
-        pos = lib.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPD)
+        pos = lib.calc_ut(jd, MEAN_NODE, SEFLG_SPD)
         speed = pos[0][3]
         check(speed < 0, f"{label} speed={speed:.6f} (expect <0)")
     except Exception as e:
@@ -792,7 +796,7 @@ for i in range(10):
     jd = J2000 + i * 500
     label = f"G11.04 MeanNode_speed JD={jd:.0f}"
     try:
-        pos = lib.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPD)
+        pos = lib.calc_ut(jd, MEAN_NODE, SEFLG_SPD)
         speed = pos[0][3]
         check(-0.06 < speed < -0.04, f"{label} speed={speed:.6f} ~-0.053")
     except Exception as e:
@@ -803,8 +807,8 @@ for i in range(20):
     jd = J2000 + i * 365.25
     label = f"G11.04 TrueVsMean JD={jd:.0f}"
     try:
-        mean = lib.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPD)
-        true = lib.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPD)
+        mean = lib.calc_ut(jd, MEAN_NODE, SEFLG_SPD)
+        true = lib.calc_ut(jd, TRUE_NODE, SEFLG_SPD)
         diff = abs(true[0][0] - mean[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -818,8 +822,8 @@ for i in range(20):
     jd = J2000 + i * 365.25
     label = f"G11.04 Apog_Perig JD={jd:.0f}"
     try:
-        apog = lib.swe_calc_ut(jd, 21, SEFLG_SPD)  # SE_INTP_APOG
-        perig = lib.swe_calc_ut(jd, 22, SEFLG_SPD)  # SE_INTP_PERG
+        apog = lib.calc_ut(jd, 21, SEFLG_SPD)  # INTP_APOG
+        perig = lib.calc_ut(jd, 22, SEFLG_SPD)  # INTP_PERG
         sep = abs(apog[0][0] - perig[0][0])
         if sep > 180:
             sep = 360 - sep
@@ -832,8 +836,8 @@ for i in range(10):
     jd = J2000 + i * 365.25
     label = f"G11.04 MeanApog_IntpApog JD={jd:.0f}"
     try:
-        mean_apog = lib.swe_calc_ut(jd, 12, SEFLG_SPD)  # SE_MEAN_APOG
-        intp_apog = lib.swe_calc_ut(jd, 21, SEFLG_SPD)  # SE_INTP_APOG
+        mean_apog = lib.calc_ut(jd, 12, SEFLG_SPD)  # MEAN_APOG
+        intp_apog = lib.calc_ut(jd, 21, SEFLG_SPD)  # INTP_APOG
         diff = abs(mean_apog[0][0] - intp_apog[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -845,10 +849,10 @@ for i in range(10):
 # but perturbations can shift them. Use wider tolerance for mean elements.
 for i in range(10):
     jd = J2000 + i * 500
-    for body, bname in [(SE_JUPITER, "Jupiter"), (SE_SATURN, "Saturn")]:
+    for body, bname in [(JUPITER, "Jupiter"), (SATURN, "Saturn")]:
         label = f"G11.04 peri_aphe_180 {bname} JD={jd:.0f}"
         try:
-            n = lib.swe_nod_aps_ut(jd, body, 1, SEFLG_SPD)
+            n = lib.nod_aps_ut(jd, body, 1, SEFLG_SPD)
             peri_lon = n[2][0]
             aphe_lon = n[3][0]
             sep = abs(peri_lon - aphe_lon)
@@ -898,14 +902,14 @@ for deg in CROSS_DEGS:
     for start_jd in START_JDS:
         label = f"G12.01 solcross {deg:.0f}deg from JD={start_jd:.0f}"
         try:
-            jd_lib = lib.swe_solcross_ut(deg, start_jd, SEFLG)
+            jd_lib = lib.solcross_ut(deg, start_jd, SEFLG)
             jd_ref = swe_ref.solcross_ut(deg, start_jd, SEFLG)
 
             # Timing match < 60 seconds
             dt = abs(jd_lib - jd_ref) * 86400  # seconds
             if dt > 60:
                 # If timing differs, verify Sun is at target
-                pos = lib.swe_calc_ut(jd_lib, SE_SUN, SEFLG_SPD)
+                pos = lib.calc_ut(jd_lib, SUN, SEFLG_SPD)
                 sun_lon = pos[0][0]
                 dlon = abs(sun_lon - deg)
                 if dlon > 180:
@@ -925,9 +929,9 @@ for deg in MOON_CROSS_DEGS:
     for _ in range(10):
         label = f"G12.02 mooncross {deg:.0f}deg JD={jd:.1f}"
         try:
-            jd_cross = lib.swe_mooncross_ut(deg, jd, SEFLG)
+            jd_cross = lib.mooncross_ut(deg, jd, SEFLG)
             # Verify Moon is at target longitude
-            pos = lib.swe_calc_ut(jd_cross, SE_MOON, SEFLG_SPD)
+            pos = lib.calc_ut(jd_cross, MOON, SEFLG_SPD)
             moon_lon = pos[0][0]
             dlon = abs(moon_lon - deg)
             if dlon > 180:
@@ -944,7 +948,7 @@ jd = J2000
 for _ in range(50):
     label = f"G12.03 mooncross_node JD={jd:.1f}"
     try:
-        jd_cross, xlon, xlat = lib.swe_mooncross_node_ut(jd, SEFLG)
+        jd_cross, xlon, xlat = lib.mooncross_node_ut(jd, SEFLG)
         # At a node crossing, latitude should be near zero
         check(abs(xlat) < 0.01, f"{label} lat={xlat:.8f} (~0)")
         jd = jd_cross + 1  # advance past this crossing
@@ -955,12 +959,12 @@ for _ in range(50):
 # G12.04: find_station_ut (50 checks)
 print("\nG12.04: find_station_ut")
 STATION_CONFIGS = [
-    (SE_MERCURY, "Mercury", 5),
-    (SE_VENUS, "Venus", 3),
-    (SE_MARS, "Mars", 5),
-    (SE_JUPITER, "Jupiter", 5),
-    (SE_SATURN, "Saturn", 5),
-    (SE_URANUS, "Uranus", 2),
+    (MERCURY, "Mercury", 5),
+    (VENUS, "Venus", 3),
+    (MARS, "Mars", 5),
+    (JUPITER, "Jupiter", 5),
+    (SATURN, "Saturn", 5),
+    (URANUS, "Uranus", 2),
 ]
 
 for body, bname, n_stations in STATION_CONFIGS:
@@ -968,10 +972,10 @@ for body, bname, n_stations in STATION_CONFIGS:
     for i in range(n_stations):
         label_base = f"G12.04 {bname} station {i}"
         try:
-            jd_station, station_type = lib.swe_find_station_ut(body, jd, "any", SEFLG)
+            jd_station, station_type = lib.find_station_ut(body, jd, "any", SEFLG)
 
             # Speed should be near zero at station
-            pos = lib.swe_calc_ut(jd_station, body, SEFLG_SPD)
+            pos = lib.calc_ut(jd_station, body, SEFLG_SPD)
             speed = abs(pos[0][3])
             check(speed < 0.01, f"{label_base} speed={speed:.6f} (~0)")
             check(station_type in ("SR", "SD"), f"{label_base} type={station_type}")

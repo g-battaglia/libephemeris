@@ -1,5 +1,5 @@
 """
-Tests for the interpolated lunar apogee (SE_INTP_APOG) and perigee (SE_INTP_PERG).
+Tests for the interpolated lunar apogee (INTP_APOG) and perigee (INTP_PERG).
 
 The interpolated apogee is a smoothed version of the osculating apogee that
 removes spurious short-period oscillations by cubic spline interpolation through
@@ -34,9 +34,9 @@ class TestInterpolatedApogeeBasic:
     """Basic functionality tests for interpolated apogee."""
 
     def test_calc_ut_returns_valid_position(self):
-        """Test that swe_calc_ut returns a valid position for SE_INTP_APOG."""
+        """Test that calc_ut returns a valid position for INTP_APOG."""
         jd_ut = 2451545.0  # J2000.0
-        result, retflag = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, swe.SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd_ut, swe.INTP_APOG, swe.FLG_SPEED)
 
         # Result should be a tuple of 6 values
         assert len(result) == 6
@@ -52,18 +52,18 @@ class TestInterpolatedApogeeBasic:
         assert 0.002 < dist < 0.003, f"Distance {dist} AU seems unreasonable"
 
     def test_calc_returns_valid_position(self):
-        """Test that swe_calc (TT) returns a valid position for SE_INTP_APOG."""
+        """Test that calc (TT) returns a valid position for INTP_APOG."""
         jd_tt = 2451545.0  # J2000.0
-        result, retflag = swe.swe_calc(jd_tt, swe.SE_INTP_APOG, 0)
+        result, retflag = swe.calc(jd_tt, swe.INTP_APOG, 0)
 
         assert len(result) == 6
         lon = result[0]
         assert 0 <= lon < 360
 
     def test_interpolated_perigee_basic(self):
-        """Test that SE_INTP_PERG returns valid position."""
+        """Test that INTP_PERG returns valid position."""
         jd_ut = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd_ut, swe.SE_INTP_PERG, 0)
+        result, retflag = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
 
         assert len(result) == 6
         lon = result[0]
@@ -79,8 +79,8 @@ class TestInterpolatedApogeeBasic:
         """
         jd_ut = 2451545.0
 
-        apogee_result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, 0)
-        perigee_result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_PERG, 0)
+        apogee_result, _ = swe.calc_ut(jd_ut, swe.INTP_APOG, 0)
+        perigee_result, _ = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
 
         apogee_lon = apogee_result[0]
         perigee_lon = perigee_result[0]
@@ -99,9 +99,9 @@ class TestInterpolatedApogeeVelocity:
     """Tests for velocity/speed calculations."""
 
     def test_velocity_is_calculated(self):
-        """Test that velocity is calculated when SEFLG_SPEED is set."""
+        """Test that velocity is calculated when FLG_SPEED is set."""
         jd_ut = 2451545.0
-        result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, swe.SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd_ut, swe.INTP_APOG, swe.FLG_SPEED)
 
         speed_lon = result[3]
         # Velocity should be non-zero
@@ -110,7 +110,7 @@ class TestInterpolatedApogeeVelocity:
     def test_velocity_reasonable_magnitude(self):
         """Test that velocity has reasonable magnitude."""
         jd_ut = 2451545.0
-        result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, swe.SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd_ut, swe.INTP_APOG, swe.FLG_SPEED)
 
         speed_lon = result[3]
         # Mean apogee moves at about 40.7 degrees/year = 0.111 deg/day
@@ -120,9 +120,9 @@ class TestInterpolatedApogeeVelocity:
         assert abs(speed_lon) < 10, f"Velocity {speed_lon} deg/day seems unreasonable"
 
     def test_no_velocity_without_flag(self):
-        """Test that velocity is zero when SEFLG_SPEED is not set."""
+        """Test that velocity is zero when FLG_SPEED is not set."""
         jd_ut = 2451545.0
-        result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, 0)
+        result, _ = swe.calc_ut(jd_ut, swe.INTP_APOG, 0)
 
         speed_lon = result[3]
         assert speed_lon == 0.0
@@ -143,8 +143,8 @@ class TestInterpolatedVsOsculating:
         for i in range(10):
             jd = jd_start + i * dt
 
-            oscu_result, _ = swe.swe_calc_ut(jd, swe.SE_OSCU_APOG, 0)
-            intp_result, _ = swe.swe_calc_ut(jd, swe.SE_INTP_APOG, 0)
+            oscu_result, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
+            intp_result, _ = swe.calc_ut(jd, swe.INTP_APOG, 0)
 
             oscu_positions.append(oscu_result[0])
             intp_positions.append(intp_result[0])
@@ -190,8 +190,8 @@ class TestInterpolatedVsOsculating:
         """Test that interpolated and osculating apogee give different results."""
         jd_ut = 2451545.0
 
-        oscu_result, _ = swe.swe_calc_ut(jd_ut, swe.SE_OSCU_APOG, 0)
-        intp_result, _ = swe.swe_calc_ut(jd_ut, swe.SE_INTP_APOG, 0)
+        oscu_result, _ = swe.calc_ut(jd_ut, swe.OSCU_APOG, 0)
+        intp_result, _ = swe.calc_ut(jd_ut, swe.INTP_APOG, 0)
 
         oscu_lon = oscu_result[0]
         intp_lon = intp_result[0]
@@ -221,7 +221,7 @@ class TestInterpolatedApogeeAtMultipleDates:
     )
     def test_valid_at_various_dates(self, jd, description):
         """Test that interpolated apogee works at various dates."""
-        result, _ = swe.swe_calc_ut(jd, swe.SE_INTP_APOG, swe.SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, swe.INTP_APOG, swe.FLG_SPEED)
 
         lon = result[0]
         speed = result[3]
@@ -270,7 +270,7 @@ class TestInterpolatedApogeeConsistency:
         prev_lon = None
         for i in range(50):
             jd = jd_start + i * dt
-            result, _ = swe.swe_calc_ut(jd, swe.SE_INTP_APOG, 0)
+            result, _ = swe.calc_ut(jd, swe.INTP_APOG, 0)
             lon = result[0]
 
             if prev_lon is not None:

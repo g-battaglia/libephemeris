@@ -2,7 +2,7 @@
 """Round 53: Planetary Distances (AU) Precision
 
 Compare geocentric distance (AU) for all major bodies across multiple epochs.
-Tests distance values from swe_calc_ut() index 2 (geocentric distance in AU).
+Tests distance values from calc_ut() index 2 (geocentric distance in AU).
 Also tests distance speed (index 5 - AU/day) and heliocentric distances.
 """
 
@@ -17,7 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -60,13 +63,13 @@ SE_BODIES = {
     20: 20,  # Vesta
 }
 
-# SE uses SE_AST_OFFSET + N for asteroids
-SE_AST_OFFSET = 10000
+# SE uses AST_OFFSET + N for asteroids
+AST_OFFSET = 10000
 SE_ASTEROID_MAP = {
-    17: SE_AST_OFFSET + 1,  # Ceres
-    18: SE_AST_OFFSET + 2,  # Pallas
-    19: SE_AST_OFFSET + 3,  # Juno
-    20: SE_AST_OFFSET + 4,  # Vesta
+    17: AST_OFFSET + 1,  # Ceres
+    18: AST_OFFSET + 2,  # Pallas
+    19: AST_OFFSET + 3,  # Juno
+    20: AST_OFFSET + 4,  # Vesta
 }
 
 # Test epochs: spread across 1600-2400
@@ -87,11 +90,11 @@ TEST_JDAYS.append((2451545.0, "J2000.0"))
 TEST_JDAYS.append((2460000.0, "JD2460000"))
 TEST_JDAYS.append((2440000.0, "JD2440000"))
 
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 
 def get_se_body(body_id):
-    """Get the SE body ID, mapping asteroids to SE_AST_OFFSET + N."""
+    """Get the SE body ID, mapping asteroids to AST_OFFSET + N."""
     return SE_ASTEROID_MAP.get(body_id, body_id)
 
 
@@ -117,7 +120,7 @@ for jd, epoch_label in TEST_JDAYS:
             se_result = swe.calc_ut(jd, se_body, FLAGS)
             se_pos = se_result[0] if isinstance(se_result, tuple) else se_result
 
-            le_result = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_result = ephem.calc_ut(jd, body_id, FLAGS)
             le_pos = le_result[0] if isinstance(le_result, tuple) else le_result
 
             se_dist = se_pos[2]
@@ -187,7 +190,7 @@ for jd, epoch_label in TEST_JDAYS[:10]:  # First 10 epochs
             se_result = swe.calc_ut(jd, se_body, FLAGS)
             se_pos = se_result[0]
 
-            le_result = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_result = ephem.calc_ut(jd, body_id, FLAGS)
             le_pos = le_result[0]
 
             se_dspeed = se_pos[5]  # distance speed AU/day
@@ -219,7 +222,7 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 # P3: Heliocentric distances
 # ============================================================
 print("\n=== P3: Heliocentric distance ===")
-HELIO_FLAG = 256 | 8  # SEFLG_SPEED | SEFLG_HELCTR
+HELIO_FLAG = 256 | 8  # FLG_SPEED | FLG_HELCTR
 
 # Skip Sun (meaningless helio) and Moon (SE may not support helio Moon well)
 HELIO_BODIES = {k: v for k, v in BODIES.items() if k not in (0, 1)}
@@ -231,7 +234,7 @@ for jd, epoch_label in TEST_JDAYS[:10]:
             se_result = swe.calc_ut(jd, se_body, HELIO_FLAG)
             se_pos = se_result[0]
 
-            le_result = ephem.swe_calc_ut(jd, body_id, HELIO_FLAG)
+            le_result = ephem.calc_ut(jd, body_id, HELIO_FLAG)
             le_pos = le_result[0]
 
             se_dist = se_pos[2]
@@ -272,7 +275,7 @@ for i in range(0, 365, 2):
     jd = jd_start + i
     try:
         se_result = swe.calc_ut(jd, 1, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le_result = ephem.calc_ut(jd, 1, FLAGS)
 
         se_dist = se_result[0][2]
         le_dist = le_result[0][2]
@@ -309,7 +312,7 @@ for i in range(0, 365, 3):
     jd = jd_start + i
     try:
         se_result = swe.calc_ut(jd, 0, FLAGS)
-        le_result = ephem.swe_calc_ut(jd, 0, FLAGS)
+        le_result = ephem.calc_ut(jd, 0, FLAGS)
 
         se_dist = se_result[0][2]
         le_dist = le_result[0][2]
@@ -337,18 +340,18 @@ print(f"  After P5: {passed} passed, {failed} failed, {errors} errors")
 # P6: XYZ mode distances (cross-check with ecliptic distances)
 # ============================================================
 print("\n=== P6: XYZ distance vs ecliptic distance consistency ===")
-XYZ_FLAG = 256 | 4096  # SEFLG_SPEED | SEFLG_XYZ
+XYZ_FLAG = 256 | 4096  # FLG_SPEED | FLG_XYZ
 
 for jd, epoch_label in TEST_JDAYS[:5]:
     for body_id in [0, 1, 2, 3, 4, 5]:
         body_name = BODIES[body_id]
         try:
             # Ecliptic distance
-            le_ecl = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_ecl = ephem.calc_ut(jd, body_id, FLAGS)
             ecl_dist = le_ecl[0][2]
 
             # XYZ distance
-            le_xyz = ephem.swe_calc_ut(jd, body_id, XYZ_FLAG)
+            le_xyz = ephem.calc_ut(jd, body_id, XYZ_FLAG)
             x, y, z = le_xyz[0][0], le_xyz[0][1], le_xyz[0][2]
             xyz_dist = math.sqrt(x * x + y * y + z * z)
 
@@ -397,7 +400,7 @@ for jd, epoch_label in extreme_epochs:
         try:
             se_body = get_se_body(body_id)
             se_result = swe.calc_ut(jd, se_body, FLAGS)
-            le_result = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_result = ephem.calc_ut(jd, body_id, FLAGS)
 
             se_dist = se_result[0][2]
             le_dist = le_result[0][2]

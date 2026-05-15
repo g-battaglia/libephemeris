@@ -2,7 +2,7 @@
 """Round 103: Ecliptic/Equatorial Coordinate Round-Trip
 
 Verifies that computing a planet's position in ecliptic, then converting to
-equatorial via cotrans, matches the direct SEFLG_EQUATORIAL output.
+equatorial via cotrans, matches the direct FLG_EQUATORIAL output.
 Also verifies the reverse round-trip (equatorial -> ecliptic via cotrans).
 
 Tests:
@@ -13,6 +13,7 @@ Tests:
 
 from __future__ import annotations
 import sys, os, time, math
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -20,11 +21,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_EQUATORIAL = 2048
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_EQUATORIAL = 2048
 
 PLANETS = [
     (0, "Sun"),
@@ -50,8 +54,8 @@ def run_tests():
     failed = 0
     total = 0
     fail_details = []
-    flags_ecl = SEFLG_SWIEPH | SEFLG_SPEED
-    flags_eq = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+    flags_ecl = FLG_SWIEPH | FLG_SPEED
+    flags_eq = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
 
     print("=" * 80)
     print("ROUND 103: Ecliptic/Equatorial Coordinate Round-Trip")
@@ -66,13 +70,13 @@ def run_tests():
 
     for jd in EPOCHS:
         # Get obliquity
-        nut_result = ephem.swe_calc_ut(jd, -1, SEFLG_SWIEPH)
+        nut_result = ephem.calc_ut(jd, -1, FLG_SWIEPH)
         eps = nut_result[0][0]  # true obliquity
 
         for body_id, body_name in PLANETS:
             total += 1
-            ecl = ephem.swe_calc_ut(jd, body_id, flags_ecl)[0]
-            eq_direct = ephem.swe_calc_ut(jd, body_id, flags_eq)[0]
+            ecl = ephem.calc_ut(jd, body_id, flags_ecl)[0]
+            eq_direct = ephem.calc_ut(jd, body_id, flags_eq)[0]
 
             # Manual cotrans from ecliptic to equatorial
             pos = (ecl[0], ecl[1], ecl[2])
@@ -106,12 +110,12 @@ def run_tests():
     p2_fail = 0
 
     for jd in EPOCHS:
-        nut_result = ephem.swe_calc_ut(jd, -1, SEFLG_SWIEPH)
+        nut_result = ephem.calc_ut(jd, -1, FLG_SWIEPH)
         eps = nut_result[0][0]
 
         for body_id, body_name in PLANETS:
             total += 1
-            ecl = ephem.swe_calc_ut(jd, body_id, flags_ecl)[0]
+            ecl = ephem.calc_ut(jd, body_id, flags_ecl)[0]
 
             # Forward: ecliptic -> equatorial
             pos = (ecl[0], ecl[1], ecl[2])
@@ -148,7 +152,7 @@ def run_tests():
     p3_fail = 0
 
     for jd in EPOCHS:
-        nut_result = swe.calc_ut(jd, -1, SEFLG_SWIEPH)
+        nut_result = swe.calc_ut(jd, -1, FLG_SWIEPH)
         eps = nut_result[0][0]
 
         for body_id, body_name in PLANETS:
@@ -190,7 +194,7 @@ def run_tests():
             # Ecliptic
             total += 1
             se_ecl = swe.calc_ut(jd, body_id, flags_ecl)[0]
-            le_ecl = ephem.swe_calc_ut(jd, body_id, flags_ecl)[0]
+            le_ecl = ephem.calc_ut(jd, body_id, flags_ecl)[0]
             dlon = abs(se_ecl[0] - le_ecl[0]) * 3600
             if dlon > 180 * 3600:
                 dlon = 360 * 3600 - dlon
@@ -206,7 +210,7 @@ def run_tests():
             # Equatorial
             total += 1
             se_eq = swe.calc_ut(jd, body_id, flags_eq)[0]
-            le_eq = ephem.swe_calc_ut(jd, body_id, flags_eq)[0]
+            le_eq = ephem.calc_ut(jd, body_id, flags_eq)[0]
             dra = abs(se_eq[0] - le_eq[0]) * 3600
             if dra > 180 * 3600:
                 dra = 360 * 3600 - dra

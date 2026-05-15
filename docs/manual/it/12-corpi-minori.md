@@ -128,7 +128,7 @@ print(f"SPK scaricato: {percorso}")
 ```
 
 ```
-SPK scaricato: /Users/giacomo/.libephemeris/spk/1_200001_205001.bsp
+SPK scaricato: ~/.libephemeris/spk/1_200001_205001.bsp
 ```
 
 ### Gestire gli SPK registrati

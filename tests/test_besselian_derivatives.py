@@ -29,7 +29,7 @@ from libephemeris import (
     calc_besselian_dl1_dt,
     calc_besselian_dl2_dt,
     calc_besselian_dmu_dt,
-    SEFLG_SWIEPH,
+    FLG_SWIEPH,
 )
 
 
@@ -106,12 +106,12 @@ class TestBesselianDerivativesBasicFunctionality:
         jd = julday(2024, 4, 8, 18.0)
 
         # Should not raise any exceptions
-        calc_besselian_dx_dt(jd, flags=SEFLG_SWIEPH)
-        calc_besselian_dy_dt(jd, flags=SEFLG_SWIEPH)
-        calc_besselian_dd_dt(jd, flags=SEFLG_SWIEPH)
-        calc_besselian_dl1_dt(jd, flags=SEFLG_SWIEPH)
-        calc_besselian_dl2_dt(jd, flags=SEFLG_SWIEPH)
-        calc_besselian_dmu_dt(jd, flags=SEFLG_SWIEPH)
+        calc_besselian_dx_dt(jd, flags=FLG_SWIEPH)
+        calc_besselian_dy_dt(jd, flags=FLG_SWIEPH)
+        calc_besselian_dd_dt(jd, flags=FLG_SWIEPH)
+        calc_besselian_dl1_dt(jd, flags=FLG_SWIEPH)
+        calc_besselian_dl2_dt(jd, flags=FLG_SWIEPH)
+        calc_besselian_dmu_dt(jd, flags=FLG_SWIEPH)
 
 
 class TestDerivativesConsistencyWithBaseElements:

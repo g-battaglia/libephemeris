@@ -1,11 +1,11 @@
 """Round 4: Crossing Functions Deep Audit
 
 Comprehensive comparison of libephemeris vs pyswisseph for:
-- swe_solcross_ut / swe_solcross: Sun longitude crossing
-- swe_mooncross_ut / swe_mooncross: Moon longitude crossing
-- swe_mooncross_node_ut / swe_mooncross_node: Moon node crossing
-- swe_cross_ut: Generic planet crossing (all planets)
-- swe_helio_cross_ut / swe_helio_cross: Heliocentric crossing
+- solcross_ut / solcross: Sun longitude crossing
+- mooncross_ut / mooncross: Moon longitude crossing
+- mooncross_node_ut / mooncross_node: Moon node crossing
+- cross_ut: Generic planet crossing (all planets)
+- helio_cross_ut / helio_cross: Heliocentric crossing
 
 Run with: env LIBEPHEMERIS_MODE=skyfield python3 compare_scripts/round4_crossing_deep.py
 """
@@ -20,9 +20,13 @@ import swisseph as swe
 
 sys.path.insert(0, ".")
 import libephemeris as ephem
+import os
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 issues = []
 stats = {}  # category -> list of diffs in arcseconds
@@ -44,11 +48,11 @@ print("ROUND 4: CROSSING FUNCTIONS DEEP AUDIT")
 print("=" * 80)
 
 # ============================================================================
-# PART 1: swe_solcross_ut — Sun longitude crossing (UT)
+# PART 1: solcross_ut — Sun longitude crossing (UT)
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 1: swe_solcross_ut — Sun longitude crossing")
+print("PART 1: solcross_ut — Sun longitude crossing")
 print("=" * 80)
 
 part1_pass = 0
@@ -70,7 +74,7 @@ for target in target_lons:
             continue
 
         try:
-            le_jd = ephem.swe_solcross_ut(target, jd)
+            le_jd = ephem.solcross_ut(target, jd)
         except Exception as e:
             print("  LE error solcross_ut({}, {}): {}".format(target, jd, e))
             continue
@@ -80,7 +84,7 @@ for target in target_lons:
 
         # Verify both actually cross the target
         se_pos = swe.calc_ut(se_jd, 0)[0][0]
-        le_pos_r = ephem.swe_calc_ut(le_jd, 0, 256)
+        le_pos_r = ephem.calc_ut(le_jd, 0, 256)
         le_pos = float(le_pos_r[0][0])
 
         se_err = abs(se_pos - target)
@@ -118,11 +122,11 @@ print()
 print("Part 1 summary: {}/{} passed".format(part1_pass, part1_total))
 
 # ============================================================================
-# PART 2: swe_mooncross_ut — Moon longitude crossing (UT)
+# PART 2: mooncross_ut — Moon longitude crossing (UT)
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 2: swe_mooncross_ut — Moon longitude crossing")
+print("PART 2: mooncross_ut — Moon longitude crossing")
 print("=" * 80)
 
 part2_pass = 0
@@ -145,7 +149,7 @@ for target in target_lons_moon:
             break
 
         try:
-            le_jd = ephem.swe_mooncross_ut(target, jd)
+            le_jd = ephem.mooncross_ut(target, jd)
         except Exception as e:
             print("  LE error mooncross_ut({}, {}): {}".format(target, jd, e))
             jd = se_jd + 20
@@ -178,11 +182,11 @@ print()
 print("Part 2 summary: {}/{} passed".format(part2_pass, part2_total))
 
 # ============================================================================
-# PART 3: swe_mooncross_node_ut — Moon node crossing
+# PART 3: mooncross_node_ut — Moon node crossing
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 3: swe_mooncross_node_ut — Moon node crossing")
+print("PART 3: mooncross_node_ut — Moon node crossing")
 print("=" * 80)
 
 part3_pass = 0
@@ -205,7 +209,7 @@ for node_i in range(60):  # ~2 node crossings per month, ~5 years
         break
 
     try:
-        le_ret = ephem.swe_mooncross_node_ut(jd)
+        le_ret = ephem.mooncross_node_ut(jd)
         le_jd = le_ret[0]
         le_lon = float(le_ret[1])
         le_lat = float(le_ret[2])
@@ -267,11 +271,11 @@ print()
 print("Part 3 summary: {}/{} passed".format(part3_pass, part3_total))
 
 # ============================================================================
-# PART 4: swe_cross_ut — Generic planet crossing
+# PART 4: cross_ut — Generic planet crossing
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 4: swe_cross_ut — Generic planet crossing")
+print("PART 4: cross_ut — Generic planet crossing")
 print("=" * 80)
 
 part4_pass = 0
@@ -307,7 +311,7 @@ for planet_id, name, targets, jd_start_p, skip in planet_tests:
                 break
 
             try:
-                le_jd = ephem.swe_cross_ut(planet_id, target, jd)
+                le_jd = ephem.cross_ut(planet_id, target, jd)
             except Exception as e:
                 print("  LE error cross_ut({}, {}, {}): {}".format(name, target, jd, e))
                 part4_skip += 1
@@ -352,11 +356,11 @@ print(
 )
 
 # ============================================================================
-# PART 5: swe_helio_cross_ut — Heliocentric crossing
+# PART 5: helio_cross_ut — Heliocentric crossing
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 5: swe_helio_cross_ut — Heliocentric planet crossing")
+print("PART 5: helio_cross_ut — Heliocentric planet crossing")
 print("=" * 80)
 
 part5_pass = 0
@@ -387,7 +391,7 @@ for planet_id, name, targets, jd_start_h, skip in helio_tests:
                 break
 
             try:
-                le_jd = ephem.swe_helio_cross_ut(planet_id, target, jd)
+                le_jd = ephem.helio_cross_ut(planet_id, target, jd)
             except Exception as e:
                 print(
                     "  LE error helio_cross_ut({}, {}, {}): {}".format(
@@ -436,7 +440,7 @@ print(
 )
 
 # ============================================================================
-# PART 6: TT versions — swe_solcross, swe_mooncross, swe_mooncross_node
+# PART 6: TT versions — solcross, mooncross, mooncross_node
 # ============================================================================
 print()
 print("=" * 80)
@@ -454,7 +458,7 @@ jd_tt_start = swe.julday(2024, 1, 1, 0.0)
 for target in [0, 90, 180, 270]:
     try:
         se_jd = swe.solcross(target, jd_tt_start)
-        le_jd = ephem.swe_solcross(target, jd_tt_start)
+        le_jd = ephem.solcross(target, jd_tt_start)
         diff_s = abs(se_jd - le_jd) * 86400
         part6_total += 1
         if diff_s > 0.01:
@@ -475,7 +479,7 @@ for target in [0, 90, 180, 270]:
 for target in [0, 90, 180, 270]:
     try:
         se_jd = swe.mooncross(target, jd_tt_start)
-        le_jd = ephem.swe_mooncross(target, jd_tt_start)
+        le_jd = ephem.mooncross(target, jd_tt_start)
         diff_s = abs(se_jd - le_jd) * 86400
         part6_total += 1
         if diff_s > 0.1:
@@ -497,7 +501,7 @@ jd = jd_tt_start
 for node_i in range(4):
     try:
         se_ret = swe.mooncross_node(jd)
-        le_ret = ephem.swe_mooncross_node(jd)
+        le_ret = ephem.mooncross_node(jd)
         diff_s = abs(se_ret[0] - le_ret[0]) * 86400
         part6_total += 1
         if diff_s > 0.5:
@@ -526,7 +530,7 @@ for planet_id, name in [(4, "Mars"), (5, "Jupiter")]:
     jd = jd_tt_start
     try:
         se_jd = swe.helio_cross(planet_id, target, jd)
-        le_jd = ephem.swe_helio_cross(planet_id, target, jd)
+        le_jd = ephem.helio_cross(planet_id, target, jd)
         diff_s = abs(se_jd - le_jd) * 86400
         part6_total += 1
         tol_s = 2.0 if planet_id <= 4 else 10.0
@@ -567,7 +571,7 @@ part7_total = 0
 for target in [359.999, 0.001, 360.0]:
     try:
         se_jd = swe.solcross_ut(target % 360, swe.julday(2024, 3, 15, 0.0))
-        le_jd = ephem.swe_solcross_ut(target, swe.julday(2024, 3, 15, 0.0))
+        le_jd = ephem.solcross_ut(target, swe.julday(2024, 3, 15, 0.0))
         diff_s = abs(se_jd - le_jd) * 86400
         part7_total += 1
         if diff_s > 0.1:
@@ -599,7 +603,7 @@ for target in [10, 20, 350]:
     if se_jd <= 0:
         continue
     try:
-        le_jd = ephem.swe_cross_ut(2, target, jd_merc)
+        le_jd = ephem.cross_ut(2, target, jd_merc)
     except Exception as e:
         print("    LE error Mercury lon={}: {}".format(target, e))
         continue
@@ -629,7 +633,7 @@ for target in [0, 45, 90, 135, 180, 225, 270, 315]:
     if se_jd <= 0:
         continue
     try:
-        le_jd = ephem.swe_cross_ut(3, target, jd_v)
+        le_jd = ephem.cross_ut(3, target, jd_v)
     except Exception as e:
         print("    LE error Venus lon={}: {}".format(target, e))
         continue
@@ -666,7 +670,7 @@ for target in [0, 90, 180, 270]:
     for _ in range(50):
         try:
             se_jd = swe.solcross_ut(target, jd)
-            le_jd = ephem.swe_solcross_ut(target, jd)
+            le_jd = ephem.solcross_ut(target, jd)
         except Exception:
             break
 
@@ -711,12 +715,12 @@ part9_total = 0
 jd = swe.julday(2024, 1, 1, 0.0)
 for node_i in range(24):  # ~1 year of node crossings
     try:
-        le_ret = ephem.swe_mooncross_node_ut(jd)
+        le_ret = ephem.mooncross_node_ut(jd)
         le_jd = le_ret[0]
         le_lat = float(le_ret[2])
 
         # Verify: compute Moon position at crossing time
-        moon_at_cross = ephem.swe_calc_ut(le_jd, 1, 256)
+        moon_at_cross = ephem.calc_ut(le_jd, 1, 256)
         actual_lat = float(moon_at_cross[0][1])
     except Exception as e:
         jd += 14

@@ -24,13 +24,16 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_TOPOCTR = 32768
-SEFLG_EQUATORIAL = 2048
-SE_MOON = 1
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_TOPOCTR = 32768
+FLG_EQUATORIAL = 2048
+MOON = 1
 
 # Geographic locations: (lat, lon, alt_m, name)
 LOCATIONS = [
@@ -91,14 +94,14 @@ def run_tests():
 
     for loc_lat, loc_lon, loc_alt, loc_name in LOCATIONS:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         for jd in EPOCHS:
             total += 1
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_TOPOCTR
 
             try:
-                se_result = swe.calc_ut(jd, SE_MOON, flags)
+                se_result = swe.calc_ut(jd, MOON, flags)
                 se_pos = se_result[0]
             except Exception as e:
                 p1_err += 1
@@ -106,7 +109,7 @@ def run_tests():
                 continue
 
             try:
-                le_result = ephem.swe_calc_ut(jd, SE_MOON, flags)
+                le_result = ephem.calc_ut(jd, MOON, flags)
                 le_pos = le_result[0]
             except Exception as e:
                 p1_err += 1
@@ -155,14 +158,14 @@ def run_tests():
 
     for loc_lat, loc_lon, loc_alt, loc_name in LOCATIONS:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         for jd in EPOCHS[:8]:  # Subset for equatorial
             total += 1
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_EQUATORIAL
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_TOPOCTR | FLG_EQUATORIAL
 
             try:
-                se_result = swe.calc_ut(jd, SE_MOON, flags)
+                se_result = swe.calc_ut(jd, MOON, flags)
                 se_pos = se_result[0]
             except Exception as e:
                 p2_err += 1
@@ -170,7 +173,7 @@ def run_tests():
                 continue
 
             try:
-                le_result = ephem.swe_calc_ut(jd, SE_MOON, flags)
+                le_result = ephem.calc_ut(jd, MOON, flags)
                 le_pos = le_result[0]
             except Exception as e:
                 p2_err += 1
@@ -211,18 +214,18 @@ def run_tests():
 
     for loc_lat, loc_lon, loc_alt, loc_name in LOCATIONS[:8]:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         for jd in EPOCHS[:6]:
             total += 1
-            flags_geo = SEFLG_SWIEPH | SEFLG_SPEED
-            flags_topo = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TOPOCTR
+            flags_geo = FLG_SWIEPH | FLG_SPEED
+            flags_topo = FLG_SWIEPH | FLG_SPEED | FLG_TOPOCTR
 
             try:
-                le_geo = ephem.swe_calc_ut(jd, SE_MOON, flags_geo)[0]
-                le_topo = ephem.swe_calc_ut(jd, SE_MOON, flags_topo)[0]
-                se_geo = swe.calc_ut(jd, SE_MOON, flags_geo)[0]
-                se_topo = swe.calc_ut(jd, SE_MOON, flags_topo)[0]
+                le_geo = ephem.calc_ut(jd, MOON, flags_geo)[0]
+                le_topo = ephem.calc_ut(jd, MOON, flags_topo)[0]
+                se_geo = swe.calc_ut(jd, MOON, flags_geo)[0]
+                se_topo = swe.calc_ut(jd, MOON, flags_topo)[0]
             except Exception as e:
                 p3_err += 1
                 errors += 1
@@ -264,19 +267,19 @@ def run_tests():
     p4_fail = 0
     p4_err = 0
 
-    SE_SUN = 0
+    SUN = 0
 
     for loc_lat, loc_lon, loc_alt, loc_name in LOCATIONS[:8]:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         for jd in EPOCHS[:6]:
             total += 1
-            flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TOPOCTR
+            flags = FLG_SWIEPH | FLG_SPEED | FLG_TOPOCTR
 
             try:
-                se_pos = swe.calc_ut(jd, SE_SUN, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, SE_SUN, flags)[0]
+                se_pos = swe.calc_ut(jd, SUN, flags)[0]
+                le_pos = ephem.calc_ut(jd, SUN, flags)[0]
             except Exception as e:
                 p4_err += 1
                 errors += 1
@@ -316,16 +319,16 @@ def run_tests():
 
     for loc_lat, loc_lon, loc_alt, loc_name in LOCATIONS[:5]:
         swe.set_topo(loc_lon, loc_lat, loc_alt)
-        ephem.swe_set_topo(loc_lon, loc_lat, loc_alt)
+        ephem.set_topo(loc_lon, loc_lat, loc_alt)
 
         for body_id, body_name in PLANETS:
             for jd in EPOCHS[:6]:
                 total += 1
-                flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TOPOCTR
+                flags = FLG_SWIEPH | FLG_SPEED | FLG_TOPOCTR
 
                 try:
                     se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                    le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                    le_pos = ephem.calc_ut(jd, body_id, flags)[0]
                 except Exception as e:
                     p5_err += 1
                     errors += 1

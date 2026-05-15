@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Measure end-to-end LEB precision: fast_calc vs swe_calc (Skyfield reference).
+"""Measure end-to-end LEB precision: fast_calc vs calc (Skyfield reference).
 
 Dense sampling across the full date range per body to find worst-case errors.
 Reports per-body statistics: mean, P99, max error in arcseconds.
@@ -17,16 +17,16 @@ import numpy as np
 
 sys.path.insert(0, ".")
 
-# Ensure LEB is NOT loaded for reference swe_calc calls.
+# Ensure LEB is NOT loaded for reference calc calls.
 # We pop the env var AND force skyfield mode so auto-discovery cannot
 # silently route reference calls through LEB.
 os.environ.pop("LIBEPHEMERIS_LEB", None)
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.leb_format import BODY_PARAMS
 
-# Force skyfield mode globally so swe_calc never auto-discovers LEB files
+# Force skyfield mode globally so calc never auto-discovers LEB files
 ephem.set_calc_mode("skyfield")
 
 # Suppress MeeusPolynomialWarning spam from ecliptic bodies on extended tier
@@ -101,8 +101,8 @@ def lon_diff_arcsec(lon1, lon2):
 def measure_body(ipl, reader, jd_start, jd_end, n_samples=2000):
     """Measure end-to-end error for a single body.
 
-    Compares fast_calc (LEB) against swe_calc (Skyfield reference).
-    The global calc mode must be set to "skyfield" so swe_calc never
+    Compares fast_calc (LEB) against calc (Skyfield reference).
+    The global calc mode must be set to "skyfield" so calc never
     uses LEB auto-discovery.
 
     Args:
@@ -127,14 +127,14 @@ def measure_body(ipl, reader, jd_start, jd_end, n_samples=2000):
     worst_jd = 0.0
     worst_err = 0.0
 
-    iflag = SEFLG_SPEED
+    iflag = FLG_SPEED
 
     for jd in jds:
         jd_float = float(jd)
 
-        # Reference: swe_calc via Skyfield (calc_mode="skyfield" set globally)
+        # Reference: calc via Skyfield (calc_mode="skyfield" set globally)
         try:
-            ref_result, _ = ephem.swe_calc(jd_float, ipl, iflag)
+            ref_result, _ = ephem.calc(jd_float, ipl, iflag)
         except Exception:
             continue
 
@@ -206,7 +206,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Measure LEB precision: fast_calc vs swe_calc (Skyfield reference)",
+        description="Measure LEB precision: fast_calc vs calc (Skyfield reference)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "The --tier flag ensures the Skyfield reference uses the matching\n"

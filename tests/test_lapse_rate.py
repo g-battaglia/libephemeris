@@ -32,10 +32,10 @@ class TestLapseRateBasic:
 
     def test_swe_prefixed_versions_exported(self):
         """Test that swe_ prefixed versions are exported."""
-        assert hasattr(ephem, "swe_get_lapse_rate")
-        assert hasattr(ephem, "swe_set_lapse_rate")
-        assert callable(ephem.swe_get_lapse_rate)
-        assert callable(ephem.swe_set_lapse_rate)
+        assert hasattr(ephem, "get_lapse_rate")
+        assert hasattr(ephem, "set_lapse_rate")
+        assert callable(ephem.get_lapse_rate)
+        assert callable(ephem.set_lapse_rate)
 
     def test_get_lapse_rate_returns_default(self):
         """Test that get_lapse_rate returns 0.0065 by default."""
@@ -132,15 +132,15 @@ class TestLapseRateAffectsRefracExtended:
 
 
 class TestLapseRateDefaultConstant:
-    """Tests for the SE_LAPSE_RATE_DEFAULT constant."""
+    """Tests for the LAPSE_RATE_DEFAULT constant."""
 
     def test_default_constant_exists(self):
-        """Test that SE_LAPSE_RATE_DEFAULT constant exists in state module."""
-        assert hasattr(state, "SE_LAPSE_RATE_DEFAULT")
+        """Test that LAPSE_RATE_DEFAULT constant exists in state module."""
+        assert hasattr(state, "LAPSE_RATE_DEFAULT")
 
     def test_default_constant_value(self):
-        """Test that SE_LAPSE_RATE_DEFAULT is 0.0065."""
-        assert state.SE_LAPSE_RATE_DEFAULT == 0.0065
+        """Test that LAPSE_RATE_DEFAULT is 0.0065."""
+        assert state.LAPSE_RATE_DEFAULT == 0.0065
 
 
 class TestLapseRateGlobalState:
@@ -166,9 +166,9 @@ class TestLapseRateGlobalState:
 
     def test_swe_prefixed_functions_same_as_unprefixed(self):
         """Test that swe_ prefixed functions behave identically."""
-        ephem.swe_set_lapse_rate(0.006)
+        ephem.set_lapse_rate(0.006)
         assert ephem.get_lapse_rate() == 0.006
-        assert ephem.swe_get_lapse_rate() == 0.006
+        assert ephem.get_lapse_rate() == 0.006
 
         ephem.set_lapse_rate(0.004)
-        assert ephem.swe_get_lapse_rate() == 0.004
+        assert ephem.get_lapse_rate() == 0.004

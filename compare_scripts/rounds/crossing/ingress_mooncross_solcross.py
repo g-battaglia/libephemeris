@@ -102,7 +102,7 @@ def run_part1():
         label = f"Sun→{name} ({lon}°)"
         try:
             se_jd = swe.solcross_ut(lon, jd_start, 0)
-            le_jd = ephem.swe_solcross_ut(lon, jd_start, 0)
+            le_jd = ephem.solcross_ut(lon, jd_start, 0)
 
             diff_sec = abs(se_jd - le_jd) * 86400
             tol = 5.0  # 5 seconds
@@ -152,7 +152,7 @@ def run_part2():
         label = f"Moon→{name} ({lon}°)"
         try:
             se_jd = swe.mooncross_ut(lon, jd_start, 0)
-            le_jd = ephem.swe_mooncross_ut(lon, jd_start, 0)
+            le_jd = ephem.mooncross_ut(lon, jd_start, 0)
 
             diff_sec = abs(se_jd - le_jd) * 86400
             tol = 2.0  # 2 seconds (Moon moves fast)
@@ -176,7 +176,7 @@ def run_part3():
 
     r = R("P3: Mercury/Venus ingresses")
 
-    for body_id, body_name in [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]:
+    for body_id, body_name in [(MERCURY, "Mercury"), (VENUS, "Venus")]:
         jd_start = swe.julday(2024, 1, 1, 0.0)
         for lon in range(0, 360, 30):
             label = f"{body_name}→{lon}°"
@@ -191,10 +191,10 @@ def run_part3():
                     continue
 
             try:
-                le_jd = ephem.swe_solcross_ut(lon, jd_start, body_id)
+                le_jd = ephem.solcross_ut(lon, jd_start, body_id)
             except Exception:
                 try:
-                    le_jd = ephem.swe_helio_cross_ut(body_id, lon, jd_start, 0)
+                    le_jd = ephem.helio_cross_ut(body_id, lon, jd_start, 0)
                 except Exception:
                     r.skip(f"{label}: LE error")
                     continue
@@ -221,16 +221,16 @@ def run_part4():
 
     # These planets move slowly, fewer ingresses per year
     for body_id, body_name, expected_ingresses in [
-        (SE_MARS, "Mars", 6),
-        (SE_JUPITER, "Jupiter", 2),
-        (SE_SATURN, "Saturn", 1),
+        (MARS, "Mars", 6),
+        (JUPITER, "Jupiter", 2),
+        (SATURN, "Saturn", 1),
     ]:
         jd_start = swe.julday(2024, 1, 1, 0.0)
         jd_end = swe.julday(2025, 1, 1, 0.0)
         count = 0
 
         # Get current position to find next sign boundary
-        pos = swe.calc_ut(jd_start, body_id, SEFLG_SPEED)[0]
+        pos = swe.calc_ut(jd_start, body_id, FLG_SPEED)[0]
         current_sign = int(pos[0] / 30)
         next_lon = ((current_sign + 1) % 12) * 30
 
@@ -245,7 +245,7 @@ def run_part4():
                 break
 
             try:
-                le_jd = ephem.swe_solcross_ut(next_lon, jd_start, body_id)
+                le_jd = ephem.solcross_ut(next_lon, jd_start, body_id)
             except Exception:
                 r.skip(f"{label}: LE error")
                 jd_start = se_jd + 1
@@ -283,7 +283,7 @@ def run_part5():
             label = f"Moon cross {lon}° #{trial + 1}"
             try:
                 se_jd = swe.mooncross_ut(lon, jd_start, 0)
-                le_jd = ephem.swe_mooncross_ut(lon, jd_start, 0)
+                le_jd = ephem.mooncross_ut(lon, jd_start, 0)
 
                 diff_sec = abs(se_jd - le_jd) * 86400
                 tol = 2.0
@@ -319,7 +319,7 @@ def run_part6():
             label = f"{year} {event}"
             try:
                 se_jd = swe.solcross_ut(lon, jd_start, 0)
-                le_jd = ephem.swe_solcross_ut(lon, jd_start, 0)
+                le_jd = ephem.solcross_ut(lon, jd_start, 0)
 
                 diff_sec = abs(se_jd - le_jd) * 86400
                 tol = 5.0

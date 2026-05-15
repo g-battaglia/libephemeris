@@ -4,10 +4,11 @@ Tests for the compare_lunar.py comparison script.
 Validates that the True Node precision comparison function works correctly.
 """
 
+import os
 import sys
 import pytest
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 class TestCompareLunarScript:

@@ -21,7 +21,7 @@ TEST_LOCATIONS = [
 ]
 
 
-# geopos for swe_sol_eclipse_when_loc is (lon, lat, alt), not (lat, lon, alt)
+# geopos for sol_eclipse_when_loc is (lon, lat, alt), not (lat, lon, alt)
 def _geopos(lat: float, lon: float, alt: float) -> tuple[float, float, float]:
     """Convert (lat, lon, alt) parametrize order to (lon, lat, alt) geopos."""
     return (lon, lat, alt)
@@ -66,10 +66,10 @@ class TestSolarEclipseLocal:
         geopos = _geopos(lat, lon, alt)
 
         ref_result = compare.skyfield(
-            ephem.swe_sol_eclipse_when_loc, jd_start, geopos, 0, False
+            ephem.sol_eclipse_when_loc, jd_start, geopos, 0, False
         )
         leb_result = compare.leb(
-            ephem.swe_sol_eclipse_when_loc, jd_start, geopos, 0, False
+            ephem.sol_eclipse_when_loc, jd_start, geopos, 0, False
         )
 
         if ref_result[0] != 0 and leb_result[0] != 0:
@@ -91,8 +91,8 @@ class TestSolarEclipseWhere:
         """Eclipse central line position matches."""
         jd = year_to_jd(2024) + 60  # Around April 2024 eclipse
 
-        ref_result = compare.skyfield(ephem.swe_sol_eclipse_where, jd, 0)
-        leb_result = compare.leb(ephem.swe_sol_eclipse_where, jd, 0)
+        ref_result = compare.skyfield(ephem.sol_eclipse_where, jd, 0)
+        leb_result = compare.leb(ephem.sol_eclipse_where, jd, 0)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_lat = ref_result[1][0]
@@ -119,8 +119,8 @@ class TestSolarEclipseHow:
         jd = year_to_jd(2024) + 60  # Around April 2024 eclipse
         geopos = _geopos(lat, lon, alt)
 
-        ref_result = compare.skyfield(ephem.swe_sol_eclipse_how, jd, geopos)
-        leb_result = compare.leb(ephem.swe_sol_eclipse_how, jd, geopos)
+        ref_result = compare.skyfield(ephem.sol_eclipse_how, jd, geopos)
+        leb_result = compare.leb(ephem.sol_eclipse_how, jd, geopos)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_mag = ref_result[1][0]

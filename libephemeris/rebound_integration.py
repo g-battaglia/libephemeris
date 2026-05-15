@@ -34,10 +34,10 @@ USAGE:
     ...     propagate_orbit_rebound,
     ...     ReboundIntegrator,
     ... )
-    >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, SE_CERES
+    >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, CERES
     >>>
     >>> # Propagate Ceres orbit using ASSIST (ephemeris-quality)
-    >>> elements = MINOR_BODY_ELEMENTS[SE_CERES]
+    >>> elements = MINOR_BODY_ELEMENTS[CERES]
     >>> jd_start = 2460000.5  # Starting JD
     >>> jd_end = 2460365.5    # One year later
     >>> x, y, z, vx, vy, vz = propagate_orbit_assist(elements, jd_start, jd_end)
@@ -706,8 +706,8 @@ def propagate_orbit_rebound(
         ValueError: If elements are invalid
 
     Example:
-        >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, SE_CERES
-        >>> elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, CERES
+        >>> elements = MINOR_BODY_ELEMENTS[CERES]
         >>> result = propagate_orbit_rebound(elements, 2460000.5, 2460365.5)
         >>> print(f"Ceres at {result.ecliptic_lon:.4f} deg, {result.distance:.4f} AU")
     """
@@ -818,9 +818,9 @@ def propagate_orbit_assist(
         ValueError: If elements are invalid
 
     Example:
-        >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, SE_CERES
+        >>> from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, CERES
         >>> from libephemeris.rebound_integration import propagate_orbit_assist
-        >>> elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        >>> elements = MINOR_BODY_ELEMENTS[CERES]
         >>> result = propagate_orbit_assist(elements, 2460000.5, 2460365.5)
         >>> print(f"Ceres: lon={result.ecliptic_lon:.6f} deg")
 

@@ -7,10 +7,10 @@ Tests many flag combinations to find edge cases:
   P2: Pairwise flag combinations (EQUATORIAL+J2000, SIDEREAL+SPEED, etc.)
   P3: Triple flag combinations
   P4: Flag preservation in retflag
-  P5: SEFLG_TRUEPOS / SEFLG_NOABERR / SEFLG_NOGDEFL
+  P5: FLG_TRUEPOS / FLG_NOABERR / FLG_NOGDEFL
   P6: Heliocentric + Barycentric with various sub-flags
   P7: Distance/radius values across flag modes
-  P8: SEFLG_RADIANS output conversion
+  P8: FLG_RADIANS output conversion
 """
 
 from __future__ import annotations
@@ -60,19 +60,19 @@ def record(name, ok, detail=""):
 JD = 2460310.5  # 2024-Jan-15
 
 # Flag definitions — use pyswisseph constants to avoid errors
-SEFLG_SPEED = swe.FLG_SPEED
-SEFLG_TOPOCTR = swe.FLG_TOPOCTR
-SEFLG_EQUATORIAL = swe.FLG_EQUATORIAL
-SEFLG_SIDEREAL = swe.FLG_SIDEREAL
-SEFLG_J2000 = swe.FLG_J2000
-SEFLG_NONUT = swe.FLG_NONUT
-SEFLG_TRUEPOS = swe.FLG_TRUEPOS
-SEFLG_NOABERR = swe.FLG_NOABERR
-SEFLG_NOGDEFL = swe.FLG_NOGDEFL
-SEFLG_HELCTR = swe.FLG_HELCTR
-SEFLG_BARYCTR = swe.FLG_BARYCTR
-SEFLG_XYZ = swe.FLG_XYZ
-SEFLG_RADIANS = swe.FLG_RADIANS
+FLG_SPEED = swe.FLG_SPEED
+FLG_TOPOCTR = swe.FLG_TOPOCTR
+FLG_EQUATORIAL = swe.FLG_EQUATORIAL
+FLG_SIDEREAL = swe.FLG_SIDEREAL
+FLG_J2000 = swe.FLG_J2000
+FLG_NONUT = swe.FLG_NONUT
+FLG_TRUEPOS = swe.FLG_TRUEPOS
+FLG_NOABERR = swe.FLG_NOABERR
+FLG_NOGDEFL = swe.FLG_NOGDEFL
+FLG_HELCTR = swe.FLG_HELCTR
+FLG_BARYCTR = swe.FLG_BARYCTR
+FLG_XYZ = swe.FLG_XYZ
+FLG_RADIANS = swe.FLG_RADIANS
 
 BODIES = [
     (swe.SUN, "Sun"),
@@ -145,16 +145,16 @@ def test_part1_single_flags():
 
     single_flags = [
         ("bare", 0),
-        ("SPEED", SEFLG_SPEED),
-        ("EQUATORIAL", SEFLG_EQUATORIAL),
-        ("J2000", SEFLG_J2000),
-        ("NONUT", SEFLG_NONUT),
-        ("TRUEPOS", SEFLG_TRUEPOS),
-        ("NOABERR", SEFLG_NOABERR),
-        ("NOGDEFL", SEFLG_NOGDEFL),
-        ("HELCTR", SEFLG_HELCTR),
-        ("BARYCTR", SEFLG_BARYCTR),
-        ("XYZ", SEFLG_XYZ),
+        ("SPEED", FLG_SPEED),
+        ("EQUATORIAL", FLG_EQUATORIAL),
+        ("J2000", FLG_J2000),
+        ("NONUT", FLG_NONUT),
+        ("TRUEPOS", FLG_TRUEPOS),
+        ("NOABERR", FLG_NOABERR),
+        ("NOGDEFL", FLG_NOGDEFL),
+        ("HELCTR", FLG_HELCTR),
+        ("BARYCTR", FLG_BARYCTR),
+        ("XYZ", FLG_XYZ),
     ]
 
     for body_id, body_name in BODIES:
@@ -165,9 +165,9 @@ def test_part1_single_flags():
             test_name = f"P1/{body_name}/{flag_name}"
             try:
                 pos_se, rf_se = swe.calc_ut(JD, body_id, flag_val)
-                pos_le, rf_le = ephem.swe_calc_ut(JD, body_id, flag_val)
+                pos_le, rf_le = ephem.calc_ut(JD, body_id, flag_val)
 
-                is_xyz = bool(flag_val & SEFLG_XYZ)
+                is_xyz = bool(flag_val & FLG_XYZ)
                 lon_se = float(pos_se[0])
                 lon_le = float(pos_le[0])
 
@@ -201,24 +201,24 @@ def test_part2_pairwise():
     print("=" * 70)
 
     pairs = [
-        ("SPEED+EQ", SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("SPEED+J2000", SEFLG_SPEED | SEFLG_J2000),
-        ("SPEED+NONUT", SEFLG_SPEED | SEFLG_NONUT),
-        ("SPEED+TRUEPOS", SEFLG_SPEED | SEFLG_TRUEPOS),
-        ("SPEED+NOABERR", SEFLG_SPEED | SEFLG_NOABERR),
-        ("SPEED+NOGDEFL", SEFLG_SPEED | SEFLG_NOGDEFL),
-        ("EQ+J2000", SEFLG_EQUATORIAL | SEFLG_J2000),
-        ("EQ+NONUT", SEFLG_EQUATORIAL | SEFLG_NONUT),
-        ("J2000+NOABERR", SEFLG_J2000 | SEFLG_NOABERR),
-        ("NONUT+NOABERR", SEFLG_NONUT | SEFLG_NOABERR),
-        ("TRUEPOS+EQ", SEFLG_TRUEPOS | SEFLG_EQUATORIAL),
-        ("NOABERR+NOGDEFL", SEFLG_NOABERR | SEFLG_NOGDEFL),
-        ("HELCTR+SPEED", SEFLG_HELCTR | SEFLG_SPEED),
-        ("BARYCTR+SPEED", SEFLG_BARYCTR | SEFLG_SPEED),
-        ("HELCTR+EQ", SEFLG_HELCTR | SEFLG_EQUATORIAL),
-        ("BARYCTR+EQ", SEFLG_BARYCTR | SEFLG_EQUATORIAL),
-        ("HELCTR+J2000", SEFLG_HELCTR | SEFLG_J2000),
-        ("BARYCTR+J2000", SEFLG_BARYCTR | SEFLG_J2000),
+        ("SPEED+EQ", FLG_SPEED | FLG_EQUATORIAL),
+        ("SPEED+J2000", FLG_SPEED | FLG_J2000),
+        ("SPEED+NONUT", FLG_SPEED | FLG_NONUT),
+        ("SPEED+TRUEPOS", FLG_SPEED | FLG_TRUEPOS),
+        ("SPEED+NOABERR", FLG_SPEED | FLG_NOABERR),
+        ("SPEED+NOGDEFL", FLG_SPEED | FLG_NOGDEFL),
+        ("EQ+J2000", FLG_EQUATORIAL | FLG_J2000),
+        ("EQ+NONUT", FLG_EQUATORIAL | FLG_NONUT),
+        ("J2000+NOABERR", FLG_J2000 | FLG_NOABERR),
+        ("NONUT+NOABERR", FLG_NONUT | FLG_NOABERR),
+        ("TRUEPOS+EQ", FLG_TRUEPOS | FLG_EQUATORIAL),
+        ("NOABERR+NOGDEFL", FLG_NOABERR | FLG_NOGDEFL),
+        ("HELCTR+SPEED", FLG_HELCTR | FLG_SPEED),
+        ("BARYCTR+SPEED", FLG_BARYCTR | FLG_SPEED),
+        ("HELCTR+EQ", FLG_HELCTR | FLG_EQUATORIAL),
+        ("BARYCTR+EQ", FLG_BARYCTR | FLG_EQUATORIAL),
+        ("HELCTR+J2000", FLG_HELCTR | FLG_J2000),
+        ("BARYCTR+J2000", FLG_BARYCTR | FLG_J2000),
     ]
 
     body_id, body_name = swe.JUPITER, "Jupiter"
@@ -227,9 +227,9 @@ def test_part2_pairwise():
         test_name = f"P2/{body_name}/{pair_name}"
         try:
             pos_se, _ = swe.calc_ut(JD, body_id, flag_val)
-            pos_le, _ = ephem.swe_calc_ut(JD, body_id, flag_val)
+            pos_le, _ = ephem.calc_ut(JD, body_id, flag_val)
 
-            is_xyz = bool(flag_val & SEFLG_XYZ)
+            is_xyz = bool(flag_val & FLG_XYZ)
             val_se = float(pos_se[0])
             val_le = float(pos_le[0])
 
@@ -253,18 +253,18 @@ def test_part2_pairwise():
     # Also test Moon for a subset
     body_id, body_name = swe.MOON, "Moon"
     moon_pairs = [
-        ("SPEED+EQ", SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("SPEED+J2000", SEFLG_SPEED | SEFLG_J2000),
-        ("EQ+J2000", SEFLG_EQUATORIAL | SEFLG_J2000),
-        ("TRUEPOS+EQ", SEFLG_TRUEPOS | SEFLG_EQUATORIAL),
-        ("NOABERR+EQ", SEFLG_NOABERR | SEFLG_EQUATORIAL),
+        ("SPEED+EQ", FLG_SPEED | FLG_EQUATORIAL),
+        ("SPEED+J2000", FLG_SPEED | FLG_J2000),
+        ("EQ+J2000", FLG_EQUATORIAL | FLG_J2000),
+        ("TRUEPOS+EQ", FLG_TRUEPOS | FLG_EQUATORIAL),
+        ("NOABERR+EQ", FLG_NOABERR | FLG_EQUATORIAL),
     ]
 
     for pair_name, flag_val in moon_pairs:
         test_name = f"P2/{body_name}/{pair_name}"
         try:
             pos_se, _ = swe.calc_ut(JD, body_id, flag_val)
-            pos_le, _ = ephem.swe_calc_ut(JD, body_id, flag_val)
+            pos_le, _ = ephem.calc_ut(JD, body_id, flag_val)
 
             val_se = float(pos_se[0])
             val_le = float(pos_le[0])
@@ -294,16 +294,16 @@ def test_part3_triple():
     print("=" * 70)
 
     triples = [
-        ("SPEED+EQ+J2000", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000),
-        ("SPEED+EQ+NONUT", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_NONUT),
-        ("SPEED+J2000+NOABERR", SEFLG_SPEED | SEFLG_J2000 | SEFLG_NOABERR),
-        ("SPEED+TRUEPOS+EQ", SEFLG_SPEED | SEFLG_TRUEPOS | SEFLG_EQUATORIAL),
-        ("SPEED+NOABERR+NOGDEFL", SEFLG_SPEED | SEFLG_NOABERR | SEFLG_NOGDEFL),
-        ("SPEED+EQ+NOABERR", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_NOABERR),
-        ("HELCTR+SPEED+EQ", SEFLG_HELCTR | SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("HELCTR+SPEED+J2000", SEFLG_HELCTR | SEFLG_SPEED | SEFLG_J2000),
-        ("BARYCTR+SPEED+EQ", SEFLG_BARYCTR | SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("SPEED+J2000+NOGDEFL", SEFLG_SPEED | SEFLG_J2000 | SEFLG_NOGDEFL),
+        ("SPEED+EQ+J2000", FLG_SPEED | FLG_EQUATORIAL | FLG_J2000),
+        ("SPEED+EQ+NONUT", FLG_SPEED | FLG_EQUATORIAL | FLG_NONUT),
+        ("SPEED+J2000+NOABERR", FLG_SPEED | FLG_J2000 | FLG_NOABERR),
+        ("SPEED+TRUEPOS+EQ", FLG_SPEED | FLG_TRUEPOS | FLG_EQUATORIAL),
+        ("SPEED+NOABERR+NOGDEFL", FLG_SPEED | FLG_NOABERR | FLG_NOGDEFL),
+        ("SPEED+EQ+NOABERR", FLG_SPEED | FLG_EQUATORIAL | FLG_NOABERR),
+        ("HELCTR+SPEED+EQ", FLG_HELCTR | FLG_SPEED | FLG_EQUATORIAL),
+        ("HELCTR+SPEED+J2000", FLG_HELCTR | FLG_SPEED | FLG_J2000),
+        ("BARYCTR+SPEED+EQ", FLG_BARYCTR | FLG_SPEED | FLG_EQUATORIAL),
+        ("SPEED+J2000+NOGDEFL", FLG_SPEED | FLG_J2000 | FLG_NOGDEFL),
     ]
 
     for body_id, body_name in [(swe.MOON, "Moon"), (swe.MARS, "Mars")]:
@@ -311,7 +311,7 @@ def test_part3_triple():
             test_name = f"P3/{body_name}/{triple_name}"
             try:
                 pos_se, _ = swe.calc_ut(JD, body_id, flag_val)
-                pos_le, _ = ephem.swe_calc_ut(JD, body_id, flag_val)
+                pos_le, _ = ephem.calc_ut(JD, body_id, flag_val)
 
                 val_se = float(pos_se[0])
                 val_le = float(pos_le[0])
@@ -343,17 +343,17 @@ def test_part4_retflag():
 
     # Flags that should be preserved in retflag
     flag_tests = [
-        ("SPEED", SEFLG_SPEED),
-        ("EQUATORIAL", SEFLG_EQUATORIAL),
-        ("J2000", SEFLG_J2000),
-        ("NONUT", SEFLG_NONUT),
-        ("TRUEPOS", SEFLG_TRUEPOS),
-        ("NOABERR", SEFLG_NOABERR),
-        ("NOGDEFL", SEFLG_NOGDEFL),
-        ("XYZ", SEFLG_XYZ),
-        ("RADIANS", SEFLG_RADIANS),
-        ("HELCTR", SEFLG_HELCTR),
-        ("BARYCTR", SEFLG_BARYCTR),
+        ("SPEED", FLG_SPEED),
+        ("EQUATORIAL", FLG_EQUATORIAL),
+        ("J2000", FLG_J2000),
+        ("NONUT", FLG_NONUT),
+        ("TRUEPOS", FLG_TRUEPOS),
+        ("NOABERR", FLG_NOABERR),
+        ("NOGDEFL", FLG_NOGDEFL),
+        ("XYZ", FLG_XYZ),
+        ("RADIANS", FLG_RADIANS),
+        ("HELCTR", FLG_HELCTR),
+        ("BARYCTR", FLG_BARYCTR),
     ]
 
     body_id = swe.MARS
@@ -361,7 +361,7 @@ def test_part4_retflag():
     for flag_name, flag_val in flag_tests:
         test_name = f"P4/retflag/{flag_name}"
         try:
-            _, rf_le = ephem.swe_calc_ut(JD, body_id, flag_val)
+            _, rf_le = ephem.calc_ut(JD, body_id, flag_val)
 
             # Check that the flag bit is set in retflag
             flag_preserved = bool(rf_le & flag_val)
@@ -376,10 +376,10 @@ def test_part4_retflag():
             record(test_name, False, f"ERROR: {e}")
 
     # Combined flags
-    combined = SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000
+    combined = FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
     test_name = "P4/retflag/SPEED+EQ+J2000"
     try:
-        _, rf_le = ephem.swe_calc_ut(JD, body_id, combined)
+        _, rf_le = ephem.calc_ut(JD, body_id, combined)
         all_set = (rf_le & combined) == combined
         record(
             test_name,
@@ -403,20 +403,20 @@ def test_part5_aberration_deflection():
     body_id, body_name = swe.MARS, "Mars"
 
     # Get baseline (apparent position — includes aberration + deflection)
-    pos_apparent_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED)
-    pos_apparent_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED)
+    pos_apparent_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED)
+    pos_apparent_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED)
 
     # Get TRUEPOS (geometric — no aberration, no deflection)
-    pos_true_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_TRUEPOS)
-    pos_true_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_TRUEPOS)
+    pos_true_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED | FLG_TRUEPOS)
+    pos_true_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED | FLG_TRUEPOS)
 
     # Get NOABERR (no aberration, but WITH deflection)
-    pos_noaberr_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_NOABERR)
-    pos_noaberr_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_NOABERR)
+    pos_noaberr_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED | FLG_NOABERR)
+    pos_noaberr_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED | FLG_NOABERR)
 
     # Get NOGDEFL (WITH aberration, no deflection)
-    pos_nogdefl_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_NOGDEFL)
-    pos_nogdefl_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_NOGDEFL)
+    pos_nogdefl_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED | FLG_NOGDEFL)
+    pos_nogdefl_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED | FLG_NOGDEFL)
 
     # 1. Verify apparent positions match
     diff = abs(float(pos_apparent_se[0]) - float(pos_apparent_le[0]))
@@ -473,13 +473,13 @@ def test_part5_aberration_deflection():
     # Repeat for Sun (aberration should be ~0 for Sun, but TRUEPOS differs)
     for body_id2, bname2 in [(swe.SUN, "Sun"), (swe.MOON, "Moon")]:
         for mode, mflag in [
-            ("truepos", SEFLG_TRUEPOS),
-            ("noaberr", SEFLG_NOABERR),
-            ("nogdefl", SEFLG_NOGDEFL),
+            ("truepos", FLG_TRUEPOS),
+            ("noaberr", FLG_NOABERR),
+            ("nogdefl", FLG_NOGDEFL),
         ]:
             try:
-                pos_se2, _ = swe.calc_ut(JD, body_id2, SEFLG_SPEED | mflag)
-                pos_le2, _ = ephem.swe_calc_ut(JD, body_id2, SEFLG_SPEED | mflag)
+                pos_se2, _ = swe.calc_ut(JD, body_id2, FLG_SPEED | mflag)
+                pos_le2, _ = ephem.calc_ut(JD, body_id2, FLG_SPEED | mflag)
                 diff2 = abs(float(pos_se2[0]) - float(pos_le2[0]))
                 if diff2 > 180:
                     diff2 = 360 - diff2
@@ -510,25 +510,25 @@ def test_part6_helio_bary():
         (swe.SATURN, "Saturn"),
     ]
 
-    for center_name, center_flag in [("helio", SEFLG_HELCTR), ("bary", SEFLG_BARYCTR)]:
+    for center_name, center_flag in [("helio", FLG_HELCTR), ("bary", FLG_BARYCTR)]:
         for body_id, body_name in bodies_hb:
             for sub_name, sub_flag in [
                 ("bare", 0),
-                ("SPEED", SEFLG_SPEED),
-                ("EQ", SEFLG_EQUATORIAL),
-                ("J2000", SEFLG_J2000),
-                ("SPEED+EQ", SEFLG_SPEED | SEFLG_EQUATORIAL),
+                ("SPEED", FLG_SPEED),
+                ("EQ", FLG_EQUATORIAL),
+                ("J2000", FLG_J2000),
+                ("SPEED+EQ", FLG_SPEED | FLG_EQUATORIAL),
             ]:
                 flags = center_flag | sub_flag
                 test_name = f"P6/{center_name}/{body_name}/{sub_name}"
                 try:
                     pos_se, _ = swe.calc_ut(JD, body_id, flags)
-                    pos_le, _ = ephem.swe_calc_ut(JD, body_id, flags)
+                    pos_le, _ = ephem.calc_ut(JD, body_id, flags)
 
                     val_se = float(pos_se[0])
                     val_le = float(pos_le[0])
                     diff = abs(val_se - val_le)
-                    if not (flags & SEFLG_XYZ) and diff > 180:
+                    if not (flags & FLG_XYZ) and diff > 180:
                         diff = 360 - diff
 
                     tol = 0.001
@@ -556,20 +556,20 @@ def test_part7_distances():
     body_id, body_name = swe.MARS, "Mars"
 
     modes = [
-        ("default", SEFLG_SPEED),
-        ("J2000", SEFLG_SPEED | SEFLG_J2000),
-        ("NONUT", SEFLG_SPEED | SEFLG_NONUT),
-        ("EQUATORIAL", SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("EQ+J2000", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000),
-        ("TRUEPOS", SEFLG_SPEED | SEFLG_TRUEPOS),
-        ("NOABERR", SEFLG_SPEED | SEFLG_NOABERR),
+        ("default", FLG_SPEED),
+        ("J2000", FLG_SPEED | FLG_J2000),
+        ("NONUT", FLG_SPEED | FLG_NONUT),
+        ("EQUATORIAL", FLG_SPEED | FLG_EQUATORIAL),
+        ("EQ+J2000", FLG_SPEED | FLG_EQUATORIAL | FLG_J2000),
+        ("TRUEPOS", FLG_SPEED | FLG_TRUEPOS),
+        ("NOABERR", FLG_SPEED | FLG_NOABERR),
     ]
 
     for mode_name, flags in modes:
         test_name = f"P7/dist/{body_name}/{mode_name}"
         try:
             pos_se, _ = swe.calc_ut(JD, body_id, flags)
-            pos_le, _ = ephem.swe_calc_ut(JD, body_id, flags)
+            pos_le, _ = ephem.calc_ut(JD, body_id, flags)
 
             dist_se = float(pos_se[2])
             dist_le = float(pos_le[2])
@@ -587,25 +587,25 @@ def test_part7_distances():
 
 
 # ============================================================================
-# PART 8: SEFLG_RADIANS output
+# PART 8: FLG_RADIANS output
 # ============================================================================
 
 
 def test_part8_radians():
     print("\n" + "=" * 70)
-    print("PART 8: SEFLG_RADIANS Output Conversion")
+    print("PART 8: FLG_RADIANS Output Conversion")
     print("=" * 70)
 
     for body_id, body_name in BODIES:
         test_name = f"P8/radians/{body_name}"
         try:
             # Get degrees
-            pos_deg_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED)
-            pos_deg_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED)
+            pos_deg_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED)
+            pos_deg_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED)
 
             # Get radians
-            pos_rad_se, _ = swe.calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_RADIANS)
-            pos_rad_le, _ = ephem.swe_calc_ut(JD, body_id, SEFLG_SPEED | SEFLG_RADIANS)
+            pos_rad_se, _ = swe.calc_ut(JD, body_id, FLG_SPEED | FLG_RADIANS)
+            pos_rad_le, _ = ephem.calc_ut(JD, body_id, FLG_SPEED | FLG_RADIANS)
 
             # Verify SE radians match
             lon_rad_se = float(pos_rad_se[0])
@@ -644,10 +644,10 @@ def test_part8_radians():
         test_name = f"P8/xyz_radians/{body_name}"
         try:
             pos_se, _ = swe.calc_ut(
-                JD, body_id, SEFLG_SPEED | SEFLG_XYZ | SEFLG_RADIANS
+                JD, body_id, FLG_SPEED | FLG_XYZ | FLG_RADIANS
             )
-            pos_le, _ = ephem.swe_calc_ut(
-                JD, body_id, SEFLG_SPEED | SEFLG_XYZ | SEFLG_RADIANS
+            pos_le, _ = ephem.calc_ut(
+                JD, body_id, FLG_SPEED | FLG_XYZ | FLG_RADIANS
             )
 
             # XYZ positions should not change with RADIANS (already Cartesian)

@@ -16,21 +16,24 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 BODIES = [
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY, 5.0),
-    ("Venus", ephem.SE_VENUS, swe.VENUS, 5.0),
-    ("Mars", ephem.SE_MARS, swe.MARS, 10.0),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER, 20.0),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN, 30.0),
+    ("Mercury", ephem.MERCURY, swe.MERCURY, 5.0),
+    ("Venus", ephem.VENUS, swe.VENUS, 5.0),
+    ("Mars", ephem.MARS, swe.MARS, 10.0),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER, 20.0),
+    ("Saturn", ephem.SATURN, swe.SATURN, 30.0),
 ]
 
 JD_START = 2451545.0
@@ -81,7 +84,7 @@ def compare_at_station(label, le_body, se_body, jd):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, le_body, FLAGS)
+        le_r = ephem.calc_ut(jd, le_body, FLAGS)
         se_r = swe.calc_ut(jd, se_body, swe.FLG_SWIEPH | swe.FLG_SPEED)
     except Exception:
         return

@@ -100,11 +100,11 @@ def run_section1_positions(rng, n_dates=200):
     for jd in jds:
         for bid in BODIES_CORE + BODIES_LUNAR:
             try:
-                res = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)
+                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
                 ref[(float(jd), bid)] = res[0][:3]
             except Exception:
                 pass
-    swe.swe_close()
+    swe.close()
 
     # LEB2
     swe.set_leb_file("data/leb2/base_core.leb2")
@@ -115,7 +115,7 @@ def run_section1_positions(rng, n_dates=200):
             if k not in ref:
                 continue
             try:
-                res = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)
+                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
                 v2 = res[0][:3]
                 v1 = ref[k]
                 ld = abs(v2[0] - v1[0])
@@ -133,7 +133,7 @@ def run_section1_positions(rng, n_dates=200):
                 )
             except Exception:
                 pass
-    swe.swe_close()
+    swe.close()
     return r.summary("Skyfield vs LEB2")
 
 
@@ -143,16 +143,16 @@ def run_section2_flags(rng, n_dates=50):
     r = Results()
 
     flags_list = [
-        swe.SEFLG_SPEED,
-        swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL,
-        swe.SEFLG_SPEED | swe.SEFLG_EQUATORIAL,
-        swe.SEFLG_SPEED | swe.SEFLG_J2000,
-        swe.SEFLG_SPEED | swe.SEFLG_NOABERR,
-        swe.SEFLG_SPEED | swe.SEFLG_HELCTR,
-        swe.SEFLG_SPEED | swe.SEFLG_TRUEPOS,
-        swe.SEFLG_SPEED | swe.SEFLG_NONUT,
-        swe.SEFLG_SPEED | swe.SEFLG_XYZ,
-        swe.SEFLG_SPEED | swe.SEFLG_RADIANS,
+        swe.FLG_SPEED,
+        swe.FLG_SPEED | swe.FLG_SIDEREAL,
+        swe.FLG_SPEED | swe.FLG_EQUATORIAL,
+        swe.FLG_SPEED | swe.FLG_J2000,
+        swe.FLG_SPEED | swe.FLG_NOABERR,
+        swe.FLG_SPEED | swe.FLG_HELCTR,
+        swe.FLG_SPEED | swe.FLG_TRUEPOS,
+        swe.FLG_SPEED | swe.FLG_NONUT,
+        swe.FLG_SPEED | swe.FLG_XYZ,
+        swe.FLG_SPEED | swe.FLG_RADIANS,
     ]
 
     jds = rng.uniform(2415020, 2488069, n_dates)
@@ -163,10 +163,10 @@ def run_section2_flags(rng, n_dates=50):
         for jd in jds:
             for bid in [0, 1, 2, 4, 5, 9]:
                 for fl in flags_list:
-                    if bid == 0 and (fl & swe.SEFLG_HELCTR):
+                    if bid == 0 and (fl & swe.FLG_HELCTR):
                         continue  # Sun helio = (0,0,0), skip
                     try:
-                        res = swe.swe_calc_ut(float(jd), bid, fl)
+                        res = swe.calc_ut(float(jd), bid, fl)
                         v = res[0]
                         r.check(
                             len(v) == 6, f"mode={mode} body={bid} flag={fl}: len != 6"
@@ -180,7 +180,7 @@ def run_section2_flags(rng, n_dates=50):
                             f"mode={mode} body={bid}: lat not finite",
                         )
                         r.check(
-                            v[2] >= 0 or (fl & swe.SEFLG_XYZ),
+                            v[2] >= 0 or (fl & swe.FLG_XYZ),
                             f"mode={mode} body={bid}: dist < 0",
                         )
                     except (KeyError, ValueError):
@@ -190,7 +190,7 @@ def run_section2_flags(rng, n_dates=50):
                             False,
                             f"mode={mode} body={bid} flag={fl}: {type(e).__name__}: {e}",
                         )
-        swe.swe_close()
+        swe.close()
     return r.summary("Flag combinations")
 
 
@@ -206,8 +206,8 @@ def run_section3_velocity(rng, n_dates=50):
         for bid in [0, 1, 2, 4, 5, 14]:
             try:
                 dt = 0.001  # days
-                r1 = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)[0]
-                r2 = swe.swe_calc_ut(float(jd) + dt, bid, swe.SEFLG_SPEED)[0]
+                r1 = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)[0]
+                r2 = swe.calc_ut(float(jd) + dt, bid, swe.FLG_SPEED)[0]
                 num_speed = (r2[0] - r1[0]) / dt
                 if abs(num_speed) > 180 / dt:
                     num_speed = ((r2[0] - r1[0] + 180) % 360 - 180) / dt
@@ -218,7 +218,7 @@ def run_section3_velocity(rng, n_dates=50):
                 )
             except Exception:
                 pass
-    swe.swe_close()
+    swe.close()
     return r.summary("Velocity accuracy")
 
 
@@ -266,9 +266,9 @@ def run_section5_sidereal(rng, n_dates=10):
         for jd in jds:
             for bid in [0, 1, 4]:
                 try:
-                    trop = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)[0]
-                    sid = swe.swe_calc_ut(
-                        float(jd), bid, swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL
+                    trop = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)[0]
+                    sid = swe.calc_ut(
+                        float(jd), bid, swe.FLG_SPEED | swe.FLG_SIDEREAL
                     )[0]
                     r.check(
                         math.isfinite(sid[0]), f"mode={mode_id} body={bid}: not finite"
@@ -297,14 +297,14 @@ def run_section6_edges():
     for bid in [0, 1, 2, 5, 14]:
         for jd in [2396758.5, 2506331.5, 2451545.0, 2415020.5, 2488069.5]:
             try:
-                res = swe.swe_calc_ut(jd, bid, swe.SEFLG_SPEED)
+                res = swe.calc_ut(jd, bid, swe.FLG_SPEED)
                 r.check(math.isfinite(res[0][0]), f"body={bid} jd={jd}: not finite")
             except (ValueError, KeyError):
                 r.check(True)  # expected range error
 
     # Invalid body
     try:
-        swe.swe_calc_ut(2451545.0, 999, 0)
+        swe.calc_ut(2451545.0, 999, 0)
         r.check(False, "body=999 should raise")
     except Exception:
         r.check(True)
@@ -354,11 +354,11 @@ def run_section8_crossbackend(rng, n_dates=50):
         for jd in jds:
             for bid in bodies:
                 try:
-                    res = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)
+                    res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
                     results_by_backend[mode][(float(jd), bid)] = res[0][:3]
                 except Exception:
                     pass
-        swe.swe_close()
+        swe.close()
 
     # LEB2
     swe.set_leb_file("data/leb2/base_core.leb2")
@@ -367,11 +367,11 @@ def run_section8_crossbackend(rng, n_dates=50):
     for jd in jds:
         for bid in bodies:
             try:
-                res = swe.swe_calc_ut(float(jd), bid, swe.SEFLG_SPEED)
+                res = swe.calc_ut(float(jd), bid, swe.FLG_SPEED)
                 results_by_backend["leb2"][(float(jd), bid)] = res[0][:3]
             except Exception:
                 pass
-    swe.swe_close()
+    swe.close()
 
     # Compare pairs
     for jd in jds:
@@ -425,7 +425,7 @@ def main():
         lambda: run_section8_crossbackend(rng, n_dates=int(50 * scale)),
     ]
     for section_fn in sections:
-        swe.swe_close()  # clean state between sections
+        swe.close()  # clean state between sections
         all_pass &= section_fn()
 
     elapsed = time.time() - t0

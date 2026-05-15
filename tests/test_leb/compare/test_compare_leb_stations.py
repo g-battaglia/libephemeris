@@ -15,15 +15,15 @@ import pytest
 pytestmark = pytest.mark.skip(reason="Station/retrograde functions not yet implemented")
 
 import libephemeris as ephem
-from libephemeris.constants import SE_MARS, SE_JUPITER, SE_SATURN
+from libephemeris.constants import MARS, JUPITER, SATURN
 
 from .conftest import TOLS, CompareHelper, year_to_jd
 
 
 STATION_BODIES = [
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 
@@ -42,10 +42,10 @@ class TestFindStation:
 
         # Find stations in range
         ref_result = compare.skyfield(
-            ephem.swe_find_station_ut, body_id, jd_start, 0, jd_end
+            ephem.find_station_ut, body_id, jd_start, 0, jd_end
         )
         leb_result = compare.leb(
-            ephem.swe_find_station_ut, body_id, jd_start, 0, jd_end
+            ephem.find_station_ut, body_id, jd_start, 0, jd_end
         )
 
         if ref_result[0] != 0 and leb_result[0] != 0:
@@ -122,9 +122,9 @@ class TestNextRetrograde:
         jd_start = year_to_jd(2024)
 
         ref_result = compare.skyfield(
-            ephem.swe_next_retrograde_ut, body_id, jd_start, 0
+            ephem.next_retrograde_ut, body_id, jd_start, 0
         )
-        leb_result = compare.leb(ephem.swe_next_retrograde_ut, body_id, jd_start, 0)
+        leb_result = compare.leb(ephem.next_retrograde_ut, body_id, jd_start, 0)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]

@@ -11,20 +11,20 @@ import pytest
 import math
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SEFLG_HELCTR,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    FLG_HELCTR,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS
 
@@ -44,19 +44,19 @@ def epoch_2025():
 def all_minor_body_ids():
     """All minor body IDs in the database."""
     return [
-        SE_CHIRON,
-        SE_PHOLUS,
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
-        SE_ERIS,
-        SE_SEDNA,
-        SE_HAUMEA,
-        SE_MAKEMAKE,
-        SE_IXION,
-        SE_ORCUS,
-        SE_QUAOAR,
+        CHIRON,
+        PHOLUS,
+        CERES,
+        PALLAS,
+        JUNO,
+        VESTA,
+        ERIS,
+        SEDNA,
+        HAUMEA,
+        MAKEMAKE,
+        IXION,
+        ORCUS,
+        QUAOAR,
     ]
 
 
@@ -95,19 +95,19 @@ class TestMeanMotionConsistency:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_CHIRON, "Chiron"),
-            (SE_PHOLUS, "Pholus"),
-            (SE_CERES, "Ceres"),
-            (SE_PALLAS, "Pallas"),
-            (SE_JUNO, "Juno"),
-            (SE_VESTA, "Vesta"),
-            (SE_ERIS, "Eris"),
-            (SE_SEDNA, "Sedna"),
-            (SE_HAUMEA, "Haumea"),
-            (SE_MAKEMAKE, "Makemake"),
-            (SE_IXION, "Ixion"),
-            (SE_ORCUS, "Orcus"),
-            (SE_QUAOAR, "Quaoar"),
+            (CHIRON, "Chiron"),
+            (PHOLUS, "Pholus"),
+            (CERES, "Ceres"),
+            (PALLAS, "Pallas"),
+            (JUNO, "Juno"),
+            (VESTA, "Vesta"),
+            (ERIS, "Eris"),
+            (SEDNA, "Sedna"),
+            (HAUMEA, "Haumea"),
+            (MAKEMAKE, "Makemake"),
+            (IXION, "Ixion"),
+            (ORCUS, "Orcus"),
+            (QUAOAR, "Quaoar"),
         ],
     )
     def test_mean_motion_matches_period(self, body_id, name):
@@ -134,7 +134,7 @@ class TestOrbitalElementsValues:
 
     def test_chiron_elements(self):
         """Chiron elements should match JPL values."""
-        el = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        el = MINOR_BODY_ELEMENTS[CHIRON]
         assert el.name == "Chiron"
         assert abs(el.a - 13.6922) < 0.01  # Semi-major axis
         assert abs(el.e - 0.378979) < 0.001  # Eccentricity
@@ -142,7 +142,7 @@ class TestOrbitalElementsValues:
 
     def test_ceres_elements(self):
         """Ceres elements should match JPL values."""
-        el = MINOR_BODY_ELEMENTS[SE_CERES]
+        el = MINOR_BODY_ELEMENTS[CERES]
         assert el.name == "Ceres"
         assert abs(el.a - 2.7656) < 0.01
         assert abs(el.e - 0.079576) < 0.001
@@ -150,7 +150,7 @@ class TestOrbitalElementsValues:
 
     def test_eris_elements(self):
         """Eris elements should match JPL values."""
-        el = MINOR_BODY_ELEMENTS[SE_ERIS]
+        el = MINOR_BODY_ELEMENTS[ERIS]
         assert el.name == "Eris"
         assert abs(el.a - 67.9964) < 0.1
         assert abs(el.e - 0.436965) < 0.001
@@ -158,7 +158,7 @@ class TestOrbitalElementsValues:
 
     def test_sedna_elements(self):
         """Sedna elements should match JPL values."""
-        el = MINOR_BODY_ELEMENTS[SE_SEDNA]
+        el = MINOR_BODY_ELEMENTS[SEDNA]
         assert el.name == "Sedna"
         assert abs(el.a - 549.541) < 1.0  # Large semi-major axis
         assert abs(el.e - 0.861297) < 0.001  # Highly eccentric
@@ -171,7 +171,7 @@ class TestPositionCalculation:
     def test_position_at_epoch(self, epoch_2025, all_minor_body_ids):
         """All bodies should return valid positions at epoch."""
         for body_id in all_minor_body_ids:
-            pos, _ = ephem.swe_calc_ut(epoch_2025, body_id, SEFLG_HELCTR)
+            pos, _ = ephem.calc_ut(epoch_2025, body_id, FLG_HELCTR)
 
             name = MINOR_BODY_ELEMENTS[body_id].name
             assert 0 <= pos[0] < 360, f"{name}: invalid longitude {pos[0]}"
@@ -182,8 +182,8 @@ class TestPositionCalculation:
         """Positions near epoch should be consistent."""
         for body_id in all_minor_body_ids:
             # Test at epoch and 1 day later
-            pos1, _ = ephem.swe_calc_ut(epoch_2025, body_id, SEFLG_HELCTR)
-            pos2, _ = ephem.swe_calc_ut(epoch_2025 + 1.0, body_id, SEFLG_HELCTR)
+            pos1, _ = ephem.calc_ut(epoch_2025, body_id, FLG_HELCTR)
+            pos2, _ = ephem.calc_ut(epoch_2025 + 1.0, body_id, FLG_HELCTR)
 
             name = MINOR_BODY_ELEMENTS[body_id].name
 
@@ -198,16 +198,16 @@ class TestPositionCalculation:
     @pytest.mark.parametrize(
         "body_id,min_dist,max_dist",
         [
-            (SE_CHIRON, 8.0, 19.0),  # Perihelion ~8.5 AU, Aphelion ~18.9 AU
-            (SE_CERES, 2.5, 3.0),  # Main belt
-            (SE_VESTA, 2.1, 2.6),  # Main belt
-            (SE_ERIS, 38.0, 98.0),  # Trans-Neptunian
-            (SE_SEDNA, 76.0, 1000.0),  # Extreme orbit
+            (CHIRON, 8.0, 19.0),  # Perihelion ~8.5 AU, Aphelion ~18.9 AU
+            (CERES, 2.5, 3.0),  # Main belt
+            (VESTA, 2.1, 2.6),  # Main belt
+            (ERIS, 38.0, 98.0),  # Trans-Neptunian
+            (SEDNA, 76.0, 1000.0),  # Extreme orbit
         ],
     )
     def test_distance_in_expected_range(self, epoch_2025, body_id, min_dist, max_dist):
         """Heliocentric distances should be within orbital constraints."""
-        pos, _ = ephem.swe_calc_ut(epoch_2025, body_id, SEFLG_HELCTR)
+        pos, _ = ephem.calc_ut(epoch_2025, body_id, FLG_HELCTR)
         dist = pos[2]
 
         name = MINOR_BODY_ELEMENTS[body_id].name
@@ -222,13 +222,13 @@ class TestPeriodsAndOrbits:
     @pytest.mark.parametrize(
         "body_id,name,expected_period_years,tolerance_years",
         [
-            (SE_CHIRON, "Chiron", 51, 2),
-            (SE_PHOLUS, "Pholus", 91, 3),
-            (SE_CERES, "Ceres", 4.6, 0.2),
-            (SE_VESTA, "Vesta", 3.6, 0.2),
-            (SE_ERIS, "Eris", 561, 10),
-            (SE_HAUMEA, "Haumea", 282, 5),
-            (SE_MAKEMAKE, "Makemake", 307, 5),
+            (CHIRON, "Chiron", 51, 2),
+            (PHOLUS, "Pholus", 91, 3),
+            (CERES, "Ceres", 4.6, 0.2),
+            (VESTA, "Vesta", 3.6, 0.2),
+            (ERIS, "Eris", 561, 10),
+            (HAUMEA, "Haumea", 282, 5),
+            (MAKEMAKE, "Makemake", 307, 5),
         ],
     )
     def test_orbital_period(

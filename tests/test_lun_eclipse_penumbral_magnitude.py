@@ -1,5 +1,5 @@
 """
-Tests for lun_eclipse_penumbral_magnitude and swe_lun_eclipse_penumbral_magnitude functions.
+Tests for lun_eclipse_penumbral_magnitude and lun_eclipse_penumbral_magnitude functions.
 
 These functions calculate the penumbral magnitude (fraction of Moon's diameter
 within Earth's penumbral shadow) for lunar eclipses.
@@ -12,13 +12,11 @@ import pytest
 from libephemeris import (
     julday,
     lun_eclipse_when,
-    swe_lun_eclipse_when,
     lun_eclipse_penumbral_magnitude,
-    swe_lun_eclipse_penumbral_magnitude,
-    SE_ECL_TOTAL,
-    SE_ECL_PARTIAL,
-    SE_ECL_PENUMBRAL,
-    SEFLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
+    FLG_SWIEPH,
 )
 
 
@@ -39,9 +37,9 @@ class TestLunEclipsePenumbralMagnitudeFunctionSignature:
 
     def test_swe_function_exists_in_package(self):
         """Test that swe_ prefixed function is exported."""
-        from libephemeris import swe_lun_eclipse_penumbral_magnitude
+        from libephemeris import lun_eclipse_penumbral_magnitude
 
-        assert callable(swe_lun_eclipse_penumbral_magnitude)
+        assert callable(lun_eclipse_penumbral_magnitude)
 
     def test_returns_float(self):
         """Test that function returns a float."""
@@ -56,25 +54,25 @@ class TestLunEclipsePenumbralMagnitudeFunctionSignature:
         """Test that function accepts optional flags parameter."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
-        result = lun_eclipse_penumbral_magnitude(jd_eclipse, flags=SEFLG_SWIEPH)
+        result = lun_eclipse_penumbral_magnitude(jd_eclipse, ifl=FLG_SWIEPH)
 
         assert isinstance(result, float)
 
 
 class TestSweLunEclipsePenumbralMagnitudeFunctionSignature:
-    """Test swe_lun_eclipse_penumbral_magnitude function signature."""
+    """Test lun_eclipse_penumbral_magnitude function signature."""
 
     def test_function_exists_in_module(self):
-        """Test that swe_lun_eclipse_penumbral_magnitude function exists in eclipse module."""
-        from libephemeris.eclipse import swe_lun_eclipse_penumbral_magnitude
+        """Test that lun_eclipse_penumbral_magnitude function exists in eclipse module."""
+        from libephemeris.eclipse import lun_eclipse_penumbral_magnitude
 
-        assert callable(swe_lun_eclipse_penumbral_magnitude)
+        assert callable(lun_eclipse_penumbral_magnitude)
 
     def test_returns_float(self):
         """Test that function returns a float."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
-        result = swe_lun_eclipse_penumbral_magnitude(jd_eclipse, SEFLG_SWIEPH)
+        result = lun_eclipse_penumbral_magnitude(jd_eclipse, FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -90,7 +88,7 @@ class TestPenumbralMagnitudeValues:
         """
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -106,7 +104,7 @@ class TestPenumbralMagnitudeValues:
 
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PARTIAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -121,7 +119,7 @@ class TestPenumbralMagnitudeValues:
         """Test that penumbral-only eclipse has positive penumbral magnitude."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -137,7 +135,7 @@ class TestPenumbralMagnitudeValues:
 
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PENUMBRAL)
         jd_max = times[0]
 
         umbral_mag = lun_eclipse_umbral_magnitude(jd_max)
@@ -209,7 +207,7 @@ class TestPenumbralMagnitudeConsistency:
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         result_legacy = lun_eclipse_penumbral_magnitude(jd_eclipse)
-        result_swe = swe_lun_eclipse_penumbral_magnitude(jd_eclipse, SEFLG_SWIEPH)
+        result_swe = lun_eclipse_penumbral_magnitude(jd_eclipse, FLG_SWIEPH)
 
         assert result_legacy == result_swe, (
             f"Results should match: legacy={result_legacy}, swe={result_swe}"
@@ -220,7 +218,7 @@ class TestPenumbralMagnitudeConsistency:
         from libephemeris import lun_eclipse_umbral_magnitude
 
         # Find different types of lunar eclipses and test
-        for eclipse_type in [SE_ECL_TOTAL, SE_ECL_PARTIAL, SE_ECL_PENUMBRAL]:
+        for eclipse_type in [ECL_TOTAL, ECL_PARTIAL, ECL_PENUMBRAL]:
             jd_start = julday(2020, 1, 1, 0)
             ecl_type, times = lun_eclipse_when(jd_start, ecltype=eclipse_type)
             jd_max = times[0]
@@ -245,7 +243,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2020, 1, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PENUMBRAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -264,7 +262,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 5, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -283,7 +281,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2023, 10, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_PARTIAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)
@@ -330,7 +328,7 @@ class TestEdgeCases:
 
         # Find a penumbral-only lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_PENUMBRAL)
         jd_max = times[0]
 
         penumbral_mag = lun_eclipse_penumbral_magnitude(jd_max)

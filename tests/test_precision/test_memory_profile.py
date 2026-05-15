@@ -29,17 +29,17 @@ from libephemeris.state import (
     clear_angles_cache,
 )
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SPEED,
 )
 
 
@@ -183,16 +183,16 @@ class TestMemoryLongCalculations:
         totaling 10000 calculations, and verifies memory doesn't grow excessively.
         """
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
         jd_start = 2451545.0  # J2000.0
         dates = [jd_start + i for i in range(1000)]
@@ -200,7 +200,7 @@ class TestMemoryLongCalculations:
         progress = progress_reporter("Memory profiling calc_ut", len(dates))
 
         # Warm up - load ephemeris and timescale
-        _ = ephem.swe_calc_ut(jd_start, SE_SUN, 0)
+        _ = ephem.calc_ut(jd_start, SUN, 0)
         gc.collect()
 
         # Start memory profiling
@@ -215,7 +215,7 @@ class TestMemoryLongCalculations:
         # Run calculations
         for i, jd in enumerate(dates):
             for planet in planets:
-                _ = ephem.swe_calc_ut(jd, planet, 0)
+                _ = ephem.calc_ut(jd, planet, 0)
 
             # Report progress at intervals
             if (i + 1) % 100 == 0:
@@ -240,19 +240,19 @@ class TestMemoryLongCalculations:
         self, memory_profiler, ensure_clean_state, progress_reporter
     ):
         """
-        Test memory usage for calc_ut with SEFLG_SPEED flag.
+        Test memory usage for calc_ut with FLG_SPEED flag.
 
         Speed calculations involve additional velocity computations
         which may have different memory characteristics.
         """
-        planets = [SE_SUN, SE_MOON, SE_MERCURY, SE_MARS, SE_JUPITER]
+        planets = [SUN, MOON, MERCURY, MARS, JUPITER]
         jd_start = 2451545.0
         dates = [jd_start + i for i in range(2000)]
 
         progress = progress_reporter("Memory profiling calc_ut+SPEED", len(dates))
 
         # Warm up
-        _ = ephem.swe_calc_ut(jd_start, SE_SUN, SEFLG_SPEED)
+        _ = ephem.calc_ut(jd_start, SUN, FLG_SPEED)
         gc.collect()
 
         memory_profiler.start()
@@ -260,7 +260,7 @@ class TestMemoryLongCalculations:
 
         print(f"\n{'=' * 70}")
         print(
-            f"MEMORY PROFILE: calc_ut + SEFLG_SPEED - "
+            f"MEMORY PROFILE: calc_ut + FLG_SPEED - "
             f"{len(planets) * len(dates)} calculations"
         )
         print(f"{'=' * 70}")
@@ -268,7 +268,7 @@ class TestMemoryLongCalculations:
 
         for i, jd in enumerate(dates):
             for planet in planets:
-                _ = ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                _ = ephem.calc_ut(jd, planet, FLG_SPEED)
 
             if (i + 1) % 200 == 0:
                 progress.update(i)
@@ -308,7 +308,7 @@ class TestMemoryLongCalculations:
         progress = progress_reporter("Memory profiling houses", len(dates))
 
         # Warm up
-        _ = ephem.swe_houses(jd_start, 41.9, 12.5, ord("P"))
+        _ = ephem.houses(jd_start, 41.9, 12.5, ord("P"))
         gc.collect()
 
         memory_profiler.start()
@@ -322,7 +322,7 @@ class TestMemoryLongCalculations:
         for i, jd in enumerate(dates):
             for lat, lon in locations:
                 for hsys in house_systems:
-                    _ = ephem.swe_houses(jd, lat, lon, hsys)
+                    _ = ephem.houses(jd, lat, lon, hsys)
 
             if (i + 1) % 50 == 0:
                 progress.update(i)
@@ -447,7 +447,7 @@ class TestEphemerisCacheManagement:
 
             # Do some calculations
             for jd in range(2451545, 2451555):
-                _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+                _ = ephem.calc_ut(jd, SUN, 0)
 
             # Close and cleanup
             ephem_close()
@@ -662,7 +662,7 @@ class TestEphemerisContextMemory:
             ctx.set_sid_mode(i % 43)  # Cycle through ayanamshas
 
             # Do some calculations
-            _ = ctx.calc_ut(2451545.0 + i, SE_SUN, 0)
+            _ = ctx.calc_ut(2451545.0 + i, SUN, 0)
 
             # Keep reference for some, let others be GC'd
             if i % 10 == 0:
@@ -712,23 +712,23 @@ class TestMemorySummary:
         progress = progress_reporter("Comprehensive memory test", num_charts)
 
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
         # Warm up
         jd = 2451545.0
         for planet in planets:
-            _ = ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
-        _ = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+            _ = ephem.calc_ut(jd, planet, FLG_SPEED)
+        _ = ephem.houses(jd, 41.9, 12.5, ord("P"))
         gc.collect()
 
         memory_profiler.start()
@@ -746,11 +746,11 @@ class TestMemorySummary:
 
             # Calculate all planets with speed
             for planet in planets:
-                _ = ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                _ = ephem.calc_ut(jd, planet, FLG_SPEED)
 
             # Calculate houses for different locations
             for lat, lon in [(41.9, 12.5), (51.5, -0.1), (40.7, -74.0)]:
-                _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+                _ = ephem.houses(jd, lat, lon, ord("P"))
 
             # Update angles cache
             angles = {

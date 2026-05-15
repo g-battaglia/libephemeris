@@ -1,7 +1,7 @@
 """
-Tests for swe_houses_ex with combined flags, especially SIDEREAL.
+Tests for houses_ex with combined flags, especially SIDEREAL.
 
-Verifies houses_ex with SEFLG_SIDEREAL, houses_ex2 with speeds,
+Verifies houses_ex with FLG_SIDEREAL, houses_ex2 with speeds,
 and combined flag behavior.
 """
 
@@ -13,13 +13,13 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
-    SE_SIDM_KRISHNAMURTI,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
+    SIDM_KRISHNAMURTI,
 )
 from libephemeris.exceptions import PolarCircleError
 
@@ -27,7 +27,7 @@ from libephemeris.exceptions import PolarCircleError
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -37,14 +37,14 @@ HOUSE_SYSTEMS = "PKORABMTUVX"  # Common systems (excluding Gauquelin and Whole S
 
 
 class TestHousesExSidereal:
-    """Test swe_houses_ex with SEFLG_SIDEREAL flag."""
+    """Test houses_ex with FLG_SIDEREAL flag."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("hsys", list(HOUSE_SYSTEMS))
     def test_sidereal_cusps_in_range(self, hsys):
         """Sidereal house cusps are in [0, 360)."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, ord(hsys), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, ord(hsys), FLG_SIDEREAL)
         for i, c in enumerate(cusps):
             assert 0.0 <= c < 360.0, f"System {hsys} cusp {i + 1} = {c} out of range"
 
@@ -52,11 +52,11 @@ class TestHousesExSidereal:
     @pytest.mark.parametrize("hsys", list(HOUSE_SYSTEMS))
     def test_sidereal_differs_from_tropical(self, hsys):
         """Sidereal cusps differ from tropical cusps by ~ayanamsa."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         ayan = swe.get_ayanamsa_ut(JD_J2000)
 
         cusps_t, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord(hsys), 0)
-        cusps_s, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord(hsys), SEFLG_SIDEREAL)
+        cusps_s, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord(hsys), FLG_SIDEREAL)
 
         # First cusp difference should be approximately the ayanamsa
         diff = (cusps_t[0] - cusps_s[0]) % 360.0
@@ -70,15 +70,15 @@ class TestHousesExSidereal:
     @pytest.mark.parametrize(
         "sid_mode",
         [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
         ],
     )
     def test_different_sidereal_modes(self, sid_mode):
         """Different sidereal modes produce different cusp positions."""
         swe.set_sid_mode(sid_mode)
-        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), SEFLG_SIDEREAL)
+        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), FLG_SIDEREAL)
         assert len(cusps) == 12
         for c in cusps:
             assert 0.0 <= c < 360.0
@@ -86,9 +86,9 @@ class TestHousesExSidereal:
     @pytest.mark.unit
     def test_sidereal_ascmc_armc_not_corrected(self):
         """ARMC (ascmc[2]) should NOT be corrected by ayanamsa."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         _, ascmc_t = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), 0)
-        _, ascmc_s = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), SEFLG_SIDEREAL)
+        _, ascmc_s = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), FLG_SIDEREAL)
         # ARMC is at index 2 — should be the same
         assert ascmc_t[2] == pytest.approx(ascmc_s[2], abs=0.01), (
             f"ARMC tropical={ascmc_t[2]}, sidereal={ascmc_s[2]}"
@@ -97,11 +97,11 @@ class TestHousesExSidereal:
     @pytest.mark.unit
     def test_sidereal_asc_corrected(self):
         """Ascendant (ascmc[0]) should be corrected by ayanamsa."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         ayan = swe.get_ayanamsa_ut(JD_J2000)
 
         _, ascmc_t = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), 0)
-        _, ascmc_s = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), SEFLG_SIDEREAL)
+        _, ascmc_s = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("P"), FLG_SIDEREAL)
 
         diff = (ascmc_t[0] - ascmc_s[0]) % 360.0
         if diff > 180.0:
@@ -115,8 +115,8 @@ class TestHousesExWholeSignSidereal:
     @pytest.mark.unit
     def test_whole_sign_sidereal_30_degree_spacing(self):
         """Whole Sign sidereal cusps are exactly 30° apart."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("W"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("W"), FLG_SIDEREAL)
         for i in range(11):
             diff = (cusps[i + 1] - cusps[i]) % 360.0
             assert diff == pytest.approx(30.0, abs=0.01), (
@@ -126,8 +126,8 @@ class TestHousesExWholeSignSidereal:
     @pytest.mark.unit
     def test_whole_sign_sidereal_cusp1_at_sign_boundary(self):
         """Whole Sign first cusp should be at a sign boundary (multiple of 30°)."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("W"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("W"), FLG_SIDEREAL)
         remainder = cusps[0] % 30.0
         assert remainder == pytest.approx(0.0, abs=0.01) or remainder == pytest.approx(
             30.0, abs=0.01
@@ -135,7 +135,7 @@ class TestHousesExWholeSignSidereal:
 
 
 class TestHousesEx2Speeds:
-    """Test swe_houses_ex2 which returns cusp speeds."""
+    """Test houses_ex2 which returns cusp speeds."""
 
     @pytest.mark.unit
     def test_houses_ex2_returns_4_tuples(self):
@@ -166,10 +166,10 @@ class TestHousesEx2Speeds:
 
     @pytest.mark.unit
     def test_houses_ex2_with_sidereal(self):
-        """houses_ex2 works with SEFLG_SIDEREAL."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        """houses_ex2 works with FLG_SIDEREAL."""
+        swe.set_sid_mode(SIDM_LAHIRI)
         cusps, ascmc, cusps_speed, ascmc_speed = swe.houses_ex2(
-            JD_J2000, 48.85, 2.35, ord("P"), SEFLG_SIDEREAL
+            JD_J2000, 48.85, 2.35, ord("P"), FLG_SIDEREAL
         )
         assert len(cusps) == 12
         assert len(cusps_speed) == 12
@@ -195,8 +195,8 @@ class TestHousesInvalidHsys:
 
     @pytest.mark.unit
     def test_house_name_unknown_for_invalid(self):
-        """swe_house_name returns 'Unknown' for invalid system."""
-        name = swe.swe_house_name(ord("Z"))
+        """house_name returns 'Unknown' for invalid system."""
+        name = swe.house_name(ord("Z"))
         assert name == "Unknown"
 
     @pytest.mark.unit

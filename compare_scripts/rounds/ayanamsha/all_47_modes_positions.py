@@ -4,10 +4,10 @@ Round 8: Deep Sidereal / Ayanamsha Audit
 ==========================================
 Compares libephemeris sidereal calculations against pyswisseph:
   P1: All 47 ayanamsha modes (0-46) — ayanamsa values at multiple epochs
-  P2: Sidereal planet positions (SEFLG_SIDEREAL) for all planets
-  P3: swe_get_ayanamsa_ex_ut API shape/values
+  P2: Sidereal planet positions (FLG_SIDEREAL) for all planets
+  P3: get_ayanamsa_ex_ut API shape/values
   P4: Modes 43-46 (new, untested) vs pyswisseph
-  P5: SE_SIDM_USER custom ayanamsha
+  P5: SIDM_USER custom ayanamsha
   P6: Sidereal velocity correctness
   P7: Fixed star sidereal positions
 """
@@ -140,8 +140,8 @@ PLANETS = [
     ("TrueNode", swe.TRUE_NODE),
 ]
 
-SEFLG_SIDEREAL = 64 * 1024  # 65536
-SEFLG_SPEED = 256
+FLG_SIDEREAL = 64 * 1024  # 65536
+FLG_SPEED = 256
 
 
 # ============================================================================
@@ -160,14 +160,14 @@ def test_part1_ayanamsa_values():
 
         # Set mode in both libraries
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode)
+        ephem.set_sid_mode(mode)
 
         for epoch_name, jd in EPOCHS:
             test_name = f"P1/{mode_name}({mode})/{epoch_name}"
 
             try:
                 aya_se = swe.get_ayanamsa_ut(jd)
-                aya_le = ephem.swe_get_ayanamsa_ut(jd)
+                aya_le = ephem.get_ayanamsa_ut(jd)
 
                 diff = abs(aya_se - aya_le)
 
@@ -204,17 +204,17 @@ def test_part2_sidereal_positions():
 
     for mode, mode_name in [(1, "Lahiri"), (0, "Fagan/Bradley")]:
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode)
+        ephem.set_sid_mode(mode)
 
         for planet_name, planet_id in PLANETS:
             test_name = f"P2/{mode_name}/{planet_name}"
 
             try:
-                flags_se = SEFLG_SIDEREAL | SEFLG_SPEED
-                flags_le = SEFLG_SIDEREAL | SEFLG_SPEED
+                flags_se = FLG_SIDEREAL | FLG_SPEED
+                flags_le = FLG_SIDEREAL | FLG_SPEED
 
                 ret_se = swe.calc_ut(jd, planet_id, flags_se)
-                ret_le = ephem.swe_calc_ut(jd, planet_id, flags_le)
+                ret_le = ephem.calc_ut(jd, planet_id, flags_le)
 
                 # Extract position data
                 if isinstance(ret_se, tuple) and isinstance(ret_se[0], (list, tuple)):
@@ -270,26 +270,26 @@ def test_part2_sidereal_positions():
 
 
 # ============================================================================
-# PART 3: swe_get_ayanamsa_ex_ut API Shape
+# PART 3: get_ayanamsa_ex_ut API Shape
 # ============================================================================
 
 
 def test_part3_ayanamsa_ex_api():
     print("\n" + "=" * 70)
-    print("PART 3: swe_get_ayanamsa_ex_ut API Shape & Values")
+    print("PART 3: get_ayanamsa_ex_ut API Shape & Values")
     print("=" * 70)
 
     jd = 2460310.5  # 2024-Jan-01
 
     for mode, mode_name in [(1, "Lahiri"), (0, "Fagan/Bradley"), (27, "TrueCitra")]:
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode)
+        ephem.set_sid_mode(mode)
 
         test_base = f"P3/{mode_name}"
 
         try:
             ret_se = swe.get_ayanamsa_ex_ut(jd, 0)
-            ret_le = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
+            ret_le = ephem.get_ayanamsa_ex_ut(jd, 0)
 
             # API shape check
             record(
@@ -355,8 +355,8 @@ def test_part4_new_modes():
             continue
 
         try:
-            ephem.swe_set_sid_mode(mode)
-            aya_le = ephem.swe_get_ayanamsa_ut(jd_2024)
+            ephem.set_sid_mode(mode)
+            aya_le = ephem.get_ayanamsa_ut(jd_2024)
 
             diff = abs(aya_se - aya_le)
             tol = 0.01  # These are formula-based
@@ -368,9 +368,9 @@ def test_part4_new_modes():
             )
 
             # Also test a planet position
-            flags = SEFLG_SIDEREAL | SEFLG_SPEED
+            flags = FLG_SIDEREAL | FLG_SPEED
             ret_se = swe.calc_ut(jd_2024, swe.VENUS, flags)
-            ret_le = ephem.swe_calc_ut(jd_2024, swe.VENUS, flags)
+            ret_le = ephem.calc_ut(jd_2024, swe.VENUS, flags)
 
             pos_se = ret_se[0] if isinstance(ret_se[0], (list, tuple)) else ret_se
             pos_le = ret_le[0] if isinstance(ret_le[0], (list, tuple)) else ret_le
@@ -391,13 +391,13 @@ def test_part4_new_modes():
 
 
 # ============================================================================
-# PART 5: SE_SIDM_USER Custom Ayanamsha
+# PART 5: SIDM_USER Custom Ayanamsha
 # ============================================================================
 
 
 def test_part5_user_ayanamsha():
     print("\n" + "=" * 70)
-    print("PART 5: SE_SIDM_USER Custom Ayanamsha")
+    print("PART 5: SIDM_USER Custom Ayanamsha")
     print("=" * 70)
 
     jd_2024 = 2460310.5
@@ -405,12 +405,12 @@ def test_part5_user_ayanamsha():
     ayan_t0 = 23.85  # Custom value at J2000
 
     swe.set_sid_mode(255, t0, ayan_t0)
-    ephem.swe_set_sid_mode(255, t0, ayan_t0)
+    ephem.set_sid_mode(255, t0, ayan_t0)
 
     try:
         # At t0, ayanamsha should be ayan_t0
         aya_se_t0 = swe.get_ayanamsa_ut(t0)
-        aya_le_t0 = ephem.swe_get_ayanamsa_ut(t0)
+        aya_le_t0 = ephem.get_ayanamsa_ut(t0)
         diff_t0 = abs(aya_se_t0 - aya_le_t0)
         record(
             "P5/user/at_t0",
@@ -421,7 +421,7 @@ def test_part5_user_ayanamsha():
 
         # At 2024, should have precessed from t0
         aya_se_2024 = swe.get_ayanamsa_ut(jd_2024)
-        aya_le_2024 = ephem.swe_get_ayanamsa_ut(jd_2024)
+        aya_le_2024 = ephem.get_ayanamsa_ut(jd_2024)
         diff_2024 = abs(aya_se_2024 - aya_le_2024)
         record(
             "P5/user/at_2024",
@@ -430,9 +430,9 @@ def test_part5_user_ayanamsha():
         )
 
         # Planet position check
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_SPEED
         ret_se = swe.calc_ut(jd_2024, swe.SUN, flags)
-        ret_le = ephem.swe_calc_ut(jd_2024, swe.SUN, flags)
+        ret_le = ephem.calc_ut(jd_2024, swe.SUN, flags)
         pos_se = ret_se[0] if isinstance(ret_se[0], (list, tuple)) else ret_se
         pos_le = ret_le[0] if isinstance(ret_le[0], (list, tuple)) else ret_le
         lon_diff = abs(float(pos_se[0]) - float(pos_le[0]))
@@ -449,7 +449,7 @@ def test_part5_user_ayanamsha():
 
     # Reset to Lahiri
     swe.set_sid_mode(1)
-    ephem.swe_set_sid_mode(1)
+    ephem.set_sid_mode(1)
 
 
 # ============================================================================
@@ -464,16 +464,16 @@ def test_part6_sidereal_velocity():
 
     jd = 2460310.5
     swe.set_sid_mode(1)  # Lahiri
-    ephem.swe_set_sid_mode(1)
+    ephem.set_sid_mode(1)
 
-    flags = SEFLG_SIDEREAL | SEFLG_SPEED
+    flags = FLG_SIDEREAL | FLG_SPEED
 
     for planet_name, planet_id in PLANETS:
         test_name = f"P6/Lahiri/{planet_name}/speed"
 
         try:
             ret_se = swe.calc_ut(jd, planet_id, flags)
-            ret_le = ephem.swe_calc_ut(jd, planet_id, flags)
+            ret_le = ephem.calc_ut(jd, planet_id, flags)
 
             pos_se = ret_se[0] if isinstance(ret_se[0], (list, tuple)) else ret_se
             pos_le = ret_le[0] if isinstance(ret_le[0], (list, tuple)) else ret_le
@@ -483,8 +483,8 @@ def test_part6_sidereal_velocity():
             diff = abs(spd_se - spd_le)
 
             # Also check tropical speed for reference
-            ret_trop_se = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
-            ret_trop_le = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            ret_trop_se = swe.calc_ut(jd, planet_id, FLG_SPEED)
+            ret_trop_le = ephem.calc_ut(jd, planet_id, FLG_SPEED)
             trop_se = (
                 ret_trop_se[0]
                 if isinstance(ret_trop_se[0], (list, tuple))
@@ -520,7 +520,7 @@ def test_part6_sidereal_velocity():
 
 def test_part7_ayanamsa_name():
     print("\n" + "=" * 70)
-    print("PART 7: swe_get_ayanamsa_name")
+    print("PART 7: get_ayanamsa_name")
     print("=" * 70)
 
     # Check a few key names
@@ -536,7 +536,7 @@ def test_part7_ayanamsa_name():
         test_name = f"P7/name/{mode}"
         try:
             name_se = swe.get_ayanamsa_name(mode)
-            name_le = ephem.swe_get_ayanamsa_name(mode)
+            name_le = ephem.get_ayanamsa_name(mode)
 
             # Just check both return non-empty strings
             ok = len(name_le) > 0
@@ -557,17 +557,17 @@ def test_part8_fixstar_sidereal():
 
     jd = 2460310.5
     swe.set_sid_mode(1)  # Lahiri
-    ephem.swe_set_sid_mode(1)
+    ephem.set_sid_mode(1)
 
     stars = ["Regulus", "Spica", "Aldebaran"]
 
     for star_name in stars:
         test_name = f"P8/star/{star_name}"
         try:
-            ret_se = swe.fixstar2_ut(star_name, jd, SEFLG_SIDEREAL)
+            ret_se = swe.fixstar2_ut(star_name, jd, FLG_SIDEREAL)
             pos_se, name_se, retflag_se = ret_se
 
-            ret_le = ephem.swe_fixstar2_ut(star_name, jd, SEFLG_SIDEREAL)
+            ret_le = ephem.fixstar2_ut(star_name, jd, FLG_SIDEREAL)
             pos_le, name_le, retflag_le = ret_le
 
             lon_se = float(pos_se[0])
@@ -631,7 +631,7 @@ def main():
 
     # Reset modes
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
 
 
 if __name__ == "__main__":

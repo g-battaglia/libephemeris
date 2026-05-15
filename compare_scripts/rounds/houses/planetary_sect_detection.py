@@ -8,6 +8,7 @@ Compares house_pos results to verify planet hemisphere placement.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,16 +16,19 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    "Sun": (swe.SUN, ephem.SE_SUN),
-    "Moon": (swe.MOON, ephem.SE_MOON),
-    "Mercury": (swe.MERCURY, ephem.SE_MERCURY),
-    "Venus": (swe.VENUS, ephem.SE_VENUS),
-    "Mars": (swe.MARS, ephem.SE_MARS),
-    "Jupiter": (swe.JUPITER, ephem.SE_JUPITER),
-    "Saturn": (swe.SATURN, ephem.SE_SATURN),
+    "Sun": (swe.SUN, ephem.SUN),
+    "Moon": (swe.MOON, ephem.MOON),
+    "Mercury": (swe.MERCURY, ephem.MERCURY),
+    "Venus": (swe.VENUS, ephem.VENUS),
+    "Mars": (swe.MARS, ephem.MARS),
+    "Jupiter": (swe.JUPITER, ephem.JUPITER),
+    "Saturn": (swe.SATURN, ephem.SATURN),
 }
 
 LOCATIONS = [
@@ -66,7 +70,7 @@ for date_str, jd in TEST_DATES:
             continue
 
         try:
-            le_houses = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), 0)
+            le_houses = ephem.houses_ex2(jd, lat, lon, ord("P"), 0)
             le_cusps = le_houses[0]
             le_ascmc = le_houses[1]
         except Exception:
@@ -76,14 +80,14 @@ for date_str, jd in TEST_DATES:
         for bname, (se_id, le_id) in BODIES.items():
             try:
                 se_pos = swe.calc_ut(jd, se_id, FLAGS)[0]
-                le_pos = ephem.swe_calc_ut(jd, le_id, FLAGS)[0]
+                le_pos = ephem.calc_ut(jd, le_id, FLAGS)[0]
             except Exception:
                 skipped += 1
                 continue
 
             try:
                 se_hp = swe.house_pos(armc, lat, eps, (se_pos[0], se_pos[1]), hsys=b"P")
-                le_hp = ephem.swe_house_pos(
+                le_hp = ephem.house_pos(
                     armc, lat, eps, ord("P"), le_pos[0], le_pos[1]
                 )
             except Exception:

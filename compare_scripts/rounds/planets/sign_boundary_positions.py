@@ -21,27 +21,30 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_SIDEREAL = 65536
+swe.set_ephe_path(_REF_EPHE_PATH)
 
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
+FLG_SPEED = 256
+FLG_SIDEREAL = 65536
+
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
 
 
 def find_sign_ingresses(body_id, start_jd, count=30):
     """Find times when planet crosses sign boundaries (multiples of 30°)."""
     ingresses = []
     jd = start_jd
-    step = 1.0 if body_id != SE_MOON else 0.25
+    step = 1.0 if body_id != MOON else 0.25
 
-    prev_sign = int(swe.calc_ut(jd, body_id, SEFLG_SPEED)[0][0] / 30.0)
+    prev_sign = int(swe.calc_ut(jd, body_id, FLG_SPEED)[0][0] / 30.0)
     jd += step
 
     max_iter = 50000
@@ -52,7 +55,7 @@ def find_sign_ingresses(body_id, start_jd, count=30):
             break
 
         try:
-            pos = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
+            pos = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
         except Exception:
             jd += step
             continue
@@ -64,7 +67,7 @@ def find_sign_ingresses(body_id, start_jd, count=30):
             a, b = jd - step, jd
             for _ in range(50):
                 mid = (a + b) / 2
-                mid_sign = int(swe.calc_ut(mid, body_id, SEFLG_SPEED)[0][0] / 30.0) % 12
+                mid_sign = int(swe.calc_ut(mid, body_id, FLG_SPEED)[0][0] / 30.0) % 12
                 if mid_sign == prev_sign:
                     a = mid
                 else:
@@ -92,13 +95,13 @@ def main():
     failures = []
 
     bodies = [
-        (SE_SUN, "Sun", 24),
-        (SE_MOON, "Moon", 30),
-        (SE_MERCURY, "Mercury", 20),
-        (SE_VENUS, "Venus", 20),
-        (SE_MARS, "Mars", 15),
-        (SE_JUPITER, "Jupiter", 8),
-        (SE_SATURN, "Saturn", 6),
+        (SUN, "Sun", 24),
+        (MOON, "Moon", 30),
+        (MERCURY, "Mercury", 20),
+        (VENUS, "Venus", 20),
+        (MARS, "Mars", 15),
+        (JUPITER, "Jupiter", 8),
+        (SATURN, "Saturn", 6),
     ]
 
     start_jd = 2451545.0  # J2000
@@ -114,8 +117,8 @@ def main():
                 jd = ingress_jd + offset_days
 
                 try:
-                    se_pos = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                    le_pos = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)[0]
+                    se_pos = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                    le_pos = ephem.calc_ut(jd, body_id, FLG_SPEED)[0]
                 except Exception:
                     continue
 
@@ -157,16 +160,16 @@ def main():
     # Sidereal sign boundaries
     print("\n--- Testing sidereal sign boundaries ---")
     swe.set_sid_mode(1)  # Lahiri
-    ephem.swe_set_sid_mode(1, 0, 0)
+    ephem.set_sid_mode(1, 0, 0)
 
-    for body_id, body_name in [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")]:
+    for body_id, body_name in [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")]:
         ingresses = find_sign_ingresses(body_id, start_jd, 12)
 
         for ingress_jd, boundary in ingresses:
-            flags = SEFLG_SPEED | SEFLG_SIDEREAL
+            flags = FLG_SPEED | FLG_SIDEREAL
             try:
                 se_pos = swe.calc_ut(ingress_jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(ingress_jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(ingress_jd, body_id, flags)[0]
             except Exception:
                 continue
 
@@ -189,7 +192,7 @@ def main():
                     )
 
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     print("\n" + "=" * 80)
     pct = 100 * total_pass / total_tests if total_tests > 0 else 0

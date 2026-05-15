@@ -19,21 +19,24 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = [
-    ("Sun", swe.SUN, ephem.SE_SUN),
-    ("Moon", swe.MOON, ephem.SE_MOON),
-    ("Mercury", swe.MERCURY, ephem.SE_MERCURY),
-    ("Venus", swe.VENUS, ephem.SE_VENUS),
-    ("Mars", swe.MARS, ephem.SE_MARS),
-    ("Jupiter", swe.JUPITER, ephem.SE_JUPITER),
-    ("Saturn", swe.SATURN, ephem.SE_SATURN),
-    ("Uranus", swe.URANUS, ephem.SE_URANUS),
-    ("Neptune", swe.NEPTUNE, ephem.SE_NEPTUNE),
-    ("Pluto", swe.PLUTO, ephem.SE_PLUTO),
-    ("Chiron", swe.CHIRON, ephem.SE_CHIRON),
-    ("Ceres", 17, ephem.SE_CERES),
+    ("Sun", swe.SUN, ephem.SUN),
+    ("Moon", swe.MOON, ephem.MOON),
+    ("Mercury", swe.MERCURY, ephem.MERCURY),
+    ("Venus", swe.VENUS, ephem.VENUS),
+    ("Mars", swe.MARS, ephem.MARS),
+    ("Jupiter", swe.JUPITER, ephem.JUPITER),
+    ("Saturn", swe.SATURN, ephem.SATURN),
+    ("Uranus", swe.URANUS, ephem.URANUS),
+    ("Neptune", swe.NEPTUNE, ephem.NEPTUNE),
+    ("Pluto", swe.PLUTO, ephem.PLUTO),
+    ("Chiron", swe.CHIRON, ephem.CHIRON),
+    ("Ceres", 17, ephem.CERES),
 ]
 
 FLAGS = swe.FLG_SPEED | swe.FLG_SWIEPH
@@ -76,7 +79,7 @@ for date_str, jd in TEST_DATES:
             continue
 
         try:
-            le_r = ephem.swe_calc_ut(jd, le_id, FLAGS)
+            le_r = ephem.calc_ut(jd, le_id, FLAGS)
             le_positions[bname] = (le_r[0][0], le_r[0][1])
         except Exception:
             continue

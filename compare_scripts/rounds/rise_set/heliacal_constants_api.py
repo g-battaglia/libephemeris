@@ -54,20 +54,20 @@ print("PART 4: Flag Constants Verification")
 print("=" * 70)
 
 checks = [
-    ("HELIACAL_RISING", ephem.SE_HELIACAL_RISING, swe.HELIACAL_RISING),
-    ("HELIACAL_SETTING", ephem.SE_HELIACAL_SETTING, swe.HELIACAL_SETTING),
-    ("EVENING_FIRST", ephem.SE_EVENING_FIRST, swe.EVENING_FIRST),
-    ("MORNING_LAST", ephem.SE_MORNING_LAST, swe.MORNING_LAST),
+    ("HELIACAL_RISING", ephem.HELIACAL_RISING, swe.HELIACAL_RISING),
+    ("HELIACAL_SETTING", ephem.HELIACAL_SETTING, swe.HELIACAL_SETTING),
+    ("EVENING_FIRST", ephem.EVENING_FIRST, swe.EVENING_FIRST),
+    ("MORNING_LAST", ephem.MORNING_LAST, swe.MORNING_LAST),
     (
         "HELFLAG_OPTICAL_PARAMS",
-        ephem.SE_HELFLAG_OPTICAL_PARAMS,
+        ephem.HELFLAG_OPTICAL_PARAMS,
         swe.HELFLAG_OPTICAL_PARAMS,
     ),
-    ("HELFLAG_NO_DETAILS", ephem.SE_HELFLAG_NO_DETAILS, swe.HELFLAG_NO_DETAILS),
-    ("HELFLAG_VISLIM_DARK", ephem.SE_HELFLAG_VISLIM_DARK, swe.HELFLAG_VISLIM_DARK),
+    ("HELFLAG_NO_DETAILS", ephem.HELFLAG_NO_DETAILS, swe.HELFLAG_NO_DETAILS),
+    ("HELFLAG_VISLIM_DARK", ephem.HELFLAG_VISLIM_DARK, swe.HELFLAG_VISLIM_DARK),
     (
         "HELFLAG_VISLIM_NOMOON",
-        ephem.SE_HELFLAG_VISLIM_NOMOON,
+        ephem.HELFLAG_VISLIM_NOMOON,
         swe.HELFLAG_VISLIM_NOMOON,
     ),
 ]
@@ -118,7 +118,7 @@ try:
         1,
         0,
     )
-    ret_le = ephem.swe_heliacal_pheno_ut(
+    ret_le = ephem.heliacal_pheno_ut(
         jd_pheno,
         geopos,
         STANDARD_ATMO,
@@ -188,7 +188,7 @@ for obj in ["Jupiter", "Venus", "Sirius", "Mars"]:
         ret_se = swe.vis_limit_mag(
             jd_night, geopos_rome, STANDARD_ATMO, STANDARD_OBSERVER, obj, 0
         )
-        ret_le = ephem.swe_vis_limit_mag(
+        ret_le = ephem.vis_limit_mag(
             jd_night, geopos_rome, STANDARD_ATMO, STANDARD_OBSERVER, obj, 0
         )
 

@@ -18,10 +18,13 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_SWIEPH = 2
 
 PLANETS = [
     (0, "Sun"),
@@ -56,7 +59,7 @@ def run_tests():
     print("ROUND 100: Full Chart Stress Test — 500 Random Charts")
     print("=" * 80)
 
-    flags = SEFLG_SWIEPH | SEFLG_SPEED
+    flags = FLG_SWIEPH | FLG_SPEED
 
     for chart_num in range(500):
         # Random date: 1900-2100
@@ -71,7 +74,7 @@ def run_tests():
             total += 1
             try:
                 se_pos = swe.calc_ut(jd, body_id, flags)[0]
-                le_pos = ephem.swe_calc_ut(jd, body_id, flags)[0]
+                le_pos = ephem.calc_ut(jd, body_id, flags)[0]
             except Exception as e:
                 errors += 1
                 chart_ok = False
@@ -100,7 +103,7 @@ def run_tests():
         total += 1
         try:
             se_cusps, se_ascmc = swe.houses(jd, lat, lon, b"P")
-            le_result = ephem.swe_houses(jd, lat, lon, ord("P"))
+            le_result = ephem.houses(jd, lat, lon, ord("P"))
             le_cusps = le_result[0]
             le_ascmc = le_result[1]
 

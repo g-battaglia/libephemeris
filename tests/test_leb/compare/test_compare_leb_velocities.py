@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 
 from .conftest import (
     TOLS,
@@ -36,8 +36,8 @@ class TestVelocityEcliptic:
 
         dates = filter_asteroid_dates(test_dates_100, body_id)
         for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             lon_err = abs(ref[3] - leb[3])
             lat_err = abs(ref[4] - leb[4])
@@ -84,8 +84,8 @@ class TestDistanceVelocity:
 
         dates = filter_asteroid_dates(test_dates_100, body_id)
         for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[5] - leb[5])
             if err > max_err:
@@ -114,14 +114,14 @@ class TestVelocityEquatorial:
         body_id: int,
         body_name: str,
     ):
-        from libephemeris.constants import SEFLG_EQUATORIAL
+        from libephemeris.constants import FLG_EQUATORIAL
 
-        flags = SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_EQUATORIAL
         max_err = 0.0
 
         for jd in test_dates_50:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[3] - leb[3])
             max_err = max(max_err, err)

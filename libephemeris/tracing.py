@@ -9,7 +9,7 @@ Usage::
     import libephemeris
 
     token = libephemeris.start_tracing()
-    result = libephemeris.swe_calc_ut(jd, body_id, flags)
+    result = libephemeris.calc_ut(jd, body_id, flags)
     traces = libephemeris.get_trace_results()   # {body_id: "LEB", ...}
     token.var.reset(token)
 """

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Round 32: XYZ Coordinate Output (SEFLG_XYZ)
+Round 32: XYZ Coordinate Output (FLG_XYZ)
 =============================================
 
 Tests Cartesian (X,Y,Z) coordinate output for all major bodies.
-SEFLG_XYZ returns rectangular coordinates instead of spherical (lon,lat,dist).
+FLG_XYZ returns rectangular coordinates instead of spherical (lon,lat,dist).
 
 Parts:
   P1: XYZ ecliptic — all planets, 3 epochs
@@ -35,35 +35,35 @@ from libephemeris.constants import *
 _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
 swe.set_ephe_path(_EPHE_PATH)
 
-SEFLG_BARYCTR = 4
+FLG_BARYCTR = 4
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_CHIRON, "Chiron"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanLilith"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (CHIRON, "Chiron"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanLilith"),
 ]
 
 HELIO_BODIES = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_CHIRON, "Chiron"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (CHIRON, "Chiron"),
 ]
 
 EPOCHS = [
@@ -146,11 +146,11 @@ def run_part1():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_XYZ
+            flags = FLG_SPEED | FLG_XYZ
             label = f"{epoch_name} {body_name}"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_xyz(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -168,11 +168,11 @@ def run_part2():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_XYZ | SEFLG_EQUATORIAL
+            flags = FLG_SPEED | FLG_XYZ | FLG_EQUATORIAL
             label = f"{epoch_name} {body_name} EQ"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_xyz(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -190,11 +190,11 @@ def run_part3():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | SEFLG_XYZ | SEFLG_J2000
+            flags = FLG_SPEED | FLG_XYZ | FLG_J2000
             label = f"{epoch_name} {body_name} J2K"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_xyz(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -212,11 +212,11 @@ def run_part4():
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in HELIO_BODIES:
-            flags = SEFLG_SPEED | SEFLG_XYZ | SEFLG_HELCTR
+            flags = FLG_SPEED | FLG_XYZ | FLG_HELCTR
             label = f"{epoch_name} {body_name} HELIO"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_xyz(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -232,17 +232,17 @@ def run_part5():
     r = R("P5: XYZ+BARY")
 
     bary_bodies = [
-        (b, n) for b, n in BODIES if b not in (SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG)
+        (b, n) for b, n in BODIES if b not in (MEAN_NODE, TRUE_NODE, MEAN_APOG)
     ]
 
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
         for body_id, body_name in bary_bodies:
-            flags = SEFLG_SPEED | SEFLG_XYZ | SEFLG_BARYCTR
+            flags = FLG_SPEED | FLG_XYZ | FLG_BARYCTR
             label = f"{epoch_name} {body_name} BARY"
             try:
                 se_r = swe.calc_ut(jd, body_id, flags)
-                le_r = ephem.swe_calc_ut(jd, body_id, flags)
+                le_r = ephem.calc_ut(jd, body_id, flags)
                 compare_xyz(r, se_r, le_r, label)
             except Exception as e:
                 r.skip(f"{label}: {e}")
@@ -261,22 +261,22 @@ def run_part6():
     dt = 1.0 / 86400.0  # 1 second
 
     check_bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     for body_id, body_name in check_bodies:
-        flags = SEFLG_SPEED | SEFLG_XYZ
+        flags = FLG_SPEED | FLG_XYZ
         label = f"{body_name} XYZ"
 
         try:
-            le_r = ephem.swe_calc_ut(jd, body_id, flags)
-            le_before = ephem.swe_calc_ut(jd - dt, body_id, SEFLG_XYZ)
-            le_after = ephem.swe_calc_ut(jd + dt, body_id, SEFLG_XYZ)
+            le_r = ephem.calc_ut(jd, body_id, flags)
+            le_before = ephem.calc_ut(jd - dt, body_id, FLG_XYZ)
+            le_after = ephem.calc_ut(jd + dt, body_id, FLG_XYZ)
 
             for i, axis in enumerate(["dX", "dY", "dZ"]):
                 reported = le_r[0][i + 3]
@@ -304,17 +304,17 @@ def run_part7():
     jd = swe.julday(2024, 3, 20, 15.5)
 
     check_bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
-        (SE_CHIRON, "Chiron"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
+        (CHIRON, "Chiron"),
     ]
 
     for body_id, body_name in check_bodies:
@@ -322,9 +322,9 @@ def run_part7():
 
         try:
             # Spherical
-            sph = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            sph = ephem.calc_ut(jd, body_id, FLG_SPEED)
             # XYZ
-            xyz = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_XYZ)
+            xyz = ephem.calc_ut(jd, body_id, FLG_SPEED | FLG_XYZ)
 
             dist_sph = sph[0][2]
             dist_xyz = math.sqrt(xyz[0][0] ** 2 + xyz[0][1] ** 2 + xyz[0][2] ** 2)
@@ -362,7 +362,7 @@ def run_part7():
 
 def main():
     print("=" * 70)
-    print("ROUND 32: XYZ Coordinate Output (SEFLG_XYZ)")
+    print("ROUND 32: XYZ Coordinate Output (FLG_XYZ)")
     print("=" * 70)
 
     start = time.time()

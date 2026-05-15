@@ -11,13 +11,13 @@ The tests here focus on the module-level API which is documented in the migratio
 import libephemeris as swe
 from libephemeris import EphemerisContext
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_TRUE_CITRA,
+    SUN,
+    MOON,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_TRUE_CITRA,
 )
 
 
@@ -28,8 +28,8 @@ class TestMigrationGuideBasicUsage:
         """Test that libephemeris works as a drop-in replacement for swisseph."""
         # This is the main claim: you can replace `import swisseph as swe`
         # with `import libephemeris as swe`
-        jd = swe.swe_julday(2000, 1, 1, 12.0)
-        pos, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        jd = swe.julday(2000, 1, 1, 12.0)
+        pos, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
 
         assert pos is not None
         assert len(pos) == 6
@@ -37,20 +37,20 @@ class TestMigrationGuideBasicUsage:
 
     def test_constants_from_module(self):
         """Test accessing constants from the module."""
-        assert swe.SE_SUN == 0
-        assert swe.SE_MOON == 1
-        assert swe.SEFLG_SPEED == 256
-        assert swe.SEFLG_SIDEREAL == 64 * 1024
+        assert swe.SUN == 0
+        assert swe.MOON == 1
+        assert swe.FLG_SPEED == 256
+        assert swe.FLG_SIDEREAL == 64 * 1024
 
     def test_prefixed_and_unprefixed_functions(self):
         """Test that both swe_ prefixed and unprefixed functions work."""
         jd = 2451545.0
 
         # Prefixed version
-        pos1, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
+        pos1, _ = swe.calc_ut(jd, SUN, 0)
 
         # Unprefixed version
-        pos2, _ = swe.calc_ut(jd, SE_SUN, 0)
+        pos2, _ = swe.calc_ut(jd, SUN, 0)
 
         # Both should give identical results
         assert pos1[0] == pos2[0]
@@ -66,7 +66,7 @@ class TestMigrationGuideHouseCusps:
         jd = 2451545.0
         lat, lon = 41.9, 12.5  # Rome
 
-        cusps, ascmc = swe.swe_houses(jd, lat, lon, ord("P"))
+        cusps, ascmc = swe.houses(jd, lat, lon, ord("P"))
 
         # Verify we get 12 cusps
         assert len(cusps) == 12
@@ -90,23 +90,23 @@ class TestMigrationGuidePrecision:
         """Test that planetary longitudes are in valid range."""
         jd = 2451545.0
 
-        for planet in [SE_SUN, SE_MOON]:
-            pos, _ = swe.swe_calc_ut(jd, planet, SEFLG_SPEED)
+        for planet in [SUN, MOON]:
+            pos, _ = swe.calc_ut(jd, planet, FLG_SPEED)
 
             assert 0 <= pos[0] < 360, f"Planet {planet} longitude out of range"
             assert -90 <= pos[1] <= 90, f"Planet {planet} latitude out of range"
             assert pos[2] > 0, f"Planet {planet} distance should be positive"
 
     def test_velocities_are_computed(self):
-        """Test that velocities are computed when SEFLG_SPEED is set."""
+        """Test that velocities are computed when FLG_SPEED is set."""
         jd = 2451545.0
 
-        pos, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
 
         # Sun moves about 1 degree per day
         assert 0.9 < pos[3] < 1.1, "Sun speed should be ~1 deg/day"
 
-        pos, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
 
         # Moon moves about 12-15 degrees per day
         assert 11 < pos[3] < 16, "Moon speed should be ~12-15 deg/day"
@@ -122,15 +122,15 @@ class TestMigrationGuideAyanamshas:
         jd = 2451545.0
 
         # Set Lahiri ayanamsha in both libraries
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        pyswe.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        pyswe.set_sid_mode(SIDM_LAHIRI)
 
         try:
             # Calculate sidereal position with libephemeris
-            pos_sidereal, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            pos_sidereal, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
             # Calculate sidereal position with pyswisseph for comparison
-            py_pos_sidereal = pyswe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)[0]
+            py_pos_sidereal = pyswe.calc_ut(jd, SUN, FLG_SIDEREAL)[0]
 
             # libephemeris sidereal should match pyswisseph sidereal
             # Tolerance: 1 arcsecond = 0.000278 degrees
@@ -147,9 +147,9 @@ class TestMigrationGuideAyanamshas:
         jd = 2451545.0
 
         results = {}
-        for mode in [SE_SIDM_FAGAN_BRADLEY, SE_SIDM_LAHIRI, SE_SIDM_TRUE_CITRA]:
-            swe.swe_set_sid_mode(mode)
-            pos, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        for mode in [SIDM_FAGAN_BRADLEY, SIDM_LAHIRI, SIDM_TRUE_CITRA]:
+            swe.set_sid_mode(mode)
+            pos, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
             results[mode] = pos[0]
 
         # All three should be different
@@ -165,10 +165,10 @@ class TestMigrationGuideEphemerisContextState:
 
         # Should be able to set state
         ctx.set_topo(12.5, 41.9, 0)  # Rome
-        ctx.set_sid_mode(SE_SIDM_LAHIRI)
+        ctx.set_sid_mode(SIDM_LAHIRI)
 
         # Verify state was set
-        assert ctx.get_sid_mode() == SE_SIDM_LAHIRI
+        assert ctx.get_sid_mode() == SIDM_LAHIRI
         topo = ctx.get_topo()
         assert topo is not None
         assert abs(topo.latitude.degrees - 41.9) < 0.01
@@ -179,12 +179,12 @@ class TestMigrationGuideEphemerisContextState:
         ctx2 = EphemerisContext()
 
         # Set different sidereal modes
-        ctx1.set_sid_mode(SE_SIDM_LAHIRI)
-        ctx2.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ctx1.set_sid_mode(SIDM_LAHIRI)
+        ctx2.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
         # Verify isolation
-        assert ctx1.get_sid_mode() == SE_SIDM_LAHIRI
-        assert ctx2.get_sid_mode() == SE_SIDM_FAGAN_BRADLEY
+        assert ctx1.get_sid_mode() == SIDM_LAHIRI
+        assert ctx2.get_sid_mode() == SIDM_FAGAN_BRADLEY
 
         # Set different locations
         ctx1.set_topo(12.5, 41.9, 0)  # Rome
@@ -211,7 +211,7 @@ class TestMigrationGuideNotImplemented:
         """
         jd = 2451545.0
 
-        result = swe.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
+        result = swe.fixstar_ut("Aldebaran", jd, FLG_SPEED)
         # fixstar_ut returns (pos, flag, starname)
         pos = result[0]
 
@@ -226,10 +226,10 @@ class TestMigrationGuideLunarNodes:
 
     def test_mean_node_returns_valid_position(self):
         """Test that mean node calculation returns valid position."""
-        from libephemeris.constants import SE_MEAN_NODE
+        from libephemeris.constants import MEAN_NODE
 
         jd = 2451545.0
-        pos, _ = swe.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd, MEAN_NODE, FLG_SPEED)
 
         assert 0 <= pos[0] < 360, "Mean node longitude should be in valid range"
         # Mean node latitude is always near zero
@@ -239,10 +239,10 @@ class TestMigrationGuideLunarNodes:
 
     def test_true_node_returns_valid_position(self):
         """Test that true node calculation returns valid position."""
-        from libephemeris.constants import SE_TRUE_NODE
+        from libephemeris.constants import TRUE_NODE
 
         jd = 2451545.0
-        pos, _ = swe.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd, TRUE_NODE, FLG_SPEED)
 
         assert 0 <= pos[0] < 360, "True node longitude should be in valid range"
         # True node latitude may oscillate slightly
@@ -254,11 +254,11 @@ class TestMigrationGuideLunarNodes:
         The true node oscillates around the mean node with an amplitude
         of about 1.5 degrees.
         """
-        from libephemeris.constants import SE_MEAN_NODE, SE_TRUE_NODE
+        from libephemeris.constants import MEAN_NODE, TRUE_NODE
 
         jd = 2451545.0
-        mean_pos, _ = swe.swe_calc_ut(jd, SE_MEAN_NODE, 0)
-        true_pos, _ = swe.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+        mean_pos, _ = swe.calc_ut(jd, MEAN_NODE, 0)
+        true_pos, _ = swe.calc_ut(jd, TRUE_NODE, 0)
 
         # The difference should be within the oscillation amplitude
         diff = abs(mean_pos[0] - true_pos[0])
@@ -272,10 +272,10 @@ class TestMigrationGuideLunarNodes:
         Note: True Lilith has known precision differences from pyswisseph
         (up to 5-7 degrees) due to different orbital element models.
         """
-        from libephemeris.constants import SE_OSCU_APOG
+        from libephemeris.constants import OSCU_APOG
 
         jd = 2451545.0
-        pos, _ = swe.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
         assert 0 <= pos[0] < 360, "True Lilith longitude should be in valid range"
         # Lilith latitude can vary
@@ -296,10 +296,10 @@ class TestMigrationGuideMultiThreading:
             """Thread-safe chart calculation function."""
             ctx = EphemerisContext()
             ctx.set_topo(location["lon"], location["lat"], 0)
-            ctx.set_sid_mode(SE_SIDM_LAHIRI)
+            ctx.set_sid_mode(SIDM_LAHIRI)
 
-            sun, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
-            moon, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_SIDEREAL)
+            sun, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
+            moon, _ = ctx.calc_ut(jd, MOON, FLG_SIDEREAL)
             cusps, ascmc = ctx.houses(jd, location["lat"], location["lon"], ord("P"))
 
             return {
@@ -353,9 +353,9 @@ class TestMigrationGuideMultiThreading:
 
         # Run concurrent modifications with different ayanamshas
         ayanamshas = [
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_LAHIRI,
-            SE_SIDM_TRUE_CITRA,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_LAHIRI,
+            SIDM_TRUE_CITRA,
         ]
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {

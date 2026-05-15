@@ -13,7 +13,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 F = 2
@@ -48,7 +51,7 @@ for body_id, name in bodies:
             jd = swe.julday(year, month, 15, 12.0)
             try:
                 se = swe.calc_ut(jd, body_id, F | S)
-                le = ephem.swe_calc_ut(jd, body_id, F | S)
+                le = ephem.calc_ut(jd, body_id, F | S)
                 diff = abs(se[0][0] - le[0][0]) * 3600.0
                 if diff > 180 * 3600:
                     diff = 360 * 3600 - diff
@@ -76,7 +79,7 @@ for body_id, name in bodies:
             jd = swe.julday(year, month, 15, 12.0)
             try:
                 se = swe.calc_ut(jd, body_id, F | S)
-                le = ephem.swe_calc_ut(jd, body_id, F | S)
+                le = ephem.calc_ut(jd, body_id, F | S)
                 diff = abs(se[0][1] - le[0][1]) * 3600.0
                 if diff < 1.0:
                     passed += 1
@@ -103,7 +106,7 @@ for body_id, name in bodies:
             jd = swe.julday(year, month, 15, 12.0)
             try:
                 se = swe.calc_ut(jd, body_id, F | S)
-                le = ephem.swe_calc_ut(jd, body_id, F | S)
+                le = ephem.calc_ut(jd, body_id, F | S)
                 if le[0][2] != 0:
                     ratio = se[0][2] / le[0][2]
                     if abs(ratio - 1.0) < 0.0001:
@@ -134,7 +137,7 @@ for body_id, name in bodies:
             jd = swe.julday(year, month, 15, 12.0)
             try:
                 se = swe.calc_ut(jd, body_id, F | S)
-                le = ephem.swe_calc_ut(jd, body_id, F | S)
+                le = ephem.calc_ut(jd, body_id, F | S)
                 diff = abs(se[0][3] - le[0][3]) * 3600.0
                 if diff < 1.0:
                     passed += 1
@@ -162,7 +165,7 @@ for body_id, name in bodies:
             jd = swe.julday(year, month, 15, 12.0)
             try:
                 se = swe.calc_ut(jd, body_id, F | S)
-                le = ephem.swe_calc_ut(jd, body_id, F | S)
+                le = ephem.calc_ut(jd, body_id, F | S)
                 diff = abs(se[0][0] - le[0][0]) * 3600.0
                 if diff > 180 * 3600:
                     diff = 360 * 3600 - diff

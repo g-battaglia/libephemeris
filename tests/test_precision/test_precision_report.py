@@ -9,12 +9,13 @@ Validates the generate_precision_report.py script functionality including:
 """
 
 import sys
+from pathlib import Path
 import json
 import pytest
 import math
 
 # Add compare_scripts to path for imports
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts"))
 
 from generate_precision_report import (
     PrecisionStats,

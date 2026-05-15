@@ -22,14 +22,14 @@ The two "pointer" stars (Dubhe and Merak) point to Polaris, the North Star.
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_DUBHE,
-    SE_MERAK,
-    SE_PHECDA,
-    SE_MEGREZ,
-    SE_ALIOTH,
-    SE_MIZAR,
-    SE_ALCOR,
-    SE_ALKAID,
+    DUBHE,
+    MERAK,
+    PHECDA,
+    MEGREZ,
+    ALIOTH,
+    MIZAR,
+    ALCOR,
+    ALKAID,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -41,36 +41,36 @@ from libephemeris.fixed_stars import (
 # The 7 Big Dipper stars plus Alcor (visual companion to Mizar)
 # (constant, name, hip_number, magnitude)
 BIG_DIPPER_STARS = [
-    (SE_DUBHE, "Dubhe", 54061, 1.79),  # Alpha UMa - pointer, upper
-    (SE_MERAK, "Merak", 53910, 2.37),  # Beta UMa - pointer, lower
-    (SE_PHECDA, "Phecda", 58001, 2.44),  # Gamma UMa - bowl corner
-    (SE_MEGREZ, "Megrez", 59774, 3.31),  # Delta UMa - bowl-handle junction
-    (SE_ALIOTH, "Alioth", 62956, 1.77),  # Epsilon UMa - brightest
-    (SE_MIZAR, "Mizar", 65378, 2.23),  # Zeta UMa - double star
-    (SE_ALCOR, "Alcor", 65477, 3.99),  # 80 UMa - companion to Mizar
-    (SE_ALKAID, "Alkaid", 67301, 1.86),  # Eta UMa - end of handle
+    (DUBHE, "Dubhe", 54061, 1.79),  # Alpha UMa - pointer, upper
+    (MERAK, "Merak", 53910, 2.37),  # Beta UMa - pointer, lower
+    (PHECDA, "Phecda", 58001, 2.44),  # Gamma UMa - bowl corner
+    (MEGREZ, "Megrez", 59774, 3.31),  # Delta UMa - bowl-handle junction
+    (ALIOTH, "Alioth", 62956, 1.77),  # Epsilon UMa - brightest
+    (MIZAR, "Mizar", 65378, 2.23),  # Zeta UMa - double star
+    (ALCOR, "Alcor", 65477, 3.99),  # 80 UMa - companion to Mizar
+    (ALKAID, "Alkaid", 67301, 1.86),  # Eta UMa - end of handle
 ]
 
 # The bowl stars (without handle)
 BOWL_STARS = [
-    (SE_DUBHE, "Dubhe"),
-    (SE_MERAK, "Merak"),
-    (SE_PHECDA, "Phecda"),
-    (SE_MEGREZ, "Megrez"),
+    (DUBHE, "Dubhe"),
+    (MERAK, "Merak"),
+    (PHECDA, "Phecda"),
+    (MEGREZ, "Megrez"),
 ]
 
 # The handle stars
 HANDLE_STARS = [
-    (SE_MEGREZ, "Megrez"),  # junction point
-    (SE_ALIOTH, "Alioth"),
-    (SE_MIZAR, "Mizar"),
-    (SE_ALKAID, "Alkaid"),
+    (MEGREZ, "Megrez"),  # junction point
+    (ALIOTH, "Alioth"),
+    (MIZAR, "Mizar"),
+    (ALKAID, "Alkaid"),
 ]
 
 # Pointer stars (point to Polaris)
 POINTER_STARS = [
-    (SE_MERAK, "Merak"),
-    (SE_DUBHE, "Dubhe"),
+    (MERAK, "Merak"),
+    (DUBHE, "Dubhe"),
 ]
 
 
@@ -99,7 +99,7 @@ class TestBigDipperStarsCatalog:
         other_mags = []
 
         for star_id, name, _, mag in BIG_DIPPER_STARS:
-            if star_id == SE_ALIOTH:
+            if star_id == ALIOTH:
                 alioth_mag = mag
             else:
                 other_mags.append((name, mag))
@@ -166,7 +166,7 @@ class TestBigDipperStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", BIG_DIPPER_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each Big Dipper star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -181,7 +181,7 @@ class TestBigDipperStarsCalculation:
         """Test that the bowl stars form a rough quadrilateral."""
         positions = []
         for star_id, name in BOWL_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0], pos[1]))
 
         # Bowl stars should be within a reasonable region
@@ -197,7 +197,7 @@ class TestBigDipperStarsCalculation:
         """Test that handle stars form a rough line."""
         positions = []
         for star_id, name in HANDLE_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0], pos[1]))
 
         # Handle stars should span along an arc
@@ -210,8 +210,8 @@ class TestBigDipperStarsCalculation:
 
     def test_mizar_alcor_close_together(self, standard_jd):
         """Test that Mizar and Alcor are very close (famous naked-eye double)."""
-        mizar_pos, _ = ephem.swe_calc_ut(standard_jd, SE_MIZAR, 0)
-        alcor_pos, _ = ephem.swe_calc_ut(standard_jd, SE_ALCOR, 0)
+        mizar_pos, _ = ephem.calc_ut(standard_jd, MIZAR, 0)
+        alcor_pos, _ = ephem.calc_ut(standard_jd, ALCOR, 0)
 
         # Calculate angular separation (simplified for small angles)
         lon_diff = abs(mizar_pos[0] - alcor_pos[0])
@@ -226,7 +226,7 @@ class TestBigDipperStarsCalculation:
     def test_big_dipper_in_leo_virgo_region(self, standard_jd):
         """Test that Big Dipper stars are in the Leo/Virgo ecliptic region (~120-180 deg)."""
         # Dubhe is a good reference for the Big Dipper's position
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_DUBHE, 0)
+        pos, _ = ephem.calc_ut(standard_jd, DUBHE, 0)
 
         # Should be in the Leo/Virgo region
         assert 130 < pos[0] < 180, (
@@ -235,7 +235,7 @@ class TestBigDipperStarsCalculation:
 
     def test_phecda_position(self, standard_jd):
         """Test that Phecda (new star) is positioned correctly in the bowl."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_PHECDA, 0)
+        pos, _ = ephem.calc_ut(standard_jd, PHECDA, 0)
 
         # Phecda should be near 147 degrees ecliptic longitude (Leo region)
         assert 140 < pos[0] < 160, (
@@ -247,7 +247,7 @@ class TestBigDipperStarsCalculation:
 
     def test_megrez_position(self, standard_jd):
         """Test that Megrez (new star) is positioned correctly at bowl-handle junction."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_MEGREZ, 0)
+        pos, _ = ephem.calc_ut(standard_jd, MEGREZ, 0)
 
         # Megrez should be near 152 degrees ecliptic longitude
         assert 145 < pos[0] < 165, (
@@ -264,65 +264,65 @@ class TestBigDipperStarsNameResolution:
 
     def test_resolve_dubhe(self):
         """Test Dubhe name resolution."""
-        assert resolve_star_name("Dubhe") == SE_DUBHE
-        assert resolve_star_name("Alpha Ursae Majoris") == SE_DUBHE
-        assert resolve_star_name("Alpha UMa") == SE_DUBHE
+        assert resolve_star_name("Dubhe") == DUBHE
+        assert resolve_star_name("Alpha Ursae Majoris") == DUBHE
+        assert resolve_star_name("Alpha UMa") == DUBHE
 
     def test_resolve_merak(self):
         """Test Merak name resolution."""
-        assert resolve_star_name("Merak") == SE_MERAK
-        assert resolve_star_name("Beta Ursae Majoris") == SE_MERAK
-        assert resolve_star_name("Beta UMa") == SE_MERAK
+        assert resolve_star_name("Merak") == MERAK
+        assert resolve_star_name("Beta Ursae Majoris") == MERAK
+        assert resolve_star_name("Beta UMa") == MERAK
 
     def test_resolve_phecda(self):
         """Test Phecda name resolution."""
-        assert resolve_star_name("Phecda") == SE_PHECDA
-        assert resolve_star_name("Gamma Ursae Majoris") == SE_PHECDA
-        assert resolve_star_name("Gamma UMa") == SE_PHECDA
-        assert resolve_star_name("Phad") == SE_PHECDA
-        assert resolve_star_name("Phekda") == SE_PHECDA
+        assert resolve_star_name("Phecda") == PHECDA
+        assert resolve_star_name("Gamma Ursae Majoris") == PHECDA
+        assert resolve_star_name("Gamma UMa") == PHECDA
+        assert resolve_star_name("Phad") == PHECDA
+        assert resolve_star_name("Phekda") == PHECDA
 
     def test_resolve_megrez(self):
         """Test Megrez name resolution."""
-        assert resolve_star_name("Megrez") == SE_MEGREZ
-        assert resolve_star_name("Delta Ursae Majoris") == SE_MEGREZ
-        assert resolve_star_name("Delta UMa") == SE_MEGREZ
-        assert resolve_star_name("Kaffa") == SE_MEGREZ
+        assert resolve_star_name("Megrez") == MEGREZ
+        assert resolve_star_name("Delta Ursae Majoris") == MEGREZ
+        assert resolve_star_name("Delta UMa") == MEGREZ
+        assert resolve_star_name("Kaffa") == MEGREZ
 
     def test_resolve_alioth(self):
         """Test Alioth name resolution."""
-        assert resolve_star_name("Alioth") == SE_ALIOTH
-        assert resolve_star_name("Epsilon Ursae Majoris") == SE_ALIOTH
-        assert resolve_star_name("Epsilon UMa") == SE_ALIOTH
+        assert resolve_star_name("Alioth") == ALIOTH
+        assert resolve_star_name("Epsilon Ursae Majoris") == ALIOTH
+        assert resolve_star_name("Epsilon UMa") == ALIOTH
 
     def test_resolve_mizar(self):
         """Test Mizar name resolution."""
-        assert resolve_star_name("Mizar") == SE_MIZAR
-        assert resolve_star_name("Zeta Ursae Majoris") == SE_MIZAR
-        assert resolve_star_name("Zeta UMa") == SE_MIZAR
-        assert resolve_star_name("Horse and Rider") == SE_MIZAR
+        assert resolve_star_name("Mizar") == MIZAR
+        assert resolve_star_name("Zeta Ursae Majoris") == MIZAR
+        assert resolve_star_name("Zeta UMa") == MIZAR
+        assert resolve_star_name("Horse and Rider") == MIZAR
 
     def test_resolve_alcor(self):
         """Test Alcor name resolution."""
-        assert resolve_star_name("Alcor") == SE_ALCOR
-        assert resolve_star_name("80 Ursae Majoris") == SE_ALCOR
-        assert resolve_star_name("80 UMa") == SE_ALCOR
-        assert resolve_star_name("Suha") == SE_ALCOR
+        assert resolve_star_name("Alcor") == ALCOR
+        assert resolve_star_name("80 Ursae Majoris") == ALCOR
+        assert resolve_star_name("80 UMa") == ALCOR
+        assert resolve_star_name("Suha") == ALCOR
 
     def test_resolve_alkaid(self):
         """Test Alkaid name resolution."""
-        assert resolve_star_name("Alkaid") == SE_ALKAID
-        assert resolve_star_name("Eta Ursae Majoris") == SE_ALKAID
-        assert resolve_star_name("Eta UMa") == SE_ALKAID
-        assert resolve_star_name("Benetnash") == SE_ALKAID
+        assert resolve_star_name("Alkaid") == ALKAID
+        assert resolve_star_name("Eta Ursae Majoris") == ALKAID
+        assert resolve_star_name("Eta UMa") == ALKAID
+        assert resolve_star_name("Benetnash") == ALKAID
 
     def test_canonical_names(self):
         """Test canonical name retrieval for Big Dipper stars."""
-        assert get_canonical_star_name(SE_DUBHE) == "Dubhe"
-        assert get_canonical_star_name(SE_MERAK) == "Merak"
-        assert get_canonical_star_name(SE_PHECDA) == "Phecda"
-        assert get_canonical_star_name(SE_MEGREZ) == "Megrez"
-        assert get_canonical_star_name(SE_ALIOTH) == "Alioth"
-        assert get_canonical_star_name(SE_MIZAR) == "Mizar"
-        assert get_canonical_star_name(SE_ALCOR) == "Alcor"
-        assert get_canonical_star_name(SE_ALKAID) == "Alkaid"
+        assert get_canonical_star_name(DUBHE) == "Dubhe"
+        assert get_canonical_star_name(MERAK) == "Merak"
+        assert get_canonical_star_name(PHECDA) == "Phecda"
+        assert get_canonical_star_name(MEGREZ) == "Megrez"
+        assert get_canonical_star_name(ALIOTH) == "Alioth"
+        assert get_canonical_star_name(MIZAR) == "Mizar"
+        assert get_canonical_star_name(ALCOR) == "Alcor"
+        assert get_canonical_star_name(ALKAID) == "Alkaid"

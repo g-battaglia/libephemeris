@@ -20,10 +20,10 @@ from libephemeris import (
     julday,
     calc_eclipse_first_contact_c1,
     sol_eclipse_when_glob,
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
 )
 
 pytestmark = pytest.mark.slow
@@ -48,7 +48,7 @@ class TestEclipseFirstContactC1BasicFunctionality:
         """Test that function returns a float value."""
         # Get a known eclipse maximum
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_first_contact_c1(jd_max)
@@ -58,10 +58,10 @@ class TestEclipseFirstContactC1BasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
-        result = calc_eclipse_first_contact_c1(jd_max, flags=SEFLG_SWIEPH)
+        result = calc_eclipse_first_contact_c1(jd_max, flags=FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -81,7 +81,7 @@ class TestEclipseFirstContactC1TimingPrecision:
         so we allow 120 seconds tolerance.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -108,7 +108,7 @@ class TestEclipseFirstContactC1TimingPrecision:
         This eclipse crossed North, Central, and South America.
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -126,7 +126,7 @@ class TestEclipseFirstContactC1TimingPrecision:
     def test_december_2021_total_eclipse_c1(self):
         """Test December 4, 2021 total solar eclipse (Antarctica) first contact."""
         jd_start = julday(2021, 11, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -152,7 +152,7 @@ class TestEclipseFirstContactC1ConsistencyWithSolEclipseWhenGlob:
         Our dedicated C1 function should produce the same result.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max = times[0]
         jd_first_glob = times[2]  # Eclipse begin from sol_eclipse_when_glob
@@ -171,9 +171,9 @@ class TestEclipseFirstContactC1ConsistencyWithSolEclipseWhenGlob:
         """Test C1 calculation consistency across multiple eclipses."""
         # Test several eclipses
         eclipse_starts = [
-            (julday(2023, 9, 1, 0.0), SE_ECL_ANNULAR),  # Oct 2023 annular
-            (julday(2024, 1, 1, 0.0), SE_ECL_TOTAL),  # Apr 2024 total
-            (julday(2025, 1, 1, 0.0), SE_ECL_TOTAL),  # Future eclipse
+            (julday(2023, 9, 1, 0.0), ECL_ANNULAR),  # Oct 2023 annular
+            (julday(2024, 1, 1, 0.0), ECL_TOTAL),  # Apr 2024 total
+            (julday(2025, 1, 1, 0.0), ECL_TOTAL),  # Future eclipse
         ]
 
         for jd_start, ecl_type in eclipse_starts:
@@ -197,7 +197,7 @@ class TestEclipseFirstContactC1PhysicalProperties:
     def test_c1_is_before_maximum(self):
         """Test that C1 is always before eclipse maximum."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -213,7 +213,7 @@ class TestEclipseFirstContactC1PhysicalProperties:
         is typically 1.5-3 hours, depending on the eclipse geometry.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -229,7 +229,7 @@ class TestEclipseFirstContactC1PhysicalProperties:
     def test_c1_returns_nonzero_for_valid_eclipse(self):
         """Test that C1 returns a non-zero value for valid eclipses."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -266,7 +266,7 @@ class TestEclipseFirstContactC1EdgeCases:
         to the time from max to C4, unless the eclipse is asymmetric.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max = times[0]
         jd_first = times[2]  # Eclipse begin (C1)

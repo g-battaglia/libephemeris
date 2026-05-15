@@ -73,8 +73,8 @@ class TestDeltaTKnownValues:
     )
     def test_deltat_matches_observed(self, year, month, expected_dt, tolerance, source):
         """Delta T should match known observed values within tolerance."""
-        jd = ephem.swe_julday(year, month, 1, 12.0)
-        dt = ephem.swe_deltat(jd)
+        jd = ephem.julday(year, month, 1, 12.0)
+        dt = ephem.deltat(jd)
         dt_seconds = dt * 86400
 
         assert abs(dt_seconds - expected_dt) < tolerance, (
@@ -99,8 +99,8 @@ class TestDeltaTGapRegion:
 
         Delta T was between -3s (1900) and ~42s (1972) in this era.
         """
-        jd = ephem.swe_julday(year, 7, 1, 12.0)
-        dt = ephem.swe_deltat(jd)
+        jd = ephem.julday(year, 7, 1, 12.0)
+        dt = ephem.deltat(jd)
         dt_seconds = dt * 86400
 
         assert -10 < dt_seconds < 50, (
@@ -115,8 +115,8 @@ class TestDeltaTGapRegion:
         """
         prev_dt = None
         for year in range(1930, 1973):
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
-            dt = ephem.swe_deltat(jd) * 86400
+            jd = ephem.julday(year, 7, 1, 12.0)
+            dt = ephem.deltat(jd) * 86400
 
             if prev_dt is not None:
                 assert dt >= prev_dt - 0.5, (
@@ -130,8 +130,8 @@ class TestDeltaTGapRegion:
 
         There should be no discontinuity larger than 0.5s at the merge point.
         """
-        jds = [ephem.swe_julday(1972 + i, 7, 1, 12.0) for i in range(4)]
-        dts = [ephem.swe_deltat(jd) * 86400 for jd in jds]
+        jds = [ephem.julday(1972 + i, 7, 1, 12.0) for i in range(4)]
+        dts = [ephem.deltat(jd) * 86400 for jd in jds]
 
         for i in range(1, len(dts)):
             jump = abs(dts[i] - dts[i - 1])
@@ -146,11 +146,11 @@ class TestDeltaTContinuity:
 
     def test_no_discontinuity_at_historic_start(self):
         """No large jump at the start of historic_deltat.npy coverage (~1657)."""
-        jd_before = ephem.swe_julday(1655, 1, 1, 12.0)
-        jd_after = ephem.swe_julday(1660, 1, 1, 12.0)
+        jd_before = ephem.julday(1655, 1, 1, 12.0)
+        jd_after = ephem.julday(1660, 1, 1, 12.0)
 
-        dt_before = ephem.swe_deltat(jd_before) * 86400
-        dt_after = ephem.swe_deltat(jd_after) * 86400
+        dt_before = ephem.deltat(jd_before) * 86400
+        dt_after = ephem.deltat(jd_after) * 86400
 
         # 5-year gap, Delta T shouldn't jump more than 10s
         assert abs(dt_after - dt_before) < 10, (
@@ -167,8 +167,8 @@ class TestDeltaTContinuity:
         prev_year = None
 
         for year in years:
-            jd = ephem.swe_julday(year, 1, 1, 12.0)
-            dt = ephem.swe_deltat(jd) * 86400
+            jd = ephem.julday(year, 1, 1, 12.0)
+            dt = ephem.deltat(jd) * 86400
 
             if prev_dt is not None:
                 jump = abs(dt - prev_dt)
@@ -196,8 +196,8 @@ class TestDeltaTVsPyswissephEnhanced:
         except ImportError:
             pytest.skip("pyswisseph not installed")
 
-        jd = ephem.swe_julday(year, 7, 1, 12.0)
-        dt_lib = ephem.swe_deltat(jd) * 86400
+        jd = ephem.julday(year, 7, 1, 12.0)
+        dt_lib = ephem.deltat(jd) * 86400
         dt_swe = swe.deltat(jd) * 86400
 
         # Both use observed data in this range; should agree within 1s
@@ -219,8 +219,8 @@ class TestDeltaTVsPyswissephEnhanced:
         except ImportError:
             pytest.skip("pyswisseph not installed")
 
-        jd = ephem.swe_julday(year, 1, 1, 12.0)
-        dt_lib = ephem.swe_deltat(jd) * 86400
+        jd = ephem.julday(year, 1, 1, 12.0)
+        dt_lib = ephem.deltat(jd) * 86400
         dt_swe = swe.deltat(jd) * 86400
 
         assert abs(dt_lib - dt_swe) < 0.5, (
@@ -241,8 +241,8 @@ class TestDeltaTStatistics:
 
         errors = []
         for year in range(1900, 2026):
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
-            dt_lib = ephem.swe_deltat(jd) * 86400
+            jd = ephem.julday(year, 7, 1, 12.0)
+            dt_lib = ephem.deltat(jd) * 86400
             dt_swe = swe.deltat(jd) * 86400
             errors.append(abs(dt_lib - dt_swe))
 
@@ -263,8 +263,8 @@ class TestDeltaTStatistics:
 
         squared_errors = []
         for year in range(1900, 2026):
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
-            dt_lib = ephem.swe_deltat(jd) * 86400
+            jd = ephem.julday(year, 7, 1, 12.0)
+            dt_lib = ephem.deltat(jd) * 86400
             dt_swe = swe.deltat(jd) * 86400
             squared_errors.append((dt_lib - dt_swe) ** 2)
 

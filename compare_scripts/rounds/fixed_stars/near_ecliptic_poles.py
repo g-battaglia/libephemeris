@@ -12,12 +12,15 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_J2000 = 32
+FLG_NONUT = 64
 
 # Stars at various ecliptic latitudes (including high-lat ones)
 STARS = [
@@ -52,10 +55,10 @@ def main():
     test_jds = [2451545.0, 2455197.5, 2459580.5, 2460310.5, 2444239.5]
 
     flag_combos = [
-        ("default", SEFLG_SPEED),
-        ("equatorial", SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("J2000", SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT),
-        ("J2000+EQ", SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT | SEFLG_EQUATORIAL),
+        ("default", FLG_SPEED),
+        ("equatorial", FLG_SPEED | FLG_EQUATORIAL),
+        ("J2000", FLG_SPEED | FLG_J2000 | FLG_NONUT),
+        ("J2000+EQ", FLG_SPEED | FLG_J2000 | FLG_NONUT | FLG_EQUATORIAL),
     ]
 
     for star in STARS:
@@ -68,7 +71,7 @@ def main():
                     continue
 
                 try:
-                    le_res = ephem.swe_fixstar2_ut(star, jd, flags)
+                    le_res = ephem.fixstar2_ut(star, jd, flags)
                     le_pos = le_res[0]
                 except Exception:
                     continue

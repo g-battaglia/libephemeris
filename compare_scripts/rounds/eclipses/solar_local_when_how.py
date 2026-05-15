@@ -3,13 +3,13 @@
 Comprehensive comparison of solar eclipse local functions between
 libephemeris and pyswisseph, covering:
 
-1. swe_sol_eclipse_when_loc - find next eclipse visible from location
+1. sol_eclipse_when_loc - find next eclipse visible from location
    - Timing of maximum, contact times
    - Eclipse type detection
    - Multiple locations worldwide
    - Multiple eclipse types (total, annular, partial)
 
-2. swe_sol_eclipse_how - eclipse circumstances at location and time
+2. sol_eclipse_how - eclipse circumstances at location and time
    - Magnitude (fraction of solar diameter covered)
    - Obscuration (fraction of solar disc area covered)
    - Diameter ratio (lunar/solar)
@@ -26,7 +26,11 @@ from __future__ import annotations
 
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SWIEPH
+from libephemeris.constants import FLG_SWIEPH
+import os
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 # ============================================================================
 # Configuration
@@ -84,7 +88,7 @@ def jd_to_date_str(jd):
 
 def run_audit():
     """Run the full Round 2 solar eclipse local deep audit."""
-    swe.set_ephe_path("swisseph/ephe")
+    swe.set_ephe_path(_REF_EPHE_PATH)
 
     print("=" * 80)
     print("ROUND 2: SOLAR ECLIPSE LOCAL FUNCTIONS DEEP AUDIT")
@@ -106,11 +110,11 @@ def run_audit():
     }
 
     # ========================================================================
-    # PART 1: swe_sol_eclipse_when_loc — find next eclipse visible from location
+    # PART 1: sol_eclipse_when_loc — find next eclipse visible from location
     # ========================================================================
 
     print("\n" + "=" * 80)
-    print("PART 1: swe_sol_eclipse_when_loc")
+    print("PART 1: sol_eclipse_when_loc")
     print("=" * 80)
 
     for date_year, date_month, date_day, date_desc in SEARCH_DATES:
@@ -124,7 +128,7 @@ def run_audit():
             try:
                 # pyswisseph: sol_eclipse_when_loc(tjdut, geopos, flags, backwards)
                 swe_ret = swe.sol_eclipse_when_loc(
-                    jd_start, geopos, SEFLG_SWIEPH, False
+                    jd_start, geopos, FLG_SWIEPH, False
                 )
                 swe_retflag = swe_ret[0]
                 swe_tret = swe_ret[1]
@@ -135,9 +139,9 @@ def run_audit():
                 continue
 
             try:
-                # libephemeris: swe_sol_eclipse_when_loc(tjd_start, ifl, geopos, backward)
-                lib_retflag, lib_tret, lib_attr = ephem.swe_sol_eclipse_when_loc(
-                    jd_start, SEFLG_SWIEPH, list(geopos), False
+                # libephemeris: sol_eclipse_when_loc(tjd_start, ifl, geopos, backward)
+                lib_retflag, lib_tret, lib_attr = ephem.sol_eclipse_when_loc(
+                    jd_start, FLG_SWIEPH, list(geopos), False
                 )
             except Exception as e:
                 msg = f"FAIL {test_id}: libephemeris error: {e}"
@@ -295,11 +299,11 @@ def run_audit():
                     print(f"  {line}")
 
     # ========================================================================
-    # PART 2: swe_sol_eclipse_how — eclipse circumstances at given time/location
+    # PART 2: sol_eclipse_how — eclipse circumstances at given time/location
     # ========================================================================
 
     print("\n" + "=" * 80)
-    print("PART 2: swe_sol_eclipse_how at known eclipse times")
+    print("PART 2: sol_eclipse_how at known eclipse times")
     print("=" * 80)
 
     # Use specific known eclipse JDs for precise attribute comparison
@@ -317,7 +321,7 @@ def run_audit():
     for ecl_desc, jd_approx in known_eclipses:
         # Find the actual eclipse max time
         try:
-            swe_glob = swe.sol_eclipse_when_glob(jd_approx - 1, SEFLG_SWIEPH)
+            swe_glob = swe.sol_eclipse_when_glob(jd_approx - 1, FLG_SWIEPH)
             jd_max = swe_glob[1][0]
         except Exception:
             print(f"  SKIP {ecl_desc}: could not find global eclipse")
@@ -332,7 +336,7 @@ def run_audit():
 
             try:
                 # pyswisseph: sol_eclipse_how(tjdut, geopos, flags)
-                swe_ret = swe.sol_eclipse_how(jd_max, geopos, SEFLG_SWIEPH)
+                swe_ret = swe.sol_eclipse_how(jd_max, geopos, FLG_SWIEPH)
                 swe_retflag = swe_ret[0]
                 swe_attr = swe_ret[1]
             except Exception as e:
@@ -340,9 +344,9 @@ def run_audit():
                 continue
 
             try:
-                # libephemeris: swe_sol_eclipse_how(tjd_ut, ifl, geopos)
-                lib_retflag, lib_attr = ephem.swe_sol_eclipse_how(
-                    jd_max, SEFLG_SWIEPH, list(geopos)
+                # libephemeris: sol_eclipse_how(tjd_ut, ifl, geopos)
+                lib_retflag, lib_attr = ephem.sol_eclipse_how(
+                    jd_max, FLG_SWIEPH, list(geopos)
                 )
             except Exception as e:
                 msg = f"FAIL {test_id}: libephemeris error: {e}"
@@ -474,7 +478,7 @@ def run_audit():
 
         try:
             swe_ret = swe.sol_eclipse_when_loc(
-                jd_start_2024, geopos, SEFLG_SWIEPH, False
+                jd_start_2024, geopos, FLG_SWIEPH, False
             )
             swe_retflag = swe_ret[0]
             swe_tret = swe_ret[1]
@@ -484,8 +488,8 @@ def run_audit():
             continue
 
         try:
-            lib_retflag, lib_tret, lib_attr = ephem.swe_sol_eclipse_when_loc(
-                jd_start_2024, SEFLG_SWIEPH, list(geopos), False
+            lib_retflag, lib_tret, lib_attr = ephem.sol_eclipse_when_loc(
+                jd_start_2024, FLG_SWIEPH, list(geopos), False
             )
         except Exception as e:
             print(f"  FAIL {loc_name}: libephemeris error: {e}")
@@ -592,7 +596,7 @@ def run_audit():
 
         for i in range(5):
             try:
-                swe_ret = swe.sol_eclipse_when_loc(jd, geopos, SEFLG_SWIEPH, False)
+                swe_ret = swe.sol_eclipse_when_loc(jd, geopos, FLG_SWIEPH, False)
                 swe_tret = swe_ret[1]
                 swe_attr = swe_ret[2]
                 swe_max = swe_tret[0]
@@ -602,8 +606,8 @@ def run_audit():
                 continue
 
             try:
-                lib_retflag, lib_tret, lib_attr = ephem.swe_sol_eclipse_when_loc(
-                    jd, SEFLG_SWIEPH, list(geopos), False
+                lib_retflag, lib_tret, lib_attr = ephem.sol_eclipse_when_loc(
+                    jd, FLG_SWIEPH, list(geopos), False
                 )
                 lib_max = lib_tret[0]
             except Exception as e:

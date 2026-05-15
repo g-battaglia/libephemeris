@@ -21,16 +21,16 @@ from __future__ import annotations
 import libephemeris as eph
 from libephemeris.constants import (
     # Planet IDs
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
     # Calculation flags
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -92,7 +92,7 @@ def example_compare_house_systems() -> None:
     longitude = -0.1278
 
     # Time: January 15, 2024 at 14:30
-    jd = eph.swe_julday(2024, 1, 15, 14.5)
+    jd = eph.julday(2024, 1, 15, 14.5)
 
     print(f"\nLocation: London ({latitude}°N, {longitude}°W)")
     print("Time: 2024-01-15 14:30 UT\n")
@@ -109,7 +109,7 @@ def example_compare_house_systems() -> None:
 
     for sys_code in systems:
         sys_name = HOUSE_SYSTEMS[sys_code][0]
-        cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord(sys_code))
+        cusps, ascmc = eph.houses(jd, latitude, longitude, ord(sys_code))
 
         print(f"{sys_name:<14}", end="")
         for i in range(6):
@@ -129,13 +129,13 @@ def example_angles_and_vertices() -> None:
     latitude = 40.7128
     longitude = -74.0060
 
-    jd = eph.swe_julday(2024, 3, 20, 12.0)
+    jd = eph.julday(2024, 3, 20, 12.0)
 
     print(f"\nLocation: New York City ({latitude}°N, {longitude}°W)")
     print("Time: 2024-03-20 12:00 UT (Spring Equinox)\n")
 
     # Calculate houses (system doesn't affect angles, but we need to call it)
-    cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord("P"))
+    cusps, ascmc = eph.houses(jd, latitude, longitude, ord("P"))
 
     print("Angles (ASCMC array):")
     print("-" * 40)
@@ -170,23 +170,23 @@ def example_house_position() -> None:
     latitude = 34.0522
     longitude = -118.2437
 
-    jd = eph.swe_julday(2024, 6, 21, 12.0)  # Summer solstice
+    jd = eph.julday(2024, 6, 21, 12.0)  # Summer solstice
 
     print(f"\nLocation: Los Angeles ({latitude}°N, {longitude}°W)")
     print("Time: 2024-06-21 12:00 UT (Summer Solstice)\n")
 
     # Get house cusps for Placidus
-    cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord("P"))
+    cusps, ascmc = eph.houses(jd, latitude, longitude, ord("P"))
 
     # Get planets
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     print(f"{'Planet':<12}{'Position':>15}{'House':>8}")
@@ -197,9 +197,9 @@ def example_house_position() -> None:
     true_obliquity = 23.4393  # Approximate value for modern epoch
 
     for planet_id, name in planets:
-        pos, _ = eph.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+        pos, _ = eph.calc_ut(jd, planet_id, FLG_SWIEPH)
 
-        # Use swe_house_pos to get the house position
+        # Use house_pos to get the house position
         # Returns a float: whole part = house number, decimal = position within house
         house_pos = eph.house_pos(
             ascmc[2],  # ARMC in degrees
@@ -231,7 +231,7 @@ def example_polar_latitudes() -> None:
     latitude = 69.6496
     longitude = 19.0134
 
-    jd = eph.swe_julday(2024, 6, 21, 12.0)  # Summer solstice
+    jd = eph.julday(2024, 6, 21, 12.0)  # Summer solstice
 
     print(f"Location: Tromsø, Norway ({latitude}°N, {longitude}°E)")
     print("Time: 2024-06-21 12:00 UT\n")
@@ -246,7 +246,7 @@ def example_polar_latitudes() -> None:
         sys_name = HOUSE_SYSTEMS[sys_code][0]
 
         try:
-            cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord(sys_code))
+            cusps, ascmc = eph.houses(jd, latitude, longitude, ord(sys_code))
             print(f"{sys_name:<16}{'OK':<12}{ascmc[0]:>11.2f}°{ascmc[1]:>11.2f}°")
         except Exception as e:
             print(f"{sys_name:<16}{'FAILED':<12} (Polar circle issue)")
@@ -258,35 +258,35 @@ def example_polar_latitudes() -> None:
 
 
 def example_extended_houses() -> None:
-    """Example 6: Using swe_houses_ex for sidereal calculations."""
+    """Example 6: Using houses_ex for sidereal calculations."""
     print("\n" + "=" * 70)
     print("Example 6: Sidereal House Calculations")
     print("=" * 70)
 
-    from libephemeris.constants import SEFLG_SIDEREAL, SE_SIDM_LAHIRI
+    from libephemeris.constants import FLG_SIDEREAL, SIDM_LAHIRI
 
     # Location: Chennai, India
     latitude = 13.0827
     longitude = 80.2707
 
-    jd = eph.swe_julday(2024, 1, 14, 6.0)  # Pongal/Makar Sankranti
+    jd = eph.julday(2024, 1, 14, 6.0)  # Pongal/Makar Sankranti
 
     print(f"\nLocation: Chennai, India ({latitude}°N, {longitude}°E)")
     print("Time: 2024-01-14 06:00 UT (Pongal)\n")
 
     # Set sidereal mode first
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+    eph.set_sid_mode(SIDM_LAHIRI)
 
     # Calculate tropical houses
-    cusps_trop, ascmc_trop = eph.swe_houses(jd, latitude, longitude, ord("W"))
+    cusps_trop, ascmc_trop = eph.houses(jd, latitude, longitude, ord("W"))
 
-    # Calculate sidereal houses using swe_houses_ex
-    cusps_sid, ascmc_sid = eph.swe_houses_ex(
-        jd, latitude, longitude, ord("W"), SEFLG_SIDEREAL
+    # Calculate sidereal houses using houses_ex
+    cusps_sid, ascmc_sid = eph.houses_ex(
+        jd, latitude, longitude, ord("W"), FLG_SIDEREAL
     )
 
     # Get ayanamsha for reference
-    aya = eph.swe_get_ayanamsa_ut(jd)
+    aya = eph.get_ayanamsa_ut(jd)
 
     print(f"Ayanamsha (Lahiri): {aya:.4f}°\n")
 
@@ -323,15 +323,15 @@ def example_gauquelin_sectors() -> None:
     latitude = 48.8566  # Paris
     longitude = 2.3522
 
-    jd = eph.swe_julday(2024, 1, 15, 8.0)
+    jd = eph.julday(2024, 1, 15, 8.0)
 
     print(f"Location: Paris ({latitude}°N, {longitude}°E)")
     print("Time: 2024-01-15 08:00 UT\n")
 
     # Get Gauquelin sectors using the G house system
-    # Note: swe_houses returns 12 house cusps even for Gauquelin
-    # For full 36 sectors, use swe_gauquelin_sector() function
-    cusps, ascmc = eph.swe_houses(jd, latitude, longitude, ord("G"))
+    # Note: houses returns 12 house cusps even for Gauquelin
+    # For full 36 sectors, use gauquelin_sector() function
+    cusps, ascmc = eph.houses(jd, latitude, longitude, ord("G"))
 
     print("Gauquelin house cusps (12 primary sectors):")
     print("-" * 45)
@@ -341,11 +341,11 @@ def example_gauquelin_sectors() -> None:
         print(f"  Sector {i + 1:2}: {cusps[i]:>10.4f}°")
 
     # Calculate sector position for a planet
-    sun_pos, _ = eph.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+    sun_pos, _ = eph.calc_ut(jd, SUN, FLG_SWIEPH)
 
     print(f"\nSun longitude: {sun_pos[0]:.4f}°")
     print("\nNote: For the full 36 Gauquelin sectors, use the")
-    print("      swe_gauquelin_sector() function.")
+    print("      gauquelin_sector() function.")
 
 
 def main() -> None:

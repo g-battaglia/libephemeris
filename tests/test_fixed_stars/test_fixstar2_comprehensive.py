@@ -1,5 +1,5 @@
 """
-Tests for swe_fixstar2_ut: flexible star lookup by partial name,
+Tests for fixstar2_ut: flexible star lookup by partial name,
 HIP number, nomenclature, and fuzzy matching.
 """
 
@@ -10,13 +10,13 @@ import math
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import SEFLG_SWIEPH, SEFLG_SPEED
+from libephemeris.constants import FLG_SWIEPH, FLG_SPEED
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -140,7 +140,7 @@ class TestFixstar2PartialName:
 
 
 class TestFixstar2Mag:
-    """Test swe_fixstar2_mag for magnitude lookup."""
+    """Test fixstar2_mag for magnitude lookup."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("star", ["Sirius", "Regulus", "Vega", "Arcturus"])

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Round 153: Equatorial RA/Dec with NONUT flag.
 
-Compare equatorial coordinates (SEFLG_EQUATORIAL) with and without NONUT flag
+Compare equatorial coordinates (FLG_EQUATORIAL) with and without NONUT flag
 for all planets across multiple epochs. NONUT removes nutation to give
 mean equatorial coordinates instead of true equatorial.
 """
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,11 +16,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_NONUT = 64
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_NONUT = 64
 
 BODIES = {
     0: "Sun",
@@ -36,9 +40,9 @@ BODIES = {
 
 # Flag combinations
 FLAG_COMBOS = [
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "EQUATORIAL"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_NONUT, "EQUATORIAL+NONUT"),
-    (SEFLG_SPEED | SEFLG_NONUT, "NONUT_ecliptic"),
+    (FLG_SPEED | FLG_EQUATORIAL, "EQUATORIAL"),
+    (FLG_SPEED | FLG_EQUATORIAL | FLG_NONUT, "EQUATORIAL+NONUT"),
+    (FLG_SPEED | FLG_NONUT, "NONUT_ecliptic"),
 ]
 
 test_dates = []
@@ -65,7 +69,7 @@ for label, jd in test_dates:
         for flags, fname in FLAG_COMBOS:
             try:
                 se_r = swe.calc_ut(jd, body, flags)
-                le_r = ephem.swe_calc_ut(jd, body, flags)
+                le_r = ephem.calc_ut(jd, body, flags)
                 se_d = se_r[0]
                 le_d = le_r[0]
 

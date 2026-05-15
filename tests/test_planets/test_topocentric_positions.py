@@ -1,8 +1,8 @@
 """
 Comprehensive tests for topocentric position calculations.
 
-Verifies that SEFLG_TOPOCTR produces valid positions that differ
-from geocentric, and that set_topo / swe_set_topo work correctly.
+Verifies that FLG_TOPOCTR produces valid positions that differ
+from geocentric, and that set_topo / set_topo work correctly.
 """
 
 from __future__ import annotations
@@ -14,18 +14,18 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
 )
 
 
@@ -42,18 +42,18 @@ LOCATIONS = [
 ]
 
 BODIES_FOR_TOPO = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 
 class TestTopoSetup:
-    """Tests for set_topo / swe_set_topo configuration."""
+    """Tests for set_topo / set_topo configuration."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("lon,lat,alt,name", LOCATIONS)
@@ -62,19 +62,19 @@ class TestTopoSetup:
     ):
         """set_topo should accept all valid geographic coordinates."""
         # Should not raise
-        swe.swe_set_topo(lon, lat, alt)
+        swe.set_topo(lon, lat, alt)
 
     @pytest.mark.unit
     def test_set_topo_invalid_latitude_raises(self):
         """set_topo should raise on latitude > 90."""
         with pytest.raises(Exception):
-            swe.swe_set_topo(0.0, 91.0, 0.0)
+            swe.set_topo(0.0, 91.0, 0.0)
 
     @pytest.mark.unit
     def test_set_topo_invalid_longitude_raises(self):
         """set_topo should raise on longitude > 180."""
         with pytest.raises(Exception):
-            swe.swe_set_topo(181.0, 0.0, 0.0)
+            swe.set_topo(181.0, 0.0, 0.0)
 
 
 class TestTopoBasicPositions:
@@ -84,9 +84,9 @@ class TestTopoBasicPositions:
     @pytest.mark.parametrize("body_id,name", BODIES_FOR_TOPO)
     def test_topo_returns_valid_position(self, body_id: int, name: str):
         """Topocentric calc returns valid 6-element tuple."""
-        swe.swe_set_topo(12.5, 41.9, 50.0)  # Rome
+        swe.set_topo(12.5, 41.9, 50.0)  # Rome
         jd = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd, body_id, SEFLG_TOPOCTR | SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, body_id, FLG_TOPOCTR | FLG_SPEED)
         assert len(result) == 6, f"{name}: expected 6 elements"
         lon, lat, dist = result[0], result[1], result[2]
         assert 0 <= lon < 360, f"{name}: topo lon {lon} out of range"
@@ -98,10 +98,10 @@ class TestTopoBasicPositions:
     def test_topo_differs_from_geocentric(self, body_id: int, name: str):
         """Topocentric position should differ from geocentric."""
         jd = 2451545.0
-        swe.swe_set_topo(12.5, 41.9, 50.0)
+        swe.set_topo(12.5, 41.9, 50.0)
 
-        geo, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-        topo, _ = swe.swe_calc_ut(jd, body_id, SEFLG_TOPOCTR | SEFLG_SPEED)
+        geo, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
+        topo, _ = swe.calc_ut(jd, body_id, FLG_TOPOCTR | FLG_SPEED)
 
         # At least one of lon/lat/dist should differ
         lon_diff = abs(geo[0] - topo[0])
@@ -119,12 +119,12 @@ class TestTopoBasicPositions:
     def test_moon_topo_parallax_largest(self):
         """Moon should show the largest topocentric parallax (closest body)."""
         jd = 2451545.0
-        swe.swe_set_topo(12.5, 41.9, 50.0)
+        swe.set_topo(12.5, 41.9, 50.0)
 
         diffs = {}
         for body_id, name in BODIES_FOR_TOPO:
-            geo, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-            topo, _ = swe.swe_calc_ut(jd, body_id, SEFLG_TOPOCTR | SEFLG_SPEED)
+            geo, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
+            topo, _ = swe.calc_ut(jd, body_id, FLG_TOPOCTR | FLG_SPEED)
             lon_diff = abs(geo[0] - topo[0])
             if lon_diff > 180:
                 lon_diff = 360 - lon_diff
@@ -148,9 +148,9 @@ class TestTopoVariousLocations:
         self, lon: float, lat: float, alt: float, loc_name: str
     ):
         """Moon topocentric position valid at various locations."""
-        swe.swe_set_topo(lon, lat, alt)
+        swe.set_topo(lon, lat, alt)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360, f"{loc_name}: lon={result[0]}"
         assert math.isfinite(result[2]), f"{loc_name}: dist={result[2]}"
 
@@ -160,9 +160,9 @@ class TestTopoVariousLocations:
         self, lon: float, lat: float, alt: float, loc_name: str
     ):
         """Sun topocentric position valid at various locations."""
-        swe.swe_set_topo(lon, lat, alt)
+        swe.set_topo(lon, lat, alt)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, SUN, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360, f"{loc_name}: lon={result[0]}"
         assert result[2] > 0, f"{loc_name}: dist={result[2]}"
 
@@ -175,26 +175,26 @@ class TestTopoFlagCombinations:
         "extra_flags,desc",
         [
             (0, "topo only"),
-            (SEFLG_SPEED, "topo+speed"),
-            (SEFLG_EQUATORIAL, "topo+equatorial"),
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "topo+speed+equatorial"),
+            (FLG_SPEED, "topo+speed"),
+            (FLG_EQUATORIAL, "topo+equatorial"),
+            (FLG_SPEED | FLG_EQUATORIAL, "topo+speed+equatorial"),
         ],
     )
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_topo_flag_combo(
         self, body_id: int, name: str, extra_flags: int, desc: str
     ):
         """Topocentric works with various flag combinations."""
-        swe.swe_set_topo(12.5, 41.9, 50.0)
+        swe.set_topo(12.5, 41.9, 50.0)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_TOPOCTR | extra_flags)
+        result, _ = swe.calc_ut(jd, body_id, FLG_TOPOCTR | extra_flags)
         assert len(result) == 6
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{name}+{desc}: result[{i}]={val}"
@@ -202,11 +202,11 @@ class TestTopoFlagCombinations:
     @pytest.mark.unit
     def test_topo_sidereal(self):
         """Topocentric + sidereal combination works."""
-        swe.swe_set_topo(12.5, 41.9, 50.0)
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_topo(12.5, 41.9, 50.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(
-            jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SIDEREAL | SEFLG_SPEED
+        result, _ = swe.calc_ut(
+            jd, MOON, FLG_TOPOCTR | FLG_SIDEREAL | FLG_SPEED
         )
         assert 0 <= result[0] < 360
 
@@ -218,20 +218,20 @@ class TestTopoDateRange:
     @pytest.mark.parametrize("year", [1900, 1950, 2000, 2024, 2050, 2100])
     def test_moon_topo_across_years(self, year: int):
         """Moon topocentric valid across years."""
-        swe.swe_set_topo(-74.0, 40.7, 10.0)  # New York
-        jd = swe.swe_julday(year, 6, 15, 12.0)
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SPEED)
+        swe.set_topo(-74.0, 40.7, 10.0)  # New York
+        jd = swe.julday(year, 6, 15, 12.0)
+        result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360
 
     @pytest.mark.unit
     def test_moon_topo_continuity(self):
         """Moon topocentric positions should be continuous over hours."""
-        swe.swe_set_topo(12.5, 41.9, 50.0)
+        swe.set_topo(12.5, 41.9, 50.0)
         jd_start = 2451545.0
         prev_lon = None
         for i in range(48):  # 2 days, hourly
             jd = jd_start + i / 24.0
-            result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR)
+            result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR)
             lon = result[0]
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -258,9 +258,9 @@ class TestTopoHighAltitude:
     )
     def test_moon_topo_altitude_effect(self, alt: float, desc: str):
         """Moon topocentric valid at various altitudes."""
-        swe.swe_set_topo(12.5, 41.9, alt)
+        swe.set_topo(12.5, 41.9, alt)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360, f"Altitude {desc}: lon={result[0]}"
         assert result[2] > 0, f"Altitude {desc}: dist={result[2]}"
 
@@ -275,8 +275,8 @@ class TestTopoHighVolume:
     )
     def test_moon_topo_50_dates(self, jd: float):
         """Moon topocentric valid at 50 random dates."""
-        swe.swe_set_topo(12.5, 41.9, 50.0)
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SPEED)
+        swe.set_topo(12.5, 41.9, 50.0)
+        result, _ = swe.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360
         assert result[2] > 0
 
@@ -287,7 +287,7 @@ class TestTopoHighVolume:
     )
     def test_sun_topo_50_dates(self, jd: float):
         """Sun topocentric valid at 50 random dates."""
-        swe.swe_set_topo(-74.0, 40.7, 10.0)
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+        swe.set_topo(-74.0, 40.7, 10.0)
+        result, _ = swe.calc_ut(jd, SUN, FLG_TOPOCTR | FLG_SPEED)
         assert 0 <= result[0] < 360
         assert result[2] > 0

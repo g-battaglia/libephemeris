@@ -45,7 +45,7 @@ class TestExtremeJulianDates:
     """§4.1 Verify robustness with extreme, invalid, and boundary JDs."""
 
     # Representative body for most tests
-    BODY = swe.SE_SUN
+    BODY = swe.SUN
 
     @pytest.mark.parametrize(
         "jd,desc",
@@ -188,10 +188,10 @@ class TestInvalidBodyIDs:
             (-999999, "Very large negative body ID"),
             (99, "Unused body ID 99"),
             (999, "Unused body ID 999"),
-            (9999, "Just below SE_AST_OFFSET"),
-            (swe.SE_AST_OFFSET, "SE_AST_OFFSET + 0 (edge case)"),
-            (swe.SE_AST_OFFSET + 1, "SE_AST_OFFSET + 1 (Ceres)"),
-            (100001, "Above SE_AST_OFFSET"),
+            (9999, "Just below AST_OFFSET"),
+            (swe.AST_OFFSET, "AST_OFFSET + 0 (edge case)"),
+            (swe.AST_OFFSET + 1, "AST_OFFSET + 1 (Ceres)"),
+            (100001, "Above AST_OFFSET"),
             (999999, "Very large body ID"),
         ],
     )
@@ -199,7 +199,7 @@ class TestInvalidBodyIDs:
         """calc_ut with invalid body IDs: valid result or clean exception."""
         try:
             result, flags = swe.calc_ut(self.JD, body_id, 0)
-            # Some of these may be valid (e.g., SE_AST_OFFSET+1 = Ceres)
+            # Some of these may be valid (e.g., AST_OFFSET+1 = Ceres)
             assert isinstance(result, tuple)
             assert len(result) == 6
         except ACCEPTABLE_EXCEPTIONS:
@@ -213,7 +213,7 @@ class TestInvalidBodyIDs:
     def test_invalid_body_raises_known_exception(self, body_id: int) -> None:
         """Invalid body IDs should raise UnknownBodyError or similar.
 
-        Note: body ID -1 (SE_ECL_NUT) is valid in Swiss Ephemeris (returns
+        Note: body ID -1 (ECL_NUT) is valid in Swiss Ephemeris (returns
         Earth nutation values), so it is excluded from this test.
         """
         with pytest.raises(ACCEPTABLE_EXCEPTIONS):
@@ -222,18 +222,18 @@ class TestInvalidBodyIDs:
     def test_all_standard_bodies_valid(self) -> None:
         """All standard body IDs (0-20) return valid results."""
         standard_bodies = [
-            swe.SE_SUN,  # 0
-            swe.SE_MOON,  # 1
-            swe.SE_MERCURY,  # 2
-            swe.SE_VENUS,  # 3
-            swe.SE_MARS,  # 4
-            swe.SE_JUPITER,  # 5
-            swe.SE_SATURN,  # 6
-            swe.SE_URANUS,  # 7
-            swe.SE_NEPTUNE,  # 8
-            swe.SE_PLUTO,  # 9
-            swe.SE_MEAN_NODE,  # 10
-            swe.SE_TRUE_NODE,  # 11
+            swe.SUN,  # 0
+            swe.MOON,  # 1
+            swe.MERCURY,  # 2
+            swe.VENUS,  # 3
+            swe.MARS,  # 4
+            swe.JUPITER,  # 5
+            swe.SATURN,  # 6
+            swe.URANUS,  # 7
+            swe.NEPTUNE,  # 8
+            swe.PLUTO,  # 9
+            swe.MEAN_NODE,  # 10
+            swe.TRUE_NODE,  # 11
         ]
         for body in standard_bodies:
             result, flags = swe.calc_ut(self.JD, body, 0)
@@ -318,7 +318,7 @@ class TestExtremeGeographicCoordinates:
         try:
             swe.set_topo(10.0, 45.0, alt)
             # If set succeeds, try a topocentric calc
-            result, flags = swe.calc_ut(self.JD, swe.SE_MOON, swe.SEFLG_TOPOCTR)
+            result, flags = swe.calc_ut(self.JD, swe.MOON, swe.FLG_TOPOCTR)
             assert isinstance(result, tuple)
             assert len(result) == 6
         except ACCEPTABLE_EXCEPTIONS:
@@ -372,24 +372,24 @@ class TestFlagExhaustion:
     """§4.4 Verify no crashes with arbitrary flag combinations."""
 
     JD = 2451545.0  # J2000.0
-    BODY = swe.SE_SUN
+    BODY = swe.SUN
 
     # The 14 individual SEFLG flags to combine
     FLAGS = [
-        swe.SEFLG_JPLEPH,  # 1
-        swe.SEFLG_SWIEPH,  # 2
-        swe.SEFLG_MOSEPH,  # 4
-        swe.SEFLG_HELCTR,  # 8
-        swe.SEFLG_TRUEPOS,  # 16
-        swe.SEFLG_J2000,  # 32
-        swe.SEFLG_NONUT,  # 64
-        swe.SEFLG_SPEED3,  # 128
-        swe.SEFLG_SPEED,  # 256
-        swe.SEFLG_NOGDEFL,  # 512
-        swe.SEFLG_NOABERR,  # 1024
-        swe.SEFLG_EQUATORIAL,  # 2048
-        swe.SEFLG_XYZ,  # 4096
-        swe.SEFLG_RADIANS,  # 8192
+        swe.FLG_JPLEPH,  # 1
+        swe.FLG_SWIEPH,  # 2
+        swe.FLG_MOSEPH,  # 4
+        swe.FLG_HELCTR,  # 8
+        swe.FLG_TRUEPOS,  # 16
+        swe.FLG_J2000,  # 32
+        swe.FLG_NONUT,  # 64
+        swe.FLG_SPEED3,  # 128
+        swe.FLG_SPEED,  # 256
+        swe.FLG_NOGDEFL,  # 512
+        swe.FLG_NOABERR,  # 1024
+        swe.FLG_EQUATORIAL,  # 2048
+        swe.FLG_XYZ,  # 4096
+        swe.FLG_RADIANS,  # 8192
     ]
 
     def test_all_single_flags(self) -> None:
@@ -476,18 +476,18 @@ class TestFlagExhaustion:
 
         for flags in test_flags:
             try:
-                result, retflags = swe.calc_ut(self.JD, swe.SE_MOON, flags)
+                result, retflags = swe.calc_ut(self.JD, swe.MOON, flags)
                 assert isinstance(result, tuple)
             except ACCEPTABLE_EXCEPTIONS:
                 pass
 
     def test_higher_flags(self) -> None:
-        """Test SEFLG_BARYCTR, SEFLG_TOPOCTR, SEFLG_SIDEREAL, SEFLG_ICRS."""
+        """Test FLG_BARYCTR, FLG_TOPOCTR, FLG_SIDEREAL, FLG_ICRS."""
         higher_flags = [
-            swe.SEFLG_BARYCTR,  # 16384
-            swe.SEFLG_TOPOCTR,  # 32768
-            swe.SEFLG_SIDEREAL,  # 65536
-            swe.SEFLG_ICRS,  # 131072
+            swe.FLG_BARYCTR,  # 16384
+            swe.FLG_TOPOCTR,  # 32768
+            swe.FLG_SIDEREAL,  # 65536
+            swe.FLG_ICRS,  # 131072
         ]
         for flag in higher_flags:
             try:
@@ -507,12 +507,12 @@ class TestFlagExhaustion:
     def test_conflicting_flag_combos(self) -> None:
         """Deliberately conflicting flags: should not crash."""
         conflicting = [
-            swe.SEFLG_HELCTR | swe.SEFLG_BARYCTR,
-            swe.SEFLG_HELCTR | swe.SEFLG_TOPOCTR,
-            swe.SEFLG_BARYCTR | swe.SEFLG_TOPOCTR,
-            swe.SEFLG_JPLEPH | swe.SEFLG_SWIEPH | swe.SEFLG_MOSEPH,
-            swe.SEFLG_EQUATORIAL | swe.SEFLG_XYZ | swe.SEFLG_RADIANS,
-            swe.SEFLG_J2000 | swe.SEFLG_SIDEREAL | swe.SEFLG_ICRS,
+            swe.FLG_HELCTR | swe.FLG_BARYCTR,
+            swe.FLG_HELCTR | swe.FLG_TOPOCTR,
+            swe.FLG_BARYCTR | swe.FLG_TOPOCTR,
+            swe.FLG_JPLEPH | swe.FLG_SWIEPH | swe.FLG_MOSEPH,
+            swe.FLG_EQUATORIAL | swe.FLG_XYZ | swe.FLG_RADIANS,
+            swe.FLG_J2000 | swe.FLG_SIDEREAL | swe.FLG_ICRS,
         ]
         for flags in conflicting:
             try:
@@ -578,20 +578,20 @@ class TestMiscRobustness:
 
     def test_rapid_successive_calls(self) -> None:
         """Rapid successive calls don't cause state corruption."""
-        bodies = [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS, swe.SE_JUPITER]
+        bodies = [swe.SUN, swe.MOON, swe.MARS, swe.JUPITER]
         jds = [2451545.0, 2451545.5, 2451546.0, 2451546.5]
 
         for _ in range(100):
             for body in bodies:
                 for jd in jds:
-                    result, flags = swe.calc_ut(jd, body, swe.SEFLG_SPEED)
+                    result, flags = swe.calc_ut(jd, body, swe.FLG_SPEED)
                     assert len(result) == 6
 
     def test_calc_ut_with_speed_and_all_bodies(self) -> None:
-        """All standard bodies with SEFLG_SPEED return valid velocities."""
-        bodies = range(0, 12)  # SE_SUN through SE_TRUE_NODE
+        """All standard bodies with FLG_SPEED return valid velocities."""
+        bodies = range(0, 12)  # SUN through TRUE_NODE
         for body in bodies:
-            result, flags = swe.calc_ut(self.JD, body, swe.SEFLG_SPEED)
+            result, flags = swe.calc_ut(self.JD, body, swe.FLG_SPEED)
             # Elements 3-5 are velocities, should be finite
             for i in range(3, 6):
                 assert math.isfinite(result[i]), (

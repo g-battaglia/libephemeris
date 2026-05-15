@@ -10,9 +10,9 @@ Phases:
   P3: Deep historical (1000-1620) — Stephenson/Morrison tables
   P4: Future predictions (2025-2100)
   P5: Pre-telescopic era (500-1000 CE)
-  P6: Consistency: swe_deltat vs swe_deltat_ex
+  P6: Consistency: deltat vs deltat_ex
   P7: Time function round-trips (JD->date->JD)
-  P8: swe_utc_to_jd / swe_jdet_to_utc if available
+  P8: utc_to_jd / jdet_to_utc if available
 """
 
 from __future__ import annotations
@@ -26,7 +26,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -46,7 +49,7 @@ def record(phase, label, ok, detail=""):
 
 def jd_from_year(year, month=1, day=1, hour=0.0):
     """Convert calendar date to JD."""
-    return ephem.swe_julday(year, month, day, hour)
+    return ephem.julday(year, month, day, hour)
 
 
 def phase1():
@@ -60,7 +63,7 @@ def phase1():
             jd = jd_from_year(year, 7, 1, 12.0)
 
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
             diff_s = abs(se_dt - le_dt) * 86400  # difference in seconds
 
@@ -88,7 +91,7 @@ def phase2():
             jd = jd_from_year(year, 1, 1, 12.0)
 
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
             diff_s = abs(se_dt - le_dt) * 86400
 
@@ -116,7 +119,7 @@ def phase3():
             jd = jd_from_year(year, 1, 1, 12.0)
 
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
             diff_s = abs(se_dt - le_dt) * 86400
 
@@ -143,7 +146,7 @@ def phase4():
             jd = jd_from_year(year, 1, 1, 12.0)
 
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
             diff_s = abs(se_dt - le_dt) * 86400
 
@@ -171,7 +174,7 @@ def phase5():
             jd = jd_from_year(year, 1, 1, 12.0)
 
             se_dt = swe.deltat(jd)
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
             diff_s = abs(se_dt - le_dt) * 86400
 
@@ -189,7 +192,7 @@ def phase5():
 
 
 def phase6():
-    """Consistency: swe_deltat vs swe_deltat_ex."""
+    """Consistency: deltat vs deltat_ex."""
     global errors
     print("\n=== P6: deltat vs deltat_ex consistency ===")
 
@@ -199,11 +202,11 @@ def phase6():
         try:
             jd = jd_from_year(year, 6, 15, 12.0)
 
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
 
-            # Check if swe_deltat_ex exists
-            if hasattr(ephem, "swe_deltat_ex"):
-                le_dt_ex = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+            # Check if deltat_ex exists
+            if hasattr(ephem, "deltat_ex"):
+                le_dt_ex = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
                 if isinstance(le_dt_ex, tuple):
                     le_dt_ex_val = le_dt_ex[0]
                 else:
@@ -245,7 +248,7 @@ def phase7():
         try:
             # Forward: date -> JD (both SE and LE)
             se_jd = swe.julday(year, month, day, hour)
-            le_jd = ephem.swe_julday(year, month, day, hour)
+            le_jd = ephem.julday(year, month, day, hour)
 
             diff_jd = abs(se_jd - le_jd)
             diff_s = diff_jd * 86400
@@ -257,7 +260,7 @@ def phase7():
             # Reverse: JD -> date (both SE and LE)
             if se_jd > 0:
                 se_rev = swe.revjul(se_jd)
-                le_rev = ephem.swe_revjul(le_jd)
+                le_rev = ephem.revjul(le_jd)
 
                 # Compare components
                 y_match = se_rev[0] == le_rev[0]
@@ -273,7 +276,7 @@ def phase7():
                 record("P7", f"revjul {label}", ok_rev, detail_rev)
 
             # Round-trip: date -> JD -> date -> JD
-            rt_jd = ephem.swe_julday(*ephem.swe_revjul(le_jd))
+            rt_jd = ephem.julday(*ephem.revjul(le_jd))
             rt_diff = abs(rt_jd - le_jd) * 86400
 
             ok_rt = rt_diff < 0.001
@@ -285,12 +288,12 @@ def phase7():
 
 
 def phase8():
-    """swe_utc_to_jd / swe_jdet_to_utc if available."""
+    """utc_to_jd / jdet_to_utc if available."""
     global errors
     print("\n=== P8: UTC<->JD conversions ===")
 
-    has_utc = hasattr(ephem, "swe_utc_to_jd")
-    has_jdet = hasattr(ephem, "swe_jdet_to_utc")
+    has_utc = hasattr(ephem, "utc_to_jd")
+    has_jdet = hasattr(ephem, "jdet_to_utc")
 
     if not has_utc and not has_jdet:
         record("P8", "utc_functions", True, "not implemented (ok)")
@@ -306,7 +309,7 @@ def phase8():
     for year, month, day, hour, minute, second, label in test_utc:
         try:
             if has_utc:
-                le_result = ephem.swe_utc_to_jd(year, month, day, hour, minute, second)
+                le_result = ephem.utc_to_jd(year, month, day, hour, minute, second)
                 # Should return (jd_et, jd_ut)
                 if isinstance(le_result, tuple) and len(le_result) >= 2:
                     jd_et = le_result[0]
@@ -314,7 +317,7 @@ def phase8():
 
                     # Verify ET-UT = delta-T
                     delta_t_from_jd = (jd_et - jd_ut) * 86400
-                    delta_t_direct = ephem.swe_deltat(jd_ut) * 86400
+                    delta_t_direct = ephem.deltat(jd_ut) * 86400
 
                     diff = abs(delta_t_from_jd - delta_t_direct)
                     ok = diff < 0.01
@@ -327,7 +330,7 @@ def phase8():
 
             if has_jdet:
                 jd = jd_from_year(year, month, day, hour + minute / 60 + second / 3600)
-                le_utc = ephem.swe_jdet_to_utc(jd, 1)  # 1=Gregorian
+                le_utc = ephem.jdet_to_utc(jd, 1)  # 1=Gregorian
                 if isinstance(le_utc, tuple) and len(le_utc) >= 6:
                     record(
                         "P8",

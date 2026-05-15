@@ -9,12 +9,13 @@ Tests verify that:
 """
 
 import sys
+from pathlib import Path
 import subprocess
 
 import pytest
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts/tests")
+sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts" / "tests"))
 
 
 class TestCompareScriptsInfrastructure:

@@ -20,7 +20,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -39,21 +42,21 @@ def le_hsys(ch: str) -> int:
 # ---- Section 1: Planet Positions (ecliptic of date) ----
 
 PLANETS = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO),
-    ("MeanNode", ephem.SE_MEAN_NODE, swe.MEAN_NODE),
-    ("TrueNode", ephem.SE_TRUE_NODE, swe.TRUE_NODE),
-    ("Chiron", ephem.SE_CHIRON, swe.CHIRON),
-    ("MeanLilith", ephem.SE_MEAN_APOG, swe.MEAN_APOG),
-    ("OscuLilith", ephem.SE_OSCU_APOG, swe.OSCU_APOG),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
+    ("Uranus", ephem.URANUS, swe.URANUS),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE),
+    ("Pluto", ephem.PLUTO, swe.PLUTO),
+    ("MeanNode", ephem.MEAN_NODE, swe.MEAN_NODE),
+    ("TrueNode", ephem.TRUE_NODE, swe.TRUE_NODE),
+    ("Chiron", ephem.CHIRON, swe.CHIRON),
+    ("MeanLilith", ephem.MEAN_APOG, swe.MEAN_APOG),
+    ("OscuLilith", ephem.OSCU_APOG, swe.OSCU_APOG),
 ]
 
 FINAL_DATES = [
@@ -69,9 +72,9 @@ FINAL_DATES = [
     2442413.5,  # 1975 Jan 1
 ]
 
-FLAGS_DEF = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
-FLAGS_EQU = FLAGS_DEF | ephem.SEFLG_EQUATORIAL
-FLAGS_J2K = FLAGS_DEF | ephem.SEFLG_J2000
+FLAGS_DEF = ephem.FLG_SWIEPH | ephem.FLG_SPEED
+FLAGS_EQU = FLAGS_DEF | ephem.FLG_EQUATORIAL
+FLAGS_J2K = FLAGS_DEF | ephem.FLG_J2000
 
 
 def test_planet_positions():
@@ -89,7 +92,7 @@ def test_planet_positions():
                 ("J2000", FLAGS_J2K, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000),
             ]:
                 try:
-                    le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                    le_r = ephem.calc_ut(jd, le_b, le_f)
                     se_r = swe.calc_ut(jd, se_b, se_f)
                 except Exception:
                     continue
@@ -128,7 +131,7 @@ def test_houses():
         for lat in latitudes:
             for hsys in house_systems:
                 try:
-                    le_c, le_a = ephem.swe_houses_ex(
+                    le_c, le_a = ephem.houses_ex(
                         jd, lat, 0.0, le_hsys(hsys), FLAGS_DEF
                     )
                     se_c, se_a = swe.houses_ex(
@@ -205,7 +208,7 @@ def test_fixed_stars():
     for jd in [2451545.0, 2460000.0, 2440000.0]:
         for star in stars:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, jd, FLAGS_DEF)
+                le_r = ephem.fixstar2_ut(star, jd, FLAGS_DEF)
                 se_r = swe.fixstar2(star, jd, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue
@@ -239,7 +242,7 @@ def test_nutation():
 
     for jd in FINAL_DATES:
         try:
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
         except Exception:
             continue
@@ -271,7 +274,7 @@ def test_deltat():
 
     for jd in FINAL_DATES:
         try:
-            le_dt = ephem.swe_deltat(jd)
+            le_dt = ephem.deltat(jd)
             se_dt = swe.deltat(jd)
         except Exception:
             continue
@@ -295,7 +298,7 @@ def test_sidtime():
 
     for jd in FINAL_DATES:
         try:
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
             se_st = swe.sidtime(jd)
         except Exception:
             continue
@@ -368,11 +371,11 @@ def test_ayanamsha():
 
     for mode in [0, 1, 3, 5, 7, 27]:
         swe.set_sid_mode(mode)
-        ephem.swe_set_sid_mode(mode, 0, 0)
+        ephem.set_sid_mode(mode, 0, 0)
 
         for jd in [2451545.0, 2460000.0, 2440000.0]:
             try:
-                le_a = ephem.swe_get_ayanamsa_ex_ut(jd, FLAGS_DEF)
+                le_a = ephem.get_ayanamsa_ex_ut(jd, FLAGS_DEF)
                 se_a = swe.get_ayanamsa_ex_ut(jd, swe.FLG_SWIEPH)
                 le_val = le_a[1] if isinstance(le_a, tuple) else le_a
                 se_val = (
@@ -392,7 +395,7 @@ def test_ayanamsha():
                 )
 
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
 
 # ---- Section 9: Hypothetical Bodies ----
@@ -402,20 +405,20 @@ def test_hypothetical():
     global passed, failed, total
 
     hyp_bodies = [
-        ("Cupido", ephem.SE_CUPIDO, 40),
-        ("Hades", ephem.SE_HADES, 41),
-        ("Zeus", ephem.SE_ZEUS, 42),
-        ("Kronos", ephem.SE_KRONOS, 43),
-        ("Apollon", ephem.SE_APOLLON, 44),
-        ("Admetos", ephem.SE_ADMETOS, 45),
-        ("Vulkanus", ephem.SE_VULKANUS, 46),
-        ("Poseidon", ephem.SE_POSEIDON, 47),
+        ("Cupido", ephem.CUPIDO, 40),
+        ("Hades", ephem.HADES, 41),
+        ("Zeus", ephem.ZEUS, 42),
+        ("Kronos", ephem.KRONOS, 43),
+        ("Apollon", ephem.APOLLON, 44),
+        ("Admetos", ephem.ADMETOS, 45),
+        ("Vulkanus", ephem.VULKANUS, 46),
+        ("Poseidon", ephem.POSEIDON, 47),
     ]
 
     for jd in [2451545.0, 2460000.0, 2440000.0]:
         for hname, le_b, se_b in hyp_bodies:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, FLAGS_DEF)
+                le_r = ephem.calc_ut(jd, le_b, FLAGS_DEF)
                 se_r = swe.calc_ut(jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue
@@ -440,16 +443,16 @@ def test_asteroids():
     global passed, failed, total
 
     asteroids = [
-        ("Ceres", ephem.SE_CERES, swe.CERES),
-        ("Pallas", ephem.SE_PALLAS, swe.PALLAS),
-        ("Juno", ephem.SE_JUNO, swe.JUNO),
-        ("Vesta", ephem.SE_VESTA, swe.VESTA),
+        ("Ceres", ephem.CERES, swe.CERES),
+        ("Pallas", ephem.PALLAS, swe.PALLAS),
+        ("Juno", ephem.JUNO, swe.JUNO),
+        ("Vesta", ephem.VESTA, swe.VESTA),
     ]
 
     for jd in [2451545.0, 2460000.0, 2440000.0]:
         for aname, le_b, se_b in asteroids:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, FLAGS_DEF)
+                le_r = ephem.calc_ut(jd, le_b, FLAGS_DEF)
                 se_r = swe.calc_ut(jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED)
             except Exception:
                 continue

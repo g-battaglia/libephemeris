@@ -15,14 +15,14 @@ Orion is one of the most recognizable constellations, featuring 8 major stars:
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_BETELGEUSE,
-    SE_RIGEL,
-    SE_BELLATRIX,
-    SE_ALNILAM,
-    SE_ALNITAK,
-    SE_MINTAKA,
-    SE_SAIPH,
-    SE_MEISSA,
+    BETELGEUSE,
+    RIGEL,
+    BELLATRIX,
+    ALNILAM,
+    ALNITAK,
+    MINTAKA,
+    SAIPH,
+    MEISSA,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -34,21 +34,21 @@ from libephemeris.fixed_stars import (
 # The 8 major Orion stars with their properties
 # (constant, name, hip_number, magnitude)
 ORION_STARS = [
-    (SE_BETELGEUSE, "Betelgeuse", 27989, 0.42),  # Alpha Ori - red supergiant
-    (SE_RIGEL, "Rigel", 24436, 0.12),  # Beta Ori - brightest
-    (SE_BELLATRIX, "Bellatrix", 25336, 1.64),  # Gamma Ori
-    (SE_ALNILAM, "Alnilam", 26311, 1.69),  # Epsilon Ori - belt center
-    (SE_ALNITAK, "Alnitak", 26727, 1.74),  # Zeta Ori - belt left
-    (SE_MINTAKA, "Mintaka", 25930, 2.23),  # Delta Ori - belt right
-    (SE_SAIPH, "Saiph", 27366, 2.06),  # Kappa Ori
-    (SE_MEISSA, "Meissa", 26207, 3.33),  # Lambda Ori - head
+    (BETELGEUSE, "Betelgeuse", 27989, 0.42),  # Alpha Ori - red supergiant
+    (RIGEL, "Rigel", 24436, 0.12),  # Beta Ori - brightest
+    (BELLATRIX, "Bellatrix", 25336, 1.64),  # Gamma Ori
+    (ALNILAM, "Alnilam", 26311, 1.69),  # Epsilon Ori - belt center
+    (ALNITAK, "Alnitak", 26727, 1.74),  # Zeta Ori - belt left
+    (MINTAKA, "Mintaka", 25930, 2.23),  # Delta Ori - belt right
+    (SAIPH, "Saiph", 27366, 2.06),  # Kappa Ori
+    (MEISSA, "Meissa", 26207, 3.33),  # Lambda Ori - head
 ]
 
 # The three belt stars
 ORION_BELT_STARS = [
-    (SE_ALNILAM, "Alnilam"),
-    (SE_ALNITAK, "Alnitak"),
-    (SE_MINTAKA, "Mintaka"),
+    (ALNILAM, "Alnilam"),
+    (ALNITAK, "Alnitak"),
+    (MINTAKA, "Mintaka"),
 ]
 
 
@@ -75,7 +75,7 @@ class TestOrionStarsCatalog:
         other_mags = []
 
         for star_id, name, _, mag in ORION_STARS:
-            if star_id == SE_RIGEL:
+            if star_id == RIGEL:
                 rigel_mag = mag
             else:
                 other_mags.append((name, mag))
@@ -142,7 +142,7 @@ class TestOrionStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", ORION_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each Orion star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -157,7 +157,7 @@ class TestOrionStarsCalculation:
         """Test that the three belt stars are roughly aligned."""
         positions = []
         for star_id, name in ORION_BELT_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0], pos[1]))
 
         # Belt stars should be within ~3 degrees of each other in longitude
@@ -173,7 +173,7 @@ class TestOrionStarsCalculation:
     def test_orion_in_gemini_region(self, standard_jd):
         """Test that Orion stars are in the Gemini ecliptic region (~60-90 deg)."""
         # Betelgeuse is a good reference for Orion's position
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_BETELGEUSE, 0)
+        pos, _ = ephem.calc_ut(standard_jd, BETELGEUSE, 0)
 
         # Should be near 88 degrees ecliptic (Gemini)
         assert 80 < pos[0] < 95, (
@@ -182,7 +182,7 @@ class TestOrionStarsCalculation:
 
     def test_meissa_in_orion_region(self, standard_jd):
         """Test that Meissa is located in the correct region (Orion's head)."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_MEISSA, 0)
+        pos, _ = ephem.calc_ut(standard_jd, MEISSA, 0)
 
         # Meissa should be near 83 degrees ecliptic longitude
         assert 75 < pos[0] < 90, f"Meissa longitude {pos[0]:.1f} out of expected range"
@@ -197,52 +197,52 @@ class TestOrionStarsNameResolution:
 
     def test_resolve_betelgeuse(self):
         """Test Betelgeuse name resolution."""
-        assert resolve_star_name("Betelgeuse") == SE_BETELGEUSE
-        assert resolve_star_name("Alpha Orionis") == SE_BETELGEUSE
-        assert resolve_star_name("Alpha Ori") == SE_BETELGEUSE
+        assert resolve_star_name("Betelgeuse") == BETELGEUSE
+        assert resolve_star_name("Alpha Orionis") == BETELGEUSE
+        assert resolve_star_name("Alpha Ori") == BETELGEUSE
 
     def test_resolve_rigel(self):
         """Test Rigel name resolution."""
-        assert resolve_star_name("Rigel") == SE_RIGEL
-        assert resolve_star_name("Beta Orionis") == SE_RIGEL
-        assert resolve_star_name("Beta Ori") == SE_RIGEL
+        assert resolve_star_name("Rigel") == RIGEL
+        assert resolve_star_name("Beta Orionis") == RIGEL
+        assert resolve_star_name("Beta Ori") == RIGEL
 
     def test_resolve_bellatrix(self):
         """Test Bellatrix name resolution."""
-        assert resolve_star_name("Bellatrix") == SE_BELLATRIX
-        assert resolve_star_name("Gamma Orionis") == SE_BELLATRIX
+        assert resolve_star_name("Bellatrix") == BELLATRIX
+        assert resolve_star_name("Gamma Orionis") == BELLATRIX
 
     def test_resolve_belt_stars(self):
         """Test belt stars name resolution."""
-        assert resolve_star_name("Alnilam") == SE_ALNILAM
-        assert resolve_star_name("Epsilon Orionis") == SE_ALNILAM
+        assert resolve_star_name("Alnilam") == ALNILAM
+        assert resolve_star_name("Epsilon Orionis") == ALNILAM
 
-        assert resolve_star_name("Alnitak") == SE_ALNITAK
-        assert resolve_star_name("Zeta Orionis") == SE_ALNITAK
+        assert resolve_star_name("Alnitak") == ALNITAK
+        assert resolve_star_name("Zeta Orionis") == ALNITAK
 
-        assert resolve_star_name("Mintaka") == SE_MINTAKA
-        assert resolve_star_name("Delta Orionis") == SE_MINTAKA
+        assert resolve_star_name("Mintaka") == MINTAKA
+        assert resolve_star_name("Delta Orionis") == MINTAKA
 
     def test_resolve_saiph(self):
         """Test Saiph name resolution."""
-        assert resolve_star_name("Saiph") == SE_SAIPH
-        assert resolve_star_name("Kappa Orionis") == SE_SAIPH
+        assert resolve_star_name("Saiph") == SAIPH
+        assert resolve_star_name("Kappa Orionis") == SAIPH
 
     def test_resolve_meissa(self):
         """Test Meissa name resolution."""
-        assert resolve_star_name("Meissa") == SE_MEISSA
-        assert resolve_star_name("Lambda Orionis") == SE_MEISSA
-        assert resolve_star_name("Lambda Ori") == SE_MEISSA
-        assert resolve_star_name("Heka") == SE_MEISSA
-        assert resolve_star_name("Head of Orion") == SE_MEISSA
+        assert resolve_star_name("Meissa") == MEISSA
+        assert resolve_star_name("Lambda Orionis") == MEISSA
+        assert resolve_star_name("Lambda Ori") == MEISSA
+        assert resolve_star_name("Heka") == MEISSA
+        assert resolve_star_name("Head of Orion") == MEISSA
 
     def test_canonical_names(self):
         """Test canonical name retrieval for Orion stars."""
-        assert get_canonical_star_name(SE_BETELGEUSE) == "Betelgeuse"
-        assert get_canonical_star_name(SE_RIGEL) == "Rigel"
-        assert get_canonical_star_name(SE_BELLATRIX) == "Bellatrix"
-        assert get_canonical_star_name(SE_ALNILAM) == "Alnilam"
-        assert get_canonical_star_name(SE_ALNITAK) == "Alnitak"
-        assert get_canonical_star_name(SE_MINTAKA) == "Mintaka"
-        assert get_canonical_star_name(SE_SAIPH) == "Saiph"
-        assert get_canonical_star_name(SE_MEISSA) == "Meissa"
+        assert get_canonical_star_name(BETELGEUSE) == "Betelgeuse"
+        assert get_canonical_star_name(RIGEL) == "Rigel"
+        assert get_canonical_star_name(BELLATRIX) == "Bellatrix"
+        assert get_canonical_star_name(ALNILAM) == "Alnilam"
+        assert get_canonical_star_name(ALNITAK) == "Alnitak"
+        assert get_canonical_star_name(MINTAKA) == "Mintaka"
+        assert get_canonical_star_name(SAIPH) == "Saiph"
+        assert get_canonical_star_name(MEISSA) == "Meissa"

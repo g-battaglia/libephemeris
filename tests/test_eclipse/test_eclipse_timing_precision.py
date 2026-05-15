@@ -6,15 +6,15 @@ import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
-    SE_ECL_PENUMBRAL,
-    SE_ECL_CENTRAL,
-    SE_ECL_NONCENTRAL,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
+    ECL_CENTRAL,
+    ECL_NONCENTRAL,
+    FLG_SWIEPH,
 )
 
 JD_J2000 = 2451545.0
@@ -57,20 +57,20 @@ class TestSolarEclipseTiming:
         """Eclipse type flags should be valid."""
         retflag, tret = swe.sol_eclipse_when_glob(JD_J2000)
         # At least one type flag should be set
-        type_flags = SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL
+        type_flags = ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL
         assert retflag & type_flags, f"No eclipse type in retflag {retflag}"
 
     def test_sol_eclipse_filter_total(self):
         """Can filter for total eclipses only."""
-        retflag, tret = swe.sol_eclipse_when_glob(JD_J2000, SEFLG_SWIEPH, SE_ECL_TOTAL)
-        assert retflag & SE_ECL_TOTAL
+        retflag, tret = swe.sol_eclipse_when_glob(JD_J2000, FLG_SWIEPH, ECL_TOTAL)
+        assert retflag & ECL_TOTAL
 
     def test_sol_eclipse_filter_annular(self):
         """Can filter for annular eclipses only."""
         retflag, tret = swe.sol_eclipse_when_glob(
-            JD_J2000, SEFLG_SWIEPH, SE_ECL_ANNULAR
+            JD_J2000, FLG_SWIEPH, ECL_ANNULAR
         )
-        assert retflag & SE_ECL_ANNULAR
+        assert retflag & ECL_ANNULAR
 
     def test_sol_eclipse_duration_reasonable(self):
         """Eclipse duration should be reasonable (< 1 day)."""
@@ -97,7 +97,7 @@ class TestLunarEclipseTiming:
     def test_lun_eclipse_types_valid(self):
         """Lunar eclipse type flags should be valid."""
         retflag, tret = swe.lun_eclipse_when(JD_J2000)
-        type_flags = SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL
+        type_flags = ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL
         assert retflag & type_flags
 
     def test_5_lunar_eclipses_sequential(self):
@@ -121,8 +121,8 @@ class TestLunarEclipseTiming:
         """Lunar eclipse should occur near full Moon (Sun-Moon ~180° apart)."""
         retflag, tret = swe.lun_eclipse_when(JD_J2000)
         jd_max = tret[0]
-        sun_pos, _ = swe.calc_ut(jd_max, SE_SUN, SEFLG_SWIEPH)
-        moon_pos, _ = swe.calc_ut(jd_max, SE_MOON, SEFLG_SWIEPH)
+        sun_pos, _ = swe.calc_ut(jd_max, SUN, FLG_SWIEPH)
+        moon_pos, _ = swe.calc_ut(jd_max, MOON, FLG_SWIEPH)
         elongation = abs(moon_pos[0] - sun_pos[0])
         if elongation > 180:
             elongation = 360 - elongation
@@ -165,8 +165,8 @@ class TestSolarEclipseAtNewMoon:
         """Solar eclipse should occur near new Moon (Sun-Moon ~0° apart)."""
         retflag, tret = swe.sol_eclipse_when_glob(JD_J2000)
         jd_max = tret[0]
-        sun_pos, _ = swe.calc_ut(jd_max, SE_SUN, SEFLG_SWIEPH)
-        moon_pos, _ = swe.calc_ut(jd_max, SE_MOON, SEFLG_SWIEPH)
+        sun_pos, _ = swe.calc_ut(jd_max, SUN, FLG_SWIEPH)
+        moon_pos, _ = swe.calc_ut(jd_max, MOON, FLG_SWIEPH)
         elongation = abs(moon_pos[0] - sun_pos[0])
         if elongation > 180:
             elongation = 360 - elongation

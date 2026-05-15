@@ -25,7 +25,7 @@ _COMPARE_MODE = os.environ.get("LIBEPHEMERIS_COMPARE_MODE", "skyfield").lower()
 
 if _COMPARE_MODE == "leb":
     # LEB mode: let auto-discovery find the LEB file, or use an explicit path.
-    # Do NOT force skyfield — we want LEB to intercept swe_calc_ut calls.
+    # Do NOT force skyfield — we want LEB to intercept calc_ut calls.
     os.environ.pop("LIBEPHEMERIS_MODE", None)
 elif _COMPARE_MODE == "horizons":
     # Horizons mode: use NASA JPL Horizons API (requires internet).
@@ -146,16 +146,16 @@ def polar_locations():
 def all_planets():
     """All major planets for testing."""
     return [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
 
@@ -163,11 +163,11 @@ def all_planets():
 def inner_planets():
     """Inner planets (faster moving)."""
     return [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
     ]
 
 
@@ -175,11 +175,11 @@ def inner_planets():
 def outer_planets():
     """Outer planets (slower moving)."""
     return [
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
 
@@ -187,10 +187,10 @@ def outer_planets():
 def lunar_points():
     """Lunar points (nodes and Lilith)."""
     return [
-        (SE_MEAN_NODE, "Mean Node"),
-        (SE_TRUE_NODE, "True Node"),
-        (SE_MEAN_APOG, "Mean Lilith"),
-        (SE_OSCU_APOG, "True Lilith"),
+        (MEAN_NODE, "Mean Node"),
+        (TRUE_NODE, "True Node"),
+        (MEAN_APOG, "Mean Lilith"),
+        (OSCU_APOG, "True Lilith"),
     ]
 
 
@@ -198,12 +198,12 @@ def lunar_points():
 def asteroids():
     """Main belt asteroids."""
     return [
-        (SE_CHIRON, "Chiron"),
-        (SE_PHOLUS, "Pholus"),
-        (SE_CERES, "Ceres"),
-        (SE_PALLAS, "Pallas"),
-        (SE_JUNO, "Juno"),
-        (SE_VESTA, "Vesta"),
+        (CHIRON, "Chiron"),
+        (PHOLUS, "Pholus"),
+        (CERES, "Ceres"),
+        (PALLAS, "Pallas"),
+        (JUNO, "Juno"),
+        (VESTA, "Vesta"),
     ]
 
 
@@ -251,49 +251,49 @@ def common_house_systems():
 def all_ayanamshas():
     """All 43 ayanamsha modes."""
     return [
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_DELUCE, "De Luce"),
-        (SE_SIDM_RAMAN, "Raman"),
-        (SE_SIDM_USHASHASHI, "Ushashashi"),
-        (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-        (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-        (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-        (SE_SIDM_JN_BHASIN, "JN Bhasin"),
-        (SE_SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
-        (SE_SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
-        (SE_SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
-        (SE_SIDM_BABYL_HUBER, "Babylonian Huber"),
-        (SE_SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
-        (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
-        (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-        (SE_SIDM_SASSANIAN, "Sassanian"),
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
-        (SE_SIDM_J2000, "J2000"),
-        (SE_SIDM_J1900, "J1900"),
-        (SE_SIDM_B1950, "B1950"),
-        (SE_SIDM_SURYASIDDHANTA, "Surya Siddhanta"),
-        (SE_SIDM_SURYASIDDHANTA_MSUN, "Surya Siddhanta Mean Sun"),
-        (SE_SIDM_ARYABHATA, "Aryabhata"),
-        (SE_SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
-        (SE_SIDM_SS_REVATI, "SS Revati"),
-        (SE_SIDM_SS_CITRA, "SS Citra"),
-        (SE_SIDM_TRUE_CITRA, "True Citra"),
-        (SE_SIDM_TRUE_REVATI, "True Revati"),
-        (SE_SIDM_TRUE_PUSHYA, "True Pushya"),
-        (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
-        (SE_SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
-        (SE_SIDM_GALEQU_TRUE, "Galactic Equator True"),
-        (SE_SIDM_GALEQU_MULA, "Galactic Equator Mula"),
-        (SE_SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
-        (SE_SIDM_TRUE_MULA, "True Mula"),
-        (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
-        (SE_SIDM_ARYABHATA_522, "Aryabhata 522"),
-        (SE_SIDM_BABYL_BRITTON, "Babylonian Britton"),
-        (SE_SIDM_TRUE_SHEORAN, "True Sheoran"),
-        (SE_SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
-        (SE_SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
-        (SE_SIDM_VALENS_MOON, "Valens Moon"),
+        (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_DELUCE, "De Luce"),
+        (SIDM_RAMAN, "Raman"),
+        (SIDM_USHASHASHI, "Ushashashi"),
+        (SIDM_KRISHNAMURTI, "Krishnamurti"),
+        (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+        (SIDM_YUKTESHWAR, "Yukteshwar"),
+        (SIDM_JN_BHASIN, "JN Bhasin"),
+        (SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
+        (SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
+        (SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
+        (SIDM_BABYL_HUBER, "Babylonian Huber"),
+        (SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
+        (SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
+        (SIDM_HIPPARCHOS, "Hipparchos"),
+        (SIDM_SASSANIAN, "Sassanian"),
+        (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_J2000, "J2000"),
+        (SIDM_J1900, "J1900"),
+        (SIDM_B1950, "B1950"),
+        (SIDM_SURYASIDDHANTA, "Surya Siddhanta"),
+        (SIDM_SURYASIDDHANTA_MSUN, "Surya Siddhanta Mean Sun"),
+        (SIDM_ARYABHATA, "Aryabhata"),
+        (SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
+        (SIDM_SS_REVATI, "SS Revati"),
+        (SIDM_SS_CITRA, "SS Citra"),
+        (SIDM_TRUE_CITRA, "True Citra"),
+        (SIDM_TRUE_REVATI, "True Revati"),
+        (SIDM_TRUE_PUSHYA, "True Pushya"),
+        (SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+        (SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
+        (SIDM_GALEQU_TRUE, "Galactic Equator True"),
+        (SIDM_GALEQU_MULA, "Galactic Equator Mula"),
+        (SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
+        (SIDM_TRUE_MULA, "True Mula"),
+        (SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+        (SIDM_ARYABHATA_522, "Aryabhata 522"),
+        (SIDM_BABYL_BRITTON, "Babylonian Britton"),
+        (SIDM_TRUE_SHEORAN, "True Sheoran"),
+        (SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
+        (SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
+        (SIDM_VALENS_MOON, "Valens Moon"),
     ]
 
 
@@ -301,11 +301,11 @@ def all_ayanamshas():
 def major_ayanamshas():
     """Major ayanamsha modes for testing."""
     return [
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_RAMAN, "Raman"),
-        (SE_SIDM_TRUE_CITRA, "True Citra"),
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_RAMAN, "Raman"),
+        (SIDM_TRUE_CITRA, "True Citra"),
+        (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
     ]
 
 
@@ -317,11 +317,11 @@ def star_based_ayanamshas():
     SE-calibrated formulas with <0.001° precision.
     """
     return [
-        SE_SIDM_TRUE_CITRA,
-        SE_SIDM_TRUE_REVATI,
-        SE_SIDM_TRUE_PUSHYA,
-        SE_SIDM_TRUE_MULA,
-        SE_SIDM_TRUE_SHEORAN,
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_TRUE_MULA,
+        SIDM_TRUE_SHEORAN,
     ]
 
 
@@ -397,7 +397,7 @@ def compare_with_swisseph():
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
 
         # Calculate with libephemeris
-        res_py, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        res_py, _ = ephem.calc_ut(jd, planet_id, flags)
 
         # Compare
         diffs = {
@@ -432,7 +432,7 @@ def compare_houses():
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys)
 
         # Calculate with libephemeris
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
 
         # Compare cusps
         cusp_diffs = []
@@ -479,8 +479,8 @@ def compare_ayanamsa():
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Set mode in libephemeris
-        ephem.swe_set_sid_mode(sid_mode)
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(sid_mode)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
 
         diff = abs(ayan_swe - ayan_lib)
         passed = diff < tolerance
@@ -507,7 +507,7 @@ def random_dates_in_de440_range():
             month = random.randint(1, 12)
             day = random.randint(1, 28)  # Safe for all months
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append((year, month, day, hour, jd))
         return dates
 
@@ -526,7 +526,7 @@ def random_dates_in_de421_range():
             month = random.randint(1, 12)
             day = random.randint(1, 28)  # Safe for all months
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append((year, month, day, hour, jd))
         return dates
 
@@ -656,7 +656,7 @@ def known_solstices():
 def reset_ephemeris_state():
     """Reset ephemeris state before each test."""
     # Reset to default sidereal mode
-    ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    ephem.set_sid_mode(SIDM_FAGAN_BRADLEY)
     if hasattr(swe, "set_sid_mode"):
         swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 
@@ -664,7 +664,7 @@ def reset_ephemeris_state():
 
     # Cleanup after test
     # Reset again for next test
-    ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    ephem.set_sid_mode(SIDM_FAGAN_BRADLEY)
     if hasattr(swe, "set_sid_mode"):
         swe.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
 

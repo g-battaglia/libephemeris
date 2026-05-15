@@ -15,7 +15,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -54,7 +57,7 @@ def test_eclipse_how():
     for ecl_label, approx_jd in ECLIPSE_EVENTS:
         # First find the actual eclipse max time
         try:
-            le_glob = ephem.swe_sol_eclipse_when_glob(approx_jd - 30, 0)
+            le_glob = ephem.sol_eclipse_when_glob(approx_jd - 30, 0)
             ecl_jd = le_glob[1][0]  # maximum time
         except Exception:
             ecl_jd = approx_jd
@@ -65,7 +68,7 @@ def test_eclipse_how():
             geopos = [lon, lat, alt]
 
             try:
-                le_r = ephem.swe_sol_eclipse_how(ecl_jd, 0, geopos)
+                le_r = ephem.sol_eclipse_how(ecl_jd, 0, geopos)
                 le_attr = le_r[1] if isinstance(le_r, tuple) and len(le_r) > 1 else le_r
             except Exception as e:
                 continue

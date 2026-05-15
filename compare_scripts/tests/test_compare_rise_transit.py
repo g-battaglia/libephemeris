@@ -7,7 +7,7 @@ Compares rise, transit, and set calculations between pyswisseph and libephemeris
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_SUN, SE_MOON, SE_VENUS
+from libephemeris.constants import SUN, MOON, VENUS
 
 
 # ============================================================================
@@ -29,9 +29,9 @@ TEST_LOCATIONS = [
 ]
 
 PLANETS_TO_TEST = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_VENUS, "Venus"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (VENUS, "Venus"),
 ]
 
 
@@ -54,7 +54,7 @@ class TestRiseSet:
         geopos = (lon, lat, alt)
 
         try:
-            # SE_CALC_RISE = 1
+            # CALC_RISE = 1
             rise_swe = swe.rise_trans(jd, planet_id, 1, geopos, 1013.25, 15.0)
             rise_py = ephem.rise_trans(jd, planet_id, 1, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
@@ -79,9 +79,9 @@ class TestRiseSet:
         geopos = (lon, lat, alt)
 
         try:
-            # SE_CALC_MTRANSIT = 4
-            trans_swe = swe.rise_trans(jd, SE_SUN, 4, geopos, 1013.25, 15.0)
-            trans_py = ephem.rise_trans(jd, SE_SUN, 4, [lon, lat, alt], 1013.25, 15.0)
+            # CALC_MTRANSIT = 4
+            trans_swe = swe.rise_trans(jd, SUN, 4, geopos, 1013.25, 15.0)
+            trans_py = ephem.rise_trans(jd, SUN, 4, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
             pytest.skip(f"Transit calculation not available: {e}")
             return
@@ -108,8 +108,8 @@ class TestMoonRiseSet:
         geopos = (lon, lat, alt)
 
         try:
-            rise_swe = swe.rise_trans(jd, SE_MOON, 1, geopos, 1013.25, 15.0)
-            rise_py = ephem.rise_trans(jd, SE_MOON, 1, [lon, lat, alt], 1013.25, 15.0)
+            rise_swe = swe.rise_trans(jd, MOON, 1, geopos, 1013.25, 15.0)
+            rise_py = ephem.rise_trans(jd, MOON, 1, [lon, lat, alt], 1013.25, 15.0)
         except Exception as e:
             pytest.skip(f"Moon rise calculation not available: {e}")
             return

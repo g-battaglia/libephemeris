@@ -7,18 +7,22 @@ G04.01: 24 house systems x 5 locations x 10 dates     = 1200  checks
                                                  Total >= 2710 checks
 """
 
+import os
 import math
 import random
 import sys
 import time
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
 # ── Setup ────────────────────────────────────────────────────────────────
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 lib.set_calc_mode("skyfield")
 
 random.seed(42)
@@ -44,18 +48,18 @@ TWO_PI = 2.0 * PI
 
 # ── Constants ────────────────────────────────────────────────────────────
 SEFLG_DEFAULT = 0
-SEFLG_SWIEPH = 2
-SEFLG_HELCTR = 8
-SEFLG_TRUEPOS = 16
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_SPEED = 256
-SEFLG_NOGDEFL = 512
-SEFLG_NOABERR = 1024
-SEFLG_EQUATORIAL = 2048
-SEFLG_XYZ = 4096
-SEFLG_RADIANS = 8192
-SEFLG_SIDEREAL = 65536
+FLG_SWIEPH = 2
+FLG_HELCTR = 8
+FLG_TRUEPOS = 16
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_SPEED = 256
+FLG_NOGDEFL = 512
+FLG_NOABERR = 1024
+FLG_EQUATORIAL = 2048
+FLG_XYZ = 4096
+FLG_RADIANS = 8192
+FLG_SIDEREAL = 65536
 
 BODIES = list(range(10))  # 0..9 (Sun through Pluto)
 BODY_NAMES = {
@@ -100,18 +104,18 @@ t0 = time.time()
 
 SINGLE_FLAGS = [
     ("DEFAULT", SEFLG_DEFAULT),
-    ("SWIEPH", SEFLG_SWIEPH),
-    ("SPEED", SEFLG_SPEED),
-    ("HELCTR", SEFLG_HELCTR),
-    ("TRUEPOS", SEFLG_TRUEPOS),
-    ("J2000", SEFLG_J2000),
-    ("NONUT", SEFLG_NONUT),
-    ("NOGDEFL", SEFLG_NOGDEFL),
-    ("NOABERR", SEFLG_NOABERR),
-    ("EQUATORIAL", SEFLG_EQUATORIAL),
-    ("XYZ", SEFLG_XYZ),
-    ("RADIANS", SEFLG_RADIANS),
-    ("SIDEREAL", SEFLG_SIDEREAL),
+    ("SWIEPH", FLG_SWIEPH),
+    ("SPEED", FLG_SPEED),
+    ("HELCTR", FLG_HELCTR),
+    ("TRUEPOS", FLG_TRUEPOS),
+    ("J2000", FLG_J2000),
+    ("NONUT", FLG_NONUT),
+    ("NOGDEFL", FLG_NOGDEFL),
+    ("NOABERR", FLG_NOABERR),
+    ("EQUATORIAL", FLG_EQUATORIAL),
+    ("XYZ", FLG_XYZ),
+    ("RADIANS", FLG_RADIANS),
+    ("SIDEREAL", FLG_SIDEREAL),
 ]
 
 g03_01_passed = 0
@@ -128,24 +132,24 @@ for flag_name, flag_val in SINGLE_FLAGS:
         bname = BODY_NAMES.get(body, f"Body{body}")
 
         # HELCTR: skip Sun (body 0) -- heliocentric Sun is undefined
-        if flag_val == SEFLG_HELCTR and body == 0:
+        if flag_val == FLG_HELCTR and body == 0:
             continue
 
         for jd in DATES_10:
             desc_prefix = f"G03.01 {flag_name} body={bname} jd={jd:.2f}"
 
             # For SIDEREAL: set mode before, reset after
-            if flag_val == SEFLG_SIDEREAL:
+            if flag_val == FLG_SIDEREAL:
                 lib.set_sid_mode(1)
 
             exc_caught = False
             try:
-                result = lib.calc_ut(jd, body, flag_val | SEFLG_SPEED)
+                result = lib.calc_ut(jd, body, flag_val | FLG_SPEED)
             except Exception as e:
                 check(False, f"{desc_prefix}: EXCEPTION {e}")
                 exc_caught = True
             finally:
-                if flag_val == SEFLG_SIDEREAL:
+                if flag_val == FLG_SIDEREAL:
                     lib.set_sid_mode(0)
 
             if exc_caught:
@@ -180,10 +184,10 @@ for flag_name, flag_val in SINGLE_FLAGS:
             # For default ecliptic/equatorial: lon in [0, 360), lat in [-90, 90]
             lon, lat = pos[0], pos[1]
 
-            if flag_val == SEFLG_XYZ:
+            if flag_val == FLG_XYZ:
                 # XYZ coordinates -- no specific range checks beyond finiteness
                 check(True, f"{desc_prefix}: XYZ finite ok")
-            elif flag_val == SEFLG_RADIANS:
+            elif flag_val == FLG_RADIANS:
                 lon_ok = -0.001 <= lon <= TWO_PI + 0.001
                 lat_ok = -(PI / 2.0 + 0.001) <= lat <= (PI / 2.0 + 0.001)
                 check(lon_ok, f"{desc_prefix}: RADIANS lon={lon:.6f} out of [0, 2pi)")
@@ -193,7 +197,7 @@ for flag_name, flag_val in SINGLE_FLAGS:
             else:
                 # Standard ecliptic or equatorial
                 lon_ok = -0.01 <= lon <= 360.01
-                if flag_val == SEFLG_EQUATORIAL:
+                if flag_val == FLG_EQUATORIAL:
                     # RA can be [0, 360), Dec in [-90, 90]
                     lat_ok = -90.01 <= lat <= 90.01
                 else:
@@ -215,12 +219,12 @@ print(f"\nG03.01 checks: {g03_01_total} passed, {g03_01_fail} failed")
 print("\n--- G03.02: Critical flag pairs (6 pairs x 5 bodies x ~7 dates) ---")
 
 FLAG_PAIRS = [
-    ("EQUATORIAL+NONUT", SEFLG_EQUATORIAL | SEFLG_NONUT),
-    ("TRUEPOS+NONUT", SEFLG_TRUEPOS | SEFLG_NONUT),
-    ("NONUT+NOGDEFL", SEFLG_NONUT | SEFLG_NOGDEFL),
-    ("NONUT+NOABERR", SEFLG_NONUT | SEFLG_NOABERR),
-    ("XYZ+HELCTR", SEFLG_XYZ | SEFLG_HELCTR),
-    ("XYZ+EQUATORIAL", SEFLG_XYZ | SEFLG_EQUATORIAL),
+    ("EQUATORIAL+NONUT", FLG_EQUATORIAL | FLG_NONUT),
+    ("TRUEPOS+NONUT", FLG_TRUEPOS | FLG_NONUT),
+    ("NONUT+NOGDEFL", FLG_NONUT | FLG_NOGDEFL),
+    ("NONUT+NOABERR", FLG_NONUT | FLG_NOABERR),
+    ("XYZ+HELCTR", FLG_XYZ | FLG_HELCTR),
+    ("XYZ+EQUATORIAL", FLG_XYZ | FLG_EQUATORIAL),
 ]
 
 PAIR_BODIES = [1, 2, 4, 5, 9]  # Moon, Mercury, Mars, Jupiter, Pluto
@@ -237,7 +241,7 @@ for pair_name, pair_flags in FLAG_PAIRS:
         for jd in PAIR_DATES:
             desc = f"G03.02 {pair_name} body={bname} jd={jd:.2f}"
             try:
-                result = lib.calc_ut(jd, body, pair_flags | SEFLG_SPEED)
+                result = lib.calc_ut(jd, body, pair_flags | FLG_SPEED)
             except Exception as e:
                 check(False, f"{desc}: EXCEPTION {e}")
                 continue

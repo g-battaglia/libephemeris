@@ -23,7 +23,7 @@ class CompositeLEBReader:
 
     Usage:
         reader = CompositeLEBReader.from_directory("/path/to/leb/")
-        pos, vel = reader.eval_body(SE_SUN, jd_tt)
+        pos, vel = reader.eval_body(SUN, jd_tt)
     """
 
     def __init__(self, readers: List) -> None:

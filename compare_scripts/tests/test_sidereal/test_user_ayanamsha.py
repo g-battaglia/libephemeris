@@ -1,18 +1,18 @@
 """
-Tests for SE_SIDM_USER custom ayanamsha functionality.
+Tests for SIDM_USER custom ayanamsha functionality.
 
 Tests user-defined ayanamsha with custom initial value and precession rate
-using swe_set_sid_mode with SE_SIDM_USER option.
+using set_sid_mode with SIDM_USER option.
 """
 
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_SIDM_USER, SE_SIDM_LAHIRI, SEFLG_SIDEREAL, SE_SUN
+from libephemeris.constants import SIDM_USER, SIDM_LAHIRI, FLG_SIDEREAL, SUN
 
 
 class TestUserDefinedAyanamsha:
-    """Test SE_SIDM_USER custom ayanamsha functionality."""
+    """Test SIDM_USER custom ayanamsha functionality."""
 
     @pytest.mark.unit
     def test_user_ayanamsha_at_reference_epoch(self):
@@ -20,8 +20,8 @@ class TestUserDefinedAyanamsha:
         jd = 2451545.0  # J2000
         ayan_t0 = 24.0  # degrees
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=ayan_t0)
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=ayan_t0)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         # At t0, ayanamsha should be exactly ayan_t0
         assert abs(ayan - ayan_t0) < 0.001, f"Expected {ayan_t0}, got {ayan}"
@@ -32,11 +32,11 @@ class TestUserDefinedAyanamsha:
         t0 = 2451545.0  # J2000
         ayan_t0 = 24.0  # degrees
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
 
         # One century later
         jd_future = t0 + 36525.0  # J2100
-        ayan = ephem.swe_get_ayanamsa_ut(jd_future)
+        ayan = ephem.get_ayanamsa_ut(jd_future)
 
         # Precession rate ~5027.8 arcsec/century = ~1.3966 deg/century
         expected = ayan_t0 + (5027.8 / 3600.0)  # ~25.396 degrees
@@ -48,11 +48,11 @@ class TestUserDefinedAyanamsha:
         t0 = 2451545.0  # J2000
         ayan_t0 = 24.0  # degrees
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
 
         # One century earlier
         jd_past = t0 - 36525.0  # J1900
-        ayan = ephem.swe_get_ayanamsa_ut(jd_past)
+        ayan = ephem.get_ayanamsa_ut(jd_past)
 
         # Precession rate ~5027.8 arcsec/century = ~1.3966 deg/century
         expected = ayan_t0 - (5027.8 / 3600.0)  # ~22.603 degrees
@@ -65,11 +65,11 @@ class TestUserDefinedAyanamsha:
         t0 = 2415020.0  # J1900
         ayan_t0 = 22.5  # degrees
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
 
         # At J2000 (100 years later)
         jd = 2451545.0
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         # Should have precessed by ~1.4 degrees
         expected = ayan_t0 + (5027.8 / 3600.0)  # ~23.9 degrees
@@ -81,8 +81,8 @@ class TestUserDefinedAyanamsha:
         t0 = 2451545.0  # J2000
         ayan_t0 = 0.0  # No ayanamsha at reference
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
-        ayan = ephem.swe_get_ayanamsa_ut(t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        ayan = ephem.get_ayanamsa_ut(t0)
 
         assert abs(ayan) < 0.001, f"Expected 0, got {ayan}"
 
@@ -92,15 +92,15 @@ class TestUserDefinedAyanamsha:
         t0 = 2451545.0  # J2000
         ayan_t0 = 359.0  # Near wrap-around
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
-        ayan = ephem.swe_get_ayanamsa_ut(t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        ayan = ephem.get_ayanamsa_ut(t0)
 
         assert abs(ayan - ayan_t0) < 0.001, f"Expected {ayan_t0}, got {ayan}"
 
     @pytest.mark.unit
     def test_user_ayanamsha_name(self):
-        """swe_get_ayanamsa_name should return 'User Defined' for SE_SIDM_USER."""
-        name = ephem.swe_get_ayanamsa_name(SE_SIDM_USER)
+        """get_ayanamsa_name should return 'User Defined' for SIDM_USER."""
+        name = ephem.get_ayanamsa_name(SIDM_USER)
         assert name == "User Defined", f"Expected 'User Defined', got '{name}'"
 
     @pytest.mark.comparison
@@ -109,8 +109,8 @@ class TestUserDefinedAyanamsha:
         t0 = 2451545.0  # J2000
         ayan_t0 = 24.0
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
-        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        swe.set_sid_mode(SIDM_USER, t0, ayan_t0)
 
         # Test at several dates
         test_dates = [
@@ -121,7 +121,7 @@ class TestUserDefinedAyanamsha:
         ]
 
         for jd in test_dates:
-            ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+            ayan_lib = ephem.get_ayanamsa_ut(jd)
             ayan_swe = swe.get_ayanamsa_ut(jd)
             diff = abs(ayan_lib - ayan_swe)
 
@@ -140,14 +140,14 @@ class TestUserAyanamshaWithSiderealPositions:
         ayan_t0 = 24.0
 
         # Get tropical position
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)  # Reset first
-        pos_tropical, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        ephem.set_sid_mode(SIDM_LAHIRI)  # Reset first
+        pos_tropical, _ = ephem.calc_ut(jd, SUN, 0)
 
         # Set user ayanamsha
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=ayan_t0)
 
         # Get sidereal position
-        pos_sidereal, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        pos_sidereal, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Sidereal = Tropical - Ayanamsha
         expected_sidereal = (pos_tropical[0] - ayan_t0) % 360.0
@@ -165,11 +165,11 @@ class TestUserAyanamshaWithSiderealPositions:
         t0 = jd
         ayan_t0 = 23.5
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=t0, ayan_t0=ayan_t0)
-        swe.set_sid_mode(SE_SIDM_USER, t0, ayan_t0)
+        ephem.set_sid_mode(SIDM_USER, t0=t0, ayan_t0=ayan_t0)
+        swe.set_sid_mode(SIDM_USER, t0, ayan_t0)
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
-        pos_swe = swe.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        pos_lib, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
+        pos_swe = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Compare longitude
         diff = abs(pos_lib[0] - pos_swe[0][0])
@@ -188,13 +188,13 @@ class TestUserAyanamshaEdgeCases:
         jd = 2451545.0
 
         # Set user ayanamsha
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=50.0)
-        ayan_user = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=50.0)
+        ayan_user = ephem.get_ayanamsa_ut(jd)
         assert abs(ayan_user - 50.0) < 0.01
 
         # Switch to Lahiri
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan_lahiri = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        ayan_lahiri = ephem.get_ayanamsa_ut(jd)
 
         # Should be Lahiri value (~23.9), not user value
         assert 23.0 < ayan_lahiri < 25.0, f"Expected Lahiri value, got {ayan_lahiri}"
@@ -207,8 +207,8 @@ class TestUserAyanamshaEdgeCases:
         ayan_t0 = 24.0
 
         # Pass t0=0 (should default to J2000)
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=0, ayan_t0=ayan_t0)
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_USER, t0=0, ayan_t0=ayan_t0)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         # At J2000, should get ayan_t0
         assert abs(ayan - ayan_t0) < 0.001, f"Expected {ayan_t0}, got {ayan}"
@@ -219,8 +219,8 @@ class TestUserAyanamshaEdgeCases:
         jd = 2451545.0
         ayan_t0 = -1.0  # Should be equivalent to 359.0
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=ayan_t0)
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=ayan_t0)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         # Result should be normalized to 0-360
         expected = 359.0
@@ -232,20 +232,20 @@ class TestUserAyanamshaEdgeCases:
         jd = 2451545.0
 
         # Get Lahiri value at J2000
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        lahiri_at_j2000 = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        lahiri_at_j2000 = ephem.get_ayanamsa_ut(jd)
 
         # Set user ayanamsha to mimic Lahiri
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=lahiri_at_j2000)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=lahiri_at_j2000)
 
         # Test at a different date
         test_jd = jd + 3652.5  # 10 years later
 
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        lahiri_later = ephem.swe_get_ayanamsa_ut(test_jd)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        lahiri_later = ephem.get_ayanamsa_ut(test_jd)
 
-        ephem.swe_set_sid_mode(SE_SIDM_USER, t0=jd, ayan_t0=lahiri_at_j2000)
-        user_later = ephem.swe_get_ayanamsa_ut(test_jd)
+        ephem.set_sid_mode(SIDM_USER, t0=jd, ayan_t0=lahiri_at_j2000)
+        user_later = ephem.get_ayanamsa_ut(test_jd)
 
         # Should be very close (both using same precession rate)
         diff = abs(lahiri_later - user_later)

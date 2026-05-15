@@ -35,22 +35,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import libephemeris as ephem
 from libephemeris import spk_auto
 from libephemeris.constants import (
-    SE_AST_OFFSET,
-    SE_CERES,
-    SE_CHIRON,
-    SE_JUNO,
-    SE_PALLAS,
-    SE_PHOLUS,
-    SE_VESTA,
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_NONUT,
-    SEFLG_SPEED,
-    SEFLG_TRUEPOS,
-    SEFLG_XYZ,
+    AST_OFFSET,
+    CERES,
+    CHIRON,
+    JUNO,
+    PALLAS,
+    PHOLUS,
+    VESTA,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_NONUT,
+    FLG_SPEED,
+    FLG_TRUEPOS,
+    FLG_XYZ,
 )
 
 # Set pyswisseph ephemeris path
@@ -98,63 +98,63 @@ def fmt_arcsec(deg: float) -> str:
 
 # Dedicated IDs (15-20)
 BIG6 = [
-    (SE_CHIRON, "Chiron"),
-    (SE_PHOLUS, "Pholus"),
-    (SE_CERES, "Ceres"),
-    (SE_PALLAS, "Pallas"),
-    (SE_JUNO, "Juno"),
-    (SE_VESTA, "Vesta"),
+    (CHIRON, "Chiron"),
+    (PHOLUS, "Pholus"),
+    (CERES, "Ceres"),
+    (PALLAS, "Pallas"),
+    (JUNO, "Juno"),
+    (VESTA, "Vesta"),
 ]
 
-# Main belt (via SE_AST_OFFSET)
+# Main belt (via AST_OFFSET)
 MAIN_BELT = [
-    (SE_AST_OFFSET + 10, "Hygiea"),
-    (SE_AST_OFFSET + 704, "Interamnia"),
-    (SE_AST_OFFSET + 511, "Davida"),
-    (SE_AST_OFFSET + 52, "Europa(ast)"),
-    (SE_AST_OFFSET + 87, "Sylvia"),
-    (SE_AST_OFFSET + 16, "Psyche"),
+    (AST_OFFSET + 10, "Hygiea"),
+    (AST_OFFSET + 704, "Interamnia"),
+    (AST_OFFSET + 511, "Davida"),
+    (AST_OFFSET + 52, "Europa(ast)"),
+    (AST_OFFSET + 87, "Sylvia"),
+    (AST_OFFSET + 16, "Psyche"),
 ]
 
 # Additional centaurs
 CENTAURS = [
-    (SE_AST_OFFSET + 7066, "Nessus"),
-    (SE_AST_OFFSET + 8405, "Asbolus"),
-    (SE_AST_OFFSET + 10199, "Chariklo"),
+    (AST_OFFSET + 7066, "Nessus"),
+    (AST_OFFSET + 8405, "Asbolus"),
+    (AST_OFFSET + 10199, "Chariklo"),
 ]
 
 # Trans-Neptunian Objects
 TNOS = [
-    (SE_AST_OFFSET + 136199, "Eris"),
-    (SE_AST_OFFSET + 90377, "Sedna"),
-    (SE_AST_OFFSET + 136108, "Haumea"),
-    (SE_AST_OFFSET + 136472, "Makemake"),
-    (SE_AST_OFFSET + 90482, "Orcus"),
-    (SE_AST_OFFSET + 50000, "Quaoar"),
-    (SE_AST_OFFSET + 20000, "Varuna"),
-    (SE_AST_OFFSET + 28978, "Ixion"),
-    (SE_AST_OFFSET + 225088, "Gonggong"),
+    (AST_OFFSET + 136199, "Eris"),
+    (AST_OFFSET + 90377, "Sedna"),
+    (AST_OFFSET + 136108, "Haumea"),
+    (AST_OFFSET + 136472, "Makemake"),
+    (AST_OFFSET + 90482, "Orcus"),
+    (AST_OFFSET + 50000, "Quaoar"),
+    (AST_OFFSET + 20000, "Varuna"),
+    (AST_OFFSET + 28978, "Ixion"),
+    (AST_OFFSET + 225088, "Gonggong"),
 ]
 
 # Near-Earth Asteroids
 NEAS = [
-    (SE_AST_OFFSET + 433, "Eros"),
-    (SE_AST_OFFSET + 1221, "Amor"),
-    (SE_AST_OFFSET + 1566, "Icarus"),
-    (SE_AST_OFFSET + 1685, "Toro"),
-    (SE_AST_OFFSET + 99942, "Apophis"),
-    (SE_AST_OFFSET + 4179, "Toutatis"),
-    (SE_AST_OFFSET + 25143, "Itokawa"),
-    (SE_AST_OFFSET + 101955, "Bennu"),
-    (SE_AST_OFFSET + 162173, "Ryugu"),
+    (AST_OFFSET + 433, "Eros"),
+    (AST_OFFSET + 1221, "Amor"),
+    (AST_OFFSET + 1566, "Icarus"),
+    (AST_OFFSET + 1685, "Toro"),
+    (AST_OFFSET + 99942, "Apophis"),
+    (AST_OFFSET + 4179, "Toutatis"),
+    (AST_OFFSET + 25143, "Itokawa"),
+    (AST_OFFSET + 101955, "Bennu"),
+    (AST_OFFSET + 162173, "Ryugu"),
 ]
 
 # Astrological asteroids
 ASTRO_AST = [
-    (SE_AST_OFFSET + 80, "Sappho"),
-    (SE_AST_OFFSET + 55, "Pandora"),
-    (SE_AST_OFFSET + 1181, "Lilith(ast)"),
-    (SE_AST_OFFSET + 944, "Hidalgo"),
+    (AST_OFFSET + 80, "Sappho"),
+    (AST_OFFSET + 55, "Pandora"),
+    (AST_OFFSET + 1181, "Lilith(ast)"),
+    (AST_OFFSET + 944, "Hidalgo"),
 ]
 
 # Test epochs
@@ -268,7 +268,7 @@ def compare_body(
         return
 
     try:
-        res_le, retflag_le = ephem.swe_calc_ut(jd, body_id, flags)
+        res_le, retflag_le = ephem.calc_ut(jd, body_id, flags)
     except Exception as e:
         results.record_fail(f"{label}: libephemeris error: {e}")
         return
@@ -279,7 +279,7 @@ def compare_body(
 
     speed_diff = 0.0
     speed_ok = True
-    if check_speed and (flags & SEFLG_SPEED):
+    if check_speed and (flags & FLG_SPEED):
         speed_diff = abs(res_se[3] - res_le[3])
         # Handle speed wrap
         if speed_diff > 180:
@@ -329,10 +329,10 @@ def run_part1():
     tol_dist = 0.0001
 
     flag_sets = [
-        (SEFLG_SPEED, "SPEED"),
-        (SEFLG_SPEED | SEFLG_J2000, "SPEED+J2000"),
-        (SEFLG_SPEED | SEFLG_EQUATORIAL, "SPEED+EQUAT"),
-        (SEFLG_SPEED | SEFLG_NONUT, "SPEED+NONUT"),
+        (FLG_SPEED, "SPEED"),
+        (FLG_SPEED | FLG_J2000, "SPEED+J2000"),
+        (FLG_SPEED | FLG_EQUATORIAL, "SPEED+EQUAT"),
+        (FLG_SPEED | FLG_NONUT, "SPEED+NONUT"),
     ]
 
     for epoch in EPOCHS_10:
@@ -380,7 +380,7 @@ def run_part2():
                 jd,
                 body_id,
                 body_name,
-                SEFLG_SPEED,
+                FLG_SPEED,
                 tol_lon,
                 tol_lat,
                 tol_dist,
@@ -417,7 +417,7 @@ def run_part3():
                 jd,
                 body_id,
                 body_name,
-                SEFLG_SPEED,
+                FLG_SPEED,
                 tol_lon,
                 tol_lat,
                 tol_dist,
@@ -454,7 +454,7 @@ def run_part4():
                 jd,
                 body_id,
                 body_name,
-                SEFLG_SPEED,
+                FLG_SPEED,
                 tol_lon,
                 tol_lat,
                 tol_dist,
@@ -491,7 +491,7 @@ def run_part5():
                 jd,
                 body_id,
                 body_name,
-                SEFLG_SPEED,
+                FLG_SPEED,
                 tol_lon,
                 tol_lat,
                 tol_dist,
@@ -528,7 +528,7 @@ def run_part6():
                 jd,
                 body_id,
                 body_name,
-                SEFLG_SPEED,
+                FLG_SPEED,
                 tol_lon,
                 tol_lat,
                 tol_dist,
@@ -559,21 +559,21 @@ def run_part7():
     tol_dist = 0.001
 
     bodies = [
-        (SE_CERES, "Ceres"),
-        (SE_PALLAS, "Pallas"),
-        (SE_CHIRON, "Chiron"),
-        (SE_VESTA, "Vesta"),
+        (CERES, "Ceres"),
+        (PALLAS, "Pallas"),
+        (CHIRON, "Chiron"),
+        (VESTA, "Vesta"),
     ]
 
     flag_combos = [
         (0, "default"),
-        (SEFLG_SPEED, "SPEED"),
-        (SEFLG_SPEED | SEFLG_J2000, "SPEED+J2000"),
-        (SEFLG_SPEED | SEFLG_EQUATORIAL, "SPEED+EQUAT"),
-        (SEFLG_SPEED | SEFLG_NONUT, "SPEED+NONUT"),
-        (SEFLG_SPEED | SEFLG_TRUEPOS, "SPEED+TRUEPOS"),
-        (SEFLG_SPEED | SEFLG_NOABERR, "SPEED+NOABERR"),
-        (SEFLG_SPEED | SEFLG_NOGDEFL, "SPEED+NOGDEFL"),
+        (FLG_SPEED, "SPEED"),
+        (FLG_SPEED | FLG_J2000, "SPEED+J2000"),
+        (FLG_SPEED | FLG_EQUATORIAL, "SPEED+EQUAT"),
+        (FLG_SPEED | FLG_NONUT, "SPEED+NONUT"),
+        (FLG_SPEED | FLG_TRUEPOS, "SPEED+TRUEPOS"),
+        (FLG_SPEED | FLG_NOABERR, "SPEED+NOABERR"),
+        (FLG_SPEED | FLG_NOGDEFL, "SPEED+NOGDEFL"),
     ]
 
     for epoch in EPOCHS_5:
@@ -619,12 +619,12 @@ def run_part8():
         for body_id, body_name in all_bodies:
             label = f"{body_name} @ {epoch[4]}"
             try:
-                res_se, _ = swe.calc_ut(jd, body_id, SEFLG_SPEED)
+                res_se, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             except Exception as e:
                 results.record_skip(f"{label}: pyswisseph error: {e}")
                 continue
             try:
-                res_le, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                res_le, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
             except Exception as e:
                 results.record_fail(f"{label}: libephemeris error: {e}")
                 continue
@@ -669,7 +669,7 @@ def run_part8():
 def run_part9():
     print("\n" + "=" * 70)
     print("PART 9: Heliocentric Positions")
-    print("  Big 6 × 5 epochs with SEFLG_HELCTR")
+    print("  Big 6 × 5 epochs with FLG_HELCTR")
     print('  Tolerance: 1.0" lon/lat')
     print("=" * 70)
 
@@ -678,7 +678,7 @@ def run_part9():
     tol_lat = 1.0 / 3600
     tol_dist = 0.0001
 
-    flags = SEFLG_SPEED | SEFLG_HELCTR
+    flags = FLG_SPEED | FLG_HELCTR
 
     for epoch in EPOCHS_5:
         jd = jd_for(epoch)
@@ -708,21 +708,21 @@ def run_part9():
 def run_part10():
     print("\n" + "=" * 70)
     print("PART 10: J2000 Equatorial + XYZ")
-    print("  Big 4 × 3 epochs with SEFLG_EQUATORIAL|J2000 and SEFLG_XYZ")
+    print("  Big 4 × 3 epochs with FLG_EQUATORIAL|J2000 and FLG_XYZ")
     print('  Tolerance: 1.0" (equat), 0.0001 AU (XYZ)')
     print("=" * 70)
 
     results = TestResults("P10: Equatorial/XYZ")
 
     bodies = [
-        (SE_CERES, "Ceres"),
-        (SE_CHIRON, "Chiron"),
-        (SE_PALLAS, "Pallas"),
-        (SE_VESTA, "Vesta"),
+        (CERES, "Ceres"),
+        (CHIRON, "Chiron"),
+        (PALLAS, "Pallas"),
+        (VESTA, "Vesta"),
     ]
 
     # Equatorial J2000
-    flags_eq = SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000
+    flags_eq = FLG_SPEED | FLG_EQUATORIAL | FLG_J2000
     tol_lon = 1.0 / 3600
     tol_lat = 1.0 / 3600
 
@@ -742,7 +742,7 @@ def run_part10():
             )
 
     # XYZ
-    flags_xyz = SEFLG_SPEED | SEFLG_XYZ
+    flags_xyz = FLG_SPEED | FLG_XYZ
     for epoch in EPOCHS_3:
         jd = jd_for(epoch)
         for body_id, body_name in bodies:
@@ -753,7 +753,7 @@ def run_part10():
                 results.record_skip(f"{label}: pyswisseph: {e}")
                 continue
             try:
-                res_le, _ = ephem.swe_calc_ut(jd, body_id, flags_xyz)
+                res_le, _ = ephem.calc_ut(jd, body_id, flags_xyz)
             except Exception as e:
                 results.record_fail(f"{label}: libephemeris: {e}")
                 continue

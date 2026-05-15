@@ -7,6 +7,7 @@ the full RA/Dec conversion pipeline including proper motion propagation.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -14,7 +15,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 STARS = [
     "Aldebaran",
@@ -68,7 +72,7 @@ for date_str, jd in TEST_DATES:
                 skipped += 1
                 continue
             try:
-                le_r = ephem.swe_fixstar2_ut(star_name, jd, flags)
+                le_r = ephem.fixstar2_ut(star_name, jd, flags)
                 le_name = le_r[1]
                 le_pos = le_r[0]
             except Exception:

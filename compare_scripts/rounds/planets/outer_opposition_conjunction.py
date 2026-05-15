@@ -12,14 +12,17 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SE_SUN = 0
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_URANUS = 7
-SE_NEPTUNE = 8
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+SUN = 0
+JUPITER = 5
+SATURN = 6
+URANUS = 7
+NEPTUNE = 8
 
 
 def find_oppositions_conjunctions(body_id, start_jd, count=15):
@@ -30,8 +33,8 @@ def find_oppositions_conjunctions(body_id, start_jd, count=15):
     found = 0
 
     def elongation(jd_):
-        sun = swe.calc_ut(jd_, SE_SUN, SEFLG_SPEED)[0][0]
-        planet = swe.calc_ut(jd_, body_id, SEFLG_SPEED)[0][0]
+        sun = swe.calc_ut(jd_, SUN, FLG_SPEED)[0][0]
+        planet = swe.calc_ut(jd_, body_id, FLG_SPEED)[0][0]
         e = planet - sun
         while e > 180:
             e -= 360
@@ -102,10 +105,10 @@ def main():
     failures = []
 
     bodies = [
-        (SE_JUPITER, "Jupiter", 20),
-        (SE_SATURN, "Saturn", 15),
-        (SE_URANUS, "Uranus", 10),
-        (SE_NEPTUNE, "Neptune", 8),
+        (JUPITER, "Jupiter", 20),
+        (SATURN, "Saturn", 15),
+        (URANUS, "Uranus", 10),
+        (NEPTUNE, "Neptune", 8),
     ]
 
     start_jd = 2451545.0
@@ -120,8 +123,8 @@ def main():
             for offset in [-0.1, 0.0, 0.1]:
                 test_jd = jd + offset
                 try:
-                    se_pos = swe.calc_ut(test_jd, body_id, SEFLG_SPEED)[0]
-                    le_pos = ephem.swe_calc_ut(test_jd, body_id, SEFLG_SPEED)[0]
+                    se_pos = swe.calc_ut(test_jd, body_id, FLG_SPEED)[0]
+                    le_pos = ephem.calc_ut(test_jd, body_id, FLG_SPEED)[0]
                 except Exception:
                     continue
 

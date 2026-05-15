@@ -7,9 +7,9 @@ Tests position calculations with all combinations of correction-suppression
 flags across all major bodies and multiple epochs.
 
 These flags disable specific corrections in the position pipeline:
-  SEFLG_TRUEPOS (16)  - geometric position (no light-time correction)
-  SEFLG_NONUT (64)    - suppress nutation (use mean ecliptic)
-  SEFLG_NOABERR (1024) - suppress aberration correction
+  FLG_TRUEPOS (16)  - geometric position (no light-time correction)
+  FLG_NONUT (64)    - suppress nutation (use mean ecliptic)
+  FLG_NOABERR (1024) - suppress aberration correction
 
 Parts:
   P1: Single flags (TRUEPOS, NONUT, NOABERR) vs default — all planets
@@ -41,20 +41,20 @@ swe.set_ephe_path(_EPHE_PATH)
 
 # Bodies to test
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanLilith"),
-    (SE_CHIRON, "Chiron"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanLilith"),
+    (CHIRON, "Chiron"),
 ]
 
 # Test epochs
@@ -128,7 +128,7 @@ def compare_pos(r, se_result, le_result, label, body_id):
     dist_diff = abs(se_pos[2] - le_pos[2])
 
     # Adaptive lat tolerance for MeanLilith
-    lat_tol = TOL_MEANLILITH_LAT if body_id == SE_MEAN_APOG else TOL_LAT
+    lat_tol = TOL_MEANLILITH_LAT if body_id == MEAN_APOG else TOL_LAT
 
     if lon_diff_arcsec > TOL_LON:
         r.fail(
@@ -153,7 +153,7 @@ def compare_pos(r, se_result, le_result, label, body_id):
 def calc_both(body_id, jd, flags):
     """Calculate position with both SE and LE."""
     se_result = swe.calc_ut(jd, body_id, flags)
-    le_result = ephem.swe_calc_ut(jd, body_id, flags)
+    le_result = ephem.calc_ut(jd, body_id, flags)
     return se_result, le_result
 
 
@@ -168,9 +168,9 @@ def run_part1():
     r = R("P1: Single flags")
 
     single_flags = [
-        (SEFLG_TRUEPOS, "TRUEPOS"),
-        (SEFLG_NONUT, "NONUT"),
-        (SEFLG_NOABERR, "NOABERR"),
+        (FLG_TRUEPOS, "TRUEPOS"),
+        (FLG_NONUT, "NONUT"),
+        (FLG_NOABERR, "NOABERR"),
     ]
 
     for y, m, d, h, epoch_name in EPOCHS:
@@ -178,7 +178,7 @@ def run_part1():
 
         for body_id, body_name in BODIES:
             for flag_val, flag_name in single_flags:
-                flags = SEFLG_SPEED | flag_val
+                flags = FLG_SPEED | flag_val
                 label = f"{epoch_name} {body_name} {flag_name}"
 
                 try:
@@ -202,9 +202,9 @@ def run_part2():
     r = R("P2: Flag pairs")
 
     flag_pairs = [
-        (SEFLG_TRUEPOS | SEFLG_NONUT, "TRUEPOS+NONUT"),
-        (SEFLG_TRUEPOS | SEFLG_NOABERR, "TRUEPOS+NOABERR"),
-        (SEFLG_NONUT | SEFLG_NOABERR, "NONUT+NOABERR"),
+        (FLG_TRUEPOS | FLG_NONUT, "TRUEPOS+NONUT"),
+        (FLG_TRUEPOS | FLG_NOABERR, "TRUEPOS+NOABERR"),
+        (FLG_NONUT | FLG_NOABERR, "NONUT+NOABERR"),
     ]
 
     for y, m, d, h, epoch_name in EPOCHS:
@@ -212,7 +212,7 @@ def run_part2():
 
         for body_id, body_name in BODIES:
             for flag_val, flag_name in flag_pairs:
-                flags = SEFLG_SPEED | flag_val
+                flags = FLG_SPEED | flag_val
                 label = f"{epoch_name} {body_name} {flag_name}"
 
                 try:
@@ -235,13 +235,13 @@ def run_part3():
 
     r = R("P3: All three flags")
 
-    flag_val = SEFLG_TRUEPOS | SEFLG_NONUT | SEFLG_NOABERR
+    flag_val = FLG_TRUEPOS | FLG_NONUT | FLG_NOABERR
 
     for y, m, d, h, epoch_name in EPOCHS:
         jd = swe.julday(y, m, d, h)
 
         for body_id, body_name in BODIES:
-            flags = SEFLG_SPEED | flag_val
+            flags = FLG_SPEED | flag_val
             label = f"{epoch_name} {body_name} ALL3"
 
             try:
@@ -265,18 +265,18 @@ def run_part4():
     r = R("P4: Flags+EQUATORIAL")
 
     flag_combos = [
-        (SEFLG_NONUT, "NONUT"),
-        (SEFLG_NOABERR, "NOABERR"),
-        (SEFLG_TRUEPOS | SEFLG_NONUT, "TRUEPOS+NONUT"),
-        (SEFLG_NONUT | SEFLG_NOABERR, "NONUT+NOABERR"),
-        (SEFLG_TRUEPOS | SEFLG_NONUT | SEFLG_NOABERR, "ALL3"),
+        (FLG_NONUT, "NONUT"),
+        (FLG_NOABERR, "NOABERR"),
+        (FLG_TRUEPOS | FLG_NONUT, "TRUEPOS+NONUT"),
+        (FLG_NONUT | FLG_NOABERR, "NONUT+NOABERR"),
+        (FLG_TRUEPOS | FLG_NONUT | FLG_NOABERR, "ALL3"),
     ]
 
     jd = swe.julday(2024, 3, 20, 15.5)
 
     for body_id, body_name in BODIES:
         for flag_val, flag_name in flag_combos:
-            flags = SEFLG_SPEED | SEFLG_EQUATORIAL | flag_val
+            flags = FLG_SPEED | FLG_EQUATORIAL | flag_val
             label = f"{body_name} EQ+{flag_name}"
 
             try:
@@ -300,10 +300,10 @@ def run_part5():
     r = R("P5: Flags+J2000")
 
     flag_combos = [
-        (SEFLG_NONUT, "NONUT"),
-        (SEFLG_NOABERR, "NOABERR"),
-        (SEFLG_TRUEPOS, "TRUEPOS"),
-        (SEFLG_TRUEPOS | SEFLG_NONUT | SEFLG_NOABERR, "ALL3"),
+        (FLG_NONUT, "NONUT"),
+        (FLG_NOABERR, "NOABERR"),
+        (FLG_TRUEPOS, "TRUEPOS"),
+        (FLG_TRUEPOS | FLG_NONUT | FLG_NOABERR, "ALL3"),
     ]
 
     # Use a date far from J2000 to test precession interactions
@@ -311,7 +311,7 @@ def run_part5():
 
     for body_id, body_name in BODIES:
         for flag_val, flag_name in flag_combos:
-            flags = SEFLG_SPEED | SEFLG_J2000 | flag_val
+            flags = FLG_SPEED | FLG_J2000 | flag_val
             label = f"{body_name} J2000+{flag_name}"
 
             try:
@@ -336,29 +336,29 @@ def run_part6():
 
     # Helio bodies (no Sun, no Moon, no nodes/Lilith for helio)
     helio_bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
-        (SE_CHIRON, "Chiron"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
+        (CHIRON, "Chiron"),
     ]
 
     flag_combos = [
-        (SEFLG_NONUT, "NONUT"),
-        (SEFLG_NOABERR, "NOABERR"),
-        (SEFLG_TRUEPOS, "TRUEPOS"),
-        (SEFLG_TRUEPOS | SEFLG_NONUT | SEFLG_NOABERR, "ALL3"),
+        (FLG_NONUT, "NONUT"),
+        (FLG_NOABERR, "NOABERR"),
+        (FLG_TRUEPOS, "TRUEPOS"),
+        (FLG_TRUEPOS | FLG_NONUT | FLG_NOABERR, "ALL3"),
     ]
 
     jd = swe.julday(2024, 3, 20, 15.5)
 
     for body_id, body_name in helio_bodies:
         for flag_val, flag_name in flag_combos:
-            flags = SEFLG_SPEED | SEFLG_HELCTR | flag_val
+            flags = FLG_SPEED | FLG_HELCTR | flag_val
             label = f"{body_name} HELIO+{flag_name}"
 
             try:
@@ -382,16 +382,16 @@ def run_part7():
     r = R("P7: Multi-epoch NONUT+NOABERR")
 
     sweep_bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (PLUTO, "Pluto"),
     ]
 
-    flags = SEFLG_SPEED | SEFLG_NONUT | SEFLG_NOABERR
+    flags = FLG_SPEED | FLG_NONUT | FLG_NOABERR
 
     years = list(range(1800, 2101, 25))
 

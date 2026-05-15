@@ -1,7 +1,7 @@
 """
 Tests for heliocentric planet positions.
 
-Verifies that SEFLG_HELCTR produces valid heliocentric coordinates
+Verifies that FLG_HELCTR produces valid heliocentric coordinates
 for all supported bodies across a wide date range. Checks output format,
 value ranges, physical plausibility, and consistency between heliocentric
 and geocentric results.
@@ -16,27 +16,27 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_EARTH,
-    SE_CHIRON,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SEFLG_HELCTR,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    EARTH,
+    CHIRON,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    FLG_HELCTR,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
 )
 
 
@@ -50,40 +50,40 @@ def _random_jds(n: int, seed: int = 42) -> list[float]:
 
 # Known heliocentric distance ranges (AU)
 HELIO_DISTANCE_RANGES = {
-    SE_MERCURY: (0.30, 0.47),
-    SE_VENUS: (0.71, 0.73),
-    SE_EARTH: (0.98, 1.02),
-    SE_MARS: (1.38, 1.67),
-    SE_JUPITER: (4.95, 5.46),
-    SE_SATURN: (9.02, 10.05),
-    SE_URANUS: (18.3, 20.1),
-    SE_NEPTUNE: (29.8, 30.4),
-    SE_PLUTO: (29.6, 49.3),
+    MERCURY: (0.30, 0.47),
+    VENUS: (0.71, 0.73),
+    EARTH: (0.98, 1.02),
+    MARS: (1.38, 1.67),
+    JUPITER: (4.95, 5.46),
+    SATURN: (9.02, 10.05),
+    URANUS: (18.3, 20.1),
+    NEPTUNE: (29.8, 30.4),
+    PLUTO: (29.6, 49.3),
 }
 
 # Approximate heliocentric orbital periods in days
 HELIO_PERIODS = {
-    SE_MERCURY: 87.97,
-    SE_VENUS: 224.7,
-    SE_EARTH: 365.25,
-    SE_MARS: 687.0,
-    SE_JUPITER: 4332.6,
-    SE_SATURN: 10759.2,
-    SE_URANUS: 30688.5,
-    SE_NEPTUNE: 60182.0,
-    SE_PLUTO: 90560.0,
+    MERCURY: 87.97,
+    VENUS: 224.7,
+    EARTH: 365.25,
+    MARS: 687.0,
+    JUPITER: 4332.6,
+    SATURN: 10759.2,
+    URANUS: 30688.5,
+    NEPTUNE: 60182.0,
+    PLUTO: 90560.0,
 }
 
 PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_EARTH, "Earth"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (EARTH, "Earth"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
@@ -95,7 +95,7 @@ class TestHeliocentricBasic:
     def test_heliocentric_returns_valid_tuple(self, body_id: int, name: str):
         """Heliocentric calculation returns valid 6-element tuple."""
         jd = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR | SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, body_id, FLG_HELCTR | FLG_SPEED)
         assert len(result) == 6, f"{name}: expected 6 elements, got {len(result)}"
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{name}: non-finite at index {i}"
@@ -105,7 +105,7 @@ class TestHeliocentricBasic:
     def test_heliocentric_longitude_range(self, body_id: int, name: str):
         """Heliocentric longitude should be in [0, 360)."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+        result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
         assert 0 <= result[0] < 360, f"{name}: longitude {result[0]} out of range"
 
     @pytest.mark.unit
@@ -113,16 +113,16 @@ class TestHeliocentricBasic:
     def test_heliocentric_latitude_small(self, body_id: int, name: str):
         """Heliocentric latitude should be small (planets orbit near ecliptic)."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+        result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
         # Pluto has high inclination (17°), others < 7°
-        max_lat = 20.0 if body_id == SE_PLUTO else 10.0
+        max_lat = 20.0 if body_id == PLUTO else 10.0
         assert abs(result[1]) < max_lat, f"{name}: latitude {result[1]}° too large"
 
     @pytest.mark.unit
     def test_sun_heliocentric_is_zero(self):
         """Sun heliocentric position should be (0,0,0,0,0,0)."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_HELCTR)
+        result, _ = swe.calc_ut(jd, SUN, FLG_HELCTR)
         for i, val in enumerate(result):
             assert val == pytest.approx(0.0, abs=1e-10), (
                 f"Sun heliocentric result[{i}] = {val}, expected 0"
@@ -147,7 +147,7 @@ class TestHeliocentricDistances:
         """Heliocentric distance should be within known orbital range."""
         jds = _random_jds(20, seed=body_id)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+            result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
             dist = result[2]
             assert dist_min * 0.9 <= dist <= dist_max * 1.1, (
                 f"{name}: distance {dist} AU outside range "
@@ -164,7 +164,7 @@ class TestHeliocentricHighVolume:
         """Heliocentric calculation succeeds for 100 random dates per planet."""
         jds = _random_jds(100, seed=body_id * 100)
         for jd in jds:
-            result, retflag = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR | SEFLG_SPEED)
+            result, retflag = swe.calc_ut(jd, body_id, FLG_HELCTR | FLG_SPEED)
             assert len(result) == 6
             assert 0 <= result[0] < 360
             assert math.isfinite(result[2])
@@ -173,7 +173,7 @@ class TestHeliocentricHighVolume:
     @pytest.mark.parametrize("jd", _random_jds(100, seed=9999))
     def test_earth_heliocentric_100_dates(self, jd: float):
         """Earth heliocentric position at 100 dates — distance ~1 AU."""
-        result, _ = swe.swe_calc_ut(jd, SE_EARTH, SEFLG_HELCTR)
+        result, _ = swe.calc_ut(jd, EARTH, FLG_HELCTR)
         assert 0.98 < result[2] < 1.02, (
             f"Earth heliocentric distance {result[2]} at JD {jd}"
         )
@@ -187,21 +187,21 @@ class TestHeliocentricFlagCombinations:
         "extra_flags,desc",
         [
             (0, "helctr only"),
-            (SEFLG_SPEED, "helctr+speed"),
-            (SEFLG_EQUATORIAL, "helctr+equatorial"),
-            (SEFLG_J2000, "helctr+J2000"),
-            (SEFLG_NOABERR, "helctr+noaberr"),
-            (SEFLG_NOGDEFL, "helctr+nogdefl"),
-            (SEFLG_SPEED | SEFLG_J2000, "helctr+speed+J2000"),
-            (SEFLG_EQUATORIAL | SEFLG_SPEED, "helctr+equatorial+speed"),
+            (FLG_SPEED, "helctr+speed"),
+            (FLG_EQUATORIAL, "helctr+equatorial"),
+            (FLG_J2000, "helctr+J2000"),
+            (FLG_NOABERR, "helctr+noaberr"),
+            (FLG_NOGDEFL, "helctr+nogdefl"),
+            (FLG_SPEED | FLG_J2000, "helctr+speed+J2000"),
+            (FLG_EQUATORIAL | FLG_SPEED, "helctr+equatorial+speed"),
         ],
     )
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_EARTH, "Earth"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (EARTH, "Earth"),
         ],
     )
     def test_heliocentric_flag_combo(
@@ -209,8 +209,8 @@ class TestHeliocentricFlagCombinations:
     ):
         """Heliocentric works with various flag combinations."""
         jd = 2451545.0
-        flags = SEFLG_HELCTR | extra_flags
-        result, retflag = swe.swe_calc_ut(jd, body_id, flags)
+        flags = FLG_HELCTR | extra_flags
+        result, retflag = swe.calc_ut(jd, body_id, flags)
         assert len(result) == 6
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{name} {desc}: non-finite at index {i}"
@@ -223,9 +223,9 @@ class TestHeliocentricVsGeocentric:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_heliocentric_distance_differs_from_geocentric(
@@ -233,8 +233,8 @@ class TestHeliocentricVsGeocentric:
     ):
         """Heliocentric and geocentric distances should differ."""
         jd = 2451545.0
-        r_helio, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
-        r_geo, _ = swe.swe_calc_ut(jd, body_id, 0)
+        r_helio, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
+        r_geo, _ = swe.calc_ut(jd, body_id, 0)
         assert abs(r_helio[2] - r_geo[2]) > 0.1, (
             f"{name}: helio dist {r_helio[2]} == geo dist {r_geo[2]}"
         )
@@ -243,8 +243,8 @@ class TestHeliocentricVsGeocentric:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_heliocentric_longitude_differs_from_geocentric(
@@ -252,8 +252,8 @@ class TestHeliocentricVsGeocentric:
     ):
         """Heliocentric and geocentric longitudes should generally differ."""
         jd = 2451545.0
-        r_helio, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
-        r_geo, _ = swe.swe_calc_ut(jd, body_id, 0)
+        r_helio, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
+        r_geo, _ = swe.calc_ut(jd, body_id, 0)
         # They might coincidentally be close, but generally differ
         diff = abs(r_helio[0] - r_geo[0])
         if diff > 180:
@@ -273,8 +273,8 @@ class TestHeliocentricVsGeocentric:
         state._LEB_READER = None
         try:
             jd = 2451545.0
-            r_earth, _ = swe.swe_calc_ut(jd, SE_EARTH, SEFLG_HELCTR)
-            r_sun, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
+            r_earth, _ = swe.calc_ut(jd, EARTH, FLG_HELCTR)
+            r_sun, _ = swe.calc_ut(jd, SUN, 0)
         finally:
             state._LEB_FILE = saved_leb
             state._LEB_READER = saved_reader
@@ -295,7 +295,7 @@ class TestHeliocentricSpeed:
     def test_heliocentric_speed_nonzero(self, body_id: int, name: str):
         """Heliocentric speed should be non-zero for all planets."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR | FLG_SPEED)
         speed = result[3]
         assert abs(speed) > 1e-6, (
             f"{name}: heliocentric speed {speed} is essentially zero"
@@ -305,12 +305,12 @@ class TestHeliocentricSpeed:
     @pytest.mark.parametrize(
         "body_id,name,expected_speed",
         [
-            (SE_MERCURY, "Mercury", 360 / 87.97),
-            (SE_VENUS, "Venus", 360 / 224.7),
-            (SE_EARTH, "Earth", 360 / 365.25),
-            (SE_MARS, "Mars", 360 / 687.0),
-            (SE_JUPITER, "Jupiter", 360 / 4332.6),
-            (SE_SATURN, "Saturn", 360 / 10759.2),
+            (MERCURY, "Mercury", 360 / 87.97),
+            (VENUS, "Venus", 360 / 224.7),
+            (EARTH, "Earth", 360 / 365.25),
+            (MARS, "Mars", 360 / 687.0),
+            (JUPITER, "Jupiter", 360 / 4332.6),
+            (SATURN, "Saturn", 360 / 10759.2),
         ],
     )
     def test_heliocentric_speed_order_of_magnitude(
@@ -318,7 +318,7 @@ class TestHeliocentricSpeed:
     ):
         """Heliocentric speed should be roughly 360°/period."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR | FLG_SPEED)
         speed = result[3]
         # Allow factor of 2 variation (eccentricity)
         assert expected_speed * 0.5 < abs(speed) < expected_speed * 2.0, (

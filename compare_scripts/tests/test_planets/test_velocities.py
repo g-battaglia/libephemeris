@@ -20,7 +20,7 @@ class TestSunVelocity:
     def test_sun_velocity_approximately_1_degree_per_day(self):
         """Sun moves approximately 1 degree per day."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
 
         # Sun velocity should be ~0.9-1.1 degrees/day
         assert 0.9 < pos[3] < 1.1, f"Sun velocity {pos[3]} should be ~1°/day"
@@ -29,19 +29,19 @@ class TestSunVelocity:
     def test_sun_velocity_always_positive(self):
         """Sun never goes retrograde."""
         for jd in [2451545.0, 2455000.0, 2460000.0]:
-            pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
             assert pos[3] > 0, "Sun velocity should always be positive"
 
     @pytest.mark.unit
     def test_sun_velocity_varies_seasonally(self):
         """Sun is faster at perihelion (January) than aphelion (July)."""
         # Perihelion around Jan 3
-        jd_jan = ephem.swe_julday(2020, 1, 3, 12.0)
+        jd_jan = ephem.julday(2020, 1, 3, 12.0)
         # Aphelion around Jul 4
-        jd_jul = ephem.swe_julday(2020, 7, 4, 12.0)
+        jd_jul = ephem.julday(2020, 7, 4, 12.0)
 
-        pos_jan, _ = ephem.swe_calc_ut(jd_jan, SE_SUN, SEFLG_SPEED)
-        pos_jul, _ = ephem.swe_calc_ut(jd_jul, SE_SUN, SEFLG_SPEED)
+        pos_jan, _ = ephem.calc_ut(jd_jan, SUN, FLG_SPEED)
+        pos_jul, _ = ephem.calc_ut(jd_jul, SUN, FLG_SPEED)
 
         assert pos_jan[3] > pos_jul[3], "Sun faster at perihelion"
 
@@ -53,7 +53,7 @@ class TestMoonVelocity:
     def test_moon_velocity_approximately_13_degrees_per_day(self):
         """Moon moves approximately 12-15 degrees per day."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, MOON, FLG_SPEED)
 
         assert 11 < pos[3] < 16, f"Moon velocity {pos[3]} should be ~12-15°/day"
 
@@ -61,7 +61,7 @@ class TestMoonVelocity:
     def test_moon_velocity_always_positive(self):
         """Moon never goes retrograde."""
         for jd in [2451545.0, 2455000.0, 2460000.0]:
-            pos, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, MOON, FLG_SPEED)
             assert pos[3] > 0, "Moon velocity should always be positive"
 
 
@@ -76,7 +76,7 @@ class TestPlanetVelocityRanges:
         progress = progress_reporter("Mercury velocity", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             velocities.append(pos[3])
             progress.update(i)
 
@@ -94,7 +94,7 @@ class TestPlanetVelocityRanges:
         progress = progress_reporter("Venus velocity", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_VENUS, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), VENUS, FLG_SPEED)
             velocities.append(pos[3])
             progress.update(i)
 
@@ -112,7 +112,7 @@ class TestPlanetVelocityRanges:
         progress = progress_reporter("Mars velocity", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MARS, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MARS, FLG_SPEED)
             velocities.append(pos[3])
             progress.update(i)
 
@@ -128,13 +128,13 @@ class TestPlanetVelocityRanges:
         jd = 2451545.0
 
         for planet_id, name, max_speed in [
-            (SE_JUPITER, "Jupiter", 0.25),
-            (SE_SATURN, "Saturn", 0.15),
-            (SE_URANUS, "Uranus", 0.08),
-            (SE_NEPTUNE, "Neptune", 0.05),
-            (SE_PLUTO, "Pluto", 0.05),
+            (JUPITER, "Jupiter", 0.25),
+            (SATURN, "Saturn", 0.15),
+            (URANUS, "Uranus", 0.08),
+            (NEPTUNE, "Neptune", 0.05),
+            (PLUTO, "Pluto", 0.05),
         ]:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
             assert abs(pos[3]) < max_speed, (
                 f"{name} velocity {pos[3]} exceeds expected {max_speed}"
             )
@@ -149,8 +149,8 @@ class TestVelocityVsPositionDifference:
         jd = 2451545.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_SUN, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, SUN, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -175,13 +175,13 @@ class TestVelocityVsPyswisseph:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_velocity_matches_swisseph(self, planet_id, planet_name):
@@ -189,8 +189,8 @@ class TestVelocityVsPyswisseph:
         jd = 2451545.0
         tolerance = 0.01  # degrees/day
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
-        pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
+        pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SPEED)
 
         # Compare longitude velocity
         vel_diff = abs(pos_lib[3] - pos_swe[3])

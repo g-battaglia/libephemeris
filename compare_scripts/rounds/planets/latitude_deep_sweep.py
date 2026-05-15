@@ -19,7 +19,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -43,12 +46,12 @@ BODIES = {
     20: "Vesta",
 }
 
-SE_AST_OFFSET = 10000
+AST_OFFSET = 10000
 SE_ASTEROID_MAP = {
-    17: SE_AST_OFFSET + 1,
-    18: SE_AST_OFFSET + 2,
-    19: SE_AST_OFFSET + 3,
-    20: SE_AST_OFFSET + 4,
+    17: AST_OFFSET + 1,
+    18: AST_OFFSET + 2,
+    19: AST_OFFSET + 3,
+    20: AST_OFFSET + 4,
 }
 
 
@@ -56,7 +59,7 @@ def se_body(b):
     return SE_ASTEROID_MAP.get(b, b)
 
 
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 60: Planetary Latitude Deep Sweep")
@@ -73,7 +76,7 @@ for month in range(0, 30 * 12, 3):  # Quarterly for 30 years
     for body_id, name in BODIES.items():
         try:
             se_r = swe.calc_ut(jd, se_body(body_id), FLAGS)
-            le_r = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_r = ephem.calc_ut(jd, body_id, FLAGS)
             se_lat = se_r[0][1]
             le_lat = le_r[0][1]
             diff = abs(se_lat - le_lat) * 3600  # arcsec
@@ -107,7 +110,7 @@ for month in range(0, 10 * 12, 6):  # Every 6 months for 10 years
     for body_id, name in list(BODIES.items())[:10]:  # Main planets only
         try:
             se_r = swe.calc_ut(jd, se_body(body_id), FLAGS)
-            le_r = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_r = ephem.calc_ut(jd, body_id, FLAGS)
             se_latspd = se_r[0][4]  # lat speed
             le_latspd = le_r[0][4]
             diff = abs(se_latspd - le_latspd)
@@ -133,7 +136,7 @@ print("\n=== P3: Sun latitude (should be ~0) ===")
 for day in range(0, 365 * 5, 10):  # Every 10 days for 5 years
     jd = jd_start + day
     try:
-        le_r = ephem.swe_calc_ut(jd, 0, FLAGS)
+        le_r = ephem.calc_ut(jd, 0, FLAGS)
         se_r = swe.calc_ut(jd, 0, FLAGS)
         le_lat = le_r[0][1]
         se_lat = se_r[0][1]
@@ -159,7 +162,7 @@ min_moon_lat = 0.0
 for day in range(0, 365 * 19, 1):  # Daily for ~1 nodal cycle
     jd = jd_start + day
     try:
-        le_r = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le_r = ephem.calc_ut(jd, 1, FLAGS)
         lat = le_r[0][1]
         if lat > max_moon_lat:
             max_moon_lat = lat
@@ -194,7 +197,7 @@ for year in [1900, 1950, 2050, 2100]:
         name = BODIES[body_id]
         try:
             se_r = swe.calc_ut(jd, body_id, FLAGS)
-            le_r = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            le_r = ephem.calc_ut(jd, body_id, FLAGS)
             diff = abs(se_r[0][1] - le_r[0][1]) * 3600
             if diff < 0.5:
                 passed += 1
@@ -211,7 +214,7 @@ print(f"  After P5: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P6: J2000 frame latitude ===")
 
-J2000_FLAG = 256 | 32  # SEFLG_SPEED | SEFLG_J2000
+J2000_FLAG = 256 | 32  # FLG_SPEED | FLG_J2000
 
 for body_id in [1, 2, 3, 4, 5, 6]:
     name = BODIES[body_id]
@@ -219,7 +222,7 @@ for body_id in [1, 2, 3, 4, 5, 6]:
         jd = swe.julday(year, 3, 21, 12.0)
         try:
             se_r = swe.calc_ut(jd, body_id, J2000_FLAG)
-            le_r = ephem.swe_calc_ut(jd, body_id, J2000_FLAG)
+            le_r = ephem.calc_ut(jd, body_id, J2000_FLAG)
             diff = abs(se_r[0][1] - le_r[0][1]) * 3600
             if diff < 0.5:
                 passed += 1

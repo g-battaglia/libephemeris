@@ -1,7 +1,7 @@
 """
 Tests for True Lunar Node velocity calculation.
 
-Validates that velocity (SEFLG_SPEED) is calculated correctly via numerical
+Validates that velocity (FLG_SPEED) is calculated correctly via numerical
 differentiation.
 
 Velocity precision characteristics:
@@ -19,7 +19,7 @@ import random
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_TRUE_NODE, SE_MEAN_NODE, SEFLG_SPEED
+from libephemeris.constants import TRUE_NODE, MEAN_NODE, FLG_SPEED
 
 
 # Mean Node velocity tolerance (should be very precise)
@@ -40,7 +40,7 @@ class TestTrueNodeVelocity:
     def test_true_node_velocity_is_negative(self):
         """True Node moves retrograde (west) at about -0.05 degrees/day."""
         jd = 2451545.0  # J2000.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
 
         # True node moves retrograde, so velocity should be negative
         # Typical velocity is around -0.05 degrees/day (completes cycle in ~18.6 years)
@@ -53,8 +53,8 @@ class TestTrueNodeVelocity:
         jd = 2451545.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_TRUE_NODE, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, TRUE_NODE, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -76,7 +76,7 @@ class TestTrueNodeVelocity:
         """True node velocity should match pyswisseph within 0.001 degrees/day at J2000."""
         jd = 2451545.0  # J2000.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
         pos_swe, _ = swe.calc_ut(jd, swe.TRUE_NODE, swe.FLG_SPEED)
 
         vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -96,7 +96,7 @@ class TestTrueNodeVelocity:
             month = random.randint(1, 12)
             day = random.randint(1, 28)
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append((year, jd))
 
         progress = progress_reporter("True node velocity", len(dates), report_every=10)
@@ -104,7 +104,7 @@ class TestTrueNodeVelocity:
         errors = []
 
         for i, (year, jd) in enumerate(dates):
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd, swe.TRUE_NODE, swe.FLG_SPEED)
 
             vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -125,16 +125,16 @@ class TestTrueNodeVelocity:
 
     @pytest.mark.unit
     def test_true_node_velocity_without_flag_is_zero(self):
-        """Without SEFLG_SPEED, velocity should be zero."""
+        """Without FLG_SPEED, velocity should be zero."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, 0)  # No SEFLG_SPEED
+        pos, _ = ephem.calc_ut(jd, TRUE_NODE, 0)  # No FLG_SPEED
 
-        assert pos[3] == 0.0, f"Velocity should be 0 without SEFLG_SPEED, got {pos[3]}"
+        assert pos[3] == 0.0, f"Velocity should be 0 without FLG_SPEED, got {pos[3]}"
         assert pos[4] == 0.0, (
-            f"Lat velocity should be 0 without SEFLG_SPEED, got {pos[4]}"
+            f"Lat velocity should be 0 without FLG_SPEED, got {pos[4]}"
         )
         assert pos[5] == 0.0, (
-            f"Dist velocity should be 0 without SEFLG_SPEED, got {pos[5]}"
+            f"Dist velocity should be 0 without FLG_SPEED, got {pos[5]}"
         )
 
 
@@ -145,7 +145,7 @@ class TestMeanNodeVelocity:
     def test_mean_node_velocity_is_negative(self):
         """Mean Node moves retrograde at about -0.053 degrees/day."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
 
         # Mean node moves retrograde with nearly constant velocity
         assert pos[3] < 0, f"Mean node should move retrograde, got velocity {pos[3]}"
@@ -158,7 +158,7 @@ class TestMeanNodeVelocity:
         """Mean node velocity should match pyswisseph within tolerance."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
         pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SPEED)
 
         vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -178,7 +178,7 @@ class TestMeanNodeVelocity:
             month = random.randint(1, 12)
             day = random.randint(1, 28)
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append((year, jd))
 
         progress = progress_reporter("Mean node velocity", len(dates), report_every=10)
@@ -186,7 +186,7 @@ class TestMeanNodeVelocity:
         errors = []
 
         for i, (year, jd) in enumerate(dates):
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SPEED)
 
             vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -215,8 +215,8 @@ class TestSouthNodeVelocity:
         jd = 2451545.0
 
         # Using negative body ID for south node
-        pos_north, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
-        pos_south, _ = ephem.swe_calc_ut(jd, -SE_TRUE_NODE, SEFLG_SPEED)
+        pos_north, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
+        pos_south, _ = ephem.calc_ut(jd, -TRUE_NODE, FLG_SPEED)
 
         # Longitude velocity should be identical
         assert pos_south[3] == pos_north[3], (

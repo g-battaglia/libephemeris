@@ -1,11 +1,12 @@
 """Round 142: house_pos with Sidereal Mode.
 
-Tests swe_house_pos() with sidereal mode enabled across multiple
+Tests house_pos() with sidereal mode enabled across multiple
 house systems, locations, and ayanamsha modes.
 """
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
@@ -13,30 +14,33 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_SIDEREAL,
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_SIDEREAL,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-BODIES = [SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
+
+BODIES = [SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN]
 BODY_NAMES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
 }
 
 TEST_JDS = [2451545.0, 2455197.5, 2458849.5, 2460676.5, 2462502.5]
@@ -63,18 +67,18 @@ total = 0
 
 for sid_mode in SIDEREAL_MODES:
     swe.set_sid_mode(sid_mode)
-    ephem.swe_set_sid_mode(sid_mode)
+    ephem.set_sid_mode(sid_mode)
 
     for jd in TEST_JDS:
         # Get obliquity
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
 
         for lat, lon, loc_name in LOCATIONS:
             # Compute ARMC for this location and time
             try:
                 se_sidtime = swe.sidtime(jd)
                 armc = (se_sidtime * 15.0 + lon) % 360.0
-                eps = swe.calc_ut(jd, -1, SEFLG_SWIEPH)[0][
+                eps = swe.calc_ut(jd, -1, FLG_SWIEPH)[0][
                     0
                 ]  # obliquity via special body
             except Exception:
@@ -85,7 +89,7 @@ for sid_mode in SIDEREAL_MODES:
                 # Get planet position in sidereal
                 try:
                     se_pos = swe.calc_ut(jd, body, flags)
-                    le_pos = ephem.swe_calc_ut(jd, body, flags)
+                    le_pos = ephem.calc_ut(jd, body, flags)
                     plon = se_pos[0][0]
                     plat = se_pos[0][1]
                     le_plon = le_pos[0][0]
@@ -99,7 +103,7 @@ for sid_mode in SIDEREAL_MODES:
                     total += 1
                     try:
                         se_hp = swe.house_pos(armc, lat, eps, (plon, plat), se_hsys)
-                        le_hp = ephem.swe_house_pos(
+                        le_hp = ephem.house_pos(
                             armc, lat, eps, le_hsys, le_plon, le_plat
                         )
 
@@ -128,7 +132,7 @@ for sid_mode in SIDEREAL_MODES:
                             )
 
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0)
+ephem.set_sid_mode(0)
 
 print(f"\n{'=' * 60}")
 print(f"Round 142: house_pos with Sidereal Mode")

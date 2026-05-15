@@ -14,7 +14,7 @@ import random
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.exceptions import PolarCircleError
 
 
@@ -83,7 +83,7 @@ class TestAllHouseSystemsBasic:
         """Each house system returns 12 valid cusps at a normal latitude."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5  # Rome
-        cusps, ascmc = swe.swe_houses(jd, lat, lon, ord(hsys))
+        cusps, ascmc = swe.houses(jd, lat, lon, ord(hsys))
 
         # Should have at least 12 cusps (Gauquelin has 36)
         n_cusps = 36 if hsys == "G" else 12
@@ -102,7 +102,7 @@ class TestAllHouseSystemsBasic:
         """Each house system returns valid ASCMC values."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
-        cusps, ascmc = swe.swe_houses(jd, lat, lon, ord(hsys))
+        cusps, ascmc = swe.houses(jd, lat, lon, ord(hsys))
 
         # ascmc[0] = ASC, ascmc[1] = MC
         asc, mc = ascmc[0], ascmc[1]
@@ -127,7 +127,7 @@ class TestExtremeLatitudes:
         jd = 2451545.0
         lon = 0.0
         try:
-            cusps, ascmc = swe.swe_houses(jd, lat, lon, ord(hsys))
+            cusps, ascmc = swe.houses(jd, lat, lon, ord(hsys))
         except PolarCircleError:
             # Expected for Placidus/Koch/Gauquelin at polar latitudes
             return
@@ -159,7 +159,7 @@ class TestExtremeLatitudes:
         """Non-quadrant house systems work at all polar latitudes."""
         jd = 2451545.0
         for lat in [70, 75, 80, 85, 89]:
-            cusps, ascmc = swe.swe_houses(jd, lat, 0.0, ord(hsys))
+            cusps, ascmc = swe.houses(jd, lat, 0.0, ord(hsys))
             for i in range(12):
                 assert 0 <= cusps[i] < 360, (
                     f"{name} @ {lat}°N: cusp {i + 1} = {cusps[i]}"
@@ -177,7 +177,7 @@ class TestExtremeLatitudes:
         """Placidus/Koch correctly raise PolarCircleError at extreme latitudes."""
         jd = 2451545.0
         with pytest.raises(PolarCircleError):
-            swe.swe_houses(jd, 89.0, 0.0, ord(hsys))
+            swe.houses(jd, 89.0, 0.0, ord(hsys))
 
 
 class TestHouseSystemConsistency:
@@ -197,7 +197,7 @@ class TestHouseSystemConsistency:
     def test_equal_house_30_degree_spacing(self, hsys: str, name: str):
         """Equal-type houses should have exactly 30° spacing."""
         jd = 2451545.0
-        cusps, _ = swe.swe_houses(jd, 41.9, 12.5, ord(hsys))
+        cusps, _ = swe.houses(jd, 41.9, 12.5, ord(hsys))
 
         for i in range(11):
             spacing = (cusps[i + 1] - cusps[i]) % 360
@@ -210,7 +210,7 @@ class TestHouseSystemConsistency:
     def test_cusps_ascending_order(self, hsys: str, name: str):
         """Cusps should be in ascending order (mod 360)."""
         jd = 2451545.0
-        cusps, _ = swe.swe_houses(jd, 41.9, 12.5, ord(hsys))
+        cusps, _ = swe.houses(jd, 41.9, 12.5, ord(hsys))
         n = 36 if hsys == "G" else 12
 
         for i in range(n - 1):
@@ -237,7 +237,7 @@ class TestHouseSystemConsistency:
     def test_cusp1_equals_asc(self, hsys: str, name: str):
         """For quadrant house systems, cusp 1 should equal ASC."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord(hsys))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord(hsys))
         asc = ascmc[0]
         assert abs(cusps[0] - asc) < 0.001, (
             f"{name}: cusp 1 {cusps[0]:.4f} != ASC {asc:.4f}"
@@ -259,7 +259,7 @@ class TestHouseSystemConsistency:
     def test_cusp10_equals_mc(self, hsys: str, name: str):
         """For quadrant house systems, cusp 10 should equal MC."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord(hsys))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord(hsys))
         mc = ascmc[1]
         assert abs(cusps[9] - mc) < 0.001, (
             f"{name}: cusp 10 {cusps[9]:.4f} != MC {mc:.4f}"
@@ -284,7 +284,7 @@ class TestMultipleDatesAndLocations:
         """Common systems produce valid results at 50 random dates."""
         jds = _random_jds(50, seed=ord(hsys) * 7)
         for jd in jds:
-            cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord(hsys))
+            cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord(hsys))
             for i in range(12):
                 assert 0 <= cusps[i] < 360, (
                     f"{name} @ JD {jd:.1f}: cusp {i + 1}={cusps[i]}"
@@ -296,7 +296,7 @@ class TestMultipleDatesAndLocations:
         """All systems work in the southern hemisphere."""
         jd = 2451545.0
         # Sydney, Australia
-        cusps, ascmc = swe.swe_houses(jd, -33.87, 151.21, ord(hsys))
+        cusps, ascmc = swe.houses(jd, -33.87, 151.21, ord(hsys))
         n = 36 if hsys == "G" else 12
         for i in range(n):
             assert 0 <= cusps[i] < 360, f"{name} @ Sydney: cusp {i + 1}={cusps[i]}"
@@ -322,7 +322,7 @@ class TestMultipleDatesAndLocations:
         jd = 2451545.0
         for lat in [70, 75, 80, 85, 89]:
             try:
-                cusps, ascmc = swe.swe_houses(jd, lat, 0.0, ord(hsys))
+                cusps, ascmc = swe.houses(jd, lat, 0.0, ord(hsys))
             except PolarCircleError:
                 # Expected for Placidus/Koch at high latitudes
                 continue
@@ -339,13 +339,13 @@ class TestMultipleDatesAndLocations:
     def test_placidus_various_longitudes(self, lon: int):
         """Placidus works at various geographic longitudes."""
         jd = 2451545.0
-        cusps, ascmc = swe.swe_houses(jd, 45.0, float(lon), ord("P"))
+        cusps, ascmc = swe.houses(jd, 45.0, float(lon), ord("P"))
         for i in range(12):
             assert 0 <= cusps[i] < 360, f"Placidus @ lon={lon}: cusp {i + 1}={cusps[i]}"
 
 
 class TestHousesArmc:
-    """Tests for swe_houses_armc function."""
+    """Tests for houses_armc function."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -362,11 +362,11 @@ class TestHousesArmc:
         ],
     )
     def test_houses_armc_valid(self, hsys: str, name: str):
-        """swe_houses_armc returns valid cusps for common systems."""
+        """houses_armc returns valid cusps for common systems."""
         armc = 120.0
         eps = 23.44
         lat = 41.9
-        cusps, ascmc = swe.swe_houses_armc(armc, lat, eps, ord(hsys))
+        cusps, ascmc = swe.houses_armc(armc, lat, eps, ord(hsys))
         n = 36 if hsys == "G" else 12
         for i in range(n):
             assert 0 <= cusps[i] < 360, f"{name}: cusp {i + 1}={cusps[i]}"

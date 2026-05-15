@@ -2,7 +2,7 @@
 """
 Horizons vs LEB2 cross-validation test.
 
-Compares swe_calc_ut() results between Horizons API and LEB2 fast path
+Compares calc_ut() results between Horizons API and LEB2 fast path
 to verify consistency across all three backends.
 
 Usage:
@@ -40,12 +40,12 @@ BODIES = [
     (17, "Ceres"),
 ]
 
-SKIP_COMBOS = {(0, swe.SEFLG_SPEED | swe.SEFLG_HELCTR)}
+SKIP_COMBOS = {(0, swe.FLG_SPEED | swe.FLG_HELCTR)}
 
 FLAGS = [
-    (swe.SEFLG_SPEED, "default"),
-    (swe.SEFLG_SPEED | swe.SEFLG_SIDEREAL, "sidereal"),
-    (swe.SEFLG_SPEED | swe.SEFLG_EQUATORIAL, "equatorial"),
+    (swe.FLG_SPEED, "default"),
+    (swe.FLG_SPEED | swe.FLG_SIDEREAL, "sidereal"),
+    (swe.FLG_SPEED | swe.FLG_EQUATORIAL, "equatorial"),
 ]
 
 JD_START = 2415020.5
@@ -74,11 +74,11 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 if (bid, fl) in SKIP_COMBOS:
                     continue
                 try:
-                    r = swe.swe_calc_ut(float(jd), bid, fl)
+                    r = swe.calc_ut(float(jd), bid, fl)
                     ref[(float(jd), bid, fl)] = r[0][:3]
                 except Exception:
                     pass
-    swe.swe_close()
+    swe.close()
 
     # Horizons
     swe.set_calc_mode("horizons")
@@ -93,7 +93,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 if k not in ref:
                     continue
                 try:
-                    r = swe.swe_calc_ut(float(jd), bid, fl)
+                    r = swe.calc_ut(float(jd), bid, fl)
                     v2 = r[0][:3]
                     v1 = ref[k]
                     ld = abs(v2[0] - v1[0])
@@ -110,7 +110,7 @@ def run_test(n_dates: int = 100, seed: int = 42) -> bool:
                 except Exception:
                     pass
 
-    swe.swe_close()
+    swe.close()
     elapsed = time.time() - t0
 
     g = max(e[0] for e in body_max.values()) if body_max else 0

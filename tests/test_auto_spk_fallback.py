@@ -14,14 +14,14 @@ import libephemeris as eph
 from libephemeris import (
     set_auto_spk_download,
     get_auto_spk_download,
-    swe_calc_ut,
+    calc_ut,
     close,
 )
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_ERIS,
-    SEFLG_HELCTR,
+    CHIRON,
+    CERES,
+    ERIS,
+    FLG_HELCTR,
 )
 from libephemeris.state import _AUTO_SPK_ENV_VAR
 from unittest.mock import patch
@@ -134,7 +134,7 @@ class TestFallbackBehavior:
 
         # Calculate Chiron position using Keplerian fallback
         jd = 2451545.0  # J2000.0
-        pos, flag = swe_calc_ut(jd, SE_CHIRON, SEFLG_HELCTR)
+        pos, flag = calc_ut(jd, CHIRON, FLG_HELCTR)
 
         # Should return valid heliocentric position
         assert 0 <= pos[0] < 360  # Longitude
@@ -146,9 +146,9 @@ class TestFallbackBehavior:
         set_auto_spk_download(False)
         jd = 2451545.0
 
-        bodies = [SE_CHIRON, SE_CERES, SE_ERIS]
+        bodies = [CHIRON, CERES, ERIS]
         for body_id in bodies:
-            pos, flag = swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+            pos, flag = calc_ut(jd, body_id, FLG_HELCTR)
             assert 0 <= pos[0] < 360, f"Invalid longitude for body {body_id}"
             assert -90 <= pos[1] <= 90, f"Invalid latitude for body {body_id}"
             assert pos[2] > 0, f"Invalid distance for body {body_id}"
@@ -158,8 +158,8 @@ class TestFallbackBehavior:
         set_auto_spk_download(False)
         jd = 2451545.0
 
-        # Geocentric calculation (no SEFLG_HELCTR)
-        pos, flag = swe_calc_ut(jd, SE_CHIRON, 0)
+        # Geocentric calculation (no FLG_HELCTR)
+        pos, flag = calc_ut(jd, CHIRON, 0)
 
         assert 0 <= pos[0] < 360  # Longitude
         assert -90 <= pos[1] <= 90  # Latitude
@@ -197,7 +197,7 @@ class TestAutoSpkDownloadAttempt:
 
         # This should use Keplerian fallback immediately
         jd = 2451545.0
-        pos, flag = swe_calc_ut(jd, SE_CHIRON, SEFLG_HELCTR)
+        pos, flag = calc_ut(jd, CHIRON, FLG_HELCTR)
 
         # Should still return valid position (Keplerian)
         assert 0 <= pos[0] < 360
@@ -213,7 +213,7 @@ class TestAutoSpkDownloadAttempt:
             "libephemeris.spk_auto._check_astroquery_available", return_value=False
         ):
             jd = 2451545.0
-            pos, flag = swe_calc_ut(jd, SE_CHIRON, SEFLG_HELCTR)
+            pos, flag = calc_ut(jd, CHIRON, FLG_HELCTR)
 
             # Should fall back to Keplerian and return valid position
             assert 0 <= pos[0] < 360

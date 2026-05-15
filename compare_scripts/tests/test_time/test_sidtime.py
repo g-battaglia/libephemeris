@@ -233,14 +233,14 @@ class TestSidtimeEdgeCases:
     @pytest.mark.edge_case
     def test_sidtime_de421_range_start(self):
         """Sidereal time at DE421 range start (1900)."""
-        jd = ephem.swe_julday(1900, 1, 1, 12.0)
+        jd = ephem.julday(1900, 1, 1, 12.0)
         lst = ephem.sidtime(jd, 0.0, 23.44, 0.0)
         assert 0 <= lst < 24
 
     @pytest.mark.edge_case
     def test_sidtime_de421_range_end(self):
         """Sidereal time at DE421 range end (2050)."""
-        jd = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd = ephem.julday(2050, 1, 1, 12.0)
         lst = ephem.sidtime(jd, 0.0, 23.44, 0.0)
         assert 0 <= lst < 24
 
@@ -416,14 +416,14 @@ class TestSidtime0EdgeCases:
     @pytest.mark.edge_case
     def test_sidtime0_de421_range_start(self):
         """GST at DE421 range start (1900)."""
-        jd = ephem.swe_julday(1900, 1, 1, 12.0)
+        jd = ephem.julday(1900, 1, 1, 12.0)
         gst = ephem.sidtime0(jd, 23.44, 0.0)
         assert 0 <= gst < 24
 
     @pytest.mark.edge_case
     def test_sidtime0_de421_range_end(self):
         """GST at DE421 range end (2050)."""
-        jd = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd = ephem.julday(2050, 1, 1, 12.0)
         gst = ephem.sidtime0(jd, 23.44, 0.0)
         assert 0 <= gst < 24
 

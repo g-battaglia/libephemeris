@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose pipeline discrepancy between generator and swe_calc().
+"""Diagnose pipeline discrepancy between generator and calc().
 
 Compares the generator's _apply_geo_ecliptic_pipeline() against
 Skyfield's observer.at(t).observe(target).apparent() step by step
@@ -19,7 +19,7 @@ import numpy as np
 sys.path.insert(0, ".")
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.state import get_planets, get_timescale
 
 
@@ -169,15 +169,15 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     print(f"    Distance:        {dist_gen_final:.12f} AU")
 
     # ========================================================================
-    # PATH C: swe_calc() (what compare tests use as reference)
+    # PATH C: calc() (what compare tests use as reference)
     # ========================================================================
     ephem.set_calc_mode("skyfield")
-    ref, _ = ephem.swe_calc(jd_tt, body_id, SEFLG_SPEED)
+    ref, _ = ephem.calc(jd_tt, body_id, FLG_SPEED)
     lon_ref = ref[0]
     lat_ref = ref[1]
     dist_ref = ref[2]
 
-    print(f"\n  PATH C: swe_calc(jd_tt, {body_id}, SEFLG_SPEED)")
+    print(f"\n  PATH C: calc(jd_tt, {body_id}, FLG_SPEED)")
     print(f"    Ecliptic lon:    {lon_ref:.10f}°")
     print(f"    Ecliptic lat:    {lat_ref:.10f}°")
     print(f"    Distance:        {dist_ref:.12f} AU")
@@ -200,10 +200,10 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
 
     print("\n  ERROR SUMMARY (arcsec):")
     print(
-        f'    Skyfield.apparent vs swe_calc:  lon={err_sky_vs_ref_lon:.6f}"  lat={err_sky_vs_ref_lat:.6f}"'
+        f'    Skyfield.apparent vs calc:  lon={err_sky_vs_ref_lon:.6f}"  lat={err_sky_vs_ref_lat:.6f}"'
     )
     print(
-        f'    Generator vs swe_calc:          lon={err_gen_vs_ref_lon:.6f}"  lat={err_gen_vs_ref_lat:.6f}"'
+        f'    Generator vs calc:          lon={err_gen_vs_ref_lon:.6f}"  lat={err_gen_vs_ref_lat:.6f}"'
     )
     print(
         f'    Generator vs Skyfield.apparent:  lon={err_gen_vs_sky_lon:.6f}"  lat={err_gen_vs_sky_lat:.6f}"'
@@ -278,7 +278,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     print(f"    lon={lon_gen2_deg:.10f}°  lat={lat_gen2_deg:.10f}°")
     print(f'    vs Skyfield.apparent: lon={err_gen2_vs_sky_lon:.6f}"')
     print(
-        f'    vs swe_calc:          lon={err_gen2_vs_ref_lon:.6f}"  lat={err_gen2_vs_ref_lat:.6f}"'
+        f'    vs calc:          lon={err_gen2_vs_ref_lon:.6f}"  lat={err_gen2_vs_ref_lat:.6f}"'
     )
 
     # Also check: generator's own PNM rotation vs Skyfield's ecliptic_frame
@@ -313,7 +313,7 @@ def diagnose_body(body_id: int, body_name: str, jd_tt: float) -> None:
     print("\n  GEN ICRS→manual PNM+obliquity:")
     print(f"    lon={lon_gen3:.10f}°  lat={lat_gen3:.10f}°")
     print(f'    vs Skyfield.apparent: lon={err_gen3_vs_sky_lon:.6f}"')
-    print(f'    vs swe_calc:          lon={err_gen3_vs_ref_lon:.6f}"')
+    print(f'    vs calc:          lon={err_gen3_vs_ref_lon:.6f}"')
     print(
         f'    vs Skyfield frame:    lon={ang_diff(lon_gen3, lon_gen2_deg) * 3600:.6f}"'
     )

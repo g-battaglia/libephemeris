@@ -3,12 +3,12 @@
 Round 11: Deep Delta-T and Time Functions Audit
 =================================================
 Compares libephemeris time-related functions against pyswisseph:
-  P1: swe_deltat — Delta-T at many epochs (historical, current, future)
-  P2: swe_deltat_ex — Extended Delta-T with ephemeris flag
-  P3: swe_julday / swe_revjul — Julian Day conversions
-  P4: swe_utc_to_jd / swe_jdut1_to_utc — UTC conversions
-  P5: swe_date_conversion — Date validation and JD
-  P6: swe_day_of_week — Day of week
+  P1: deltat — Delta-T at many epochs (historical, current, future)
+  P2: deltat_ex — Extended Delta-T with ephemeris flag
+  P3: julday / revjul — Julian Day conversions
+  P4: utc_to_jd / jdut1_to_utc — UTC conversions
+  P5: date_conversion — Date validation and JD
+  P6: day_of_week — Day of week
   P7: Delta-T sweep 1600-2100 — systematic drift detection
   P8: TT-UT consistency (calc_ut vs calc with manual Delta-T)
 """
@@ -53,13 +53,13 @@ def record(name, ok, detail=""):
 
 
 # ============================================================================
-# PART 1: swe_deltat at many epochs
+# PART 1: deltat at many epochs
 # ============================================================================
 
 
 def test_part1_deltat():
     print("\n" + "=" * 70)
-    print("PART 1: swe_deltat — Delta-T at Multiple Epochs")
+    print("PART 1: deltat — Delta-T at Multiple Epochs")
     print("=" * 70)
 
     # Test epochs spanning historical to future
@@ -88,7 +88,7 @@ def test_part1_deltat():
         test_name = f"P1/deltat/{epoch_name}"
         try:
             dt_se = swe.deltat(jd)
-            dt_le = ephem.swe_deltat(jd)
+            dt_le = ephem.deltat(jd)
 
             diff = abs(dt_se - dt_le)
             diff_sec = diff * 86400.0  # Convert days to seconds
@@ -116,13 +116,13 @@ def test_part1_deltat():
 
 
 # ============================================================================
-# PART 2: swe_deltat_ex — Extended Delta-T
+# PART 2: deltat_ex — Extended Delta-T
 # ============================================================================
 
 
 def test_part2_deltat_ex():
     print("\n" + "=" * 70)
-    print("PART 2: swe_deltat_ex — Extended Delta-T with Ephemeris Flag")
+    print("PART 2: deltat_ex — Extended Delta-T with Ephemeris Flag")
     print("=" * 70)
 
     epochs = [
@@ -140,7 +140,7 @@ def test_part2_deltat_ex():
                 dt_se = dt_se[0]
 
             # libephemeris also returns a float
-            dt_le = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
+            dt_le = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
             if isinstance(dt_le, tuple):
                 dt_le = dt_le[0]
 
@@ -158,13 +158,13 @@ def test_part2_deltat_ex():
 
 
 # ============================================================================
-# PART 3: swe_julday / swe_revjul — Julian Day conversions
+# PART 3: julday / revjul — Julian Day conversions
 # ============================================================================
 
 
 def test_part3_julday():
     print("\n" + "=" * 70)
-    print("PART 3: swe_julday / swe_revjul — Julian Day Conversions")
+    print("PART 3: julday / revjul — Julian Day Conversions")
     print("=" * 70)
 
     # Test dates (year, month, day, hour, calendar)
@@ -183,7 +183,7 @@ def test_part3_julday():
         test_name = f"P3/julday/{name}"
         try:
             jd_se = swe.julday(year, month, day, hour, cal)
-            jd_le = ephem.swe_julday(year, month, day, hour, cal)
+            jd_le = ephem.julday(year, month, day, hour, cal)
 
             diff = abs(jd_se - jd_le)
             ok = diff < 1e-10
@@ -202,7 +202,7 @@ def test_part3_julday():
         test_name = f"P3/revjul/JD={jd}"
         try:
             result_se = swe.revjul(jd, 1)  # Gregorian
-            result_le = ephem.swe_revjul(jd, 1)
+            result_le = ephem.revjul(jd, 1)
 
             # Both return (year, month, day, hour)
             ok = (
@@ -223,13 +223,13 @@ def test_part3_julday():
 
 
 # ============================================================================
-# PART 4: swe_utc_to_jd / swe_jdut1_to_utc
+# PART 4: utc_to_jd / jdut1_to_utc
 # ============================================================================
 
 
 def test_part4_utc():
     print("\n" + "=" * 70)
-    print("PART 4: swe_utc_to_jd / swe_jdut1_to_utc")
+    print("PART 4: utc_to_jd / jdut1_to_utc")
     print("=" * 70)
 
     # Test UTC dates: (year, month, day, hour, min, sec)
@@ -247,7 +247,7 @@ def test_part4_utc():
             result_se = swe.utc_to_jd(year, month, day, hour, minute, sec, 1)
             jd_et_se, jd_ut1_se = result_se[0], result_se[1]
 
-            result_le = ephem.swe_utc_to_jd(year, month, day, hour, minute, sec, 1)
+            result_le = ephem.utc_to_jd(year, month, day, hour, minute, sec, 1)
             jd_et_le, jd_ut1_le = result_le[0], result_le[1]
 
             diff_et_sec = abs(jd_et_se - jd_et_le) * 86400.0
@@ -278,7 +278,7 @@ def test_part4_utc():
     except Exception as e:
         se_err = str(e)
     try:
-        ephem.swe_utc_to_jd(2024, 6, 30, 23, 59, 60.0, 1)
+        ephem.utc_to_jd(2024, 6, 30, 23, 59, 60.0, 1)
     except Exception as e:
         le_err = str(e)
     # Both should raise an error (no leap second at that date)
@@ -295,7 +295,7 @@ def test_part4_utc():
         test_name = f"P4/jdut1_to_utc/JD={jd}"
         try:
             result_se = swe.jdut1_to_utc(jd, 1)  # Gregorian
-            result_le = ephem.swe_jdut1_to_utc(jd, 1)
+            result_le = ephem.jdut1_to_utc(jd, 1)
 
             # Both return (year, month, day, hour, min, sec)
             # Tolerance 0.1s for seconds — different Delta-T models produce
@@ -321,13 +321,13 @@ def test_part4_utc():
 
 
 # ============================================================================
-# PART 5: swe_date_conversion
+# PART 5: date_conversion
 # ============================================================================
 
 
 def test_part5_date_conversion():
     print("\n" + "=" * 70)
-    print("PART 5: swe_date_conversion")
+    print("PART 5: date_conversion")
     print("=" * 70)
 
     # Test valid dates
@@ -342,7 +342,7 @@ def test_part5_date_conversion():
         test_name = f"P5/date_conv/{name}"
         try:
             result_se = swe.date_conversion(year, month, day, hour, cal)
-            result_le = ephem.swe_date_conversion(year, month, day, hour, cal)
+            result_le = ephem.date_conversion(year, month, day, hour, cal)
 
             # Both return (valid_bool, jd, (year, month, day, hour))
             valid_se, jd_se = result_se[0], result_se[1]
@@ -363,7 +363,7 @@ def test_part5_date_conversion():
     test_name = "P5/date_conv/invalid"
     try:
         result_se = swe.date_conversion(2024, 13, 1, 0.0, b"g")
-        result_le = ephem.swe_date_conversion(2024, 13, 1, 0.0, b"g")
+        result_le = ephem.date_conversion(2024, 13, 1, 0.0, b"g")
         ok = result_se[0] == result_le[0] == False  # noqa: E712
         record(
             test_name,
@@ -375,13 +375,13 @@ def test_part5_date_conversion():
 
 
 # ============================================================================
-# PART 6: swe_day_of_week
+# PART 6: day_of_week
 # ============================================================================
 
 
 def test_part6_day_of_week():
     print("\n" + "=" * 70)
-    print("PART 6: swe_day_of_week")
+    print("PART 6: day_of_week")
     print("=" * 70)
 
     # Known days
@@ -396,7 +396,7 @@ def test_part6_day_of_week():
         test_name = f"P6/dow/{name}"
         try:
             dow_se = swe.day_of_week(jd)
-            dow_le = ephem.swe_day_of_week(jd)
+            dow_le = ephem.day_of_week(jd)
 
             ok = dow_se == dow_le
             days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -428,7 +428,7 @@ def test_part7_deltat_sweep():
     for year in range(1900, 2031, 5):
         jd = swe.julday(year, 1, 1, 0.0)
         dt_se = swe.deltat(jd)
-        dt_le = ephem.swe_deltat(jd)
+        dt_le = ephem.deltat(jd)
         diff_sec = abs(dt_se - dt_le) * 86400.0
         diffs.append((year, diff_sec))
         if diff_sec > max_diff_sec:
@@ -448,7 +448,7 @@ def test_part7_deltat_sweep():
     for year in range(1600, 1901, 25):
         jd = swe.julday(year, 1, 1, 0.0)
         dt_se = swe.deltat(jd)
-        dt_le = ephem.swe_deltat(jd)
+        dt_le = ephem.deltat(jd)
         diff_sec = abs(dt_se - dt_le) * 86400.0
         if diff_sec > max_diff_hist:
             max_diff_hist = diff_sec
@@ -467,7 +467,7 @@ def test_part7_deltat_sweep():
     for year in range(2030, 2101, 5):
         jd = swe.julday(year, 1, 1, 0.0)
         dt_se = swe.deltat(jd)
-        dt_le = ephem.swe_deltat(jd)
+        dt_le = ephem.deltat(jd)
         diff_sec = abs(dt_se - dt_le) * 86400.0
         if diff_sec > max_diff_future:
             max_diff_future = diff_sec
@@ -502,12 +502,12 @@ def test_part8_tt_ut_consistency():
         test_name = f"P8/tt_ut/{body_name}"
         try:
             # Get position via calc_ut (UT input)
-            pos_ut_le, _ = ephem.swe_calc_ut(jd_ut, body_id, flags)
+            pos_ut_le, _ = ephem.calc_ut(jd_ut, body_id, flags)
 
             # Get Delta-T, then use calc (TT input)
-            dt_le = ephem.swe_deltat(jd_ut)
+            dt_le = ephem.deltat(jd_ut)
             jd_tt = jd_ut + dt_le
-            pos_tt_le, _ = ephem.swe_calc(jd_tt, body_id, flags)
+            pos_tt_le, _ = ephem.calc(jd_tt, body_id, flags)
 
             # Both should give identical results
             lon_diff = abs(pos_ut_le[0] - pos_tt_le[0])

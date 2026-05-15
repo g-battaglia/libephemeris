@@ -16,10 +16,10 @@ import random
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
 )
 
 # Mean Lilith now uses SE-compatible DE404 algorithm with ecliptic projection
@@ -74,7 +74,7 @@ class TestMeanNode:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+        pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
 
@@ -88,7 +88,7 @@ class TestMeanNode:
         jd = swe.julday(2000, 1, 1, 12.0)
 
         pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SPEED)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 256)  # SEFLG_SPEED
+        pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 256)  # FLG_SPEED
 
         diff_lon = angular_diff(pos_swe[0], pos_py[0])
         diff_speed = abs(pos_swe[3] - pos_py[3])
@@ -107,7 +107,7 @@ class TestTrueNode:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.TRUE_NODE, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+        pos_py, _ = ephem.calc_ut(jd, TRUE_NODE, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
 
@@ -130,7 +130,7 @@ class TestTrueNode:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.TRUE_NODE, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+            pos_py, _ = ephem.calc_ut(jd, TRUE_NODE, 0)
 
             diff = angular_diff(pos_swe[0], pos_py[0])
             errors.append(diff)
@@ -156,7 +156,7 @@ class TestMeanLilith:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.MEAN_APOG, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, 0)
+        pos_py, _ = ephem.calc_ut(jd, MEAN_APOG, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
 
@@ -180,7 +180,7 @@ class TestTrueLilith:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+        pos_py, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
         diff = angular_diff(pos_swe[0], pos_py[0])
 
@@ -203,7 +203,7 @@ class TestTrueLilith:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_py, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff = angular_diff(pos_swe[0], pos_py[0])
             errors.append(diff)
@@ -225,7 +225,7 @@ class TestNodalMotion:
         """Test that Mean Node is always retrograde."""
         jd = swe.julday(2000, 1, 1, 12.0)
 
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 256)  # SEFLG_SPEED
+        pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 256)  # FLG_SPEED
 
         # Mean Node is always retrograde (negative daily motion)
         assert pos_py[3] < 0, "Mean Node should have retrograde motion"
@@ -236,7 +236,7 @@ class TestNodalMotion:
         jd = swe.julday(2000, 1, 1, 12.0)
 
         # Get North Node
-        pos_north, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+        pos_north, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
 
         # South Node is 180° from North Node
         south_node = (pos_north[0] + 180) % 360
@@ -255,7 +255,7 @@ class TestLilithLatitude:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.MEAN_APOG, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, 0)
+        pos_py, _ = ephem.calc_ut(jd, MEAN_APOG, 0)
 
         diff_lat = abs(pos_swe[1] - pos_py[1])
 
@@ -269,7 +269,7 @@ class TestLilithLatitude:
         jd = swe.julday(year, month, day, hour)
 
         pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-        pos_py, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+        pos_py, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
         diff_lat = abs(pos_swe[1] - pos_py[1])
 

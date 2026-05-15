@@ -26,19 +26,19 @@ from libephemeris.minor_bodies import (
     OrbitalElements,
 )
 from libephemeris.constants import (
-    SE_CERES,
-    SE_PALLAS,
-    SE_VESTA,
-    SE_JUNO,
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
+    CERES,
+    PALLAS,
+    VESTA,
+    JUNO,
+    CHIRON,
+    PHOLUS,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
 )
 
 
@@ -107,7 +107,7 @@ class TestDetectMeanMotionResonance:
 
     def test_ixion_is_plutino(self):
         """Ixion should be detected as a plutino (2:3 resonance)."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         result = detect_mean_motion_resonance(elements)
 
         assert result.is_resonant is True
@@ -121,7 +121,7 @@ class TestDetectMeanMotionResonance:
 
     def test_orcus_is_plutino(self):
         """Orcus (anti-Pluto) should be detected as a plutino."""
-        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        elements = MINOR_BODY_ELEMENTS[ORCUS]
         result = detect_mean_motion_resonance(elements)
 
         assert result.is_resonant is True
@@ -130,7 +130,7 @@ class TestDetectMeanMotionResonance:
 
     def test_ceres_not_resonant(self):
         """Ceres (main belt) should not be in Neptune resonance."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         result = detect_mean_motion_resonance(elements)
 
         assert result.is_resonant is False
@@ -139,7 +139,7 @@ class TestDetectMeanMotionResonance:
 
     def test_eris_not_in_major_resonance(self):
         """Eris (scattered disk) is not in a major Neptune resonance."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         result = detect_mean_motion_resonance(elements)
 
         # Eris at ~68 AU is not in any of the major resonances
@@ -147,14 +147,14 @@ class TestDetectMeanMotionResonance:
 
     def test_chiron_not_resonant(self):
         """Chiron (centaur) should not be in Neptune resonance."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         result = detect_mean_motion_resonance(elements)
 
         assert result.is_resonant is False
 
     def test_sedna_not_resonant(self):
         """Sedna (detached object) should not be in Neptune resonance."""
-        elements = MINOR_BODY_ELEMENTS[SE_SEDNA]
+        elements = MINOR_BODY_ELEMENTS[SEDNA]
         result = detect_mean_motion_resonance(elements)
 
         # Sedna at ~550 AU is way beyond any Neptune resonance
@@ -163,7 +163,7 @@ class TestDetectMeanMotionResonance:
     def test_inner_solar_system_bodies_not_checked(self):
         """Bodies with a < 20 AU should not be checked for Neptune resonance."""
         # All inner solar system bodies should return is_resonant=False
-        for body_id in [SE_CERES, SE_PALLAS, SE_VESTA, SE_JUNO]:
+        for body_id in [CERES, PALLAS, VESTA, JUNO]:
             elements = MINOR_BODY_ELEMENTS[body_id]
             result = detect_mean_motion_resonance(elements)
             assert result.is_resonant is False
@@ -171,7 +171,7 @@ class TestDetectMeanMotionResonance:
 
     def test_tolerance_parameter(self):
         """Tolerance parameter should control resonance detection sensitivity."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
 
         # With very small tolerance, might not detect resonance
         result_strict = detect_mean_motion_resonance(elements, tolerance=0.001)
@@ -188,14 +188,14 @@ class TestDetectMeanMotionResonance:
 
     def test_result_contains_body_name_in_warning(self):
         """Warning message should contain the body name."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         result = detect_mean_motion_resonance(elements)
 
         assert "Ixion" in result.warning_message
 
     def test_deviation_is_fractional(self):
         """Deviation should be a small fractional value for resonant bodies."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         result = detect_mean_motion_resonance(elements)
 
         # Deviation should be less than the tolerance
@@ -207,19 +207,19 @@ class TestIsBodyResonant:
 
     def test_ixion_is_resonant(self):
         """Ixion should be detected as resonant."""
-        assert is_body_resonant(SE_IXION) is True
+        assert is_body_resonant(IXION) is True
 
     def test_orcus_is_resonant(self):
         """Orcus should be detected as resonant."""
-        assert is_body_resonant(SE_ORCUS) is True
+        assert is_body_resonant(ORCUS) is True
 
     def test_ceres_not_resonant(self):
         """Ceres should not be resonant."""
-        assert is_body_resonant(SE_CERES) is False
+        assert is_body_resonant(CERES) is False
 
     def test_eris_not_resonant(self):
         """Eris should not be in a major resonance."""
-        assert is_body_resonant(SE_ERIS) is False
+        assert is_body_resonant(ERIS) is False
 
     def test_unknown_body_raises_error(self):
         """Unknown body ID should raise ValueError."""
@@ -229,22 +229,22 @@ class TestIsBodyResonant:
     @pytest.mark.parametrize(
         "body_id,expected",
         [
-            (SE_CERES, False),
-            (SE_PALLAS, False),
-            (SE_VESTA, False),
-            (SE_JUNO, False),
-            (SE_CHIRON, False),
-            (SE_PHOLUS, False),
-            (SE_ERIS, False),
-            (SE_SEDNA, False),
+            (CERES, False),
+            (PALLAS, False),
+            (VESTA, False),
+            (JUNO, False),
+            (CHIRON, False),
+            (PHOLUS, False),
+            (ERIS, False),
+            (SEDNA, False),
             # Note: Haumea and Quaoar are near but not in the 4:7 resonance
             # With 2% tolerance, they get flagged - this is expected behavior
             # as the function is conservative and flags "near resonance" bodies
-            (SE_HAUMEA, True),  # Near 4:7 (~1.6% deviation)
-            (SE_MAKEMAKE, False),
-            (SE_IXION, True),  # Plutino
-            (SE_ORCUS, True),  # Plutino
-            (SE_QUAOAR, True),  # Near 4:7 (~1.1% deviation)
+            (HAUMEA, True),  # Near 4:7 (~1.6% deviation)
+            (MAKEMAKE, False),
+            (IXION, True),  # Plutino
+            (ORCUS, True),  # Plutino
+            (QUAOAR, True),  # Near 4:7 (~1.1% deviation)
         ],
     )
     def test_all_bodies_resonance_status(self, body_id, expected):
@@ -257,7 +257,7 @@ class TestGetResonanceInfo:
 
     def test_ixion_info(self):
         """Should return detailed info for Ixion."""
-        info = get_resonance_info(SE_IXION)
+        info = get_resonance_info(IXION)
 
         assert info is not None
         assert info.is_resonant is True
@@ -265,7 +265,7 @@ class TestGetResonanceInfo:
 
     def test_ceres_info(self):
         """Should return non-resonant info for Ceres."""
-        info = get_resonance_info(SE_CERES)
+        info = get_resonance_info(CERES)
 
         assert info is not None
         assert info.is_resonant is False
@@ -281,7 +281,7 @@ class TestResonanceResult:
 
     def test_resonance_result_fields(self):
         """ResonanceResult should have all required fields."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         result = detect_mean_motion_resonance(elements)
 
         assert hasattr(result, "is_resonant")
@@ -291,7 +291,7 @@ class TestResonanceResult:
 
     def test_non_resonant_result_structure(self):
         """Non-resonant result should have None for optional fields."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         result = detect_mean_motion_resonance(elements)
 
         assert result.is_resonant is False
@@ -305,7 +305,7 @@ class TestResonancePhysics:
 
     def test_plutino_mean_motion_ratio(self):
         """Plutinos should have mean motion ratio ~2/3 with Neptune."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         n_ratio = elements.n / NEPTUNE_MEAN_MOTION
 
         # For 2:3 resonance, body completes 2 orbits while Neptune completes 3
@@ -315,8 +315,8 @@ class TestResonancePhysics:
 
     def test_ixion_and_orcus_similar_orbits(self):
         """Ixion and Orcus (both plutinos) should have similar semi-major axes."""
-        ixion = MINOR_BODY_ELEMENTS[SE_IXION]
-        orcus = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        ixion = MINOR_BODY_ELEMENTS[IXION]
+        orcus = MINOR_BODY_ELEMENTS[ORCUS]
 
         # Both should be at ~39.4 AU
         assert abs(ixion.a - orcus.a) < 1.0  # Within 1 AU
@@ -335,7 +335,7 @@ class TestResonancePhysics:
 
     def test_quaoar_not_in_plutino_region(self):
         """Quaoar at ~43 AU should not be in the plutino region."""
-        quaoar = MINOR_BODY_ELEMENTS[SE_QUAOAR]
+        quaoar = MINOR_BODY_ELEMENTS[QUAOAR]
         plutino = next(r for r in NEPTUNE_RESONANCES if r.name == "plutino")
 
         # Quaoar is at ~43 AU, plutinos at ~39 AU
@@ -417,19 +417,19 @@ class TestAllBodiesResonanceCheck:
     @pytest.mark.parametrize(
         "body_id",
         [
-            SE_CERES,
-            SE_PALLAS,
-            SE_VESTA,
-            SE_JUNO,
-            SE_CHIRON,
-            SE_PHOLUS,
-            SE_ERIS,
-            SE_SEDNA,
-            SE_HAUMEA,
-            SE_MAKEMAKE,
-            SE_IXION,
-            SE_ORCUS,
-            SE_QUAOAR,
+            CERES,
+            PALLAS,
+            VESTA,
+            JUNO,
+            CHIRON,
+            PHOLUS,
+            ERIS,
+            SEDNA,
+            HAUMEA,
+            MAKEMAKE,
+            IXION,
+            ORCUS,
+            QUAOAR,
         ],
     )
     def test_all_bodies_resonance_check_runs(self, body_id):
@@ -444,19 +444,19 @@ class TestAllBodiesResonanceCheck:
     @pytest.mark.parametrize(
         "body_id",
         [
-            SE_CERES,
-            SE_PALLAS,
-            SE_VESTA,
-            SE_JUNO,
-            SE_CHIRON,
-            SE_PHOLUS,
-            SE_ERIS,
-            SE_SEDNA,
-            SE_HAUMEA,
-            SE_MAKEMAKE,
-            SE_IXION,
-            SE_ORCUS,
-            SE_QUAOAR,
+            CERES,
+            PALLAS,
+            VESTA,
+            JUNO,
+            CHIRON,
+            PHOLUS,
+            ERIS,
+            SEDNA,
+            HAUMEA,
+            MAKEMAKE,
+            IXION,
+            ORCUS,
+            QUAOAR,
         ],
     )
     def test_get_resonance_info_runs(self, body_id):
@@ -509,7 +509,7 @@ class TestEdgeCases:
 
     def test_zero_tolerance(self):
         """Zero tolerance should only match exact resonances."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         result = detect_mean_motion_resonance(elements, tolerance=0.0)
 
         # Ixion is close but not exactly at resonance, so with 0 tolerance

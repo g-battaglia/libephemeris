@@ -315,7 +315,7 @@ def generate_python_code(fetched: FetchedElements, body_const: str) -> str:
 
     Args:
         fetched: Fetched orbital elements
-        body_const: Constant name (e.g., 'SE_CHIRON')
+        body_const: Constant name (e.g., 'CHIRON')
 
     Returns:
         Python code string for the OrbitalElements entry
@@ -509,19 +509,19 @@ Quarterly Maintenance:
     try:
         from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
         from libephemeris.constants import (
-            SE_CHIRON,
-            SE_PHOLUS,
-            SE_CERES,
-            SE_PALLAS,
-            SE_JUNO,
-            SE_VESTA,
-            SE_ERIS,
-            SE_SEDNA,
-            SE_HAUMEA,
-            SE_MAKEMAKE,
-            SE_IXION,
-            SE_ORCUS,
-            SE_QUAOAR,
+            CHIRON,
+            PHOLUS,
+            CERES,
+            PALLAS,
+            JUNO,
+            VESTA,
+            ERIS,
+            SEDNA,
+            HAUMEA,
+            MAKEMAKE,
+            IXION,
+            ORCUS,
+            QUAOAR,
         )
     except ImportError as e:
         print(f"Error importing libephemeris: {e}", file=sys.stderr)
@@ -529,19 +529,19 @@ Quarterly Maintenance:
 
     # Map body IDs to names and constants
     body_id_to_name = {
-        SE_CHIRON: "Chiron",
-        SE_PHOLUS: "Pholus",
-        SE_CERES: "Ceres",
-        SE_PALLAS: "Pallas",
-        SE_JUNO: "Juno",
-        SE_VESTA: "Vesta",
-        SE_ERIS: "Eris",
-        SE_SEDNA: "Sedna",
-        SE_HAUMEA: "Haumea",
-        SE_MAKEMAKE: "Makemake",
-        SE_IXION: "Ixion",
-        SE_ORCUS: "Orcus",
-        SE_QUAOAR: "Quaoar",
+        CHIRON: "Chiron",
+        PHOLUS: "Pholus",
+        CERES: "Ceres",
+        PALLAS: "Pallas",
+        JUNO: "Juno",
+        VESTA: "Vesta",
+        ERIS: "Eris",
+        SEDNA: "Sedna",
+        HAUMEA: "Haumea",
+        MAKEMAKE: "Makemake",
+        IXION: "Ixion",
+        ORCUS: "Orcus",
+        QUAOAR: "Quaoar",
     }
 
     # Determine which bodies to check

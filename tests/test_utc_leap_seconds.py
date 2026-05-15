@@ -263,7 +263,7 @@ class TestTaiUtcConsistency:
     def test_tai_utc_via_jd(self):
         """Verify TAI-UTC can be correctly retrieved via JD functions."""
         # Get TAI-UTC for 2020 using the JD-based function
-        jd = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd = ephem.julday(2020, 1, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
 
         assert tai_utc == 37.0, f"TAI-UTC for 2020 should be 37s, got {tai_utc}s"
@@ -280,7 +280,7 @@ class TestTaiUtcConsistency:
         ]
 
         for year, month, day, expected_tai_utc in test_cases:
-            jd = ephem.swe_julday(year, month, day, 12.0)
+            jd = ephem.julday(year, month, day, 12.0)
             tai_utc = ephem.get_tai_utc_for_jd(jd)
             assert tai_utc == expected_tai_utc, (
                 f"TAI-UTC at {year}-{month:02d}-{day:02d} should be {expected_tai_utc}s, "
@@ -295,7 +295,7 @@ class TestTaiTimeConversions:
         """Verify UTC to TAI JD correctly adds leap seconds."""
         # In 2020, TAI-UTC = 37 seconds
         jd_tai = ephem.utc_to_tai_jd(2020, 1, 1, 0, 0, 0.0)
-        jd_utc = ephem.swe_julday(2020, 1, 1, 0.0)
+        jd_utc = ephem.julday(2020, 1, 1, 0.0)
 
         # TAI should be ahead of UTC by 37 seconds
         diff_seconds = (jd_tai - jd_utc) * 86400
@@ -350,17 +350,17 @@ class TestDeltaTWithIersData:
         """Verify Delta T has reasonable values for modern dates."""
         # Delta T at J2000.0 should be approximately 64 seconds
         jd_j2000 = 2451545.0
-        dt = ephem.swe_deltat(jd_j2000) * 86400  # Convert to seconds
+        dt = ephem.deltat(jd_j2000) * 86400  # Convert to seconds
 
         assert 60 < dt < 70, f"Delta T at J2000.0 should be ~64s, got {dt:.2f}s"
 
     def test_deltat_increasing_trend(self):
         """Verify Delta T has increased from 2000 to 2020."""
-        jd_2000 = ephem.swe_julday(2000, 1, 1, 12.0)
-        jd_2020 = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_2000 = ephem.julday(2000, 1, 1, 12.0)
+        jd_2020 = ephem.julday(2020, 1, 1, 12.0)
 
-        dt_2000 = ephem.swe_deltat(jd_2000) * 86400
-        dt_2020 = ephem.swe_deltat(jd_2020) * 86400
+        dt_2000 = ephem.deltat(jd_2000) * 86400
+        dt_2020 = ephem.deltat(jd_2020) * 86400
 
         assert dt_2020 > dt_2000, (
             f"Delta T should increase from 2000 to 2020: {dt_2000:.2f}s vs {dt_2020:.2f}s"
@@ -370,8 +370,8 @@ class TestDeltaTWithIersData:
         """Test Delta T extended function with different ephemeris flags."""
         jd = 2451545.0
 
-        dt_swieph = ephem.swe_deltat_ex(jd, ephem.SEFLG_SWIEPH)
-        dt_jpleph = ephem.swe_deltat_ex(jd, ephem.SEFLG_JPLEPH)
+        dt_swieph = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
+        dt_jpleph = ephem.deltat_ex(jd, ephem.FLG_JPLEPH)
 
         # Both should give similar results (Skyfield uses JPL data internally)
         assert abs(dt_swieph - dt_jpleph) < 1e-10, (
@@ -382,14 +382,14 @@ class TestDeltaTWithIersData:
         """Verify Moshier ephemeris uses the same Delta T calculation (no warning)."""
         jd = 2451545.0
 
-        dt = ephem.swe_deltat_ex(jd, ephem.SEFLG_MOSEPH)
+        dt = ephem.deltat_ex(jd, ephem.FLG_MOSEPH)
 
         # Should return a valid Delta T value matching other ephemeris modes
         dt_seconds = dt * 86400
         assert 60 < dt_seconds < 70
 
         # Verify it matches the standard function
-        dt_standard = ephem.swe_deltat(jd)
+        dt_standard = ephem.deltat(jd)
         assert dt == dt_standard
 
 
@@ -436,8 +436,8 @@ class TestLeapSecondEdgeCases:
         """Verify consistency when crossing multiple leap seconds."""
         # From 1990 (TAI-UTC=25) to 2020 (TAI-UTC=37) = 12 leap seconds
 
-        jd_utc_1990 = ephem.swe_julday(1990, 1, 1, 12.0)
-        jd_utc_2020 = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc_1990 = ephem.julday(1990, 1, 1, 12.0)
+        jd_utc_2020 = ephem.julday(2020, 1, 1, 12.0)
 
         tai_utc_1990 = ephem.get_tai_utc_for_jd(jd_utc_1990)
         tai_utc_2020 = ephem.get_tai_utc_for_jd(jd_utc_2020)
@@ -490,7 +490,7 @@ class TestIersDataIntegration:
 
         load_iers_data()
 
-        jd = ephem.swe_julday(2015, 6, 15, 12.0)
+        jd = ephem.julday(2015, 6, 15, 12.0)
         mjd = _calendar_to_mjd(2015, 6, 15)
 
         # Get components
@@ -502,7 +502,7 @@ class TestIersDataIntegration:
             expected_delta_t = tai_utc + 32.184 - ut1_utc
 
             # Get actual Delta T from Skyfield
-            actual_delta_t = ephem.swe_deltat(jd) * 86400
+            actual_delta_t = ephem.deltat(jd) * 86400
 
             # They should be close (within 0.5 seconds)
             assert abs(actual_delta_t - expected_delta_t) < 0.5, (

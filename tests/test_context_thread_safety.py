@@ -25,28 +25,28 @@ import pytest
 import libephemeris as ephem
 from libephemeris import EphemerisContext
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_TOPOCTR,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_RAMAN,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_DELUCE,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_GALCENT_0SAG,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_TOPOCTR,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_RAMAN,
+    SIDM_KRISHNAMURTI,
+    SIDM_YUKTESHWAR,
+    SIDM_TRUE_CITRA,
+    SIDM_DELUCE,
+    SIDM_JN_BHASIN,
+    SIDM_DJWHAL_KHUL,
+    SIDM_USHASHASHI,
+    SIDM_BABYL_KUGLER1,
+    SIDM_GALCENT_0SAG,
 )
 
 pytestmark = pytest.mark.slow
@@ -61,18 +61,18 @@ pytestmark = pytest.mark.slow
 def test_ayanamshas():
     """12 different ayanamsha systems for thread testing."""
     return [
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-        (SE_SIDM_LAHIRI, "Lahiri"),
-        (SE_SIDM_RAMAN, "Raman"),
-        (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-        (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-        (SE_SIDM_TRUE_CITRA, "True Citra"),
-        (SE_SIDM_DELUCE, "De Luce"),
-        (SE_SIDM_JN_BHASIN, "JN Bhasin"),
-        (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-        (SE_SIDM_USHASHASHI, "Ushashashi"),
-        (SE_SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+        (SIDM_LAHIRI, "Lahiri"),
+        (SIDM_RAMAN, "Raman"),
+        (SIDM_KRISHNAMURTI, "Krishnamurti"),
+        (SIDM_YUKTESHWAR, "Yukteshwar"),
+        (SIDM_TRUE_CITRA, "True Citra"),
+        (SIDM_DELUCE, "De Luce"),
+        (SIDM_JN_BHASIN, "JN Bhasin"),
+        (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+        (SIDM_USHASHASHI, "Ushashashi"),
+        (SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
+        (SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
     ]
 
 
@@ -108,11 +108,11 @@ class TestContextInstanceIsolation:
         ctx1 = EphemerisContext()
         ctx2 = EphemerisContext()
 
-        ctx1.set_sid_mode(SE_SIDM_LAHIRI)
-        ctx2.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ctx1.set_sid_mode(SIDM_LAHIRI)
+        ctx2.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
-        assert ctx1.get_sid_mode() == SE_SIDM_LAHIRI
-        assert ctx2.get_sid_mode() == SE_SIDM_FAGAN_BRADLEY
+        assert ctx1.get_sid_mode() == SIDM_LAHIRI
+        assert ctx2.get_sid_mode() == SIDM_FAGAN_BRADLEY
 
     def test_separate_contexts_have_isolated_topo(self):
         """Each context should have its own topocentric location."""
@@ -166,7 +166,7 @@ class TestContextResourceSharing:
         """Module-level API uses shared planetary ephemeris."""
         from libephemeris import state
 
-        # Explicitly load planets (swe_calc_ut may use LEB fast path)
+        # Explicitly load planets (calc_ut may use LEB fast path)
         state.get_planets()
 
         # Verify module state is loaded
@@ -184,13 +184,13 @@ class TestContextResourceSharing:
         from libephemeris import state
 
         # Pre-load
-        ephem.swe_calc_ut(2451545.0, SE_SUN, 0)
+        ephem.calc_ut(2451545.0, SUN, 0)
 
         # Verify timescale is loaded
         assert state._TS is not None
 
         ts_before = state._TS
-        ephem.swe_calc_ut(2451545.0, SE_MARS, 0)
+        ephem.calc_ut(2451545.0, MARS, 0)
         ts_after = state._TS
 
         assert ts_before is ts_after, "Timescale should remain shared"
@@ -214,8 +214,8 @@ class TestSequentialAyanamshaCalculations:
         results: dict[int, float] = {}
 
         for mode, name in test_ayanamshas:
-            ephem.swe_set_sid_mode(mode)
-            pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            ephem.set_sid_mode(mode)
+            pos, _ = ephem.calc_ut(jd, SUN, FLG_SIDEREAL)
             results[mode] = pos[0]
 
         # All 12 ayanamshas should produce different positions
@@ -256,7 +256,7 @@ class TestConcurrentModuleLevelAPI:
 
         def calculate_planet(thread_id: int, planet: int):
             try:
-                pos, _ = ephem.swe_calc_ut(jd, planet, 0)
+                pos, _ = ephem.calc_ut(jd, planet, 0)
                 with results_lock:
                     results.append((planet, pos[0]))
             except Exception as e:
@@ -264,13 +264,13 @@ class TestConcurrentModuleLevelAPI:
                     errors.append(f"Thread {thread_id}: {e}")
 
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
         ]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as ex:
@@ -296,7 +296,7 @@ class TestConcurrentModuleLevelAPI:
 
         def calculate_houses(thread_id: int, lat: float, lon: float):
             try:
-                cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("P"))
+                cusps, ascmc = ephem.houses(jd, lat, lon, ord("P"))
                 with results_lock:
                     results.append((thread_id, cusps))
             except Exception as e:
@@ -333,13 +333,13 @@ class TestConcurrentSequentialCalculations:
         jd = 2451545.0
         num_threads = 10
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
         ]
         errors: list[str] = []
         calculation_counts = [0]
@@ -348,7 +348,7 @@ class TestConcurrentSequentialCalculations:
         def calculate_all_planets(thread_id: int):
             try:
                 for planet in planets:
-                    pos, _ = ephem.swe_calc_ut(jd + thread_id * 0.1, planet, 0)
+                    pos, _ = ephem.calc_ut(jd + thread_id * 0.1, planet, 0)
                     # Verify position is valid
                     if not (0 <= pos[0] < 360):
                         with count_lock:
@@ -388,8 +388,8 @@ class TestConcurrentSequentialCalculations:
             try:
                 for i in range(calculations_per_thread):
                     jd = 2451545.0 + thread_id + i * 0.05
-                    planet = [SE_SUN, SE_MOON, SE_MARS][i % 3]
-                    pos, _ = ephem.swe_calc_ut(jd, planet, 0)
+                    planet = [SUN, MOON, MARS][i % 3]
+                    pos, _ = ephem.calc_ut(jd, planet, 0)
 
                     if not (0 <= pos[0] < 360):
                         raise ValueError(f"Invalid position: {pos[0]}")
@@ -424,7 +424,7 @@ class TestResultConsistency:
 
         results = []
         for _ in range(num_iterations):
-            pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
             results.append(pos[0])
 
         # All results should be identical
@@ -444,7 +444,7 @@ class TestResultConsistency:
 
         def calculate(thread_id: int):
             try:
-                pos, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+                pos, _ = ephem.calc_ut(jd, MOON, FLG_SPEED)
                 with results_lock:
                     results.append(pos[0])
             except Exception as e:
@@ -484,8 +484,8 @@ class TestMixedCalculationTypes:
 
         def calc_planet(thread_id: int):
             try:
-                planet = [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER][thread_id % 4]
-                pos, _ = ephem.swe_calc_ut(jd, planet, 0)
+                planet = [SUN, MOON, MARS, JUPITER][thread_id % 4]
+                pos, _ = ephem.calc_ut(jd, planet, 0)
                 with results_lock:
                     planet_results.append(pos[0])
             except Exception as e:
@@ -494,7 +494,7 @@ class TestMixedCalculationTypes:
 
         def calc_houses(thread_id: int, lat: float, lon: float):
             try:
-                cusps, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+                cusps, _ = ephem.houses(jd, lat, lon, ord("P"))
                 with results_lock:
                     house_results.append(cusps)
             except Exception as e:
@@ -528,7 +528,7 @@ class TestMixedCalculationTypes:
 
         def calculate(thread_id: int, jd: float):
             try:
-                pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+                pos, _ = ephem.calc_ut(jd, SUN, 0)
                 with results_lock:
                     results[thread_id] = pos[0]
             except Exception as e:
@@ -573,8 +573,8 @@ class TestHighLoad:
         def worker(thread_id: int):
             try:
                 jd = 2451545.0 + thread_id
-                planet = [SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS][thread_id % 5]
-                pos, _ = ephem.swe_calc_ut(jd, planet, 0)
+                planet = [SUN, MOON, MERCURY, VENUS, MARS][thread_id % 5]
+                pos, _ = ephem.calc_ut(jd, planet, 0)
 
                 if not (0 <= pos[0] < 360):
                     raise ValueError(f"Invalid: {pos[0]}")
@@ -609,7 +609,7 @@ class TestHighLoad:
             def calc(thread_id: int):
                 try:
                     jd = 2451545.0 + batch + thread_id * 0.1
-                    pos, _ = ephem.swe_calc_ut(jd, SE_MOON, 0)
+                    pos, _ = ephem.calc_ut(jd, MOON, 0)
                     with results_lock:
                         results.append(pos[0])
                 except Exception as e:
@@ -654,8 +654,8 @@ class TestLongRunningSessions:
             try:
                 for i in range(calcs_per_thread):
                     jd = 2451545.0 + i * 0.5
-                    planet = [SE_SUN, SE_MOON, SE_MARS][i % 3]
-                    ephem.swe_calc_ut(jd, planet, 0)
+                    planet = [SUN, MOON, MARS][i % 3]
+                    ephem.calc_ut(jd, planet, 0)
 
                 with count_lock:
                     total_calcs[0] += calcs_per_thread
@@ -722,7 +722,7 @@ class TestEphemerisContextThreadSafety:
         for mode, _ in test_ayanamshas:
             ctx = EphemerisContext()
             ctx.set_sid_mode(mode)
-            pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
             expected[mode] = pos[0]
 
         def calculate_with_context(thread_id: int, mode: int, mode_name: str):
@@ -731,7 +731,7 @@ class TestEphemerisContextThreadSafety:
                 ctx.set_sid_mode(mode)
 
                 # Perform calculation
-                pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
                 with results_lock:
                     results[mode] = pos[0]
@@ -780,7 +780,7 @@ class TestEphemerisContextThreadSafety:
                 ctx.set_topo(lon, lat, alt)
 
                 # Perform topocentric calculation
-                pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+                pos, _ = ctx.calc_ut(jd, SUN, FLG_TOPOCTR | FLG_SPEED)
 
                 with results_lock:
                     results[thread_id] = (lat, pos[0])
@@ -810,10 +810,10 @@ class TestEphemerisContextThreadSafety:
         """
         Multiple threads calculating houses with different sidereal modes.
 
-        Tests that _swe_houses_with_context properly uses the lock.
+        Tests that _houses_with_context properly uses the lock.
         """
         jd = 2451545.0
-        sidereal_modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+        sidereal_modes = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]
         errors: list[str] = []
         results: list[tuple[int, int, float]] = []  # (loc_id, mode, asc)
         results_lock = threading.Lock()
@@ -864,11 +864,11 @@ class TestEphemerisContextThreadSafety:
 
         # Create contexts with different configurations
         configs = [
-            (SE_SIDM_LAHIRI, 12.5, 41.9),  # Rome, Lahiri
-            (SE_SIDM_FAGAN_BRADLEY, -0.1, 51.5),  # London, Fagan-Bradley
-            (SE_SIDM_RAMAN, 139.7, 35.7),  # Tokyo, Raman
-            (SE_SIDM_KRISHNAMURTI, -74.0, 40.7),  # New York, Krishnamurti
-            (SE_SIDM_YUKTESHWAR, 151.2, -33.9),  # Sydney, Yukteshwar
+            (SIDM_LAHIRI, 12.5, 41.9),  # Rome, Lahiri
+            (SIDM_FAGAN_BRADLEY, -0.1, 51.5),  # London, Fagan-Bradley
+            (SIDM_RAMAN, 139.7, 35.7),  # Tokyo, Raman
+            (SIDM_KRISHNAMURTI, -74.0, 40.7),  # New York, Krishnamurti
+            (SIDM_YUKTESHWAR, 151.2, -33.9),  # Sydney, Yukteshwar
         ]
 
         for batch in range(num_batches):
@@ -886,7 +886,7 @@ class TestEphemerisContextThreadSafety:
                     ctx.set_topo(lon, lat, 0)
 
                     pos, _ = ctx.calc_ut(
-                        jd + batch * 0.1, SE_SUN, SEFLG_SIDEREAL | SEFLG_TOPOCTR
+                        jd + batch * 0.1, SUN, FLG_SIDEREAL | FLG_TOPOCTR
                     )
 
                     with results_lock:
@@ -924,17 +924,17 @@ class TestEphemerisContextThreadSafety:
         errors: list[str] = []
 
         # Two very different configurations
-        config_a = (SE_SIDM_LAHIRI, "Lahiri")  # ~23° ayanamsha
-        config_b = (SE_SIDM_GALCENT_0SAG, "GalCent0Sag")  # ~25° ayanamsha
+        config_a = (SIDM_LAHIRI, "Lahiri")  # ~23° ayanamsha
+        config_b = (SIDM_GALCENT_0SAG, "GalCent0Sag")  # ~25° ayanamsha
 
         # Pre-calculate expected values
         ctx_a = EphemerisContext()
         ctx_a.set_sid_mode(config_a[0])
-        expected_a, _ = ctx_a.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        expected_a, _ = ctx_a.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         ctx_b = EphemerisContext()
         ctx_b.set_sid_mode(config_b[0])
-        expected_b, _ = ctx_b.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        expected_b, _ = ctx_b.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Verify they're different enough to detect corruption
         diff = abs(expected_a[0] - expected_b[0])
@@ -949,7 +949,7 @@ class TestEphemerisContextThreadSafety:
                 ctx = EphemerisContext()
                 ctx.set_sid_mode(config_a[0])
                 for _ in range(num_iterations):
-                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
                     # Check result is close to expected_a, not expected_b
                     if abs(pos[0] - expected_a[0]) > 0.001:
                         with results_lock:
@@ -968,7 +968,7 @@ class TestEphemerisContextThreadSafety:
                 ctx = EphemerisContext()
                 ctx.set_sid_mode(config_b[0])
                 for _ in range(num_iterations):
-                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
                     # Check result is close to expected_b, not expected_a
                     if abs(pos[0] - expected_b[0]) > 0.001:
                         with results_lock:
@@ -1023,7 +1023,7 @@ class TestEphemerisContextThreadSafety:
                 ctx.set_sid_mode(mode)
 
                 # Calculate Moon as seen from Mars
-                pos, _ = ctx.calc_pctr(jd, SE_MOON, SE_MARS, SEFLG_SIDEREAL)
+                pos, _ = ctx.calc_pctr(jd, MOON, MARS, FLG_SIDEREAL)
 
                 with results_lock:
                     results.append(pos[0])
@@ -1032,7 +1032,7 @@ class TestEphemerisContextThreadSafety:
                 with results_lock:
                     errors.append(f"Thread {thread_id}: {e}")
 
-        modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+        modes = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=9) as ex:
             futures = [ex.submit(calc_pctr, i, modes[i % 3]) for i in range(9)]
@@ -1125,7 +1125,7 @@ class TestEphemerisContextClose:
         assert ts_before is not None
 
         # Do calculation for comparison
-        pos_before, _ = ctx.calc_ut(jd, SE_SUN, 0)
+        pos_before, _ = ctx.calc_ut(jd, SUN, 0)
 
         # Step 2: Call close()
         EphemerisContext.close()
@@ -1155,7 +1155,7 @@ class TestEphemerisContextClose:
         assert ts_after is not ts_before, "Timescale should be new instance"
 
         # Do calculation after reload and verify same result
-        pos_after, _ = ctx.calc_ut(jd, SE_SUN, 0)
+        pos_after, _ = ctx.calc_ut(jd, SUN, 0)
 
         # Results should be identical (same calculation)
         assert abs(pos_before[0] - pos_after[0]) < 1e-10, (
@@ -1172,7 +1172,7 @@ class TestEphemerisContextClose:
 
         # Load resources
         ctx = EphemerisContext()
-        ctx.calc_ut(2451545.0, SE_SUN, 0)
+        ctx.calc_ut(2451545.0, SUN, 0)
 
         # Call close() multiple times
         EphemerisContext.close()
@@ -1185,7 +1185,7 @@ class TestEphemerisContextClose:
         assert ctx_module._SHARED_PLANETS is None
 
         # Can still do calculations after
-        pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+        pos, _ = ctx.calc_ut(2451545.0, SUN, 0)
         assert 0 <= pos[0] < 360
 
     def test_close_does_not_affect_instance_state(self):
@@ -1199,17 +1199,17 @@ class TestEphemerisContextClose:
 
         # Create context with specific settings
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SE_SIDM_LAHIRI)
+        ctx.set_sid_mode(SIDM_LAHIRI)
         ctx.set_topo(12.5, 41.9, 100)  # Rome
 
         # Do a calculation to load shared resources
-        ctx.calc_ut(2451545.0, SE_SUN, 0)
+        ctx.calc_ut(2451545.0, SUN, 0)
 
         # Call close()
         EphemerisContext.close()
 
         # Instance state should be preserved
-        assert ctx.sidereal_mode == SE_SIDM_LAHIRI, (
+        assert ctx.sidereal_mode == SIDM_LAHIRI, (
             "Sidereal mode should be preserved after close()"
         )
         assert ctx.topo is not None, "Topo should be preserved after close()"
@@ -1239,10 +1239,10 @@ class TestEphemerisContextClose:
             try:
                 for i in range(num_iterations):
                     ctx = EphemerisContext()
-                    ctx.set_sid_mode(SE_SIDM_LAHIRI)
+                    ctx.set_sid_mode(SIDM_LAHIRI)
 
                     # Do a calculation
-                    pos, _ = ctx.calc_ut(jd + i * 0.1, SE_SUN, 0)
+                    pos, _ = ctx.calc_ut(jd + i * 0.1, SUN, 0)
 
                     # Validate result
                     if not (0 <= pos[0] < 360):
@@ -1290,7 +1290,7 @@ class TestEphemerisContextClose:
             try:
                 for i in range(num_iterations):
                     ctx = EphemerisContext()
-                    pos, _ = ctx.calc_ut(jd + i * 0.1, SE_MOON, 0)
+                    pos, _ = ctx.calc_ut(jd + i * 0.1, MOON, 0)
 
                     if not (0 <= pos[0] < 360):
                         with errors_lock:
@@ -1364,7 +1364,7 @@ class TestEphemerisContextClose:
             # Explicitly load context's shared resources
             _ = ctx.get_planets()
 
-            pos, _ = ctx.calc_ut(jd, SE_SUN, 0)
+            pos, _ = ctx.calc_ut(jd, SUN, 0)
             results.append(pos[0])
 
             # Verify context resources are loaded
@@ -1395,16 +1395,16 @@ class TestEphemerisContextClose:
 
         # Calculate with Lahiri before close
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SE_SIDM_LAHIRI)
-        pos_lahiri_before, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx.set_sid_mode(SIDM_LAHIRI)
+        pos_lahiri_before, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Close
         EphemerisContext.close()
 
         # Calculate with same settings after close
         ctx2 = EphemerisContext()
-        ctx2.set_sid_mode(SE_SIDM_LAHIRI)
-        pos_lahiri_after, _ = ctx2.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx2.set_sid_mode(SIDM_LAHIRI)
+        pos_lahiri_after, _ = ctx2.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Results should be identical
         assert abs(pos_lahiri_before[0] - pos_lahiri_after[0]) < 1e-10, (
@@ -1415,8 +1415,8 @@ class TestEphemerisContextClose:
         EphemerisContext.close()
 
         ctx3 = EphemerisContext()
-        ctx3.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-        pos_fagan, _ = ctx3.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx3.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        pos_fagan, _ = ctx3.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Different ayanamsha should give different results
         assert abs(pos_lahiri_after[0] - pos_fagan[0]) > 0.1, (

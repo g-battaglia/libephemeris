@@ -2,7 +2,7 @@
 """Round 168: Hypothetical/Uranian bodies with sidereal mode.
 
 Tests Uranian/hypothetical bodies (Cupido, Hades, Zeus, Kronos, Apollon,
-Admetos, Vulkanus, Poseidon) with SEFLG_SIDEREAL flag and various ayanamsha
+Admetos, Vulkanus, Poseidon) with FLG_SIDEREAL flag and various ayanamsha
 modes. This combination exercises the hypothetical body Keplerian propagation
 + sidereal coordinate transformation pipeline.
 """
@@ -18,17 +18,20 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 HYPOTHETICAL = {
-    "Cupido": (swe.CUPIDO, ephem.SE_CUPIDO),
-    "Hades": (swe.HADES, ephem.SE_HADES),
-    "Zeus": (swe.ZEUS, ephem.SE_ZEUS),
-    "Kronos": (swe.KRONOS, ephem.SE_KRONOS),
-    "Apollon": (swe.APOLLON, ephem.SE_APOLLON),
-    "Admetos": (swe.ADMETOS, ephem.SE_ADMETOS),
-    "Vulkanus": (swe.VULKANUS, ephem.SE_VULKANUS),
-    "Poseidon": (swe.POSEIDON, ephem.SE_POSEIDON),
+    "Cupido": (swe.CUPIDO, ephem.CUPIDO),
+    "Hades": (swe.HADES, ephem.HADES),
+    "Zeus": (swe.ZEUS, ephem.ZEUS),
+    "Kronos": (swe.KRONOS, ephem.KRONOS),
+    "Apollon": (swe.APOLLON, ephem.APOLLON),
+    "Admetos": (swe.ADMETOS, ephem.ADMETOS),
+    "Vulkanus": (swe.VULKANUS, ephem.VULKANUS),
+    "Poseidon": (swe.POSEIDON, ephem.POSEIDON),
 }
 
 # Ayanamsha modes to test
@@ -55,10 +58,10 @@ errors = []
 
 for aya_name, aya_mode in AYANAMSHAS.items():
     swe.set_sid_mode(aya_mode)
-    ephem.swe_set_sid_mode(aya_mode, 0, 0)
+    ephem.set_sid_mode(aya_mode, 0, 0)
 
     flags_se = swe.FLG_SPEED | swe.FLG_SIDEREAL
-    flags_le = ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+    flags_le = ephem.FLG_SPEED | ephem.FLG_SIDEREAL
 
     for date_str, jd in TEST_DATES:
         for bname, (se_id, le_id) in HYPOTHETICAL.items():
@@ -73,7 +76,7 @@ for aya_name, aya_mode in AYANAMSHAS.items():
                 continue
 
             try:
-                le_result = ephem.swe_calc_ut(jd, le_id, flags_le)
+                le_result = ephem.calc_ut(jd, le_id, flags_le)
                 le_pos = le_result[0]
             except Exception:
                 continue
@@ -106,7 +109,7 @@ for aya_name, aya_mode in AYANAMSHAS.items():
 
 # Reset sidereal mode
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0, 0, 0)
+ephem.set_sid_mode(0, 0, 0)
 
 total = passed + failed
 print(f"\n=== Round 168: Hypothetical Bodies with Sidereal Mode ===")

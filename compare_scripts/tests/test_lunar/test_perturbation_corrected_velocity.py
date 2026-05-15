@@ -19,11 +19,11 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_TRUE_NODE,
-    SE_MEAN_NODE,
-    SE_OSCU_APOG,
-    SE_MEAN_APOG,
-    SEFLG_SPEED,
+    TRUE_NODE,
+    MEAN_NODE,
+    OSCU_APOG,
+    MEAN_APOG,
+    FLG_SPEED,
 )
 
 
@@ -52,8 +52,8 @@ class TestTrueNodePerturbationCorrectedVelocity:
         jd = 2451545.0  # J2000.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_TRUE_NODE, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, TRUE_NODE, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -89,7 +89,7 @@ class TestTrueNodePerturbationCorrectedVelocity:
         # Sample velocities every hour for 24 hours
         for i in range(25):
             jd = jd_start + i / 24.0
-            pos, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
             velocities.append(pos[3])
 
         # Check that velocity changes smoothly (no jumps > 0.01 deg/day)
@@ -119,11 +119,11 @@ class TestTrueNodePerturbationCorrectedVelocity:
             month = random.randint(1, 12)
             day = random.randint(1, 28)
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dt = 1.0
 
-            pos1, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
-            pos2, _ = ephem.swe_calc_ut(jd + dt, SE_TRUE_NODE, SEFLG_SPEED)
+            pos1, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
+            pos2, _ = ephem.calc_ut(jd + dt, TRUE_NODE, FLG_SPEED)
 
             actual_change = pos2[0] - pos1[0]
             if actual_change > 180:
@@ -160,8 +160,8 @@ class TestTrueLilithPerturbationCorrectedVelocity:
         jd = 2451545.0  # J2000.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_OSCU_APOG, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, OSCU_APOG, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -194,7 +194,7 @@ class TestTrueLilithPerturbationCorrectedVelocity:
         # Sample velocities every hour for 24 hours
         for i in range(25):
             jd = jd_start + i / 24.0
-            pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
             velocities.append(pos[3])
 
         # Check that velocity changes smoothly (osculating apogee can vary more)
@@ -214,15 +214,15 @@ class TestMeanLilithVelocity:
 
     @pytest.mark.unit
     def test_mean_lilith_velocity_is_nonzero(self):
-        """Mean Lilith velocity should now be calculated with SEFLG_SPEED."""
+        """Mean Lilith velocity should now be calculated with FLG_SPEED."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, MEAN_APOG, FLG_SPEED)
 
         # Mean Lilith velocity should be positive (prograde apsidal precession)
         # The base apsidal precession is about 40.7 degrees/year = 0.111 deg/day
         # However, the Mean Lilith formula includes periodic corrections that
         # can make the instantaneous velocity vary significantly (up to ~0.5 deg/day)
-        assert pos[3] != 0.0, "Mean Lilith velocity should be non-zero with SEFLG_SPEED"
+        assert pos[3] != 0.0, "Mean Lilith velocity should be non-zero with FLG_SPEED"
         assert 0.0 < pos[3] < 1.0, (
             f"Mean Lilith velocity {pos[3]} deg/day outside expected range [0.0, 1.0]"
         )
@@ -233,8 +233,8 @@ class TestMeanLilithVelocity:
         jd = 2451545.0
         dt = 1.0
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_MEAN_APOG, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, MEAN_APOG, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, MEAN_APOG, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -265,8 +265,8 @@ class TestMeanNodeVelocityConsistency:
         jd = 2451545.0
         dt = 1.0
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_MEAN_NODE, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, MEAN_NODE, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -306,7 +306,7 @@ class TestVelocityStationDetection:
         # Sample velocities every 3 days for 100 days
         for i in range(34):
             jd = jd_start + i * 3.0
-            pos, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)
             velocities.append(pos[3])
 
         # True node generally moves retrograde, but velocity magnitude varies

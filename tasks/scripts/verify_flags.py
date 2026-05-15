@@ -47,66 +47,66 @@ def check(condition: bool, label: str) -> None:
 # Constants
 # ---------------------------------------------------------------------------
 SEFLG_DEFAULT = 0
-SEFLG_SWIEPH = 2
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_TRUEPOS = 16
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_NOGDEFL = 512
-SEFLG_NOABERR = 1024
-SEFLG_EQUATORIAL = 2048
-SEFLG_XYZ = 4096
-SEFLG_RADIANS = 8192
-SEFLG_SIDEREAL = 65536
+FLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_TRUEPOS = 16
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_NOGDEFL = 512
+FLG_NOABERR = 1024
+FLG_EQUATORIAL = 2048
+FLG_XYZ = 4096
+FLG_RADIANS = 8192
+FLG_SIDEREAL = 65536
 
 SINGLE_FLAGS = [
     ("DEFAULT", SEFLG_DEFAULT),
-    ("SWIEPH", SEFLG_SWIEPH),
-    ("SPEED", SEFLG_SPEED),
-    ("HELCTR", SEFLG_HELCTR),
-    ("TRUEPOS", SEFLG_TRUEPOS),
-    ("J2000", SEFLG_J2000),
-    ("NONUT", SEFLG_NONUT),
-    ("NOGDEFL", SEFLG_NOGDEFL),
-    ("NOABERR", SEFLG_NOABERR),
-    ("EQUATORIAL", SEFLG_EQUATORIAL),
-    ("XYZ", SEFLG_XYZ),
-    ("RADIANS", SEFLG_RADIANS),
-    ("SIDEREAL", SEFLG_SIDEREAL),
+    ("SWIEPH", FLG_SWIEPH),
+    ("SPEED", FLG_SPEED),
+    ("HELCTR", FLG_HELCTR),
+    ("TRUEPOS", FLG_TRUEPOS),
+    ("J2000", FLG_J2000),
+    ("NONUT", FLG_NONUT),
+    ("NOGDEFL", FLG_NOGDEFL),
+    ("NOABERR", FLG_NOABERR),
+    ("EQUATORIAL", FLG_EQUATORIAL),
+    ("XYZ", FLG_XYZ),
+    ("RADIANS", FLG_RADIANS),
+    ("SIDEREAL", FLG_SIDEREAL),
 ]
 
 FLAG_PAIRS = [
-    ("SPEED+HELCTR", SEFLG_SPEED | SEFLG_HELCTR),
-    ("SPEED+EQUATORIAL", SEFLG_SPEED | SEFLG_EQUATORIAL),
-    ("SPEED+TRUEPOS", SEFLG_SPEED | SEFLG_TRUEPOS),
-    ("SPEED+J2000", SEFLG_SPEED | SEFLG_J2000),
-    ("SPEED+NONUT", SEFLG_SPEED | SEFLG_NONUT),
-    ("SPEED+NOGDEFL", SEFLG_SPEED | SEFLG_NOGDEFL),
-    ("SPEED+NOABERR", SEFLG_SPEED | SEFLG_NOABERR),
-    ("HELCTR+TRUEPOS", SEFLG_HELCTR | SEFLG_TRUEPOS),
-    ("HELCTR+J2000", SEFLG_HELCTR | SEFLG_J2000),
-    ("HELCTR+NONUT", SEFLG_HELCTR | SEFLG_NONUT),
-    ("EQUATORIAL+J2000", SEFLG_EQUATORIAL | SEFLG_J2000),
-    ("EQUATORIAL+NONUT", SEFLG_EQUATORIAL | SEFLG_NONUT),
-    ("EQUATORIAL+SPEED", SEFLG_EQUATORIAL | SEFLG_SPEED),
-    ("XYZ+SPEED", SEFLG_XYZ | SEFLG_SPEED),
-    ("TRUEPOS+J2000", SEFLG_TRUEPOS | SEFLG_J2000),
-    ("TRUEPOS+NONUT", SEFLG_TRUEPOS | SEFLG_NONUT),
-    ("J2000+NONUT", SEFLG_J2000 | SEFLG_NONUT),
-    ("J2000+NOGDEFL", SEFLG_J2000 | SEFLG_NOGDEFL),
-    ("J2000+NOABERR", SEFLG_J2000 | SEFLG_NOABERR),
-    ("NONUT+NOGDEFL", SEFLG_NONUT | SEFLG_NOGDEFL),
-    ("NONUT+NOABERR", SEFLG_NONUT | SEFLG_NOABERR),
-    ("NOGDEFL+NOABERR", SEFLG_NOGDEFL | SEFLG_NOABERR),
-    ("HELCTR+EQUATORIAL", SEFLG_HELCTR | SEFLG_EQUATORIAL),
-    ("HELCTR+NOGDEFL", SEFLG_HELCTR | SEFLG_NOGDEFL),
-    ("HELCTR+NOABERR", SEFLG_HELCTR | SEFLG_NOABERR),
-    ("EQUATORIAL+NOGDEFL", SEFLG_EQUATORIAL | SEFLG_NOGDEFL),
-    ("EQUATORIAL+NOABERR", SEFLG_EQUATORIAL | SEFLG_NOABERR),
-    ("EQUATORIAL+TRUEPOS", SEFLG_EQUATORIAL | SEFLG_TRUEPOS),
-    ("XYZ+HELCTR", SEFLG_XYZ | SEFLG_HELCTR),
-    ("XYZ+EQUATORIAL", SEFLG_XYZ | SEFLG_EQUATORIAL),
+    ("SPEED+HELCTR", FLG_SPEED | FLG_HELCTR),
+    ("SPEED+EQUATORIAL", FLG_SPEED | FLG_EQUATORIAL),
+    ("SPEED+TRUEPOS", FLG_SPEED | FLG_TRUEPOS),
+    ("SPEED+J2000", FLG_SPEED | FLG_J2000),
+    ("SPEED+NONUT", FLG_SPEED | FLG_NONUT),
+    ("SPEED+NOGDEFL", FLG_SPEED | FLG_NOGDEFL),
+    ("SPEED+NOABERR", FLG_SPEED | FLG_NOABERR),
+    ("HELCTR+TRUEPOS", FLG_HELCTR | FLG_TRUEPOS),
+    ("HELCTR+J2000", FLG_HELCTR | FLG_J2000),
+    ("HELCTR+NONUT", FLG_HELCTR | FLG_NONUT),
+    ("EQUATORIAL+J2000", FLG_EQUATORIAL | FLG_J2000),
+    ("EQUATORIAL+NONUT", FLG_EQUATORIAL | FLG_NONUT),
+    ("EQUATORIAL+SPEED", FLG_EQUATORIAL | FLG_SPEED),
+    ("XYZ+SPEED", FLG_XYZ | FLG_SPEED),
+    ("TRUEPOS+J2000", FLG_TRUEPOS | FLG_J2000),
+    ("TRUEPOS+NONUT", FLG_TRUEPOS | FLG_NONUT),
+    ("J2000+NONUT", FLG_J2000 | FLG_NONUT),
+    ("J2000+NOGDEFL", FLG_J2000 | FLG_NOGDEFL),
+    ("J2000+NOABERR", FLG_J2000 | FLG_NOABERR),
+    ("NONUT+NOGDEFL", FLG_NONUT | FLG_NOGDEFL),
+    ("NONUT+NOABERR", FLG_NONUT | FLG_NOABERR),
+    ("NOGDEFL+NOABERR", FLG_NOGDEFL | FLG_NOABERR),
+    ("HELCTR+EQUATORIAL", FLG_HELCTR | FLG_EQUATORIAL),
+    ("HELCTR+NOGDEFL", FLG_HELCTR | FLG_NOGDEFL),
+    ("HELCTR+NOABERR", FLG_HELCTR | FLG_NOABERR),
+    ("EQUATORIAL+NOGDEFL", FLG_EQUATORIAL | FLG_NOGDEFL),
+    ("EQUATORIAL+NOABERR", FLG_EQUATORIAL | FLG_NOABERR),
+    ("EQUATORIAL+TRUEPOS", FLG_EQUATORIAL | FLG_TRUEPOS),
+    ("XYZ+HELCTR", FLG_XYZ | FLG_HELCTR),
+    ("XYZ+EQUATORIAL", FLG_XYZ | FLG_EQUATORIAL),
 ]
 
 # 22 bodies: 0-9, 10-13, 14, 15, 17-22
@@ -140,7 +140,7 @@ BODY_NAMES = {
 
 PAIR_BODIES = [0, 1, 4, 5, 6]  # Sun, Moon, Mars, Jupiter, Saturn
 
-SE_EARTH = 14
+EARTH = 14
 
 # ---------------------------------------------------------------------------
 # Date generation
@@ -225,13 +225,13 @@ def run_section_2_1() -> None:
     print("=" * 70)
 
     for flag_name, flag_val in SINGLE_FLAGS:
-        # SEFLG_SIDEREAL requires swe_set_sid_mode first
-        if flag_val == SEFLG_SIDEREAL:
+        # FLG_SIDEREAL requires set_sid_mode first
+        if flag_val == FLG_SIDEREAL:
             lib.set_sid_mode(1)  # Lahiri ayanamsha
 
         for body in ALL_BODIES:
             # Skip heliocentric Earth -- known to be problematic
-            if flag_val == SEFLG_HELCTR and body == SE_EARTH:
+            if flag_val == FLG_HELCTR and body == EARTH:
                 continue
 
             for jd in DATES_50:
@@ -245,9 +245,9 @@ def run_section_2_1() -> None:
                     continue
 
                 # Range checks (only for non-XYZ results)
-                is_xyz = bool(flag_val & SEFLG_XYZ)
-                is_rad = bool(flag_val & SEFLG_RADIANS)
-                is_earth_geo = (body == SE_EARTH) and not (flag_val & SEFLG_HELCTR)
+                is_xyz = bool(flag_val & FLG_XYZ)
+                is_rad = bool(flag_val & FLG_RADIANS)
+                is_earth_geo = (body == EARTH) and not (flag_val & FLG_HELCTR)
 
                 if not is_xyz and not is_earth_geo:
                     lon, lat = pos[0], pos[1]
@@ -272,7 +272,7 @@ def run_section_2_1() -> None:
                         )
 
         # Reset sidereal mode after the flag is done
-        if flag_val == SEFLG_SIDEREAL:
+        if flag_val == FLG_SIDEREAL:
             lib.set_sid_mode(0)
 
 
@@ -290,7 +290,7 @@ def run_section_2_2() -> None:
                 label = (
                     f"pair={pair_name} body={BODY_NAMES.get(body, body)} jd={jd:.1f}"
                 )
-                result = safe_calc_ut(jd, body, pair_val | SEFLG_SWIEPH)
+                result = safe_calc_ut(jd, body, pair_val | FLG_SWIEPH)
                 validate_result_basic(result, label)
 
 
@@ -309,9 +309,9 @@ def run_section_2_4() -> None:
             label = f"xyz_coherence body={BODY_NAMES.get(body, body)} jd={jd:.1f}"
 
             # Spherical
-            res_sph = safe_calc_ut(jd, body, SEFLG_SPEED)
+            res_sph = safe_calc_ut(jd, body, FLG_SPEED)
             # XYZ
-            res_xyz = safe_calc_ut(jd, body, SEFLG_SPEED | SEFLG_XYZ)
+            res_xyz = safe_calc_ut(jd, body, FLG_SPEED | FLG_XYZ)
 
             if res_sph is None or res_xyz is None:
                 check(False, f"{label}: one of the calls failed")
@@ -362,8 +362,8 @@ def run_section_2_5() -> None:
         for jd in DATES_50:
             label = f"rad_coherence body={BODY_NAMES.get(body, body)} jd={jd:.1f}"
 
-            res_deg = safe_calc_ut(jd, body, SEFLG_SPEED)
-            res_rad = safe_calc_ut(jd, body, SEFLG_SPEED | SEFLG_RADIANS)
+            res_deg = safe_calc_ut(jd, body, FLG_SPEED)
+            res_rad = safe_calc_ut(jd, body, FLG_SPEED | FLG_RADIANS)
 
             if res_deg is None or res_rad is None:
                 check(False, f"{label}: one of the calls failed")
@@ -402,7 +402,7 @@ def run_section_2_6() -> None:
 
     for jd in DATES_50:
         label = f"sun_helio jd={jd:.1f}"
-        result = safe_calc_ut(jd, 0, SEFLG_HELCTR)  # body 0 = Sun
+        result = safe_calc_ut(jd, 0, FLG_HELCTR)  # body 0 = Sun
 
         if result is None:
             check(False, f"{label}: calc_ut raised exception")

@@ -305,12 +305,12 @@ class TestConstantsDocumented:
         assert hasattr(eph, "NAIF_SEDNA")
 
     def test_se_chiron_exists(self):
-        """SE_CHIRON constant should exist."""
-        assert hasattr(eph, "SE_CHIRON")
+        """CHIRON constant should exist."""
+        assert hasattr(eph, "CHIRON")
 
     def test_se_eris_exists(self):
-        """SE_ERIS constant should exist."""
-        assert hasattr(eph, "SE_ERIS")
+        """ERIS constant should exist."""
+        assert hasattr(eph, "ERIS")
 
 
 class TestEnvironmentVariablesDocumented:
@@ -399,14 +399,14 @@ class TestPrecisionTuningFunctionality:
 
     def test_set_delta_t_userdef_works(self):
         """set_delta_t_userdef should work as documented."""
-        from libephemeris import swe_deltat
+        from libephemeris import deltat
 
         # Set a fixed Delta T
         fixed_dt = 65.0 / 86400.0  # 65 seconds in days
         eph.set_delta_t_userdef(fixed_dt)
 
         # Should return the fixed value
-        result = swe_deltat(2451545.0)
+        result = deltat(2451545.0)
         assert abs(result - fixed_dt) < 1e-10
 
         # Clear
@@ -456,7 +456,7 @@ class TestPrecisionTuningFunctionality:
     def test_get_current_file_data_works(self):
         """get_current_file_data should work as documented."""
         # Force ephemeris loading
-        eph.swe_calc_ut(2451545.0, eph.SE_SUN, 0)
+        eph.calc_ut(2451545.0, eph.SUN, 0)
 
         # Should return file info
         path, start, end, denum = eph.get_current_file_data()

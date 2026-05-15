@@ -12,11 +12,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SE_SUN = 0
-SE_MERCURY = 2
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+SUN = 0
+MERCURY = 2
 
 
 def find_max_elongations(start_jd, count=30):
@@ -26,8 +29,8 @@ def find_max_elongations(start_jd, count=30):
     step = 1.0
 
     def elong(j):
-        s = swe.calc_ut(j, SE_SUN, SEFLG_SPEED)[0][0]
-        p = swe.calc_ut(j, SE_MERCURY, SEFLG_SPEED)[0][0]
+        s = swe.calc_ut(j, SUN, FLG_SPEED)[0][0]
+        p = swe.calc_ut(j, MERCURY, FLG_SPEED)[0][0]
         e = p - s
         while e > 180:
             e -= 360
@@ -93,8 +96,8 @@ def main():
         for offset in [-0.1, 0.0, 0.1]:
             tj = jd + offset
             try:
-                se = swe.calc_ut(tj, SE_MERCURY, SEFLG_SPEED)[0]
-                le = ephem.swe_calc_ut(tj, SE_MERCURY, SEFLG_SPEED)[0]
+                se = swe.calc_ut(tj, MERCURY, FLG_SPEED)[0]
+                le = ephem.calc_ut(tj, MERCURY, FLG_SPEED)[0]
             except Exception:
                 continue
 

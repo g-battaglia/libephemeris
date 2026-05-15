@@ -1,5 +1,5 @@
 """
-Tests for swe_houses_armc with all house systems.
+Tests for houses_armc with all house systems.
 
 Verifies houses_armc produces valid cusps for all 25 systems,
 consistency with houses() at equivalent ARMC, and edge cases.
@@ -12,14 +12,14 @@ import math
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import SEFLG_SWIEPH
+from libephemeris.constants import FLG_SWIEPH
 from libephemeris.exceptions import PolarCircleError
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -31,7 +31,7 @@ POLAR_SENSITIVE = "PKG"
 
 
 class TestHousesArmcAllSystems:
-    """Test swe_houses_armc with all house systems."""
+    """Test houses_armc with all house systems."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("hsys", list(ALL_SYSTEMS))
@@ -123,7 +123,7 @@ class TestHousesArmcConsistency:
 
 
 class TestHousesArmcEx2:
-    """Test swe_houses_armc_ex2 with speeds."""
+    """Test houses_armc_ex2 with speeds."""
 
     @pytest.mark.unit
     def test_houses_armc_ex2_returns_4_tuples(self):

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 
 from tests.test_leb.compare.conftest import (
     HYPOTHETICAL_BODIES,
@@ -40,8 +40,8 @@ class TestMediumHypotheticalPosition:
         worst_jd = 0.0
 
         for jd in medium_dates_300:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
             lat_err = abs(ref[1] - leb[1]) * 3600.0
@@ -78,8 +78,8 @@ class TestMediumHypotheticalSpeed:
         worst_jd = 0.0
 
         for jd in medium_dates_300:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[3] - leb[3])
             if err > max_err:

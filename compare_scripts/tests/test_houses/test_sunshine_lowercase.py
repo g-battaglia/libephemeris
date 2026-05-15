@@ -64,10 +64,10 @@ class TestSunshineLowercase:
     def test_sunshine_lowercase_vs_uppercase(self, name, jd, lat, lon):
         """Test that lowercase 'i' produces identical results to uppercase 'I'."""
         # Calculate with uppercase 'I'
-        cusps_I, ascmc_I = ephem.swe_houses(jd, lat, lon, ord("I"))
+        cusps_I, ascmc_I = ephem.houses(jd, lat, lon, ord("I"))
 
         # Calculate with lowercase 'i'
-        cusps_i, ascmc_i = ephem.swe_houses(jd, lat, lon, ord("i"))
+        cusps_i, ascmc_i = ephem.houses(jd, lat, lon, ord("i"))
 
         # Verify cusps are identical
         for house_num in range(12):
@@ -92,7 +92,7 @@ class TestSunshineLowercase:
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b"I")
 
         # libephemeris with lowercase 'i'
-        cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, ord("i"))
+        cusps_py, ascmc_py = ephem.houses(jd, lat, lon, ord("i"))
 
         # Verify cusps match
         max_diff = 0.0
@@ -116,8 +116,8 @@ class TestSunshineLowercase:
         jd = swe.julday(year, month, day, hour)
 
         # Both should produce the same results
-        cusps_I, ascmc_I = ephem.swe_houses(jd, lat, lon, ord("I"))
-        cusps_i, ascmc_i = ephem.swe_houses(jd, lat, lon, ord("i"))
+        cusps_I, ascmc_I = ephem.houses(jd, lat, lon, ord("I"))
+        cusps_i, ascmc_i = ephem.houses(jd, lat, lon, ord("i"))
 
         # Verify identical results
         for house_num in range(12):
@@ -129,16 +129,16 @@ class TestSunshineLowercase:
 
 
 class TestSunshineName:
-    """Tests for swe_house_name with Sunshine systems."""
+    """Tests for house_name with Sunshine systems."""
 
     def test_uppercase_I_name(self):
         """Test that 'I' returns 'Sunshine' name."""
-        name = ephem.swe_house_name(ord("I"))
+        name = ephem.house_name(ord("I"))
         assert name == "Sunshine", f"Expected 'Sunshine' for 'I', got '{name}'"
 
     def test_lowercase_i_name(self):
         """Test that 'i' returns 'Sunshine/alt.' name."""
-        name = ephem.swe_house_name(ord("i"))
+        name = ephem.house_name(ord("i"))
         assert name == "Sunshine/alt.", (
             f"Expected 'Sunshine/alt.' for 'i', got '{name}'"
         )
@@ -151,10 +151,10 @@ class TestSunshineNotFallingBackToPlacidus:
     def test_sunshine_different_from_placidus(self, name, jd, lat, lon):
         """Verify Sunshine 'i' produces different results from Placidus (the old default)."""
         # Calculate with lowercase 'i' (should be Sunshine)
-        cusps_i, _ = ephem.swe_houses(jd, lat, lon, ord("i"))
+        cusps_i, _ = ephem.houses(jd, lat, lon, ord("i"))
 
         # Calculate with Placidus
-        cusps_P, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_P, _ = ephem.houses(jd, lat, lon, ord("P"))
 
         # They should be DIFFERENT (if they're the same, lowercase was falling back to Placidus)
         total_diff = sum(angular_diff(cusps_i[i], cusps_P[i]) for i in range(12))
@@ -169,8 +169,8 @@ class TestSunshineNotFallingBackToPlacidus:
     @pytest.mark.parametrize("name,jd,lat,lon", TEST_LOCATIONS)
     def test_sunshine_matches_uppercase(self, name, jd, lat, lon):
         """Verify lowercase 'i' matches uppercase 'I' exactly."""
-        cusps_I, _ = ephem.swe_houses(jd, lat, lon, ord("I"))
-        cusps_i, _ = ephem.swe_houses(jd, lat, lon, ord("i"))
+        cusps_I, _ = ephem.houses(jd, lat, lon, ord("I"))
+        cusps_i, _ = ephem.houses(jd, lat, lon, ord("i"))
 
         # They should be IDENTICAL
         total_diff = sum(angular_diff(cusps_I[i], cusps_i[i]) for i in range(12))

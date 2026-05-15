@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Round 16: Deep Planetary Phenomena (swe_pheno_ut) Verification
+Round 16: Deep Planetary Phenomena (pheno_ut) Verification
 ===============================================================
 
 Parts:
@@ -33,16 +33,16 @@ swe.set_ephe_path(_EPHE_PATH)
 
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 EPOCHS = [
@@ -106,7 +106,7 @@ def run_part1():
             label = f"{name} @ {epoch[4]}"
             try:
                 se_attr = swe.pheno_ut(jd, ipl, 0)
-                le_attr, _ = ephem.swe_pheno_ut(jd, ipl, 0)
+                le_attr, _ = ephem.pheno_ut(jd, ipl, 0)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -160,7 +160,7 @@ def run_part2():
             label = f"{name} @ {epoch[4]}"
             try:
                 se_attr = swe.pheno_ut(jd, ipl, 0)
-                le_attr, _ = ephem.swe_pheno_ut(jd, ipl, 0)
+                le_attr, _ = ephem.pheno_ut(jd, ipl, 0)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -214,7 +214,7 @@ def run_part3():
             label = f"{name} @ {epoch[4]}"
             try:
                 se_attr = swe.pheno_ut(jd, ipl, 0)
-                le_attr, _ = ephem.swe_pheno_ut(jd, ipl, 0)
+                le_attr, _ = ephem.pheno_ut(jd, ipl, 0)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -247,7 +247,7 @@ def run_part4():
         label = f"{name} structure"
         try:
             se_attr = swe.pheno_ut(jd, ipl, 0)
-            le_attr, le_flag = ephem.swe_pheno_ut(jd, ipl, 0)
+            le_attr, le_flag = ephem.pheno_ut(jd, ipl, 0)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -278,12 +278,12 @@ def run_part5():
     jd = jd_for(EPOCHS[2])
 
     for ipl, name in BODIES:
-        if ipl == SE_SUN:
+        if ipl == SUN:
             r.skip("Sun")
             continue
         label = f"{name} formula"
         try:
-            le_attr, _ = ephem.swe_pheno_ut(jd, ipl, 0)
+            le_attr, _ = ephem.pheno_ut(jd, ipl, 0)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -312,18 +312,18 @@ def run_part6():
 
     for epoch in EPOCHS:
         jd_ut = jd_for(epoch)
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
         for ipl, name in [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (MOON, "Moon"),
         ]:
             label = f"{name} @ {epoch[4]}"
             try:
-                ut_attr, _ = ephem.swe_pheno_ut(jd_ut, ipl, 0)
-                tt_attr, _ = ephem.swe_pheno(jd_tt, ipl, 0)
+                ut_attr, _ = ephem.pheno_ut(jd_ut, ipl, 0)
+                tt_attr, _ = ephem.pheno(jd_tt, ipl, 0)
             except Exception as e:
                 r.fail(f"{label}: {e}")
                 continue
@@ -341,7 +341,7 @@ def run_part6():
 
 def main():
     print("=" * 70)
-    print("ROUND 16: Deep Planetary Phenomena (swe_pheno_ut) Verification")
+    print("ROUND 16: Deep Planetary Phenomena (pheno_ut) Verification")
     print("=" * 70)
 
     start = time.time()

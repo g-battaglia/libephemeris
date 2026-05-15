@@ -1,7 +1,7 @@
 """
-SEFLG_NOGDEFL Comparison Tests.
+FLG_NOGDEFL Comparison Tests.
 
-Validates that SEFLG_NOGDEFL (skip gravitational light deflection, keep aberration)
+Validates that FLG_NOGDEFL (skip gravitational light deflection, keep aberration)
 produces results matching pyswisseph for:
 - All major planets (Sun through Pluto)
 - NOGDEFL alone (aberration without deflection)
@@ -17,22 +17,22 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_NOGDEFL,
-    SEFLG_NOABERR,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_NOGDEFL,
+    FLG_NOABERR,
+    FLG_EQUATORIAL,
+    FLG_J2000,
 )
 
 
@@ -41,16 +41,16 @@ from libephemeris.constants import (
 # ============================================================================
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 TEST_DATES = [
@@ -80,7 +80,7 @@ def angular_diff(val1: float, val2: float) -> float:
 
 
 class TestNogdeflPlanets:
-    """Test SEFLG_NOGDEFL for all planets."""
+    """Test FLG_NOGDEFL for all planets."""
 
     @pytest.mark.parametrize("planet_id,planet_name", PLANETS)
     @pytest.mark.parametrize("year,month,day,hour,label", TEST_DATES)
@@ -89,10 +89,10 @@ class TestNogdeflPlanets:
     ):
         """NOGDEFL ecliptic positions match pyswisseph."""
         jd = swe.julday(year, month, day, hour)
-        iflag = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOGDEFL
+        iflag = FLG_SWIEPH | FLG_SPEED | FLG_NOGDEFL
 
         swe_result = swe.calc_ut(jd, planet_id, iflag)
-        lib_result = ephem.swe_calc_ut(jd, planet_id, iflag)
+        lib_result = ephem.calc_ut(jd, planet_id, iflag)
 
         swe_pos = swe_result[0] if isinstance(swe_result, tuple) else swe_result
         lib_pos = lib_result[0]
@@ -125,11 +125,11 @@ class TestNogdeflPlanets:
         """NOGDEFL + EQUATORIAL + J2000 matches pyswisseph."""
         jd = swe.julday(2000, 1, 1, 12.0)
         iflag = (
-            SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOGDEFL | SEFLG_EQUATORIAL | SEFLG_J2000
+            FLG_SWIEPH | FLG_SPEED | FLG_NOGDEFL | FLG_EQUATORIAL | FLG_J2000
         )
 
         swe_result = swe.calc_ut(jd, planet_id, iflag)
-        lib_result = ephem.swe_calc_ut(jd, planet_id, iflag)
+        lib_result = ephem.calc_ut(jd, planet_id, iflag)
 
         swe_pos = swe_result[0] if isinstance(swe_result, tuple) else swe_result
         lib_pos = lib_result[0]
@@ -149,13 +149,13 @@ class TestNogdeflAstrometric:
 
     @pytest.mark.parametrize("planet_id,planet_name", PLANETS)
     def test_astrometric_matches_nogdefl_noaberr(self, planet_id, planet_name):
-        """SEFLG_ASTROMETRIC (NOABERR|NOGDEFL) matches pyswisseph."""
+        """FLG_ASTROMETRIC (NOABERR|NOGDEFL) matches pyswisseph."""
         jd = swe.julday(2000, 1, 1, 12.0)
-        # SEFLG_ASTROMETRIC = SEFLG_NOABERR | SEFLG_NOGDEFL
-        iflag = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOABERR | SEFLG_NOGDEFL
+        # FLG_ASTROMETRIC = FLG_NOABERR | FLG_NOGDEFL
+        iflag = FLG_SWIEPH | FLG_SPEED | FLG_NOABERR | FLG_NOGDEFL
 
         swe_result = swe.calc_ut(jd, planet_id, iflag)
-        lib_result = ephem.swe_calc_ut(jd, planet_id, iflag)
+        lib_result = ephem.calc_ut(jd, planet_id, iflag)
 
         swe_pos = swe_result[0] if isinstance(swe_result, tuple) else swe_result
         lib_pos = lib_result[0]
@@ -177,9 +177,9 @@ class TestNogdeflEffect:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_nogdefl_differs_from_apparent(self, planet_id, planet_name):
@@ -192,12 +192,12 @@ class TestNogdeflEffect:
         jd = swe.julday(2000, 1, 1, 12.0)
 
         # Normal apparent position
-        iflag_normal = SEFLG_SWIEPH | SEFLG_SPEED
+        iflag_normal = FLG_SWIEPH | FLG_SPEED
         swe_normal = swe.calc_ut(jd, planet_id, iflag_normal)
         swe_normal_pos = swe_normal[0] if isinstance(swe_normal, tuple) else swe_normal
 
         # NOGDEFL position
-        iflag_nogdefl = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOGDEFL
+        iflag_nogdefl = FLG_SWIEPH | FLG_SPEED | FLG_NOGDEFL
         swe_nogdefl = swe.calc_ut(jd, planet_id, iflag_nogdefl)
         swe_nogdefl_pos = (
             swe_nogdefl[0] if isinstance(swe_nogdefl, tuple) else swe_nogdefl
@@ -209,8 +209,8 @@ class TestNogdeflEffect:
         # Deflection is typically small but measurable
         # For pyswisseph, the difference should be > 0 (even if tiny)
         # We just verify our library produces the same difference magnitude
-        lib_normal = ephem.swe_calc_ut(jd, planet_id, iflag_normal)
-        lib_nogdefl = ephem.swe_calc_ut(jd, planet_id, iflag_nogdefl)
+        lib_normal = ephem.calc_ut(jd, planet_id, iflag_normal)
+        lib_nogdefl = ephem.calc_ut(jd, planet_id, iflag_nogdefl)
 
         lib_lon_diff = angular_diff(lib_normal[0][0], lib_nogdefl[0][0])
 
@@ -230,10 +230,10 @@ class TestNogdeflFixedStars:
     def test_fixstar_nogdefl(self, star_name):
         """NOGDEFL fixed star positions match pyswisseph."""
         jd = swe.julday(2000, 1, 1, 12.0)
-        iflag = SEFLG_SWIEPH | SEFLG_NOGDEFL
+        iflag = FLG_SWIEPH | FLG_NOGDEFL
 
         swe_result = swe.fixstar_ut(star_name, jd, iflag)
-        lib_result = ephem.swe_fixstar_ut(star_name, jd, iflag)
+        lib_result = ephem.fixstar_ut(star_name, jd, iflag)
 
         swe_pos = swe_result[0] if isinstance(swe_result, tuple) else swe_result
         lib_pos = lib_result[0]
@@ -254,10 +254,10 @@ class TestNogdeflFixedStars:
     def test_fixstar2_nogdefl(self, star_name):
         """NOGDEFL fixed star positions via fixstar2 match pyswisseph."""
         jd = swe.julday(2000, 1, 1, 12.0)
-        iflag = SEFLG_SWIEPH | SEFLG_NOGDEFL
+        iflag = FLG_SWIEPH | FLG_NOGDEFL
 
         swe_result = swe.fixstar2_ut(star_name, jd, iflag)
-        lib_result = ephem.swe_fixstar2_ut(star_name, jd, iflag)
+        lib_result = ephem.fixstar2_ut(star_name, jd, iflag)
 
         # pyswisseph fixstar2_ut returns (position_tuple, star_name, retflag)
         # libephemeris returns (position_tuple, star_name, retflag)

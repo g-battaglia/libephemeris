@@ -79,19 +79,19 @@ def jd_to_date_str(jd):
 def ecl_type_str(flags):
     """Convert eclipse type flags to string."""
     parts = []
-    if flags & SE_ECL_TOTAL:
+    if flags & ECL_TOTAL:
         parts.append("TOTAL")
-    if flags & SE_ECL_ANNULAR:
+    if flags & ECL_ANNULAR:
         parts.append("ANNULAR")
-    if flags & SE_ECL_PARTIAL:
+    if flags & ECL_PARTIAL:
         parts.append("PARTIAL")
-    if flags & SE_ECL_ANNULAR_TOTAL:
+    if flags & ECL_ANNULAR_TOTAL:
         parts.append("HYBRID")
-    if flags & SE_ECL_PENUMBRAL:
+    if flags & ECL_PENUMBRAL:
         parts.append("PENUMBRAL")
-    if flags & SE_ECL_CENTRAL:
+    if flags & ECL_CENTRAL:
         parts.append("central")
-    if flags & SE_ECL_NONCENTRAL:
+    if flags & ECL_NONCENTRAL:
         parts.append("noncentral")
     return "|".join(parts) if parts else f"0x{flags:x}"
 
@@ -112,7 +112,7 @@ def run_part1():
         label = f"Solar eclipse #{i + 1}"
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd)
+            le_res, le_tret = ephem.sol_eclipse_when_glob(jd)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 30
@@ -155,10 +155,10 @@ def run_part1():
 
         # Check eclipse type agreement (mask out visibility flags)
         se_type_bits = se_res & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
         le_type_bits = le_res & (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
         if se_type_bits != le_type_bits:
             fails.append(f"type: SE={se_type} LE={le_type}")
@@ -202,14 +202,14 @@ def run_part2():
         label = f"Where #{i + 1} [{date_str}]"
 
         # Only test central eclipses (non-central don't have a defined central line)
-        if not (se_res & SE_ECL_CENTRAL):
+        if not (se_res & ECL_CENTRAL):
             r.skip(f"{label}: non-central")
             jd = jd_max + 10
             continue
 
         try:
             se_res2, se_geopos, se_attr = swe.sol_eclipse_where(jd_max)
-            le_res2, le_geopos, le_attr = ephem.swe_sol_eclipse_where(jd_max, 0)
+            le_res2, le_geopos, le_attr = ephem.sol_eclipse_where(jd_max, 0)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd = jd_max + 10
@@ -270,7 +270,7 @@ def run_part3():
     jd_max = None
     for _ in range(20):
         se_res, se_tret = swe.sol_eclipse_when_glob(jd)
-        if se_res & SE_ECL_CENTRAL:
+        if se_res & ECL_CENTRAL:
             jd_max = se_tret[0]
             break
         jd = se_tret[0] + 10
@@ -302,7 +302,7 @@ def run_part3():
         try:
             # pyswisseph uses (tjd, geopos, flags) order
             se_res3, se_attr = swe.sol_eclipse_how(jd_max, geopos, 0)
-            le_res3, le_attr = ephem.swe_sol_eclipse_how(jd_max, 0, geopos)
+            le_res3, le_attr = ephem.sol_eclipse_how(jd_max, 0, geopos)
         except Exception as e:
             r.fail(f"{label}: {e}")
             continue
@@ -351,7 +351,7 @@ def run_part4():
         label = f"Lunar eclipse #{i + 1}"
         try:
             se_res, se_tret = swe.lun_eclipse_when(jd)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(jd)
+            le_res, le_tret = ephem.lun_eclipse_when(jd)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 30
@@ -393,8 +393,8 @@ def run_part4():
         # contacts on very shallow penumbral eclipses where grazing
         # geometry makes exact contact times inherently imprecise.
         tol_sec = 120.0
-        is_shallow_penumbral = (se_res & SE_ECL_PENUMBRAL) and not (
-            se_res & (SE_ECL_TOTAL | SE_ECL_PARTIAL)
+        is_shallow_penumbral = (se_res & ECL_PENUMBRAL) and not (
+            se_res & (ECL_TOTAL | ECL_PARTIAL)
         )
         tol_pen_contact = 300.0 if is_shallow_penumbral else 120.0
 
@@ -414,8 +414,8 @@ def run_part4():
         le_type = ecl_type_str(le_res)
 
         # Check eclipse type agreement
-        se_type_bits = se_res & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
-        le_type_bits = le_res & (SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL)
+        se_type_bits = se_res & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
+        le_type_bits = le_res & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
         if se_type_bits != le_type_bits:
             fails.append(f"type: SE={se_type} LE={le_type}")
 
@@ -460,7 +460,7 @@ def run_part5():
         try:
             # pyswisseph uses (tjd, geopos, flags) order
             se_res2, se_attr = swe.lun_eclipse_how(jd_max, geopos, 0)
-            le_res2, le_attr = ephem.swe_lun_eclipse_how(jd_max, 0, geopos)
+            le_res2, le_attr = ephem.lun_eclipse_how(jd_max, 0, geopos)
         except Exception as e:
             r.fail(f"{label} [{date_str}]: {e}")
             jd = jd_max + 10
@@ -514,7 +514,7 @@ def run_part6():
     for i in range(15):
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd)
+            le_res, le_tret = ephem.sol_eclipse_when_glob(jd)
         except Exception as e:
             r.fail(f"Solar #{i + 1}: {e}")
             jd += 30
@@ -524,9 +524,9 @@ def run_part6():
 
         # Compare type bits
         type_mask = (
-            SE_ECL_TOTAL | SE_ECL_ANNULAR | SE_ECL_PARTIAL | SE_ECL_ANNULAR_TOTAL
+            ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL
         )
-        central_mask = SE_ECL_CENTRAL | SE_ECL_NONCENTRAL
+        central_mask = ECL_CENTRAL | ECL_NONCENTRAL
 
         se_type = se_res & type_mask
         le_type = le_res & type_mask
@@ -553,7 +553,7 @@ def run_part6():
     for i in range(15):
         try:
             se_res, se_tret = swe.lun_eclipse_when(jd)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(jd)
+            le_res, le_tret = ephem.lun_eclipse_when(jd)
         except Exception as e:
             r.fail(f"Lunar #{i + 1}: {e}")
             jd += 30
@@ -561,7 +561,7 @@ def run_part6():
 
         date_str = jd_to_date_str(se_tret[0])
 
-        type_mask = SE_ECL_TOTAL | SE_ECL_PARTIAL | SE_ECL_PENUMBRAL
+        type_mask = ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL
         se_type = se_res & type_mask
         le_type = le_res & type_mask
 
@@ -597,7 +597,7 @@ def run_part7():
         label = f"Solar back #{i + 1}"
         try:
             se_res, se_tret = swe.sol_eclipse_when_glob(jd, backwards=True)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd, backwards=True)
+            le_res, le_tret = ephem.sol_eclipse_when_glob(jd, backwards=True)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd -= 30
@@ -614,7 +614,7 @@ def run_part7():
         print(f"  Sol back #{i + 1}: {date_str}  dt_max={dt_max:6.1f}s")
         jd = se_tret[0] - 10
 
-    # Lunar backward — swe_lun_eclipse_when doesn't support backward param
+    # Lunar backward — lun_eclipse_when doesn't support backward param
     # so we skip this part (it's an API gap to note, not a bug)
     jd = jd_start
     for i in range(5):
@@ -623,7 +623,7 @@ def run_part7():
             se_res, se_tret = swe.lun_eclipse_when(jd, backwards=True)
             # LE doesn't have backward param — just search forward from earlier date
             # to find same eclipse. Use SE result to verify.
-            le_res, le_tret = ephem.swe_lun_eclipse_when(se_tret[0] - 5)
+            le_res, le_tret = ephem.lun_eclipse_when(se_tret[0] - 5)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd -= 30
@@ -659,8 +659,8 @@ def run_part8():
     for i in range(3):
         label = f"Total solar #{i + 1}"
         try:
-            se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=SE_ECL_TOTAL)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(jd, ecltype=SE_ECL_TOTAL)
+            se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=ECL_TOTAL)
+            le_res, le_tret = ephem.sol_eclipse_when_glob(jd, ecltype=ECL_TOTAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180
@@ -670,9 +670,9 @@ def run_part8():
         date_str = jd_to_date_str(se_tret[0])
 
         # Verify both report TOTAL
-        if not (se_res & SE_ECL_TOTAL):
+        if not (se_res & ECL_TOTAL):
             r.fail(f"{label}: SE not total ({ecl_type_str(se_res)})")
-        elif not (le_res & SE_ECL_TOTAL):
+        elif not (le_res & ECL_TOTAL):
             r.fail(f"{label}: LE not total ({ecl_type_str(le_res)})")
         elif dt_max > 120:
             r.fail(f"{label} [{date_str}]: dt_max={dt_max:.1f}s")
@@ -689,9 +689,9 @@ def run_part8():
     for i in range(3):
         label = f"Annular solar #{i + 1}"
         try:
-            se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=SE_ECL_ANNULAR)
-            le_res, le_tret = ephem.swe_sol_eclipse_when_glob(
-                jd, ecltype=SE_ECL_ANNULAR
+            se_res, se_tret = swe.sol_eclipse_when_glob(jd, ecltype=ECL_ANNULAR)
+            le_res, le_tret = ephem.sol_eclipse_when_glob(
+                jd, ecltype=ECL_ANNULAR
             )
         except Exception as e:
             r.fail(f"{label}: {e}")
@@ -701,9 +701,9 @@ def run_part8():
         dt_max = abs(se_tret[0] - le_tret[0]) * 86400
         date_str = jd_to_date_str(se_tret[0])
 
-        if not (se_res & SE_ECL_ANNULAR):
+        if not (se_res & ECL_ANNULAR):
             r.fail(f"{label}: SE not annular ({ecl_type_str(se_res)})")
-        elif not (le_res & SE_ECL_ANNULAR):
+        elif not (le_res & ECL_ANNULAR):
             r.fail(f"{label}: LE not annular ({ecl_type_str(le_res)})")
         elif dt_max > 120:
             r.fail(f"{label} [{date_str}]: dt_max={dt_max:.1f}s")
@@ -720,8 +720,8 @@ def run_part8():
     for i in range(3):
         label = f"Total lunar #{i + 1}"
         try:
-            se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=SE_ECL_TOTAL)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(jd, ecltype=SE_ECL_TOTAL)
+            se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=ECL_TOTAL)
+            le_res, le_tret = ephem.lun_eclipse_when(jd, ecltype=ECL_TOTAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180
@@ -730,9 +730,9 @@ def run_part8():
         dt_max = abs(se_tret[0] - le_tret[0]) * 86400
         date_str = jd_to_date_str(se_tret[0])
 
-        if not (se_res & SE_ECL_TOTAL):
+        if not (se_res & ECL_TOTAL):
             r.fail(f"{label}: SE not total ({ecl_type_str(se_res)})")
-        elif not (le_res & SE_ECL_TOTAL):
+        elif not (le_res & ECL_TOTAL):
             r.fail(f"{label}: LE not total ({ecl_type_str(le_res)})")
         elif dt_max > 120:
             r.fail(f"{label} [{date_str}]: dt_max={dt_max:.1f}s")
@@ -749,8 +749,8 @@ def run_part8():
     for i in range(3):
         label = f"Penumbral lunar #{i + 1}"
         try:
-            se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=SE_ECL_PENUMBRAL)
-            le_res, le_tret = ephem.swe_lun_eclipse_when(jd, ecltype=SE_ECL_PENUMBRAL)
+            se_res, se_tret = swe.lun_eclipse_when(jd, ecltype=ECL_PENUMBRAL)
+            le_res, le_tret = ephem.lun_eclipse_when(jd, ecltype=ECL_PENUMBRAL)
         except Exception as e:
             r.fail(f"{label}: {e}")
             jd += 180
@@ -759,9 +759,9 @@ def run_part8():
         dt_max = abs(se_tret[0] - le_tret[0]) * 86400
         date_str = jd_to_date_str(se_tret[0])
 
-        if not (se_res & SE_ECL_PENUMBRAL):
+        if not (se_res & ECL_PENUMBRAL):
             r.fail(f"{label}: SE not penumbral ({ecl_type_str(se_res)})")
-        elif not (le_res & SE_ECL_PENUMBRAL):
+        elif not (le_res & ECL_PENUMBRAL):
             r.fail(f"{label}: LE not penumbral ({ecl_type_str(le_res)})")
         elif dt_max > 120:
             r.fail(f"{label} [{date_str}]: dt_max={dt_max:.1f}s")

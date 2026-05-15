@@ -125,7 +125,7 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
 
     from astropy.time import Time
     from .state import get_timescale
-    from .time_utils import swe_deltat
+    from .time_utils import deltat
 
     # Skyfield calculations
     ts = get_timescale()

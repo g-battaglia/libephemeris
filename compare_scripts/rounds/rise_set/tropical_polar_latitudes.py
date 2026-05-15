@@ -23,7 +23,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -31,12 +34,12 @@ errors = 0
 skipped = 0
 
 # Rise/set flags
-SE_CALC_RISE = 1
-SE_CALC_SET = 2
-SE_CALC_MTRANSIT = 4
-SE_CALC_ITRANSIT = 8
-SE_BIT_DISC_CENTER = 256
-SE_BIT_NO_REFRACTION = 512
+CALC_RISE = 1
+CALC_SET = 2
+CALC_MTRANSIT = 4
+CALC_ITRANSIT = 8
+BIT_DISC_CENTER = 256
+BIT_NO_REFRACTION = 512
 
 
 def se_hsys(ch):
@@ -55,7 +58,7 @@ def compare_rise_set(label, body, jd, lat, lon, alt, rsmi, tol_sec=30.0):
         se_jd = None
 
     try:
-        le_result = ephem.swe_rise_trans(
+        le_result = ephem.rise_trans(
             jd, body, rsmi, [lon, lat, alt], 1013.25, 15.0, 2
         )
         le_jd = le_result[1][0]
@@ -153,7 +156,7 @@ print("\n=== P1: Sun rise/set across latitudes and seasons ===")
 
 for date_name, jd in dates.items():
     for lat in latitudes:
-        for rsmi, rsmi_name in [(SE_CALC_RISE, "rise"), (SE_CALC_SET, "set")]:
+        for rsmi, rsmi_name in [(CALC_RISE, "rise"), (CALC_SET, "set")]:
             label = f"Sun {rsmi_name} {date_name} lat={lat}"
             compare_rise_set(label, swe.SUN, jd, lat, lon, alt, rsmi)
 
@@ -168,7 +171,7 @@ print("\n=== P2: Moon rise/set across latitudes and seasons ===")
 
 for date_name, jd in list(dates.items())[:4]:  # Just 2000 dates
     for lat in latitudes:
-        for rsmi, rsmi_name in [(SE_CALC_RISE, "rise"), (SE_CALC_SET, "set")]:
+        for rsmi, rsmi_name in [(CALC_RISE, "rise"), (CALC_SET, "set")]:
             label = f"Moon {rsmi_name} {date_name} lat={lat}"
             compare_rise_set(label, swe.MOON, jd, lat, lon, alt, rsmi, tol_sec=60.0)
 
@@ -185,8 +188,8 @@ for date_name, jd in list(dates.items())[:4]:
     for lat in [0.0, 45.0, 66.56, 75.0]:
         for body_id, body_name in [(swe.SUN, "Sun"), (swe.MOON, "Moon")]:
             for rsmi, rsmi_name in [
-                (SE_CALC_MTRANSIT, "upper_transit"),
-                (SE_CALC_ITRANSIT, "lower_transit"),
+                (CALC_MTRANSIT, "upper_transit"),
+                (CALC_ITRANSIT, "lower_transit"),
             ]:
                 label = f"{body_name} {rsmi_name} {date_name} lat={lat}"
                 compare_rise_set(label, body_id, jd, lat, lon, alt, rsmi, tol_sec=30.0)
@@ -202,7 +205,7 @@ print("\n=== P4: Mars rise/set ===")
 
 for date_name, jd in list(dates.items())[:4]:
     for lat in [0.0, 23.44, 45.0, 66.56, 75.0, -45.0]:
-        for rsmi, rsmi_name in [(SE_CALC_RISE, "rise"), (SE_CALC_SET, "set")]:
+        for rsmi, rsmi_name in [(CALC_RISE, "rise"), (CALC_SET, "set")]:
             label = f"Mars {rsmi_name} {date_name} lat={lat}"
             compare_rise_set(label, swe.MARS, jd, lat, lon, alt, rsmi)
 
@@ -218,12 +221,12 @@ print("\n=== P5: Disc center + no refraction flags ===")
 for date_name, jd in list(dates.items())[:2]:
     for lat in [0.0, 45.0, 66.56, 75.0]:
         for rsmi_flag in [
-            SE_CALC_RISE | SE_BIT_DISC_CENTER,
-            SE_CALC_SET | SE_BIT_DISC_CENTER,
-            SE_CALC_RISE | SE_BIT_NO_REFRACTION,
-            SE_CALC_SET | SE_BIT_NO_REFRACTION,
-            SE_CALC_RISE | SE_BIT_DISC_CENTER | SE_BIT_NO_REFRACTION,
-            SE_CALC_SET | SE_BIT_DISC_CENTER | SE_BIT_NO_REFRACTION,
+            CALC_RISE | BIT_DISC_CENTER,
+            CALC_SET | BIT_DISC_CENTER,
+            CALC_RISE | BIT_NO_REFRACTION,
+            CALC_SET | BIT_NO_REFRACTION,
+            CALC_RISE | BIT_DISC_CENTER | BIT_NO_REFRACTION,
+            CALC_SET | BIT_DISC_CENTER | BIT_NO_REFRACTION,
         ]:
             label = f"Sun flags={rsmi_flag} {date_name} lat={lat}"
             compare_rise_set(label, swe.SUN, jd, lat, lon, alt, rsmi_flag)
@@ -242,8 +245,8 @@ jd = 2451716.5  # Jun 21, 2000
 
 for longitude in longitudes:
     for lat in [0.0, 45.0, 66.56]:
-        for rsmi in [SE_CALC_RISE, SE_CALC_SET]:
-            rsmi_name = "rise" if rsmi == SE_CALC_RISE else "set"
+        for rsmi in [CALC_RISE, CALC_SET]:
+            rsmi_name = "rise" if rsmi == CALC_RISE else "set"
             label = f"Sun {rsmi_name} lon={longitude} lat={lat}"
             compare_rise_set(label, swe.SUN, jd, lat, longitude, alt, rsmi)
 
@@ -261,8 +264,8 @@ jd = 2451623.5  # Mar 20, 2000
 
 for altitude in altitudes:
     for lat in [0.0, 45.0, 66.56]:
-        for rsmi in [SE_CALC_RISE, SE_CALC_SET]:
-            rsmi_name = "rise" if rsmi == SE_CALC_RISE else "set"
+        for rsmi in [CALC_RISE, CALC_SET]:
+            rsmi_name = "rise" if rsmi == CALC_RISE else "set"
             label = f"Sun {rsmi_name} alt={altitude}m lat={lat}"
             compare_rise_set(label, swe.SUN, jd, lat, 0.0, altitude, rsmi)
 
@@ -280,8 +283,8 @@ horizon_alts = [0.0, 0.5, 1.0, 2.0, 5.0]
 
 for horhgt in horizon_alts:
     for lat in [0.0, 30.0, 45.0, 60.0]:
-        for rsmi in [SE_CALC_RISE, SE_CALC_SET]:
-            rsmi_name = "rise" if rsmi == SE_CALC_RISE else "set"
+        for rsmi in [CALC_RISE, CALC_SET]:
+            rsmi_name = "rise" if rsmi == CALC_RISE else "set"
             label = f"Sun truhor {rsmi_name} horhgt={horhgt} lat={lat}"
             geopos = [0.0, lat, 0.0]
             try:
@@ -293,7 +296,7 @@ for horhgt in horizon_alts:
                 se_jd = None
 
             try:
-                le_result = ephem.swe_rise_trans_true_hor(
+                le_result = ephem.rise_trans_true_hor(
                     jd, swe.SUN, rsmi, [0.0, lat, 0.0], 1013.25, 15.0, horhgt, 2
                 )
                 le_jd = le_result[1][0]
@@ -330,21 +333,21 @@ print(
 # ============================================================
 print("\n=== P9: Twilight modes at various latitudes ===")
 
-SE_BIT_CIVIL_TWILIGHT = 4096
-SE_BIT_NAUTIC_TWILIGHT = 8192
-SE_BIT_ASTRO_TWILIGHT = 16384
+BIT_CIVIL_TWILIGHT = 4096
+BIT_NAUTIC_TWILIGHT = 8192
+BIT_ASTRO_TWILIGHT = 16384
 
 jd = 2451716.5  # Jun 21, 2000
 
 for twilight_flag, tw_name in [
-    (SE_BIT_CIVIL_TWILIGHT, "civil"),
-    (SE_BIT_NAUTIC_TWILIGHT, "nautical"),
-    (SE_BIT_ASTRO_TWILIGHT, "astronomical"),
+    (BIT_CIVIL_TWILIGHT, "civil"),
+    (BIT_NAUTIC_TWILIGHT, "nautical"),
+    (BIT_ASTRO_TWILIGHT, "astronomical"),
 ]:
     for lat in [0.0, 30.0, 45.0, 55.0, 60.0, 66.56]:
-        for rsmi_base in [SE_CALC_RISE, SE_CALC_SET]:
+        for rsmi_base in [CALC_RISE, CALC_SET]:
             rsmi = rsmi_base | twilight_flag
-            rsmi_name = "begin" if rsmi_base == SE_CALC_RISE else "end"
+            rsmi_name = "begin" if rsmi_base == CALC_RISE else "end"
             label = f"{tw_name}_twilight {rsmi_name} lat={lat}"
             compare_rise_set(label, swe.SUN, jd, lat, 0.0, 0.0, rsmi, tol_sec=30.0)
 

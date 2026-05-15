@@ -38,18 +38,18 @@ JDS = [
 ]
 
 BODIES = [
-    swe.SE_SUN,  # 0
-    swe.SE_MOON,  # 1
-    swe.SE_MERCURY,  # 2
-    swe.SE_VENUS,  # 3
-    swe.SE_MARS,  # 4
-    swe.SE_JUPITER,  # 5
-    swe.SE_SATURN,  # 6
-    swe.SE_URANUS,  # 7
-    swe.SE_NEPTUNE,  # 8
-    swe.SE_PLUTO,  # 9
-    swe.SE_MEAN_NODE,  # 10
-    swe.SE_TRUE_NODE,  # 11
+    swe.SUN,  # 0
+    swe.MOON,  # 1
+    swe.MERCURY,  # 2
+    swe.VENUS,  # 3
+    swe.MARS,  # 4
+    swe.JUPITER,  # 5
+    swe.SATURN,  # 6
+    swe.URANUS,  # 7
+    swe.NEPTUNE,  # 8
+    swe.PLUTO,  # 9
+    swe.MEAN_NODE,  # 10
+    swe.TRUE_NODE,  # 11
 ]
 
 HOUSE_SYSTEMS = [ord("P"), ord("K"), ord("E"), ord("W")]
@@ -75,31 +75,31 @@ def generate_calc_ut_entries() -> list[dict]:
     entries = []
     flag_combos = [
         (0, "default"),
-        (swe.SEFLG_SPEED, "speed"),
-        (swe.SEFLG_EQUATORIAL, "equatorial"),
-        (swe.SEFLG_HELCTR, "heliocentric"),
+        (swe.FLG_SPEED, "speed"),
+        (swe.FLG_EQUATORIAL, "equatorial"),
+        (swe.FLG_HELCTR, "heliocentric"),
     ]
 
     # 12 bodies × 8 dates × 1 flag = 96 entries (default flags only for all)
     for body in BODIES:
         for jd in JDS:
-            pos, retflag = swe.calc_ut(jd, body, swe.SEFLG_SPEED)
+            pos, retflag = swe.calc_ut(jd, body, swe.FLG_SPEED)
             entries.append(
                 {
                     "type": "calc_ut",
                     "jd": jd,
                     "body": body,
-                    "flags": swe.SEFLG_SPEED,
+                    "flags": swe.FLG_SPEED,
                     "result": [safe_float(v) for v in pos],
                     "retflag": int(retflag),
                 }
             )
 
     # Additional flag combos for Sun and Moon only (to keep count manageable)
-    for body in [swe.SE_SUN, swe.SE_MOON]:
+    for body in [swe.SUN, swe.MOON]:
         jd = 2451545.0  # J2000
         for flags, desc in flag_combos:
-            if flags == swe.SEFLG_SPEED:
+            if flags == swe.FLG_SPEED:
                 continue  # Already covered above
             try:
                 pos, retflag = swe.calc_ut(jd, body, flags)
@@ -149,14 +149,14 @@ def generate_sidereal_entries() -> list[dict]:
     entries = []
     jd = 2451545.0
     modes = [
-        (swe.SE_SIDM_LAHIRI, "Lahiri"),
-        (swe.SE_SIDM_FAGAN_BRADLEY, "FaganBradley"),
+        (swe.SIDM_LAHIRI, "Lahiri"),
+        (swe.SIDM_FAGAN_BRADLEY, "FaganBradley"),
     ]
 
     for mode, mode_name in modes:
         swe.set_sid_mode(mode)
-        for body in [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS]:
-            pos, retflag = swe.calc_ut(jd, body, swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED)
+        for body in [swe.SUN, swe.MOON, swe.MARS]:
+            pos, retflag = swe.calc_ut(jd, body, swe.FLG_SIDEREAL | swe.FLG_SPEED)
             entries.append(
                 {
                     "type": "sidereal",
@@ -169,7 +169,7 @@ def generate_sidereal_entries() -> list[dict]:
             )
 
     # Reset to default
-    swe.set_sid_mode(swe.SE_SIDM_LAHIRI)
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     return entries
 
 
@@ -226,7 +226,7 @@ def generate_eclipse_entries() -> list[dict]:
 
     # Solar eclipse
     jd = swe.julday(2024, 4, 1, 0.0)
-    ecl_type, times = swe.sol_eclipse_when_glob(jd, ecltype=swe.SE_ECL_TOTAL)
+    ecl_type, times = swe.sol_eclipse_when_glob(jd, ecltype=swe.ECL_TOTAL)
     entries.append(
         {
             "type": "solar_eclipse",
@@ -238,7 +238,7 @@ def generate_eclipse_entries() -> list[dict]:
 
     # Lunar eclipse
     jd = swe.julday(2025, 3, 1, 0.0)
-    ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.SE_ECL_TOTAL)
+    ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.ECL_TOTAL)
     entries.append(
         {
             "type": "lunar_eclipse",

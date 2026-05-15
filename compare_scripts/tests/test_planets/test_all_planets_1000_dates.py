@@ -15,16 +15,16 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 )
 
 
@@ -33,16 +33,16 @@ class TestAllPlanets1000Dates:
 
     # Define all planets from Sun through Pluto
     PLANETS = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
     @pytest.mark.comparison
@@ -86,7 +86,7 @@ class TestAllPlanets1000Dates:
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in self.PLANETS:
                 # Calculate with libephemeris
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
 
                 # Calculate with pyswisseph
                 pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
@@ -148,7 +148,7 @@ class TestAllPlanets1000Dates:
         by comparing the longitude, latitude, and distance velocities
         between libephemeris and pyswisseph.
         """
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.constants import FLG_SPEED
 
         # Generate 1000 random dates
         dates = random_dates_in_de421_range(1000)
@@ -168,10 +168,10 @@ class TestAllPlanets1000Dates:
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in self.PLANETS:
                 # Calculate with libephemeris (with speed flag)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
 
                 # Calculate with pyswisseph (with speed flag)
-                pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
+                pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SPEED)
 
                 # Position differences
                 lon_diff = abs(pos_lib[0] - pos_swe[0])
@@ -247,7 +247,7 @@ class TestAllPlanets1000DatesStatistics:
         iteration = 0
         for year, month, day, hour, jd in dates:
             for planet_id, planet_name in self.PLANETS:
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
                 pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
                 lon_diff = abs(pos_lib[0] - pos_swe[0])

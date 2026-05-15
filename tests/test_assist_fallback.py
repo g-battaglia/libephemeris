@@ -16,11 +16,11 @@ import math
 import libephemeris as eph
 from libephemeris import state
 from libephemeris.constants import (
-    SE_SEDNA,
-    SE_CERES,
-    SE_CHIRON,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
+    SEDNA,
+    CERES,
+    CHIRON,
+    FLG_SPEED,
+    FLG_HELCTR,
 )
 
 
@@ -86,7 +86,7 @@ class TestAssistFallbackLogic:
                 "libephemeris.rebound_integration.propagate_orbit_assist",
                 return_value=mock_result,
             ) as mock_propagate:
-                pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, 0)
+                pos, _ = eph.calc_ut(2451545.0, SEDNA, 0)
 
                 mock_propagate.assert_called_once()
                 assert pos[0] > 0
@@ -101,7 +101,7 @@ class TestAssistFallbackLogic:
             "libephemeris.rebound_integration.check_assist_data_available",
             return_value=False,
         ):
-            pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, 0)
+            pos, _ = eph.calc_ut(2451545.0, SEDNA, 0)
 
             assert pos[0] != 0.0
             assert pos[2] > 50.0
@@ -119,7 +119,7 @@ class TestAssistFallbackLogic:
                 "libephemeris.rebound_integration.propagate_orbit_assist",
                 side_effect=FileNotFoundError("No ephemeris files"),
             ):
-                pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, 0)
+                pos, _ = eph.calc_ut(2451545.0, SEDNA, 0)
 
                 assert pos[0] != 0.0
 
@@ -159,7 +159,7 @@ class TestAssistFallbackLogic:
                 "libephemeris.rebound_integration.propagate_orbit_assist",
                 side_effect=mock_propagate,
             ):
-                pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, SEFLG_SPEED)
+                pos, _ = eph.calc_ut(2451545.0, SEDNA, FLG_SPEED)
 
                 assert call_count[0] == 3
                 assert pos[3] != 0.0
@@ -167,7 +167,7 @@ class TestAssistFallbackLogic:
                 assert pos[5] != 0.0
 
     def test_assist_heliocentric(self):
-        """ASSIST should work with SEFLG_HELCTR."""
+        """ASSIST should work with FLG_HELCTR."""
         eph.set_strict_precision(False)
         eph.set_auto_spk_download(False)
 
@@ -183,7 +183,7 @@ class TestAssistFallbackLogic:
                 "libephemeris.rebound_integration.propagate_orbit_assist",
                 return_value=mock_result,
             ):
-                pos, _ = eph.calc_ut(2451545.0, SE_SEDNA, SEFLG_HELCTR)
+                pos, _ = eph.calc_ut(2451545.0, SEDNA, FLG_HELCTR)
 
                 expected_lon = mock_result.ecliptic_lon
                 expected_dist = mock_result.distance
@@ -227,7 +227,7 @@ class TestAssistVsKeplerianPrecision:
 
         jd = 2451545.0
 
-        keplerian_pos, _ = eph.calc_ut(jd, SE_SEDNA, 0)
+        keplerian_pos, _ = eph.calc_ut(jd, SEDNA, 0)
 
         mock_result = MockPropagationResult(
             x=-50.0, y=30.0, z=-10.0, vx=0.001, vy=-0.002, vz=0.0001, jd_tt=jd
@@ -241,7 +241,7 @@ class TestAssistVsKeplerianPrecision:
                 "libephemeris.rebound_integration.propagate_orbit_assist",
                 return_value=mock_result,
             ) as mock_propagate:
-                assist_pos, _ = eph.calc_ut(jd, SE_SEDNA, 0)
+                assist_pos, _ = eph.calc_ut(jd, SEDNA, 0)
 
                 mock_propagate.assert_called()
 

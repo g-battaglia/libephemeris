@@ -1,8 +1,8 @@
 """Round 6: Houses Ex2 Cusp Speeds Deep Audit
 
 Comprehensive comparison of libephemeris vs pyswisseph for:
-- swe_houses_ex2: cusp positions and speeds across all house systems
-- swe_houses_armc_ex2: ARMC-based cusp positions and speeds
+- houses_ex2: cusp positions and speeds across all house systems
+- houses_armc_ex2: ARMC-based cusp positions and speeds
 - Multiple locations, dates, and house systems
 - ASCMC angle speeds
 
@@ -19,9 +19,13 @@ import swisseph as swe
 
 sys.path.insert(0, ".")
 import libephemeris as ephem
+import os
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 issues = []
 stats = {}
@@ -106,7 +110,7 @@ def le_hsys(ch):
     return ord(ch)
 
 
-SEFLG_SPEED = 256  # SEFLG_SPEED
+FLG_SPEED = 256  # FLG_SPEED
 
 # ============================================================================
 # PART 1: Cusp positions across all house systems and locations
@@ -136,7 +140,7 @@ for hsys_code, hsys_name, pos_tol, speed_tol in HOUSE_SYSTEMS:
                 continue
 
             try:
-                le_ret = ephem.swe_houses_ex(jd, lat, lon, le_hsys(hsys_code))
+                le_ret = ephem.houses_ex(jd, lat, lon, le_hsys(hsys_code))
                 le_cusps = le_ret[0]
                 le_ascmc = le_ret[1]
             except Exception as e:
@@ -197,7 +201,7 @@ for name, lat, lon in LOCATIONS:
             continue
 
         try:
-            le_ret = ephem.swe_houses_ex(jd, lat, lon, ord("P"))
+            le_ret = ephem.houses_ex(jd, lat, lon, ord("P"))
             le_ascmc = le_ret[1]
         except Exception as e:
             if "polar" in str(e).lower():
@@ -230,7 +234,7 @@ print(f"Part 2 summary: {part2_pass}/{part2_total} passed ({part2_skip} skipped)
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 3: Cusp speeds via houses_ex2 (SEFLG_SPEED)")
+print("PART 3: Cusp speeds via houses_ex2 (FLG_SPEED)")
 print("=" * 80)
 
 part3_pass = 0
@@ -272,7 +276,7 @@ for hsys_code, hsys_name, pos_tol, _ in HOUSE_SYSTEMS:
     for name, lat, lon in LOCATIONS[:6]:  # First 6 locations
         for jd in DATES[:2]:  # First 2 dates
             try:
-                se_ret = swe.houses_ex2(jd, lat, lon, se_hsys(hsys_code), SEFLG_SPEED)
+                se_ret = swe.houses_ex2(jd, lat, lon, se_hsys(hsys_code), FLG_SPEED)
                 se_cusps = se_ret[0]
                 se_ascmc = se_ret[1]
                 se_cusp_speeds = se_ret[2]
@@ -282,8 +286,8 @@ for hsys_code, hsys_name, pos_tol, _ in HOUSE_SYSTEMS:
                 continue
 
             try:
-                le_ret = ephem.swe_houses_ex2(
-                    jd, lat, lon, le_hsys(hsys_code), SEFLG_SPEED
+                le_ret = ephem.houses_ex2(
+                    jd, lat, lon, le_hsys(hsys_code), FLG_SPEED
                 )
                 le_cusps = le_ret[0]
                 le_ascmc = le_ret[1]
@@ -353,14 +357,14 @@ ASCMC_SPEED_TOL = 1.0  # deg/day
 for name, lat, lon in LOCATIONS[:6]:
     for jd in DATES[:2]:
         try:
-            se_ret = swe.houses_ex2(jd, lat, lon, b"P", SEFLG_SPEED)
+            se_ret = swe.houses_ex2(jd, lat, lon, b"P", FLG_SPEED)
             se_ascmc_speeds = se_ret[3]
         except Exception:
             part4_skip += 1
             continue
 
         try:
-            le_ret = ephem.swe_houses_ex2(jd, lat, lon, ord("P"), SEFLG_SPEED)
+            le_ret = ephem.houses_ex2(jd, lat, lon, ord("P"), FLG_SPEED)
             le_ascmc_speeds = le_ret[3]
         except Exception as e:
             if "polar" in str(e).lower():
@@ -438,8 +442,8 @@ for hsys_code, hsys_name, speed_tol in ARMC_SYSTEMS:
                 continue
 
             try:
-                le_ret = ephem.swe_houses_armc_ex2(
-                    armc, lat, OBLIQUITY, le_hsys(hsys_code), SEFLG_SPEED
+                le_ret = ephem.houses_armc_ex2(
+                    armc, lat, OBLIQUITY, le_hsys(hsys_code), FLG_SPEED
                 )
                 le_cusps = le_ret[0]
                 le_ascmc = le_ret[1]
@@ -500,8 +504,8 @@ for hsys_code, hsys_name, _, _ in HOUSE_SYSTEMS[:10]:  # First 10 systems
     for name, lat, lon in LOCATIONS[:4]:
         jd = DATES[0]
         try:
-            ex_ret = ephem.swe_houses_ex(jd, lat, lon, le_hsys(hsys_code))
-            ex2_ret = ephem.swe_houses_ex2(jd, lat, lon, le_hsys(hsys_code))
+            ex_ret = ephem.houses_ex(jd, lat, lon, le_hsys(hsys_code))
+            ex2_ret = ephem.houses_ex2(jd, lat, lon, le_hsys(hsys_code))
 
             ex_cusps = ex_ret[0]
             ex2_cusps = ex2_ret[0]
@@ -549,7 +553,7 @@ for name, lat, lon in LOCATIONS[:4]:
             continue
 
         try:
-            le_ret = ephem.swe_houses_ex(jd, lat, lon, ord("G"))
+            le_ret = ephem.houses_ex(jd, lat, lon, ord("G"))
             le_cusps = le_ret[0]
         except Exception:
             part7_skip += 1
@@ -571,7 +575,7 @@ print()
 print(f"Part 7 summary: {part7_pass}/{part7_total} passed ({part7_skip} skipped)")
 
 # ============================================================================
-# PART 8: Sidereal house cusps (SEFLG_SIDEREAL)
+# PART 8: Sidereal house cusps (FLG_SIDEREAL)
 # ============================================================================
 print()
 print("=" * 80)
@@ -583,12 +587,12 @@ part8_fail = 0
 part8_skip = 0
 part8_total = 0
 
-SEFLG_SIDEREAL = 64 * 1024  # 0x10000
+FLG_SIDEREAL = 64 * 1024  # 0x10000
 SIDEREAL_TOL = 0.01  # degrees (wider due to ayanamsha differences)
 
 # Set Lahiri ayanamsha for both
 swe.set_sid_mode(1)  # Lahiri
-ephem.swe_set_sid_mode(1, 0.0, 0.0)
+ephem.set_sid_mode(1, 0.0, 0.0)
 
 SIDEREAL_SYSTEMS = ["P", "E", "W", "R"]
 
@@ -598,15 +602,15 @@ for hsys_code in SIDEREAL_SYSTEMS:
         jd = DATES[0]
         try:
             se_cusps, se_ascmc = swe.houses_ex(
-                jd, lat, lon, se_hsys(hsys_code), SEFLG_SIDEREAL
+                jd, lat, lon, se_hsys(hsys_code), FLG_SIDEREAL
             )
         except Exception:
             part8_skip += 1
             continue
 
         try:
-            le_ret = ephem.swe_houses_ex(
-                jd, lat, lon, le_hsys(hsys_code), SEFLG_SIDEREAL
+            le_ret = ephem.houses_ex(
+                jd, lat, lon, le_hsys(hsys_code), FLG_SIDEREAL
             )
             le_cusps = le_ret[0]
         except Exception as e:
@@ -632,7 +636,7 @@ for hsys_code in SIDEREAL_SYSTEMS:
 
 # Reset sidereal mode
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0, 0.0, 0.0)
+ephem.set_sid_mode(0, 0.0, 0.0)
 
 print()
 print(f"Part 8 summary: {part8_pass}/{part8_total} passed ({part8_skip} skipped)")

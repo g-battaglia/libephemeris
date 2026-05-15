@@ -8,21 +8,21 @@ These stars were considered particularly powerful in magical and astrological wo
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_ALGOL,
-    SE_ALCYONE,
-    SE_ALDEBARAN,
-    SE_REGULUS,
-    SE_ALKAID,
-    SE_ALGORAB,
-    SE_SPICA_STAR,
-    SE_ARCTURUS,
-    SE_ALPHECCA,
-    SE_ANTARES,
-    SE_VEGA,
-    SE_DENEB_ALGEDI,
-    SE_FOMALHAUT,
-    SE_DENEB,
-    SE_MARKAB,
+    ALGOL,
+    ALCYONE,
+    ALDEBARAN,
+    REGULUS,
+    ALKAID,
+    ALGORAB,
+    SPICA_STAR,
+    ARCTURUS,
+    ALPHECCA,
+    ANTARES,
+    VEGA,
+    DENEB_ALGEDI,
+    FOMALHAUT,
+    DENEB,
+    MARKAB,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -34,29 +34,29 @@ from libephemeris.fixed_stars import (
 # The 15 Behenian fixed stars as defined in medieval astrological tradition
 BEHENIAN_STARS = [
     # (constant, name, approximate_lon_j2000 in ecliptic degrees)
-    (SE_ALGOL, "Algol", 56.0),  # ~26° Taurus = 56° ecliptic
-    (SE_ALCYONE, "Alcyone", 60.0),  # ~0° Gemini = 60° ecliptic (Pleiades)
-    (SE_ALDEBARAN, "Aldebaran", 70.0),  # ~10° Gemini = 70° ecliptic
-    (SE_REGULUS, "Regulus", 149.0),  # ~29° Leo = 149° ecliptic
-    (SE_ALKAID, "Alkaid", 177.0),  # ~27° Virgo = 177° ecliptic (Eta Ursae Majoris)
-    (SE_ALGORAB, "Algorab", 193.0),  # ~13° Libra = 193° ecliptic (Delta Corvi)
-    (SE_SPICA_STAR, "Spica", 203.0),  # ~23° Libra = 203° ecliptic
-    (SE_ARCTURUS, "Arcturus", 203.0),  # ~24° Libra = 203-204° ecliptic
+    (ALGOL, "Algol", 56.0),  # ~26° Taurus = 56° ecliptic
+    (ALCYONE, "Alcyone", 60.0),  # ~0° Gemini = 60° ecliptic (Pleiades)
+    (ALDEBARAN, "Aldebaran", 70.0),  # ~10° Gemini = 70° ecliptic
+    (REGULUS, "Regulus", 149.0),  # ~29° Leo = 149° ecliptic
+    (ALKAID, "Alkaid", 177.0),  # ~27° Virgo = 177° ecliptic (Eta Ursae Majoris)
+    (ALGORAB, "Algorab", 193.0),  # ~13° Libra = 193° ecliptic (Delta Corvi)
+    (SPICA_STAR, "Spica", 203.0),  # ~23° Libra = 203° ecliptic
+    (ARCTURUS, "Arcturus", 203.0),  # ~24° Libra = 203-204° ecliptic
     (
-        SE_ALPHECCA,
+        ALPHECCA,
         "Alphecca",
         222.0,
     ),  # ~12° Scorpio = 222° ecliptic (Alpha Coronae Borealis)
-    (SE_ANTARES, "Antares", 249.0),  # ~9° Sagittarius = 249° ecliptic
-    (SE_VEGA, "Vega", 275.0),  # ~15° Capricorn = 275° ecliptic
+    (ANTARES, "Antares", 249.0),  # ~9° Sagittarius = 249° ecliptic
+    (VEGA, "Vega", 275.0),  # ~15° Capricorn = 275° ecliptic
     (
-        SE_DENEB_ALGEDI,
+        DENEB_ALGEDI,
         "Deneb Algedi",
         323.0,
     ),  # ~23° Aquarius = 323° ecliptic (Delta Capricorni)
-    (SE_FOMALHAUT, "Fomalhaut", 333.0),  # ~3° Pisces = 333° ecliptic
-    (SE_DENEB, "Deneb", 335.0),  # ~5° Pisces = 335° ecliptic (Alpha Cygni)
-    (SE_MARKAB, "Markab", 353.0),  # ~23° Pisces = 353° ecliptic (Alpha Pegasi)
+    (FOMALHAUT, "Fomalhaut", 333.0),  # ~3° Pisces = 333° ecliptic
+    (DENEB, "Deneb", 335.0),  # ~5° Pisces = 335° ecliptic (Alpha Cygni)
+    (MARKAB, "Markab", 353.0),  # ~23° Pisces = 353° ecliptic (Alpha Pegasi)
 ]
 
 
@@ -118,7 +118,7 @@ class TestBehenianStarsCalculation:
     @pytest.mark.parametrize("star_id,name,approx_lon", BEHENIAN_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, approx_lon):
         """Test each Behenian star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}° out of range"
@@ -134,7 +134,7 @@ class TestBehenianStarsCalculation:
         self, standard_jd, star_id, name, approx_lon
     ):
         """Test each Behenian star is near its expected longitude."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Allow 10° tolerance for approximate positions (precession moves stars)
         diff = abs(pos[0] - approx_lon)
@@ -150,93 +150,93 @@ class TestBehenianStarsNameResolution:
 
     def test_resolve_algol(self):
         """Test Algol name resolution."""
-        assert resolve_star_name("Algol") == SE_ALGOL
-        assert resolve_star_name("Demon Star") == SE_ALGOL
-        assert resolve_star_name("Beta Persei") == SE_ALGOL
+        assert resolve_star_name("Algol") == ALGOL
+        assert resolve_star_name("Demon Star") == ALGOL
+        assert resolve_star_name("Beta Persei") == ALGOL
 
     def test_resolve_alcyone(self):
         """Test Alcyone (Pleiades) name resolution."""
-        assert resolve_star_name("Alcyone") == SE_ALCYONE
-        assert resolve_star_name("Pleiades") == SE_ALCYONE
-        assert resolve_star_name("Eta Tauri") == SE_ALCYONE
-        assert resolve_star_name("Seven Sisters") == SE_ALCYONE
+        assert resolve_star_name("Alcyone") == ALCYONE
+        assert resolve_star_name("Pleiades") == ALCYONE
+        assert resolve_star_name("Eta Tauri") == ALCYONE
+        assert resolve_star_name("Seven Sisters") == ALCYONE
 
     def test_resolve_aldebaran(self):
         """Test Aldebaran name resolution."""
-        assert resolve_star_name("Aldebaran") == SE_ALDEBARAN
-        assert resolve_star_name("Alpha Tauri") == SE_ALDEBARAN
-        assert resolve_star_name("Eye of Taurus") == SE_ALDEBARAN
+        assert resolve_star_name("Aldebaran") == ALDEBARAN
+        assert resolve_star_name("Alpha Tauri") == ALDEBARAN
+        assert resolve_star_name("Eye of Taurus") == ALDEBARAN
 
     def test_resolve_regulus(self):
         """Test Regulus name resolution."""
-        assert resolve_star_name("Regulus") == SE_REGULUS
-        assert resolve_star_name("Alpha Leonis") == SE_REGULUS
-        assert resolve_star_name("Cor Leonis") == SE_REGULUS
+        assert resolve_star_name("Regulus") == REGULUS
+        assert resolve_star_name("Alpha Leonis") == REGULUS
+        assert resolve_star_name("Cor Leonis") == REGULUS
 
     def test_resolve_alkaid(self):
         """Test Alkaid name resolution."""
-        assert resolve_star_name("Alkaid") == SE_ALKAID
-        assert resolve_star_name("Eta Ursae Majoris") == SE_ALKAID
-        assert resolve_star_name("Benetnash") == SE_ALKAID
+        assert resolve_star_name("Alkaid") == ALKAID
+        assert resolve_star_name("Eta Ursae Majoris") == ALKAID
+        assert resolve_star_name("Benetnash") == ALKAID
 
     def test_resolve_algorab(self):
         """Test Algorab name resolution."""
-        assert resolve_star_name("Algorab") == SE_ALGORAB
-        assert resolve_star_name("Delta Corvi") == SE_ALGORAB
-        assert resolve_star_name("Crow's Wing") == SE_ALGORAB
+        assert resolve_star_name("Algorab") == ALGORAB
+        assert resolve_star_name("Delta Corvi") == ALGORAB
+        assert resolve_star_name("Crow's Wing") == ALGORAB
 
     def test_resolve_spica(self):
         """Test Spica name resolution."""
-        assert resolve_star_name("Spica") == SE_SPICA_STAR
-        assert resolve_star_name("Alpha Virginis") == SE_SPICA_STAR
+        assert resolve_star_name("Spica") == SPICA_STAR
+        assert resolve_star_name("Alpha Virginis") == SPICA_STAR
 
     def test_resolve_arcturus(self):
         """Test Arcturus name resolution."""
-        assert resolve_star_name("Arcturus") == SE_ARCTURUS
-        assert resolve_star_name("Alpha Bootis") == SE_ARCTURUS
-        assert resolve_star_name("Bear Guard") == SE_ARCTURUS
+        assert resolve_star_name("Arcturus") == ARCTURUS
+        assert resolve_star_name("Alpha Bootis") == ARCTURUS
+        assert resolve_star_name("Bear Guard") == ARCTURUS
 
     def test_resolve_alphecca(self):
         """Test Alphecca name resolution."""
-        assert resolve_star_name("Alphecca") == SE_ALPHECCA
-        assert resolve_star_name("Alpha Coronae Borealis") == SE_ALPHECCA
-        assert resolve_star_name("Gemma") == SE_ALPHECCA
+        assert resolve_star_name("Alphecca") == ALPHECCA
+        assert resolve_star_name("Alpha Coronae Borealis") == ALPHECCA
+        assert resolve_star_name("Gemma") == ALPHECCA
 
     def test_resolve_antares(self):
         """Test Antares name resolution."""
-        assert resolve_star_name("Antares") == SE_ANTARES
-        assert resolve_star_name("Alpha Scorpii") == SE_ANTARES
-        assert resolve_star_name("Rival of Mars") == SE_ANTARES
+        assert resolve_star_name("Antares") == ANTARES
+        assert resolve_star_name("Alpha Scorpii") == ANTARES
+        assert resolve_star_name("Rival of Mars") == ANTARES
 
     def test_resolve_vega(self):
         """Test Vega name resolution."""
-        assert resolve_star_name("Vega") == SE_VEGA
-        assert resolve_star_name("Alpha Lyrae") == SE_VEGA
-        assert resolve_star_name("Harp Star") == SE_VEGA
+        assert resolve_star_name("Vega") == VEGA
+        assert resolve_star_name("Alpha Lyrae") == VEGA
+        assert resolve_star_name("Harp Star") == VEGA
 
     def test_resolve_deneb_algedi(self):
         """Test Deneb Algedi name resolution."""
-        assert resolve_star_name("Deneb Algedi") == SE_DENEB_ALGEDI
-        assert resolve_star_name("Delta Capricorni") == SE_DENEB_ALGEDI
-        assert resolve_star_name("Tail of the Goat") == SE_DENEB_ALGEDI
+        assert resolve_star_name("Deneb Algedi") == DENEB_ALGEDI
+        assert resolve_star_name("Delta Capricorni") == DENEB_ALGEDI
+        assert resolve_star_name("Tail of the Goat") == DENEB_ALGEDI
 
     def test_resolve_fomalhaut(self):
         """Test Fomalhaut name resolution."""
-        assert resolve_star_name("Fomalhaut") == SE_FOMALHAUT
-        assert resolve_star_name("Alpha Piscis Austrini") == SE_FOMALHAUT
-        assert resolve_star_name("Fish's Mouth") == SE_FOMALHAUT
+        assert resolve_star_name("Fomalhaut") == FOMALHAUT
+        assert resolve_star_name("Alpha Piscis Austrini") == FOMALHAUT
+        assert resolve_star_name("Fish's Mouth") == FOMALHAUT
 
     def test_resolve_deneb(self):
         """Test Deneb name resolution."""
-        assert resolve_star_name("Deneb") == SE_DENEB
-        assert resolve_star_name("Alpha Cygni") == SE_DENEB
-        assert resolve_star_name("Tail of Hen") == SE_DENEB
+        assert resolve_star_name("Deneb") == DENEB
+        assert resolve_star_name("Alpha Cygni") == DENEB
+        assert resolve_star_name("Tail of Hen") == DENEB
 
     def test_resolve_markab(self):
         """Test Markab name resolution."""
-        assert resolve_star_name("Markab") == SE_MARKAB
-        assert resolve_star_name("Alpha Pegasi") == SE_MARKAB
-        assert resolve_star_name("Saddle") == SE_MARKAB
+        assert resolve_star_name("Markab") == MARKAB
+        assert resolve_star_name("Alpha Pegasi") == MARKAB
+        assert resolve_star_name("Saddle") == MARKAB
 
     @pytest.mark.parametrize("star_id,name,_", BEHENIAN_STARS)
     def test_canonical_name_retrieval(self, star_id, name, _):
@@ -251,19 +251,19 @@ class TestBehenianStarsProperMotion:
 
     def test_proper_motion_over_50_years(self):
         """Test that Behenian stars move over 50 years."""
-        jd1 = ephem.swe_julday(2000, 1, 1, 12.0)
-        jd2 = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd1 = ephem.julday(2000, 1, 1, 12.0)
+        jd2 = ephem.julday(2050, 1, 1, 12.0)
 
         # Test a few high proper motion stars
         test_stars = [
-            (SE_ARCTURUS, "Arcturus"),  # High proper motion
-            (SE_VEGA, "Vega"),  # Moderate proper motion
-            (SE_REGULUS, "Regulus"),  # Low proper motion
+            (ARCTURUS, "Arcturus"),  # High proper motion
+            (VEGA, "Vega"),  # Moderate proper motion
+            (REGULUS, "Regulus"),  # Low proper motion
         ]
 
         for star_id, name in test_stars:
-            pos1, _ = ephem.swe_calc_ut(jd1, star_id, 0)
-            pos2, _ = ephem.swe_calc_ut(jd2, star_id, 0)
+            pos1, _ = ephem.calc_ut(jd1, star_id, 0)
+            pos2, _ = ephem.calc_ut(jd2, star_id, 0)
 
             diff = abs(pos2[0] - pos1[0])
             if diff > 180:
@@ -281,7 +281,7 @@ class TestNewBehenianStarsData:
         """Test Alcyone (Pleiades) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ALCYONE:
+            if e.id == ALCYONE:
                 entry = e
                 break
 
@@ -297,7 +297,7 @@ class TestNewBehenianStarsData:
         """Test Algorab (Delta Corvi) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ALGORAB:
+            if e.id == ALGORAB:
                 entry = e
                 break
 
@@ -313,7 +313,7 @@ class TestNewBehenianStarsData:
         """Test Alphecca (Alpha Coronae Borealis) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ALPHECCA:
+            if e.id == ALPHECCA:
                 entry = e
                 break
 
@@ -329,7 +329,7 @@ class TestNewBehenianStarsData:
         """Test Deneb Algedi (Delta Capricorni) catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_DENEB_ALGEDI:
+            if e.id == DENEB_ALGEDI:
                 entry = e
                 break
 

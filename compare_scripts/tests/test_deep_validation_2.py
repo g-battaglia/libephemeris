@@ -5,7 +5,7 @@ This test suite targets all functions and scenarios NOT covered by test_deep_val
 including:
 - Eclipse location-specific functions (sol_eclipse_when_loc, sol_eclipse_how, lun_eclipse_how, etc.)
 - Lunar eclipse magnitude/gamma convenience functions
-- TT-input variants (swe_calc, swe_get_ayanamsa, swe_pheno, swe_nod_aps, etc.)
+- TT-input variants (calc, get_ayanamsa, pheno, nod_aps, etc.)
 - House functions (houses_armc, houses_ex2, house_pos, house_name)
 - Fixed star v2 functions (fixstar2_ut, fixstar2_mag)
 - Planet-centric calculations (calc_pctr)
@@ -50,14 +50,14 @@ def jd_diff_seconds(jd1: float, jd2: float) -> float:
 
 # Standard test dates (JD UT)
 TEST_DATES_UT = [
-    ephem.swe_julday(2000, 1, 1, 12.0),  # J2000
-    ephem.swe_julday(2024, 4, 8, 18.0),  # Solar eclipse date
-    ephem.swe_julday(1990, 7, 15, 6.0),  # Past
-    ephem.swe_julday(2010, 3, 21, 0.0),  # Equinox era
-    ephem.swe_julday(1955, 11, 1, 12.0),  # Mid-century
-    ephem.swe_julday(2050, 6, 15, 0.0),  # Future
-    ephem.swe_julday(1850, 1, 15, 12.0),  # 19th century
-    ephem.swe_julday(2100, 12, 25, 6.0),  # 22nd century
+    ephem.julday(2000, 1, 1, 12.0),  # J2000
+    ephem.julday(2024, 4, 8, 18.0),  # Solar eclipse date
+    ephem.julday(1990, 7, 15, 6.0),  # Past
+    ephem.julday(2010, 3, 21, 0.0),  # Equinox era
+    ephem.julday(1955, 11, 1, 12.0),  # Mid-century
+    ephem.julday(2050, 6, 15, 0.0),  # Future
+    ephem.julday(1850, 1, 15, 12.0),  # 19th century
+    ephem.julday(2100, 12, 25, 6.0),  # 22nd century
 ]
 
 # Global locations for testing
@@ -76,16 +76,16 @@ LOCATIONS = [
 ]
 
 PLANETS_MAIN = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
@@ -100,20 +100,20 @@ class TestTTVariants:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:6])
     @pytest.mark.parametrize("planet_id,name", PLANETS_MAIN)
     def test_swe_calc_tt(self, jd_ut, planet_id, name):
-        """swe_calc (TT) should match pyswisseph calc."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """calc (TT) should match pyswisseph calc."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
-        lib_pos, lib_flags = ephem.swe_calc(
-            jd_tt_lib, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+        lib_pos, lib_flags = ephem.calc(
+            jd_tt_lib, planet_id, FLG_SWIEPH | FLG_SPEED
         )
         swe_pos, swe_flags = swe.calc(
             jd_tt_swe, planet_id, swe.FLG_SWIEPH | swe.FLG_SPEED
         )
 
-        tol = 0.06 if planet_id == SE_MOON else 0.008
+        tol = 0.06 if planet_id == MOON else 0.008
         lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
         assert lon_diff < tol, (
             f"{name} calc(TT) lon diff {lon_diff:.6f}° > {tol}° at JD {jd_ut}"
@@ -121,13 +121,13 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:6])
     def test_calc_tt_vs_calc_ut_consistency(self, jd_ut):
-        """swe_calc(TT) should give same result as swe_calc_ut(UT) for same instant."""
-        dt = ephem.swe_deltat(jd_ut)
+        """calc(TT) should give same result as calc_ut(UT) for same instant."""
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
         for planet_id, name in PLANETS_MAIN[:5]:
-            pos_tt, _ = ephem.swe_calc(jd_tt, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            pos_ut, _ = ephem.swe_calc_ut(jd_ut, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+            pos_tt, _ = ephem.calc(jd_tt, planet_id, FLG_SWIEPH | FLG_SPEED)
+            pos_ut, _ = ephem.calc_ut(jd_ut, planet_id, FLG_SWIEPH | FLG_SPEED)
             lon_diff = angular_diff(float(pos_tt[0]), float(pos_ut[0]))
             assert lon_diff < 1e-8, (
                 f"{name} calc(TT) vs calc_ut(UT) diff {lon_diff} at JD {jd_ut}"
@@ -135,19 +135,19 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
     @pytest.mark.parametrize(
-        "sid_mode", [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+        "sid_mode", [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]
     )
     def test_swe_get_ayanamsa_tt(self, jd_ut, sid_mode):
-        """swe_get_ayanamsa (TT) should match pyswisseph get_ayanamsa."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """get_ayanamsa (TT) should match pyswisseph get_ayanamsa."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_ayan = ephem.swe_get_ayanamsa(jd_tt_lib)
+        lib_ayan = ephem.get_ayanamsa(jd_tt_lib)
         swe_ayan = swe.get_ayanamsa(jd_tt_swe)
 
         diff = abs(float(lib_ayan) - float(swe_ayan))
@@ -158,26 +158,26 @@ class TestTTVariants:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
     def test_swe_get_ayanamsa_tt_vs_ut_consistency(self, jd_ut):
         """get_ayanamsa(TT) should match get_ayanamsa_ut(UT) for same instant."""
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ayan_tt = ephem.swe_get_ayanamsa(jd_tt)
-        ayan_ut = ephem.swe_get_ayanamsa_ut(jd_ut)
+        ayan_tt = ephem.get_ayanamsa(jd_tt)
+        ayan_ut = ephem.get_ayanamsa_ut(jd_ut)
         diff = abs(float(ayan_tt) - float(ayan_ut))
         assert diff < 1e-10, f"get_ayanamsa TT vs UT diff {diff} at JD {jd_ut}"
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
     def test_swe_pheno_tt(self, jd_ut):
-        """swe_pheno (TT) should match pyswisseph pheno."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """pheno (TT) should match pyswisseph pheno."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
-        for planet_id in [SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
-            lib_result = ephem.swe_pheno(jd_tt_lib, planet_id, SEFLG_SWIEPH)
+        for planet_id in [VENUS, MARS, JUPITER, SATURN]:
+            lib_result = ephem.pheno(jd_tt_lib, planet_id, FLG_SWIEPH)
             swe_result = swe.pheno(jd_tt_swe, planet_id, swe.FLG_SWIEPH)
 
             # Compare phase angle [0] and elongation [0]
@@ -192,14 +192,14 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_swe_solcross_tt(self, jd_ut):
-        """swe_solcross (TT) should match pyswisseph solcross."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """solcross (TT) should match pyswisseph solcross."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
         for x2cross in [0.0, 90.0, 180.0, 270.0]:
-            lib_jd = ephem.swe_solcross(x2cross, jd_tt_lib)
+            lib_jd = ephem.solcross(x2cross, jd_tt_lib)
             swe_jd = swe.solcross(x2cross, jd_tt_swe)
 
             diff_sec = jd_diff_seconds(float(lib_jd), float(swe_jd))
@@ -209,14 +209,14 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_swe_mooncross_tt(self, jd_ut):
-        """swe_mooncross (TT) should match pyswisseph mooncross."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """mooncross (TT) should match pyswisseph mooncross."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
         for x2cross in [0.0, 90.0, 180.0]:
-            lib_jd = ephem.swe_mooncross(x2cross, jd_tt_lib)
+            lib_jd = ephem.mooncross(x2cross, jd_tt_lib)
             swe_jd = swe.mooncross(x2cross, jd_tt_swe)
 
             diff_sec = jd_diff_seconds(float(lib_jd), float(swe_jd))
@@ -226,13 +226,13 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_swe_mooncross_node_tt(self, jd_ut):
-        """swe_mooncross_node (TT) should match pyswisseph mooncross_node."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """mooncross_node (TT) should match pyswisseph mooncross_node."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
-        lib_result = ephem.swe_mooncross_node(jd_tt_lib)
+        lib_result = ephem.mooncross_node(jd_tt_lib)
         swe_result = swe.mooncross_node(jd_tt_swe)
 
         diff_sec = jd_diff_seconds(float(lib_result[0]), float(swe_result[0]))
@@ -240,14 +240,14 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_swe_helio_cross_tt(self, jd_ut):
-        """swe_helio_cross (TT) should match pyswisseph helio_cross."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """helio_cross (TT) should match pyswisseph helio_cross."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
-        for planet_id in [SE_MARS, SE_JUPITER]:
-            lib_jd = ephem.swe_helio_cross(planet_id, 0.0, jd_tt_lib, SEFLG_SWIEPH)
+        for planet_id in [MARS, JUPITER]:
+            lib_jd = ephem.helio_cross(planet_id, 0.0, jd_tt_lib, FLG_SWIEPH)
             swe_jd = swe.helio_cross(planet_id, 0.0, jd_tt_swe, swe.FLG_SWIEPH)
 
             diff_sec = jd_diff_seconds(float(lib_jd), float(swe_jd))
@@ -257,15 +257,15 @@ class TestTTVariants:
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_swe_fixstar_tt(self, jd_ut):
-        """swe_fixstar (TT) should match pyswisseph fixstar."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        """fixstar (TT) should match pyswisseph fixstar."""
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
         for star in ["Regulus", "Spica", "Aldebaran", "Sirius"]:
             try:
-                lib_result = ephem.swe_fixstar(star, jd_tt_lib, SEFLG_SWIEPH)
+                lib_result = ephem.fixstar(star, jd_tt_lib, FLG_SWIEPH)
                 swe_result = swe.fixstar_ut(star, jd_ut, swe.FLG_SWIEPH)
 
                 lib_lon = float(lib_result[0][0])
@@ -288,10 +288,10 @@ class TestSolarEclipseLocation:
 
     def test_sol_eclipse_when_loc_dallas_2024(self):
         """April 8, 2024 total solar eclipse visible from Dallas."""
-        jd_start = ephem.swe_julday(2024, 1, 1, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0)
         dallas = [-96.797, 32.7767, 0]  # lon, lat, alt
 
-        lib_result = ephem.swe_sol_eclipse_when_loc(jd_start, dallas, SEFLG_SWIEPH)
+        lib_result = ephem.sol_eclipse_when_loc(jd_start, dallas, FLG_SWIEPH)
         swe_result = swe.sol_eclipse_when_loc(jd_start, dallas)
 
         # Both should find the April 8, 2024 eclipse
@@ -305,12 +305,12 @@ class TestSolarEclipseLocation:
         )
 
         # Both should be on April 8, 2024
-        y, m, d, h = ephem.swe_revjul(lib_max)
+        y, m, d, h = ephem.revjul(lib_max)
         assert (y, m, d) == (2024, 4, 8), f"Expected April 8, 2024, got {y}-{m}-{d}"
 
     def test_sol_eclipse_when_loc_multiple_locations(self):
         """Solar eclipse detection at multiple locations."""
-        jd_start = ephem.swe_julday(2020, 1, 1, 0)
+        jd_start = ephem.julday(2020, 1, 1, 0)
 
         # Test locations where eclipses should be visible (within 2020-2026 range)
         test_locs = [
@@ -320,8 +320,8 @@ class TestSolarEclipseLocation:
 
         for name, geopos in test_locs:
             try:
-                lib_result = ephem.swe_sol_eclipse_when_loc(
-                    jd_start, geopos, SEFLG_SWIEPH
+                lib_result = ephem.sol_eclipse_when_loc(
+                    jd_start, geopos, FLG_SWIEPH
                 )
                 swe_result = swe.sol_eclipse_when_loc(jd_start, geopos)
 
@@ -339,7 +339,7 @@ class TestSolarEclipseLocation:
     def test_sol_eclipse_how_during_eclipse(self):
         """sol_eclipse_how during known eclipse should return valid attributes."""
         # April 8, 2024 eclipse - find max time first
-        jd_start = ephem.swe_julday(2024, 1, 1, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0)
         dallas = [-96.797, 32.7767, 0]
 
         # Find eclipse time
@@ -347,7 +347,7 @@ class TestSolarEclipseLocation:
         jd_max = float(swe_result[1][0])
 
         # Calculate circumstances at maximum
-        lib_how = ephem.swe_sol_eclipse_how(jd_max, dallas, SEFLG_SWIEPH)
+        lib_how = ephem.sol_eclipse_how(jd_max, dallas, FLG_SWIEPH)
         swe_how = swe.sol_eclipse_how(jd_max, dallas)
 
         lib_retflag = lib_how[0]
@@ -369,10 +369,10 @@ class TestSolarEclipseLocation:
 
     def test_sol_eclipse_how_no_eclipse(self):
         """sol_eclipse_how at random time should return 0 magnitude."""
-        jd = ephem.swe_julday(2024, 7, 15, 12.0)  # Not an eclipse date
+        jd = ephem.julday(2024, 7, 15, 12.0)  # Not an eclipse date
         rome = [12.4964, 41.9028, 0]
 
-        lib_result = ephem.swe_sol_eclipse_how(jd, rome, SEFLG_SWIEPH)
+        lib_result = ephem.sol_eclipse_how(jd, rome, FLG_SWIEPH)
 
         # Should return 0 or very small magnitude
         lib_mag = float(lib_result[1][0])
@@ -388,13 +388,13 @@ class TestLunarEclipseLocation:
         """lun_eclipse_how during known total lunar eclipse."""
         # Nov 8, 2022 total lunar eclipse
         # First find it with swe
-        jd_start = ephem.swe_julday(2022, 10, 1, 0)
+        jd_start = ephem.julday(2022, 10, 1, 0)
         swe_ecl = swe.lun_eclipse_when(jd_start)
         jd_max = float(swe_ecl[1][0])
 
         la = [-118.24, 34.05, 0]  # Los Angeles
 
-        lib_result = ephem.swe_lun_eclipse_how(jd_max, la, SEFLG_SWIEPH)
+        lib_result = ephem.lun_eclipse_how(jd_max, la, FLG_SWIEPH)
         swe_result = swe.lun_eclipse_how(jd_max, la)
 
         lib_retflag = lib_result[0]
@@ -417,10 +417,10 @@ class TestLunarEclipseLocation:
 
     def test_lun_eclipse_how_no_eclipse(self):
         """lun_eclipse_how at non-eclipse time should return 0."""
-        jd = ephem.swe_julday(2024, 7, 15, 12.0)
+        jd = ephem.julday(2024, 7, 15, 12.0)
         rome = [12.4964, 41.9028, 0]
 
-        lib_result = ephem.swe_lun_eclipse_how(jd, rome, SEFLG_SWIEPH)
+        lib_result = ephem.lun_eclipse_how(jd, rome, FLG_SWIEPH)
 
         lib_umag = float(lib_result[1][0])
         assert lib_umag < 0.01, (
@@ -429,9 +429,9 @@ class TestLunarEclipseLocation:
 
     def test_lun_eclipse_when_loc(self):
         """lun_eclipse_when_loc should find eclipses visible from location."""
-        jd_start = ephem.swe_julday(2022, 1, 1, 0)
+        jd_start = ephem.julday(2022, 1, 1, 0)
 
-        lib_result = ephem.swe_lun_eclipse_when_loc(jd_start, [-118.24, 34.05, 0.0])
+        lib_result = ephem.lun_eclipse_when_loc(jd_start, [-118.24, 34.05, 0.0])
         swe_result = swe.lun_eclipse_when_loc(jd_start, [-118.24, 34.05, 0])
 
         lib_max = float(lib_result[1][0])
@@ -450,7 +450,7 @@ class TestLunarEclipseMagnitudeGamma:
     def _get_known_lunar_eclipses(self):
         """Get a few known lunar eclipse max times from pyswisseph."""
         eclipses = []
-        jd = ephem.swe_julday(2020, 1, 1, 0)
+        jd = ephem.julday(2020, 1, 1, 0)
         for _ in range(5):
             result = swe.lun_eclipse_when(jd)
             jd_max = float(result[1][0])
@@ -463,14 +463,14 @@ class TestLunarEclipseMagnitudeGamma:
         """lun_eclipse_umbral_magnitude at known eclipse times."""
         eclipses = self._get_known_lunar_eclipses()
         for jd_max, ecl_type in eclipses:
-            lib_umag = float(ephem.swe_lun_eclipse_umbral_magnitude(jd_max))
+            lib_umag = float(ephem.lun_eclipse_umbral_magnitude(jd_max))
 
             # At eclipse maximum, should have some magnitude
-            if ecl_type & 4:  # SE_ECL_TOTAL
+            if ecl_type & 4:  # ECL_TOTAL
                 assert lib_umag > 0.5, (
                     f"Total eclipse at JD {jd_max}: umbral mag {lib_umag} should be > 0.5"
                 )
-            elif ecl_type & 2:  # SE_ECL_PARTIAL
+            elif ecl_type & 2:  # ECL_PARTIAL
                 assert lib_umag > 0.0, (
                     f"Partial eclipse at JD {jd_max}: umbral mag {lib_umag} should be > 0"
                 )
@@ -479,7 +479,7 @@ class TestLunarEclipseMagnitudeGamma:
         """lun_eclipse_penumbral_magnitude at known eclipse times."""
         eclipses = self._get_known_lunar_eclipses()
         for jd_max, ecl_type in eclipses:
-            lib_pmag = float(ephem.swe_lun_eclipse_penumbral_magnitude(jd_max))
+            lib_pmag = float(ephem.lun_eclipse_penumbral_magnitude(jd_max))
 
             # At any eclipse maximum, penumbral magnitude should be > 0
             assert lib_pmag > 0.0, (
@@ -490,7 +490,7 @@ class TestLunarEclipseMagnitudeGamma:
         """lun_eclipse_gamma at known eclipse times should be reasonable."""
         eclipses = self._get_known_lunar_eclipses()
         for jd_max, ecl_type in eclipses:
-            lib_gamma = float(ephem.swe_lun_eclipse_gamma(jd_max))
+            lib_gamma = float(ephem.lun_eclipse_gamma(jd_max))
 
             # During an eclipse, gamma should be < ~1.6
             assert abs(lib_gamma) < 2.0, (
@@ -499,11 +499,11 @@ class TestLunarEclipseMagnitudeGamma:
 
     def test_lun_eclipse_no_eclipse_time(self):
         """At non-eclipse time, magnitudes should be ~0 and gamma large."""
-        jd = ephem.swe_julday(2024, 7, 15, 12.0)
+        jd = ephem.julday(2024, 7, 15, 12.0)
 
-        umag = float(ephem.swe_lun_eclipse_umbral_magnitude(jd))
-        pmag = float(ephem.swe_lun_eclipse_penumbral_magnitude(jd))
-        gamma = float(ephem.swe_lun_eclipse_gamma(jd))
+        umag = float(ephem.lun_eclipse_umbral_magnitude(jd))
+        pmag = float(ephem.lun_eclipse_penumbral_magnitude(jd))
+        gamma = float(ephem.lun_eclipse_gamma(jd))
 
         assert umag < 0.01, f"No eclipse: umbral mag {umag} should be ~0"
         assert pmag < 0.5, f"No eclipse: penumbral mag {pmag} should be small"
@@ -515,13 +515,13 @@ class TestSolarEclipseMagnitude:
     def test_sol_eclipse_magnitude_at_loc(self):
         """sol_eclipse_magnitude_at_loc during known eclipse."""
         # Find April 8 2024 eclipse max at Dallas
-        jd_start = ephem.swe_julday(2024, 1, 1, 0)
+        jd_start = ephem.julday(2024, 1, 1, 0)
         dallas = [-96.797, 32.7767, 0]
         swe_result = swe.sol_eclipse_when_loc(jd_start, dallas)
         jd_max = float(swe_result[1][0])
 
         lib_mag = float(
-            ephem.swe_sol_eclipse_magnitude_at_loc(jd_max, dallas, SEFLG_SWIEPH)
+            ephem.sol_eclipse_magnitude_at_loc(jd_max, dallas, FLG_SWIEPH)
         )
 
         # Dallas should see >0.9 magnitude for this total eclipse
@@ -531,10 +531,10 @@ class TestSolarEclipseMagnitude:
 
     def test_sol_eclipse_magnitude_no_eclipse(self):
         """sol_eclipse_magnitude_at_loc at random time should return ~0."""
-        jd = ephem.swe_julday(2024, 7, 15, 12.0)
+        jd = ephem.julday(2024, 7, 15, 12.0)
         rome = [12.4964, 41.9028, 0]
 
-        lib_mag = float(ephem.swe_sol_eclipse_magnitude_at_loc(jd, rome, SEFLG_SWIEPH))
+        lib_mag = float(ephem.sol_eclipse_magnitude_at_loc(jd, rome, FLG_SWIEPH))
         assert lib_mag < 0.01, f"No eclipse: magnitude {lib_mag} should be ~0"
 
 
@@ -543,9 +543,9 @@ class TestEclipseTypeClassification:
 
     def test_solar_eclipse_types(self):
         """Verify solar eclipse type classification over 10 years."""
-        jd = ephem.swe_julday(2020, 1, 1, 0)
+        jd = ephem.julday(2020, 1, 1, 0)
         for _ in range(15):
-            lib_result = ephem.swe_sol_eclipse_when_glob(jd, SEFLG_SWIEPH)
+            lib_result = ephem.sol_eclipse_when_glob(jd, FLG_SWIEPH)
             swe_result = swe.sol_eclipse_when_glob(jd)
 
             lib_type = lib_result[0]
@@ -553,9 +553,9 @@ class TestEclipseTypeClassification:
 
             # Check type bits match (total, annular, partial)
             for bit, name in [
-                (SE_ECL_TOTAL, "TOTAL"),
-                (SE_ECL_ANNULAR, "ANNULAR"),
-                (SE_ECL_PARTIAL, "PARTIAL"),
+                (ECL_TOTAL, "TOTAL"),
+                (ECL_ANNULAR, "ANNULAR"),
+                (ECL_PARTIAL, "PARTIAL"),
             ]:
                 lib_has = bool(lib_type & bit)
                 swe_has = bool(swe_type & bit)
@@ -569,9 +569,9 @@ class TestEclipseTypeClassification:
 
     def test_lunar_eclipse_types(self):
         """Verify lunar eclipse type classification over 10 years."""
-        jd = ephem.swe_julday(2020, 1, 1, 0)
+        jd = ephem.julday(2020, 1, 1, 0)
         for _ in range(15):
-            lib_result = ephem.swe_lun_eclipse_when(jd, SEFLG_SWIEPH)
+            lib_result = ephem.lun_eclipse_when(jd, FLG_SWIEPH)
             swe_result = swe.lun_eclipse_when(jd)
 
             lib_type = lib_result[0]
@@ -579,9 +579,9 @@ class TestEclipseTypeClassification:
 
             # Check type bits
             for bit, name in [
-                (SE_ECL_TOTAL, "TOTAL"),
-                (SE_ECL_PARTIAL, "PARTIAL"),
-                (SE_ECL_PENUMBRAL, "PENUMBRAL"),
+                (ECL_TOTAL, "TOTAL"),
+                (ECL_PARTIAL, "PARTIAL"),
+                (ECL_PENUMBRAL, "PENUMBRAL"),
             ]:
                 lib_has = bool(lib_type & bit)
                 swe_has = bool(swe_type & bit)
@@ -615,17 +615,17 @@ class TestHouseAdvanced:
         ],
     )
     def test_houses_armc(self, hsys_code, location):
-        """swe_houses_armc should match pyswisseph houses_armc."""
+        """houses_armc should match pyswisseph houses_armc."""
         name, lat, lon = location
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        # Get ARMC from swe_houses, obliquity from ECL_NUT
+        # Get ARMC from houses, obliquity from ECL_NUT
         _, ascmc_swe = swe.houses(jd, lat, lon, hsys_code.encode())
         armc = float(ascmc_swe[2])
         ecl_nut, _ = swe.calc_ut(jd, swe.ECL_NUT)
         eps = float(ecl_nut[0])
 
-        lib_cusps, lib_ascmc = ephem.swe_houses_armc(armc, lat, eps, ord(hsys_code))
+        lib_cusps, lib_ascmc = ephem.houses_armc(armc, lat, eps, ord(hsys_code))
         swe_cusps, swe_ascmc = swe.houses_armc(armc, lat, eps, hsys_code.encode())
 
         # Compare cusps
@@ -641,11 +641,11 @@ class TestHouseAdvanced:
     @pytest.mark.parametrize("hsys_code", ["P", "K", "O", "R", "C", "E", "W"])
     def test_houses_ex2_cusps_match_houses(self, hsys_code):
         """houses_ex2 cusps should match houses for same inputs."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        lib_cusps_h, lib_ascmc_h = ephem.swe_houses(jd, lat, lon, ord(hsys_code))
-        lib_result = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys_code))
+        lib_cusps_h, lib_ascmc_h = ephem.houses(jd, lat, lon, ord(hsys_code))
+        lib_result = ephem.houses_ex2(jd, lat, lon, ord(hsys_code))
         lib_cusps_ex2 = lib_result[0]
 
         max_diff = 0
@@ -660,10 +660,10 @@ class TestHouseAdvanced:
     @pytest.mark.parametrize("hsys_code", ["P", "K", "O", "R", "C", "E", "W"])
     def test_houses_ex2_vs_pyswisseph(self, hsys_code):
         """houses_ex2 should match pyswisseph houses_ex2."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        lib_result = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys_code))
+        lib_result = ephem.houses_ex2(jd, lat, lon, ord(hsys_code))
         swe_result = swe.houses_ex2(jd, lat, lon, hsys_code.encode())
 
         # Compare cusps
@@ -679,8 +679,8 @@ class TestHouseAdvanced:
 
     @pytest.mark.parametrize("hsys_code", ["P", "K", "O", "R", "C", "E", "W"])
     def test_house_pos(self, hsys_code):
-        """swe_house_pos should match pyswisseph house_pos."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        """house_pos should match pyswisseph house_pos."""
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat = 41.9028
 
         # Get ARMC and eps from houses
@@ -689,12 +689,12 @@ class TestHouseAdvanced:
         eps = float(ascmc[3])
 
         # Test a few planet positions
-        for planet_id in [SE_SUN, SE_MOON, SE_VENUS, SE_MARS, SE_JUPITER]:
+        for planet_id in [SUN, MOON, VENUS, MARS, JUPITER]:
             pos, _ = swe.calc_ut(jd, planet_id)
             obj_coord = (float(pos[0]), float(pos[1]))
 
             lib_hpos = float(
-                ephem.swe_house_pos(armc, lat, eps, obj_coord, ord(hsys_code))
+                ephem.house_pos(armc, lat, eps, obj_coord, ord(hsys_code))
             )
             swe_hpos = float(
                 swe.house_pos(armc, lat, eps, obj_coord, hsys_code.encode())
@@ -712,7 +712,7 @@ class TestHouseAdvanced:
             )
 
     def test_house_name(self):
-        """swe_house_name should return correct names."""
+        """house_name should return correct names."""
         expected_names = {
             "P": "Placidus",
             "K": "Koch",
@@ -725,7 +725,7 @@ class TestHouseAdvanced:
         }
 
         for code, expected in expected_names.items():
-            lib_name = ephem.swe_house_name(ord(code))
+            lib_name = ephem.house_name(ord(code))
             swe_name = swe.house_name(code.encode())
             # At least one of them should match
             assert (
@@ -737,12 +737,12 @@ class TestHouseAdvanced:
 
     @pytest.mark.parametrize("hsys_code", ["P", "K", "O", "R", "C", "E", "W"])
     def test_houses_vs_houses_ex_consistency(self, hsys_code):
-        """swe_houses should give identical cusps to swe_houses_ex with flags=0."""
-        jd = ephem.swe_julday(2024, 3, 20, 12.0)
+        """houses should give identical cusps to houses_ex with flags=0."""
+        jd = ephem.julday(2024, 3, 20, 12.0)
         lat, lon = 48.8566, 2.3522  # Paris
 
-        cusps_h, ascmc_h = ephem.swe_houses(jd, lat, lon, ord(hsys_code))
-        cusps_ex, ascmc_ex = ephem.swe_houses_ex(jd, lat, lon, ord(hsys_code), 0)
+        cusps_h, ascmc_h = ephem.houses(jd, lat, lon, ord(hsys_code))
+        cusps_ex, ascmc_ex = ephem.houses_ex(jd, lat, lon, ord(hsys_code), 0)
 
         for i in range(12):
             diff = angular_diff(float(cusps_h[i]), float(cusps_ex[i]))
@@ -779,11 +779,11 @@ class TestFixedStarV2:
     @pytest.mark.parametrize("star", STARS_TO_TEST)
     def test_fixstar2_ut_positions(self, star):
         """fixstar2_ut positions should match fixstar_ut for same star."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         try:
-            result1 = ephem.swe_fixstar_ut(star, jd, SEFLG_SWIEPH)
-            result2 = ephem.swe_fixstar2_ut(star, jd, SEFLG_SWIEPH)
+            result1 = ephem.fixstar_ut(star, jd, FLG_SWIEPH)
+            result2 = ephem.fixstar2_ut(star, jd, FLG_SWIEPH)
         except Exception:
             pytest.skip(f"Star {star} not found")
 
@@ -798,10 +798,10 @@ class TestFixedStarV2:
     @pytest.mark.parametrize("star", STARS_TO_TEST)
     def test_fixstar2_ut_vs_pyswisseph(self, star):
         """fixstar2_ut should match pyswisseph fixstar2_ut."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         try:
-            lib_result = ephem.swe_fixstar2_ut(star, jd, SEFLG_SWIEPH)
+            lib_result = ephem.fixstar2_ut(star, jd, FLG_SWIEPH)
             swe_result = swe.fixstar2_ut(star, jd, swe.FLG_SWIEPH)
         except Exception:
             pytest.skip(f"Star {star} not found in one implementation")
@@ -819,7 +819,7 @@ class TestFixedStarV2:
     def test_fixstar2_mag(self, star):
         """fixstar2_mag should match pyswisseph fixstar2_mag."""
         try:
-            lib_result = ephem.swe_fixstar2_mag(star)
+            lib_result = ephem.fixstar2_mag(star)
             swe_result = swe.fixstar2_mag(star)
         except Exception:
             pytest.skip(f"Star {star} not found in one implementation")
@@ -846,24 +846,24 @@ class TestCalcPctr:
     @pytest.mark.parametrize(
         "target,center",
         [
-            (SE_MOON, SE_MARS),
-            (SE_SUN, SE_JUPITER),
-            (SE_VENUS, SE_MARS),
-            (SE_MARS, SE_JUPITER),
-            (SE_SATURN, SE_JUPITER),
+            (MOON, MARS),
+            (SUN, JUPITER),
+            (VENUS, MARS),
+            (MARS, JUPITER),
+            (SATURN, JUPITER),
         ],
     )
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
     def test_calc_pctr_vs_pyswisseph(self, target, center, jd_ut):
         """calc_pctr should match pyswisseph calc_pctr."""
-        dt_lib = ephem.swe_deltat(jd_ut)
+        dt_lib = ephem.deltat(jd_ut)
         dt_swe = swe.deltat(jd_ut)
         jd_tt_lib = jd_ut + dt_lib
         jd_tt_swe = jd_ut + dt_swe
 
         try:
-            lib_result = ephem.swe_calc_pctr(
-                jd_tt_lib, target, center, SEFLG_SWIEPH | SEFLG_SPEED
+            lib_result = ephem.calc_pctr(
+                jd_tt_lib, target, center, FLG_SWIEPH | FLG_SPEED
             )
             swe_result = swe.calc_pctr(
                 jd_tt_swe, target, center, swe.FLG_SWIEPH | swe.FLG_SPEED
@@ -876,7 +876,7 @@ class TestCalcPctr:
 
         lon_diff = angular_diff(lib_lon, swe_lon)
         # Planet-centric compounds position errors
-        tol = 0.15 if SE_MOON in (target, center) else 0.02
+        tol = 0.15 if MOON in (target, center) else 0.02
         assert lon_diff < tol, (
             f"calc_pctr target={target} center={center} lon diff {lon_diff:.6f}° "
             f"(lib={lib_lon:.4f}, swe={swe_lon:.4f})"
@@ -902,21 +902,21 @@ class TestRiseTransTrueHorizon:
     def test_rise_trans_true_hor_sun(self, location, hor_alt):
         """rise_trans_true_hor for Sun should be reasonable vs standard rise_trans."""
         name, lat, lon, alt = location
-        jd = ephem.swe_julday(2024, 6, 21, 0)
+        jd = ephem.julday(2024, 6, 21, 0)
 
         try:
-            result_true = ephem.swe_rise_trans_true_hor(
+            result_true = ephem.rise_trans_true_hor(
                 jd,
-                SE_SUN,
-                SE_CALC_RISE,
+                SUN,
+                CALC_RISE,
                 [lon, lat, alt],
                 1013.25,
                 15.0,
                 hor_alt,
-                SEFLG_SWIEPH,
+                FLG_SWIEPH,
             )
-            result_std = ephem.swe_rise_trans(
-                jd, SE_SUN, SE_CALC_RISE, [lon, lat, alt], 1013.25, 15.0, SEFLG_SWIEPH
+            result_std = ephem.rise_trans(
+                jd, SUN, CALC_RISE, [lon, lat, alt], 1013.25, 15.0, FLG_SWIEPH
             )
         except Exception:
             pytest.skip(f"rise_trans_true_hor not available at {name}")
@@ -935,11 +935,11 @@ class TestRiseTransTrueHorizon:
 
     def test_rise_trans_true_hor_vs_pyswisseph(self):
         """rise_trans_true_hor should match pyswisseph rise_trans_true_hor."""
-        jd = ephem.swe_julday(2024, 6, 21, 0)
+        jd = ephem.julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964
 
-        lib_result = ephem.swe_rise_trans_true_hor(
-            jd, SE_SUN, SE_CALC_RISE, [lon, lat, 0.0], 0.0, 0.0, 0.5, SEFLG_SWIEPH
+        lib_result = ephem.rise_trans_true_hor(
+            jd, SUN, CALC_RISE, [lon, lat, 0.0], 0.0, 0.0, 0.5, FLG_SWIEPH
         )
         swe_result = swe.rise_trans_true_hor(
             jd, swe.SUN, swe.CALC_RISE, [lon, lat, 0], 0, 0, 0.5
@@ -963,11 +963,11 @@ class TestAyanamsaExtended:
     @pytest.mark.parametrize(
         "sid_mode",
         [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
-            SE_SIDM_KRISHNAMURTI,
-            SE_SIDM_TRUE_CITRA,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
+            SIDM_KRISHNAMURTI,
+            SIDM_TRUE_CITRA,
         ],
     )
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
@@ -976,17 +976,17 @@ class TestAyanamsaExtended:
 
         Both APIs now use global set_sid_mode and return (retflag, ayanamsa).
         """
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, SEFLG_SWIEPH)
+        lib_result = ephem.get_ayanamsa_ex_ut(jd_ut, FLG_SWIEPH)
         swe_result = swe.get_ayanamsa_ex_ut(jd_ut, swe.FLG_SWIEPH)
 
         lib_ayan = float(lib_result[1])
         swe_ayan = float(swe_result[1])
 
         diff = abs(lib_ayan - swe_ayan)
-        tol = 0.1 if sid_mode in (SE_SIDM_TRUE_CITRA,) else 0.005
+        tol = 0.1 if sid_mode in (SIDM_TRUE_CITRA,) else 0.005
         assert diff < tol, (
             f"get_ayanamsa_ex_ut diff {diff:.6f}° for sidmode {sid_mode} "
             f"(lib={lib_ayan:.6f}, swe={swe_ayan:.6f})"
@@ -995,21 +995,21 @@ class TestAyanamsaExtended:
     @pytest.mark.parametrize(
         "sid_mode",
         [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
         ],
     )
     def test_get_ayanamsa_ex_tt(self, sid_mode):
         """get_ayanamsa_ex (TT) should match pyswisseph."""
         jd_ut = TEST_DATES_UT[0]
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_result = ephem.swe_get_ayanamsa_ex(jd_tt, SEFLG_SWIEPH)
+        lib_result = ephem.get_ayanamsa_ex(jd_tt, FLG_SWIEPH)
         swe_result = swe.get_ayanamsa_ex(jd_tt + swe.deltat(jd_ut) - dt, swe.FLG_SWIEPH)
 
         lib_ayan = float(lib_result[1])
@@ -1023,13 +1023,13 @@ class TestAyanamsaExtended:
     def test_get_ayanamsa_name(self):
         """get_ayanamsa_name should return correct names."""
         test_cases = [
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan"),
-            (SE_SIDM_RAMAN, "Raman"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_FAGAN_BRADLEY, "Fagan"),
+            (SIDM_RAMAN, "Raman"),
         ]
 
         for sid_mode, expected_substr in test_cases:
-            lib_name = ephem.swe_get_ayanamsa_name(sid_mode)
+            lib_name = ephem.get_ayanamsa_name(sid_mode)
             swe_name = swe.get_ayanamsa_name(sid_mode)
             assert expected_substr.lower() in lib_name.lower(), (
                 f"get_ayanamsa_name({sid_mode}): '{lib_name}' should contain '{expected_substr}'"
@@ -1038,10 +1038,10 @@ class TestAyanamsaExtended:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_get_ayanamsa_ex_ut_vs_get_ayanamsa_ut_consistency(self, jd_ut):
         """get_ayanamsa_ex_ut should match get_ayanamsa_ut for same mode."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ex_result = ephem.swe_get_ayanamsa_ex_ut(jd_ut, SEFLG_SWIEPH)
-        simple_result = ephem.swe_get_ayanamsa_ut(jd_ut)
+        ex_result = ephem.get_ayanamsa_ex_ut(jd_ut, FLG_SWIEPH)
+        simple_result = ephem.get_ayanamsa_ut(jd_ut)
 
         diff = abs(float(ex_result[1]) - float(simple_result))
         assert diff < 1e-10, f"get_ayanamsa_ex_ut vs get_ayanamsa_ut diff {diff}"
@@ -1056,19 +1056,19 @@ class TestCombinedFlags:
     """Test flag combinations not covered by test_deep_validation.py."""
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
-    @pytest.mark.parametrize("sid_mode", [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY])
+    @pytest.mark.parametrize("sid_mode", [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY])
     def test_sidereal_equatorial(self, jd_ut, sid_mode):
         """SIDEREAL + EQUATORIAL combined flag."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_EQUATORIAL | FLG_SPEED
 
         for planet_id, name in PLANETS_MAIN[:5]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
-            tol = 0.06 if planet_id == SE_MOON else 0.01
+            tol = 0.06 if planet_id == MOON else 0.01
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
             assert lon_diff < tol, (
                 f"{name} SIDEREAL+EQUATORIAL lon diff {lon_diff:.6f}° > {tol}°"
@@ -1077,20 +1077,20 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_sidereal_topocentric(self, jd_ut):
         """SIDEREAL + TOPOCENTRIC combined flag."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
         lat, lon, alt = 41.9028, 12.4964, 0
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
         swe.set_topo(lon, lat, alt)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_TOPOCTR | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_TOPOCTR | FLG_SPEED
 
-        for planet_id, name in [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+        for planet_id, name in [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")]:
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
-            tol = 0.1 if planet_id == SE_MOON else 0.01
+            tol = 0.1 if planet_id == MOON else 0.01
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
             assert lon_diff < tol, (
                 f"{name} SIDEREAL+TOPOCENTRIC lon diff {lon_diff:.6f}° > {tol}°"
@@ -1099,14 +1099,14 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_barycentric_equatorial(self, jd_ut):
         """BARYCENTRIC + EQUATORIAL combined flag."""
-        flags = SEFLG_SWIEPH | SEFLG_BARYCTR | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_BARYCTR | FLG_EQUATORIAL | FLG_SPEED
 
         for planet_id, name in [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1117,10 +1117,10 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_heliocentric_xyz(self, jd_ut):
         """HELIOCENTRIC + XYZ combined flag."""
-        flags = SEFLG_SWIEPH | SEFLG_HELCTR | SEFLG_XYZ | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_HELCTR | FLG_XYZ | FLG_SPEED
 
-        for planet_id, name in [(SE_MARS, "Mars"), (SE_JUPITER, "Jupiter")]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+        for planet_id, name in [(MARS, "Mars"), (JUPITER, "Jupiter")]:
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
             for i in range(3):  # x, y, z
@@ -1132,10 +1132,10 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_radians_equatorial(self, jd_ut):
         """RADIANS + EQUATORIAL combined flag."""
-        flags = SEFLG_SWIEPH | SEFLG_RADIANS | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_RADIANS | FLG_EQUATORIAL | FLG_SPEED
 
-        for planet_id, name in [(SE_SUN, "Sun"), (SE_MARS, "Mars")]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+        for planet_id, name in [(SUN, "Sun"), (MARS, "Mars")]:
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
             # Convert to degrees for comparison
@@ -1150,17 +1150,17 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_sidereal_j2000(self, jd_ut):
         """SIDEREAL + J2000 combined flag."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
         for planet_id, name in [
-            (SE_SUN, "Sun"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1169,13 +1169,13 @@ class TestCombinedFlags:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:3])
     def test_sidereal_nonut(self, jd_ut):
         """SIDEREAL + NONUT combined flag."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_NONUT | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_NONUT | FLG_SPEED
 
-        for planet_id, name in [(SE_SUN, "Sun"), (SE_MARS, "Mars")]:
-            lib_pos, _ = ephem.swe_calc_ut(jd_ut, planet_id, flags)
+        for planet_id, name in [(SUN, "Sun"), (MARS, "Mars")]:
+            lib_pos, _ = ephem.calc_ut(jd_ut, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd_ut, planet_id, flags)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1194,34 +1194,34 @@ class TestTopocentricMultiLocation:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_topocentric_positions(self, location, planet_id, name):
         """Topocentric positions should match pyswisseph at various locations."""
         loc_name, lat, lon, alt = location
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
         swe.set_topo(lon, lat, alt)
 
-        flags = SEFLG_SWIEPH | SEFLG_TOPOCTR | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_TOPOCTR | FLG_SPEED
 
-        lib_pos, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+        lib_pos, _ = ephem.calc_ut(jd, planet_id, flags)
         swe_pos, _ = swe.calc_ut(jd, planet_id, flags)
 
-        tol = 0.06 if planet_id == SE_MOON else 0.008
+        tol = 0.06 if planet_id == MOON else 0.008
         lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
         assert lon_diff < tol, (
             f"{name} topocentric at {loc_name}: lon diff {lon_diff:.6f}° > {tol}°"
         )
 
         lat_diff = abs(float(lib_pos[1]) - float(swe_pos[1]))
-        lat_tol = 0.06 if planet_id == SE_MOON else 0.01
+        lat_tol = 0.06 if planet_id == MOON else 0.01
         assert lat_diff < lat_tol, (
             f"{name} topocentric at {loc_name}: lat diff {lat_diff:.6f}°"
         )
@@ -1238,19 +1238,19 @@ class TestNodApsTT:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
-    @pytest.mark.parametrize("method", [SE_NODBIT_MEAN, SE_NODBIT_OSCU])
+    @pytest.mark.parametrize("method", [NODBIT_MEAN, NODBIT_OSCU])
     def test_nod_aps_tt(self, planet_id, name, method):
         """nod_aps (TT) should return reasonable node/apse data."""
         jd_ut = TEST_DATES_UT[0]
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
-        lib_result = ephem.swe_nod_aps(jd_tt, planet_id, SEFLG_SWIEPH, method)
+        lib_result = ephem.nod_aps(jd_tt, planet_id, FLG_SWIEPH, method)
 
         # Should return 4 tuples (asc_node, desc_node, perihelion, aphelion)
         assert len(lib_result) == 4, f"nod_aps should return 4 elements"
@@ -1265,18 +1265,18 @@ class TestNodApsTT:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_nod_aps_tt_vs_ut_consistency(self, planet_id, name):
         """nod_aps(TT) should match nod_aps_ut(UT) for same instant."""
         jd_ut = TEST_DATES_UT[0]
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
-        tt_result = ephem.swe_nod_aps(jd_tt, planet_id, SEFLG_SWIEPH, SE_NODBIT_MEAN)
-        ut_result = ephem.swe_nod_aps_ut(jd_ut, planet_id, SEFLG_SWIEPH, SE_NODBIT_MEAN)
+        tt_result = ephem.nod_aps(jd_tt, planet_id, FLG_SWIEPH, NODBIT_MEAN)
+        ut_result = ephem.nod_aps_ut(jd_ut, planet_id, FLG_SWIEPH, NODBIT_MEAN)
 
         for i in range(4):
             lon_diff = angular_diff(float(tt_result[i][0]), float(ut_result[i][0]))
@@ -1295,30 +1295,30 @@ class TestRiseSetEdgeCases:
 
     def test_rise_set_normal_locations(self):
         """Rise and set times should be reasonable at normal latitudes."""
-        jd = ephem.swe_julday(2024, 3, 20, 0)  # Spring equinox
+        jd = ephem.julday(2024, 3, 20, 0)  # Spring equinox
 
         for name, lat, lon, _ in LOCATIONS[:6]:
             if abs(lat) > 66:
                 continue  # Skip polar locations for this test
 
             try:
-                rise = ephem.swe_rise_trans(
+                rise = ephem.rise_trans(
                     jd,
-                    SE_SUN,
-                    SE_CALC_RISE,
+                    SUN,
+                    CALC_RISE,
                     [lon, lat, 0.0],
                     1013.25,
                     15.0,
-                    SEFLG_SWIEPH,
+                    FLG_SWIEPH,
                 )
-                sett = ephem.swe_rise_trans(
+                sett = ephem.rise_trans(
                     jd,
-                    SE_SUN,
-                    SE_CALC_SET,
+                    SUN,
+                    CALC_SET,
                     [lon, lat, 0.0],
                     1013.25,
                     15.0,
-                    SEFLG_SWIEPH,
+                    FLG_SWIEPH,
                 )
 
                 rise_jd = float(rise[1][0])
@@ -1334,23 +1334,23 @@ class TestRiseSetEdgeCases:
 
     def test_rise_set_vs_pyswisseph_multiple_planets(self):
         """Rise/set times for multiple planets should match pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 0)
+        jd = ephem.julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964
 
         for planet_id, name in [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_VENUS, "Venus"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (VENUS, "Venus"),
         ]:
             try:
-                lib_rise = ephem.swe_rise_trans(
+                lib_rise = ephem.rise_trans(
                     jd,
                     planet_id,
-                    SE_CALC_RISE,
+                    CALC_RISE,
                     [lon, lat, 0.0],
                     1013.25,
                     15.0,
-                    SEFLG_SWIEPH,
+                    FLG_SWIEPH,
                 )
                 swe_rise = swe.rise_trans(
                     jd, planet_id, swe.CALC_RISE, [lon, lat, 0], 1013.25, 15.0
@@ -1360,7 +1360,7 @@ class TestRiseSetEdgeCases:
                 swe_jd = float(swe_rise[1][0])
 
                 diff_sec = jd_diff_seconds(lib_jd, swe_jd)
-                tol = 180 if planet_id == SE_MOON else 120
+                tol = 180 if planet_id == MOON else 120
                 assert diff_sec < tol, (
                     f"{name} rise time diff {diff_sec:.1f}s (max {tol}s)"
                 )
@@ -1369,11 +1369,11 @@ class TestRiseSetEdgeCases:
 
     def test_meridian_transit(self):
         """Meridian transit times should match pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 0)
+        jd = ephem.julday(2024, 6, 21, 0)
         lat, lon = 41.9028, 12.4964
 
-        lib_transit = ephem.swe_rise_trans(
-            jd, SE_SUN, SE_CALC_MTRANSIT, [lon, lat, 0.0], 1013.25, 15.0, SEFLG_SWIEPH
+        lib_transit = ephem.rise_trans(
+            jd, SUN, CALC_MTRANSIT, [lon, lat, 0.0], 1013.25, 15.0, FLG_SWIEPH
         )
         swe_transit = swe.rise_trans(
             jd, swe.SUN, swe.CALC_MTRANSIT, [lon, lat, 0], 1013.25, 15.0
@@ -1397,22 +1397,22 @@ class TestSiderealHouses:
     @pytest.mark.parametrize(
         "sid_mode",
         [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
         ],
     )
     @pytest.mark.parametrize("hsys_code", ["P", "K", "O", "E", "W"])
     def test_sidereal_houses_ex(self, sid_mode, hsys_code):
         """Sidereal houses_ex should match pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         lat, lon = 41.9028, 12.4964
 
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
-        lib_cusps, lib_ascmc = ephem.swe_houses_ex(
-            jd, lat, lon, ord(hsys_code), SEFLG_SIDEREAL
+        lib_cusps, lib_ascmc = ephem.houses_ex(
+            jd, lat, lon, ord(hsys_code), FLG_SIDEREAL
         )
         swe_cusps, swe_ascmc = swe.houses_ex(
             jd, lat, lon, hsys_code.encode(), swe.FLG_SIDEREAL
@@ -1445,37 +1445,37 @@ class TestStatisticalFlagSurvey:
             month = random.randint(1, 12)
             day = random.randint(1, 28)
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append(jd)
         return dates
 
     @pytest.mark.parametrize(
         "flags_name,flags,tol",
         [
-            ("HELCTR", SEFLG_SWIEPH | SEFLG_HELCTR | SEFLG_SPEED, 0.008),
-            ("BARYCTR", SEFLG_SWIEPH | SEFLG_BARYCTR | SEFLG_SPEED, 0.008),
-            ("J2000", SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_SPEED, 0.008),
-            ("NONUT", SEFLG_SWIEPH | SEFLG_NONUT | SEFLG_SPEED, 0.015),
-            ("EQUATORIAL", SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED, 0.008),
-            ("ICRS", SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_SPEED, 0.008),
+            ("HELCTR", FLG_SWIEPH | FLG_HELCTR | FLG_SPEED, 0.008),
+            ("BARYCTR", FLG_SWIEPH | FLG_BARYCTR | FLG_SPEED, 0.008),
+            ("J2000", FLG_SWIEPH | FLG_J2000 | FLG_SPEED, 0.008),
+            ("NONUT", FLG_SWIEPH | FLG_NONUT | FLG_SPEED, 0.015),
+            ("EQUATORIAL", FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED, 0.008),
+            ("ICRS", FLG_SWIEPH | FLG_ICRS | FLG_SPEED, 0.008),
         ],
     )
     def test_flag_survey(self, flags_name, flags, tol):
         """Survey positions across many dates for various flags."""
         dates = self._generate_dates(30)
         planets = [
-            (SE_SUN, "Sun"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ]
 
         # Skip barycentric for Sun
-        if flags & SEFLG_BARYCTR:
-            planets = [(pid, n) for pid, n in planets if pid != SE_SUN]
+        if flags & FLG_BARYCTR:
+            planets = [(pid, n) for pid, n in planets if pid != SUN]
         # Skip heliocentric for Sun
-        if flags & SEFLG_HELCTR:
-            planets = [(pid, n) for pid, n in planets if pid != SE_SUN]
+        if flags & FLG_HELCTR:
+            planets = [(pid, n) for pid, n in planets if pid != SUN]
 
         max_diff_seen = 0
         worst_case = ""
@@ -1483,7 +1483,7 @@ class TestStatisticalFlagSurvey:
         for jd in dates:
             for planet_id, name in planets:
                 try:
-                    lib_pos, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                    lib_pos, _ = ephem.calc_ut(jd, planet_id, flags)
                     swe_pos, _ = swe.calc_ut(jd, planet_id, flags)
 
                     lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1509,19 +1509,19 @@ class TestOrbitalElementsUT:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_orbital_elements_ut_vs_tt_consistency(self, planet_id, name):
         """get_orbital_elements_ut should match get_orbital_elements for same instant."""
         jd_ut = TEST_DATES_UT[0]
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
-        ut_result = ephem.swe_get_orbital_elements_ut(jd_ut, planet_id, SEFLG_SWIEPH)
-        tt_result = ephem.swe_get_orbital_elements(jd_tt, planet_id, SEFLG_SWIEPH)
+        ut_result = ephem.get_orbital_elements_ut(jd_ut, planet_id, FLG_SWIEPH)
+        tt_result = ephem.get_orbital_elements(jd_tt, planet_id, FLG_SWIEPH)
 
         # Result is a flat tuple of 50 elements
         ut_elems = ut_result
@@ -1543,13 +1543,13 @@ class TestOrbitalElementsUT:
 
 
 class TestDeltaTEx:
-    """Test swe_deltat_ex function."""
+    """Test deltat_ex function."""
 
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:6])
     def test_deltat_ex_vs_deltat(self, jd_ut):
         """deltat_ex should give same value as deltat for same flags."""
-        dt = ephem.swe_deltat(jd_ut)
-        dt_ex = ephem.swe_deltat_ex(jd_ut, SEFLG_SWIEPH)
+        dt = ephem.deltat(jd_ut)
+        dt_ex = ephem.deltat_ex(jd_ut, FLG_SWIEPH)
 
         # dt_ex now returns a float directly
         diff = abs(dt - dt_ex)
@@ -1558,7 +1558,7 @@ class TestDeltaTEx:
     @pytest.mark.parametrize("jd_ut", TEST_DATES_UT[:4])
     def test_deltat_ex_vs_pyswisseph(self, jd_ut):
         """deltat_ex should match pyswisseph deltat_ex."""
-        lib_result = ephem.swe_deltat_ex(jd_ut, SEFLG_SWIEPH)
+        lib_result = ephem.deltat_ex(jd_ut, FLG_SWIEPH)
         swe_result = swe.deltat_ex(jd_ut, swe.FLG_SWIEPH)
 
         lib_val = float(lib_result)
@@ -1579,14 +1579,14 @@ class TestInternalConsistency:
 
     def test_sidereal_position_equals_tropical_minus_ayanamsa(self):
         """Sidereal position should equal tropical position minus ayanamsa."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        jd = ephem.julday(2024, 6, 21, 12.0)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ayan = float(ephem.swe_get_ayanamsa_ut(jd))
+        ayan = float(ephem.get_ayanamsa_ut(jd))
 
         for planet_id, name in PLANETS_MAIN[:5]:
-            trop_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
-            sid_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SIDEREAL)
+            trop_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
+            sid_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SIDEREAL)
 
             expected_sid = (float(trop_pos[0]) - ayan) % 360
             actual_sid = float(sid_pos[0]) % 360
@@ -1599,10 +1599,10 @@ class TestInternalConsistency:
 
     def test_equatorial_ra_dec_consistency(self):
         """Equatorial RA should be in 0-360 and Dec in -90..+90."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         for planet_id, name in PLANETS_MAIN:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_EQUATORIAL)
+            pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_EQUATORIAL)
             ra = float(pos[0])
             dec = float(pos[1])
 
@@ -1611,15 +1611,15 @@ class TestInternalConsistency:
 
     def test_xyz_distance_consistency(self):
         """XYZ distance should equal sqrt(x^2 + y^2 + z^2)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         for planet_id, name in PLANETS_MAIN[:5]:
             # Get spherical
-            sph_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+            sph_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
             dist_sph = float(sph_pos[2])
 
             # Get Cartesian
-            xyz_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_XYZ)
+            xyz_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_XYZ)
             x, y, z = float(xyz_pos[0]), float(xyz_pos[1]), float(xyz_pos[2])
             dist_xyz = math.sqrt(x * x + y * y + z * z)
 
@@ -1631,10 +1631,10 @@ class TestInternalConsistency:
 
     def test_houses_asc_mc_in_ascmc_array(self):
         """ASC and MC in ascmc array should match cusp 1 and cusp 10."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         for hsys in ["P", "K", "O", "R", "C"]:
-            cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord(hsys))
+            cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord(hsys))
 
             asc_diff = angular_diff(float(ascmc[0]), float(cusps[0]))
             mc_diff = angular_diff(float(ascmc[1]), float(cusps[9]))
@@ -1650,15 +1650,15 @@ class TestInternalConsistency:
 
     def test_heliocentric_sun_is_earth(self):
         """Heliocentric Sun position should give Earth's position (opposite of geocentric Sun)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         # Heliocentric Earth
-        earth_pos, _ = ephem.swe_calc_ut(
-            jd, SE_EARTH, SEFLG_SWIEPH | SEFLG_HELCTR | SEFLG_SPEED
+        earth_pos, _ = ephem.calc_ut(
+            jd, EARTH, FLG_SWIEPH | FLG_HELCTR | FLG_SPEED
         )
 
         # Geocentric Sun - heliocentric Earth should be ~180° opposite
-        sun_pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+        sun_pos, _ = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
 
         # Earth heliocentric lon should be Sun geocentric + 180
         expected_earth_lon = (float(sun_pos[0]) + 180.0) % 360
@@ -1672,12 +1672,12 @@ class TestInternalConsistency:
 
     def test_speed_sign_consistency(self):
         """Planet speed should be consistent with position change."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
         dt = 0.01  # 0.01 days
 
         for planet_id, name in PLANETS_MAIN[:5]:
-            pos1, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
-            pos2, _ = ephem.swe_calc_ut(jd + dt, planet_id, SEFLG_SWIEPH)
+            pos1, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
+            pos2, _ = ephem.calc_ut(jd + dt, planet_id, FLG_SWIEPH)
 
             reported_speed = float(pos1[3])  # deg/day
             numerical_speed = angular_diff(float(pos1[0]), float(pos2[0])) / dt
@@ -1706,17 +1706,17 @@ class TestDateRangeBoundaries:
 
     def test_de440_start_boundary(self):
         """Positions at DE440 start boundary (1550) should be valid."""
-        jd = ephem.swe_julday(1550, 1, 15, 12.0)
+        jd = ephem.julday(1550, 1, 15, 12.0)
 
         for planet_id, name in PLANETS_MAIN[:5]:
             try:
-                lib_pos, _ = ephem.swe_calc_ut(
-                    jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+                lib_pos, _ = ephem.calc_ut(
+                    jd, planet_id, FLG_SWIEPH | FLG_SPEED
                 )
                 swe_pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SWIEPH | swe.FLG_SPEED)
 
                 lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
-                tol = 0.1 if planet_id == SE_MOON else 0.02
+                tol = 0.1 if planet_id == MOON else 0.02
                 assert lon_diff < tol, (
                     f"{name} at DE440 start: lon diff {lon_diff:.6f}°"
                 )
@@ -1725,17 +1725,17 @@ class TestDateRangeBoundaries:
 
     def test_de440_end_boundary(self):
         """Positions at DE440 end boundary (2650) should be valid."""
-        jd = ephem.swe_julday(2640, 1, 15, 12.0)
+        jd = ephem.julday(2640, 1, 15, 12.0)
 
         for planet_id, name in PLANETS_MAIN[:5]:
             try:
-                lib_pos, _ = ephem.swe_calc_ut(
-                    jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+                lib_pos, _ = ephem.calc_ut(
+                    jd, planet_id, FLG_SWIEPH | FLG_SPEED
                 )
                 swe_pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SWIEPH | swe.FLG_SPEED)
 
                 lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
-                tol = 0.1 if planet_id == SE_MOON else 0.02
+                tol = 0.1 if planet_id == MOON else 0.02
                 assert lon_diff < tol, f"{name} at DE440 end: lon diff {lon_diff:.6f}°"
             except Exception:
                 pass
@@ -1743,14 +1743,14 @@ class TestDateRangeBoundaries:
     def test_gregorian_reform_boundary(self):
         """Positions around Gregorian reform (Oct 15, 1582) should be valid."""
         # Just after reform
-        jd = ephem.swe_julday(1582, 10, 15, 12.0)
+        jd = ephem.julday(1582, 10, 15, 12.0)
 
         for planet_id, name in [
-            (SE_SUN, "Sun"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ]:
-            lib_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+            lib_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
             swe_pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SWIEPH)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1761,9 +1761,9 @@ class TestDateRangeBoundaries:
     def test_year_boundaries(self):
         """Positions at century boundaries should be valid."""
         for year in [1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500]:
-            jd = ephem.swe_julday(year, 1, 1, 0.0)
+            jd = ephem.julday(year, 1, 1, 0.0)
 
-            lib_pos, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+            lib_pos, _ = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
             swe_pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1781,12 +1781,12 @@ class TestCuspWrapping:
     def test_cusp_wrapping_various_dates(self):
         """All cusps should be in 0-360 range for various dates."""
         dates = [
-            ephem.swe_julday(y, m, 15, 12.0) for y in [2000, 2024] for m in range(1, 13)
+            ephem.julday(y, m, 15, 12.0) for y in [2000, 2024] for m in range(1, 13)
         ]
 
         for jd in dates:
             for hsys in ["P", "K", "O", "R", "C", "E", "W"]:
-                cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord(hsys))
+                cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord(hsys))
 
                 for i in range(12):
                     c = float(cusps[i])
@@ -1802,10 +1802,10 @@ class TestCuspWrapping:
 
     def test_cusp_monotonicity(self):
         """Cusps should generally increase (with wrap-around at 360)."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
         for hsys in ["P", "K", "O", "R", "C"]:
-            cusps, _ = ephem.swe_houses(jd, 41.9, 12.5, ord(hsys))
+            cusps, _ = ephem.houses(jd, 41.9, 12.5, ord(hsys))
 
             # Check that cusps go in order (allowing wrap)
             wraps = 0
@@ -1833,19 +1833,19 @@ class TestSpecialBodies:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_CHIRON, "Chiron"),
-            (SE_PHOLUS, "Pholus"),
-            (SE_CERES, "Ceres"),
-            (SE_PALLAS, "Pallas"),
-            (SE_JUNO, "Juno"),
-            (SE_VESTA, "Vesta"),
+            (CHIRON, "Chiron"),
+            (PHOLUS, "Pholus"),
+            (CERES, "Ceres"),
+            (PALLAS, "Pallas"),
+            (JUNO, "Juno"),
+            (VESTA, "Vesta"),
         ],
     )
     def test_asteroids(self, planet_id, name):
         """Asteroid positions should be within tolerance of pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        lib_pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        lib_pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
         swe_pos, _ = swe.calc_ut(jd, planet_id, swe.FLG_SWIEPH | swe.FLG_SPEED)
 
         lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
@@ -1854,10 +1854,10 @@ class TestSpecialBodies:
         )
 
     def test_ecl_nut_obliquity(self):
-        """SE_ECL_NUT should return valid obliquity values."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        """ECL_NUT should return valid obliquity values."""
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        lib_pos, _ = ephem.swe_calc_ut(jd, SE_ECL_NUT, SEFLG_SWIEPH)
+        lib_pos, _ = ephem.calc_ut(jd, ECL_NUT, FLG_SWIEPH)
         swe_pos, _ = swe.calc_ut(jd, swe.ECL_NUT, swe.FLG_SWIEPH)
 
         # True obliquity should be ~23.4°
@@ -1873,26 +1873,26 @@ class TestSpecialBodies:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_MEAN_NODE, "Mean Node"),
-            (SE_TRUE_NODE, "True Node"),
-            (SE_MEAN_APOG, "Mean Lilith"),
-            (SE_OSCU_APOG, "True Lilith"),
-            (SE_INTP_APOG, "Interp Apogee"),
-            (SE_INTP_PERG, "Interp Perigee"),
+            (MEAN_NODE, "Mean Node"),
+            (TRUE_NODE, "True Node"),
+            (MEAN_APOG, "Mean Lilith"),
+            (OSCU_APOG, "True Lilith"),
+            (INTP_APOG, "Interp Apogee"),
+            (INTP_PERG, "Interp Perigee"),
         ],
     )
     def test_lunar_points_equatorial(self, planet_id, name):
         """Lunar points in equatorial mode should match pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED
 
         try:
-            lib_pos, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+            lib_pos, _ = ephem.calc_ut(jd, planet_id, flags)
             swe_pos, _ = swe.calc_ut(jd, planet_id, flags)
 
             lon_diff = angular_diff(float(lib_pos[0]), float(swe_pos[0]))
-            tol = 5.0 if planet_id == SE_INTP_PERG else 0.5
+            tol = 5.0 if planet_id == INTP_PERG else 0.5
             assert lon_diff < tol, f"{name} equatorial RA diff {lon_diff:.4f}°"
         except Exception:
             pass
@@ -1909,19 +1909,19 @@ class TestPhenoComprehensive:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_pheno_ut_physical_constraints(self, planet_id, name):
         """pheno_ut results should satisfy physical constraints."""
-        dates = [ephem.swe_julday(y, 6, 15, 12.0) for y in range(2020, 2026)]
+        dates = [ephem.julday(y, 6, 15, 12.0) for y in range(2020, 2026)]
 
         for jd in dates:
-            vals = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
+            vals = ephem.pheno_ut(jd, planet_id, FLG_SWIEPH)
 
             phase_angle = float(vals[0])
             phase = float(vals[1])
@@ -1948,11 +1948,11 @@ class TestPhenoComprehensive:
             )
 
             # For inner planets, check elongation constraints
-            if planet_id == SE_MERCURY:
+            if planet_id == MERCURY:
                 assert elongation < 30, (
                     f"Mercury elongation {elongation}° > 30° (impossible)"
                 )
-            elif planet_id == SE_VENUS:
+            elif planet_id == VENUS:
                 assert elongation < 50, (
                     f"Venus elongation {elongation}° > 50° (impossible)"
                 )
@@ -1960,16 +1960,16 @@ class TestPhenoComprehensive:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_pheno_ut_vs_pyswisseph_detailed(self, planet_id, name):
         """Detailed pheno_ut comparison with pyswisseph."""
-        jd = ephem.swe_julday(2024, 6, 21, 12.0)
+        jd = ephem.julday(2024, 6, 21, 12.0)
 
-        lib_vals = ephem.swe_pheno_ut(jd, planet_id, SEFLG_SWIEPH)
+        lib_vals = ephem.pheno_ut(jd, planet_id, FLG_SWIEPH)
         swe_result = swe.pheno_ut(jd, planet_id, swe.FLG_SWIEPH)
 
         swe_vals = swe_result[0] if isinstance(swe_result[0], tuple) else swe_result

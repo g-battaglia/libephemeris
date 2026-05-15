@@ -13,13 +13,13 @@ from unittest.mock import patch, MagicMock
 import libephemeris as eph
 from libephemeris import state
 from libephemeris.constants import (
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_CHIRON,
-    SE_ERIS,
-    SE_SEDNA,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    CHIRON,
+    ERIS,
+    SEDNA,
     NAIF_CERES,
     NAIF_CHIRON,
 )
@@ -40,31 +40,31 @@ class TestIsMajorAsteroid:
 
     def test_ceres_is_major(self):
         """Ceres should be identified as a major asteroid."""
-        assert is_major_asteroid(SE_CERES) is True
+        assert is_major_asteroid(CERES) is True
 
     def test_pallas_is_major(self):
         """Pallas should be identified as a major asteroid."""
-        assert is_major_asteroid(SE_PALLAS) is True
+        assert is_major_asteroid(PALLAS) is True
 
     def test_juno_is_major(self):
         """Juno should be identified as a major asteroid."""
-        assert is_major_asteroid(SE_JUNO) is True
+        assert is_major_asteroid(JUNO) is True
 
     def test_vesta_is_major(self):
         """Vesta should be identified as a major asteroid."""
-        assert is_major_asteroid(SE_VESTA) is True
+        assert is_major_asteroid(VESTA) is True
 
     def test_chiron_is_major(self):
         """Chiron should be identified as a major asteroid."""
-        assert is_major_asteroid(SE_CHIRON) is True
+        assert is_major_asteroid(CHIRON) is True
 
     def test_eris_is_not_major(self):
         """Eris (TNO) should not be identified as a major asteroid."""
-        assert is_major_asteroid(SE_ERIS) is False
+        assert is_major_asteroid(ERIS) is False
 
     def test_sedna_is_not_major(self):
         """Sedna (TNO) should not be identified as a major asteroid."""
-        assert is_major_asteroid(SE_SEDNA) is False
+        assert is_major_asteroid(SEDNA) is False
 
     def test_invalid_id_is_not_major(self):
         """Invalid body ID should not be identified as a major asteroid."""
@@ -77,7 +77,7 @@ class TestGetMajorAsteroidInfo:
 
     def test_ceres_info(self):
         """Should return correct info for Ceres."""
-        info = get_major_asteroid_info(SE_CERES)
+        info = get_major_asteroid_info(CERES)
         assert info is not None
         ast_num, horizons_id, naif_id, name = info
         assert ast_num == 1
@@ -87,7 +87,7 @@ class TestGetMajorAsteroidInfo:
 
     def test_chiron_info(self):
         """Should return correct info for Chiron."""
-        info = get_major_asteroid_info(SE_CHIRON)
+        info = get_major_asteroid_info(CHIRON)
         assert info is not None
         ast_num, horizons_id, naif_id, name = info
         assert ast_num == 2060
@@ -97,7 +97,7 @@ class TestGetMajorAsteroidInfo:
 
     def test_eris_returns_none(self):
         """Eris (TNO) should return None."""
-        assert get_major_asteroid_info(SE_ERIS) is None
+        assert get_major_asteroid_info(ERIS) is None
 
     def test_invalid_id_returns_none(self):
         """Invalid body ID should return None."""
@@ -118,11 +118,11 @@ class TestListMajorAsteroids:
         body_ids = [item[0] for item in result]
         names = [item[1] for item in result]
 
-        assert SE_CERES in body_ids
-        assert SE_PALLAS in body_ids
-        assert SE_JUNO in body_ids
-        assert SE_VESTA in body_ids
-        assert SE_CHIRON in body_ids
+        assert CERES in body_ids
+        assert PALLAS in body_ids
+        assert JUNO in body_ids
+        assert VESTA in body_ids
+        assert CHIRON in body_ids
 
         assert "Ceres" in names
         assert "Pallas" in names
@@ -154,12 +154,12 @@ class TestIsSpkAvailableForBody:
 
     def test_returns_false_when_not_registered(self):
         """Should return False when no SPK is registered."""
-        assert is_spk_available_for_body(SE_CERES) is False
+        assert is_spk_available_for_body(CERES) is False
 
     def test_returns_true_when_registered(self):
         """Should return True when SPK is registered."""
-        state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
-        assert is_spk_available_for_body(SE_CERES) is True
+        state._SPK_BODY_MAP[CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+        assert is_spk_available_for_body(CERES) is True
 
 
 class TestAutoDownloadAsteroidSpk:
@@ -189,9 +189,9 @@ class TestAutoDownloadAsteroidSpk:
         """Should return path when SPK is already registered."""
         mock_check.return_value = True
         expected_path = "/path/to/ceres.bsp"
-        state._SPK_BODY_MAP[SE_CERES] = (expected_path, NAIF_CERES)
+        state._SPK_BODY_MAP[CERES] = (expected_path, NAIF_CERES)
 
-        result = auto_download_asteroid_spk(SE_CERES)
+        result = auto_download_asteroid_spk(CERES)
         assert result == expected_path
 
     @pytest.mark.skip(reason="Implementation now uses direct HTTP, not astroquery")
@@ -199,7 +199,7 @@ class TestAutoDownloadAsteroidSpk:
     def test_returns_none_when_astroquery_unavailable(self, mock_check):
         """Should return None when astroquery is not available."""
         mock_check.return_value = False
-        result = auto_download_asteroid_spk(SE_CERES)
+        result = auto_download_asteroid_spk(CERES)
         assert result is None
 
     @pytest.mark.skip(
@@ -212,12 +212,12 @@ class TestAutoDownloadAsteroidSpk:
         mock_check.return_value = True
         mock_auto_get.return_value = "/path/to/ceres.bsp"
 
-        result = auto_download_asteroid_spk(SE_CERES)
+        result = auto_download_asteroid_spk(CERES)
 
         mock_auto_get.assert_called_once()
         call_kwargs = mock_auto_get.call_args.kwargs
         assert call_kwargs["body_id"] == "1"
-        assert call_kwargs["ipl"] == SE_CERES
+        assert call_kwargs["ipl"] == CERES
         assert call_kwargs["naif_id"] == NAIF_CERES
         assert "jd_start" in call_kwargs
         assert "jd_end" in call_kwargs
@@ -236,7 +236,7 @@ class TestAutoDownloadAsteroidSpk:
         jd_start = 2451545.0
         jd_end = 2455197.5
 
-        auto_download_asteroid_spk(SE_CERES, jd_start=jd_start, jd_end=jd_end)
+        auto_download_asteroid_spk(CERES, jd_start=jd_start, jd_end=jd_end)
 
         call_kwargs = mock_auto_get.call_args.kwargs
         assert call_kwargs["jd_start"] == jd_start
@@ -252,7 +252,7 @@ class TestAutoDownloadAsteroidSpk:
         mock_check.return_value = True
         mock_auto_get.side_effect = Exception("Network error")
 
-        result = auto_download_asteroid_spk(SE_CERES)
+        result = auto_download_asteroid_spk(CERES)
         assert result is None
 
 
@@ -270,8 +270,8 @@ class TestEnsureMajorAsteroidSpk:
 
     def test_returns_true_when_already_available(self):
         """Should return True immediately when SPK is already registered."""
-        state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
-        result = ensure_major_asteroid_spk(SE_CERES)
+        state._SPK_BODY_MAP[CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+        result = ensure_major_asteroid_spk(CERES)
         assert result is True
 
     @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
@@ -279,7 +279,7 @@ class TestEnsureMajorAsteroidSpk:
         """Should call auto_download when SPK is not available."""
         mock_download.return_value = "/path/to/ceres.bsp"
 
-        result = ensure_major_asteroid_spk(SE_CERES)
+        result = ensure_major_asteroid_spk(CERES)
 
         mock_download.assert_called_once()
         assert result is True
@@ -289,7 +289,7 @@ class TestEnsureMajorAsteroidSpk:
         """Should return False when download fails."""
         mock_download.return_value = None
 
-        result = ensure_major_asteroid_spk(SE_CERES)
+        result = ensure_major_asteroid_spk(CERES)
 
         assert result is False
 
@@ -299,11 +299,11 @@ class TestMajorAsteroidSpkInfo:
 
     def test_has_expected_keys(self):
         """Dictionary should have all expected body IDs."""
-        assert SE_CERES in MAJOR_ASTEROID_SPK_INFO
-        assert SE_PALLAS in MAJOR_ASTEROID_SPK_INFO
-        assert SE_JUNO in MAJOR_ASTEROID_SPK_INFO
-        assert SE_VESTA in MAJOR_ASTEROID_SPK_INFO
-        assert SE_CHIRON in MAJOR_ASTEROID_SPK_INFO
+        assert CERES in MAJOR_ASTEROID_SPK_INFO
+        assert PALLAS in MAJOR_ASTEROID_SPK_INFO
+        assert JUNO in MAJOR_ASTEROID_SPK_INFO
+        assert VESTA in MAJOR_ASTEROID_SPK_INFO
+        assert CHIRON in MAJOR_ASTEROID_SPK_INFO
 
     def test_value_format(self):
         """Each value should be (asteroid_number, horizons_id, naif_id, name)."""
@@ -342,7 +342,7 @@ class TestCalcMinorBodyHeliocentricWithSpk:
     def test_falls_back_to_keplerian_when_no_spk(self):
         """Should use Keplerian when no SPK is registered."""
         jd = 2451545.0  # J2000.0
-        lon, lat, dist = calc_minor_body_heliocentric(SE_CERES, jd)
+        lon, lat, dist = calc_minor_body_heliocentric(CERES, jd)
 
         # Just verify we get reasonable values
         assert 0 <= lon < 360
@@ -352,12 +352,12 @@ class TestCalcMinorBodyHeliocentricWithSpk:
     def test_use_spk_false_bypasses_spk(self):
         """Should bypass SPK when use_spk=False."""
         # Even if SPK is registered, use_spk=False should use Keplerian
-        state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+        state._SPK_BODY_MAP[CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
 
         jd = 2451545.0
         # This should not raise an error even though the SPK path is fake
         # because use_spk=False bypasses SPK entirely
-        lon, lat, dist = calc_minor_body_heliocentric(SE_CERES, jd, use_spk=False)
+        lon, lat, dist = calc_minor_body_heliocentric(CERES, jd, use_spk=False)
 
         assert 0 <= lon < 360
         assert -90 <= lat <= 90
@@ -446,8 +446,8 @@ class TestEnsureMajorAsteroidSpkLogging:
         import logging
 
         with caplog.at_level(logging.DEBUG, logger="libephemeris"):
-            state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
-            ensure_major_asteroid_spk(SE_CERES)
+            state._SPK_BODY_MAP[CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+            ensure_major_asteroid_spk(CERES)
 
         # Check that checking message was logged
         assert any(
@@ -461,8 +461,8 @@ class TestEnsureMajorAsteroidSpkLogging:
         import logging
 
         with caplog.at_level(logging.DEBUG, logger="libephemeris"):
-            state._SPK_BODY_MAP[SE_CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
-            ensure_major_asteroid_spk(SE_CERES)
+            state._SPK_BODY_MAP[CERES] = ("/path/to/ceres.bsp", NAIF_CERES)
+            ensure_major_asteroid_spk(CERES)
 
         # Check that cache hit message was logged at DEBUG level
         cache_records = [
@@ -483,7 +483,7 @@ class TestEnsureMajorAsteroidSpkLogging:
         mock_download.return_value = "/path/to/ceres.bsp"
 
         with caplog.at_level(logging.DEBUG, logger="libephemeris"):
-            ensure_major_asteroid_spk(SE_CERES)
+            ensure_major_asteroid_spk(CERES)
 
         # Check that download message was logged at INFO level
         download_records = [
@@ -504,13 +504,13 @@ class TestEnsureMajorAsteroidSpkLogging:
         mock_download.return_value = "/path/to/chiron.bsp"
 
         with caplog.at_level(logging.DEBUG, logger="libephemeris"):
-            ensure_major_asteroid_spk(SE_CHIRON)
+            ensure_major_asteroid_spk(CHIRON)
 
         # All log messages mentioning this body should include the name
         relevant_records = [
             record
             for record in caplog.records
-            if "Chiron" in record.message or str(SE_CHIRON) in record.message
+            if "Chiron" in record.message or str(CHIRON) in record.message
         ]
         assert len(relevant_records) >= 1
         # Ensure "Chiron" appears (not just the numeric ID)
@@ -530,27 +530,27 @@ class TestRequiredSpkBodies:
         """REQUIRED_SPK_BODIES should contain all expected body IDs."""
         from libephemeris.constants import (
             REQUIRED_SPK_BODIES,
-            SE_CHIRON,
-            SE_CERES,
-            SE_PALLAS,
-            SE_JUNO,
-            SE_VESTA,
-            SE_PHOLUS,
-            SE_NESSUS,
-            SE_ERIS,
+            CHIRON,
+            CERES,
+            PALLAS,
+            JUNO,
+            VESTA,
+            PHOLUS,
+            NESSUS,
+            ERIS,
         )
 
         # All major asteroids from MAJOR_ASTEROID_SPK_INFO
-        assert SE_CERES in REQUIRED_SPK_BODIES
-        assert SE_PALLAS in REQUIRED_SPK_BODIES
-        assert SE_JUNO in REQUIRED_SPK_BODIES
-        assert SE_VESTA in REQUIRED_SPK_BODIES
-        assert SE_CHIRON in REQUIRED_SPK_BODIES
+        assert CERES in REQUIRED_SPK_BODIES
+        assert PALLAS in REQUIRED_SPK_BODIES
+        assert JUNO in REQUIRED_SPK_BODIES
+        assert VESTA in REQUIRED_SPK_BODIES
+        assert CHIRON in REQUIRED_SPK_BODIES
 
         # Additional centaurs and dwarf planets
-        assert SE_PHOLUS in REQUIRED_SPK_BODIES
-        assert SE_NESSUS in REQUIRED_SPK_BODIES
-        assert SE_ERIS in REQUIRED_SPK_BODIES
+        assert PHOLUS in REQUIRED_SPK_BODIES
+        assert NESSUS in REQUIRED_SPK_BODIES
+        assert ERIS in REQUIRED_SPK_BODIES
 
     def test_all_bodies_in_spk_body_name_map(self):
         """All REQUIRED_SPK_BODIES should have entries in SPK_BODY_NAME_MAP."""
@@ -596,28 +596,28 @@ class TestEnsureMajorAsteroidSpkForNonMajor:
 
     def test_returns_true_when_already_cached_for_pholus(self):
         """Should return True when SPK is already cached for non-major asteroid."""
-        from libephemeris.constants import SE_PHOLUS, NAIF_PHOLUS
+        from libephemeris.constants import PHOLUS, NAIF_PHOLUS
 
-        state._SPK_BODY_MAP[SE_PHOLUS] = ("/path/to/pholus.bsp", NAIF_PHOLUS)
+        state._SPK_BODY_MAP[PHOLUS] = ("/path/to/pholus.bsp", NAIF_PHOLUS)
 
-        result = ensure_major_asteroid_spk(SE_PHOLUS)
+        result = ensure_major_asteroid_spk(PHOLUS)
 
         assert result is True
 
     def test_returns_true_when_already_cached_for_eris(self):
         """Should return True when SPK is already cached for Eris."""
-        from libephemeris.constants import SE_ERIS, NAIF_ERIS
+        from libephemeris.constants import ERIS, NAIF_ERIS
 
-        state._SPK_BODY_MAP[SE_ERIS] = ("/path/to/eris.bsp", NAIF_ERIS)
+        state._SPK_BODY_MAP[ERIS] = ("/path/to/eris.bsp", NAIF_ERIS)
 
-        result = ensure_major_asteroid_spk(SE_ERIS)
+        result = ensure_major_asteroid_spk(ERIS)
 
         assert result is True
 
     @patch("libephemeris.minor_bodies.auto_download_asteroid_spk")
     def test_returns_false_when_astroquery_not_available_for_pholus(self, mock_auto):
         """Should return False when astroquery is not available."""
-        from libephemeris.constants import SE_PHOLUS
+        from libephemeris.constants import PHOLUS
 
         # auto_download_asteroid_spk returns None for non-major asteroids
         mock_auto.return_value = None
@@ -626,7 +626,7 @@ class TestEnsureMajorAsteroidSpkForNonMajor:
         with patch(
             "libephemeris.spk_auto._check_astroquery_available", return_value=False
         ):
-            result = ensure_major_asteroid_spk(SE_PHOLUS)
+            result = ensure_major_asteroid_spk(PHOLUS)
 
         assert result is False
 
@@ -640,19 +640,19 @@ class TestEnsureMajorAsteroidSpkForNonMajor:
         self, mock_auto_get, mock_check, mock_auto_download
     ):
         """Should use SPK_BODY_NAME_MAP for non-major asteroids."""
-        from libephemeris.constants import SE_PHOLUS, NAIF_PHOLUS
+        from libephemeris.constants import PHOLUS, NAIF_PHOLUS
 
         mock_auto_download.return_value = None
         mock_check.return_value = True
         mock_auto_get.return_value = "/path/to/pholus.bsp"
 
-        result = ensure_major_asteroid_spk(SE_PHOLUS)
+        result = ensure_major_asteroid_spk(PHOLUS)
 
         assert result is True
         mock_auto_get.assert_called_once()
         call_kwargs = mock_auto_get.call_args[1]
         assert call_kwargs["body_id"] == "5145"
-        assert call_kwargs["ipl"] == SE_PHOLUS
+        assert call_kwargs["ipl"] == PHOLUS
         assert call_kwargs["naif_id"] == NAIF_PHOLUS
 
     @pytest.mark.skip(
@@ -665,17 +665,17 @@ class TestEnsureMajorAsteroidSpkForNonMajor:
         self, mock_auto_get, mock_check, mock_auto_download
     ):
         """Should use SPK_BODY_NAME_MAP for Eris."""
-        from libephemeris.constants import SE_ERIS, NAIF_ERIS
+        from libephemeris.constants import ERIS, NAIF_ERIS
 
         mock_auto_download.return_value = None
         mock_check.return_value = True
         mock_auto_get.return_value = "/path/to/eris.bsp"
 
-        result = ensure_major_asteroid_spk(SE_ERIS)
+        result = ensure_major_asteroid_spk(ERIS)
 
         assert result is True
         mock_auto_get.assert_called_once()
         call_kwargs = mock_auto_get.call_args[1]
         assert call_kwargs["body_id"] == "136199"
-        assert call_kwargs["ipl"] == SE_ERIS
+        assert call_kwargs["ipl"] == ERIS
         assert call_kwargs["naif_id"] == NAIF_ERIS

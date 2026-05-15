@@ -1,5 +1,5 @@
 """
-Tests for planetary phenomena calculations (swe_pheno, swe_pheno_ut).
+Tests for planetary phenomena calculations (pheno, pheno_ut).
 
 Tests cover:
 - Phase angle calculations
@@ -15,16 +15,16 @@ import math
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 )
 
 
@@ -35,7 +35,7 @@ class TestPhenoBasic:
     def test_pheno_ut_returns_tuple(self):
         """pheno_ut should return a tuple of phenomenon values."""
         jd = 2451545.0  # J2000
-        result = ephem.pheno_ut(jd, SE_MARS, 0)
+        result = ephem.pheno_ut(jd, MARS, 0)
 
         assert isinstance(result, tuple)
         assert len(result) >= 5  # At least 5 phenomenon values
@@ -44,16 +44,16 @@ class TestPhenoBasic:
     def test_pheno_returns_tuple(self):
         """pheno should return a tuple of phenomenon values."""
         jd = 2451545.0  # J2000 TT
-        result = ephem.pheno(jd, SE_MARS, 0)
+        result = ephem.pheno(jd, MARS, 0)
 
         assert isinstance(result, tuple)
         assert len(result) >= 5
 
     @pytest.mark.unit
     def test_swe_prefix_aliases_exist(self):
-        """Both swe_pheno and swe_pheno_ut should be accessible."""
-        assert hasattr(ephem, "swe_pheno")
-        assert hasattr(ephem, "swe_pheno_ut")
+        """Both pheno and pheno_ut should be accessible."""
+        assert hasattr(ephem, "pheno")
+        assert hasattr(ephem, "pheno_ut")
         assert hasattr(ephem, "pheno")
         assert hasattr(ephem, "pheno_ut")
 
@@ -65,7 +65,7 @@ class TestSunPhenomena:
     def test_sun_phase_is_full(self):
         """Sun should always have phase = 1.0 (fully illuminated)."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_SUN, 0)
+        attr = ephem.pheno_ut(jd, SUN, 0)
 
         phase_angle = attr[0]
         phase = attr[1]
@@ -81,7 +81,7 @@ class TestSunPhenomena:
     def test_sun_diameter_reasonable(self):
         """Sun apparent diameter should be around 32 arcminutes."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_SUN, 0)
+        attr = ephem.pheno_ut(jd, SUN, 0)
 
         diameter = attr[3]
         # Sun diameter ~32 arcmin ≈ 0.53 degrees, varies with distance
@@ -91,7 +91,7 @@ class TestSunPhenomena:
     def test_sun_magnitude_reasonable(self):
         """Sun magnitude should be around -26.7."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_SUN, 0)
+        attr = ephem.pheno_ut(jd, SUN, 0)
 
         magnitude = attr[4]
         assert -27.0 < magnitude < -26.0, f"Sun magnitude {magnitude} unexpected"
@@ -107,8 +107,8 @@ class TestMoonPhenomena:
         jd_new = 2451550.1  # Near new moon (around Jan 6, 2000)
         jd_full = 2451565.0  # Near full moon (around Jan 21, 2000)
 
-        attr_new = ephem.pheno_ut(jd_new, SE_MOON, 0)
-        attr_full = ephem.pheno_ut(jd_full, SE_MOON, 0)
+        attr_new = ephem.pheno_ut(jd_new, MOON, 0)
+        attr_full = ephem.pheno_ut(jd_full, MOON, 0)
 
         phase_new = attr_new[1]
         phase_full = attr_full[1]
@@ -121,7 +121,7 @@ class TestMoonPhenomena:
     def test_moon_diameter_reasonable(self):
         """Moon apparent diameter should be around 30-34 arcminutes."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_MOON, 0)
+        attr = ephem.pheno_ut(jd, MOON, 0)
 
         diameter = attr[3]
         # Moon diameter ~31 arcmin ≈ 0.49-0.56 degrees, varies with distance
@@ -133,7 +133,7 @@ class TestMoonPhenomena:
     def test_moon_elongation_varies(self):
         """Moon elongation should be between 0 and 180 degrees."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_MOON, 0)
+        attr = ephem.pheno_ut(jd, MOON, 0)
 
         elongation = attr[2]
         assert 0 <= elongation <= 180, f"Moon elongation {elongation} out of range"
@@ -146,11 +146,11 @@ class TestPlanetPhenomena:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_planet_phase_in_range(self, planet_id, planet_name):
@@ -165,11 +165,11 @@ class TestPlanetPhenomena:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_planet_elongation_in_range(self, planet_id, planet_name):
@@ -186,11 +186,11 @@ class TestPlanetPhenomena:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_planet_diameter_positive(self, planet_id, planet_name):
@@ -207,12 +207,12 @@ class TestPlanetPhenomena:
         jd = 2451545.0
 
         diameters = {}
-        for planet_id in [SE_MARS, SE_JUPITER, SE_SATURN]:
+        for planet_id in [MARS, JUPITER, SATURN]:
             attr = ephem.pheno_ut(jd, planet_id, 0)
             diameters[planet_id] = attr[3]
 
         # Jupiter should have larger diameter than Mars
-        assert diameters[SE_JUPITER] > diameters[SE_MARS]
+        assert diameters[JUPITER] > diameters[MARS]
 
 
 class TestMagnitudes:
@@ -222,10 +222,10 @@ class TestMagnitudes:
     @pytest.mark.parametrize(
         "planet_id,min_mag,max_mag,planet_name",
         [
-            (SE_VENUS, -5.0, -3.0, "Venus"),  # Venus is always bright
-            (SE_JUPITER, -3.0, -1.0, "Jupiter"),  # Jupiter is bright
-            (SE_SATURN, -0.5, 1.5, "Saturn"),  # Saturn varies more
-            (SE_MARS, -3.0, 2.0, "Mars"),  # Mars varies significantly
+            (VENUS, -5.0, -3.0, "Venus"),  # Venus is always bright
+            (JUPITER, -3.0, -1.0, "Jupiter"),  # Jupiter is bright
+            (SATURN, -0.5, 1.5, "Saturn"),  # Saturn varies more
+            (MARS, -3.0, 2.0, "Mars"),  # Mars varies significantly
         ],
     )
     def test_planet_magnitude_typical_range(
@@ -249,11 +249,11 @@ class TestComparisonWithSwissEph:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_phase_angle_matches_swe(self, planet_id, planet_name):
@@ -279,11 +279,11 @@ class TestComparisonWithSwissEph:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_phase_matches_swe(self, planet_id, planet_name):
@@ -307,11 +307,11 @@ class TestComparisonWithSwissEph:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_elongation_matches_swe(self, planet_id, planet_name):
@@ -337,8 +337,8 @@ class TestComparisonWithSwissEph:
         jd = 2451545.0
 
         swe.set_ephe_path(None)
-        swe_attr = swe.pheno_ut(jd, SE_MOON, 0)
-        lib_attr = ephem.pheno_ut(jd, SE_MOON, 0)
+        swe_attr = swe.pheno_ut(jd, MOON, 0)
+        lib_attr = ephem.pheno_ut(jd, MOON, 0)
 
         # Phase angle
         diff_angle = abs(swe_attr[0] - lib_attr[0])
@@ -360,9 +360,9 @@ class TestOuterPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_outer_planet_nearly_full(self, planet_id, planet_name):
@@ -378,9 +378,9 @@ class TestOuterPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_outer_planet_small_phase_angle(self, planet_id, planet_name):
@@ -403,7 +403,7 @@ class TestPhaseAngleFormula:
         """Phase should be calculated correctly from phase angle."""
         jd = 2451545.0
 
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
+        for planet_id in [MERCURY, VENUS, MARS, JUPITER]:
             attr = ephem.pheno_ut(jd, planet_id, 0)
 
             phase_angle = attr[0]
@@ -441,8 +441,8 @@ class TestEdgeCases:
         jd1 = 2451545.0  # J2000
         jd2 = 2451645.0  # 100 days later
 
-        attr1 = ephem.pheno_ut(jd1, SE_MARS, 0)
-        attr2 = ephem.pheno_ut(jd2, SE_MARS, 0)
+        attr1 = ephem.pheno_ut(jd1, MARS, 0)
+        attr2 = ephem.pheno_ut(jd2, MARS, 0)
 
         # At least one value should differ significantly
         differences = [abs(attr1[i] - attr2[i]) for i in range(5)]
@@ -451,7 +451,7 @@ class TestEdgeCases:
 
 class TestSwePheno20Values:
     """
-    Verify swe_pheno_ut returns all 20 output values matching Swiss Ephemeris.
+    Verify pheno_ut returns all 20 output values matching Swiss Ephemeris.
 
     This is the core verification suite for Swiss Ephemeris compatibility.
     All 20 values in the phenomena tuple must be verified:
@@ -471,9 +471,9 @@ class TestSwePheno20Values:
 
     @pytest.mark.comparison
     def test_returns_exactly_20_values(self):
-        """swe_pheno_ut must return exactly 20 values in the attr tuple."""
+        """pheno_ut must return exactly 20 values in the attr tuple."""
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_MARS, 0)
+        attr = ephem.pheno_ut(jd, MARS, 0)
 
         assert len(attr) == 20, f"Expected 20 values, got {len(attr)}"
 
@@ -483,7 +483,7 @@ class TestSwePheno20Values:
         jd = 2451545.0
 
         # Test across multiple planets and bodies
-        bodies = [SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]
+        bodies = [SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN]
 
         for body_id in bodies:
             attr = ephem.pheno_ut(jd, body_id, 0)
@@ -497,11 +497,11 @@ class TestSwePheno20Values:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_all_five_active_values_match_swe(self, planet_id, planet_name):
@@ -551,7 +551,7 @@ class TestSwePheno20Values:
 
         # attr[4]: Magnitude
         # Saturn magnitude has larger tolerance due to ring contribution differences
-        if planet_id == SE_SATURN:
+        if planet_id == SATURN:
             mag_tol = self.SATURN_MAGNITUDE_TOL
         else:
             mag_tol = self.MAGNITUDE_TOL
@@ -567,8 +567,8 @@ class TestSwePheno20Values:
         jd = 2451545.0
 
         swe.set_ephe_path(None)
-        swe_attr = swe.pheno_ut(jd, SE_SUN, 0)
-        lib_attr = ephem.pheno_ut(jd, SE_SUN, 0)
+        swe_attr = swe.pheno_ut(jd, SUN, 0)
+        lib_attr = ephem.pheno_ut(jd, SUN, 0)
 
         # Must have exactly 20 values
         assert len(lib_attr) == 20
@@ -604,8 +604,8 @@ class TestSwePheno20Values:
         jd = 2451545.0
 
         swe.set_ephe_path(None)
-        swe_attr = swe.pheno_ut(jd, SE_MOON, 0)
-        lib_attr = ephem.pheno_ut(jd, SE_MOON, 0)
+        swe_attr = swe.pheno_ut(jd, MOON, 0)
+        lib_attr = ephem.pheno_ut(jd, MOON, 0)
 
         # Must have exactly 20 values
         assert len(lib_attr) == 20
@@ -638,9 +638,9 @@ class TestSwePheno20Values:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_outer_planets_all_20_values(self, planet_id, planet_name):
@@ -699,7 +699,7 @@ class TestSwePheno20Values:
         swe.set_ephe_path(None)
 
         for jd in test_dates:
-            for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
+            for planet_id in [MERCURY, VENUS, MARS, JUPITER]:
                 swe_attr = swe.pheno_ut(jd, planet_id, 0)
                 lib_attr = ephem.pheno_ut(jd, planet_id, 0)
 
@@ -720,12 +720,12 @@ class TestSwePheno20Values:
 
     @pytest.mark.comparison
     def test_swe_pheno_et_version_20_values(self):
-        """Verify swe_pheno (ET version) also returns 20 values."""
+        """Verify pheno (ET version) also returns 20 values."""
         jd_et = 2451545.0  # J2000 TT
 
         swe.set_ephe_path(None)
-        swe_attr = swe.pheno(jd_et, SE_MARS, 0)
-        lib_attr = ephem.pheno(jd_et, SE_MARS, 0)
+        swe_attr = swe.pheno(jd_et, MARS, 0)
+        lib_attr = ephem.pheno(jd_et, MARS, 0)
 
         # Must have exactly 20 values
         assert len(lib_attr) == 20, (
@@ -746,13 +746,13 @@ class TestSwePheno20Values:
         jd = 2451545.0
 
         # Test with flag = 0
-        attr0 = ephem.pheno_ut(jd, SE_MARS, 0)
+        attr0 = ephem.pheno_ut(jd, MARS, 0)
         assert isinstance(attr0, tuple)
 
-        # Test with SEFLG_TRUEPOS
-        from libephemeris.constants import SEFLG_TRUEPOS
+        # Test with FLG_TRUEPOS
+        from libephemeris.constants import FLG_TRUEPOS
 
-        attr_true = ephem.pheno_ut(jd, SE_MARS, SEFLG_TRUEPOS)
+        attr_true = ephem.pheno_ut(jd, MARS, FLG_TRUEPOS)
         assert isinstance(attr_true, tuple)
 
 
@@ -781,14 +781,14 @@ class TestPhaseAngleAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_phase_angle_at_multiple_dates(self, planet_id, planet_name):
@@ -841,7 +841,7 @@ class TestPhaseAngleAllPlanets:
 
         for i in range(200):  # Sample over Mercury's synodic period
             jd = jd_start + i
-            attr_mercury = ephem.pheno_ut(jd, SE_MERCURY, 0)
+            attr_mercury = ephem.pheno_ut(jd, MERCURY, 0)
             phase_angles_mercury.append(attr_mercury[0])
 
         # Mercury should show substantial phase angle variation (range > 60°)
@@ -854,7 +854,7 @@ class TestPhaseAngleAllPlanets:
         phase_angles_venus = []
         for i in range(600):  # Sample over Venus's synodic period
             jd = jd_start + i
-            attr_venus = ephem.pheno_ut(jd, SE_VENUS, 0)
+            attr_venus = ephem.pheno_ut(jd, VENUS, 0)
             phase_angles_venus.append(attr_venus[0])
 
         # Venus should show substantial phase angle variation (range > 60°)
@@ -874,11 +874,11 @@ class TestPhaseAngleAllPlanets:
         # Sample dates across a year
         jd_start = 2451545.0
         outer_planets = [
-            (SE_JUPITER, "Jupiter", 12),  # max phase angle ~12°
-            (SE_SATURN, "Saturn", 7),  # max phase angle ~7°
-            (SE_URANUS, "Uranus", 4),  # max phase angle ~4°
-            (SE_NEPTUNE, "Neptune", 2),  # max phase angle ~2°
-            (SE_PLUTO, "Pluto", 2),  # max phase angle ~2°
+            (JUPITER, "Jupiter", 12),  # max phase angle ~12°
+            (SATURN, "Saturn", 7),  # max phase angle ~7°
+            (URANUS, "Uranus", 4),  # max phase angle ~4°
+            (NEPTUNE, "Neptune", 2),  # max phase angle ~2°
+            (PLUTO, "Pluto", 2),  # max phase angle ~2°
         ]
 
         for planet_id, planet_name, max_expected in outer_planets:
@@ -904,7 +904,7 @@ class TestPhaseAngleAllPlanets:
 
         for i in range(780):  # ~2 years (Mars synodic period ~780 days)
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MARS, 0)
+            attr = ephem.pheno_ut(jd, MARS, 0)
             max_phase_angle = max(max_phase_angle, attr[0])
 
         # Mars maximum phase angle is about 47° at quadrature
@@ -923,7 +923,7 @@ class TestPhaseAngleAllPlanets:
         jd_start = 2451545.0
         swe.set_ephe_path(None)
 
-        for planet_id in [SE_JUPITER, SE_SATURN]:
+        for planet_id in [JUPITER, SATURN]:
             # Find date near opposition (elongation close to 180°)
             for i in range(400):
                 jd = jd_start + i
@@ -955,14 +955,14 @@ class TestPhaseAngleAllPlanets:
             2459700.0,
         ]
         planets = [
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
         for jd in test_dates:
@@ -996,8 +996,8 @@ class TestPhaseAngleAllPlanets:
         jd_new = 2451550.1  # Near new moon
         jd_full = 2451565.0  # Near full moon
 
-        attr_new = ephem.pheno_ut(jd_new, SE_MOON, 0)
-        attr_full = ephem.pheno_ut(jd_full, SE_MOON, 0)
+        attr_new = ephem.pheno_ut(jd_new, MOON, 0)
+        attr_full = ephem.pheno_ut(jd_full, MOON, 0)
 
         # Near new moon, phase angle should be high (approaching 180°)
         assert attr_new[0] > 100, (
@@ -1027,7 +1027,7 @@ class TestIlluminatedFractionAllPlanets:
     - k = 0.5 (50%): Half phase - half of the visible disk is illuminated
     - k = 0.0 (0%): New phase - visible disk is not illuminated
 
-    This corresponds to attr[1] in the swe_pheno_ut output.
+    This corresponds to attr[1] in the pheno_ut output.
     """
 
     # Tolerance for illuminated fraction comparison with Swiss Ephemeris
@@ -1049,7 +1049,7 @@ class TestIlluminatedFractionAllPlanets:
         ]
 
         for jd in test_dates:
-            attr = ephem.pheno_ut(jd, SE_SUN, 0)
+            attr = ephem.pheno_ut(jd, SUN, 0)
             assert attr[1] == 0.0, (
                 f"Sun at JD {jd}: illuminated fraction should be 0.0 (inapplicable), got {attr[1]}"
             )
@@ -1058,14 +1058,14 @@ class TestIlluminatedFractionAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_illuminated_fraction_in_valid_range(self, planet_id, planet_name):
@@ -1107,7 +1107,7 @@ class TestIlluminatedFractionAllPlanets:
         # Sample over one lunar month
         for i in range(30):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             illuminations.append(attr[1])
 
         min_illum = min(illuminations)
@@ -1132,8 +1132,8 @@ class TestIlluminatedFractionAllPlanets:
         jd_start = 2451545.0
 
         for planet_id, planet_name, synodic_period in [
-            (SE_MERCURY, "Mercury", 116),
-            (SE_VENUS, "Venus", 584),
+            (MERCURY, "Mercury", 116),
+            (VENUS, "Venus", 584),
         ]:
             illuminations = []
             # Sample over synodic period
@@ -1155,11 +1155,11 @@ class TestIlluminatedFractionAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name,min_expected",
         [
-            (SE_JUPITER, "Jupiter", 0.99),
-            (SE_SATURN, "Saturn", 0.99),
-            (SE_URANUS, "Uranus", 0.999),
-            (SE_NEPTUNE, "Neptune", 0.999),
-            (SE_PLUTO, "Pluto", 0.999),
+            (JUPITER, "Jupiter", 0.99),
+            (SATURN, "Saturn", 0.99),
+            (URANUS, "Uranus", 0.999),
+            (NEPTUNE, "Neptune", 0.999),
+            (PLUTO, "Pluto", 0.999),
         ],
     )
     def test_outer_planets_nearly_fully_illuminated(
@@ -1197,7 +1197,7 @@ class TestIlluminatedFractionAllPlanets:
         # Sample over Mars synodic period (~780 days)
         for i in range(0, 780, 10):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MARS, 0)
+            attr = ephem.pheno_ut(jd, MARS, 0)
             illuminations.append(attr[1])
 
         min_illum = min(illuminations)
@@ -1218,14 +1218,14 @@ class TestIlluminatedFractionAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_illuminated_fraction_matches_swiss_ephemeris(self, planet_id, planet_name):
@@ -1279,8 +1279,8 @@ class TestIlluminatedFractionAllPlanets:
         swe.set_ephe_path(None)
 
         for jd in test_dates:
-            swe_attr = swe.pheno_ut(jd, SE_MOON, 0)
-            lib_attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            swe_attr = swe.pheno_ut(jd, MOON, 0)
+            lib_attr = ephem.pheno_ut(jd, MOON, 0)
 
             swe_illumination = swe_attr[1]
             lib_illumination = lib_attr[1]
@@ -1296,15 +1296,15 @@ class TestIlluminatedFractionAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_illumination_formula_from_phase_angle(self, planet_id, planet_name):
@@ -1367,7 +1367,7 @@ class TestIlluminatedFractionAllPlanets:
         """
         jd_start = 2451545.0
 
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_MOON]:
+        for planet_id in [MERCURY, VENUS, MARS, MOON]:
             prev_illumination = None
 
             for i in range(100):
@@ -1396,7 +1396,7 @@ class TestApparentDiameterAllPlanets:
         diameter = 2 * arctan(radius / distance) ≈ 2 * radius / distance (in radians)
         diameter_deg = diameter_rad * (180/π)
 
-    This corresponds to attr[3] in the swe_pheno_ut output (in degrees).
+    This corresponds to attr[3] in the pheno_ut output (in degrees).
     """
 
     # Tolerance for diameter comparison with Swiss Ephemeris (relative)
@@ -1411,7 +1411,7 @@ class TestApparentDiameterAllPlanets:
         due to Earth's elliptical orbit.
         """
         jd = 2451545.0  # J2000
-        attr = ephem.pheno_ut(jd, SE_SUN, 0)
+        attr = ephem.pheno_ut(jd, SUN, 0)
 
         diameter = attr[3]
         # Sun diameter ~32 arcmin ≈ 0.53 deg (±3%)
@@ -1431,8 +1431,8 @@ class TestApparentDiameterAllPlanets:
         jd_perihelion = 2451547.5  # ~Jan 3, 2000
         jd_aphelion = 2451731.5  # ~Jul 4, 2000
 
-        attr_peri = ephem.pheno_ut(jd_perihelion, SE_SUN, 0)
-        attr_aph = ephem.pheno_ut(jd_aphelion, SE_SUN, 0)
+        attr_peri = ephem.pheno_ut(jd_perihelion, SUN, 0)
+        attr_aph = ephem.pheno_ut(jd_aphelion, SUN, 0)
 
         # Perihelion should have larger diameter
         assert attr_peri[3] > attr_aph[3], (
@@ -1449,7 +1449,7 @@ class TestApparentDiameterAllPlanets:
         due to its elliptical orbit.
         """
         jd = 2451545.0
-        attr = ephem.pheno_ut(jd, SE_MOON, 0)
+        attr = ephem.pheno_ut(jd, MOON, 0)
 
         diameter = attr[3]
         # Moon diameter typically 29-34 arcmin ≈ 0.47-0.57 degrees
@@ -1470,7 +1470,7 @@ class TestApparentDiameterAllPlanets:
         # Sample over 30 days (more than one anomalistic month of ~27.5 days)
         for i in range(30):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             diameters.append(attr[3])
 
         min_diam = min(diameters)
@@ -1486,11 +1486,11 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name,min_diam,max_diam",
         [
-            (SE_MERCURY, "Mercury", 0.0011, 0.0039),  # 4"-14" in degrees
-            (SE_VENUS, "Venus", 0.0028, 0.0183),  # 10"-66" in degrees
-            (SE_MARS, "Mars", 0.0008, 0.0072),  # 3"-26" in degrees
-            (SE_JUPITER, "Jupiter", 0.0083, 0.0142),  # 30"-51" in degrees
-            (SE_SATURN, "Saturn", 0.0042, 0.0058),  # 15"-21" in degrees
+            (MERCURY, "Mercury", 0.0011, 0.0039),  # 4"-14" in degrees
+            (VENUS, "Venus", 0.0028, 0.0183),  # 10"-66" in degrees
+            (MARS, "Mars", 0.0008, 0.0072),  # 3"-26" in degrees
+            (JUPITER, "Jupiter", 0.0083, 0.0142),  # 30"-51" in degrees
+            (SATURN, "Saturn", 0.0042, 0.0058),  # 15"-21" in degrees
         ],
     )
     def test_planet_diameter_in_typical_range(
@@ -1515,9 +1515,9 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name,max_expected",
         [
-            (SE_URANUS, "Uranus", 0.00125),  # 3.4"-4.1" in degrees
-            (SE_NEPTUNE, "Neptune", 0.00069),  # 2.2"-2.4" in degrees
-            (SE_PLUTO, "Pluto", 0.000056),  # ~0.11" in degrees
+            (URANUS, "Uranus", 0.00125),  # 3.4"-4.1" in degrees
+            (NEPTUNE, "Neptune", 0.00069),  # 2.2"-2.4" in degrees
+            (PLUTO, "Pluto", 0.000056),  # ~0.11" in degrees
         ],
     )
     def test_outer_planet_diameter_small(self, planet_id, planet_name, max_expected):
@@ -1537,16 +1537,16 @@ class TestApparentDiameterAllPlanets:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ],
     )
     def test_diameter_matches_swiss_ephemeris(self, planet_id, planet_name):
@@ -1596,11 +1596,11 @@ class TestApparentDiameterAllPlanets:
         for i in range(0, 780, 30):  # ~2 years in monthly steps
             jd = jd_start + i
             # Get Mars position
-            pos, _ = ephem.calc_ut(jd, SE_MARS, 0)
+            pos, _ = ephem.calc_ut(jd, MARS, 0)
             distance = pos[2]  # Distance in AU
 
             # Get Mars diameter
-            attr = ephem.pheno_ut(jd, SE_MARS, 0)
+            attr = ephem.pheno_ut(jd, MARS, 0)
             diameter = attr[3]
 
             distances.append(distance)
@@ -1625,14 +1625,14 @@ class TestApparentDiameterAllPlanets:
         jd = 2451545.0
 
         planet_diameters = {}
-        for planet_id in [SE_MARS, SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]:
+        for planet_id in [MARS, JUPITER, SATURN, URANUS, NEPTUNE]:
             attr = ephem.pheno_ut(jd, planet_id, 0)
             planet_diameters[planet_id] = attr[3]
 
-        jupiter_diam = planet_diameters[SE_JUPITER]
+        jupiter_diam = planet_diameters[JUPITER]
 
         for planet_id, diam in planet_diameters.items():
-            if planet_id != SE_JUPITER:
+            if planet_id != JUPITER:
                 assert jupiter_diam > diam, (
                     f"Jupiter ({jupiter_diam:.2f}as) should be larger than "
                     f"planet {planet_id} ({diam:.2f}as)"
@@ -1645,16 +1645,16 @@ class TestApparentDiameterAllPlanets:
         """
         jd = 2451545.0
         bodies = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
         for body_id in bodies:
@@ -1675,7 +1675,7 @@ class TestApparentDiameterAllPlanets:
         # Sun: radius ~695700 km, at ~1 AU
         # Expected diameter: 2 * 695700 / 149597870.7 * 206264.806 ≈ 1919.1 arcsec
         jd = 2451545.0
-        attr_sun = ephem.pheno_ut(jd, SE_SUN, 0)
+        attr_sun = ephem.pheno_ut(jd, SUN, 0)
 
         # The Sun's diameter should be close to the theoretical value
         # (within a few percent due to actual distance variation)
@@ -1709,7 +1709,7 @@ class TestApparentDiameterAllPlanets:
         swe.set_ephe_path(None)
 
         for jd in test_dates:
-            for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+            for planet_id in [MERCURY, VENUS, MARS, JUPITER, SATURN]:
                 swe_attr = swe.pheno_ut(jd, planet_id, 0)
                 lib_attr = ephem.pheno_ut(jd, planet_id, 0)
 
@@ -1729,7 +1729,7 @@ class TestElongationHelpers:
     Tests for elongation helper functions that distinguish between
     morning star (western elongation) and evening star (eastern elongation).
 
-    These functions extend the basic swe_pheno_ut elongation calculation
+    These functions extend the basic pheno_ut elongation calculation
     by providing signed elongation values and morning/evening star classification.
 
     Convention:
@@ -1743,7 +1743,7 @@ class TestElongationHelpers:
     def test_get_elongation_from_sun_returns_tuple(self):
         """get_elongation_from_sun should return (elongation, is_evening_star)."""
         jd = 2451545.0
-        result = ephem.get_elongation_from_sun(jd, SE_VENUS)
+        result = ephem.get_elongation_from_sun(jd, VENUS)
 
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -1755,35 +1755,35 @@ class TestElongationHelpers:
     def test_get_signed_elongation_returns_float(self):
         """get_signed_elongation should return a float."""
         jd = 2451545.0
-        result = ephem.get_signed_elongation(jd, SE_VENUS)
+        result = ephem.get_signed_elongation(jd, VENUS)
         assert isinstance(result, float)
 
     @pytest.mark.unit
     def test_is_morning_star_returns_bool(self):
         """is_morning_star should return a boolean."""
         jd = 2451545.0
-        result = ephem.is_morning_star(jd, SE_VENUS)
+        result = ephem.is_morning_star(jd, VENUS)
         assert isinstance(result, bool)
 
     @pytest.mark.unit
     def test_is_evening_star_returns_bool(self):
         """is_evening_star should return a boolean."""
         jd = 2451545.0
-        result = ephem.is_evening_star(jd, SE_VENUS)
+        result = ephem.is_evening_star(jd, VENUS)
         assert isinstance(result, bool)
 
     @pytest.mark.unit
     def test_get_elongation_type_returns_string(self):
         """get_elongation_type should return 'eastern', 'western', or 'none'."""
         jd = 2451545.0
-        result = ephem.get_elongation_type(jd, SE_VENUS)
+        result = ephem.get_elongation_type(jd, VENUS)
         assert result in ("eastern", "western", "none")
 
     @pytest.mark.unit
     def test_morning_evening_mutually_exclusive(self):
         """A planet cannot be both morning star and evening star at same time."""
         jd = 2451545.0
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
+        for planet_id in [MERCURY, VENUS, MARS, JUPITER]:
             is_morning = ephem.is_morning_star(jd, planet_id)
             is_evening = ephem.is_evening_star(jd, planet_id)
             assert is_morning != is_evening, (
@@ -1794,7 +1794,7 @@ class TestElongationHelpers:
     def test_signed_elongation_range(self):
         """Signed elongation should be between -180 and +180 degrees."""
         jd = 2451545.0
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+        for planet_id in [MERCURY, VENUS, MARS, JUPITER, SATURN]:
             elong = ephem.get_signed_elongation(jd, planet_id)
             assert -180.0 <= elong <= 180.0, (
                 f"Planet {planet_id} signed elongation {elong} out of range"
@@ -1802,9 +1802,9 @@ class TestElongationHelpers:
 
     @pytest.mark.unit
     def test_absolute_elongation_matches_pheno(self):
-        """Absolute value of signed elongation should match swe_pheno_ut result."""
+        """Absolute value of signed elongation should match pheno_ut result."""
         jd = 2451545.0
-        for planet_id in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]:
+        for planet_id in [MERCURY, VENUS, MARS, JUPITER, SATURN]:
             signed_elong = ephem.get_signed_elongation(jd, planet_id)
             pheno_attr = ephem.pheno_ut(jd, planet_id, 0)
             pheno_elong = pheno_attr[2]
@@ -1821,24 +1821,24 @@ class TestElongationHelpers:
     def test_sun_elongation_type_is_none(self):
         """Sun should return 'none' for elongation type."""
         jd = 2451545.0
-        assert ephem.get_elongation_type(jd, SE_SUN) == "none"
+        assert ephem.get_elongation_type(jd, SUN) == "none"
 
     @pytest.mark.unit
     def test_sun_is_not_morning_or_evening_star(self):
         """Sun cannot be morning or evening star."""
         jd = 2451545.0
-        assert not ephem.is_morning_star(jd, SE_SUN)
-        assert not ephem.is_evening_star(jd, SE_SUN)
+        assert not ephem.is_morning_star(jd, SUN)
+        assert not ephem.is_evening_star(jd, SUN)
 
     @pytest.mark.comparison
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_signed_elongation_matches_swe_positions(self, planet_id, planet_name):
@@ -1850,7 +1850,7 @@ class TestElongationHelpers:
 
         # Calculate expected elongation from Swiss Ephemeris positions
         pos_planet = swe.calc_ut(jd, planet_id, 0)[0][0]
-        pos_sun = swe.calc_ut(jd, 0, 0)[0][0]  # SE_SUN = 0
+        pos_sun = swe.calc_ut(jd, 0, 0)[0][0]  # SUN = 0
 
         expected_diff = pos_planet - pos_sun
         if expected_diff > 180.0:
@@ -1882,7 +1882,7 @@ class TestElongationHelpers:
 
         for i in range(0, 365, 10):  # Check over a year
             jd = jd_start + i
-            is_morning = ephem.is_morning_star(jd, SE_VENUS)
+            is_morning = ephem.is_morning_star(jd, VENUS)
             if is_morning:
                 morning_found = True
             else:
@@ -1905,11 +1905,11 @@ class TestElongationHelpers:
         jd_start = 2460000.0
 
         transition_count = 0
-        prev_is_evening = ephem.is_evening_star(jd_start, SE_MERCURY)
+        prev_is_evening = ephem.is_evening_star(jd_start, MERCURY)
 
         for i in range(1, 365):  # Check over a year
             jd = jd_start + i
-            is_evening = ephem.is_evening_star(jd, SE_MERCURY)
+            is_evening = ephem.is_evening_star(jd, MERCURY)
             if is_evening != prev_is_evening:
                 transition_count += 1
                 prev_is_evening = is_evening
@@ -1929,12 +1929,12 @@ class TestElongationHelpers:
         # Check over a range to find an evening star configuration
         for delta in range(0, 200, 10):
             test_jd = jd + delta
-            if ephem.is_evening_star(test_jd, SE_VENUS):
-                elong = ephem.get_signed_elongation(test_jd, SE_VENUS)
+            if ephem.is_evening_star(test_jd, VENUS):
+                elong = ephem.get_signed_elongation(test_jd, VENUS)
                 assert elong > 0, (
                     f"Evening star should have positive elongation, got {elong}"
                 )
-                elong_type = ephem.get_elongation_type(test_jd, SE_VENUS)
+                elong_type = ephem.get_elongation_type(test_jd, VENUS)
                 assert elong_type == "eastern", (
                     f"Evening star should have eastern elongation, got {elong_type}"
                 )
@@ -1951,12 +1951,12 @@ class TestElongationHelpers:
         # Check over a range to find a morning star configuration
         for delta in range(0, 200, 10):
             test_jd = jd + delta
-            if ephem.is_morning_star(test_jd, SE_VENUS):
-                elong = ephem.get_signed_elongation(test_jd, SE_VENUS)
+            if ephem.is_morning_star(test_jd, VENUS):
+                elong = ephem.get_signed_elongation(test_jd, VENUS)
                 assert elong < 0, (
                     f"Morning star should have negative elongation, got {elong}"
                 )
-                elong_type = ephem.get_elongation_type(test_jd, SE_VENUS)
+                elong_type = ephem.get_elongation_type(test_jd, VENUS)
                 assert elong_type == "western", (
                     f"Morning star should have western elongation, got {elong_type}"
                 )
@@ -1976,7 +1976,7 @@ class TestElongationHelpers:
             2460000.0,  # 2023
         ]
 
-        planets = [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN]
+        planets = [MERCURY, VENUS, MARS, JUPITER, SATURN]
         swe.set_ephe_path(None)
 
         for jd in test_dates:
@@ -2018,7 +2018,7 @@ class TestElongationHelpers:
 
         for i in range(30):  # One lunar month
             jd = jd_start + i
-            elong = ephem.get_signed_elongation(jd, SE_MOON)
+            elong = ephem.get_signed_elongation(jd, MOON)
             min_elong = min(min_elong, elong)
             max_elong = max(max_elong, elong)
 

@@ -12,24 +12,24 @@ import pytest
 import libephemeris as eph
 from libephemeris.constants import (
     # Body IDs
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_VARUNA,
-    SE_HYGIEA,
-    SE_DAVIDA,
-    SE_INTERAMNIA,
-    SE_BENNU,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    VARUNA,
+    HYGIEA,
+    DAVIDA,
+    INTERAMNIA,
+    BENNU,
     # NAIF IDs
     NAIF_CHIRON,
     NAIF_PHOLUS,
@@ -66,26 +66,26 @@ class TestSpkBodyNameMap:
 
     def test_map_contains_centaurs(self):
         """Map contains centaurs (Chiron, Pholus)."""
-        assert SE_CHIRON in SPK_BODY_NAME_MAP
-        assert SE_PHOLUS in SPK_BODY_NAME_MAP
+        assert CHIRON in SPK_BODY_NAME_MAP
+        assert PHOLUS in SPK_BODY_NAME_MAP
 
     def test_map_contains_main_belt_asteroids(self):
         """Map contains main belt asteroids (Ceres, Pallas, Juno, Vesta)."""
-        assert SE_CERES in SPK_BODY_NAME_MAP
-        assert SE_PALLAS in SPK_BODY_NAME_MAP
-        assert SE_JUNO in SPK_BODY_NAME_MAP
-        assert SE_VESTA in SPK_BODY_NAME_MAP
+        assert CERES in SPK_BODY_NAME_MAP
+        assert PALLAS in SPK_BODY_NAME_MAP
+        assert JUNO in SPK_BODY_NAME_MAP
+        assert VESTA in SPK_BODY_NAME_MAP
 
     def test_map_contains_tnos(self):
         """Map contains trans-Neptunian objects."""
-        assert SE_ERIS in SPK_BODY_NAME_MAP
-        assert SE_SEDNA in SPK_BODY_NAME_MAP
-        assert SE_HAUMEA in SPK_BODY_NAME_MAP
-        assert SE_MAKEMAKE in SPK_BODY_NAME_MAP
-        assert SE_IXION in SPK_BODY_NAME_MAP
-        assert SE_ORCUS in SPK_BODY_NAME_MAP
-        assert SE_QUAOAR in SPK_BODY_NAME_MAP
-        assert SE_VARUNA in SPK_BODY_NAME_MAP
+        assert ERIS in SPK_BODY_NAME_MAP
+        assert SEDNA in SPK_BODY_NAME_MAP
+        assert HAUMEA in SPK_BODY_NAME_MAP
+        assert MAKEMAKE in SPK_BODY_NAME_MAP
+        assert IXION in SPK_BODY_NAME_MAP
+        assert ORCUS in SPK_BODY_NAME_MAP
+        assert QUAOAR in SPK_BODY_NAME_MAP
+        assert VARUNA in SPK_BODY_NAME_MAP
 
     def test_map_values_are_tuples(self):
         """Map values are tuples of (horizons_id, naif_id)."""
@@ -104,12 +104,12 @@ class TestChironMapping:
 
     def test_chiron_horizons_id(self):
         """Chiron's Horizons ID is '2060'."""
-        horizons_id, _ = SPK_BODY_NAME_MAP[SE_CHIRON]
+        horizons_id, _ = SPK_BODY_NAME_MAP[CHIRON]
         assert horizons_id == "2060"
 
     def test_chiron_naif_id(self):
         """Chiron's NAIF ID matches NAIF_CHIRON constant."""
-        _, naif_id = SPK_BODY_NAME_MAP[SE_CHIRON]
+        _, naif_id = SPK_BODY_NAME_MAP[CHIRON]
         assert naif_id == NAIF_CHIRON
         assert naif_id == 2060 + NAIF_ASTEROID_OFFSET
 
@@ -119,26 +119,26 @@ class TestMainBeltAsteroidMappings:
 
     def test_ceres_mapping(self):
         """Ceres mapping uses name syntax to bypass JPL major body index."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_CERES]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[CERES]
         assert horizons_id == "Ceres;"
         assert naif_id == NAIF_CERES
         assert naif_id == 1 + NAIF_ASTEROID_OFFSET
 
     def test_pallas_mapping(self):
         """Pallas mapping uses name syntax to bypass JPL major body index."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_PALLAS]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[PALLAS]
         assert horizons_id == "Pallas;"
         assert naif_id == NAIF_PALLAS
 
     def test_juno_mapping(self):
         """Juno mapping uses name syntax to bypass JPL major body index."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_JUNO]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[JUNO]
         assert horizons_id == "Juno;"
         assert naif_id == NAIF_JUNO
 
     def test_vesta_mapping(self):
         """Vesta mapping uses name syntax to bypass JPL major body index."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_VESTA]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[VESTA]
         assert horizons_id == "Vesta;"
         assert naif_id == NAIF_VESTA
 
@@ -148,38 +148,38 @@ class TestTnoMappings:
 
     def test_eris_mapping(self):
         """Eris mapping is correct (asteroid #136199)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_ERIS]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[ERIS]
         assert horizons_id == "136199"
         assert naif_id == NAIF_ERIS
         assert naif_id == 136199 + NAIF_ASTEROID_OFFSET
 
     def test_sedna_mapping(self):
         """Sedna mapping is correct (asteroid #90377)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_SEDNA]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[SEDNA]
         assert horizons_id == "90377"
         assert naif_id == NAIF_SEDNA
 
     def test_haumea_mapping(self):
         """Haumea mapping is correct (asteroid #136108)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_HAUMEA]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[HAUMEA]
         assert horizons_id == "136108"
         assert naif_id == NAIF_HAUMEA
 
     def test_makemake_mapping(self):
         """Makemake mapping is correct (asteroid #136472)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_MAKEMAKE]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[MAKEMAKE]
         assert horizons_id == "136472"
         assert naif_id == NAIF_MAKEMAKE
 
     def test_quaoar_mapping(self):
         """Quaoar mapping is correct (asteroid #50000)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_QUAOAR]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[QUAOAR]
         assert horizons_id == "50000"
         assert naif_id == NAIF_QUAOAR
 
     def test_varuna_mapping(self):
         """Varuna mapping is correct (asteroid #20000)."""
-        horizons_id, naif_id = SPK_BODY_NAME_MAP[SE_VARUNA]
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[VARUNA]
         assert horizons_id == "20000"
         assert naif_id == 20000 + NAIF_ASTEROID_OFFSET
 
@@ -189,15 +189,15 @@ class TestGetHorizonsId:
 
     def test_get_horizons_id_chiron(self):
         """get_horizons_id returns '2060' for Chiron."""
-        assert get_horizons_id(SE_CHIRON) == "2060"
+        assert get_horizons_id(CHIRON) == "2060"
 
     def test_get_horizons_id_eris(self):
         """get_horizons_id returns '136199' for Eris."""
-        assert get_horizons_id(SE_ERIS) == "136199"
+        assert get_horizons_id(ERIS) == "136199"
 
     def test_get_horizons_id_ceres(self):
         """get_horizons_id returns 'Ceres;' for Ceres (name syntax)."""
-        assert get_horizons_id(SE_CERES) == "Ceres;"
+        assert get_horizons_id(CERES) == "Ceres;"
 
     def test_get_horizons_id_unknown(self):
         """get_horizons_id returns None for unknown body ID."""
@@ -216,15 +216,15 @@ class TestGetNaifIdFromIpl:
 
     def test_get_naif_id_chiron(self):
         """get_naif_id_from_ipl returns NAIF_CHIRON for Chiron."""
-        assert get_naif_id_from_ipl(SE_CHIRON) == NAIF_CHIRON
+        assert get_naif_id_from_ipl(CHIRON) == NAIF_CHIRON
 
     def test_get_naif_id_eris(self):
         """get_naif_id_from_ipl returns NAIF_ERIS for Eris."""
-        assert get_naif_id_from_ipl(SE_ERIS) == NAIF_ERIS
+        assert get_naif_id_from_ipl(ERIS) == NAIF_ERIS
 
     def test_get_naif_id_ceres(self):
         """get_naif_id_from_ipl returns NAIF_CERES for Ceres."""
-        assert get_naif_id_from_ipl(SE_CERES) == NAIF_CERES
+        assert get_naif_id_from_ipl(CERES) == NAIF_CERES
 
     def test_get_naif_id_unknown(self):
         """get_naif_id_from_ipl returns None for unknown body ID."""
@@ -245,12 +245,12 @@ class TestGetSpkBodyInfoFromMap:
 
     def test_get_info_chiron(self):
         """get_spk_body_info_from_map returns correct tuple for Chiron."""
-        result = get_spk_body_info_from_map(SE_CHIRON)
+        result = get_spk_body_info_from_map(CHIRON)
         assert result == ("2060", NAIF_CHIRON)
 
     def test_get_info_eris(self):
         """get_spk_body_info_from_map returns correct tuple for Eris."""
-        result = get_spk_body_info_from_map(SE_ERIS)
+        result = get_spk_body_info_from_map(ERIS)
         assert result == ("136199", NAIF_ERIS)
 
     def test_get_info_unknown(self):
@@ -273,19 +273,19 @@ class TestNaifIdConsistency:
     @pytest.mark.parametrize(
         "ipl,naif_constant",
         [
-            (SE_CHIRON, NAIF_CHIRON),
-            (SE_PHOLUS, NAIF_PHOLUS),
-            (SE_CERES, NAIF_CERES),
-            (SE_PALLAS, NAIF_PALLAS),
-            (SE_JUNO, NAIF_JUNO),
-            (SE_VESTA, NAIF_VESTA),
-            (SE_ERIS, NAIF_ERIS),
-            (SE_SEDNA, NAIF_SEDNA),
-            (SE_HAUMEA, NAIF_HAUMEA),
-            (SE_MAKEMAKE, NAIF_MAKEMAKE),
-            (SE_IXION, NAIF_IXION),
-            (SE_ORCUS, NAIF_ORCUS),
-            (SE_QUAOAR, NAIF_QUAOAR),
+            (CHIRON, NAIF_CHIRON),
+            (PHOLUS, NAIF_PHOLUS),
+            (CERES, NAIF_CERES),
+            (PALLAS, NAIF_PALLAS),
+            (JUNO, NAIF_JUNO),
+            (VESTA, NAIF_VESTA),
+            (ERIS, NAIF_ERIS),
+            (SEDNA, NAIF_SEDNA),
+            (HAUMEA, NAIF_HAUMEA),
+            (MAKEMAKE, NAIF_MAKEMAKE),
+            (IXION, NAIF_IXION),
+            (ORCUS, NAIF_ORCUS),
+            (QUAOAR, NAIF_QUAOAR),
         ],
     )
     def test_naif_id_matches_constant(self, ipl, naif_constant):
@@ -305,31 +305,31 @@ class TestModuleExports:
     def test_get_horizons_id_exported(self):
         """get_horizons_id is exported from libephemeris."""
         assert hasattr(eph, "get_horizons_id")
-        assert eph.get_horizons_id(SE_CHIRON) == "2060"
+        assert eph.get_horizons_id(CHIRON) == "2060"
 
     def test_get_naif_id_from_ipl_exported(self):
         """get_naif_id_from_ipl is exported from libephemeris."""
         assert hasattr(eph, "get_naif_id_from_ipl")
-        assert eph.get_naif_id_from_ipl(SE_CHIRON) == NAIF_CHIRON
+        assert eph.get_naif_id_from_ipl(CHIRON) == NAIF_CHIRON
 
     def test_get_spk_body_info_from_map_exported(self):
         """get_spk_body_info_from_map is exported from libephemeris."""
         assert hasattr(eph, "get_spk_body_info_from_map")
-        assert eph.get_spk_body_info_from_map(SE_CHIRON) == ("2060", NAIF_CHIRON)
+        assert eph.get_spk_body_info_from_map(CHIRON) == ("2060", NAIF_CHIRON)
 
 
 class TestHorizonsIdFormat:
     """Test that Horizons IDs are in the expected format for JPL Horizons API."""
 
     _MAJOR_BODY_INDEX_ASTEROIDS = {
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
-        SE_HYGIEA,
-        SE_DAVIDA,
-        SE_INTERAMNIA,
-        SE_BENNU,
+        CERES,
+        PALLAS,
+        JUNO,
+        VESTA,
+        HYGIEA,
+        DAVIDA,
+        INTERAMNIA,
+        BENNU,
     }
 
     def test_horizons_ids_are_numeric_strings(self):
@@ -352,20 +352,20 @@ class TestHorizonsIdFormat:
     def test_horizons_ids_match_asteroid_numbers(self):
         """Horizons IDs match expected asteroid catalog numbers or name syntax."""
         expected = {
-            SE_CHIRON: "2060",  # 2060 Chiron
-            SE_PHOLUS: "5145",  # 5145 Pholus
-            SE_CERES: "Ceres;",  # 1 Ceres (name syntax)
-            SE_PALLAS: "Pallas;",  # 2 Pallas (name syntax)
-            SE_JUNO: "Juno;",  # 3 Juno (name syntax)
-            SE_VESTA: "Vesta;",  # 4 Vesta (name syntax)
-            SE_ERIS: "136199",  # 136199 Eris
-            SE_SEDNA: "90377",  # 90377 Sedna
-            SE_HAUMEA: "136108",  # 136108 Haumea
-            SE_MAKEMAKE: "136472",  # 136472 Makemake
-            SE_IXION: "28978",  # 28978 Ixion
-            SE_ORCUS: "90482",  # 90482 Orcus
-            SE_QUAOAR: "50000",  # 50000 Quaoar
-            SE_VARUNA: "20000",  # 20000 Varuna
+            CHIRON: "2060",  # 2060 Chiron
+            PHOLUS: "5145",  # 5145 Pholus
+            CERES: "Ceres;",  # 1 Ceres (name syntax)
+            PALLAS: "Pallas;",  # 2 Pallas (name syntax)
+            JUNO: "Juno;",  # 3 Juno (name syntax)
+            VESTA: "Vesta;",  # 4 Vesta (name syntax)
+            ERIS: "136199",  # 136199 Eris
+            SEDNA: "90377",  # 90377 Sedna
+            HAUMEA: "136108",  # 136108 Haumea
+            MAKEMAKE: "136472",  # 136472 Makemake
+            IXION: "28978",  # 28978 Ixion
+            ORCUS: "90482",  # 90482 Orcus
+            QUAOAR: "50000",  # 50000 Quaoar
+            VARUNA: "20000",  # 20000 Varuna
         }
         for ipl, expected_id in expected.items():
             horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
@@ -379,8 +379,8 @@ class TestSpkAutoDownloadBlocked:
 
     def test_bennu_is_blocked(self):
         """Bennu is in the blocked set."""
-        assert SE_BENNU in SPK_AUTO_DOWNLOAD_BLOCKED
-        assert is_spk_auto_download_blocked(SE_BENNU)
+        assert BENNU in SPK_AUTO_DOWNLOAD_BLOCKED
+        assert is_spk_auto_download_blocked(BENNU)
 
     def test_blocked_bodies_are_in_name_map(self):
         """All blocked bodies must also be in SPK_BODY_NAME_MAP."""
@@ -412,7 +412,7 @@ class TestSpkAutoDownloadBlocked:
 
     def test_non_blocked_body_returns_false(self):
         """Non-blocked body returns False from helper."""
-        assert not is_spk_auto_download_blocked(SE_CHIRON)
+        assert not is_spk_auto_download_blocked(CHIRON)
 
     def test_exported_from_package(self):
         """SPK_AUTO_DOWNLOAD_BLOCKED is exported from libephemeris."""

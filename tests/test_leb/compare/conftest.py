@@ -22,7 +22,7 @@ from typing import Any, Callable, Generator
 import pytest
 
 import libephemeris as ephem
-from libephemeris.time_utils import swe_julday
+from libephemeris.time_utils import julday
 
 
 # =============================================================================
@@ -258,7 +258,7 @@ def generate_test_dates(
 
 def year_to_jd(year: int) -> float:
     """Convert a year to Julian Day (January 1.0)."""
-    return swe_julday(year, 1, 1, 0.0)
+    return julday(year, 1, 1, 0.0)
 
 
 def leb_file_path(tier: str) -> str:

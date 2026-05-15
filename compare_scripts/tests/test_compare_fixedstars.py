@@ -105,7 +105,7 @@ class TestFixedStarVelocity:
 
         try:
             result_swe = swe.fixstar_ut(star_name, jd, swe.FLG_SPEED)
-            result_py = ephem.fixstar_ut(star_name, jd, 256)  # SEFLG_SPEED
+            result_py = ephem.fixstar_ut(star_name, jd, 256)  # FLG_SPEED
         except Exception as e:
             pytest.skip(f"Star {star_name} not available: {e}")
             return

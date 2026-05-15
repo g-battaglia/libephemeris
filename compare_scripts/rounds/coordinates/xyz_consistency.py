@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 85: XYZ Output Consistency
 
-Tests SEFLG_XYZ flag which outputs cartesian coordinates (X, Y, Z) instead of
+Tests FLG_XYZ flag which outputs cartesian coordinates (X, Y, Z) instead of
 (lon, lat, dist). Verifies all planets across multiple dates and flag combos.
 """
 
@@ -17,19 +17,22 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SWIEPH = 2
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SEFLG_XYZ = 4096
+FLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+FLG_XYZ = 4096
 
 print("=" * 70)
 print("ROUND 85: XYZ Output Consistency")
@@ -68,13 +71,13 @@ def check_xyz(label, se, le, tol_au=0.0001):
 # P1: Geocentric ecliptic XYZ
 # ============================================================
 print("\n=== P1: Geocentric ecliptic XYZ ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ
+flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ
 for body_id, name in bodies:
     for year, jd in test_jds:
         label = f"{name} {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             check_xyz(label, se, le)
         except Exception as e:
             errors += 1
@@ -86,13 +89,13 @@ print(f"  After P1: {passed} passed, {failed} failed, {errors} errors")
 # P2: Heliocentric XYZ
 # ============================================================
 print("\n=== P2: Heliocentric XYZ ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ | SEFLG_HELCTR
+flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ | FLG_HELCTR
 for body_id, name in bodies[1:]:  # Skip Sun
     for year, jd in test_jds:
         label = f"{name} helio {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             check_xyz(label, se, le)
         except Exception as e:
             errors += 1
@@ -102,13 +105,13 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 # P3: J2000 XYZ
 # ============================================================
 print("\n=== P3: J2000 ecliptic XYZ ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ | SEFLG_J2000 | SEFLG_NONUT
+flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ | FLG_J2000 | FLG_NONUT
 for body_id, name in bodies:
     for year, jd in test_jds:
         label = f"{name} J2000 {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             check_xyz(label, se, le)
         except Exception as e:
             errors += 1
@@ -118,7 +121,7 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 # P4: Equatorial XYZ
 # ============================================================
 print("\n=== P4: Equatorial XYZ ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ | SEFLG_EQUATORIAL
+flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ | FLG_EQUATORIAL
 for body_id, name in [
     (swe.SUN, "Sun"),
     (swe.MOON, "Moon"),
@@ -130,7 +133,7 @@ for body_id, name in [
         label = f"{name} eq {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             check_xyz(label, se, le)
         except Exception as e:
             errors += 1
@@ -140,7 +143,7 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 # P5: XYZ speeds (velocity components)
 # ============================================================
 print("\n=== P5: XYZ velocity components ===")
-flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ
+flags = FLG_SWIEPH | FLG_SPEED | FLG_XYZ
 for body_id, name in [
     (swe.SUN, "Sun"),
     (swe.MOON, "Moon"),
@@ -151,7 +154,7 @@ for body_id, name in [
         label = f"{name} vel {year}"
         try:
             se = swe.calc_ut(jd, body_id, flags)
-            le = ephem.swe_calc_ut(jd, body_id, flags)
+            le = ephem.calc_ut(jd, body_id, flags)
             for i, axis in enumerate(["vX", "vY", "vZ"]):
                 diff = abs(se[0][3 + i] - le[0][3 + i])
                 if diff < 0.0001:  # AU/day
@@ -174,11 +177,11 @@ for body_id, name in [(swe.SUN, "Sun"), (swe.MOON, "Moon"), (swe.MARS, "Mars")]:
         label = f"{name} dist_check {year}"
         try:
             # Get spherical
-            le_sph = ephem.swe_calc_ut(jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED)
+            le_sph = ephem.calc_ut(jd, body_id, FLG_SWIEPH | FLG_SPEED)
             dist_sph = le_sph[0][2]
             # Get XYZ
-            le_xyz = ephem.swe_calc_ut(
-                jd, body_id, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_XYZ
+            le_xyz = ephem.calc_ut(
+                jd, body_id, FLG_SWIEPH | FLG_SPEED | FLG_XYZ
             )
             dist_xyz = math.sqrt(
                 le_xyz[0][0] ** 2 + le_xyz[0][1] ** 2 + le_xyz[0][2] ** 2

@@ -11,10 +11,10 @@ The expected precision is <0.01" (arcseconds) at all epochs from 1900-2100.
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
-    SE_SIDM_KRISHNAMURTI,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
+    SIDM_KRISHNAMURTI,
 )
 
 
@@ -30,21 +30,21 @@ class TestAyanamsaPrecession:
     # Format: (JD, sid_mode, expected_ayanamsa)
     REFERENCE_VALUES = [
         # Lahiri
-        (JD_J1900, SE_SIDM_LAHIRI, 22.46051148),
-        (JD_J2000, SE_SIDM_LAHIRI, 23.85709235),
-        (JD_J2100, SE_SIDM_LAHIRI, 25.25428740),
+        (JD_J1900, SIDM_LAHIRI, 22.46051148),
+        (JD_J2000, SIDM_LAHIRI, 23.85709235),
+        (JD_J2100, SIDM_LAHIRI, 25.25428740),
         # Fagan-Bradley
-        (JD_J1900, SE_SIDM_FAGAN_BRADLEY, 23.34371910),
-        (JD_J2000, SE_SIDM_FAGAN_BRADLEY, 24.74029999),
-        (JD_J2100, SE_SIDM_FAGAN_BRADLEY, 26.13749505),
+        (JD_J1900, SIDM_FAGAN_BRADLEY, 23.34371910),
+        (JD_J2000, SIDM_FAGAN_BRADLEY, 24.74029999),
+        (JD_J2100, SIDM_FAGAN_BRADLEY, 26.13749505),
         # Raman - actual Swiss Eph values
-        (JD_J1900, SE_SIDM_RAMAN, 21.01421001),
-        (JD_J2000, SE_SIDM_RAMAN, 22.41079104),
-        (JD_J2100, SE_SIDM_RAMAN, 23.80798618),
+        (JD_J1900, SIDM_RAMAN, 21.01421001),
+        (JD_J2000, SIDM_RAMAN, 22.41079104),
+        (JD_J2100, SIDM_RAMAN, 23.80798618),
         # Krishnamurti - actual Swiss Eph values
-        (JD_J1900, SE_SIDM_KRISHNAMURTI, 22.36365901),
-        (JD_J2000, SE_SIDM_KRISHNAMURTI, 23.76024004),
-        (JD_J2100, SE_SIDM_KRISHNAMURTI, 25.15743518),
+        (JD_J1900, SIDM_KRISHNAMURTI, 22.36365901),
+        (JD_J2000, SIDM_KRISHNAMURTI, 23.76024004),
+        (JD_J2100, SIDM_KRISHNAMURTI, 25.15743518),
     ]
 
     @pytest.mark.unit
@@ -56,8 +56,8 @@ class TestAyanamsaPrecession:
         This tests the IAU 2006 precession model implementation with both
         linear rate (5028.796273"/century) and quadratic term (1.105608"/century²).
         """
-        ephem.swe_set_sid_mode(sid_mode)
-        ayan = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(sid_mode)
+        ayan = ephem.get_ayanamsa_ut(jd)
 
         # Tolerance: 0.01 arcseconds = 0.01/3600 degrees ≈ 0.0000028 degrees
         tolerance_arcsec = 0.01
@@ -80,10 +80,10 @@ class TestAyanamsaPrecession:
         The IAU 2006 precession model gives ~5028.8"/century at J2000,
         which is 1.39689°/century.
         """
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ayan_2000 = ephem.swe_get_ayanamsa_ut(self.JD_J2000)
-        ayan_2100 = ephem.swe_get_ayanamsa_ut(self.JD_J2100)
+        ayan_2000 = ephem.get_ayanamsa_ut(self.JD_J2000)
+        ayan_2100 = ephem.get_ayanamsa_ut(self.JD_J2100)
 
         rate = ayan_2100 - ayan_2000  # degrees per century
 
@@ -103,11 +103,11 @@ class TestAyanamsaPrecession:
 
         From 1900-2000, rate should be slightly less than from 2000-2100.
         """
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        ayan_1900 = ephem.swe_get_ayanamsa_ut(self.JD_J1900)
-        ayan_2000 = ephem.swe_get_ayanamsa_ut(self.JD_J2000)
-        ayan_2100 = ephem.swe_get_ayanamsa_ut(self.JD_J2100)
+        ayan_1900 = ephem.get_ayanamsa_ut(self.JD_J1900)
+        ayan_2000 = ephem.get_ayanamsa_ut(self.JD_J2000)
+        ayan_2100 = ephem.get_ayanamsa_ut(self.JD_J2100)
 
         rate_1900_2000 = ayan_2000 - ayan_1900
         rate_2000_2100 = ayan_2100 - ayan_2000

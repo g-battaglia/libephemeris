@@ -21,10 +21,10 @@ from libephemeris import (
     calc_eclipse_second_contact_c2,
     calc_eclipse_first_contact_c1,
     sol_eclipse_when_glob,
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
 )
 
 pytestmark = pytest.mark.slow
@@ -49,7 +49,7 @@ class TestEclipseSecondContactC2BasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total eclipse maximum (C2 exists for total eclipses)
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_eclipse_second_contact_c2(jd_max)
@@ -59,10 +59,10 @@ class TestEclipseSecondContactC2BasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
-        result = calc_eclipse_second_contact_c2(jd_max, flags=SEFLG_SWIEPH)
+        result = calc_eclipse_second_contact_c2(jd_max, flags=FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -84,7 +84,7 @@ class TestEclipseSecondContactC2TimingPrecision:
         We allow 300 seconds (5 minute) tolerance to account for these factors.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -116,7 +116,7 @@ class TestEclipseSecondContactC2TimingPrecision:
         C2 marks when annularity begins (antumbral shadow touches Earth).
         """
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -170,7 +170,7 @@ class TestEclipseSecondContactC2ConsistencyWithSolEclipseWhenGlob:
         Our dedicated C2 function should produce the same result.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max = times[0]
         jd_second_glob = times[
@@ -191,9 +191,9 @@ class TestEclipseSecondContactC2ConsistencyWithSolEclipseWhenGlob:
         """Test C2 calculation consistency across multiple central eclipses."""
         # Test several eclipses (only central eclipses have C2)
         eclipse_starts = [
-            (julday(2023, 9, 1, 0.0), SE_ECL_ANNULAR),  # Oct 2023 annular
-            (julday(2024, 1, 1, 0.0), SE_ECL_TOTAL),  # Apr 2024 total
-            (julday(2025, 1, 1, 0.0), SE_ECL_TOTAL),  # Future eclipse
+            (julday(2023, 9, 1, 0.0), ECL_ANNULAR),  # Oct 2023 annular
+            (julday(2024, 1, 1, 0.0), ECL_TOTAL),  # Apr 2024 total
+            (julday(2025, 1, 1, 0.0), ECL_TOTAL),  # Future eclipse
         ]
 
         for jd_start, ecl_type in eclipse_starts:
@@ -217,7 +217,7 @@ class TestEclipseSecondContactC2PhysicalProperties:
     def test_c2_is_before_maximum(self):
         """Test that C2 is always before eclipse maximum."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -230,7 +230,7 @@ class TestEclipseSecondContactC2PhysicalProperties:
     def test_c2_is_after_c1(self):
         """Test that C2 is always after C1 (first contact)."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -245,7 +245,7 @@ class TestEclipseSecondContactC2PhysicalProperties:
         is typically 0.3-1.5 hours, depending on the eclipse geometry.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -261,7 +261,7 @@ class TestEclipseSecondContactC2PhysicalProperties:
     def test_c2_returns_nonzero_for_central_eclipse(self):
         """Test that C2 returns a non-zero value for central eclipses."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -290,7 +290,7 @@ class TestEclipseSecondContactC2PartialEclipses:
 
         # Get a total eclipse and verify C2 exists (baseline)
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
@@ -304,7 +304,7 @@ class TestEclipseSecondContactC2PartialEclipses:
     def test_c1_c2_order(self):
         """Test that contacts occur in correct order: C1 < C2 < max."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max = times[0]
         jd_c1 = calc_eclipse_first_contact_c1(jd_max)
@@ -318,7 +318,7 @@ class TestEclipseSecondContactC2PartialEclipses:
     def test_c2_for_annular_eclipse(self):
         """Test C2 calculation for annular eclipse (antumbral shadow)."""
         jd_start = julday(2023, 9, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
         jd_max = times[0]
 
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)

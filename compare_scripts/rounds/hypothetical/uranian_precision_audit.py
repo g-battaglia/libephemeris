@@ -3,8 +3,12 @@
 from __future__ import annotations
 import swisseph as swe
 import libephemeris as ephem
+import os
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = [
     (40, swe.CUPIDO, "Cupido"),
@@ -54,7 +58,7 @@ for body_le, body_se, name in BODIES:
             print(f"  SE skip {y}: {e}")
             continue
         try:
-            pos_le, _ = ephem.swe_calc_ut(jd, body_le, 256)  # SEFLG_SPEED
+            pos_le, _ = ephem.calc_ut(jd, body_le, 256)  # FLG_SPEED
         except Exception as e:
             print(f"  LE skip {y}: {e}")
             continue

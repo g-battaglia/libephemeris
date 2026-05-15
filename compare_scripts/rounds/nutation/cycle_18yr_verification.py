@@ -7,6 +7,7 @@ across a full 18.6-year lunar nodal regression cycle.
 
 from __future__ import annotations
 import sys, os, time, math
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -14,11 +15,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_NONUT = 64
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_NONUT = 64
 
 # Sample every 30 days over 20 years (covers one full 18.6-year cycle)
 EPOCHS = [2451545.0 + i * 30.0 for i in range(243)]
@@ -40,7 +44,7 @@ def run_tests():
     print("=" * 80)
 
     # =========================================================================
-    # PART 1: Nutation angles (dpsi, deps) from SE_ECL_NUT
+    # PART 1: Nutation angles (dpsi, deps) from ECL_NUT
     # =========================================================================
     print("\n--- PART 1: Nutation Angles (dpsi, deps) ---")
     p1_pass = 0
@@ -50,8 +54,8 @@ def run_tests():
 
     for jd in EPOCHS:
         total += 1
-        se_nut = swe.calc_ut(jd, -1, SEFLG_SWIEPH)[0]  # SE_ECL_NUT
-        le_nut = ephem.swe_calc_ut(jd, -1, SEFLG_SWIEPH)[0]
+        se_nut = swe.calc_ut(jd, -1, FLG_SWIEPH)[0]  # ECL_NUT
+        le_nut = ephem.calc_ut(jd, -1, FLG_SWIEPH)[0]
 
         # se_nut: (true_obl, mean_obl, dpsi, deps, 0, 0)
         ddpsi = abs(se_nut[2] - le_nut[2]) * 3600  # arcsec
@@ -86,8 +90,8 @@ def run_tests():
 
     for jd in EPOCHS:
         total += 1
-        se_nut = swe.calc_ut(jd, -1, SEFLG_SWIEPH)[0]
-        le_nut = ephem.swe_calc_ut(jd, -1, SEFLG_SWIEPH)[0]
+        se_nut = swe.calc_ut(jd, -1, FLG_SWIEPH)[0]
+        le_nut = ephem.calc_ut(jd, -1, FLG_SWIEPH)[0]
 
         d_true = abs(se_nut[0] - le_nut[0]) * 3600
         d_mean = abs(se_nut[1] - le_nut[1]) * 3600
@@ -111,13 +115,13 @@ def run_tests():
 
     for jd in EPOCHS:
         total += 1
-        flags_nut = SEFLG_SWIEPH | SEFLG_SPEED
-        flags_nonut = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT
+        flags_nut = FLG_SWIEPH | FLG_SPEED
+        flags_nonut = FLG_SWIEPH | FLG_SPEED | FLG_NONUT
 
         se_nut_pos = swe.calc_ut(jd, 0, flags_nut)[0]
         se_nonut_pos = swe.calc_ut(jd, 0, flags_nonut)[0]
-        le_nut_pos = ephem.swe_calc_ut(jd, 0, flags_nut)[0]
-        le_nonut_pos = ephem.swe_calc_ut(jd, 0, flags_nonut)[0]
+        le_nut_pos = ephem.calc_ut(jd, 0, flags_nut)[0]
+        le_nonut_pos = ephem.calc_ut(jd, 0, flags_nonut)[0]
 
         # Nutation effect in longitude
         se_nut_effect = (se_nut_pos[0] - se_nonut_pos[0]) * 3600
@@ -148,13 +152,13 @@ def run_tests():
 
     for jd in EPOCHS:
         total += 1
-        flags_nut = SEFLG_SWIEPH | SEFLG_SPEED
-        flags_nonut = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT
+        flags_nut = FLG_SWIEPH | FLG_SPEED
+        flags_nonut = FLG_SWIEPH | FLG_SPEED | FLG_NONUT
 
         se_nut_pos = swe.calc_ut(jd, 1, flags_nut)[0]
         se_nonut_pos = swe.calc_ut(jd, 1, flags_nonut)[0]
-        le_nut_pos = ephem.swe_calc_ut(jd, 1, flags_nut)[0]
-        le_nonut_pos = ephem.swe_calc_ut(jd, 1, flags_nonut)[0]
+        le_nut_pos = ephem.calc_ut(jd, 1, flags_nut)[0]
+        le_nonut_pos = ephem.calc_ut(jd, 1, flags_nonut)[0]
 
         se_nut_effect = (se_nut_pos[0] - se_nonut_pos[0]) * 3600
         le_nut_effect = (le_nut_pos[0] - le_nonut_pos[0]) * 3600
@@ -186,7 +190,7 @@ def run_tests():
 
     for jd in EPOCHS:
         total += 1
-        le_nut = ephem.swe_calc_ut(jd, -1, SEFLG_SWIEPH)[0]
+        le_nut = ephem.calc_ut(jd, -1, FLG_SWIEPH)[0]
         dpsi = le_nut[2] * 3600  # arcsec
 
         le_dpsi_min = min(le_dpsi_min, dpsi)

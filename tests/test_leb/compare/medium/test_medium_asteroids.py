@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
@@ -41,8 +41,8 @@ class TestMediumAsteroidPrecision:
 
         for jd in dates:
             try:
-                ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-                leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+                ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+                leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
             except (KeyError, ValueError, EphemerisRangeError):
                 continue
 

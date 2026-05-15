@@ -16,7 +16,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -106,7 +109,7 @@ def test_fine_latitude_sweep():
         for lat in LATITUDES:
             for lon in LONGITUDES[::3]:  # every 3rd longitude for speed
                 try:
-                    le_r = ephem.swe_houses_ex2(JD, float(lat), float(lon), le_hsys, 0)
+                    le_r = ephem.houses_ex2(JD, float(lat), float(lon), le_hsys, 0)
                     le_cusps = le_r[0]
                 except Exception as e:
                     continue
@@ -130,7 +133,7 @@ def test_ascmc_fine():
     for lat in range(-66, 67, 2):
         for lon in [0, 90, 180, 270]:
             try:
-                le_r = ephem.swe_houses_ex2(JD, float(lat), float(lon), ord("P"), 0)
+                le_r = ephem.houses_ex2(JD, float(lat), float(lon), ord("P"), 0)
                 le_ascmc = le_r[1]
 
                 se_r = swe.houses_ex(JD, float(lat), float(lon), b"P")
@@ -184,7 +187,7 @@ def test_armc_sweep():
         for lat in [-45, 0, 30, 52, 66]:
             eps = 23.4393  # approximate obliquity
             try:
-                le_r = ephem.swe_houses_armc_ex2(
+                le_r = ephem.houses_armc_ex2(
                     float(armc), float(lat), eps, ord("P"), 0
                 )
                 le_cusps = le_r[0]

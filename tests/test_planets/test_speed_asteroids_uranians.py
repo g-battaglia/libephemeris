@@ -13,20 +13,20 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -64,13 +64,13 @@ def _numerical_speed(body, jd, flags, component=0):
 class TestAsteroidSpeedConsistency:
     """Test speed consistency for main asteroids."""
 
-    ASTEROIDS = [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]
+    ASTEROIDS = [CHIRON, CERES, PALLAS, JUNO, VESTA]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", ASTEROIDS)
     def test_lon_speed(self, body):
         """Asteroid longitude speed matches numerical derivative."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         returned = pos[3]
         numerical = _numerical_speed(body, JD_J2000, flags, 0)
@@ -82,7 +82,7 @@ class TestAsteroidSpeedConsistency:
     @pytest.mark.parametrize("body", ASTEROIDS)
     def test_lat_speed(self, body):
         """Asteroid latitude speed matches numerical derivative."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         returned = pos[4]
         numerical = _numerical_speed(body, JD_J2000, flags, 1)
@@ -94,7 +94,7 @@ class TestAsteroidSpeedConsistency:
     @pytest.mark.parametrize("body", ASTEROIDS)
     def test_dist_speed(self, body):
         """Asteroid distance speed matches numerical derivative."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         returned = pos[5]
         numerical = _numerical_speed(body, JD_J2000, flags, 2)
@@ -106,7 +106,7 @@ class TestAsteroidSpeedConsistency:
     @pytest.mark.parametrize("body", ASTEROIDS)
     def test_speed_magnitude_reasonable(self, body):
         """Asteroid speed magnitude is within physical limits."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         # Asteroids move slower than inner planets
         assert abs(pos[3]) < 1.0, f"Body {body}: lon speed {pos[3]} too fast"
@@ -121,7 +121,7 @@ class TestUranianSpeedConsistency:
     @pytest.mark.parametrize("body", URANIANS)
     def test_lon_speed(self, body):
         """Uranian longitude speed matches numerical derivative."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         returned = pos[3]
         numerical = _numerical_speed(body, JD_J2000, flags, 0)
@@ -133,7 +133,7 @@ class TestUranianSpeedConsistency:
     @pytest.mark.parametrize("body", URANIANS)
     def test_speed_magnitude(self, body):
         """Uranian body speed is within expected range."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         pos, _ = swe.calc_ut(JD_J2000, body, flags)
         # Uranians are very slow-moving (trans-Neptunian orbit periods)
         assert abs(pos[3]) < 0.5, f"Body {body}: lon speed {pos[3]} too fast"
@@ -142,7 +142,7 @@ class TestUranianSpeedConsistency:
     @pytest.mark.parametrize("body", URANIANS)
     def test_speed_at_2020(self, body):
         """Uranian speed also consistent at a different date."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         jd = 2458849.5  # 2020
         pos, _ = swe.calc_ut(jd, body, flags)
         returned = pos[3]

@@ -82,10 +82,13 @@ export LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1
 
 ### 4. Ephemeris Data Files
 
-Some tests require ephemeris data files in `swisseph/ephe/`:
+Some tests require reference ephemeris data files. Point the
+``REF_EPHE_PATH`` environment variable to a directory containing
+the expected datasets:
 
 - `fictitious_orbits.csv` - bundled orbital elements dataset (included in package)
 - Asteroid/TNO data files
+- `seorbel.txt` - orbital elements reference (optional, skipped if missing)
 
 ---
 

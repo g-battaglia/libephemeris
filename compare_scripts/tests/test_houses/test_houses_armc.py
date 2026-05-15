@@ -1,5 +1,5 @@
 """
-Tests for swe_houses_armc function.
+Tests for houses_armc function.
 
 Tests the house calculation from ARMC (Right Ascension of Medium Coeli)
 instead of from Julian Day.
@@ -21,7 +21,7 @@ class TestHousesArmcBasic:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Should have 12 cusps
         assert len(cusps) == 12
@@ -35,7 +35,7 @@ class TestHousesArmcBasic:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         for i, cusp in enumerate(cusps):
             assert 0 <= cusp < 360, f"Cusp {i + 1} = {cusp} out of range"
@@ -47,7 +47,7 @@ class TestHousesArmcBasic:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         assert 0 <= ascmc[0] < 360, f"ASC = {ascmc[0]} out of range"
         assert 0 <= ascmc[1] < 360, f"MC = {ascmc[1]} out of range"
@@ -59,7 +59,7 @@ class TestHousesArmcBasic:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # ascmc[2] is ARMC
         assert abs(ascmc[2] - armc) < 0.001, f"ARMC mismatch: {ascmc[2]} vs {armc}"
@@ -75,7 +75,7 @@ class TestHousesArmcVsPyswisseph:
         lat = 41.9
         eps = 23.43767671605485
 
-        cusps_lib, ascmc_lib = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps_lib, ascmc_lib = ephem.houses_armc(armc, lat, eps, ord("P"))
         cusps_swe, ascmc_swe = swe.houses_armc(armc, lat, eps, b"P")
 
         # Compare ASC
@@ -118,7 +118,7 @@ class TestHousesArmcVsPyswisseph:
         lat = 45.0
         eps = 23.44
 
-        cusps_lib, ascmc_lib = ephem.swe_houses_armc(armc, lat, eps, hsys)
+        cusps_lib, ascmc_lib = ephem.houses_armc(armc, lat, eps, hsys)
         cusps_swe, ascmc_swe = swe.houses_armc(armc, lat, eps, bytes([hsys]))
 
         # Compare ASC
@@ -145,7 +145,7 @@ class TestHousesArmcConsistencyWithHouses:
         lon = 12.5
 
         # First, calculate using houses() to get ARMC and obliquity
-        cusps_houses, ascmc_houses = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_houses, ascmc_houses = ephem.houses(jd, lat, lon, ord("P"))
 
         armc = ascmc_houses[2]  # Get ARMC from houses()
 
@@ -153,7 +153,7 @@ class TestHousesArmcConsistencyWithHouses:
         eps = swe.calc_ut(jd, swe.ECL_NUT)[0][0]
 
         # Now calculate using houses_armc with the same ARMC and obliquity
-        cusps_armc, ascmc_armc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps_armc, ascmc_armc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Compare ASC (might have small differences due to obliquity calc)
         asc_diff = abs(ascmc_houses[0] - ascmc_armc[0])
@@ -179,7 +179,7 @@ class TestHousesArmcEdgeCases:
         lat = 0.0
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         assert 0 <= ascmc[0] < 360
         assert 0 <= ascmc[1] < 360
@@ -191,7 +191,7 @@ class TestHousesArmcEdgeCases:
         armc = 100.0
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Should return valid values (even if approximation)
         assert 0 <= ascmc[0] < 360
@@ -205,12 +205,12 @@ class TestHousesArmcEdgeCases:
 
         # 70° is within the polar circle - Placidus should raise an error
         with pytest.raises(ephem.Error) as exc_info:
-            ephem.swe_houses_armc(armc, 70.0, eps, ord("P"))
+            ephem.houses_armc(armc, 70.0, eps, ord("P"))
 
         assert "polar circle" in str(exc_info.value).lower()
 
         # But Porphyry should work
-        cusps, ascmc = ephem.swe_houses_armc(armc, 70.0, eps, ord("O"))
+        cusps, ascmc = ephem.houses_armc(armc, 70.0, eps, ord("O"))
         assert 0 <= ascmc[0] < 360
 
     @pytest.mark.edge_case
@@ -220,7 +220,7 @@ class TestHousesArmcEdgeCases:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         assert 0 <= ascmc[0] < 360
         assert 0 <= ascmc[1] < 360
@@ -233,7 +233,7 @@ class TestHousesArmcEdgeCases:
         lat = -33.9  # Sydney
         eps = 23.44
 
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         assert 0 <= ascmc[0] < 360
         assert 0 <= ascmc[1] < 360
@@ -245,15 +245,15 @@ class TestHousesArmcEdgeCases:
         eps = 23.44
 
         # Test with ARMC > 360
-        cusps1, ascmc1 = ephem.swe_houses_armc(400.0, lat, eps, ord("P"))
-        cusps2, ascmc2 = ephem.swe_houses_armc(40.0, lat, eps, ord("P"))
+        cusps1, ascmc1 = ephem.houses_armc(400.0, lat, eps, ord("P"))
+        cusps2, ascmc2 = ephem.houses_armc(40.0, lat, eps, ord("P"))
 
         assert abs(ascmc1[0] - ascmc2[0]) < 0.001
         assert abs(ascmc1[1] - ascmc2[1]) < 0.001
 
         # Test with negative ARMC
-        cusps3, ascmc3 = ephem.swe_houses_armc(-40.0, lat, eps, ord("P"))
-        cusps4, ascmc4 = ephem.swe_houses_armc(320.0, lat, eps, ord("P"))
+        cusps3, ascmc3 = ephem.houses_armc(-40.0, lat, eps, ord("P"))
+        cusps4, ascmc4 = ephem.houses_armc(320.0, lat, eps, ord("P"))
 
         assert abs(ascmc3[0] - ascmc4[0]) < 0.001
         assert abs(ascmc3[1] - ascmc4[1]) < 0.001
@@ -275,7 +275,7 @@ class TestHousesArmcAlias:
         eps = 23.4393
 
         # Both should return the same result
-        cusps1, ascmc1 = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps1, ascmc1 = ephem.houses_armc(armc, lat, eps, ord("P"))
         cusps2, ascmc2 = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         assert cusps1 == cusps2
@@ -292,7 +292,7 @@ class TestHousesArmcEx2Basic:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -312,8 +312,8 @@ class TestHousesArmcEx2Basic:
         lat = 41.9
         eps = 23.4393
 
-        cusps_ex2, ascmc_ex2, _, _ = ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps_ex2, ascmc_ex2, _, _ = ephem.houses_armc_ex2(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Positions should be identical
         assert cusps_ex2 == cusps
@@ -321,13 +321,13 @@ class TestHousesArmcEx2Basic:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_velocities_are_reasonable(self):
-        """Velocities should be in reasonable range for house cusps when SEFLG_SPEED is set."""
+        """Velocities should be in reasonable range for house cusps when FLG_SPEED is set."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
 
-        _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+        _, _, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
+            armc, lat, eps, ord("P"), FLG_SPEED
         )
 
         # House cusps and angles rotate with Earth: ~360°/day
@@ -346,13 +346,13 @@ class TestHousesArmcEx2Basic:
 
     @pytest.mark.unit
     def test_houses_armc_ex2_velocities_are_positive(self):
-        """Velocities should generally be positive (prograde motion) when SEFLG_SPEED is set."""
+        """Velocities should generally be positive (prograde motion) when FLG_SPEED is set."""
         armc = 150.0
         lat = 45.0
         eps = 23.44
 
-        _, _, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+        _, _, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
+            armc, lat, eps, ord("P"), FLG_SPEED
         )
 
         # Most cusps should have positive velocity (increasing longitude)
@@ -392,7 +392,7 @@ class TestHousesArmcEx2VariousSystems:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, hsys
         )
 
@@ -417,7 +417,7 @@ class TestHousesArmcEx2EdgeCases:
         lat = 0.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -431,7 +431,7 @@ class TestHousesArmcEx2EdgeCases:
         armc = 100.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -445,7 +445,7 @@ class TestHousesArmcEx2EdgeCases:
         lat = -33.9  # Sydney
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -469,7 +469,7 @@ class TestHousesArmcEx2Alias:
         eps = 23.4393
 
         # Both should return the same result
-        result1 = ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+        result1 = ephem.houses_armc_ex2(armc, lat, eps, ord("P"))
         result2 = ephem.houses_armc_ex2(armc, lat, eps, ord("P"))
 
         assert result1 == result2
@@ -486,7 +486,7 @@ class TestHousesArmcEx2VsPyswisseph:
         eps = 23.43767671605485
 
         cusps_lib, ascmc_lib, cusps_speed_lib, ascmc_speed_lib = (
-            ephem.swe_houses_armc_ex2(armc, lat, eps, ord("P"))
+            ephem.houses_armc_ex2(armc, lat, eps, ord("P"))
         )
         cusps_swe, ascmc_swe, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
             armc, lat, eps, b"P"
@@ -513,13 +513,13 @@ class TestHousesArmcEx2VsPyswisseph:
 
     @pytest.mark.comparison
     def test_houses_armc_ex2_velocities_match_pyswisseph(self):
-        """houses_armc_ex2 velocities should be close to pyswisseph when SEFLG_SPEED is set."""
+        """houses_armc_ex2 velocities should be close to pyswisseph when FLG_SPEED is set."""
         armc = 150.0
         lat = 45.0
         eps = 23.44
 
-        _, _, cusps_speed_lib, ascmc_speed_lib = ephem.swe_houses_armc_ex2(
-            armc, lat, eps, ord("P"), SEFLG_SPEED
+        _, _, cusps_speed_lib, ascmc_speed_lib = ephem.houses_armc_ex2(
+            armc, lat, eps, ord("P"), FLG_SPEED
         )
         _, _, cusps_speed_swe, ascmc_speed_swe = swe.houses_armc_ex2(
             armc, lat, eps, b"P"

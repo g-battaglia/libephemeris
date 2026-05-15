@@ -17,59 +17,62 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 
 # Known approximate conjunction/opposition dates (JD) for various planets
 # These are times when distance is at an extreme
 TEST_EVENTS = [
     # Mars oppositions (closest approach)
-    ("Mars opposition 2003", ephem.SE_MARS, swe.MARS, 2452879.5),  # Aug 2003
-    ("Mars opposition 2005", ephem.SE_MARS, swe.MARS, 2453684.5),  # Nov 2005
-    ("Mars opposition 2010", ephem.SE_MARS, swe.MARS, 2455210.5),  # Jan 2010
-    ("Mars opposition 2014", ephem.SE_MARS, swe.MARS, 2456753.5),  # Apr 2014
-    ("Mars opposition 2018", ephem.SE_MARS, swe.MARS, 2458324.5),  # Jul 2018
-    ("Mars opposition 2020", ephem.SE_MARS, swe.MARS, 2459133.5),  # Oct 2020
+    ("Mars opposition 2003", ephem.MARS, swe.MARS, 2452879.5),  # Aug 2003
+    ("Mars opposition 2005", ephem.MARS, swe.MARS, 2453684.5),  # Nov 2005
+    ("Mars opposition 2010", ephem.MARS, swe.MARS, 2455210.5),  # Jan 2010
+    ("Mars opposition 2014", ephem.MARS, swe.MARS, 2456753.5),  # Apr 2014
+    ("Mars opposition 2018", ephem.MARS, swe.MARS, 2458324.5),  # Jul 2018
+    ("Mars opposition 2020", ephem.MARS, swe.MARS, 2459133.5),  # Oct 2020
     # Mars conjunctions (farthest)
-    ("Mars conjunction 2004", ephem.SE_MARS, swe.MARS, 2453270.5),  # Sep 2004
-    ("Mars conjunction 2006", ephem.SE_MARS, swe.MARS, 2454042.5),  # Oct 2006
-    ("Mars conjunction 2019", ephem.SE_MARS, swe.MARS, 2458720.5),  # Sep 2019
+    ("Mars conjunction 2004", ephem.MARS, swe.MARS, 2453270.5),  # Sep 2004
+    ("Mars conjunction 2006", ephem.MARS, swe.MARS, 2454042.5),  # Oct 2006
+    ("Mars conjunction 2019", ephem.MARS, swe.MARS, 2458720.5),  # Sep 2019
     # Jupiter oppositions
-    ("Jupiter opp 2010", ephem.SE_JUPITER, swe.JUPITER, 2455461.5),
-    ("Jupiter opp 2015", ephem.SE_JUPITER, swe.JUPITER, 2457048.5),
-    ("Jupiter opp 2020", ephem.SE_JUPITER, swe.JUPITER, 2459038.5),
-    ("Jupiter opp 2022", ephem.SE_JUPITER, swe.JUPITER, 2459845.5),
+    ("Jupiter opp 2010", ephem.JUPITER, swe.JUPITER, 2455461.5),
+    ("Jupiter opp 2015", ephem.JUPITER, swe.JUPITER, 2457048.5),
+    ("Jupiter opp 2020", ephem.JUPITER, swe.JUPITER, 2459038.5),
+    ("Jupiter opp 2022", ephem.JUPITER, swe.JUPITER, 2459845.5),
     # Saturn oppositions
-    ("Saturn opp 2010", ephem.SE_SATURN, swe.SATURN, 2455281.5),
-    ("Saturn opp 2015", ephem.SE_SATURN, swe.SATURN, 2457168.5),
-    ("Saturn opp 2020", ephem.SE_SATURN, swe.SATURN, 2459046.5),
+    ("Saturn opp 2010", ephem.SATURN, swe.SATURN, 2455281.5),
+    ("Saturn opp 2015", ephem.SATURN, swe.SATURN, 2457168.5),
+    ("Saturn opp 2020", ephem.SATURN, swe.SATURN, 2459046.5),
     # Venus inferior conjunctions (closest)
-    ("Venus inf conj 2004", ephem.SE_VENUS, swe.VENUS, 2453158.5),
-    ("Venus inf conj 2012", ephem.SE_VENUS, swe.VENUS, 2456082.5),
-    ("Venus inf conj 2020", ephem.SE_VENUS, swe.VENUS, 2459005.5),
+    ("Venus inf conj 2004", ephem.VENUS, swe.VENUS, 2453158.5),
+    ("Venus inf conj 2012", ephem.VENUS, swe.VENUS, 2456082.5),
+    ("Venus inf conj 2020", ephem.VENUS, swe.VENUS, 2459005.5),
     # Venus superior conjunctions (farthest)
-    ("Venus sup conj 2006", ephem.SE_VENUS, swe.VENUS, 2454046.5),
-    ("Venus sup conj 2014", ephem.SE_VENUS, swe.VENUS, 2456953.5),
-    ("Venus sup conj 2022", ephem.SE_VENUS, swe.VENUS, 2459877.5),
+    ("Venus sup conj 2006", ephem.VENUS, swe.VENUS, 2454046.5),
+    ("Venus sup conj 2014", ephem.VENUS, swe.VENUS, 2456953.5),
+    ("Venus sup conj 2022", ephem.VENUS, swe.VENUS, 2459877.5),
     # Mercury conjunctions
-    ("Mercury inf conj 2000", ephem.SE_MERCURY, swe.MERCURY, 2451651.5),
-    ("Mercury inf conj 2010", ephem.SE_MERCURY, swe.MERCURY, 2455474.5),
-    ("Mercury inf conj 2020", ephem.SE_MERCURY, swe.MERCURY, 2458896.5),
-    ("Mercury sup conj 2000", ephem.SE_MERCURY, swe.MERCURY, 2451553.5),
-    ("Mercury sup conj 2010", ephem.SE_MERCURY, swe.MERCURY, 2455407.5),
-    ("Mercury sup conj 2020", ephem.SE_MERCURY, swe.MERCURY, 2459032.5),
+    ("Mercury inf conj 2000", ephem.MERCURY, swe.MERCURY, 2451651.5),
+    ("Mercury inf conj 2010", ephem.MERCURY, swe.MERCURY, 2455474.5),
+    ("Mercury inf conj 2020", ephem.MERCURY, swe.MERCURY, 2458896.5),
+    ("Mercury sup conj 2000", ephem.MERCURY, swe.MERCURY, 2451553.5),
+    ("Mercury sup conj 2010", ephem.MERCURY, swe.MERCURY, 2455407.5),
+    ("Mercury sup conj 2020", ephem.MERCURY, swe.MERCURY, 2459032.5),
     # Moon perigee/apogee (closest/farthest)
-    ("Moon perigee 2000 Jan", ephem.SE_MOON, swe.MOON, 2451560.5),
-    ("Moon perigee 2010 Jan", ephem.SE_MOON, swe.MOON, 2455218.5),
-    ("Moon perigee 2020 Apr", ephem.SE_MOON, swe.MOON, 2458949.5),
-    ("Moon apogee 2000 Jan", ephem.SE_MOON, swe.MOON, 2451566.5),
-    ("Moon apogee 2010 Jan", ephem.SE_MOON, swe.MOON, 2455225.5),
-    ("Moon apogee 2020 Mar", ephem.SE_MOON, swe.MOON, 2458935.5),
+    ("Moon perigee 2000 Jan", ephem.MOON, swe.MOON, 2451560.5),
+    ("Moon perigee 2010 Jan", ephem.MOON, swe.MOON, 2455218.5),
+    ("Moon perigee 2020 Apr", ephem.MOON, swe.MOON, 2458949.5),
+    ("Moon apogee 2000 Jan", ephem.MOON, swe.MOON, 2451566.5),
+    ("Moon apogee 2010 Jan", ephem.MOON, swe.MOON, 2455225.5),
+    ("Moon apogee 2020 Mar", ephem.MOON, swe.MOON, 2458935.5),
     # Outer planets
-    ("Uranus opp 2015", ephem.SE_URANUS, swe.URANUS, 2457306.5),
-    ("Neptune opp 2015", ephem.SE_NEPTUNE, swe.NEPTUNE, 2457261.5),
-    ("Pluto opp 2015", ephem.SE_PLUTO, swe.PLUTO, 2457209.5),
+    ("Uranus opp 2015", ephem.URANUS, swe.URANUS, 2457306.5),
+    ("Neptune opp 2015", ephem.NEPTUNE, swe.NEPTUNE, 2457261.5),
+    ("Pluto opp 2015", ephem.PLUTO, swe.PLUTO, 2457209.5),
 ]
 
 passed = 0
@@ -82,7 +85,7 @@ def compare(label, le_body, se_body, jd, flags_le, flags_se):
     global passed, failed, total
 
     try:
-        le_r = ephem.swe_calc_ut(jd, le_body, flags_le)
+        le_r = ephem.calc_ut(jd, le_body, flags_le)
         se_r = swe.calc_ut(jd, se_body, flags_se)
     except Exception as e:
         return
@@ -167,22 +170,22 @@ if __name__ == "__main__":
         compare(f"{label} -1d", le_body, se_body, jd - 1.0, FLAGS, se_flags)
         compare(f"{label} +1d", le_body, se_body, jd + 1.0, FLAGS, se_flags)
 
-    # Also test with SEFLG_EQUATORIAL
+    # Also test with FLG_EQUATORIAL
     print("\nEquatorial mode tests...")
-    flags_le_eq = FLAGS | ephem.SEFLG_EQUATORIAL
+    flags_le_eq = FLAGS | ephem.FLG_EQUATORIAL
     flags_se_eq = se_flags | swe.FLG_EQUATORIAL
     for label, le_body, se_body, jd in TEST_EVENTS[:12]:
         compare(f"{label} EQ", le_body, se_body, jd, flags_le_eq, flags_se_eq)
 
     # Also test heliocentric distances for inner planets
     print("Heliocentric distance tests...")
-    flags_le_h = FLAGS | ephem.SEFLG_HELCTR
+    flags_le_h = FLAGS | ephem.FLG_HELCTR
     flags_se_h = se_flags | swe.FLG_HELCTR
     for label, le_body, se_body, jd in TEST_EVENTS:
         if "Moon" in label:
             continue  # No heliocentric Moon
         try:
-            le_r = ephem.swe_calc_ut(jd, le_body, flags_le_h)
+            le_r = ephem.calc_ut(jd, le_body, flags_le_h)
             se_r = swe.calc_ut(jd, se_body, flags_se_h)
             total += 1
             dist_diff = abs(le_r[0][2] - se_r[0][2])

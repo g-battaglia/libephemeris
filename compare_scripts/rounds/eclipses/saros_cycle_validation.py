@@ -18,7 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -47,7 +50,7 @@ se_eclipses = []
 jd_search = jd
 while jd_search < jd_end:
     try:
-        le_result = ephem.swe_sol_eclipse_when_glob(jd_search, FLAGS, 0)
+        le_result = ephem.sol_eclipse_when_glob(jd_search, FLAGS, 0)
         le_tret = le_result[1] if isinstance(le_result, tuple) else le_result
         le_max = le_tret[0]
         if le_max > 0 and le_max < jd_end:
@@ -114,7 +117,7 @@ for i, (ecl_jd, ecl_type) in enumerate(le_eclipses[:5]):  # First 5
         continue
     try:
         # Search for eclipse near expected Saros return
-        result = ephem.swe_sol_eclipse_when_glob(expected_next - 15, FLAGS, 0)
+        result = ephem.sol_eclipse_when_glob(expected_next - 15, FLAGS, 0)
         tret = result[1] if isinstance(result, tuple) else result
         found_jd = tret[0]
 
@@ -149,7 +152,7 @@ se_lunar = []
 jd_search = jd
 while jd_search < jd_end:
     try:
-        le_result = ephem.swe_lun_eclipse_when(jd_search, FLAGS, 0)
+        le_result = ephem.lun_eclipse_when(jd_search, FLAGS, 0)
         le_tret = le_result[1] if isinstance(le_result, tuple) else le_result
         le_max = le_tret[0]
         if le_max > 0 and le_max < jd_end:
@@ -207,7 +210,7 @@ for i, (ecl_jd, ecl_type) in enumerate(le_lunar[:5]):
     if expected_next > jd_2040:
         continue
     try:
-        result = ephem.swe_lun_eclipse_when(expected_next - 15, FLAGS, 0)
+        result = ephem.lun_eclipse_when(expected_next - 15, FLAGS, 0)
         tret = result[1] if isinstance(result, tuple) else result
         found_jd = tret[0]
 
@@ -240,8 +243,8 @@ for i, ((le_max, le_type), (se_max, se_type)) in enumerate(
     y, m, d, h = swe.revjul(le_max)
 
     # Check basic type bits match
-    # SE_ECL_TOTAL = 1, SE_ECL_ANNULAR = 2, SE_ECL_PARTIAL = 4,
-    # SE_ECL_ANNULAR_TOTAL/HYBRID = 8
+    # ECL_TOTAL = 1, ECL_ANNULAR = 2, ECL_PARTIAL = 4,
+    # ECL_ANNULAR_TOTAL/HYBRID = 8
     le_basic = le_type & 0xF  # Lower 4 bits = eclipse type
     se_basic = se_type & 0xF
 
@@ -314,7 +317,7 @@ known_solar = [
 for year, month, day, expected_type in known_solar:
     jd_search = swe.julday(year, month, day - 5, 0.0)
     try:
-        result = ephem.swe_sol_eclipse_when_glob(jd_search, FLAGS, 0)
+        result = ephem.sol_eclipse_when_glob(jd_search, FLAGS, 0)
         tret = result[1] if isinstance(result, tuple) else result
         ecl_jd = tret[0]
         ecl_type = result[0] if isinstance(result, tuple) else 0
@@ -348,7 +351,7 @@ print("\n=== P8: Eclipse tret array comparison ===")
 jd_search = swe.julday(2024, 1, 1, 0.0)
 for ecl_num in range(3):
     try:
-        le_result = ephem.swe_sol_eclipse_when_glob(jd_search, FLAGS, 0)
+        le_result = ephem.sol_eclipse_when_glob(jd_search, FLAGS, 0)
         se_result = swe.sol_eclipse_when_glob(jd_search, FLAGS)
 
         le_tret = le_result[1] if isinstance(le_result, tuple) else le_result

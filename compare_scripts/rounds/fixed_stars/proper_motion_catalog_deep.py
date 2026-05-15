@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 STARS = [
     "Aldebaran",
@@ -58,7 +62,7 @@ for star in STARS:
     for jd in DATES:
         try:
             se = swe.fixstar2_ut(star, jd, FLAGS)
-            le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+            le = ephem.fixstar2_ut(star, jd, FLAGS)
             # SE returns (pos_tuple, starname, retflag)
             # LE returns (pos_tuple, starname, retflag)
             se_lon = se[0][0]
@@ -91,7 +95,7 @@ for star in STARS:
     for jd in DATES[:5]:
         try:
             se = swe.fixstar2_ut(star, jd, FLAGS)
-            le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+            le = ephem.fixstar2_ut(star, jd, FLAGS)
             se_lat = se[0][1]
             le_lat = le[0][1]
             diff = abs(se_lat - le_lat) * 3600
@@ -109,7 +113,7 @@ for star in STARS[:15]:
     jd = 2451545.0
     try:
         se = swe.fixstar2_ut(star, jd, FLAGS)
-        le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+        le = ephem.fixstar2_ut(star, jd, FLAGS)
         se_dist = se[0][2]
         le_dist = le[0][2]
         if se_dist > 0 and le_dist > 0:
@@ -133,8 +137,8 @@ for star in STARS[:20]:
     try:
         se_2000 = swe.fixstar2_ut(star, jd_2000, FLAGS)
         se_2100 = swe.fixstar2_ut(star, jd_2100, FLAGS)
-        le_2000 = ephem.swe_fixstar2_ut(star, jd_2000, FLAGS)
-        le_2100 = ephem.swe_fixstar2_ut(star, jd_2100, FLAGS)
+        le_2000 = ephem.fixstar2_ut(star, jd_2000, FLAGS)
+        le_2100 = ephem.fixstar2_ut(star, jd_2100, FLAGS)
 
         se_drift = se_2100[0][0] - se_2000[0][0]
         le_drift = le_2100[0][0] - le_2000[0][0]
@@ -162,7 +166,7 @@ for star in STARS[:15]:
     for jd in DATES[:5]:
         try:
             se = swe.fixstar2_ut(star, jd, J2000)
-            le = ephem.swe_fixstar2_ut(star, jd, J2000)
+            le = ephem.fixstar2_ut(star, jd, J2000)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -180,7 +184,7 @@ for star in STARS[:15]:
     jd = 2451545.0
     try:
         se = swe.fixstar2_ut(star, jd, FLAGS)
-        le = ephem.swe_fixstar2_ut(star, jd, FLAGS)
+        le = ephem.fixstar2_ut(star, jd, FLAGS)
         se_lon_spd = se[0][3]
         le_lon_spd = le[0][3]
         diff = abs(se_lon_spd - le_lon_spd)

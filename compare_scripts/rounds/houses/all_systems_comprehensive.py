@@ -12,7 +12,7 @@ Phases:
   P5: ARMC-based functions (houses_armc vs houses_armc)
   P6: house_pos - planet-in-house computation
   P7: house_name - name string verification
-  P8: Sidereal mode house cusps (houses_ex with SEFLG_SIDEREAL)
+  P8: Sidereal mode house cusps (houses_ex with FLG_SIDEREAL)
 """
 
 from __future__ import annotations
@@ -28,7 +28,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 
 # Helpers for house system byte/int conversion
@@ -101,10 +104,10 @@ def compare_cusps_ascmc(
         le_flags = 0
         if sidereal:
             se_flags |= swe.FLG_SIDEREAL
-            le_flags |= ephem.SEFLG_SIDEREAL
+            le_flags |= ephem.FLG_SIDEREAL
             # Use Lahiri as default
             swe.set_sid_mode(swe.SIDM_LAHIRI)
-            ephem.swe_set_sid_mode(ephem.SE_SIDM_LAHIRI, 0, 0)
+            ephem.set_sid_mode(ephem.SIDM_LAHIRI, 0, 0)
 
         # Call SE
         try:
@@ -126,11 +129,11 @@ def compare_cusps_ascmc(
         # Call LE
         try:
             if use_ex or sidereal:
-                le_result = ephem.swe_houses_ex(
+                le_result = ephem.houses_ex(
                     tjdut, lat, lon, le_hsys(hsys_ch), le_flags
                 )
             else:
-                le_result = ephem.swe_houses(tjdut, lat, lon, le_hsys(hsys_ch))
+                le_result = ephem.houses(tjdut, lat, lon, le_hsys(hsys_ch))
             le_cusps = le_result[0]
             le_ascmc = le_result[1]
         except Exception as e:
@@ -292,7 +295,7 @@ def phase5():
 
             try:
                 se_cusps, se_ascmc = swe.houses_armc(armc, lat, eps, se_hsys(hsys_ch))
-                le_cusps, le_ascmc = ephem.swe_houses_armc(
+                le_cusps, le_ascmc = ephem.houses_armc(
                     armc, lat, eps, le_hsys(hsys_ch)
                 )
 
@@ -407,8 +410,8 @@ def phase6():
                         armc, lat, eps, (p_lon, p_lat), se_hsys(hsys_ch)
                     )
 
-                    # LE house_pos: swe_house_pos(armc, lat, eps, objcoord, hsys)
-                    le_hp = ephem.swe_house_pos(armc, lat, eps, (p_lon, p_lat), hsys_ch)
+                    # LE house_pos: house_pos(armc, lat, eps, objcoord, hsys)
+                    le_hp = ephem.house_pos(armc, lat, eps, (p_lon, p_lat), hsys_ch)
 
                     diff = abs(se_hp - le_hp)
                     tol = 0.01  # 0.01 house unit
@@ -438,7 +441,7 @@ def phase7():
     for hsys_ch in ALL_SYSTEMS:
         try:
             se_name = swe.house_name(se_hsys(hsys_ch))
-            le_name = ephem.swe_house_name(le_hsys(hsys_ch))
+            le_name = ephem.house_name(le_hsys(hsys_ch))
 
             # Both should return non-empty strings
             if not se_name or not le_name:
@@ -492,7 +495,7 @@ def phase8():
 
     for sid_id, sid_name in sid_modes:
         swe.set_sid_mode(sid_id)
-        ephem.swe_set_sid_mode(sid_id, 0, 0)
+        ephem.set_sid_mode(sid_id, 0, 0)
 
         for lat in lats:
             for hsys_ch in systems:

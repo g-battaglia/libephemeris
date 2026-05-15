@@ -14,49 +14,49 @@ import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
     # Main belt asteroids
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
     # Centaurs (original)
-    SE_CHIRON,
-    SE_PHOLUS,
+    CHIRON,
+    PHOLUS,
     # Additional Centaurs
-    SE_NESSUS,
-    SE_ASBOLUS,
-    SE_CHARIKLO,
+    NESSUS,
+    ASBOLUS,
+    CHARIKLO,
     # Trans-Neptunian Objects (TNOs)
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_VARUNA,
-    SE_GONGGONG,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    VARUNA,
+    GONGGONG,
     # Large main belt asteroids
-    SE_HYGIEA,
-    SE_INTERAMNIA,
-    SE_DAVIDA,
-    SE_EUROPA_AST,
-    SE_SYLVIA,
-    SE_PSYCHE,
+    HYGIEA,
+    INTERAMNIA,
+    DAVIDA,
+    EUROPA_AST,
+    SYLVIA,
+    PSYCHE,
     # Near-Earth asteroids
-    SE_APOPHIS,
-    SE_EROS,
-    SE_AMOR,
-    SE_ICARUS,
-    SE_TORO,
-    SE_TOUTATIS,
-    SE_ITOKAWA,
-    SE_BENNU,
-    SE_RYUGU,
+    APOPHIS,
+    EROS,
+    AMOR,
+    ICARUS,
+    TORO,
+    TOUTATIS,
+    ITOKAWA,
+    BENNU,
+    RYUGU,
     # Astrologically significant asteroids
-    SE_SAPPHO,
-    SE_PANDORA_AST,
-    SE_LILITH_AST,
-    SE_HIDALGO,
+    SAPPHO,
+    PANDORA_AST,
+    LILITH_AST,
+    HIDALGO,
 )
 
 
@@ -84,64 +84,64 @@ DISTANT_TNO_TOL = 0.5  # degrees - very distant/uncertain TNOs like Sedna
 # ============================================================================
 
 MAIN_ASTEROIDS = [
-    (SE_CERES, "Ceres"),
-    (SE_PALLAS, "Pallas"),
-    (SE_JUNO, "Juno"),
-    (SE_VESTA, "Vesta"),
+    (CERES, "Ceres"),
+    (PALLAS, "Pallas"),
+    (JUNO, "Juno"),
+    (VESTA, "Vesta"),
 ]
 
 LARGE_MAIN_BELT = [
-    (SE_HYGIEA, "Hygiea"),
-    (SE_INTERAMNIA, "Interamnia"),
-    (SE_DAVIDA, "Davida"),
-    (SE_EUROPA_AST, "Europa (asteroid)"),
-    (SE_SYLVIA, "Sylvia"),
-    (SE_PSYCHE, "Psyche"),
+    (HYGIEA, "Hygiea"),
+    (INTERAMNIA, "Interamnia"),
+    (DAVIDA, "Davida"),
+    (EUROPA_AST, "Europa (asteroid)"),
+    (SYLVIA, "Sylvia"),
+    (PSYCHE, "Psyche"),
 ]
 
 CENTAURS = [
-    (SE_CHIRON, "Chiron"),
-    (SE_PHOLUS, "Pholus"),
+    (CHIRON, "Chiron"),
+    (PHOLUS, "Pholus"),
 ]
 
 ADDITIONAL_CENTAURS = [
-    (SE_NESSUS, "Nessus"),
-    (SE_ASBOLUS, "Asbolus"),
-    (SE_CHARIKLO, "Chariklo"),
+    (NESSUS, "Nessus"),
+    (ASBOLUS, "Asbolus"),
+    (CHARIKLO, "Chariklo"),
 ]
 
 TNOS_STANDARD = [
-    (SE_ERIS, "Eris"),
-    (SE_HAUMEA, "Haumea"),
-    (SE_MAKEMAKE, "Makemake"),
-    (SE_ORCUS, "Orcus"),
-    (SE_QUAOAR, "Quaoar"),
-    (SE_VARUNA, "Varuna"),
-    (SE_IXION, "Ixion"),
-    (SE_GONGGONG, "Gonggong"),
+    (ERIS, "Eris"),
+    (HAUMEA, "Haumea"),
+    (MAKEMAKE, "Makemake"),
+    (ORCUS, "Orcus"),
+    (QUAOAR, "Quaoar"),
+    (VARUNA, "Varuna"),
+    (IXION, "Ixion"),
+    (GONGGONG, "Gonggong"),
 ]
 
 TNOS_DISTANT = [
-    (SE_SEDNA, "Sedna"),  # Very distant, relaxed tolerance
+    (SEDNA, "Sedna"),  # Very distant, relaxed tolerance
 ]
 
 NEAR_EARTH_ASTEROIDS = [
-    (SE_EROS, "Eros"),
-    (SE_AMOR, "Amor"),
-    (SE_ICARUS, "Icarus"),
-    (SE_TORO, "Toro"),
-    (SE_APOPHIS, "Apophis"),
-    (SE_TOUTATIS, "Toutatis"),
-    (SE_ITOKAWA, "Itokawa"),
-    (SE_BENNU, "Bennu"),
-    (SE_RYUGU, "Ryugu"),
+    (EROS, "Eros"),
+    (AMOR, "Amor"),
+    (ICARUS, "Icarus"),
+    (TORO, "Toro"),
+    (APOPHIS, "Apophis"),
+    (TOUTATIS, "Toutatis"),
+    (ITOKAWA, "Itokawa"),
+    (BENNU, "Bennu"),
+    (RYUGU, "Ryugu"),
 ]
 
 ASTROLOGICAL_ASTEROIDS = [
-    (SE_SAPPHO, "Sappho"),
-    (SE_PANDORA_AST, "Pandora (asteroid)"),
-    (SE_LILITH_AST, "Lilith (asteroid)"),
-    (SE_HIDALGO, "Hidalgo"),
+    (SAPPHO, "Sappho"),
+    (PANDORA_AST, "Pandora (asteroid)"),
+    (LILITH_AST, "Lilith (asteroid)"),
+    (HIDALGO, "Hidalgo"),
 ]
 
 TEST_DATES = [
@@ -170,7 +170,7 @@ class TestMainAsteroids:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -196,7 +196,7 @@ class TestLargeMainBeltAsteroids:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -220,7 +220,7 @@ class TestCentaurs:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -246,7 +246,7 @@ class TestAdditionalCentaurs:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -270,7 +270,7 @@ class TestTNOsStandard:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -296,7 +296,7 @@ class TestTNOsDistant:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -320,7 +320,7 @@ class TestNearEarthAsteroids:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -346,7 +346,7 @@ class TestAstrologicalAsteroids:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -368,7 +368,7 @@ class TestChironSpecific:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, swe.CHIRON, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_CHIRON, 0)
+            pos_py, _ = ephem.calc_ut(jd, CHIRON, 0)
         except Exception as e:
             pytest.skip(f"Chiron not available: {e}")
             return
@@ -384,7 +384,7 @@ class TestChironSpecific:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, swe.CHIRON, swe.FLG_SPEED)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_CHIRON, 256)  # SEFLG_SPEED
+            pos_py, _ = ephem.calc_ut(jd, CHIRON, 256)  # FLG_SPEED
         except Exception as e:
             pytest.skip(f"Chiron not available: {e}")
             return
@@ -406,7 +406,7 @@ class TestCeresSpecific:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, swe.CERES, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_CERES, 0)
+            pos_py, _ = ephem.calc_ut(jd, CERES, 0)
         except Exception as e:
             pytest.skip(f"Ceres not available: {e}")
             return
@@ -425,8 +425,8 @@ class TestErisSpecific:
         jd = 2451545.0
 
         try:
-            pos_swe, _ = swe.calc_ut(jd, SE_ERIS, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_ERIS, 0)
+            pos_swe, _ = swe.calc_ut(jd, ERIS, 0)
+            pos_py, _ = ephem.calc_ut(jd, ERIS, 0)
         except Exception as e:
             pytest.skip(f"Eris not available: {e}")
             return
@@ -445,8 +445,8 @@ class TestGonggongSpecific:
         jd = swe.julday(2024, 6, 15, 12.0)
 
         try:
-            pos_swe, _ = swe.calc_ut(jd, SE_GONGGONG, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_GONGGONG, 0)
+            pos_swe, _ = swe.calc_ut(jd, GONGGONG, 0)
+            pos_py, _ = ephem.calc_ut(jd, GONGGONG, 0)
         except Exception as e:
             pytest.skip(f"Gonggong not available: {e}")
             return
@@ -465,8 +465,8 @@ class TestApophisSpecific:
         jd = swe.julday(2024, 6, 15, 12.0)
 
         try:
-            pos_swe, _ = swe.calc_ut(jd, SE_APOPHIS, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_APOPHIS, 0)
+            pos_swe, _ = swe.calc_ut(jd, APOPHIS, 0)
+            pos_py, _ = ephem.calc_ut(jd, APOPHIS, 0)
         except Exception as e:
             pytest.skip(f"Apophis not available: {e}")
             return
@@ -487,7 +487,7 @@ class TestAsteroidVelocity:
 
         try:
             pos_swe, _ = swe.calc_ut(jd, body_id, swe.FLG_SPEED)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 256)  # SEFLG_SPEED
+            pos_py, _ = ephem.calc_ut(jd, body_id, 256)  # FLG_SPEED
         except Exception as e:
             pytest.skip(f"{body_name} not available: {e}")
             return
@@ -521,43 +521,43 @@ class TestAllBodiesCoverage:
 
         # These are all the SE_* minor body constants defined in constants.py
         expected_bodies = {
-            SE_CERES,
-            SE_PALLAS,
-            SE_JUNO,
-            SE_VESTA,
-            SE_CHIRON,
-            SE_PHOLUS,
-            SE_NESSUS,
-            SE_ASBOLUS,
-            SE_CHARIKLO,
-            SE_ERIS,
-            SE_SEDNA,
-            SE_HAUMEA,
-            SE_MAKEMAKE,
-            SE_IXION,
-            SE_ORCUS,
-            SE_QUAOAR,
-            SE_VARUNA,
-            SE_GONGGONG,
-            SE_HYGIEA,
-            SE_INTERAMNIA,
-            SE_DAVIDA,
-            SE_EUROPA_AST,
-            SE_SYLVIA,
-            SE_PSYCHE,
-            SE_APOPHIS,
-            SE_EROS,
-            SE_AMOR,
-            SE_ICARUS,
-            SE_TORO,
-            SE_TOUTATIS,
-            SE_ITOKAWA,
-            SE_BENNU,
-            SE_RYUGU,
-            SE_SAPPHO,
-            SE_PANDORA_AST,
-            SE_LILITH_AST,
-            SE_HIDALGO,
+            CERES,
+            PALLAS,
+            JUNO,
+            VESTA,
+            CHIRON,
+            PHOLUS,
+            NESSUS,
+            ASBOLUS,
+            CHARIKLO,
+            ERIS,
+            SEDNA,
+            HAUMEA,
+            MAKEMAKE,
+            IXION,
+            ORCUS,
+            QUAOAR,
+            VARUNA,
+            GONGGONG,
+            HYGIEA,
+            INTERAMNIA,
+            DAVIDA,
+            EUROPA_AST,
+            SYLVIA,
+            PSYCHE,
+            APOPHIS,
+            EROS,
+            AMOR,
+            ICARUS,
+            TORO,
+            TOUTATIS,
+            ITOKAWA,
+            BENNU,
+            RYUGU,
+            SAPPHO,
+            PANDORA_AST,
+            LILITH_AST,
+            HIDALGO,
         }
 
         missing_bodies = expected_bodies - all_tested_bodies

@@ -15,15 +15,15 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_CUPIDO,
-    SE_HADES,
-    SE_ZEUS,
-    SE_KRONOS,
-    SE_APOLLON,
-    SE_ADMETOS,
-    SE_VULKANUS,
-    SE_POSEIDON,
-    SE_ISIS,
+    CUPIDO,
+    HADES,
+    ZEUS,
+    KRONOS,
+    APOLLON,
+    ADMETOS,
+    VULKANUS,
+    POSEIDON,
+    ISIS,
 )
 
 
@@ -54,19 +54,19 @@ LATITUDE_TOLERANCE = 0.02  # 72 arcsec for latitude
 
 # Uranian Planets (Hamburg School) - IDs 40-47
 URANIAN_PLANETS = [
-    (SE_CUPIDO, swe.CUPIDO, "Cupido"),
-    (SE_HADES, swe.HADES, "Hades"),
-    (SE_ZEUS, swe.ZEUS, "Zeus"),
-    (SE_KRONOS, swe.KRONOS, "Kronos"),
-    (SE_APOLLON, swe.APOLLON, "Apollon"),
-    (SE_ADMETOS, swe.ADMETOS, "Admetos"),
-    (SE_VULKANUS, swe.VULKANUS, "Vulkanus"),
-    (SE_POSEIDON, swe.POSEIDON, "Poseidon"),
+    (CUPIDO, swe.CUPIDO, "Cupido"),
+    (HADES, swe.HADES, "Hades"),
+    (ZEUS, swe.ZEUS, "Zeus"),
+    (KRONOS, swe.KRONOS, "Kronos"),
+    (APOLLON, swe.APOLLON, "Apollon"),
+    (ADMETOS, swe.ADMETOS, "Admetos"),
+    (VULKANUS, swe.VULKANUS, "Vulkanus"),
+    (POSEIDON, swe.POSEIDON, "Poseidon"),
 ]
 
 # Other hypothetical bodies
 OTHER_HYPOTHETICAL = [
-    (SE_ISIS, swe.ISIS, "Transpluto/Isis"),
+    (ISIS, swe.ISIS, "Transpluto/Isis"),
 ]
 
 # Test dates
@@ -115,7 +115,7 @@ class TestUranianPlanets:
 
         # LibEphemeris
         try:
-            pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_py, 0)
         except Exception as e:
             pytest.skip(f"LibEphemeris {name} failed: {e}")
 
@@ -138,7 +138,7 @@ class TestUranianPlanets:
 
             try:
                 pos_swe, _ = swe.calc_ut(jd, body_swe, 0)
-                pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+                pos_py, _ = ephem.calc_ut(jd, body_py, 0)
 
                 diff_lon = angular_diff(pos_swe[0], pos_py[0])
                 assert diff_lon < URANIAN_LONGITUDE_TOLERANCE
@@ -160,7 +160,7 @@ class TestUranianPlanets:
             pytest.skip(f"SwissEphemeris {name} not available: {e}")
 
         try:
-            pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_py, 0)
         except Exception as e:
             pytest.skip(f"LibEphemeris {name} failed: {e}")
 
@@ -202,7 +202,7 @@ class TestOtherHypothetical:
 
         # LibEphemeris
         try:
-            pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_py, 0)
         except Exception as e:
             pytest.skip(f"LibEphemeris {name} failed: {e}")
 
@@ -233,7 +233,7 @@ class TestHypotheticalSummary:
 
         for body_py, body_swe, name in URANIAN_PLANETS:
             try:
-                pos_py, _ = ephem.swe_calc_ut(jd, body_py, 0)
+                pos_py, _ = ephem.calc_ut(jd, body_py, 0)
                 available += 1
             except Exception:
                 pass
@@ -249,7 +249,7 @@ class TestHypotheticalSummary:
             for year in [2000, 2010, 2020]:
                 jd = swe.julday(year, 1, 1, 12.0)
                 try:
-                    pos, _ = ephem.swe_calc_ut(jd, body_py, 0)
+                    pos, _ = ephem.calc_ut(jd, body_py, 0)
                     positions.append(pos[0])
                 except Exception:
                     pass

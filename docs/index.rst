@@ -28,7 +28,7 @@ Quick Start
 
    # Calculate planetary positions
    jd = swe.julday(2024, 1, 1, 12.0)
-   pos, flags = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
+   pos, flags = swe.calc_ut(jd, swe.SUN, swe.FLG_SPEED)
    print(f"Sun longitude: {pos[0]:.4f} degrees")
 
    # Calculate house cusps
@@ -36,8 +36,8 @@ Quick Start
    print(f"Ascendant: {ascmc[0]:.2f} degrees")
 
    # Sidereal calculations
-   swe.set_sid_mode(swe.SE_SIDM_LAHIRI)
-   pos_sid, _ = swe.calc_ut(jd, swe.SE_MOON, swe.SEFLG_SIDEREAL)
+   swe.set_sid_mode(swe.SIDM_LAHIRI)
+   pos_sid, _ = swe.calc_ut(jd, swe.MOON, swe.FLG_SIDEREAL)
    print(f"Moon (sidereal): {pos_sid[0]:.4f} degrees")
 
 Installation

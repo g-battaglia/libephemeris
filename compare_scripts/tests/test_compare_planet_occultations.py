@@ -20,15 +20,15 @@ import math
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MERCURY,
-    SE_SUN,
-    SE_MOON,
-    SEFLG_SWIEPH,
-    SEFLG_EQUATORIAL,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    MERCURY,
+    SUN,
+    MOON,
+    FLG_SWIEPH,
+    FLG_EQUATORIAL,
 )
 
 
@@ -61,9 +61,9 @@ OCCULT_STARS = [
 
 # Planets that can occult (inner planets more common occultors)
 OCCULTING_PLANETS = [
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 # Test locations
@@ -116,7 +116,7 @@ def get_planet_equatorial_position(jd: float, planet_id: int) -> tuple:
     Returns:
         (ra_degrees, dec_degrees, distance_au)
     """
-    flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+    flags = FLG_SWIEPH | FLG_EQUATORIAL
     result, _ = swe.calc_ut(jd, planet_id, flags)
     return result[0], result[1], result[2]
 
@@ -128,7 +128,7 @@ def get_star_equatorial_position(jd: float, star_name: str) -> tuple:
     Returns:
         (ra_degrees, dec_degrees, distance_au)
     """
-    flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+    flags = FLG_SWIEPH | FLG_EQUATORIAL
     try:
         result = swe.fixstar_ut(star_name, jd, flags)
         return result[0][0], result[0][1], result[0][2]
@@ -168,14 +168,14 @@ class TestPlanetOccultFunctionsAvailable:
         """Verify planetary occultation functions are available."""
         assert callable(pyephem.planet_occult_when_glob)
         assert callable(pyephem.planet_occult_when_loc)
-        assert callable(pyephem.swe_planet_occult_when_glob)
-        assert callable(pyephem.swe_planet_occult_when_loc)
+        assert callable(pyephem.planet_occult_when_glob)
+        assert callable(pyephem.planet_occult_when_loc)
 
     @pytest.mark.comparison
     def test_swe_aliases_are_same(self):
         """Verify swe_* aliases point to same functions."""
-        assert pyephem.planet_occult_when_glob is pyephem.swe_planet_occult_when_glob
-        assert pyephem.planet_occult_when_loc is pyephem.swe_planet_occult_when_loc
+        assert pyephem.planet_occult_when_glob is pyephem.planet_occult_when_glob
+        assert pyephem.planet_occult_when_loc is pyephem.planet_occult_when_loc
 
 
 # ============================================================================
@@ -191,21 +191,21 @@ class TestPlanetOccultErrorHandling:
         """Test that invalid star name raises ValueError."""
         with pytest.raises(ValueError):
             pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, 0, "NonexistentStar123", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, 0, "NonexistentStar123", FLG_SWIEPH, 0
             )
 
     @pytest.mark.comparison
     def test_no_target_raises_error(self, jd_2024):
         """Test that missing target raises ValueError."""
         with pytest.raises(ValueError):
-            pyephem.planet_occult_when_glob(jd_2024, SE_VENUS, 0, "", SEFLG_SWIEPH, 0)
+            pyephem.planet_occult_when_glob(jd_2024, VENUS, 0, "", FLG_SWIEPH, 0)
 
     @pytest.mark.comparison
     def test_same_planet_raises_error(self, jd_2024):
         """Test that same planet as occulting and occulted raises ValueError."""
         with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, SE_VENUS, "", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, VENUS, "", FLG_SWIEPH, 0
             )
 
     @pytest.mark.comparison
@@ -213,7 +213,7 @@ class TestPlanetOccultErrorHandling:
         """Test that Sun cannot be the occulting body."""
         with pytest.raises(ValueError, match="Sun cannot be"):
             pyephem.planet_occult_when_glob(
-                jd_2024, SE_SUN, SE_VENUS, "", SEFLG_SWIEPH, 0
+                jd_2024, SUN, VENUS, "", FLG_SWIEPH, 0
             )
 
     @pytest.mark.comparison
@@ -221,7 +221,7 @@ class TestPlanetOccultErrorHandling:
         """Test that Moon cannot be the occulting body."""
         with pytest.raises(ValueError, match="Moon cannot be"):
             pyephem.planet_occult_when_glob(
-                jd_2024, SE_MOON, SE_VENUS, "", SEFLG_SWIEPH, 0
+                jd_2024, MOON, VENUS, "", FLG_SWIEPH, 0
             )
 
     @pytest.mark.comparison
@@ -229,21 +229,21 @@ class TestPlanetOccultErrorHandling:
         """Test that invalid planet ID raises error."""
         with pytest.raises(ValueError):
             pyephem.planet_occult_when_glob(
-                jd_2024, 999, SE_JUPITER, "", SEFLG_SWIEPH, 0
+                jd_2024, 999, JUPITER, "", FLG_SWIEPH, 0
             )
 
     @pytest.mark.comparison
     def test_invalid_occulted_planet_raises_error(self, jd_2024):
         """Test that invalid occulted planet ID raises error."""
         with pytest.raises(ValueError):
-            pyephem.planet_occult_when_glob(jd_2024, SE_VENUS, 999, "", SEFLG_SWIEPH, 0)
+            pyephem.planet_occult_when_glob(jd_2024, VENUS, 999, "", FLG_SWIEPH, 0)
 
     @pytest.mark.comparison
     def test_loc_invalid_star_name_raises_error(self, jd_2024):
         """Test that invalid star name raises ValueError in loc function."""
         with pytest.raises(ValueError):
             pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, 0, "NonexistentStar123", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_2024, VENUS, 0, "NonexistentStar123", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     @pytest.mark.comparison
@@ -251,7 +251,7 @@ class TestPlanetOccultErrorHandling:
         """Test that missing target raises ValueError in loc function."""
         with pytest.raises(ValueError):
             pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, 0, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_2024, VENUS, 0, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     @pytest.mark.comparison
@@ -259,7 +259,7 @@ class TestPlanetOccultErrorHandling:
         """Test that same planet raises error in loc function."""
         with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, SE_VENUS, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_2024, VENUS, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
 
@@ -279,10 +279,10 @@ class TestPlanetOccultFunctionSignatures:
         with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_glob(
                 jd_2024,  # tjdut
-                SE_VENUS,  # occulting_planet
-                SE_VENUS,  # occulted_planet (same = validation error)
+                VENUS,  # occulting_planet
+                VENUS,  # occulted_planet (same = validation error)
                 "",  # starname
-                SEFLG_SWIEPH,  # flags
+                FLG_SWIEPH,  # flags
                 0,  # direction (forward)
             )
 
@@ -294,13 +294,13 @@ class TestPlanetOccultFunctionSignatures:
         with pytest.raises(ValueError, match="cannot be the same"):
             pyephem.planet_occult_when_loc(
                 jd_2024,  # jd_start
-                SE_VENUS,  # occulting_planet
-                SE_VENUS,  # occulted_planet (same = validation error)
+                VENUS,  # occulting_planet
+                VENUS,  # occulted_planet (same = validation error)
                 "",  # star_name
                 40.7128,  # lat
                 -74.0060,  # lon
                 0,  # altitude
-                SEFLG_SWIEPH,  # flags
+                FLG_SWIEPH,  # flags
             )
 
     @pytest.mark.comparison
@@ -314,7 +314,7 @@ class TestPlanetOccultFunctionSignatures:
         # Test that planet is accepted by checking it doesn't raise "invalid planet" error
         # Use empty starname to trigger quick validation error
         try:
-            pyephem.planet_occult_when_glob(jd_2024, planet_id, 0, "", SEFLG_SWIEPH, 0)
+            pyephem.planet_occult_when_glob(jd_2024, planet_id, 0, "", FLG_SWIEPH, 0)
         except ValueError as e:
             # Should fail for "no target specified", not "invalid planet"
             assert "must be specified" in str(e) or "target" in str(e).lower(), (
@@ -331,7 +331,7 @@ class TestPlanetOccultFunctionSignatures:
         """
         # Just verify the star can be resolved - don't run the slow occultation search
         try:
-            result = pyephem.fixstar_ut(star_name, jd_2024, SEFLG_SWIEPH)
+            result = pyephem.fixstar_ut(star_name, jd_2024, FLG_SWIEPH)
             # If we get here, the star is recognized
             assert result is not None
         except ValueError as e:
@@ -358,7 +358,7 @@ class TestVenusRegulus:
         """Test Venus-Regulus global occultation search returns proper structure."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, 0, "Regulus", FLG_SWIEPH, 0
             )
 
             # Verify return structure
@@ -387,13 +387,13 @@ class TestVenusRegulus:
         """
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, 0, "Regulus", FLG_SWIEPH, 0
             )
 
             jd_max = tret[0]
 
             # Get Venus position at occultation max (using pyswisseph)
-            venus_ra, venus_dec, _ = get_planet_equatorial_position(jd_max, SE_VENUS)
+            venus_ra, venus_dec, _ = get_planet_equatorial_position(jd_max, VENUS)
 
             # Get Regulus position at occultation max (using pyswisseph)
             regulus_ra, regulus_dec, _ = get_star_equatorial_position(jd_max, "Regulus")
@@ -433,7 +433,7 @@ class TestMarsStarOccultation:
         """Test Mars-star global occultation search returns proper structure."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2000, SE_MARS, 0, star_name, SEFLG_SWIEPH, 0
+                jd_2000, MARS, 0, star_name, FLG_SWIEPH, 0
             )
 
             # Verify return structure
@@ -460,13 +460,13 @@ class TestMarsStarOccultation:
         """Validate Mars-star occultation by checking angular separation."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2000, SE_MARS, 0, star_name, SEFLG_SWIEPH, 0
+                jd_2000, MARS, 0, star_name, FLG_SWIEPH, 0
             )
 
             jd_max = tret[0]
 
             # Get Mars position at occultation max
-            mars_ra, mars_dec, _ = get_planet_equatorial_position(jd_max, SE_MARS)
+            mars_ra, mars_dec, _ = get_planet_equatorial_position(jd_max, MARS)
 
             # Get star position at occultation max
             star_ra, star_dec, _ = get_star_equatorial_position(jd_max, star_name)
@@ -504,7 +504,7 @@ class TestPlanetOccultWhenLoc:
         """Test Venus-Regulus local occultation search returns proper structure."""
         try:
             times, attr, retflag = pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, 0, "Regulus", lat, lon, alt, SEFLG_SWIEPH
+                jd_2024, VENUS, 0, "Regulus", lat, lon, alt, FLG_SWIEPH
             )
 
             # Verify return structure
@@ -530,7 +530,7 @@ class TestPlanetOccultWhenLoc:
         """Validate that occultation is actually visible from the location."""
         try:
             times, attr, retflag = pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, 0, "Regulus", lat, lon, alt, SEFLG_SWIEPH
+                jd_2024, VENUS, 0, "Regulus", lat, lon, alt, FLG_SWIEPH
             )
 
             # Check that altitude attributes indicate visibility
@@ -573,7 +573,7 @@ class TestMutualPlanetaryOccultation:
         """
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2000, SE_VENUS, SE_JUPITER, "", SEFLG_SWIEPH, 0
+                jd_2000, VENUS, JUPITER, "", FLG_SWIEPH, 0
             )
 
             # If we found an event, verify structure
@@ -594,7 +594,7 @@ class TestMutualPlanetaryOccultation:
         """Test Venus-Mars global occultation search structure."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2000, SE_VENUS, SE_MARS, "", SEFLG_SWIEPH, 0
+                jd_2000, VENUS, MARS, "", FLG_SWIEPH, 0
             )
 
             assert isinstance(retflags, int)
@@ -620,7 +620,7 @@ class TestOccultationTimingValidation:
         """Test that occultation phase times are properly ordered."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, 0, "Regulus", FLG_SWIEPH, 0
             )
 
             jd_max = tret[0]  # Maximum
@@ -647,7 +647,7 @@ class TestOccultationTimingValidation:
         """Test that occultation duration is reasonable."""
         try:
             retflags, tret = pyephem.planet_occult_when_glob(
-                jd_2024, SE_VENUS, 0, "Regulus", SEFLG_SWIEPH, 0
+                jd_2024, VENUS, 0, "Regulus", FLG_SWIEPH, 0
             )
 
             jd_begin = tret[2]
@@ -689,11 +689,11 @@ class TestPlanetOccultCrossValidation:
     def test_venus_position_matches_pyswisseph(self, jd_2024):
         """Verify Venus position calculations match pyswisseph."""
         # Get Venus position using pyswisseph
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
-        venus_swe, _ = swe.calc_ut(jd_2024, SE_VENUS, flags)
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
+        venus_swe, _ = swe.calc_ut(jd_2024, VENUS, flags)
 
         # Get Venus position using libephemeris
-        venus_py, _ = pyephem.calc_ut(jd_2024, SE_VENUS, flags)
+        venus_py, _ = pyephem.calc_ut(jd_2024, VENUS, flags)
 
         # Positions should match within arcsecond precision
         ra_diff = abs(venus_swe[0] - venus_py[0]) * 3600  # arcseconds
@@ -705,9 +705,9 @@ class TestPlanetOccultCrossValidation:
     @pytest.mark.comparison
     def test_mars_position_matches_pyswisseph(self, jd_2024):
         """Verify Mars position calculations match pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
-        mars_swe, _ = swe.calc_ut(jd_2024, SE_MARS, flags)
-        mars_py, _ = pyephem.calc_ut(jd_2024, SE_MARS, flags)
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
+        mars_swe, _ = swe.calc_ut(jd_2024, MARS, flags)
+        mars_py, _ = pyephem.calc_ut(jd_2024, MARS, flags)
 
         ra_diff = abs(mars_swe[0] - mars_py[0]) * 3600
         dec_diff = abs(mars_swe[1] - mars_py[1]) * 3600
@@ -718,7 +718,7 @@ class TestPlanetOccultCrossValidation:
     @pytest.mark.comparison
     def test_regulus_position_matches_pyswisseph(self, jd_2024):
         """Verify Regulus star position matches pyswisseph."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         # libephemeris
         regulus_py = pyephem.fixstar_ut("Regulus", jd_2024, flags)
@@ -766,9 +766,9 @@ class TestPlanetOccultCrossValidation:
 
         # Get Venus position from both libraries in ECLIPTIC coordinates
         # (planetary occultations are measured in ecliptic system)
-        flags = SEFLG_SWIEPH
-        venus_swe, _ = swe.calc_ut(jd_conjunction, SE_VENUS, flags)
-        venus_py, _ = pyephem.calc_ut(jd_conjunction, SE_VENUS, flags)
+        flags = FLG_SWIEPH
+        venus_swe, _ = swe.calc_ut(jd_conjunction, VENUS, flags)
+        venus_py, _ = pyephem.calc_ut(jd_conjunction, VENUS, flags)
 
         # Get Regulus from libephemeris (ecliptic coordinates)
         regulus_py = pyephem.fixstar_ut("Regulus", jd_conjunction, flags)
@@ -806,14 +806,14 @@ class TestPlanetOccultCrossValidation:
             (2030, 12, 25, 6.0),
         ]
 
-        planets = [(SE_VENUS, "Venus"), (SE_MARS, "Mars"), (SE_JUPITER, "Jupiter")]
+        planets = [(VENUS, "Venus"), (MARS, "Mars"), (JUPITER, "Jupiter")]
 
         for year, month, day, hour in test_dates:
             jd = swe.julday(year, month, day, hour)
 
             for planet_id, planet_name in planets:
                 # Compare ecliptic positions
-                flags = SEFLG_SWIEPH
+                flags = FLG_SWIEPH
                 pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
                 pos_py, _ = pyephem.calc_ut(jd, planet_id, flags)
 
@@ -854,13 +854,13 @@ class TestMarsStarCrossValidation:
         This tests the core calculation used by planet_occult_when_glob
         to determine when occultations occur.
         """
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
         # Get Mars position from pyswisseph
-        mars_swe, _ = swe.calc_ut(jd_2024, SE_MARS, flags)
+        mars_swe, _ = swe.calc_ut(jd_2024, MARS, flags)
 
         # Get Mars position from libephemeris
-        mars_py, _ = pyephem.calc_ut(jd_2024, SE_MARS, flags)
+        mars_py, _ = pyephem.calc_ut(jd_2024, MARS, flags)
 
         # Verify Mars positions match
         ra_diff = abs(mars_swe[0] - mars_py[0]) * 3600
@@ -899,10 +899,10 @@ class TestPlanetOccultLocCrossValidation:
         lat, lon, alt = 40.7128, -74.0060, 0
 
         # Get Venus position for topocentric calculation
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_EQUATORIAL
 
-        venus_swe, _ = swe.calc_ut(jd_2024, SE_VENUS, flags)
-        venus_py, _ = pyephem.calc_ut(jd_2024, SE_VENUS, flags)
+        venus_swe, _ = swe.calc_ut(jd_2024, VENUS, flags)
+        venus_py, _ = pyephem.calc_ut(jd_2024, VENUS, flags)
 
         # Verify geocentric positions match
         ra_diff = abs(venus_swe[0] - venus_py[0]) * 3600
@@ -958,7 +958,7 @@ class TestPlanetOccultLocCrossValidation:
         try:
             # Trigger a quick error by using same planet for both
             pyephem.planet_occult_when_loc(
-                jd_2024, SE_VENUS, SE_VENUS, "", lat, lon, alt, SEFLG_SWIEPH
+                jd_2024, VENUS, VENUS, "", lat, lon, alt, FLG_SWIEPH
             )
         except ValueError as e:
             # Expected: "cannot be the same" - this means parameters were parsed

@@ -12,10 +12,10 @@ from typing import Dict, List, Tuple
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_TRUE_NODE,
-    SE_MEAN_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
+    TRUE_NODE,
+    MEAN_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
 )
 
 
@@ -95,12 +95,12 @@ def compare_lunar_nodes(
     tolerance = 0.3  # degrees - relaxed for true node
 
     for name, body_id, swe_id in [
-        ("mean_node", SE_MEAN_NODE, swe.MEAN_NODE),
-        ("true_node", SE_TRUE_NODE, swe.TRUE_NODE),
+        ("mean_node", MEAN_NODE, swe.MEAN_NODE),
+        ("true_node", TRUE_NODE, swe.TRUE_NODE),
     ]:
         try:
             pos_swe, _ = swe.calc_ut(jd, swe_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
             diff = angular_diff(pos_swe[0], pos_py[0])
             passed = diff < tolerance
             results[name] = (passed, diff)
@@ -127,12 +127,12 @@ def compare_lilith(
     results = {}
 
     for name, body_id, swe_id, tol in [
-        ("mean_lilith", SE_MEAN_APOG, swe.MEAN_APOG, 0.15),
-        ("true_lilith", SE_OSCU_APOG, swe.OSCU_APOG, 10.0),
+        ("mean_lilith", MEAN_APOG, swe.MEAN_APOG, 0.15),
+        ("true_lilith", OSCU_APOG, swe.OSCU_APOG, 10.0),
     ]:
         try:
             pos_swe, _ = swe.calc_ut(jd, swe_id, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, body_id, 0)
+            pos_py, _ = ephem.calc_ut(jd, body_id, 0)
             diff = angular_diff(pos_swe[0], pos_py[0])
             passed = diff < tol
             results[name] = (passed, diff)
@@ -162,7 +162,7 @@ def compare_true_node_precision(
     for year, month, day, hour, jd in dates:
         try:
             pos_swe, _ = swe.calc_ut(jd, swe.TRUE_NODE, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_TRUE_NODE, 0)
+            pos_py, _ = ephem.calc_ut(jd, TRUE_NODE, 0)
             diff = angular_diff(pos_swe[0], pos_py[0])
 
             stats.total += 1
@@ -199,7 +199,7 @@ def compare_mean_node_precision(
     for year, month, day, hour, jd in dates:
         try:
             pos_swe, _ = swe.calc_ut(jd, swe.MEAN_NODE, 0)
-            pos_py, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, 0)
+            pos_py, _ = ephem.calc_ut(jd, MEAN_NODE, 0)
             diff = angular_diff(pos_swe[0], pos_py[0])
 
             stats.total += 1

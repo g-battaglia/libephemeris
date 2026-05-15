@@ -1,7 +1,7 @@
 """
 Tests for the fast calculation pipeline (fast_calc.py).
 
-Compares fast_calc output with Skyfield/swe_calc_ut for all supported bodies
+Compares fast_calc output with Skyfield/calc_ut for all supported bodies
 and flag combinations.
 """
 
@@ -12,22 +12,22 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MARS,
-    SE_MEAN_NODE,
-    SE_MOON,
-    SE_SUN,
-    SEFLG_BARYCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_NONUT,
-    SEFLG_RADIANS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_XYZ,
+    MARS,
+    MEAN_NODE,
+    MOON,
+    SUN,
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NONUT,
+    FLG_RADIANS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    FLG_TRUEPOS,
+    FLG_XYZ,
 )
 from libephemeris.fast_calc import (
     _calc_ayanamsa_from_leb,
@@ -133,12 +133,12 @@ class TestFastCalcVsSkyfield:
         return dates
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     def test_planet_ecliptic_default(self, leb_reader, test_dates, ipl):
         """Planet ecliptic lon/lat matches Skyfield within tolerance."""
         for jd in test_dates:
-            fast_result, _ = fast_calc_ut(leb_reader, jd, ipl, SEFLG_SPEED)
-            sky_result, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(leb_reader, jd, ipl, FLG_SPEED)
+            sky_result, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             lon_err = abs(fast_result[0] - sky_result[0])
             # Handle wrap-around
@@ -159,8 +159,8 @@ class TestFastCalcVsSkyfield:
     def test_mean_node_ecliptic(self, leb_reader, test_dates):
         """Mean node longitude matches Skyfield within tolerance."""
         for jd in test_dates:
-            fast_result, _ = fast_calc_ut(leb_reader, jd, SE_MEAN_NODE, SEFLG_SPEED)
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(leb_reader, jd, MEAN_NODE, FLG_SPEED)
+            sky_result, _ = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)
 
             lon_err = abs(fast_result[0] - sky_result[0])
             if lon_err > 180.0:
@@ -175,8 +175,8 @@ class TestFastCalcVsSkyfield:
     def test_sun_speed(self, leb_reader, test_dates):
         """Sun speed from .leb should match Skyfield within ~0.001 deg/day."""
         for jd in test_dates:
-            fast_result, _ = fast_calc_ut(leb_reader, jd, SE_SUN, SEFLG_SPEED)
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(leb_reader, jd, SUN, FLG_SPEED)
+            sky_result, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
 
             # Speed tolerance: 0.001 deg/day = 3.6 arcsec/day
             speed_err = abs(fast_result[3] - sky_result[3])
@@ -188,8 +188,8 @@ class TestFastCalcVsSkyfield:
     def test_sun_distance(self, leb_reader, test_dates):
         """Sun distance from .leb should match Skyfield within ~1e-6 AU."""
         for jd in test_dates:
-            fast_result, _ = fast_calc_ut(leb_reader, jd, SE_SUN, SEFLG_SPEED)
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(leb_reader, jd, SUN, FLG_SPEED)
+            sky_result, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
 
             dist_err = abs(fast_result[2] - sky_result[2])
             assert dist_err < 1e-4, f"Sun distance error at JD {jd}: {dist_err:.2e} AU"
@@ -206,23 +206,23 @@ class TestFastCalcFlags:
 
     @pytest.mark.integration
     def test_no_speed(self, leb_reader, jd_mid):
-        """Without SEFLG_SPEED, velocity should be zero."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, 0)
+        """Without FLG_SPEED, velocity should be zero."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, 0)
         assert result[3] == 0.0
         assert result[4] == 0.0
         assert result[5] == 0.0
 
     @pytest.mark.integration
     def test_with_speed(self, leb_reader, jd_mid):
-        """With SEFLG_SPEED, velocity should be non-zero."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        """With FLG_SPEED, velocity should be non-zero."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
         # Sun moves ~1 deg/day in longitude
         assert abs(result[3]) > 0.5, f"Sun speed too small: {result[3]}"
 
     @pytest.mark.integration
     def test_equatorial_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL should return equatorial RA/Dec for ICRS_BARY bodies."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL)
+        """FLG_EQUATORIAL should return equatorial RA/Dec for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_EQUATORIAL)
         # RA should be in [0, 360)
         assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
         # Dec should be in [-90, 90]
@@ -230,92 +230,92 @@ class TestFastCalcFlags:
 
     @pytest.mark.integration
     def test_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_J2000 should return J2000 ecliptic coords for ICRS_BARY bodies."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_J2000)
+        """FLG_J2000 should return J2000 ecliptic coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_J2000)
         assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_equatorial_j2000_flag(self, leb_reader, jd_mid):
-        """SEFLG_EQUATORIAL|SEFLG_J2000 should return J2000 RA/Dec."""
+        """FLG_EQUATORIAL|FLG_J2000 should return J2000 RA/Dec."""
         result, _ = fast_calc_ut(
-            leb_reader, jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_J2000
+            leb_reader, jd_mid, SUN, FLG_EQUATORIAL | FLG_J2000
         )
         assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
         assert -90.0 <= result[1] <= 90.0, f"Dec = {result[1]}"
 
     @pytest.mark.integration
     def test_helctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_HELCTR should return heliocentric coords for ICRS_BARY bodies."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_HELCTR)
+        """FLG_HELCTR should return heliocentric coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, MARS, FLG_HELCTR)
         # Mars heliocentric distance ~1.38-1.67 AU
         assert 1.0 < result[2] < 2.0, f"Mars helio dist = {result[2]}"
 
     @pytest.mark.integration
     def test_baryctr_flag(self, leb_reader, jd_mid):
-        """SEFLG_BARYCTR should return barycentric coords for ICRS_BARY bodies."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_BARYCTR)
+        """FLG_BARYCTR should return barycentric coords for ICRS_BARY bodies."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, MARS, FLG_BARYCTR)
         # Mars barycentric distance ~1.38-1.67 AU
         assert 1.0 < result[2] < 2.0, f"Mars bary dist = {result[2]}"
 
     @pytest.mark.integration
     def test_noaberr_flag(self, leb_reader, jd_mid):
-        """SEFLG_NOABERR should skip aberration and return valid coords."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_NOABERR)
+        """FLG_NOABERR should skip aberration and return valid coords."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, MARS, FLG_NOABERR)
         assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_truepos_flag(self, leb_reader, jd_mid):
-        """SEFLG_TRUEPOS should skip light-time and aberration."""
-        result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MARS, SEFLG_TRUEPOS)
+        """FLG_TRUEPOS should skip light-time and aberration."""
+        result, _ = fast_calc_ut(leb_reader, jd_mid, MARS, FLG_TRUEPOS)
         assert 0.0 <= result[0] < 360.0, f"Lon = {result[0]}"
 
     @pytest.mark.integration
     def test_topoctr_requires_topo(self, leb_reader, jd_mid):
-        """SEFLG_TOPOCTR without swe_set_topo() raises ValueError."""
+        """FLG_TOPOCTR without set_topo() raises ValueError."""
         from libephemeris import state
 
         saved = state._TOPO
         state._TOPO = None
         try:
-            with pytest.raises(ValueError, match="swe_set_topo"):
-                fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_TOPOCTR)
+            with pytest.raises(ValueError, match="set_topo"):
+                fast_calc_ut(leb_reader, jd_mid, SUN, FLG_TOPOCTR)
         finally:
             state._TOPO = saved
 
     @pytest.mark.integration
     def test_topoctr_with_topo(self, leb_reader, jd_mid):
-        """SEFLG_TOPOCTR works after swe_set_topo()."""
+        """FLG_TOPOCTR works after set_topo()."""
         import libephemeris
         from libephemeris import state
 
         saved = state._TOPO
         libephemeris.set_topo(12.5, 41.9, 0)
         try:
-            result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_TOPOCTR)
+            result, _flags = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_TOPOCTR)
             assert 0.0 < result[0] < 360.0
         finally:
             state._TOPO = saved
 
     @pytest.mark.integration
     def test_xyz_flag(self, leb_reader, jd_mid):
-        """SEFLG_XYZ returns Cartesian coordinates (~1 AU from Sun)."""
+        """FLG_XYZ returns Cartesian coordinates (~1 AU from Sun)."""
         import math
 
-        result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_XYZ)
+        result, _flags = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_XYZ)
         r = math.sqrt(result[0] ** 2 + result[1] ** 2 + result[2] ** 2)
         assert 0.98 < r < 1.02  # ~1 AU distance
 
     @pytest.mark.integration
     def test_radians_flag(self, leb_reader, jd_mid):
-        """SEFLG_RADIANS returns coordinates in radians."""
+        """FLG_RADIANS returns coordinates in radians."""
         import math
-        result_deg, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, 0)
-        result_rad, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_RADIANS)
+        result_deg, _ = fast_calc_ut(leb_reader, jd_mid, SUN, 0)
+        result_rad, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_RADIANS)
         assert abs(result_rad[0] - math.radians(result_deg[0])) < 1e-10
 
 
 class TestEclipticDirectVelocity:
-    """Test ecliptic-direct bodies with SEFLG_EQUATORIAL + SEFLG_SPEED.
+    """Test ecliptic-direct bodies with FLG_EQUATORIAL + FLG_SPEED.
 
     This validates the approximate velocity transform in Pipeline B
     (_pipeline_ecliptic) when converting from ecliptic to equatorial.
@@ -329,9 +329,9 @@ class TestEclipticDirectVelocity:
     @pytest.mark.integration
     def test_mean_node_equatorial_speed(self, leb_reader, jd_mid):
         """Mean node equatorial velocity via LEB should match Skyfield."""
-        flags = SEFLG_EQUATORIAL | SEFLG_SPEED
-        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MEAN_NODE, flags)
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, SE_MEAN_NODE, flags)
+        flags = FLG_EQUATORIAL | FLG_SPEED
+        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, MEAN_NODE, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, MEAN_NODE, flags)
 
         # Position check (RA/Dec)
         ra_err = abs(fast_result[0] - sky_result[0])
@@ -356,10 +356,10 @@ class TestEclipticDirectVelocity:
 
     @pytest.mark.integration
     def test_mean_node_equatorial_j2000_speed(self, leb_reader, jd_mid):
-        """Mean node SEFLG_EQUATORIAL | SEFLG_J2000 should produce valid output."""
-        flags = SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
-        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MEAN_NODE, flags)
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, SE_MEAN_NODE, flags)
+        """Mean node FLG_EQUATORIAL | FLG_J2000 should produce valid output."""
+        flags = FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
+        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, MEAN_NODE, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, MEAN_NODE, flags)
 
         # Position check
         ra_err = abs(fast_result[0] - sky_result[0])
@@ -372,10 +372,10 @@ class TestEclipticDirectVelocity:
 
     @pytest.mark.integration
     def test_mean_node_j2000_ecliptic(self, leb_reader, jd_mid):
-        """Mean node SEFLG_J2000 (ecliptic J2000) should match Skyfield."""
-        flags = SEFLG_J2000 | SEFLG_SPEED
-        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_MEAN_NODE, flags)
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, SE_MEAN_NODE, flags)
+        """Mean node FLG_J2000 (ecliptic J2000) should match Skyfield."""
+        flags = FLG_J2000 | FLG_SPEED
+        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, MEAN_NODE, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, MEAN_NODE, flags)
 
         lon_err = abs(fast_result[0] - sky_result[0])
         if lon_err > 180.0:
@@ -405,7 +405,7 @@ class TestFastCalcFallback:
         """JD outside .leb range should raise ValueError."""
         jd_start, _ = leb_reader.jd_range
         with pytest.raises((ValueError, KeyError)):
-            fast_calc_ut(leb_reader, jd_start - 10000, SE_SUN, 0)
+            fast_calc_ut(leb_reader, jd_start - 10000, SUN, 0)
 
 
 class TestFastCalcTT:
@@ -416,7 +416,7 @@ class TestFastCalcTT:
         """fast_calc_tt should work with TT input."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        result, iflag = fast_calc_tt(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        result, iflag = fast_calc_tt(leb_reader, jd_mid, SUN, FLG_SPEED)
 
         assert len(result) == 6
         assert 0.0 <= result[0] < 360.0
@@ -429,8 +429,8 @@ class TestFastCalcTT:
 
         # UT and TT differ by Delta-T (~69 sec in 2020s)
         # Using the same JD should give slightly different positions
-        result_ut, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
-        result_tt, _ = fast_calc_tt(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        result_ut, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
+        result_tt, _ = fast_calc_tt(leb_reader, jd_mid, SUN, FLG_SPEED)
 
         # Sun moves ~1 deg/day, Delta-T ~69 sec → diff ~0.0008 deg
         lon_diff = abs(result_ut[0] - result_tt[0])
@@ -441,22 +441,22 @@ class TestFastCalcTT:
 
 
 class TestNonutFallback:
-    """Test SEFLG_NONUT triggers Skyfield fallback."""
+    """Test FLG_NONUT triggers Skyfield fallback."""
 
     @pytest.mark.integration
     def test_nonut_flag_ut(self, leb_reader):
-        """SEFLG_NONUT should work in LEB mode (mean ecliptic)."""
+        """FLG_NONUT should work in LEB mode (mean ecliptic)."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        result, _flags = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        result, _flags = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_NONUT)
         assert 0.0 < result[0] < 360.0
 
     @pytest.mark.integration
     def test_nonut_flag_tt(self, leb_reader):
-        """SEFLG_NONUT should work in TT path too."""
+        """FLG_NONUT should work in TT path too."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        result, _flags = fast_calc_tt(leb_reader, jd_mid, SE_SUN, SEFLG_NONUT)
+        result, _flags = fast_calc_tt(leb_reader, jd_mid, SUN, FLG_NONUT)
         assert 0.0 < result[0] < 360.0
 
 
@@ -472,14 +472,14 @@ class TestExplicitSiderealParams:
         result, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
-            SE_SUN,
-            SEFLG_SPEED | SEFLG_SIDEREAL,
+            SUN,
+            FLG_SPEED | FLG_SIDEREAL,
             sid_mode=1,
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
         # Sidereal lon should be ~24 deg less than tropical
-        tropical, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        tropical, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
         diff = tropical[0] - result[0]
         if diff < 0:
             diff += 360.0
@@ -495,8 +495,8 @@ class TestExplicitSiderealParams:
         result_lahiri, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
-            SE_SUN,
-            SEFLG_SPEED | SEFLG_SIDEREAL,
+            SUN,
+            FLG_SPEED | FLG_SIDEREAL,
             sid_mode=1,
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
@@ -504,8 +504,8 @@ class TestExplicitSiderealParams:
         result_fb, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
-            SE_SUN,
-            SEFLG_SPEED | SEFLG_SIDEREAL,
+            SUN,
+            FLG_SPEED | FLG_SIDEREAL,
             sid_mode=0,
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
@@ -521,12 +521,12 @@ class TestExplicitSiderealParams:
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        trop, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        trop, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
         sid, _ = fast_calc_ut(
             leb_reader,
             jd_mid,
-            SE_SUN,
-            SEFLG_SPEED | SEFLG_SIDEREAL,
+            SUN,
+            FLG_SPEED | FLG_SIDEREAL,
             sid_mode=1,
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
@@ -551,10 +551,10 @@ class TestPipelineBJ2000Velocity:
 
         # J2000 ecliptic (the branch we fixed)
         result_j2000, _ = fast_calc_ut(
-            leb_reader, jd_mid, SE_MEAN_NODE, SEFLG_SPEED | SEFLG_J2000
+            leb_reader, jd_mid, MEAN_NODE, FLG_SPEED | FLG_J2000
         )
         # Ecliptic of date (default)
-        result_date, _ = fast_calc_ut(leb_reader, jd_mid, SE_MEAN_NODE, SEFLG_SPEED)
+        result_date, _ = fast_calc_ut(leb_reader, jd_mid, MEAN_NODE, FLG_SPEED)
 
         # Velocity should differ slightly due to precession correction
         # Mean node moves ~-0.053 deg/day
@@ -638,10 +638,10 @@ class TestSiderealRegressionBug1:
         return (jd_start + jd_end) / 2.0
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     def test_sid_eq_pipeline_a_position(self, leb_reader, jd_mid, ipl):
         """SID+EQ for Pipeline A bodies: LEB vs Skyfield within 0.1"."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         ephem.set_sid_mode(1, 2451545.0, 0.0)
 
         fast_result, _ = fast_calc_ut(
@@ -653,7 +653,7 @@ class TestSiderealRegressionBug1:
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, ipl, flags)
 
         ra_err = abs(fast_result[0] - sky_result[0])
         if ra_err > 180.0:
@@ -671,10 +671,10 @@ class TestSiderealRegressionBug1:
         )
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     def test_sid_j2k_pipeline_a_position(self, leb_reader, jd_mid, ipl):
         """SID+J2K for Pipeline A bodies: LEB vs Skyfield within 0.1"."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         ephem.set_sid_mode(1, 2451545.0, 0.0)
 
         fast_result, _ = fast_calc_ut(
@@ -686,7 +686,7 @@ class TestSiderealRegressionBug1:
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, ipl, flags)
 
         lon_err = abs(fast_result[0] - sky_result[0])
         if lon_err > 180.0:
@@ -698,10 +698,10 @@ class TestSiderealRegressionBug1:
         )
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     def test_sid_eq_j2k_pipeline_a_position(self, leb_reader, jd_mid, ipl):
         """SID+EQ+J2K for Pipeline A bodies: LEB vs Skyfield within 0.5"."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000
         ephem.set_sid_mode(1, 2451545.0, 0.0)
 
         fast_result, _ = fast_calc_ut(
@@ -713,7 +713,7 @@ class TestSiderealRegressionBug1:
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, ipl, flags)
 
         ra_err = abs(fast_result[0] - sky_result[0])
         if ra_err > 180.0:
@@ -725,11 +725,11 @@ class TestSiderealRegressionBug1:
         )
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     @pytest.mark.parametrize("sid_mode", [0, 1, 3])
     def test_sid_eq_multi_ayanamsha(self, leb_reader, jd_mid, ipl, sid_mode):
         """SID+EQ should match Skyfield for multiple ayanamsha modes."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
         fast_result, _ = fast_calc_ut(
@@ -741,7 +741,7 @@ class TestSiderealRegressionBug1:
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
-        sky_result, _ = ephem.swe_calc_ut(jd_mid, ipl, flags)
+        sky_result, _ = ephem.calc_ut(jd_mid, ipl, flags)
 
         ra_err = abs(fast_result[0] - sky_result[0])
         if ra_err > 180.0:
@@ -777,20 +777,20 @@ class TestSiderealRegressionBug2:
     @pytest.mark.integration
     def test_mean_node_sid_eq(self, leb_reader, test_dates):
         """MeanNode SID+EQ: LEB vs Skyfield within 0.1"."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         for jd in test_dates:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
             fast_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
+                MEAN_NODE,
                 flags,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
             )
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+            sky_result, _ = ephem.calc_ut(jd, MEAN_NODE, flags)
 
             ra_err = abs(fast_result[0] - sky_result[0])
             if ra_err > 180.0:
@@ -805,20 +805,20 @@ class TestSiderealRegressionBug2:
     @pytest.mark.integration
     def test_mean_node_sid_eq_speed(self, leb_reader, test_dates):
         """MeanNode SID+EQ velocity: LEB vs Skyfield within 0.01 deg/day."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         for jd in test_dates:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
             fast_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
+                MEAN_NODE,
                 flags,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
             )
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+            sky_result, _ = ephem.calc_ut(jd, MEAN_NODE, flags)
 
             speed_err = abs(fast_result[3] - sky_result[3])
 
@@ -829,7 +829,7 @@ class TestSiderealRegressionBug2:
 
 class TestSiderealRegressionBug3:
     """Bug 3 regression (commit 9f0fde7):
-    pyswisseph ignores SEFLG_J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
+    pyswisseph ignores FLG_J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
     when SIDEREAL is set.  MeanNode and MeanApog precess to J2000 normally.
 
     Only MeanNode is in the test LEB.  We verify MeanNode SID+J2K DOES differ
@@ -860,8 +860,8 @@ class TestSiderealRegressionBug3:
             sid_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
-                SEFLG_SPEED | SEFLG_SIDEREAL,
+                MEAN_NODE,
+                FLG_SPEED | FLG_SIDEREAL,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
@@ -869,8 +869,8 @@ class TestSiderealRegressionBug3:
             sid_j2k_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
-                SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000,
+                MEAN_NODE,
+                FLG_SPEED | FLG_SIDEREAL | FLG_J2000,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
@@ -890,19 +890,19 @@ class TestSiderealRegressionBug3:
     def test_mean_node_sid_j2k_matches_skyfield(self, leb_reader, test_dates):
         """MeanNode SID+J2K from LEB matches Skyfield within 0.5"."""
         for jd in test_dates:
-            flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+            flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
             fast_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
+                MEAN_NODE,
                 flags,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
             )
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+            sky_result, _ = ephem.calc_ut(jd, MEAN_NODE, flags)
 
             lon_err = abs(fast_result[0] - sky_result[0])
             if lon_err > 180.0:
@@ -939,20 +939,20 @@ class TestSiderealRegressionBug4:
     @pytest.mark.integration
     def test_mean_node_sid_eq_j2k_combined(self, leb_reader, test_dates):
         """MeanNode SID+EQ+J2K: LEB vs Skyfield within 0.5"."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000
         for jd in test_dates:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
             fast_result, _ = fast_calc_ut(
                 leb_reader,
                 jd,
-                SE_MEAN_NODE,
+                MEAN_NODE,
                 flags,
                 sid_mode=1,
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
             )
-            sky_result, _ = ephem.swe_calc_ut(jd, SE_MEAN_NODE, flags)
+            sky_result, _ = ephem.calc_ut(jd, MEAN_NODE, flags)
 
             ra_err = abs(fast_result[0] - sky_result[0])
             if ra_err > 180.0:
@@ -965,7 +965,7 @@ class TestSiderealRegressionBug4:
             )
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("ipl", [SE_SUN, SE_MOON, SE_MARS])
+    @pytest.mark.parametrize("ipl", [SUN, MOON, MARS])
     def test_pipeline_a_precession_no_frame_bias(self, leb_reader, test_dates, ipl):
         """Pipeline A SID+EQ: verify no ICRS frame bias in precession.
 
@@ -973,7 +973,7 @@ class TestSiderealRegressionBug4:
         distance from J2000.  With the fix, LEB and Skyfield use the same
         mean equator precession matrix (no frame bias).
         """
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         max_err = 0.0
 
         for jd in test_dates:
@@ -988,7 +988,7 @@ class TestSiderealRegressionBug4:
                 sid_t0=2451545.0,
                 sid_ayan_t0=0.0,
             )
-            sky_result, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            sky_result, _ = ephem.calc_ut(jd, ipl, flags)
 
             ra_err = abs(fast_result[0] - sky_result[0])
             if ra_err > 180.0:

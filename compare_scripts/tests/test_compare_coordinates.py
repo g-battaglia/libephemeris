@@ -331,7 +331,7 @@ class TestAzalt:
         xin = (280.0, -23.0, 1.0)  # Approximate RA, Dec, distance
 
         result_swe = swe.azalt(jd, swe.ECL2HOR, geopos, atpress, attemp, xin)
-        result_py = ephem.azalt(jd, 0, geopos, atpress, attemp, xin)  # SE_ECL2HOR = 0
+        result_py = ephem.azalt(jd, 0, geopos, atpress, attemp, xin)  # ECL2HOR = 0
 
         diff_az = angular_diff(result_swe[0], result_py[0])
         diff_alt = abs(result_swe[1] - result_py[1])
@@ -355,7 +355,7 @@ class TestAzaltRev:
         altitude = 45.0
 
         result_swe = swe.azalt_rev(jd, swe.HOR2ECL, geopos, azimuth, altitude)
-        result_py = ephem.azalt_rev(jd, ephem.SE_HOR2ECL, geopos, azimuth, altitude)
+        result_py = ephem.azalt_rev(jd, ephem.HOR2ECL, geopos, azimuth, altitude)
 
         diff_lon = angular_diff(result_swe[0], result_py[0])
         diff_lat = abs(result_swe[1] - result_py[1])
@@ -377,7 +377,7 @@ class TestRefrac:
         refrac_swe = swe.refrac(alt_true, pressure, temperature, swe.TRUE_TO_APP)
         refrac_py = ephem.refrac(
             alt_true, pressure, temperature, 0
-        )  # SE_TRUE_TO_APP = 0
+        )  # TRUE_TO_APP = 0
 
         diff = abs(refrac_swe - refrac_py)
 
@@ -393,7 +393,7 @@ class TestRefrac:
         refrac_swe = swe.refrac(alt_app, pressure, temperature, swe.APP_TO_TRUE)
         refrac_py = ephem.refrac(
             alt_app, pressure, temperature, 1
-        )  # SE_APP_TO_TRUE = 1
+        )  # APP_TO_TRUE = 1
 
         diff = abs(refrac_swe - refrac_py)
 
@@ -413,7 +413,7 @@ class TestRefracExtended:
         pressure = 1013.25
         temperature = 15.0
         lapse_rate = 0.0065  # Standard lapse rate
-        calc_flag = 0  # SE_TRUE_TO_APP
+        calc_flag = 0  # TRUE_TO_APP
 
         result_swe = swe.refrac_extended(
             alt_true, geoalt, pressure, temperature, lapse_rate, calc_flag

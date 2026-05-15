@@ -15,25 +15,25 @@ import swisseph as swe_ref
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_RAMAN,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_SURYASIDDHANTA,
-    SE_SIDM_J2000,
-    SE_SIDM_HIPPARCHOS,
-    SE_SIDM_LAHIRI_1940,
-    SE_SIDM_LAHIRI_VP285,
-    SE_SIDM_KRISHNAMURTI_VP291,
-    SE_SIDM_LAHIRI_ICRC,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_RAMAN,
+    SIDM_KRISHNAMURTI,
+    SIDM_YUKTESHWAR,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_SURYASIDDHANTA,
+    SIDM_J2000,
+    SIDM_HIPPARCHOS,
+    SIDM_LAHIRI_1940,
+    SIDM_LAHIRI_VP285,
+    SIDM_KRISHNAMURTI_VP291,
+    SIDM_LAHIRI_ICRC,
 )
 
 
@@ -64,17 +64,17 @@ AYAN_TRUE_TOL_DEG = 0.005  # 0.005 degrees = 18 arcseconds
 
 # Modes where libephemeris and pyswisseph are known to agree well
 SELECTED_MODES = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
 ]
 
 POSITION_TEST_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
 ]
 
 POSITION_TEST_DATES = [
@@ -113,10 +113,10 @@ class TestAyanamshaAtJ2000:
         Standard modes use 0.001 degree; true-star modes use 0.005 degree
         to account for different star position catalogs.
         """
-        swe.swe_set_sid_mode(mode)
+        swe.set_sid_mode(mode)
         swe_ref.set_sid_mode(mode)
 
-        lib_ayan = float(swe.swe_get_ayanamsa_ut(J2000))
+        lib_ayan = float(swe.get_ayanamsa_ut(J2000))
         ref_ayan = float(swe_ref.get_ayanamsa_ut(J2000))
 
         tol = AYAN_TRUE_TOL_DEG if mode in TRUE_STAR_MODES else AYAN_TOL_DEG
@@ -130,8 +130,8 @@ class TestAyanamshaAtJ2000:
     @pytest.mark.parametrize("mode", ALL_MODES)
     def test_ayanamsha_finite(self, mode: int):
         """Each ayanamsha mode returns a finite value at J2000."""
-        swe.swe_set_sid_mode(mode)
-        ayan = swe.swe_get_ayanamsa_ut(J2000)
+        swe.set_sid_mode(mode)
+        ayan = swe.get_ayanamsa_ut(J2000)
         assert math.isfinite(float(ayan)), f"Mode {mode}: ayanamsha={ayan} not finite"
 
     @pytest.mark.unit
@@ -142,8 +142,8 @@ class TestAyanamshaAtJ2000:
         Some true-star modes return numpy float64 from the stellar position
         pipeline; both are acceptable numeric types.
         """
-        swe.swe_set_sid_mode(mode)
-        ayan = swe.swe_get_ayanamsa_ut(J2000)
+        swe.set_sid_mode(mode)
+        ayan = swe.get_ayanamsa_ut(J2000)
         assert isinstance(ayan, (int, float)) or hasattr(ayan, "__float__"), (
             f"Mode {mode}: type={type(ayan)} is not numeric"
         )
@@ -163,7 +163,7 @@ class TestAyanamshaNames:
     @pytest.mark.parametrize("mode", ALL_MODES)
     def test_name_non_empty(self, mode: int):
         """Each valid mode returns a non-empty name string."""
-        name = swe.swe_get_ayanamsa_name(mode)
+        name = swe.get_ayanamsa_name(mode)
         assert isinstance(name, str), f"Mode {mode}: type={type(name)}"
         assert len(name) > 0, f"Mode {mode}: name is empty"
 
@@ -171,21 +171,21 @@ class TestAyanamshaNames:
     @pytest.mark.parametrize(
         "mode,expected_fragment",
         [
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan"),
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_RAMAN, "Raman"),
-            (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-            (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-            (SE_SIDM_TRUE_CITRA, "Citra"),
-            (SE_SIDM_TRUE_REVATI, "Revati"),
-            (SE_SIDM_SURYASIDDHANTA, "Surya"),
-            (SE_SIDM_J2000, "J2000"),
-            (SE_SIDM_HIPPARCHOS, "Hipparchos"),
+            (SIDM_FAGAN_BRADLEY, "Fagan"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_RAMAN, "Raman"),
+            (SIDM_KRISHNAMURTI, "Krishnamurti"),
+            (SIDM_YUKTESHWAR, "Yukteshwar"),
+            (SIDM_TRUE_CITRA, "Citra"),
+            (SIDM_TRUE_REVATI, "Revati"),
+            (SIDM_SURYASIDDHANTA, "Surya"),
+            (SIDM_J2000, "J2000"),
+            (SIDM_HIPPARCHOS, "Hipparchos"),
         ],
     )
     def test_name_contains_expected(self, mode: int, expected_fragment: str):
         """Known mode names contain expected keyword."""
-        name = swe.swe_get_ayanamsa_name(mode)
+        name = swe.get_ayanamsa_name(mode)
         assert expected_fragment.lower() in name.lower(), (
             f"Mode {mode}: name='{name}' does not contain '{expected_fragment}'"
         )
@@ -194,7 +194,7 @@ class TestAyanamshaNames:
     @pytest.mark.parametrize("mode", ALL_MODES)
     def test_name_matches_swisseph(self, mode: int):
         """Mode names match pyswisseph (case-insensitive substring)."""
-        lib_name = swe.swe_get_ayanamsa_name(mode)
+        lib_name = swe.get_ayanamsa_name(mode)
         ref_name = swe_ref.get_ayanamsa_name(mode)
         # Some names may differ slightly in formatting, so we compare
         # lowercased first few characters
@@ -219,10 +219,10 @@ class TestAyanamshaTimeVariation:
         For most modes, ayanamsha in 2000 > ayanamsha in 1900.
         (Exception: mode 40/Cochrane wraps around, but we test safe modes.)
         """
-        swe.swe_set_sid_mode(mode)
-        ayan_1900 = float(swe.swe_get_ayanamsa_ut(2415020.0))
-        ayan_2000 = float(swe.swe_get_ayanamsa_ut(2451545.0))
-        ayan_2100 = float(swe.swe_get_ayanamsa_ut(2488070.0))
+        swe.set_sid_mode(mode)
+        ayan_1900 = float(swe.get_ayanamsa_ut(2415020.0))
+        ayan_2000 = float(swe.get_ayanamsa_ut(2451545.0))
+        ayan_2100 = float(swe.get_ayanamsa_ut(2488070.0))
 
         assert ayan_2000 > ayan_1900, (
             f"Mode {mode}: ayanamsha should increase 1900->2000 "
@@ -237,9 +237,9 @@ class TestAyanamshaTimeVariation:
     @pytest.mark.parametrize("mode", [0, 1, 3, 5, 7])
     def test_precession_rate_approximately_50_arcsec_per_year(self, mode: int):
         """Annual precession rate is approximately 50\"/year for standard modes."""
-        swe.swe_set_sid_mode(mode)
-        ayan_2000 = float(swe.swe_get_ayanamsa_ut(2451545.0))
-        ayan_2100 = float(swe.swe_get_ayanamsa_ut(2488070.0))
+        swe.set_sid_mode(mode)
+        ayan_2000 = float(swe.get_ayanamsa_ut(2451545.0))
+        ayan_2100 = float(swe.get_ayanamsa_ut(2488070.0))
 
         rate_arcsec = (ayan_2100 - ayan_2000) * 3600 / 100.0  # arcsec/year
         assert 49 < rate_arcsec < 51, (
@@ -268,11 +268,11 @@ class TestSiderealPositions:
         jd: float,
     ):
         """Sidereal longitude matches pyswisseph within 2 arcseconds."""
-        swe.swe_set_sid_mode(mode)
+        swe.set_sid_mode(mode)
         swe_ref.set_sid_mode(mode)
 
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
-        lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
+        flags = FLG_SIDEREAL | FLG_SPEED
+        lib_vals, _ = swe.calc_ut(jd, body_id, flags)
         ref_vals, _ = swe_ref.calc_ut(jd, body_id, flags)
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
@@ -288,8 +288,8 @@ class TestSiderealPositions:
         self, mode: int, mode_name: str, body_id: int, body_name: str
     ):
         """Sidereal longitude is in [0, 360) range."""
-        swe.swe_set_sid_mode(mode)
-        vals, _ = swe.swe_calc_ut(J2000, body_id, SEFLG_SIDEREAL)
+        swe.set_sid_mode(mode)
+        vals, _ = swe.calc_ut(J2000, body_id, FLG_SIDEREAL)
         assert 0 <= vals[0] < 360, (
             f"{mode_name} {body_name}: lon={vals[0]} out of range"
         )
@@ -298,12 +298,12 @@ class TestSiderealPositions:
     @pytest.mark.parametrize("mode,mode_name", SELECTED_MODES)
     def test_sidereal_vs_tropical_offset(self, mode: int, mode_name: str):
         """Sidereal longitude = tropical longitude - ayanamsha (mod 360)."""
-        swe.swe_set_sid_mode(mode)
+        swe.set_sid_mode(mode)
         jd = J2000
 
-        trop_vals, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
-        sid_vals, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL | SEFLG_SPEED)
-        ayan = float(swe.swe_get_ayanamsa_ut(jd))
+        trop_vals, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
+        sid_vals, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL | FLG_SPEED)
+        ayan = float(swe.get_ayanamsa_ut(jd))
 
         expected_sid = (trop_vals[0] - ayan) % 360
         actual_sid = sid_vals[0]
@@ -326,28 +326,28 @@ class TestExtendedModes:
     """Test newer/less common ayanamsha modes (43-46)."""
 
     EXTENDED_MODES = [
-        (SE_SIDM_LAHIRI_1940, "Lahiri 1940"),
-        (SE_SIDM_LAHIRI_VP285, "Lahiri VP285"),
-        (SE_SIDM_KRISHNAMURTI_VP291, "Krishnamurti VP291"),
-        (SE_SIDM_LAHIRI_ICRC, "Lahiri ICRC"),
+        (SIDM_LAHIRI_1940, "Lahiri 1940"),
+        (SIDM_LAHIRI_VP285, "Lahiri VP285"),
+        (SIDM_KRISHNAMURTI_VP291, "Krishnamurti VP291"),
+        (SIDM_LAHIRI_ICRC, "Lahiri ICRC"),
     ]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("mode,name", EXTENDED_MODES)
     def test_extended_mode_finite(self, mode: int, name: str):
         """Extended mode returns a finite ayanamsha."""
-        swe.swe_set_sid_mode(mode)
-        ayan = swe.swe_get_ayanamsa_ut(J2000)
+        swe.set_sid_mode(mode)
+        ayan = swe.get_ayanamsa_ut(J2000)
         assert math.isfinite(float(ayan)), f"{name}: ayan={ayan}"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("mode,name", EXTENDED_MODES)
     def test_extended_mode_matches_swisseph(self, mode: int, name: str):
         """Extended mode matches pyswisseph within tolerance."""
-        swe.swe_set_sid_mode(mode)
+        swe.set_sid_mode(mode)
         swe_ref.set_sid_mode(mode)
 
-        lib_ayan = float(swe.swe_get_ayanamsa_ut(J2000))
+        lib_ayan = float(swe.get_ayanamsa_ut(J2000))
         ref_ayan = float(swe_ref.get_ayanamsa_ut(J2000))
 
         diff = abs(lib_ayan - ref_ayan)
@@ -358,9 +358,9 @@ class TestExtendedModes:
     @pytest.mark.unit
     @pytest.mark.parametrize("mode,name", EXTENDED_MODES)
     def test_extended_mode_calc_works(self, mode: int, name: str):
-        """Extended mode works with swe_calc_ut + SEFLG_SIDEREAL."""
-        swe.swe_set_sid_mode(mode)
-        vals, _ = swe.swe_calc_ut(J2000, SE_SUN, SEFLG_SIDEREAL)
+        """Extended mode works with calc_ut + FLG_SIDEREAL."""
+        swe.set_sid_mode(mode)
+        vals, _ = swe.calc_ut(J2000, SUN, FLG_SIDEREAL)
         assert 0 <= vals[0] < 360, f"{name}: lon={vals[0]}"
 
 
@@ -370,11 +370,11 @@ class TestDistinctModes:
     @pytest.mark.unit
     def test_lahiri_vs_fagan_bradley(self):
         """Lahiri and Fagan-Bradley produce different ayanamshas."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan_lahiri = float(swe.swe_get_ayanamsa_ut(J2000))
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ayan_lahiri = float(swe.get_ayanamsa_ut(J2000))
 
-        swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-        ayan_fb = float(swe.swe_get_ayanamsa_ut(J2000))
+        swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        ayan_fb = float(swe.get_ayanamsa_ut(J2000))
 
         assert abs(ayan_lahiri - ayan_fb) > 0.1, (
             f"Lahiri={ayan_lahiri:.6f}, Fagan-Bradley={ayan_fb:.6f} "
@@ -384,8 +384,8 @@ class TestDistinctModes:
     @pytest.mark.unit
     def test_j2000_mode_is_near_zero(self):
         """J2000 mode should have ayanamsha very close to 0.0."""
-        swe.swe_set_sid_mode(SE_SIDM_J2000)
-        ayan = float(swe.swe_get_ayanamsa_ut(J2000))
+        swe.set_sid_mode(SIDM_J2000)
+        ayan = float(swe.get_ayanamsa_ut(J2000))
         # Allow 1e-6 degree (about 0.004 arcsecond) for numerical noise
         assert abs(ayan) < 1e-6, f"J2000 mode ayanamsha={ayan}, expected ~0.0"
 
@@ -398,8 +398,8 @@ class TestDistinctModes:
         """
         values = {}
         for mode in range(43):
-            swe.swe_set_sid_mode(mode)
-            ayan = float(swe.swe_get_ayanamsa_ut(J2000))
+            swe.set_sid_mode(mode)
+            ayan = float(swe.get_ayanamsa_ut(J2000))
             values[mode] = ayan
 
         # Check that most pairs differ by at least 0.001 degree

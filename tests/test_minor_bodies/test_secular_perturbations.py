@@ -27,14 +27,14 @@ from libephemeris.minor_bodies import (
     NEPTUNE_A,
 )
 from libephemeris.constants import (
-    SE_CERES,
-    SE_PALLAS,
-    SE_VESTA,
-    SE_CHIRON,
-    SE_ERIS,
-    SE_QUAOAR,
-    SE_IXION,
-    SE_ORCUS,
+    CERES,
+    PALLAS,
+    VESTA,
+    CHIRON,
+    ERIS,
+    QUAOAR,
+    IXION,
+    ORCUS,
 )
 
 
@@ -77,7 +77,7 @@ class TestSecularPerturbationRates:
 
     def test_ceres_perturbation_rates(self):
         """Ceres should have measurable perturbation rates from Jupiter."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
         # Ceres is in the main belt, should have positive perihelion precession
@@ -95,7 +95,7 @@ class TestSecularPerturbationRates:
 
     def test_chiron_perturbation_rates(self):
         """Chiron (between Saturn and Uranus) should have smaller perturbation rates."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
         # Chiron is beyond Saturn, so perturbations from Jupiter are weaker
@@ -109,7 +109,7 @@ class TestSecularPerturbationRates:
 
     def test_eris_perturbation_rates(self):
         """Eris (very distant TNO) should have very small perturbation rates."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
         # Eris is ~68 AU, so Jupiter/Saturn perturbations are very weak
@@ -124,7 +124,7 @@ class TestApplySecularPerturbations:
 
     def test_short_propagation_unchanged(self):
         """For very short propagation times, elements should be essentially unchanged."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         epoch = elements.epoch
 
         # Propagate for 0.5 days
@@ -142,7 +142,7 @@ class TestApplySecularPerturbations:
 
     def test_long_propagation_changed(self):
         """For long propagation times, elements should show measurable drift."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         epoch = elements.epoch
 
         # Propagate for 10 years (3652.5 days)
@@ -170,7 +170,7 @@ class TestApplySecularPerturbations:
 
     def test_perturbations_disabled_no_change(self):
         """With perturbations disabled, only mean anomaly should change."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         epoch = elements.epoch
 
         # Propagate for 1000 days without perturbations
@@ -192,7 +192,7 @@ class TestPositionWithPerturbations:
 
     def test_position_with_and_without_perturbations(self):
         """Positions with perturbations should differ from those without."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         epoch = elements.epoch
 
         # Propagate for 5 years
@@ -215,7 +215,7 @@ class TestPositionWithPerturbations:
 
     def test_position_at_epoch_similar(self):
         """At epoch, perturbed and unperturbed positions should be essentially identical."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         epoch = elements.epoch
 
         # Calculate at epoch
@@ -279,7 +279,7 @@ class TestUranusPerturbations:
     def test_tno_uranus_perturbation_nonzero(self):
         """TNOs should have non-zero Uranus perturbations."""
         # Eris is a distant TNO (~68 AU) - exterior to Uranus
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
         # The total rates should be non-zero (combined effect of all planets)
@@ -289,7 +289,7 @@ class TestUranusPerturbations:
 
     def test_quaoar_uranus_perturbation_contribution(self):
         """Quaoar (a~43 AU) should have significant Uranus contribution."""
-        elements = MINOR_BODY_ELEMENTS[SE_QUAOAR]
+        elements = MINOR_BODY_ELEMENTS[QUAOAR]
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
         # Convert to arcsec/year for easier comparison
@@ -300,7 +300,7 @@ class TestUranusPerturbations:
 
     def test_chiron_between_saturn_uranus(self):
         """Chiron (between Saturn and Uranus) should have perturbations from all planets."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         # Chiron a ~ 13.7 AU, so between Saturn (9.5 AU) and Uranus (19.2 AU)
         assert SATURN_A < elements.a < URANUS_A, (
             f"Chiron should be between Saturn and Uranus: {elements.a} AU"
@@ -322,7 +322,7 @@ class TestUranusPerturbations:
         """Verify Uranus perturbations increase total effect for TNOs."""
         # For a TNO exterior to Uranus, the Uranus contribution should add to
         # the total effect (same sign as other planets for secular precession)
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
 
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
@@ -342,7 +342,7 @@ class TestAllBodiesPerturbations:
 
     @pytest.mark.parametrize(
         "body_id",
-        [SE_CERES, SE_PALLAS, SE_VESTA, SE_CHIRON, SE_ERIS, SE_QUAOAR],
+        [CERES, PALLAS, VESTA, CHIRON, ERIS, QUAOAR],
     )
     def test_perturbation_rates_finite(self, body_id):
         """Perturbation rates should be finite for all bodies."""
@@ -355,7 +355,7 @@ class TestAllBodiesPerturbations:
 
     @pytest.mark.parametrize(
         "body_id",
-        [SE_CERES, SE_PALLAS, SE_VESTA, SE_CHIRON, SE_ERIS, SE_QUAOAR],
+        [CERES, PALLAS, VESTA, CHIRON, ERIS, QUAOAR],
     )
     def test_position_valid_with_perturbations(self, body_id):
         """Position should be valid with perturbations for all bodies."""
@@ -396,13 +396,13 @@ class TestNeptunePerturbations:
         """Neptune perturbations should only apply for bodies with a > 20 AU."""
         # Ceres is in the main belt (~2.77 AU) - should NOT have Neptune perturbation
         # The test verifies that inner solar system bodies are unaffected
-        ceres_elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        ceres_elements = MINOR_BODY_ELEMENTS[CERES]
         assert ceres_elements.a < 20.0, "Ceres should be interior to 20 AU threshold"
 
     def test_ixion_neptune_perturbation(self):
         """Ixion (plutino, a~39 AU) should have significant Neptune perturbation."""
         # Ixion is in 2:3 mean motion resonance with Neptune
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
 
         # Verify Ixion is a plutino (a ~ 39 AU, near 2:3 resonance with Neptune)
         assert 38.0 < elements.a < 41.0, f"Ixion should be at ~39 AU, got {elements.a}"
@@ -420,7 +420,7 @@ class TestNeptunePerturbations:
     def test_orcus_neptune_perturbation(self):
         """Orcus (plutino, a~39 AU) should have significant Neptune perturbation."""
         # Orcus is also in 2:3 mean motion resonance with Neptune (anti-Pluto phase)
-        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        elements = MINOR_BODY_ELEMENTS[ORCUS]
 
         # Verify Orcus is a plutino
         assert 38.0 < elements.a < 41.0, f"Orcus should be at ~39 AU, got {elements.a}"
@@ -437,7 +437,7 @@ class TestNeptunePerturbations:
 
     def test_eris_neptune_perturbation(self):
         """Eris (a~68 AU) should have Neptune perturbation as exterior body."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
 
         # Eris is exterior to Neptune
         assert elements.a > NEPTUNE_A, (
@@ -460,7 +460,7 @@ class TestNeptunePerturbations:
         """For plutinos, Neptune perturbation should be a significant contributor."""
         # Compare perturbation rates for Ixion with and without the Neptune effect
         # by testing that the rate is larger than it would be from just Uranus
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
 
         d_omega, d_Omega, d_n = calc_secular_perturbation_rates(elements)
 
@@ -475,7 +475,7 @@ class TestNeptunePerturbations:
             f"Ixion omega rate {d_omega_arcsec_year:.2f} arcsec/yr should be > 0.5"
         )
 
-    @pytest.mark.parametrize("body_id", [SE_IXION, SE_ORCUS, SE_QUAOAR, SE_ERIS])
+    @pytest.mark.parametrize("body_id", [IXION, ORCUS, QUAOAR, ERIS])
     def test_tno_neptune_perturbation_finite(self, body_id):
         """All TNOs should have finite perturbation rates including Neptune."""
         elements = MINOR_BODY_ELEMENTS[body_id]
@@ -489,7 +489,7 @@ class TestNeptunePerturbations:
         assert math.isfinite(d_Omega), f"d_Omega should be finite for {elements.name}"
         assert math.isfinite(d_n), f"d_n should be finite for {elements.name}"
 
-    @pytest.mark.parametrize("body_id", [SE_IXION, SE_ORCUS])
+    @pytest.mark.parametrize("body_id", [IXION, ORCUS])
     def test_plutino_position_with_neptune_perturbations(self, body_id):
         """Plutino positions should be valid with Neptune perturbations."""
         elements = MINOR_BODY_ELEMENTS[body_id]
@@ -515,7 +515,7 @@ class TestNeptunePerturbations:
     def test_neptune_perturbation_changes_position(self):
         """Neptune perturbations should cause measurable position changes for plutinos."""
         # For Ixion, propagate forward and compare with/without perturbations
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         epoch = elements.epoch
 
         # Propagate 10 years

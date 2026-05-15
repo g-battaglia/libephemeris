@@ -18,9 +18,12 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-FLAGS = ephem.SEFLG_SWIEPH
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLAGS = ephem.FLG_SWIEPH
 
 passed = 0
 failed = 0
@@ -53,7 +56,7 @@ def test_nutation_cycle():
         jd = JD_J2000 + i * SAMPLE_STEP
 
         try:
-            # Get nutation/obliquity from SE via calc_ut with SE_ECL_NUT
+            # Get nutation/obliquity from SE via calc_ut with ECL_NUT
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
             se_true_obl = se_r[0][0]
             se_mean_obl = se_r[0][1]
@@ -61,7 +64,7 @@ def test_nutation_cycle():
             se_nut_obl = se_r[0][3]  # deps in degrees
 
             # Get from libephemeris
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
             le_true_obl = le_r[0][0]
             le_mean_obl = le_r[0][1]
             le_nut_lon = le_r[0][2]
@@ -140,7 +143,7 @@ def test_nutation_extremes():
     for jd in extreme_jds:
         try:
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
 
             for idx, name in [
                 (0, "true_obl"),
@@ -180,7 +183,7 @@ def test_nutation_at_historical():
     for jd in historical_jds:
         try:
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
 
             for idx, name in [
                 (0, "true_obl"),

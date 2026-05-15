@@ -88,11 +88,11 @@ class TestDeltaTKnownHistoricalValues:
         # Convert year to Julian Day (July 1 at noon)
         if year <= 0:
             # Astronomical year numbering: 1 BC = year 0, 2 BC = year -1
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
+            jd = ephem.julday(year, 7, 1, 12.0)
         else:
-            jd = ephem.swe_julday(year, 7, 1, 12.0)
+            jd = ephem.julday(year, 7, 1, 12.0)
 
-        dt = ephem.swe_deltat(jd)
+        dt = ephem.deltat(jd)
         dt_seconds = dt * 86400
 
         assert dt_seconds == pytest.approx(expected_dt_seconds, abs=tolerance), (
@@ -111,8 +111,8 @@ class TestDeltaTModelProperties:
         prev_dt = None
 
         for year in years:
-            jd = ephem.swe_julday(year, 1, 1, 12.0)
-            dt = ephem.swe_deltat(jd) * 86400  # in seconds
+            jd = ephem.julday(year, 1, 1, 12.0)
+            dt = ephem.deltat(jd) * 86400  # in seconds
 
             if prev_dt is not None:
                 # Change per decade should be reasonable
@@ -128,13 +128,13 @@ class TestDeltaTModelProperties:
     def test_delta_t_smoothly_varying(self):
         """Delta T should change smoothly (no discontinuities in derivative)."""
         # Test that the rate of change is itself smooth
-        jd_start = ephem.swe_julday(1900, 1, 1, 12.0)
+        jd_start = ephem.julday(1900, 1, 1, 12.0)
 
         # Calculate Delta T at 1-year intervals
         dts = []
         for i in range(100):
             jd = jd_start + i * 365.25
-            dts.append(ephem.swe_deltat(jd) * 86400)
+            dts.append(ephem.deltat(jd) * 86400)
 
         # Calculate first differences (rate of change)
         rates = [dts[i + 1] - dts[i] for i in range(len(dts) - 1)]
@@ -154,8 +154,8 @@ class TestDeltaTModelProperties:
     def test_ancient_delta_t_is_large_positive(self):
         """For ancient dates, Delta T should be large and positive (hours)."""
         # Year 1000 BC
-        jd = ephem.swe_julday(-1000, 7, 1, 12.0)
-        dt_seconds = ephem.swe_deltat(jd) * 86400
+        jd = ephem.julday(-1000, 7, 1, 12.0)
+        dt_seconds = ephem.deltat(jd) * 86400
 
         # Should be multiple hours
         assert dt_seconds > 10000, (
@@ -170,8 +170,8 @@ class TestDeltaTModelProperties:
     def test_modern_delta_t_magnitude(self):
         """For modern dates (1900-2050), Delta T should be within reasonable bounds."""
         for year in range(1900, 2051, 10):
-            jd = ephem.swe_julday(year, 1, 1, 12.0)
-            dt_seconds = abs(ephem.swe_deltat(jd) * 86400)
+            jd = ephem.julday(year, 1, 1, 12.0)
+            dt_seconds = abs(ephem.deltat(jd) * 86400)
 
             # Modern Delta T should be less than 200 seconds
             assert dt_seconds < 200, (
@@ -193,7 +193,7 @@ class TestDeltaTUsesSkyfieldModel:
         jd = 2451545.0
 
         # libephemeris result
-        dt_lib = ephem.swe_deltat(jd) * 86400  # in seconds
+        dt_lib = ephem.deltat(jd) * 86400  # in seconds
 
         # Direct Skyfield result
         t = ts.ut1_jd(jd)
@@ -217,9 +217,9 @@ class TestDeltaTUsesSkyfieldModel:
         test_years = [1980, 2000, 2010, 2020]
 
         for year in test_years:
-            jd = ephem.swe_julday(year, 6, 15, 12.0)
+            jd = ephem.julday(year, 6, 15, 12.0)
 
-            dt_lib = ephem.swe_deltat(jd) * 86400
+            dt_lib = ephem.deltat(jd) * 86400
             t = ts.ut1_jd(jd)
             dt_skyfield = t.delta_t
 
@@ -236,8 +236,8 @@ class TestDeltaTUsesSkyfieldModel:
         ts_default = load.timescale()
 
         # At 1955, the S15 spline gives ~30.4s but the AA observed value is 31.07s
-        jd_1955 = ephem.swe_julday(1955, 1, 1, 12.0)
-        dt_lib = ephem.swe_deltat(jd_1955) * 86400
+        jd_1955 = ephem.julday(1955, 1, 1, 12.0)
+        dt_lib = ephem.deltat(jd_1955) * 86400
         t = ts_default.ut1_jd(jd_1955)
         dt_skyfield_default = t.delta_t
 
@@ -253,8 +253,8 @@ class TestDeltaTDocumentation:
 
     @pytest.mark.unit
     def test_docstring_mentions_smh2016(self):
-        """swe_deltat docstring should mention the SMH 2016 model."""
-        docstring = ephem.swe_deltat.__doc__
+        """deltat docstring should mention the SMH 2016 model."""
+        docstring = ephem.deltat.__doc__
         assert docstring is not None
         assert "Stephenson" in docstring
         assert "Morrison" in docstring
@@ -263,8 +263,8 @@ class TestDeltaTDocumentation:
 
     @pytest.mark.unit
     def test_docstring_mentions_parabola_formula(self):
-        """swe_deltat docstring should describe the parabolic formula."""
-        docstring = ephem.swe_deltat.__doc__
+        """deltat docstring should describe the parabolic formula."""
+        docstring = ephem.deltat.__doc__
         assert docstring is not None
         # Check for the key components of the formula
         assert "-320" in docstring or "320" in docstring
@@ -272,8 +272,8 @@ class TestDeltaTDocumentation:
 
     @pytest.mark.unit
     def test_docstring_ex_mentions_smh2016(self):
-        """swe_deltat_ex docstring should also mention the model."""
-        docstring = ephem.swe_deltat_ex.__doc__
+        """deltat_ex docstring should also mention the model."""
+        docstring = ephem.deltat_ex.__doc__
         assert docstring is not None
         assert "Stephenson" in docstring
         assert "Morrison" in docstring

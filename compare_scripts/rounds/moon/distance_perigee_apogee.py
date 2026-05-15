@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 68: Moon & Sun Distance Precision")
@@ -23,7 +27,7 @@ for i in range(2920):  # ~2 years at 6h steps
     jd = jd_start + i * 0.25
     try:
         se = swe.calc_ut(jd, 1, FLAGS)
-        le = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le = ephem.calc_ut(jd, 1, FLAGS)
         se_dist = se[0][2]
         le_dist = le[0][2]
         diff_km = abs(se_dist - le_dist) * 149597870.7  # AU to km
@@ -45,7 +49,7 @@ for i in range(730):
     jd = jd_start + i
     try:
         se = swe.calc_ut(jd, 0, FLAGS)
-        le = ephem.swe_calc_ut(jd, 0, FLAGS)
+        le = ephem.calc_ut(jd, 0, FLAGS)
         se_dist = se[0][2]
         le_dist = le[0][2]
         diff_km = abs(se_dist - le_dist) * 149597870.7
@@ -67,7 +71,7 @@ for i in range(365):
     jd = jd_start + i
     try:
         se = swe.calc_ut(jd, 1, FLAGS)
-        le = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le = ephem.calc_ut(jd, 1, FLAGS)
         se_speed = se[0][3]  # lon speed
         le_speed = le[0][3]
         diff = abs(se_speed - le_speed)
@@ -103,7 +107,7 @@ apogee_dates = [
 for jd in perigee_dates + apogee_dates:
     try:
         se = swe.calc_ut(jd, 1, FLAGS)
-        le = ephem.swe_calc_ut(jd, 1, FLAGS)
+        le = ephem.calc_ut(jd, 1, FLAGS)
         diff_km = abs(se[0][2] - le[0][2]) * 149597870.7
         if diff_km < 0.5:
             passed += 1
@@ -122,7 +126,7 @@ for body in [4, 5, 6]:  # Mars, Jupiter, Saturn
         jd = jd_start + i
         try:
             se = swe.calc_ut(jd, body, FLAGS)
-            le = ephem.swe_calc_ut(jd, body, FLAGS)
+            le = ephem.calc_ut(jd, body, FLAGS)
             se_dist = se[0][2]
             le_dist = le[0][2]
             if se_dist > 0:

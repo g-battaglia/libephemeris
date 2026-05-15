@@ -30,46 +30,46 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_CHIRON,
-    SE_EARTH,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    CHIRON,
+    EARTH,
+    FLG_SPEED,
+    FLG_SWIEPH,
 )
-from libephemeris.time_utils import swe_julday
+from libephemeris.time_utils import julday
 
 # Body sets -------------------------------------------------------------------
 
 BODIES_CORE = [
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_CHIRON,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    CHIRON,
 ]
 
-BODIES_MINIMAL = [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_SATURN]
+BODIES_MINIMAL = [SUN, MOON, MARS, JUPITER, SATURN]
 
 BODY_SETS = {
     "core": BODIES_CORE,
@@ -81,11 +81,11 @@ def generate_test_leb(bodies: list[int], years: int = 5) -> str:
     """Generate a temporary .leb file and return its path."""
     from scripts.generate_leb import assemble_leb
 
-    jd_start = swe_julday(2023, 1, 1, 0.0)
-    jd_end = swe_julday(2023 + years, 1, 1, 0.0)
+    jd_start = julday(2023, 1, 1, 0.0)
+    jd_end = julday(2023 + years, 1, 1, 0.0)
 
-    # Include SE_EARTH — needed internally as observer
-    all_bodies = sorted(set(bodies) | {SE_EARTH})
+    # Include EARTH — needed internally as observer
+    all_bodies = sorted(set(bodies) | {EARTH})
 
     fd, path = tempfile.mkstemp(suffix=".leb")
     os.close(fd)
@@ -197,7 +197,7 @@ def main():
     args = parser.parse_args()
 
     bodies = BODY_SETS[args.bodies]
-    iflag = SEFLG_SPEED | SEFLG_SWIEPH
+    iflag = FLG_SPEED | FLG_SWIEPH
 
     # Get or generate LEB file
     if args.leb:

@@ -87,9 +87,9 @@ class TestNutationFallbackBehavior:
     """Tests for nutation fallback behavior during calculations."""
 
     def test_ecl_nut_calculation_succeeds(self, standard_jd):
-        """Test that SE_ECL_NUT calculation works with either nutation model."""
+        """Test that ECL_NUT calculation works with either nutation model."""
         # This should work regardless of which model is active
-        pos, flag = eph.calc_ut(standard_jd, eph.SE_ECL_NUT, 0)
+        pos, flag = eph.calc_ut(standard_jd, eph.ECL_NUT, 0)
 
         # Verify we got valid nutation data
         true_obliquity = pos[0]
@@ -110,7 +110,7 @@ class TestNutationFallbackBehavior:
         info = get_nutation_model()
 
         # Calculate nutation - this should work with pyerfa
-        pos, _ = eph.calc_ut(standard_jd, eph.SE_ECL_NUT, 0)
+        pos, _ = eph.calc_ut(standard_jd, eph.ECL_NUT, 0)
 
         # If we got here without error, the model reported is being used
         assert pos is not None

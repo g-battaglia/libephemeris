@@ -14,14 +14,17 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 JD_START = 2451545.0
 SEARCH_YEARS = 20
 
@@ -67,7 +70,7 @@ def compare_at_phase(label, jd):
 
     # Compare Moon position
     try:
-        le_m = ephem.swe_calc_ut(jd, ephem.SE_MOON, FLAGS)
+        le_m = ephem.calc_ut(jd, ephem.MOON, FLAGS)
         se_m = swe.calc_ut(jd, swe.MOON, swe.FLG_SWIEPH | swe.FLG_SPEED)
     except:
         return
@@ -85,7 +88,7 @@ def compare_at_phase(label, jd):
 
     # Compare Sun position
     try:
-        le_s = ephem.swe_calc_ut(jd, ephem.SE_SUN, FLAGS)
+        le_s = ephem.calc_ut(jd, ephem.SUN, FLAGS)
         se_s = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH | swe.FLG_SPEED)
     except:
         return

@@ -50,19 +50,19 @@ def example_basic_download():
 
             # Register the SPK for Chiron
             eph.register_spk_body(
-                ipl=eph.SE_CHIRON,
+                ipl=eph.CHIRON,
                 spk_file=path,
                 naif_id=eph.NAIF_CHIRON,  # 2002060
             )
-            print(f"Registered SE_CHIRON with NAIF ID {eph.NAIF_CHIRON}")
+            print(f"Registered CHIRON with NAIF ID {eph.NAIF_CHIRON}")
 
             # Check registration
-            info = eph.get_spk_body_info(eph.SE_CHIRON)
+            info = eph.get_spk_body_info(eph.CHIRON)
             print(f"Registration info: {info}")
 
             # Calculate position using SPK
             jd = 2459215.5  # 2021-01-01
-            pos, _ = eph.calc_ut(jd, eph.SE_CHIRON, eph.SEFLG_SPEED)
+            pos, _ = eph.calc_ut(jd, eph.CHIRON, eph.FLG_SPEED)
             print(f"\nChiron position (SPK) at JD {jd}:")
             print(f"  Longitude: {pos[0]:.6f} deg")
             print(f"  Latitude:  {pos[1]:.6f} deg")
@@ -70,7 +70,7 @@ def example_basic_download():
             print(f"  Speed:     {pos[3]:.6f} deg/day")
 
             # Unregister to go back to Keplerian
-            eph.unregister_spk_body(eph.SE_CHIRON)
+            eph.unregister_spk_body(eph.CHIRON)
             print("\nUnregistered SPK, back to Keplerian model")
 
         except Exception as e:
@@ -88,21 +88,21 @@ def example_compare_precision():
         try:
             # First, calculate with Keplerian (default)
             jd = 2459215.5  # 2021-01-01
-            pos_kep, _ = eph.calc_ut(jd, eph.SE_CHIRON, 0)
+            pos_kep, _ = eph.calc_ut(jd, eph.CHIRON, 0)
             print(f"\nChiron at JD {jd}:")
             print(f"  Keplerian: {pos_kep[0]:.4f} deg")
 
             # Download and register SPK
             path = eph.download_and_register_spk(
                 body="2060",
-                ipl=eph.SE_CHIRON,
+                ipl=eph.CHIRON,
                 start="2020-01-01",
                 end="2030-01-01",
                 path=tmpdir,
             )
 
             # Calculate with SPK
-            pos_spk, _ = eph.calc_ut(jd, eph.SE_CHIRON, 0)
+            pos_spk, _ = eph.calc_ut(jd, eph.CHIRON, 0)
             print(f"  SPK:       {pos_spk[0]:.4f} deg")
 
             # Compare
@@ -118,7 +118,7 @@ def example_compare_precision():
                 )
 
             # Cleanup
-            eph.unregister_spk_body(eph.SE_CHIRON)
+            eph.unregister_spk_body(eph.CHIRON)
 
         except Exception as e:
             print(f"Error: {e}")
@@ -132,8 +132,8 @@ def example_multiple_bodies():
     print("=" * 60)
 
     bodies = [
-        ("1", eph.SE_CERES, eph.NAIF_CERES, "Ceres"),
-        ("4", eph.SE_VESTA, eph.NAIF_VESTA, "Vesta"),
+        ("1", eph.CERES, eph.NAIF_CERES, "Ceres"),
+        ("4", eph.VESTA, eph.NAIF_VESTA, "Vesta"),
     ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -189,7 +189,7 @@ def example_ephemeris_context():
             ctx2 = eph.EphemerisContext()
 
             # Register SPK only in ctx1
-            ctx1.register_spk_body(eph.SE_CHIRON, path, eph.NAIF_CHIRON)
+            ctx1.register_spk_body(eph.CHIRON, path, eph.NAIF_CHIRON)
 
             print("\nContext 1: SPK registered")
             print(f"  list_spk_bodies(): {ctx1.list_spk_bodies()}")
@@ -199,8 +199,8 @@ def example_ephemeris_context():
 
             # Calculate in both contexts
             jd = 2459215.5
-            pos1, _ = ctx1.calc_ut(jd, eph.SE_CHIRON, 0)
-            pos2, _ = ctx2.calc_ut(jd, eph.SE_CHIRON, 0)
+            pos1, _ = ctx1.calc_ut(jd, eph.CHIRON, 0)
+            pos2, _ = ctx2.calc_ut(jd, eph.CHIRON, 0)
 
             print(f"\nChiron at JD {jd}:")
             print(f"  Context 1 (SPK):      {pos1[0]:.4f} deg")
@@ -238,25 +238,25 @@ def example_coverage_check():
                 print(f"  End:   JD {end_jd:.1f}")
 
                 # Register
-                eph.register_spk_body(eph.SE_CHIRON, path, eph.NAIF_CHIRON)
+                eph.register_spk_body(eph.CHIRON, path, eph.NAIF_CHIRON)
 
                 # Calculate within coverage
                 jd_ok = 2459215.5  # 2021-01-01 (within range)
-                pos, _ = eph.calc_ut(jd_ok, eph.SE_CHIRON, 0)
+                pos, _ = eph.calc_ut(jd_ok, eph.CHIRON, 0)
                 print(f"\nCalculation at JD {jd_ok} (within coverage): OK")
                 print(f"  Longitude: {pos[0]:.4f} deg")
 
                 # Calculate outside coverage
                 jd_bad = 2465000.0  # ~2029 (outside range)
                 try:
-                    pos, _ = eph.calc_ut(jd_bad, eph.SE_CHIRON, 0)
+                    pos, _ = eph.calc_ut(jd_bad, eph.CHIRON, 0)
                     print(f"\nCalculation at JD {jd_bad} (outside coverage):")
                     print("  Should have raised error!")
                 except ValueError as e:
                     print(f"\nCalculation at JD {jd_bad} (outside coverage):")
                     print(f"  Correctly raised error: {e}")
 
-                eph.unregister_spk_body(eph.SE_CHIRON)
+                eph.unregister_spk_body(eph.CHIRON)
 
         except Exception as e:
             print(f"Error: {e}")
@@ -280,7 +280,7 @@ def main():
         print("NAIF_CHIRON constant:", eph.NAIF_CHIRON)
 
         # Keplerian fallback always works
-        pos, _ = eph.calc_ut(2451545.0, eph.SE_CHIRON, 0)
+        pos, _ = eph.calc_ut(2451545.0, eph.CHIRON, 0)
         print(f"Chiron (Keplerian): {pos[0]:.4f} deg")
 
     else:

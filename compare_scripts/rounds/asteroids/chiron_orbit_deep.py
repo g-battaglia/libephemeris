@@ -17,19 +17,22 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SWIEPH = 2
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SE_CHIRON = 15
+FLG_SWIEPH = 2
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+CHIRON = 15
 
 print("=" * 70)
 print("ROUND 84: Chiron Full Orbit Deep Verification")
@@ -53,14 +56,14 @@ def check(label, se_val, le_val, tol_arcsec):
 # ============================================================
 print("\n=== P1: Geocentric ecliptic longitude (monthly 1950-2050) ===")
 
-flags = SEFLG_SWIEPH | SEFLG_SPEED
+flags = FLG_SWIEPH | FLG_SPEED
 for year in range(1950, 2051, 2):
     for month in [1, 7]:
         jd = swe.julday(year, month, 1, 12.0)
         label = f"Chiron lon {year}-{month:02d}"
         try:
-            se = swe.calc_ut(jd, SE_CHIRON, flags)
-            le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se = swe.calc_ut(jd, CHIRON, flags)
+            le = ephem.calc_ut(jd, CHIRON, flags)
             check(label, se[0][0], le[0][0], 1.0)
         except Exception as e:
             errors += 1
@@ -79,8 +82,8 @@ for year in range(1950, 2051, 2):
         jd = swe.julday(year, month, 1, 12.0)
         label = f"Chiron lat {year}-{month:02d}"
         try:
-            se = swe.calc_ut(jd, SE_CHIRON, flags)
-            le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se = swe.calc_ut(jd, CHIRON, flags)
+            le = ephem.calc_ut(jd, CHIRON, flags)
             check(label, se[0][1], le[0][1], 1.0)
         except Exception as e:
             errors += 1
@@ -96,8 +99,8 @@ for year in range(1950, 2051, 5):
     jd = swe.julday(year, 1, 1, 12.0)
     label = f"Chiron dist {year}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, flags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+        se = swe.calc_ut(jd, CHIRON, flags)
+        le = ephem.calc_ut(jd, CHIRON, flags)
         ratio = se[0][2] / le[0][2] if le[0][2] != 0 else 999
         if abs(ratio - 1.0) < 0.0001:
             passed += 1
@@ -120,8 +123,8 @@ for year in range(1950, 2051, 2):
     jd = swe.julday(year, 6, 15, 12.0)
     label = f"Chiron speed {year}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, flags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+        se = swe.calc_ut(jd, CHIRON, flags)
+        le = ephem.calc_ut(jd, CHIRON, flags)
         diff = abs(se[0][3] - le[0][3]) * 3600.0
         if diff < 1.0:
             passed += 1
@@ -140,13 +143,13 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P5: Heliocentric positions ===")
 
-hflags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR
+hflags = FLG_SWIEPH | FLG_SPEED | FLG_HELCTR
 for year in range(1950, 2051, 5):
     jd = swe.julday(year, 1, 1, 12.0)
     label = f"Chiron helio {year}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, hflags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, hflags)
+        se = swe.calc_ut(jd, CHIRON, hflags)
+        le = ephem.calc_ut(jd, CHIRON, hflags)
         check(f"{label} lon", se[0][0], le[0][0], 1.0)
         check(f"{label} lat", se[0][1], le[0][1], 1.0)
     except Exception as e:
@@ -159,13 +162,13 @@ print(f"  After P5: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P6: J2000 ecliptic frame ===")
 
-j2kflags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT
+j2kflags = FLG_SWIEPH | FLG_SPEED | FLG_J2000 | FLG_NONUT
 for year in range(1950, 2051, 5):
     jd = swe.julday(year, 1, 1, 12.0)
     label = f"Chiron J2000 {year}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, j2kflags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, j2kflags)
+        se = swe.calc_ut(jd, CHIRON, j2kflags)
+        le = ephem.calc_ut(jd, CHIRON, j2kflags)
         check(f"{label} lon", se[0][0], le[0][0], 1.0)
         check(f"{label} lat", se[0][1], le[0][1], 1.0)
     except Exception as e:
@@ -178,13 +181,13 @@ print(f"  After P6: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P7: Equatorial coordinates ===")
 
-eqflags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+eqflags = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
 for year in range(1950, 2051, 5):
     jd = swe.julday(year, 1, 1, 12.0)
     label = f"Chiron eq {year}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, eqflags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, eqflags)
+        se = swe.calc_ut(jd, CHIRON, eqflags)
+        le = ephem.calc_ut(jd, CHIRON, eqflags)
         check(f"{label} RA", se[0][0], le[0][0], 1.5)
         check(f"{label} Dec", se[0][1], le[0][1], 1.5)
     except Exception as e:
@@ -201,8 +204,8 @@ for month in range(1, 13):
     jd = swe.julday(1996, month, 15, 12.0)
     label = f"Chiron perihelion 1996-{month:02d}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, flags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+        se = swe.calc_ut(jd, CHIRON, flags)
+        le = ephem.calc_ut(jd, CHIRON, flags)
         check(f"{label} lon", se[0][0], le[0][0], 1.0)
         check(f"{label} lat", se[0][1], le[0][1], 1.0)
     except Exception as e:
@@ -219,8 +222,8 @@ for month in range(1, 13):
     jd = swe.julday(2021, month, 15, 12.0)
     label = f"Chiron aphelion 2021-{month:02d}"
     try:
-        se = swe.calc_ut(jd, SE_CHIRON, flags)
-        le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+        se = swe.calc_ut(jd, CHIRON, flags)
+        le = ephem.calc_ut(jd, CHIRON, flags)
         check(f"{label} lon", se[0][0], le[0][0], 1.0)
         check(f"{label} lat", se[0][1], le[0][1], 1.0)
     except Exception as e:
@@ -239,8 +242,8 @@ for year in range(1980, 2030):
     for month in range(1, 13):
         jd = swe.julday(year, month, 15, 12.0)
         try:
-            se = swe.calc_ut(jd, SE_CHIRON, flags)
-            le = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se = swe.calc_ut(jd, CHIRON, flags)
+            le = ephem.calc_ut(jd, CHIRON, flags)
             se_retro = se[0][3] < 0
             le_retro = le[0][3] < 0
             if se_retro == le_retro:

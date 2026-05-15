@@ -17,7 +17,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # Southern hemisphere locations
 LOCATIONS = [
@@ -68,7 +71,7 @@ for y, m, d in START_DATES:
             continue
 
         try:
-            le_result = ephem.swe_sol_eclipse_when_loc(
+            le_result = ephem.sol_eclipse_when_loc(
                 jd_start, lat, lon, float(alt), 0
             )
             le_tret = (

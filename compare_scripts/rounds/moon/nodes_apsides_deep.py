@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Round 15: Deep Node/Apsides (swe_nod_aps_ut) Verification
+Round 15: Deep Node/Apsides (nod_aps_ut) Verification
 ==========================================================
 
 Comprehensive comparison of orbital node and apsides calculations between
@@ -32,22 +32,22 @@ import swisseph as swe
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_NODBIT_MEAN,
-    SE_NODBIT_OSCU,
-    SE_NODBIT_OSCU_BAR,
-    SE_NODBIT_FOPOINT,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_OSCU_BAR,
+    NODBIT_FOPOINT,
+    FLG_SPEED,
+    FLG_SWIEPH,
 )
 
 _EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "swisseph", "ephe")
@@ -70,14 +70,14 @@ def fmt_deg(deg):
 
 
 PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 EPOCHS = [
@@ -162,8 +162,8 @@ def run_part1():
             label = f"{name} @ {epoch[4]}"
             t = tol.get(name, 0.1)
             try:
-                se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-                le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
+                se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
+                le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
             except Exception as e:
                 r.fail(f"{label}: error: {e}")
                 continue
@@ -217,8 +217,8 @@ def run_part2():
             label = f"{name} @ {epoch[4]}"
             t = tol.get(name, 5.0)
             try:
-                se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-                le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
+                se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
+                le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
             except Exception as e:
                 r.fail(f"{label}: error: {e}")
                 continue
@@ -256,16 +256,16 @@ def run_part3():
     r = Results("P3: Method Comparison")
 
     bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     methods = [
-        (SE_NODBIT_MEAN, "MEAN"),
-        (SE_NODBIT_OSCU, "OSCU"),
-        (SE_NODBIT_OSCU_BAR, "OSCU_BAR"),
+        (NODBIT_MEAN, "MEAN"),
+        (NODBIT_OSCU, "OSCU"),
+        (NODBIT_OSCU_BAR, "OSCU_BAR"),
     ]
 
     epochs = [EPOCHS[0], EPOCHS[2], EPOCHS[4]]  # 1950, J2000, 2025
@@ -280,8 +280,8 @@ def run_part3():
             for method, method_name in methods:
                 label = f"{name} @ {epoch[4]} {method_name}"
                 try:
-                    se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, method)
-                    le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, method)
+                    se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, method)
+                    le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, method)
                 except Exception as e:
                     r.fail(f"{label}: error: {e}")
                     continue
@@ -311,15 +311,15 @@ def run_part4():
     r = Results("P4: FOPOINT")
 
     bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_PLUTO, "Pluto"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (PLUTO, "Pluto"),
     ]
 
     method_combos = [
-        (SE_NODBIT_OSCU | SE_NODBIT_FOPOINT, "OSCU+FOPOINT"),
-        (SE_NODBIT_MEAN | SE_NODBIT_FOPOINT, "MEAN+FOPOINT"),
+        (NODBIT_OSCU | NODBIT_FOPOINT, "OSCU+FOPOINT"),
+        (NODBIT_MEAN | NODBIT_FOPOINT, "MEAN+FOPOINT"),
     ]
 
     epochs = [EPOCHS[0], EPOCHS[2], EPOCHS[4]]
@@ -332,8 +332,8 @@ def run_part4():
             for method, method_name in method_combos:
                 label = f"{name} @ {epoch[4]} {method_name}"
                 try:
-                    se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, method)
-                    le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, method)
+                    se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, method)
+                    le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, method)
                 except Exception as e:
                     r.fail(f"{label}: error: {e}")
                     continue
@@ -372,9 +372,9 @@ def run_part5():
     r = Results("P5: Moon")
 
     methods = [
-        (SE_NODBIT_MEAN, "MEAN"),
-        (SE_NODBIT_OSCU, "OSCU"),
-        (SE_NODBIT_OSCU_BAR, "OSCU_BAR"),
+        (NODBIT_MEAN, "MEAN"),
+        (NODBIT_OSCU, "OSCU"),
+        (NODBIT_OSCU_BAR, "OSCU_BAR"),
     ]
 
     tol_node = 1.0  # Moon nodes: wider tolerance due to complex perturbations
@@ -385,8 +385,8 @@ def run_part5():
         for method, method_name in methods:
             label = f"Moon @ {epoch[4]} {method_name}"
             try:
-                se = swe.nod_aps_ut(jd, SE_MOON, SEFLG_SPEED, method)
-                le = ephem.swe_nod_aps_ut(jd, SE_MOON, SEFLG_SPEED, method)
+                se = swe.nod_aps_ut(jd, MOON, FLG_SPEED, method)
+                le = ephem.nod_aps_ut(jd, MOON, FLG_SPEED, method)
             except Exception as e:
                 r.fail(f"{label}: error: {e}")
                 continue
@@ -431,10 +431,10 @@ def run_part6():
     r = Results("P6: Speeds")
 
     bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (MOON, "Moon"),
     ]
 
     jd = jd_for(EPOCHS[2])  # J2000
@@ -442,8 +442,8 @@ def run_part6():
     for ipl, name in bodies:
         label = f"{name} speeds"
         try:
-            se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-            le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
+            se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
+            le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
         except Exception as e:
             r.fail(f"{label}: error: {e}")
             continue
@@ -495,8 +495,8 @@ def run_part7():
     for ipl, name in PLANETS:
         label = f"{name} node lat"
         try:
-            se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-            le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
+            se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
+            le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
         except Exception as e:
             r.fail(f"{label}: error: {e}")
             continue
@@ -528,28 +528,28 @@ def run_part7():
 def run_part8():
     print("\n" + "=" * 70)
     print("PART 8: TT vs UT Consistency")
-    print("  swe_nod_aps(tt) should match swe_nod_aps_ut(ut) for same instant")
+    print("  nod_aps(tt) should match nod_aps_ut(ut) for same instant")
     print("=" * 70)
 
     r = Results("P8: TT/UT Consistency")
 
     bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (MOON, "Moon"),
     ]
 
     for epoch in EPOCHS:
         jd_ut = jd_for(epoch)
-        dt = ephem.swe_deltat(jd_ut)
+        dt = ephem.deltat(jd_ut)
         jd_tt = jd_ut + dt
 
         for ipl, name in bodies:
             label = f"{name} @ {epoch[4]} TT/UT"
             try:
-                res_ut = ephem.swe_nod_aps_ut(jd_ut, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-                res_tt = ephem.swe_nod_aps(jd_tt, ipl, SE_NODBIT_OSCU, SEFLG_SPEED)
+                res_ut = ephem.nod_aps_ut(jd_ut, ipl, FLG_SPEED, NODBIT_OSCU)
+                res_tt = ephem.nod_aps(jd_tt, ipl, NODBIT_OSCU, FLG_SPEED)
             except Exception as e:
                 r.fail(f"{label}: error: {e}")
                 continue
@@ -583,10 +583,10 @@ def run_part9():
     r = Results("P9: Distances")
 
     bodies = [
-        (SE_MERCURY, "Mercury"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
+        (MERCURY, "Mercury"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
     ]
 
     jd = jd_for(EPOCHS[2])  # J2000
@@ -594,8 +594,8 @@ def run_part9():
     for ipl, name in bodies:
         label = f"{name} distances"
         try:
-            se = swe.nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
-            le = ephem.swe_nod_aps_ut(jd, ipl, SEFLG_SPEED, SE_NODBIT_OSCU)
+            se = swe.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
+            le = ephem.nod_aps_ut(jd, ipl, FLG_SPEED, NODBIT_OSCU)
         except Exception as e:
             r.fail(f"{label}: error: {e}")
             continue
@@ -629,7 +629,7 @@ def run_part9():
 
 def main():
     print("=" * 70)
-    print("ROUND 15: Deep Node/Apsides (swe_nod_aps_ut) Verification")
+    print("ROUND 15: Deep Node/Apsides (nod_aps_ut) Verification")
     print("=" * 70)
 
     start = time.time()

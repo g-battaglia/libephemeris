@@ -5,7 +5,7 @@ For each failing outer planet, measures:
 1. Raw Chebyshev error: LEB eval vs Skyfield geometric ICRS (same COB source)
 2. COB mismatch: Skyfield geometric with SPK centers vs analytical COB
 3. Pipeline error: LEB pipeline using perfect positions vs Skyfield apparent
-4. Total end-to-end: LEB pipeline vs swe_calc
+4. Total end-to-end: LEB pipeline vs calc
 """
 
 from __future__ import annotations
@@ -22,18 +22,18 @@ os.environ.pop("LIBEPHEMERIS_LEB", None)
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_EARTH,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    EARTH,
+    FLG_SPEED,
 )
 from libephemeris.state import get_planets, get_timescale, get_planet_center_segment
 from libephemeris.planets import _PLANET_FALLBACK, _PLANET_CENTER_NAIF_IDS
@@ -225,7 +225,7 @@ def diagnose_body(ipl, leb_path, jd_samples, planets, ts):
 
         # Approximate distance from Earth for angular conversion
         try:
-            earth_pos, _ = reader.eval_body(SE_EARTH, jd_tt)
+            earth_pos, _ = reader.eval_body(EARTH, jd_tt)
             geo_dist = vec_dist_au(leb_pos, earth_pos)
         except Exception:
             geo_dist = 5.0  # fallback
@@ -243,10 +243,10 @@ def diagnose_body(ipl, leb_path, jd_samples, planets, ts):
             results["cob_mismatch_au"].append(cob_err_au)
             results["cob_mismatch_arcsec"].append(cob_err_arcsec)
 
-        # 4. Total end-to-end: LEB fast_calc vs swe_calc
+        # 4. Total end-to-end: LEB fast_calc vs calc
         try:
-            leb_result, _ = fast_calc_tt(reader, jd_tt, ipl, SEFLG_SPEED)
-            ref_result, _ = ephem.swe_calc(jd_tt, ipl, SEFLG_SPEED)
+            leb_result, _ = fast_calc_tt(reader, jd_tt, ipl, FLG_SPEED)
+            ref_result, _ = ephem.calc(jd_tt, ipl, FLG_SPEED)
             total_err = angular_sep_arcsec(
                 ref_result[0],
                 ref_result[1],

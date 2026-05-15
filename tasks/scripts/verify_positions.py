@@ -5,7 +5,7 @@ Compares 22 bodies x 100 random dates x basic, 10 flag variants x 10 bodies x 50
 speed vs numerical derivative, and heliocentric positions.
 
 Run with:
-    /Users/giacomo/dev/libephemeris/.venv/bin/python tasks/scripts/verify_positions.py
+    .venv/bin/python tasks/scripts/verify_positions.py
 
 Tolerance tiers (DE440/Skyfield vs Swiss Ephemeris with proper .se1 files):
   - Tier 1 (inner planets 0,2-4, Earth 14): lon/lat < 1", dist < 1e-5, speed < 0.01
@@ -222,7 +222,7 @@ def section_1_1() -> None:
     print("=" * 72)
 
     dates = random_jds(100)
-    flags_lib = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
+    flags_lib = lib.FLG_SWIEPH | lib.FLG_SPEED
     flags_ref = swe_ref.FLG_SWIEPH | swe_ref.FLG_SPEED
 
     for body in ALL_BODIES:
@@ -232,7 +232,7 @@ def section_1_1() -> None:
         for jd in dates:
             label = f"S1.1 {bname} JD={jd:.2f}"
             try:
-                pos_lib, _ = lib.swe_calc_ut(jd, body, flags_lib)
+                pos_lib, _ = lib.calc_ut(jd, body, flags_lib)
                 pos_ref, _ = swe_ref.calc_ut(jd, body, flags_ref)
             except Exception as exc:
                 record_error(label, exc)
@@ -302,16 +302,16 @@ def section_1_2() -> None:
 
     # (flag_name, lib_flag, ref_flag, needs_sid_mode, skip_sun)
     flag_variants = [
-        ("SWIEPH", lib.SEFLG_SWIEPH, swe_ref.FLG_SWIEPH, False, False),
-        ("SPEED", lib.SEFLG_SPEED, swe_ref.FLG_SPEED, False, False),
-        ("HELCTR", lib.SEFLG_HELCTR, swe_ref.FLG_HELCTR, False, True),
-        ("TRUEPOS", lib.SEFLG_TRUEPOS, swe_ref.FLG_TRUEPOS, False, False),
-        ("J2000", lib.SEFLG_J2000, swe_ref.FLG_J2000, False, False),
-        ("NONUT", lib.SEFLG_NONUT, swe_ref.FLG_NONUT, False, False),
-        ("NOGDEFL", lib.SEFLG_NOGDEFL, swe_ref.FLG_NOGDEFL, False, False),
-        ("NOABERR", lib.SEFLG_NOABERR, swe_ref.FLG_NOABERR, False, False),
-        ("EQUATORIAL", lib.SEFLG_EQUATORIAL, swe_ref.FLG_EQUATORIAL, False, False),
-        ("SIDEREAL", lib.SEFLG_SIDEREAL, swe_ref.FLG_SIDEREAL, True, False),
+        ("SWIEPH", lib.FLG_SWIEPH, swe_ref.FLG_SWIEPH, False, False),
+        ("SPEED", lib.FLG_SPEED, swe_ref.FLG_SPEED, False, False),
+        ("HELCTR", lib.FLG_HELCTR, swe_ref.FLG_HELCTR, False, True),
+        ("TRUEPOS", lib.FLG_TRUEPOS, swe_ref.FLG_TRUEPOS, False, False),
+        ("J2000", lib.FLG_J2000, swe_ref.FLG_J2000, False, False),
+        ("NONUT", lib.FLG_NONUT, swe_ref.FLG_NONUT, False, False),
+        ("NOGDEFL", lib.FLG_NOGDEFL, swe_ref.FLG_NOGDEFL, False, False),
+        ("NOABERR", lib.FLG_NOABERR, swe_ref.FLG_NOABERR, False, False),
+        ("EQUATORIAL", lib.FLG_EQUATORIAL, swe_ref.FLG_EQUATORIAL, False, False),
+        ("SIDEREAL", lib.FLG_SIDEREAL, swe_ref.FLG_SIDEREAL, True, False),
     ]
 
     # Moon gets 3" tolerance, planets get 2"
@@ -320,11 +320,11 @@ def section_1_2() -> None:
 
     for fname, lflag, rflag, needs_sid, skip_sun in flag_variants:
         # Always include SPEED for both
-        lflag_full = lflag | lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
+        lflag_full = lflag | lib.FLG_SWIEPH | lib.FLG_SPEED
         rflag_full = rflag | swe_ref.FLG_SWIEPH | swe_ref.FLG_SPEED
 
         if needs_sid:
-            lib.swe_set_sid_mode(1)
+            lib.set_sid_mode(1)
             swe_ref.set_sid_mode(1)
 
         for body in PLANETS_0_9:
@@ -336,7 +336,7 @@ def section_1_2() -> None:
             for jd in dates:
                 label = f"S1.2 {fname} {bname} JD={jd:.2f}"
                 try:
-                    pos_lib, _ = lib.swe_calc_ut(jd, body, lflag_full)
+                    pos_lib, _ = lib.calc_ut(jd, body, lflag_full)
                     pos_ref, _ = swe_ref.calc_ut(jd, body, rflag_full)
                 except Exception as exc:
                     record_error(label, exc)
@@ -362,7 +362,7 @@ def section_1_2() -> None:
 
         if needs_sid:
             # Reset sidereal mode
-            lib.swe_set_sid_mode(0)
+            lib.set_sid_mode(0)
             swe_ref.set_sid_mode(0)
 
 
@@ -382,16 +382,16 @@ def section_23_4() -> None:
     h = 0.01  # step for numerical derivative
     tol = 0.05  # deg/day
 
-    flags = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
+    flags = lib.FLG_SWIEPH | lib.FLG_SPEED
 
     for body in bodies:
         bname = BODY_NAMES.get(body, f"body{body}")
         for jd in dates:
             label = f"S23.4 {bname} JD={jd:.2f}"
             try:
-                pos_center, _ = lib.swe_calc_ut(jd, body, flags)
-                pos_plus, _ = lib.swe_calc_ut(jd + h, body, flags)
-                pos_minus, _ = lib.swe_calc_ut(jd - h, body, flags)
+                pos_center, _ = lib.calc_ut(jd, body, flags)
+                pos_plus, _ = lib.calc_ut(jd + h, body, flags)
+                pos_minus, _ = lib.calc_ut(jd - h, body, flags)
             except Exception as exc:
                 record_error(label, exc)
                 continue
@@ -432,7 +432,7 @@ def section_1_6() -> None:
     # Mercury-Pluto (2-9) + Moon (1) + Chiron (15) -- skip Sun (0)
     bodies = [1, 2, 3, 4, 5, 6, 7, 8, 9, 15]
 
-    flags_lib = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED | lib.SEFLG_HELCTR
+    flags_lib = lib.FLG_SWIEPH | lib.FLG_SPEED | lib.FLG_HELCTR
     flags_ref = swe_ref.FLG_SWIEPH | swe_ref.FLG_SPEED | swe_ref.FLG_HELCTR
 
     for body in bodies:
@@ -448,7 +448,7 @@ def section_1_6() -> None:
         for jd in dates:
             label = f"S1.6 helio {bname} JD={jd:.2f}"
             try:
-                pos_lib, _ = lib.swe_calc_ut(jd, body, flags_lib)
+                pos_lib, _ = lib.calc_ut(jd, body, flags_lib)
                 pos_ref, _ = swe_ref.calc_ut(jd, body, flags_ref)
             except Exception as exc:
                 record_error(label, exc)

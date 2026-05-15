@@ -49,9 +49,9 @@ class TestConcurrentContextStress:
 
     def test_50_threads_match_baseline(self) -> None:
         """50 threads each computing 100 positions must match single-threaded."""
-        bodies = [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS, swe.SE_JUPITER, swe.SE_SATURN]
+        bodies = [swe.SUN, swe.MOON, swe.MARS, swe.JUPITER, swe.SATURN]
         jds = [J2000 + i * 30.0 for i in range(20)]  # 20 dates, 30 days apart
-        flags = swe.SEFLG_SPEED
+        flags = swe.FLG_SPEED
 
         # 5 bodies × 20 dates = 100 calculations per thread
         baseline = self._compute_single_threaded_baseline(bodies, jds, flags)
@@ -96,8 +96,8 @@ class TestConcurrentContextStress:
             ctx = EphemerisContext()
             for i in range(50):
                 jd = J2000 + i * 10.0
-                ctx.calc_ut(jd, swe.SE_SUN, 0)
-                ctx.calc_ut(jd, swe.SE_MOON, swe.SEFLG_SPEED)
+                ctx.calc_ut(jd, swe.SUN, 0)
+                ctx.calc_ut(jd, swe.MOON, swe.FLG_SPEED)
             with lock:
                 completed.append(thread_id)
 
@@ -121,16 +121,16 @@ class TestConcurrentContextStress:
     def test_concurrent_different_bodies(self) -> None:
         """Each thread computes a different body — results match baseline."""
         all_bodies = [
-            swe.SE_SUN,
-            swe.SE_MOON,
-            swe.SE_MERCURY,
-            swe.SE_VENUS,
-            swe.SE_MARS,
-            swe.SE_JUPITER,
-            swe.SE_SATURN,
-            swe.SE_URANUS,
-            swe.SE_NEPTUNE,
-            swe.SE_PLUTO,
+            swe.SUN,
+            swe.MOON,
+            swe.MERCURY,
+            swe.VENUS,
+            swe.MARS,
+            swe.JUPITER,
+            swe.SATURN,
+            swe.URANUS,
+            swe.NEPTUNE,
+            swe.PLUTO,
         ]
         jd = J2000
 
@@ -173,8 +173,8 @@ class TestGlobalStateIsolation:
     def test_sidereal_mode_isolation(self) -> None:
         """Thread A (LAHIRI) and Thread B (FAGAN_BRADLEY) get different results."""
         jd = J2000
-        body = swe.SE_SUN
-        flags = swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED
+        body = swe.SUN
+        flags = swe.FLG_SIDEREAL | swe.FLG_SPEED
 
         results_lahiri: list[tuple[float, ...]] = []
         results_fagan: list[tuple[float, ...]] = []
@@ -183,7 +183,7 @@ class TestGlobalStateIsolation:
 
         def worker_lahiri() -> None:
             ctx = EphemerisContext()
-            ctx.set_sid_mode(swe.SE_SIDM_LAHIRI)
+            ctx.set_sid_mode(swe.SIDM_LAHIRI)
             barrier.wait(timeout=10)
             for _ in range(50):
                 pos, _ = ctx.calc_ut(jd, body, flags)
@@ -192,7 +192,7 @@ class TestGlobalStateIsolation:
 
         def worker_fagan() -> None:
             ctx = EphemerisContext()
-            ctx.set_sid_mode(swe.SE_SIDM_FAGAN_BRADLEY)
+            ctx.set_sid_mode(swe.SIDM_FAGAN_BRADLEY)
             barrier.wait(timeout=10)
             for _ in range(50):
                 pos, _ = ctx.calc_ut(jd, body, flags)
@@ -236,8 +236,8 @@ class TestGlobalStateIsolation:
     def test_topo_isolation(self) -> None:
         """Different threads with different topocentric positions get different results."""
         jd = J2000
-        body = swe.SE_MOON
-        flags = swe.SEFLG_TOPOCTR | swe.SEFLG_SPEED
+        body = swe.MOON
+        flags = swe.FLG_TOPOCTR | swe.FLG_SPEED
 
         results_rome: list[tuple[float, ...]] = []
         results_tokyo: list[tuple[float, ...]] = []
@@ -294,17 +294,17 @@ class TestGlobalStateIsolation:
         lock = threading.Lock()
 
         sid_modes = [
-            swe.SE_SIDM_LAHIRI,  # 1
-            swe.SE_SIDM_FAGAN_BRADLEY,  # 0
+            swe.SIDM_LAHIRI,  # 1
+            swe.SIDM_FAGAN_BRADLEY,  # 0
         ]
 
         def worker(mode: int, thread_id: int) -> None:
             ctx = EphemerisContext()
             ctx.set_sid_mode(mode)
-            flags = swe.SEFLG_SIDEREAL
+            flags = swe.FLG_SIDEREAL
             ref_pos = None
             for i in range(100):
-                pos, _ = ctx.calc_ut(jd, swe.SE_SUN, flags)
+                pos, _ = ctx.calc_ut(jd, swe.SUN, flags)
                 if ref_pos is None:
                     ref_pos = pos
                 elif abs(pos[0] - ref_pos[0]) > 1e-10:
@@ -340,8 +340,8 @@ class TestLEBSkyfieldMixedMode:
     def test_leb_and_skyfield_concurrent(self) -> None:
         """Contexts with LEB and without LEB produce consistent results."""
         jd = J2000
-        body = swe.SE_SUN
-        flags = swe.SEFLG_SPEED
+        body = swe.SUN
+        flags = swe.FLG_SPEED
 
         # Get a LEB file path if available
         leb_path = None
@@ -433,16 +433,16 @@ class TestLEBSkyfieldMixedMode:
         ctx_base = EphemerisContext()
         ctx_base.set_leb_file(leb_path)
         baseline = {}
-        for body in [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS]:
-            pos, _ = ctx_base.calc_ut(jd, body, swe.SEFLG_SPEED)
+        for body in [swe.SUN, swe.MOON, swe.MARS]:
+            pos, _ = ctx_base.calc_ut(jd, body, swe.FLG_SPEED)
             baseline[body] = pos
 
         def worker(thread_id: int) -> None:
             ctx = EphemerisContext()
             ctx.set_leb_file(leb_path)
             for _ in range(50):
-                for body in [swe.SE_SUN, swe.SE_MOON, swe.SE_MARS]:
-                    pos, _ = ctx.calc_ut(jd, body, swe.SEFLG_SPEED)
+                for body in [swe.SUN, swe.MOON, swe.MARS]:
+                    pos, _ = ctx.calc_ut(jd, body, swe.FLG_SPEED)
                     for i in range(6):
                         if abs(pos[i] - baseline[body][i]) > 1e-10:
                             with lock:
@@ -512,7 +512,7 @@ class TestConcurrencyEdgeCases:
         def worker() -> None:
             ctx = EphemerisContext()
             # Do a calculation to force lazy init of shared resources
-            pos, _ = ctx.calc_ut(J2000, swe.SE_SUN, 0)
+            pos, _ = ctx.calc_ut(J2000, swe.SUN, 0)
             assert len(pos) == 6
             with lock:
                 contexts.append(ctx)
@@ -527,12 +527,12 @@ class TestConcurrencyEdgeCases:
 
     def test_threadpool_executor_pattern(self) -> None:
         """Typical ThreadPoolExecutor usage pattern works correctly."""
-        bodies = list(range(10))  # SE_SUN through SE_PLUTO
+        bodies = list(range(10))  # SUN through PLUTO
         jds = [J2000 + i for i in range(10)]
 
         def compute(body: int, jd: float) -> tuple[int, float, tuple]:
             ctx = EphemerisContext()
-            pos, _ = ctx.calc_ut(jd, body, swe.SEFLG_SPEED)
+            pos, _ = ctx.calc_ut(jd, body, swe.FLG_SPEED)
             return (body, jd, pos)
 
         results = []
@@ -573,7 +573,7 @@ class TestConcurrencyEdgeCases:
                     return
 
                 # Do a sidereal calculation
-                pos, _ = ctx.calc_ut(J2000, swe.SE_SUN, swe.SEFLG_SIDEREAL)
+                pos, _ = ctx.calc_ut(J2000, swe.SUN, swe.FLG_SIDEREAL)
                 assert len(pos) == 6
 
         threads = []

@@ -20,17 +20,17 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    MEAN_NODE,
+    TRUE_NODE,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -95,18 +95,18 @@ class TestPlanetBenchmarks:
     @pytest.mark.parametrize(
         "planet_py,planet_swe,name",
         [
-            (SE_SUN, swe.SUN, "Sun"),
-            (SE_MOON, swe.MOON, "Moon"),
-            (SE_MARS, swe.MARS, "Mars"),
-            (SE_JUPITER, swe.JUPITER, "Jupiter"),
+            (SUN, swe.SUN, "Sun"),
+            (MOON, swe.MOON, "Moon"),
+            (MARS, swe.MARS, "Mars"),
+            (JUPITER, swe.JUPITER, "Jupiter"),
         ],
     )
     def test_planet_calculation_performance(self, planet_py, planet_swe, name):
         """Test that planet calculations complete within acceptable time."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         result = compare_performance(
-            lambda: ephem.swe_calc_ut(TEST_JD, planet_py, flags),
+            lambda: ephem.calc_ut(TEST_JD, planet_py, flags),
             lambda: swe.calc_ut(TEST_JD, planet_swe, flags),
         )
 
@@ -117,15 +117,15 @@ class TestPlanetBenchmarks:
     @pytest.mark.benchmark
     def test_all_planets_batch(self):
         """Test batch calculation of all planets."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         planets_py = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
         ]
         planets_swe = [
             swe.SUN,
@@ -139,7 +139,7 @@ class TestPlanetBenchmarks:
 
         def calc_all_libephem():
             for p in planets_py:
-                ephem.swe_calc_ut(TEST_JD, p, flags)
+                ephem.calc_ut(TEST_JD, p, flags)
 
         def calc_all_pyswisseph():
             for p in planets_swe:
@@ -173,7 +173,7 @@ class TestHouseBenchmarks:
         lat, lon = 41.9028, 12.4964  # Rome
 
         result = compare_performance(
-            lambda: ephem.swe_houses(TEST_JD, lat, lon, hsys),
+            lambda: ephem.houses(TEST_JD, lat, lon, hsys),
             lambda: swe.houses(TEST_JD, lat, lon, hsys.encode("ascii")),
         )
 
@@ -194,7 +194,7 @@ class TestUtilityBenchmarks:
     def test_julday_performance(self):
         """Test Julian Day calculation performance."""
         result = compare_performance(
-            lambda: ephem.swe_julday(2000, 1, 1, 12.0),
+            lambda: ephem.julday(2000, 1, 1, 12.0),
             lambda: swe.julday(2000, 1, 1, 12.0),
         )
 
@@ -204,7 +204,7 @@ class TestUtilityBenchmarks:
     def test_revjul_performance(self):
         """Test reverse Julian Day calculation performance."""
         result = compare_performance(
-            lambda: ephem.swe_revjul(TEST_JD),
+            lambda: ephem.revjul(TEST_JD),
             lambda: swe.revjul(TEST_JD),
         )
 
@@ -214,7 +214,7 @@ class TestUtilityBenchmarks:
     def test_deltat_performance(self):
         """Test Delta T calculation performance."""
         result = compare_performance(
-            lambda: ephem.swe_deltat(TEST_JD),
+            lambda: ephem.deltat(TEST_JD),
             lambda: swe.deltat(TEST_JD),
         )
 
@@ -233,16 +233,16 @@ class TestLunarPointBenchmarks:
     @pytest.mark.parametrize(
         "point_py,point_swe,name",
         [
-            (SE_MEAN_NODE, swe.MEAN_NODE, "Mean Node"),
-            (SE_TRUE_NODE, swe.TRUE_NODE, "True Node"),
+            (MEAN_NODE, swe.MEAN_NODE, "Mean Node"),
+            (TRUE_NODE, swe.TRUE_NODE, "True Node"),
         ],
     )
     def test_lunar_point_performance(self, point_py, point_swe, name):
         """Test lunar point calculation performance."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         result = compare_performance(
-            lambda: ephem.swe_calc_ut(TEST_JD, point_py, flags),
+            lambda: ephem.calc_ut(TEST_JD, point_py, flags),
             lambda: swe.calc_ut(TEST_JD, point_swe, flags),
         )
 
@@ -262,21 +262,21 @@ class TestBenchmarkSummary:
     @pytest.mark.benchmark
     def test_overall_performance(self):
         """Test that overall performance is within acceptable range."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         ratios = []
 
         # Test a few key calculations
         test_cases = [
             (
-                lambda: ephem.swe_calc_ut(TEST_JD, SE_SUN, flags),
+                lambda: ephem.calc_ut(TEST_JD, SUN, flags),
                 lambda: swe.calc_ut(TEST_JD, swe.SUN, flags),
             ),
             (
-                lambda: ephem.swe_houses(TEST_JD, 45.0, 0.0, "P"),
+                lambda: ephem.houses(TEST_JD, 45.0, 0.0, "P"),
                 lambda: swe.houses(TEST_JD, 45.0, 0.0, b"P"),
             ),
             (
-                lambda: ephem.swe_julday(2024, 1, 1, 12.0),
+                lambda: ephem.julday(2024, 1, 1, 12.0),
                 lambda: swe.julday(2024, 1, 1, 12.0),
             ),
         ]
@@ -294,10 +294,10 @@ class TestBenchmarkSummary:
     @pytest.mark.benchmark
     def test_calculation_correctness_with_speed(self):
         """Test that fast calculations are still correct."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         # Quick calculation
-        pos_py, _ = ephem.swe_calc_ut(TEST_JD, SE_SUN, flags)
+        pos_py, _ = ephem.calc_ut(TEST_JD, SUN, flags)
         pos_swe, _ = swe.calc_ut(TEST_JD, swe.SUN, flags)
 
         # Should still be accurate

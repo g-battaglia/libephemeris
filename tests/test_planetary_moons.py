@@ -20,20 +20,20 @@ from unittest.mock import patch, MagicMock
 import libephemeris as eph
 from libephemeris import planetary_moons, state
 from libephemeris.constants import (
-    SE_MOON_OFFSET,
-    SE_MOON_IO,
-    SE_MOON_EUROPA,
-    SE_MOON_GANYMEDE,
-    SE_MOON_CALLISTO,
-    SE_MOON_TITAN,
-    SE_MOON_ENCELADUS,
-    SE_MOON_TRITON,
-    SE_MOON_PHOBOS,
-    SE_MOON_DEIMOS,
-    SE_MOON_CHARON,
-    SE_SUN,
-    SE_MARS,
-    SEFLG_SPEED,
+    MOON_OFFSET,
+    MOON_IO,
+    MOON_EUROPA,
+    MOON_GANYMEDE,
+    MOON_CALLISTO,
+    MOON_TITAN,
+    MOON_ENCELADUS,
+    MOON_TRITON,
+    MOON_PHOBOS,
+    MOON_DEIMOS,
+    MOON_CHARON,
+    SUN,
+    MARS,
+    FLG_SPEED,
     NAIF_IO,
     NAIF_EUROPA,
     NAIF_GANYMEDE,
@@ -49,27 +49,27 @@ class TestMoonConstants:
     """Test planetary moon constant definitions."""
 
     def test_moon_offset(self):
-        """Verify SE_MOON_OFFSET is correctly defined."""
-        assert SE_MOON_OFFSET == 9000
+        """Verify MOON_OFFSET is correctly defined."""
+        assert MOON_OFFSET == 9000
 
     def test_galilean_moon_ids(self):
         """Verify Galilean moon IDs are correctly defined."""
-        assert SE_MOON_IO == SE_MOON_OFFSET + 1  # 9001
-        assert SE_MOON_EUROPA == SE_MOON_OFFSET + 2  # 9002
-        assert SE_MOON_GANYMEDE == SE_MOON_OFFSET + 3  # 9003
-        assert SE_MOON_CALLISTO == SE_MOON_OFFSET + 4  # 9004
+        assert MOON_IO == MOON_OFFSET + 1  # 9001
+        assert MOON_EUROPA == MOON_OFFSET + 2  # 9002
+        assert MOON_GANYMEDE == MOON_OFFSET + 3  # 9003
+        assert MOON_CALLISTO == MOON_OFFSET + 4  # 9004
 
     def test_saturn_moon_ids(self):
         """Verify Saturn moon IDs are correctly defined."""
-        assert SE_MOON_TITAN == SE_MOON_OFFSET + 16  # 9016
-        assert SE_MOON_ENCELADUS == SE_MOON_OFFSET + 12  # 9012
+        assert MOON_TITAN == MOON_OFFSET + 16  # 9016
+        assert MOON_ENCELADUS == MOON_OFFSET + 12  # 9012
 
     def test_other_moon_ids(self):
         """Verify other moon IDs are correctly defined."""
-        assert SE_MOON_TRITON == SE_MOON_OFFSET + 31  # 9031
-        assert SE_MOON_PHOBOS == SE_MOON_OFFSET + 41  # 9041
-        assert SE_MOON_DEIMOS == SE_MOON_OFFSET + 42  # 9042
-        assert SE_MOON_CHARON == SE_MOON_OFFSET + 51  # 9051
+        assert MOON_TRITON == MOON_OFFSET + 31  # 9031
+        assert MOON_PHOBOS == MOON_OFFSET + 41  # 9041
+        assert MOON_DEIMOS == MOON_OFFSET + 42  # 9042
+        assert MOON_CHARON == MOON_OFFSET + 51  # 9051
 
 
 class TestNaifMapping:
@@ -90,15 +90,15 @@ class TestNaifMapping:
         """Verify MOON_NAIF_MAP contains Galilean moons."""
         from libephemeris.planetary_moons import MOON_NAIF_MAP
 
-        assert SE_MOON_IO in MOON_NAIF_MAP
-        assert SE_MOON_EUROPA in MOON_NAIF_MAP
-        assert SE_MOON_GANYMEDE in MOON_NAIF_MAP
-        assert SE_MOON_CALLISTO in MOON_NAIF_MAP
+        assert MOON_IO in MOON_NAIF_MAP
+        assert MOON_EUROPA in MOON_NAIF_MAP
+        assert MOON_GANYMEDE in MOON_NAIF_MAP
+        assert MOON_CALLISTO in MOON_NAIF_MAP
 
-        assert MOON_NAIF_MAP[SE_MOON_IO] == NAIF_IO
-        assert MOON_NAIF_MAP[SE_MOON_EUROPA] == NAIF_EUROPA
-        assert MOON_NAIF_MAP[SE_MOON_GANYMEDE] == NAIF_GANYMEDE
-        assert MOON_NAIF_MAP[SE_MOON_CALLISTO] == NAIF_CALLISTO
+        assert MOON_NAIF_MAP[MOON_IO] == NAIF_IO
+        assert MOON_NAIF_MAP[MOON_EUROPA] == NAIF_EUROPA
+        assert MOON_NAIF_MAP[MOON_GANYMEDE] == NAIF_GANYMEDE
+        assert MOON_NAIF_MAP[MOON_CALLISTO] == NAIF_CALLISTO
 
 
 class TestMoonNames:
@@ -106,22 +106,22 @@ class TestMoonNames:
 
     def test_get_moon_name_galilean(self):
         """Test getting names of Galilean moons."""
-        assert planetary_moons.get_moon_name(SE_MOON_IO) == "Io"
-        assert planetary_moons.get_moon_name(SE_MOON_EUROPA) == "Europa"
-        assert planetary_moons.get_moon_name(SE_MOON_GANYMEDE) == "Ganymede"
-        assert planetary_moons.get_moon_name(SE_MOON_CALLISTO) == "Callisto"
+        assert planetary_moons.get_moon_name(MOON_IO) == "Io"
+        assert planetary_moons.get_moon_name(MOON_EUROPA) == "Europa"
+        assert planetary_moons.get_moon_name(MOON_GANYMEDE) == "Ganymede"
+        assert planetary_moons.get_moon_name(MOON_CALLISTO) == "Callisto"
 
     def test_get_moon_name_saturn(self):
         """Test getting names of Saturn moons."""
-        assert planetary_moons.get_moon_name(SE_MOON_TITAN) == "Titan"
-        assert planetary_moons.get_moon_name(SE_MOON_ENCELADUS) == "Enceladus"
+        assert planetary_moons.get_moon_name(MOON_TITAN) == "Titan"
+        assert planetary_moons.get_moon_name(MOON_ENCELADUS) == "Enceladus"
 
     def test_get_moon_name_other(self):
         """Test getting names of other moons."""
-        assert planetary_moons.get_moon_name(SE_MOON_TRITON) == "Triton"
-        assert planetary_moons.get_moon_name(SE_MOON_PHOBOS) == "Phobos"
-        assert planetary_moons.get_moon_name(SE_MOON_DEIMOS) == "Deimos"
-        assert planetary_moons.get_moon_name(SE_MOON_CHARON) == "Charon"
+        assert planetary_moons.get_moon_name(MOON_TRITON) == "Triton"
+        assert planetary_moons.get_moon_name(MOON_PHOBOS) == "Phobos"
+        assert planetary_moons.get_moon_name(MOON_DEIMOS) == "Deimos"
+        assert planetary_moons.get_moon_name(MOON_CHARON) == "Charon"
 
     def test_get_moon_name_unknown(self):
         """Test getting name for unknown moon ID."""
@@ -136,15 +136,15 @@ class TestIsPlanetaryMoon:
 
     def test_is_planetary_moon_true(self):
         """Test that planetary moon IDs return True."""
-        assert planetary_moons.is_planetary_moon(SE_MOON_IO) is True
-        assert planetary_moons.is_planetary_moon(SE_MOON_TITAN) is True
-        assert planetary_moons.is_planetary_moon(SE_MOON_TRITON) is True
-        assert planetary_moons.is_planetary_moon(SE_MOON_PHOBOS) is True
+        assert planetary_moons.is_planetary_moon(MOON_IO) is True
+        assert planetary_moons.is_planetary_moon(MOON_TITAN) is True
+        assert planetary_moons.is_planetary_moon(MOON_TRITON) is True
+        assert planetary_moons.is_planetary_moon(MOON_PHOBOS) is True
 
     def test_is_planetary_moon_false(self):
         """Test that non-moon IDs return False."""
-        assert planetary_moons.is_planetary_moon(SE_SUN) is False
-        assert planetary_moons.is_planetary_moon(SE_MARS) is False
+        assert planetary_moons.is_planetary_moon(SUN) is False
+        assert planetary_moons.is_planetary_moon(MARS) is False
         assert planetary_moons.is_planetary_moon(0) is False
         assert planetary_moons.is_planetary_moon(99999) is False
 
@@ -172,19 +172,19 @@ class TestMoonRegistration:
 
     def test_get_moon_coverage_unregistered(self):
         """Test coverage returns None for unregistered moon."""
-        coverage = planetary_moons.get_moon_coverage(SE_MOON_IO)
+        coverage = planetary_moons.get_moon_coverage(MOON_IO)
         assert coverage is None
 
     def test_calc_moon_position_unregistered(self):
         """Test position returns None for unregistered moon."""
         ts = state.get_timescale()
         t = ts.tt_jd(2451545.0)
-        result = planetary_moons.calc_moon_position(t, SE_MOON_IO, SEFLG_SPEED)
+        result = planetary_moons.calc_moon_position(t, MOON_IO, FLG_SPEED)
         assert result is None
 
 
 class TestMoonPositionUnregistered:
-    """Test moon position calculation via swe_calc_ut when not registered."""
+    """Test moon position calculation via calc_ut when not registered."""
 
     def setup_method(self):
         """Reset state before each test."""
@@ -198,7 +198,7 @@ class TestMoonPositionUnregistered:
     def test_calc_ut_unregistered_moon_returns_zeros(self):
         """Test that calc_ut returns zeros for unregistered moon."""
         jd = 2451545.0  # J2000.0
-        pos, flag = eph.calc_ut(jd, SE_MOON_IO, SEFLG_SPEED)
+        pos, flag = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
 
         # Unregistered moon should return zeros
         assert pos[0] == 0.0  # longitude
@@ -216,16 +216,16 @@ class TestMoonParentMapping:
             NAIF_JUPITER_BARYCENTER,
         )
 
-        assert MOON_PARENT_MAP[SE_MOON_IO] == NAIF_JUPITER_BARYCENTER
-        assert MOON_PARENT_MAP[SE_MOON_EUROPA] == NAIF_JUPITER_BARYCENTER
-        assert MOON_PARENT_MAP[SE_MOON_GANYMEDE] == NAIF_JUPITER_BARYCENTER
-        assert MOON_PARENT_MAP[SE_MOON_CALLISTO] == NAIF_JUPITER_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_IO] == NAIF_JUPITER_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_EUROPA] == NAIF_JUPITER_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_GANYMEDE] == NAIF_JUPITER_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_CALLISTO] == NAIF_JUPITER_BARYCENTER
 
     def test_titan_parent_saturn(self):
         """Test that Titan has Saturn as parent."""
         from libephemeris.planetary_moons import MOON_PARENT_MAP, NAIF_SATURN_BARYCENTER
 
-        assert MOON_PARENT_MAP[SE_MOON_TITAN] == NAIF_SATURN_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_TITAN] == NAIF_SATURN_BARYCENTER
 
     def test_triton_parent_neptune(self):
         """Test that Triton has Neptune as parent."""
@@ -234,14 +234,14 @@ class TestMoonParentMapping:
             NAIF_NEPTUNE_BARYCENTER,
         )
 
-        assert MOON_PARENT_MAP[SE_MOON_TRITON] == NAIF_NEPTUNE_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_TRITON] == NAIF_NEPTUNE_BARYCENTER
 
     def test_mars_moons_parent_mars(self):
         """Test that Mars moons have Mars as parent."""
         from libephemeris.planetary_moons import MOON_PARENT_MAP, NAIF_MARS_BARYCENTER
 
-        assert MOON_PARENT_MAP[SE_MOON_PHOBOS] == NAIF_MARS_BARYCENTER
-        assert MOON_PARENT_MAP[SE_MOON_DEIMOS] == NAIF_MARS_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_PHOBOS] == NAIF_MARS_BARYCENTER
+        assert MOON_PARENT_MAP[MOON_DEIMOS] == NAIF_MARS_BARYCENTER
 
 
 # =============================================================================
@@ -300,7 +300,7 @@ class TestMoonPositionIntegration:
         moons = planetary_moons.list_registered_moons()
 
         # Should have at least the Galilean moons
-        assert SE_MOON_IO in moons or len(moons) > 0
+        assert MOON_IO in moons or len(moons) > 0
 
     def test_calc_io_position(self):
         """Test calculating Io's position."""
@@ -311,7 +311,7 @@ class TestMoonPositionIntegration:
         planetary_moons.register_moon_spk(spk_path)
 
         jd = 2451545.0  # J2000.0
-        pos, flag = eph.calc_ut(jd, SE_MOON_IO, SEFLG_SPEED)
+        pos, flag = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
 
         # Should have non-zero position
         assert pos[2] > 0  # Distance should be positive
@@ -328,7 +328,7 @@ class TestMoonPositionIntegration:
         planetary_moons.register_moon_spk(spk_path)
 
         jd = 2451545.0
-        pos, flag = eph.calc_ut(jd, SE_MOON_IO, SEFLG_SPEED)
+        pos, flag = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
 
         # Io has fast orbital motion (~17 hours period)
         # Should have significant daily motion
@@ -340,12 +340,12 @@ class TestMoonConstantsExport:
 
     def test_moon_constants_accessible(self):
         """Test that moon constants are accessible from libephemeris."""
-        assert hasattr(eph, "SE_MOON_IO")
-        assert hasattr(eph, "SE_MOON_EUROPA")
-        assert hasattr(eph, "SE_MOON_GANYMEDE")
-        assert hasattr(eph, "SE_MOON_CALLISTO")
-        assert hasattr(eph, "SE_MOON_TITAN")
-        assert hasattr(eph, "SE_MOON_TRITON")
+        assert hasattr(eph, "MOON_IO")
+        assert hasattr(eph, "MOON_EUROPA")
+        assert hasattr(eph, "MOON_GANYMEDE")
+        assert hasattr(eph, "MOON_CALLISTO")
+        assert hasattr(eph, "MOON_TITAN")
+        assert hasattr(eph, "MOON_TRITON")
 
     def test_moon_functions_accessible(self):
         """Test that moon functions are accessible from libephemeris."""
@@ -372,7 +372,7 @@ class TestCloseFunction:
     def test_close_clears_moon_registrations(self):
         """Test that eph.close() clears moon registrations."""
         # Add a mock registration
-        planetary_moons._MOON_SPK_BY_BODY[SE_MOON_IO] = "test.bsp"
+        planetary_moons._MOON_SPK_BY_BODY[MOON_IO] = "test.bsp"
 
         # Close should clear it
         planetary_moons.close_moon_kernels()

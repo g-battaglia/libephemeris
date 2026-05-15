@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Rounds 276-295: Deep diverse verification batch 4.
 
-276: Planet XYZ coordinate output (SEFLG_XYZ)
-277: RADIANS output mode (SEFLG_RADIANS)
+276: Planet XYZ coordinate output (FLG_XYZ)
+277: RADIANS output mode (FLG_RADIANS)
 278: Topocentric positions at world cities
 279: Pluto heliocentric deep sweep
 280: Sun equatorial positions deep
@@ -32,7 +32,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 results = {}
 
@@ -68,29 +71,29 @@ DATES = [
     2465000.0,  # 2036
 ]
 PLANETS = [
-    (ephem.SE_SUN, swe.SUN),
-    (ephem.SE_MOON, swe.MOON),
-    (ephem.SE_MERCURY, swe.MERCURY),
-    (ephem.SE_VENUS, swe.VENUS),
-    (ephem.SE_MARS, swe.MARS),
-    (ephem.SE_JUPITER, swe.JUPITER),
-    (ephem.SE_SATURN, swe.SATURN),
-    (ephem.SE_URANUS, swe.URANUS),
-    (ephem.SE_NEPTUNE, swe.NEPTUNE),
-    (ephem.SE_PLUTO, swe.PLUTO),
+    (ephem.SUN, swe.SUN),
+    (ephem.MOON, swe.MOON),
+    (ephem.MERCURY, swe.MERCURY),
+    (ephem.VENUS, swe.VENUS),
+    (ephem.MARS, swe.MARS),
+    (ephem.JUPITER, swe.JUPITER),
+    (ephem.SATURN, swe.SATURN),
+    (ephem.URANUS, swe.URANUS),
+    (ephem.NEPTUNE, swe.NEPTUNE),
+    (ephem.PLUTO, swe.PLUTO),
 ]
-LF = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+LF = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 SF = swe.FLG_SWIEPH | swe.FLG_SPEED
 
 
 def test_276():  # Planet XYZ coordinates
     p, f, t, fails = 0, 0, 0, []
-    lxf = LF | ephem.SEFLG_XYZ
+    lxf = LF | ephem.FLG_XYZ
     sxf = SF | swe.FLG_XYZ
     for le_b, se_b in PLANETS:
         for jd in DATES[:8]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, lxf)
+                lr = ephem.calc_ut(jd, le_b, lxf)
                 sr = swe.calc_ut(jd, se_b, sxf)
             except:
                 continue
@@ -98,7 +101,7 @@ def test_276():  # Planet XYZ coordinates
                 t += 1
                 d = abs(lr[0][ci] - sr[0][ci])
                 # XYZ in AU, tolerance 1e-5 AU (~1500 km)
-                tol = 1e-5 if le_b != ephem.SE_MOON else 1e-4
+                tol = 1e-5 if le_b != ephem.MOON else 1e-4
                 if d <= tol:
                     p += 1
                 else:
@@ -110,12 +113,12 @@ def test_276():  # Planet XYZ coordinates
 
 def test_277():  # RADIANS output
     p, f, t, fails = 0, 0, 0, []
-    lrf = LF | ephem.SEFLG_RADIANS
+    lrf = LF | ephem.FLG_RADIANS
     srf = SF | swe.FLG_RADIANS
     for le_b, se_b in PLANETS[:7]:
         for jd in DATES[:6]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, lrf)
+                lr = ephem.calc_ut(jd, le_b, lrf)
                 sr = swe.calc_ut(jd, se_b, srf)
             except:
                 continue
@@ -152,25 +155,25 @@ def test_278():  # Topocentric at world cities
         (55.7558, 37.6173, 156.0, "Moscow"),
         (-22.9068, -43.1729, 11.0, "Rio"),
     ]
-    ltf = LF | ephem.SEFLG_TOPOCTR
+    ltf = LF | ephem.FLG_TOPOCTR
     stf = SF | swe.FLG_TOPOCTR
     for lat, lon, alt, city in cities:
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
         swe.set_topo(lon, lat, alt)
         for le_b, se_b in [
-            (ephem.SE_MOON, swe.MOON),
-            (ephem.SE_SUN, swe.SUN),
-            (ephem.SE_MARS, swe.MARS),
+            (ephem.MOON, swe.MOON),
+            (ephem.SUN, swe.SUN),
+            (ephem.MARS, swe.MARS),
         ]:
             for jd in [2451545.0, 2460000.0, 2458000.0]:
                 try:
-                    lr = ephem.swe_calc_ut(jd, le_b, ltf)
+                    lr = ephem.calc_ut(jd, le_b, ltf)
                     sr = swe.calc_ut(jd, se_b, stf)
                 except:
                     continue
                 t += 1
                 d = adiff(lr[0][0], sr[0][0]) * 3600
-                tol = 5.0 if le_b == ephem.SE_MOON else 1.0
+                tol = 5.0 if le_b == ephem.MOON else 1.0
                 if d <= tol:
                     p += 1
                 else:
@@ -181,12 +184,12 @@ def test_278():  # Topocentric at world cities
 
 def test_279():  # Pluto heliocentric deep
     p, f, t, fails = 0, 0, 0, []
-    lhf = LF | ephem.SEFLG_HELCTR
+    lhf = LF | ephem.FLG_HELCTR
     shf = SF | swe.FLG_HELCTR
     for i in range(40):
         jd = 2415020.0 + i * 1300.0  # ~142 years span
         try:
-            lr = ephem.swe_calc_ut(jd, ephem.SE_PLUTO, lhf)
+            lr = ephem.calc_ut(jd, ephem.PLUTO, lhf)
             sr = swe.calc_ut(jd, swe.PLUTO, shf)
         except:
             continue
@@ -209,12 +212,12 @@ def test_279():  # Pluto heliocentric deep
 
 def test_280():  # Sun equatorial deep
     p, f, t, fails = 0, 0, 0, []
-    lef = LF | ephem.SEFLG_EQUATORIAL
+    lef = LF | ephem.FLG_EQUATORIAL
     sef = SF | swe.FLG_EQUATORIAL
     for i in range(50):
         jd = 2440000.0 + i * 500.0
         try:
-            lr = ephem.swe_calc_ut(jd, ephem.SE_SUN, lef)
+            lr = ephem.calc_ut(jd, ephem.SUN, lef)
             sr = swe.calc_ut(jd, swe.SUN, sef)
         except:
             continue
@@ -248,14 +251,14 @@ def test_280():  # Sun equatorial deep
 def test_281():  # Moon sidereal all ayanamsha modes
     p, f, t, fails = 0, 0, 0, []
     sid_modes = [0, 1, 3, 4, 5, 7, 15, 21, 22, 27]
-    lsf = LF | ephem.SEFLG_SIDEREAL
+    lsf = LF | ephem.FLG_SIDEREAL
     ssf = SF | swe.FLG_SIDEREAL
     for sid in sid_modes:
         swe.set_sid_mode(sid)
-        ephem.swe_set_sid_mode(sid, 0, 0)
+        ephem.set_sid_mode(sid, 0, 0)
         for jd in DATES[:5]:
             try:
-                lr = ephem.swe_calc_ut(jd, ephem.SE_MOON, lsf)
+                lr = ephem.calc_ut(jd, ephem.MOON, lsf)
                 sr = swe.calc_ut(jd, swe.MOON, ssf)
             except:
                 continue
@@ -267,7 +270,7 @@ def test_281():  # Moon sidereal all ayanamsha modes
                 f += 1
                 fails.append(f'  Moon sid={sid} jd={jd:.0f} diff={d:.2f}"')
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
@@ -277,8 +280,8 @@ def test_282():  # houses_ex2 cusp speed validation
         for jd in [2451545.0, 2460000.0, 2455000.0]:
             for lat in [45.0, -30.0, 60.0]:
                 try:
-                    lc, la, lcs, las = ephem.swe_houses_ex2(
-                        jd, lat, 10.0, ord(hs), LF | ephem.SEFLG_SPEED
+                    lc, la, lcs, las = ephem.houses_ex2(
+                        jd, lat, 10.0, ord(hs), LF | ephem.FLG_SPEED
                     )
                     sc, sa, scs, sas = swe.houses_ex2(jd, lat, 10.0, hs.encode(), SF)
                 except:
@@ -311,7 +314,7 @@ def test_283():  # Ecliptic obliquity at many dates
     for i in range(50):
         jd = 2415020.0 + i * 1000.0
         try:
-            lr = ephem.swe_calc_ut(jd, -1, 0)
+            lr = ephem.calc_ut(jd, -1, 0)
             sr = swe.calc_ut(jd, -1, 0)
         except:
             continue
@@ -344,11 +347,11 @@ def test_283():  # Ecliptic obliquity at many dates
 
 def test_284():  # nod_aps_ut mean node and apogee
     p, f, t, fails = 0, 0, 0, []
-    for le_b, se_b in [(ephem.SE_MOON, swe.MOON)]:
+    for le_b, se_b in [(ephem.MOON, swe.MOON)]:
         for jd in DATES[:8]:
             try:
                 # Mean node
-                lr_n = ephem.swe_calc_ut(jd, ephem.SE_MEAN_NODE, LF)
+                lr_n = ephem.calc_ut(jd, ephem.MEAN_NODE, LF)
                 sr_n = swe.calc_ut(jd, swe.MEAN_NODE, SF)
             except:
                 continue
@@ -361,7 +364,7 @@ def test_284():  # nod_aps_ut mean node and apogee
                 fails.append(f'  MeanNode jd={jd:.0f} diff={d:.4f}"')
             try:
                 # Mean apogee (Lilith)
-                lr_a = ephem.swe_calc_ut(jd, ephem.SE_MEAN_APOG, LF)
+                lr_a = ephem.calc_ut(jd, ephem.MEAN_APOG, LF)
                 sr_a = swe.calc_ut(jd, swe.MEAN_APOG, SF)
             except:
                 continue
@@ -374,7 +377,7 @@ def test_284():  # nod_aps_ut mean node and apogee
                 fails.append(f'  MeanLilith jd={jd:.0f} diff={d:.4f}"')
             # True node
             try:
-                lr_tn = ephem.swe_calc_ut(jd, ephem.SE_TRUE_NODE, LF)
+                lr_tn = ephem.calc_ut(jd, ephem.TRUE_NODE, LF)
                 sr_tn = swe.calc_ut(jd, swe.TRUE_NODE, SF)
             except:
                 continue
@@ -410,7 +413,7 @@ def test_285():  # Fixed star magnitude comparison
     jd = 2451545.0
     for star in stars:
         try:
-            lr = ephem.swe_fixstar2_ut(star, jd, LF)
+            lr = ephem.fixstar2_ut(star, jd, LF)
             sr = swe.fixstar2(star, jd, SF)
             # lr = (pos_tuple, starname, retflag)
             # sr = ((lon,lat,dist,...), starname, retflag)
@@ -448,7 +451,7 @@ def test_286():  # Planet positions near retrograde midpoint
             for step in range(60):
                 jd_test = jd + step * 5.0
                 try:
-                    lr = ephem.swe_calc_ut(jd_test, le_b, LF)
+                    lr = ephem.calc_ut(jd_test, le_b, LF)
                     sr = swe.calc_ut(jd_test, se_b, SF)
                 except:
                     continue
@@ -470,21 +473,21 @@ def test_287():  # house_pos all planets Placidus
     p, f, t, fails = 0, 0, 0, []
     for jd in [2451545.0, 2460000.0, 2455000.0, 2458000.0]:
         try:
-            nut = ephem.swe_calc_ut(jd, -1, 0)
+            nut = ephem.calc_ut(jd, -1, 0)
             eps = nut[0][0]
-            st = ephem.swe_sidtime(jd)
+            st = ephem.sidtime(jd)
             armc = st * 15.0
         except:
             continue
         for le_b, se_b in PLANETS:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
+                lr = ephem.calc_ut(jd, le_b, LF)
                 sr = swe.calc_ut(jd, se_b, SF)
             except:
                 continue
             for lat in [45.0, -30.0, 52.5]:
                 try:
-                    le_hp = ephem.swe_house_pos(
+                    le_hp = ephem.house_pos(
                         armc, lat, eps, ord("P"), lr[0][0], lr[0][1]
                     )
                     se_hp = swe.house_pos(
@@ -504,15 +507,15 @@ def test_287():  # house_pos all planets Placidus
 
 def test_288():  # Chiron sidereal mode sweep
     p, f, t, fails = 0, 0, 0, []
-    lsf = LF | ephem.SEFLG_SIDEREAL
+    lsf = LF | ephem.FLG_SIDEREAL
     ssf = SF | swe.FLG_SIDEREAL
     for sid in [0, 1, 3, 5, 7, 27]:
         swe.set_sid_mode(sid)
-        ephem.swe_set_sid_mode(sid, 0, 0)
+        ephem.set_sid_mode(sid, 0, 0)
         for i in range(10):
             jd = 2440000.0 + i * 2500.0
             try:
-                lr = ephem.swe_calc_ut(jd, ephem.SE_CHIRON, lsf)
+                lr = ephem.calc_ut(jd, ephem.CHIRON, lsf)
                 sr = swe.calc_ut(jd, swe.CHIRON, ssf)
             except:
                 continue
@@ -524,7 +527,7 @@ def test_288():  # Chiron sidereal mode sweep
                 f += 1
                 fails.append(f'  Chiron sid={sid} jd={jd:.0f} diff={d:.2f}"')
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
@@ -533,9 +536,9 @@ def test_289():  # Mean vs True node divergence pattern
     for i in range(40):
         jd = 2451545.0 + i * 170.0  # ~18.6 year cycle covered
         try:
-            lr_mn = ephem.swe_calc_ut(jd, ephem.SE_MEAN_NODE, LF)
+            lr_mn = ephem.calc_ut(jd, ephem.MEAN_NODE, LF)
             sr_mn = swe.calc_ut(jd, swe.MEAN_NODE, SF)
-            lr_tn = ephem.swe_calc_ut(jd, ephem.SE_TRUE_NODE, LF)
+            lr_tn = ephem.calc_ut(jd, ephem.TRUE_NODE, LF)
             sr_tn = swe.calc_ut(jd, swe.TRUE_NODE, SF)
         except:
             continue
@@ -571,16 +574,16 @@ def test_289():  # Mean vs True node divergence pattern
 def test_290():  # Asteroid geocentric distance
     p, f, t, fails = 0, 0, 0, []
     asteroids = [
-        (ephem.SE_CERES, swe.CERES),
-        (ephem.SE_PALLAS, swe.PALLAS),
-        (ephem.SE_JUNO, swe.JUNO),
-        (ephem.SE_VESTA, swe.VESTA),
-        (ephem.SE_CHIRON, swe.CHIRON),
+        (ephem.CERES, swe.CERES),
+        (ephem.PALLAS, swe.PALLAS),
+        (ephem.JUNO, swe.JUNO),
+        (ephem.VESTA, swe.VESTA),
+        (ephem.CHIRON, swe.CHIRON),
     ]
     for le_b, se_b in asteroids:
         for jd in DATES[:8]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
+                lr = ephem.calc_ut(jd, le_b, LF)
                 sr = swe.calc_ut(jd, se_b, SF)
             except:
                 continue
@@ -608,7 +611,7 @@ def test_291():  # sol_eclipse_when_glob forward search
     jd_start = 2451545.0  # J2000
     for i in range(10):
         try:
-            lr = ephem.swe_sol_eclipse_when_glob(jd_start, LF, 0)
+            lr = ephem.sol_eclipse_when_glob(jd_start, LF, 0)
             sr = swe.sol_eclipse_when_glob(jd_start, SF, 0, False)
         except:
             continue
@@ -641,8 +644,8 @@ def test_292():  # cotrans_sp all planets with speeds
     for le_b, se_b in PLANETS[:7]:
         for jd in DATES[:6]:
             try:
-                lr = ephem.swe_calc_ut(jd, le_b, LF)
-                nut = ephem.swe_calc_ut(jd, -1, 0)
+                lr = ephem.calc_ut(jd, le_b, LF)
+                nut = ephem.calc_ut(jd, -1, 0)
                 eps = nut[0][0]
                 # Convert ecliptic -> equatorial with speeds
                 coord = (lr[0][0], lr[0][1], lr[0][2])
@@ -688,9 +691,9 @@ def test_293():  # Sidereal time at year boundaries
     p, f, t, fails = 0, 0, 0, []
     # Jan 1 of each year from 1950 to 2040
     for year in range(1950, 2041, 1):
-        jd = ephem.swe_julday(year, 1, 1, 0.0, 1)
+        jd = ephem.julday(year, 1, 1, 0.0, 1)
         try:
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
             se_st = swe.sidtime(jd)
         except:
             continue
@@ -710,7 +713,7 @@ def test_294():  # Houses at longitude 180 (date line)
         for jd in [2451545.0, 2460000.0]:
             for lat in [35.0, -45.0]:
                 try:
-                    lc, la = ephem.swe_houses_ex(jd, lat, 180.0, ord(hs), LF)
+                    lc, la = ephem.houses_ex(jd, lat, 180.0, ord(hs), LF)
                     sc, sa = swe.houses_ex(jd, lat, 180.0, hs.encode(), SF)
                 except:
                     continue
@@ -731,23 +734,23 @@ def test_295():  # All flag combos for Venus
     p, f, t, fails = 0, 0, 0, []
     flag_combos = [
         (0, "default"),
-        (ephem.SEFLG_HELCTR, "helio"),
-        (ephem.SEFLG_J2000, "J2000"),
-        (ephem.SEFLG_NONUT, "NONUT"),
-        (ephem.SEFLG_NOABERR, "NOABERR"),
-        (ephem.SEFLG_EQUATORIAL, "equatorial"),
-        (ephem.SEFLG_J2000 | ephem.SEFLG_NONUT, "J2000+NONUT"),
-        (ephem.SEFLG_EQUATORIAL | ephem.SEFLG_J2000, "EQ+J2000"),
-        (ephem.SEFLG_EQUATORIAL | ephem.SEFLG_NONUT, "EQ+NONUT"),
-        (ephem.SEFLG_TRUEPOS, "TRUEPOS"),
-        (ephem.SEFLG_HELCTR | ephem.SEFLG_J2000, "HELIO+J2000"),
+        (ephem.FLG_HELCTR, "helio"),
+        (ephem.FLG_J2000, "J2000"),
+        (ephem.FLG_NONUT, "NONUT"),
+        (ephem.FLG_NOABERR, "NOABERR"),
+        (ephem.FLG_EQUATORIAL, "equatorial"),
+        (ephem.FLG_J2000 | ephem.FLG_NONUT, "J2000+NONUT"),
+        (ephem.FLG_EQUATORIAL | ephem.FLG_J2000, "EQ+J2000"),
+        (ephem.FLG_EQUATORIAL | ephem.FLG_NONUT, "EQ+NONUT"),
+        (ephem.FLG_TRUEPOS, "TRUEPOS"),
+        (ephem.FLG_HELCTR | ephem.FLG_J2000, "HELIO+J2000"),
     ]
     for extra, label in flag_combos:
         lfl = LF | extra
         sfl = SF | extra  # pyswisseph flags same numeric values
         for jd in DATES[:6]:
             try:
-                lr = ephem.swe_calc_ut(jd, ephem.SE_VENUS, lfl)
+                lr = ephem.calc_ut(jd, ephem.VENUS, lfl)
                 sr = swe.calc_ut(jd, swe.VENUS, sfl)
             except:
                 continue

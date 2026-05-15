@@ -5,10 +5,10 @@ Compares ALL 24 house system calculations between pyswisseph and libephemeris
 with tight tolerances across multiple locations, dates, and functions.
 
 Coverage:
-  - swe_houses: 24 systems × 8 locations × 12 dates — all 12 cusps + all 8 ASCMC
-  - swe_houses_armc: 24 systems × 12 ARMC × 4 latitudes — cusps + ASCMC
-  - swe_house_pos: 12 systems × 18 longitudes × 3 body latitudes × 4 dates
-  - swe_houses_ex (sidereal): 8 systems × 3 ayanamshas × 6 dates
+  - houses: 24 systems × 8 locations × 12 dates — all 12 cusps + all 8 ASCMC
+  - houses_armc: 24 systems × 12 ARMC × 4 latitudes — cusps + ASCMC
+  - house_pos: 12 systems × 18 longitudes × 3 body latitudes × 4 dates
+  - houses_ex (sidereal): 8 systems × 3 ayanamshas × 6 dates
   - Precision report: per-system max error for cusps and each ASCMC index
 
 Run via:
@@ -24,10 +24,10 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
 )
 
 
@@ -160,7 +160,7 @@ def _track(system: str, value_name: str, diff: float) -> None:
 
 
 # ============================================================================
-# TEST: swe_houses — All cusps + ALL 8 ASCMC
+# TEST: houses — All cusps + ALL 8 ASCMC
 # ============================================================================
 
 
@@ -181,7 +181,7 @@ class TestHouseCuspsAllSystems:
             pytest.skip(f"pyswisseph raises error for {hsys} at {loc_name}")
 
         try:
-            cusps_py, _ = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, _ = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"libephemeris raises error for {hsys} at {loc_name}")
 
@@ -218,7 +218,7 @@ class TestAscmcComplete:
             pytest.skip(f"pyswisseph raises error for {hsys} at {loc_name}")
 
         try:
-            _, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+            _, ascmc_py = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"libephemeris raises error for {hsys} at {loc_name}")
 
@@ -245,7 +245,7 @@ class TestAscmcComplete:
 
 
 # ============================================================================
-# TEST: swe_houses_armc — All 24 systems, multiple latitudes
+# TEST: houses_armc — All 24 systems, multiple latitudes
 # ============================================================================
 
 
@@ -278,7 +278,7 @@ class TestHousesArmcAllSystems:
             pytest.skip(f"pyswisseph error for {hsys} at {lat_name}")
 
         try:
-            cusps_py, ascmc_py = ephem.swe_houses_armc(armc, lat, eps, hsys)
+            cusps_py, ascmc_py = ephem.houses_armc(armc, lat, eps, hsys)
         except Exception:
             pytest.skip(f"libephemeris error for {hsys} at {lat_name}")
 
@@ -319,7 +319,7 @@ class TestHousesArmcAllSystems:
 
 
 # ============================================================================
-# TEST: swe_house_pos — Comprehensive
+# TEST: house_pos — Comprehensive
 # ============================================================================
 
 HPOS_SYSTEMS = ["P", "K", "O", "R", "C", "E", "W", "B", "M", "T", "X", "V"]
@@ -378,14 +378,14 @@ class TestHousePosComprehensive:
 
 
 # ============================================================================
-# TEST: swe_houses_ex — Sidereal
+# TEST: houses_ex — Sidereal
 # ============================================================================
 
 SIDEREAL_SYSTEMS = ["P", "K", "E", "W", "O", "R", "C", "B"]
 SIDEREAL_MODES = [
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (SE_SIDM_RAMAN, "Raman"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (SIDM_RAMAN, "Raman"),
 ]
 
 
@@ -405,7 +405,7 @@ class TestSiderealHouses:
 
         try:
             cusps_swe, ascmc_swe = swe.houses_ex(
-                jd, lat, lon, hsys.encode("ascii"), SEFLG_SIDEREAL
+                jd, lat, lon, hsys.encode("ascii"), FLG_SIDEREAL
             )
         except swe.Error:
             swe.set_sid_mode(0)
@@ -414,7 +414,7 @@ class TestSiderealHouses:
 
         try:
             cusps_py, ascmc_py = ephem.houses_ex(
-                jd, lat, lon, hsys, SEFLG_SIDEREAL
+                jd, lat, lon, hsys, FLG_SIDEREAL
             )
         except Exception:
             swe.set_sid_mode(0)
@@ -506,7 +506,7 @@ class TestEdgeCaseLocations:
             pytest.skip(f"pyswisseph error for {hsys} at {loc_name}")
 
         try:
-            cusps_py, _ = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, _ = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"libephemeris error for {hsys} at {loc_name}")
 
@@ -541,7 +541,7 @@ class TestEdgeCaseDates:
             pytest.skip(f"pyswisseph error for {hsys}")
 
         try:
-            cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, ascmc_py = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"libephemeris error for {hsys}")
 
@@ -578,7 +578,7 @@ class TestCuspAscMcConsistency:
 
         try:
             cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-            cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, ascmc_py = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"Error for {hsys} at {loc_name}")
 
@@ -597,7 +597,7 @@ class TestCuspAscMcConsistency:
 
         try:
             cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode("ascii"))
-            cusps_py, ascmc_py = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, ascmc_py = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"Error for {hsys} at {loc_name}")
 
@@ -624,7 +624,7 @@ class TestOppositeHouses:
         jd = 2451545.0
 
         try:
-            cusps_py, _ = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps_py, _ = ephem.houses(jd, lat, lon, hsys)
         except Exception:
             pytest.skip(f"Error for {hsys} at {loc_name}")
 
@@ -655,7 +655,7 @@ class TestPolarCircleErrors:
 
         py_error = False
         try:
-            ephem.swe_houses(jd, lat, 0.0, hsys)
+            ephem.houses(jd, lat, 0.0, hsys)
         except Exception:
             py_error = True
 
@@ -671,7 +671,7 @@ class TestPolarCircleErrors:
         lat = 65.0
 
         cusps_swe, ascmc_swe = swe.houses(jd, lat, 0.0, hsys.encode("ascii"))
-        cusps_py, ascmc_py = ephem.swe_houses(jd, lat, 0.0, hsys)
+        cusps_py, ascmc_py = ephem.houses(jd, lat, 0.0, hsys)
 
         asc_diff = angular_diff(ascmc_swe[0], ascmc_py[0])
         assert asc_diff < 0.002, f"{hsys} at 65°: ASC diff {asc_diff:.6f}°"
@@ -691,7 +691,7 @@ class TestGauquelin36Sectors:
             pytest.skip(f"pyswisseph error at {loc_name}")
 
         try:
-            cusps_py, _ = ephem.swe_houses(jd, lat, lon, "G")
+            cusps_py, _ = ephem.houses(jd, lat, lon, "G")
         except Exception:
             pytest.skip(f"libephemeris error at {loc_name}")
 
@@ -719,14 +719,14 @@ class TestHousesArmcConsistencyWithHouses:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps_h, ascmc_h = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_h, ascmc_h = ephem.houses(jd, lat, lon, hsys)
         armc = ascmc_h[2]
 
         # Get obliquity from pyswisseph for consistency
         ecl = swe.calc_ut(jd, -1, 0)
         eps = float(ecl[0][0])
 
-        cusps_a, ascmc_a = ephem.swe_houses_armc(armc, lat, eps, hsys)
+        cusps_a, ascmc_a = ephem.houses_armc(armc, lat, eps, hsys)
 
         # Cusps should be very close (not exactly equal due to obliquity path)
         for i in range(12):
@@ -748,7 +748,7 @@ class TestAscmcSameAcrossSystems:
 
         # Use Placidus as reference
         try:
-            _, ref_ascmc = ephem.swe_houses(jd, lat, lon, "P")
+            _, ref_ascmc = ephem.houses(jd, lat, lon, "P")
         except Exception:
             pytest.skip("Cannot compute Placidus")
 
@@ -756,7 +756,7 @@ class TestAscmcSameAcrossSystems:
             if hsys in POLAR_FAIL_SYSTEMS and abs(lat) > 66:
                 continue
             try:
-                _, ascmc = ephem.swe_houses(jd, lat, lon, hsys)
+                _, ascmc = ephem.houses(jd, lat, lon, hsys)
             except Exception:
                 continue
 
@@ -783,7 +783,7 @@ class TestHousePosAtCuspBoundaries:
         ecl = swe.calc_ut(jd, -1, 0)
         eps = float(ecl[0][0])
 
-        cusps, _ = ephem.swe_houses_armc(armc, lat, eps, hsys)
+        cusps, _ = ephem.houses_armc(armc, lat, eps, hsys)
 
         # Place body at cusp 1 (ASC)
         hp = float(ephem.house_pos(armc, lat, eps, (cusps[0], 0.0), hsys))
@@ -805,7 +805,7 @@ class TestHousePosAtCuspBoundaries:
         ecl = swe.calc_ut(jd, -1, 0)
         eps = float(ecl[0][0])
 
-        cusps, _ = ephem.swe_houses_armc(armc, lat, eps, hsys)
+        cusps, _ = ephem.houses_armc(armc, lat, eps, hsys)
 
         # Place body in middle of house 1
         c1 = cusps[0]
@@ -880,7 +880,7 @@ class TestHousesArmcEdgeCaseArmc:
             pytest.skip(f"pyswisseph error for {hsys} at armc={armc}")
 
         try:
-            cusps_py, _ = ephem.swe_houses_armc(armc, lat, eps, hsys)
+            cusps_py, _ = ephem.houses_armc(armc, lat, eps, hsys)
         except Exception:
             pytest.skip(f"libephemeris error for {hsys} at armc={armc}")
 
@@ -909,14 +909,14 @@ class TestSiderealMultipleLocations:
         """Sidereal cusps must match at various locations."""
         jd = 2451545.0  # J2000
 
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        ephem.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
         try:
             cusps_swe, _ = swe.houses_ex(
-                jd, lat, lon, hsys.encode("ascii"), SEFLG_SIDEREAL
+                jd, lat, lon, hsys.encode("ascii"), FLG_SIDEREAL
             )
-            cusps_py, _ = ephem.houses_ex(jd, lat, lon, hsys, SEFLG_SIDEREAL)
+            cusps_py, _ = ephem.houses_ex(jd, lat, lon, hsys, FLG_SIDEREAL)
         except Exception:
             swe.set_sid_mode(0)
             ephem.set_sid_mode(0)
@@ -962,7 +962,7 @@ class TestPrecisionReport:
         print("=" * 100)
 
         # --- Cusp max errors ---
-        print("\nMax cusp error per system (swe_houses):")
+        print("\nMax cusp error per system (houses):")
         print(f"  {'System':<25s} {'Max Cusp':>12s} {'Worst Cusp':>12s}")
         print(f"  {'-' * 25} {'-' * 12} {'-' * 12}")
         for sys_char in systems:
@@ -979,7 +979,7 @@ class TestPrecisionReport:
                 print(f"  {name + ' (' + sys_char + ')':<25s} {max_cusp:>12.7f} {worst:>12s}")
 
         # --- ASCMC max errors ---
-        print(f"\nMax ASCMC error per system (swe_houses):")
+        print(f"\nMax ASCMC error per system (houses):")
         header = f"  {'System':<18s}"
         for lbl in ascmc_keys:
             header += f" {lbl:>10s}"
@@ -1003,7 +1003,7 @@ class TestPrecisionReport:
             for s in systems for k in armc_cusp_keys
         )
         if has_armc_data:
-            print(f"\nMax cusp error per system (swe_houses_armc):")
+            print(f"\nMax cusp error per system (houses_armc):")
             print(f"  {'System':<25s} {'Max Cusp':>12s}")
             print(f"  {'-' * 25} {'-' * 12}")
             for sys_char in systems:

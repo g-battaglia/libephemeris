@@ -278,16 +278,16 @@ class TestArabicPartsIntegration:
     def test_arabic_parts_from_real_positions(self):
         """Calculate Arabic parts from actual planetary positions."""
         jd = 2451545.0
-        swe.swe_set_topo(12.5, 41.9, 0.0)
+        swe.set_topo(12.5, 41.9, 0.0)
 
         # Get actual positions
-        sun_pos, _ = swe.swe_calc_ut(jd, 0, 0)
-        moon_pos, _ = swe.swe_calc_ut(jd, 1, 0)
-        merc_pos, _ = swe.swe_calc_ut(jd, 2, 0)
-        venus_pos, _ = swe.swe_calc_ut(jd, 3, 0)
+        sun_pos, _ = swe.calc_ut(jd, 0, 0)
+        moon_pos, _ = swe.calc_ut(jd, 1, 0)
+        merc_pos, _ = swe.calc_ut(jd, 2, 0)
+        venus_pos, _ = swe.calc_ut(jd, 3, 0)
 
         # Get Asc from houses
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord("P"))
         asc = ascmc[0]
 
         positions = {
@@ -307,14 +307,14 @@ class TestArabicPartsIntegration:
     @pytest.mark.parametrize("year", [1900, 1950, 2000, 2024, 2050, 2100])
     def test_arabic_parts_across_years(self, year: int):
         """Arabic parts from real positions at different years."""
-        jd = swe.swe_julday(year, 6, 21, 12.0)
-        swe.swe_set_topo(12.5, 41.9, 0.0)
+        jd = swe.julday(year, 6, 21, 12.0)
+        swe.set_topo(12.5, 41.9, 0.0)
 
-        sun_pos, _ = swe.swe_calc_ut(jd, 0, 0)
-        moon_pos, _ = swe.swe_calc_ut(jd, 1, 0)
-        merc_pos, _ = swe.swe_calc_ut(jd, 2, 0)
-        venus_pos, _ = swe.swe_calc_ut(jd, 3, 0)
-        cusps, ascmc = swe.swe_houses(jd, 41.9, 12.5, ord("P"))
+        sun_pos, _ = swe.calc_ut(jd, 0, 0)
+        moon_pos, _ = swe.calc_ut(jd, 1, 0)
+        merc_pos, _ = swe.calc_ut(jd, 2, 0)
+        venus_pos, _ = swe.calc_ut(jd, 3, 0)
+        cusps, ascmc = swe.houses(jd, 41.9, 12.5, ord("P"))
 
         positions = {
             "Asc": ascmc[0],

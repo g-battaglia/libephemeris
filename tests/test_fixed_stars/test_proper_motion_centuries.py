@@ -13,7 +13,7 @@ import random
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 
 
 # Well-known bright stars with significant proper motion
@@ -53,7 +53,7 @@ class TestFixstarBasic:
     def test_fixstar_returns_valid_position(self, star_name: str):
         """fixstar_ut returns valid position for known bright stars."""
         jd = 2451545.0
-        result = swe.swe_fixstar_ut(star_name, jd, 0)
+        result = swe.fixstar_ut(star_name, jd, 0)
         # Returns (name, (lon, lat, dist, slon, slat, sdist), retflag)
         assert len(result) >= 2
         pos = result[1] if isinstance(result[1], tuple) else result[0]
@@ -70,9 +70,9 @@ class TestFixstarBasic:
     @pytest.mark.unit
     @pytest.mark.parametrize("star_name", BRIGHT_STARS[:5])
     def test_fixstar_with_speed_flag(self, star_name: str):
-        """fixstar_ut works with SEFLG_SPEED."""
+        """fixstar_ut works with FLG_SPEED."""
         jd = 2451545.0
-        result = swe.swe_fixstar_ut(star_name, jd, SEFLG_SPEED)
+        result = swe.fixstar_ut(star_name, jd, FLG_SPEED)
         if isinstance(result[0], tuple):
             pos = result[0]
         elif isinstance(result[0], str):
@@ -95,8 +95,8 @@ class TestProperMotion:
         jd1 = 2451545.0  # J2000
         jd2 = jd1 + 365.25 * 100  # +100 years
 
-        r1 = swe.swe_fixstar_ut(star_name, jd1, 0)
-        r2 = swe.swe_fixstar_ut(star_name, jd2, 0)
+        r1 = swe.fixstar_ut(star_name, jd1, 0)
+        r2 = swe.fixstar_ut(star_name, jd2, 0)
 
         # Extract positions
         if isinstance(r1[0], str):
@@ -133,8 +133,8 @@ class TestProperMotion:
         jd1 = 2451545.0
         jd2 = jd1 + 365.25 * 10
 
-        r1 = swe.swe_fixstar_ut(star_name, jd1, 0)
-        r2 = swe.swe_fixstar_ut(star_name, jd2, 0)
+        r1 = swe.fixstar_ut(star_name, jd1, 0)
+        r2 = swe.fixstar_ut(star_name, jd2, 0)
 
         if isinstance(r1[0], str):
             pos1, pos2 = r1[1], r2[1]
@@ -158,8 +158,8 @@ class TestFixstarMultipleDates:
     def test_fixstar_across_centuries(self, star_name: str):
         """Star position is valid from 1600 to 2500."""
         for year in [1600, 1700, 1800, 1900, 2000, 2100, 2200, 2400]:
-            jd = swe.swe_julday(year, 1, 1, 12.0)
-            result = swe.swe_fixstar_ut(star_name, jd, 0)
+            jd = swe.julday(year, 1, 1, 12.0)
+            result = swe.fixstar_ut(star_name, jd, 0)
             if isinstance(result[0], str):
                 pos = result[1]
             else:
@@ -172,11 +172,11 @@ class TestFixstarMultipleDates:
     def test_star_longitude_increases_with_precession(self):
         """Star longitudes should generally increase due to precession."""
         star = "Spica"
-        jd1 = swe.swe_julday(1900, 1, 1, 12.0)
-        jd2 = swe.swe_julday(2100, 1, 1, 12.0)
+        jd1 = swe.julday(1900, 1, 1, 12.0)
+        jd2 = swe.julday(2100, 1, 1, 12.0)
 
-        r1 = swe.swe_fixstar_ut(star, jd1, 0)
-        r2 = swe.swe_fixstar_ut(star, jd2, 0)
+        r1 = swe.fixstar_ut(star, jd1, 0)
+        r2 = swe.fixstar_ut(star, jd2, 0)
 
         if isinstance(r1[0], str):
             pos1, pos2 = r1[1], r2[1]
@@ -213,7 +213,7 @@ class TestFixstarMagnitude:
         self, star_name: str, expected_mag_range: tuple[float, float]
     ):
         """Star magnitudes should be within expected ranges."""
-        result = swe.swe_fixstar_mag(star_name)
+        result = swe.fixstar_mag(star_name)
         # fixstar_mag returns (magnitude, star_name) tuple
         mag = result[0] if isinstance(result, tuple) else result
         lo, hi = expected_mag_range
@@ -231,7 +231,7 @@ class TestFixstarContinuity:
         prev_lon = None
         for i in range(12):
             jd = jd_start + i * 30.44
-            result = swe.swe_fixstar_ut(star_name, jd, 0)
+            result = swe.fixstar_ut(star_name, jd, 0)
             if isinstance(result[0], str):
                 pos = result[1]
             else:

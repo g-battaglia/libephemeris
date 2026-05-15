@@ -16,10 +16,10 @@ in ancient Persia to mark the solstices and equinoxes around 3000 BCE.
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_ALDEBARAN,
-    SE_REGULUS,
-    SE_ANTARES,
-    SE_FOMALHAUT,
+    ALDEBARAN,
+    REGULUS,
+    ANTARES,
+    FOMALHAUT,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -31,10 +31,10 @@ from libephemeris.fixed_stars import (
 # The four Royal Stars of Persia with their expected data
 # (constant, name, watcher_direction, persian_name, approx_ra_j2000, approx_magnitude)
 ROYAL_STARS = [
-    (SE_ALDEBARAN, "Aldebaran", "East", "Tascheter", 68.98, 0.85),
-    (SE_REGULUS, "Regulus", "North", "Venant", 152.09, 1.40),
-    (SE_ANTARES, "Antares", "West", "Satevis", 247.35, 1.06),
-    (SE_FOMALHAUT, "Fomalhaut", "South", "Hastorang", 344.41, 1.16),
+    (ALDEBARAN, "Aldebaran", "East", "Tascheter", 68.98, 0.85),
+    (REGULUS, "Regulus", "North", "Venant", 152.09, 1.40),
+    (ANTARES, "Antares", "West", "Satevis", 247.35, 1.06),
+    (FOMALHAUT, "Fomalhaut", "South", "Hastorang", 344.41, 1.16),
 ]
 
 
@@ -133,7 +133,7 @@ class TestRoyalStarsCalculation:
         self, standard_jd, star_id, name, direction, persian_name, approx_ra, approx_mag
     ):
         """Test each Royal Star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -148,7 +148,7 @@ class TestRoyalStarsCalculation:
         """Test Royal Stars are spread roughly 90 degrees apart in ecliptic longitude."""
         positions = []
         for star_id, name, _, _, _, _ in ROYAL_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0]))
 
         # Sort by longitude
@@ -177,47 +177,47 @@ class TestRoyalStarsNameResolution:
 
     def test_resolve_aldebaran_canonical(self):
         """Test Aldebaran canonical name resolution."""
-        assert resolve_star_name("Aldebaran") == SE_ALDEBARAN
-        assert resolve_star_name("Alpha Tauri") == SE_ALDEBARAN
-        assert resolve_star_name("Eye of Taurus") == SE_ALDEBARAN
+        assert resolve_star_name("Aldebaran") == ALDEBARAN
+        assert resolve_star_name("Alpha Tauri") == ALDEBARAN
+        assert resolve_star_name("Eye of Taurus") == ALDEBARAN
 
     def test_resolve_aldebaran_watcher(self):
         """Test Aldebaran watcher alias resolution."""
-        assert resolve_star_name("Watcher of the East") == SE_ALDEBARAN
-        assert resolve_star_name("Tascheter") == SE_ALDEBARAN
+        assert resolve_star_name("Watcher of the East") == ALDEBARAN
+        assert resolve_star_name("Tascheter") == ALDEBARAN
 
     def test_resolve_regulus_canonical(self):
         """Test Regulus canonical name resolution."""
-        assert resolve_star_name("Regulus") == SE_REGULUS
-        assert resolve_star_name("Alpha Leonis") == SE_REGULUS
-        assert resolve_star_name("Cor Leonis") == SE_REGULUS
+        assert resolve_star_name("Regulus") == REGULUS
+        assert resolve_star_name("Alpha Leonis") == REGULUS
+        assert resolve_star_name("Cor Leonis") == REGULUS
 
     def test_resolve_regulus_watcher(self):
         """Test Regulus watcher alias resolution."""
-        assert resolve_star_name("Watcher of the North") == SE_REGULUS
-        assert resolve_star_name("Venant") == SE_REGULUS
+        assert resolve_star_name("Watcher of the North") == REGULUS
+        assert resolve_star_name("Venant") == REGULUS
 
     def test_resolve_antares_canonical(self):
         """Test Antares canonical name resolution."""
-        assert resolve_star_name("Antares") == SE_ANTARES
-        assert resolve_star_name("Alpha Scorpii") == SE_ANTARES
-        assert resolve_star_name("Rival of Mars") == SE_ANTARES
+        assert resolve_star_name("Antares") == ANTARES
+        assert resolve_star_name("Alpha Scorpii") == ANTARES
+        assert resolve_star_name("Rival of Mars") == ANTARES
 
     def test_resolve_antares_watcher(self):
         """Test Antares watcher alias resolution."""
-        assert resolve_star_name("Watcher of the West") == SE_ANTARES
-        assert resolve_star_name("Satevis") == SE_ANTARES
+        assert resolve_star_name("Watcher of the West") == ANTARES
+        assert resolve_star_name("Satevis") == ANTARES
 
     def test_resolve_fomalhaut_canonical(self):
         """Test Fomalhaut canonical name resolution."""
-        assert resolve_star_name("Fomalhaut") == SE_FOMALHAUT
-        assert resolve_star_name("Alpha Piscis Austrini") == SE_FOMALHAUT
-        assert resolve_star_name("Fish's Mouth") == SE_FOMALHAUT
+        assert resolve_star_name("Fomalhaut") == FOMALHAUT
+        assert resolve_star_name("Alpha Piscis Austrini") == FOMALHAUT
+        assert resolve_star_name("Fish's Mouth") == FOMALHAUT
 
     def test_resolve_fomalhaut_watcher(self):
         """Test Fomalhaut watcher alias resolution."""
-        assert resolve_star_name("Watcher of the South") == SE_FOMALHAUT
-        assert resolve_star_name("Hastorang") == SE_FOMALHAUT
+        assert resolve_star_name("Watcher of the South") == FOMALHAUT
+        assert resolve_star_name("Hastorang") == FOMALHAUT
 
     @pytest.mark.parametrize(
         "star_id,name,direction,persian_name,approx_ra,approx_mag", ROYAL_STARS
@@ -237,7 +237,7 @@ class TestRoyalStarsHipparcos:
     def test_aldebaran_hipparcos(self):
         """Test Aldebaran has correct Hipparcos number."""
         for e in STAR_CATALOG:
-            if e.id == SE_ALDEBARAN:
+            if e.id == ALDEBARAN:
                 assert e.hip_number == 21421
                 assert e.nomenclature == "alTau"
                 break
@@ -245,7 +245,7 @@ class TestRoyalStarsHipparcos:
     def test_regulus_hipparcos(self):
         """Test Regulus has correct Hipparcos number."""
         for e in STAR_CATALOG:
-            if e.id == SE_REGULUS:
+            if e.id == REGULUS:
                 assert e.hip_number == 49669
                 assert e.nomenclature == "alLeo"
                 break
@@ -253,7 +253,7 @@ class TestRoyalStarsHipparcos:
     def test_antares_hipparcos(self):
         """Test Antares has correct Hipparcos number."""
         for e in STAR_CATALOG:
-            if e.id == SE_ANTARES:
+            if e.id == ANTARES:
                 assert e.hip_number == 80763
                 assert e.nomenclature == "alSco"
                 break
@@ -261,7 +261,7 @@ class TestRoyalStarsHipparcos:
     def test_fomalhaut_hipparcos(self):
         """Test Fomalhaut has correct Hipparcos number."""
         for e in STAR_CATALOG:
-            if e.id == SE_FOMALHAUT:
+            if e.id == FOMALHAUT:
                 assert e.hip_number == 113368
                 assert e.nomenclature == "alPsA"
                 break
@@ -273,12 +273,12 @@ class TestRoyalStarsProperMotion:
 
     def test_proper_motion_over_50_years(self):
         """Test that Royal Stars move over 50 years."""
-        jd1 = ephem.swe_julday(2000, 1, 1, 12.0)
-        jd2 = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd1 = ephem.julday(2000, 1, 1, 12.0)
+        jd2 = ephem.julday(2050, 1, 1, 12.0)
 
         for star_id, name, _, _, _, _ in ROYAL_STARS:
-            pos1, _ = ephem.swe_calc_ut(jd1, star_id, 0)
-            pos2, _ = ephem.swe_calc_ut(jd2, star_id, 0)
+            pos1, _ = ephem.calc_ut(jd1, star_id, 0)
+            pos2, _ = ephem.calc_ut(jd2, star_id, 0)
 
             diff = abs(pos2[0] - pos1[0])
             if diff > 180:

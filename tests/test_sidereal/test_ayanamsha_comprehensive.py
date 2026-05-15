@@ -14,11 +14,11 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
 )
 
 
@@ -43,15 +43,15 @@ class TestAyanamshaBasic:
     @pytest.mark.unit
     def test_get_ayanamsa_ut_returns_float(self):
         """get_ayanamsa_ut returns a Python float."""
-        swe.swe_set_sid_mode(1)
-        result = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(1)
+        result = swe.get_ayanamsa_ut(2451545.0)
         assert type(result) is float
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ut_returns_tuple(self):
         """get_ayanamsa_ex_ut returns (retflag, ayanamsa)."""
-        swe.swe_set_sid_mode(1)
-        result = swe.swe_get_ayanamsa_ex_ut(2451545.0, 0)
+        swe.set_sid_mode(1)
+        result = swe.get_ayanamsa_ex_ut(2451545.0, 0)
         assert len(result) == 2
         retflag, ayan = result
         assert isinstance(retflag, int)
@@ -59,9 +59,9 @@ class TestAyanamshaBasic:
 
     @pytest.mark.unit
     def test_ayanamsa_ex_ut_retflag_is_2(self):
-        """get_ayanamsa_ex_ut should return retflag=2 (SEFLG_SWIEPH)."""
-        swe.swe_set_sid_mode(1)
-        retflag, _ = swe.swe_get_ayanamsa_ex_ut(2451545.0, 0)
+        """get_ayanamsa_ex_ut should return retflag=2 (FLG_SWIEPH)."""
+        swe.set_sid_mode(1)
+        retflag, _ = swe.get_ayanamsa_ex_ut(2451545.0, 0)
         assert retflag == 2, f"retflag={retflag}, expected 2"
 
 
@@ -72,17 +72,17 @@ class TestAyanamshaAllModes:
     @pytest.mark.parametrize("mode", SIDEREAL_MODES)
     def test_mode_returns_finite(self, mode: int):
         """Each sidereal mode returns a finite ayanamsha."""
-        swe.swe_set_sid_mode(mode)
-        ayan = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(mode)
+        ayan = swe.get_ayanamsa_ut(2451545.0)
         assert math.isfinite(ayan), f"Mode {mode}: ayanamsha={ayan} not finite"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("mode", SIDEREAL_MODES)
     def test_mode_calc_ut_works(self, mode: int):
-        """Each sidereal mode works with calc_ut + SEFLG_SIDEREAL."""
-        swe.swe_set_sid_mode(mode)
+        """Each sidereal mode works with calc_ut + FLG_SIDEREAL."""
+        swe.set_sid_mode(mode)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        result, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
         assert 0 <= result[0] < 360, f"Mode {mode}: lon={result[0]}"
 
 
@@ -93,8 +93,8 @@ class TestAyanamshaKnownValues:
     @pytest.mark.parametrize("mode,name,lo,hi", KNOWN_MODES)
     def test_known_mode_range(self, mode: int, name: str, lo: float, hi: float):
         """Known sidereal modes should have ayanamsha in expected range at J2000."""
-        swe.swe_set_sid_mode(mode)
-        ayan = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(mode)
+        ayan = swe.get_ayanamsa_ut(2451545.0)
         assert lo < ayan < hi, (
             f"{name} (mode {mode}): ayanamsha={ayan:.4f}, expected [{lo}, {hi}]"
         )
@@ -107,9 +107,9 @@ class TestAyanamshaPrecession:
     @pytest.mark.parametrize("mode", [0, 1, 3, 5])
     def test_ayanamsha_increases_over_century(self, mode: int):
         """Ayanamsha should increase over a century (precession ~50.3"/yr)."""
-        swe.swe_set_sid_mode(mode)
-        ayan_2000 = swe.swe_get_ayanamsa_ut(2451545.0)
-        ayan_2100 = swe.swe_get_ayanamsa_ut(2451545.0 + 36525.0)
+        swe.set_sid_mode(mode)
+        ayan_2000 = swe.get_ayanamsa_ut(2451545.0)
+        ayan_2100 = swe.get_ayanamsa_ut(2451545.0 + 36525.0)
         diff = ayan_2100 - ayan_2000
         # Should increase by ~1.4° per century
         assert 1.0 < diff < 2.0, (
@@ -120,10 +120,10 @@ class TestAyanamshaPrecession:
     @pytest.mark.parametrize("mode", [0, 1, 3])
     def test_ayanamsha_at_different_dates(self, mode: int):
         """Ayanamsha should be different at different dates."""
-        swe.swe_set_sid_mode(mode)
-        ayan_1900 = swe.swe_get_ayanamsa_ut(2415020.0)
-        ayan_2000 = swe.swe_get_ayanamsa_ut(2451545.0)
-        ayan_2100 = swe.swe_get_ayanamsa_ut(2451545.0 + 36525.0)
+        swe.set_sid_mode(mode)
+        ayan_1900 = swe.get_ayanamsa_ut(2415020.0)
+        ayan_2000 = swe.get_ayanamsa_ut(2451545.0)
+        ayan_2100 = swe.get_ayanamsa_ut(2451545.0 + 36525.0)
         assert ayan_1900 < ayan_2000 < ayan_2100, (
             f"Mode {mode}: not monotonically increasing"
         )
@@ -136,10 +136,10 @@ class TestAyanamshaDifferentModes:
     def test_lahiri_vs_fagan(self):
         """Lahiri and Fagan-Bradley should differ."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(0)
-        fagan = swe.swe_get_ayanamsa_ut(jd)
-        swe.swe_set_sid_mode(1)
-        lahiri = swe.swe_get_ayanamsa_ut(jd)
+        swe.set_sid_mode(0)
+        fagan = swe.get_ayanamsa_ut(jd)
+        swe.set_sid_mode(1)
+        lahiri = swe.get_ayanamsa_ut(jd)
         diff = abs(fagan - lahiri)
         assert diff > 0.1, f"Fagan={fagan:.4f}, Lahiri={lahiri:.4f}"
 
@@ -149,8 +149,8 @@ class TestAyanamshaDifferentModes:
         jd = 2451545.0
         values = set()
         for mode in [0, 1, 3, 5, 7, 27, 28]:
-            swe.swe_set_sid_mode(mode)
-            ayan = swe.swe_get_ayanamsa_ut(jd)
+            swe.set_sid_mode(mode)
+            ayan = swe.get_ayanamsa_ut(jd)
             values.add(round(ayan, 2))
         assert len(values) >= 4, f"Only {len(values)} distinct values from 7 modes"
 
@@ -162,12 +162,12 @@ class TestSiderealPositions:
     @pytest.mark.parametrize("mode", [0, 1, 3])
     def test_sidereal_lon_equals_tropical_minus_ayan(self, mode: int):
         """Sidereal longitude ≈ tropical longitude - ayanamsha."""
-        swe.swe_set_sid_mode(mode)
+        swe.set_sid_mode(mode)
         jd = 2451545.0
 
-        tropical, _ = swe.swe_calc_ut(jd, SE_SUN, 0)
-        sidereal, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
-        ayan = swe.swe_get_ayanamsa_ut(jd)
+        tropical, _ = swe.calc_ut(jd, SUN, 0)
+        sidereal, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
+        ayan = swe.get_ayanamsa_ut(jd)
 
         expected_sid = (tropical[0] - ayan) % 360
         diff = abs(sidereal[0] - expected_sid)
@@ -180,14 +180,14 @@ class TestSiderealPositions:
     @pytest.mark.unit
     @pytest.mark.parametrize(
         "body_id,name",
-        [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")],
+        [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")],
     )
     def test_sidereal_lat_unchanged(self, body_id: int, name: str):
         """Sidereal latitude should equal tropical latitude."""
-        swe.swe_set_sid_mode(1)
+        swe.set_sid_mode(1)
         jd = 2451545.0
-        tropical, _ = swe.swe_calc_ut(jd, body_id, 0)
-        sidereal, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SIDEREAL)
+        tropical, _ = swe.calc_ut(jd, body_id, 0)
+        sidereal, _ = swe.calc_ut(jd, body_id, FLG_SIDEREAL)
         assert abs(tropical[1] - sidereal[1]) < 0.001, (
             f"{name}: trop lat={tropical[1]:.6f}, sid lat={sidereal[1]:.6f}"
         )

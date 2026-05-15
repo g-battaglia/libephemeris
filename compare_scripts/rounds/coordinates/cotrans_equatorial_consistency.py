@@ -2,8 +2,8 @@
 """Round 213: cotrans + equatorial consistency.
 
 Verifies that manual cotrans() ecliptic-to-equatorial transformations
-are consistent with SEFLG_EQUATORIAL flag results, and that cotrans_sp()
-speed transformations match equatorial speeds from swe_calc_ut.
+are consistent with FLG_EQUATORIAL flag results, and that cotrans_sp()
+speed transformations match equatorial speeds from calc_ut.
 """
 
 from __future__ import annotations
@@ -17,24 +17,27 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS_ECL = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
-FLAGS_EQU = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_EQUATORIAL
+FLAGS_ECL = ephem.FLG_SWIEPH | ephem.FLG_SPEED
+FLAGS_EQU = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_EQUATORIAL
 
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
 ]
 
 DATES = [
@@ -52,18 +55,18 @@ DATES = [
 
 
 def compare_cotrans_vs_flag(body_name, le_body, se_body, jd):
-    """Compare manual cotrans with SEFLG_EQUATORIAL flag."""
+    """Compare manual cotrans with FLG_EQUATORIAL flag."""
     global passed, failed, total
 
     label = f"{body_name} JD={jd:.1f}"
 
     try:
         # Get ecliptic positions
-        le_ecl = ephem.swe_calc_ut(jd, le_body, FLAGS_ECL)
+        le_ecl = ephem.calc_ut(jd, le_body, FLAGS_ECL)
         # Get equatorial via flag
-        le_equ = ephem.swe_calc_ut(jd, le_body, FLAGS_EQU)
+        le_equ = ephem.calc_ut(jd, le_body, FLAGS_EQU)
         # Get obliquity
-        le_nut = ephem.swe_calc_ut(jd, -1, 0)
+        le_nut = ephem.calc_ut(jd, -1, 0)
         eps = le_nut[0][0]  # true obliquity
     except Exception as e:
         return
@@ -170,8 +173,8 @@ def compare_cotrans_sp(body_name, le_body, jd):
     label = f"{body_name} JD={jd:.1f} cotrans_sp"
 
     try:
-        le_ecl = ephem.swe_calc_ut(jd, le_body, FLAGS_ECL)
-        le_nut = ephem.swe_calc_ut(jd, -1, 0)
+        le_ecl = ephem.calc_ut(jd, le_body, FLAGS_ECL)
+        le_nut = ephem.calc_ut(jd, -1, 0)
         eps = le_nut[0][0]
 
         ecl_pos_spd = (

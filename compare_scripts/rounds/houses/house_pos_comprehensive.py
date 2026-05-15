@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """Round 64: House Position (house_pos) Comprehensive
 
-Compare swe_house_pos() for various house systems, latitudes, and planet positions.
+Compare house_pos() for various house systems, latitudes, and planet positions.
 house_pos returns the house position (1.0-12.999) for a given ARMC, geo lat, obliquity, and planet lon/lat.
 """
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 
@@ -49,7 +53,7 @@ for lat in LATITUDES:
                 se_hp = swe.house_pos(
                     armc, lat, OBLIQUITY, (planet_lon, planet_lat), se_hsys("P")
                 )
-                le_hp = ephem.swe_house_pos(
+                le_hp = ephem.house_pos(
                     armc, lat, OBLIQUITY, le_hsys("P"), planet_lon, planet_lat
                 )
                 diff = abs(se_hp - le_hp)
@@ -77,7 +81,7 @@ for lat in LATITUDES:
                 se_hp = swe.house_pos(
                     armc, lat, OBLIQUITY, (planet_lon, 0.0), se_hsys("K")
                 )
-                le_hp = ephem.swe_house_pos(
+                le_hp = ephem.house_pos(
                     armc, lat, OBLIQUITY, le_hsys("K"), planet_lon, 0.0
                 )
                 diff = abs(se_hp - le_hp)
@@ -106,7 +110,7 @@ for hsys in HOUSE_SYSTEMS:
             se_hp = swe.house_pos(
                 armc, lat, OBLIQUITY, (planet_lon, 0.0), se_hsys(hsys)
             )
-            le_hp = ephem.swe_house_pos(
+            le_hp = ephem.house_pos(
                 armc, lat, OBLIQUITY, le_hsys(hsys), planet_lon, 0.0
             )
             diff = abs(se_hp - le_hp)
@@ -141,7 +145,7 @@ for lat in [30, 45, 55]:
                             (planet_lon, planet_lat),
                             se_hsys(hsys),
                         )
-                        le_hp = ephem.swe_house_pos(
+                        le_hp = ephem.house_pos(
                             armc, lat, OBLIQUITY, le_hsys(hsys), planet_lon, planet_lat
                         )
                         diff = abs(se_hp - le_hp)
@@ -169,15 +173,15 @@ for lat in [0, 30, 45, 55, 65]:
     for lon in [0, 30, 90]:
         # Get houses first
         try:
-            le_houses = ephem.swe_houses_ex(jd_test, lat, lon, le_hsys("P"), 0)
+            le_houses = ephem.houses_ex(jd_test, lat, lon, le_hsys("P"), 0)
             le_cusps = le_houses[0]
             le_ascmc = le_houses[1]
             armc = le_ascmc[2]
-            obl = ephem.swe_calc_ut(jd_test, -1, 0)[0][1]  # mean obliquity
+            obl = ephem.calc_ut(jd_test, -1, 0)[0][1]  # mean obliquity
 
             # Get planet positions and compute house_pos
             for body in [0, 1, 2, 3, 4, 5]:
-                planet = ephem.swe_calc_ut(jd_test, body, FLAGS)[0]
+                planet = ephem.calc_ut(jd_test, body, FLAGS)[0]
                 plon, plat = planet[0], planet[1]
 
                 for hsys in ["P", "K", "O", "R", "E"]:
@@ -185,7 +189,7 @@ for lat in [0, 30, 45, 55, 65]:
                         se_hp = swe.house_pos(
                             armc, lat, obl, (plon, plat), se_hsys(hsys)
                         )
-                        le_hp = ephem.swe_house_pos(
+                        le_hp = ephem.house_pos(
                             armc, lat, obl, le_hsys(hsys), plon, plat
                         )
                         diff = abs(se_hp - le_hp)
@@ -212,7 +216,7 @@ for lat in [0, 30, 60]:
     for armc in range(0, 360, 30):
         for plon in range(0, 360, 10):
             try:
-                hp = ephem.swe_house_pos(armc, lat, OBLIQUITY, le_hsys("P"), plon, 0.0)
+                hp = ephem.house_pos(armc, lat, OBLIQUITY, le_hsys("P"), plon, 0.0)
                 if 1.0 <= hp < 13.0:
                     passed += 1
                 else:
@@ -233,7 +237,7 @@ for lat in [0, 20, 40, 60]:
         for plon in range(0, 360, 30):
             try:
                 se_hp = swe.house_pos(armc, lat, OBLIQUITY, (plon, 0.0), se_hsys("O"))
-                le_hp = ephem.swe_house_pos(
+                le_hp = ephem.house_pos(
                     armc, lat, OBLIQUITY, le_hsys("O"), plon, 0.0
                 )
                 diff = abs(se_hp - le_hp)
@@ -259,7 +263,7 @@ for lat in [0, 30, 45, 60]:
         for plon in range(0, 360, 15):
             try:
                 se_hp = swe.house_pos(armc, lat, OBLIQUITY, (plon, 0.0), se_hsys("E"))
-                le_hp = ephem.swe_house_pos(
+                le_hp = ephem.house_pos(
                     armc, lat, OBLIQUITY, le_hsys("E"), plon, 0.0
                 )
                 diff = abs(se_hp - le_hp)

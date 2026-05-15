@@ -25,22 +25,22 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 
@@ -71,12 +71,12 @@ def generate_jds(n: int, start_year: int, end_year: int, seed: int = 42) -> list
         month = rng.randint(1, 12)
         day = rng.randint(1, 28)
         hour = rng.uniform(0, 24)
-        jd = ephem.swe_julday(year, month, day, hour)
+        jd = ephem.julday(year, month, day, hour)
         jds.append(jd)
     return jds
 
 
-def compute_position_errors(planet_id: int, jds: list, flags: int = SEFLG_SWIEPH):
+def compute_position_errors(planet_id: int, jds: list, flags: int = FLG_SWIEPH):
     """Compute positional errors between libephemeris and pyswisseph.
 
     Returns dict with lon_errors, lat_errors, dist_errors (all in degrees/AU).
@@ -88,7 +88,7 @@ def compute_position_errors(planet_id: int, jds: list, flags: int = SEFLG_SWIEPH
     for jd in jds:
         try:
             res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-            res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+            res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
         except Exception:
             continue
 
@@ -137,45 +137,45 @@ SAMPLE_JDS_WIDE = generate_jds(200, 1550, 2650, seed=42)
 # Modern-era tolerances matching PRECISION.md (arcseconds)
 # Format: (planet_id, name, max_mean_arcsec, max_max_arcsec)
 MODERN_TOLERANCES = [
-    (SE_SUN, "Sun", 0.10, 0.50),
-    (SE_MOON, "Moon", 1.50, 5.00),
-    (SE_MERCURY, "Mercury", 0.15, 0.80),
-    (SE_VENUS, "Venus", 0.20, 0.80),
-    (SE_MARS, "Mars", 0.15, 1.10),
-    (SE_JUPITER, "Jupiter", 0.25, 1.00),
-    (SE_SATURN, "Saturn", 0.25, 1.00),
-    (SE_URANUS, "Uranus", 0.50, 1.00),
-    (SE_NEPTUNE, "Neptune", 0.50, 2.00),
-    (SE_PLUTO, "Pluto", 0.50, 1.50),
+    (SUN, "Sun", 0.10, 0.50),
+    (MOON, "Moon", 1.50, 5.00),
+    (MERCURY, "Mercury", 0.15, 0.80),
+    (VENUS, "Venus", 0.20, 0.80),
+    (MARS, "Mars", 0.15, 1.10),
+    (JUPITER, "Jupiter", 0.25, 1.00),
+    (SATURN, "Saturn", 0.25, 1.00),
+    (URANUS, "Uranus", 0.50, 1.00),
+    (NEPTUNE, "Neptune", 0.50, 2.00),
+    (PLUTO, "Pluto", 0.50, 1.50),
 ]
 
 # Wide-range tolerances (relaxed — DE440 vs DE431 diverge at extremes)
 # These are regression guards, not precision claims.
 # Format: (planet_id, name, max_mean_arcsec, max_max_arcsec)
 WIDE_RANGE_TOLERANCES = [
-    (SE_SUN, "Sun", 10.0, 30.0),
-    (SE_MOON, "Moon", 120.0, 400.0),
-    (SE_MERCURY, "Mercury", 15.0, 60.0),
-    (SE_VENUS, "Venus", 10.0, 40.0),
-    (SE_MARS, "Mars", 8.0, 25.0),
-    (SE_JUPITER, "Jupiter", 2.0, 8.0),
-    (SE_SATURN, "Saturn", 1.5, 5.0),
-    (SE_URANUS, "Uranus", 2.0, 5.0),
-    (SE_NEPTUNE, "Neptune", 4.0, 10.0),
-    (SE_PLUTO, "Pluto", 8.0, 20.0),
+    (SUN, "Sun", 10.0, 30.0),
+    (MOON, "Moon", 120.0, 400.0),
+    (MERCURY, "Mercury", 15.0, 60.0),
+    (VENUS, "Venus", 10.0, 40.0),
+    (MARS, "Mars", 8.0, 25.0),
+    (JUPITER, "Jupiter", 2.0, 8.0),
+    (SATURN, "Saturn", 1.5, 5.0),
+    (URANUS, "Uranus", 2.0, 5.0),
+    (NEPTUNE, "Neptune", 4.0, 10.0),
+    (PLUTO, "Pluto", 8.0, 20.0),
 ]
 
 ALL_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
@@ -228,7 +228,7 @@ class TestModernEraLatitude:
         max_as = arcsec(s["max"])
 
         # Latitude tolerance: 5" for Moon, 2" for others
-        tol = 5.0 if planet_id == SE_MOON else 2.0
+        tol = 5.0 if planet_id == MOON else 2.0
         assert max_as < tol, f'{name} latitude max error {max_as:.4f}" exceeds {tol}"'
 
 
@@ -246,7 +246,7 @@ class TestModernEraDistance:
         s = stats(errors["dist"])
 
         # Distance tolerance: 0.001 AU for Moon, 0.0005 AU for others
-        tol = 0.001 if planet_id == SE_MOON else 0.0005
+        tol = 0.001 if planet_id == MOON else 0.0005
         assert s["max"] < tol, (
             f"{name} distance max error {s['max']:.8f} AU exceeds {tol} AU"
         )
@@ -304,7 +304,7 @@ class TestVelocityStatistics:
     )
     def test_velocity_statistics(self, planet_id, name):
         """Velocity errors should be within PRECISION.md bounds."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         lon_speed_errors = []
         lat_speed_errors = []
         dist_speed_errors = []
@@ -312,7 +312,7 @@ class TestVelocityStatistics:
         for jd in SAMPLE_JDS_MODERN:
             try:
                 res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                res_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                res_lib, _ = ephem.calc_ut(jd, planet_id, flags)
             except Exception:
                 continue
 
@@ -326,8 +326,8 @@ class TestVelocityStatistics:
 
         # PRECISION.md: lon speed < 0.003 deg/day, lat speed < 0.004 deg/day,
         # dist speed < 0.0001 AU/day.  Slightly relaxed for Moon.
-        lon_tol = 0.005 if planet_id == SE_MOON else 0.003
-        lat_tol = 0.005 if planet_id == SE_MOON else 0.004
+        lon_tol = 0.005 if planet_id == MOON else 0.003
+        lat_tol = 0.005 if planet_id == MOON else 0.004
 
         assert s_lon["max"] < lon_tol, (
             f"{name} lon speed max error {s_lon['max']:.6f} deg/day exceeds {lon_tol}"
@@ -351,10 +351,10 @@ class TestLunarPointStatistics:
     LUNAR_POINTS = [
         # (point_id, name, max_lon_deg)
         # Mean Node: PRECISION.md says <0.001 deg
-        (SE_MEAN_NODE, "Mean Node", 0.001),
+        (MEAN_NODE, "Mean Node", 0.001),
         # Mean Lilith: PRECISION.md says <0.015" = 0.0000042 deg
         # Use relaxed tolerance for statistical sampling
-        (SE_MEAN_APOG, "Mean Lilith", 0.001),
+        (MEAN_APOG, "Mean Lilith", 0.001),
     ]
 
     @pytest.mark.parametrize(
@@ -375,7 +375,7 @@ class TestLunarPointStatistics:
 
     def test_true_node_precision(self):
         """True Node should match pyswisseph within 0.5" for modern dates."""
-        errors = compute_position_errors(SE_TRUE_NODE, SAMPLE_JDS_MODERN)
+        errors = compute_position_errors(TRUE_NODE, SAMPLE_JDS_MODERN)
         s = stats(errors["lon"])
         max_as = arcsec(s["max"])
 
@@ -387,7 +387,7 @@ class TestLunarPointStatistics:
 
     def test_true_lilith_precision(self):
         """True Lilith should match within ~1" (PRECISION.md says <0.5")."""
-        errors = compute_position_errors(SE_OSCU_APOG, SAMPLE_JDS_MODERN)
+        errors = compute_position_errors(OSCU_APOG, SAMPLE_JDS_MODERN)
         s = stats(errors["lon"])
         max_as = arcsec(s["max"])
 
@@ -413,10 +413,10 @@ class TestModernVsWideRange:
     @pytest.mark.parametrize(
         "planet_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
         ids=["Sun", "Moon", "Mars", "Jupiter"],
     )
@@ -445,7 +445,7 @@ class TestPositionErrorDistribution:
 
     @pytest.mark.parametrize(
         "planet_id,name",
-        [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")],
+        [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")],
         ids=["Sun", "Moon", "Mars"],
     )
     def test_95th_percentile_reasonable(self, planet_id, name):
@@ -463,7 +463,7 @@ class TestPositionErrorDistribution:
 
     @pytest.mark.parametrize(
         "planet_id,name",
-        [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")],
+        [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")],
         ids=["Sun", "Moon", "Mars"],
     )
     def test_no_extreme_outliers(self, planet_id, name):
@@ -494,7 +494,7 @@ class TestPrecisionMDConsistency:
     def test_all_planets_sub_arcsecond_mean(self):
         """PRECISION.md claims all planets are sub-arcsecond mean difference."""
         for planet_id, name, _, _ in MODERN_TOLERANCES:
-            if planet_id == SE_MOON:
+            if planet_id == MOON:
                 continue  # Moon is documented as 0.70" mean, allowed > 1"
             errors = compute_position_errors(planet_id, SAMPLE_JDS_MODERN)
             s = stats(errors["lon"])
@@ -506,7 +506,7 @@ class TestPrecisionMDConsistency:
 
     def test_moon_under_5_arcsec_max(self):
         """PRECISION.md documents Moon max ~3.32" (we allow 5" for sampling)."""
-        errors = compute_position_errors(SE_MOON, SAMPLE_JDS_MODERN)
+        errors = compute_position_errors(MOON, SAMPLE_JDS_MODERN)
         s = stats(errors["lon"])
         max_as = arcsec(s["max"])
 
@@ -516,11 +516,11 @@ class TestPrecisionMDConsistency:
 
     def test_sun_among_best_precision(self):
         """Sun should have one of the smallest mean errors."""
-        sun_errors = compute_position_errors(SE_SUN, SAMPLE_JDS_MODERN)
+        sun_errors = compute_position_errors(SUN, SAMPLE_JDS_MODERN)
         sun_mean = stats(sun_errors["lon"])["mean"]
 
         # Sun should be better than the outer planets (which have larger errors)
-        for planet_id in [SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE, SE_PLUTO]:
+        for planet_id in [JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]:
             errors = compute_position_errors(planet_id, SAMPLE_JDS_MODERN)
             other_mean = stats(errors["lon"])["mean"]
 

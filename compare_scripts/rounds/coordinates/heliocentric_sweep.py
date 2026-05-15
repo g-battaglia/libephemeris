@@ -2,7 +2,7 @@
 """Round 223: Planet heliocentric positions sweep.
 
 Deep comparison of heliocentric positions for all planets across
-multiple dates with SEFLG_HELCTR flag.
+multiple dates with FLG_HELCTR flag.
 """
 
 from __future__ import annotations
@@ -14,28 +14,31 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-LE_FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_HELCTR
+LE_FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_HELCTR
 SE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_HELCTR
 
 BODIES = [
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Earth", ephem.SE_EARTH, swe.EARTH),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
-    ("Uranus", ephem.SE_URANUS, swe.URANUS),
-    ("Neptune", ephem.SE_NEPTUNE, swe.NEPTUNE),
-    ("Pluto", ephem.SE_PLUTO, swe.PLUTO),
-    ("Chiron", ephem.SE_CHIRON, swe.CHIRON),
-    ("Ceres", ephem.SE_CERES, swe.CERES),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Earth", ephem.EARTH, swe.EARTH),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
+    ("Uranus", ephem.URANUS, swe.URANUS),
+    ("Neptune", ephem.NEPTUNE, swe.NEPTUNE),
+    ("Pluto", ephem.PLUTO, swe.PLUTO),
+    ("Chiron", ephem.CHIRON, swe.CHIRON),
+    ("Ceres", ephem.CERES, swe.CERES),
 ]
 
 DATES = [
@@ -60,7 +63,7 @@ DATES = [
 def compare(bname, le_b, se_b, jd):
     global passed, failed, total
     try:
-        le_r = ephem.swe_calc_ut(jd, le_b, LE_FLAGS)
+        le_r = ephem.calc_ut(jd, le_b, LE_FLAGS)
         se_r = swe.calc_ut(jd, se_b, SE_FLAGS)
     except:
         return

@@ -33,7 +33,7 @@ class TestUnknownBodyError:
 
 
 class TestCalcUtUnknownBody:
-    """Test swe_calc_ut with unknown body IDs."""
+    """Test calc_ut with unknown body IDs."""
 
     def test_unknown_body_raises_error(self):
         """Test that unknown body ID raises UnknownBodyError."""
@@ -41,7 +41,7 @@ class TestCalcUtUnknownBody:
         unknown_id = 99999
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_ut(jd, unknown_id, 0)
+            ephem.calc_ut(jd, unknown_id, 0)
 
         assert exc_info.value.body_id == unknown_id
         assert "99999" in str(exc_info.value)
@@ -54,18 +54,18 @@ class TestCalcUtUnknownBody:
         unknown_id = -100
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_ut(jd, unknown_id, 0)
+            ephem.calc_ut(jd, unknown_id, 0)
 
         assert exc_info.value.body_id == unknown_id
 
     def test_gap_between_ranges(self):
         """Test that IDs in gaps between valid ranges raise error."""
         jd = 2451545.0
-        # IDs 23-39 are in a gap (between SE_NPLANETS=23 and SE_FICT_OFFSET=40)
+        # IDs 23-39 are in a gap (between NPLANETS=23 and FICT_OFFSET=40)
         gap_id = 30
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_ut(jd, gap_id, 0)
+            ephem.calc_ut(jd, gap_id, 0)
 
         assert exc_info.value.body_id == gap_id
 
@@ -75,7 +75,7 @@ class TestCalcUtUnknownBody:
         unknown_id = 99999
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_ut(jd, unknown_id, 0)
+            ephem.calc_ut(jd, unknown_id, 0)
 
         msg = str(exc_info.value)
         # Should mention supported body types
@@ -84,21 +84,21 @@ class TestCalcUtUnknownBody:
 
 
 class TestCalcUnknownBody:
-    """Test swe_calc with unknown body IDs."""
+    """Test calc with unknown body IDs."""
 
     def test_unknown_body_raises_error(self):
-        """Test that unknown body ID raises UnknownBodyError in swe_calc."""
+        """Test that unknown body ID raises UnknownBodyError in calc."""
         jd = 2451545.0
         unknown_id = 88888
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc(jd, unknown_id, 0)
+            ephem.calc(jd, unknown_id, 0)
 
         assert exc_info.value.body_id == unknown_id
 
 
 class TestCalcPctrUnknownBody:
-    """Test swe_calc_pctr with unknown body IDs."""
+    """Test calc_pctr with unknown body IDs."""
 
     def test_unknown_target_raises_error(self):
         """Test that unknown target body ID raises UnknownBodyError."""
@@ -106,7 +106,7 @@ class TestCalcPctrUnknownBody:
         unknown_id = 77777
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_pctr(jd, unknown_id, ephem.SE_EARTH, 0)
+            ephem.calc_pctr(jd, unknown_id, ephem.EARTH, 0)
 
         assert exc_info.value.body_id == unknown_id
         assert "target" in str(exc_info.value).lower()
@@ -117,7 +117,7 @@ class TestCalcPctrUnknownBody:
         unknown_id = 66666
 
         with pytest.raises(UnknownBodyError) as exc_info:
-            ephem.swe_calc_pctr(jd, ephem.SE_MOON, unknown_id, 0)
+            ephem.calc_pctr(jd, ephem.MOON, unknown_id, 0)
 
         assert exc_info.value.body_id == unknown_id
         assert "observer" in str(exc_info.value).lower()
@@ -129,33 +129,33 @@ class TestValidBodiesStillWork:
     def test_sun_calculation(self):
         """Test that Sun calculation works."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
         # Sun should be near 280 degrees at J2000.0
         assert 270 < pos[0] < 290
 
     def test_moon_calculation(self):
         """Test that Moon calculation works."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(jd, ephem.MOON, ephem.FLG_SPEED)
         # Moon should have valid longitude
         assert 0 <= pos[0] < 360
 
     def test_mars_calculation(self):
         """Test that Mars calculation works."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_SPEED)
         assert 0 <= pos[0] < 360
 
     def test_lunar_node_calculation(self):
         """Test that lunar node calculation works."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_ut(jd, ephem.SE_MEAN_NODE, 0)
+        pos, flags = ephem.calc_ut(jd, ephem.MEAN_NODE, 0)
         assert 0 <= pos[0] < 360
 
     def test_pctr_valid_bodies(self):
         """Test that planet-centric calculation works for valid bodies."""
         jd = 2451545.0
-        pos, flags = ephem.swe_calc_pctr(jd, ephem.SE_MOON, ephem.SE_MARS, 0)
+        pos, flags = ephem.calc_pctr(jd, ephem.MOON, ephem.MARS, 0)
         assert 0 <= pos[0] < 360
 
 
@@ -167,7 +167,7 @@ class TestExceptionCanBeCaught:
         jd = 2451545.0
         caught = False
         try:
-            ephem.swe_calc_ut(jd, 99999, 0)
+            ephem.calc_ut(jd, 99999, 0)
         except UnknownBodyError:
             caught = True
         assert caught
@@ -177,7 +177,7 @@ class TestExceptionCanBeCaught:
         jd = 2451545.0
         caught = False
         try:
-            ephem.swe_calc_ut(jd, 99999, 0)
+            ephem.calc_ut(jd, 99999, 0)
         except ephem.Error:
             caught = True
         assert caught
@@ -186,6 +186,6 @@ class TestExceptionCanBeCaught:
         """Test accessing body_id attribute from caught exception."""
         jd = 2451545.0
         try:
-            ephem.swe_calc_ut(jd, 12345, 0)
+            ephem.calc_ut(jd, 12345, 0)
         except UnknownBodyError as e:
             assert e.body_id == 12345

@@ -1,7 +1,7 @@
 """
 Tests for state management and calc_mode switching.
 
-Verifies that set_calc_mode, get_calc_mode, swe_close,
+Verifies that set_calc_mode, get_calc_mode, close,
 and related state functions behave correctly.
 """
 
@@ -12,14 +12,14 @@ import pytest
 import libephemeris as swe
 from libephemeris.state import set_calc_mode, get_calc_mode
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
 )
 
 
@@ -80,7 +80,7 @@ class TestCalcModeCalculations:
         """Skyfield mode produces valid results."""
         set_calc_mode("skyfield")
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360
 
     @pytest.mark.unit
@@ -88,7 +88,7 @@ class TestCalcModeCalculations:
         """Auto mode produces valid results."""
         set_calc_mode("auto")
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360
 
     @pytest.mark.unit
@@ -97,10 +97,10 @@ class TestCalcModeCalculations:
         jd = 2451545.0
 
         set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+        r_sky, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
 
         set_calc_mode("auto")
-        r_auto, _ = swe.swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+        r_auto, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
 
         # Results should be very close regardless of mode
         lon_diff = abs(r_sky[0] - r_auto[0])
@@ -110,27 +110,27 @@ class TestCalcModeCalculations:
 
 
 class TestSweClose:
-    """Test swe_close behavior."""
+    """Test close behavior."""
 
     @pytest.mark.unit
     def test_swe_close_does_not_crash(self):
-        """swe_close should not crash."""
-        swe.swe_close()
+        """close should not crash."""
+        swe.close()
 
     @pytest.mark.unit
     def test_calc_works_after_close(self):
-        """Calculations should work after swe_close."""
-        swe.swe_close()
+        """Calculations should work after close."""
+        swe.close()
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360
 
     @pytest.mark.unit
     def test_multiple_close_calls(self):
-        """Multiple swe_close calls should be safe."""
+        """Multiple close calls should be safe."""
         for _ in range(5):
-            swe.swe_close()
-        result, _ = swe.swe_calc_ut(2451545.0, SE_SUN, 0)
+            swe.close()
+        result, _ = swe.calc_ut(2451545.0, SUN, 0)
         assert 0 <= result[0] < 360
 
 
@@ -140,13 +140,13 @@ class TestSiderealModeState:
     @pytest.mark.unit
     def test_set_sid_mode_lahiri(self):
         """Can set Lahiri sidereal mode."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         # Should not raise
 
     @pytest.mark.unit
     def test_set_sid_mode_fagan(self):
         """Can set Fagan-Bradley sidereal mode."""
-        swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
         # Should not raise
 
     @pytest.mark.unit
@@ -154,11 +154,11 @@ class TestSiderealModeState:
         """Different sidereal modes should produce different longitudes."""
         jd = 2451545.0
 
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        r1, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        r1, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
-        swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-        r2, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        r2, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         diff = abs(r1[0] - r2[0])
         if diff > 180:
@@ -170,9 +170,9 @@ class TestSiderealModeState:
         """Three sidereal modes should all differ."""
         jd = 2451545.0
         results = []
-        for mode in [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]:
-            swe.swe_set_sid_mode(mode)
-            r, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        for mode in [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]:
+            swe.set_sid_mode(mode)
+            r, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
             results.append(r[0])
 
         # All three should be distinct
@@ -190,30 +190,30 @@ class TestAyanamsaState:
     @pytest.mark.unit
     def test_get_ayanamsa_ut_returns_float(self):
         """get_ayanamsa_ut returns a float."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ayan = swe.get_ayanamsa_ut(2451545.0)
         assert type(ayan) is float
 
     @pytest.mark.unit
     def test_ayanamsa_positive(self):
         """Ayanamsa should be positive for modern dates."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ayan = swe.get_ayanamsa_ut(2451545.0)
         assert ayan > 0, f"Ayanamsa {ayan} not positive"
 
     @pytest.mark.unit
     def test_ayanamsa_lahiri_approx(self):
         """Lahiri ayanamsa at J2000 should be ~23.85°."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan = swe.swe_get_ayanamsa_ut(2451545.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ayan = swe.get_ayanamsa_ut(2451545.0)
         assert 23 < ayan < 25, f"Lahiri ayanamsa {ayan}° (expected ~23.85)"
 
     @pytest.mark.unit
     def test_ayanamsa_increases_over_time(self):
         """Ayanamsa should increase over centuries (precession)."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        ayan_2000 = swe.swe_get_ayanamsa_ut(2451545.0)
-        ayan_2100 = swe.swe_get_ayanamsa_ut(2451545.0 + 36525.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        ayan_2000 = swe.get_ayanamsa_ut(2451545.0)
+        ayan_2100 = swe.get_ayanamsa_ut(2451545.0 + 36525.0)
         assert ayan_2100 > ayan_2000, (
             f"Ayanamsa not increasing: {ayan_2000} -> {ayan_2100}"
         )
@@ -221,8 +221,8 @@ class TestAyanamsaState:
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ut_returns_tuple(self):
         """get_ayanamsa_ex_ut returns (retflag, ayanamsa)."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        result = swe.swe_get_ayanamsa_ex_ut(2451545.0, 0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        result = swe.get_ayanamsa_ex_ut(2451545.0, 0)
         assert len(result) == 2
         retflag, ayan = result
         assert isinstance(retflag, int)
@@ -230,7 +230,7 @@ class TestAyanamsaState:
 
 
 class TestPlanetName:
-    """Test swe_get_planet_name."""
+    """Test get_planet_name."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -249,15 +249,15 @@ class TestPlanetName:
         ],
     )
     def test_planet_name(self, body_id: int, expected: str):
-        """swe_get_planet_name returns correct name."""
-        name = swe.swe_get_planet_name(body_id)
+        """get_planet_name returns correct name."""
+        name = swe.get_planet_name(body_id)
         assert expected.lower() in name.lower(), (
             f"Body {body_id}: got '{name}', expected '{expected}'"
         )
 
     @pytest.mark.unit
     def test_planet_name_returns_string(self):
-        """swe_get_planet_name always returns a string."""
+        """get_planet_name always returns a string."""
         for body_id in range(10):
-            name = swe.swe_get_planet_name(body_id)
+            name = swe.get_planet_name(body_id)
             assert isinstance(name, str)

@@ -9,11 +9,11 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 
 
@@ -44,10 +44,10 @@ class OccultTolerance:
 
 # Planets for occultation tests (Moon can occult these)
 OCCULT_BODIES = [
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Test locations
@@ -96,7 +96,7 @@ class TestLunOccultWhenGlob:
         # SwissEphemeris (API: tjdut, body, flags, ecltype, backwards)
         try:
             ret_swe = swe.lun_occult_when_glob(
-                jd_start, body_id, SEFLG_SWIEPH, 0, False
+                jd_start, body_id, FLG_SWIEPH, 0, False
             )
             if ret_swe[0] == 0:
                 pytest.skip(f"No {body_name} occultation found by SwissEphemeris")
@@ -107,7 +107,7 @@ class TestLunOccultWhenGlob:
         # LibEphemeris (API: tjdut, body, flags, ecltype, backwards) - 1:1 compatible
         try:
             ret_py = pyephem.lun_occult_when_glob(
-                jd_start, body_id, SEFLG_SWIEPH, 0, False
+                jd_start, body_id, FLG_SWIEPH, 0, False
             )
             if ret_py[0] == 0:
                 pytest.skip(f"No {body_name} occultation found by LibEphemeris")
@@ -142,7 +142,7 @@ class TestLunOccultWhenLoc:
         # SwissEphemeris (API: tjdut, body, geopos, flags, backwards)
         try:
             ret_swe = swe.lun_occult_when_loc(
-                jd_2024, body_id, geopos, SEFLG_SWIEPH, False
+                jd_2024, body_id, geopos, FLG_SWIEPH, False
             )
             if ret_swe[0] == 0:
                 pytest.skip(f"No {body_name} occultation visible at {loc_name}")
@@ -152,8 +152,8 @@ class TestLunOccultWhenLoc:
 
         # LibEphemeris (API: tjdut, body, geopos, flags, backwards) - 1:1 compatible
         try:
-            ret_py = pyephem.swe_lun_occult_when_loc(
-                jd_2024, body_id, geopos, SEFLG_SWIEPH, False
+            ret_py = pyephem.lun_occult_when_loc(
+                jd_2024, body_id, geopos, FLG_SWIEPH, False
             )
             if ret_py[0] == 0:
                 pytest.skip(f"No {body_name} occultation visible (LibEphemeris)")
@@ -182,7 +182,7 @@ class TestLunOccultWhere:
         """Test lunar occultation location calculation."""
         # First find an occultation
         try:
-            ret = swe.lun_occult_when_glob(jd_2024, body_id, SEFLG_SWIEPH, 0, False)
+            ret = swe.lun_occult_when_glob(jd_2024, body_id, FLG_SWIEPH, 0, False)
             if ret[0] == 0:
                 pytest.skip(f"No {body_name} occultation found")
             jd_occult = ret[1][0]
@@ -191,7 +191,7 @@ class TestLunOccultWhere:
 
         # SwissEphemeris (new API: tjdut, body, flags)
         try:
-            ret_swe = swe.lun_occult_where(jd_occult, body_id, SEFLG_SWIEPH)
+            ret_swe = swe.lun_occult_where(jd_occult, body_id, FLG_SWIEPH)
             if ret_swe[0] == 0:
                 pytest.skip("No central line (SwissEphemeris)")
             lon_swe, lat_swe = ret_swe[1][0], ret_swe[1][1]
@@ -200,7 +200,7 @@ class TestLunOccultWhere:
 
         # LibEphemeris (API: tjdut, body, flags) - 1:1 compatible
         try:
-            ret_py = pyephem.lun_occult_where(jd_occult, body_id, SEFLG_SWIEPH)
+            ret_py = pyephem.lun_occult_where(jd_occult, body_id, FLG_SWIEPH)
             if ret_py[0] == 0:
                 pytest.skip("No central line (LibEphemeris)")
             lon_py, lat_py = ret_py[1][0], ret_py[1][1]
@@ -239,10 +239,10 @@ class TestOccultationSummary:
         """Test Venus occultation search specifically."""
         try:
             ret_swe = swe.lun_occult_when_glob(
-                jd_2024, SE_VENUS, SEFLG_SWIEPH, 0, False
+                jd_2024, VENUS, FLG_SWIEPH, 0, False
             )
             ret_py = pyephem.lun_occult_when_glob(
-                jd_2024, SE_VENUS, SEFLG_SWIEPH, 0, False
+                jd_2024, VENUS, FLG_SWIEPH, 0, False
             )
 
             # Both should return the same status (found or not found)

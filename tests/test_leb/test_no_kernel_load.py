@@ -23,6 +23,15 @@ def leb_mode(test_leb_file):
     import libephemeris
     from libephemeris import state
 
+    # Restore the previous calc-mode after the test. An earlier test in
+    # the suite may have forced the process into ``"skyfield"`` (e.g.
+    # via ``LIBEPHEMERIS_MODE=skyfield``), in which case
+    # ``get_leb_reader()`` will ignore the explicit ``set_leb_file()``
+    # below and silently fall back to the DE kernel — defeating the
+    # very assertion this fixture is meant to enforce.
+    _prev_mode = state.get_calc_mode()
+    libephemeris.set_calc_mode("leb")
+
     state._PLANETS = None
     libephemeris.set_leb_file(test_leb_file)
 
@@ -52,97 +61,98 @@ def leb_mode(test_leb_file):
         p.stop()
 
     state._PLANETS = None
+    libephemeris.set_calc_mode(_prev_mode)
     libephemeris.set_leb_file("")
 
 
 class TestFixedStarsNoKernel:
-    """Phase 1: swe_fixstar_ut and swe_batch_fixstars_ut must not load DE kernel."""
+    """Phase 1: fixstar_ut and batch_fixstars_ut must not load DE kernel."""
 
     def test_swe_fixstar_ut_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.fixed_stars import swe_fixstar_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.fixed_stars import fixstar_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        pos, _name, _flags = swe_fixstar_ut("Regulus", jd, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        pos, _name, _flags = fixstar_ut("Regulus", jd, 0)
         assert state._PLANETS is None
         assert 140 < pos[0] < 160
 
     def test_swe_fixstar_ut_with_speed(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SEFLG_SPEED
-        from libephemeris.fixed_stars import swe_fixstar_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import FLG_SPEED
+        from libephemeris.fixed_stars import fixstar_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        pos, _name, _flags = swe_fixstar_ut("Regulus", jd, SEFLG_SPEED)
+        jd = julday(2024, 6, 15, 12.0)
+        pos, _name, _flags = fixstar_ut("Regulus", jd, FLG_SPEED)
         assert state._PLANETS is None
         assert pos[3] != 0.0
 
     def test_swe_batch_fixstars_ut_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.fixed_stars import swe_batch_fixstars_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.fixed_stars import batch_fixstars_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        results = swe_batch_fixstars_ut(["Regulus", "Spica", "Aldebaran"], jd, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        results = batch_fixstars_ut(["Regulus", "Spica", "Aldebaran"], jd, 0)
         assert state._PLANETS is None
         assert all(r is not None for r in results)
 
     def test_swe_fixstar_ut_j2000(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SEFLG_J2000
-        from libephemeris.fixed_stars import swe_fixstar_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import FLG_J2000
+        from libephemeris.fixed_stars import fixstar_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        _pos, _, _ = swe_fixstar_ut("Regulus", jd, SEFLG_J2000)
+        jd = julday(2024, 6, 15, 12.0)
+        _pos, _, _ = fixstar_ut("Regulus", jd, FLG_J2000)
         assert state._PLANETS is None
 
     def test_swe_fixstar_ut_noaberr(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SEFLG_NOABERR
-        from libephemeris.fixed_stars import swe_fixstar_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import FLG_NOABERR
+        from libephemeris.fixed_stars import fixstar_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        _pos, _, _ = swe_fixstar_ut("Regulus", jd, SEFLG_NOABERR)
+        jd = julday(2024, 6, 15, 12.0)
+        _pos, _, _ = fixstar_ut("Regulus", jd, FLG_NOABERR)
         assert state._PLANETS is None
 
 
 class TestPhenoNoKernel:
-    """Phase 3: swe_pheno_ut must not load DE kernel."""
+    """Phase 3: pheno_ut must not load DE kernel."""
 
     def test_swe_pheno_ut_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_MARS
-        from libephemeris.planets import swe_pheno_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import MARS
+        from libephemeris.planets import pheno_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        result = swe_pheno_ut(jd, SE_MARS, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        result = pheno_ut(jd, MARS, 0)
         assert state._PLANETS is None
         assert result[2] > 0  # elongation > 0
 
     def test_swe_pheno_ut_moon(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_MOON
-        from libephemeris.planets import swe_pheno_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import MOON
+        from libephemeris.planets import pheno_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        result = swe_pheno_ut(jd, SE_MOON, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        result = pheno_ut(jd, MOON, 0)
         assert state._PLANETS is None
         assert 0 < result[0] < 180  # phase angle
 
     def test_swe_pheno_ut_sun(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_SUN
-        from libephemeris.planets import swe_pheno_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import SUN
+        from libephemeris.planets import pheno_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        result = swe_pheno_ut(jd, SE_SUN, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        result = pheno_ut(jd, SUN, 0)
         assert state._PLANETS is None
         assert result[0] == 0.0  # phase angle for Sun = 0
 
@@ -152,12 +162,14 @@ class TestHeliacalNoKernel:
 
     def test_heliacal_pheno_ut_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_VENUS
-        from libephemeris.heliacal import heliacal_pheno_ut
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.constants import VENUS
+        from libephemeris.heliacal import _heliacal_pheno_ut_pythonic
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        _result, _retflag = heliacal_pheno_ut(jd, 41.9, 12.5, body=SE_VENUS)
+        jd = julday(2024, 6, 15, 12.0)
+        _result, _retflag = _heliacal_pheno_ut_pythonic(
+            jd, 41.9, 12.5, body=VENUS
+        )
         assert state._PLANETS is None
 
 
@@ -167,9 +179,9 @@ class TestEclipseNoKernel:
     def test_calc_gamma_no_kernel(self, leb_mode):
         from libephemeris import state
         from libephemeris.eclipse import _calc_gamma
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 4, 8, 18.0)
+        jd = julday(2024, 4, 8, 18.0)
         gamma = _calc_gamma(jd)
         assert state._PLANETS is None
         assert isinstance(gamma, float)
@@ -177,9 +189,9 @@ class TestEclipseNoKernel:
     def test_calc_penumbra_limit_no_kernel(self, leb_mode):
         from libephemeris import state
         from libephemeris.eclipse import _calc_penumbra_limit
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 4, 8, 18.0)
+        jd = julday(2024, 4, 8, 18.0)
         l1 = _calc_penumbra_limit(jd)
         assert state._PLANETS is None
         assert l1 > 0
@@ -187,22 +199,22 @@ class TestEclipseNoKernel:
     def test_besselian_x_no_kernel(self, leb_mode):
         from libephemeris import state
         from libephemeris.eclipse import calc_besselian_x
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 4, 8, 18.0)
+        jd = julday(2024, 4, 8, 18.0)
         x = calc_besselian_x(jd)
         assert state._PLANETS is None
         assert isinstance(x, float)
 
     def test_xyz_pipeline_a_no_double_convert(self, leb_mode):
-        """SEFLG_XYZ for Pipeline A returns actual Cartesian, not spherical."""
-        from libephemeris.constants import SE_SUN, SEFLG_XYZ
-        from libephemeris.planets import swe_calc_ut
-        from libephemeris.time_utils import swe_julday
+        """FLG_XYZ for Pipeline A returns actual Cartesian, not spherical."""
+        from libephemeris.constants import SUN, FLG_XYZ
+        from libephemeris.planets import calc_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        pos_xyz, _ = swe_calc_ut(jd, SE_SUN, SEFLG_XYZ)
-        pos_sph, _ = swe_calc_ut(jd, SE_SUN, 0)
+        jd = julday(2024, 6, 15, 12.0)
+        pos_xyz, _ = calc_ut(jd, SUN, FLG_XYZ)
+        pos_sph, _ = calc_ut(jd, SUN, 0)
         # XYZ distance should be ~1 AU (not degrees-sized values)
         import math
         r = math.sqrt(pos_xyz[0] ** 2 + pos_xyz[1] ** 2 + pos_xyz[2] ** 2)
@@ -211,27 +223,27 @@ class TestEclipseNoKernel:
         assert 0.98 < pos_sph[2] < 1.02
 
     def test_xyz_pipeline_b_mean_node(self, leb_mode):
-        """SEFLG_XYZ for Pipeline B (Mean Node) returns Cartesian."""
-        from libephemeris.constants import SE_MEAN_NODE, SEFLG_XYZ
-        from libephemeris.planets import swe_calc_ut
-        from libephemeris.time_utils import swe_julday
+        """FLG_XYZ for Pipeline B (Mean Node) returns Cartesian."""
+        from libephemeris.constants import MEAN_NODE, FLG_XYZ
+        from libephemeris.planets import calc_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        pos_xyz, _ = swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_XYZ)
+        jd = julday(2024, 6, 15, 12.0)
+        pos_xyz, _ = calc_ut(jd, MEAN_NODE, FLG_XYZ)
         # Mean Node distance ~0.00257 AU, Cartesian components should be small
         import math
         r = math.sqrt(pos_xyz[0] ** 2 + pos_xyz[1] ** 2 + pos_xyz[2] ** 2)
         assert 0.001 < r < 0.01, f"r={r} unexpected for Mean Node"
 
     def test_xyz_radians_pipeline_a(self, leb_mode):
-        """SEFLG_XYZ | SEFLG_RADIANS should NOT apply radians to Cartesian."""
-        from libephemeris.constants import SE_SUN, SEFLG_XYZ, SEFLG_RADIANS
-        from libephemeris.planets import swe_calc_ut
-        from libephemeris.time_utils import swe_julday
+        """FLG_XYZ | FLG_RADIANS should NOT apply radians to Cartesian."""
+        from libephemeris.constants import SUN, FLG_XYZ, FLG_RADIANS
+        from libephemeris.planets import calc_ut
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 12.0)
-        pos_xyz, _ = swe_calc_ut(jd, SE_SUN, SEFLG_XYZ)
-        pos_xyz_rad, _ = swe_calc_ut(jd, SE_SUN, SEFLG_XYZ | SEFLG_RADIANS)
+        jd = julday(2024, 6, 15, 12.0)
+        pos_xyz, _ = calc_ut(jd, SUN, FLG_XYZ)
+        pos_xyz_rad, _ = calc_ut(jd, SUN, FLG_XYZ | FLG_RADIANS)
         # Both should be identical — RADIANS is a no-op with XYZ
         assert abs(pos_xyz[0] - pos_xyz_rad[0]) < 1e-12
         assert abs(pos_xyz[1] - pos_xyz_rad[1]) < 1e-12
@@ -239,9 +251,9 @@ class TestEclipseNoKernel:
     def test_sol_eclipse_when_glob_no_kernel(self, leb_mode):
         from libephemeris import state
         from libephemeris.eclipse import sol_eclipse_when_glob
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 1, 1, 0.0)
+        jd = julday(2024, 1, 1, 0.0)
         ecl_type, tret = sol_eclipse_when_glob(jd)
         assert state._PLANETS is None
         assert ecl_type != 0
@@ -250,42 +262,42 @@ class TestEclipseNoKernel:
     def test_lun_eclipse_when_no_kernel(self, leb_mode):
         from libephemeris import state
         from libephemeris.eclipse import lun_eclipse_when
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 1, 1, 0.0)
+        jd = julday(2024, 1, 1, 0.0)
         ecl_type, _tret = lun_eclipse_when(jd)
         assert state._PLANETS is None
         assert ecl_type != 0
 
     def test_swe_sol_eclipse_how_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.eclipse import sol_eclipse_when_glob, swe_sol_eclipse_how
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.eclipse import sol_eclipse_when_glob, sol_eclipse_how
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 1, 1, 0.0)
+        jd = julday(2024, 1, 1, 0.0)
         _, tret = sol_eclipse_when_glob(jd)
         jd_max = tret[0]
-        _retflag, _attr = swe_sol_eclipse_how(jd_max, [0.0, 0.0, 0.0])
+        _retflag, _attr = sol_eclipse_how(jd_max, [0.0, 0.0, 0.0])
         assert state._PLANETS is None
 
     def test_rise_trans_sun_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_SUN, SE_CALC_RISE
+        from libephemeris.constants import SUN, CALC_RISE
         from libephemeris.eclipse import rise_trans
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 0.0)
-        _retflag, tret = rise_trans(jd, SE_SUN, SE_CALC_RISE, [12.5, 41.9, 0])
+        jd = julday(2024, 6, 15, 0.0)
+        _retflag, tret = rise_trans(jd, SUN, CALC_RISE, [12.5, 41.9, 0])
         assert state._PLANETS is None
         assert tret[0] > jd
 
     def test_rise_trans_star_no_kernel(self, leb_mode):
         from libephemeris import state
-        from libephemeris.constants import SE_CALC_RISE
+        from libephemeris.constants import CALC_RISE
         from libephemeris.eclipse import rise_trans
-        from libephemeris.time_utils import swe_julday
+        from libephemeris.time_utils import julday
 
-        jd = swe_julday(2024, 6, 15, 0.0)
-        _retflag, tret = rise_trans(jd, "Sirius", SE_CALC_RISE, [12.5, 41.9, 0])
+        jd = julday(2024, 6, 15, 0.0)
+        _retflag, tret = rise_trans(jd, "Sirius", CALC_RISE, [12.5, 41.9, 0])
         assert state._PLANETS is None
         assert tret[0] > jd

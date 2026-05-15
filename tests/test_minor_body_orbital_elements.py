@@ -11,43 +11,43 @@ Tests verify:
 import math
 import pytest
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_NESSUS,
-    SE_ASBOLUS,
-    SE_CHARIKLO,
-    SE_GONGGONG,
-    SE_VARUNA,
-    SE_APOPHIS,
-    SE_HYGIEA,
-    SE_INTERAMNIA,
-    SE_DAVIDA,
-    SE_EUROPA_AST,
-    SE_SYLVIA,
-    SE_PSYCHE,
-    SE_EROS,
-    SE_AMOR,
-    SE_ICARUS,
-    SE_TORO,
-    SE_SAPPHO,
-    SE_PANDORA_AST,
-    SE_LILITH_AST,
-    SE_HIDALGO,
-    SE_TOUTATIS,
-    SE_ITOKAWA,
-    SE_BENNU,
-    SE_RYUGU,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    NESSUS,
+    ASBOLUS,
+    CHARIKLO,
+    GONGGONG,
+    VARUNA,
+    APOPHIS,
+    HYGIEA,
+    INTERAMNIA,
+    DAVIDA,
+    EUROPA_AST,
+    SYLVIA,
+    PSYCHE,
+    EROS,
+    AMOR,
+    ICARUS,
+    TORO,
+    SAPPHO,
+    PANDORA_AST,
+    LILITH_AST,
+    HIDALGO,
+    TOUTATIS,
+    ITOKAWA,
+    BENNU,
+    RYUGU,
 )
 from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
 
@@ -65,43 +65,43 @@ KEPLER_CONSTANT = 0.9856076686  # degrees/day for a in AU
 def all_minor_body_ids():
     """All minor body identifiers."""
     return [
-        SE_CHIRON,
-        SE_PHOLUS,
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
-        SE_ERIS,
-        SE_SEDNA,
-        SE_HAUMEA,
-        SE_MAKEMAKE,
-        SE_IXION,
-        SE_ORCUS,
-        SE_QUAOAR,
-        SE_NESSUS,
-        SE_ASBOLUS,
-        SE_CHARIKLO,
-        SE_GONGGONG,
-        SE_VARUNA,
-        SE_APOPHIS,
-        SE_HYGIEA,
-        SE_INTERAMNIA,
-        SE_DAVIDA,
-        SE_EUROPA_AST,
-        SE_SYLVIA,
-        SE_PSYCHE,
-        SE_EROS,
-        SE_AMOR,
-        SE_ICARUS,
-        SE_TORO,
-        SE_SAPPHO,
-        SE_PANDORA_AST,
-        SE_LILITH_AST,
-        SE_HIDALGO,
-        SE_TOUTATIS,
-        SE_ITOKAWA,
-        SE_BENNU,
-        SE_RYUGU,
+        CHIRON,
+        PHOLUS,
+        CERES,
+        PALLAS,
+        JUNO,
+        VESTA,
+        ERIS,
+        SEDNA,
+        HAUMEA,
+        MAKEMAKE,
+        IXION,
+        ORCUS,
+        QUAOAR,
+        NESSUS,
+        ASBOLUS,
+        CHARIKLO,
+        GONGGONG,
+        VARUNA,
+        APOPHIS,
+        HYGIEA,
+        INTERAMNIA,
+        DAVIDA,
+        EUROPA_AST,
+        SYLVIA,
+        PSYCHE,
+        EROS,
+        AMOR,
+        ICARUS,
+        TORO,
+        SAPPHO,
+        PANDORA_AST,
+        LILITH_AST,
+        HIDALGO,
+        TOUTATIS,
+        ITOKAWA,
+        BENNU,
+        RYUGU,
     ]
 
 
@@ -211,7 +211,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_chiron_orbital_elements(self):
         """Chiron: Centaur with orbit between Saturn and Uranus."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         assert elements.name == "Chiron"
         assert 13.5 < elements.a < 14.0, f"Chiron a={elements.a} unexpected"
         assert 0.37 < elements.e < 0.39, f"Chiron e={elements.e} unexpected"
@@ -219,7 +219,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_ceres_orbital_elements(self):
         """Ceres: Largest main belt asteroid, dwarf planet."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         assert elements.name == "Ceres"
         assert 2.7 < elements.a < 2.8, f"Ceres a={elements.a} unexpected"
         assert 0.07 < elements.e < 0.09, f"Ceres e={elements.e} unexpected"
@@ -227,20 +227,20 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_pallas_high_inclination(self):
         """Pallas: Known for high inclination ~35 degrees."""
-        elements = MINOR_BODY_ELEMENTS[SE_PALLAS]
+        elements = MINOR_BODY_ELEMENTS[PALLAS]
         assert elements.name == "Pallas"
         assert 34.0 < elements.i < 36.0, f"Pallas i={elements.i} unexpected"
 
     def test_eris_distant_tno(self):
         """Eris: Distant TNO with high inclination."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         assert elements.name == "Eris"
         assert 67.0 < elements.a < 69.0, f"Eris a={elements.a} unexpected"
         assert 43.0 < elements.i < 45.0, f"Eris i={elements.i} unexpected"
 
     def test_sedna_extreme_orbit(self):
         """Sedna: Detached object with extreme orbit."""
-        elements = MINOR_BODY_ELEMENTS[SE_SEDNA]
+        elements = MINOR_BODY_ELEMENTS[SEDNA]
         assert elements.name == "Sedna"
         # Sedna has the most distant semi-major axis
         assert 500 < elements.a < 600, f"Sedna a={elements.a} unexpected"
@@ -251,21 +251,21 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_ixion_plutino(self):
         """Ixion: Plutino in 2:3 resonance with Neptune."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         assert elements.name == "Ixion"
         # Plutinos have a ~ 39.4 AU (like Pluto)
         assert 39.0 < elements.a < 40.0, f"Ixion a={elements.a} unexpected"
 
     def test_orcus_anti_pluto(self):
         """Orcus: Anti-Pluto (opposite phase in 2:3 resonance)."""
-        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        elements = MINOR_BODY_ELEMENTS[ORCUS]
         assert elements.name == "Orcus"
         # Similar to Pluto's orbital parameters
         assert 39.0 < elements.a < 40.0, f"Orcus a={elements.a} unexpected"
 
     def test_quaoar_low_eccentricity(self):
         """Quaoar: TNO with nearly circular orbit."""
-        elements = MINOR_BODY_ELEMENTS[SE_QUAOAR]
+        elements = MINOR_BODY_ELEMENTS[QUAOAR]
         assert elements.name == "Quaoar"
         # Low eccentricity for a TNO
         assert elements.e < 0.05, (
@@ -274,7 +274,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_nessus_centaur(self):
         """Nessus: Centaur with orbit between Saturn and Pluto."""
-        elements = MINOR_BODY_ELEMENTS[SE_NESSUS]
+        elements = MINOR_BODY_ELEMENTS[NESSUS]
         assert elements.name == "Nessus"
         # Semi-major axis ~24.5 AU (between Saturn ~9.5 AU and Pluto ~39.5 AU)
         assert 24.0 < elements.a < 25.0, f"Nessus a={elements.a} unexpected"
@@ -285,7 +285,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_asbolus_centaur(self):
         """Asbolus: Centaur with orbit between Saturn and Uranus."""
-        elements = MINOR_BODY_ELEMENTS[SE_ASBOLUS]
+        elements = MINOR_BODY_ELEMENTS[ASBOLUS]
         assert elements.name == "Asbolus"
         # Semi-major axis ~18 AU (between Saturn ~9.5 AU and Uranus ~19.2 AU)
         assert 17.5 < elements.a < 18.5, f"Asbolus a={elements.a} unexpected"
@@ -296,7 +296,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_chariklo_centaur(self):
         """Chariklo: Largest known centaur with ring system discovered in 2014."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHARIKLO]
+        elements = MINOR_BODY_ELEMENTS[CHARIKLO]
         assert elements.name == "Chariklo"
         # Semi-major axis ~15.7 AU (between Saturn ~9.5 AU and Uranus ~19.2 AU)
         assert 15.5 < elements.a < 16.0, f"Chariklo a={elements.a} unexpected"
@@ -307,7 +307,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_gonggong_tno(self):
         """Gonggong: TNO dwarf planet candidate (formerly 2007 OR10)."""
-        elements = MINOR_BODY_ELEMENTS[SE_GONGGONG]
+        elements = MINOR_BODY_ELEMENTS[GONGGONG]
         assert elements.name == "Gonggong"
         # Semi-major axis ~67 AU (distant TNO)
         assert 66.0 < elements.a < 68.0, f"Gonggong a={elements.a} unexpected"
@@ -320,7 +320,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_varuna_classical_kbo(self):
         """Varuna: Large classical Kuiper belt object (~670 km diameter)."""
-        elements = MINOR_BODY_ELEMENTS[SE_VARUNA]
+        elements = MINOR_BODY_ELEMENTS[VARUNA]
         assert elements.name == "Varuna"
         # Semi-major axis ~43.2 AU (classical KBO region)
         assert 42.5 < elements.a < 44.0, f"Varuna a={elements.a} unexpected"
@@ -333,7 +333,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_apophis_near_earth_asteroid(self):
         """Apophis: Near-Earth asteroid with close approach in 2029."""
-        elements = MINOR_BODY_ELEMENTS[SE_APOPHIS]
+        elements = MINOR_BODY_ELEMENTS[APOPHIS]
         assert elements.name == "Apophis"
         # Semi-major axis ~0.92 AU (Aten-class NEA, crosses Earth's orbit)
         assert 0.91 < elements.a < 0.93, f"Apophis a={elements.a} unexpected"
@@ -346,7 +346,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_hygiea_main_belt_asteroid(self):
         """Hygiea: Fourth largest main belt asteroid, dwarf planet candidate."""
-        elements = MINOR_BODY_ELEMENTS[SE_HYGIEA]
+        elements = MINOR_BODY_ELEMENTS[HYGIEA]
         assert elements.name == "Hygiea"
         # Semi-major axis ~3.15 AU (main belt)
         assert 3.10 < elements.a < 3.20, f"Hygiea a={elements.a} unexpected"
@@ -359,7 +359,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_interamnia_main_belt_asteroid(self):
         """Interamnia: Fifth largest main belt asteroid."""
-        elements = MINOR_BODY_ELEMENTS[SE_INTERAMNIA]
+        elements = MINOR_BODY_ELEMENTS[INTERAMNIA]
         assert elements.name == "Interamnia"
         # Semi-major axis ~3.06 AU (main belt)
         assert 3.00 < elements.a < 3.10, f"Interamnia a={elements.a} unexpected"
@@ -372,7 +372,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_davida_main_belt_asteroid(self):
         """Davida: Seventh largest main belt asteroid."""
-        elements = MINOR_BODY_ELEMENTS[SE_DAVIDA]
+        elements = MINOR_BODY_ELEMENTS[DAVIDA]
         assert elements.name == "Davida"
         # Semi-major axis ~3.16 AU (main belt)
         assert 3.10 < elements.a < 3.20, f"Davida a={elements.a} unexpected"
@@ -385,7 +385,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_europa_main_belt_asteroid(self):
         """Europa: Main belt asteroid (not to be confused with Jupiter's moon)."""
-        elements = MINOR_BODY_ELEMENTS[SE_EUROPA_AST]
+        elements = MINOR_BODY_ELEMENTS[EUROPA_AST]
         assert elements.name == "Europa"
         # Semi-major axis ~3.09 AU (main belt)
         assert 3.05 < elements.a < 3.15, f"Europa a={elements.a} unexpected"
@@ -398,7 +398,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_sylvia_triple_asteroid(self):
         """Sylvia: Triple asteroid system with moons Romulus and Remus."""
-        elements = MINOR_BODY_ELEMENTS[SE_SYLVIA]
+        elements = MINOR_BODY_ELEMENTS[SYLVIA]
         assert elements.name == "Sylvia"
         # Semi-major axis ~3.48 AU (outer main belt)
         assert 3.45 < elements.a < 3.55, f"Sylvia a={elements.a} unexpected"
@@ -411,7 +411,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_psyche_metallic_asteroid(self):
         """Psyche: Metallic M-type asteroid, target of NASA Psyche mission."""
-        elements = MINOR_BODY_ELEMENTS[SE_PSYCHE]
+        elements = MINOR_BODY_ELEMENTS[PSYCHE]
         assert elements.name == "Psyche"
         # Semi-major axis ~2.92 AU (main belt)
         assert 2.90 < elements.a < 2.95, f"Psyche a={elements.a} unexpected"
@@ -424,7 +424,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_eros_near_earth_asteroid(self):
         """Eros: Near-Earth asteroid, target of NEAR Shoemaker mission."""
-        elements = MINOR_BODY_ELEMENTS[SE_EROS]
+        elements = MINOR_BODY_ELEMENTS[EROS]
         assert elements.name == "Eros"
         # Semi-major axis ~1.46 AU (Amor-class NEA, crosses Mars's orbit)
         assert 1.45 < elements.a < 1.47, f"Eros a={elements.a} unexpected"
@@ -437,7 +437,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_amor_near_earth_asteroid(self):
         """Amor: Prototype of the Amor near-Earth asteroid class."""
-        elements = MINOR_BODY_ELEMENTS[SE_AMOR]
+        elements = MINOR_BODY_ELEMENTS[AMOR]
         assert elements.name == "Amor"
         # Semi-major axis ~1.92 AU (Amor-class NEA prototype)
         assert 1.90 < elements.a < 1.94, f"Amor a={elements.a} unexpected"
@@ -450,7 +450,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_icarus_apollo_asteroid(self):
         """Icarus: Apollo asteroid with highly eccentric orbit reaching inside Mercury."""
-        elements = MINOR_BODY_ELEMENTS[SE_ICARUS]
+        elements = MINOR_BODY_ELEMENTS[ICARUS]
         assert elements.name == "Icarus"
         # Semi-major axis ~1.08 AU (Apollo-class NEA)
         assert 1.07 < elements.a < 1.09, f"Icarus a={elements.a} unexpected"
@@ -463,7 +463,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_toro_apollo_asteroid(self):
         """Toro: Apollo asteroid, near-Earth asteroid."""
-        elements = MINOR_BODY_ELEMENTS[SE_TORO]
+        elements = MINOR_BODY_ELEMENTS[TORO]
         assert elements.name == "Toro"
         # Semi-major axis ~1.37 AU (Apollo-class NEA)
         assert 1.36 < elements.a < 1.38, f"Toro a={elements.a} unexpected"
@@ -476,7 +476,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_sappho_main_belt_asteroid(self):
         """Sappho: Main belt asteroid, artistic expression and same-sex love."""
-        elements = MINOR_BODY_ELEMENTS[SE_SAPPHO]
+        elements = MINOR_BODY_ELEMENTS[SAPPHO]
         assert elements.name == "Sappho"
         # Semi-major axis ~2.30 AU (main belt asteroid)
         assert 2.29 < elements.a < 2.31, f"Sappho a={elements.a} unexpected"
@@ -489,7 +489,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_pandora_main_belt_asteroid(self):
         """Pandora: Main belt asteroid (distinct from Saturn moon Pandora)."""
-        elements = MINOR_BODY_ELEMENTS[SE_PANDORA_AST]
+        elements = MINOR_BODY_ELEMENTS[PANDORA_AST]
         assert elements.name == "Pandora"
         # Semi-major axis ~2.76 AU (main belt asteroid)
         assert 2.75 < elements.a < 2.77, f"Pandora a={elements.a} unexpected"
@@ -502,7 +502,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_lilith_main_belt_asteroid(self):
         """Lilith: Main belt asteroid (not to be confused with lunar apogee Lilith)."""
-        elements = MINOR_BODY_ELEMENTS[SE_LILITH_AST]
+        elements = MINOR_BODY_ELEMENTS[LILITH_AST]
         assert elements.name == "Lilith"
         # Semi-major axis ~2.66 AU (main belt asteroid)
         assert 2.65 < elements.a < 2.68, f"Lilith a={elements.a} unexpected"
@@ -515,7 +515,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_hidalgo_centaur_asteroid(self):
         """Hidalgo: Centaur-class asteroid with comet-like orbit, used in astrological research."""
-        elements = MINOR_BODY_ELEMENTS[SE_HIDALGO]
+        elements = MINOR_BODY_ELEMENTS[HIDALGO]
         assert elements.name == "Hidalgo"
         # Semi-major axis ~5.73 AU (between Mars and Jupiter, Centaur-class)
         assert 5.70 < elements.a < 5.76, f"Hidalgo a={elements.a} unexpected"
@@ -528,7 +528,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_toutatis_apollo_asteroid(self):
         """Toutatis: Apollo PHA, radar and spacecraft target, tumbling rotation."""
-        elements = MINOR_BODY_ELEMENTS[SE_TOUTATIS]
+        elements = MINOR_BODY_ELEMENTS[TOUTATIS]
         assert elements.name == "Toutatis"
         # Semi-major axis ~2.54 AU (Apollo asteroid)
         assert 2.53 < elements.a < 2.56, f"Toutatis a={elements.a} unexpected"
@@ -541,7 +541,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_itokawa_apollo_asteroid(self):
         """Itokawa: Apollo PHA, target of Hayabusa sample return mission."""
-        elements = MINOR_BODY_ELEMENTS[SE_ITOKAWA]
+        elements = MINOR_BODY_ELEMENTS[ITOKAWA]
         assert elements.name == "Itokawa"
         # Semi-major axis ~1.32 AU (Apollo asteroid)
         assert 1.32 < elements.a < 1.33, f"Itokawa a={elements.a} unexpected"
@@ -554,7 +554,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_bennu_apollo_asteroid(self):
         """Bennu: Apollo PHA, target of OSIRIS-REx sample return mission."""
-        elements = MINOR_BODY_ELEMENTS[SE_BENNU]
+        elements = MINOR_BODY_ELEMENTS[BENNU]
         assert elements.name == "Bennu"
         # Semi-major axis ~1.13 AU (Apollo asteroid)
         assert 1.12 < elements.a < 1.14, f"Bennu a={elements.a} unexpected"
@@ -567,7 +567,7 @@ class TestSpecificBodiesOrbitalElements:
 
     def test_ryugu_apollo_asteroid(self):
         """Ryugu: Apollo PHA, target of Hayabusa2 sample return mission."""
-        elements = MINOR_BODY_ELEMENTS[SE_RYUGU]
+        elements = MINOR_BODY_ELEMENTS[RYUGU]
         assert elements.name == "Ryugu"
         # Semi-major axis ~1.19 AU (Apollo asteroid)
         assert 1.18 < elements.a < 1.20, f"Ryugu a={elements.a} unexpected"
@@ -585,7 +585,7 @@ class TestOrbitalElementsDataclass:
 
     def test_orbital_elements_attributes(self):
         """Test OrbitalElements has all required attributes."""
-        elem = MINOR_BODY_ELEMENTS[SE_CERES]
+        elem = MINOR_BODY_ELEMENTS[CERES]
         assert hasattr(elem, "name")
         assert hasattr(elem, "epoch")
         assert hasattr(elem, "a")
@@ -598,7 +598,7 @@ class TestOrbitalElementsDataclass:
 
     def test_orbital_elements_types(self):
         """Test OrbitalElements attribute types."""
-        elem = MINOR_BODY_ELEMENTS[SE_CERES]
+        elem = MINOR_BODY_ELEMENTS[CERES]
         assert isinstance(elem.name, str)
         assert isinstance(elem.epoch, float)
         assert isinstance(elem.a, float)

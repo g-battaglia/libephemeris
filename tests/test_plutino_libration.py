@@ -12,11 +12,11 @@ Tests verify:
 import math
 import pytest
 from libephemeris.constants import (
-    SE_IXION,
-    SE_ORCUS,
-    SE_CERES,
-    SE_ERIS,
-    SE_QUAOAR,
+    IXION,
+    ORCUS,
+    CERES,
+    ERIS,
+    QUAOAR,
 )
 from libephemeris.minor_bodies import (
     MINOR_BODY_ELEMENTS,
@@ -40,8 +40,8 @@ class TestLibrationParameters:
 
     def test_ixion_has_libration_params(self):
         """Ixion should have libration parameters defined."""
-        assert SE_IXION in PLUTINO_LIBRATION_PARAMS
-        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+        assert IXION in PLUTINO_LIBRATION_PARAMS
+        params = PLUTINO_LIBRATION_PARAMS[IXION]
         assert isinstance(params, LibrationParameters)
         assert params.amplitude > 0
         assert params.period > 0
@@ -49,8 +49,8 @@ class TestLibrationParameters:
 
     def test_orcus_has_libration_params(self):
         """Orcus should have libration parameters defined."""
-        assert SE_ORCUS in PLUTINO_LIBRATION_PARAMS
-        params = PLUTINO_LIBRATION_PARAMS[SE_ORCUS]
+        assert ORCUS in PLUTINO_LIBRATION_PARAMS
+        params = PLUTINO_LIBRATION_PARAMS[ORCUS]
         assert isinstance(params, LibrationParameters)
         assert params.amplitude > 0
         assert params.period > 0
@@ -78,9 +78,9 @@ class TestLibrationParameters:
 
     def test_non_plutinos_no_params(self):
         """Non-plutino bodies should not have libration parameters."""
-        assert SE_CERES not in PLUTINO_LIBRATION_PARAMS
-        assert SE_ERIS not in PLUTINO_LIBRATION_PARAMS
-        assert SE_QUAOAR not in PLUTINO_LIBRATION_PARAMS
+        assert CERES not in PLUTINO_LIBRATION_PARAMS
+        assert ERIS not in PLUTINO_LIBRATION_PARAMS
+        assert QUAOAR not in PLUTINO_LIBRATION_PARAMS
 
 
 class TestNeptuneMeanLongitude:
@@ -115,7 +115,7 @@ class TestResonantArgument:
 
     def test_resonant_argument_range(self):
         """Resonant argument should be in 0-360 range."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         phi = calc_resonant_argument_plutino(
             elements, J2000_EPOCH, elements.omega, elements.M0
         )
@@ -123,7 +123,7 @@ class TestResonantArgument:
 
     def test_resonant_argument_for_ixion(self):
         """Ixion's resonant argument should be calculable."""
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         # At epoch
         phi = calc_resonant_argument_plutino(
             elements, elements.epoch, elements.omega, elements.M0
@@ -134,7 +134,7 @@ class TestResonantArgument:
 
     def test_resonant_argument_for_orcus(self):
         """Orcus's resonant argument should be calculable."""
-        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        elements = MINOR_BODY_ELEMENTS[ORCUS]
         phi = calc_resonant_argument_plutino(
             elements, elements.epoch, elements.omega, elements.M0
         )
@@ -146,55 +146,55 @@ class TestLibrationCorrection:
 
     def test_ixion_correction_bounded(self):
         """Ixion's libration correction should be bounded by amplitude/3."""
-        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+        params = PLUTINO_LIBRATION_PARAMS[IXION]
         max_expected = params.amplitude / 3.0
 
         # Test at multiple times over a full libration period
         for phase in range(0, 360, 30):
             t = J2000_EPOCH + (phase / 360.0) * params.period
-            correction = calc_libration_correction(SE_IXION, t)
+            correction = calc_libration_correction(IXION, t)
             assert abs(correction) <= max_expected + 0.1  # Small tolerance
 
     def test_orcus_correction_bounded(self):
         """Orcus's libration correction should be bounded by amplitude/3."""
-        params = PLUTINO_LIBRATION_PARAMS[SE_ORCUS]
+        params = PLUTINO_LIBRATION_PARAMS[ORCUS]
         max_expected = params.amplitude / 3.0
 
         for phase in range(0, 360, 30):
             t = J2000_EPOCH + (phase / 360.0) * params.period
-            correction = calc_libration_correction(SE_ORCUS, t)
+            correction = calc_libration_correction(ORCUS, t)
             assert abs(correction) <= max_expected + 0.1
 
     def test_non_plutino_zero_correction(self):
         """Non-plutinos should have zero libration correction."""
-        correction = calc_libration_correction(SE_CERES, J2000_EPOCH)
+        correction = calc_libration_correction(CERES, J2000_EPOCH)
         assert correction == 0.0
 
-        correction = calc_libration_correction(SE_ERIS, J2000_EPOCH)
+        correction = calc_libration_correction(ERIS, J2000_EPOCH)
         assert correction == 0.0
 
     def test_libration_periodic(self):
         """Libration correction should be periodic over the libration period."""
-        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+        params = PLUTINO_LIBRATION_PARAMS[IXION]
 
         # Correction at t and t + period should be the same
         t0 = J2000_EPOCH
         t1 = J2000_EPOCH + params.period
 
-        correction_t0 = calc_libration_correction(SE_IXION, t0)
-        correction_t1 = calc_libration_correction(SE_IXION, t1)
+        correction_t0 = calc_libration_correction(IXION, t0)
+        correction_t1 = calc_libration_correction(IXION, t1)
 
         assert abs(correction_t0 - correction_t1) < 0.01
 
     def test_libration_varies_with_time(self):
         """Libration correction should vary over time (not constant)."""
-        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+        params = PLUTINO_LIBRATION_PARAMS[IXION]
 
         # Check corrections at quarter period intervals
         corrections = []
         for i in range(4):
             t = J2000_EPOCH + i * params.period / 4
-            corrections.append(calc_libration_correction(SE_IXION, t))
+            corrections.append(calc_libration_correction(IXION, t))
 
         # Not all corrections should be the same
         assert not all(abs(c - corrections[0]) < 0.01 for c in corrections)
@@ -205,24 +205,24 @@ class TestHelperFunctions:
 
     def test_has_libration_model_plutinos(self):
         """has_libration_model should return True for plutinos."""
-        assert has_libration_model(SE_IXION) is True
-        assert has_libration_model(SE_ORCUS) is True
+        assert has_libration_model(IXION) is True
+        assert has_libration_model(ORCUS) is True
 
     def test_has_libration_model_non_plutinos(self):
         """has_libration_model should return False for non-plutinos."""
-        assert has_libration_model(SE_CERES) is False
-        assert has_libration_model(SE_ERIS) is False
-        assert has_libration_model(SE_QUAOAR) is False
+        assert has_libration_model(CERES) is False
+        assert has_libration_model(ERIS) is False
+        assert has_libration_model(QUAOAR) is False
 
     def test_get_libration_parameters_plutinos(self):
         """get_libration_parameters should return params for plutinos."""
-        params = get_libration_parameters(SE_IXION)
+        params = get_libration_parameters(IXION)
         assert params is not None
         assert isinstance(params, LibrationParameters)
 
     def test_get_libration_parameters_non_plutinos(self):
         """get_libration_parameters should return None for non-plutinos."""
-        params = get_libration_parameters(SE_CERES)
+        params = get_libration_parameters(CERES)
         assert params is None
 
 
@@ -235,8 +235,8 @@ class TestPositionWithLibration:
         jd1 = J2000_EPOCH
         jd2 = J2000_EPOCH + 365.25 * 10  # 10 years later
 
-        lon1, lat1, dist1 = calc_minor_body_heliocentric(SE_IXION, jd1, use_spk=False)
-        lon2, lat2, dist2 = calc_minor_body_heliocentric(SE_IXION, jd2, use_spk=False)
+        lon1, lat1, dist1 = calc_minor_body_heliocentric(IXION, jd1, use_spk=False)
+        lon2, lat2, dist2 = calc_minor_body_heliocentric(IXION, jd2, use_spk=False)
 
         # Positions should be valid
         assert 0 <= lon1 < 360
@@ -250,7 +250,7 @@ class TestPositionWithLibration:
         """Non-plutino positions should work normally."""
         jd = J2000_EPOCH
 
-        lon, lat, dist = calc_minor_body_heliocentric(SE_CERES, jd, use_spk=False)
+        lon, lat, dist = calc_minor_body_heliocentric(CERES, jd, use_spk=False)
 
         assert 0 <= lon < 360
         assert -90 <= lat <= 90
@@ -286,7 +286,7 @@ class TestLongTermAccuracy:
 
         for years in range(0, 101, 10):
             jd = start_jd + years * 365.25
-            correction = calc_libration_correction(SE_IXION, jd)
+            correction = calc_libration_correction(IXION, jd)
             corrections.append(abs(correction))
 
         # Maximum correction should be bounded (amplitude/3 ~ 26 degrees)
@@ -300,7 +300,7 @@ class TestLongTermAccuracy:
         prev_lon = None
         for days in range(0, 3650, 365):  # 10 years, yearly steps
             jd = jd_start + days
-            lon, _, _ = calc_minor_body_heliocentric(SE_IXION, jd, use_spk=False)
+            lon, _, _ = calc_minor_body_heliocentric(IXION, jd, use_spk=False)
 
             if prev_lon is not None:
                 # Position change should be reasonable (< 20 degrees/year for slow TNO)
@@ -318,7 +318,7 @@ class TestLongTermAccuracy:
         prev_lon = None
         for days in range(0, 3650, 365):
             jd = jd_start + days
-            lon, _, _ = calc_minor_body_heliocentric(SE_ORCUS, jd, use_spk=False)
+            lon, _, _ = calc_minor_body_heliocentric(ORCUS, jd, use_spk=False)
 
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -336,14 +336,14 @@ class TestCalcMinorBodyPositionLibration:
         """calc_minor_body_position with body_id should apply libration for plutinos."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
         jd = J2000_EPOCH + 365.25 * 50  # 50 years from J2000
 
         # Without body_id: no libration correction
         x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
 
         # With body_id: libration correction applied
-        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=IXION)
 
         # Convert to longitude for comparison
         lon1 = math.degrees(math.atan2(y1, x1)) % 360.0
@@ -365,14 +365,14 @@ class TestCalcMinorBodyPositionLibration:
         """Non-plutinos should have same position with or without body_id."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = J2000_EPOCH + 365.25 * 10
 
         # Without body_id
         x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
 
         # With body_id (Ceres is not a plutino)
-        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_CERES)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=CERES)
 
         # Positions should be identical (Ceres has no libration params)
         assert abs(x1 - x2) < 1e-10
@@ -383,11 +383,11 @@ class TestCalcMinorBodyPositionLibration:
         """Orcus position should include libration correction with body_id."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_ORCUS]
+        elements = MINOR_BODY_ELEMENTS[ORCUS]
         jd = J2000_EPOCH + 365.25 * 50
 
         x1, y1, z1 = calc_minor_body_position(elements, jd, body_id=None)
-        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=SE_ORCUS)
+        x2, y2, z2 = calc_minor_body_position(elements, jd, body_id=ORCUS)
 
         lon1 = math.degrees(math.atan2(y1, x1)) % 360.0
         lon2 = math.degrees(math.atan2(y2, x2)) % 360.0
@@ -403,8 +403,8 @@ class TestCalcMinorBodyPositionLibration:
         """Libration correction should vary over the libration period."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
-        params = PLUTINO_LIBRATION_PARAMS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
+        params = PLUTINO_LIBRATION_PARAMS[IXION]
 
         # Sample at quarter-period intervals
         corrections = []
@@ -412,7 +412,7 @@ class TestCalcMinorBodyPositionLibration:
             jd = J2000_EPOCH + i * params.period / 4
 
             x_no_lib, y_no_lib, _ = calc_minor_body_position(elements, jd, body_id=None)
-            x_lib, y_lib, _ = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+            x_lib, y_lib, _ = calc_minor_body_position(elements, jd, body_id=IXION)
 
             lon_no_lib = math.degrees(math.atan2(y_no_lib, x_no_lib)) % 360.0
             lon_lib = math.degrees(math.atan2(y_lib, x_lib)) % 360.0
@@ -437,14 +437,14 @@ class TestLongTermPlutonoAccuracy:
         """Ixion position should be computable over 100 years without errors."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
 
         # Ixion orbital period is ~248 years, so in 100 years it moves ~145°
         jd_start = J2000_EPOCH
         jd_end = J2000_EPOCH + 365.25 * 100
 
-        x1, y1, z1 = calc_minor_body_position(elements, jd_start, body_id=SE_IXION)
-        x2, y2, z2 = calc_minor_body_position(elements, jd_end, body_id=SE_IXION)
+        x1, y1, z1 = calc_minor_body_position(elements, jd_start, body_id=IXION)
+        x2, y2, z2 = calc_minor_body_position(elements, jd_end, body_id=IXION)
 
         # Positions should be valid (finite, non-zero distance)
         r1 = math.sqrt(x1**2 + y1**2 + z1**2)
@@ -468,12 +468,12 @@ class TestLongTermPlutonoAccuracy:
         """Positions should change smoothly with libration correction."""
         from libephemeris.minor_bodies import calc_minor_body_position
 
-        elements = MINOR_BODY_ELEMENTS[SE_IXION]
+        elements = MINOR_BODY_ELEMENTS[IXION]
 
         prev_lon = None
         for year in range(0, 100, 5):  # Every 5 years over 100 years
             jd = J2000_EPOCH + year * 365.25
-            x, y, _ = calc_minor_body_position(elements, jd, body_id=SE_IXION)
+            x, y, _ = calc_minor_body_position(elements, jd, body_id=IXION)
             lon = math.degrees(math.atan2(y, x)) % 360.0
 
             if prev_lon is not None:

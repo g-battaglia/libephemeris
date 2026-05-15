@@ -8,6 +8,7 @@ hours calculations and house cusp accuracy.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,7 +16,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 LOCATIONS = [
     ("London", 51.5, -0.1, 0),
@@ -29,11 +33,11 @@ LOCATIONS = [
 ]
 
 BODIES = [
-    ("Sun", swe.SUN, ephem.SE_SUN),
-    ("Moon", swe.MOON, ephem.SE_MOON),
+    ("Sun", swe.SUN, ephem.SUN),
+    ("Moon", swe.MOON, ephem.MOON),
 ]
 
-# SE_CALC_MTRANSIT = 4, SE_CALC_ITRANSIT = 8
+# CALC_MTRANSIT = 4, CALC_ITRANSIT = 8
 TRANSIT = 4  # upper transit (meridian)
 ITRANSIT = 8  # lower transit (anti-meridian / IC)
 
@@ -64,7 +68,7 @@ for y, m, d in TEST_DATES:
                     skipped += 1
                     continue
                 try:
-                    le_r = ephem.swe_rise_trans(
+                    le_r = ephem.rise_trans(
                         jd_start, le_body, event, [lon, lat, float(alt)], 1013.25, 15.0
                     )
                     le_jd = le_r[1][0]

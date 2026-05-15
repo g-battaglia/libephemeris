@@ -15,7 +15,7 @@ from libephemeris.minor_bodies import (
     MINOR_BODY_ELEMENTS,
     calc_minor_body_position,
 )
-from libephemeris.constants import SE_CERES, SE_VESTA, SE_CHIRON, SE_ERIS
+from libephemeris.constants import CERES, VESTA, CHIRON, ERIS
 from libephemeris.rebound_integration import (
     ReboundIntegrator,
     AssistEphemConfig,
@@ -168,7 +168,7 @@ class TestElementsConversion:
 
     def test_convert_ceres_elements(self):
         """Converting Ceres elements should produce valid REBOUND params."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = elements.epoch
 
         params = elements_to_rebound_orbit(elements, jd)
@@ -187,7 +187,7 @@ class TestElementsConversion:
 
     def test_angles_in_radians(self):
         """Angles should be converted to radians."""
-        elements = MINOR_BODY_ELEMENTS[SE_VESTA]
+        elements = MINOR_BODY_ELEMENTS[VESTA]
         jd = elements.epoch
 
         params = elements_to_rebound_orbit(elements, jd)
@@ -210,7 +210,7 @@ class TestPropagateOrbitRebound:
 
     def test_propagate_ceres_short(self, skip_if_no_rebound):
         """Propagate Ceres orbit for a short time."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 30  # 30 days
 
@@ -224,7 +224,7 @@ class TestPropagateOrbitRebound:
 
     def test_propagate_vesta(self, skip_if_no_rebound):
         """Propagate Vesta orbit."""
-        elements = MINOR_BODY_ELEMENTS[SE_VESTA]
+        elements = MINOR_BODY_ELEMENTS[VESTA]
         jd_start = elements.epoch
         jd_end = jd_start + 100  # 100 days
 
@@ -236,7 +236,7 @@ class TestPropagateOrbitRebound:
 
     def test_propagate_chiron(self, skip_if_no_rebound):
         """Propagate Chiron (centaur) orbit."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         jd_start = elements.epoch
         jd_end = jd_start + 365  # 1 year
 
@@ -247,7 +247,7 @@ class TestPropagateOrbitRebound:
 
     def test_integrator_ias15(self, skip_if_no_rebound):
         """IAS15 integrator should work."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 10
 
@@ -258,7 +258,7 @@ class TestPropagateOrbitRebound:
 
     def test_integrator_whfast(self, skip_if_no_rebound):
         """WHFast integrator should work."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 10
 
@@ -269,7 +269,7 @@ class TestPropagateOrbitRebound:
 
     def test_integrator_leapfrog(self, skip_if_no_rebound):
         """Leapfrog integrator should work."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 10
 
@@ -280,7 +280,7 @@ class TestPropagateOrbitRebound:
 
     def test_custom_timestep(self, skip_if_no_rebound):
         """Custom timestep should be used."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 30
 
@@ -294,7 +294,7 @@ class TestPropagateOrbitRebound:
 
     def test_backward_integration(self, skip_if_no_rebound):
         """Backward integration should work."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start - 30  # 30 days backward
 
@@ -315,7 +315,7 @@ class TestPropagateTrajectory:
 
     def test_trajectory_basic(self, skip_if_no_rebound):
         """Basic trajectory propagation should return list of points."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 100
 
@@ -332,7 +332,7 @@ class TestPropagateTrajectory:
 
     def test_trajectory_times_evenly_spaced(self, skip_if_no_rebound):
         """Trajectory times should be evenly spaced."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 100
 
@@ -348,7 +348,7 @@ class TestPropagateTrajectory:
 
     def test_trajectory_first_and_last(self, skip_if_no_rebound):
         """First and last points should match start and end times."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 50
 
@@ -371,7 +371,7 @@ class TestCompareWithKeplerian:
 
     def test_compare_returns_dict(self, skip_if_no_rebound):
         """Comparison should return a dictionary with expected keys."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = elements.epoch + 100
 
         comparison = compare_with_keplerian(elements, jd, use_assist=False)
@@ -385,7 +385,7 @@ class TestCompareWithKeplerian:
 
     def test_compare_keplerian_values(self, skip_if_no_rebound):
         """Keplerian values should match direct calculation."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = elements.epoch + 30
 
         comparison = compare_with_keplerian(elements, jd, use_assist=False)
@@ -402,7 +402,7 @@ class TestCompareWithKeplerian:
 
     def test_short_propagation_small_difference(self, skip_if_no_rebound):
         """Short propagation should have small difference from Keplerian."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = elements.epoch + 10  # Only 10 days
 
         comparison = compare_with_keplerian(elements, jd, use_assist=False)
@@ -430,7 +430,7 @@ class TestModuleWithoutRebound:
         if check_rebound_available():
             pytest.skip("REBOUND is installed")
 
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         with pytest.raises(ImportError):
             propagate_orbit_rebound(elements, 2460000.5, 2460010.5)
 
@@ -446,7 +446,7 @@ class TestIntegrationAccuracy:
 
     def test_orbit_stays_bounded(self, skip_if_no_rebound):
         """Orbit should stay within physical bounds over 1 year."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 365.25  # 1 year
 
@@ -458,7 +458,7 @@ class TestIntegrationAccuracy:
 
     def test_eccentric_orbit_accuracy(self, skip_if_no_rebound):
         """Highly eccentric orbit (Chiron) should remain bounded."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         jd_start = elements.epoch
         jd_end = jd_start + 365.25
 
@@ -470,7 +470,7 @@ class TestIntegrationAccuracy:
 
     def test_distant_tno_accuracy(self, skip_if_no_rebound):
         """Distant TNO (Eris) orbit should remain bounded."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         jd_start = elements.epoch
         jd_end = jd_start + 365.25
 
@@ -492,7 +492,7 @@ class TestOrbitRoundTrip:
 
     def test_forward_backward_consistency(self, skip_if_no_rebound):
         """Forward then backward propagation should return to start."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_mid = jd_start + 50
 
@@ -607,7 +607,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_propagate_ceres_assist(self):
         """Propagate Ceres with ASSIST for 30 days."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 30
 
@@ -621,7 +621,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_propagate_vesta_assist(self):
         """Propagate Vesta with ASSIST for 100 days."""
-        elements = MINOR_BODY_ELEMENTS[SE_VESTA]
+        elements = MINOR_BODY_ELEMENTS[VESTA]
         jd_start = elements.epoch
         jd_end = jd_start + 100
 
@@ -632,7 +632,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_propagate_chiron_assist(self):
         """Propagate Chiron (centaur) with ASSIST for 1 year."""
-        elements = MINOR_BODY_ELEMENTS[SE_CHIRON]
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
         jd_start = elements.epoch
         jd_end = jd_start + 365.25
 
@@ -643,7 +643,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_assist_vs_rebound_ceres(self):
         """ASSIST should give different (more accurate) results than 2-body REBOUND."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 365.25  # 1 year
 
@@ -664,7 +664,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_assist_backward_integration(self):
         """Backward ASSIST integration should work."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start - 30  # 30 days backward
 
@@ -676,7 +676,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_assist_trajectory(self):
         """Trajectory propagation with ASSIST should return multiple points."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd_start = elements.epoch
         jd_end = jd_start + 100
 
@@ -692,7 +692,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_compare_with_keplerian_assist(self):
         """compare_with_keplerian with use_assist=True should use ASSIST."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         jd = elements.epoch + 365.25
 
         comparison = compare_with_keplerian(elements, jd, use_assist=True)
@@ -703,7 +703,7 @@ class TestAssistEndToEnd:
     @requires_assist_data
     def test_assist_missing_planets_file_raises(self):
         """propagate_orbit_assist should raise FileNotFoundError for missing file."""
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         config = AssistEphemConfig(
             planets_file="/nonexistent/linux_p1550p2650.440",
         )
@@ -718,7 +718,7 @@ class TestAssistEndToEnd:
         if not check_assist_available():
             pytest.skip("ASSIST not installed")
 
-        elements = MINOR_BODY_ELEMENTS[SE_CERES]
+        elements = MINOR_BODY_ELEMENTS[CERES]
         config = AssistEphemConfig.__new__(AssistEphemConfig)
         config.planets_file = None
         config.asteroids_file = None

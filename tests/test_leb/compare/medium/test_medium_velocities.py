@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED, SEFLG_EQUATORIAL
+from libephemeris.constants import FLG_SPEED, FLG_EQUATORIAL
 from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
@@ -50,8 +50,8 @@ class TestMediumVelocityEcliptic:
 
         for jd in dates:
             try:
-                ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-                leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+                ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+                leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
             except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
@@ -90,8 +90,8 @@ class TestMediumDistanceVelocity:
 
         for jd in dates:
             try:
-                ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-                leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+                ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+                leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
             except (KeyError, ValueError, EphemerisRangeError):
                 continue
 
@@ -116,12 +116,12 @@ class TestMediumVelocityEquatorial:
         body_id: int,
         body_name: str,
     ):
-        flags = SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_EQUATORIAL
         max_err = 0.0
 
         for jd in medium_dates_100:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[3] - leb[3])
             max_err = max(max_err, err)

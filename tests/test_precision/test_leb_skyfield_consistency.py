@@ -6,24 +6,24 @@ import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_HELCTR,
-    SE_SIDM_LAHIRI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_HELCTR,
+    SIDM_LAHIRI,
 )
 
 JD_J2000 = 2451545.0
@@ -31,7 +31,7 @@ JD_J2000 = 2451545.0
 
 def reset_to_mode(mode: str):
     """Reset and switch to specified backend mode."""
-    swe.swe_close()
+    swe.close()
     swe.set_calc_mode(mode)
 
 
@@ -42,23 +42,23 @@ class TestLEBvsSkyfield:
     @pytest.fixture(autouse=True)
     def _reset_after(self):
         yield
-        swe.swe_close()
+        swe.close()
 
     @pytest.mark.parametrize(
         "body,name,tol_arcsec",
         [
-            (SE_SUN, "Sun", 0.5),
-            (SE_MOON, "Moon", 2.5),
-            (SE_MERCURY, "Mercury", 1.0),
-            (SE_VENUS, "Venus", 1.0),
-            (SE_MARS, "Mars", 1.0),
-            (SE_JUPITER, "Jupiter", 1.0),
-            (SE_SATURN, "Saturn", 1.0),
+            (SUN, "Sun", 0.5),
+            (MOON, "Moon", 2.5),
+            (MERCURY, "Mercury", 1.0),
+            (VENUS, "Venus", 1.0),
+            (MARS, "Mars", 1.0),
+            (JUPITER, "Jupiter", 1.0),
+            (SATURN, "Saturn", 1.0),
         ],
     )
     def test_planet_longitude_matches(self, body, name, tol_arcsec):
         """Planet longitude should match between LEB and Skyfield backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
         leb_result, _ = swe.calc_ut(JD_J2000, body, flags)
@@ -78,15 +78,15 @@ class TestLEBvsSkyfield:
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_planet_latitude_matches(self, body, name):
         """Planet latitude should match between LEB and Skyfield backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
         leb_result, _ = swe.calc_ut(JD_J2000, body, flags)
@@ -100,14 +100,14 @@ class TestLEBvsSkyfield:
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_planet_distance_matches(self, body, name):
         """Planet distance should match between LEB and Skyfield backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
         leb_result, _ = swe.calc_ut(JD_J2000, body, flags)
@@ -122,14 +122,14 @@ class TestLEBvsSkyfield:
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_speed_matches(self, body, name):
         """Speed should match between LEB and Skyfield backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
         leb_result, _ = swe.calc_ut(JD_J2000, body, flags)
@@ -138,16 +138,16 @@ class TestLEBvsSkyfield:
         sky_result, _ = swe.calc_ut(JD_J2000, body, flags)
 
         # Speed tolerance
-        tol = 0.001 if body != SE_MOON else 0.01
+        tol = 0.001 if body != MOON else 0.01
         assert leb_result[3] == pytest.approx(sky_result[3], abs=tol), (
             f"{name} speed: LEB={leb_result[3]:.6f}, Sky={sky_result[3]:.6f}"
         )
 
     def test_nodes_match(self):
         """Node positions should match between backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
-        for body_id, name in [(SE_MEAN_NODE, "Mean Node"), (SE_TRUE_NODE, "True Node")]:
+        for body_id, name in [(MEAN_NODE, "Mean Node"), (TRUE_NODE, "True Node")]:
             reset_to_mode("leb")
             leb_result, _ = swe.calc_ut(JD_J2000, body_id, flags)
 
@@ -162,17 +162,17 @@ class TestLEBvsSkyfield:
 
     def test_sidereal_consistency(self):
         """Sidereal positions should be consistent across backends."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
 
-        swe.swe_close()
+        swe.close()
         swe.set_calc_mode("leb")
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        leb_result, _ = swe.calc_ut(JD_J2000, SE_SUN, flags)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        leb_result, _ = swe.calc_ut(JD_J2000, SUN, flags)
 
-        swe.swe_close()
+        swe.close()
         swe.set_calc_mode("skyfield")
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        sky_result, _ = swe.calc_ut(JD_J2000, SE_SUN, flags)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        sky_result, _ = swe.calc_ut(JD_J2000, SUN, flags)
 
         diff = abs(leb_result[0] - sky_result[0])
         if diff > 180:
@@ -188,7 +188,7 @@ class TestLEBMultipleDates:
     @pytest.fixture(autouse=True)
     def _reset_after(self):
         yield
-        swe.swe_close()
+        swe.close()
 
     @pytest.mark.parametrize(
         "jd_offset",
@@ -198,13 +198,13 @@ class TestLEBMultipleDates:
     def test_sun_across_dates(self, jd_offset):
         """Sun position should match between backends at various dates."""
         jd = JD_J2000 + jd_offset
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
-        leb_result, _ = swe.calc_ut(jd, SE_SUN, flags)
+        leb_result, _ = swe.calc_ut(jd, SUN, flags)
 
         reset_to_mode("skyfield")
-        sky_result, _ = swe.calc_ut(jd, SE_SUN, flags)
+        sky_result, _ = swe.calc_ut(jd, SUN, flags)
 
         diff = abs(leb_result[0] - sky_result[0])
         if diff > 180:
@@ -222,13 +222,13 @@ class TestLEBMultipleDates:
     def test_moon_across_dates(self, jd_offset):
         """Moon position should match between backends at various dates."""
         jd = JD_J2000 + jd_offset
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         reset_to_mode("leb")
-        leb_result, _ = swe.calc_ut(jd, SE_MOON, flags)
+        leb_result, _ = swe.calc_ut(jd, MOON, flags)
 
         reset_to_mode("skyfield")
-        sky_result, _ = swe.calc_ut(jd, SE_MOON, flags)
+        sky_result, _ = swe.calc_ut(jd, MOON, flags)
 
         diff = abs(leb_result[0] - sky_result[0])
         if diff > 180:

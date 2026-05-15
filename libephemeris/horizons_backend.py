@@ -10,7 +10,7 @@ This backend is used when:
 - mode="horizons" — always use Horizons
 - mode="auto" — no LEB file AND no DE440 locally available
 
-Bodies not supported by Horizons (fixed stars, planetary moons, SEFLG_TOPOCTR)
+Bodies not supported by Horizons (fixed stars, planetary moons, FLG_TOPOCTR)
 raise KeyError to trigger Skyfield fallback.
 """
 
@@ -355,25 +355,25 @@ def horizons_calc_ut(
         KeyError: Body not supported by Horizons.
     """
     from .constants import (
-        SEFLG_EQUATORIAL,
-        SEFLG_HELCTR,
-        SEFLG_BARYCTR,
-        SEFLG_J2000,
-        SEFLG_NOABERR,
-        SEFLG_NOGDEFL,
-        SEFLG_SIDEREAL,
-        SEFLG_SPEED,
-        SEFLG_TOPOCTR,
-        SEFLG_TRUEPOS,
-        SEFLG_XYZ,
-        SEFLG_RADIANS,
-        SEFLG_ICRS,
-        SEFLG_NONUT,
+        FLG_EQUATORIAL,
+        FLG_HELCTR,
+        FLG_BARYCTR,
+        FLG_J2000,
+        FLG_NOABERR,
+        FLG_NOGDEFL,
+        FLG_SIDEREAL,
+        FLG_SPEED,
+        FLG_TOPOCTR,
+        FLG_TRUEPOS,
+        FLG_XYZ,
+        FLG_RADIANS,
+        FLG_ICRS,
+        FLG_NONUT,
     )
 
     # Unsupported flags → fallback to Skyfield
-    if iflag & SEFLG_TOPOCTR:
-        raise KeyError("SEFLG_TOPOCTR not supported by Horizons backend")
+    if iflag & FLG_TOPOCTR:
+        raise KeyError("FLG_TOPOCTR not supported by Horizons backend")
 
     # Analytical bodies — no HTTP needed
     if body_id in _ANALYTICAL_BODIES:
@@ -381,7 +381,7 @@ def horizons_calc_ut(
 
     # Uranian hypotheticals — analytical, heliocentric only
     if body_id in _URANIAN_BODIES:
-        if not (iflag & SEFLG_HELCTR):
+        if not (iflag & FLG_HELCTR):
             raise KeyError(
                 f"Uranian body {body_id} geocentric not supported via Horizons"
             )
@@ -392,22 +392,22 @@ def horizons_calc_ut(
         raise KeyError(f"Body {body_id} not in Horizons command map")
 
     # Convert UT to TT (approximate, good enough for Horizons queries)
-    from .time_utils import swe_deltat
+    from .time_utils import deltat
 
-    delta_t = swe_deltat(jd_ut)
+    delta_t = deltat(jd_ut)
     jd_tt = jd_ut + delta_t
 
     command = _HORIZONS_COMMAND[body_id]
 
     # Heliocentric or barycentric — simpler pipeline
-    if iflag & SEFLG_HELCTR:
+    if iflag & FLG_HELCTR:
         if body_id == 0:
             # Sun heliocentric = Sun from Sun = (0, 0, 0)
             return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag)
         sv = client.fetch_state_vector(command, jd_tt, center="@10", time_type="TDB")
         return _to_ecliptic_output(sv.pos, sv.vel, jd_tt, iflag)
 
-    if iflag & SEFLG_BARYCTR:
+    if iflag & FLG_BARYCTR:
         sv = client.fetch_state_vector(command, jd_tt, center="@0", time_type="TDB")
         return _to_ecliptic_output(sv.pos, sv.vel, jd_tt, iflag)
 
@@ -436,7 +436,7 @@ def horizons_calc_ut(
     )
 
     # Light-time correction (single iteration, sufficient for arcsecond precision)
-    if not (iflag & SEFLG_TRUEPOS):
+    if not (iflag & FLG_TRUEPOS):
         import math
 
         c_au_day = 173.14463267  # speed of light in AU/day
@@ -456,11 +456,11 @@ def horizons_calc_ut(
         lt = 0.0
 
     # Gravitational deflection
-    if not (iflag & SEFLG_NOGDEFL):
+    if not (iflag & FLG_NOGDEFL):
         geo = _apply_deflection_horizons(geo, earth_sv.pos, jd_tt, lt, batch)
 
     # Aberration
-    if not (iflag & SEFLG_NOABERR) and not (iflag & SEFLG_TRUEPOS):
+    if not (iflag & FLG_NOABERR) and not (iflag & FLG_TRUEPOS):
         from .fast_calc import _apply_aberration
 
         geo = _apply_aberration(geo, earth_sv.vel)
@@ -480,7 +480,7 @@ def horizons_calc_ut(
     )
 
     # Apply same corrections to geo2
-    if not (iflag & SEFLG_TRUEPOS):
+    if not (iflag & FLG_TRUEPOS):
         dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
         lt2 = dist2 / c_au_day
         target_lt2 = client.fetch_state_vector(command, jd_tt2 - lt2, "@0", "TDB")
@@ -490,17 +490,17 @@ def horizons_calc_ut(
             target_lt2.z - earth_sv2.z,
         )
 
-    if not (iflag & SEFLG_NOGDEFL):
+    if not (iflag & FLG_NOGDEFL):
         # Use same deflector positions (good enough for dt=1s)
         geo2 = _apply_deflection_horizons(
             geo2,
             earth_sv2.pos,
             jd_tt2,
-            lt if not (iflag & SEFLG_TRUEPOS) else 0.0,
+            lt if not (iflag & FLG_TRUEPOS) else 0.0,
             batch,
         )
 
-    if not (iflag & SEFLG_NOABERR) and not (iflag & SEFLG_TRUEPOS):
+    if not (iflag & FLG_NOABERR) and not (iflag & FLG_TRUEPOS):
         from .fast_calc import _apply_aberration
 
         geo2 = _apply_aberration(geo2, earth_sv2.vel)
@@ -593,14 +593,14 @@ def _to_ecliptic_output(
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Convert ICRS Cartesian to ecliptic spherical output."""
     from .constants import (
-        SEFLG_EQUATORIAL,
-        SEFLG_J2000,
-        SEFLG_SIDEREAL,
-        SEFLG_SPEED,
-        SEFLG_XYZ,
-        SEFLG_RADIANS,
-        SEFLG_ICRS,
-        SEFLG_NONUT,
+        FLG_EQUATORIAL,
+        FLG_J2000,
+        FLG_SIDEREAL,
+        FLG_SPEED,
+        FLG_XYZ,
+        FLG_RADIANS,
+        FLG_ICRS,
+        FLG_NONUT,
     )
     from .fast_calc import (
         _cartesian_to_spherical,
@@ -616,14 +616,14 @@ def _to_ecliptic_output(
     pos = pos_icrs
     vel = vel_icrs
 
-    if iflag & SEFLG_ICRS:
+    if iflag & FLG_ICRS:
         # Output in ICRS — no rotation
         pass
-    elif iflag & SEFLG_J2000:
+    elif iflag & FLG_J2000:
         # J2000 ecliptic
         pos = _rotate_icrs_to_ecliptic_j2000(pos)
         vel = _rotate_icrs_to_ecliptic_j2000(vel)
-    elif iflag & SEFLG_EQUATORIAL:
+    elif iflag & FLG_EQUATORIAL:
         # True equatorial of date — apply precession-nutation matrix
         pn_mat, dpsi, deps, eps_true = _get_skyfield_frame_data(jd_tt)
         pos = _mat3_vec3(pn_mat, pos)
@@ -643,18 +643,18 @@ def _to_ecliptic_output(
     dlon, dlat, ddist = _cartesian_velocity_to_spherical(pos, vel)
 
     # Sidereal correction
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
 
         ayan = get_ayanamsha_ut(jd_tt)
         lon = (lon - ayan) % 360.0
 
     # XYZ output
-    if iflag & SEFLG_XYZ:
+    if iflag & FLG_XYZ:
         return (pos + vel, iflag)  # type: ignore
 
     # Radians
-    if iflag & SEFLG_RADIANS:
+    if iflag & FLG_RADIANS:
         lon = math.radians(lon)
         lat = math.radians(lat)
         dlon = math.radians(dlon)
@@ -667,10 +667,10 @@ def _calc_analytical(
     jd_ut: float, body_id: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate analytical body (Mean Node, Mean Apogee)."""
-    from .time_utils import swe_deltat
-    from .constants import SEFLG_SPEED, SEFLG_SIDEREAL
+    from .time_utils import deltat
+    from .constants import FLG_SPEED, FLG_SIDEREAL
 
-    jd_tt = jd_ut + swe_deltat(jd_ut)
+    jd_tt = jd_ut + deltat(jd_ut)
 
     if body_id == 10:  # Mean Node
         from .lunar import calc_mean_lunar_node
@@ -704,7 +704,7 @@ def _calc_analytical(
         dlon = 0.0
 
     # Sidereal
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
 
         ayan = get_ayanamsha_ut(jd_tt)
@@ -717,10 +717,10 @@ def _calc_uranian(
     jd_ut: float, body_id: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate Uranian hypothetical body (heliocentric only)."""
-    from .time_utils import swe_deltat
-    from .constants import SEFLG_SIDEREAL
+    from .time_utils import deltat
+    from .constants import FLG_SIDEREAL
 
-    jd_tt = jd_ut + swe_deltat(jd_ut)
+    jd_tt = jd_ut + deltat(jd_ut)
 
     from .hypothetical import calc_uranian_planet, calc_transpluto
 
@@ -729,7 +729,7 @@ def _calc_uranian(
     else:
         lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(body_id, jd_tt)
 
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         from .ayanamsha import get_ayanamsha_ut
 
         ayan = get_ayanamsha_ut(jd_tt)

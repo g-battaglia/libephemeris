@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
 
 DATES = [2451545.0 + i * 365.25 for i in range(20)]
@@ -33,10 +37,10 @@ print("=" * 70)
 # P1: cotrans ecliptic→equatorial→ecliptic round-trip
 print("\n=== P1: cotrans round-trip ===")
 for jd in DATES[:10]:
-    obl = ephem.swe_calc_ut(jd, -1, 0)[0][1]
+    obl = ephem.calc_ut(jd, -1, 0)[0][1]
     for body in BODIES:
         try:
-            pos = ephem.swe_calc_ut(jd, body, 256)[0]
+            pos = ephem.calc_ut(jd, body, 256)[0]
             lon, lat = pos[0], pos[1]
             eq = ephem.cotrans((lon, lat, 1.0), -obl)
             ecl = ephem.cotrans((eq[0], eq[1], 1.0), obl)
@@ -56,14 +60,14 @@ for jd in DATES[:10]:
             errors += 1
 print(f"  After P1: {passed} passed, {failed} failed, {errors} errors")
 
-# P2: SEFLG_EQUATORIAL vs manual cotrans
-print("\n=== P2: SEFLG_EQUATORIAL vs manual cotrans ===")
+# P2: FLG_EQUATORIAL vs manual cotrans
+print("\n=== P2: FLG_EQUATORIAL vs manual cotrans ===")
 for jd in DATES:
-    obl = ephem.swe_calc_ut(jd, -1, 0)[0][1]
+    obl = ephem.calc_ut(jd, -1, 0)[0][1]
     for body in BODIES:
         try:
-            ecl = ephem.swe_calc_ut(jd, body, 256)[0]
-            eq_flag = ephem.swe_calc_ut(jd, body, 256 | 2048)[0]
+            ecl = ephem.calc_ut(jd, body, 256)[0]
+            eq_flag = ephem.calc_ut(jd, body, 256 | 2048)[0]
             eq_manual = ephem.cotrans((ecl[0], ecl[1], 1.0), -obl)
             diff_ra = abs(eq_flag[0] - eq_manual[0])
             if diff_ra > 180:
@@ -139,7 +143,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.calc_ut(jd, body, 256 | 32 | 2048)
-            le = ephem.swe_calc_ut(jd, body, 256 | 32 | 2048)
+            le = ephem.calc_ut(jd, body, 256 | 32 | 2048)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -157,7 +161,7 @@ for jd in DATES:
     for body in BODIES:
         try:
             se = swe.calc_ut(jd, body, 256 | 32)
-            le = ephem.swe_calc_ut(jd, body, 256 | 32)
+            le = ephem.calc_ut(jd, body, 256 | 32)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -175,7 +179,7 @@ for jd in [2415020.0, 2433282.0, 2451545.0, 2460000.0, 2469807.0]:
     for body in [0, 1, 4, 5]:
         try:
             se = swe.calc_ut(jd, body, 256 | 2048)
-            le = ephem.swe_calc_ut(jd, body, 256 | 2048)
+            le = ephem.calc_ut(jd, body, 256 | 2048)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff

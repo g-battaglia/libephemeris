@@ -10,16 +10,16 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
 )
 
 
@@ -34,16 +34,16 @@ class TestPerformanceBenchmark:
     def planets(self):
         """All major planets for benchmarking."""
         return [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
     @pytest.fixture
@@ -97,13 +97,13 @@ class TestPerformanceBenchmark:
         # Warmup
         for jd in benchmark_dates[:10]:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, 0)
+                ephem.calc_ut(jd, planet, 0)
 
         # Actual benchmark
         lib_start = time.perf_counter()
         for jd in benchmark_dates:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, 0)
+                ephem.calc_ut(jd, planet, 0)
         lib_elapsed = time.perf_counter() - lib_start
 
         # Calculate statistics
@@ -140,16 +140,16 @@ class TestPerformanceBenchmark:
         is significantly slower than others.
         """
         planets = [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
-            (SE_PLUTO, "Pluto"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
+            (PLUTO, "Pluto"),
         ]
 
         num_dates = len(benchmark_dates)
@@ -178,7 +178,7 @@ class TestPerformanceBenchmark:
             # Benchmark libephemeris
             lib_start = time.perf_counter()
             for jd in benchmark_dates:
-                ephem.swe_calc_ut(jd, planet_id, 0)
+                ephem.calc_ut(jd, planet_id, 0)
             lib_elapsed = time.perf_counter() - lib_start
 
             slowdown = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -207,36 +207,36 @@ class TestPerformanceBenchmark:
 
     @pytest.mark.slow
     @pytest.mark.xfail(
-        reason="SEFLG_SPEED requires additional computations; per-planet without speed is under 100x",
+        reason="FLG_SPEED requires additional computations; per-planet without speed is under 100x",
         strict=False,
     )
     def test_benchmark_with_speed_flag(
         self, planets, benchmark_dates, progress_reporter
     ):
         """
-        Benchmark calculations with SEFLG_SPEED flag (includes velocities).
+        Benchmark calculations with FLG_SPEED flag (includes velocities).
 
         This tests the more common use case where speed calculations are included.
         """
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.constants import FLG_SPEED
 
         num_calculations = len(planets) * len(benchmark_dates)
         progress = progress_reporter("Benchmark with speed", 2, report_every=50)
 
-        # Benchmark pyswisseph with SEFLG_SPEED
-        progress.update(0, "pyswisseph with SEFLG_SPEED")
+        # Benchmark pyswisseph with FLG_SPEED
+        progress.update(0, "pyswisseph with FLG_SPEED")
         swe_start = time.perf_counter()
         for jd in benchmark_dates:
             for planet in planets:
                 swe.calc_ut(jd, planet, swe.FLG_SPEED)
         swe_elapsed = time.perf_counter() - swe_start
 
-        # Benchmark libephemeris with SEFLG_SPEED
-        progress.update(1, "libephemeris with SEFLG_SPEED")
+        # Benchmark libephemeris with FLG_SPEED
+        progress.update(1, "libephemeris with FLG_SPEED")
         lib_start = time.perf_counter()
         for jd in benchmark_dates:
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, SEFLG_SPEED)
+                ephem.calc_ut(jd, planet, FLG_SPEED)
         lib_elapsed = time.perf_counter() - lib_start
 
         slowdown_factor = lib_elapsed / swe_elapsed if swe_elapsed > 0 else float("inf")
@@ -244,7 +244,7 @@ class TestPerformanceBenchmark:
         progress.done()
 
         print(f"\n{'=' * 60}")
-        print(f"BENCHMARK WITH SEFLG_SPEED: {num_calculations} calculations")
+        print(f"BENCHMARK WITH FLG_SPEED: {num_calculations} calculations")
         print(f"{'=' * 60}")
         print(f"pyswisseph (C):     {swe_elapsed:.4f}s")
         print(f"libephemeris (Py):  {lib_elapsed:.4f}s")
@@ -252,6 +252,6 @@ class TestPerformanceBenchmark:
         print(f"{'=' * 60}")
 
         assert slowdown_factor <= MAX_SLOWDOWN_FACTOR, (
-            f"With SEFLG_SPEED, libephemeris is {slowdown_factor:.2f}x slower than pyswisseph, "
+            f"With FLG_SPEED, libephemeris is {slowdown_factor:.2f}x slower than pyswisseph, "
             f"exceeding the maximum allowed {MAX_SLOWDOWN_FACTOR}x slowdown."
         )

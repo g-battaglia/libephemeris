@@ -12,11 +12,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+MEAN_NODE = 10
+TRUE_NODE = 11
 
 
 def main():
@@ -38,10 +41,10 @@ def main():
     jd = start_jd
     while jd <= end_jd:
         try:
-            se_mean = swe.calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)[0]
-            se_true = swe.calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)[0]
-            le_mean = ephem.swe_calc_ut(jd, SE_MEAN_NODE, SEFLG_SPEED)[0]
-            le_true = ephem.swe_calc_ut(jd, SE_TRUE_NODE, SEFLG_SPEED)[0]
+            se_mean = swe.calc_ut(jd, MEAN_NODE, FLG_SPEED)[0]
+            se_true = swe.calc_ut(jd, TRUE_NODE, FLG_SPEED)[0]
+            le_mean = ephem.calc_ut(jd, MEAN_NODE, FLG_SPEED)[0]
+            le_true = ephem.calc_ut(jd, TRUE_NODE, FLG_SPEED)[0]
         except Exception:
             jd += step
             continue

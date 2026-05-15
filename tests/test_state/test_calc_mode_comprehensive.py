@@ -14,10 +14,10 @@ import pytest
 import libephemeris as swe
 from libephemeris.state import set_calc_mode, get_calc_mode
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SPEED,
 )
 
 
@@ -71,8 +71,8 @@ class TestSkyfieldBackend:
     def test_skyfield_sun_position(self):
         """Sun position computable in skyfield mode."""
         set_calc_mode("skyfield")
-        swe.swe_close()
-        result, flags = swe.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        swe.close()
+        result, flags = swe.calc_ut(2451545.0, SUN, FLG_SPEED)
         lon = result[0]
         assert 0 <= lon < 360, f"Sun lon={lon}"
         assert math.isfinite(result[1])
@@ -82,8 +82,8 @@ class TestSkyfieldBackend:
     def test_skyfield_moon_position(self):
         """Moon position computable in skyfield mode."""
         set_calc_mode("skyfield")
-        swe.swe_close()
-        result, flags = swe.swe_calc_ut(2451545.0, SE_MOON, SEFLG_SPEED)
+        swe.close()
+        result, flags = swe.calc_ut(2451545.0, MOON, FLG_SPEED)
         lon = result[0]
         assert 0 <= lon < 360, f"Moon lon={lon}"
         # Moon distance should be ~0.0025 AU
@@ -100,16 +100,16 @@ class TestBackendConsistency:
 
         # LEB mode
         set_calc_mode("leb")
-        swe.swe_close()
+        swe.close()
         try:
-            leb_result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            leb_result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
         except Exception:
             pytest.skip("LEB mode not available")
 
         # Skyfield mode
         set_calc_mode("skyfield")
-        swe.swe_close()
-        sky_result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        swe.close()
+        sky_result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
 
         lon_diff = abs(leb_result[0] - sky_result[0])
         if lon_diff > 180:
@@ -124,15 +124,15 @@ class TestBackendConsistency:
         jd = 2451545.0
 
         set_calc_mode("leb")
-        swe.swe_close()
+        swe.close()
         try:
-            leb_result, _ = swe.swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+            leb_result, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
         except Exception:
             pytest.skip("LEB mode not available")
 
         set_calc_mode("skyfield")
-        swe.swe_close()
-        sky_result, _ = swe.swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+        swe.close()
+        sky_result, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
 
         lon_diff = abs(leb_result[0] - sky_result[0])
         if lon_diff > 180:
@@ -142,20 +142,20 @@ class TestBackendConsistency:
 
 
 class TestCloseAndReset:
-    """Test swe_close behavior."""
+    """Test close behavior."""
 
     @pytest.mark.unit
     def test_close_allows_recalc(self):
-        """swe_close followed by calc_ut should work."""
-        swe.swe_close()
-        result, _ = swe.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        """close followed by calc_ut should work."""
+        swe.close()
+        result, _ = swe.calc_ut(2451545.0, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360
 
     @pytest.mark.unit
     def test_multiple_close_safe(self):
-        """Multiple swe_close calls should not crash."""
-        swe.swe_close()
-        swe.swe_close()
-        swe.swe_close()
-        result, _ = swe.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        """Multiple close calls should not crash."""
+        swe.close()
+        swe.close()
+        swe.close()
+        result, _ = swe.calc_ut(2451545.0, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360

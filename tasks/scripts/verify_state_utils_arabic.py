@@ -6,7 +6,7 @@ Sections 21-25 of the exhaustive verification plan.
 Target: ~3000+ checks in <30 seconds.
 
 Usage:
-    /Users/giacomo/dev/libephemeris/.venv/bin/python tasks/scripts/verify_state_utils_arabic.py
+    .venv/bin/python tasks/scripts/verify_state_utils_arabic.py
 """
 
 from __future__ import annotations
@@ -129,7 +129,7 @@ for lon, lat, alt, label in LOCATIONS:
     try:
         lib.set_topo(lon, lat, alt)
         # Verify by doing a topocentric calculation (no crash = ok)
-        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED | lib.SEFLG_TOPOCTR)
+        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.FLG_SPEED | lib.FLG_TOPOCTR)
         check(
             f"set_topo({label}) + topo calc ok",
             isinstance(pos[0], float) and 0 <= pos[0] < 360,
@@ -149,7 +149,7 @@ for mode in [0, 1, 2, 3]:
             f"ayan={ayan}",
         )
         # Verify sidereal calc works
-        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED | lib.SEFLG_SIDEREAL)
+        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.FLG_SPEED | lib.FLG_SIDEREAL)
         check(
             f"set_sid_mode({mode}) sidereal Sun in [0,360)",
             0 <= pos[0] < 360,
@@ -183,7 +183,7 @@ if swe_ref:
 try:
     lib.close()
     # After close, calc should still work (auto re-init)
-    pos, flag = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED)
+    pos, flag = lib.calc_ut(J2000, lib.SUN, lib.FLG_SPEED)
     check(
         "close() then re-calc Sun ok",
         isinstance(pos[0], float) and 0 <= pos[0] < 360,
@@ -227,8 +227,8 @@ else:
     # --- 22.1  Create context, calc_ut returns same as global ---
     try:
         ctx = EphemerisContext()
-        pos_ctx, flag_ctx = ctx.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED)
-        pos_lib, flag_lib = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED)
+        pos_ctx, flag_ctx = ctx.calc_ut(J2000, lib.SUN, lib.FLG_SPEED)
+        pos_lib, flag_lib = lib.calc_ut(J2000, lib.SUN, lib.FLG_SPEED)
         diff = abs(pos_ctx[0] - pos_lib[0])
         check(
             "ctx.calc_ut(Sun) matches lib.calc_ut(Sun)",
@@ -242,8 +242,8 @@ else:
     for ipl in [lib.SUN, lib.MOON, lib.MARS, lib.JUPITER, lib.SATURN]:
         try:
             ctx = EphemerisContext()
-            pos_ctx, _ = ctx.calc_ut(J2000, ipl, lib.SEFLG_SPEED)
-            pos_lib, _ = lib.calc_ut(J2000, ipl, lib.SEFLG_SPEED)
+            pos_ctx, _ = ctx.calc_ut(J2000, ipl, lib.FLG_SPEED)
+            pos_lib, _ = lib.calc_ut(J2000, ipl, lib.FLG_SPEED)
             diff = abs(pos_ctx[0] - pos_lib[0])
             name = lib.get_planet_name(ipl)
             check(
@@ -269,8 +269,8 @@ else:
         )
 
         # Topocentric calculations should differ
-        pos1, _ = ctx1.calc_ut(J2000, lib.MOON, lib.SEFLG_SPEED | lib.SEFLG_TOPOCTR)
-        pos2, _ = ctx2.calc_ut(J2000, lib.MOON, lib.SEFLG_SPEED | lib.SEFLG_TOPOCTR)
+        pos1, _ = ctx1.calc_ut(J2000, lib.MOON, lib.FLG_SPEED | lib.FLG_TOPOCTR)
+        pos2, _ = ctx2.calc_ut(J2000, lib.MOON, lib.FLG_SPEED | lib.FLG_TOPOCTR)
         diff = abs(pos1[0] - pos2[0])
         check(
             "ctx topo isolation: different Moon positions",
@@ -296,10 +296,10 @@ else:
         )
 
         pos_l, _ = ctx_lahiri.calc_ut(
-            J2000, lib.SUN, lib.SEFLG_SPEED | lib.SEFLG_SIDEREAL
+            J2000, lib.SUN, lib.FLG_SPEED | lib.FLG_SIDEREAL
         )
         pos_f, _ = ctx_fagan.calc_ut(
-            J2000, lib.SUN, lib.SEFLG_SPEED | lib.SEFLG_SIDEREAL
+            J2000, lib.SUN, lib.FLG_SPEED | lib.FLG_SIDEREAL
         )
         diff = abs(pos_l[0] - pos_f[0])
         check(
@@ -320,7 +320,7 @@ else:
         ctx_ny.set_topo(-73.97, 40.78, 10)
         ctx_ny.set_sid_mode(0)
 
-        flag = lib.SEFLG_SPEED | lib.SEFLG_SIDEREAL | lib.SEFLG_TOPOCTR
+        flag = lib.FLG_SPEED | lib.FLG_SIDEREAL | lib.FLG_TOPOCTR
         pos_rome, _ = ctx_rome.calc_ut(J2000, lib.MOON, flag)
         pos_ny, _ = ctx_ny.calc_ut(J2000, lib.MOON, flag)
         diff = abs(pos_rome[0] - pos_ny[0])
@@ -365,7 +365,7 @@ else:
         ctx = EphemerisContext()
         for jd in TEST_DATES_JD:
             try:
-                pos, flag = ctx.calc_ut(jd, lib.SUN, lib.SEFLG_SPEED)
+                pos, flag = ctx.calc_ut(jd, lib.SUN, lib.FLG_SPEED)
                 check(
                     f"ctx.calc_ut(Sun, jd={jd:.1f}) ok",
                     0 <= pos[0] < 360,
@@ -750,12 +750,12 @@ except Exception as e:
     check("lib.version", False, str(e))
 
 try:
-    v = lib.swe_version()
+    v = lib.version()
     check(
-        "swe_version() is string", isinstance(v, str) and len(v) > 0, f"version={v!r}"
+        "version() is string", isinstance(v, str) and len(v) > 0, f"version={v!r}"
     )
 except Exception as e:
-    check("swe_version()", False, str(e))
+    check("version()", False, str(e))
 
 # --- 24.10  deg_midp ---
 deg_midp_cases = [
@@ -1090,10 +1090,10 @@ EXPECTED_PARTS = ["Pars_Fortunae", "Pars_Spiritus", "Pars_Amoris", "Pars_Fidei"]
 
 def compute_arabic_parts(jd: float, lon: float, lat: float, alt: float):
     """Helper to compute Arabic parts for a given date and location."""
-    sun, _ = lib.calc_ut(jd, lib.SUN, lib.SEFLG_SPEED)
-    moon, _ = lib.calc_ut(jd, lib.MOON, lib.SEFLG_SPEED)
-    mercury, _ = lib.calc_ut(jd, lib.MERCURY, lib.SEFLG_SPEED)
-    venus, _ = lib.calc_ut(jd, lib.VENUS, lib.SEFLG_SPEED)
+    sun, _ = lib.calc_ut(jd, lib.SUN, lib.FLG_SPEED)
+    moon, _ = lib.calc_ut(jd, lib.MOON, lib.FLG_SPEED)
+    mercury, _ = lib.calc_ut(jd, lib.MERCURY, lib.FLG_SPEED)
+    venus, _ = lib.calc_ut(jd, lib.VENUS, lib.FLG_SPEED)
 
     cusps, ascmc = lib.houses(jd, lat, lon, ord("P"))
     asc = ascmc[0]
@@ -1206,7 +1206,7 @@ safe_dates = [
 for label, jd in safe_dates:
     for ipl in [lib.SUN, lib.MOON, lib.MARS, lib.JUPITER, lib.SATURN]:
         try:
-            pos, flag = lib.calc_ut(jd, ipl, lib.SEFLG_SPEED)
+            pos, flag = lib.calc_ut(jd, ipl, lib.FLG_SPEED)
             name = lib.get_planet_name(ipl)
             check(
                 f"edge {label} {name} valid",
@@ -1228,7 +1228,7 @@ extreme_dates = [
 ]
 for label, jd in extreme_dates:
     try:
-        pos, flag = lib.calc_ut(jd, lib.SUN, lib.SEFLG_SPEED)
+        pos, flag = lib.calc_ut(jd, lib.SUN, lib.FLG_SPEED)
         # If it succeeds (e.g., with extended ephemeris), just check validity
         check(f"edge {label} Sun lon valid", 0 <= pos[0] < 360, f"lon={pos[0]}")
     except lib.EphemerisRangeError:
@@ -1338,7 +1338,7 @@ for jd in [J2000, 2460000.5, 2440587.5]:
 
 # --- 23.7  Sun heliocentric returns near-zero ---
 try:
-    pos, flag = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_HELCTR)
+    pos, flag = lib.calc_ut(J2000, lib.SUN, lib.FLG_HELCTR)
     check("Sun heliocentric lon=0", pos[0] == 0.0, f"lon={pos[0]}")
     check(
         "Sun heliocentric all zeros", all(pos[i] == 0.0 for i in range(6)), f"pos={pos}"
@@ -1355,7 +1355,7 @@ try:
         f"jd={jd_cross}",
     )
     # Verify Sun is near 0 at that JD
-    pos, _ = lib.calc_ut(jd_cross, lib.SUN, lib.SEFLG_SPEED)
+    pos, _ = lib.calc_ut(jd_cross, lib.SUN, lib.FLG_SPEED)
     check(
         "solcross_ut(0) Sun near 0 at crossing",
         pos[0] < 0.01 or pos[0] > 359.99,
@@ -1372,7 +1372,7 @@ try:
         f"jd={jd_cross}",
     )
     # Verify Moon is near 0 at that JD
-    pos, _ = lib.calc_ut(jd_cross, lib.MOON, lib.SEFLG_SPEED)
+    pos, _ = lib.calc_ut(jd_cross, lib.MOON, lib.FLG_SPEED)
     check(
         "mooncross_ut(0) Moon near 0 at crossing",
         pos[0] < 0.1 or pos[0] > 359.9,
@@ -1385,7 +1385,7 @@ except Exception as e:
 for deg in [90, 180, 270]:
     try:
         jd_cross = lib.solcross_ut(float(deg), J2000, 0)
-        pos, _ = lib.calc_ut(jd_cross, lib.SUN, lib.SEFLG_SPEED)
+        pos, _ = lib.calc_ut(jd_cross, lib.SUN, lib.FLG_SPEED)
         check(
             f"solcross_ut({deg}) Sun near {deg}",
             abs(pos[0] - deg) < 0.01,
@@ -1397,18 +1397,18 @@ for deg in [90, 180, 270]:
 # --- 23.9  All standard flags produce valid output ---
 flag_combos = [
     0,
-    lib.SEFLG_SPEED,
-    lib.SEFLG_EQUATORIAL,
-    lib.SEFLG_XYZ,
-    lib.SEFLG_RADIANS,
-    lib.SEFLG_HELCTR,
-    lib.SEFLG_TRUEPOS,
-    lib.SEFLG_NOABERR,
-    lib.SEFLG_NOGDEFL,
-    lib.SEFLG_J2000,
-    lib.SEFLG_NONUT,
-    lib.SEFLG_SPEED | lib.SEFLG_EQUATORIAL,
-    lib.SEFLG_SPEED | lib.SEFLG_XYZ,
+    lib.FLG_SPEED,
+    lib.FLG_EQUATORIAL,
+    lib.FLG_XYZ,
+    lib.FLG_RADIANS,
+    lib.FLG_HELCTR,
+    lib.FLG_TRUEPOS,
+    lib.FLG_NOABERR,
+    lib.FLG_NOGDEFL,
+    lib.FLG_J2000,
+    lib.FLG_NONUT,
+    lib.FLG_SPEED | lib.FLG_EQUATORIAL,
+    lib.FLG_SPEED | lib.FLG_XYZ,
 ]
 for iflag in flag_combos:
     try:
@@ -1430,7 +1430,7 @@ for iflag in flag_combos:
 for mode in range(43):
     try:
         lib.set_sid_mode(mode)
-        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.SEFLG_SPEED | lib.SEFLG_SIDEREAL)
+        pos, flag = lib.calc_ut(J2000, lib.SUN, lib.FLG_SPEED | lib.FLG_SIDEREAL)
         check(
             f"sidereal mode {mode} Sun in [0,360)",
             0 <= pos[0] < 360,
@@ -1450,7 +1450,7 @@ except Exception as e:
 # --- 23.12  azalt basic ---
 try:
     result = lib.azalt(
-        J2000, lib.SE_ECL2HOR, (12.5, 41.9, 0), 1013.25, 15.0, (280.0, -0.5, 1.0)
+        J2000, lib.ECL2HOR, (12.5, 41.9, 0), 1013.25, 15.0, (280.0, -0.5, 1.0)
     )
     check("azalt returns tuple", isinstance(result, tuple), f"type={type(result)}")
 except Exception as e:
@@ -1651,47 +1651,47 @@ for name, actual, expected in constant_checks:
 
 # SE_ prefixed constants
 se_constant_checks = [
-    ("SE_SUN", lib.SE_SUN, 0),
-    ("SE_MOON", lib.SE_MOON, 1),
-    ("SE_MERCURY", lib.SE_MERCURY, 2),
-    ("SE_VENUS", lib.SE_VENUS, 3),
-    ("SE_MARS", lib.SE_MARS, 4),
-    ("SE_JUPITER", lib.SE_JUPITER, 5),
-    ("SE_SATURN", lib.SE_SATURN, 6),
-    ("SE_URANUS", lib.SE_URANUS, 7),
-    ("SE_NEPTUNE", lib.SE_NEPTUNE, 8),
-    ("SE_PLUTO", lib.SE_PLUTO, 9),
-    ("SE_MEAN_NODE", lib.SE_MEAN_NODE, 10),
-    ("SE_TRUE_NODE", lib.SE_TRUE_NODE, 11),
-    ("SE_MEAN_APOG", lib.SE_MEAN_APOG, 12),
-    ("SE_OSCU_APOG", lib.SE_OSCU_APOG, 13),
-    ("SE_EARTH", lib.SE_EARTH, 14),
-    ("SE_CHIRON", lib.SE_CHIRON, 15),
-    ("SE_CERES", lib.SE_CERES, 17),
-    ("SE_PALLAS", lib.SE_PALLAS, 18),
-    ("SE_JUNO", lib.SE_JUNO, 19),
-    ("SE_VESTA", lib.SE_VESTA, 20),
-    ("SE_INTP_APOG", lib.SE_INTP_APOG, 21),
-    ("SE_INTP_PERG", lib.SE_INTP_PERG, 22),
-    ("SE_CUPIDO", lib.SE_CUPIDO, 40),
+    ("SUN", lib.SUN, 0),
+    ("MOON", lib.MOON, 1),
+    ("MERCURY", lib.MERCURY, 2),
+    ("VENUS", lib.VENUS, 3),
+    ("MARS", lib.MARS, 4),
+    ("JUPITER", lib.JUPITER, 5),
+    ("SATURN", lib.SATURN, 6),
+    ("URANUS", lib.URANUS, 7),
+    ("NEPTUNE", lib.NEPTUNE, 8),
+    ("PLUTO", lib.PLUTO, 9),
+    ("MEAN_NODE", lib.MEAN_NODE, 10),
+    ("TRUE_NODE", lib.TRUE_NODE, 11),
+    ("MEAN_APOG", lib.MEAN_APOG, 12),
+    ("OSCU_APOG", lib.OSCU_APOG, 13),
+    ("EARTH", lib.EARTH, 14),
+    ("CHIRON", lib.CHIRON, 15),
+    ("CERES", lib.CERES, 17),
+    ("PALLAS", lib.PALLAS, 18),
+    ("JUNO", lib.JUNO, 19),
+    ("VESTA", lib.VESTA, 20),
+    ("INTP_APOG", lib.INTP_APOG, 21),
+    ("INTP_PERG", lib.INTP_PERG, 22),
+    ("CUPIDO", lib.CUPIDO, 40),
 ]
 for name, actual, expected in se_constant_checks:
     check(f"constant {name} == {expected}", actual == expected, f"actual={actual}")
 
 # Flag constants
 flag_checks = [
-    ("SEFLG_SPEED", lib.SEFLG_SPEED, 256),
-    ("SEFLG_HELCTR", lib.SEFLG_HELCTR, 8),
-    ("SEFLG_TRUEPOS", lib.SEFLG_TRUEPOS, 16),
-    ("SEFLG_XYZ", lib.SEFLG_XYZ, 4096),
-    ("SEFLG_RADIANS", lib.SEFLG_RADIANS, 8192),
-    ("SEFLG_EQUATORIAL", lib.SEFLG_EQUATORIAL, 2048),
-    ("SEFLG_SIDEREAL", lib.SEFLG_SIDEREAL, 64 * 1024),
-    ("SEFLG_TOPOCTR", lib.SEFLG_TOPOCTR, 32 * 1024),
-    ("SEFLG_J2000", lib.SEFLG_J2000, 32),
-    ("SEFLG_NONUT", lib.SEFLG_NONUT, 64),
-    ("SEFLG_NOABERR", lib.SEFLG_NOABERR, 1024),
-    ("SEFLG_NOGDEFL", lib.SEFLG_NOGDEFL, 512),
+    ("FLG_SPEED", lib.FLG_SPEED, 256),
+    ("FLG_HELCTR", lib.FLG_HELCTR, 8),
+    ("FLG_TRUEPOS", lib.FLG_TRUEPOS, 16),
+    ("FLG_XYZ", lib.FLG_XYZ, 4096),
+    ("FLG_RADIANS", lib.FLG_RADIANS, 8192),
+    ("FLG_EQUATORIAL", lib.FLG_EQUATORIAL, 2048),
+    ("FLG_SIDEREAL", lib.FLG_SIDEREAL, 64 * 1024),
+    ("FLG_TOPOCTR", lib.FLG_TOPOCTR, 32 * 1024),
+    ("FLG_J2000", lib.FLG_J2000, 32),
+    ("FLG_NONUT", lib.FLG_NONUT, 64),
+    ("FLG_NOABERR", lib.FLG_NOABERR, 1024),
+    ("FLG_NOGDEFL", lib.FLG_NOGDEFL, 512),
 ]
 for name, actual, expected in flag_checks:
     check(
@@ -1732,7 +1732,7 @@ if swe_ref:
             lib.SATURN,
         ]:
             try:
-                lpos, lflag = lib.calc_ut(jd, ipl, lib.SEFLG_SPEED)
+                lpos, lflag = lib.calc_ut(jd, ipl, lib.FLG_SPEED)
                 spos, sflag = swe_ref.calc_ut(jd, ipl, swe_ref.FLG_SPEED)
                 name = lib.get_planet_name(ipl)
                 for i, comp in enumerate(

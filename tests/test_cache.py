@@ -234,19 +234,19 @@ class TestCachePerformance:
 
         clear_caches()
 
-        jd = ephem.swe_julday(2024, 1, 1, 12.0)
+        jd = ephem.julday(2024, 1, 1, 12.0)
         lat, lon = 41.9, 12.5  # Rome
 
         # First call - cache cold
         start = time.perf_counter()
-        ephem.swe_houses(jd, lat, lon, ord("P"))
+        ephem.houses(jd, lat, lon, ord("P"))
         time1 = time.perf_counter() - start
 
         # Subsequent calls - cache warm
         times = []
         for _ in range(10):
             start = time.perf_counter()
-            ephem.swe_houses(jd, lat, lon, ord("P"))
+            ephem.houses(jd, lat, lon, ord("P"))
             times.append(time.perf_counter() - start)
 
         avg_warm = sum(times) / len(times)

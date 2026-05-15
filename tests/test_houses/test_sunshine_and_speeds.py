@@ -11,10 +11,10 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
 )
 from libephemeris.exceptions import PolarCircleError
 
@@ -22,7 +22,7 @@ from libephemeris.exceptions import PolarCircleError
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -80,9 +80,9 @@ class TestSunshineHouseSystem:
 
     @pytest.mark.unit
     def test_sunshine_house_name(self):
-        """swe_house_name recognizes Sunshine."""
-        name_I = swe.swe_house_name(ord("I"))
-        name_i = swe.swe_house_name(ord("i"))
+        """house_name recognizes Sunshine."""
+        name_I = swe.house_name(ord("I"))
+        name_i = swe.house_name(ord("i"))
         assert name_I != "Unknown"
         assert name_i != "Unknown"
 
@@ -94,8 +94,8 @@ class TestSunshineHouseSidereal:
     @pytest.mark.parametrize("hsys", [ord("I"), ord("i")])
     def test_sunshine_sidereal_cusps_in_range(self, hsys):
         """Sidereal Sunshine cusps are in [0, 360)."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, hsys, SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, ascmc = swe.houses_ex(JD_J2000, 48.85, 2.35, hsys, FLG_SIDEREAL)
         assert len(cusps) == 12
         for i, c in enumerate(cusps):
             assert 0.0 <= c < 360.0, f"Cusp {i + 1} = {c} out of range"
@@ -103,11 +103,11 @@ class TestSunshineHouseSidereal:
     @pytest.mark.unit
     def test_sunshine_sidereal_differs_from_tropical(self):
         """Sidereal Sunshine cusps differ from tropical by ~ayanamsa."""
-        swe.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         ayan = swe.get_ayanamsa_ut(JD_J2000)
 
         cusps_t, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("I"), 0)
-        cusps_s, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("I"), SEFLG_SIDEREAL)
+        cusps_s, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("I"), FLG_SIDEREAL)
 
         # For Sunshine, the ayanamsa correction is applied but the intermediate
         # cusps are recalculated, so the diff may not be exactly ayanamsa for all.
@@ -124,15 +124,15 @@ class TestSunshineHouseSidereal:
     @pytest.mark.parametrize(
         "sid_mode",
         [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
         ],
     )
     def test_sunshine_sidereal_different_modes(self, sid_mode):
         """Sunshine works with different sidereal modes."""
         swe.set_sid_mode(sid_mode)
-        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("I"), SEFLG_SIDEREAL)
+        cusps, _ = swe.houses_ex(JD_J2000, 48.85, 2.35, ord("I"), FLG_SIDEREAL)
         assert len(cusps) == 12
         for c in cusps:
             assert 0.0 <= c < 360.0

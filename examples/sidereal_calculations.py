@@ -20,35 +20,35 @@ from __future__ import annotations
 import libephemeris as eph
 from libephemeris.constants import (
     # Planet IDs
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
     # Calculation flags
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SIDEREAL,
     # Sidereal modes (ayanamshas)
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_RAMAN,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_GALCENT_0SAG,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_0SAG,
 )
 
 
@@ -105,31 +105,31 @@ def example_ayanamsha_overview() -> None:
     print("and sidereal zodiacs, caused by the precession of equinoxes.")
     print("\nPopular ayanamsha systems:\n")
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
     # List of common ayanamshas with descriptions
     ayanamshas = [
-        (SE_SIDM_LAHIRI, "Lahiri", "Official Indian government standard"),
-        (SE_SIDM_RAMAN, "Raman", "B.V. Raman's ayanamsha"),
-        (SE_SIDM_KRISHNAMURTI, "Krishnamurti", "KP astrology system"),
-        (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley", "Western sidereal standard"),
-        (SE_SIDM_TRUE_CITRA, "True Citra", "Spica at 0° Libra"),
-        (SE_SIDM_YUKTESHWAR, "Yukteshwar", "Sri Yukteshwar's calculation"),
-        (SE_SIDM_JN_BHASIN, "JN Bhasin", "J.N. Bhasin's ayanamsha"),
-        (SE_SIDM_USHASHASHI, "Ushashashi", "Based on Surya Siddhanta"),
-        (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul", "Theosophical tradition"),
-        (SE_SIDM_TRUE_REVATI, "True Revati", "Zeta Piscium at 29°50' Pisces"),
-        (SE_SIDM_TRUE_PUSHYA, "True Pushya", "Delta Cancri at 16° Cancer"),
-        (SE_SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)", "Ancient Babylonian"),
-        (SE_SIDM_GALCENT_0SAG, "Galactic Center", "Galactic center at 0° Sagittarius"),
+        (SIDM_LAHIRI, "Lahiri", "Official Indian government standard"),
+        (SIDM_RAMAN, "Raman", "B.V. Raman's ayanamsha"),
+        (SIDM_KRISHNAMURTI, "Krishnamurti", "KP astrology system"),
+        (SIDM_FAGAN_BRADLEY, "Fagan-Bradley", "Western sidereal standard"),
+        (SIDM_TRUE_CITRA, "True Citra", "Spica at 0° Libra"),
+        (SIDM_YUKTESHWAR, "Yukteshwar", "Sri Yukteshwar's calculation"),
+        (SIDM_JN_BHASIN, "JN Bhasin", "J.N. Bhasin's ayanamsha"),
+        (SIDM_USHASHASHI, "Ushashashi", "Based on Surya Siddhanta"),
+        (SIDM_DJWHAL_KHUL, "Djwhal Khul", "Theosophical tradition"),
+        (SIDM_TRUE_REVATI, "True Revati", "Zeta Piscium at 29°50' Pisces"),
+        (SIDM_TRUE_PUSHYA, "True Pushya", "Delta Cancri at 16° Cancer"),
+        (SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)", "Ancient Babylonian"),
+        (SIDM_GALCENT_0SAG, "Galactic Center", "Galactic center at 0° Sagittarius"),
     ]
 
     print(f"{'Ayanamsha':<25} {'Value':>12}  Description")
     print("-" * 65)
 
     for mode, name, desc in ayanamshas:
-        eph.swe_set_sid_mode(mode)
-        aya = eph.swe_get_ayanamsa_ut(jd)
+        eph.set_sid_mode(mode)
+        aya = eph.get_ayanamsa_ut(jd)
         print(f"{name:<25} {aya:>11.6f}°  {desc}")
 
 
@@ -139,22 +139,22 @@ def example_tropical_vs_sidereal() -> None:
     print("Example 2: Tropical vs Sidereal Positions")
     print("=" * 60)
 
-    jd = eph.swe_julday(2024, 3, 21, 12.0)  # Spring equinox 2024
+    jd = eph.julday(2024, 3, 21, 12.0)  # Spring equinox 2024
 
     print(f"\nComparison at JD {jd} (Spring Equinox 2024):\n")
 
     # Set Lahiri ayanamsha
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    ayanamsha = eph.swe_get_ayanamsa_ut(jd)
+    eph.set_sid_mode(SIDM_LAHIRI)
+    ayanamsha = eph.get_ayanamsa_ut(jd)
     print(f"Lahiri Ayanamsha: {ayanamsha:.6f}°\n")
 
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_TRUE_NODE, "Rahu"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (TRUE_NODE, "Rahu"),
     ]
 
     print(f"{'Planet':<12} {'Tropical':>22} {'Sidereal (Lahiri)':>22}")
@@ -162,11 +162,11 @@ def example_tropical_vs_sidereal() -> None:
 
     for planet_id, name in planets:
         # Tropical position
-        pos_trop, _ = eph.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos_trop, _ = eph.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
         # Sidereal position
-        pos_sid, _ = eph.swe_calc_ut(
-            jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+        pos_sid, _ = eph.calc_ut(
+            jd, planet_id, FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
         )
 
         trop_str = format_zodiac(pos_trop[0])
@@ -188,7 +188,7 @@ def example_vedic_chart() -> None:
     latitude = 19.0760  # Mumbai latitude
     longitude = 72.8777  # Mumbai longitude
 
-    jd = eph.swe_julday(year, month, day, hour)
+    jd = eph.julday(year, month, day, hour)
 
     print(
         f"\nBirth data: {year}-{month:02d}-{day:02d} at {int(hour):02d}:{int((hour % 1) * 60):02d}"
@@ -196,8 +196,8 @@ def example_vedic_chart() -> None:
     print(f"Location: Mumbai ({latitude}°N, {longitude}°E)")
 
     # Set Lahiri ayanamsha (most common in India)
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    ayanamsha = eph.swe_get_ayanamsa_ut(jd)
+    eph.set_sid_mode(SIDM_LAHIRI)
+    ayanamsha = eph.get_ayanamsa_ut(jd)
     print(f"Ayanamsha (Lahiri): {ayanamsha:.6f}°\n")
 
     # Calculate sidereal planets
@@ -205,26 +205,26 @@ def example_vedic_chart() -> None:
     print("-" * 40)
 
     planets = [
-        (SE_SUN, "Surya (Sun)"),
-        (SE_MOON, "Chandra (Moon)"),
-        (SE_MERCURY, "Budha (Mercury)"),
-        (SE_VENUS, "Shukra (Venus)"),
-        (SE_MARS, "Mangal (Mars)"),
-        (SE_JUPITER, "Guru (Jupiter)"),
-        (SE_SATURN, "Shani (Saturn)"),
-        (SE_TRUE_NODE, "Rahu"),
+        (SUN, "Surya (Sun)"),
+        (MOON, "Chandra (Moon)"),
+        (MERCURY, "Budha (Mercury)"),
+        (VENUS, "Shukra (Venus)"),
+        (MARS, "Mangal (Mars)"),
+        (JUPITER, "Guru (Jupiter)"),
+        (SATURN, "Shani (Saturn)"),
+        (TRUE_NODE, "Rahu"),
     ]
 
-    flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL
+    flags = FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL
 
     for planet_id, name in planets:
-        pos, _ = eph.swe_calc_ut(jd, planet_id, flags)
+        pos, _ = eph.calc_ut(jd, planet_id, flags)
         formatted = format_zodiac(pos[0], use_vedic_names=True)
         retro = " (Vakri)" if pos[3] < 0 else ""
         print(f"  {name:20} {formatted}{retro}")
 
     # Calculate Ketu (opposite of Rahu)
-    rahu_pos, _ = eph.swe_calc_ut(jd, SE_TRUE_NODE, flags)
+    rahu_pos, _ = eph.calc_ut(jd, TRUE_NODE, flags)
     ketu_lon = (rahu_pos[0] + 180) % 360
     print(f"  {'Ketu':20} {format_zodiac(ketu_lon, use_vedic_names=True)}")
 
@@ -233,7 +233,7 @@ def example_vedic_chart() -> None:
     print("-" * 40)
 
     # Get ascendant in sidereal
-    cusps, ascmc = eph.swe_houses_ex(jd, latitude, longitude, ord("W"), SEFLG_SIDEREAL)
+    cusps, ascmc = eph.houses_ex(jd, latitude, longitude, ord("W"), FLG_SIDEREAL)
 
     for i in range(12):
         print(f"  Bhava {i + 1:2}: {format_zodiac(cusps[i], use_vedic_names=True)}")
@@ -250,28 +250,28 @@ def example_ayanamsha_change_over_time() -> None:
     print("\nThe ayanamsha increases by approximately 50.3 arcseconds per year")
     print("due to the precession of the Earth's axis.\n")
 
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+    eph.set_sid_mode(SIDM_LAHIRI)
 
     years = [1900, 1950, 2000, 2024, 2050, 2100]
 
     print(f"{'Year':>6}  {'Ayanamsha':>12}  {'Change from 2000':>18}")
     print("-" * 40)
 
-    jd_2000 = eph.swe_julday(2000, 1, 1, 0.0)
-    aya_2000 = eph.swe_get_ayanamsa_ut(jd_2000)
+    jd_2000 = eph.julday(2000, 1, 1, 0.0)
+    aya_2000 = eph.get_ayanamsa_ut(jd_2000)
 
     for year in years:
-        jd = eph.swe_julday(year, 1, 1, 0.0)
-        aya = eph.swe_get_ayanamsa_ut(jd)
+        jd = eph.julday(year, 1, 1, 0.0)
+        aya = eph.get_ayanamsa_ut(jd)
         change = aya - aya_2000
         sign = "+" if change >= 0 else ""
         print(f"{year:>6}  {aya:>11.6f}°  {sign}{change:>17.6f}°")
 
     # Rate of precession
-    jd1 = eph.swe_julday(2024, 1, 1, 0.0)
-    jd2 = eph.swe_julday(2025, 1, 1, 0.0)
-    aya1 = eph.swe_get_ayanamsa_ut(jd1)
-    aya2 = eph.swe_get_ayanamsa_ut(jd2)
+    jd1 = eph.julday(2024, 1, 1, 0.0)
+    jd2 = eph.julday(2025, 1, 1, 0.0)
+    aya1 = eph.get_ayanamsa_ut(jd1)
+    aya2 = eph.get_ayanamsa_ut(jd2)
     annual_precession = aya2 - aya1
 
     print(f"\nAnnual precession rate: {annual_precession * 3600:.2f} arcseconds")
@@ -284,9 +284,9 @@ def example_custom_ayanamsha() -> None:
     print("Example 5: Custom Ayanamsha")
     print("=" * 60)
 
-    from libephemeris.constants import SE_SIDM_USER
+    from libephemeris.constants import SIDM_USER
 
-    jd = eph.swe_julday(2024, 1, 1, 0.0)
+    jd = eph.julday(2024, 1, 1, 0.0)
 
     print("\nYou can define a custom ayanamsha by specifying:")
     print("- Reference epoch (Julian Day)")
@@ -297,16 +297,16 @@ def example_custom_ayanamsha() -> None:
     j2000 = 2451545.0  # J2000.0 epoch
     custom_aya = 23.5  # Custom value at J2000
 
-    # SE_SIDM_USER (255) enables user-defined ayanamsha
-    eph.swe_set_sid_mode(SE_SIDM_USER, j2000, custom_aya)
+    # SIDM_USER (255) enables user-defined ayanamsha
+    eph.set_sid_mode(SIDM_USER, j2000, custom_aya)
 
-    aya = eph.swe_get_ayanamsa_ut(jd)
+    aya = eph.get_ayanamsa_ut(jd)
     print("Custom ayanamsha (23.5° at J2000):")
     print(f"  Value at 2024-01-01: {aya:.6f}°")
 
     # Compare with standard Lahiri
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
-    lahiri = eph.swe_get_ayanamsa_ut(jd)
+    eph.set_sid_mode(SIDM_LAHIRI)
+    lahiri = eph.get_ayanamsa_ut(jd)
     print("\nLahiri for comparison:")
     print(f"  Value at 2024-01-01: {lahiri:.6f}°")
 
@@ -348,30 +348,30 @@ def example_nakshatra_calculation() -> None:
         "Revati",
     ]
 
-    jd = eph.swe_julday(2024, 1, 1, 12.0)
+    jd = eph.julday(2024, 1, 1, 12.0)
 
     # Set Lahiri ayanamsha
-    eph.swe_set_sid_mode(SE_SIDM_LAHIRI)
+    eph.set_sid_mode(SIDM_LAHIRI)
 
     print(f"\nNakshatra positions at JD {jd}:\n")
 
-    flags = SEFLG_SWIEPH | SEFLG_SIDEREAL
+    flags = FLG_SWIEPH | FLG_SIDEREAL
 
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MARS, "Mars"),
-        (SE_MERCURY, "Mercury"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_VENUS, "Venus"),
-        (SE_SATURN, "Saturn"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MARS, "Mars"),
+        (MERCURY, "Mercury"),
+        (JUPITER, "Jupiter"),
+        (VENUS, "Venus"),
+        (SATURN, "Saturn"),
     ]
 
     print(f"{'Planet':<10} {'Nakshatra':<20} {'Pada':>6} {'Position':>12}")
     print("-" * 52)
 
     for planet_id, name in planets:
-        pos, _ = eph.swe_calc_ut(jd, planet_id, flags)
+        pos, _ = eph.calc_ut(jd, planet_id, flags)
         longitude = pos[0]
 
         # Calculate nakshatra (each is 13°20' = 13.3333°)

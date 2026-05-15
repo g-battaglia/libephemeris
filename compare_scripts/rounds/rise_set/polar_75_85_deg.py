@@ -17,7 +17,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -27,10 +30,10 @@ failures = []
 
 # Bodies to test
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Moon", ephem.SE_MOON, swe.MOON),
-    ("Mars", ephem.SE_MARS, swe.MARS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Moon", ephem.MOON, swe.MOON),
+    ("Mars", ephem.MARS, swe.MARS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
 ]
 
 # Extreme latitudes
@@ -47,10 +50,10 @@ TEST_DATES = [
 ]
 
 # Rise/set event types
-SE_CALC_RISE = 1
-SE_CALC_SET = 2
-SE_CALC_MTRANSIT = 4
-SE_CALC_ITRANSIT = 8
+CALC_RISE = 1
+CALC_SET = 2
+CALC_MTRANSIT = 4
+CALC_ITRANSIT = 8
 
 
 def test_rise_set_polar():
@@ -71,10 +74,10 @@ def test_rise_set_polar():
                 temp = 10.0
 
                 for rsmi, event_name in [
-                    (SE_CALC_RISE, "rise"),
-                    (SE_CALC_SET, "set"),
-                    (SE_CALC_MTRANSIT, "transit"),
-                    (SE_CALC_ITRANSIT, "itransit"),
+                    (CALC_RISE, "rise"),
+                    (CALC_SET, "set"),
+                    (CALC_MTRANSIT, "transit"),
+                    (CALC_ITRANSIT, "itransit"),
                 ]:
                     label = f"{body_name} {event_name} lat={lat}"
 
@@ -91,7 +94,7 @@ def test_rise_set_polar():
 
                     # libephemeris
                     try:
-                        le_result = ephem.swe_rise_trans(
+                        le_result = ephem.rise_trans(
                             jd, le_body, rsmi, [lon, lat, alt], pressure, temp
                         )
                         le_jd = le_result[1][0]

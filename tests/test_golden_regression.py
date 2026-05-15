@@ -162,7 +162,7 @@ class TestGoldenSidereal:
             expected = entry["result"]
 
             swe.set_sid_mode(mode)
-            pos, _ = swe.calc_ut(jd, body, swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED)
+            pos, _ = swe.calc_ut(jd, body, swe.FLG_SIDEREAL | swe.FLG_SPEED)
 
             for i in range(6):
                 diff = abs(pos[i] - expected[i])
@@ -173,7 +173,7 @@ class TestGoldenSidereal:
                     )
 
         # Reset
-        swe.set_sid_mode(swe.SE_SIDM_LAHIRI)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
 
         assert not mismatches, (
             f"{len(mismatches)} sidereal regression(s):\n" + "\n".join(mismatches[:20])
@@ -238,7 +238,7 @@ class TestGoldenEclipses:
             expected_times = entry["times"]
 
             ecl_type, times = swe.sol_eclipse_when_glob(
-                search_jd, ecltype=swe.SE_ECL_TOTAL
+                search_jd, ecltype=swe.ECL_TOTAL
             )
 
             assert ecl_type == expected_type, (
@@ -259,7 +259,7 @@ class TestGoldenEclipses:
             expected_type = entry["ecl_type"]
             expected_times = entry["times"]
 
-            ecl_type, times = swe.lun_eclipse_when(search_jd, ecltype=swe.SE_ECL_TOTAL)
+            ecl_type, times = swe.lun_eclipse_when(search_jd, ecltype=swe.ECL_TOTAL)
 
             assert ecl_type == expected_type, (
                 f"Eclipse type changed: got {ecl_type}, expected {expected_type}"

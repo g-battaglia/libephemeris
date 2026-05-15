@@ -107,10 +107,10 @@ SOLAR_ECLIPSES_HISTORICAL = [
 
 # Expected type mapping
 TYPE_MAP = {
-    "T": swe.SE_ECL_TOTAL,
-    "A": swe.SE_ECL_ANNULAR,
-    "H": swe.SE_ECL_ANNULAR_TOTAL,
-    "P": swe.SE_ECL_PARTIAL,
+    "T": swe.ECL_TOTAL,
+    "A": swe.ECL_ANNULAR,
+    "H": swe.ECL_ANNULAR_TOTAL,
+    "P": swe.ECL_PARTIAL,
 }
 
 
@@ -168,7 +168,7 @@ class TestSolarEclipseCatalog:
         """Eclipse contact times should be in chronological order."""
         # 2024-04-08 total solar eclipse
         jd = swe.julday(2024, 4, 1, 0.0)
-        ecl_type, times = swe.sol_eclipse_when_glob(jd, ecltype=swe.SE_ECL_TOTAL)
+        ecl_type, times = swe.sol_eclipse_when_glob(jd, ecltype=swe.ECL_TOTAL)
 
         jd_c1 = times[2]  # First contact
         jd_c2 = times[4]  # Second contact (totality begins)
@@ -243,9 +243,9 @@ LUNAR_ECLIPSES_HISTORICAL = [
 ]
 
 LUNAR_TYPE_MAP = {
-    "T": swe.SE_ECL_TOTAL,
-    "P": swe.SE_ECL_PARTIAL,
-    "Pen": swe.SE_ECL_PENUMBRAL,
+    "T": swe.ECL_TOTAL,
+    "P": swe.ECL_PARTIAL,
+    "Pen": swe.ECL_PENUMBRAL,
 }
 
 
@@ -301,7 +301,7 @@ class TestLunarEclipseCatalog:
         """Lunar eclipse contact times in chronological order."""
         # 2022-05-16 total lunar eclipse
         jd = swe.julday(2022, 5, 10, 0.0)
-        ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.SE_ECL_TOTAL)
+        ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.ECL_TOTAL)
 
         jd_max = times[0]
         jd_p1 = times[6]  # Penumbral begin
@@ -331,7 +331,7 @@ class TestLunarEclipseCatalog:
         """Verify gamma sign for a known lunar eclipse."""
         # 2022-11-08 total lunar eclipse
         jd = swe.julday(2022, 11, 1, 0.0)
-        ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.SE_ECL_TOTAL)
+        ecl_type, times = swe.lun_eclipse_when(jd, ecltype=swe.ECL_TOTAL)
 
         gamma = swe.lun_eclipse_gamma(times[0])
         # Gamma should be a finite number for a valid eclipse

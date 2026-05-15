@@ -34,40 +34,40 @@ jd_wide = st.floats(min_value=2378497.0, max_value=2524594.0)
 # Standard body IDs (planets + lunar points)
 standard_bodies = st.sampled_from(
     [
-        swe.SE_SUN,
-        swe.SE_MOON,
-        swe.SE_MERCURY,
-        swe.SE_VENUS,
-        swe.SE_MARS,
-        swe.SE_JUPITER,
-        swe.SE_SATURN,
-        swe.SE_URANUS,
-        swe.SE_NEPTUNE,
-        swe.SE_PLUTO,
+        swe.SUN,
+        swe.MOON,
+        swe.MERCURY,
+        swe.VENUS,
+        swe.MARS,
+        swe.JUPITER,
+        swe.SATURN,
+        swe.URANUS,
+        swe.NEPTUNE,
+        swe.PLUTO,
     ]
 )
 
 # All bodies including lunar points and asteroids
 all_bodies = st.sampled_from(
     [
-        swe.SE_SUN,
-        swe.SE_MOON,
-        swe.SE_MERCURY,
-        swe.SE_VENUS,
-        swe.SE_MARS,
-        swe.SE_JUPITER,
-        swe.SE_SATURN,
-        swe.SE_URANUS,
-        swe.SE_NEPTUNE,
-        swe.SE_PLUTO,
-        swe.SE_MEAN_NODE,
-        swe.SE_TRUE_NODE,
-        swe.SE_MEAN_APOG,
-        swe.SE_CHIRON,
-        swe.SE_CERES,
-        swe.SE_PALLAS,
-        swe.SE_JUNO,
-        swe.SE_VESTA,
+        swe.SUN,
+        swe.MOON,
+        swe.MERCURY,
+        swe.VENUS,
+        swe.MARS,
+        swe.JUPITER,
+        swe.SATURN,
+        swe.URANUS,
+        swe.NEPTUNE,
+        swe.PLUTO,
+        swe.MEAN_NODE,
+        swe.TRUE_NODE,
+        swe.MEAN_APOG,
+        swe.CHIRON,
+        swe.CERES,
+        swe.PALLAS,
+        swe.JUNO,
+        swe.VESTA,
     ]
 )
 
@@ -109,7 +109,7 @@ class TestCoordinateRoundTrips:
         lon_ecl, lat_ecl, dist_ecl = float(ecl[0]), float(ecl[1]), float(ecl[2])
 
         # Get true obliquity from nutation/obliquity
-        nut, _ = swe.calc_ut(jd, swe.SE_ECL_NUT)
+        nut, _ = swe.calc_ut(jd, swe.ECL_NUT)
         eps = float(nut[1])  # true obliquity in degrees
 
         # cotrans: ecliptic → equatorial (negative obliquity)
@@ -139,9 +139,9 @@ class TestCoordinateRoundTrips:
         """Degrees and radians outputs should be consistent."""
         deg_result, _ = swe.calc_ut(jd, body)
         try:
-            rad_result, _ = swe.calc_ut(jd, body, swe.SEFLG_RADIANS)
+            rad_result, _ = swe.calc_ut(jd, body, swe.FLG_RADIANS)
         except Exception:
-            # SEFLG_RADIANS may trigger fallback in LEB mode
+            # FLG_RADIANS may trigger fallback in LEB mode
             return
 
         lon_deg = deg_result[0]
@@ -163,10 +163,10 @@ class TestCoordinateRoundTrips:
         jd=jd_core,
         body=st.sampled_from(
             [
-                swe.SE_SUN,
-                swe.SE_MOON,
-                swe.SE_MARS,
-                swe.SE_JUPITER,
+                swe.SUN,
+                swe.MOON,
+                swe.MARS,
+                swe.JUPITER,
             ]
         ),
     )
@@ -175,7 +175,7 @@ class TestCoordinateRoundTrips:
         """XYZ and spherical coordinates should be geometrically consistent."""
         try:
             sph, _ = swe.calc_ut(jd, body)
-            xyz, _ = swe.calc_ut(jd, body, swe.SEFLG_XYZ)
+            xyz, _ = swe.calc_ut(jd, body, swe.FLG_XYZ)
         except Exception:
             return
 
@@ -244,8 +244,8 @@ class TestAPIContracts:
     @given(jd=jd_core, body=all_bodies)
     @settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
     def test_calc_ut_accepts_moseph(self, jd: float, body: int) -> None:
-        """All functions accept SEFLG_MOSEPH without error."""
-        result, flags = swe.calc_ut(jd, body, swe.SEFLG_MOSEPH)
+        """All functions accept FLG_MOSEPH without error."""
+        result, flags = swe.calc_ut(jd, body, swe.FLG_MOSEPH)
         assert isinstance(result, tuple)
         assert len(result) == 6
 
@@ -301,7 +301,7 @@ class TestMonotonicity:
         prev_lon = None
         for i in range(10):
             t = jd + i * step
-            result, _ = swe.calc_ut(t, swe.SE_SUN)
+            result, _ = swe.calc_ut(t, swe.SUN)
             lon = float(result[0])
             if prev_lon is not None:
                 # Sun moves ~1°/day eastward, so each step should increase
@@ -322,7 +322,7 @@ class TestMonotonicity:
         prev_lon = None
         for i in range(10):
             t = jd + i * step
-            result, _ = swe.calc_ut(t, swe.SE_MEAN_NODE)
+            result, _ = swe.calc_ut(t, swe.MEAN_NODE)
             lon = float(result[0])
             if prev_lon is not None:
                 # Mean node regresses ~0.053°/day
@@ -380,8 +380,8 @@ class TestSymmetry:
     @given(jd=jd_core)
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_heliocentric_sun_is_origin(self, jd: float) -> None:
-        """calc_ut(jd, SE_SUN, SEFLG_HELCTR) returns (0, 0, 0, ...)."""
-        result, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_HELCTR)
+        """calc_ut(jd, SUN, FLG_HELCTR) returns (0, 0, 0, ...)."""
+        result, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_HELCTR)
         assert float(result[0]) == 0.0, f"Helio Sun lon={result[0]}"
         assert float(result[1]) == 0.0, f"Helio Sun lat={result[1]}"
         assert float(result[2]) == 0.0, f"Helio Sun dist={result[2]}"
@@ -389,8 +389,8 @@ class TestSymmetry:
     @given(jd=jd_core)
     @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_pheno_sun_phase_angle_zero(self, jd: float) -> None:
-        """pheno_ut(jd, SE_SUN) returns phase_angle = 0."""
-        pheno = swe.pheno_ut(jd, swe.SE_SUN)
+        """pheno_ut(jd, SUN) returns phase_angle = 0."""
+        pheno = swe.pheno_ut(jd, swe.SUN)
         assert float(pheno[0]) == 0.0, f"Sun phase_angle={pheno[0]}"
 
     @given(jd=jd_core, lat=latitudes, lon=longitudes)
@@ -421,8 +421,8 @@ class TestSymmetry:
     @given(jd=jd_core)
     @settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
     def test_speed_flag_adds_velocity(self, jd: float) -> None:
-        """SEFLG_SPEED should produce non-zero velocities for moving bodies."""
-        result, _ = swe.calc_ut(jd, swe.SE_MARS, swe.SEFLG_SPEED)
+        """FLG_SPEED should produce non-zero velocities for moving bodies."""
+        result, _ = swe.calc_ut(jd, swe.MARS, swe.FLG_SPEED)
         # result[3] = lon speed, result[4] = lat speed, result[5] = dist speed
         lon_speed = float(result[3])
         # Mars moves at least 0.1°/day in longitude typically
@@ -439,7 +439,7 @@ class TestSymmetry:
         assume(abs(jd - 2451545.0) > 365)  # At least 1 year from J2000
 
         r_date, _ = swe.calc_ut(jd, body)
-        r_j2000, _ = swe.calc_ut(jd, body, swe.SEFLG_J2000)
+        r_j2000, _ = swe.calc_ut(jd, body, swe.FLG_J2000)
 
         # Precession is ~50"/year, so after 1 year they should differ
         dlon = abs(float(r_date[0]) - float(r_j2000[0]))

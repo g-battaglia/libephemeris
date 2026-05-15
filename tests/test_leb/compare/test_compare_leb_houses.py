@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SIDEREAL
+from libephemeris.constants import FLG_SIDEREAL
 
 from .conftest import TOLS, CompareHelper, year_to_jd, angular_diff
 
@@ -69,8 +69,8 @@ class TestNonSunshineIdentical:
         jd: float,
     ):
         """Non-Sunshine house cusps must be identical in both modes."""
-        ref_cusps, ref_ascmc = compare.skyfield(ephem.swe_houses, jd, lat, lon, hsys)
-        leb_cusps, leb_ascmc = compare.leb(ephem.swe_houses, jd, lat, lon, hsys)
+        ref_cusps, ref_ascmc = compare.skyfield(ephem.houses, jd, lat, lon, hsys)
+        leb_cusps, leb_ascmc = compare.leb(ephem.houses, jd, lat, lon, hsys)
 
         # All cusps must be exactly identical
         for i in range(min(len(ref_cusps), len(leb_cusps))):
@@ -86,7 +86,7 @@ class TestNonSunshineIdentical:
 
 
 class TestSunshinePrecision:
-    """Sunshine system precision (uses swe_calc_ut for Sun declination)."""
+    """Sunshine system precision (uses calc_ut for Sun declination)."""
 
     @pytest.mark.leb_compare
     @pytest.mark.parametrize("name,lat,lon", TEST_LOCATIONS)
@@ -95,8 +95,8 @@ class TestSunshinePrecision:
         self, compare: CompareHelper, name: str, lat: float, lon: float, jd: float
     ):
         """Sunshine cusps match within tolerance."""
-        ref_cusps, _ = compare.skyfield(ephem.swe_houses, jd, lat, lon, "I")
-        leb_cusps, _ = compare.leb(ephem.swe_houses, jd, lat, lon, "I")
+        ref_cusps, _ = compare.skyfield(ephem.houses, jd, lat, lon, "I")
+        leb_cusps, _ = compare.leb(ephem.houses, jd, lat, lon, "I")
 
         for i in range(min(len(ref_cusps), len(leb_cusps))):
             diff = angular_diff(ref_cusps[i], leb_cusps[i]) * 3600.0
@@ -106,7 +106,7 @@ class TestSunshinePrecision:
 
 
 class TestHousesExSidereal:
-    """swe_houses_ex with sidereal flag."""
+    """houses_ex with sidereal flag."""
 
     @pytest.mark.leb_compare
     @pytest.mark.parametrize("sid_mode", [0, 1, 2, 3])
@@ -114,14 +114,14 @@ class TestHousesExSidereal:
     def test_sidereal_houses(
         self, compare: CompareHelper, sid_mode: int, name: str, lat: float, lon: float
     ):
-        """Sidereal houses must be identical (both use same swe_calc_ut path)."""
+        """Sidereal houses must be identical (both use same calc_ut path)."""
         jd = year_to_jd(2024)
-        flags = SEFLG_SIDEREAL
+        flags = FLG_SIDEREAL
         ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
         hsys = ord("P")  # Placidus
-        ref_cusps, _ = compare.skyfield(ephem.swe_houses_ex, jd, lat, lon, hsys, flags)
-        leb_cusps, _ = compare.leb(ephem.swe_houses_ex, jd, lat, lon, hsys, flags)
+        ref_cusps, _ = compare.skyfield(ephem.houses_ex, jd, lat, lon, hsys, flags)
+        leb_cusps, _ = compare.leb(ephem.houses_ex, jd, lat, lon, hsys, flags)
 
         for i in range(12):
             assert ref_cusps[i] == pytest.approx(leb_cusps[i], rel=1e-10), (

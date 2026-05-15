@@ -1,5 +1,5 @@
 """
-Tests for house_pos and swe_house_pos functions.
+Tests for house_pos and house_pos functions.
 
 Tests the calculation of house position for celestial bodies.
 """
@@ -52,14 +52,14 @@ class TestHousePosBasic:
 
     @pytest.mark.unit
     def test_house_pos_alias_matches(self):
-        """swe_house_pos should give same result as house_pos."""
+        """house_pos should give same result as house_pos."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
         lon = 15.0
 
         result1 = ephem.house_pos(armc, lat, eps, ord("P"), lon, 0.0)
-        result2 = ephem.swe_house_pos(armc, lat, eps, ord("P"), lon, 0.0)
+        result2 = ephem.house_pos(armc, lat, eps, ord("P"), lon, 0.0)
 
         assert result1 == result2
 
@@ -75,7 +75,7 @@ class TestHousePosConsistency:
         eps = 23.4393
 
         # Get the house cusps first
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Place body at the start of house 1 (the ASC)
         lon = cusps[0]
@@ -96,7 +96,7 @@ class TestHousePosConsistency:
         eps = 23.4393
 
         # Get the house cusps
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         # Place body just before house 2 cusp (still in house 1)
         # Calculate a position that's 99% through house 1
@@ -153,7 +153,7 @@ class TestHousePosComparisonWithSwisseph:
     @pytest.mark.unit
     @pytest.mark.parametrize("armc,lat,eps,lon,lat_body,hsys", TEST_CASES)
     def test_house_pos_matches_swisseph(self, armc, lat, eps, lon, lat_body, hsys):
-        """house_pos should match Swiss Ephemeris swe_house_pos."""
+        """house_pos should match Swiss Ephemeris house_pos."""
         # Get result from libephemeris
         result_lib = ephem.house_pos(armc, lat, eps, ord(hsys), lon, lat_body)
 
@@ -233,7 +233,7 @@ class TestHousePosAllHouses:
         eps = 23.4393
 
         # Get cusps
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
 
         houses_found = set()
 
@@ -255,7 +255,7 @@ class TestHousePosAllHouses:
 
 
 class TestHousePosTypeSignatures:
-    """Test type signature overloads for house_pos and swe_house_pos.
+    """Test type signature overloads for house_pos and house_pos.
 
     Tests that all supported calling conventions work correctly:
     1. 5-arg pyswisseph form: house_pos(armc, lat, obliquity, objcoord, hsys)
@@ -361,22 +361,22 @@ class TestHousePosTypeSignatures:
 
     @pytest.mark.unit
     def test_swe_house_pos_same_as_house_pos_6arg_int(self):
-        """swe_house_pos should match house_pos for 6-arg int form."""
+        """house_pos should match house_pos for 6-arg int form."""
         result_hp = ephem.house_pos(
             self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
         )
-        result_shp = ephem.swe_house_pos(
+        result_shp = ephem.house_pos(
             self.ARMC, self.LAT, self.EPS, ord("P"), self.LON, self.LAT_BODY
         )
         assert result_hp == result_shp
 
     @pytest.mark.unit
     def test_swe_house_pos_same_as_house_pos_5arg_tuple(self):
-        """swe_house_pos should match house_pos for 5-arg tuple form."""
+        """house_pos should match house_pos for 5-arg tuple form."""
         result_hp = ephem.house_pos(
             self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
         )
-        result_shp = ephem.swe_house_pos(
+        result_shp = ephem.house_pos(
             self.ARMC, self.LAT, self.EPS, (self.LON, self.LAT_BODY), b"P"
         )
         assert result_hp == result_shp

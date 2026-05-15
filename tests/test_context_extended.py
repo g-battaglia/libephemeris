@@ -23,7 +23,7 @@ from skyfield.timelib import Timescale
 
 from libephemeris import EphemerisContext
 from libephemeris import context as ctx_module
-from libephemeris.constants import SE_SUN
+from libephemeris.constants import SUN
 
 
 # =============================================================================
@@ -484,7 +484,7 @@ class TestResourceLifecycleAfterClose:
         ctx = EphemerisContext()
 
         # Do a calculation
-        pos1, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+        pos1, _ = ctx.calc_ut(2451545.0, SUN, 0)
         assert 0 <= pos1[0] < 360
 
         # Close
@@ -495,7 +495,7 @@ class TestResourceLifecycleAfterClose:
         assert ctx_module._SHARED_TS is None
 
         # Do another calculation - should reinitialize automatically
-        pos2, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+        pos2, _ = ctx.calc_ut(2451545.0, SUN, 0)
         assert 0 <= pos2[0] < 360
 
         # Results should be consistent
@@ -561,17 +561,17 @@ class TestInstanceStateAfterClose:
         """
         Instance sidereal_mode should persist after close().
         """
-        from libephemeris.constants import SE_SIDM_FAGAN_BRADLEY
+        from libephemeris.constants import SIDM_FAGAN_BRADLEY
 
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ctx.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
         mode_before = ctx.get_sid_mode()
 
         EphemerisContext.close()
 
         mode_after = ctx.get_sid_mode()
-        assert mode_after == mode_before == SE_SIDM_FAGAN_BRADLEY
+        assert mode_after == mode_before == SIDM_FAGAN_BRADLEY
 
     def test_angles_cache_persists_after_close(self):
         """

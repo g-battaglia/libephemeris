@@ -22,103 +22,103 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_BARYCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_TRUEPOS,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_XYZ,
-    SEFLG_RADIANS,
-    SEFLG_TOPOCTR,
-    SEFLG_SIDEREAL,
-    SEFLG_ICRS,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_DELUCE,
-    SE_SIDM_RAMAN,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_BABYL_KUGLER2,
-    SE_SIDM_BABYL_KUGLER3,
-    SE_SIDM_BABYL_HUBER,
-    SE_SIDM_BABYL_ETPSC,
-    SE_SIDM_ALDEBARAN_15TAU,
-    SE_SIDM_HIPPARCHOS,
-    SE_SIDM_SASSANIAN,
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_J2000,
-    SE_SIDM_J1900,
-    SE_SIDM_B1950,
-    SE_SIDM_SURYASIDDHANTA,
-    SE_SIDM_SURYASIDDHANTA_MSUN,
-    SE_SIDM_ARYABHATA,
-    SE_SIDM_ARYABHATA_MSUN,
-    SE_SIDM_SS_REVATI,
-    SE_SIDM_SS_CITRA,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALEQU_IAU1958,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALALIGN_MARDYKS,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_ARYABHATA_522,
-    SE_SIDM_BABYL_BRITTON,
-    SE_SIDM_TRUE_SHEORAN,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_FIORENZA,
-    SE_SIDM_VALENS_MOON,
-    SE_GREG_CAL,
-    SE_JUL_CAL,
-    SE_NODBIT_MEAN,
-    SE_NODBIT_OSCU,
-    SE_NODBIT_OSCU_BAR,
-    SE_NODBIT_FOPOINT,
-    SE_ECL_CENTRAL,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
-    SE_ECL_PENUMBRAL,
-    SE_CALC_RISE,
-    SE_CALC_SET,
-    SE_CALC_MTRANSIT,
-    SE_CALC_ITRANSIT,
-    SE_BIT_DISC_CENTER,
-    SE_BIT_NO_REFRACTION,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_TRUEPOS,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_XYZ,
+    FLG_RADIANS,
+    FLG_TOPOCTR,
+    FLG_SIDEREAL,
+    FLG_ICRS,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_GALCENT_0SAG,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_ARYABHATA_522,
+    SIDM_BABYL_BRITTON,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_VALENS_MOON,
+    GREG_CAL,
+    JUL_CAL,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_OSCU_BAR,
+    NODBIT_FOPOINT,
+    ECL_CENTRAL,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
+    CALC_RISE,
+    CALC_SET,
+    CALC_MTRANSIT,
+    CALC_ITRANSIT,
+    BIT_DISC_CENTER,
+    BIT_NO_REFRACTION,
     SPLIT_DEG_ROUND_SEC,
     SPLIT_DEG_ROUND_MIN,
     SPLIT_DEG_ROUND_DEG,
@@ -200,7 +200,7 @@ def generate_test_jds(n: int = 200, seed: int = 42) -> list[float]:
         month = rng.randint(1, 12)
         day = rng.randint(1, 28)
         hour = rng.uniform(0, 24)
-        jd = ephem.swe_julday(year, month, day, hour)
+        jd = ephem.julday(year, month, day, hour)
         jds.append(jd)
     # Add well-known epochs
     jds.extend(
@@ -225,57 +225,57 @@ def generate_test_jds(n: int = 200, seed: int = 42) -> list[float]:
 # ============================================================================
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Comprehensive flag combinations
 FLAG_COMBOS = [
-    (SEFLG_SWIEPH, "default_ecliptic"),
-    (SEFLG_SWIEPH | SEFLG_SPEED, "with_speed"),
-    (SEFLG_SWIEPH | SEFLG_EQUATORIAL, "equatorial"),
-    (SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED, "equatorial_speed"),
-    (SEFLG_SWIEPH | SEFLG_HELCTR, "heliocentric"),
-    (SEFLG_SWIEPH | SEFLG_HELCTR | SEFLG_SPEED, "heliocentric_speed"),
-    (SEFLG_SWIEPH | SEFLG_J2000, "J2000_frame"),
-    (SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_EQUATORIAL, "J2000_equatorial"),
-    (SEFLG_SWIEPH | SEFLG_NONUT, "no_nutation"),
-    (SEFLG_SWIEPH | SEFLG_NONUT | SEFLG_EQUATORIAL, "no_nutation_equatorial"),
-    (SEFLG_SWIEPH | SEFLG_TRUEPOS, "true_position"),
-    (SEFLG_SWIEPH | SEFLG_NOABERR, "no_aberration"),
-    (SEFLG_SWIEPH | SEFLG_NOGDEFL, "no_grav_deflection"),
-    (SEFLG_SWIEPH | SEFLG_NOABERR | SEFLG_NOGDEFL, "astrometric"),
-    (SEFLG_SWIEPH | SEFLG_XYZ, "cartesian_xyz"),
-    (SEFLG_SWIEPH | SEFLG_XYZ | SEFLG_SPEED, "cartesian_xyz_speed"),
-    (SEFLG_SWIEPH | SEFLG_XYZ | SEFLG_EQUATORIAL, "cartesian_equatorial"),
-    (SEFLG_SWIEPH | SEFLG_RADIANS, "radians"),
-    (SEFLG_SWIEPH | SEFLG_ICRS, "ICRS"),
-    (SEFLG_SWIEPH | SEFLG_ICRS | SEFLG_EQUATORIAL, "ICRS_equatorial"),
-    (SEFLG_SWIEPH | SEFLG_TRUEPOS | SEFLG_SPEED, "true_pos_speed"),
-    (SEFLG_SWIEPH | SEFLG_NOABERR | SEFLG_SPEED, "no_aberr_speed"),
-    (SEFLG_SWIEPH | SEFLG_J2000 | SEFLG_NONUT, "J2000_nonut"),
-    (SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000, "speed_eq_J2000"),
+    (FLG_SWIEPH, "default_ecliptic"),
+    (FLG_SWIEPH | FLG_SPEED, "with_speed"),
+    (FLG_SWIEPH | FLG_EQUATORIAL, "equatorial"),
+    (FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED, "equatorial_speed"),
+    (FLG_SWIEPH | FLG_HELCTR, "heliocentric"),
+    (FLG_SWIEPH | FLG_HELCTR | FLG_SPEED, "heliocentric_speed"),
+    (FLG_SWIEPH | FLG_J2000, "J2000_frame"),
+    (FLG_SWIEPH | FLG_J2000 | FLG_EQUATORIAL, "J2000_equatorial"),
+    (FLG_SWIEPH | FLG_NONUT, "no_nutation"),
+    (FLG_SWIEPH | FLG_NONUT | FLG_EQUATORIAL, "no_nutation_equatorial"),
+    (FLG_SWIEPH | FLG_TRUEPOS, "true_position"),
+    (FLG_SWIEPH | FLG_NOABERR, "no_aberration"),
+    (FLG_SWIEPH | FLG_NOGDEFL, "no_grav_deflection"),
+    (FLG_SWIEPH | FLG_NOABERR | FLG_NOGDEFL, "astrometric"),
+    (FLG_SWIEPH | FLG_XYZ, "cartesian_xyz"),
+    (FLG_SWIEPH | FLG_XYZ | FLG_SPEED, "cartesian_xyz_speed"),
+    (FLG_SWIEPH | FLG_XYZ | FLG_EQUATORIAL, "cartesian_equatorial"),
+    (FLG_SWIEPH | FLG_RADIANS, "radians"),
+    (FLG_SWIEPH | FLG_ICRS, "ICRS"),
+    (FLG_SWIEPH | FLG_ICRS | FLG_EQUATORIAL, "ICRS_equatorial"),
+    (FLG_SWIEPH | FLG_TRUEPOS | FLG_SPEED, "true_pos_speed"),
+    (FLG_SWIEPH | FLG_NOABERR | FLG_SPEED, "no_aberr_speed"),
+    (FLG_SWIEPH | FLG_J2000 | FLG_NONUT, "J2000_nonut"),
+    (FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL | FLG_J2000, "speed_eq_J2000"),
 ]
 
 # Barycentric flags (Sun not supported in barycentric by swisseph)
 BARY_FLAGS = [
-    (SEFLG_SWIEPH | SEFLG_BARYCTR, "barycentric"),
-    (SEFLG_SWIEPH | SEFLG_BARYCTR | SEFLG_SPEED, "barycentric_speed"),
+    (FLG_SWIEPH | FLG_BARYCTR, "barycentric"),
+    (FLG_SWIEPH | FLG_BARYCTR | FLG_SPEED, "barycentric_speed"),
 ]
 
 # Topocentric flags
 TOPO_FLAGS = [
-    (SEFLG_SWIEPH | SEFLG_TOPOCTR | SEFLG_SPEED, "topocentric_speed"),
+    (FLG_SWIEPH | FLG_TOPOCTR | FLG_SPEED, "topocentric_speed"),
     (
-        SEFLG_SWIEPH | SEFLG_TOPOCTR | SEFLG_EQUATORIAL | SEFLG_SPEED,
+        FLG_SWIEPH | FLG_TOPOCTR | FLG_EQUATORIAL | FLG_SPEED,
         "topocentric_eq_speed",
     ),
 ]
@@ -291,17 +291,17 @@ class TestPlanetaryPositionsDeep:
     def test_planet_flag_combo(self, planet_id, planet_name, flags, flag_desc):
         """Test planet across 200 dates with a given flag combination."""
         # Sun can't do heliocentric
-        if planet_id == SE_SUN and (flags & SEFLG_HELCTR):
+        if planet_id == SUN and (flags & FLG_HELCTR):
             pytest.skip("Sun not valid for heliocentric")
 
-        is_xyz = bool(flags & SEFLG_XYZ)
-        is_radians = bool(flags & SEFLG_RADIANS)
-        is_helio = bool(flags & SEFLG_HELCTR)
-        is_bary = bool(flags & SEFLG_BARYCTR)
-        has_speed = bool(flags & SEFLG_SPEED)
-        is_nonut_only = bool(flags & SEFLG_NONUT) and not bool(flags & SEFLG_J2000)
-        is_moon = planet_id == SE_MOON
-        is_pluto = planet_id == SE_PLUTO
+        is_xyz = bool(flags & FLG_XYZ)
+        is_radians = bool(flags & FLG_RADIANS)
+        is_helio = bool(flags & FLG_HELCTR)
+        is_bary = bool(flags & FLG_BARYCTR)
+        has_speed = bool(flags & FLG_SPEED)
+        is_nonut_only = bool(flags & FLG_NONUT) and not bool(flags & FLG_J2000)
+        is_moon = planet_id == MOON
+        is_pluto = planet_id == PLUTO
 
         # Body-aware tolerances reflecting actual DE440 vs Swiss Ephemeris
         # precision measured across 1600-2600:
@@ -353,7 +353,7 @@ class TestPlanetaryPositionsDeep:
         for jd in self.TEST_JDS:
             try:
                 pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
             except Exception as exc:
                 # Some flag combos may not be supported for all dates
                 continue
@@ -426,7 +426,7 @@ class TestPlanetaryPositionsDeep:
         )
 
     @pytest.mark.parametrize(
-        "planet_id,planet_name", [(p, n) for p, n in PLANETS if p != SE_SUN]
+        "planet_id,planet_name", [(p, n) for p, n in PLANETS if p != SUN]
     )
     @pytest.mark.parametrize("flags,flag_desc", BARY_FLAGS)
     def test_planet_barycentric(self, planet_id, planet_name, flags, flag_desc):
@@ -436,7 +436,7 @@ class TestPlanetaryPositionsDeep:
         for jd in self.TEST_JDS[:100]:
             try:
                 pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
             except Exception:
                 continue
             d = angular_diff(pos_swe[0], pos_lib[0])
@@ -463,7 +463,7 @@ class TestPlanetaryPositionsDeep:
         for jd in self.TEST_JDS[:50]:
             try:
                 pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
             except Exception:
                 continue
             d = angular_diff(pos_swe[0], pos_lib[0])
@@ -473,7 +473,7 @@ class TestPlanetaryPositionsDeep:
             mx = max(errors_lon)
             # Topocentric can have larger diff for Moon due to parallax + DE440 vs
             # analytical lunar theory differences (~130" max across 800 years)
-            tol = 0.06 if planet_id == SE_MOON else 0.005
+            tol = 0.06 if planet_id == MOON else 0.005
             print(
                 f'\n  {planet_name}/{flag_desc}: lon_max={arcsec(mx):.3f}" (n={len(errors_lon)})'
             )
@@ -485,12 +485,12 @@ class TestPlanetaryPositionsDeep:
 # ============================================================================
 
 LUNAR_BODIES = [
-    (SE_MEAN_NODE, "Mean Node", 0.01),
-    (SE_TRUE_NODE, "True Node", 0.15),
-    (SE_MEAN_APOG, "Mean Lilith", 0.01),
-    (SE_OSCU_APOG, "True Lilith", 0.15),
-    (SE_INTP_APOG, "Interp Apogee", 1.0),
-    (SE_INTP_PERG, "Interp Perigee", 5.0),
+    (MEAN_NODE, "Mean Node", 0.01),
+    (TRUE_NODE, "True Node", 0.15),
+    (MEAN_APOG, "Mean Lilith", 0.01),
+    (OSCU_APOG, "True Lilith", 0.15),
+    (INTP_APOG, "Interp Apogee", 1.0),
+    (INTP_PERG, "Interp Perigee", 5.0),
 ]
 
 
@@ -502,7 +502,7 @@ class TestLunarPointsDeep:
     @pytest.mark.parametrize("body_id,body_name,tol_deg", LUNAR_BODIES)
     def test_lunar_body_positions(self, body_id, body_name, tol_deg):
         """Test lunar body across 300 dates."""
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         errors_lon = []
         errors_lat = []
         errors_vlon = []
@@ -510,7 +510,7 @@ class TestLunarPointsDeep:
         for jd in self.TEST_JDS:
             try:
                 pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-                pos_lib, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                pos_lib, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception:
                 continue
 
@@ -544,12 +544,12 @@ class TestLunarPointsDeep:
     )  # Mean/True Node/Lilith
     def test_lunar_equatorial(self, body_id, body_name, tol_deg):
         """Test lunar points in equatorial coordinates."""
-        flags = SEFLG_SWIEPH | SEFLG_EQUATORIAL | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_EQUATORIAL | FLG_SPEED
         errors = []
         for jd in self.TEST_JDS[:100]:
             try:
                 pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-                pos_lib, _ = ephem.swe_calc_ut(jd, body_id, flags)
+                pos_lib, _ = ephem.calc_ut(jd, body_id, flags)
             except Exception:
                 continue
             d = angular_diff(pos_swe[0], pos_lib[0])
@@ -661,7 +661,7 @@ class TestHouseSystemsDeep:
             for jd in HOUSE_TEST_JDS:
                 try:
                     cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, hsys.encode())
-                    cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+                    cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
                 except Exception:
                     skipped += 1
                     continue
@@ -698,21 +698,21 @@ class TestHouseSystemsDeep:
         assert mx_mc < tol, f"{hsys_name}: MC max {mx_mc:.6f}° >= {tol}°"
 
     def test_houses_ex_sidereal(self):
-        """Test swe_houses_ex with sidereal flag across ayanamshas."""
+        """Test houses_ex with sidereal flag across ayanamshas."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
         ayanamshas = [
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan"),
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_RAMAN, "Raman"),
+            (SIDM_FAGAN_BRADLEY, "Fagan"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_RAMAN, "Raman"),
         ]
         for sid_id, sid_name in ayanamshas:
             swe.set_sid_mode(sid_id)
-            ephem.swe_set_sid_mode(sid_id)
-            flags = SEFLG_SIDEREAL
+            ephem.set_sid_mode(sid_id)
+            flags = FLG_SIDEREAL
             try:
                 cusps_swe, ascmc_swe = swe.houses_ex(jd, lat, lon, b"P", flags)
-                cusps_lib, ascmc_lib = ephem.swe_houses_ex(
+                cusps_lib, ascmc_lib = ephem.houses_ex(
                     jd, lat, lon, ord("P"), flags
                 )
             except Exception:
@@ -740,10 +740,10 @@ class TestTimeFunctionsDeep:
             month = rng.randint(1, 12)
             day = rng.randint(1, 28)
             hour = rng.uniform(0, 24)
-            cal = SE_GREG_CAL if year > 1582 else SE_JUL_CAL
+            cal = GREG_CAL if year > 1582 else JUL_CAL
 
             jd_swe = swe.julday(year, month, day, hour, cal)
-            jd_lib = ephem.swe_julday(year, month, day, hour, cal)
+            jd_lib = ephem.julday(year, month, day, hour, cal)
             err = abs(jd_swe - jd_lib)
             max_err = max(max_err, err)
 
@@ -757,8 +757,8 @@ class TestTimeFunctionsDeep:
         max_err = 0.0
         for jd in jds:
             try:
-                y_swe, m_swe, d_swe, h_swe = swe.revjul(jd, SE_GREG_CAL)
-                y_lib, m_lib, d_lib, h_lib = ephem.swe_revjul(jd, SE_GREG_CAL)
+                y_swe, m_swe, d_swe, h_swe = swe.revjul(jd, GREG_CAL)
+                y_lib, m_lib, d_lib, h_lib = ephem.revjul(jd, GREG_CAL)
             except Exception:
                 continue
 
@@ -780,7 +780,7 @@ class TestTimeFunctionsDeep:
         for jd in jds:
             try:
                 dt_swe = swe.deltat(jd)
-                dt_lib = ephem.swe_deltat(jd)
+                dt_lib = ephem.deltat(jd)
             except Exception:
                 continue
             err = abs(dt_swe - dt_lib)
@@ -826,7 +826,7 @@ class TestTimeFunctionsDeep:
             (1969, 7, 20, 12.0, 6),  # Sunday (Moon landing)
         ]
         for y, m, d, h, expected_dow in test_data:
-            jd = ephem.swe_julday(y, m, d, h)
+            jd = ephem.julday(y, m, d, h)
             dow_swe = swe.day_of_week(jd)
             dow_lib = ephem.day_of_week(jd)
             assert dow_swe == dow_lib, f"{y}-{m}-{d}: swe={dow_swe} lib={dow_lib}"
@@ -841,8 +841,8 @@ class TestTimeFunctionsDeep:
         ]
         for y, m, d, h, mi, s in test_dates:
             try:
-                jd_et_swe, jd_ut_swe = swe.utc_to_jd(y, m, d, h, mi, s, SE_GREG_CAL)
-                jd_et_lib, jd_ut_lib = ephem.utc_to_jd(y, m, d, h, mi, s, SE_GREG_CAL)
+                jd_et_swe, jd_ut_swe = swe.utc_to_jd(y, m, d, h, mi, s, GREG_CAL)
+                jd_et_lib, jd_ut_lib = ephem.utc_to_jd(y, m, d, h, mi, s, GREG_CAL)
             except Exception:
                 continue
 
@@ -893,77 +893,77 @@ class TestTimeFunctionsDeep:
 # ============================================================================
 
 ALL_AYANAMSHAS = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan_Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_DELUCE, "DeLuce"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_USHASHASHI, "Ushashashi"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_DJWHAL_KHUL, "Djwhal_Khul"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (SE_SIDM_JN_BHASIN, "JN_Bhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "Babyl_Kugler1"),
-    (SE_SIDM_BABYL_KUGLER2, "Babyl_Kugler2"),
-    (SE_SIDM_BABYL_KUGLER3, "Babyl_Kugler3"),
-    (SE_SIDM_BABYL_HUBER, "Babyl_Huber"),
-    (SE_SIDM_BABYL_ETPSC, "Babyl_ETPSC"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran_15Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_SASSANIAN, "Sassanian"),
-    (SE_SIDM_GALCENT_0SAG, "GalCent_0Sag"),
-    (SE_SIDM_J2000, "J2000"),
-    (SE_SIDM_J1900, "J1900"),
-    (SE_SIDM_B1950, "B1950"),
-    (SE_SIDM_SURYASIDDHANTA, "Surya"),
-    (SE_SIDM_SURYASIDDHANTA_MSUN, "Surya_MSun"),
-    (SE_SIDM_ARYABHATA, "Aryabhata"),
-    (SE_SIDM_ARYABHATA_MSUN, "Aryabhata_MSun"),
-    (SE_SIDM_SS_REVATI, "SS_Revati"),
-    (SE_SIDM_SS_CITRA, "SS_Citra"),
-    (SE_SIDM_TRUE_CITRA, "True_Citra"),
-    (SE_SIDM_TRUE_REVATI, "True_Revati"),
-    (SE_SIDM_TRUE_PUSHYA, "True_Pushya"),
-    (SE_SIDM_GALCENT_RGILBRAND, "GalCent_Rgilbrand"),
-    (SE_SIDM_GALEQU_IAU1958, "GalEqu_IAU1958"),
-    (SE_SIDM_GALEQU_TRUE, "GalEqu_True"),
-    (SE_SIDM_GALEQU_MULA, "GalEqu_Mula"),
-    (SE_SIDM_GALALIGN_MARDYKS, "GalAlign_Mardyks"),
-    (SE_SIDM_TRUE_MULA, "True_Mula"),
-    (SE_SIDM_GALCENT_MULA_WILHELM, "GalCent_Mula_Wilhelm"),
-    (SE_SIDM_ARYABHATA_522, "Aryabhata_522"),
-    (SE_SIDM_BABYL_BRITTON, "Babyl_Britton"),
-    (SE_SIDM_TRUE_SHEORAN, "True_Sheoran"),
-    (SE_SIDM_GALCENT_COCHRANE, "GalCent_Cochrane"),
-    (SE_SIDM_GALEQU_FIORENZA, "GalEqu_Fiorenza"),
-    (SE_SIDM_VALENS_MOON, "Valens_Moon"),
+    (SIDM_FAGAN_BRADLEY, "Fagan_Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_DELUCE, "DeLuce"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_USHASHASHI, "Ushashashi"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_DJWHAL_KHUL, "Djwhal_Khul"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_JN_BHASIN, "JN_Bhasin"),
+    (SIDM_BABYL_KUGLER1, "Babyl_Kugler1"),
+    (SIDM_BABYL_KUGLER2, "Babyl_Kugler2"),
+    (SIDM_BABYL_KUGLER3, "Babyl_Kugler3"),
+    (SIDM_BABYL_HUBER, "Babyl_Huber"),
+    (SIDM_BABYL_ETPSC, "Babyl_ETPSC"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran_15Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_SASSANIAN, "Sassanian"),
+    (SIDM_GALCENT_0SAG, "GalCent_0Sag"),
+    (SIDM_J2000, "J2000"),
+    (SIDM_J1900, "J1900"),
+    (SIDM_B1950, "B1950"),
+    (SIDM_SURYASIDDHANTA, "Surya"),
+    (SIDM_SURYASIDDHANTA_MSUN, "Surya_MSun"),
+    (SIDM_ARYABHATA, "Aryabhata"),
+    (SIDM_ARYABHATA_MSUN, "Aryabhata_MSun"),
+    (SIDM_SS_REVATI, "SS_Revati"),
+    (SIDM_SS_CITRA, "SS_Citra"),
+    (SIDM_TRUE_CITRA, "True_Citra"),
+    (SIDM_TRUE_REVATI, "True_Revati"),
+    (SIDM_TRUE_PUSHYA, "True_Pushya"),
+    (SIDM_GALCENT_RGILBRAND, "GalCent_Rgilbrand"),
+    (SIDM_GALEQU_IAU1958, "GalEqu_IAU1958"),
+    (SIDM_GALEQU_TRUE, "GalEqu_True"),
+    (SIDM_GALEQU_MULA, "GalEqu_Mula"),
+    (SIDM_GALALIGN_MARDYKS, "GalAlign_Mardyks"),
+    (SIDM_TRUE_MULA, "True_Mula"),
+    (SIDM_GALCENT_MULA_WILHELM, "GalCent_Mula_Wilhelm"),
+    (SIDM_ARYABHATA_522, "Aryabhata_522"),
+    (SIDM_BABYL_BRITTON, "Babyl_Britton"),
+    (SIDM_TRUE_SHEORAN, "True_Sheoran"),
+    (SIDM_GALCENT_COCHRANE, "GalCent_Cochrane"),
+    (SIDM_GALEQU_FIORENZA, "GalEqu_Fiorenza"),
+    (SIDM_VALENS_MOON, "Valens_Moon"),
 ]
 
 # Star-based ayanamshas have larger tolerance
 STAR_BASED = {
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_TRUE_SHEORAN,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_TRUE_MULA,
+    SIDM_TRUE_SHEORAN,
 }
 
 # Galactic-center/equator-based ayanamshas: different galactic center
 # coordinates cause 0.01-0.06° systematic differences
 GALACTIC_BASED = {
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALEQU_IAU1958,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALALIGN_MARDYKS,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_FIORENZA,
-    SE_SIDM_VALENS_MOON,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_VALENS_MOON,
 }
 
 # J1900 ayanamsha: completely different epoch handling
-J1900_MODES = {SE_SIDM_J1900}
+J1900_MODES = {SIDM_J1900}
 
 
 class TestSiderealDeep:
@@ -986,10 +986,10 @@ class TestSiderealDeep:
 
         for jd in self.TEST_JDS:
             swe.set_sid_mode(sid_id)
-            ephem.swe_set_sid_mode(sid_id)
+            ephem.set_sid_mode(sid_id)
             try:
                 ayan_swe = swe.get_ayanamsa_ut(jd)
-                ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+                ayan_lib = ephem.get_ayanamsa_ut(jd)
             except Exception:
                 continue
             err = abs(ayan_swe - ayan_lib)
@@ -1013,15 +1013,15 @@ class TestSiderealDeep:
         # but planet position differences dominate: max ~122" (~0.034°)
         tol = 0.1 if sid_id in STAR_BASED else 0.04
         swe.set_sid_mode(sid_id)
-        ephem.swe_set_sid_mode(sid_id)
-        flags = SEFLG_SWIEPH | SEFLG_SIDEREAL | SEFLG_SPEED
+        ephem.set_sid_mode(sid_id)
+        flags = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
 
         errors = []
         for jd in self.TEST_JDS:
             for planet_id, _ in PLANETS[:5]:  # Sun through Mars
                 try:
                     pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                    pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                    pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
                 except Exception:
                     continue
                 d = angular_diff(pos_swe[0], pos_lib[0])
@@ -1151,13 +1151,13 @@ class TestFixedStarsDeep:
     def test_fixed_star_position(self, star_name):
         """Test fixed star position at multiple dates."""
         jds = [2451545.0, 2460000.5, 2440587.5, 2415020.0]
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         errors = []
 
         for jd in jds:
             try:
                 result_swe = swe.fixstar_ut(star_name, jd, flags)
-                result_lib = ephem.swe_fixstar_ut(star_name, jd, flags)
+                result_lib = ephem.fixstar_ut(star_name, jd, flags)
             except Exception:
                 continue
 
@@ -1199,7 +1199,7 @@ class TestFixedStarsDeep:
         for star in stars:
             try:
                 mag_swe = swe.fixstar_mag(star)
-                mag_lib = ephem.swe_fixstar_mag(star)
+                mag_lib = ephem.fixstar_mag(star)
             except Exception:
                 continue
 
@@ -1224,15 +1224,15 @@ class TestEclipsesDeep:
 
     def test_solar_eclipse_search(self):
         """Search for solar eclipses over 20 years, compare timing."""
-        jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
-        flags = SEFLG_SWIEPH
+        jd_start = ephem.julday(2000, 1, 1, 0.0)
+        flags = FLG_SWIEPH
 
         errors_timing = []
         jd = jd_start
         for i in range(30):  # Find 30 solar eclipses
             try:
                 res_swe = swe.sol_eclipse_when_glob(jd, flags)
-                res_lib = ephem.swe_sol_eclipse_when_glob(jd, flags)
+                res_lib = ephem.sol_eclipse_when_glob(jd, flags)
             except Exception:
                 break
 
@@ -1267,15 +1267,15 @@ class TestEclipsesDeep:
 
     def test_lunar_eclipse_search(self):
         """Search for lunar eclipses over 20 years, compare timing."""
-        jd_start = ephem.swe_julday(2000, 1, 1, 0.0)
-        flags = SEFLG_SWIEPH
+        jd_start = ephem.julday(2000, 1, 1, 0.0)
+        flags = FLG_SWIEPH
 
         errors_timing = []
         jd = jd_start
         for i in range(30):
             try:
                 res_swe = swe.lun_eclipse_when(jd, flags)
-                res_lib = ephem.swe_lun_eclipse_when(jd, flags)
+                res_lib = ephem.lun_eclipse_when(jd, flags)
             except Exception:
                 break
 
@@ -1316,14 +1316,14 @@ class TestCrossingsDeep:
 
     def test_solar_crossings_equinoxes(self):
         """Test Sun crossing 0° (equinoxes) and 90° (solstices) for 50 years."""
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
         errors = []
         for year in range(1950, 2050):
-            jd_start = ephem.swe_julday(year, 1, 1, 0.0)
+            jd_start = ephem.julday(year, 1, 1, 0.0)
             for target_lon in [0.0, 90.0, 180.0, 270.0]:
                 try:
                     jd_swe = swe.solcross_ut(target_lon, jd_start, flags)
-                    jd_lib = ephem.swe_solcross_ut(target_lon, jd_start, flags)
+                    jd_lib = ephem.solcross_ut(target_lon, jd_start, flags)
                 except Exception:
                     continue
                 err_sec = abs(jd_swe - jd_lib) * 86400
@@ -1337,14 +1337,14 @@ class TestCrossingsDeep:
 
     def test_moon_crossings(self):
         """Test Moon crossing various longitudes over 5 years."""
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
         errors = []
         for year in range(2020, 2025):
-            jd_start = ephem.swe_julday(year, 1, 1, 0.0)
+            jd_start = ephem.julday(year, 1, 1, 0.0)
             for target_lon in [0.0, 30.0, 60.0, 90.0, 120.0, 180.0, 270.0]:
                 try:
                     jd_swe = swe.mooncross_ut(target_lon, jd_start, flags)
-                    jd_lib = ephem.swe_mooncross_ut(target_lon, jd_start, flags)
+                    jd_lib = ephem.mooncross_ut(target_lon, jd_start, flags)
                 except Exception:
                     continue
                 err_sec = abs(jd_swe - jd_lib) * 86400
@@ -1358,13 +1358,13 @@ class TestCrossingsDeep:
 
     def test_moon_node_crossings(self):
         """Test Moon node crossings over 10 years."""
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
         errors = []
         for year in range(2015, 2025):
-            jd_start = ephem.swe_julday(year, 1, 1, 0.0)
+            jd_start = ephem.julday(year, 1, 1, 0.0)
             try:
                 res_swe = swe.mooncross_node_ut(jd_start, flags)
-                res_lib = ephem.swe_mooncross_node_ut(jd_start, flags)
+                res_lib = ephem.mooncross_node_ut(jd_start, flags)
             except Exception:
                 continue
 
@@ -1430,11 +1430,11 @@ class TestCoordinateTransforms:
 
         for planet_id, name in PLANETS[:5]:
             # Get ecliptic coordinates first
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_EQUATORIAL)
+            pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_EQUATORIAL)
             xin = (pos[0], pos[1], pos[2])
 
             try:
-                res_swe = swe.azalt(jd, swe.SE_ECL2HOR, geopos, atpress, attemp, xin)
+                res_swe = swe.azalt(jd, swe.ECL2HOR, geopos, atpress, attemp, xin)
                 res_lib = ephem.azalt(jd, 0, geopos, atpress, attemp, xin)
             except Exception:
                 continue
@@ -1705,18 +1705,18 @@ class TestPhenomenaDeep:
 
     @pytest.mark.parametrize(
         "planet_id,planet_name",
-        [(p, n) for p, n in PLANETS if p not in (SE_SUN, SE_MOON)],
+        [(p, n) for p, n in PLANETS if p not in (SUN, MOON)],
     )
     def test_pheno_ut(self, planet_id, planet_name):
         """Test planetary phenomena (phase angle, elongation, etc.)."""
         jds = generate_test_jds(50)
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
         errors = []
 
         for jd in jds:
             try:
                 res_swe = swe.pheno_ut(jd, planet_id, flags)
-                res_lib = ephem.swe_pheno_ut(jd, planet_id, flags)
+                res_lib = ephem.pheno_ut(jd, planet_id, flags)
             except Exception:
                 continue
 
@@ -1758,37 +1758,37 @@ class TestNodApsDeep:
     # planets (Jupiter e~0.048, Neptune e~0.009) have poorly constrained
     # perihelion direction, leading to large methodological differences.
     _APSE_TOL = {
-        SE_PLUTO: 5.0,  # e~0.25, well-defined but geocentric projection
-        SE_MERCURY: 25.0,  # e~0.21, but inner planet geocentric projection
-        SE_MARS: 180.0,  # e~0.09, geocentric projection can flip direction
-        SE_VENUS: 50.0,  # e~0.007, very low eccentricity
-        SE_JUPITER: 180.0,  # e~0.048, low eccentricity
-        SE_SATURN: 100.0,  # e~0.054, low eccentricity
-        SE_URANUS: 40.0,  # e~0.047, low eccentricity
-        SE_NEPTUNE: 180.0,  # e~0.009, very low eccentricity
+        PLUTO: 5.0,  # e~0.25, well-defined but geocentric projection
+        MERCURY: 25.0,  # e~0.21, but inner planet geocentric projection
+        MARS: 180.0,  # e~0.09, geocentric projection can flip direction
+        VENUS: 50.0,  # e~0.007, very low eccentricity
+        JUPITER: 180.0,  # e~0.048, low eccentricity
+        SATURN: 100.0,  # e~0.054, low eccentricity
+        URANUS: 40.0,  # e~0.047, low eccentricity
+        NEPTUNE: 180.0,  # e~0.009, very low eccentricity
     }
 
     @pytest.mark.parametrize(
         "planet_id,planet_name",
-        [(p, n) for p, n in PLANETS if p not in (SE_SUN, SE_MOON)],
+        [(p, n) for p, n in PLANETS if p not in (SUN, MOON)],
     )
     @pytest.mark.parametrize(
         "method,method_name",
         [
-            (SE_NODBIT_MEAN, "mean"),
-            (SE_NODBIT_OSCU, "osculating"),
+            (NODBIT_MEAN, "mean"),
+            (NODBIT_OSCU, "osculating"),
         ],
     )
     def test_nod_aps_nodes(self, planet_id, planet_name, method, method_name):
         """Test node longitude calculation (ascending + descending)."""
         jds = generate_test_jds(30)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         errors = []
 
         for jd in jds:
             try:
                 res_swe = swe.nod_aps_ut(jd, planet_id, flags, method)
-                res_lib = ephem.swe_nod_aps_ut(jd, planet_id, flags, method)
+                res_lib = ephem.nod_aps_ut(jd, planet_id, flags, method)
             except Exception:
                 continue
 
@@ -1814,25 +1814,25 @@ class TestNodApsDeep:
 
     @pytest.mark.parametrize(
         "planet_id,planet_name",
-        [(p, n) for p, n in PLANETS if p not in (SE_SUN, SE_MOON)],
+        [(p, n) for p, n in PLANETS if p not in (SUN, MOON)],
     )
     @pytest.mark.parametrize(
         "method,method_name",
         [
-            (SE_NODBIT_MEAN, "mean"),
-            (SE_NODBIT_OSCU, "osculating"),
+            (NODBIT_MEAN, "mean"),
+            (NODBIT_OSCU, "osculating"),
         ],
     )
     def test_nod_aps_apsides(self, planet_id, planet_name, method, method_name):
         """Test apse longitude calculation (perihelion + aphelion)."""
         jds = generate_test_jds(30)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         errors = []
 
         for jd in jds:
             try:
                 res_swe = swe.nod_aps_ut(jd, planet_id, flags, method)
-                res_lib = ephem.swe_nod_aps_ut(jd, planet_id, flags, method)
+                res_lib = ephem.nod_aps_ut(jd, planet_id, flags, method)
             except Exception:
                 continue
 
@@ -1873,25 +1873,25 @@ class TestRiseTransitDeep:
         geopos = (lon, lat, alt)
         atpress = 1013.25
         attemp = 15.0
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
 
         errors_rise = []
         errors_set = []
 
         for year in range(2020, 2025):
             for month in [1, 4, 7, 10]:
-                jd = ephem.swe_julday(year, month, 15, 0.0)
+                jd = ephem.julday(year, month, 15, 0.0)
                 for event, errors_list in [
-                    (SE_CALC_RISE, errors_rise),
-                    (SE_CALC_SET, errors_set),
+                    (CALC_RISE, errors_rise),
+                    (CALC_SET, errors_set),
                 ]:
                     try:
                         # pyswisseph: rise_trans(tjdut, body, rsmi, geopos, atpress, attemp, flags)
                         res_swe = swe.rise_trans(
                             jd, planet_id, event, geopos, atpress, attemp, flags
                         )
-                        # libephemeris: swe_rise_trans(tjdut, body, rsmi, geopos, atpress, attemp, flags)
-                        res_lib = ephem.swe_rise_trans(
+                        # libephemeris: rise_trans(tjdut, body, rsmi, geopos, atpress, attemp, flags)
+                        res_lib = ephem.rise_trans(
                             jd, planet_id, event, geopos, atpress, attemp, flags
                         )
                     except Exception:
@@ -1947,25 +1947,25 @@ class TestRiseTransitDeep:
 
         for year in range(2020, 2025):
             for month in [1, 4, 7, 10]:
-                jd = ephem.swe_julday(year, month, 15, 0.0)
+                jd = ephem.julday(year, month, 15, 0.0)
                 try:
                     res_swe = swe.rise_trans(
                         jd,
-                        SE_SUN,
-                        SE_CALC_MTRANSIT,
+                        SUN,
+                        CALC_MTRANSIT,
                         geopos,
                         1013.25,
                         15.0,
-                        SEFLG_SWIEPH,
+                        FLG_SWIEPH,
                     )
-                    res_lib = ephem.swe_rise_trans(
+                    res_lib = ephem.rise_trans(
                         jd,
-                        SE_SUN,
-                        SE_CALC_MTRANSIT,
+                        SUN,
+                        CALC_MTRANSIT,
                         geopos,
                         1013.25,
                         15.0,
-                        SEFLG_SWIEPH,
+                        FLG_SWIEPH,
                     )
                 except Exception:
                     continue
@@ -2035,7 +2035,7 @@ class TestStatisticalPlanetarySurvey:
     def test_500_date_survey_all_planets(self):
         """500-date random survey for all planets, default geocentric."""
         jds = generate_test_jds(500, seed=2024)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
 
         print("\n" + "=" * 80)
         print("  STATISTICAL PLANETARY SURVEY (500 dates x 10 planets)")
@@ -2051,7 +2051,7 @@ class TestStatisticalPlanetarySurvey:
             for jd in jds:
                 try:
                     pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                    pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                    pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
                 except Exception:
                     continue
 
@@ -2075,7 +2075,7 @@ class TestStatisticalPlanetarySurvey:
             mx_vlon = max(vlon_as)
 
             # Moon uses larger threshold due to DE440 vs analytical lunar theory
-            fail_tol = 200 if planet_id == SE_MOON else 36
+            fail_tol = 200 if planet_id == MOON else 36
             status = "PASS" if mx_lon < 3.6 else "WARN" if mx_lon < fail_tol else "FAIL"
             if status == "FAIL":
                 all_pass = False
@@ -2092,7 +2092,7 @@ class TestStatisticalPlanetarySurvey:
     def test_500_date_survey_equatorial(self):
         """500-date survey in equatorial mode."""
         jds = generate_test_jds(500, seed=2025)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags = FLG_SWIEPH | FLG_SPEED | FLG_EQUATORIAL
 
         print("\n" + "=" * 80)
         print("  STATISTICAL EQUATORIAL SURVEY (500 dates x 10 planets)")
@@ -2105,7 +2105,7 @@ class TestStatisticalPlanetarySurvey:
             for jd in jds:
                 try:
                     pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-                    pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+                    pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
                 except Exception:
                     continue
 
@@ -2120,7 +2120,7 @@ class TestStatisticalPlanetarySurvey:
             p95 = sorted(ra_as)[int(len(ra_as) * 0.95)]
 
             # Moon uses larger threshold due to DE440 vs analytical lunar theory
-            fail_tol = 200 if planet_id == SE_MOON else 36
+            fail_tol = 200 if planet_id == MOON else 36
             status = "PASS" if mx < 3.6 else "WARN" if mx < fail_tol else "FAIL"
             if status == "FAIL":
                 all_pass = False
@@ -2144,10 +2144,10 @@ class TestEdgeCases:
     def test_j2000_epoch_exact(self):
         """Test all planets at exact J2000.0 epoch."""
         jd = 2451545.0
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         for planet_id, name in PLANETS:
             pos_swe, _ = swe.calc_ut(jd, planet_id, flags)
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, flags)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, flags)
             d = angular_diff(pos_swe[0], pos_lib[0])
             print(f'  {name} at J2000: diff={arcsec(d):.4f}"')
             assert d < 0.0005, f"{name} at J2000: diff={d}° exceeds 0.0005°"
@@ -2155,9 +2155,9 @@ class TestEdgeCases:
     def test_year_boundaries(self):
         """Test at year boundaries (midnight transitions)."""
         for year in range(1900, 2101, 10):
-            jd = ephem.swe_julday(year, 1, 1, 0.0)
-            pos_swe, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+            jd = ephem.julday(year, 1, 1, 0.0)
+            pos_swe, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+            pos_lib, _ = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
             d = angular_diff(pos_swe[0], pos_lib[0])
             assert d < 0.001, f"Sun at {year}-01-01: diff={d}°"
 
@@ -2168,9 +2168,9 @@ class TestEdgeCases:
             # Check if actually a leap year
             is_leap = (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
             if is_leap:
-                jd = ephem.swe_julday(year, 2, 29, 12.0)
-                pos_swe, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SPEED)
-                pos_lib, _ = ephem.swe_calc_ut(jd, SE_MOON, SEFLG_SWIEPH | SEFLG_SPEED)
+                jd = ephem.julday(year, 2, 29, 12.0)
+                pos_swe, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH | FLG_SPEED)
+                pos_lib, _ = ephem.calc_ut(jd, MOON, FLG_SWIEPH | FLG_SPEED)
                 d = angular_diff(pos_swe[0], pos_lib[0])
                 # Moon diverges more at distant dates (DE440 vs analytical theory)
                 assert d < 0.05, f"Moon on {year}-02-29: diff={d}°"
@@ -2178,31 +2178,31 @@ class TestEdgeCases:
     def test_extreme_dates(self):
         """Test at extreme ends of DE440 range."""
         extreme_jds = [
-            (ephem.swe_julday(1550, 1, 1, 0.0), "1550-01-01"),
-            (ephem.swe_julday(1600, 6, 15, 12.0), "1600-06-15"),
-            (ephem.swe_julday(2400, 1, 1, 0.0), "2400-01-01"),
-            (ephem.swe_julday(2200, 12, 31, 23.99), "2200-12-31"),
+            (ephem.julday(1550, 1, 1, 0.0), "1550-01-01"),
+            (ephem.julday(1600, 6, 15, 12.0), "1600-06-15"),
+            (ephem.julday(2400, 1, 1, 0.0), "2400-01-01"),
+            (ephem.julday(2200, 12, 31, 23.99), "2200-12-31"),
         ]
         for jd, desc in extreme_jds:
             for planet_id, name in PLANETS:
                 try:
-                    pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SWIEPH)
-                    pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH)
+                    pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SWIEPH)
+                    pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH)
                 except Exception:
                     continue
                 d = angular_diff(pos_swe[0], pos_lib[0])
                 # Moon at extreme dates can diverge up to ~0.05° due to
                 # different lunar theories (DE440 vs ELP/MPP02+DE431)
-                tol = 0.05 if planet_id == SE_MOON else 0.005
+                tol = 0.05 if planet_id == MOON else 0.005
                 assert d < tol, f"{name} at {desc}: diff={d}°"
 
     def test_near_zero_longitude(self):
         """Test planets near 0/360 degree boundary."""
         # Find dates where Sun is near 0° Aries (equinox)
         for year in range(2000, 2025):
-            jd = ephem.swe_julday(year, 3, 20, 12.0)
-            pos_swe, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+            jd = ephem.julday(year, 3, 20, 12.0)
+            pos_swe, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+            pos_lib, _ = ephem.calc_ut(jd, SUN, FLG_SWIEPH)
             d = angular_diff(pos_swe[0], pos_lib[0])
             assert d < 0.001, f"Sun near equinox {year}: diff={d}°"
 
@@ -2216,9 +2216,9 @@ class TestEdgeCases:
             (2023, 12, 13, 12.0),  # Mercury retro ~Dec 2023
         ]
         for y, m, d, h in retro_dates:
-            jd = ephem.swe_julday(y, m, d, h)
-            pos_swe, _ = swe.calc_ut(jd, SE_MERCURY, SEFLG_SWIEPH | SEFLG_SPEED)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_MERCURY, SEFLG_SWIEPH | SEFLG_SPEED)
+            jd = ephem.julday(y, m, d, h)
+            pos_swe, _ = swe.calc_ut(jd, MERCURY, FLG_SWIEPH | FLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, MERCURY, FLG_SWIEPH | FLG_SPEED)
             d_lon = angular_diff(pos_swe[0], pos_lib[0])
             d_vel = abs(pos_swe[3] - pos_lib[3])
             print(
@@ -2229,12 +2229,12 @@ class TestEdgeCases:
     def test_moon_speed_accuracy(self):
         """Test Moon speed accuracy at various phases."""
         jds = generate_test_jds(100)
-        flags = SEFLG_SWIEPH | SEFLG_SPEED
+        flags = FLG_SWIEPH | FLG_SPEED
         errors = []
 
         for jd in jds:
-            pos_swe, _ = swe.calc_ut(jd, SE_MOON, flags)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_MOON, flags)
+            pos_swe, _ = swe.calc_ut(jd, MOON, flags)
+            pos_lib, _ = ephem.calc_ut(jd, MOON, flags)
             d_vel = abs(pos_swe[3] - pos_lib[3])
             errors.append(d_vel)
 
@@ -2254,17 +2254,17 @@ class TestOrbitalElementsDeep:
 
     @pytest.mark.parametrize(
         "planet_id,planet_name",
-        [(p, n) for p, n in PLANETS if p not in (SE_SUN, SE_MOON)],
+        [(p, n) for p, n in PLANETS if p not in (SUN, MOON)],
     )
     def test_orbital_elements(self, planet_id, planet_name):
         """Test orbital elements for planets."""
         jds = generate_test_jds(20)
-        flags = SEFLG_SWIEPH
+        flags = FLG_SWIEPH
 
         for jd in jds:
             try:
                 res_swe = swe.get_orbital_elements(jd, planet_id, flags)
-                res_lib = ephem.swe_get_orbital_elements(jd, planet_id, flags)
+                res_lib = ephem.get_orbital_elements(jd, planet_id, flags)
             except Exception:
                 continue
 
@@ -2296,7 +2296,7 @@ class TestSiderealTimeDeep:
     """Test sidereal time functions."""
 
     def test_sidtime0(self):
-        """Test swe_sidtime0 (sidereal time from components)."""
+        """Test sidtime0 (sidereal time from components)."""
         jds = generate_test_jds(50)
         errors = []
         for jd in jds:

@@ -32,7 +32,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 results = {}
 
@@ -68,29 +71,29 @@ DATES_10 = [
     2465000.0,
 ]
 PLANETS_7 = [
-    (ephem.SE_SUN, swe.SUN),
-    (ephem.SE_MOON, swe.MOON),
-    (ephem.SE_MERCURY, swe.MERCURY),
-    (ephem.SE_VENUS, swe.VENUS),
-    (ephem.SE_MARS, swe.MARS),
-    (ephem.SE_JUPITER, swe.JUPITER),
-    (ephem.SE_SATURN, swe.SATURN),
+    (ephem.SUN, swe.SUN),
+    (ephem.MOON, swe.MOON),
+    (ephem.MERCURY, swe.MERCURY),
+    (ephem.VENUS, swe.VENUS),
+    (ephem.MARS, swe.MARS),
+    (ephem.JUPITER, swe.JUPITER),
+    (ephem.SATURN, swe.SATURN),
 ]
 PLANETS_ALL = PLANETS_7 + [
-    (ephem.SE_URANUS, swe.URANUS),
-    (ephem.SE_NEPTUNE, swe.NEPTUNE),
-    (ephem.SE_PLUTO, swe.PLUTO),
+    (ephem.URANUS, swe.URANUS),
+    (ephem.NEPTUNE, swe.NEPTUNE),
+    (ephem.PLUTO, swe.PLUTO),
 ]
 
 
 def test_236():
     p, f, t, fails = 0, 0, 0, []
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_TRUEPOS
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_TRUEPOS
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS
     for le_b, se_b in PLANETS_ALL:
         for jd in DATES_10:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                le_r = ephem.calc_ut(jd, le_b, le_f)
                 se_r = swe.calc_ut(jd, se_b, se_f)
             except:
                 continue
@@ -114,16 +117,16 @@ def test_236():
 def test_237():
     p, f, t, fails = 0, 0, 0, []
     bodies = [
-        (ephem.SE_MOON, swe.MOON, "Moon"),
-        (ephem.SE_VENUS, swe.VENUS, "Venus"),
-        (ephem.SE_MARS, swe.MARS, "Mars"),
-        (ephem.SE_JUPITER, swe.JUPITER, "Jupiter"),
-        (ephem.SE_SATURN, swe.SATURN, "Saturn"),
+        (ephem.MOON, swe.MOON, "Moon"),
+        (ephem.VENUS, swe.VENUS, "Venus"),
+        (ephem.MARS, swe.MARS, "Mars"),
+        (ephem.JUPITER, swe.JUPITER, "Jupiter"),
+        (ephem.SATURN, swe.SATURN, "Saturn"),
     ]
     for le_b, se_b, nm in bodies:
         for jd in DATES_10[:7]:
             try:
-                le_r = ephem.swe_pheno_ut(jd, le_b, ephem.SEFLG_SWIEPH)
+                le_r = ephem.pheno_ut(jd, le_b, ephem.FLG_SWIEPH)
                 se_r = swe.pheno_ut(jd, se_b, swe.FLG_SWIEPH)
                 le_elong = le_r[0][2]
                 se_elong = se_r[2]
@@ -183,7 +186,7 @@ def test_238():
     for jd in leap_jds:
         for offset in [-0.001, 0.0, 0.001]:
             try:
-                le_dt = ephem.swe_deltat(jd + offset)
+                le_dt = ephem.deltat(jd + offset)
                 se_dt = swe.deltat(jd + offset)
             except:
                 continue
@@ -205,8 +208,8 @@ def test_239():
         for lat in lats:
             for hs in hsystems:
                 try:
-                    le_c, le_a = ephem.swe_houses_ex(
-                        jd, lat, 0.0, ord(hs), ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+                    le_c, le_a = ephem.houses_ex(
+                        jd, lat, 0.0, ord(hs), ephem.FLG_SWIEPH | ephem.FLG_SPEED
                     )
                     se_c, se_a = swe.houses_ex(
                         jd, lat, 0.0, hs.encode(), swe.FLG_SWIEPH | swe.FLG_SPEED
@@ -246,12 +249,12 @@ def test_240():
         "Capella",
         "Procyon",
     ]
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_EQUATORIAL
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_EQUATORIAL
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_EQUATORIAL
     for star in stars:
         for jd in [2451545.0, 2460000.0, 2440000.0, 2455000.0]:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, jd, le_f)
+                le_r = ephem.fixstar2_ut(star, jd, le_f)
                 se_r = swe.fixstar2(star, jd, se_f)
             except:
                 continue
@@ -276,13 +279,13 @@ def test_241():
     p, f, t, fails = 0, 0, 0, []
     for sid_mode in [1, 3]:  # Lahiri, Raman
         swe.set_sid_mode(sid_mode)
-        ephem.swe_set_sid_mode(sid_mode, 0, 0)
-        le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+        ephem.set_sid_mode(sid_mode, 0, 0)
+        le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL
         se_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
         for le_b, se_b in PLANETS_ALL:
             for jd in DATES_10[:7]:
                 try:
-                    le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                    le_r = ephem.calc_ut(jd, le_b, le_f)
                     se_r = swe.calc_ut(jd, se_b, se_f)
                 except:
                     continue
@@ -294,7 +297,7 @@ def test_241():
                     f += 1
                     fails.append(f'  sid={sid_mode} B{le_b} jd={jd:.0f} diff={d:.2f}"')
         swe.set_sid_mode(0)
-        ephem.swe_set_sid_mode(0, 0, 0)
+        ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
@@ -303,24 +306,24 @@ def test_242():
     flag_combos = [
         (
             "Default",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED,
             swe.FLG_SWIEPH | swe.FLG_SPEED,
         ),
         (
             "NOABERR",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_NOABERR,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_NOABERR,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NOABERR,
         ),
         (
             "TRUEPOS",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_TRUEPOS,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_TRUEPOS,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS,
         ),
     ]
     for fl, le_f, se_f in flag_combos:
         for jd in DATES_10[:8]:
             try:
-                le_r = ephem.swe_calc_ut(jd, ephem.SE_MOON, le_f)
+                le_r = ephem.calc_ut(jd, ephem.MOON, le_f)
                 se_r = swe.calc_ut(jd, swe.MOON, se_f)
             except:
                 continue
@@ -345,26 +348,26 @@ def test_242():
 def test_243():
     p, f, t, fails = 0, 0, 0, []
     bodies = [
-        (ephem.SE_CHIRON, swe.CHIRON, "Chiron"),
-        (ephem.SE_CERES, swe.CERES, "Ceres"),
+        (ephem.CHIRON, swe.CHIRON, "Chiron"),
+        (ephem.CERES, swe.CERES, "Ceres"),
     ]
     flag_combos = [
         (
             "Helio",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_HELCTR,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_HELCTR,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_HELCTR,
         ),
         (
             "J2000",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_J2000,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_J2000,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000,
         ),
         (
             "Helio+J2000",
-            ephem.SEFLG_SWIEPH
-            | ephem.SEFLG_SPEED
-            | ephem.SEFLG_HELCTR
-            | ephem.SEFLG_J2000,
+            ephem.FLG_SWIEPH
+            | ephem.FLG_SPEED
+            | ephem.FLG_HELCTR
+            | ephem.FLG_J2000,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_HELCTR | swe.FLG_J2000,
         ),
     ]
@@ -372,7 +375,7 @@ def test_243():
         for fl, le_f, se_f in flag_combos:
             for jd in DATES_10[:8]:
                 try:
-                    le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                    le_r = ephem.calc_ut(jd, le_b, le_f)
                     se_r = swe.calc_ut(jd, se_b, se_f)
                 except:
                     continue
@@ -391,10 +394,10 @@ def test_244():
     for le_b, se_b in PLANETS_7:
         for jd in DATES_10[:6]:
             try:
-                le_r = ephem.swe_calc_ut(
-                    jd, le_b, ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+                le_r = ephem.calc_ut(
+                    jd, le_b, ephem.FLG_SWIEPH | ephem.FLG_SPEED
                 )
-                le_nut = ephem.swe_calc_ut(jd, -1, 0)
+                le_nut = ephem.calc_ut(jd, -1, 0)
                 eps = le_nut[0][0]
                 ecl_sp = (
                     le_r[0][0],
@@ -434,14 +437,14 @@ def test_244():
 
 def test_245():
     p, f, t, fails = 0, 0, 0, []
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED
     for jd_base in [2451545.0, 2460000.0, 2440000.0]:
         for h_frac in [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]:
             jd = jd_base + h_frac
             for le_b, se_b in PLANETS_ALL:
                 try:
-                    le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                    le_r = ephem.calc_ut(jd, le_b, le_f)
                     se_r = swe.calc_ut(jd, se_b, se_f)
                 except:
                     continue
@@ -468,8 +471,8 @@ def test_246():
         for lat in lats:
             for hs in hsystems:
                 try:
-                    le_r = ephem.swe_houses_armc_ex2(
-                        armc, lat, eps, ord(hs), ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+                    le_r = ephem.houses_armc_ex2(
+                        armc, lat, eps, ord(hs), ephem.FLG_SWIEPH | ephem.FLG_SPEED
                     )
                     se_r = swe.houses_armc_ex2(
                         armc, lat, eps, hs.encode(), swe.FLG_SWIEPH | swe.FLG_SPEED
@@ -489,17 +492,17 @@ def test_246():
 
 def test_247():
     p, f, t, fails = 0, 0, 0, []
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED
     for le_b, se_b in [
-        (ephem.SE_MARS, swe.MARS),
-        (ephem.SE_JUPITER, swe.JUPITER),
-        (ephem.SE_SATURN, swe.SATURN),
-        (ephem.SE_VENUS, swe.VENUS),
+        (ephem.MARS, swe.MARS),
+        (ephem.JUPITER, swe.JUPITER),
+        (ephem.SATURN, swe.SATURN),
+        (ephem.VENUS, swe.VENUS),
     ]:
         for jd in DATES_10[:8]:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                le_r = ephem.calc_ut(jd, le_b, le_f)
                 se_r = swe.calc_ut(jd, se_b, se_f)
             except:
                 continue
@@ -526,7 +529,7 @@ def test_248():
     for i in range(40):
         jd = 2451545.0 + i * 170.0
         try:
-            le_r = ephem.swe_calc_ut(jd, -1, 0)
+            le_r = ephem.calc_ut(jd, -1, 0)
             se_r = swe.calc_ut(jd, -1, swe.FLG_SWIEPH)
         except:
             continue
@@ -563,15 +566,15 @@ def test_248():
 
 def test_249():
     p, f, t, fails = 0, 0, 0, []
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED
     for le_b, se_b, nm, tol in [
-        (ephem.SE_OSCU_APOG, swe.OSCU_APOG, "OscuLilith", 1.0),
-        (ephem.SE_MEAN_APOG, swe.MEAN_APOG, "MeanLilith", 1.0),
+        (ephem.OSCU_APOG, swe.OSCU_APOG, "OscuLilith", 1.0),
+        (ephem.MEAN_APOG, swe.MEAN_APOG, "MeanLilith", 1.0),
     ]:
         for jd in DATES_10:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                le_r = ephem.calc_ut(jd, le_b, le_f)
                 se_r = swe.calc_ut(jd, se_b, se_f)
             except:
                 continue
@@ -596,7 +599,7 @@ def test_249():
 def test_250():
     p, f, t, fails = 0, 0, 0, []
     swe.set_sid_mode(1)
-    ephem.swe_set_sid_mode(1, 0, 0)
+    ephem.set_sid_mode(1, 0, 0)
     stars = [
         "Aldebaran",
         "Regulus",
@@ -607,12 +610,12 @@ def test_250():
         "Pollux",
         "Arcturus",
     ]
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED | ephem.SEFLG_SIDEREAL
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED | ephem.FLG_SIDEREAL
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
     for star in stars:
         for jd in [2451545.0, 2460000.0, 2440000.0, 2455000.0]:
             try:
-                le_r = ephem.swe_fixstar2_ut(star, jd, le_f)
+                le_r = ephem.fixstar2_ut(star, jd, le_f)
                 se_r = swe.fixstar2(star, jd, se_f)
             except:
                 continue
@@ -624,23 +627,23 @@ def test_250():
                 f += 1
                 fails.append(f'  {star} sid jd={jd:.0f} lon diff={d:.4f}"')
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
     return p, f, t, fails
 
 
 def test_251():
     p, f, t, fails = 0, 0, 0, []
     le_f = (
-        ephem.SEFLG_SWIEPH
-        | ephem.SEFLG_SPEED
-        | ephem.SEFLG_NONUT
-        | ephem.SEFLG_EQUATORIAL
+        ephem.FLG_SWIEPH
+        | ephem.FLG_SPEED
+        | ephem.FLG_NONUT
+        | ephem.FLG_EQUATORIAL
     )
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT | swe.FLG_EQUATORIAL
     for le_b, se_b in PLANETS_ALL:
         for jd in DATES_10[:7]:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                le_r = ephem.calc_ut(jd, le_b, le_f)
                 se_r = swe.calc_ut(jd, se_b, se_f)
             except:
                 continue
@@ -666,19 +669,19 @@ def test_252():
     hsystems = ["P", "K", "R", "C", "E", "W"]
     for jd in [2451545.0, 2460000.0, 2440000.0, 2455000.0]:
         try:
-            le_moon = ephem.swe_calc_ut(
-                jd, ephem.SE_MOON, ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+            le_moon = ephem.calc_ut(
+                jd, ephem.MOON, ephem.FLG_SWIEPH | ephem.FLG_SPEED
             )
-            le_nut = ephem.swe_calc_ut(jd, -1, 0)
+            le_nut = ephem.calc_ut(jd, -1, 0)
             eps = le_nut[0][0]
-            armc = ephem.swe_sidtime(jd) * 15.0
+            armc = ephem.sidtime(jd) * 15.0
             plon, plat = le_moon[0][0], le_moon[0][1]
         except:
             continue
         for lat in [0.0, 30.0, 45.0, 51.5, -33.87]:
             for hs in hsystems:
                 try:
-                    le_hp = ephem.swe_house_pos(armc, lat, eps, ord(hs), plon, plat)
+                    le_hp = ephem.house_pos(armc, lat, eps, ord(hs), plon, plat)
                     se_hp = swe.house_pos(armc, lat, eps, (plon, plat), hs.encode())
                 except:
                     continue
@@ -695,17 +698,17 @@ def test_252():
 def test_253():
     p, f, t, fails = 0, 0, 0, []
     asteroids = [
-        (ephem.SE_CERES, swe.CERES, "Ceres"),
-        (ephem.SE_PALLAS, swe.PALLAS, "Pallas"),
-        (ephem.SE_JUNO, swe.JUNO, "Juno"),
-        (ephem.SE_VESTA, swe.VESTA, "Vesta"),
+        (ephem.CERES, swe.CERES, "Ceres"),
+        (ephem.PALLAS, swe.PALLAS, "Pallas"),
+        (ephem.JUNO, swe.JUNO, "Juno"),
+        (ephem.VESTA, swe.VESTA, "Vesta"),
     ]
-    le_f = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+    le_f = ephem.FLG_SWIEPH | ephem.FLG_SPEED
     se_f = swe.FLG_SWIEPH | swe.FLG_SPEED
     for le_b, se_b, nm in asteroids:
         for jd in DATES_10:
             try:
-                le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                le_r = ephem.calc_ut(jd, le_b, le_f)
                 se_r = swe.calc_ut(jd, se_b, se_f)
             except:
                 continue
@@ -745,14 +748,14 @@ def test_254():
         for lat, lon, alt, nm in locations:
             for rsmi in [1, 2]:  # rise, set
                 try:
-                    le_r = ephem.swe_rise_trans(
+                    le_r = ephem.rise_trans(
                         jd,
-                        ephem.SE_SUN,
+                        ephem.SUN,
                         rsmi,
                         [lon, lat, alt],
                         1013.25,
                         15.0,
-                        ephem.SEFLG_SWIEPH,
+                        ephem.FLG_SWIEPH,
                     )
                     se_r = swe.rise_trans(
                         jd, swe.SUN, rsmi, [lon, lat, alt], 1013.25, 15.0
@@ -780,48 +783,48 @@ def test_255():
     flag_combos = [
         (
             "Default",
-            ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED,
+            ephem.FLG_SWIEPH | ephem.FLG_SPEED,
             swe.FLG_SWIEPH | swe.FLG_SPEED,
             1.0,
         ),
         (
             "J2000+EQ",
-            ephem.SEFLG_SWIEPH
-            | ephem.SEFLG_SPEED
-            | ephem.SEFLG_J2000
-            | ephem.SEFLG_EQUATORIAL,
+            ephem.FLG_SWIEPH
+            | ephem.FLG_SPEED
+            | ephem.FLG_J2000
+            | ephem.FLG_EQUATORIAL,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000 | swe.FLG_EQUATORIAL,
             1.0,
         ),
         (
             "NONUT+NOABERR",
-            ephem.SEFLG_SWIEPH
-            | ephem.SEFLG_SPEED
-            | ephem.SEFLG_NONUT
-            | ephem.SEFLG_NOABERR,
+            ephem.FLG_SWIEPH
+            | ephem.FLG_SPEED
+            | ephem.FLG_NONUT
+            | ephem.FLG_NOABERR,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_NONUT | swe.FLG_NOABERR,
             35.0,
         ),
         (
             "J2000+NONUT",
-            ephem.SEFLG_SWIEPH
-            | ephem.SEFLG_SPEED
-            | ephem.SEFLG_J2000
-            | ephem.SEFLG_NONUT,
+            ephem.FLG_SWIEPH
+            | ephem.FLG_SPEED
+            | ephem.FLG_J2000
+            | ephem.FLG_NONUT,
             swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000 | swe.FLG_NONUT,
             1.0,
         ),
     ]
     for le_b, se_b in [
-        (ephem.SE_SUN, swe.SUN),
-        (ephem.SE_MOON, swe.MOON),
-        (ephem.SE_MARS, swe.MARS),
-        (ephem.SE_JUPITER, swe.JUPITER),
+        (ephem.SUN, swe.SUN),
+        (ephem.MOON, swe.MOON),
+        (ephem.MARS, swe.MARS),
+        (ephem.JUPITER, swe.JUPITER),
     ]:
         for fl, le_f, se_f, tol in flag_combos:
             for jd in DATES_10[:5]:
                 try:
-                    le_r = ephem.swe_calc_ut(jd, le_b, le_f)
+                    le_r = ephem.calc_ut(jd, le_b, le_f)
                     se_r = swe.calc_ut(jd, se_b, se_f)
                 except:
                     continue

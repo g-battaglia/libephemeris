@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "1.6.0"
+version = "2.0.0"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -110,7 +110,14 @@ requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["libephemeris", "libephemeris.cli", "libephemeris.dev_cli"]
+packages = [
+    "libephemeris",
+    "libephemeris.cli",
+    "libephemeris.contrib",
+    "libephemeris.dev_cli",
+    "libephemeris.moon_theories",
+    "libephemeris.vendor",
+]
 
 [tool.setuptools.package-data]
 libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]

@@ -1,15 +1,15 @@
 """
 Tests for lunar occultation location-specific calculations in libephemeris.
 
-Tests the swe_lun_occult_when_loc function which finds lunar occultations
+Tests the lun_occult_when_loc function which finds lunar occultations
 of planets and fixed stars visible from a specific geographic location.
 
 Lunar occultations occur when the Moon passes in front of a planet or star.
 This function adds location-specific visibility checking to ensure the
 occultation is observable from the given coordinates.
 
-The function matches the pyswisseph swe_lun_occult_when_loc() API:
-    swe_lun_occult_when_loc(tjdut, body, geopos, flags, backwards)
+The function matches the pyswisseph lun_occult_when_loc() API:
+    lun_occult_when_loc(tjdut, body, geopos, flags, backwards)
     -> (retflags, tret, attr)
 """
 
@@ -20,19 +20,18 @@ pytestmark = pytest.mark.slow
 from libephemeris import (
     julday,
     lun_occult_when_loc,
-    swe_lun_occult_when_loc,
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_PARTIAL,
-    SE_ECL_VISIBLE,
-    SE_ECL_MAX_VISIBLE,
-    SE_ECL_1ST_VISIBLE,
-    SE_ECL_4TH_VISIBLE,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_PARTIAL,
+    ECL_VISIBLE,
+    ECL_MAX_VISIBLE,
+    ECL_1ST_VISIBLE,
+    ECL_4TH_VISIBLE,
 )
 
 
 class TestSweLunOccultWhenLoc:
-    """Test suite for swe_lun_occult_when_loc function (pyswisseph API)."""
+    """Test suite for lun_occult_when_loc function (pyswisseph API)."""
 
     def test_finds_star_occultation_regulus_from_location(self):
         """Test finding a lunar occultation of Regulus visible from a location.
@@ -47,8 +46,8 @@ class TestSweLunOccultWhenLoc:
         # geopos = [lon, lat, alt] - pyswisseph convention
         geopos = [10.0, 45.0, 0.0]  # Northern Italy (lon=10°E, lat=45°N)
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # Should find an occultation
@@ -61,8 +60,8 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # retflags should be int
@@ -81,8 +80,8 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         jd_max = tret[0]
@@ -109,31 +108,31 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # Should be either total or partial
-        assert (retflags & SE_ECL_TOTAL) or (retflags & SE_ECL_PARTIAL)
+        assert (retflags & ECL_TOTAL) or (retflags & ECL_PARTIAL)
 
         # Should have visibility flags
-        assert retflags & SE_ECL_VISIBLE
+        assert retflags & ECL_VISIBLE
 
     def test_visibility_flags_set(self):
         """Test that visibility flags are properly set."""
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # At least one visibility flag should be set
         visibility_flags = (
-            SE_ECL_VISIBLE
-            | SE_ECL_MAX_VISIBLE
-            | SE_ECL_1ST_VISIBLE
-            | SE_ECL_4TH_VISIBLE
+            ECL_VISIBLE
+            | ECL_MAX_VISIBLE
+            | ECL_1ST_VISIBLE
+            | ECL_4TH_VISIBLE
         )
         assert retflags & visibility_flags
 
@@ -145,8 +144,8 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # Fraction covered should be between 0 and 1
@@ -170,7 +169,7 @@ class TestSweLunOccultWhenLoc:
         geopos = [10.0, 45.0, 0.0]
 
         with pytest.raises(ValueError):
-            swe_lun_occult_when_loc(jd_start, 0, geopos, SEFLG_SWIEPH)
+            lun_occult_when_loc(jd_start, 0, geopos, FLG_SWIEPH)
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
@@ -178,7 +177,7 @@ class TestSweLunOccultWhenLoc:
         geopos = [10.0, 45.0, 0.0]
 
         with pytest.raises(ValueError):
-            swe_lun_occult_when_loc(jd_start, "UnknownStar123", geopos, SEFLG_SWIEPH)
+            lun_occult_when_loc(jd_start, "UnknownStar123", geopos, FLG_SWIEPH)
 
     def test_raises_error_for_invalid_geopos(self):
         """Test that function raises error for invalid geopos."""
@@ -186,7 +185,7 @@ class TestSweLunOccultWhenLoc:
         geopos = [10.0, 45.0]  # Missing altitude
 
         with pytest.raises(ValueError):
-            swe_lun_occult_when_loc(jd_start, "Regulus", geopos, SEFLG_SWIEPH)
+            lun_occult_when_loc(jd_start, "Regulus", geopos, FLG_SWIEPH)
 
     def test_occultation_duration_reasonable(self):
         """Test that occultation duration is reasonable.
@@ -197,8 +196,8 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         jd_first = tret[1]
@@ -222,11 +221,11 @@ class TestSweLunOccultLocDifferentLocations:
         geopos2 = [139.7, 35.7, 0.0]  # Tokyo
 
         # Both should find occultations
-        retflags1, tret1, attr1 = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos1, SEFLG_SWIEPH
+        retflags1, tret1, attr1 = lun_occult_when_loc(
+            jd_start, "Regulus", geopos1, FLG_SWIEPH
         )
-        retflags2, tret2, attr2 = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos2, SEFLG_SWIEPH
+        retflags2, tret2, attr2 = lun_occult_when_loc(
+            jd_start, "Regulus", geopos2, FLG_SWIEPH
         )
 
         # Both should find occultations
@@ -249,8 +248,8 @@ class TestSweLunOccultLocEdgeCases:
         geopos = [10.0, 45.0, 1000.0]  # 1000m above sea level
 
         # Should not raise an error
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         assert tret[0] > 0
@@ -262,8 +261,8 @@ class TestSweLunOccultLocEdgeCases:
 
         # Should find an occultation or raise RuntimeError if none visible
         try:
-            retflags, tret, attr = swe_lun_occult_when_loc(
-                jd_start, "Regulus", geopos, SEFLG_SWIEPH
+            retflags, tret, attr = lun_occult_when_loc(
+                jd_start, "Regulus", geopos, FLG_SWIEPH
             )
             assert tret[0] > jd_start
         except RuntimeError as e:
@@ -277,8 +276,8 @@ class TestSweLunOccultLocEdgeCases:
 
         # Should find an occultation or raise RuntimeError if none visible
         try:
-            retflags, tret, attr = swe_lun_occult_when_loc(
-                jd_start, "Regulus", geopos, SEFLG_SWIEPH
+            retflags, tret, attr = lun_occult_when_loc(
+                jd_start, "Regulus", geopos, FLG_SWIEPH
             )
             assert tret[0] > jd_start
         except RuntimeError as e:
@@ -289,8 +288,8 @@ class TestSweLunOccultLocEdgeCases:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # Moonrise time is at index 7
@@ -315,8 +314,8 @@ class TestSweLunOccultLocEdgeCases:
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        retflags, tret, attr = swe_lun_occult_when_loc(
-            jd_start, "Regulus", geopos, SEFLG_SWIEPH
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, "Regulus", geopos, FLG_SWIEPH
         )
 
         # Angular separation at maximum is at index 7

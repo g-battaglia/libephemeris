@@ -22,7 +22,7 @@ class TestDocumentedFormulas:
         jd = 2451545.0  # J2000
         lat, lon = 41.9, 12.5  # Rome
 
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("E"))
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("E"))
         asc = ascmc[0]
 
         # Verify each cusp follows the documented formula
@@ -43,7 +43,7 @@ class TestDocumentedFormulas:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("W"))
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("W"))
         asc = ascmc[0]
 
         # Calculate expected start (0° of sign containing Asc)
@@ -65,7 +65,7 @@ class TestDocumentedFormulas:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("V"))
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("V"))
         asc = ascmc[0]
 
         # Calculate expected start (Asc - 15°)
@@ -87,7 +87,7 @@ class TestDocumentedFormulas:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("O"))
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("O"))
         asc = ascmc[0]
         mc = ascmc[1]
         ic = (mc + 180.0) % 360.0
@@ -129,7 +129,7 @@ class TestDocumentedFormulas:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc = ephem.swe_houses(jd, lat, lon, ord("N"))
+        cusps, ascmc = ephem.houses(jd, lat, lon, ord("N"))
 
         for i in range(1, 13):
             expected = (i - 1) * 30.0
@@ -149,7 +149,7 @@ class TestDocumentedFormulas:
         systems = ["P", "K", "O", "R", "C", "E", "W", "B", "M", "T", "X", "V"]
 
         for hsys in systems:
-            cusps, _ = ephem.swe_houses(jd, lat, lon, ord(hsys))
+            cusps, _ = ephem.houses(jd, lat, lon, ord(hsys))
 
             for i in range(6):
                 opposite = (i + 6) % 12
@@ -250,11 +250,11 @@ class TestPolarLatitudeDocumentation:
 
         # Placidus should raise PolarCircleError
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses(jd, polar_lat, lon, ord("P"))
+            ephem.houses(jd, polar_lat, lon, ord("P"))
 
         # Koch should raise PolarCircleError
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses(jd, polar_lat, lon, ord("K"))
+            ephem.houses(jd, polar_lat, lon, ord("K"))
 
     @pytest.mark.unit
     def test_universal_systems_work_at_poles(self):
@@ -268,7 +268,7 @@ class TestPolarLatitudeDocumentation:
 
         # These should not raise errors
         for hsys in ["E", "W", "O"]:
-            cusps, ascmc = ephem.swe_houses(jd, polar_lat, lon, ord(hsys))
+            cusps, ascmc = ephem.houses(jd, polar_lat, lon, ord(hsys))
             assert len(cusps) >= 12, f"System {hsys} failed at polar latitude"
 
 
@@ -277,10 +277,10 @@ class TestHouseSystemNames:
 
     @pytest.mark.unit
     def test_house_system_names(self):
-        """Test that swe_house_name returns documented names."""
-        from libephemeris.houses import swe_house_name
+        """Test that house_name returns documented names."""
+        from libephemeris.houses import house_name
 
-        # Test names that are defined in the swe_house_name function
+        # Test names that are defined in the house_name function
         expected_names = {
             "P": "Placidus",
             "K": "Koch",
@@ -303,7 +303,7 @@ class TestHouseSystemNames:
         }
 
         for code, expected in expected_names.items():
-            actual = swe_house_name(ord(code))
+            actual = house_name(ord(code))
             assert actual == expected, (
                 f"System '{code}': expected '{expected}', got '{actual}'"
             )

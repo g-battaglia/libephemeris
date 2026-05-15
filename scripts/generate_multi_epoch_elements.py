@@ -570,13 +570,13 @@ Examples:
         else:
             horizons_id = ""
 
-        # Derive SE_* constant name from body name
-        const_name = f"SE_{body_name.upper()}"
-        # Handle special cases
+        # Derive bare constant name from body name
+        const_name = body_name.upper()
+        # Handle special cases (collision avoidance with planet/moon names)
         name_to_const = {
-            "Europa": "SE_EUROPA_AST",
-            "Pandora": "SE_PANDORA_AST",
-            "Lilith": "SE_LILITH_AST",
+            "Europa": "EUROPA_AST",
+            "Pandora": "PANDORA_AST",
+            "Lilith": "LILITH_AST",
         }
         if body_name in name_to_const:
             const_name = name_to_const[body_name]

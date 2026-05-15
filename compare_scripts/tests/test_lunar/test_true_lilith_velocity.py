@@ -1,7 +1,7 @@
 """
 Tests for True Lilith (osculating lunar apogee) velocity calculation.
 
-Validates that velocity (SEFLG_SPEED) is calculated correctly via numerical
+Validates that velocity (FLG_SPEED) is calculated correctly via numerical
 differentiation for True Lilith.
 
 True Lilith (osculating apogee) can move rapidly because the osculating orbital
@@ -24,7 +24,7 @@ import random
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_OSCU_APOG, SE_MEAN_APOG, SEFLG_SPEED
+from libephemeris.constants import OSCU_APOG, MEAN_APOG, FLG_SPEED
 
 
 # True Lilith velocity tolerance (osculating apogee can have significant velocity variations)
@@ -42,32 +42,32 @@ class TestTrueLilithVelocity:
 
     @pytest.mark.unit
     def test_true_lilith_velocity_is_nonzero_with_flag(self):
-        """True Lilith velocity should be calculated when SEFLG_SPEED is set."""
+        """True Lilith velocity should be calculated when FLG_SPEED is set."""
         jd = 2451545.0  # J2000.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
         # Velocity components should be non-zero
-        assert pos[3] != 0.0, "Longitude velocity should be non-zero with SEFLG_SPEED"
+        assert pos[3] != 0.0, "Longitude velocity should be non-zero with FLG_SPEED"
 
     @pytest.mark.unit
     def test_true_lilith_velocity_without_flag_is_zero(self):
-        """Without SEFLG_SPEED, velocity should be zero."""
+        """Without FLG_SPEED, velocity should be zero."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)  # No SEFLG_SPEED
+        pos, _ = ephem.calc_ut(jd, OSCU_APOG, 0)  # No FLG_SPEED
 
-        assert pos[3] == 0.0, f"Velocity should be 0 without SEFLG_SPEED, got {pos[3]}"
+        assert pos[3] == 0.0, f"Velocity should be 0 without FLG_SPEED, got {pos[3]}"
         assert pos[4] == 0.0, (
-            f"Lat velocity should be 0 without SEFLG_SPEED, got {pos[4]}"
+            f"Lat velocity should be 0 without FLG_SPEED, got {pos[4]}"
         )
         assert pos[5] == 0.0, (
-            f"Dist velocity should be 0 without SEFLG_SPEED, got {pos[5]}"
+            f"Dist velocity should be 0 without FLG_SPEED, got {pos[5]}"
         )
 
     @pytest.mark.unit
     def test_true_lilith_velocity_in_expected_range(self):
         """True Lilith velocity should be within physically reasonable range."""
         jd = 2451545.0  # J2000.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
         # The osculating apogee typically moves between -1.0 and +1.0 degrees/day
         # (faster than mean apogee due to short-period oscillations)
@@ -81,8 +81,8 @@ class TestTrueLilithVelocity:
         jd = 2451545.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_OSCU_APOG, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, OSCU_APOG, FLG_SPEED)
 
         # Actual position change
         actual_change = pos2[0] - pos1[0]
@@ -107,7 +107,7 @@ class TestTrueLilithVelocity:
         """True Lilith velocity should be reasonable compared to pyswisseph."""
         jd = 2451545.0  # J2000.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
         pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
 
         vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -127,7 +127,7 @@ class TestTrueLilithVelocity:
             month = random.randint(1, 12)
             day = random.randint(1, 28)
             hour = random.uniform(0, 24)
-            jd = ephem.swe_julday(year, month, day, hour)
+            jd = ephem.julday(year, month, day, hour)
             dates.append((year, jd))
 
         progress = progress_reporter(
@@ -137,7 +137,7 @@ class TestTrueLilithVelocity:
         errors = []
 
         for i, (year, jd) in enumerate(dates):
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
 
             vel_diff = abs(pos_lib[3] - pos_swe[3])
@@ -165,16 +165,16 @@ class TestTrueLilithLatitudeVelocity:
 
     @pytest.mark.unit
     def test_latitude_velocity_is_calculated(self):
-        """True Lilith latitude velocity should be calculated with SEFLG_SPEED."""
+        """True Lilith latitude velocity should be calculated with FLG_SPEED."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
         # Latitude velocity (pos[4]) may be zero at some times, but generally isn't
         # Just verify it's being calculated (not permanently zero)
         # Check a few dates
         any_nonzero = False
         for offset in range(10):
-            pos_test, _ = ephem.swe_calc_ut(jd + offset * 10, SE_OSCU_APOG, SEFLG_SPEED)
+            pos_test, _ = ephem.calc_ut(jd + offset * 10, OSCU_APOG, FLG_SPEED)
             if pos_test[4] != 0.0:
                 any_nonzero = True
                 break
@@ -186,7 +186,7 @@ class TestTrueLilithLatitudeVelocity:
         """True Lilith latitude velocity should be reasonable compared to pyswisseph."""
         jd = 2451545.0
 
-        pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+        pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
         pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
 
         # Latitude velocity difference
@@ -205,15 +205,15 @@ class TestMeanLilithVelocity:
 
     @pytest.mark.unit
     def test_mean_lilith_velocity_is_nonzero(self):
-        """Mean Lilith velocity should now be calculated with SEFLG_SPEED."""
+        """Mean Lilith velocity should now be calculated with FLG_SPEED."""
         jd = 2451545.0
-        pos, _ = ephem.swe_calc_ut(jd, SE_MEAN_APOG, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, MEAN_APOG, FLG_SPEED)
 
         # Mean Lilith velocity is now implemented using central difference
         # The base apsidal precession is about 40.7 degrees/year = 0.111 deg/day
         # but the Mean Lilith formula includes periodic corrections that cause
         # the instantaneous velocity to vary
-        assert pos[3] != 0.0, "Mean Lilith velocity should be non-zero with SEFLG_SPEED"
+        assert pos[3] != 0.0, "Mean Lilith velocity should be non-zero with FLG_SPEED"
         assert 0.0 < pos[3] < 1.0, (
             f"Mean Lilith velocity {pos[3]} deg/day outside expected range [0.0, 1.0]"
         )
@@ -233,7 +233,7 @@ class TestTrueLilithVelocityEdgeCases:
         ]
 
         for jd in epochs:
-            pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
             # Velocity should be within reasonable range at all epochs
             assert -3.0 < pos[3] < 3.0, (
@@ -245,7 +245,7 @@ class TestTrueLilithVelocityEdgeCases:
         """Calling multiple times should give consistent results."""
         jd = 2451545.0
 
-        results = [ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED) for _ in range(5)]
+        results = [ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED) for _ in range(5)]
 
         velocities = [r[0][3] for r in results]
         assert all(v == velocities[0] for v in velocities), (
@@ -261,7 +261,7 @@ class TestTrueLilithVelocityEdgeCases:
 
         for offset in range(100):
             jd = 2451545.0 + offset * 3  # Check every 3 days for 300 days
-            pos, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
 
             if pos[3] > 0.01:
                 positive_count += 1
@@ -283,8 +283,8 @@ class TestTrueLilithVelocityDocumentation:
         jd = 2451545.0
         dt = 1.0  # 1 day
 
-        pos1, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, SEFLG_SPEED)
-        pos2, _ = ephem.swe_calc_ut(jd + dt, SE_OSCU_APOG, SEFLG_SPEED)
+        pos1, _ = ephem.calc_ut(jd, OSCU_APOG, FLG_SPEED)
+        pos2, _ = ephem.calc_ut(jd + dt, OSCU_APOG, FLG_SPEED)
 
         # Calculate numerical derivative
         actual_change = pos2[0] - pos1[0]

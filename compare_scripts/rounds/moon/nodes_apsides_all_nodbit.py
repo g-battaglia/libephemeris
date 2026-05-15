@@ -19,10 +19,13 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 # Constants
-SEFLG_SPEED = 256
+FLG_SPEED = 256
 NODBIT_MEAN = 1
 NODBIT_OSCU = 2
 NODBIT_OSCU_BAR = 4
@@ -99,8 +102,8 @@ for label, jd in test_dates:
     for body in BODIES:
         for nodbit, nodbit_name in NODBIT_FLAGS:
             try:
-                se_result = swe.nod_aps_ut(jd, body, nodbit, SEFLG_SPEED)
-                le_result = ephem.swe_nod_aps_ut(jd, body, nodbit, SEFLG_SPEED)
+                se_result = swe.nod_aps_ut(jd, body, nodbit, FLG_SPEED)
+                le_result = ephem.nod_aps_ut(jd, body, nodbit, FLG_SPEED)
 
                 is_oscu = (nodbit & (NODBIT_OSCU | NODBIT_OSCU_BAR)) != 0
 

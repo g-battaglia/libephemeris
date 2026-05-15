@@ -81,19 +81,19 @@ def angle_diff(a, b):
 
 
 PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanLilith"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanLilith"),
 ]
 
 DATES = [
@@ -106,24 +106,24 @@ DATES = [
 
 # Ayanamsha modes to test
 AYANAMSHA_MODES = [
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_FAGAN_BRADLEY, "FaganBradley"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (SE_SIDM_JN_BHASIN, "JNBhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "BabylKugler1"),
-    (SE_SIDM_BABYL_KUGLER2, "BabylKugler2"),
-    (SE_SIDM_BABYL_KUGLER3, "BabylKugler3"),
-    (SE_SIDM_BABYL_HUBER, "BabylHuber"),
-    (SE_SIDM_BABYL_ETPSC, "BabylEtPsc"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran15Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_SASSANIAN, "Sassanian"),
-    (SE_SIDM_GALCENT_0SAG, "GalCent0Sag"),
-    (SE_SIDM_J2000, "J2000"),
-    (SE_SIDM_J1900, "J1900"),
-    (SE_SIDM_B1950, "B1950"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_FAGAN_BRADLEY, "FaganBradley"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_JN_BHASIN, "JNBhasin"),
+    (SIDM_BABYL_KUGLER1, "BabylKugler1"),
+    (SIDM_BABYL_KUGLER2, "BabylKugler2"),
+    (SIDM_BABYL_KUGLER3, "BabylKugler3"),
+    (SIDM_BABYL_HUBER, "BabylHuber"),
+    (SIDM_BABYL_ETPSC, "BabylEtPsc"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran15Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_SASSANIAN, "Sassanian"),
+    (SIDM_GALCENT_0SAG, "GalCent0Sag"),
+    (SIDM_J2000, "J2000"),
+    (SIDM_J1900, "J1900"),
+    (SIDM_B1950, "B1950"),
 ]
 
 
@@ -131,7 +131,7 @@ def se_calc_sidereal(jd, body, sidm):
     """SE sidereal calc."""
     try:
         swe.set_sid_mode(sidm)
-        xx = swe.calc_ut(jd, body, SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL)[0]
+        xx = swe.calc_ut(jd, body, FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL)[0]
         return xx
     except Exception:
         return None
@@ -140,8 +140,8 @@ def se_calc_sidereal(jd, body, sidm):
 def le_calc_sidereal(jd, body, sidm):
     """LE sidereal calc."""
     try:
-        ephem.swe_set_sid_mode(sidm, 0, 0)
-        xx, _ = ephem.swe_calc_ut(jd, body, SEFLG_SPEED | SEFLG_SIDEREAL)
+        ephem.set_sid_mode(sidm, 0, 0)
+        xx, _ = ephem.calc_ut(jd, body, FLG_SPEED | FLG_SIDEREAL)
         return xx
     except Exception:
         return None
@@ -159,8 +159,8 @@ def se_get_ayanamsa(jd, sidm):
 def le_get_ayanamsa(jd, sidm):
     """Get ayanamsha from LE."""
     try:
-        ephem.swe_set_sid_mode(sidm, 0, 0)
-        return ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(sidm, 0, 0)
+        return ephem.get_ayanamsa_ut(jd)
     except Exception:
         return None
 
@@ -204,15 +204,15 @@ def run_sidereal_planets(sidm, sidm_name, dates, tol_arcsec=5.0):
 # PART 1-3: Specific ayanamsha modes
 # ============================================================
 def run_part1():
-    return run_sidereal_planets(SE_SIDM_LAHIRI, "P1: Lahiri", DATES)
+    return run_sidereal_planets(SIDM_LAHIRI, "P1: Lahiri", DATES)
 
 
 def run_part2():
-    return run_sidereal_planets(SE_SIDM_FAGAN_BRADLEY, "P2: Fagan-Bradley", DATES)
+    return run_sidereal_planets(SIDM_FAGAN_BRADLEY, "P2: Fagan-Bradley", DATES)
 
 
 def run_part3():
-    return run_sidereal_planets(SE_SIDM_RAMAN, "P3: Raman", DATES)
+    return run_sidereal_planets(SIDM_RAMAN, "P3: Raman", DATES)
 
 
 # ============================================================
@@ -272,8 +272,8 @@ def run_part5():
         jd = swe.julday(y, 1, 1, 0.0)
         label = f"Lahiri {y}"
 
-        se_ayan = se_get_ayanamsa(jd, SE_SIDM_LAHIRI)
-        le_ayan = le_get_ayanamsa(jd, SE_SIDM_LAHIRI)
+        se_ayan = se_get_ayanamsa(jd, SIDM_LAHIRI)
+        le_ayan = le_get_ayanamsa(jd, SIDM_LAHIRI)
 
         if se_ayan is None or le_ayan is None:
             r.skip(f"{label}")
@@ -310,8 +310,8 @@ def run_part6():
     for body_id, body_name in PLANETS:
         label = f"Speed {body_name}"
 
-        se_xx = se_calc_sidereal(jd, body_id, SE_SIDM_LAHIRI)
-        le_xx = le_calc_sidereal(jd, body_id, SE_SIDM_LAHIRI)
+        se_xx = se_calc_sidereal(jd, body_id, SIDM_LAHIRI)
+        le_xx = le_calc_sidereal(jd, body_id, SIDM_LAHIRI)
 
         if se_xx is None or le_xx is None:
             r.skip(f"{label}")
@@ -370,12 +370,12 @@ def run_part7():
         label = f"Houses {loc_name}"
 
         try:
-            swe.set_sid_mode(SE_SIDM_LAHIRI)
-            se_cusps, se_ascmc = swe.houses_ex(jd, lat, lon, b"P", SEFLG_SIDEREAL)
+            swe.set_sid_mode(SIDM_LAHIRI)
+            se_cusps, se_ascmc = swe.houses_ex(jd, lat, lon, b"P", FLG_SIDEREAL)
 
-            ephem.swe_set_sid_mode(SE_SIDM_LAHIRI, 0, 0)
-            le_cusps, le_ascmc = ephem.swe_houses_ex(
-                jd, lat, lon, ord("P"), SEFLG_SIDEREAL
+            ephem.set_sid_mode(SIDM_LAHIRI, 0, 0)
+            le_cusps, le_ascmc = ephem.houses_ex(
+                jd, lat, lon, ord("P"), FLG_SIDEREAL
             )
         except Exception as e:
             r.fail(f"{label}: {e}")

@@ -7,7 +7,7 @@ Compares eclipse calculations between pyswisseph and libephemeris.
 import pytest
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_SUN, SE_MOON
+from libephemeris.constants import SUN, MOON
 
 
 # ============================================================================
@@ -110,8 +110,8 @@ class TestEclipseAttributes:
 
         # pyswisseph signature: sol_eclipse_how(tjdut, geopos, flags)
         attr_swe = swe.sol_eclipse_how(jd, geopos, 0)
-        # libephemeris signature: swe_sol_eclipse_how(tjdut, geopos, flags)
-        attr_py = ephem.swe_sol_eclipse_how(jd, geopos, 0)
+        # libephemeris signature: sol_eclipse_how(tjdut, geopos, flags)
+        attr_py = ephem.sol_eclipse_how(jd, geopos, 0)
 
         # Compare obscuration/magnitude
         # attr[0] = fraction of solar diameter covered

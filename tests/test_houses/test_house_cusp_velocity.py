@@ -1,31 +1,31 @@
 """
-Tests for house cusp velocity calculations in swe_houses_ex2 and swe_houses_armc_ex2.
+Tests for house cusp velocity calculations in houses_ex2 and houses_armc_ex2.
 
 Velocities are always computed (matching pyswisseph behavior), regardless of
-whether SEFLG_SPEED is set. The SEFLG_SPEED flag is accepted but has no effect
+whether FLG_SPEED is set. The FLG_SPEED flag is accepted but has no effect
 on speed computation for house cusps.
 """
 
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED, SEFLG_SIDEREAL, SE_SIDM_LAHIRI
+from libephemeris.constants import FLG_SPEED, FLG_SIDEREAL, SIDM_LAHIRI
 
 
 class TestHousesEx2SpeedFlag:
-    """Tests for velocities in swe_houses_ex2."""
+    """Tests for velocities in houses_ex2."""
 
     @pytest.mark.unit
     def test_houses_ex2_always_computes_velocities(self):
-        """Velocities are always computed, even without SEFLG_SPEED."""
+        """Velocities are always computed, even without FLG_SPEED."""
         jd = 2451545.0  # J2000.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
             jd,
             lat,
             lon,
             ord("P"),
-            0,  # No SEFLG_SPEED
+            0,  # No FLG_SPEED
         )
 
         # All cusp velocities should be non-zero (speeds always computed)
@@ -38,12 +38,12 @@ class TestHousesEx2SpeedFlag:
 
     @pytest.mark.unit
     def test_houses_ex2_with_speed_flag_returns_nonzero_velocities(self):
-        """When SEFLG_SPEED is set, velocities should be calculated."""
+        """When FLG_SPEED is set, velocities should be calculated."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # All cusp velocities should be non-zero
@@ -62,15 +62,15 @@ class TestHousesEx2SpeedFlag:
 
     @pytest.mark.unit
     def test_houses_ex2_speeds_identical_with_or_without_flag(self):
-        """Speeds should be identical regardless of SEFLG_SPEED flag."""
+        """Speeds should be identical regardless of FLG_SPEED flag."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        cusps_a, ascmc_a, cusps_speed_a, ascmc_speed_a = ephem.swe_houses_ex2(
+        cusps_a, ascmc_a, cusps_speed_a, ascmc_speed_a = ephem.houses_ex2(
             jd, lat, lon, ord("P"), 0
         )
-        cusps_b, ascmc_b, cusps_speed_b, ascmc_speed_b = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps_b, ascmc_b, cusps_speed_b, ascmc_speed_b = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # Positions should be identical
@@ -86,34 +86,34 @@ class TestHousesEx2SpeedFlag:
 
     @pytest.mark.unit
     def test_houses_ex2_with_sidereal_and_speed_flag(self):
-        """SEFLG_SPEED should work together with SEFLG_SIDEREAL."""
+        """FLG_SPEED should work together with FLG_SIDEREAL."""
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
         # Set Lahiri ayanamsa
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
         # With both flags
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SIDEREAL | SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SIDEREAL | FLG_SPEED
         )
 
         # Velocities should be calculated
         for i, speed in enumerate(cusps_speed):
             assert speed != 0.0, f"Cusp {i + 1} speed should be non-zero"
 
-        # With SEFLG_SIDEREAL but not SEFLG_SPEED — speeds still computed
-        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SIDEREAL
+        # With FLG_SIDEREAL but not FLG_SPEED — speeds still computed
+        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SIDEREAL
         )
 
         # Velocities should also be non-zero (always computed)
         for i, speed in enumerate(cusps_speed2):
             assert speed != 0.0, (
-                f"Cusp {i + 1} speed should be non-zero even without SEFLG_SPEED"
+                f"Cusp {i + 1} speed should be non-zero even without FLG_SPEED"
             )
 
-        # Speeds should be identical with or without SEFLG_SPEED
+        # Speeds should be identical with or without FLG_SPEED
         assert cusps_speed == cusps_speed2
 
     @pytest.mark.unit
@@ -135,14 +135,14 @@ class TestHousesEx2SpeedFlag:
         jd = 2451545.0
         lat, lon = 45.0, 12.0
 
-        # Without SEFLG_SPEED
-        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.swe_houses_ex2(
+        # Without FLG_SPEED
+        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.houses_ex2(
             jd, lat, lon, hsys, 0
         )
 
-        # With SEFLG_SPEED
-        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_ex2(
-            jd, lat, lon, hsys, SEFLG_SPEED
+        # With FLG_SPEED
+        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.houses_ex2(
+            jd, lat, lon, hsys, FLG_SPEED
         )
 
         # Positions should match
@@ -171,14 +171,14 @@ class TestHousesEx2SpeedFlag:
         jd = 2451545.0
         lat, lon = 45.0, 12.0
 
-        # Without SEFLG_SPEED
-        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.swe_houses_ex2(
+        # Without FLG_SPEED
+        cusps1, ascmc1, cusps_speed1, ascmc_speed1 = ephem.houses_ex2(
             jd, lat, lon, ord("W"), 0
         )
 
-        # With SEFLG_SPEED
-        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("W"), SEFLG_SPEED
+        # With FLG_SPEED
+        cusps2, ascmc2, cusps_speed2, ascmc_speed2 = ephem.houses_ex2(
+            jd, lat, lon, ord("W"), FLG_SPEED
         )
 
         # Positions should match
@@ -202,16 +202,16 @@ class TestHousesEx2SpeedFlag:
         assert cusps_speed1[6] != 0.0, "Cusp 7 (DESC) speed should be non-zero"
         assert cusps_speed1[9] != 0.0, "Cusp 10 (MC) speed should be non-zero"
 
-    """Tests for velocities in swe_houses_armc_ex2."""
+    """Tests for velocities in houses_armc_ex2."""
 
     @pytest.mark.unit
     def test_houses_armc_ex2_always_computes_velocities(self):
-        """Velocities are always computed in swe_houses_armc_ex2."""
+        """Velocities are always computed in houses_armc_ex2."""
         armc = 292.957
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc,
             lat,
             eps,
@@ -233,7 +233,7 @@ class TestHousesEx2SpeedFlag:
         lat = 41.9
         eps = 23.4393
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -258,10 +258,10 @@ class TestHousesEx2SpeedFlag:
         lat = 41.9
         eps = 23.4393
 
-        cusps_a, ascmc_a, speed_a, aspeed_a = ephem.swe_houses_armc_ex2(
+        cusps_a, ascmc_a, speed_a, aspeed_a = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
-        cusps_b, ascmc_b, speed_b, aspeed_b = ephem.swe_houses_armc_ex2(
+        cusps_b, ascmc_b, speed_b, aspeed_b = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P"), 0.0
         )
 
@@ -296,7 +296,7 @@ class TestHousesEx2SpeedFlag:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, hsys
         )
 
@@ -315,7 +315,7 @@ class TestHousesEx2SpeedFlag:
         lat = 45.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("W")
         )
 
@@ -342,8 +342,8 @@ class TestHouseCuspVelocityEdgeCases:
         jd = 2451545.0
         lat, lon = 0.0, 0.0
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # Velocities should be calculated
@@ -356,8 +356,8 @@ class TestHouseCuspVelocityEdgeCases:
         jd = 2451545.0
         lat, lon = 60.0, 0.0
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # Velocities should be calculated
@@ -369,8 +369,8 @@ class TestHouseCuspVelocityEdgeCases:
         jd = 2451545.0
         lat, lon = -33.9, 151.2  # Sydney
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # Velocities should be calculated
@@ -383,7 +383,7 @@ class TestHouseCuspVelocityEdgeCases:
         lat = 0.0
         eps = 23.44
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_armc_ex2(
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_armc_ex2(
             armc, lat, eps, ord("P")
         )
 
@@ -400,8 +400,8 @@ class TestHouseCuspVelocityProgression:
         jd = 2451545.0
         lat, lon = 45.0, 0.0
 
-        cusps, ascmc, cusps_speed, ascmc_speed = ephem.swe_houses_ex2(
-            jd, lat, lon, ord("P"), SEFLG_SPEED
+        cusps, ascmc, cusps_speed, ascmc_speed = ephem.houses_ex2(
+            jd, lat, lon, ord("P"), FLG_SPEED
         )
 
         # MC velocity should be positive (moving forward)
@@ -425,11 +425,11 @@ class TestHouseCuspVelocityProgression:
         jd1 = 2451545.0
         jd2 = 2451545.5  # 12 hours later
 
-        _, _, _, ascmc_speed1 = ephem.swe_houses_ex2(
-            jd1, lat, lon, ord("P"), SEFLG_SPEED
+        _, _, _, ascmc_speed1 = ephem.houses_ex2(
+            jd1, lat, lon, ord("P"), FLG_SPEED
         )
-        _, _, _, ascmc_speed2 = ephem.swe_houses_ex2(
-            jd2, lat, lon, ord("P"), SEFLG_SPEED
+        _, _, _, ascmc_speed2 = ephem.houses_ex2(
+            jd2, lat, lon, ord("P"), FLG_SPEED
         )
 
         # MC velocity should be similar at different times

@@ -56,11 +56,11 @@ def record(name, ok, detail=""):
 # CONSTANTS
 # ============================================================================
 
-SEFLG_SPEED = swe.FLG_SPEED
-SEFLG_TOPOCTR = swe.FLG_TOPOCTR
-SEFLG_EQUATORIAL = swe.FLG_EQUATORIAL
-SEFLG_SIDEREAL = swe.FLG_SIDEREAL
-SEFLG_J2000 = 32  # FLG_J2000
+FLG_SPEED = swe.FLG_SPEED
+FLG_TOPOCTR = swe.FLG_TOPOCTR
+FLG_EQUATORIAL = swe.FLG_EQUATORIAL
+FLG_SIDEREAL = swe.FLG_SIDEREAL
+FLG_J2000 = 32  # FLG_J2000
 
 # Observer locations: (name, lon, lat, alt_m)
 LOCATIONS = [
@@ -106,17 +106,17 @@ def test_part1_topo_positions():
     print("=" * 70)
 
     jd = JD_2024
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR
+    flags = FLG_SPEED | FLG_TOPOCTR
 
     for loc_name, lon, lat, alt in LOCATIONS:
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
         for body_id, body_name in BODIES:
             test_name = f"P1/{loc_name}/{body_name}"
             try:
                 pos_se, retflag_se = swe.calc_ut(jd, body_id, flags)
-                pos_le, retflag_le = ephem.swe_calc_ut(jd, body_id, flags)
+                pos_le, retflag_le = ephem.calc_ut(jd, body_id, flags)
 
                 lon_se = float(pos_se[0])
                 lon_le = float(pos_le[0])
@@ -176,17 +176,17 @@ def test_part2_moon_parallax():
 
     for loc_name, lon, lat, alt in LOCATIONS[:3]:  # Test 3 locations
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
         test_name = f"P2/{loc_name}/Moon"
         try:
             # Geocentric
-            geo_se, _ = swe.calc_ut(jd, swe.MOON, SEFLG_SPEED)
-            geo_le, _ = ephem.swe_calc_ut(jd, swe.MOON, SEFLG_SPEED)
+            geo_se, _ = swe.calc_ut(jd, swe.MOON, FLG_SPEED)
+            geo_le, _ = ephem.calc_ut(jd, swe.MOON, FLG_SPEED)
 
             # Topocentric
-            topo_se, _ = swe.calc_ut(jd, swe.MOON, SEFLG_SPEED | SEFLG_TOPOCTR)
-            topo_le, _ = ephem.swe_calc_ut(jd, swe.MOON, SEFLG_SPEED | SEFLG_TOPOCTR)
+            topo_se, _ = swe.calc_ut(jd, swe.MOON, FLG_SPEED | FLG_TOPOCTR)
+            topo_le, _ = ephem.calc_ut(jd, swe.MOON, FLG_SPEED | FLG_TOPOCTR)
 
             # Parallax shift
             shift_se = abs(float(geo_se[0]) - float(topo_se[0]))
@@ -230,11 +230,11 @@ def test_part3_topo_equatorial():
     print("=" * 70)
 
     jd = JD_2024
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_EQUATORIAL
+    flags = FLG_SPEED | FLG_TOPOCTR | FLG_EQUATORIAL
 
     loc_name, lon, lat, alt = LOCATIONS[0]  # Rome
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     bodies_subset = BODIES[:7]  # Sun through Saturn
 
@@ -242,7 +242,7 @@ def test_part3_topo_equatorial():
         test_name = f"P3/topo+eq/{body_name}"
         try:
             pos_se, _ = swe.calc_ut(jd, body_id, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_le, _ = ephem.calc_ut(jd, body_id, flags)
 
             ra_se = float(pos_se[0])
             ra_le = float(pos_le[0])
@@ -287,12 +287,12 @@ def test_part4_topo_sidereal():
 
     jd = JD_2024
     swe.set_sid_mode(1)  # Lahiri
-    ephem.swe_set_sid_mode(1)
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_SIDEREAL
+    ephem.set_sid_mode(1)
+    flags = FLG_SPEED | FLG_TOPOCTR | FLG_SIDEREAL
 
     loc_name, lon, lat, alt = LOCATIONS[0]  # Rome
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     bodies_subset = BODIES[:7]
 
@@ -300,7 +300,7 @@ def test_part4_topo_sidereal():
         test_name = f"P4/topo+sid/{body_name}"
         try:
             pos_se, _ = swe.calc_ut(jd, body_id, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_le, _ = ephem.calc_ut(jd, body_id, flags)
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])
@@ -323,7 +323,7 @@ def test_part4_topo_sidereal():
 
     # Reset sidereal mode
     swe.set_sid_mode(0)
-    ephem.swe_set_sid_mode(0)
+    ephem.set_sid_mode(0)
 
 
 # ============================================================================
@@ -337,11 +337,11 @@ def test_part5_topo_j2000():
     print("=" * 70)
 
     jd = JD_2024
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR | SEFLG_J2000
+    flags = FLG_SPEED | FLG_TOPOCTR | FLG_J2000
 
     loc_name, lon, lat, alt = LOCATIONS[0]  # Rome
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     bodies_subset = BODIES[:7]
 
@@ -349,7 +349,7 @@ def test_part5_topo_j2000():
         test_name = f"P5/topo+J2000/{body_name}"
         try:
             pos_se, _ = swe.calc_ut(jd, body_id, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_le, _ = ephem.calc_ut(jd, body_id, flags)
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])
@@ -382,7 +382,7 @@ def test_part6_extreme_altitudes():
     print("=" * 70)
 
     jd = JD_2024
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR
+    flags = FLG_SPEED | FLG_TOPOCTR
     lon, lat = 12.4964, 41.9028  # Rome coordinates
 
     altitudes = [
@@ -395,13 +395,13 @@ def test_part6_extreme_altitudes():
 
     for alt_name, alt in altitudes:
         swe.set_topo(lon, lat, alt)
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
 
         # Test Moon (most affected by altitude)
         test_name = f"P6/{alt_name}/Moon"
         try:
             pos_se, _ = swe.calc_ut(jd, swe.MOON, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, swe.MOON, flags)
+            pos_le, _ = ephem.calc_ut(jd, swe.MOON, flags)
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])
@@ -424,7 +424,7 @@ def test_part6_extreme_altitudes():
         test_name = f"P6/{alt_name}/Sun"
         try:
             pos_se, _ = swe.calc_ut(jd, swe.SUN, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, swe.SUN, flags)
+            pos_le, _ = ephem.calc_ut(jd, swe.SUN, flags)
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])
@@ -455,11 +455,11 @@ def test_part7_topo_velocity():
     print("=" * 70)
 
     jd = JD_2024
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR
+    flags = FLG_SPEED | FLG_TOPOCTR
 
     loc_name, lon, lat, alt = LOCATIONS[0]  # Rome
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     bodies_subset = BODIES[:7]  # Sun through Saturn
 
@@ -467,7 +467,7 @@ def test_part7_topo_velocity():
         test_name = f"P7/topo_vel/{body_name}"
         try:
             pos_se, _ = swe.calc_ut(jd, body_id, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_le, _ = ephem.calc_ut(jd, body_id, flags)
 
             speed_lon_se = float(pos_se[3])
             speed_lon_le = float(pos_le[3])
@@ -512,7 +512,7 @@ def test_part8_topo_sun():
     print("PART 8: Topocentric Sun Position at Multiple Epochs")
     print("=" * 70)
 
-    flags = SEFLG_SPEED | SEFLG_TOPOCTR
+    flags = FLG_SPEED | FLG_TOPOCTR
     epochs = [
         ("J2000", JD_2000),
         ("2024-Jan", JD_2024),
@@ -521,13 +521,13 @@ def test_part8_topo_sun():
 
     loc_name, lon, lat, alt = LOCATIONS[0]  # Rome
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
 
     for epoch_name, jd in epochs:
         test_name = f"P8/Sun/{epoch_name}"
         try:
             pos_se, _ = swe.calc_ut(jd, swe.SUN, flags)
-            pos_le, _ = ephem.swe_calc_ut(jd, swe.SUN, flags)
+            pos_le, _ = ephem.calc_ut(jd, swe.SUN, flags)
 
             lon_se = float(pos_se[0])
             lon_le = float(pos_le[0])

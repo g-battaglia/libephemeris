@@ -1,7 +1,7 @@
 """
 Tests for rise/set/transit calculations with various bodies and locations.
 
-Verifies swe_rise_trans for Sun, Moon, planets, and fixed stars
+Verifies rise_trans for Sun, Moon, planets, and fixed stars
 at different geographic locations and dates.
 """
 
@@ -13,17 +13,17 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_CALC_RISE,
-    SE_CALC_SET,
-    SE_CALC_MTRANSIT,
-    SE_CALC_ITRANSIT,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    CALC_RISE,
+    CALC_SET,
+    CALC_MTRANSIT,
+    CALC_ITRANSIT,
 )
 
 
@@ -38,11 +38,11 @@ LOCATIONS = [
 ]
 
 PLANETS_FOR_RISE = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 
@@ -55,7 +55,7 @@ class TestSunRiseSet:
         """Sun rise should be found at most locations."""
         jd = 2451545.0
         geopos = (lon, lat, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         if res == 0:
             rise_jd = tret[0]
             assert rise_jd > jd, f"{name}: rise {rise_jd} not after start {jd}"
@@ -68,7 +68,7 @@ class TestSunRiseSet:
         """Sun set should be found at most locations."""
         jd = 2451545.0
         geopos = (lon, lat, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_SET, geopos)
         if res == 0:
             set_jd = tret[0]
             assert set_jd > jd
@@ -78,11 +78,11 @@ class TestSunRiseSet:
     def test_sun_rise_before_set(self):
         """Sun rise time should be before set time (same day, equinox)."""
         # Use spring equinox at equator for clean result
-        jd = swe.swe_julday(2024, 3, 20, 0.0)
+        jd = swe.julday(2024, 3, 20, 0.0)
         geopos = (0.0, 0.0, 0.0)
 
-        res_r, tret_r = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
-        res_s, tret_s = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res_r, tret_r = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
+        res_s, tret_s = swe.rise_trans(jd, SUN, CALC_SET, geopos)
 
         if res_r == 0 and res_s == 0:
             rise_jd = tret_r[0]
@@ -93,11 +93,11 @@ class TestSunRiseSet:
     @pytest.mark.unit
     def test_equatorial_day_length_near_12h(self):
         """At equator near equinox, day should be ~12 hours."""
-        jd = swe.swe_julday(2024, 3, 20, 0.0)
+        jd = swe.julday(2024, 3, 20, 0.0)
         geopos = (0.0, 0.0, 0.0)
 
-        res_r, tret_r = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
-        res_s, tret_s = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res_r, tret_r = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
+        res_s, tret_s = swe.rise_trans(jd, SUN, CALC_SET, geopos)
 
         if res_r == 0 and res_s == 0:
             rise_jd = tret_r[0]
@@ -117,7 +117,7 @@ class TestMeridianTransit:
         """Sun upper meridian transit should be found."""
         jd = 2451545.0
         geopos = (lon, lat, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_MTRANSIT, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_MTRANSIT, geopos)
         if res == 0:
             transit_jd = tret[0]
             assert transit_jd > jd
@@ -129,7 +129,7 @@ class TestMeridianTransit:
         """Sun lower meridian transit should be found."""
         jd = 2451545.0
         geopos = (lon, lat, alt)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_ITRANSIT, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_ITRANSIT, geopos)
         if res == 0:
             transit_jd = tret[0]
             assert transit_jd > jd
@@ -141,8 +141,8 @@ class TestMeridianTransit:
         jd = 2451545.0
         geopos = (12.5, 41.9, 50.0)
 
-        res_u, tret_u = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_MTRANSIT, geopos)
-        res_l, tret_l = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_ITRANSIT, geopos)
+        res_u, tret_u = swe.rise_trans(jd, SUN, CALC_MTRANSIT, geopos)
+        res_l, tret_l = swe.rise_trans(jd, SUN, CALC_ITRANSIT, geopos)
 
         if res_u == 0 and res_l == 0:
             upper_jd = tret_u[0]
@@ -164,7 +164,7 @@ class TestPlanetRiseSet:
         """Planet rise found at Rome."""
         jd = 2451545.0
         geopos = (12.5, 41.9, 50.0)
-        res, tret = swe.swe_rise_trans(jd, body_id, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, body_id, CALC_RISE, geopos)
         if res == 0:
             rise_jd = tret[0]
             assert rise_jd > jd
@@ -177,7 +177,7 @@ class TestPlanetRiseSet:
         """Planet set found at Rome."""
         jd = 2451545.0
         geopos = (12.5, 41.9, 50.0)
-        res, tret = swe.swe_rise_trans(jd, body_id, SE_CALC_SET, geopos)
+        res, tret = swe.rise_trans(jd, body_id, CALC_SET, geopos)
         if res == 0:
             set_jd = tret[0]
             assert set_jd > jd
@@ -194,7 +194,7 @@ class TestMoonRiseSet:
         geopos = (12.5, 41.9, 50.0)
         rises = []
         for _ in range(3):
-            res, tret = swe.swe_rise_trans(jd, SE_MOON, SE_CALC_RISE, geopos)
+            res, tret = swe.rise_trans(jd, MOON, CALC_RISE, geopos)
             if res == 0:
                 rise_jd = tret[0]
                 rises.append(rise_jd)
@@ -216,9 +216,9 @@ class TestRiseSetDateRange:
     @pytest.mark.parametrize("year", [1950, 2000, 2024, 2050])
     def test_sun_rise_across_years(self, year: int):
         """Sun rise valid across years."""
-        jd = swe.swe_julday(year, 6, 21, 0.0)
+        jd = swe.julday(year, 6, 21, 0.0)
         geopos = (12.5, 41.9, 50.0)
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_RISE, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_RISE, geopos)
         if res == 0:
             rise_jd = tret[0]
             assert rise_jd > jd
@@ -230,9 +230,9 @@ class TestCircumpolar:
     @pytest.mark.unit
     def test_midnight_sun(self):
         """At high latitude in summer, Sun may not set (circumpolar)."""
-        jd = swe.swe_julday(2024, 6, 21, 0.0)
+        jd = swe.julday(2024, 6, 21, 0.0)
         geopos = (25.0, 70.0, 0.0)  # Northern Norway
-        res, tret = swe.swe_rise_trans(jd, SE_SUN, SE_CALC_SET, geopos)
+        res, tret = swe.rise_trans(jd, SUN, CALC_SET, geopos)
         # res=-2 means circumpolar (no rise/set)
         # Either it finds a set or returns circumpolar
         assert res in (0, -2), f"Unexpected result: {res}"

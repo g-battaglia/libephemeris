@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Round 117: MOSEPH Flag Verification — Ensure Silently Ignored
 
-Tests that SEFLG_MOSEPH is accepted but silently ignored by libephemeris.
+Tests that FLG_MOSEPH is accepted but silently ignored by libephemeris.
 All calculations should use JPL DE440 regardless.
 
 Verifies:
@@ -23,37 +23,37 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import libephemeris as ephem
 
 # Constants
-SEFLG_SWIEPH = 2
-SEFLG_MOSEPH = 4  # Moshier ephemeris flag — should be silently ignored
-SEFLG_SPEED = 256
-SEFLG_EQUATORIAL = 2048
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_NOABERR = 1024
-SEFLG_TRUEPOS = 16
-SEFLG_TOPOCTR = 32768
-SEFLG_SIDEREAL = 65536
-SEFLG_HELCTR = 8
-SEFLG_BARYCTR = 4  # Note: same value as MOSEPH — this is important!
-SEFLG_XYZ = 4096
-SEFLG_RADIANS = 8192
+FLG_SWIEPH = 2
+FLG_MOSEPH = 4  # Moshier ephemeris flag — should be silently ignored
+FLG_SPEED = 256
+FLG_EQUATORIAL = 2048
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_NOABERR = 1024
+FLG_TRUEPOS = 16
+FLG_TOPOCTR = 32768
+FLG_SIDEREAL = 65536
+FLG_HELCTR = 8
+FLG_BARYCTR = 4  # Note: same value as MOSEPH — this is important!
+FLG_XYZ = 4096
+FLG_RADIANS = 8192
 
-SE_SUN = 0
-SE_MOON = 1
-SE_MERCURY = 2
-SE_VENUS = 3
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-SE_URANUS = 7
-SE_NEPTUNE = 8
-SE_PLUTO = 9
-SE_MEAN_NODE = 10
-SE_TRUE_NODE = 11
-SE_MEAN_APOG = 12
-SE_CHIRON = 15
-SE_CERES = 17
-SE_PALLAS = 18
+SUN = 0
+MOON = 1
+MERCURY = 2
+VENUS = 3
+MARS = 4
+JUPITER = 5
+SATURN = 6
+URANUS = 7
+NEPTUNE = 8
+PLUTO = 9
+MEAN_NODE = 10
+TRUE_NODE = 11
+MEAN_APOG = 12
+CHIRON = 15
+CERES = 17
+PALLAS = 18
 
 
 def main():
@@ -79,25 +79,25 @@ def main():
     ]
 
     bodies = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
-        (SE_MEAN_NODE, "MeanNode"),
-        (SE_TRUE_NODE, "TrueNode"),
-        (SE_MEAN_APOG, "MeanApog"),
-        (SE_CHIRON, "Chiron"),
-        (SE_CERES, "Ceres"),
-        (SE_PALLAS, "Pallas"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
+        (MEAN_NODE, "MeanNode"),
+        (TRUE_NODE, "TrueNode"),
+        (MEAN_APOG, "MeanApog"),
+        (CHIRON, "Chiron"),
+        (CERES, "Ceres"),
+        (PALLAS, "Pallas"),
     ]
 
-    # IMPORTANT: SEFLG_MOSEPH = 4 = SEFLG_BARYCTR in Swiss Ephemeris!
+    # IMPORTANT: FLG_MOSEPH = 4 = FLG_BARYCTR in Swiss Ephemeris!
     # In SE, the same bit is used for both. In libephemeris, MOSEPH should be ignored
     # but BARYCTR should work. We need to test that the MOSEPH *concept* is ignored,
     # meaning specifying Moshier mode doesn't change results from SWIEPH mode.
@@ -107,12 +107,12 @@ def main():
     print("\n--- Test 1: Default vs SWIEPH flag (should be identical) ---")
     for jd in test_jds:
         for body_id, body_name in bodies:
-            flags_default = SEFLG_SPEED
-            flags_swieph = SEFLG_SPEED | SEFLG_SWIEPH
+            flags_default = FLG_SPEED
+            flags_swieph = FLG_SPEED | FLG_SWIEPH
 
             try:
-                result_default = ephem.swe_calc_ut(jd, body_id, flags_default)
-                result_swieph = ephem.swe_calc_ut(jd, body_id, flags_swieph)
+                result_default = ephem.calc_ut(jd, body_id, flags_default)
+                result_swieph = ephem.calc_ut(jd, body_id, flags_swieph)
             except Exception as e:
                 # Both should succeed or both fail
                 continue
@@ -138,14 +138,14 @@ def main():
     print("\n--- Test 2: MOSEPH flag (value 4) accepted without error ---")
     for jd in test_jds[:4]:
         for body_id, body_name in bodies:
-            if body_id == SE_SUN and True:
+            if body_id == SUN and True:
                 # BARYCTR for Sun should work (gives SSB)
                 pass
 
-            flags_moseph = SEFLG_SPEED | SEFLG_MOSEPH
+            flags_moseph = FLG_SPEED | FLG_MOSEPH
 
             try:
-                result = ephem.swe_calc_ut(jd, body_id, flags_moseph)
+                result = ephem.calc_ut(jd, body_id, flags_moseph)
                 total_tests += 1
                 # Should return a valid result (not crash)
                 if result is not None and len(result[0]) == 6:
@@ -165,32 +165,32 @@ def main():
     # Test 3: Various flag combinations all produce valid results
     print("\n--- Test 3: Flag combinations produce valid results ---")
     flag_combos = [
-        ("SPEED", SEFLG_SPEED),
-        ("SPEED|EQUATORIAL", SEFLG_SPEED | SEFLG_EQUATORIAL),
-        ("SPEED|J2000", SEFLG_SPEED | SEFLG_J2000),
-        ("SPEED|NONUT", SEFLG_SPEED | SEFLG_NONUT),
-        ("SPEED|NOABERR", SEFLG_SPEED | SEFLG_NOABERR),
-        ("SPEED|TRUEPOS", SEFLG_SPEED | SEFLG_TRUEPOS),
-        ("SPEED|J2000|NONUT", SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT),
-        ("SPEED|EQUATORIAL|J2000", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000),
-        ("SPEED|EQUATORIAL|NONUT", SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_NONUT),
-        ("SPEED|XYZ", SEFLG_SPEED | SEFLG_XYZ),
-        ("SPEED|RADIANS", SEFLG_SPEED | SEFLG_RADIANS),
+        ("SPEED", FLG_SPEED),
+        ("SPEED|EQUATORIAL", FLG_SPEED | FLG_EQUATORIAL),
+        ("SPEED|J2000", FLG_SPEED | FLG_J2000),
+        ("SPEED|NONUT", FLG_SPEED | FLG_NONUT),
+        ("SPEED|NOABERR", FLG_SPEED | FLG_NOABERR),
+        ("SPEED|TRUEPOS", FLG_SPEED | FLG_TRUEPOS),
+        ("SPEED|J2000|NONUT", FLG_SPEED | FLG_J2000 | FLG_NONUT),
+        ("SPEED|EQUATORIAL|J2000", FLG_SPEED | FLG_EQUATORIAL | FLG_J2000),
+        ("SPEED|EQUATORIAL|NONUT", FLG_SPEED | FLG_EQUATORIAL | FLG_NONUT),
+        ("SPEED|XYZ", FLG_SPEED | FLG_XYZ),
+        ("SPEED|RADIANS", FLG_SPEED | FLG_RADIANS),
     ]
 
     for jd in test_jds:
         for body_id, body_name in [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_PLUTO, "Pluto"),
-            (SE_CHIRON, "Chiron"),
-            (SE_CERES, "Ceres"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (PLUTO, "Pluto"),
+            (CHIRON, "Chiron"),
+            (CERES, "Ceres"),
         ]:
             for flag_name, flag_val in flag_combos:
                 try:
-                    result = ephem.swe_calc_ut(jd, body_id, flag_val)
+                    result = ephem.calc_ut(jd, body_id, flag_val)
                     total_tests += 1
                     if result is not None and len(result[0]) == 6:
                         total_pass += 1
@@ -214,16 +214,16 @@ def main():
     ]
 
     for lon, lat, alt, name in locations:
-        ephem.swe_set_topo(lon, lat, alt)
+        ephem.set_topo(lon, lat, alt)
         for jd in test_jds[:4]:
-            flags_topo = SEFLG_SPEED | SEFLG_TOPOCTR
+            flags_topo = FLG_SPEED | FLG_TOPOCTR
             for body_id, body_name in [
-                (SE_MOON, "Moon"),
-                (SE_SUN, "Sun"),
-                (SE_MARS, "Mars"),
+                (MOON, "Moon"),
+                (SUN, "Sun"),
+                (MARS, "Mars"),
             ]:
                 try:
-                    result = ephem.swe_calc_ut(jd, body_id, flags_topo)
+                    result = ephem.calc_ut(jd, body_id, flags_topo)
                     total_tests += 1
                     if result is not None and len(result[0]) == 6:
                         total_pass += 1
@@ -242,16 +242,16 @@ def main():
     sid_modes = [0, 1, 3, 27]  # Fagan-Bradley, Lahiri, Raman, True_Citra
 
     for mode in sid_modes:
-        ephem.swe_set_sid_mode(mode, 0, 0)
+        ephem.set_sid_mode(mode, 0, 0)
         for jd in test_jds[:4]:
-            flags_sid = SEFLG_SPEED | SEFLG_SIDEREAL
+            flags_sid = FLG_SPEED | FLG_SIDEREAL
             for body_id, body_name in [
-                (SE_MOON, "Moon"),
-                (SE_SUN, "Sun"),
-                (SE_JUPITER, "Jupiter"),
+                (MOON, "Moon"),
+                (SUN, "Sun"),
+                (JUPITER, "Jupiter"),
             ]:
                 try:
-                    result = ephem.swe_calc_ut(jd, body_id, flags_sid)
+                    result = ephem.calc_ut(jd, body_id, flags_sid)
                     total_tests += 1
                     if result is not None and len(result[0]) == 6:
                         total_pass += 1
@@ -266,7 +266,7 @@ def main():
                         )
 
     # Reset sidereal
-    ephem.swe_set_sid_mode(0, 0, 0)
+    ephem.set_sid_mode(0, 0, 0)
 
     # Test 6: House calculations work with all house systems
     print("\n--- Test 6: House calculations with all systems ---")
@@ -277,7 +277,7 @@ def main():
             for lat in [0.0, 45.0, 66.0, -33.0]:
                 lon = 12.5
                 try:
-                    result = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys), SEFLG_SPEED)
+                    result = ephem.houses_ex2(jd, lat, lon, ord(hsys), FLG_SPEED)
                     total_tests += 1
                     if result is not None:
                         total_pass += 1
@@ -303,12 +303,12 @@ def main():
     for star in stars:
         for jd in test_jds[:4]:
             for flags in [
-                SEFLG_SPEED,
-                SEFLG_SPEED | SEFLG_EQUATORIAL,
-                SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT,
+                FLG_SPEED,
+                FLG_SPEED | FLG_EQUATORIAL,
+                FLG_SPEED | FLG_J2000 | FLG_NONUT,
             ]:
                 try:
-                    result = ephem.swe_fixstar2_ut(star, jd, flags)
+                    result = ephem.fixstar2_ut(star, jd, flags)
                     total_tests += 1
                     if result is not None:
                         total_pass += 1
@@ -324,7 +324,7 @@ def main():
     print("\n--- Test 8: Time function consistency ---")
     for jd in test_jds:
         try:
-            dt = ephem.swe_deltat(jd)
+            dt = ephem.deltat(jd)
             total_tests += 1
             if isinstance(dt, float):
                 total_pass += 1
@@ -335,7 +335,7 @@ def main():
             total_fail += 1
 
         try:
-            st = ephem.swe_sidtime(jd)
+            st = ephem.sidtime(jd)
             total_tests += 1
             if isinstance(st, float) and 0 <= st < 24:
                 total_pass += 1
@@ -348,15 +348,15 @@ def main():
     # Test 9: Verify retflag strips MOSEPH/preserves other flags
     print("\n--- Test 9: Return flag handling ---")
     for jd in test_jds[:4]:
-        for body_id, body_name in [(SE_MOON, "Moon"), (SE_SUN, "Sun")]:
-            for extra_flags in [0, SEFLG_EQUATORIAL, SEFLG_J2000, SEFLG_NONUT]:
-                flags = SEFLG_SPEED | extra_flags
+        for body_id, body_name in [(MOON, "Moon"), (SUN, "Sun")]:
+            for extra_flags in [0, FLG_EQUATORIAL, FLG_J2000, FLG_NONUT]:
+                flags = FLG_SPEED | extra_flags
                 try:
-                    result = ephem.swe_calc_ut(jd, body_id, flags)
+                    result = ephem.calc_ut(jd, body_id, flags)
                     retflag = result[1]
                     total_tests += 1
                     # retflag should have SPEED set
-                    if retflag & SEFLG_SPEED:
+                    if retflag & FLG_SPEED:
                         total_pass += 1
                     else:
                         total_fail += 1
@@ -372,11 +372,11 @@ def main():
     # Test 10: Heliocentric flag produces different results from geocentric
     print("\n--- Test 10: Heliocentric vs Geocentric (different results expected) ---")
     for jd in test_jds[:4]:
-        for body_id, body_name in [(SE_MARS, "Mars"), (SE_JUPITER, "Jupiter")]:
+        for body_id, body_name in [(MARS, "Mars"), (JUPITER, "Jupiter")]:
             try:
-                result_geo = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-                result_helio = ephem.swe_calc_ut(
-                    jd, body_id, SEFLG_SPEED | SEFLG_HELCTR
+                result_geo = ephem.calc_ut(jd, body_id, FLG_SPEED)
+                result_helio = ephem.calc_ut(
+                    jd, body_id, FLG_SPEED | FLG_HELCTR
                 )
                 total_tests += 1
                 # They should be DIFFERENT (helio vs geo)

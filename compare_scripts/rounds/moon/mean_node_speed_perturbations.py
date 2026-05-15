@@ -17,14 +17,17 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 total = 0
 failures = []
 
-FLAGS = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
+FLAGS = ephem.FLG_SWIEPH | ephem.FLG_SPEED
 JD_BASE = 2451545.0  # J2000
 
 
@@ -44,7 +47,7 @@ def test_mean_node_speed():
         jd = JD_BASE + i
 
         try:
-            le_r = ephem.swe_calc_ut(jd, ephem.SE_MEAN_NODE, FLAGS)
+            le_r = ephem.calc_ut(jd, ephem.MEAN_NODE, FLAGS)
             se_r = swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SWIEPH | swe.FLG_SPEED)
         except Exception:
             continue
@@ -92,7 +95,7 @@ def test_mean_node_speed():
         jd = JD_BASE + i
 
         try:
-            le_r = ephem.swe_calc_ut(jd, ephem.SE_TRUE_NODE, FLAGS)
+            le_r = ephem.calc_ut(jd, ephem.TRUE_NODE, FLAGS)
             se_r = swe.calc_ut(jd, swe.TRUE_NODE, swe.FLG_SWIEPH | swe.FLG_SPEED)
         except Exception:
             continue
@@ -137,7 +140,7 @@ def test_mean_node_speed():
         jd = JD_BASE + i
 
         try:
-            le_r = ephem.swe_calc_ut(jd, ephem.SE_MEAN_APOG, FLAGS)
+            le_r = ephem.calc_ut(jd, ephem.MEAN_APOG, FLAGS)
             se_r = swe.calc_ut(jd, swe.MEAN_APOG, swe.FLG_SWIEPH | swe.FLG_SPEED)
         except Exception:
             continue

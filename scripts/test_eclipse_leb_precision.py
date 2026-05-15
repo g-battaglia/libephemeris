@@ -17,13 +17,13 @@ import time
 
 import libephemeris
 from libephemeris.constants import (
-    SE_CALC_RISE,
-    SE_CALC_SET,
-    SE_MOON,
-    SE_SUN,
-    SEFLG_SPEED,
+    CALC_RISE,
+    CALC_SET,
+    MOON,
+    SUN,
+    FLG_SPEED,
 )
-from libephemeris.time_utils import swe_julday
+from libephemeris.time_utils import julday
 
 
 def _run_with_mode(mode: str, func, *args, **kwargs):
@@ -56,11 +56,11 @@ def compare_besselian_elements():
     )
 
     eclipses = [
-        ("2024-04-08 Total", swe_julday(2024, 4, 8, 18.17)),
-        ("2023-10-14 Annular", swe_julday(2023, 10, 14, 17.97)),
-        ("2025-03-29 Partial", swe_julday(2025, 3, 29, 10.5)),
-        ("2024-10-02 Annular", swe_julday(2024, 10, 2, 18.5)),
-        ("2026-02-17 Annular", swe_julday(2026, 2, 17, 12.0)),
+        ("2024-04-08 Total", julday(2024, 4, 8, 18.17)),
+        ("2023-10-14 Annular", julday(2023, 10, 14, 17.97)),
+        ("2025-03-29 Partial", julday(2025, 3, 29, 10.5)),
+        ("2024-10-02 Annular", julday(2024, 10, 2, 18.5)),
+        ("2026-02-17 Annular", julday(2026, 2, 17, 12.0)),
     ]
 
     funcs = [
@@ -115,9 +115,9 @@ def compare_eclipse_timing():
     print("=" * 70)
 
     search_dates = [
-        ("Solar from 2024-01", swe_julday(2024, 1, 1, 0.0)),
-        ("Solar from 2025-01", swe_julday(2025, 1, 1, 0.0)),
-        ("Solar from 2026-01", swe_julday(2026, 1, 1, 0.0)),
+        ("Solar from 2024-01", julday(2024, 1, 1, 0.0)),
+        ("Solar from 2025-01", julday(2025, 1, 1, 0.0)),
+        ("Solar from 2026-01", julday(2026, 1, 1, 0.0)),
     ]
 
     all_pass = True
@@ -179,13 +179,13 @@ def compare_rise_trans():
         ("Reykjavik", [-21.9, 64.1, 0]),
     ]
 
-    jd = swe_julday(2024, 6, 15, 0.0)
+    jd = julday(2024, 6, 15, 0.0)
     all_pass = True
 
     for loc_name, geopos in locations:
         try:
-            _, tret_leb = _run_with_mode("leb", rise_trans, jd, SE_SUN, SE_CALC_RISE, geopos)
-            _, tret_sf = _run_with_mode("skyfield", rise_trans, jd, SE_SUN, SE_CALC_RISE, geopos)
+            _, tret_leb = _run_with_mode("leb", rise_trans, jd, SUN, CALC_RISE, geopos)
+            _, tret_sf = _run_with_mode("skyfield", rise_trans, jd, SUN, CALC_RISE, geopos)
 
             if tret_leb[0] > 0 and tret_sf[0] > 0:
                 diff_sec = abs(tret_leb[0] - tret_sf[0]) * 86400.0

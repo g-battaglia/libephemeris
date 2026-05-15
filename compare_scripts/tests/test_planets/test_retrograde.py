@@ -96,7 +96,7 @@ def get_velocity_libephemeris(planet_id):
     """Create a velocity function for libephemeris."""
 
     def velocity_func(jd):
-        pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
         return pos[3]  # Longitude velocity in degrees/day
 
     return velocity_func
@@ -126,7 +126,7 @@ class TestMercuryRetrograde:
         )
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             if pos[3] < 0:
                 retrograde_found = True
                 progress.done(f"found at JD {jd}")
@@ -143,7 +143,7 @@ class TestMercuryRetrograde:
         progress = progress_reporter("Mercury direct scan", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             if pos[3] > 0.5:  # Clear direct motion
                 direct_found = True
                 progress.done(f"found at JD {jd}")
@@ -162,7 +162,7 @@ class TestMercuryRetrograde:
         progress = progress_reporter("Mercury station scan", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             current_sign = pos[3] > 0
 
             if prev_sign is not None and current_sign != prev_sign:
@@ -190,7 +190,7 @@ class TestVenusRetrograde:
         )
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_VENUS, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), VENUS, FLG_SPEED)
             if pos[3] < 0:
                 retrograde_found = True
                 progress.done(f"found at JD {jd}")
@@ -212,7 +212,7 @@ class TestMarsRetrograde:
         progress = progress_reporter("Mars retrograde scan", len(days), report_every=20)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MARS, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MARS, FLG_SPEED)
             if pos[3] < 0:
                 retrograde_found = True
                 progress.done(f"found at JD {jd}")
@@ -229,17 +229,17 @@ class TestOuterPlanetRetrograde:
     @pytest.mark.parametrize(
         "planet_id,planet_name,sample_days",
         [
-            (SE_JUPITER, "Jupiter", 400),
-            (SE_SATURN, "Saturn", 380),
-            (SE_URANUS, "Uranus", 370),
-            (SE_NEPTUNE, "Neptune", 370),
+            (JUPITER, "Jupiter", 400),
+            (SATURN, "Saturn", 380),
+            (URANUS, "Uranus", 370),
+            (NEPTUNE, "Neptune", 370),
         ],
     )
     def test_outer_planet_retrograde(self, planet_id, planet_name, sample_days):
         """Outer planets should have annual retrograde periods."""
         retrograde_found = False
         for jd in range(2451545, 2451545 + sample_days):
-            pos, _ = ephem.swe_calc_ut(float(jd), planet_id, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), planet_id, FLG_SPEED)
             if pos[3] < 0:
                 retrograde_found = True
                 break
@@ -259,7 +259,7 @@ class TestNoRetrogradeBodies:
         progress = progress_reporter("Sun velocity check", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_SUN, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), SUN, FLG_SPEED)
             assert pos[3] > 0, f"Sun retrograde at JD {jd}?!"
             progress.update(i)
 
@@ -272,7 +272,7 @@ class TestNoRetrogradeBodies:
         progress = progress_reporter("Moon velocity check", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MOON, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MOON, FLG_SPEED)
             assert pos[3] > 0, f"Moon retrograde at JD {jd}?!"
             progress.update(i)
 
@@ -291,7 +291,7 @@ class TestRetrogradeVelocitySign:
         progress = progress_reporter("Find retrogrades", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             if pos[3] < 0:
                 retrograde_days.append(jd)
             progress.update(i)
@@ -300,7 +300,7 @@ class TestRetrogradeVelocitySign:
 
         # Verify all retrograde days have negative velocity
         for jd in retrograde_days[:10]:  # Check first 10
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             assert pos[3] < 0
 
     @pytest.mark.unit
@@ -312,7 +312,7 @@ class TestRetrogradeVelocitySign:
         progress = progress_reporter("Find retro start", len(days), report_every=25)
 
         for i, jd in enumerate(days):
-            pos, _ = ephem.swe_calc_ut(float(jd), SE_MERCURY, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(float(jd), MERCURY, FLG_SPEED)
             if pos[3] < -0.5:  # Clear retrograde
                 retro_start = jd
                 progress.done(f"at JD {jd}")
@@ -320,8 +320,8 @@ class TestRetrogradeVelocitySign:
             progress.update(i)
 
         if retro_start:
-            pos1, _ = ephem.swe_calc_ut(float(retro_start), SE_MERCURY, 0)
-            pos2, _ = ephem.swe_calc_ut(float(retro_start + 1), SE_MERCURY, 0)
+            pos1, _ = ephem.calc_ut(float(retro_start), MERCURY, 0)
+            pos2, _ = ephem.calc_ut(float(retro_start + 1), MERCURY, 0)
 
             # Longitude should decrease (with wraparound handling)
             change = pos2[0] - pos1[0]
@@ -359,11 +359,11 @@ class TestRetrogradeStationTimeComparison:
     # Per-planet tolerances calibrated to the KI-010 velocity offset
     # amplified by each planet's acceleration near station.
     TOLERANCE_PER_PLANET = {
-        SE_MERCURY: 90.0,  # max observed ~73 s
-        SE_VENUS: 250.0,  # max observed ~205 s
-        SE_MARS: 1000.0,  # max observed ~874 s
-        SE_JUPITER: 3000.0,  # max observed ~2418 s
-        SE_SATURN: 5000.0,  # max observed ~4875 s
+        MERCURY: 90.0,  # max observed ~73 s
+        VENUS: 250.0,  # max observed ~205 s
+        MARS: 1000.0,  # max observed ~874 s
+        JUPITER: 3000.0,  # max observed ~2418 s
+        SATURN: 5000.0,  # max observed ~4875 s
     }
 
     # Legacy aliases kept for readability in per-planet test methods.
@@ -385,11 +385,11 @@ class TestRetrogradeStationTimeComparison:
     @pytest.mark.parametrize(
         "planet_id,planet_name,search_days,expected_min_stations",
         [
-            (SE_MERCURY, "Mercury", 365, 4),  # ~3-4 retrogrades per year
-            (SE_VENUS, "Venus", 600, 1),  # ~1 retrograde per 18 months
-            (SE_MARS, "Mars", 800, 1),  # ~1 retrograde per 2 years
-            (SE_JUPITER, "Jupiter", 400, 2),  # ~1 retrograde per year
-            (SE_SATURN, "Saturn", 400, 2),  # ~1 retrograde per year
+            (MERCURY, "Mercury", 365, 4),  # ~3-4 retrogrades per year
+            (VENUS, "Venus", 600, 1),  # ~1 retrograde per 18 months
+            (MARS, "Mars", 800, 1),  # ~1 retrograde per 2 years
+            (JUPITER, "Jupiter", 400, 2),  # ~1 retrograde per year
+            (SATURN, "Saturn", 400, 2),  # ~1 retrograde per year
         ],
     )
     def test_station_times_match_within_one_minute(
@@ -457,8 +457,8 @@ class TestRetrogradeStationTimeComparison:
         # JD for 2022-01-01 00:00 UT (2 year span)
         jd_2022 = jd_2020 + 730
 
-        vel_lib = get_velocity_libephemeris(SE_MERCURY)
-        vel_swe = get_velocity_swisseph(SE_MERCURY)
+        vel_lib = get_velocity_libephemeris(MERCURY)
+        vel_swe = get_velocity_swisseph(MERCURY)
 
         stations_lib = find_all_stations_in_period(vel_lib, jd_2020, jd_2022)
         stations_swe = find_all_stations_in_period(vel_swe, jd_2020, jd_2022)
@@ -489,8 +489,8 @@ class TestRetrogradeStationTimeComparison:
         jd_2020_jan = 2458849.5  # 2020-01-01
         jd_2020_dec = jd_2020_jan + 365
 
-        vel_lib = get_velocity_libephemeris(SE_VENUS)
-        vel_swe = get_velocity_swisseph(SE_VENUS)
+        vel_lib = get_velocity_libephemeris(VENUS)
+        vel_swe = get_velocity_swisseph(VENUS)
 
         stations_lib = find_all_stations_in_period(vel_lib, jd_2020_jan, jd_2020_dec)
         stations_swe = find_all_stations_in_period(vel_swe, jd_2020_jan, jd_2020_dec)
@@ -520,8 +520,8 @@ class TestRetrogradeStationTimeComparison:
         jd_2020_jan = 2458849.5  # 2020-01-01
         jd_2021_jan = jd_2020_jan + 365
 
-        vel_lib = get_velocity_libephemeris(SE_MARS)
-        vel_swe = get_velocity_swisseph(SE_MARS)
+        vel_lib = get_velocity_libephemeris(MARS)
+        vel_swe = get_velocity_swisseph(MARS)
 
         stations_lib = find_all_stations_in_period(vel_lib, jd_2020_jan, jd_2021_jan)
         stations_swe = find_all_stations_in_period(vel_swe, jd_2020_jan, jd_2021_jan)
@@ -549,8 +549,8 @@ class TestRetrogradeStationTimeComparison:
         jd_start = self.JD_2000
         jd_end = jd_start + 400  # ~13 months
 
-        vel_lib = get_velocity_libephemeris(SE_JUPITER)
-        vel_swe = get_velocity_swisseph(SE_JUPITER)
+        vel_lib = get_velocity_libephemeris(JUPITER)
+        vel_swe = get_velocity_swisseph(JUPITER)
 
         stations_lib = find_all_stations_in_period(vel_lib, jd_start, jd_end)
         stations_swe = find_all_stations_in_period(vel_swe, jd_start, jd_end)
@@ -578,8 +578,8 @@ class TestRetrogradeStationTimeComparison:
         jd_start = self.JD_2000
         jd_end = jd_start + 400  # ~13 months
 
-        vel_lib = get_velocity_libephemeris(SE_SATURN)
-        vel_swe = get_velocity_swisseph(SE_SATURN)
+        vel_lib = get_velocity_libephemeris(SATURN)
+        vel_swe = get_velocity_swisseph(SATURN)
 
         stations_lib = find_all_stations_in_period(vel_lib, jd_start, jd_end)
         stations_swe = find_all_stations_in_period(vel_swe, jd_start, jd_end)
@@ -609,11 +609,11 @@ class TestRetrogradeVelocityComparison:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_velocity_values_match_during_retrograde(self, planet_id, planet_name):
@@ -621,12 +621,12 @@ class TestRetrogradeVelocityComparison:
         Verify velocity values match between libraries during retrograde periods.
         """
         jd_start = 2451545.0  # J2000.0
-        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+        search_days = 800 if planet_id in (VENUS, MARS) else 400
 
         # Find a retrograde period
         retrograde_jd = None
         for jd in range(int(jd_start), int(jd_start + search_days)):
-            pos_lib, _ = ephem.swe_calc_ut(float(jd), planet_id, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(float(jd), planet_id, FLG_SPEED)
             if pos_lib[3] < -0.01:  # Clearly retrograde
                 retrograde_jd = float(jd)
                 break
@@ -638,7 +638,7 @@ class TestRetrogradeVelocityComparison:
         # Compare velocities at multiple points during retrograde
         for offset in [0, 0.25, 0.5, 0.75, 1.0, 2.0, 5.0]:
             jd = retrograde_jd + offset
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd, planet_id, swe.FLG_SPEED)
 
             vel_lib = pos_lib[3]
@@ -656,11 +656,11 @@ class TestRetrogradeVelocityComparison:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_station_velocity_near_zero_matches(self, planet_id, planet_name):
@@ -668,7 +668,7 @@ class TestRetrogradeVelocityComparison:
         Verify that at station points, both libraries show velocity near zero.
         """
         jd_start = 2451545.0
-        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+        search_days = 800 if planet_id in (VENUS, MARS) else 400
 
         vel_lib_func = get_velocity_libephemeris(planet_id)
         stations = find_all_stations_in_period(
@@ -679,7 +679,7 @@ class TestRetrogradeVelocityComparison:
 
         for jd_station, is_retro in stations[:4]:  # Check first 4 stations
             # Get velocity from both libraries at station time
-            pos_lib, _ = ephem.swe_calc_ut(jd_station, planet_id, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd_station, planet_id, FLG_SPEED)
             pos_swe, _ = swe.calc_ut(jd_station, planet_id, swe.FLG_SPEED)
 
             vel_lib = pos_lib[3]
@@ -713,11 +713,11 @@ class TestRetrogradePeriodDuration:
     @pytest.mark.parametrize(
         "planet_id,planet_name,expected_min_days,expected_max_days",
         [
-            (SE_MERCURY, "Mercury", 18, 26),  # Mercury retrogrades ~20-24 days
-            (SE_VENUS, "Venus", 38, 45),  # Venus retrogrades ~40-43 days
-            (SE_MARS, "Mars", 58, 82),  # Mars retrogrades ~60-80 days
-            (SE_JUPITER, "Jupiter", 115, 125),  # Jupiter retrogrades ~120 days
-            (SE_SATURN, "Saturn", 130, 145),  # Saturn retrogrades ~134-140 days
+            (MERCURY, "Mercury", 18, 26),  # Mercury retrogrades ~20-24 days
+            (VENUS, "Venus", 38, 45),  # Venus retrogrades ~40-43 days
+            (MARS, "Mars", 58, 82),  # Mars retrogrades ~60-80 days
+            (JUPITER, "Jupiter", 115, 125),  # Jupiter retrogrades ~120 days
+            (SATURN, "Saturn", 130, 145),  # Saturn retrogrades ~134-140 days
         ],
     )
     def test_retrograde_duration_matches(
@@ -727,7 +727,7 @@ class TestRetrogradePeriodDuration:
         Verify retrograde period duration is within expected range and matches.
         """
         jd_start = 2451545.0  # J2000.0
-        search_days = 800 if planet_id in (SE_VENUS, SE_MARS) else 400
+        search_days = 800 if planet_id in (VENUS, MARS) else 400
 
         vel_lib = get_velocity_libephemeris(planet_id)
         vel_swe = get_velocity_swisseph(planet_id)
@@ -767,11 +767,11 @@ class TestRetrogradePeriodDuration:
                 # tolerance because both start and end stations contribute.
                 duration_diff_seconds = abs(duration_lib - duration_swe) * 86400.0
                 _DURATION_TOL = {
-                    SE_MERCURY: 200,
-                    SE_VENUS: 500,
-                    SE_MARS: 2000,
-                    SE_JUPITER: 6000,
-                    SE_SATURN: 8000,
+                    MERCURY: 200,
+                    VENUS: 500,
+                    MARS: 2000,
+                    JUPITER: 6000,
+                    SATURN: 8000,
                 }
                 tolerance_seconds = _DURATION_TOL.get(planet_id, 500)
                 assert duration_diff_seconds < tolerance_seconds, (

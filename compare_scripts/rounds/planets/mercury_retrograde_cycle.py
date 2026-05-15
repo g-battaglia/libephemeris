@@ -19,17 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SE_MERCURY = 2
-SE_MARS = 4
-SE_JUPITER = 5
-SE_SATURN = 6
-FLAGS = 256  # SEFLG_SPEED
+MERCURY = 2
+MARS = 4
+JUPITER = 5
+SATURN = 6
+FLAGS = 256  # FLG_SPEED
 
 print("=" * 70)
 print("ROUND 56: Mercury Retrograde Precision")
@@ -43,7 +46,7 @@ def find_stations(body_id, jd_start, jd_end, step=1.0):
     prev_speed = None
     while jd < jd_end:
         try:
-            result = ephem.swe_calc_ut(jd, body_id, FLAGS)
+            result = ephem.calc_ut(jd, body_id, FLAGS)
             speed = result[0][3]  # lon speed deg/day
             if prev_speed is not None:
                 if prev_speed > 0 and speed < 0:
@@ -63,12 +66,12 @@ def _bisect_station(body_id, jd_lo, jd_hi, tol=1e-8):
     """Bisect to find when lon speed = 0."""
     for _ in range(60):
         jd_mid = (jd_lo + jd_hi) / 2
-        result = ephem.swe_calc_ut(jd_mid, body_id, FLAGS)
+        result = ephem.calc_ut(jd_mid, body_id, FLAGS)
         speed = result[0][3]
         if abs(speed) < 1e-10:
             return jd_mid
         # Get speed at lo
-        lo_result = ephem.swe_calc_ut(jd_lo, body_id, FLAGS)
+        lo_result = ephem.calc_ut(jd_lo, body_id, FLAGS)
         lo_speed = lo_result[0][3]
         if (lo_speed > 0 and speed > 0) or (lo_speed < 0 and speed < 0):
             jd_lo = jd_mid
@@ -127,8 +130,8 @@ print("\n=== P1: Mercury station timing 2020-2030 ===")
 jd_2020 = swe.julday(2020, 1, 1, 0.0)
 jd_2030 = swe.julday(2030, 1, 1, 0.0)
 
-le_stations = find_stations(SE_MERCURY, jd_2020, jd_2030, step=0.5)
-se_stations = find_stations_se(SE_MERCURY, jd_2020, jd_2030, step=0.5)
+le_stations = find_stations(MERCURY, jd_2020, jd_2030, step=0.5)
+se_stations = find_stations_se(MERCURY, jd_2020, jd_2030, step=0.5)
 
 print(
     f"  LE found {len(le_stations)} Mercury stations, SE found {len(se_stations)} stations"
@@ -171,8 +174,8 @@ print("\n=== P2: Mercury longitude at station points ===")
 
 for i, ((le_type, le_jd), (se_type, se_jd)) in enumerate(zip(le_stations, se_stations)):
     try:
-        le_result = ephem.swe_calc_ut(le_jd, SE_MERCURY, FLAGS)
-        se_result = swe.calc_ut(se_jd, SE_MERCURY, FLAGS)
+        le_result = ephem.calc_ut(le_jd, MERCURY, FLAGS)
+        se_result = swe.calc_ut(se_jd, MERCURY, FLAGS)
 
         le_lon = le_result[0][0]
         se_lon = se_result[0][0]
@@ -250,8 +253,8 @@ for i in range(0, min(6, len(le_stations) - 1), 2):  # First 3 retrogrades
             end = le_d_jd + 5  # End 5 days after station D
             while jd < end:
                 try:
-                    le_result = ephem.swe_calc_ut(jd, SE_MERCURY, FLAGS)
-                    se_result = swe.calc_ut(jd, SE_MERCURY, FLAGS)
+                    le_result = ephem.calc_ut(jd, MERCURY, FLAGS)
+                    se_result = swe.calc_ut(jd, MERCURY, FLAGS)
 
                     le_lon = le_result[0][0]
                     se_lon = se_result[0][0]
@@ -281,8 +284,8 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P5: Mars station timing 2020-2030 ===")
 
-le_mars = find_stations(SE_MARS, jd_2020, jd_2030, step=1.0)
-se_mars = find_stations_se(SE_MARS, jd_2020, jd_2030, step=1.0)
+le_mars = find_stations(MARS, jd_2020, jd_2030, step=1.0)
+se_mars = find_stations_se(MARS, jd_2020, jd_2030, step=1.0)
 
 print(f"  LE found {len(le_mars)} Mars stations, SE found {len(se_mars)} stations")
 
@@ -313,8 +316,8 @@ print(f"  After P5: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P6: Jupiter station timing 2020-2030 ===")
 
-le_jup = find_stations(SE_JUPITER, jd_2020, jd_2030, step=1.0)
-se_jup = find_stations_se(SE_JUPITER, jd_2020, jd_2030, step=1.0)
+le_jup = find_stations(JUPITER, jd_2020, jd_2030, step=1.0)
+se_jup = find_stations_se(JUPITER, jd_2020, jd_2030, step=1.0)
 
 print(f"  LE found {len(le_jup)} Jupiter stations, SE found {len(se_jup)} stations")
 
@@ -323,8 +326,8 @@ if len(le_jup) == len(se_jup):
     for i, ((le_type, le_jd), (se_type, se_jd)) in enumerate(zip(le_jup, se_jup)):
         if le_type == se_type:
             diff_sec = abs(le_jd - se_jd) * 86400
-            le_result = ephem.swe_calc_ut(le_jd, SE_JUPITER, FLAGS)
-            se_result = swe.calc_ut(se_jd, SE_JUPITER, FLAGS)
+            le_result = ephem.calc_ut(le_jd, JUPITER, FLAGS)
+            se_result = swe.calc_ut(se_jd, JUPITER, FLAGS)
             pos_diff = abs(le_result[0][0] - se_result[0][0]) * 3600
 
             if diff_sec < 300.0:  # Jupiter very slow near station, allow 5 min
@@ -349,8 +352,8 @@ print(f"  After P6: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P7: Saturn station timing 2020-2030 ===")
 
-le_sat = find_stations(SE_SATURN, jd_2020, jd_2030, step=1.0)
-se_sat = find_stations_se(SE_SATURN, jd_2020, jd_2030, step=1.0)
+le_sat = find_stations(SATURN, jd_2020, jd_2030, step=1.0)
+se_sat = find_stations_se(SATURN, jd_2020, jd_2030, step=1.0)
 
 print(f"  LE found {len(le_sat)} Saturn stations, SE found {len(se_sat)} stations")
 
@@ -383,7 +386,7 @@ print("\n=== P8: Speed at station points (should be ~0) ===")
 
 for i, (le_type, le_jd) in enumerate(le_stations[:10]):  # First 10 stations
     try:
-        le_result = ephem.swe_calc_ut(le_jd, SE_MERCURY, FLAGS)
+        le_result = ephem.calc_ut(le_jd, MERCURY, FLAGS)
         le_speed = le_result[0][3]
 
         # Speed at station should be very close to 0

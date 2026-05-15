@@ -3,7 +3,7 @@
 
 Quick check of heliacal functions with minimal test cases to avoid
 the extreme slowness of heliacal calculations.
-Only tests swe_heliacal_ut for a few bright planets/stars.
+Only tests heliacal_ut for a few bright planets/stars.
 """
 
 from __future__ import annotations
@@ -17,7 +17,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -33,9 +36,9 @@ LOCATIONS = [
 
 # Bodies to test (only bright, fast ones)
 BODIES = [
-    ("Venus", ephem.SE_VENUS, swe.VENUS),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Mercury", ephem.SE_MERCURY, swe.MERCURY),
+    ("Venus", ephem.VENUS, swe.VENUS),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Mercury", ephem.MERCURY, swe.MERCURY),
 ]
 
 # Event types
@@ -101,14 +104,14 @@ if __name__ == "__main__":
                         continue
 
                     try:
-                        le_result = ephem.swe_heliacal_ut(
+                        le_result = ephem.heliacal_ut(
                             jd,
                             [lon, lat, alt],
                             [ATPRESS, ATTEMP, 50, 0, 0, 0],
                             [0] * 20,
                             str(le_body),
                             evt_type,
-                            ephem.SEFLG_SWIEPH | ephem.SE_HELFLAG_HIGH_PRECISION,
+                            ephem.FLG_SWIEPH | ephem.HELFLAG_HIGH_PRECISION,
                         )
                         le_jd = le_result[0]
                     except Exception as e:

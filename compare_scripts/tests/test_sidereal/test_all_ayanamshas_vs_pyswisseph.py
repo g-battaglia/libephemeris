@@ -18,49 +18,49 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_DELUCE,
-    SE_SIDM_RAMAN,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_BABYL_KUGLER2,
-    SE_SIDM_BABYL_KUGLER3,
-    SE_SIDM_BABYL_HUBER,
-    SE_SIDM_BABYL_ETPSC,
-    SE_SIDM_ALDEBARAN_15TAU,
-    SE_SIDM_HIPPARCHOS,
-    SE_SIDM_SASSANIAN,
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_J2000,
-    SE_SIDM_J1900,
-    SE_SIDM_B1950,
-    SE_SIDM_SURYASIDDHANTA,
-    SE_SIDM_SURYASIDDHANTA_MSUN,
-    SE_SIDM_ARYABHATA,
-    SE_SIDM_ARYABHATA_MSUN,
-    SE_SIDM_SS_REVATI,
-    SE_SIDM_SS_CITRA,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALEQU_IAU1958,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALALIGN_MARDYKS,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_ARYABHATA_522,
-    SE_SIDM_BABYL_BRITTON,
-    SE_SIDM_TRUE_SHEORAN,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_FIORENZA,
-    SE_SIDM_VALENS_MOON,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_GALCENT_0SAG,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_ARYABHATA_522,
+    SIDM_BABYL_BRITTON,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_VALENS_MOON,
 )
 
 
@@ -70,68 +70,68 @@ from libephemeris.constants import (
 
 # Complete list of all 43 ayanamsha modes (0-42)
 ALL_AYANAMSHA_MODES = [
-    (0, SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-    (1, SE_SIDM_LAHIRI, "Lahiri"),
-    (2, SE_SIDM_DELUCE, "De Luce"),
-    (3, SE_SIDM_RAMAN, "Raman"),
-    (4, SE_SIDM_USHASHASHI, "Ushashashi"),
-    (5, SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (6, SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-    (7, SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (8, SE_SIDM_JN_BHASIN, "JN Bhasin"),
-    (9, SE_SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
-    (10, SE_SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
-    (11, SE_SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
-    (12, SE_SIDM_BABYL_HUBER, "Babylonian Huber"),
-    (13, SE_SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
-    (14, SE_SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
-    (15, SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (16, SE_SIDM_SASSANIAN, "Sassanian"),
-    (17, SE_SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
-    (18, SE_SIDM_J2000, "J2000"),
-    (19, SE_SIDM_J1900, "J1900"),
-    (20, SE_SIDM_B1950, "B1950"),
-    (21, SE_SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
-    (22, SE_SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta Mean Sun"),
-    (23, SE_SIDM_ARYABHATA, "Aryabhata"),
-    (24, SE_SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
-    (25, SE_SIDM_SS_REVATI, "SS Revati"),
-    (26, SE_SIDM_SS_CITRA, "SS Citra"),
-    (27, SE_SIDM_TRUE_CITRA, "True Citra"),
-    (28, SE_SIDM_TRUE_REVATI, "True Revati"),
-    (29, SE_SIDM_TRUE_PUSHYA, "True Pushya"),
-    (30, SE_SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
-    (31, SE_SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
-    (32, SE_SIDM_GALEQU_TRUE, "Galactic Equator True"),
-    (33, SE_SIDM_GALEQU_MULA, "Galactic Equator Mula"),
-    (34, SE_SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
-    (35, SE_SIDM_TRUE_MULA, "True Mula"),
-    (36, SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
-    (37, SE_SIDM_ARYABHATA_522, "Aryabhata 522"),
-    (38, SE_SIDM_BABYL_BRITTON, "Babylonian Britton"),
-    (39, SE_SIDM_TRUE_SHEORAN, "True Sheoran"),
-    (40, SE_SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
-    (41, SE_SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
-    (42, SE_SIDM_VALENS_MOON, "Valens Moon"),
+    (0, SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+    (1, SIDM_LAHIRI, "Lahiri"),
+    (2, SIDM_DELUCE, "De Luce"),
+    (3, SIDM_RAMAN, "Raman"),
+    (4, SIDM_USHASHASHI, "Ushashashi"),
+    (5, SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (6, SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+    (7, SIDM_YUKTESHWAR, "Yukteshwar"),
+    (8, SIDM_JN_BHASIN, "JN Bhasin"),
+    (9, SIDM_BABYL_KUGLER1, "Babylonian Kugler 1"),
+    (10, SIDM_BABYL_KUGLER2, "Babylonian Kugler 2"),
+    (11, SIDM_BABYL_KUGLER3, "Babylonian Kugler 3"),
+    (12, SIDM_BABYL_HUBER, "Babylonian Huber"),
+    (13, SIDM_BABYL_ETPSC, "Babylonian ETPSC"),
+    (14, SIDM_ALDEBARAN_15TAU, "Aldebaran 15 Tau"),
+    (15, SIDM_HIPPARCHOS, "Hipparchos"),
+    (16, SIDM_SASSANIAN, "Sassanian"),
+    (17, SIDM_GALCENT_0SAG, "Galactic Center 0 Sag"),
+    (18, SIDM_J2000, "J2000"),
+    (19, SIDM_J1900, "J1900"),
+    (20, SIDM_B1950, "B1950"),
+    (21, SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
+    (22, SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta Mean Sun"),
+    (23, SIDM_ARYABHATA, "Aryabhata"),
+    (24, SIDM_ARYABHATA_MSUN, "Aryabhata Mean Sun"),
+    (25, SIDM_SS_REVATI, "SS Revati"),
+    (26, SIDM_SS_CITRA, "SS Citra"),
+    (27, SIDM_TRUE_CITRA, "True Citra"),
+    (28, SIDM_TRUE_REVATI, "True Revati"),
+    (29, SIDM_TRUE_PUSHYA, "True Pushya"),
+    (30, SIDM_GALCENT_RGILBRAND, "Galactic Center Rgilbrand"),
+    (31, SIDM_GALEQU_IAU1958, "Galactic Equator IAU 1958"),
+    (32, SIDM_GALEQU_TRUE, "Galactic Equator True"),
+    (33, SIDM_GALEQU_MULA, "Galactic Equator Mula"),
+    (34, SIDM_GALALIGN_MARDYKS, "Galactic Alignment Mardyks"),
+    (35, SIDM_TRUE_MULA, "True Mula"),
+    (36, SIDM_GALCENT_MULA_WILHELM, "Galactic Center Mula Wilhelm"),
+    (37, SIDM_ARYABHATA_522, "Aryabhata 522"),
+    (38, SIDM_BABYL_BRITTON, "Babylonian Britton"),
+    (39, SIDM_TRUE_SHEORAN, "True Sheoran"),
+    (40, SIDM_GALCENT_COCHRANE, "Galactic Center Cochrane"),
+    (41, SIDM_GALEQU_FIORENZA, "Galactic Equator Fiorenza"),
+    (42, SIDM_VALENS_MOON, "Valens Moon"),
 ]
 
 # Star-based and galactic ayanamshas that may have larger differences
 # due to different star catalogs, proper motion calculations, or ambiguous definitions
 STAR_BASED_AYANAMSHAS = {
-    SE_SIDM_TRUE_CITRA,  # 27 - True position of Spica
-    SE_SIDM_TRUE_REVATI,  # 28 - True position of Revati
-    SE_SIDM_TRUE_PUSHYA,  # 29 - True position of Pushya
-    SE_SIDM_TRUE_MULA,  # 35 - True position of Mula
-    SE_SIDM_TRUE_SHEORAN,  # 39 - True Sheoran
-    SE_SIDM_GALCENT_0SAG,  # 17 - Galactic Center at 0 Sag
-    SE_SIDM_GALCENT_RGILBRAND,  # 30 - Galactic Center (Gil Brand)
-    SE_SIDM_GALCENT_MULA_WILHELM,  # 36 - Galactic Center at Mula (Wilhelm)
-    SE_SIDM_GALCENT_COCHRANE,  # 40 - Galactic Center (Cochrane)
-    SE_SIDM_GALEQU_IAU1958,  # 31 - Galactic Equator (IAU 1958)
-    SE_SIDM_GALEQU_TRUE,  # 32 - Galactic Equator (True)
-    SE_SIDM_GALEQU_MULA,  # 33 - Galactic Equator at Mula
-    SE_SIDM_GALEQU_FIORENZA,  # 41 - Galactic Equator (Fiorenza)
-    SE_SIDM_GALALIGN_MARDYKS,  # 34 - Galactic Alignment (Mardyks)
+    SIDM_TRUE_CITRA,  # 27 - True position of Spica
+    SIDM_TRUE_REVATI,  # 28 - True position of Revati
+    SIDM_TRUE_PUSHYA,  # 29 - True position of Pushya
+    SIDM_TRUE_MULA,  # 35 - True position of Mula
+    SIDM_TRUE_SHEORAN,  # 39 - True Sheoran
+    SIDM_GALCENT_0SAG,  # 17 - Galactic Center at 0 Sag
+    SIDM_GALCENT_RGILBRAND,  # 30 - Galactic Center (Gil Brand)
+    SIDM_GALCENT_MULA_WILHELM,  # 36 - Galactic Center at Mula (Wilhelm)
+    SIDM_GALCENT_COCHRANE,  # 40 - Galactic Center (Cochrane)
+    SIDM_GALEQU_IAU1958,  # 31 - Galactic Equator (IAU 1958)
+    SIDM_GALEQU_TRUE,  # 32 - Galactic Equator (True)
+    SIDM_GALEQU_MULA,  # 33 - Galactic Equator at Mula
+    SIDM_GALEQU_FIORENZA,  # 41 - Galactic Equator (Fiorenza)
+    SIDM_GALALIGN_MARDYKS,  # 34 - Galactic Alignment (Mardyks)
 }
 
 # Tolerances
@@ -199,11 +199,11 @@ class TestAllAyanamshasAtJ2000:
         tolerance = get_tolerance(sid_mode)
 
         # Set mode in both libraries
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
         # Calculate ayanamsha
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Compare (use angle_diff to handle wrap-around at 360 degrees)
@@ -234,11 +234,11 @@ class TestAllAyanamshasAt1900:
         tolerance = get_tolerance(sid_mode)
 
         # Set mode in both libraries
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
         # Calculate ayanamsha
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Compare (use angle_diff to handle wrap-around at 360 degrees)
@@ -269,11 +269,11 @@ class TestAllAyanamshasAt2100:
         tolerance = get_tolerance(sid_mode)
 
         # Set mode in both libraries
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
         # Calculate ayanamsha
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Compare (use angle_diff to handle wrap-around at 360 degrees)
@@ -322,11 +322,11 @@ class TestFormulBasedAyanamshasTight:
         tolerance = FORMULA_TOLERANCE
 
         # Set mode in both libraries
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
         # Calculate ayanamsha
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Compare (use angle_diff to handle wrap-around at 360 degrees)
@@ -372,11 +372,11 @@ class TestStarBasedAyanamshasRelaxed:
         tolerance = STAR_TOLERANCE
 
         # Set mode in both libraries
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
         swe.set_sid_mode(sid_mode)
 
         # Calculate ayanamsha
-        ayan_lib = ephem.swe_get_ayanamsa_ut(jd)
+        ayan_lib = ephem.get_ayanamsa_ut(jd)
         ayan_swe = swe.get_ayanamsa_ut(jd)
 
         # Compare (use angle_diff to handle wrap-around at 360 degrees)
@@ -403,14 +403,14 @@ class TestAyanamshaConsistency:
 
         Exception: J2000 mode (18) which is always 0 at J2000.
         """
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
-        ayan_1900 = ephem.swe_get_ayanamsa_ut(JD_1900)
-        ayan_2000 = ephem.swe_get_ayanamsa_ut(JD_J2000)
-        ayan_2100 = ephem.swe_get_ayanamsa_ut(JD_2100)
+        ayan_1900 = ephem.get_ayanamsa_ut(JD_1900)
+        ayan_2000 = ephem.get_ayanamsa_ut(JD_J2000)
+        ayan_2100 = ephem.get_ayanamsa_ut(JD_2100)
 
         # J2000 mode is special - always returns 0 at J2000 epoch
-        if sid_mode == SE_SIDM_J2000:
+        if sid_mode == SIDM_J2000:
             assert abs(ayan_2000) < 0.001, "J2000 mode should be 0 at J2000"
         else:
             # For most modes, ayanamsha increases with time (precession ~50"/year)
@@ -427,10 +427,10 @@ class TestAyanamshaConsistency:
     )
     def test_ayanamsha_returns_float(self, mode_id, sid_mode, name):
         """All ayanamsha modes should return a valid float value."""
-        ephem.swe_set_sid_mode(sid_mode)
+        ephem.set_sid_mode(sid_mode)
 
         for jd in [JD_1900, JD_J2000, JD_2100]:
-            ayan = ephem.swe_get_ayanamsa_ut(jd)
+            ayan = ephem.get_ayanamsa_ut(jd)
             assert isinstance(ayan, float), f"Mode {mode_id} should return float"
             # Ayanamsha can range from negative to 360+ depending on mode and epoch
             # J1900 mode at 1900 epoch can be close to 0 or 360
@@ -473,14 +473,14 @@ class TestAyanamshaExFunctions:
     )
     def test_get_ayanamsa_ex_matches_standard(self, mode_id, sid_mode, name):
         """
-        Verify swe_get_ayanamsa_ex returns consistent ayanamsha values.
+        Verify get_ayanamsa_ex returns consistent ayanamsha values.
         """
         jd = JD_J2000
 
-        ephem.swe_set_sid_mode(sid_mode)
-        ayan_standard = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(sid_mode)
+        ayan_standard = ephem.get_ayanamsa_ut(jd)
 
-        retflag, ayan_ex = ephem.swe_get_ayanamsa_ex_ut(jd, 0)
+        retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, 0)
 
         # Ayanamsha should match
         assert abs(ayan_ex - ayan_standard) < 0.0001, (

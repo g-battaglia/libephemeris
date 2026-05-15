@@ -187,52 +187,52 @@ class TestSetTopoValidation:
 
 
 class TestSweHousesValidation:
-    """Tests for coordinate validation in swe_houses()."""
+    """Tests for coordinate validation in houses()."""
 
     def test_swe_houses_valid_coordinates(self):
-        """swe_houses with valid coordinates should work."""
+        """houses with valid coordinates should work."""
         jd = 2451545.0  # J2000
-        cusps, ascmc = ephem.swe_houses(jd, 41.9, 12.5, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 41.9, 12.5, ord("P"))
         assert len(cusps) == 12
         assert len(ascmc) == 8
 
     def test_swe_houses_invalid_latitude(self):
-        """swe_houses with invalid latitude should raise CoordinateError."""
+        """houses with invalid latitude should raise CoordinateError."""
         jd = 2451545.0
         with pytest.raises(CoordinateError) as exc_info:
-            ephem.swe_houses(jd, 91.0, 0.0, ord("P"))
+            ephem.houses(jd, 91.0, 0.0, ord("P"))
         error = exc_info.value
         assert error.coordinate_name == "latitude"
-        assert "swe_houses" in str(error)
+        assert "houses" in str(error)
 
     def test_swe_houses_invalid_longitude(self):
-        """swe_houses with invalid longitude should raise CoordinateError."""
+        """houses with invalid longitude should raise CoordinateError."""
         jd = 2451545.0
         with pytest.raises(CoordinateError) as exc_info:
-            ephem.swe_houses(jd, 45.0, 200.0, ord("P"))
+            ephem.houses(jd, 45.0, 200.0, ord("P"))
         error = exc_info.value
         assert error.coordinate_name == "longitude"
-        assert "swe_houses" in str(error)
+        assert "houses" in str(error)
 
 
 class TestSweHousesArmcValidation:
-    """Tests for coordinate validation in swe_houses_armc()."""
+    """Tests for coordinate validation in houses_armc()."""
 
     def test_swe_houses_armc_valid_latitude(self):
-        """swe_houses_armc with valid latitude should work."""
+        """houses_armc with valid latitude should work."""
         armc = 45.0
         lat = 41.9
         eps = 23.44
-        cusps, ascmc = ephem.swe_houses_armc(armc, lat, eps, ord("P"))
+        cusps, ascmc = ephem.houses_armc(armc, lat, eps, ord("P"))
         assert len(cusps) == 12
 
     def test_swe_houses_armc_invalid_latitude(self):
-        """swe_houses_armc with invalid latitude should raise CoordinateError."""
+        """houses_armc with invalid latitude should raise CoordinateError."""
         with pytest.raises(CoordinateError) as exc_info:
-            ephem.swe_houses_armc(45.0, 91.0, 23.44, ord("P"))
+            ephem.houses_armc(45.0, 91.0, 23.44, ord("P"))
         error = exc_info.value
         assert error.coordinate_name == "latitude"
-        assert "swe_houses_armc" in str(error)
+        assert "houses_armc" in str(error)
 
 
 class TestContextSetTopoValidation:

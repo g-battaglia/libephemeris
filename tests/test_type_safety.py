@@ -10,8 +10,8 @@ from pathlib import Path
 import libephemeris as ephem
 from libephemeris import EphemerisContext
 from libephemeris.state import get_sid_mode, set_sid_mode, close
-from libephemeris.houses import swe_houses, swe_houses_ex, swe_house_name
-from libephemeris.constants import SE_SIDM_LAHIRI
+from libephemeris.houses import houses, houses_ex, house_name
+from libephemeris.constants import SIDM_LAHIRI
 
 
 class TestPEP561Compliance:
@@ -55,18 +55,18 @@ class TestGetSidMode:
         close()
         mode = get_sid_mode()
         assert isinstance(mode, int)
-        assert mode == 1  # Default to SE_SIDM_LAHIRI
+        assert mode == 1  # Default to SIDM_LAHIRI
 
     def test_get_sid_mode_returns_int_when_set(self):
         """get_sid_mode() should return int when mode is explicitly set."""
-        set_sid_mode(SE_SIDM_LAHIRI)
+        set_sid_mode(SIDM_LAHIRI)
         mode = get_sid_mode()
         assert isinstance(mode, int)
-        assert mode == SE_SIDM_LAHIRI
+        assert mode == SIDM_LAHIRI
 
     def test_get_sid_mode_full_returns_tuple(self):
         """get_sid_mode(full=True) should return a tuple of (int, float, float)."""
-        set_sid_mode(SE_SIDM_LAHIRI, 2451545.0, 23.5)
+        set_sid_mode(SIDM_LAHIRI, 2451545.0, 23.5)
         result = get_sid_mode(full=True)
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -90,28 +90,28 @@ class TestHousesReturnTypes:
     """Tests for house calculation return types."""
 
     def test_swe_houses_returns_tuples(self):
-        """swe_houses should return tuple of tuples, not lists."""
-        cusps, ascmc = swe_houses(2451545.0, 51.5, -0.12, ord("P"))
+        """houses should return tuple of tuples, not lists."""
+        cusps, ascmc = houses(2451545.0, 51.5, -0.12, ord("P"))
         assert isinstance(cusps, tuple)
         assert isinstance(ascmc, tuple)
         assert len(cusps) == 12
         assert len(ascmc) == 8
 
     def test_swe_houses_ex_returns_tuples(self):
-        """swe_houses_ex should return tuple of tuples."""
-        cusps, ascmc = swe_houses_ex(2451545.0, 51.5, -0.12, ord("P"), 0)
+        """houses_ex should return tuple of tuples."""
+        cusps, ascmc = houses_ex(2451545.0, 51.5, -0.12, ord("P"), 0)
         assert isinstance(cusps, tuple)
         assert isinstance(ascmc, tuple)
 
     def test_swe_house_name_with_int(self):
-        """swe_house_name should accept int and return str."""
-        name = swe_house_name(ord("P"))
+        """house_name should accept int and return str."""
+        name = house_name(ord("P"))
         assert isinstance(name, str)
         assert name == "Placidus"
 
     def test_swe_house_name_with_unknown(self):
-        """swe_house_name should return 'Unknown' for unknown systems."""
-        name = swe_house_name(ord("Z"))  # Unknown system
+        """house_name should return 'Unknown' for unknown systems."""
+        name = house_name(ord("Z"))  # Unknown system
         assert isinstance(name, str)
         assert name == "Unknown"
 
@@ -133,14 +133,14 @@ class TestAyanamsaTypes:
     """Tests for ayanamsa calculation types."""
 
     def test_get_ayanamsa_ut_returns_float(self):
-        """swe_get_ayanamsa_ut should return float."""
-        set_sid_mode(SE_SIDM_LAHIRI)
-        ayanamsa = ephem.swe_get_ayanamsa_ut(2451545.0)
+        """get_ayanamsa_ut should return float."""
+        set_sid_mode(SIDM_LAHIRI)
+        ayanamsa = ephem.get_ayanamsa_ut(2451545.0)
         assert isinstance(ayanamsa, float)
 
     def test_get_ayanamsa_ut_with_unset_mode(self):
-        """swe_get_ayanamsa_ut works even when mode was never explicitly set."""
+        """get_ayanamsa_ut works even when mode was never explicitly set."""
         close()
         # Should use default mode (1 = Lahiri)
-        ayanamsa = ephem.swe_get_ayanamsa_ut(2451545.0)
+        ayanamsa = ephem.get_ayanamsa_ut(2451545.0)
         assert isinstance(ayanamsa, float)

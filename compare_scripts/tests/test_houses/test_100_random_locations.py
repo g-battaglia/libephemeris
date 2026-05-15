@@ -127,7 +127,7 @@ class TestAll19HouseSystemsAt100Locations:
         for i, (lat, lon, jd) in enumerate(RANDOM_LOCATIONS):
             try:
                 # Calculate with libephemeris
-                cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+                cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
 
                 # Calculate with pyswisseph
                 cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
@@ -201,7 +201,7 @@ class TestAll19HouseSystemsAt100Locations:
 
         for hsys_char, name, _ in ALL_HOUSE_SYSTEMS:
             hsys = ord(hsys_char)
-            cusps, ascmc = ephem.swe_houses(jd, lat, lon, hsys)
+            cusps, ascmc = ephem.houses(jd, lat, lon, hsys)
 
             # Should have 12 cusps
             assert len(cusps) >= 12, f"{name}: Expected 12 cusps, got {len(cusps)}"
@@ -236,7 +236,7 @@ class TestAll19HouseSystemsAt100Locations:
 
             for lat, lon, jd in sample_locations:
                 try:
-                    cusps, _ = ephem.swe_houses(jd, lat, lon, hsys)
+                    cusps, _ = ephem.houses(jd, lat, lon, hsys)
 
                     # Houses 1-6 should be 180° from houses 7-12
                     for i in range(6):
@@ -291,7 +291,7 @@ class TestHouseSystemsStatistics:
 
             for lat, lon, jd in RANDOM_LOCATIONS:
                 try:
-                    cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+                    cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
                     cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
 
                     asc_diffs.append(angular_diff(ascmc_lib[0], ascmc_swe[0]))
@@ -375,7 +375,7 @@ class TestHouseSystemsByLatitudeBand:
             max_diff = 0.0
             for lat, lon, jd in band_locations:
                 try:
-                    cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+                    cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
                     cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
 
                     asc_diff = angular_diff(ascmc_lib[0], ascmc_swe[0])

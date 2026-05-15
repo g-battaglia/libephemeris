@@ -17,7 +17,10 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -25,13 +28,13 @@ total = 0
 failures = []
 
 BODIES = [
-    ("Sun", ephem.SE_SUN, swe.SUN),
-    ("Jupiter", ephem.SE_JUPITER, swe.JUPITER),
-    ("Saturn", ephem.SE_SATURN, swe.SATURN),
+    ("Sun", ephem.SUN, swe.SUN),
+    ("Jupiter", ephem.JUPITER, swe.JUPITER),
+    ("Saturn", ephem.SATURN, swe.SATURN),
 ]
 
-FLAGS_DATE = ephem.SEFLG_SWIEPH | ephem.SEFLG_SPEED
-FLAGS_J2000 = FLAGS_DATE | ephem.SEFLG_J2000
+FLAGS_DATE = ephem.FLG_SWIEPH | ephem.FLG_SPEED
+FLAGS_J2000 = FLAGS_DATE | ephem.FLG_J2000
 
 TEST_JDS = [
     2451545.0,  # J2000 (precession = 0)
@@ -60,8 +63,8 @@ def test_precession_rates():
 
             # Get ecliptic of date and J2000 positions from both
             try:
-                le_date = ephem.swe_calc_ut(jd, le_b, FLAGS_DATE)
-                le_j2k = ephem.swe_calc_ut(jd, le_b, FLAGS_J2000)
+                le_date = ephem.calc_ut(jd, le_b, FLAGS_DATE)
+                le_j2k = ephem.calc_ut(jd, le_b, FLAGS_J2000)
                 se_date = swe.calc_ut(jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED)
                 se_j2k = swe.calc_ut(
                     jd, se_b, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000
@@ -122,8 +125,8 @@ def test_precession_rates():
         years = jd_offset / 365.25
 
         try:
-            le_sun_d = ephem.swe_calc_ut(jd, ephem.SE_SUN, FLAGS_DATE)[0][0]
-            le_sun_j = ephem.swe_calc_ut(jd, ephem.SE_SUN, FLAGS_J2000)[0][0]
+            le_sun_d = ephem.calc_ut(jd, ephem.SUN, FLAGS_DATE)[0][0]
+            le_sun_j = ephem.calc_ut(jd, ephem.SUN, FLAGS_J2000)[0][0]
             se_sun_d = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH | swe.FLG_SPEED)[0][0]
             se_sun_j = swe.calc_ut(
                 jd, swe.SUN, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_J2000

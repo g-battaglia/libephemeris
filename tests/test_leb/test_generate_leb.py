@@ -15,13 +15,13 @@ import pytest
 # Ensure scripts directory is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
 
-from libephemeris.constants import SE_EARTH, SE_MOON, SE_SUN
+from libephemeris.constants import EARTH, MOON, SUN
 from libephemeris.leb_format import (
     BODY_PARAMS,
     MAGIC,
 )
 from libephemeris.leb_reader import LEBReader
-from libephemeris.time_utils import swe_julday
+from libephemeris.time_utils import julday
 
 
 class TestAssembleLeb:
@@ -53,11 +53,11 @@ class TestAssembleLeb:
     def test_generated_file_has_expected_bodies(self, test_leb_file):
         """Generated file should contain the requested bodies."""
         with LEBReader(test_leb_file) as reader:
-            # conftest requests: SE_SUN(0), SE_MOON(1), SE_MARS(4),
-            # SE_EARTH(14), SE_MEAN_NODE(10)
-            assert reader.has_body(SE_SUN)
-            assert reader.has_body(SE_MOON)
-            assert reader.has_body(SE_EARTH)
+            # conftest requests: SUN(0), MOON(1), MARS(4),
+            # EARTH(14), MEAN_NODE(10)
+            assert reader.has_body(SUN)
+            assert reader.has_body(MOON)
+            assert reader.has_body(EARTH)
 
     @pytest.mark.integration
     def test_generated_file_has_nutation(self, test_leb_file):
@@ -91,10 +91,10 @@ class TestGenerateMinimal:
     def test_minimal_file_works(self, test_leb_file_minimal):
         """Minimal .leb file should work correctly."""
         with LEBReader(test_leb_file_minimal) as reader:
-            assert reader.has_body(SE_SUN)
-            assert reader.has_body(SE_EARTH)
+            assert reader.has_body(SUN)
+            assert reader.has_body(EARTH)
             # Should not have other bodies
-            assert not reader.has_body(SE_MOON)
+            assert not reader.has_body(MOON)
 
     @pytest.mark.integration
     def test_minimal_roundtrip(self, test_leb_file_minimal):
@@ -103,7 +103,7 @@ class TestGenerateMinimal:
             jd_start, jd_end = reader.jd_range
             jd_mid = (jd_start + jd_end) / 2.0
 
-            pos, vel = reader.eval_body(SE_SUN, jd_mid)
+            pos, vel = reader.eval_body(SUN, jd_mid)
             # ICRS barycentric: Sun is near SSB, typically <0.01 AU
             import math
 
@@ -121,8 +121,8 @@ class TestGenerateSingleBody:
         from scripts.generate_leb import assemble_leb
 
         path = str(tmp_path / "sun_only.leb")
-        jd_start = swe_julday(2024, 1, 1, 0.0)
-        jd_end = swe_julday(2024, 7, 1, 0.0)
+        jd_start = julday(2024, 1, 1, 0.0)
+        jd_end = julday(2024, 7, 1, 0.0)
 
         assemble_leb(
             output=path,
@@ -134,9 +134,9 @@ class TestGenerateSingleBody:
         )
 
         with LEBReader(path) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
             jd_mid = (jd_start + jd_end) / 2.0
-            pos, vel = reader.eval_body(SE_SUN, jd_mid)
+            pos, vel = reader.eval_body(SUN, jd_mid)
             assert len(pos) == 3
             assert len(vel) == 3
 
@@ -152,7 +152,7 @@ class TestChebyshevFitting:
         segment parameters.  Production accuracy validated by compare/ tests.
         """
         import libephemeris as ephem
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.constants import FLG_SPEED
         from libephemeris.fast_calc import fast_calc_ut
 
         with LEBReader(test_leb_file) as reader:
@@ -160,10 +160,10 @@ class TestChebyshevFitting:
             jd_mid = (jd_start + jd_end) / 2.0
 
             # Full pipeline: LEB → fast_calc → geocentric ecliptic
-            fast_result, _ = fast_calc_ut(reader, jd_mid, SE_SUN, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(reader, jd_mid, SUN, FLG_SPEED)
 
             # Skyfield reference (geocentric ecliptic of date)
-            ref, _ = ephem.swe_calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
+            ref, _ = ephem.calc_ut(jd_mid, SUN, FLG_SPEED)
 
             lon_err = abs(fast_result[0] - ref[0])
             if lon_err > 180.0:
@@ -183,7 +183,7 @@ class TestChebyshevFitting:
         segment parameters.  Production accuracy validated by compare/ tests.
         """
         import libephemeris as ephem
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.constants import FLG_SPEED
         from libephemeris.fast_calc import fast_calc_ut
 
         with LEBReader(test_leb_file) as reader:
@@ -191,10 +191,10 @@ class TestChebyshevFitting:
             jd_mid = (jd_start + jd_end) / 2.0
 
             # Full pipeline: LEB → fast_calc → geocentric ecliptic
-            fast_result, _ = fast_calc_ut(reader, jd_mid, SE_MOON, SEFLG_SPEED)
+            fast_result, _ = fast_calc_ut(reader, jd_mid, MOON, FLG_SPEED)
 
             # Skyfield reference (geocentric ecliptic of date)
-            ref, _ = ephem.swe_calc_ut(jd_mid, SE_MOON, SEFLG_SPEED)
+            ref, _ = ephem.calc_ut(jd_mid, MOON, FLG_SPEED)
 
             lon_err = abs(fast_result[0] - ref[0])
             if lon_err > 180.0:

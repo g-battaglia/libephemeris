@@ -9,20 +9,20 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_TOPOCTR,
-    SEFLG_HELCTR,
-    SEFLG_BARYCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_J2000,
-    SEFLG_EQUATORIAL,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_TOPOCTR,
+    FLG_HELCTR,
+    FLG_BARYCTR,
+    FLG_TRUEPOS,
+    FLG_J2000,
+    FLG_EQUATORIAL,
+    FLG_SPEED,
+    FLG_SWIEPH,
 )
 
 
@@ -68,12 +68,12 @@ SUBJECTS = [
 
 # Comparison modes with flags
 COMPARISON_MODES = [
-    ("Topocentric", SE_MOON, "Moon", SEFLG_TOPOCTR | SEFLG_SPEED, False),
-    ("Heliocentric", SE_MARS, "Mars", SEFLG_HELCTR | SEFLG_SPEED, True),
-    ("Barycentric", SE_JUPITER, "Jupiter", SEFLG_BARYCTR | SEFLG_SPEED, True),
-    ("TruePos", SE_VENUS, "Venus", SEFLG_TRUEPOS | SEFLG_SPEED, False),
-    ("J2000 Equ", SE_SUN, "Sun", SEFLG_J2000 | SEFLG_EQUATORIAL | SEFLG_SPEED, False),
-    ("J2000 Ecl", SE_SATURN, "Saturn", SEFLG_J2000 | SEFLG_SPEED, False),
+    ("Topocentric", MOON, "Moon", FLG_TOPOCTR | FLG_SPEED, False),
+    ("Heliocentric", MARS, "Mars", FLG_HELCTR | FLG_SPEED, True),
+    ("Barycentric", JUPITER, "Jupiter", FLG_BARYCTR | FLG_SPEED, True),
+    ("TruePos", VENUS, "Venus", FLG_TRUEPOS | FLG_SPEED, False),
+    ("J2000 Equ", SUN, "Sun", FLG_J2000 | FLG_EQUATORIAL | FLG_SPEED, False),
+    ("J2000 Ecl", SATURN, "Saturn", FLG_J2000 | FLG_SPEED, False),
 ]
 
 
@@ -113,9 +113,9 @@ class TestObservationModes:
         jd = swe.julday(year, month, day, hour)
 
         # Set topocentric location if needed
-        if flags & SEFLG_TOPOCTR:
+        if flags & FLG_TOPOCTR:
             swe.set_topo(lon, lat, alt)
-            pyephem.swe_set_topo(lon, lat, alt)
+            pyephem.set_topo(lon, lat, alt)
 
         # SwissEphemeris
         try:
@@ -125,7 +125,7 @@ class TestObservationModes:
 
         # LibEphemeris
         try:
-            res_py, _ = pyephem.swe_calc_ut(jd, planet_id, flags)
+            res_py, _ = pyephem.calc_ut(jd, planet_id, flags)
         except Exception as e:
             pytest.skip(f"LibEphemeris failed: {e}")
 
@@ -183,13 +183,13 @@ class TestTopocentric:
     def test_topocentric_moon(self, lat, lon, alt, loc_name):
         """Test topocentric Moon calculations at various latitudes."""
         jd = swe.julday(2024, 1, 15, 12.0)
-        flags = SEFLG_TOPOCTR | SEFLG_SPEED | SEFLG_SWIEPH
+        flags = FLG_TOPOCTR | FLG_SPEED | FLG_SWIEPH
 
         swe.set_topo(lon, lat, alt)
-        pyephem.swe_set_topo(lon, lat, alt)
+        pyephem.set_topo(lon, lat, alt)
 
-        res_swe, _ = swe.calc_ut(jd, SE_MOON, flags)
-        res_py, _ = pyephem.swe_calc_ut(jd, SE_MOON, flags)
+        res_swe, _ = swe.calc_ut(jd, MOON, flags)
+        res_py, _ = pyephem.calc_ut(jd, MOON, flags)
 
         diff_lon = angular_diff(res_swe[0], res_py[0])
 
@@ -210,19 +210,19 @@ class TestHeliocentric:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_heliocentric_planets(self, planet_id, planet_name):
         """Test heliocentric planetary positions."""
         jd = swe.julday(2024, 1, 1, 12.0)
-        flags = SEFLG_HELCTR | SEFLG_SPEED | SEFLG_SWIEPH
+        flags = FLG_HELCTR | FLG_SPEED | FLG_SWIEPH
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_py, _ = pyephem.swe_calc_ut(jd, planet_id, flags)
+        res_py, _ = pyephem.calc_ut(jd, planet_id, flags)
 
         diff_lon = angular_diff(res_swe[0], res_py[0])
         diff_lat = abs(res_swe[1] - res_py[1])
@@ -247,18 +247,18 @@ class TestJ2000Coordinates:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_j2000_ecliptic(self, planet_id, planet_name):
         """Test J2000 ecliptic coordinates."""
         jd = swe.julday(2024, 6, 15, 12.0)
-        flags = SEFLG_J2000 | SEFLG_SPEED | SEFLG_SWIEPH
+        flags = FLG_J2000 | FLG_SPEED | FLG_SWIEPH
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_py, _ = pyephem.swe_calc_ut(jd, planet_id, flags)
+        res_py, _ = pyephem.calc_ut(jd, planet_id, flags)
 
         diff_lon = angular_diff(res_swe[0], res_py[0])
 
@@ -270,17 +270,17 @@ class TestJ2000Coordinates:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
         ],
     )
     def test_j2000_equatorial(self, planet_id, planet_name):
         """Test J2000 equatorial coordinates."""
         jd = swe.julday(2024, 6, 15, 12.0)
-        flags = SEFLG_J2000 | SEFLG_EQUATORIAL | SEFLG_SPEED | SEFLG_SWIEPH
+        flags = FLG_J2000 | FLG_EQUATORIAL | FLG_SPEED | FLG_SWIEPH
 
         res_swe, _ = swe.calc_ut(jd, planet_id, flags)
-        res_py, _ = pyephem.swe_calc_ut(jd, planet_id, flags)
+        res_py, _ = pyephem.calc_ut(jd, planet_id, flags)
 
         diff_ra = angular_diff(res_swe[0], res_py[0])
         diff_dec = abs(res_swe[1] - res_py[1])

@@ -23,7 +23,7 @@ except ImportError:
     HAS_SWISSEPH = False
 
 import libephemeris as ephem
-from libephemeris.constants import SE_OSCU_APOG
+from libephemeris.constants import OSCU_APOG
 
 
 def angular_diff(a: float, b: float) -> float:
@@ -63,7 +63,7 @@ class TestTrueLilithPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff_deg = angular_diff(pos_swe[0], pos_lib[0])
             diff_arcsec = diff_deg * 3600
@@ -88,7 +88,7 @@ class TestTrueLilithPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff_deg = angular_diff(pos_swe[0], pos_lib[0])
             diffs_arcsec.append(diff_deg * 3600)
@@ -114,7 +114,7 @@ class TestTrueLilithPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff_deg = angular_diff(pos_swe[0], pos_lib[0])
             diffs_arcsec.append(diff_deg * 3600)
@@ -140,7 +140,7 @@ class TestTrueLilithPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff_deg = angular_diff(pos_swe[0], pos_lib[0])
             diffs_arcsec.append(diff_deg * 3600)
@@ -179,7 +179,7 @@ class TestTrueLilithPrecision:
             jd = swe.julday(year, month, day, hour)
 
             pos_swe, _ = swe.calc_ut(jd, swe.OSCU_APOG, 0)
-            pos_lib, _ = ephem.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            pos_lib, _ = ephem.calc_ut(jd, OSCU_APOG, 0)
 
             diff_deg = angular_diff(pos_swe[0], pos_lib[0])
 

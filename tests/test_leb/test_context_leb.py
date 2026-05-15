@@ -13,12 +13,12 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MEAN_NODE,
-    SE_MOON,
-    SE_SUN,
-    SEFLG_EQUATORIAL,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
+    MEAN_NODE,
+    MOON,
+    SUN,
+    FLG_EQUATORIAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
 )
 from libephemeris.context import EphemerisContext
 
@@ -47,7 +47,7 @@ class TestContextLEBFastPath:
     @pytest.mark.integration
     def test_calc_ut_with_leb(self, ctx_with_leb, jd_mid):
         """calc_ut() should produce valid results when .leb is set."""
-        result, retflag = ctx_with_leb.calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
+        result, retflag = ctx_with_leb.calc_ut(jd_mid, SUN, FLG_SPEED)
 
         assert len(result) == 6
         assert 0.0 <= result[0] < 360.0
@@ -57,7 +57,7 @@ class TestContextLEBFastPath:
 
     @pytest.mark.integration
     def test_calc_ut_matches_global(self, ctx_with_leb, jd_mid, test_leb_file):
-        """Context calc_ut() with LEB should match global swe_calc_ut() with LEB."""
+        """Context calc_ut() with LEB should match global calc_ut() with LEB."""
         # Set up global LEB too
         old_leb = None
         old_calc_mode = None
@@ -74,8 +74,8 @@ class TestContextLEBFastPath:
             state.set_calc_mode("auto")
             ephem.set_leb_file(test_leb_file)
 
-            ctx_result, _ = ctx_with_leb.calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
-            global_result, _ = ephem.swe_calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
+            ctx_result, _ = ctx_with_leb.calc_ut(jd_mid, SUN, FLG_SPEED)
+            global_result, _ = ephem.calc_ut(jd_mid, SUN, FLG_SPEED)
 
             # Should match exactly (same LEB reader, same code path)
             for i in range(6):
@@ -89,7 +89,7 @@ class TestContextLEBFastPath:
     @pytest.mark.integration
     def test_calc_tt_with_leb(self, ctx_with_leb, jd_mid):
         """calc() (TT) should produce valid results when .leb is set."""
-        result, retflag = ctx_with_leb.calc(jd_mid, SE_SUN, SEFLG_SPEED)
+        result, retflag = ctx_with_leb.calc(jd_mid, SUN, FLG_SPEED)
 
         assert len(result) == 6
         assert 0.0 <= result[0] < 360.0
@@ -97,7 +97,7 @@ class TestContextLEBFastPath:
     @pytest.mark.integration
     def test_calc_ut_moon(self, ctx_with_leb, jd_mid):
         """Moon position via context + LEB should be valid."""
-        result, _ = ctx_with_leb.calc_ut(jd_mid, SE_MOON, SEFLG_SPEED)
+        result, _ = ctx_with_leb.calc_ut(jd_mid, MOON, FLG_SPEED)
 
         assert 0.0 <= result[0] < 360.0
         assert -10.0 <= result[1] <= 10.0  # Moon latitude within ~5 deg
@@ -105,7 +105,7 @@ class TestContextLEBFastPath:
     @pytest.mark.integration
     def test_calc_ut_mean_node(self, ctx_with_leb, jd_mid):
         """Mean node via context + LEB (ecliptic direct pipeline)."""
-        result, _ = ctx_with_leb.calc_ut(jd_mid, SE_MEAN_NODE, SEFLG_SPEED)
+        result, _ = ctx_with_leb.calc_ut(jd_mid, MEAN_NODE, FLG_SPEED)
 
         assert 0.0 <= result[0] < 360.0
         # Mean node retrograde speed: ~-0.053 deg/day
@@ -114,7 +114,7 @@ class TestContextLEBFastPath:
     @pytest.mark.integration
     def test_calc_ut_equatorial(self, ctx_with_leb, jd_mid):
         """Equatorial coordinates via context + LEB."""
-        result, _ = ctx_with_leb.calc_ut(jd_mid, SE_SUN, SEFLG_EQUATORIAL | SEFLG_SPEED)
+        result, _ = ctx_with_leb.calc_ut(jd_mid, SUN, FLG_EQUATORIAL | FLG_SPEED)
 
         assert 0.0 <= result[0] < 360.0
         assert -90.0 <= result[1] <= 90.0
@@ -141,9 +141,9 @@ class TestContextLEBFallback:
 
     @pytest.mark.integration
     def test_fallback_for_topoctr(self, ctx_with_leb, jd_mid):
-        """SEFLG_TOPOCTR should fall back to Skyfield (not crash)."""
+        """FLG_TOPOCTR should fall back to Skyfield (not crash)."""
         ctx_with_leb.set_topo(12.5, 41.9, 0)
-        result, _ = ctx_with_leb.calc_ut(jd_mid, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+        result, _ = ctx_with_leb.calc_ut(jd_mid, SUN, FLG_TOPOCTR | FLG_SPEED)
 
         # Should get valid results from Skyfield fallback
         assert 0.0 <= result[0] < 360.0
@@ -151,9 +151,9 @@ class TestContextLEBFallback:
     @pytest.mark.integration
     def test_fallback_for_unknown_body(self, ctx_with_leb, jd_mid):
         """Body not in .leb should fall back to Skyfield."""
-        # SE_MARS (4) is in the test LEB, but try a body that isn't
+        # MARS (4) is in the test LEB, but try a body that isn't
         # Jupiter (5) is not in the test fixture
-        result, _ = ctx_with_leb.calc_ut(jd_mid, 5, SEFLG_SPEED)
+        result, _ = ctx_with_leb.calc_ut(jd_mid, 5, FLG_SPEED)
 
         # Should get valid results from Skyfield fallback
         assert 0.0 <= result[0] < 360.0
@@ -174,7 +174,7 @@ class TestContextLEBGracefulError:
 
         # calc_ut should still work via Skyfield fallback
         jd = 2460000.0  # ~2023
-        result, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
         assert 0.0 <= result[0] < 360.0
 
     @pytest.mark.integration
@@ -196,7 +196,7 @@ class TestContextLEBGracefulError:
 
             # calc_ut should still work via Skyfield fallback
             jd = 2460000.0
-            result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            result, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
             assert 0.0 <= result[0] < 360.0
         finally:
             state.set_calc_mode(None)
@@ -231,7 +231,7 @@ class TestContextLEBGlobalFallthrough:
             reader_tmp.close()
 
             # calc_ut should use the global LEB reader
-            result, _ = ctx.calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
+            result, _ = ctx.calc_ut(jd_mid, SUN, FLG_SPEED)
             assert 0.0 <= result[0] < 360.0
             assert abs(result[3]) > 0.5  # Sun speed confirms it worked
         finally:
@@ -398,7 +398,7 @@ class TestCalcMode:
 
     @pytest.mark.integration
     def test_skyfield_mode_calc_works(self, test_leb_file):
-        """In skyfield mode, swe_calc_ut should use Skyfield (not LEB)."""
+        """In skyfield mode, calc_ut should use Skyfield (not LEB)."""
         from libephemeris.state import set_calc_mode
 
         old_leb = ephem.state._LEB_FILE
@@ -407,7 +407,7 @@ class TestCalcMode:
             set_calc_mode("skyfield")
 
             jd = 2451545.0  # J2000
-            result, _ = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            result, _ = ephem.calc_ut(jd, SUN, FLG_SPEED)
             assert 0.0 <= result[0] < 360.0
             assert abs(result[3]) > 0.5
         finally:
@@ -453,7 +453,7 @@ class TestCalcMode:
             # Context without own LEB should pick up global mode
             ctx = EphemerisContext()
             jd = 2451545.0
-            result, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+            result, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
             assert 0.0 <= result[0] < 360.0
         finally:
             set_calc_mode(None)

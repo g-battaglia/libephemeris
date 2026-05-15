@@ -12,7 +12,7 @@ Tests cover:
 
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 
 
 class TestJdetToUtcBasic:
@@ -201,16 +201,16 @@ class TestJdetToUtcCalendars:
     def test_gregorian_default(self):
         """Gregorian calendar should be default."""
         result_default = ephem.jdet_to_utc(2451545.0)
-        result_greg = ephem.jdet_to_utc(2451545.0, SE_GREG_CAL)
+        result_greg = ephem.jdet_to_utc(2451545.0, GREG_CAL)
         assert result_default == result_greg
 
     @pytest.mark.unit
     def test_julian_calendar_differs(self):
         """Julian calendar should give different date for modern dates."""
         year_greg, month_greg, day_greg, _, _, _ = ephem.jdet_to_utc(
-            2451545.0, SE_GREG_CAL
+            2451545.0, GREG_CAL
         )
-        year_jul, month_jul, day_jul, _, _, _ = ephem.jdet_to_utc(2451545.0, SE_JUL_CAL)
+        year_jul, month_jul, day_jul, _, _, _ = ephem.jdet_to_utc(2451545.0, JUL_CAL)
 
         # In 2000, Julian calendar is 13 days behind Gregorian
         # Gregorian 2000-01-01 = Julian 1999-12-19
@@ -235,9 +235,9 @@ class TestJdetToUtcCalendars:
             orig_hour,
             orig_minute,
             orig_second,
-            calendar=SE_JUL_CAL,
+            calendar=JUL_CAL,
         )
-        year, month, day, hour, minute, second = ephem.jdet_to_utc(jd_tt, SE_JUL_CAL)
+        year, month, day, hour, minute, second = ephem.jdet_to_utc(jd_tt, JUL_CAL)
 
         assert year == orig_year
         assert month == orig_month
@@ -385,8 +385,8 @@ class TestJdetToUtcConsistency:
         y1, m1, d1, _, _, _ = ephem.jdet_to_utc(jd_tt_1)
 
         # Convert to JD for comparison (ignoring time)
-        jd_date_0 = ephem.swe_julday(y0, m0, d0, 0.0)
-        jd_date_1 = ephem.swe_julday(y1, m1, d1, 0.0)
+        jd_date_0 = ephem.julday(y0, m0, d0, 0.0)
+        jd_date_1 = ephem.julday(y1, m1, d1, 0.0)
 
         # Should differ by 1 day
         assert jd_date_1 - jd_date_0 == pytest.approx(1.0, abs=0.01)

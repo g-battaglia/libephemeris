@@ -12,9 +12,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
 
 
 def main():
@@ -37,7 +40,7 @@ def main():
     while jd <= end_jd:
         # Get nutation from both
         try:
-            se_nut = swe.calc_ut(jd, -1, 0)  # SE_ECL_NUT = -1
+            se_nut = swe.calc_ut(jd, -1, 0)  # ECL_NUT = -1
             # Returns (true_obl, mean_obl, dpsi, deps, 0, 0)
             se_true_obl = se_nut[0][0]
             se_mean_obl = se_nut[0][1]
@@ -48,7 +51,7 @@ def main():
             continue
 
         try:
-            le_nut = ephem.swe_calc_ut(jd, -1, 0)
+            le_nut = ephem.calc_ut(jd, -1, 0)
             le_true_obl = le_nut[0][0]
             le_mean_obl = le_nut[0][1]
             le_dpsi = le_nut[0][2]

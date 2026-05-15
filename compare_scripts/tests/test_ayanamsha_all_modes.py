@@ -9,112 +9,112 @@ import pytest
 import swisseph as swe
 import libephemeris as pyephem
 from libephemeris.constants import (
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_DELUCE,
-    SE_SIDM_RAMAN,
-    SE_SIDM_USHASHASHI,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_DJWHAL_KHUL,
-    SE_SIDM_YUKTESHWAR,
-    SE_SIDM_JN_BHASIN,
-    SE_SIDM_BABYL_KUGLER1,
-    SE_SIDM_BABYL_KUGLER2,
-    SE_SIDM_BABYL_KUGLER3,
-    SE_SIDM_BABYL_HUBER,
-    SE_SIDM_BABYL_ETPSC,
-    SE_SIDM_ALDEBARAN_15TAU,
-    SE_SIDM_HIPPARCHOS,
-    SE_SIDM_SASSANIAN,
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_J2000,
-    SE_SIDM_J1900,
-    SE_SIDM_B1950,
-    SE_SIDM_SURYASIDDHANTA,
-    SE_SIDM_SURYASIDDHANTA_MSUN,
-    SE_SIDM_ARYABHATA,
-    SE_SIDM_ARYABHATA_MSUN,
-    SE_SIDM_SS_REVATI,
-    SE_SIDM_SS_CITRA,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALEQU_IAU1958,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALALIGN_MARDYKS,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_ARYABHATA_522,
-    SE_SIDM_BABYL_BRITTON,
-    SE_SIDM_TRUE_SHEORAN,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_FIORENZA,
-    SE_SIDM_VALENS_MOON,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_GALCENT_0SAG,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_ARYABHATA_522,
+    SIDM_BABYL_BRITTON,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_VALENS_MOON,
 )
 
 # All 43 ayanamsha modes with their names
 ALL_AYANAMSHA_MODES = [
-    (SE_SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
-    (SE_SIDM_LAHIRI, "Lahiri"),
-    (SE_SIDM_DELUCE, "De Luce"),
-    (SE_SIDM_RAMAN, "Raman"),
-    (SE_SIDM_USHASHASHI, "Ushashashi"),
-    (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
-    (SE_SIDM_DJWHAL_KHUL, "Djwhal Khul"),
-    (SE_SIDM_YUKTESHWAR, "Yukteshwar"),
-    (SE_SIDM_JN_BHASIN, "JN Bhasin"),
-    (SE_SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)"),
-    (SE_SIDM_BABYL_KUGLER2, "Babylonian (Kugler 2)"),
-    (SE_SIDM_BABYL_KUGLER3, "Babylonian (Kugler 3)"),
-    (SE_SIDM_BABYL_HUBER, "Babylonian (Huber)"),
-    (SE_SIDM_BABYL_ETPSC, "Babylonian (ETPSC)"),
-    (SE_SIDM_ALDEBARAN_15TAU, "Aldebaran at 15 Tau"),
-    (SE_SIDM_HIPPARCHOS, "Hipparchos"),
-    (SE_SIDM_SASSANIAN, "Sassanian"),
-    (SE_SIDM_GALCENT_0SAG, "Galactic Center at 0 Sag"),
-    (SE_SIDM_J2000, "J2000"),
-    (SE_SIDM_J1900, "J1900"),
-    (SE_SIDM_B1950, "B1950"),
-    (SE_SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
-    (SE_SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta (mean Sun)"),
-    (SE_SIDM_ARYABHATA, "Aryabhata"),
-    (SE_SIDM_ARYABHATA_MSUN, "Aryabhata (mean Sun)"),
-    (SE_SIDM_SS_REVATI, "SS Revati"),
-    (SE_SIDM_SS_CITRA, "SS Citra"),
-    (SE_SIDM_TRUE_CITRA, "True Citra"),
-    (SE_SIDM_TRUE_REVATI, "True Revati"),
-    (SE_SIDM_TRUE_PUSHYA, "True Pushya"),
-    (SE_SIDM_GALCENT_RGILBRAND, "Galactic Center (Gil Brand)"),
-    (SE_SIDM_GALEQU_IAU1958, "Galactic Equator (IAU 1958)"),
-    (SE_SIDM_GALEQU_TRUE, "Galactic Equator (True)"),
-    (SE_SIDM_GALEQU_MULA, "Galactic Equator at Mula"),
-    (SE_SIDM_GALALIGN_MARDYKS, "Galactic Alignment (Mardyks)"),
-    (SE_SIDM_TRUE_MULA, "True Mula"),
-    (SE_SIDM_GALCENT_MULA_WILHELM, "Galactic Center at Mula (Wilhelm)"),
-    (SE_SIDM_ARYABHATA_522, "Aryabhata 522"),
-    (SE_SIDM_BABYL_BRITTON, "Babylonian (Britton)"),
-    (SE_SIDM_TRUE_SHEORAN, "True Sheoran"),
-    (SE_SIDM_GALCENT_COCHRANE, "Galactic Center (Cochrane)"),
-    (SE_SIDM_GALEQU_FIORENZA, "Galactic Equator (Fiorenza)"),
-    (SE_SIDM_VALENS_MOON, "Valens (Moon)"),
+    (SIDM_FAGAN_BRADLEY, "Fagan/Bradley"),
+    (SIDM_LAHIRI, "Lahiri"),
+    (SIDM_DELUCE, "De Luce"),
+    (SIDM_RAMAN, "Raman"),
+    (SIDM_USHASHASHI, "Ushashashi"),
+    (SIDM_KRISHNAMURTI, "Krishnamurti"),
+    (SIDM_DJWHAL_KHUL, "Djwhal Khul"),
+    (SIDM_YUKTESHWAR, "Yukteshwar"),
+    (SIDM_JN_BHASIN, "JN Bhasin"),
+    (SIDM_BABYL_KUGLER1, "Babylonian (Kugler 1)"),
+    (SIDM_BABYL_KUGLER2, "Babylonian (Kugler 2)"),
+    (SIDM_BABYL_KUGLER3, "Babylonian (Kugler 3)"),
+    (SIDM_BABYL_HUBER, "Babylonian (Huber)"),
+    (SIDM_BABYL_ETPSC, "Babylonian (ETPSC)"),
+    (SIDM_ALDEBARAN_15TAU, "Aldebaran at 15 Tau"),
+    (SIDM_HIPPARCHOS, "Hipparchos"),
+    (SIDM_SASSANIAN, "Sassanian"),
+    (SIDM_GALCENT_0SAG, "Galactic Center at 0 Sag"),
+    (SIDM_J2000, "J2000"),
+    (SIDM_J1900, "J1900"),
+    (SIDM_B1950, "B1950"),
+    (SIDM_SURYASIDDHANTA, "Suryasiddhanta"),
+    (SIDM_SURYASIDDHANTA_MSUN, "Suryasiddhanta (mean Sun)"),
+    (SIDM_ARYABHATA, "Aryabhata"),
+    (SIDM_ARYABHATA_MSUN, "Aryabhata (mean Sun)"),
+    (SIDM_SS_REVATI, "SS Revati"),
+    (SIDM_SS_CITRA, "SS Citra"),
+    (SIDM_TRUE_CITRA, "True Citra"),
+    (SIDM_TRUE_REVATI, "True Revati"),
+    (SIDM_TRUE_PUSHYA, "True Pushya"),
+    (SIDM_GALCENT_RGILBRAND, "Galactic Center (Gil Brand)"),
+    (SIDM_GALEQU_IAU1958, "Galactic Equator (IAU 1958)"),
+    (SIDM_GALEQU_TRUE, "Galactic Equator (True)"),
+    (SIDM_GALEQU_MULA, "Galactic Equator at Mula"),
+    (SIDM_GALALIGN_MARDYKS, "Galactic Alignment (Mardyks)"),
+    (SIDM_TRUE_MULA, "True Mula"),
+    (SIDM_GALCENT_MULA_WILHELM, "Galactic Center at Mula (Wilhelm)"),
+    (SIDM_ARYABHATA_522, "Aryabhata 522"),
+    (SIDM_BABYL_BRITTON, "Babylonian (Britton)"),
+    (SIDM_TRUE_SHEORAN, "True Sheoran"),
+    (SIDM_GALCENT_COCHRANE, "Galactic Center (Cochrane)"),
+    (SIDM_GALEQU_FIORENZA, "Galactic Equator (Fiorenza)"),
+    (SIDM_VALENS_MOON, "Valens (Moon)"),
 ]
 
 # Star-based modes that may have larger differences due to proper motion calculations
 STAR_BASED_MODES = {
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_TRUE_REVATI,
-    SE_SIDM_TRUE_PUSHYA,
-    SE_SIDM_TRUE_MULA,
-    SE_SIDM_TRUE_SHEORAN,
-    SE_SIDM_GALCENT_0SAG,
-    SE_SIDM_GALCENT_RGILBRAND,
-    SE_SIDM_GALCENT_MULA_WILHELM,
-    SE_SIDM_GALCENT_COCHRANE,
-    SE_SIDM_GALEQU_TRUE,
-    SE_SIDM_GALEQU_MULA,
-    SE_SIDM_GALEQU_FIORENZA,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_TRUE_MULA,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALEQU_FIORENZA,
 }
 
 # Multiple test dates spanning different epochs
@@ -152,8 +152,8 @@ class TestAllAyanamshasMultipleDates:
         aya_swe = swe.get_ayanamsa_ut(jd)
 
         # libephemeris
-        pyephem.swe_set_sid_mode(sid_mode)
-        aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+        pyephem.set_sid_mode(sid_mode)
+        aya_py = pyephem.get_ayanamsa_ut(jd)
 
         diff = abs(aya_swe - aya_py)
         tol = get_tolerance(sid_mode)
@@ -167,17 +167,17 @@ class TestAllAyanamshasMultipleDates:
     def test_ayanamsha_increases_over_time(self, sid_mode, mode_name):
         """Verify that ayanamsha increases over time (precession)."""
         # J2000 mode is anchored at 0 at J2000, so skip it
-        if sid_mode == SE_SIDM_J2000:
+        if sid_mode == SIDM_J2000:
             pytest.skip("J2000 mode has zero ayanamsha at J2000 epoch")
 
         jd_1900 = swe.julday(1900, 1, 1, 12.0)
         jd_2000 = swe.julday(2000, 1, 1, 12.0)
         jd_2050 = swe.julday(2050, 1, 1, 12.0)
 
-        pyephem.swe_set_sid_mode(sid_mode)
-        aya_1900 = pyephem.swe_get_ayanamsa_ut(jd_1900)
-        aya_2000 = pyephem.swe_get_ayanamsa_ut(jd_2000)
-        aya_2050 = pyephem.swe_get_ayanamsa_ut(jd_2050)
+        pyephem.set_sid_mode(sid_mode)
+        aya_1900 = pyephem.get_ayanamsa_ut(jd_1900)
+        aya_2000 = pyephem.get_ayanamsa_ut(jd_2000)
+        aya_2050 = pyephem.get_ayanamsa_ut(jd_2050)
 
         # Helper to compute difference accounting for 360-degree wrap-around
         def compute_increase(later: float, earlier: float) -> float:
@@ -213,8 +213,8 @@ class TestAllAyanamshasMultipleDates:
         """Verify ayanamsha values are in a reasonable range for the epoch."""
         jd_2000 = swe.julday(2000, 1, 1, 12.0)
 
-        pyephem.swe_set_sid_mode(sid_mode)
-        aya = pyephem.swe_get_ayanamsa_ut(jd_2000)
+        pyephem.set_sid_mode(sid_mode)
+        aya = pyephem.get_ayanamsa_ut(jd_2000)
 
         # At J2000, most ayanamshas should be roughly 22-25 degrees
         # But some modes like J2000, B1950, J1900 are epoch-based (near 0 at their epoch)
@@ -235,8 +235,8 @@ class TestAyanamshaConsistency:
 
         values = {}
         for sid_mode, mode_name in ALL_AYANAMSHA_MODES:
-            pyephem.swe_set_sid_mode(sid_mode)
-            aya = pyephem.swe_get_ayanamsa_ut(jd)
+            pyephem.set_sid_mode(sid_mode)
+            aya = pyephem.get_ayanamsa_ut(jd)
             values[mode_name] = aya
 
         # Check that we have 43 unique modes
@@ -246,8 +246,8 @@ class TestAyanamshaConsistency:
         """Test known Lahiri ayanamsha value at J2000."""
         jd = swe.julday(2000, 1, 1, 12.0)
 
-        pyephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        aya = pyephem.swe_get_ayanamsa_ut(jd)
+        pyephem.set_sid_mode(SIDM_LAHIRI)
+        aya = pyephem.get_ayanamsa_ut(jd)
 
         # Lahiri ayanamsha at J2000 should be approximately 23.86 degrees
         assert 23.5 < aya < 24.2, (
@@ -258,8 +258,8 @@ class TestAyanamshaConsistency:
         """Test that J2000 mode gives zero ayanamsha at J2000.0 epoch."""
         jd = swe.julday(2000, 1, 1, 12.0)
 
-        pyephem.swe_set_sid_mode(SE_SIDM_J2000)
-        aya = pyephem.swe_get_ayanamsa_ut(jd)
+        pyephem.set_sid_mode(SIDM_J2000)
+        aya = pyephem.get_ayanamsa_ut(jd)
 
         # J2000 mode should be exactly 0 at J2000.0
         assert abs(aya) < 0.001, f"J2000 mode at J2000.0 should be ~0, got {aya:.6f}"
@@ -270,8 +270,8 @@ class TestAyanamshaConsistency:
         jd = swe.julday(year, month, day, hour)
 
         for sid_mode, mode_name in ALL_AYANAMSHA_MODES:
-            pyephem.swe_set_sid_mode(sid_mode)
-            aya = pyephem.swe_get_ayanamsa_ut(jd)
+            pyephem.set_sid_mode(sid_mode)
+            aya = pyephem.get_ayanamsa_ut(jd)
 
             # Should produce a finite number
             assert isinstance(aya, float), (
@@ -298,8 +298,8 @@ class TestAyanamshaComparison:
                 aya_swe = swe.get_ayanamsa_ut(jd)
 
                 # libephemeris
-                pyephem.swe_set_sid_mode(sid_mode)
-                aya_py = pyephem.swe_get_ayanamsa_ut(jd)
+                pyephem.set_sid_mode(sid_mode)
+                aya_py = pyephem.get_ayanamsa_ut(jd)
 
                 diff = abs(aya_swe - aya_py)
                 tol = get_tolerance(sid_mode)

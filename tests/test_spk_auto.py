@@ -21,13 +21,13 @@ from pathlib import Path
 import libephemeris as eph
 from libephemeris import spk_auto
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_ERIS,
-    SE_PHOLUS,
+    CHIRON,
+    CERES,
+    ERIS,
+    PHOLUS,
     NAIF_CHIRON,
     NAIF_CERES,
-    SEFLG_SPEED,
+    FLG_SPEED,
 )
 
 
@@ -37,12 +37,12 @@ class TestAutoSpkConfig:
     def test_config_creation(self):
         """Create AutoSpkConfig with basic parameters."""
         config = spk_auto.AutoSpkConfig(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             naif_id=NAIF_CHIRON,
         )
 
-        assert config.ipl == SE_CHIRON
+        assert config.ipl == CHIRON
         assert config.body_id == "2060"
         assert config.naif_id == NAIF_CHIRON
         assert config.enabled is True
@@ -51,7 +51,7 @@ class TestAutoSpkConfig:
     def test_config_with_dates(self):
         """Create config with custom date range."""
         config = spk_auto.AutoSpkConfig(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             start="2020-01-01",
             end="2030-01-01",
@@ -63,7 +63,7 @@ class TestAutoSpkConfig:
     def test_cache_filename_generation(self):
         """Generate unique cache filename."""
         config = spk_auto.AutoSpkConfig(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             start="2000-01-01",
             end="2100-01-01",
@@ -76,13 +76,13 @@ class TestAutoSpkConfig:
     def test_cache_filename_uniqueness(self):
         """Different configs produce different filenames."""
         config1 = spk_auto.AutoSpkConfig(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             start="2000-01-01",
             end="2100-01-01",
         )
         config2 = spk_auto.AutoSpkConfig(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             start="2020-01-01",
             end="2030-01-01",
@@ -106,41 +106,41 @@ class TestEnableDisableAutoSpk:
     def test_enable_auto_spk(self, mock_check):
         """Enable auto-SPK for a body."""
         spk_auto.enable_auto_spk(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             naif_id=NAIF_CHIRON,
         )
 
-        assert spk_auto.is_auto_spk_enabled(SE_CHIRON) is True
+        assert spk_auto.is_auto_spk_enabled(CHIRON) is True
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_disable_auto_spk(self, mock_check):
         """Disable auto-SPK for a body."""
         spk_auto.enable_auto_spk(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
         )
 
-        spk_auto.disable_auto_spk(SE_CHIRON)
+        spk_auto.disable_auto_spk(CHIRON)
 
-        assert spk_auto.is_auto_spk_enabled(SE_CHIRON) is False
+        assert spk_auto.is_auto_spk_enabled(CHIRON) is False
 
     def test_is_auto_spk_enabled_not_configured(self):
         """Check auto-SPK status for unconfigured body."""
-        assert spk_auto.is_auto_spk_enabled(SE_CHIRON) is False
+        assert spk_auto.is_auto_spk_enabled(CHIRON) is False
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_get_auto_spk_config(self, mock_check):
         """Get configuration for a body."""
         spk_auto.enable_auto_spk(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             naif_id=NAIF_CHIRON,
             start="2000-01-01",
             end="2100-01-01",
         )
 
-        config = spk_auto.get_auto_spk_config(SE_CHIRON)
+        config = spk_auto.get_auto_spk_config(CHIRON)
 
         assert config is not None
         assert config.body_id == "2060"
@@ -148,25 +148,25 @@ class TestEnableDisableAutoSpk:
 
     def test_get_auto_spk_config_not_configured(self):
         """Get config for unconfigured body returns None."""
-        assert spk_auto.get_auto_spk_config(SE_CHIRON) is None
+        assert spk_auto.get_auto_spk_config(CHIRON) is None
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_list_auto_spk_bodies(self, mock_check):
         """List all configured bodies."""
-        spk_auto.enable_auto_spk(ipl=SE_CHIRON, body_id="2060")
-        spk_auto.enable_auto_spk(ipl=SE_CERES, body_id="1")
+        spk_auto.enable_auto_spk(ipl=CHIRON, body_id="2060")
+        spk_auto.enable_auto_spk(ipl=CERES, body_id="1")
 
         bodies = spk_auto.list_auto_spk_bodies()
 
-        assert SE_CHIRON in bodies
-        assert SE_CERES in bodies
+        assert CHIRON in bodies
+        assert CERES in bodies
         assert len(bodies) == 2
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_disable_all(self, mock_check):
         """Disable all auto-SPK configurations."""
-        spk_auto.enable_auto_spk(ipl=SE_CHIRON, body_id="2060")
-        spk_auto.enable_auto_spk(ipl=SE_CERES, body_id="1")
+        spk_auto.enable_auto_spk(ipl=CHIRON, body_id="2060")
+        spk_auto.enable_auto_spk(ipl=CERES, body_id="1")
 
         spk_auto.disable_all()
 
@@ -389,7 +389,7 @@ class TestTryAutoDownload:
 
     def test_returns_none_when_not_configured(self):
         """Returns None for unconfigured body."""
-        result = spk_auto.try_auto_download(SE_CHIRON)
+        result = spk_auto.try_auto_download(CHIRON)
         assert result is None
 
 
@@ -407,7 +407,7 @@ class TestDownloadNowWithoutConfig:
     def test_download_now_raises_without_config(self):
         """download_now raises ValueError when not configured."""
         with pytest.raises(ValueError) as exc_info:
-            spk_auto.download_now(SE_CHIRON)
+            spk_auto.download_now(CHIRON)
 
         assert "Auto-SPK not enabled" in str(exc_info.value)
 
@@ -431,8 +431,8 @@ class TestEnableCommonBodies:
         bodies = spk_auto.list_auto_spk_bodies()
 
         # Should include common bodies
-        assert SE_CHIRON in bodies
-        assert SE_CERES in bodies
+        assert CHIRON in bodies
+        assert CERES in bodies
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_enable_common_bodies_with_dates(self, mock_check):
@@ -442,7 +442,7 @@ class TestEnableCommonBodies:
             end="2030-01-01",
         )
 
-        config = spk_auto.get_auto_spk_config(SE_CHIRON)
+        config = spk_auto.get_auto_spk_config(CHIRON)
 
         assert config is not None
         assert config.start == "2020-01-01"
@@ -462,7 +462,7 @@ class TestClearCache:
 
     def test_clear_cache_returns_zero_when_empty(self):
         """clear_cache returns 0 when no files to delete."""
-        deleted = spk_auto.clear_cache(SE_CHIRON)
+        deleted = spk_auto.clear_cache(CHIRON)
         assert deleted == 0
 
 
@@ -518,7 +518,7 @@ class TestSpkAutoDownloadIntegration:
     def test_download_chiron_spk(self, tmp_path):
         """Download Chiron SPK using astroquery."""
         spk_auto.enable_auto_spk(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             naif_id=NAIF_CHIRON,
             start="2020-01-01",
@@ -526,7 +526,7 @@ class TestSpkAutoDownloadIntegration:
             cache_dir=str(tmp_path),
         )
 
-        path = spk_auto.download_now(SE_CHIRON)
+        path = spk_auto.download_now(CHIRON)
 
         assert os.path.exists(path)
         assert path.endswith(".bsp")
@@ -534,7 +534,7 @@ class TestSpkAutoDownloadIntegration:
     def test_auto_download_and_calc(self, tmp_path):
         """Enable auto-SPK and calculate position."""
         spk_auto.enable_auto_spk(
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             body_id="2060",
             naif_id=NAIF_CHIRON,
             start="2020-01-01",
@@ -543,12 +543,12 @@ class TestSpkAutoDownloadIntegration:
         )
 
         # Trigger download
-        path = spk_auto.download_now(SE_CHIRON)
+        path = spk_auto.download_now(CHIRON)
         assert os.path.exists(path)
 
         # Calculate position - should use SPK
         jd = 2459215.5  # 2021-01-01
-        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, CHIRON, FLG_SPEED)
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0
@@ -1151,7 +1151,7 @@ class TestRegisterSpkAfterDownload:
             spk_auto._register_spk_after_download(
                 str(spk_file),
                 "UnknownBodyWithNoNumber",
-                SE_CHIRON,
+                CHIRON,
                 naif_id=None,
             )
 
@@ -1198,13 +1198,13 @@ class TestAutoGetSpkWithRegistration:
                 2458849.5,
                 2462502.5,
                 str(tmp_path),
-                ipl=SE_CHIRON,
+                ipl=CHIRON,
             )
 
             # Verify registration was called
             mock_register.assert_called_once()
             call_args = mock_register.call_args
-            assert call_args[0][2] == SE_CHIRON  # ipl argument
+            assert call_args[0][2] == CHIRON  # ipl argument
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
@@ -1239,7 +1239,7 @@ class TestAutoGetSpkWithRegistration:
                 2458849.5,
                 2462502.5,
                 str(tmp_path),
-                ipl=SE_CHIRON,
+                ipl=CHIRON,
             )
 
             # Should return cached file
@@ -1249,7 +1249,7 @@ class TestAutoGetSpkWithRegistration:
             mock_register.assert_called_once()
             call_args = mock_register.call_args
             assert call_args[0][0] == str(spk_file)  # spk_path
-            assert call_args[0][2] == SE_CHIRON  # ipl
+            assert call_args[0][2] == CHIRON  # ipl
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     @patch.object(spk_auto, "_download_spk_astroquery")
@@ -1269,7 +1269,7 @@ class TestAutoGetSpkWithRegistration:
                 2458849.5,
                 2462502.5,
                 str(tmp_path),
-                ipl=SE_CHIRON,
+                ipl=CHIRON,
                 naif_id=NAIF_CHIRON,
             )
 
@@ -1321,7 +1321,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
                     2458849.5,
                     2462502.5,
                     output_path,
-                    ipl=SE_CHIRON,
+                    ipl=CHIRON,
                 )
 
                 # Verify registration was called
@@ -1329,7 +1329,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
                 call_args = mock_register.call_args
                 assert call_args[0][0] == output_path  # spk_path
                 assert call_args[0][1] == "2060"  # body_id
-                assert call_args[0][2] == SE_CHIRON  # ipl
+                assert call_args[0][2] == CHIRON  # ipl
 
     @patch.object(spk_auto, "_check_astroquery_available", return_value=True)
     def test_does_not_register_when_ipl_not_provided(self, mock_check, tmp_path):
@@ -1386,7 +1386,7 @@ class TestDownloadSpkFromHorizonsWithRegistration:
                     2458849.5,
                     2462502.5,
                     output_path,
-                    ipl=SE_CHIRON,
+                    ipl=CHIRON,
                     naif_id=NAIF_CHIRON,
                 )
 
@@ -1431,20 +1431,20 @@ class TestSpkRegistrationIntegration:
             jd_start,
             jd_end,
             str(tmp_path),
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
         )
 
         # Verify file exists
         assert os.path.exists(spk_path)
 
         # Verify registration
-        info = eph.get_spk_body_info(SE_CHIRON)
+        info = eph.get_spk_body_info(CHIRON)
         assert info is not None
         assert info[0] == spk_path
 
         # Calculate position using SPK
         jd = 2459580.5  # 2022-01-01
-        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, CHIRON, FLG_SPEED)
 
         assert 0 <= pos[0] < 360  # Valid longitude
         assert pos[2] > 0  # Positive distance
@@ -1461,7 +1461,7 @@ class TestSpkRegistrationIntegration:
             jd_start,
             jd_end,
             output_path,
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
         )
 
         # Verify file exists
@@ -1469,13 +1469,13 @@ class TestSpkRegistrationIntegration:
         assert result == output_path
 
         # Verify registration
-        info = eph.get_spk_body_info(SE_CHIRON)
+        info = eph.get_spk_body_info(CHIRON)
         assert info is not None
         assert info[0] == output_path
 
         # Calculate position using SPK
         jd = 2459580.5  # 2022-01-01
-        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, CHIRON, FLG_SPEED)
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0
@@ -1666,10 +1666,10 @@ class TestClearSpkCache:
         spk_file.write_bytes(b"dummy")
 
         # Create a mock config with spk_path set
-        config = spk_auto.AutoSpkConfig(ipl=SE_CHIRON, body_id="2060")
+        config = spk_auto.AutoSpkConfig(ipl=CHIRON, body_id="2060")
         config.spk_path = str(spk_file)
 
-        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {SE_CHIRON: config}):
+        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {CHIRON: config}):
             spk_auto.clear_spk_cache(cache_dir=str(tmp_path))
 
             # spk_path should be cleared since file was deleted
@@ -1863,10 +1863,10 @@ class TestPruneOldCache:
         os.utime(spk_file, (old_time, os.stat(spk_file).st_mtime))
 
         # Create a mock config with spk_path set
-        config = spk_auto.AutoSpkConfig(ipl=SE_CHIRON, body_id="2060")
+        config = spk_auto.AutoSpkConfig(ipl=CHIRON, body_id="2060")
         config.spk_path = str(spk_file)
 
-        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {SE_CHIRON: config}):
+        with patch.object(spk_auto, "_AUTO_SPK_REGISTRY", {CHIRON: config}):
             spk_auto.prune_old_cache(max_age_days=30, cache_dir=str(tmp_path))
 
             # spk_path should be cleared since file was deleted

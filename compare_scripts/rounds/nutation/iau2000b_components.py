@@ -4,12 +4,12 @@
 Verifies libephemeris nutation/obliquity against pyswisseph and pyerfa independently.
 
 Phases:
-  P1: SE_ECL_NUT query — nutation angles and obliquity vs pyswisseph
+  P1: ECL_NUT query — nutation angles and obliquity vs pyswisseph
   P2: Nutation angles vs pyerfa IAU 2006/2000A directly
   P3: Mean obliquity vs pyerfa IAU 2006 directly
   P4: Nutation at historical/future dates (1000 BCE to 3000 CE)
   P5: Nutation consistency — dpsi/deps match between calc_ut and cache
-  P6: SEFLG_NONUT flag — verify mean vs true obliquity selection
+  P6: FLG_NONUT flag — verify mean vs true obliquity selection
   P7: Nutation speed — dpsi/deps rate of change verification
 """
 
@@ -32,7 +32,10 @@ from libephemeris.cache import (
     get_true_obliquity,
 )
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
@@ -53,8 +56,8 @@ def record(phase, label, ok, detail=""):
 
 
 def phase1():
-    """SE_ECL_NUT query — compare LE vs SE for nutation and obliquity."""
-    print("\n=== P1: SE_ECL_NUT nutation/obliquity vs pyswisseph ===")
+    """ECL_NUT query — compare LE vs SE for nutation and obliquity."""
+    print("\n=== P1: ECL_NUT nutation/obliquity vs pyswisseph ===")
 
     test_dates = {
         "J2000": 2451545.0,
@@ -72,7 +75,7 @@ def phase1():
     for label, jd in test_dates.items():
         try:
             se_result = swe.calc_ut(jd, swe.ECL_NUT)[0]
-            le_result = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
+            le_result = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
 
             # SE returns: (true_obl, mean_obl, dpsi, deps, 0, 0)
             se_true_obl = se_result[0]
@@ -227,7 +230,7 @@ def phase4():
         jd = J2000 + (year - 2000) * 365.25
         try:
             se_result = swe.calc_ut(jd, swe.ECL_NUT)[0]
-            le_result = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
+            le_result = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
 
             true_obl_diff = abs(se_result[0] - le_result[0]) * 3600
             mean_obl_diff = abs(se_result[1] - le_result[1]) * 3600
@@ -275,8 +278,8 @@ def phase5():
 
     for jd in test_jds:
         try:
-            # Get from swe_calc_ut
-            le_result = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
+            # Get from calc_ut
+            le_result = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
             le_dpsi_deg = le_result[2]
             le_deps_deg = le_result[3]
             le_mean_obl = le_result[1]
@@ -319,22 +322,22 @@ def phase5():
 
 
 def phase6():
-    """SEFLG_NONUT flag — mean vs true obliquity."""
-    print("\n=== P6: SEFLG_NONUT flag verification ===")
+    """FLG_NONUT flag — mean vs true obliquity."""
+    print("\n=== P6: FLG_NONUT flag verification ===")
 
     test_dates = [J2000, J2000 + 5000, J2000 - 5000]
 
     for jd in test_dates:
         try:
             # Without NONUT — should use true equinox
-            le_pos, _ = ephem.swe_calc_ut(jd, 0, ephem.SEFLG_SPEED)
+            le_pos, _ = ephem.calc_ut(jd, 0, ephem.FLG_SPEED)
             # With NONUT — should use mean equinox
-            le_pos_nn, _ = ephem.swe_calc_ut(
-                jd, 0, ephem.SEFLG_SPEED | ephem.SEFLG_NONUT
+            le_pos_nn, _ = ephem.calc_ut(
+                jd, 0, ephem.FLG_SPEED | ephem.FLG_NONUT
             )
 
             # The positions should differ by approximately dpsi * cos(eps)
-            le_nut = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
+            le_nut = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
             dpsi = le_nut[2]  # degrees
             eps = le_nut[0]  # true obliquity
 
@@ -378,9 +381,9 @@ def phase7():
     for jd in test_jds:
         try:
             # LE nutation at jd-dt, jd, jd+dt
-            le_m = ephem.swe_calc_ut(jd - dt, ephem.SE_ECL_NUT, 0)[0]
-            le_0 = ephem.swe_calc_ut(jd, ephem.SE_ECL_NUT, 0)[0]
-            le_p = ephem.swe_calc_ut(jd + dt, ephem.SE_ECL_NUT, 0)[0]
+            le_m = ephem.calc_ut(jd - dt, ephem.ECL_NUT, 0)[0]
+            le_0 = ephem.calc_ut(jd, ephem.ECL_NUT, 0)[0]
+            le_p = ephem.calc_ut(jd + dt, ephem.ECL_NUT, 0)[0]
 
             # SE nutation at jd-dt, jd, jd+dt
             se_m = swe.calc_ut(jd - dt, swe.ECL_NUT)[0]

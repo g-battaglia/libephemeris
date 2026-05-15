@@ -16,12 +16,13 @@ Precision targets:
 Note: For research-grade precision, SPK kernels should be used instead.
 """
 
+import os
 import pytest
 import math
 import sys
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     import swisseph as swe
@@ -31,7 +32,7 @@ except ImportError:
     HAS_SWISSEPH = False
 
 import libephemeris as ephem
-from libephemeris.constants import SE_ERIS, SE_MAKEMAKE, SE_IXION, SE_ORCUS
+from libephemeris.constants import ERIS, MAKEMAKE, IXION, ORCUS
 from libephemeris.minor_bodies import (
     MINOR_BODY_ELEMENTS,
     calc_secular_perturbation_rates,
@@ -55,10 +56,10 @@ EXPECTED_MEAN_LON_ERROR = 5.0  # Expected mean error should be better than worst
 
 # TNO definitions
 TNOS = [
-    (SE_ERIS, 136199, "Eris"),
-    (SE_MAKEMAKE, 136472, "Makemake"),
-    (SE_IXION, 28978, "Ixion"),
-    (SE_ORCUS, 90482, "Orcus"),
+    (ERIS, 136199, "Eris"),
+    (MAKEMAKE, 136472, "Makemake"),
+    (IXION, 28978, "Ixion"),
+    (ORCUS, 90482, "Orcus"),
 ]
 
 
@@ -76,7 +77,7 @@ def get_swe_position(jd: float, ast_num: int):
 
 def get_libeph_position(jd: float, body_id: int):
     """Get position from libephemeris."""
-    pos, _ = ephem.swe_calc_ut(jd, body_id, 0)
+    pos, _ = ephem.calc_ut(jd, body_id, 0)
     return pos[0], pos[1], pos[2]
 
 
@@ -146,7 +147,7 @@ class TestTNOValidation:
             if swe_pos is None:
                 pytest.skip("SwissEph data not available for Eris")
 
-            lib_pos = get_libeph_position(jd, SE_ERIS)
+            lib_pos = get_libeph_position(jd, ERIS)
 
             lon_diffs.append(angular_diff(swe_pos[0], lib_pos[0]))
             lat_diffs.append(abs(swe_pos[1] - lib_pos[1]))
@@ -179,7 +180,7 @@ class TestTNOValidation:
             if swe_pos is None:
                 pytest.skip("SwissEph data not available for Makemake")
 
-            lib_pos = get_libeph_position(jd, SE_MAKEMAKE)
+            lib_pos = get_libeph_position(jd, MAKEMAKE)
 
             lon_diffs.append(angular_diff(swe_pos[0], lib_pos[0]))
             lat_diffs.append(abs(swe_pos[1] - lib_pos[1]))
@@ -212,7 +213,7 @@ class TestTNOValidation:
             if swe_pos is None:
                 pytest.skip("SwissEph data not available for Ixion")
 
-            lib_pos = get_libeph_position(jd, SE_IXION)
+            lib_pos = get_libeph_position(jd, IXION)
 
             lon_diffs.append(angular_diff(swe_pos[0], lib_pos[0]))
             lat_diffs.append(abs(swe_pos[1] - lib_pos[1]))
@@ -243,7 +244,7 @@ class TestTNOValidation:
             if swe_pos is None:
                 pytest.skip("SwissEph data not available for Orcus")
 
-            lib_pos = get_libeph_position(jd, SE_ORCUS)
+            lib_pos = get_libeph_position(jd, ORCUS)
 
             lon_diffs.append(angular_diff(swe_pos[0], lib_pos[0]))
             lat_diffs.append(abs(swe_pos[1] - lib_pos[1]))
@@ -284,7 +285,7 @@ class TestPerturbationImprovements:
 
     def test_neptune_perturbation_applied_to_plutinos(self):
         """Verify Neptune perturbations are applied to plutinos."""
-        for body_id, name in [(SE_IXION, "Ixion"), (SE_ORCUS, "Orcus")]:
+        for body_id, name in [(IXION, "Ixion"), (ORCUS, "Orcus")]:
             elements = MINOR_BODY_ELEMENTS[body_id]
 
             # Verify these are plutinos (a ~ 39 AU)
@@ -303,7 +304,7 @@ class TestPerturbationImprovements:
 
     def test_resonance_detection_for_plutinos(self):
         """Verify resonance detection works for Ixion and Orcus."""
-        for body_id, name in [(SE_IXION, "Ixion"), (SE_ORCUS, "Orcus")]:
+        for body_id, name in [(IXION, "Ixion"), (ORCUS, "Orcus")]:
             elements = MINOR_BODY_ELEMENTS[body_id]
             result = detect_mean_motion_resonance(elements)
 
@@ -318,7 +319,7 @@ class TestPerturbationImprovements:
 
     def test_eris_is_not_resonant(self):
         """Verify Eris is not in a Neptune resonance."""
-        elements = MINOR_BODY_ELEMENTS[SE_ERIS]
+        elements = MINOR_BODY_ELEMENTS[ERIS]
         result = detect_mean_motion_resonance(elements)
 
         # Eris is in the scattered disk, not in a major resonance

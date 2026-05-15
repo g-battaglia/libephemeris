@@ -12,20 +12,20 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_CHIRON,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    CHIRON,
+    FLG_SPEED,
 )
 
 
@@ -138,23 +138,23 @@ FAMOUS_PEOPLE = [
 
 # Major planets for natal chart
 NATAL_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Extended chart points
 # Note: True Node uses different calculation formula (osculating vs mean)
 # and Chiron requires external ephemeris files, so we only test Mean Node
 EXTENDED_POINTS = [
-    (SE_MEAN_NODE, "Mean Node"),
+    (MEAN_NODE, "Mean Node"),
 ]
 
 # Common house systems for testing
@@ -284,16 +284,16 @@ class TestNatalChartPlanetaryPositions:
         This is the primary validation that libephemeris produces accurate
         natal chart data.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         max_diff = 0
         for planet_id, planet_name in NATAL_PLANETS:
             # Calculate with libephemeris
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
             # Calculate with Swiss Ephemeris
-            pos_swe, _ = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos_swe, _ = swe.calc_ut(jd, planet_id, FLG_SPEED)
 
             # Compare longitudes
             lon_diff = angle_diff(pos_lib[0], pos_swe[0])
@@ -315,7 +315,7 @@ class TestNatalChartPlanetaryPositions:
 
             # Compare distances (AU) - relaxed tolerance for outer planets
             # Pluto uses Keplerian approximation, so needs wider tolerance
-            if planet_id == SE_PLUTO:
+            if planet_id == PLUTO:
                 dist_tolerance = 0.001  # AU - Pluto Keplerian model
             else:
                 dist_tolerance = 0.0001  # AU - JPL ephemeris planets
@@ -334,10 +334,10 @@ class TestNatalChartPlanetaryPositions:
     @pytest.mark.parametrize("person", FAMOUS_PEOPLE, ids=lambda p: p["name"])
     def test_sun_in_expected_sign(self, person):
         """Verify Sun is in the expected zodiac sign."""
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
-        pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        pos, _ = ephem.calc_ut(jd, SUN, 0)
         actual_sign = get_sign(pos[0])
 
         assert actual_sign == person["expected_sun_sign"], (
@@ -349,10 +349,10 @@ class TestNatalChartPlanetaryPositions:
     @pytest.mark.parametrize("person", FAMOUS_PEOPLE, ids=lambda p: p["name"])
     def test_moon_in_expected_sign(self, person):
         """Verify Moon is in the expected zodiac sign."""
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
-        pos, _ = ephem.swe_calc_ut(jd, SE_MOON, 0)
+        pos, _ = ephem.calc_ut(jd, MOON, 0)
         actual_sign = get_sign(pos[0])
 
         assert actual_sign == person["expected_moon_sign"], (
@@ -370,20 +370,20 @@ class TestNatalChartPlanetaryPositions:
         Note: Some points like Chiron use Keplerian approximation and have
         relaxed tolerance.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         for planet_id, planet_name in EXTENDED_POINTS:
-            pos_lib, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos_lib, _ = ephem.calc_ut(jd, planet_id, 0)
             pos_swe, _ = swe.calc_ut(jd, planet_id, 0)
 
             lon_diff = angle_diff(pos_lib[0], pos_swe[0])
 
             # Relaxed tolerance for points using different calculation models
-            if planet_id == SE_CHIRON:
+            if planet_id == CHIRON:
                 tolerance = 1.0  # degrees - Chiron uses Keplerian model
-            elif planet_id in (SE_MEAN_NODE, SE_TRUE_NODE):
+            elif planet_id in (MEAN_NODE, TRUE_NODE):
                 tolerance = 0.01  # degrees - nodes may use different formulas
             else:
                 tolerance = 0.001  # degrees for other points
@@ -407,7 +407,7 @@ class TestNatalChartHouses:
         """
         House cusps should match Swiss Ephemeris for all common systems.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
         lat = person["lat"]
@@ -418,7 +418,7 @@ class TestNatalChartHouses:
             pytest.skip(f"{hsys_name} undefined at lat {lat}")
 
         # Calculate with libephemeris
-        cusps_lib, ascmc_lib = ephem.swe_houses(jd, lat, lon, hsys)
+        cusps_lib, ascmc_lib = ephem.houses(jd, lat, lon, hsys)
         # Calculate with Swiss Ephemeris
         cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, bytes([hsys]))
 
@@ -448,11 +448,11 @@ class TestNatalChartHouses:
     @pytest.mark.parametrize("person", FAMOUS_PEOPLE[:3], ids=lambda p: p["name"])
     def test_asc_in_valid_range(self, person):
         """Ascendant should be a valid longitude (0-360)."""
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
-        cusps, ascmc = ephem.swe_houses(jd, person["lat"], person["lon"], ord("P"))
+        cusps, ascmc = ephem.houses(jd, person["lat"], person["lon"], ord("P"))
 
         assert 0 <= ascmc[0] < 360, f"ASC {ascmc[0]} out of range"
         assert 0 <= ascmc[1] < 360, f"MC {ascmc[1]} out of range"
@@ -461,11 +461,11 @@ class TestNatalChartHouses:
     @pytest.mark.parametrize("person", FAMOUS_PEOPLE[:3], ids=lambda p: p["name"])
     def test_cusps_progress_around_zodiac(self, person):
         """House cusps should progress around the zodiac in order."""
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
-        cusps, _ = ephem.swe_houses(jd, person["lat"], person["lon"], ord("P"))
+        cusps, _ = ephem.houses(jd, person["lat"], person["lon"], ord("P"))
 
         # Check that cusps generally increase (with wraparound handling)
         for i in range(11):
@@ -490,14 +490,14 @@ class TestNatalChartAspects:
         Both libephemeris and pyswisseph should produce the same planetary
         positions, so the same aspects should be detected.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         # Calculate positions with libephemeris
         positions_lib = {}
         for planet_id, planet_name in NATAL_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions_lib[planet_name] = pos[0]
 
         # Calculate positions with Swiss Ephemeris
@@ -537,13 +537,13 @@ class TestNatalChartAspects:
 
         This is a sanity check that aspect detection is working.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         positions = {}
         for planet_id, planet_name in NATAL_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions[planet_name] = pos[0]
 
         aspects = calculate_all_aspects(positions)
@@ -568,10 +568,10 @@ class TestNatalChartAspects:
         Marilyn has a Sun-Mercury conjunction (both in Gemini).
         """
         # Marilyn Monroe: June 1, 1926, 16:30 UT, Los Angeles
-        jd = ephem.swe_julday(1926, 6, 1, 16.5)
+        jd = ephem.julday(1926, 6, 1, 16.5)
 
-        sun_pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
-        mercury_pos, _ = ephem.swe_calc_ut(jd, SE_MERCURY, 0)
+        sun_pos, _ = ephem.calc_ut(jd, SUN, 0)
+        mercury_pos, _ = ephem.calc_ut(jd, MERCURY, 0)
 
         aspect = find_aspect(sun_pos[0], mercury_pos[0])
 
@@ -624,7 +624,7 @@ class TestCompleteNatalChartIntegration:
         - Major aspects
         """
         # Calculate Julian Day
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
@@ -635,7 +635,7 @@ class TestCompleteNatalChartIntegration:
         chart = {"planets": {}, "houses": {}, "aspects": []}
 
         for planet_id, planet_name in NATAL_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, planet_id, FLG_SPEED)
 
             assert 0 <= pos[0] < 360, f"{planet_name} longitude out of range"
             assert -90 <= pos[1] <= 90, f"{planet_name} latitude out of range"
@@ -651,7 +651,7 @@ class TestCompleteNatalChartIntegration:
 
         # Calculate houses (skip if polar latitude for Placidus)
         if abs(person["lat"]) < 66:
-            cusps, ascmc = ephem.swe_houses(jd, person["lat"], person["lon"], ord("P"))
+            cusps, ascmc = ephem.houses(jd, person["lat"], person["lon"], ord("P"))
 
             chart["houses"]["cusps"] = list(cusps)
             chart["houses"]["asc"] = ascmc[0]
@@ -686,7 +686,7 @@ class TestCompleteNatalChartIntegration:
         Calculating the same chart twice should give identical results.
         """
         person = FAMOUS_PEOPLE[0]  # Einstein
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
@@ -695,8 +695,8 @@ class TestCompleteNatalChartIntegration:
         results2 = []
 
         for planet_id, _ in NATAL_PLANETS:
-            pos1, _ = ephem.swe_calc_ut(jd, planet_id, 0)
-            pos2, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos1, _ = ephem.calc_ut(jd, planet_id, 0)
+            pos2, _ = ephem.calc_ut(jd, planet_id, 0)
             results1.append(pos1[0])
             results2.append(pos2[0])
 
@@ -719,9 +719,9 @@ class TestHistoricalDates:
         """
         # JFK's father, Joe Kennedy Sr.: September 6, 1888 - outside range
         # Using a date just inside the range: August 1, 1900
-        jd = ephem.swe_julday(1900, 8, 1, 12.0)
+        jd = ephem.julday(1900, 8, 1, 12.0)
 
-        pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        pos, _ = ephem.calc_ut(jd, SUN, 0)
         # Should be valid
         assert 0 <= pos[0] < 360
         assert get_sign(pos[0]) == "Leo"  # Early August = Leo
@@ -729,9 +729,9 @@ class TestHistoricalDates:
     @pytest.mark.integration
     def test_future_date_2050(self):
         """Test calculation near the end of DE421 range (2050)."""
-        jd = ephem.swe_julday(2050, 6, 15, 12.0)
+        jd = ephem.julday(2050, 6, 15, 12.0)
 
-        pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        pos, _ = ephem.calc_ut(jd, SUN, 0)
 
         # Should be valid
         assert 0 <= pos[0] < 360
@@ -748,11 +748,11 @@ class TestHistoricalDates:
         jd = 2451545.0  # J2000.0
 
         # Sun should be near 280° longitude at J2000
-        sun_pos, _ = ephem.swe_calc_ut(jd, SE_SUN, 0)
+        sun_pos, _ = ephem.calc_ut(jd, SUN, 0)
         assert 279 < sun_pos[0] < 281, f"Sun at J2000: {sun_pos[0]}°"
 
         # Compare with Swiss Ephemeris
-        sun_swe, _ = swe.calc_ut(jd, SE_SUN, 0)
+        sun_swe, _ = swe.calc_ut(jd, SUN, 0)
         diff = angle_diff(sun_pos[0], sun_swe[0])
         assert diff < 1 / 3600, f"J2000 Sun diff: {diff * 3600:.2f} arcsec"
 
@@ -764,11 +764,11 @@ class TestHistoricalDates:
         """
         Dates before 1899-07-29 should raise an error.
         """
-        jd = ephem.swe_julday(1899, 1, 1, 12.0)
+        jd = ephem.julday(1899, 1, 1, 12.0)
 
         with pytest.raises(Exception):
             # Should raise EphemerisRangeError or similar
-            ephem.swe_calc_ut(jd, SE_SUN, 0)
+            ephem.calc_ut(jd, SUN, 0)
 
     @pytest.mark.integration
     @pytest.mark.skip(
@@ -778,8 +778,8 @@ class TestHistoricalDates:
         """
         Dates after 2053-10-09 should raise an error.
         """
-        jd = ephem.swe_julday(2054, 1, 1, 12.0)
+        jd = ephem.julday(2054, 1, 1, 12.0)
 
         with pytest.raises(Exception):
             # Should raise EphemerisRangeError or similar
-            ephem.swe_calc_ut(jd, SE_SUN, 0)
+            ephem.calc_ut(jd, SUN, 0)

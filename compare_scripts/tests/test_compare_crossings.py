@@ -9,12 +9,12 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 
 
@@ -69,7 +69,7 @@ class TestSunCrossings:
         jd = jd_start + offset
 
         # LibEphemeris
-        jd_py = ephem.swe_solcross_ut(target_lon, jd, 0)
+        jd_py = ephem.solcross_ut(target_lon, jd, 0)
 
         # SwissEphemeris
         jd_swe = swe.solcross_ut(target_lon, jd, 0)
@@ -78,7 +78,7 @@ class TestSunCrossings:
         diff_seconds = abs(jd_py - jd_swe) * 86400
 
         # Verify Sun is near target longitude
-        pos_py, _ = ephem.swe_calc_ut(jd_py, SE_SUN, 0)
+        pos_py, _ = ephem.calc_ut(jd_py, SUN, 0)
         lon_diff = min(abs(pos_py[0] - target_lon), 360 - abs(pos_py[0] - target_lon))
 
         assert diff_seconds < CrossingTolerance.SUN_SECONDS, (
@@ -102,7 +102,7 @@ class TestMoonCrossings:
         jd_start = swe.julday(2024, 11, 1, 0.0)
 
         # LibEphemeris
-        jd_py = ephem.swe_mooncross_ut(target_lon, jd_start, 0)
+        jd_py = ephem.mooncross_ut(target_lon, jd_start, 0)
 
         # SwissEphemeris
         jd_swe = swe.mooncross_ut(target_lon, jd_start, 0)
@@ -173,9 +173,9 @@ class TestHelioCrossings:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     @pytest.mark.parametrize("target_lon", [0, 90, 180, 270])
@@ -183,13 +183,13 @@ class TestHelioCrossings:
         """Test heliocentric longitude crossings."""
         # SwissEphemeris
         try:
-            jd_swe = swe.helio_cross_ut(body_id, target_lon, jd_start, SEFLG_SWIEPH)
+            jd_swe = swe.helio_cross_ut(body_id, target_lon, jd_start, FLG_SWIEPH)
         except Exception as e:
             pytest.skip(f"SwissEphemeris helio_cross_ut failed: {e}")
 
         # LibEphemeris
         try:
-            jd_py = ephem.helio_cross_ut(body_id, target_lon, jd_start, SEFLG_SWIEPH)
+            jd_py = ephem.helio_cross_ut(body_id, target_lon, jd_start, FLG_SWIEPH)
         except Exception as e:
             pytest.skip(f"LibEphemeris helio_cross_ut failed: {e}")
 
@@ -206,7 +206,7 @@ class TestHelioCrossings:
 
 
 class TestGenericCrossings:
-    """Tests for generic crossing (swe_cross_ut) calculations."""
+    """Tests for generic crossing (cross_ut) calculations."""
 
     @pytest.mark.comparison
     def test_swe_cross_ut_sun(self, jd_start):
@@ -214,13 +214,13 @@ class TestGenericCrossings:
         target_lon = 0
 
         # SwissEphemeris - use solcross_ut for Sun
-        jd_swe = swe.solcross_ut(target_lon, jd_start, SEFLG_SWIEPH)
+        jd_swe = swe.solcross_ut(target_lon, jd_start, FLG_SWIEPH)
 
-        # LibEphemeris - use swe_cross_ut
-        jd_py = ephem.swe_cross_ut(SE_SUN, target_lon, jd_start, SEFLG_SWIEPH)
+        # LibEphemeris - use cross_ut
+        jd_py = ephem.cross_ut(SUN, target_lon, jd_start, FLG_SWIEPH)
 
         diff_seconds = abs(jd_py - jd_swe) * 86400
 
         assert diff_seconds < CrossingTolerance.PLANET_SECONDS, (
-            f"swe_cross_ut Sun crossing difference: {diff_seconds:.2f}s"
+            f"cross_ut Sun crossing difference: {diff_seconds:.2f}s"
         )

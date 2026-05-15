@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
@@ -42,8 +42,8 @@ class TestFuturePlanetPosition:
         worst_jd = 0.0
 
         for jd in ext_future_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -73,8 +73,8 @@ class TestFuturePlanetSpeed:
         worst_jd = 0.0
 
         for jd in ext_future_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[3] - leb[3])
             if err > max_err:
@@ -105,8 +105,8 @@ class TestFutureEcliptic:
         worst_jd = 0.0
 
         for jd in ext_future_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:

@@ -16,57 +16,60 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_NOABERR,
-    SEFLG_SWIEPH,
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_TRUEPOS,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_NOABERR,
+    FLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODY_NAMES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
-    SE_URANUS: "Uranus",
-    SE_NEPTUNE: "Neptune",
-    SE_PLUTO: "Pluto",
-    SE_MEAN_NODE: "MeanNode",
-    SE_TRUE_NODE: "TrueNode",
-    SE_MEAN_APOG: "MeanApog",
-    SE_OSCU_APOG: "OscuApog",
-    SE_CHIRON: "Chiron",
-    SE_CERES: "Ceres",
-    SE_PALLAS: "Pallas",
-    SE_JUNO: "Juno",
-    SE_VESTA: "Vesta",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
+    URANUS: "Uranus",
+    NEPTUNE: "Neptune",
+    PLUTO: "Pluto",
+    MEAN_NODE: "MeanNode",
+    TRUE_NODE: "TrueNode",
+    MEAN_APOG: "MeanApog",
+    OSCU_APOG: "OscuApog",
+    CHIRON: "Chiron",
+    CERES: "Ceres",
+    PALLAS: "Pallas",
+    JUNO: "Juno",
+    VESTA: "Vesta",
 }
 
 # Test dates spanning 200 years
@@ -93,19 +96,19 @@ TEST_JDS = [
 
 # Flag combinations
 FLAG_COMBOS = {
-    "default": SEFLG_SWIEPH | SEFLG_SPEED,
-    "J2000": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_J2000,
-    "NONUT": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NONUT,
-    "TRUEPOS": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_TRUEPOS,
-    "NOABERR": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_NOABERR,
-    "HELCTR": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_HELCTR,
+    "default": FLG_SWIEPH | FLG_SPEED,
+    "J2000": FLG_SWIEPH | FLG_SPEED | FLG_J2000,
+    "NONUT": FLG_SWIEPH | FLG_SPEED | FLG_NONUT,
+    "TRUEPOS": FLG_SWIEPH | FLG_SPEED | FLG_TRUEPOS,
+    "NOABERR": FLG_SWIEPH | FLG_SPEED | FLG_NOABERR,
+    "HELCTR": FLG_SWIEPH | FLG_SPEED | FLG_HELCTR,
 }
 
 # Bodies that can't be heliocentric
-NO_HELIO = {SE_SUN, SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG, SE_OSCU_APOG}
+NO_HELIO = {SUN, MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG}
 
 # Bodies not available at all dates
-RESTRICTED_BODIES = {SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA}
+RESTRICTED_BODIES = {CHIRON, CERES, PALLAS, JUNO, VESTA}
 RESTRICTED_MIN_JD = 2396758.5  # ~1850
 
 passed = 0
@@ -124,7 +127,7 @@ for jd in TEST_JDS:
             if flag_name == "HELCTR" and body in NO_HELIO:
                 continue
             # Sun can't be heliocentric
-            if (flags & SEFLG_HELCTR) and body == SE_SUN:
+            if (flags & FLG_HELCTR) and body == SUN:
                 continue
 
             total += 1
@@ -132,7 +135,7 @@ for jd in TEST_JDS:
                 se_result = swe.calc_ut(jd, body, flags)
                 se_lat_speed = se_result[0][4]  # lat_speed is index 4
 
-                le_result = ephem.swe_calc_ut(jd, body, flags)
+                le_result = ephem.calc_ut(jd, body, flags)
                 le_lat_speed = le_result[0][4]
 
                 diff = abs(le_lat_speed - se_lat_speed)
@@ -143,11 +146,11 @@ for jd in TEST_JDS:
                 base_tol = 1.0  # 1 arcsec/day default
 
                 # Analytical bodies have known differences
-                if body in (SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG, SE_OSCU_APOG):
+                if body in (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG):
                     base_tol = 60.0  # 1 arcmin/day
-                elif body == SE_MOON:
+                elif body == MOON:
                     base_tol = 5.0  # Moon moves fast, finite-diff differences
-                elif body in (SE_CHIRON,):
+                elif body in (CHIRON,):
                     base_tol = 2.0
 
                 # Relative tolerance: 0.5% of speed magnitude

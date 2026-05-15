@@ -17,21 +17,21 @@ import swisseph as swe_ref
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
 )
 
 
@@ -40,16 +40,16 @@ from libephemeris.constants import (
 # ---------------------------------------------------------------------------
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 # Chiron requires seas_18.se1 which may not be available for pyswisseph,
@@ -58,11 +58,11 @@ BODIES_WITH_CHIRON = BODIES
 
 # Bodies valid for heliocentric comparison (not Sun or Moon)
 HELIO_BODIES = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # 20 dates spanning 1900-2100
@@ -124,8 +124,8 @@ class TestGeocentricPositions:
     @pytest.mark.parametrize("jd", DATES)
     def test_geocentric_lon_lat_dist(self, body_id: int, body_name: str, jd: float):
         """Geocentric lon, lat, dist match pyswisseph within tolerances."""
-        lib_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-        ref_vals, _ = swe_ref.calc_ut(jd, body_id, SEFLG_SPEED)
+        lib_vals, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
+        ref_vals, _ = swe_ref.calc_ut(jd, body_id, FLG_SPEED)
 
         # Longitude
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
@@ -160,8 +160,8 @@ class TestHeliocentricPositions:
     )
     def test_heliocentric_lon_lat_dist(self, body_id: int, body_name: str, jd: float):
         """Heliocentric lon, lat, dist match pyswisseph within tolerances."""
-        flags = SEFLG_HELCTR | SEFLG_SPEED
-        lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
+        flags = FLG_HELCTR | FLG_SPEED
+        lib_vals, _ = swe.calc_ut(jd, body_id, flags)
         ref_vals, _ = swe_ref.calc_ut(jd, body_id, flags)
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
@@ -191,8 +191,8 @@ class TestEquatorialPositions:
     )
     def test_equatorial_ra_dec(self, body_id: int, body_name: str, jd: float):
         """Equatorial RA/Dec match pyswisseph within 1 arcsecond."""
-        flags = SEFLG_EQUATORIAL | SEFLG_SPEED
-        lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
+        flags = FLG_EQUATORIAL | FLG_SPEED
+        lib_vals, _ = swe.calc_ut(jd, body_id, flags)
         ref_vals, _ = swe_ref.calc_ut(jd, body_id, flags)
 
         # RA
@@ -217,11 +217,11 @@ class TestSiderealPositions:
     )
     def test_sidereal_lahiri_lon(self, body_id: int, body_name: str, jd: float):
         """Sidereal Lahiri longitude matches pyswisseph within 1 arcsecond."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        swe_ref.set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        swe_ref.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_SPEED
-        lib_vals, _ = swe.swe_calc_ut(jd, body_id, flags)
+        flags = FLG_SIDEREAL | FLG_SPEED
+        lib_vals, _ = swe.calc_ut(jd, body_id, flags)
         ref_vals, _ = swe_ref.calc_ut(jd, body_id, flags)
 
         dlon = abs(_angle_diff(lib_vals[0], ref_vals[0]))
@@ -237,11 +237,11 @@ class TestSpeedNumericalDerivative:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     @pytest.mark.parametrize("jd", [DATES[5], DATES[10], DATES[15]])
@@ -251,11 +251,11 @@ class TestSpeedNumericalDerivative:
         """Speed in lon approximates (lon(jd+h) - lon(jd-h)) / (2h)."""
         h = 1.0 / 24.0  # 1 hour step
 
-        vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        vals, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         lon_speed = vals[3]  # speed in longitude (deg/day)
 
-        vals_plus, _ = swe.swe_calc_ut(jd + h, body_id, 0)
-        vals_minus, _ = swe.swe_calc_ut(jd - h, body_id, 0)
+        vals_plus, _ = swe.calc_ut(jd + h, body_id, 0)
+        vals_minus, _ = swe.calc_ut(jd - h, body_id, 0)
 
         num_speed = _angle_diff(vals_plus[0], vals_minus[0]) / (2.0 * h)
 

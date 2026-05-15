@@ -1,7 +1,7 @@
 """
-Tests for date_conversion / swe_date_conversion function.
+Tests for date_conversion / date_conversion function.
 
-After Phase 2, `date_conversion` is an alias for `swe_date_conversion` and
+After Phase 2, `date_conversion` is an alias for `date_conversion` and
 returns ``(valid, jd, (year, month, day, hour))`` matching pyswisseph.
 
 The old calendar-conversion helper is available as
@@ -20,7 +20,7 @@ from libephemeris.time_utils import date_conversion as calendar_convert
 
 
 class TestSWEDateConversion:
-    """Test swe_date_conversion / date_conversion pyswisseph-compatible API."""
+    """Test date_conversion / date_conversion pyswisseph-compatible API."""
 
     @pytest.mark.unit
     def test_returns_valid_jd_tuple(self):
@@ -83,9 +83,9 @@ class TestSWEDateConversion:
 
     @pytest.mark.unit
     def test_swe_date_conversion_alias(self):
-        """swe_date_conversion should be the same function as date_conversion."""
+        """date_conversion should be the same function as date_conversion."""
         result_bare = ephem.date_conversion(2000, 6, 15, 8.5, "g")
-        result_swe = ephem.swe_date_conversion(2000, 6, 15, 8.5, "g")
+        result_swe = ephem.date_conversion(2000, 6, 15, 8.5, "g")
         assert result_bare == result_swe
 
 
@@ -147,15 +147,15 @@ class TestCalendarConversionHelper:
         output as Julian (since it's before 1582). We verify correctness via
         JD equivalence instead.
         """
-        from libephemeris.time_utils import swe_julday
-        from libephemeris.constants import SE_JUL_CAL, SE_GREG_CAL
+        from libephemeris.time_utils import julday
+        from libephemeris.constants import JUL_CAL, GREG_CAL
 
         original = (1400, 3, 15, 12.0)
         greg = calendar_convert(*original, "g")
 
         # Verify the JD is the same in both calendars
-        jd_julian = swe_julday(*original, SE_JUL_CAL)
-        jd_greg = swe_julday(*greg, SE_GREG_CAL)
+        jd_julian = julday(*original, JUL_CAL)
+        jd_greg = julday(*greg, GREG_CAL)
         assert jd_julian == pytest.approx(jd_greg, abs=1e-10)
 
     @pytest.mark.unit

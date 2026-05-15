@@ -15,14 +15,13 @@ import pytest
 from libephemeris import (
     julday,
     vis_limit_mag,
-    swe_vis_limit_mag,
-    SEFLG_SWIEPH,
-    SE_HELFLAG_VISLIM_DARK,
-    SE_HELFLAG_VISLIM_NOMOON,
-    SE_HELFLAG_BELOW_HORIZON,
-    SE_HELFLAG_PHOTOPIC,
-    SE_HELFLAG_SCOTOPIC,
-    SE_HELFLAG_MIXED,
+    FLG_SWIEPH,
+    HELFLAG_VISLIM_DARK,
+    HELFLAG_VISLIM_NOMOON,
+    HELFLAG_BELOW_HORIZON,
+    HELFLAG_PHOTOPIC,
+    HELFLAG_SCOTOPIC,
+    HELFLAG_MIXED,
 )
 
 
@@ -73,10 +72,10 @@ class TestVisLimitMagBasic:
         assert len(dret) == 10
         # Result should be a valid vision type or below horizon
         assert result in (
-            SE_HELFLAG_BELOW_HORIZON,
-            SE_HELFLAG_PHOTOPIC,
-            SE_HELFLAG_SCOTOPIC,
-            SE_HELFLAG_MIXED,
+            HELFLAG_BELOW_HORIZON,
+            HELFLAG_PHOTOPIC,
+            HELFLAG_SCOTOPIC,
+            HELFLAG_MIXED,
         )
 
     def test_mars_visibility(self):
@@ -90,10 +89,10 @@ class TestVisLimitMagBasic:
 
         assert len(dret) == 10
         assert result in (
-            SE_HELFLAG_BELOW_HORIZON,
-            SE_HELFLAG_PHOTOPIC,
-            SE_HELFLAG_SCOTOPIC,
-            SE_HELFLAG_MIXED,
+            HELFLAG_BELOW_HORIZON,
+            HELFLAG_PHOTOPIC,
+            HELFLAG_SCOTOPIC,
+            HELFLAG_MIXED,
         )
 
     def test_saturn_visibility(self):
@@ -257,7 +256,7 @@ class TestVisLimitMagFlags:
 
         # Without dark sky flag
         result_normal, dret_normal = vis_limit_mag(
-            jd, geopos, atmo, observer, "Venus", flags=SEFLG_SWIEPH
+            jd, geopos, atmo, observer, "Venus", flags=FLG_SWIEPH
         )
 
         # With dark sky flag (Sun at nadir)
@@ -267,7 +266,7 @@ class TestVisLimitMagFlags:
             atmo,
             observer,
             "Venus",
-            flags=SEFLG_SWIEPH | SE_HELFLAG_VISLIM_DARK,
+            flags=FLG_SWIEPH | HELFLAG_VISLIM_DARK,
         )
 
         # Sun altitude with dark flag should be -90
@@ -286,7 +285,7 @@ class TestVisLimitMagFlags:
 
         # With Moon
         result_with_moon, dret_with_moon = vis_limit_mag(
-            jd, geopos, atmo, observer, "Venus", flags=SEFLG_SWIEPH
+            jd, geopos, atmo, observer, "Venus", flags=FLG_SWIEPH
         )
 
         # Without Moon contribution
@@ -296,12 +295,12 @@ class TestVisLimitMagFlags:
             atmo,
             observer,
             "Venus",
-            flags=SEFLG_SWIEPH | SE_HELFLAG_VISLIM_NOMOON,
+            flags=FLG_SWIEPH | HELFLAG_VISLIM_NOMOON,
         )
 
         # Moon altitude with no-moon flag should be -90
         # (only when object is above horizon; below-horizon returns all zeros)
-        if result_no_moon != SE_HELFLAG_BELOW_HORIZON:
+        if result_no_moon != HELFLAG_BELOW_HORIZON:
             assert dret_no_moon[5] == -90.0
         else:
             assert dret_no_moon[5] == 0.0
@@ -323,7 +322,7 @@ class TestVisLimitMagVisionTypes:
 
         # If below horizon, result should be -2
         if dret[1] < 0:
-            assert result == SE_HELFLAG_BELOW_HORIZON
+            assert result == HELFLAG_BELOW_HORIZON
 
     def test_photopic_vision_during_twilight(self):
         """Test photopic vision during bright twilight."""
@@ -338,7 +337,7 @@ class TestVisLimitMagVisionTypes:
         # If sun is between 0 and -6, should be photopic or mixed
         if dret[1] > 0:  # Venus above horizon
             if dret[3] > -6:
-                assert result in (SE_HELFLAG_PHOTOPIC, SE_HELFLAG_MIXED)
+                assert result in (HELFLAG_PHOTOPIC, HELFLAG_MIXED)
 
 
 class TestVisLimitMagEdgeCases:
@@ -400,14 +399,14 @@ class TestVisLimitMagAliases:
     """Test function aliases work correctly."""
 
     def test_swe_vis_limit_mag_alias(self):
-        """Test that swe_vis_limit_mag is an alias for vis_limit_mag."""
+        """Test that vis_limit_mag is an alias for vis_limit_mag."""
         jd = julday(2024, 8, 15, 22.0)
         geopos = (12.5, 42.0, 0)
         atmo = (1013.25, 15.0, 50.0, 0.0)
         observer = (36, 1.0)
 
         result1, dret1 = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        result2, dret2 = swe_vis_limit_mag(jd, geopos, atmo, observer, "Venus")
+        result2, dret2 = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
 
         assert result1 == result2
         assert dret1 == dret2

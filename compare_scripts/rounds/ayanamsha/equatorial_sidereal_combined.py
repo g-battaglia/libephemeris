@@ -1,6 +1,6 @@
 """Round 139: All Planets Equatorial+Sidereal Combined.
 
-Tests the combination of SEFLG_EQUATORIAL + SEFLG_SIDEREAL for all planets.
+Tests the combination of FLG_EQUATORIAL + FLG_SIDEREAL for all planets.
 This is a tricky flag combination where ayanamsha must be applied correctly
 to RA/Dec coordinates.
 """
@@ -16,56 +16,59 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_SIDEREAL,
-    SEFLG_EQUATORIAL,
-    SEFLG_NONUT,
-    SEFLG_J2000,
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_SIDEREAL,
+    FLG_EQUATORIAL,
+    FLG_NONUT,
+    FLG_J2000,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    SE_SUN: "Sun",
-    SE_MOON: "Moon",
-    SE_MERCURY: "Mercury",
-    SE_VENUS: "Venus",
-    SE_MARS: "Mars",
-    SE_JUPITER: "Jupiter",
-    SE_SATURN: "Saturn",
-    SE_URANUS: "Uranus",
-    SE_NEPTUNE: "Neptune",
-    SE_PLUTO: "Pluto",
-    SE_CHIRON: "Chiron",
-    SE_CERES: "Ceres",
-    SE_PALLAS: "Pallas",
-    SE_JUNO: "Juno",
-    SE_VESTA: "Vesta",
-    SE_MEAN_NODE: "MeanNode",
-    SE_TRUE_NODE: "TrueNode",
-    SE_MEAN_APOG: "MeanApog",
-    SE_OSCU_APOG: "OscuApog",
+    SUN: "Sun",
+    MOON: "Moon",
+    MERCURY: "Mercury",
+    VENUS: "Venus",
+    MARS: "Mars",
+    JUPITER: "Jupiter",
+    SATURN: "Saturn",
+    URANUS: "Uranus",
+    NEPTUNE: "Neptune",
+    PLUTO: "Pluto",
+    CHIRON: "Chiron",
+    CERES: "Ceres",
+    PALLAS: "Pallas",
+    JUNO: "Juno",
+    VESTA: "Vesta",
+    MEAN_NODE: "MeanNode",
+    TRUE_NODE: "TrueNode",
+    MEAN_APOG: "MeanApog",
+    OSCU_APOG: "OscuApog",
 }
 
 TEST_JDS = [
@@ -84,12 +87,12 @@ TEST_JDS = [
 SIDEREAL_MODES = [0, 1, 3, 5, 27]  # Fagan, Lahiri, Raman, Krishnamurti, TrueCitra
 
 FLAG_COMBOS = {
-    "SID+EQ": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL,
-    "SID+EQ+NONUT": SEFLG_SWIEPH
-    | SEFLG_SPEED
-    | SEFLG_SIDEREAL
-    | SEFLG_EQUATORIAL
-    | SEFLG_NONUT,
+    "SID+EQ": FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL,
+    "SID+EQ+NONUT": FLG_SWIEPH
+    | FLG_SPEED
+    | FLG_SIDEREAL
+    | FLG_EQUATORIAL
+    | FLG_NONUT,
 }
 
 COMP_NAMES = ["RA", "Dec", "dist", "RA_spd", "Dec_spd", "dist_spd"]
@@ -101,14 +104,14 @@ total = 0
 
 for sid_mode in SIDEREAL_MODES:
     swe.set_sid_mode(sid_mode)
-    ephem.swe_set_sid_mode(sid_mode)
+    ephem.set_sid_mode(sid_mode)
 
     for jd in TEST_JDS:
         for body, bname in BODIES.items():
             for flag_name, flags in FLAG_COMBOS.items():
                 try:
                     se_result = swe.calc_ut(jd, body, flags)
-                    le_result = ephem.swe_calc_ut(jd, body, flags)
+                    le_result = ephem.calc_ut(jd, body, flags)
 
                     for i, comp in enumerate(COMP_NAMES):
                         total += 1
@@ -122,13 +125,13 @@ for sid_mode in SIDEREAL_MODES:
                         else:
                             diff_arcsec = diff * 3600.0
                             if body in (
-                                SE_MEAN_NODE,
-                                SE_TRUE_NODE,
-                                SE_MEAN_APOG,
-                                SE_OSCU_APOG,
+                                MEAN_NODE,
+                                TRUE_NODE,
+                                MEAN_APOG,
+                                OSCU_APOG,
                             ):
                                 tol = 120.0  # 2 arcmin for analytical bodies
-                            elif "spd" in comp and body == SE_OSCU_APOG:
+                            elif "spd" in comp and body == OSCU_APOG:
                                 tol = 200.0
                             else:
                                 tol = 60.0  # 1 arcmin (includes ~14" sidereal offset)
@@ -150,7 +153,7 @@ for sid_mode in SIDEREAL_MODES:
                         )
 
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0)
+ephem.set_sid_mode(0)
 
 print(f"\n{'=' * 60}")
 print(f"Round 139: All Planets Equatorial+Sidereal Combined")

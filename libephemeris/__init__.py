@@ -79,10 +79,10 @@ from .exceptions import (
     validate_coordinates,
 )
 from .time_utils import (
-    swe_julday,
-    swe_revjul,
-    swe_deltat,
-    swe_deltat_ex,
+    julday,
+    revjul,
+    deltat,
+    deltat_ex,
     date_conversion as _date_conversion_calendars,
     day_of_week,
     utc_to_jd,
@@ -106,22 +106,22 @@ from .time_utils import (
     utc_jd_to_tai,
 )
 from .planets import (
-    swe_calc_ut,
-    swe_calc,
-    swe_calc_pctr,
-    swe_get_ayanamsa_ut,
-    swe_get_ayanamsa,
-    swe_get_ayanamsa_ex,
-    swe_get_ayanamsa_ex_ut,
-    swe_get_ayanamsa_name,
-    swe_set_sid_mode,
-    swe_nod_aps,
-    swe_nod_aps_ut,
-    swe_get_orbital_elements,
-    swe_get_orbital_elements_ut,
-    swe_orbit_max_min_true_distance,
-    swe_pheno,
-    swe_pheno_ut,
+    calc_ut,
+    calc,
+    calc_pctr,
+    get_ayanamsa_ut,
+    get_ayanamsa,
+    get_ayanamsa_ex,
+    get_ayanamsa_ex_ut,
+    get_ayanamsa_name,
+    set_sid_mode,
+    nod_aps,
+    nod_aps_ut,
+    get_orbital_elements,
+    get_orbital_elements_ut,
+    orbit_max_min_true_distance,
+    pheno,
+    pheno_ut,
     get_planet_name,
     HeliocentricNodApsWarning,
     NutationFallbackWarning,
@@ -134,39 +134,38 @@ from .planets import (
     get_elongation_type,
 )
 from .houses import (
-    swe_houses,
-    swe_houses_armc,
-    swe_houses_armc_ex2,
-    swe_houses_ex,
-    swe_houses_ex2,
-    swe_house_name,
-    swe_house_pos,
+    houses,
+    houses_armc,
+    houses_armc_ex2,
+    houses_ex,
+    houses_ex2,
+    house_name,
     house_pos,
-    gauquelin_sector as _gauquelin_sector_pythonic,
-    swe_gauquelin_sector,
+    _house_pos_pythonic,
+    _gauquelin_sector_pythonic,
+    gauquelin_sector,
     # Polar latitude handling
-    swe_houses_with_fallback,
-    swe_houses_armc_with_fallback,
+    houses_with_fallback,
+    houses_armc_with_fallback,
     get_polar_latitude_threshold,
     # Extreme latitude handling
     get_extreme_latitude_info,
     EXTREME_LATITUDE_THRESHOLD,
 )
 from .state import (
-    set_topo as swe_set_topo,
-    set_ephe_path as swe_set_ephe_path,
-    set_ephemeris_file as swe_set_ephemeris_file,
-    set_jpl_file as swe_set_jpl_file,
-    set_tid_acc as swe_set_tid_acc,
-    get_tid_acc as swe_get_tid_acc,
-    set_delta_t_userdef as swe_set_delta_t_userdef,
-    get_delta_t_userdef as swe_get_delta_t_userdef,
-    set_lapse_rate as swe_set_lapse_rate,
-    get_lapse_rate as swe_get_lapse_rate,
-    get_library_path as swe_get_library_path,
-    get_current_file_data as swe_get_current_file_data,
-    close as swe_close,
-    reset_session as swe_reset_session,
+    set_topo,
+    set_ephe_path,
+    set_ephemeris_file,
+    set_jpl_file,
+    set_tid_acc,
+    get_tid_acc,
+    set_delta_t_userdef,
+    get_delta_t_userdef,
+    set_lapse_rate,
+    get_lapse_rate,
+    get_library_path,
+    get_current_file_data,
+    close,
     reset_session,
     # LEB binary ephemeris mode
     set_leb_file,
@@ -221,17 +220,17 @@ from .iers_data import (
     get_iers_auto_download,
 )
 from .crossing import (
-    swe_solcross_ut,
-    swe_solcross,
-    swe_mooncross_ut,
-    swe_mooncross,
-    swe_mooncross_node_ut,
-    swe_mooncross_node,
-    swe_cross_ut,
-    swe_helio_cross_ut,
-    swe_helio_cross,
-    swe_find_station_ut,
-    swe_next_retrograde_ut,
+    solcross_ut,
+    solcross,
+    mooncross_ut,
+    mooncross,
+    mooncross_node_ut,
+    mooncross_node,
+    cross_ut,
+    helio_cross_ut,
+    helio_cross,
+    find_station_ut,
+    next_retrograde_ut,
 )
 from .lunar import (
     # Meeus polynomial validity warnings/errors
@@ -254,53 +253,47 @@ from .lunar import (
 from .eclipse import (
     BesselianElements,
     sol_eclipse_max_time,
-    swe_sol_eclipse_max_time,
-    sol_eclipse_when_glob as _sol_eclipse_when_glob_pythonic,
-    swe_sol_eclipse_when_glob,
-    sol_eclipse_when_loc as _sol_eclipse_when_loc_pythonic,
-    swe_sol_eclipse_when_loc,
-    sol_eclipse_where as _sol_eclipse_where_pythonic,
-    swe_sol_eclipse_where,
-    sol_eclipse_how as _sol_eclipse_how_pythonic,
-    swe_sol_eclipse_how,
+    _sol_eclipse_when_glob_pythonic,
+    sol_eclipse_when_glob,
+    _sol_eclipse_when_loc_pythonic,
+    sol_eclipse_when_loc,
+    _sol_eclipse_where_pythonic,
+    sol_eclipse_where,
+    _sol_eclipse_how_pythonic,
+    sol_eclipse_how,
+    _sol_eclipse_how_details_pythonic,
     sol_eclipse_how_details,
-    swe_sol_eclipse_how_details,
     # Eclipse magnitude at location
+    _sol_eclipse_magnitude_at_loc_pythonic,
     sol_eclipse_magnitude_at_loc,
-    swe_sol_eclipse_magnitude_at_loc,
     # Eclipse obscuration at location
+    _sol_eclipse_obscuration_at_loc_pythonic,
     sol_eclipse_obscuration_at_loc,
-    swe_sol_eclipse_obscuration_at_loc,
-    lun_eclipse_when as _lun_eclipse_when_pythonic,
-    swe_lun_eclipse_when,
-    lun_eclipse_when_loc as _lun_eclipse_when_loc_pythonic,
-    swe_lun_eclipse_when_loc,
-    lun_eclipse_how as _lun_eclipse_how_pythonic,
-    swe_lun_eclipse_how,
+    _lun_eclipse_when_pythonic,
+    lun_eclipse_when,
+    _lun_eclipse_when_loc_pythonic,
+    lun_eclipse_when_loc,
+    _lun_eclipse_how_pythonic,
+    lun_eclipse_how,
     # Lunar eclipse umbral magnitude
+    _lun_eclipse_umbral_magnitude_pythonic,
     lun_eclipse_umbral_magnitude,
-    swe_lun_eclipse_umbral_magnitude,
     # Lunar eclipse penumbral magnitude
+    _lun_eclipse_penumbral_magnitude_pythonic,
     lun_eclipse_penumbral_magnitude,
-    swe_lun_eclipse_penumbral_magnitude,
     # Lunar eclipse gamma parameter
+    _lun_eclipse_gamma_pythonic,
     lun_eclipse_gamma,
-    swe_lun_eclipse_gamma,
     lun_occult_when_glob,
-    swe_lun_occult_when_glob,
-    lun_occult_when_loc as _lun_occult_when_loc_pythonic,
-    swe_lun_occult_when_loc,
+    _lun_occult_when_loc_pythonic,
+    lun_occult_when_loc,
+    _lun_occult_where_pythonic,
     lun_occult_where,
-    swe_lun_occult_where,
     # Planetary occultations
     planet_occult_when_glob,
-    swe_planet_occult_when_glob,
     planet_occult_when_loc,
-    swe_planet_occult_when_loc,
     rise_trans,
-    swe_rise_trans,
     rise_trans_true_hor,
-    swe_rise_trans_true_hor,
     calc_besselian_x,
     calc_besselian_y,
     calc_besselian_d,
@@ -330,16 +323,12 @@ from .eclipse import (
     calc_lunar_eclipse_umbral_duration,
     # Eclipse path width calculation
     calc_eclipse_path_width,
-    swe_calc_eclipse_path_width,
     # Eclipse central line coordinates
     calc_eclipse_central_line,
-    swe_calc_eclipse_central_line,
     # Eclipse northern limit coordinates
     calc_eclipse_northern_limit,
-    swe_calc_eclipse_northern_limit,
     # Eclipse southern limit coordinates
     calc_eclipse_southern_limit,
-    swe_calc_eclipse_southern_limit,
     # Saros series calculation
     get_saros_number,
     SAROS_CYCLE_DAYS,
@@ -348,12 +337,11 @@ from .eclipse import (
     INEX_CYCLE_DAYS,
 )
 from .heliacal import (
-    heliacal_ut as _heliacal_ut_pythonic,
-    swe_heliacal_ut,
-    heliacal_pheno_ut as _heliacal_pheno_ut_pythonic,
-    swe_heliacal_pheno_ut,
+    _heliacal_ut_pythonic,
+    heliacal_ut,
+    _heliacal_pheno_ut_pythonic,
+    heliacal_pheno_ut,
     vis_limit_mag,
-    swe_vis_limit_mag,
     is_inner_planet,
     is_fixed_star,
     INNER_PLANETS,
@@ -421,19 +409,13 @@ from .utils import (
     rad_midp,
     d2l,
     split_deg,
-    swe_calc_angles,
+    calc_angles,
     cotrans,
     cotrans_sp,
     azalt,
     azalt_rev,
     refrac,
     refrac_extended,
-    SE_ECL2HOR,
-    SE_EQU2HOR,
-    SE_HOR2ECL,
-    SE_HOR2EQU,
-    SE_TRUE_TO_APP,
-    SE_APP_TO_TRUE,
     ECL2HOR,
     EQU2HOR,
     HOR2ECL,
@@ -449,13 +431,13 @@ from .utils import (
     SPLIT_DEG_KEEP_DEG,
 )
 from .fixed_stars import (
-    swe_fixstar_ut,
-    swe_fixstar,
-    swe_fixstar2,
-    swe_fixstar2_ut,
-    swe_batch_fixstars_ut,
-    swe_fixstar_mag,
-    swe_fixstar2_mag,
+    fixstar_ut,
+    fixstar,
+    fixstar2,
+    fixstar2_ut,
+    batch_fixstars_ut,
+    fixstar_mag,
+    fixstar2_mag,
     list_fixed_stars,
     StarCatalogEntry,
     propagate_proper_motion,
@@ -528,21 +510,21 @@ from .hypothetical import (  # Hamburg School Uranian planets
     get_bundled_seorbel_path,
     load_bundled_seorbel,
     TPolynomial,
-    SE_CUPIDO as SE_CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
-    SE_HADES as SE_HADES_HYPO,  # Alias to avoid conflict with constants.py
-    SE_ZEUS as SE_ZEUS_HYPO,  # Alias to avoid conflict with constants.py
-    SE_KRONOS as SE_KRONOS_HYPO,  # Alias to avoid conflict with constants.py
-    SE_APOLLON as SE_APOLLON_HYPO,  # Alias to avoid conflict with constants.py
-    SE_ADMETOS as SE_ADMETOS_HYPO,  # Alias to avoid conflict with constants.py
-    SE_VULKANUS as SE_VULKANUS_HYPO,  # Alias to avoid conflict with constants.py
-    SE_POSEIDON as SE_POSEIDON_HYPO,  # Alias to avoid conflict with constants.py
-    SE_ISIS as SE_ISIS_HYPO,  # Alias to avoid conflict with constants.py
-    SE_TRANSPLUTO as SE_TRANSPLUTO_HYPO,  # Alias to avoid conflict with constants.py
-    SE_VULCAN as SE_VULCAN_HYPO,  # Alias to avoid conflict with constants.py
-    SE_WALDEMATH as SE_WALDEMATH_HYPO,  # Alias to avoid conflict with constants.py
-    SE_WHITE_MOON as SE_WHITE_MOON_HYPO,  # Alias to avoid conflict with constants.py
-    SE_PROSERPINA as SE_PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
-    SE_PLANET_X_PICKERING as SE_PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
+    CUPIDO as CUPIDO_HYPO,  # Alias to avoid conflict with constants.py
+    HADES as HADES_HYPO,  # Alias to avoid conflict with constants.py
+    ZEUS as ZEUS_HYPO,  # Alias to avoid conflict with constants.py
+    KRONOS as KRONOS_HYPO,  # Alias to avoid conflict with constants.py
+    APOLLON as APOLLON_HYPO,  # Alias to avoid conflict with constants.py
+    ADMETOS as ADMETOS_HYPO,  # Alias to avoid conflict with constants.py
+    VULKANUS as VULKANUS_HYPO,  # Alias to avoid conflict with constants.py
+    POSEIDON as POSEIDON_HYPO,  # Alias to avoid conflict with constants.py
+    ISIS as ISIS_HYPO,  # Alias to avoid conflict with constants.py
+    TRANSPLUTO as TRANSPLUTO_HYPO,  # Alias to avoid conflict with constants.py
+    VULCAN as VULCAN_HYPO,  # Alias to avoid conflict with constants.py
+    WALDEMATH as WALDEMATH_HYPO,  # Alias to avoid conflict with constants.py
+    WHITE_MOON as WHITE_MOON_HYPO,  # Alias to avoid conflict with constants.py
+    PROSERPINA as PROSERPINA_HYPO,  # Alias to avoid conflict with constants.py
+    PLANET_X_PICKERING as PLANET_X_PICKERING_HYPO,  # Alias to avoid conflict with constants.py
 )
 
 # REBOUND/ASSIST n-body integration (optional dependency)
@@ -599,19 +581,11 @@ from .planetary_moons import (  # Planetary moons (Galilean moons, Titan, etc.)
 )
 
 # =============================================================================
-# REFERENCE API-COMPATIBLE FUNCTION ALIASES (without swe_ prefix)
+# date_conversion wrapper (reference-API return shape)
 # =============================================================================
-# Reference API uses function names without the swe_ prefix
-# These aliases provide 100% API compatibility with the reference API
-
-# Time functions
-julday = swe_julday
-revjul = swe_revjul
-deltat = swe_deltat
-deltat_ex = swe_deltat_ex
 
 
-def swe_date_conversion(
+def date_conversion(
     year: int,
     month: int,
     day: int,
@@ -620,7 +594,7 @@ def swe_date_conversion(
 ) -> "tuple[bool, float, tuple[int, int, int, float]]":
     """Convert and validate a calendar date, returning Julian Day number.
 
-    Wrapper matching pyswisseph's ``swe_date_conversion`` return convention:
+    Wrapper matching the reference ``date_conversion`` return convention:
     ``(valid, jd, (year, month, day, hour))``.
 
     Args:
@@ -642,135 +616,12 @@ def swe_date_conversion(
     if cal_char not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {cal!r}")
 
-    cal_flag = SE_JUL_CAL if cal_char == "j" else SE_GREG_CAL
-    jd = swe_julday(year, month, day, hour, cal_flag)
+    cal_flag = JUL_CAL if cal_char == "j" else GREG_CAL
+    jd = julday(year, month, day, hour, cal_flag)
     # Round-trip to check validity: convert JD back to calendar date
-    y2, m2, d2, h2 = swe_revjul(jd, cal_flag)
+    y2, m2, d2, h2 = revjul(jd, cal_flag)
     valid = y2 == year and m2 == month and d2 == day
     return (valid, jd, (y2, m2, d2, h2))
-
-
-# Make date_conversion an alias of swe_date_conversion for pyswisseph compat.
-# The old calendar-conversion helper is still available as _date_conversion_calendars.
-date_conversion = swe_date_conversion
-
-swe_day_of_week = day_of_week
-swe_utc_to_jd = utc_to_jd
-swe_jdet_to_utc = jdet_to_utc
-swe_jdut1_to_utc = jdut1_to_utc
-swe_utc_time_zone = utc_time_zone
-swe_time_equ = time_equ
-swe_lat_to_lmt = lat_to_lmt
-swe_lmt_to_lat = lmt_to_lat
-swe_sidtime = sidtime
-swe_sidtime0 = sidtime0
-
-# Planet calculation
-calc_ut = swe_calc_ut
-calc = swe_calc
-calc_pctr = swe_calc_pctr
-nod_aps = swe_nod_aps
-nod_aps_ut = swe_nod_aps_ut
-get_orbital_elements = swe_get_orbital_elements
-get_orbital_elements_ut = swe_get_orbital_elements_ut
-orbit_max_min_true_distance = swe_orbit_max_min_true_distance
-pheno = swe_pheno
-pheno_ut = swe_pheno_ut
-
-# Houses
-houses = swe_houses
-houses_armc = swe_houses_armc
-houses_armc_ex2 = swe_houses_armc_ex2
-houses_ex = swe_houses_ex
-houses_ex2 = swe_houses_ex2
-house_name = swe_house_name
-# house_pos is already the main function name (matching reference API)
-
-# Ayanamsa (sidereal)
-get_ayanamsa_ut = swe_get_ayanamsa_ut
-get_ayanamsa = swe_get_ayanamsa
-get_ayanamsa_ex = swe_get_ayanamsa_ex
-get_ayanamsa_ex_ut = swe_get_ayanamsa_ex_ut
-get_ayanamsa_name = swe_get_ayanamsa_name
-set_sid_mode = swe_set_sid_mode
-
-# Observer location
-set_topo = swe_set_topo
-set_ephe_path = swe_set_ephe_path
-set_ephemeris_file = swe_set_ephemeris_file
-set_jpl_file = swe_set_jpl_file
-
-# Tidal acceleration for Delta T
-set_tid_acc = swe_set_tid_acc
-get_tid_acc = swe_get_tid_acc
-
-# User-defined Delta T
-set_delta_t_userdef = swe_set_delta_t_userdef
-get_delta_t_userdef = swe_get_delta_t_userdef
-
-# Lapse rate for refraction calculations
-set_lapse_rate = swe_set_lapse_rate
-get_lapse_rate = swe_get_lapse_rate
-
-# Library path
-get_library_path = swe_get_library_path
-
-# Current file data
-get_current_file_data = swe_get_current_file_data
-
-# Close and cleanup
-close = swe_close
-
-# Fixed Stars
-fixstar_ut = swe_fixstar_ut
-fixstar = swe_fixstar
-fixstar2 = swe_fixstar2
-fixstar2_ut = swe_fixstar2_ut
-batch_fixstars_ut = swe_batch_fixstars_ut
-fixstar_mag = swe_fixstar_mag
-fixstar2_mag = swe_fixstar2_mag
-
-# Crossings
-solcross_ut = swe_solcross_ut
-solcross = swe_solcross
-mooncross_ut = swe_mooncross_ut
-mooncross = swe_mooncross
-mooncross_node_ut = swe_mooncross_node_ut
-mooncross_node = swe_mooncross_node
-helio_cross_ut = swe_helio_cross_ut
-helio_cross = swe_helio_cross
-find_station_ut = swe_find_station_ut
-next_retrograde_ut = swe_next_retrograde_ut
-
-# pyswisseph swe_ prefixed aliases for utility functions
-swe_cotrans = cotrans
-swe_cotrans_sp = cotrans_sp
-swe_azalt = azalt
-swe_azalt_rev = azalt_rev
-swe_refrac = refrac
-swe_refrac_extended = refrac_extended
-swe_split_deg = split_deg
-swe_degnorm = degnorm
-swe_radnorm = radnorm
-swe_difdeg2n = difdeg2n
-swe_difdegn = difdegn
-swe_difrad2n = difrad2n
-swe_difcs2n = difcs2n
-swe_difcsn = difcsn
-swe_csnorm = csnorm
-swe_csroundsec = csroundsec
-swe_cs2degstr = cs2degstr
-swe_cs2lonlatstr = cs2lonlatstr
-swe_cs2timestr = cs2timestr
-swe_d2l = d2l
-swe_deg_midp = deg_midp
-swe_rad_midp = rad_midp
-swe_get_planet_name = get_planet_name
-
-
-def swe_version() -> str:
-    """Return the library version string (pyswisseph-compatible)."""
-    return __version__
 
 
 # Helper for Arabic parts
@@ -779,25 +630,19 @@ from .arabic_parts import calc_all_arabic_parts
 # .env file loader (public API for manual reloading)
 from ._dotenv import load_dotenv
 
-__version__ = "1.6.0"
+# Extended astrology helpers submodule
+from . import contrib
+
+__version__ = "2.0.0"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"
 
-# P3: Bare-name aliases — match pyswisseph where bare names ARE the swe_ functions.
-# The old "Pythonic" versions (separate lat/lon/alt params) are kept as _*_pythonic
-# for internal use but NOT exported as the public bare names.
-sol_eclipse_when_glob = swe_sol_eclipse_when_glob
-sol_eclipse_when_loc = swe_sol_eclipse_when_loc
-sol_eclipse_where = swe_sol_eclipse_where
-sol_eclipse_how = swe_sol_eclipse_how
-lun_eclipse_when = swe_lun_eclipse_when
-lun_eclipse_when_loc = swe_lun_eclipse_when_loc
-lun_eclipse_how = swe_lun_eclipse_how
-lun_occult_when_loc = swe_lun_occult_when_loc
-heliacal_ut = swe_heliacal_ut
-heliacal_pheno_ut = swe_heliacal_pheno_ut
-gauquelin_sector = swe_gauquelin_sector
+# Note: the original Pythonic variants of sol_eclipse_*, lun_eclipse_*,
+# lun_occult_when_loc, heliacal_ut, heliacal_pheno_ut, and gauquelin_sector
+# are imported above as _*_pythonic from their source modules. They are
+# kept as private helpers, NOT re-exported as public bare names. The
+# public bare names are the pyswisseph-compatible wrappers.
 
 __all__ = [
     # .env file loader
@@ -852,36 +697,21 @@ __all__ = [
     # Thread-safe Context API
     "EphemerisContext",
     # Time functions (both swe_ and non-prefixed aliases)
-    "swe_julday",
     "julday",
-    "swe_revjul",
     "revjul",
-    "swe_deltat",
     "deltat",
-    "swe_deltat_ex",
     "deltat_ex",
     "date_conversion",
-    "swe_date_conversion",
     "day_of_week",
-    "swe_day_of_week",
     "utc_to_jd",
-    "swe_utc_to_jd",
     "jdet_to_utc",
-    "swe_jdet_to_utc",
     "jdut1_to_utc",
-    "swe_jdut1_to_utc",
     "utc_time_zone",
-    "swe_utc_time_zone",
     "time_equ",
-    "swe_time_equ",
     "lat_to_lmt",
-    "swe_lat_to_lmt",
     "lmt_to_lat",
-    "swe_lmt_to_lat",
     "sidtime",
-    "swe_sidtime",
     "sidtime0",
-    "swe_sidtime0",
     # TAI (International Atomic Time) functions
     "TT_TAI_OFFSET_SECONDS",
     "TT_TAI_OFFSET_DAYS",
@@ -893,27 +723,17 @@ __all__ = [
     "tai_to_utc_jd",
     "utc_jd_to_tai",
     # Planet calculation
-    "swe_calc_ut",
     "calc_ut",
-    "swe_calc",
     "calc",
-    "swe_calc_pctr",
     "calc_pctr",
-    "swe_nod_aps",
     "nod_aps",
-    "swe_nod_aps_ut",
     "nod_aps_ut",
     "HeliocentricNodApsWarning",
-    "swe_get_orbital_elements",
     "get_orbital_elements",
-    "swe_get_orbital_elements_ut",
     "get_orbital_elements_ut",
-    "swe_orbit_max_min_true_distance",
     "orbit_max_min_true_distance",
     # Planetary phenomena
-    "swe_pheno",
     "pheno",
-    "swe_pheno_ut",
     "pheno_ut",
     # Elongation helper functions
     "get_elongation_from_sun",
@@ -922,127 +742,74 @@ __all__ = [
     "is_evening_star",
     "get_elongation_type",
     # Houses
-    "swe_houses",
     "houses",
-    "swe_houses_armc",
     "houses_armc",
-    "swe_houses_armc_ex2",
     "houses_armc_ex2",
-    "swe_houses_ex",
     "houses_ex",
-    "swe_houses_ex2",
     "houses_ex2",
-    "swe_house_name",
     "house_name",
-    "swe_house_pos",
     "house_pos",
     "gauquelin_sector",
-    "swe_gauquelin_sector",
     # Ayanamsa (sidereal)
-    "swe_set_sid_mode",
     "set_sid_mode",
-    "swe_get_ayanamsa_ut",
     "get_ayanamsa_ut",
-    "swe_get_ayanamsa",
     "get_ayanamsa",
-    "swe_get_ayanamsa_ex",
     "get_ayanamsa_ex",
-    "swe_get_ayanamsa_ex_ut",
     "get_ayanamsa_ex_ut",
-    "swe_get_ayanamsa_name",
     "get_ayanamsa_name",
     # Observer location
-    "swe_set_topo",
     "set_topo",
-    "swe_set_ephe_path",
     "set_ephe_path",
-    "swe_set_ephemeris_file",
     "set_ephemeris_file",
-    "swe_set_jpl_file",
     "set_jpl_file",
     # Tidal acceleration
-    "swe_set_tid_acc",
     "set_tid_acc",
-    "swe_get_tid_acc",
     "get_tid_acc",
     # User-defined Delta T
-    "swe_set_delta_t_userdef",
     "set_delta_t_userdef",
-    "swe_get_delta_t_userdef",
     "get_delta_t_userdef",
     # Lapse rate for refraction
-    "swe_set_lapse_rate",
     "set_lapse_rate",
-    "swe_get_lapse_rate",
     "get_lapse_rate",
     # Library path
-    "swe_get_library_path",
     "get_library_path",
     # Current file data
-    "swe_get_current_file_data",
     "get_current_file_data",
     # Close and cleanup
-    "swe_close",
     "close",
     # Crossings
-    "swe_solcross_ut",
     "solcross_ut",
-    "swe_solcross",
     "solcross",
-    "swe_mooncross_ut",
     "mooncross_ut",
-    "swe_mooncross",
     "mooncross",
-    "swe_mooncross_node_ut",
     "mooncross_node_ut",
-    "swe_mooncross_node",
     "mooncross_node",
-    "swe_cross_ut",
-    "swe_helio_cross_ut",
+    "cross_ut",
     "helio_cross_ut",
-    "swe_helio_cross",
     "helio_cross",
-    "swe_find_station_ut",
     "find_station_ut",
-    "swe_next_retrograde_ut",
     "next_retrograde_ut",
     # Eclipses
     "sol_eclipse_max_time",
-    "swe_sol_eclipse_max_time",
     "sol_eclipse_when_glob",
-    "swe_sol_eclipse_when_glob",
     "sol_eclipse_when_loc",
-    "swe_sol_eclipse_when_loc",
     "sol_eclipse_where",
-    "swe_sol_eclipse_where",
     "sol_eclipse_how",
-    "swe_sol_eclipse_how",
     "sol_eclipse_how_details",
-    "swe_sol_eclipse_how_details",
     # Eclipse magnitude at location
     "sol_eclipse_magnitude_at_loc",
-    "swe_sol_eclipse_magnitude_at_loc",
     # Eclipse obscuration at location
     "sol_eclipse_obscuration_at_loc",
-    "swe_sol_eclipse_obscuration_at_loc",
     "lun_eclipse_when",
-    "swe_lun_eclipse_when",
     "lun_eclipse_when_loc",
-    "swe_lun_eclipse_when_loc",
     "lun_eclipse_how",
-    "swe_lun_eclipse_how",
     # Lunar eclipse umbral magnitude
     "lun_eclipse_umbral_magnitude",
-    "swe_lun_eclipse_umbral_magnitude",
     # Lunar eclipse penumbral magnitude
     "lun_eclipse_penumbral_magnitude",
-    "swe_lun_eclipse_penumbral_magnitude",
     "lun_occult_when_glob",
-    "swe_lun_occult_when_glob",
     "lun_occult_when_loc",
-    "swe_lun_occult_when_loc",
     "lun_occult_where",
-    "swe_lun_occult_where",
     # Besselian elements
     "calc_besselian_x",
     "calc_besselian_y",
@@ -1076,10 +843,8 @@ __all__ = [
     "calc_lunar_eclipse_umbral_duration",
     # Eclipse path width calculation
     "calc_eclipse_path_width",
-    "swe_calc_eclipse_path_width",
     # Eclipse central line coordinates
     "calc_eclipse_central_line",
-    "swe_calc_eclipse_central_line",
     # Saros series calculation
     "get_saros_number",
     "SAROS_CYCLE_DAYS",
@@ -1088,16 +853,11 @@ __all__ = [
     "INEX_CYCLE_DAYS",
     # Rise/Set/Transit
     "rise_trans",
-    "swe_rise_trans",
     "rise_trans_true_hor",
-    "swe_rise_trans_true_hor",
     # Heliacal events
     "heliacal_ut",
-    "swe_heliacal_ut",
     "heliacal_pheno_ut",
-    "swe_heliacal_pheno_ut",
     "vis_limit_mag",
-    "swe_vis_limit_mag",
     "is_inner_planet",
     "is_fixed_star",
     "INNER_PLANETS",
@@ -1158,7 +918,7 @@ __all__ = [
     "rad_midp",
     "d2l",
     "split_deg",
-    "swe_calc_angles",
+    "calc_angles",
     "cotrans",
     "cotrans_sp",
     "azalt",
@@ -1166,36 +926,14 @@ __all__ = [
     "refrac",
     "refrac_extended",
     # swe_ prefixed utility aliases (pyswisseph compatibility)
-    "swe_cotrans",
-    "swe_cotrans_sp",
-    "swe_azalt",
-    "swe_azalt_rev",
-    "swe_refrac",
-    "swe_refrac_extended",
-    "swe_split_deg",
-    "swe_degnorm",
-    "swe_radnorm",
-    "swe_difdeg2n",
-    "swe_difdegn",
-    "swe_difrad2n",
-    "swe_difcs2n",
-    "swe_difcsn",
-    "swe_csnorm",
-    "swe_csroundsec",
-    "swe_cs2degstr",
-    "swe_cs2lonlatstr",
-    "swe_cs2timestr",
-    "swe_d2l",
-    "swe_deg_midp",
-    "swe_rad_midp",
-    "swe_get_planet_name",
-    "swe_version",
-    "SE_ECL2HOR",
-    "SE_EQU2HOR",
-    "SE_HOR2ECL",
-    "SE_HOR2EQU",
-    "SE_TRUE_TO_APP",
-    "SE_APP_TO_TRUE",
+    "get_planet_name",
+    "version",
+    "ECL2HOR",
+    "EQU2HOR",
+    "HOR2ECL",
+    "HOR2EQU",
+    "TRUE_TO_APP",
+    "APP_TO_TRUE",
     "SPLIT_DEG_ROUND_SEC",
     "SPLIT_DEG_ROUND_MIN",
     "SPLIT_DEG_ROUND_DEG",
@@ -1205,23 +943,15 @@ __all__ = [
     "SPLIT_DEG_KEEP_DEG",
     # Helpers
     "calc_all_arabic_parts",
-    "get_planet_name",
     # Fixed Stars
-    "swe_fixstar_ut",
     "fixstar_ut",
-    "swe_fixstar",
     "fixstar",
-    "swe_fixstar2",
     "fixstar2",
-    "swe_fixstar2_ut",
     "fixstar2_ut",
-    "swe_batch_fixstars_ut",
     "batch_fixstars_ut",
     "list_fixed_stars",
     "StarCatalogEntry",
-    "swe_fixstar_mag",
     "fixstar_mag",
-    "swe_fixstar2_mag",
     "fixstar2_mag",
     # Proper motion propagation
     "propagate_proper_motion",
@@ -1373,9 +1103,6 @@ __all__ = [
     "propagate_trajectory",
     "compare_with_keplerian",
     # Ephemeris selection flags (from constants.py)
-    "SEFLG_JPLEPH",
-    "SEFLG_SWIEPH",
-    "SEFLG_MOSEPH",
     "FLG_JPLEPH",
     "FLG_SWIEPH",
     "FLG_MOSEPH",
@@ -1384,7 +1111,6 @@ __all__ = [
     "ACRONYCHAL_SETTING",
     "ADMETOS",
     "APOLLON",
-    "APP_TO_TRUE",
     "ARMC",
     "ASC",
     "ASTNAMFILE",
@@ -1415,7 +1141,6 @@ __all__ = [
     "DE_NUMBER",
     "DELTAT_AUTOMATIC",
     "EARTH",
-    "ECL2HOR",
     "ECL_1ST_VISIBLE",
     "ECL_2ND_VISIBLE",
     "ECL_3RD_VISIBLE",
@@ -1443,7 +1168,6 @@ __all__ = [
     "ECL_TOTEND_VISIBLE",
     "ECL_VISIBLE",
     "EPHE_PATH",
-    "EQU2HOR",
     "EQUASC",
     "EVENING_FIRST",
     "EVENING_LAST",
@@ -1502,8 +1226,6 @@ __all__ = [
     "HELFLAG_VISLIM_PHOTOPIC",
     "HELIACAL_RISING",
     "HELIACAL_SETTING",
-    "HOR2ECL",
-    "HOR2EQU",
     "INTP_APOG",
     "INTP_PERG",
     "ISIS",
@@ -1597,7 +1319,7 @@ __all__ = [
     "PROSERPINA",
     "SATURN",
     "SCOTOPIC_FLAG",
-    "SE_FNAME_DE431",
+    "FNAME_DE431",
     "SIDBITS",
     "SIDBIT_ECL_DATE",
     "SIDBIT_ECL_T0",
@@ -1676,7 +1398,6 @@ __all__ = [
     "TIDAL_SWIEPH",
     "TJD_INVALID",
     "TRUE_NODE",
-    "TRUE_TO_APP",
     "URANUS",
     "VARUNA",
     "VENUS",
@@ -1687,5 +1408,4 @@ __all__ = [
     "WALDEMATH",
     "WHITE_MOON",
     "ZEUS",
-    "version",
 ]

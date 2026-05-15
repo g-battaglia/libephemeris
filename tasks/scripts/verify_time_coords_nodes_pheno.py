@@ -111,7 +111,7 @@ def test_julday_revjul():
     for _ in range(n):
         y, m, d, h = random_date()
         try:
-            jd_lib = lib.swe_julday(y, m, d, h)
+            jd_lib = lib.julday(y, m, d, h)
             jd_ref = swe_ref.julday(y, m, d, h)
             # Both use Meeus formula; allow FP rounding (1e-9 ~ 0.1ms)
             check(
@@ -121,7 +121,7 @@ def test_julday_revjul():
             )
 
             # revjul
-            yr_l, mr_l, dr_l, hr_l = lib.swe_revjul(jd_lib)
+            yr_l, mr_l, dr_l, hr_l = lib.revjul(jd_lib)
             yr_r, mr_r, dr_r, hr_r = swe_ref.revjul(jd_lib)
             check(
                 yr_l == yr_r and mr_l == mr_r and dr_l == dr_r,
@@ -165,7 +165,7 @@ def test_deltat():
     prev_jd = None
     for jd in jds:
         try:
-            dt_lib = lib.swe_deltat(jd)
+            dt_lib = lib.deltat(jd)
             dt_ref = swe_ref.deltat(jd)
             check(
                 close(dt_lib, dt_ref, 1e-4),
@@ -333,7 +333,7 @@ def test_day_of_week():
     ]
     for y, m, d, expected_dow in known:
         try:
-            jd = lib.swe_julday(y, m, d, 12.0)
+            jd = lib.julday(y, m, d, 12.0)
             dow_lib = lib.day_of_week(jd)
             dow_ref = swe_ref.day_of_week(jd)
             check(
@@ -449,13 +449,13 @@ def test_lunar_nodes_apsides():
     jd_start = 2415020.5  # ~1900
     jd_end = 2488069.5  # ~2100
     n = 100
-    flags_lib = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
+    flags_lib = lib.FLG_SWIEPH | lib.FLG_SPEED
     flags_ref = swe_ref.FLG_SWIEPH | swe_ref.FLG_SPEED
     jds = [jd_start + random.random() * (jd_end - jd_start) for _ in range(n)]
     for jd in jds:
         # --- Mean Node ---
         try:
-            mn_lib, _ = lib.swe_calc_ut(jd, lib.SE_MEAN_NODE, flags_lib)
+            mn_lib, _ = lib.calc_ut(jd, lib.MEAN_NODE, flags_lib)
             mn_ref = swe_ref.calc_ut(jd, swe_ref.MEAN_NODE, flags_ref)
             mn_ref_lon = mn_ref[0][0]
             diff_mn = angle_diff(mn_lib[0], mn_ref_lon)
@@ -475,7 +475,7 @@ def test_lunar_nodes_apsides():
 
         # --- True Node ---
         try:
-            tn_lib, _ = lib.swe_calc_ut(jd, lib.SE_TRUE_NODE, flags_lib)
+            tn_lib, _ = lib.calc_ut(jd, lib.TRUE_NODE, flags_lib)
             tn_ref = swe_ref.calc_ut(jd, swe_ref.TRUE_NODE, flags_ref)
             tn_ref_lon = tn_ref[0][0]
             diff_tn = angle_diff(tn_lib[0], tn_ref_lon)
@@ -491,7 +491,7 @@ def test_lunar_nodes_apsides():
 
         # --- Mean Apogee (Black Moon Lilith) ---
         try:
-            ma_lib, _ = lib.swe_calc_ut(jd, lib.SE_MEAN_APOG, flags_lib)
+            ma_lib, _ = lib.calc_ut(jd, lib.MEAN_APOG, flags_lib)
             ma_ref = swe_ref.calc_ut(jd, swe_ref.MEAN_APOG, flags_ref)
             ma_ref_lon = ma_ref[0][0]
             diff_ma = angle_diff(ma_lib[0], ma_ref_lon)
@@ -511,7 +511,7 @@ def test_lunar_nodes_apsides():
 
         # --- Osculating Apogee ---
         try:
-            oa_lib, _ = lib.swe_calc_ut(jd, lib.SE_OSCU_APOG, flags_lib)
+            oa_lib, _ = lib.calc_ut(jd, lib.OSCU_APOG, flags_lib)
             oa_ref = swe_ref.calc_ut(jd, swe_ref.OSCU_APOG, flags_ref)
             oa_ref_lon = oa_ref[0][0]
             diff_oa = angle_diff(oa_lib[0], oa_ref_lon)
@@ -527,8 +527,8 @@ def test_lunar_nodes_apsides():
 
         # --- IntpApog + IntpPerig: should be roughly opposite (within 30 deg) ---
         try:
-            ia_lib, _ = lib.swe_calc_ut(jd, lib.SE_INTP_APOG, flags_lib)
-            ip_lib, _ = lib.swe_calc_ut(jd, lib.SE_INTP_PERG, flags_lib)
+            ia_lib, _ = lib.calc_ut(jd, lib.INTP_APOG, flags_lib)
+            ip_lib, _ = lib.calc_ut(jd, lib.INTP_PERG, flags_lib)
             sep = angle_diff(ia_lib[0], ip_lib[0])
             # Interpolated apse positions can deviate from exact opposition
             check(
@@ -548,11 +548,11 @@ def test_nod_aps_ut():
     global errors
     print("\n=== 12.5  nod_aps_ut (5 bodies x 5 dates) ===")
     bodies_lib = [
-        lib.SE_MARS,
-        lib.SE_JUPITER,
-        lib.SE_SATURN,
-        lib.SE_URANUS,
-        lib.SE_NEPTUNE,
+        lib.MARS,
+        lib.JUPITER,
+        lib.SATURN,
+        lib.URANUS,
+        lib.NEPTUNE,
     ]
     bodies_ref = [
         swe_ref.MARS,
@@ -563,14 +563,14 @@ def test_nod_aps_ut():
     ]
     body_names = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune"]
     jds = [2451545.0, 2455000.0, 2458000.0, 2460000.0, 2462000.0]
-    flags_lib = lib.SEFLG_SWIEPH | lib.SEFLG_SPEED
+    flags_lib = lib.FLG_SWIEPH | lib.FLG_SPEED
     flags_ref = swe_ref.FLG_SWIEPH | swe_ref.FLG_SPEED
-    method = 1  # SE_NODBIT_MEAN
+    method = 1  # NODBIT_MEAN
 
     for i, (b_lib, b_ref, bname) in enumerate(zip(bodies_lib, bodies_ref, body_names)):
         for jd in jds:
             try:
-                nasc_l, ndsc_l, peri_l, aphe_l = lib.swe_nod_aps_ut(
+                nasc_l, ndsc_l, peri_l, aphe_l = lib.nod_aps_ut(
                     jd, b_lib, method, flags_lib
                 )
                 nasc_r, ndsc_r, peri_r, aphe_r = swe_ref.nod_aps_ut(
@@ -618,16 +618,16 @@ def test_pheno_ut():
     # Use only planets that pyswisseph can calculate without extra ephemeris files
     # (Chiron requires seas_18.se1 which may not be installed)
     bodies_lib = [
-        lib.SE_MERCURY,
-        lib.SE_VENUS,
-        lib.SE_MARS,
-        lib.SE_JUPITER,
-        lib.SE_SATURN,
-        lib.SE_URANUS,
-        lib.SE_NEPTUNE,
-        lib.SE_PLUTO,
-        lib.SE_SUN,
-        lib.SE_MOON,
+        lib.MERCURY,
+        lib.VENUS,
+        lib.MARS,
+        lib.JUPITER,
+        lib.SATURN,
+        lib.URANUS,
+        lib.NEPTUNE,
+        lib.PLUTO,
+        lib.SUN,
+        lib.MOON,
     ]
     bodies_ref = [
         swe_ref.MERCURY,
@@ -656,13 +656,13 @@ def test_pheno_ut():
     jd_start = 2451545.0  # J2000
     jd_end = 2460000.0  # ~2023
     jds = [jd_start + (jd_end - jd_start) * i / 9.0 for i in range(10)]
-    flags_lib = lib.SEFLG_SWIEPH
+    flags_lib = lib.FLG_SWIEPH
     flags_ref = swe_ref.FLG_SWIEPH
 
     for i, (b_lib, b_ref, bname) in enumerate(zip(bodies_lib, bodies_ref, body_names)):
         for jd in jds:
             try:
-                attr_lib = lib.swe_pheno_ut(jd, b_lib, flags_lib)
+                attr_lib = lib.pheno_ut(jd, b_lib, flags_lib)
                 attr_ref = swe_ref.pheno_ut(jd, b_ref, flags_ref)
 
                 # [0] phase angle

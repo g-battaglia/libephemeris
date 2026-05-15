@@ -22,21 +22,21 @@ if _PROJECT_ROOT not in sys.path:
 def test_leb_file(tmp_path_factory):
     """Generate a small .leb file for testing (5-year range, subset of bodies)."""
     from scripts.generate_leb import assemble_leb
-    from libephemeris.time_utils import swe_julday
+    from libephemeris.time_utils import julday
 
     path = tmp_path_factory.mktemp("leb") / "test.leb"
 
-    jd_start = swe_julday(2023, 1, 1, 0.0)
-    jd_end = swe_julday(2028, 1, 1, 0.0)
+    jd_start = julday(2023, 1, 1, 0.0)
+    jd_end = julday(2028, 1, 1, 0.0)
 
     # Use a small subset of bodies for fast generation
     bodies = [
-        0,  # SE_SUN
-        1,  # SE_MOON
-        3,  # SE_VENUS  (needed by heliacal no-kernel tests)
-        4,  # SE_MARS
-        14,  # SE_EARTH
-        10,  # SE_MEAN_NODE
+        0,  # SUN
+        1,  # MOON
+        3,  # VENUS  (needed by heliacal no-kernel tests)
+        4,  # MARS
+        14,  # EARTH
+        10,  # MEAN_NODE
     ]
 
     assemble_leb(
@@ -65,12 +65,12 @@ def leb_reader(test_leb_file):
 def test_leb_file_minimal(tmp_path_factory):
     """Generate a minimal .leb file with just Sun and Earth (1-year range)."""
     from scripts.generate_leb import assemble_leb
-    from libephemeris.time_utils import swe_julday
+    from libephemeris.time_utils import julday
 
     path = tmp_path_factory.mktemp("leb_min") / "minimal.leb"
 
-    jd_start = swe_julday(2024, 1, 1, 0.0)
-    jd_end = swe_julday(2025, 1, 1, 0.0)
+    jd_start = julday(2024, 1, 1, 0.0)
+    jd_end = julday(2025, 1, 1, 0.0)
 
     assemble_leb(
         output=str(path),

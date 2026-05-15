@@ -13,9 +13,9 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -39,21 +39,21 @@ class TestHousesArmcBasic:
     @pytest.mark.unit
     def test_houses_armc_returns_cusps_and_ascmc(self):
         """houses_armc returns (cusps, ascmc) tuple."""
-        cusps, ascmc = swe.swe_houses_armc(292.957, 41.9, 23.44, ord("P"))
+        cusps, ascmc = swe.houses_armc(292.957, 41.9, 23.44, ord("P"))
         assert len(cusps) >= 12
         assert len(ascmc) >= 8
 
     @pytest.mark.unit
     def test_houses_armc_cusps_in_range(self):
         """All cusps should be 0-360°."""
-        cusps, ascmc = swe.swe_houses_armc(292.957, 41.9, 23.44, ord("P"))
+        cusps, ascmc = swe.houses_armc(292.957, 41.9, 23.44, ord("P"))
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"Cusp {i + 1}: {c}°"
 
     @pytest.mark.unit
     def test_houses_armc_ascmc_in_range(self):
         """ASCMC values should be 0-360° (except ARMC which can be the input)."""
-        cusps, ascmc = swe.swe_houses_armc(292.957, 41.9, 23.44, ord("P"))
+        cusps, ascmc = swe.houses_armc(292.957, 41.9, 23.44, ord("P"))
         for i in [0, 1, 3, 4, 5, 6, 7]:  # Skip ARMC (index 2)
             assert 0 <= ascmc[i] < 360, f"ascmc[{i}]: {ascmc[i]}°"
 
@@ -65,7 +65,7 @@ class TestHousesArmcAllSystems:
     @pytest.mark.parametrize("hsys,name", HOUSE_SYSTEMS)
     def test_houses_armc_system(self, hsys: int, name: str):
         """houses_armc works for each house system."""
-        cusps, ascmc = swe.swe_houses_armc(180.0, 41.9, 23.44, hsys)
+        cusps, ascmc = swe.houses_armc(180.0, 41.9, 23.44, hsys)
         assert len(cusps) >= 12, f"{name}: insufficient cusps"
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"{name} cusp {i + 1}: {c}°"
@@ -81,12 +81,12 @@ class TestHousesArmcConsistency:
         lat, lon = 41.9, 12.5
 
         # Get houses normally
-        cusps_h, ascmc_h = swe.swe_houses(jd, lat, lon, ord("P"))
+        cusps_h, ascmc_h = swe.houses(jd, lat, lon, ord("P"))
         armc = ascmc_h[2]
         obliquity = ascmc_h[4] if len(ascmc_h) > 4 else 23.44
 
         # Get houses from ARMC
-        cusps_a, ascmc_a = swe.swe_houses_armc(armc, lat, obliquity, ord("P"))
+        cusps_a, ascmc_a = swe.houses_armc(armc, lat, obliquity, ord("P"))
 
         # Cusps should be close. Note: houses() uses its own obliquity
         # calculation while houses_armc uses the obliquity we pass,
@@ -110,7 +110,7 @@ class TestHousesArmcVariousArmc:
     )
     def test_various_armc_values(self, armc: float):
         """houses_armc valid at various ARMC values."""
-        cusps, ascmc = swe.swe_houses_armc(armc, 41.9, 23.44, ord("P"))
+        cusps, ascmc = swe.houses_armc(armc, 41.9, 23.44, ord("P"))
         assert len(cusps) >= 12
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"ARMC={armc} cusp {i + 1}: {c}°"
@@ -119,7 +119,7 @@ class TestHousesArmcVariousArmc:
     @pytest.mark.parametrize("lat", [0.0, 20.0, 40.0, 60.0, -20.0, -40.0, -60.0])
     def test_various_latitudes(self, lat: float):
         """houses_armc valid at various latitudes."""
-        cusps, ascmc = swe.swe_houses_armc(180.0, lat, 23.44, ord("R"))
+        cusps, ascmc = swe.houses_armc(180.0, lat, 23.44, ord("R"))
         assert len(cusps) >= 12
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"Lat={lat} cusp {i + 1}: {c}°"
@@ -132,8 +132,8 @@ class TestHousesExBasic:
     def test_houses_ex_tropical(self):
         """houses_ex without sidereal flag equals houses()."""
         jd = 2451545.0
-        cusps_h, ascmc_h = swe.swe_houses(jd, 41.9, 12.5, ord("P"))
-        cusps_e, ascmc_e = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), 0)
+        cusps_h, ascmc_h = swe.houses(jd, 41.9, 12.5, ord("P"))
+        cusps_e, ascmc_e = swe.houses_ex(jd, 41.9, 12.5, ord("P"), 0)
 
         for i in range(12):
             diff = abs(cusps_h[i] - cusps_e[i])
@@ -145,12 +145,12 @@ class TestHousesExBasic:
 
     @pytest.mark.unit
     def test_houses_ex_sidereal_differs(self):
-        """houses_ex with SEFLG_SIDEREAL should differ from tropical."""
+        """houses_ex with FLG_SIDEREAL should differ from tropical."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
 
-        cusps_trop, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), 0)
-        cusps_sid, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        cusps_trop, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), 0)
+        cusps_sid, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
 
         # At least some cusps should differ by ~ayanamsha
         diffs = []
@@ -167,8 +167,8 @@ class TestHousesExBasic:
     def test_houses_ex_sidereal_cusps_in_range(self):
         """Sidereal cusps should still be 0-360°."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, ascmc = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, ascmc = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"Sidereal cusp {i + 1}: {c}°"
 
@@ -180,15 +180,15 @@ class TestHousesExSiderealModes:
     @pytest.mark.parametrize(
         "mode,name",
         [
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
         ],
     )
     def test_different_sid_modes_different_cusps(self, mode: int, name: str):
         """Different sidereal modes should produce different cusps."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(mode)
-        cusps, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(mode)
+        cusps, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
         assert len(cusps) >= 12
         for c in cusps[:12]:
             assert 0 <= c < 360
@@ -201,8 +201,8 @@ class TestHousesExDateRange:
     @pytest.mark.parametrize("year", [1900, 1950, 2000, 2050, 2100])
     def test_houses_ex_across_years(self, year: int):
         """houses_ex valid across years."""
-        jd = swe.swe_julday(year, 6, 21, 12.0)
-        cusps, ascmc = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), 0)
+        jd = swe.julday(year, 6, 21, 12.0)
+        cusps, ascmc = swe.houses_ex(jd, 41.9, 12.5, ord("P"), 0)
         assert len(cusps) >= 12
         for c in cusps[:12]:
             assert 0 <= c < 360

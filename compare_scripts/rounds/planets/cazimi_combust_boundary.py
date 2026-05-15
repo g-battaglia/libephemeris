@@ -8,6 +8,7 @@ both libraries agree on exact elongation from Sun.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,10 +16,13 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SE_SUN = 0
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+SUN = 0
 
 BODIES = {2: "Mercury", 3: "Venus", 4: "Mars", 5: "Jupiter", 6: "Saturn"}
 
@@ -90,12 +94,12 @@ for label, jd in test_cases:
     for body, bname in BODIES.items():
         try:
             # Get Sun position from both
-            se_sun = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)[0]
-            le_sun = ephem.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)[0]
+            se_sun = swe.calc_ut(jd, SUN, FLG_SPEED)[0]
+            le_sun = ephem.calc_ut(jd, SUN, FLG_SPEED)[0]
 
             # Get planet position from both
-            se_pl = swe.calc_ut(jd, body, SEFLG_SPEED)[0]
-            le_pl = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)[0]
+            se_pl = swe.calc_ut(jd, body, FLG_SPEED)[0]
+            le_pl = ephem.calc_ut(jd, body, FLG_SPEED)[0]
 
             # Compare planet positions
             for i, (cname, tol, unit) in enumerate(

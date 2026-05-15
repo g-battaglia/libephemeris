@@ -9,11 +9,12 @@ Tests verify that:
 """
 
 import sys
+from pathlib import Path
 import time
 
 import pytest
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris/compare_scripts")
+sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts"))
 
 # Skip entire module if compare_benchmark doesn't exist
 pytest.importorskip("compare_benchmark", reason="compare_benchmark module not found")

@@ -24,14 +24,17 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 results = {"passed": [], "failed": [], "errors": []}
 
-SEFLG_SWIEPH = 2
+FLG_SWIEPH = 2
 
 
 def record(phase, label, ok, detail=""):
@@ -48,7 +51,7 @@ def safe_lun_when_loc(jd_start, lat, lon, alt=0.0):
     """Get lun_eclipse_when_loc from both SE and LE."""
     geopos_se = [lon, lat, alt]  # pyswisseph: [lon, lat, alt]
     try:
-        se_ret = swe.lun_eclipse_when_loc(jd_start, geopos_se, SEFLG_SWIEPH, False)
+        se_ret = swe.lun_eclipse_when_loc(jd_start, geopos_se, FLG_SWIEPH, False)
         se_flag = se_ret[0]
         se_tret = se_ret[1]
         se_attr = se_ret[2]
@@ -57,7 +60,7 @@ def safe_lun_when_loc(jd_start, lat, lon, alt=0.0):
 
     try:
         # libephemeris: lun_eclipse_when_loc(jd, geopos, flags)
-        le_ret = ephem.lun_eclipse_when_loc(jd_start, (lon, lat, alt), SEFLG_SWIEPH)
+        le_ret = ephem.lun_eclipse_when_loc(jd_start, (lon, lat, alt), FLG_SWIEPH)
         le_flag = le_ret[0]
         le_tret = le_ret[1]
         le_attr = le_ret[2]
@@ -72,15 +75,15 @@ def safe_lun_how(jd, lat, lon, alt=0.0):
     geopos = [lon, lat, alt]
     try:
         # pyswisseph: lun_eclipse_how(tjd, geopos, ifl)
-        se_ret = swe.lun_eclipse_how(jd, geopos, SEFLG_SWIEPH)
+        se_ret = swe.lun_eclipse_how(jd, geopos, FLG_SWIEPH)
         se_flag = se_ret[0]
         se_attr = se_ret[1]
     except Exception as e:
         return None, f"SE error: {e}"
 
     try:
-        # libephemeris: swe_lun_eclipse_how(tjd, ifl, geopos)
-        le_ret = ephem.swe_lun_eclipse_how(jd, SEFLG_SWIEPH, geopos)
+        # libephemeris: lun_eclipse_how(tjd, ifl, geopos)
+        le_ret = ephem.lun_eclipse_how(jd, FLG_SWIEPH, geopos)
         le_flag = le_ret[0]
         le_attr = le_ret[1]
     except Exception as e:
@@ -306,7 +309,7 @@ def phase2():
         try:
             # Get eclipse max time from SE
             geopos = [lon, lat, 0.0]
-            se_when = swe.lun_eclipse_when_loc(jd_before, geopos, SEFLG_SWIEPH, False)
+            se_when = swe.lun_eclipse_when_loc(jd_before, geopos, FLG_SWIEPH, False)
             jd_max = se_when[1][0]
 
             if jd_max == 0.0:

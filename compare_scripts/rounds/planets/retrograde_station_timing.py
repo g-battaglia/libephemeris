@@ -72,27 +72,27 @@ class R:
 
 
 PLANETS = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
 def get_speed(body, jd):
     """Get ecliptic longitude speed from both SE and LE."""
     try:
-        se_xx = swe.calc_ut(jd, body, SEFLG_SPEED)[0]
+        se_xx = swe.calc_ut(jd, body, FLG_SPEED)[0]
         se_speed = se_xx[3]  # lon speed in deg/day
     except Exception:
         se_speed = None
 
     try:
-        le_xx, _ = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)
+        le_xx, _ = ephem.calc_ut(jd, body, FLG_SPEED)
         le_speed = le_xx[3]
     except Exception:
         le_speed = None
@@ -202,7 +202,7 @@ def run_part2():
                     label = f"{body_name} {station_type} JD={se_station:.2f}"
 
                     # Tolerance: 2 hours for inner planets, 6 hours for outer
-                    tol_h = 2.0 if body_id <= SE_MARS else 6.0
+                    tol_h = 2.0 if body_id <= MARS else 6.0
                     if diff_hours > tol_h:
                         r.fail(f"{label}: diff={diff_hours:.2f}h")
                     else:
@@ -231,13 +231,13 @@ def _bisect_speed_zero(body_id, jd_a, jd_b, use_se=True, max_iter=50):
         jd_mid = (jd_a + jd_b) / 2
         if use_se:
             try:
-                xx = swe.calc_ut(jd_mid, body_id, SEFLG_SPEED)[0]
+                xx = swe.calc_ut(jd_mid, body_id, FLG_SPEED)[0]
                 spd = xx[3]
             except Exception:
                 return None
         else:
             try:
-                xx, _ = ephem.swe_calc_ut(jd_mid, body_id, SEFLG_SPEED)
+                xx, _ = ephem.calc_ut(jd_mid, body_id, FLG_SPEED)
                 spd = xx[3]
             except Exception:
                 return None
@@ -245,13 +245,13 @@ def _bisect_speed_zero(body_id, jd_a, jd_b, use_se=True, max_iter=50):
         # Get speed at jd_a for comparison
         if use_se:
             try:
-                xa = swe.calc_ut(jd_a, body_id, SEFLG_SPEED)[0]
+                xa = swe.calc_ut(jd_a, body_id, FLG_SPEED)[0]
                 spd_a = xa[3]
             except Exception:
                 return None
         else:
             try:
-                xa, _ = ephem.swe_calc_ut(jd_a, body_id, SEFLG_SPEED)
+                xa, _ = ephem.calc_ut(jd_a, body_id, FLG_SPEED)
                 spd_a = xa[3]
             except Exception:
                 return None
@@ -311,21 +311,21 @@ def run_part3():
         # Scan for speed sign change (positive → negative = Rx)
         step = 0.25  # 6-hour steps
         jd = jd_search_start
-        se_prev = swe.calc_ut(jd, SE_MERCURY, SEFLG_SPEED)[0][3]
-        le_prev_xx, _ = ephem.swe_calc_ut(jd, SE_MERCURY, SEFLG_SPEED)
+        se_prev = swe.calc_ut(jd, MERCURY, FLG_SPEED)[0][3]
+        le_prev_xx, _ = ephem.calc_ut(jd, MERCURY, FLG_SPEED)
         le_prev = le_prev_xx[3]
 
         while jd < jd_search_end:
             jd += step
-            se_spd = swe.calc_ut(jd, SE_MERCURY, SEFLG_SPEED)[0][3]
-            le_xx, _ = ephem.swe_calc_ut(jd, SE_MERCURY, SEFLG_SPEED)
+            se_spd = swe.calc_ut(jd, MERCURY, FLG_SPEED)[0][3]
+            le_xx, _ = ephem.calc_ut(jd, MERCURY, FLG_SPEED)
             le_spd = le_xx[3]
 
             if se_prev > 0 and se_spd <= 0 and se_station is None:
-                se_station = _bisect_speed_zero(SE_MERCURY, jd - step, jd, use_se=True)
+                se_station = _bisect_speed_zero(MERCURY, jd - step, jd, use_se=True)
 
             if le_prev > 0 and le_spd <= 0 and le_station is None:
-                le_station = _bisect_speed_zero(SE_MERCURY, jd - step, jd, use_se=False)
+                le_station = _bisect_speed_zero(MERCURY, jd - step, jd, use_se=False)
 
             if se_station is not None and le_station is not None:
                 break
@@ -412,11 +412,11 @@ def run_part5():
     r = R("P5: Outer Stations")
 
     outer_planets = [
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
     jd_start = swe.julday(2020, 1, 1, 0.0)
@@ -482,19 +482,19 @@ def run_part6():
 
     stations_found = 0
     jd = jd_start
-    se_spd_prev, _ = get_speed(SE_VENUS, jd)
+    se_spd_prev, _ = get_speed(VENUS, jd)
 
     while jd < jd_end:
         jd += step
-        se_spd, le_spd = get_speed(SE_VENUS, jd)
+        se_spd, le_spd = get_speed(VENUS, jd)
 
         if se_spd is None or se_spd_prev is None:
             se_spd_prev = se_spd
             continue
 
         if se_spd_prev * se_spd < 0:
-            se_station = _bisect_speed_zero(SE_VENUS, jd - step, jd, use_se=True)
-            le_station = _bisect_speed_zero(SE_VENUS, jd - step, jd, use_se=False)
+            se_station = _bisect_speed_zero(VENUS, jd - step, jd, use_se=True)
+            le_station = _bisect_speed_zero(VENUS, jd - step, jd, use_se=False)
 
             if se_station is not None and le_station is not None:
                 diff_hours = abs(se_station - le_station) * 24.0

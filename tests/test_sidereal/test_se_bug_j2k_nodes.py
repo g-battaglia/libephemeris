@@ -2,13 +2,13 @@
 Tests for the intentional Swiss Ephemeris divergence: SIDEREAL + J2000 on
 lunar nodes and apsides.
 
-pyswisseph silently ignores SEFLG_J2000 for TrueNode (SE_TRUE_NODE),
-OscuApog (SE_OSCU_APOG), IntpApog (SE_INTP_APOG), and IntpPerg (SE_INTP_PERG)
-when SEFLG_SIDEREAL is also set.  This is a behavioral bug: ayanamsha
+pyswisseph silently ignores FLG_J2000 for TrueNode (TRUE_NODE),
+OscuApog (OSCU_APOG), IntpApog (INTP_APOG), and IntpPerg (INTP_PERG)
+when FLG_SIDEREAL is also set.  This is a behavioral bug: ayanamsha
 (1D longitude zero-point shift) and J2000 ecliptic precession (3D ecliptic
 plane rotation) are geometrically distinct, composable operations.
 
-LibEphemeris intentionally corrects this: SEFLG_J2000 is honored for ALL
+LibEphemeris intentionally corrects this: FLG_J2000 is honored for ALL
 bodies uniformly, including these four.
 
 These tests verify:
@@ -28,16 +28,16 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_J2000,
-    SE_SIDM_LAHIRI,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_J2000,
+    SIDM_LAHIRI,
 )
 
 
@@ -51,29 +51,29 @@ def angular_diff(a: float, b: float) -> float:
 
 # Bodies affected by the SE bug (J2000 was silently ignored)
 AFFECTED_BODIES = [
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_INTP_APOG, "IntpApog"),
-    (SE_INTP_PERG, "IntpPerg"),
+    (TRUE_NODE, "TrueNode"),
+    (OSCU_APOG, "OscuApog"),
+    (INTP_APOG, "IntpApog"),
+    (INTP_PERG, "IntpPerg"),
 ]
 
 # All Pipeline B bodies (for uniformity checks)
 ALL_PIPELINE_B = [
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanApog"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_INTP_APOG, "IntpApog"),
-    (SE_INTP_PERG, "IntpPerg"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanApog"),
+    (OSCU_APOG, "OscuApog"),
+    (INTP_APOG, "IntpApog"),
+    (INTP_PERG, "IntpPerg"),
 ]
 
 # Mean/True pairs for physical sanity checks
 NODE_PAIRS = [
-    (SE_MEAN_NODE, SE_TRUE_NODE, "MeanNode", "TrueNode"),
+    (MEAN_NODE, TRUE_NODE, "MeanNode", "TrueNode"),
 ]
 
 APOGEE_PAIRS = [
-    (SE_MEAN_APOG, SE_OSCU_APOG, "MeanApog", "OscuApog"),
+    (MEAN_APOG, OSCU_APOG, "MeanApog", "OscuApog"),
 ]
 
 # Representative dates: JD values spanning the full range
@@ -86,7 +86,7 @@ TEST_DATES = [
 
 
 class TestJ2000HonoredForAllBodies:
-    """Verify SEFLG_J2000 is actually applied for all Pipeline B bodies.
+    """Verify FLG_J2000 is actually applied for all Pipeline B bodies.
 
     After the fix, SID+J2K must produce different results from SID alone
     for ALL bodies, including the four that pyswisseph incorrectly skips.
@@ -96,13 +96,13 @@ class TestJ2000HonoredForAllBodies:
     @pytest.mark.parametrize("jd,date_desc", TEST_DATES)
     def test_j2000_applied(self, body_id, body_name, jd, date_desc):
         """SID+J2K must differ from SID for every body."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
-        flags_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid = FLG_SIDEREAL | FLG_SPEED
+        flags_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_sid, _ = ephem.swe_calc_ut(jd, body_id, flags_sid)
-        pos_j2k, _ = ephem.swe_calc_ut(jd, body_id, flags_j2k)
+        pos_sid, _ = ephem.calc_ut(jd, body_id, flags_sid)
+        pos_j2k, _ = ephem.calc_ut(jd, body_id, flags_j2k)
 
         diff = angular_diff(pos_sid[0], pos_j2k[0])
 
@@ -129,12 +129,12 @@ class TestPhysicalSanity:
         self, mean_id, true_id, mean_name, true_name, jd, date_desc
     ):
         """TrueNode must stay within 2 degrees of MeanNode."""
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_mean, _ = ephem.swe_calc_ut(jd, mean_id, flags)
-        pos_true, _ = ephem.swe_calc_ut(jd, true_id, flags)
+        pos_mean, _ = ephem.calc_ut(jd, mean_id, flags)
+        pos_true, _ = ephem.calc_ut(jd, true_id, flags)
 
         diff = angular_diff(pos_mean[0], pos_true[0])
 
@@ -154,12 +154,12 @@ class TestPhysicalSanity:
         true node (up to ~30 degrees in extreme cases), so the tolerance
         is wider.
         """
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_mean, _ = ephem.swe_calc_ut(jd, mean_id, flags)
-        pos_true, _ = ephem.swe_calc_ut(jd, true_id, flags)
+        pos_mean, _ = ephem.calc_ut(jd, mean_id, flags)
+        pos_true, _ = ephem.calc_ut(jd, true_id, flags)
 
         diff = angular_diff(pos_mean[0], pos_true[0])
 
@@ -178,17 +178,17 @@ class TestLebVsSkyfieldConsistency:
         """LEB and Skyfield paths produce identical SID+J2K results."""
         from libephemeris.state import set_calc_mode
 
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
         # Skyfield path
         set_calc_mode("skyfield")
-        pos_sky, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_sky, _ = ephem.calc_ut(jd, body_id, flags)
 
         # LEB path (if available)
         try:
             set_calc_mode("leb")
-            pos_leb, _ = ephem.swe_calc_ut(jd, body_id, flags)
+            pos_leb, _ = ephem.calc_ut(jd, body_id, flags)
         except Exception:
             pytest.skip("LEB file not available")
         finally:
@@ -198,7 +198,7 @@ class TestLebVsSkyfieldConsistency:
 
         # IntpApog/IntpPerg: LEB data predates apse correction tables,
         # so large divergence expected until LEB regeneration.
-        tol = 3600.0 if body_id in (SE_INTP_APOG, SE_INTP_PERG) else 0.5
+        tol = 3600.0 if body_id in (INTP_APOG, INTP_PERG) else 0.5
         assert diff_arcsec < tol, (
             f"{body_name} SID+J2K at {date_desc}: "
             f'LEB vs Skyfield diff {diff_arcsec:.4f}" (should be < 0.5")'
@@ -229,12 +229,12 @@ class TestSeDivergenceDocumented:
         import swisseph as swe
 
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        ephem.set_sid_mode(SIDM_LAHIRI)
 
-        flags = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
         pos_swe, _ = swe.calc_ut(jd, body_id, flags)
-        pos_py, _ = ephem.swe_calc_ut(jd, body_id, flags)
+        pos_py, _ = ephem.calc_ut(jd, body_id, flags)
 
         divergence_deg = angular_diff(float(pos_swe[0]), pos_py[0])
         divergence_arcsec = divergence_deg * 3600.0
@@ -267,11 +267,11 @@ class TestSeDivergenceDocumented:
 
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        flags_sid = SEFLG_SIDEREAL | SEFLG_SPEED
-        flags_j2k = SEFLG_SIDEREAL | SEFLG_J2000 | SEFLG_SPEED
+        flags_sid = FLG_SIDEREAL | FLG_SPEED
+        flags_j2k = FLG_SIDEREAL | FLG_J2000 | FLG_SPEED
 
-        pos_sid, _ = swe.calc_ut(jd, SE_TRUE_NODE, flags_sid)
-        pos_j2k, _ = swe.calc_ut(jd, SE_TRUE_NODE, flags_j2k)
+        pos_sid, _ = swe.calc_ut(jd, TRUE_NODE, flags_sid)
+        pos_j2k, _ = swe.calc_ut(jd, TRUE_NODE, flags_j2k)
 
         diff = angular_diff(float(pos_sid[0]), float(pos_j2k[0]))
 

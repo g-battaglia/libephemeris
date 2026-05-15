@@ -26,7 +26,7 @@ from build_star_catalog import (
     StarCatalogData,
     IAU_STAR_NAMES,
     TRADITIONAL_STAR_NAMES,
-    SE_FIXSTAR_OFFSET,
+    FIXSTAR_OFFSET,
     get_star_name,
     generate_nomenclature,
     output_csv,
@@ -241,7 +241,7 @@ class TestOutputFormats:
 
         # Should contain imports
         assert "from libephemeris.fixed_stars import StarData, StarCatalogEntry" in py
-        assert "from libephemeris.constants import SE_FIXSTAR_OFFSET" in py
+        assert "from libephemeris.constants import FIXSTAR_OFFSET" in py
 
         # Should contain list definition
         assert "HIPPARCOS_STAR_CATALOG: list[StarCatalogEntry] = [" in py
@@ -286,8 +286,8 @@ class TestConstants:
     """Test script constants."""
 
     def test_fixstar_offset(self):
-        """SE_FIXSTAR_OFFSET should match libephemeris constant."""
-        assert SE_FIXSTAR_OFFSET == 1000000
+        """FIXSTAR_OFFSET should match libephemeris constant."""
+        assert FIXSTAR_OFFSET == 1000000
 
     def test_astroquery_check(self):
         """check_astroquery should return a boolean."""

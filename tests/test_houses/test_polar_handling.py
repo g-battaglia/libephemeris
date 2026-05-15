@@ -2,7 +2,7 @@
 Comprehensive tests for improved Placidus polar latitude handling.
 
 Tests the PolarCircleError exception, get_polar_latitude_threshold(),
-swe_houses_with_fallback(), and related functionality.
+houses_with_fallback(), and related functionality.
 
 Also includes tests for extreme latitude (>80°) edge cases.
 """
@@ -58,7 +58,7 @@ class TestPolarCircleError:
         jd = 2451545.0
 
         try:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
             pytest.fail("Should have raised PolarCircleError")
         except ephem.Error as e:
             # Should be caught as Error
@@ -103,7 +103,7 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         assert exc_info.value.latitude == 70.0
         assert "70" in str(exc_info.value)
@@ -114,7 +114,7 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         assert exc_info.value.threshold is not None
         assert exc_info.value.threshold > 66.0
@@ -126,7 +126,7 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         assert exc_info.value.house_system == "P"
         assert "Placidus" in str(exc_info.value)
@@ -137,18 +137,18 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         msg = str(exc_info.value).lower()
         assert "porphyry" in msg or "equal" in msg or "whole sign" in msg
 
     @pytest.mark.unit
     def test_error_mentions_fallback_function(self):
-        """Error message should mention swe_houses_with_fallback."""
+        """Error message should mention houses_with_fallback."""
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         assert "fallback" in str(exc_info.value).lower()
 
@@ -159,7 +159,7 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, lat, 0.0, ord("P"))
+            ephem.houses(jd, lat, 0.0, ord("P"))
 
         assert exc_info.value.latitude == lat
         # Should mention Northern
@@ -172,7 +172,7 @@ class TestPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, lat, 0.0, ord("P"))
+            ephem.houses(jd, lat, 0.0, ord("P"))
 
         assert exc_info.value.latitude == lat
         # Should mention Southern
@@ -180,14 +180,14 @@ class TestPolarCircleErrorDetails:
 
 
 class TestSweHousesWithFallback:
-    """Test the swe_houses_with_fallback() convenience function."""
+    """Test the houses_with_fallback() convenience function."""
 
     @pytest.mark.unit
     def test_returns_normal_result_for_non_polar(self):
         """Should return normal result without fallback for non-polar latitudes."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 45.0, 0.0, ord("P")
         )
 
@@ -201,7 +201,7 @@ class TestSweHousesWithFallback:
         """Should fall back to Porphyry for polar latitudes."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 70.0, 0.0, ord("P")
         )
 
@@ -217,7 +217,7 @@ class TestSweHousesWithFallback:
         """Warning message should include the threshold."""
         jd = 2451545.0
 
-        _, _, _, warning = ephem.swe_houses_with_fallback(jd, 70.0, 0.0, ord("P"))
+        _, _, _, warning = ephem.houses_with_fallback(jd, 70.0, 0.0, ord("P"))
 
         assert "threshold" in warning.lower()
 
@@ -226,7 +226,7 @@ class TestSweHousesWithFallback:
         """Should use custom fallback system when specified."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd,
             70.0,
             0.0,
@@ -244,7 +244,7 @@ class TestSweHousesWithFallback:
         lat = 70.0
 
         for hsys in [ord("P"), ord("K"), ord("G")]:  # Placidus, Koch, Gauquelin
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, lat, 0.0, hsys
             )
             assert used_fallback is True
@@ -258,7 +258,7 @@ class TestSweHousesWithFallback:
 
         # These systems should work at polar latitudes
         for hsys in [ord("O"), ord("E"), ord("W"), ord("M")]:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, lat, 0.0, hsys
             )
             assert used_fallback is False
@@ -272,11 +272,11 @@ class TestSweHousesWithFallback:
 
         # Get fallback result
         cusps_fallback, ascmc_fallback, used_fallback, _ = (
-            ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("P"))
+            ephem.houses_with_fallback(jd, lat, 0.0, ord("P"))
         )
 
         # Get direct Porphyry
-        cusps_porphyry, ascmc_porphyry = ephem.swe_houses(jd, lat, 0.0, ord("O"))
+        cusps_porphyry, ascmc_porphyry = ephem.houses(jd, lat, 0.0, ord("O"))
 
         # Should match
         assert used_fallback is True
@@ -289,13 +289,13 @@ class TestSweHousesWithFallback:
         jd = 2451545.0
 
         for lat in [80.0, 85.0, 89.0, -80.0, -85.0, -89.0]:
-            cusps, ascmc, _, _ = ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("P"))
+            cusps, ascmc, _, _ = ephem.houses_with_fallback(jd, lat, 0.0, ord("P"))
             for cusp in cusps:
                 assert 0 <= cusp < 360
 
 
 class TestSweHousesArmcWithFallback:
-    """Test the swe_houses_armc_with_fallback() convenience function."""
+    """Test the houses_armc_with_fallback() convenience function."""
 
     @pytest.mark.unit
     def test_returns_normal_result_for_non_polar(self):
@@ -303,7 +303,7 @@ class TestSweHousesArmcWithFallback:
         armc = 280.0
         eps = 23.44
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, 45.0, eps, ord("P")
         )
 
@@ -318,7 +318,7 @@ class TestSweHousesArmcWithFallback:
         armc = 280.0
         eps = 23.44
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, 70.0, eps, ord("P")
         )
 
@@ -332,7 +332,7 @@ class TestSweHousesArmcWithFallback:
         armc = 280.0
         eps = 23.44
 
-        _, _, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        _, _, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, 70.0, eps, ord("P"), fallback_hsys=ord("W")
         )
 
@@ -351,7 +351,7 @@ class TestPolarCircleEdgeCases:
         # Get the actual threshold for the current obliquity
         # At J2000, obliquity is ~23.44°, so threshold is ~66.56°
         # Test at 66.0° which should be safely below
-        cusps, ascmc = ephem.swe_houses(jd, 66.0, 0.0, ord("P"))
+        cusps, ascmc = ephem.houses(jd, 66.0, 0.0, ord("P"))
         assert len(cusps) == 12
 
     @pytest.mark.unit
@@ -361,7 +361,7 @@ class TestPolarCircleEdgeCases:
 
         # At 67° it should definitely fail
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses(jd, 67.0, 0.0, ord("P"))
+            ephem.houses(jd, 67.0, 0.0, ord("P"))
 
     @pytest.mark.unit
     def test_different_times_different_thresholds(self):
@@ -373,10 +373,10 @@ class TestPolarCircleEdgeCases:
 
         # Both should raise error at 70°
         with pytest.raises(PolarCircleError) as exc1:
-            ephem.swe_houses(jd_2000, 70.0, 0.0, ord("P"))
+            ephem.houses(jd_2000, 70.0, 0.0, ord("P"))
 
         with pytest.raises(PolarCircleError) as exc2:
-            ephem.swe_houses(jd_1900, 70.0, 0.0, ord("P"))
+            ephem.houses(jd_1900, 70.0, 0.0, ord("P"))
 
         # Thresholds should be slightly different due to different obliquities
         # The difference is very small (~0.01° per century)
@@ -394,7 +394,7 @@ class TestBackwardCompatibility:
 
         # Old code catching Error should still work
         try:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
             pytest.fail("Should have raised an error")
         except ephem.Error:
             pass  # Old code would catch this
@@ -405,19 +405,19 @@ class TestBackwardCompatibility:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("P"))
+            ephem.houses(jd, 70.0, 0.0, ord("P"))
 
         # Tests may check for this string
         assert "polar" in str(exc_info.value).lower()
 
     @pytest.mark.unit
     def test_houses_armc_also_raises_polar_error(self):
-        """swe_houses_armc should also raise PolarCircleError."""
+        """houses_armc should also raise PolarCircleError."""
         armc = 280.0
         eps = 23.44
 
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses_armc(armc, 70.0, eps, ord("P"))
+            ephem.houses_armc(armc, 70.0, eps, ord("P"))
 
 
 class TestKochAndGauquelinPolar:
@@ -429,7 +429,7 @@ class TestKochAndGauquelinPolar:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         assert exc_info.value.house_system == "K"
         assert "Koch" in str(exc_info.value)
@@ -440,17 +440,17 @@ class TestKochAndGauquelinPolar:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("G"))
+            ephem.houses(jd, 70.0, 0.0, ord("G"))
 
         assert exc_info.value.house_system == "G"
         assert "Gauquelin" in str(exc_info.value)
 
     @pytest.mark.unit
     def test_koch_fallback_works(self):
-        """swe_houses_with_fallback should work for Koch."""
+        """houses_with_fallback should work for Koch."""
         jd = 2451545.0
 
-        cusps, _, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, _, used_fallback, warning = ephem.houses_with_fallback(
             jd, 70.0, 0.0, ord("K")
         )
 
@@ -460,10 +460,10 @@ class TestKochAndGauquelinPolar:
 
     @pytest.mark.unit
     def test_gauquelin_fallback_works(self):
-        """swe_houses_with_fallback should work for Gauquelin."""
+        """houses_with_fallback should work for Gauquelin."""
         jd = 2451545.0
 
-        cusps, _, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, _, used_fallback, warning = ephem.houses_with_fallback(
             jd, 70.0, 0.0, ord("G")
         )
 
@@ -481,7 +481,7 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         assert exc_info.value.latitude == 70.0
         assert "70" in str(exc_info.value)
@@ -492,7 +492,7 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         assert exc_info.value.threshold is not None
         assert exc_info.value.threshold > 66.0
@@ -504,7 +504,7 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         assert exc_info.value.house_system == "K"
         assert "Koch" in str(exc_info.value)
@@ -515,18 +515,18 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         msg = str(exc_info.value).lower()
         assert "porphyry" in msg or "equal" in msg or "whole sign" in msg
 
     @pytest.mark.unit
     def test_koch_error_mentions_fallback_function(self):
-        """Koch error message should mention swe_houses_with_fallback."""
+        """Koch error message should mention houses_with_fallback."""
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         assert "fallback" in str(exc_info.value).lower()
 
@@ -537,7 +537,7 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+            ephem.houses(jd, lat, 0.0, ord("K"))
 
         assert exc_info.value.latitude == lat
         # Should mention Northern
@@ -550,7 +550,7 @@ class TestKochPolarCircleErrorDetails:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, lat, 0.0, ord("K"))
+            ephem.houses(jd, lat, 0.0, ord("K"))
 
         assert exc_info.value.latitude == lat
         # Should mention Southern
@@ -567,7 +567,7 @@ class TestKochPolarEdgeCases:
 
         # At J2000, obliquity is ~23.44deg, so threshold is ~66.56deg
         # Test at 66.0deg which should be safely below
-        cusps, ascmc = ephem.swe_houses(jd, 66.0, 0.0, ord("K"))
+        cusps, ascmc = ephem.houses(jd, 66.0, 0.0, ord("K"))
         assert len(cusps) == 12
 
     @pytest.mark.unit
@@ -577,7 +577,7 @@ class TestKochPolarEdgeCases:
 
         # At 67deg it should definitely fail
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses(jd, 67.0, 0.0, ord("K"))
+            ephem.houses(jd, 67.0, 0.0, ord("K"))
 
     @pytest.mark.unit
     def test_koch_matches_porphyry_when_fallback_used(self):
@@ -587,11 +587,11 @@ class TestKochPolarEdgeCases:
 
         # Get fallback result
         cusps_fallback, ascmc_fallback, used_fallback, _ = (
-            ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("K"))
+            ephem.houses_with_fallback(jd, lat, 0.0, ord("K"))
         )
 
         # Get direct Porphyry
-        cusps_porphyry, ascmc_porphyry = ephem.swe_houses(jd, lat, 0.0, ord("O"))
+        cusps_porphyry, ascmc_porphyry = ephem.houses(jd, lat, 0.0, ord("O"))
 
         # Should match
         assert used_fallback is True
@@ -604,7 +604,7 @@ class TestKochPolarEdgeCases:
         jd = 2451545.0
 
         for lat in [80.0, 85.0, 89.0, -80.0, -85.0, -89.0]:
-            cusps, ascmc, _, _ = ephem.swe_houses_with_fallback(jd, lat, 0.0, ord("K"))
+            cusps, ascmc, _, _ = ephem.houses_with_fallback(jd, lat, 0.0, ord("K"))
             for cusp in cusps:
                 assert 0 <= cusp < 360
 
@@ -613,7 +613,7 @@ class TestKochPolarEdgeCases:
         """Koch should use custom fallback system when specified."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd,
             70.0,
             0.0,
@@ -629,7 +629,7 @@ class TestKochPolarEdgeCases:
         """Koch warning message should include the threshold."""
         jd = 2451545.0
 
-        _, _, _, warning = ephem.swe_houses_with_fallback(jd, 70.0, 0.0, ord("K"))
+        _, _, _, warning = ephem.houses_with_fallback(jd, 70.0, 0.0, ord("K"))
 
         assert "threshold" in warning.lower()
 
@@ -644,7 +644,7 @@ class TestKochBackwardCompatibility:
 
         # Old code catching Error should still work
         try:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
             pytest.fail("Should have raised an error")
         except ephem.Error:
             pass  # Old code would catch this
@@ -655,27 +655,27 @@ class TestKochBackwardCompatibility:
         jd = 2451545.0
 
         with pytest.raises(PolarCircleError) as exc_info:
-            ephem.swe_houses(jd, 70.0, 0.0, ord("K"))
+            ephem.houses(jd, 70.0, 0.0, ord("K"))
 
         # Tests may check for this string
         assert "polar" in str(exc_info.value).lower()
 
     @pytest.mark.unit
     def test_koch_houses_armc_also_raises_polar_error(self):
-        """Koch swe_houses_armc should also raise PolarCircleError."""
+        """Koch houses_armc should also raise PolarCircleError."""
         armc = 280.0
         eps = 23.44
 
         with pytest.raises(PolarCircleError):
-            ephem.swe_houses_armc(armc, 70.0, eps, ord("K"))
+            ephem.houses_armc(armc, 70.0, eps, ord("K"))
 
     @pytest.mark.unit
     def test_koch_armc_fallback_works(self):
-        """swe_houses_armc_with_fallback should work for Koch."""
+        """houses_armc_with_fallback should work for Koch."""
         armc = 280.0
         eps = 23.44
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, 70.0, eps, ord("K")
         )
 
@@ -685,11 +685,11 @@ class TestKochBackwardCompatibility:
 
     @pytest.mark.unit
     def test_koch_armc_custom_fallback(self):
-        """Koch swe_houses_armc_with_fallback should use custom fallback when specified."""
+        """Koch houses_armc_with_fallback should use custom fallback when specified."""
         armc = 280.0
         eps = 23.44
 
-        _, _, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        _, _, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, 70.0, eps, ord("K"), fallback_hsys=ord("W")
         )
 
@@ -770,7 +770,7 @@ class TestExtremeLatitudeWarnings:
         """Should generate warning for potentially unstable systems at >80°."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 85.0, 0.0, hsys
         )
 
@@ -795,7 +795,7 @@ class TestExtremeLatitudeWarnings:
         """Stable systems should have no warning at extreme latitudes."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 85.0, 0.0, hsys
         )
 
@@ -808,7 +808,7 @@ class TestExtremeLatitudeWarnings:
         jd = 2451545.0
 
         for hsys in [ord("P"), ord("K"), ord("G")]:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, 85.0, 0.0, hsys
             )
 
@@ -825,7 +825,7 @@ class TestCuspValidation:
         """Cusps should be valid at normal latitudes."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 45.0, 0.0, ord("C"), validate_cusps=True
         )
 
@@ -840,7 +840,7 @@ class TestCuspValidation:
         jd = 2451545.0
 
         for lat in [80.0, 85.0, 89.0, -85.0]:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, lat, 0.0, ord("C"), validate_cusps=True
             )
 
@@ -856,7 +856,7 @@ class TestCuspValidation:
         jd = 2451545.0
 
         # Just verify it doesn't crash with validation disabled
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 85.0, 0.0, ord("C"), validate_cusps=False
         )
 
@@ -897,7 +897,7 @@ class TestAllHouseSystemsAtExtremeLatitudes:
         ]
 
         for hsys in all_systems:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, lat, 0.0, hsys
             )
 
@@ -918,7 +918,7 @@ class TestAllHouseSystemsAtExtremeLatitudes:
         lat = 89.5
 
         # Placidus should fall back
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, lat, 0.0, ord("P")
         )
 
@@ -939,7 +939,7 @@ class TestAllHouseSystemsAtExtremeLatitudes:
         ]
 
         for jd in julian_days:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd,
                 lat,
                 0.0,
@@ -952,7 +952,7 @@ class TestAllHouseSystemsAtExtremeLatitudes:
 
 
 class TestArmcWithFallbackAtExtremeLatitudes:
-    """Test swe_houses_armc_with_fallback at extreme latitudes."""
+    """Test houses_armc_with_fallback at extreme latitudes."""
 
     @pytest.mark.unit
     def test_armc_fallback_at_extreme_latitude(self):
@@ -962,7 +962,7 @@ class TestArmcWithFallbackAtExtremeLatitudes:
         lat = 85.0
 
         # Placidus should fail
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, lat, eps, ord("P")
         )
 
@@ -977,7 +977,7 @@ class TestArmcWithFallbackAtExtremeLatitudes:
         lat = 85.0
 
         # Campanus should warn but not fail
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, lat, eps, ord("C")
         )
 
@@ -992,7 +992,7 @@ class TestArmcWithFallbackAtExtremeLatitudes:
         eps = 23.44
         lat = 85.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_armc_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_armc_with_fallback(
             armc, lat, eps, ord("R"), validate_cusps=True
         )
 
@@ -1008,7 +1008,7 @@ class TestEdgeCasesNearPoles:
         """Test at 89.9° latitude."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, 89.9, 0.0, ord("P")
         )
 
@@ -1023,14 +1023,14 @@ class TestEdgeCasesNearPoles:
 
         # 90.1 degrees should be out of range
         with pytest.raises(ephem.CoordinateError):
-            ephem.swe_houses(jd, 90.1, 0.0, ord("O"))
+            ephem.houses(jd, 90.1, 0.0, ord("O"))
 
     @pytest.mark.unit
     def test_negative_extreme_latitude(self):
         """Should handle extreme southern latitudes."""
         jd = 2451545.0
 
-        cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
             jd, -89.0, 0.0, ord("O")
         )
 
@@ -1046,7 +1046,7 @@ class TestEdgeCasesNearPoles:
 
         # Use longitudes within valid range (-180 to 180)
         for lon in [0.0, 90.0, 180.0, -90.0, -45.0, -120.0]:
-            cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+            cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
                 jd, lat, lon, ord("O")
             )
 

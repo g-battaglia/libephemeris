@@ -8,6 +8,7 @@ Uses mooncross_ut to find exact Sun-Moon conjunction/opposition.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,11 +16,14 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
-SE_SUN = 0
-SE_MOON = 1
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
+SUN = 0
+MOON = 1
 
 # Sample lunation dates: approximate New Moons 2020-2025
 # We'll compute exact positions at these approximate times
@@ -121,10 +125,10 @@ print(f"Testing Moon+Sun at {len(test_dates)} lunation dates")
 print("=" * 90)
 
 for label, jd in test_dates:
-    for body, bname in [(SE_SUN, "Sun"), (SE_MOON, "Moon")]:
+    for body, bname in [(SUN, "Sun"), (MOON, "Moon")]:
         try:
-            se_r = swe.calc_ut(jd, body, SEFLG_SPEED)
-            le_r = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)
+            se_r = swe.calc_ut(jd, body, FLG_SPEED)
+            le_r = ephem.calc_ut(jd, body, FLG_SPEED)
             se_d = se_r[0]
             le_d = le_r[0]
 

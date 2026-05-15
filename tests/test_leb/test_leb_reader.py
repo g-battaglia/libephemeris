@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from numpy.polynomial.chebyshev import chebder, chebval
 
-from libephemeris.constants import SE_EARTH, SE_MARS, SE_MEAN_NODE, SE_MOON, SE_SUN
+from libephemeris.constants import EARTH, MARS, MEAN_NODE, MOON, SUN
 from libephemeris.leb_reader import (
     LEBReader,
     _clenshaw,
@@ -215,11 +215,11 @@ class TestLEBReaderInit:
     @pytest.mark.integration
     def test_has_expected_bodies(self, leb_reader):
         """Test .leb file contains the bodies from conftest."""
-        assert leb_reader.has_body(SE_SUN)
-        assert leb_reader.has_body(SE_MOON)
-        assert leb_reader.has_body(SE_MARS)
-        assert leb_reader.has_body(SE_EARTH)
-        assert leb_reader.has_body(SE_MEAN_NODE)
+        assert leb_reader.has_body(SUN)
+        assert leb_reader.has_body(MOON)
+        assert leb_reader.has_body(MARS)
+        assert leb_reader.has_body(EARTH)
+        assert leb_reader.has_body(MEAN_NODE)
 
     @pytest.mark.integration
     def test_does_not_have_unknown_body(self, leb_reader):
@@ -230,7 +230,7 @@ class TestLEBReaderInit:
     def test_context_manager(self, test_leb_file):
         """LEBReader works as a context manager."""
         with LEBReader(test_leb_file) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
 
 
 class TestEvalBody:
@@ -241,7 +241,7 @@ class TestEvalBody:
         """Sun position returns 3 position and 3 velocity components."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        pos, vel = leb_reader.eval_body(SE_SUN, jd_mid)
+        pos, vel = leb_reader.eval_body(SUN, jd_mid)
         assert len(pos) == 3
         assert len(vel) == 3
 
@@ -250,7 +250,7 @@ class TestEvalBody:
         """Sun ICRS barycentric position should have reasonable magnitude."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        pos, vel = leb_reader.eval_body(SE_SUN, jd_mid)
+        pos, vel = leb_reader.eval_body(SUN, jd_mid)
         # ICRS barycentric: Sun is near SSB, typically <0.01 AU from it
         import math
 
@@ -262,7 +262,7 @@ class TestEvalBody:
         """Mars ICRS barycentric position should have reasonable magnitude."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        pos, vel = leb_reader.eval_body(SE_MARS, jd_mid)
+        pos, vel = leb_reader.eval_body(MARS, jd_mid)
         # ICRS barycentric: Mars orbits at ~1.38-1.67 AU from Sun
         import math
 
@@ -274,7 +274,7 @@ class TestEvalBody:
         """Mean node longitude should be in [0, 360)."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        pos, vel = leb_reader.eval_body(SE_MEAN_NODE, jd_mid)
+        pos, vel = leb_reader.eval_body(MEAN_NODE, jd_mid)
         assert 0.0 <= pos[0] < 360.0, f"Mean node lon = {pos[0]}"
 
     @pytest.mark.integration
@@ -282,7 +282,7 @@ class TestEvalBody:
         """Mean node longitude should be retrograde (negative speed)."""
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
-        pos, vel = leb_reader.eval_body(SE_MEAN_NODE, jd_mid)
+        pos, vel = leb_reader.eval_body(MEAN_NODE, jd_mid)
         # Mean node regresses at ~-0.053 deg/day
         assert vel[0] < 0, f"Mean node velocity = {vel[0]} (expected negative)"
 
@@ -294,19 +294,19 @@ class TestEvalBody:
         parameters.  The tolerance is generous to accommodate Chebyshev
         fitting error.  Production accuracy is validated by the compare/ suite.
         """
-        from libephemeris.constants import SEFLG_SPEED
+        from libephemeris.constants import FLG_SPEED
         from libephemeris.fast_calc import fast_calc_ut
 
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
         # Full pipeline: LEB → fast_calc → geocentric ecliptic of date
-        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SE_SUN, SEFLG_SPEED)
+        fast_result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_SPEED)
 
-        # Skyfield reference via swe_calc_ut (geocentric ecliptic of date)
+        # Skyfield reference via calc_ut (geocentric ecliptic of date)
         import libephemeris as ephem
 
-        ref, _ = ephem.swe_calc_ut(jd_mid, SE_SUN, SEFLG_SPEED)
+        ref, _ = ephem.calc_ut(jd_mid, SUN, FLG_SPEED)
 
         # Longitude
         lon_err = abs(fast_result[0] - ref[0])
@@ -337,21 +337,21 @@ class TestEvalBody:
         """eval_body raises ValueError for JD outside range."""
         jd_start, jd_end = leb_reader.jd_range
         with pytest.raises(ValueError, match="outside range"):
-            leb_reader.eval_body(SE_SUN, jd_start - 100.0)
+            leb_reader.eval_body(SUN, jd_start - 100.0)
         with pytest.raises(ValueError, match="outside range"):
-            leb_reader.eval_body(SE_SUN, jd_end + 100.0)
+            leb_reader.eval_body(SUN, jd_end + 100.0)
 
     @pytest.mark.integration
     def test_eval_at_segment_boundaries(self, leb_reader):
         """Evaluation at segment boundaries should not crash."""
         jd_start, jd_end = leb_reader.jd_range
-        body = leb_reader._bodies[SE_SUN]
+        body = leb_reader._bodies[SUN]
         interval = body.interval_days
 
         # Evaluate at exact segment boundaries
         for i in range(min(5, body.segment_count)):
             jd = jd_start + i * interval
-            pos, vel = leb_reader.eval_body(SE_SUN, jd)
+            pos, vel = leb_reader.eval_body(SUN, jd)
             assert len(pos) == 3
 
     @pytest.mark.integration
@@ -361,9 +361,9 @@ class TestEvalBody:
         jd_mid = (jd_start + jd_end) / 2.0
         dt = 0.01  # 0.01 day
 
-        pos0, vel0 = leb_reader.eval_body(SE_SUN, jd_mid)
-        pos_prev, _ = leb_reader.eval_body(SE_SUN, jd_mid - dt)
-        pos_next, _ = leb_reader.eval_body(SE_SUN, jd_mid + dt)
+        pos0, vel0 = leb_reader.eval_body(SUN, jd_mid)
+        pos_prev, _ = leb_reader.eval_body(SUN, jd_mid - dt)
+        pos_next, _ = leb_reader.eval_body(SUN, jd_mid + dt)
 
         for c in range(3):
             fd_vel = (pos_next[c] - pos_prev[c]) / (2.0 * dt)
@@ -438,13 +438,13 @@ class TestDeltaT:
 
     @pytest.mark.integration
     def test_delta_t_matches_swe(self, leb_reader):
-        """Delta-T from .leb should match swe_deltat within 0.1 seconds."""
-        from libephemeris.time_utils import swe_deltat
+        """Delta-T from .leb should match deltat within 0.1 seconds."""
+        from libephemeris.time_utils import deltat
 
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
         dt_leb = leb_reader.delta_t(jd_mid)
-        dt_swe = swe_deltat(jd_mid)
+        dt_swe = deltat(jd_mid)
 
         err_sec = abs(dt_leb - dt_swe) * 86400.0
         assert err_sec < 0.1, f"Delta-T error = {err_sec:.4f} sec"

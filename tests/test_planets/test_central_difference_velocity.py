@@ -10,27 +10,28 @@ approximately 100x better numerical precision for the same timestep.
 """
 
 import math
+import os
 import pytest
 import swisseph as swe
 
-from libephemeris import swe_calc_ut, swe_calc, swe_calc_pctr
+from libephemeris import calc_ut, calc, calc_pctr
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    FLG_SPEED,
 )
 
 
@@ -44,16 +45,16 @@ class TestCentralDifferenceVelocity:
     @pytest.mark.parametrize(
         "planet_id,planet_name,vel_tolerance",
         [
-            (SE_SUN, "Sun", 0.001),
-            (SE_MOON, "Moon", 0.002),  # Numerical vs analytical derivative difference
-            (SE_MERCURY, "Mercury", 0.001),
-            (SE_VENUS, "Venus", 0.001),
-            (SE_MARS, "Mars", 0.001),
-            (SE_JUPITER, "Jupiter", 0.001),
-            (SE_SATURN, "Saturn", 0.001),
-            (SE_URANUS, "Uranus", 0.001),
-            (SE_NEPTUNE, "Neptune", 0.001),
-            (SE_PLUTO, "Pluto", 0.001),
+            (SUN, "Sun", 0.001),
+            (MOON, "Moon", 0.002),  # Numerical vs analytical derivative difference
+            (MERCURY, "Mercury", 0.001),
+            (VENUS, "Venus", 0.001),
+            (MARS, "Mars", 0.001),
+            (JUPITER, "Jupiter", 0.001),
+            (SATURN, "Saturn", 0.001),
+            (URANUS, "Uranus", 0.001),
+            (NEPTUNE, "Neptune", 0.001),
+            (PLUTO, "Pluto", 0.001),
         ],
     )
     def test_velocity_matches_pyswisseph(
@@ -66,11 +67,11 @@ class TestCentralDifferenceVelocity:
         match the analytical derivatives used by pyswisseph.
         """
         # Get libephemeris velocity
-        lib_pos, _ = swe_calc_ut(JD_J2000, planet_id, SEFLG_SPEED)
+        lib_pos, _ = calc_ut(JD_J2000, planet_id, FLG_SPEED)
         lib_dlon = lib_pos[3]
 
         # Get pyswisseph velocity
-        swe_pos, _ = swe.calc_ut(JD_J2000, planet_id, SEFLG_SPEED)
+        swe_pos, _ = swe.calc_ut(JD_J2000, planet_id, FLG_SPEED)
         swe_dlon = swe_pos[3]
 
         # Compare velocities
@@ -85,10 +86,10 @@ class TestCentralDifferenceVelocity:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_velocity_sign_matches_position_change(
@@ -103,12 +104,12 @@ class TestCentralDifferenceVelocity:
         jd = JD_J2000
 
         # Get position and velocity at jd
-        pos, _ = swe_calc_ut(jd, planet_id, SEFLG_SPEED)
+        pos, _ = calc_ut(jd, planet_id, FLG_SPEED)
         lon = pos[0]
         dlon = pos[3]
 
         # Get position 1 day later
-        pos_next, _ = swe_calc_ut(jd + 1.0, planet_id, SEFLG_SPEED)
+        pos_next, _ = calc_ut(jd + 1.0, planet_id, FLG_SPEED)
         lon_next = pos_next[0]
 
         # Calculate actual change (handling wrap-around)
@@ -128,10 +129,10 @@ class TestCentralDifferenceVelocity:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (MARS, "Mars"),
         ],
     )
     def test_velocity_magnitude_reasonable(self, planet_id: int, planet_name: str):
@@ -140,15 +141,15 @@ class TestCentralDifferenceVelocity:
 
         Each planet has characteristic velocity ranges based on its orbital period.
         """
-        pos, _ = swe_calc_ut(JD_J2000, planet_id, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, planet_id, FLG_SPEED)
         dlon = pos[3]
 
         # Expected approximate maximum velocities (deg/day)
         expected_max = {
-            SE_SUN: 1.1,  # ~1 deg/day
-            SE_MOON: 16.0,  # ~12-15 deg/day
-            SE_MERCURY: 2.5,  # Can be retrograde or fast direct
-            SE_MARS: 1.0,  # ~0.5 deg/day direct
+            SUN: 1.1,  # ~1 deg/day
+            MOON: 16.0,  # ~12-15 deg/day
+            MERCURY: 2.5,  # Can be retrograde or fast direct
+            MARS: 1.0,  # ~0.5 deg/day direct
         }
 
         max_vel = expected_max.get(planet_id, 2.0)
@@ -159,7 +160,7 @@ class TestCentralDifferenceVelocity:
 
     def test_all_velocity_components_returned(self):
         """Test that all 6 position/velocity components are returned."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_MARS, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, MARS, FLG_SPEED)
 
         assert len(pos) == 6, f"Expected 6 components, got {len(pos)}"
 
@@ -183,7 +184,7 @@ class TestCentralDifferenceVelocity:
         ]
 
         for jd in test_jds:
-            pos, _ = swe_calc_ut(jd, SE_JUPITER, SEFLG_SPEED)
+            pos, _ = calc_ut(jd, JUPITER, FLG_SPEED)
             dlon = pos[3]
 
             # Jupiter's velocity should be roughly 0.08-0.14 deg/day when direct
@@ -198,7 +199,7 @@ class TestCentralDifferenceForLunarPoints:
 
     def test_mean_node_velocity(self):
         """Test that mean node has negative (retrograde) velocity."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_MEAN_NODE, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, MEAN_NODE, FLG_SPEED)
         dlon = pos[3]
 
         # Mean node moves retrograde at ~-0.053 deg/day
@@ -207,7 +208,7 @@ class TestCentralDifferenceForLunarPoints:
 
     def test_true_node_velocity(self):
         """Test that true node velocity is calculated and reasonable."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_TRUE_NODE, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, TRUE_NODE, FLG_SPEED)
         dlon = pos[3]
 
         # True node can oscillate but should be reasonable
@@ -215,7 +216,7 @@ class TestCentralDifferenceForLunarPoints:
 
     def test_osculating_apogee_velocity(self):
         """Test that osculating apogee (True Lilith) velocity is calculated."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_OSCU_APOG, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, OSCU_APOG, FLG_SPEED)
         dlon = pos[3]
 
         # Osculating apogee moves ~0.1 deg/day on average
@@ -223,7 +224,7 @@ class TestCentralDifferenceForLunarPoints:
 
     def test_interpolated_apogee_velocity(self):
         """Test that interpolated apogee velocity is calculated."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_INTP_APOG, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, INTP_APOG, FLG_SPEED)
         dlon = pos[3]
 
         # Interpolated apogee should have reasonable velocity
@@ -231,7 +232,7 @@ class TestCentralDifferenceForLunarPoints:
 
     def test_interpolated_perigee_velocity(self):
         """Test that interpolated perigee velocity is calculated."""
-        pos, _ = swe_calc_ut(JD_J2000, SE_INTP_PERG, SEFLG_SPEED)
+        pos, _ = calc_ut(JD_J2000, INTP_PERG, FLG_SPEED)
         dlon = pos[3]
 
         # Interpolated perigee should have reasonable velocity
@@ -243,7 +244,7 @@ class TestCentralDifferencePlanetCentric:
 
     def test_pctr_velocity_calculated(self):
         """Test that planet-centric velocity is calculated."""
-        pos, _ = swe_calc_pctr(JD_J2000, SE_MOON, SE_MARS, SEFLG_SPEED)
+        pos, _ = calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED)
 
         # All 6 components should be returned
         assert len(pos) == 6
@@ -254,7 +255,7 @@ class TestCentralDifferencePlanetCentric:
 
     def test_pctr_velocity_reasonable(self):
         """Test that planet-centric velocity magnitude is reasonable."""
-        pos, _ = swe_calc_pctr(JD_J2000, SE_JUPITER, SE_MARS, SEFLG_SPEED)
+        pos, _ = calc_pctr(JD_J2000, JUPITER, MARS, FLG_SPEED)
         dlon = pos[3]
 
         # Jupiter seen from Mars - velocity depends on both orbital motions
@@ -275,8 +276,8 @@ class TestCentralDifferenceNumericalStability:
         jd = JD_J2000
         epsilon = 1e-6  # Very small time offset
 
-        pos1, _ = swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
-        pos2, _ = swe_calc_ut(jd + epsilon, SE_MARS, SEFLG_SPEED)
+        pos1, _ = calc_ut(jd, MARS, FLG_SPEED)
+        pos2, _ = calc_ut(jd + epsilon, MARS, FLG_SPEED)
 
         dlon1, dlon2 = pos1[3], pos2[3]
 
@@ -296,7 +297,7 @@ class TestCentralDifferenceNumericalStability:
         # Moon moves ~13 deg/day, so it crosses 0 frequently
         for offset in range(0, 365, 1):
             jd = JD_J2000 + offset
-            pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+            pos, _ = calc_ut(jd, MOON, FLG_SPEED)
             lon = pos[0]
             dlon = pos[3]
 
@@ -312,9 +313,9 @@ class TestCentralDifferenceNumericalStability:
         pytest.skip("Could not find Moon near 0/360 boundary in test range")
 
     def test_swe_calc_tt_velocity(self):
-        """Test that swe_calc (TT input) also calculates velocity correctly."""
-        pos_ut, _ = swe_calc_ut(JD_J2000, SE_VENUS, SEFLG_SPEED)
-        pos_tt, _ = swe_calc(JD_J2000, SE_VENUS, SEFLG_SPEED)
+        """Test that calc (TT input) also calculates velocity correctly."""
+        pos_ut, _ = calc_ut(JD_J2000, VENUS, FLG_SPEED)
+        pos_tt, _ = calc(JD_J2000, VENUS, FLG_SPEED)
 
         dlon_ut = pos_ut[3]
         dlon_tt = pos_tt[3]
@@ -336,16 +337,16 @@ class TestCentralDifferenceVsPyswisseph:
     @pytest.fixture(autouse=True)
     def setup_ephemeris(self):
         """Setup pyswisseph ephemeris path."""
-        swe.set_ephe_path("/Users/giacomo/dev/libephemeris/ephe")
+        swe.set_ephe_path(os.environ.get("REF_EPHE_PATH", "./ephe"))
         yield
 
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_velocity_precision_o_h_squared(self, planet_id: int, planet_name: str):
@@ -364,8 +365,8 @@ class TestCentralDifferenceVsPyswisseph:
         ]
 
         for jd in test_jds:
-            lib_pos, _ = swe_calc_ut(jd, planet_id, SEFLG_SPEED)
-            swe_pos, _ = swe.calc_ut(jd, planet_id, SEFLG_SPEED)
+            lib_pos, _ = calc_ut(jd, planet_id, FLG_SPEED)
+            swe_pos, _ = swe.calc_ut(jd, planet_id, FLG_SPEED)
 
             lib_dlon = lib_pos[3]
             swe_dlon = swe_pos[3]
@@ -393,7 +394,7 @@ class TestMoonVelocityPrecision:
     @pytest.fixture(autouse=True)
     def setup_ephemeris(self):
         """Setup pyswisseph ephemeris path."""
-        swe.set_ephe_path("/Users/giacomo/dev/libephemeris/ephe")
+        swe.set_ephe_path(os.environ.get("REF_EPHE_PATH", "./ephe"))
         yield
 
     @pytest.mark.parametrize(
@@ -418,8 +419,8 @@ class TestMoonVelocityPrecision:
         not a bug. The tolerance of 0.002 deg/day (7.2 arcsec/day) provides
         comfortable margin.
         """
-        lib_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
-        swe_pos, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        lib_pos, _ = calc_ut(jd, MOON, FLG_SPEED)
+        swe_pos, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
 
         lib_dlon = lib_pos[3]
         swe_dlon = swe_pos[3]
@@ -450,8 +451,8 @@ class TestMoonVelocityPrecision:
         test_jds = [2415020.5 + random.random() * 73049 for _ in range(50)]
 
         for jd in test_jds:
-            lib_pos, _ = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
-            swe_pos, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
+            lib_pos, _ = calc_ut(jd, MOON, FLG_SPEED)
+            swe_pos, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
 
             vel_diff = abs(lib_pos[3] - swe_pos[3])
             if vel_diff > max_error:

@@ -8,9 +8,9 @@ testing more dates, flag combinations, and edge cases.
 
 Parts:
   P1: All 8 Uranian bodies at 10 dates (geocentric, ecliptic of date)
-  P2: Heliocentric positions (SEFLG_HELCTR)
-  P3: J2000 ecliptic positions (SEFLG_J2000)
-  P4: Equatorial positions (SEFLG_EQUATORIAL)
+  P2: Heliocentric positions (FLG_HELCTR)
+  P3: J2000 ecliptic positions (FLG_J2000)
+  P4: Equatorial positions (FLG_EQUATORIAL)
   P5: Speed values for all Uranian bodies
   P6: Historical dates (1900-1950) — long-term propagation accuracy
 """
@@ -81,14 +81,14 @@ def angle_diff(a, b):
 
 # Uranian/hypothetical bodies
 URANIANS = [
-    (SE_CUPIDO, "Cupido"),
-    (SE_HADES, "Hades"),
-    (SE_ZEUS, "Zeus"),
-    (SE_KRONOS, "Kronos"),
-    (SE_APOLLON, "Apollon"),
-    (SE_ADMETOS, "Admetos"),
-    (SE_VULKANUS, "Vulkanus"),
-    (SE_POSEIDON, "Poseidon"),
+    (CUPIDO, "Cupido"),
+    (HADES, "Hades"),
+    (ZEUS, "Zeus"),
+    (KRONOS, "Kronos"),
+    (APOLLON, "Apollon"),
+    (ADMETOS, "Admetos"),
+    (VULKANUS, "Vulkanus"),
+    (POSEIDON, "Poseidon"),
 ]
 
 DATES = [
@@ -117,12 +117,12 @@ def run_part(part_name, flags, tol_arcsec, flag_desc):
         for body_id, body_name in URANIANS:
             label = f"{body_name} {y}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, flags | SEFLG_SPEED)[0]
+                se_xx = swe.calc_ut(jd, body_id, flags | FLG_SPEED)[0]
             except Exception:
                 r.skip(f"{label}: SE error")
                 continue
             try:
-                le_xx, _ = ephem.swe_calc_ut(jd, body_id, flags | SEFLG_SPEED)
+                le_xx, _ = ephem.calc_ut(jd, body_id, flags | FLG_SPEED)
             except Exception:
                 r.skip(f"{label}: LE error")
                 continue
@@ -151,15 +151,15 @@ def run_part1():
 
 
 def run_part2():
-    return run_part("P2: Heliocentric", SEFLG_HELCTR, 30.0, "Heliocentric positions")
+    return run_part("P2: Heliocentric", FLG_HELCTR, 30.0, "Heliocentric positions")
 
 
 def run_part3():
-    return run_part("P3: J2000", SEFLG_J2000, 60.0, "J2000 ecliptic positions")
+    return run_part("P3: J2000", FLG_J2000, 60.0, "J2000 ecliptic positions")
 
 
 def run_part4():
-    return run_part("P4: Equatorial", SEFLG_EQUATORIAL, 60.0, "Equatorial positions")
+    return run_part("P4: Equatorial", FLG_EQUATORIAL, 60.0, "Equatorial positions")
 
 
 def run_part5():
@@ -173,8 +173,8 @@ def run_part5():
     for body_id, body_name in URANIANS:
         label = f"{body_name} speed"
         try:
-            se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-            le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+            le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
         except Exception:
             r.skip(f"{label}")
             continue
@@ -215,8 +215,8 @@ def run_part6():
         for body_id, body_name in URANIANS:
             label = f"{body_name} {y}"
             try:
-                se_xx = swe.calc_ut(jd, body_id, SEFLG_SPEED)[0]
-                le_xx, _ = ephem.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+                se_xx = swe.calc_ut(jd, body_id, FLG_SPEED)[0]
+                le_xx, _ = ephem.calc_ut(jd, body_id, FLG_SPEED)
             except Exception:
                 r.skip(f"{label}")
                 continue

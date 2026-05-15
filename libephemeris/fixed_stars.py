@@ -57,137 +57,137 @@ from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
 
 from .constants import (
-    SE_REGULUS,
-    SE_SPICA_STAR,
-    SE_ALGOL,
-    SE_SIRIUS,
-    SE_ALDEBARAN,
-    SE_ANTARES,
-    SE_VEGA,
-    SE_POLARIS,
-    SE_FOMALHAUT,
-    SE_BETELGEUSE,
-    SE_RIGEL,
-    SE_PROCYON,
-    SE_CAPELLA,
-    SE_ARCTURUS,
-    SE_DENEB,
-    SE_POLLUX,
-    SE_CASTOR,
-    SE_ALTAIR,
-    SE_ACHERNAR,
-    SE_CANOPUS,
-    SE_ACRUX,
-    SE_MIMOSA,
-    SE_GACRUX,
-    SE_HADAR,
-    SE_RIGIL_KENT,
-    SE_SHAULA,
-    SE_BELLATRIX,
-    SE_ELNATH,
-    SE_MIRA,
-    SE_ALNILAM,
-    SE_ALNITAK,
-    SE_MINTAKA,
-    SE_SAIPH,
-    SE_DIPHDA,
-    SE_ALPHARD,
-    SE_RASALHAGUE,
-    SE_ETAMIN,
-    SE_KOCHAB,
-    SE_ALKAID,
-    SE_DUBHE,
-    SE_MERAK,
-    SE_ALIOTH,
-    SE_MIZAR,
-    SE_ALCOR,
-    SE_VINDEMIATRIX,
-    SE_ZUBENELGENUBI,
-    SE_ZUBENESCHAMALI,
-    SE_UNUKALHAI,
-    SE_ALGIEBA,
-    SE_DENEBOLA,
-    SE_MARKAB,
-    SE_SCHEAT,
-    SE_ALCYONE,
-    SE_ALGORAB,
-    SE_ALPHECCA,
-    SE_DENEB_ALGEDI,
-    SE_ASTEROPE,
-    SE_CELAENO,
-    SE_ELECTRA,
-    SE_MAIA,
-    SE_MEROPE,
-    SE_TAYGETA,
-    SE_ATLAS,
-    SE_PLEIONE,
-    SE_PRIMA_HYADUM,
-    SE_SECUNDA_HYADUM,
-    SE_THETA_TAURI,
-    SE_AIN,
-    SE_MEISSA,
-    SE_PHECDA,
-    SE_MEGREZ,
-    SE_DELTA_CRUCIS,
-    SE_MENKENT,
-    SE_MUHLIFAIN,
-    SE_EPSILON_CENTAURI,
-    SE_ETA_CENTAURI,
-    SE_ZETA_CENTAURI,
-    SE_SARGAS,
-    SE_DSCHUBBA,
-    SE_GRAFFIAS,
-    SE_LESATH,
-    SE_ZOSMA,
-    SE_HAMAL,
-    SE_SHERATAN,
-    SE_MESARTHIM,
-    SE_ACUBENS,
-    SE_TARF,
-    SE_ASELLUS_BOREALIS,
-    SE_ASELLUS_AUSTRALIS,
-    SE_KAUS_AUSTRALIS,
-    SE_NUNKI,
-    SE_KAUS_MEDIA,
-    SE_KAUS_BOREALIS,
-    SE_ASCELLA,
-    SE_ALGEDI,
-    SE_DABIH,
-    SE_NASHIRA,
-    SE_SADALSUUD,
-    SE_SADALMELIK,
-    SE_SKAT,
-    SE_ETA_PISCIUM,
-    SE_ALRESCHA,
-    SE_ALPHERATZ,
-    SE_ALGENIB,
-    SE_PROPUS,
-    SE_ALHENA,
-    SE_TEJAT,
-    SE_WASAT,
-    SE_ADHARA,
-    SE_WEZEN,
-    SE_THUBAN,
-    SE_RASALGETHI,
-    SE_ALBIREO,
-    SE_MIRACH,
-    SE_ALMACH,
-    SE_MENKAR,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SPEED3,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_SIDEREAL,
-    SEFLG_MOSEPH,
-    SEFLG_XYZ,
-    SEFLG_RADIANS,
-    SEFLG_ICRS,
-    SEFLG_TRUEPOS,
-    SEFLG_TOPOCTR,
+    REGULUS,
+    SPICA_STAR,
+    ALGOL,
+    SIRIUS,
+    ALDEBARAN,
+    ANTARES,
+    VEGA,
+    POLARIS,
+    FOMALHAUT,
+    BETELGEUSE,
+    RIGEL,
+    PROCYON,
+    CAPELLA,
+    ARCTURUS,
+    DENEB,
+    POLLUX,
+    CASTOR,
+    ALTAIR,
+    ACHERNAR,
+    CANOPUS,
+    ACRUX,
+    MIMOSA,
+    GACRUX,
+    HADAR,
+    RIGIL_KENT,
+    SHAULA,
+    BELLATRIX,
+    ELNATH,
+    MIRA,
+    ALNILAM,
+    ALNITAK,
+    MINTAKA,
+    SAIPH,
+    DIPHDA,
+    ALPHARD,
+    RASALHAGUE,
+    ETAMIN,
+    KOCHAB,
+    ALKAID,
+    DUBHE,
+    MERAK,
+    ALIOTH,
+    MIZAR,
+    ALCOR,
+    VINDEMIATRIX,
+    ZUBENELGENUBI,
+    ZUBENESCHAMALI,
+    UNUKALHAI,
+    ALGIEBA,
+    DENEBOLA,
+    MARKAB,
+    SCHEAT,
+    ALCYONE,
+    ALGORAB,
+    ALPHECCA,
+    DENEB_ALGEDI,
+    ASTEROPE,
+    CELAENO,
+    ELECTRA,
+    MAIA,
+    MEROPE,
+    TAYGETA,
+    ATLAS,
+    PLEIONE,
+    PRIMA_HYADUM,
+    SECUNDA_HYADUM,
+    THETA_TAURI,
+    AIN,
+    MEISSA,
+    PHECDA,
+    MEGREZ,
+    DELTA_CRUCIS,
+    MENKENT,
+    MUHLIFAIN,
+    EPSILON_CENTAURI,
+    ETA_CENTAURI,
+    ZETA_CENTAURI,
+    SARGAS,
+    DSCHUBBA,
+    GRAFFIAS,
+    LESATH,
+    ZOSMA,
+    HAMAL,
+    SHERATAN,
+    MESARTHIM,
+    ACUBENS,
+    TARF,
+    ASELLUS_BOREALIS,
+    ASELLUS_AUSTRALIS,
+    KAUS_AUSTRALIS,
+    NUNKI,
+    KAUS_MEDIA,
+    KAUS_BOREALIS,
+    ASCELLA,
+    ALGEDI,
+    DABIH,
+    NASHIRA,
+    SADALSUUD,
+    SADALMELIK,
+    SKAT,
+    ETA_PISCIUM,
+    ALRESCHA,
+    ALPHERATZ,
+    ALGENIB,
+    PROPUS,
+    ALHENA,
+    TEJAT,
+    WASAT,
+    ADHARA,
+    WEZEN,
+    THUBAN,
+    RASALGETHI,
+    ALBIREO,
+    MIRACH,
+    ALMACH,
+    MENKAR,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SPEED3,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_SIDEREAL,
+    FLG_MOSEPH,
+    FLG_XYZ,
+    FLG_RADIANS,
+    FLG_ICRS,
+    FLG_TRUEPOS,
+    FLG_TOPOCTR,
     J2000,
     J1991_25,
     DAYS_PER_JULIAN_YEAR,
@@ -368,7 +368,7 @@ def propagate_proper_motion(
 # Extended star catalog with names and catalog numbers
 STAR_CATALOG: List[StarCatalogEntry] = [
     StarCatalogEntry(
-        id=SE_REGULUS,
+        id=REGULUS,
         name="Regulus",
         nomenclature="alLeo",
         hip_number=49669,
@@ -383,7 +383,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.40,  # Visual magnitude
     ),
     StarCatalogEntry(
-        id=SE_SPICA_STAR,
+        id=SPICA_STAR,
         name="Spica",
         nomenclature="alVir",
         hip_number=65474,
@@ -398,7 +398,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.04,  # Visual magnitude
     ),
     StarCatalogEntry(
-        id=SE_ALGOL,
+        id=ALGOL,
         name="Algol",
         nomenclature="bePer",
         hip_number=14576,
@@ -413,7 +413,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.12,
     ),
     StarCatalogEntry(
-        id=SE_SIRIUS,
+        id=SIRIUS,
         name="Sirius",
         nomenclature="alCMa",
         hip_number=32349,
@@ -428,7 +428,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=-1.46,
     ),
     StarCatalogEntry(
-        id=SE_ALDEBARAN,
+        id=ALDEBARAN,
         name="Aldebaran",
         nomenclature="alTau",
         hip_number=21421,
@@ -443,7 +443,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.85,
     ),
     StarCatalogEntry(
-        id=SE_ANTARES,
+        id=ANTARES,
         name="Antares",
         nomenclature="alSco",
         hip_number=80763,
@@ -458,7 +458,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.06,
     ),
     StarCatalogEntry(
-        id=SE_VEGA,
+        id=VEGA,
         name="Vega",
         nomenclature="alLyr",
         hip_number=91262,
@@ -473,7 +473,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.03,
     ),
     StarCatalogEntry(
-        id=SE_POLARIS,
+        id=POLARIS,
         name="Polaris",
         nomenclature="alUMi",
         hip_number=11767,
@@ -488,7 +488,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.98,
     ),
     StarCatalogEntry(
-        id=SE_FOMALHAUT,
+        id=FOMALHAUT,
         name="Fomalhaut",
         nomenclature="alPsA",
         hip_number=113368,
@@ -503,7 +503,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.16,
     ),
     StarCatalogEntry(
-        id=SE_BETELGEUSE,
+        id=BETELGEUSE,
         name="Betelgeuse",
         nomenclature="alOri",
         hip_number=27989,
@@ -518,7 +518,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.42,
     ),
     StarCatalogEntry(
-        id=SE_RIGEL,
+        id=RIGEL,
         name="Rigel",
         nomenclature="beOri",
         hip_number=24436,
@@ -533,7 +533,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.12,
     ),
     StarCatalogEntry(
-        id=SE_PROCYON,
+        id=PROCYON,
         name="Procyon",
         nomenclature="alCMi",
         hip_number=37279,
@@ -548,7 +548,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.34,
     ),
     StarCatalogEntry(
-        id=SE_CAPELLA,
+        id=CAPELLA,
         name="Capella",
         nomenclature="alAur",
         hip_number=24608,
@@ -563,7 +563,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.08,
     ),
     StarCatalogEntry(
-        id=SE_ARCTURUS,
+        id=ARCTURUS,
         name="Arcturus",
         nomenclature="alBoo",
         hip_number=69673,
@@ -578,7 +578,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=-0.04,
     ),
     StarCatalogEntry(
-        id=SE_DENEB,
+        id=DENEB,
         name="Deneb",
         nomenclature="alCyg",
         hip_number=102098,
@@ -593,7 +593,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.25,
     ),
     StarCatalogEntry(
-        id=SE_POLLUX,
+        id=POLLUX,
         name="Pollux",
         nomenclature="beGem",
         hip_number=37826,
@@ -608,7 +608,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.14,
     ),
     StarCatalogEntry(
-        id=SE_CASTOR,
+        id=CASTOR,
         name="Castor",
         nomenclature="alGem",
         hip_number=36850,
@@ -623,7 +623,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.58,
     ),
     StarCatalogEntry(
-        id=SE_ALTAIR,
+        id=ALTAIR,
         name="Altair",
         nomenclature="alAql",
         hip_number=97649,
@@ -638,7 +638,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.77,
     ),
     StarCatalogEntry(
-        id=SE_ACHERNAR,
+        id=ACHERNAR,
         name="Achernar",
         nomenclature="alEri",
         hip_number=7588,
@@ -653,7 +653,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.46,
     ),
     StarCatalogEntry(
-        id=SE_CANOPUS,
+        id=CANOPUS,
         name="Canopus",
         nomenclature="alCar",
         hip_number=30438,
@@ -668,7 +668,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=-0.72,
     ),
     StarCatalogEntry(
-        id=SE_ACRUX,
+        id=ACRUX,
         name="Acrux",
         nomenclature="alCru",
         hip_number=60718,
@@ -683,7 +683,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.76,
     ),
     StarCatalogEntry(
-        id=SE_MIMOSA,
+        id=MIMOSA,
         name="Mimosa",
         nomenclature="beCru",
         hip_number=62434,
@@ -698,7 +698,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.25,
     ),
     StarCatalogEntry(
-        id=SE_GACRUX,
+        id=GACRUX,
         name="Gacrux",
         nomenclature="gaCru",
         hip_number=61084,
@@ -713,7 +713,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.64,
     ),
     StarCatalogEntry(
-        id=SE_HADAR,
+        id=HADAR,
         name="Hadar",
         nomenclature="beCen",
         hip_number=68702,
@@ -728,7 +728,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=0.61,
     ),
     StarCatalogEntry(
-        id=SE_RIGIL_KENT,
+        id=RIGIL_KENT,
         name="Rigil Kentaurus",
         nomenclature="alCen",
         hip_number=71683,
@@ -743,7 +743,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=-0.27,
     ),
     StarCatalogEntry(
-        id=SE_SHAULA,
+        id=SHAULA,
         name="Shaula",
         nomenclature="laSco",
         hip_number=85927,
@@ -758,7 +758,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.62,
     ),
     StarCatalogEntry(
-        id=SE_BELLATRIX,
+        id=BELLATRIX,
         name="Bellatrix",
         nomenclature="gaOri",
         hip_number=25336,
@@ -773,7 +773,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.64,
     ),
     StarCatalogEntry(
-        id=SE_ELNATH,
+        id=ELNATH,
         name="Elnath",
         nomenclature="beTau",
         hip_number=25428,
@@ -788,7 +788,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.65,
     ),
     StarCatalogEntry(
-        id=SE_MIRA,
+        id=MIRA,
         name="Mira",
         nomenclature="omCet",
         hip_number=10826,
@@ -803,7 +803,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.04,
     ),
     StarCatalogEntry(
-        id=SE_ALNILAM,
+        id=ALNILAM,
         name="Alnilam",
         nomenclature="epOri",
         hip_number=26311,
@@ -818,7 +818,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.69,
     ),
     StarCatalogEntry(
-        id=SE_ALNITAK,
+        id=ALNITAK,
         name="Alnitak",
         nomenclature="zeOri",
         hip_number=26727,
@@ -833,7 +833,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.74,
     ),
     StarCatalogEntry(
-        id=SE_MINTAKA,
+        id=MINTAKA,
         name="Mintaka",
         nomenclature="deOri",
         hip_number=25930,
@@ -848,7 +848,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.23,
     ),
     StarCatalogEntry(
-        id=SE_SAIPH,
+        id=SAIPH,
         name="Saiph",
         nomenclature="kaOri",
         hip_number=27366,
@@ -863,7 +863,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.06,
     ),
     StarCatalogEntry(
-        id=SE_MEISSA,
+        id=MEISSA,
         name="Meissa",
         nomenclature="laOri",
         hip_number=26207,
@@ -878,7 +878,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.33,
     ),
     StarCatalogEntry(
-        id=SE_DIPHDA,
+        id=DIPHDA,
         name="Diphda",
         nomenclature="beCet",
         hip_number=3419,
@@ -893,7 +893,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.04,
     ),
     StarCatalogEntry(
-        id=SE_ALPHARD,
+        id=ALPHARD,
         name="Alphard",
         nomenclature="alHya",
         hip_number=46390,
@@ -908,7 +908,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.98,
     ),
     StarCatalogEntry(
-        id=SE_RASALHAGUE,
+        id=RASALHAGUE,
         name="Rasalhague",
         nomenclature="alOph",
         hip_number=86032,
@@ -923,7 +923,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.07,
     ),
     StarCatalogEntry(
-        id=SE_ETAMIN,
+        id=ETAMIN,
         name="Etamin",
         nomenclature="gaDra",
         hip_number=87833,
@@ -938,7 +938,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.23,
     ),
     StarCatalogEntry(
-        id=SE_KOCHAB,
+        id=KOCHAB,
         name="Kochab",
         nomenclature="beUMi",
         hip_number=72607,
@@ -953,7 +953,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.08,
     ),
     StarCatalogEntry(
-        id=SE_ALKAID,
+        id=ALKAID,
         name="Alkaid",
         nomenclature="etUMa",
         hip_number=67301,
@@ -968,7 +968,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.86,
     ),
     StarCatalogEntry(
-        id=SE_DUBHE,
+        id=DUBHE,
         name="Dubhe",
         nomenclature="alUMa",
         hip_number=54061,
@@ -983,7 +983,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.79,
     ),
     StarCatalogEntry(
-        id=SE_MERAK,
+        id=MERAK,
         name="Merak",
         nomenclature="beUMa",
         hip_number=53910,
@@ -998,7 +998,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.37,
     ),
     StarCatalogEntry(
-        id=SE_ALIOTH,
+        id=ALIOTH,
         name="Alioth",
         nomenclature="epUMa",
         hip_number=62956,
@@ -1013,7 +1013,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.77,
     ),
     StarCatalogEntry(
-        id=SE_MIZAR,
+        id=MIZAR,
         name="Mizar",
         nomenclature="zeUMa",
         hip_number=65378,
@@ -1028,7 +1028,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.23,
     ),
     StarCatalogEntry(
-        id=SE_ALCOR,
+        id=ALCOR,
         name="Alcor",
         nomenclature="80UMa",
         hip_number=65477,
@@ -1043,7 +1043,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.99,
     ),
     StarCatalogEntry(
-        id=SE_PHECDA,
+        id=PHECDA,
         name="Phecda",
         nomenclature="gaUMa",
         hip_number=58001,
@@ -1058,7 +1058,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.44,
     ),
     StarCatalogEntry(
-        id=SE_MEGREZ,
+        id=MEGREZ,
         name="Megrez",
         nomenclature="deUMa",
         hip_number=59774,
@@ -1073,7 +1073,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.31,
     ),
     StarCatalogEntry(
-        id=SE_VINDEMIATRIX,
+        id=VINDEMIATRIX,
         name="Vindemiatrix",
         nomenclature="epVir",
         hip_number=63608,
@@ -1088,7 +1088,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.83,
     ),
     StarCatalogEntry(
-        id=SE_ZUBENELGENUBI,
+        id=ZUBENELGENUBI,
         name="Zubenelgenubi",
         nomenclature="alLib",
         hip_number=72622,
@@ -1103,7 +1103,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.75,
     ),
     StarCatalogEntry(
-        id=SE_ZUBENESCHAMALI,
+        id=ZUBENESCHAMALI,
         name="Zubeneschamali",
         nomenclature="beLib",
         hip_number=74785,
@@ -1118,7 +1118,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.61,
     ),
     StarCatalogEntry(
-        id=SE_UNUKALHAI,
+        id=UNUKALHAI,
         name="Unukalhai",
         nomenclature="alSer",
         hip_number=77070,
@@ -1133,7 +1133,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.65,
     ),
     StarCatalogEntry(
-        id=SE_ALGIEBA,
+        id=ALGIEBA,
         name="Algieba",
         nomenclature="gaLeo",
         hip_number=50583,
@@ -1148,7 +1148,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.08,
     ),
     StarCatalogEntry(
-        id=SE_DENEBOLA,
+        id=DENEBOLA,
         name="Denebola",
         nomenclature="beLeo",
         hip_number=57632,
@@ -1163,7 +1163,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.14,
     ),
     StarCatalogEntry(
-        id=SE_MARKAB,
+        id=MARKAB,
         name="Markab",
         nomenclature="alPeg",
         hip_number=113963,
@@ -1178,7 +1178,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.49,
     ),
     StarCatalogEntry(
-        id=SE_SCHEAT,
+        id=SCHEAT,
         name="Scheat",
         nomenclature="bePeg",
         hip_number=113881,
@@ -1194,7 +1194,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== BEHENIAN FIXED STARS (additional) ========
     StarCatalogEntry(
-        id=SE_ALCYONE,
+        id=ALCYONE,
         name="Alcyone",
         nomenclature="etTau",
         hip_number=17702,
@@ -1209,7 +1209,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.87,
     ),
     StarCatalogEntry(
-        id=SE_ALGORAB,
+        id=ALGORAB,
         name="Algorab",
         nomenclature="deCrv",
         hip_number=60965,
@@ -1224,7 +1224,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.95,
     ),
     StarCatalogEntry(
-        id=SE_ALPHECCA,
+        id=ALPHECCA,
         name="Alphecca",
         nomenclature="alCrB",
         hip_number=76267,
@@ -1239,7 +1239,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.23,
     ),
     StarCatalogEntry(
-        id=SE_DENEB_ALGEDI,
+        id=DENEB_ALGEDI,
         name="Deneb Algedi",
         nomenclature="deCap",
         hip_number=107556,
@@ -1257,7 +1257,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # The Pleiades (M45) is an open star cluster in Taurus
     # These are the 9 brightest named stars visible to the naked eye
     StarCatalogEntry(
-        id=SE_ASTEROPE,
+        id=ASTEROPE,
         name="Asterope",
         nomenclature="21Tau",
         hip_number=17579,
@@ -1272,7 +1272,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=5.76,
     ),
     StarCatalogEntry(
-        id=SE_CELAENO,
+        id=CELAENO,
         name="Celaeno",
         nomenclature="16Tau",
         hip_number=17489,
@@ -1287,7 +1287,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=5.45,
     ),
     StarCatalogEntry(
-        id=SE_ELECTRA,
+        id=ELECTRA,
         name="Electra",
         nomenclature="17Tau",
         hip_number=17499,
@@ -1302,7 +1302,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.70,
     ),
     StarCatalogEntry(
-        id=SE_MAIA,
+        id=MAIA,
         name="Maia",
         nomenclature="20Tau",
         hip_number=17573,
@@ -1317,7 +1317,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.87,
     ),
     StarCatalogEntry(
-        id=SE_MEROPE,
+        id=MEROPE,
         name="Merope",
         nomenclature="23Tau",
         hip_number=17608,
@@ -1332,7 +1332,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=4.14,
     ),
     StarCatalogEntry(
-        id=SE_TAYGETA,
+        id=TAYGETA,
         name="Taygeta",
         nomenclature="19Tau",
         hip_number=17531,
@@ -1347,7 +1347,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=4.30,
     ),
     StarCatalogEntry(
-        id=SE_ATLAS,
+        id=ATLAS,
         name="Atlas",
         nomenclature="27Tau",
         hip_number=17847,
@@ -1362,7 +1362,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.62,
     ),
     StarCatalogEntry(
-        id=SE_PLEIONE,
+        id=PLEIONE,
         name="Pleione",
         nomenclature="28Tau",
         hip_number=17851,
@@ -1380,7 +1380,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # The Hyades is an open star cluster in Taurus, one of the nearest to Earth
     # These are the brightest named members visible to the naked eye
     StarCatalogEntry(
-        id=SE_PRIMA_HYADUM,
+        id=PRIMA_HYADUM,
         name="Prima Hyadum",
         nomenclature="gaTau",
         hip_number=20205,
@@ -1395,7 +1395,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.65,
     ),
     StarCatalogEntry(
-        id=SE_SECUNDA_HYADUM,
+        id=SECUNDA_HYADUM,
         name="Secunda Hyadum",
         nomenclature="de1Tau",
         hip_number=20455,
@@ -1410,7 +1410,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.77,
     ),
     StarCatalogEntry(
-        id=SE_THETA_TAURI,
+        id=THETA_TAURI,
         name="Theta Tauri",
         nomenclature="th2Tau",
         hip_number=20894,
@@ -1423,7 +1423,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.40,
     ),
     StarCatalogEntry(
-        id=SE_AIN,
+        id=AIN,
         name="Ain",
         nomenclature="epTau",
         hip_number=20889,
@@ -1440,7 +1440,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== SOUTHERN CROSS (CRUX) CONSTELLATION ========
     # Completing the Crux constellation - Acrux, Mimosa, Gacrux already defined above
     StarCatalogEntry(
-        id=SE_DELTA_CRUCIS,
+        id=DELTA_CRUCIS,
         name="Delta Crucis",
         nomenclature="deCru",
         hip_number=59747,
@@ -1455,7 +1455,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== CENTAURUS CONSTELLATION ========
     # Completing the bright stars of Centaurus (Alpha and Beta already defined above)
     StarCatalogEntry(
-        id=SE_MENKENT,
+        id=MENKENT,
         name="Menkent",
         nomenclature="thCen",
         hip_number=68933,
@@ -1470,7 +1470,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.06,
     ),
     StarCatalogEntry(
-        id=SE_MUHLIFAIN,
+        id=MUHLIFAIN,
         name="Muhlifain",
         nomenclature="gaCen",
         hip_number=61932,
@@ -1485,7 +1485,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.17,
     ),
     StarCatalogEntry(
-        id=SE_EPSILON_CENTAURI,
+        id=EPSILON_CENTAURI,
         name="Epsilon Centauri",
         nomenclature="epCen",
         hip_number=66657,
@@ -1498,7 +1498,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.30,
     ),
     StarCatalogEntry(
-        id=SE_ETA_CENTAURI,
+        id=ETA_CENTAURI,
         name="Eta Centauri",
         nomenclature="etCen",
         hip_number=71352,
@@ -1511,7 +1511,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.31,
     ),
     StarCatalogEntry(
-        id=SE_ZETA_CENTAURI,
+        id=ZETA_CENTAURI,
         name="Zeta Centauri",
         nomenclature="zeCen",
         hip_number=68002,
@@ -1525,7 +1525,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # Scorpius constellation stars
     StarCatalogEntry(
-        id=SE_SARGAS,
+        id=SARGAS,
         name="Sargas",
         nomenclature="thSco",
         hip_number=86228,
@@ -1540,7 +1540,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.87,
     ),
     StarCatalogEntry(
-        id=SE_DSCHUBBA,
+        id=DSCHUBBA,
         name="Dschubba",
         nomenclature="deSco",
         hip_number=78401,
@@ -1555,7 +1555,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.32,
     ),
     StarCatalogEntry(
-        id=SE_GRAFFIAS,
+        id=GRAFFIAS,
         name="Graffias",
         nomenclature="beSco",
         hip_number=78820,
@@ -1570,7 +1570,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.56,
     ),
     StarCatalogEntry(
-        id=SE_LESATH,
+        id=LESATH,
         name="Lesath",
         nomenclature="upSco",
         hip_number=85696,
@@ -1586,7 +1586,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # Leo constellation stars
     StarCatalogEntry(
-        id=SE_ZOSMA,
+        id=ZOSMA,
         name="Zosma",
         nomenclature="deLeo",
         hip_number=54872,
@@ -1605,7 +1605,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== ARIES CONSTELLATION ========
     # The Ram - first sign of the zodiac
     StarCatalogEntry(
-        id=SE_HAMAL,
+        id=HAMAL,
         name="Hamal",
         nomenclature="alAri",
         hip_number=9884,
@@ -1620,7 +1620,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.00,
     ),
     StarCatalogEntry(
-        id=SE_SHERATAN,
+        id=SHERATAN,
         name="Sheratan",
         nomenclature="beAri",
         hip_number=8903,
@@ -1635,7 +1635,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.64,
     ),
     StarCatalogEntry(
-        id=SE_MESARTHIM,
+        id=MESARTHIM,
         name="Mesarthim",
         nomenclature="gaAri",
         hip_number=8832,
@@ -1652,7 +1652,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== CANCER CONSTELLATION ========
     # The Crab - features the Beehive Cluster (M44)
     StarCatalogEntry(
-        id=SE_ACUBENS,
+        id=ACUBENS,
         name="Acubens",
         nomenclature="alCnc",
         hip_number=44066,
@@ -1667,7 +1667,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=4.25,
     ),
     StarCatalogEntry(
-        id=SE_TARF,
+        id=TARF,
         name="Tarf",
         nomenclature="beCnc",
         hip_number=42911,
@@ -1680,7 +1680,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.52,
     ),
     StarCatalogEntry(
-        id=SE_ASELLUS_BOREALIS,
+        id=ASELLUS_BOREALIS,
         name="Asellus Borealis",
         nomenclature="gaCnc",
         hip_number=42806,
@@ -1695,7 +1695,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=4.66,
     ),
     StarCatalogEntry(
-        id=SE_ASELLUS_AUSTRALIS,
+        id=ASELLUS_AUSTRALIS,
         name="Asellus Australis",
         nomenclature="deCnc",
         hip_number=42911,  # Corrected HIP number for Delta Cancri
@@ -1712,7 +1712,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== SAGITTARIUS CONSTELLATION ========
     # The Archer - prominent in the summer sky, contains galactic center
     StarCatalogEntry(
-        id=SE_KAUS_AUSTRALIS,
+        id=KAUS_AUSTRALIS,
         name="Kaus Australis",
         nomenclature="epSgr",
         hip_number=90185,
@@ -1727,7 +1727,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.85,
     ),
     StarCatalogEntry(
-        id=SE_NUNKI,
+        id=NUNKI,
         name="Nunki",
         nomenclature="siSgr",
         hip_number=92855,
@@ -1742,7 +1742,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.02,
     ),
     StarCatalogEntry(
-        id=SE_KAUS_MEDIA,
+        id=KAUS_MEDIA,
         name="Kaus Media",
         nomenclature="deSgr",
         hip_number=89931,
@@ -1757,7 +1757,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.70,
     ),
     StarCatalogEntry(
-        id=SE_KAUS_BOREALIS,
+        id=KAUS_BOREALIS,
         name="Kaus Borealis",
         nomenclature="laSgr",
         hip_number=90496,
@@ -1772,7 +1772,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.81,
     ),
     StarCatalogEntry(
-        id=SE_ASCELLA,
+        id=ASCELLA,
         name="Ascella",
         nomenclature="zeSgr",
         hip_number=93506,
@@ -1789,7 +1789,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== CAPRICORNUS CONSTELLATION ========
     # The Sea Goat - complementing Deneb Algedi already defined above
     StarCatalogEntry(
-        id=SE_ALGEDI,
+        id=ALGEDI,
         name="Algedi",
         nomenclature="alCap",
         hip_number=100064,
@@ -1804,7 +1804,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.57,
     ),
     StarCatalogEntry(
-        id=SE_DABIH,
+        id=DABIH,
         name="Dabih",
         nomenclature="beCap",
         hip_number=100345,
@@ -1819,7 +1819,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.08,
     ),
     StarCatalogEntry(
-        id=SE_NASHIRA,
+        id=NASHIRA,
         name="Nashira",
         nomenclature="gaCap",
         hip_number=106985,
@@ -1836,7 +1836,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== AQUARIUS CONSTELLATION ========
     # The Water Bearer
     StarCatalogEntry(
-        id=SE_SADALSUUD,
+        id=SADALSUUD,
         name="Sadalsuud",
         nomenclature="beAqr",
         hip_number=106278,
@@ -1851,7 +1851,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.87,
     ),
     StarCatalogEntry(
-        id=SE_SADALMELIK,
+        id=SADALMELIK,
         name="Sadalmelik",
         nomenclature="alAqr",
         hip_number=109074,
@@ -1866,7 +1866,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.96,
     ),
     StarCatalogEntry(
-        id=SE_SKAT,
+        id=SKAT,
         name="Skat",
         nomenclature="deAqr",
         hip_number=113136,
@@ -1883,7 +1883,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== PISCES CONSTELLATION ========
     # The Fishes - where the vernal equinox currently resides
     StarCatalogEntry(
-        id=SE_ETA_PISCIUM,
+        id=ETA_PISCIUM,
         name="Eta Piscium",
         nomenclature="etPsc",
         hip_number=5742,
@@ -1896,7 +1896,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.62,
     ),
     StarCatalogEntry(
-        id=SE_ALRESCHA,
+        id=ALRESCHA,
         name="Alrescha",
         nomenclature="alPsc",
         hip_number=7097,
@@ -1913,7 +1913,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== ANDROMEDA CONSTELLATION ========
     # Data: ESA Hipparcos catalogue (ESA SP-1200, 1997) via CDS/SIMBAD
     StarCatalogEntry(
-        id=SE_ALPHERATZ,
+        id=ALPHERATZ,
         name="Alpheratz",
         nomenclature="alAnd",
         hip_number=677,
@@ -1929,7 +1929,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== PEGASUS CONSTELLATION - additional stars ========
     StarCatalogEntry(
-        id=SE_ALGENIB,
+        id=ALGENIB,
         name="Algenib",
         nomenclature="gaPeg",
         hip_number=1067,
@@ -1946,7 +1946,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     # ======== GEMINI CONSTELLATION - additional stars ========
     # Data: ESA Hipparcos catalogue via CDS/SIMBAD
     StarCatalogEntry(
-        id=SE_PROPUS,
+        id=PROPUS,
         name="Propus",
         nomenclature="etGem",
         hip_number=29655,
@@ -1961,7 +1961,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=3.28,
     ),
     StarCatalogEntry(
-        id=SE_TEJAT,
+        id=TEJAT,
         name="Tejat",
         nomenclature="muGem",
         hip_number=30343,
@@ -1976,7 +1976,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.87,
     ),
     StarCatalogEntry(
-        id=SE_ALHENA,
+        id=ALHENA,
         name="Alhena",
         nomenclature="gaGem",
         hip_number=31681,
@@ -1991,7 +1991,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.92,
     ),
     StarCatalogEntry(
-        id=SE_WASAT,
+        id=WASAT,
         name="Wasat",
         nomenclature="deGem",
         hip_number=35550,
@@ -2007,7 +2007,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== CANIS MAJOR CONSTELLATION - additional stars ========
     StarCatalogEntry(
-        id=SE_ADHARA,
+        id=ADHARA,
         name="Adhara",
         nomenclature="epCMa",
         hip_number=33579,
@@ -2022,7 +2022,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=1.50,
     ),
     StarCatalogEntry(
-        id=SE_WEZEN,
+        id=WEZEN,
         name="Wezen",
         nomenclature="deCMa",
         hip_number=34444,
@@ -2038,7 +2038,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== DRACO CONSTELLATION ========
     StarCatalogEntry(
-        id=SE_THUBAN,
+        id=THUBAN,
         name="Thuban",
         nomenclature="alDra",
         hip_number=68756,
@@ -2054,7 +2054,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== HERCULES CONSTELLATION ========
     StarCatalogEntry(
-        id=SE_RASALGETHI,
+        id=RASALGETHI,
         name="Rasalgethi",
         nomenclature="alHer",
         hip_number=84345,
@@ -2070,7 +2070,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== CYGNUS CONSTELLATION ========
     StarCatalogEntry(
-        id=SE_ALBIREO,
+        id=ALBIREO,
         name="Albireo",
         nomenclature="beCyg",
         hip_number=95947,
@@ -2086,7 +2086,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== ANDROMEDA CONSTELLATION (additional) ========
     StarCatalogEntry(
-        id=SE_MIRACH,
+        id=MIRACH,
         name="Mirach",
         nomenclature="beAnd",
         hip_number=5447,
@@ -2101,7 +2101,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         magnitude=2.05,
     ),
     StarCatalogEntry(
-        id=SE_ALMACH,
+        id=ALMACH,
         name="Almach",
         nomenclature="ga1And",
         hip_number=9640,
@@ -2117,7 +2117,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     ),
     # ======== CETUS CONSTELLATION ========
     StarCatalogEntry(
-        id=SE_MENKAR,
+        id=MENKAR,
         name="Menkar",
         nomenclature="alCet",
         hip_number=14135,
@@ -2560,965 +2560,965 @@ def _parse_flamsteed_designation(designation: str) -> str | None:
 # Flamsteed numbers, Arabic names, Latin names, Greek transliterations
 STAR_ALIASES: dict[str, int] = {
     # ======== REGULUS (Alpha Leonis) - ROYAL STAR ========
-    "COR LEONIS": SE_REGULUS,
-    "ALPHA LEONIS": SE_REGULUS,
-    "ALPHA LEO": SE_REGULUS,
-    "87 LEO": SE_REGULUS,
-    "α LEO": SE_REGULUS,
-    "QALB AL-ASAD": SE_REGULUS,
-    "BASILISKOS": SE_REGULUS,
-    "REX": SE_REGULUS,
-    "KALB AL-ASAD": SE_REGULUS,
-    "ALLEO": SE_REGULUS,
-    "WATCHER OF THE NORTH": SE_REGULUS,
-    "VENANT": SE_REGULUS,
+    "COR LEONIS": REGULUS,
+    "ALPHA LEONIS": REGULUS,
+    "ALPHA LEO": REGULUS,
+    "87 LEO": REGULUS,
+    "α LEO": REGULUS,
+    "QALB AL-ASAD": REGULUS,
+    "BASILISKOS": REGULUS,
+    "REX": REGULUS,
+    "KALB AL-ASAD": REGULUS,
+    "ALLEO": REGULUS,
+    "WATCHER OF THE NORTH": REGULUS,
+    "VENANT": REGULUS,
     # ======== SPICA (Alpha Virginis) ========
-    "ALPHA VIRGINIS": SE_SPICA_STAR,
-    "ALPHA VIR": SE_SPICA_STAR,
-    "67 VIR": SE_SPICA_STAR,
-    "α VIR": SE_SPICA_STAR,
-    "AZIMECH": SE_SPICA_STAR,
-    "ALARAPH": SE_SPICA_STAR,
-    "ALVIR": SE_SPICA_STAR,
-    "SUNBULA": SE_SPICA_STAR,
-    "VIRGIN'S SPIKE": SE_SPICA_STAR,
-    "ARISTA": SE_SPICA_STAR,
+    "ALPHA VIRGINIS": SPICA_STAR,
+    "ALPHA VIR": SPICA_STAR,
+    "67 VIR": SPICA_STAR,
+    "α VIR": SPICA_STAR,
+    "AZIMECH": SPICA_STAR,
+    "ALARAPH": SPICA_STAR,
+    "ALVIR": SPICA_STAR,
+    "SUNBULA": SPICA_STAR,
+    "VIRGIN'S SPIKE": SPICA_STAR,
+    "ARISTA": SPICA_STAR,
     # ======== ALGOL (Beta Persei) ========
-    "DEMON STAR": SE_ALGOL,
-    "BETA PERSEI": SE_ALGOL,
-    "BETA PER": SE_ALGOL,
-    "26 PER": SE_ALGOL,
-    "β PER": SE_ALGOL,
-    "GORGONEA PRIMA": SE_ALGOL,
-    "RA'S AL-GHUL": SE_ALGOL,
-    "RAS AL-GHUL": SE_ALGOL,
-    "BEPER": SE_ALGOL,
-    "HEAD OF THE GHOUL": SE_ALGOL,
-    "GORGON'S HEAD": SE_ALGOL,
+    "DEMON STAR": ALGOL,
+    "BETA PERSEI": ALGOL,
+    "BETA PER": ALGOL,
+    "26 PER": ALGOL,
+    "β PER": ALGOL,
+    "GORGONEA PRIMA": ALGOL,
+    "RA'S AL-GHUL": ALGOL,
+    "RAS AL-GHUL": ALGOL,
+    "BEPER": ALGOL,
+    "HEAD OF THE GHOUL": ALGOL,
+    "GORGON'S HEAD": ALGOL,
     # ======== SIRIUS (Alpha Canis Majoris) ========
-    "DOG STAR": SE_SIRIUS,
-    "ALPHA CANIS MAJORIS": SE_SIRIUS,
-    "ALPHA CMA": SE_SIRIUS,
-    "α CMA": SE_SIRIUS,
-    "9 CMA": SE_SIRIUS,
-    "CANICULA": SE_SIRIUS,
-    "ASCHERE": SE_SIRIUS,
-    "ALCMA": SE_SIRIUS,
-    "AL-SHIRA": SE_SIRIUS,
-    "SOTHIS": SE_SIRIUS,
+    "DOG STAR": SIRIUS,
+    "ALPHA CANIS MAJORIS": SIRIUS,
+    "ALPHA CMA": SIRIUS,
+    "α CMA": SIRIUS,
+    "9 CMA": SIRIUS,
+    "CANICULA": SIRIUS,
+    "ASCHERE": SIRIUS,
+    "ALCMA": SIRIUS,
+    "AL-SHIRA": SIRIUS,
+    "SOTHIS": SIRIUS,
     # ======== ALDEBARAN (Alpha Tauri) - ROYAL STAR ========
-    "EYE OF TAURUS": SE_ALDEBARAN,
-    "ALPHA TAURI": SE_ALDEBARAN,
-    "ALPHA TAU": SE_ALDEBARAN,
-    "87 TAU": SE_ALDEBARAN,
-    "α TAU": SE_ALDEBARAN,
-    "ALTAU": SE_ALDEBARAN,
-    "PARILICIUM": SE_ALDEBARAN,
-    "AL-DABARAN": SE_ALDEBARAN,
-    "FOLLOWER": SE_ALDEBARAN,
-    "ROHINI": SE_ALDEBARAN,
-    "WATCHER OF THE EAST": SE_ALDEBARAN,
-    "TASCHETER": SE_ALDEBARAN,
+    "EYE OF TAURUS": ALDEBARAN,
+    "ALPHA TAURI": ALDEBARAN,
+    "ALPHA TAU": ALDEBARAN,
+    "87 TAU": ALDEBARAN,
+    "α TAU": ALDEBARAN,
+    "ALTAU": ALDEBARAN,
+    "PARILICIUM": ALDEBARAN,
+    "AL-DABARAN": ALDEBARAN,
+    "FOLLOWER": ALDEBARAN,
+    "ROHINI": ALDEBARAN,
+    "WATCHER OF THE EAST": ALDEBARAN,
+    "TASCHETER": ALDEBARAN,
     # ======== ANTARES (Alpha Scorpii) - ROYAL STAR ========
-    "RIVAL OF MARS": SE_ANTARES,
-    "ALPHA SCORPII": SE_ANTARES,
-    "ALPHA SCO": SE_ANTARES,
-    "21 SCO": SE_ANTARES,
-    "α SCO": SE_ANTARES,
-    "ALSCO": SE_ANTARES,
-    "COR SCORPII": SE_ANTARES,
-    "CALB AL-AKRAB": SE_ANTARES,
-    "HEART OF SCORPION": SE_ANTARES,
-    "JYESHTHA": SE_ANTARES,
-    "WATCHER OF THE WEST": SE_ANTARES,
-    "SATEVIS": SE_ANTARES,
+    "RIVAL OF MARS": ANTARES,
+    "ALPHA SCORPII": ANTARES,
+    "ALPHA SCO": ANTARES,
+    "21 SCO": ANTARES,
+    "α SCO": ANTARES,
+    "ALSCO": ANTARES,
+    "COR SCORPII": ANTARES,
+    "CALB AL-AKRAB": ANTARES,
+    "HEART OF SCORPION": ANTARES,
+    "JYESHTHA": ANTARES,
+    "WATCHER OF THE WEST": ANTARES,
+    "SATEVIS": ANTARES,
     # ======== VEGA (Alpha Lyrae) ========
-    "HARP STAR": SE_VEGA,
-    "ALPHA LYRAE": SE_VEGA,
-    "ALPHA LYR": SE_VEGA,
-    "3 LYR": SE_VEGA,
-    "α LYR": SE_VEGA,
-    "ALLYR": SE_VEGA,
-    "WEGA": SE_VEGA,
-    "AL-NASR AL-WAQI": SE_VEGA,
-    "FIDIS": SE_VEGA,
-    "ABHIJIT": SE_VEGA,
+    "HARP STAR": VEGA,
+    "ALPHA LYRAE": VEGA,
+    "ALPHA LYR": VEGA,
+    "3 LYR": VEGA,
+    "α LYR": VEGA,
+    "ALLYR": VEGA,
+    "WEGA": VEGA,
+    "AL-NASR AL-WAQI": VEGA,
+    "FIDIS": VEGA,
+    "ABHIJIT": VEGA,
     # ======== POLARIS (Alpha Ursae Minoris) ========
-    "NORTH STAR": SE_POLARIS,
-    "POLE STAR": SE_POLARIS,
-    "ALPHA URSAE MINORIS": SE_POLARIS,
-    "ALPHA UMI": SE_POLARIS,
-    "1 UMI": SE_POLARIS,
-    "α UMI": SE_POLARIS,
-    "ALUMI": SE_POLARIS,
-    "CYNOSURA": SE_POLARIS,
-    "LODESTAR": SE_POLARIS,
-    "STELLA POLARIS": SE_POLARIS,
+    "NORTH STAR": POLARIS,
+    "POLE STAR": POLARIS,
+    "ALPHA URSAE MINORIS": POLARIS,
+    "ALPHA UMI": POLARIS,
+    "1 UMI": POLARIS,
+    "α UMI": POLARIS,
+    "ALUMI": POLARIS,
+    "CYNOSURA": POLARIS,
+    "LODESTAR": POLARIS,
+    "STELLA POLARIS": POLARIS,
     # ======== FOMALHAUT (Alpha Piscis Austrini) - ROYAL STAR ========
-    "FISH'S MOUTH": SE_FOMALHAUT,
-    "ALPHA PISCIS AUSTRINI": SE_FOMALHAUT,
-    "ALPHA PSA": SE_FOMALHAUT,
-    "24 PSA": SE_FOMALHAUT,
-    "α PSA": SE_FOMALHAUT,
-    "ALPSA": SE_FOMALHAUT,
-    "FUM AL-HUT": SE_FOMALHAUT,
-    "OS PISCIS MERIDIANI": SE_FOMALHAUT,
-    "LONELY STAR": SE_FOMALHAUT,
-    "HASTORANG": SE_FOMALHAUT,
-    "WATCHER OF THE SOUTH": SE_FOMALHAUT,
+    "FISH'S MOUTH": FOMALHAUT,
+    "ALPHA PISCIS AUSTRINI": FOMALHAUT,
+    "ALPHA PSA": FOMALHAUT,
+    "24 PSA": FOMALHAUT,
+    "α PSA": FOMALHAUT,
+    "ALPSA": FOMALHAUT,
+    "FUM AL-HUT": FOMALHAUT,
+    "OS PISCIS MERIDIANI": FOMALHAUT,
+    "LONELY STAR": FOMALHAUT,
+    "HASTORANG": FOMALHAUT,
+    "WATCHER OF THE SOUTH": FOMALHAUT,
     # ======== BETELGEUSE (Alpha Orionis) ========
-    "ARMPIT OF ORION": SE_BETELGEUSE,
-    "ALPHA ORIONIS": SE_BETELGEUSE,
-    "ALPHA ORI": SE_BETELGEUSE,
-    "58 ORI": SE_BETELGEUSE,
-    "α ORI": SE_BETELGEUSE,
-    "ALORI": SE_BETELGEUSE,
-    "BETELGEUZE": SE_BETELGEUSE,
-    "IBT AL-JAUZAH": SE_BETELGEUSE,
-    "ARDRA": SE_BETELGEUSE,
-    "YAD AL-JAWZA": SE_BETELGEUSE,
+    "ARMPIT OF ORION": BETELGEUSE,
+    "ALPHA ORIONIS": BETELGEUSE,
+    "ALPHA ORI": BETELGEUSE,
+    "58 ORI": BETELGEUSE,
+    "α ORI": BETELGEUSE,
+    "ALORI": BETELGEUSE,
+    "BETELGEUZE": BETELGEUSE,
+    "IBT AL-JAUZAH": BETELGEUSE,
+    "ARDRA": BETELGEUSE,
+    "YAD AL-JAWZA": BETELGEUSE,
     # ======== RIGEL (Beta Orionis) ========
-    "FOOT OF ORION": SE_RIGEL,
-    "BETA ORIONIS": SE_RIGEL,
-    "BETA ORI": SE_RIGEL,
-    "19 ORI": SE_RIGEL,
-    "β ORI": SE_RIGEL,
-    "BEORI": SE_RIGEL,
-    "ALGEBAR": SE_RIGEL,
-    "RIJL JAUZAH AL-YUSRA": SE_RIGEL,
-    "ORION'S FOOT": SE_RIGEL,
+    "FOOT OF ORION": RIGEL,
+    "BETA ORIONIS": RIGEL,
+    "BETA ORI": RIGEL,
+    "19 ORI": RIGEL,
+    "β ORI": RIGEL,
+    "BEORI": RIGEL,
+    "ALGEBAR": RIGEL,
+    "RIJL JAUZAH AL-YUSRA": RIGEL,
+    "ORION'S FOOT": RIGEL,
     # ======== PROCYON (Alpha Canis Minoris) ========
-    "LITTLE DOG STAR": SE_PROCYON,
-    "ALPHA CANIS MINORIS": SE_PROCYON,
-    "ALPHA CMI": SE_PROCYON,
-    "10 CMI": SE_PROCYON,
-    "α CMI": SE_PROCYON,
-    "ALCMI": SE_PROCYON,
-    "ANTECANIS": SE_PROCYON,
-    "ELGOMAISA": SE_PROCYON,
-    "AL-GHUMAISA": SE_PROCYON,
+    "LITTLE DOG STAR": PROCYON,
+    "ALPHA CANIS MINORIS": PROCYON,
+    "ALPHA CMI": PROCYON,
+    "10 CMI": PROCYON,
+    "α CMI": PROCYON,
+    "ALCMI": PROCYON,
+    "ANTECANIS": PROCYON,
+    "ELGOMAISA": PROCYON,
+    "AL-GHUMAISA": PROCYON,
     # ======== CAPELLA (Alpha Aurigae) ========
-    "SHE-GOAT": SE_CAPELLA,
-    "ALPHA AURIGAE": SE_CAPELLA,
-    "ALPHA AUR": SE_CAPELLA,
-    "13 AUR": SE_CAPELLA,
-    "α AUR": SE_CAPELLA,
-    "ALAUR": SE_CAPELLA,
-    "ALHAJOTH": SE_CAPELLA,
-    "AMALTHEA": SE_CAPELLA,
-    "GOAT STAR": SE_CAPELLA,
+    "SHE-GOAT": CAPELLA,
+    "ALPHA AURIGAE": CAPELLA,
+    "ALPHA AUR": CAPELLA,
+    "13 AUR": CAPELLA,
+    "α AUR": CAPELLA,
+    "ALAUR": CAPELLA,
+    "ALHAJOTH": CAPELLA,
+    "AMALTHEA": CAPELLA,
+    "GOAT STAR": CAPELLA,
     # ======== ARCTURUS (Alpha Bootis) ========
-    "BEAR GUARD": SE_ARCTURUS,
-    "ALPHA BOOTIS": SE_ARCTURUS,
-    "ALPHA BOO": SE_ARCTURUS,
-    "16 BOO": SE_ARCTURUS,
-    "α BOO": SE_ARCTURUS,
-    "ALBOO": SE_ARCTURUS,
-    "AL-SIMAK AL-RAMIH": SE_ARCTURUS,
-    "HARIS AL-SAMA": SE_ARCTURUS,
-    "GUARDIAN OF BEAR": SE_ARCTURUS,
+    "BEAR GUARD": ARCTURUS,
+    "ALPHA BOOTIS": ARCTURUS,
+    "ALPHA BOO": ARCTURUS,
+    "16 BOO": ARCTURUS,
+    "α BOO": ARCTURUS,
+    "ALBOO": ARCTURUS,
+    "AL-SIMAK AL-RAMIH": ARCTURUS,
+    "HARIS AL-SAMA": ARCTURUS,
+    "GUARDIAN OF BEAR": ARCTURUS,
     # ======== DENEB (Alpha Cygni) ========
-    "TAIL OF HEN": SE_DENEB,
-    "ALPHA CYGNI": SE_DENEB,
-    "ALPHA CYG": SE_DENEB,
-    "50 CYG": SE_DENEB,
-    "α CYG": SE_DENEB,
-    "ALCYG": SE_DENEB,
-    "DHANAB AD-DAJAJAH": SE_DENEB,
-    "ARIDED": SE_DENEB,
-    "GALLINA": SE_DENEB,
+    "TAIL OF HEN": DENEB,
+    "ALPHA CYGNI": DENEB,
+    "ALPHA CYG": DENEB,
+    "50 CYG": DENEB,
+    "α CYG": DENEB,
+    "ALCYG": DENEB,
+    "DHANAB AD-DAJAJAH": DENEB,
+    "ARIDED": DENEB,
+    "GALLINA": DENEB,
     # ======== POLLUX (Beta Geminorum) ========
-    "TWIN STAR": SE_POLLUX,
-    "BETA GEMINORUM": SE_POLLUX,
-    "BETA GEM": SE_POLLUX,
-    "78 GEM": SE_POLLUX,
-    "β GEM": SE_POLLUX,
-    "BEGEM": SE_POLLUX,
-    "POLYDEUCES": SE_POLLUX,
-    "HEAD OF SECOND TWIN": SE_POLLUX,
+    "TWIN STAR": POLLUX,
+    "BETA GEMINORUM": POLLUX,
+    "BETA GEM": POLLUX,
+    "78 GEM": POLLUX,
+    "β GEM": POLLUX,
+    "BEGEM": POLLUX,
+    "POLYDEUCES": POLLUX,
+    "HEAD OF SECOND TWIN": POLLUX,
     # ======== CASTOR (Alpha Geminorum) ========
-    "ALPHA GEMINORUM": SE_CASTOR,
-    "ALPHA GEM": SE_CASTOR,
-    "66 GEM": SE_CASTOR,
-    "α GEM": SE_CASTOR,
-    "ALGEM": SE_CASTOR,
-    "APOLLO": SE_CASTOR,
-    "HEAD OF FIRST TWIN": SE_CASTOR,
+    "ALPHA GEMINORUM": CASTOR,
+    "ALPHA GEM": CASTOR,
+    "66 GEM": CASTOR,
+    "α GEM": CASTOR,
+    "ALGEM": CASTOR,
+    "APOLLO": CASTOR,
+    "HEAD OF FIRST TWIN": CASTOR,
     # ======== ALTAIR (Alpha Aquilae) ========
-    "FLYING EAGLE": SE_ALTAIR,
-    "ALPHA AQUILAE": SE_ALTAIR,
-    "ALPHA AQL": SE_ALTAIR,
-    "53 AQL": SE_ALTAIR,
-    "α AQL": SE_ALTAIR,
-    "ALAQL": SE_ALTAIR,
-    "AL-NASR AL-TAIR": SE_ALTAIR,
-    "ATAIR": SE_ALTAIR,
-    "SRAVANA": SE_ALTAIR,
+    "FLYING EAGLE": ALTAIR,
+    "ALPHA AQUILAE": ALTAIR,
+    "ALPHA AQL": ALTAIR,
+    "53 AQL": ALTAIR,
+    "α AQL": ALTAIR,
+    "ALAQL": ALTAIR,
+    "AL-NASR AL-TAIR": ALTAIR,
+    "ATAIR": ALTAIR,
+    "SRAVANA": ALTAIR,
     # ======== ACHERNAR (Alpha Eridani) ========
-    "END OF RIVER": SE_ACHERNAR,
-    "ALPHA ERIDANI": SE_ACHERNAR,
-    "ALPHA ERI": SE_ACHERNAR,
-    "α ERI": SE_ACHERNAR,
-    "ALERI": SE_ACHERNAR,
-    "AKHIR AN-NAHR": SE_ACHERNAR,
-    "RIVER'S END": SE_ACHERNAR,
+    "END OF RIVER": ACHERNAR,
+    "ALPHA ERIDANI": ACHERNAR,
+    "ALPHA ERI": ACHERNAR,
+    "α ERI": ACHERNAR,
+    "ALERI": ACHERNAR,
+    "AKHIR AN-NAHR": ACHERNAR,
+    "RIVER'S END": ACHERNAR,
     # ======== CANOPUS (Alpha Carinae) ========
-    "SHIP'S PILOT": SE_CANOPUS,
-    "ALPHA CARINAE": SE_CANOPUS,
-    "ALPHA CAR": SE_CANOPUS,
-    "α CAR": SE_CANOPUS,
-    "ALCAR": SE_CANOPUS,
-    "SUHAIL": SE_CANOPUS,
-    "SUHAYL": SE_CANOPUS,
-    "AGASTYA": SE_CANOPUS,
+    "SHIP'S PILOT": CANOPUS,
+    "ALPHA CARINAE": CANOPUS,
+    "ALPHA CAR": CANOPUS,
+    "α CAR": CANOPUS,
+    "ALCAR": CANOPUS,
+    "SUHAIL": CANOPUS,
+    "SUHAYL": CANOPUS,
+    "AGASTYA": CANOPUS,
     # ======== ACRUX (Alpha Crucis) ========
-    "ALPHA CRUCIS": SE_ACRUX,
-    "ALPHA CRU": SE_ACRUX,
-    "α CRU": SE_ACRUX,
-    "ALCRU": SE_ACRUX,
-    "CRUX ALPHA": SE_ACRUX,
-    "STAR OF BETHLEHEM": SE_ACRUX,
+    "ALPHA CRUCIS": ACRUX,
+    "ALPHA CRU": ACRUX,
+    "α CRU": ACRUX,
+    "ALCRU": ACRUX,
+    "CRUX ALPHA": ACRUX,
+    "STAR OF BETHLEHEM": ACRUX,
     # ======== MIMOSA (Beta Crucis) ========
-    "BETA CRUCIS": SE_MIMOSA,
-    "BETA CRU": SE_MIMOSA,
-    "β CRU": SE_MIMOSA,
-    "BECRU": SE_MIMOSA,
-    "BECRUX": SE_MIMOSA,
-    "CRUX BETA": SE_MIMOSA,
+    "BETA CRUCIS": MIMOSA,
+    "BETA CRU": MIMOSA,
+    "β CRU": MIMOSA,
+    "BECRU": MIMOSA,
+    "BECRUX": MIMOSA,
+    "CRUX BETA": MIMOSA,
     # ======== GACRUX (Gamma Crucis) ========
-    "GAMMA CRUCIS": SE_GACRUX,
-    "GAMMA CRU": SE_GACRUX,
-    "γ CRU": SE_GACRUX,
-    "GACRU": SE_GACRUX,
-    "CRUX GAMMA": SE_GACRUX,
-    "RUBIDEA": SE_GACRUX,
+    "GAMMA CRUCIS": GACRUX,
+    "GAMMA CRU": GACRUX,
+    "γ CRU": GACRUX,
+    "GACRU": GACRUX,
+    "CRUX GAMMA": GACRUX,
+    "RUBIDEA": GACRUX,
     # ======== DELTA CRUCIS (Delta Crucis) ========
-    "DELTA CRUCIS": SE_DELTA_CRUCIS,
-    "DELTA CRU": SE_DELTA_CRUCIS,
-    "δ CRU": SE_DELTA_CRUCIS,
-    "DECRU": SE_DELTA_CRUCIS,
-    "CRUX DELTA": SE_DELTA_CRUCIS,
-    "DECRUX": SE_DELTA_CRUCIS,
+    "DELTA CRUCIS": DELTA_CRUCIS,
+    "DELTA CRU": DELTA_CRUCIS,
+    "δ CRU": DELTA_CRUCIS,
+    "DECRU": DELTA_CRUCIS,
+    "CRUX DELTA": DELTA_CRUCIS,
+    "DECRUX": DELTA_CRUCIS,
     # ======== HADAR (Beta Centauri) ========
-    "BETA CENTAURI": SE_HADAR,
-    "BETA CEN": SE_HADAR,
-    "β CEN": SE_HADAR,
-    "BECEN": SE_HADAR,
-    "AGENA": SE_HADAR,
-    "KNEE OF CENTAUR": SE_HADAR,
+    "BETA CENTAURI": HADAR,
+    "BETA CEN": HADAR,
+    "β CEN": HADAR,
+    "BECEN": HADAR,
+    "AGENA": HADAR,
+    "KNEE OF CENTAUR": HADAR,
     # ======== RIGIL KENTAURUS (Alpha Centauri) ========
-    "ALPHA CENTAURI": SE_RIGIL_KENT,
-    "ALPHA CEN": SE_RIGIL_KENT,
-    "α CEN": SE_RIGIL_KENT,
-    "ALCEN": SE_RIGIL_KENT,
-    "TOLIMAN": SE_RIGIL_KENT,
-    "RIGIL KENT": SE_RIGIL_KENT,
-    "FOOT OF CENTAUR": SE_RIGIL_KENT,
-    "BUNGULA": SE_RIGIL_KENT,
+    "ALPHA CENTAURI": RIGIL_KENT,
+    "ALPHA CEN": RIGIL_KENT,
+    "α CEN": RIGIL_KENT,
+    "ALCEN": RIGIL_KENT,
+    "TOLIMAN": RIGIL_KENT,
+    "RIGIL KENT": RIGIL_KENT,
+    "FOOT OF CENTAUR": RIGIL_KENT,
+    "BUNGULA": RIGIL_KENT,
     # ======== MENKENT (Theta Centauri) ========
-    "THETA CENTAURI": SE_MENKENT,
-    "THETA CEN": SE_MENKENT,
-    "θ CEN": SE_MENKENT,
-    "THCEN": SE_MENKENT,
-    "HARATAN": SE_MENKENT,
+    "THETA CENTAURI": MENKENT,
+    "THETA CEN": MENKENT,
+    "θ CEN": MENKENT,
+    "THCEN": MENKENT,
+    "HARATAN": MENKENT,
     # ======== MUHLIFAIN (Gamma Centauri) ========
-    "GAMMA CENTAURI": SE_MUHLIFAIN,
-    "GAMMA CEN": SE_MUHLIFAIN,
-    "γ CEN": SE_MUHLIFAIN,
-    "GACEN": SE_MUHLIFAIN,
+    "GAMMA CENTAURI": MUHLIFAIN,
+    "GAMMA CEN": MUHLIFAIN,
+    "γ CEN": MUHLIFAIN,
+    "GACEN": MUHLIFAIN,
     # ======== EPSILON CENTAURI ========
-    "EPSILON CENTAURI": SE_EPSILON_CENTAURI,
-    "EPSILON CEN": SE_EPSILON_CENTAURI,
-    "ε CEN": SE_EPSILON_CENTAURI,
-    "EPCEN": SE_EPSILON_CENTAURI,
+    "EPSILON CENTAURI": EPSILON_CENTAURI,
+    "EPSILON CEN": EPSILON_CENTAURI,
+    "ε CEN": EPSILON_CENTAURI,
+    "EPCEN": EPSILON_CENTAURI,
     # ======== ETA CENTAURI ========
-    "ETA CENTAURI": SE_ETA_CENTAURI,
-    "ETA CEN": SE_ETA_CENTAURI,
-    "η CEN": SE_ETA_CENTAURI,
-    "ETCEN": SE_ETA_CENTAURI,
+    "ETA CENTAURI": ETA_CENTAURI,
+    "ETA CEN": ETA_CENTAURI,
+    "η CEN": ETA_CENTAURI,
+    "ETCEN": ETA_CENTAURI,
     # ======== ZETA CENTAURI ========
-    "ZETA CENTAURI": SE_ZETA_CENTAURI,
-    "ZETA CEN": SE_ZETA_CENTAURI,
-    "ζ CEN": SE_ZETA_CENTAURI,
-    "ZECEN": SE_ZETA_CENTAURI,
-    "ALNAIR": SE_ZETA_CENTAURI,
+    "ZETA CENTAURI": ZETA_CENTAURI,
+    "ZETA CEN": ZETA_CENTAURI,
+    "ζ CEN": ZETA_CENTAURI,
+    "ZECEN": ZETA_CENTAURI,
+    "ALNAIR": ZETA_CENTAURI,
     # ======== SHAULA (Lambda Scorpii) ========
-    "LAMBDA SCORPII": SE_SHAULA,
-    "LAMBDA SCO": SE_SHAULA,
-    "λ SCO": SE_SHAULA,
-    "LASCO": SE_SHAULA,
-    "SCORPION'S STING": SE_SHAULA,
-    "35 SCO": SE_SHAULA,
+    "LAMBDA SCORPII": SHAULA,
+    "LAMBDA SCO": SHAULA,
+    "λ SCO": SHAULA,
+    "LASCO": SHAULA,
+    "SCORPION'S STING": SHAULA,
+    "35 SCO": SHAULA,
     # ======== BELLATRIX (Gamma Orionis) ========
-    "AMAZON STAR": SE_BELLATRIX,
-    "GAMMA ORIONIS": SE_BELLATRIX,
-    "GAMMA ORI": SE_BELLATRIX,
-    "24 ORI": SE_BELLATRIX,
-    "γ ORI": SE_BELLATRIX,
-    "GAORI": SE_BELLATRIX,
-    "FEMALE WARRIOR": SE_BELLATRIX,
+    "AMAZON STAR": BELLATRIX,
+    "GAMMA ORIONIS": BELLATRIX,
+    "GAMMA ORI": BELLATRIX,
+    "24 ORI": BELLATRIX,
+    "γ ORI": BELLATRIX,
+    "GAORI": BELLATRIX,
+    "FEMALE WARRIOR": BELLATRIX,
     # ======== ELNATH (Beta Tauri) ========
-    "BETA TAURI": SE_ELNATH,
-    "BETA TAU": SE_ELNATH,
-    "112 TAU": SE_ELNATH,
-    "β TAU": SE_ELNATH,
-    "BETAU": SE_ELNATH,
-    "NATH": SE_ELNATH,
-    "AL-NATH": SE_ELNATH,
-    "EL NATH": SE_ELNATH,
+    "BETA TAURI": ELNATH,
+    "BETA TAU": ELNATH,
+    "112 TAU": ELNATH,
+    "β TAU": ELNATH,
+    "BETAU": ELNATH,
+    "NATH": ELNATH,
+    "AL-NATH": ELNATH,
+    "EL NATH": ELNATH,
     # ======== MIRA (Omicron Ceti) ========
-    "WONDERFUL STAR": SE_MIRA,
-    "OMICRON CETI": SE_MIRA,
-    "OMICRON CET": SE_MIRA,
-    "68 CET": SE_MIRA,
-    "ο CET": SE_MIRA,
-    "OMCET": SE_MIRA,
-    "STELLA MIRA": SE_MIRA,
+    "WONDERFUL STAR": MIRA,
+    "OMICRON CETI": MIRA,
+    "OMICRON CET": MIRA,
+    "68 CET": MIRA,
+    "ο CET": MIRA,
+    "OMCET": MIRA,
+    "STELLA MIRA": MIRA,
     # ======== ALNILAM (Epsilon Orionis) ========
-    "STRING OF PEARLS": SE_ALNILAM,
-    "EPSILON ORIONIS": SE_ALNILAM,
-    "EPSILON ORI": SE_ALNILAM,
-    "46 ORI": SE_ALNILAM,
-    "ε ORI": SE_ALNILAM,
-    "EPORI": SE_ALNILAM,
-    "AL-NIZAM": SE_ALNILAM,
+    "STRING OF PEARLS": ALNILAM,
+    "EPSILON ORIONIS": ALNILAM,
+    "EPSILON ORI": ALNILAM,
+    "46 ORI": ALNILAM,
+    "ε ORI": ALNILAM,
+    "EPORI": ALNILAM,
+    "AL-NIZAM": ALNILAM,
     # ======== ALNITAK (Zeta Orionis) ========
-    "GIRDLE": SE_ALNITAK,
-    "ZETA ORIONIS": SE_ALNITAK,
-    "ZETA ORI": SE_ALNITAK,
-    "50 ORI": SE_ALNITAK,
-    "ζ ORI": SE_ALNITAK,
-    "ZEORI": SE_ALNITAK,
-    "AL-NITAK": SE_ALNITAK,
+    "GIRDLE": ALNITAK,
+    "ZETA ORIONIS": ALNITAK,
+    "ZETA ORI": ALNITAK,
+    "50 ORI": ALNITAK,
+    "ζ ORI": ALNITAK,
+    "ZEORI": ALNITAK,
+    "AL-NITAK": ALNITAK,
     # ======== MINTAKA (Delta Orionis) ========
-    "BELT STAR": SE_MINTAKA,
-    "DELTA ORIONIS": SE_MINTAKA,
-    "DELTA ORI": SE_MINTAKA,
-    "34 ORI": SE_MINTAKA,
-    "δ ORI": SE_MINTAKA,
-    "DEORI": SE_MINTAKA,
-    "MINTAKA": SE_MINTAKA,
+    "BELT STAR": MINTAKA,
+    "DELTA ORIONIS": MINTAKA,
+    "DELTA ORI": MINTAKA,
+    "34 ORI": MINTAKA,
+    "δ ORI": MINTAKA,
+    "DEORI": MINTAKA,
+    "MINTAKA": MINTAKA,
     # ======== SAIPH (Kappa Orionis) ========
-    "SWORD OF GIANT": SE_SAIPH,
-    "KAPPA ORIONIS": SE_SAIPH,
-    "KAPPA ORI": SE_SAIPH,
-    "53 ORI": SE_SAIPH,
-    "κ ORI": SE_SAIPH,
-    "KAORI": SE_SAIPH,
-    "SAIF AL-JABBAR": SE_SAIPH,
+    "SWORD OF GIANT": SAIPH,
+    "KAPPA ORIONIS": SAIPH,
+    "KAPPA ORI": SAIPH,
+    "53 ORI": SAIPH,
+    "κ ORI": SAIPH,
+    "KAORI": SAIPH,
+    "SAIF AL-JABBAR": SAIPH,
     # ======== MEISSA (Lambda Orionis) ========
-    "LAMBDA ORIONIS": SE_MEISSA,
-    "LAMBDA ORI": SE_MEISSA,
-    "39 ORI": SE_MEISSA,
-    "λ ORI": SE_MEISSA,
-    "LAORI": SE_MEISSA,
-    "HEKA": SE_MEISSA,
-    "HEAD OF ORION": SE_MEISSA,
-    "AL-MAISAN": SE_MEISSA,
+    "LAMBDA ORIONIS": MEISSA,
+    "LAMBDA ORI": MEISSA,
+    "39 ORI": MEISSA,
+    "λ ORI": MEISSA,
+    "LAORI": MEISSA,
+    "HEKA": MEISSA,
+    "HEAD OF ORION": MEISSA,
+    "AL-MAISAN": MEISSA,
     # ======== DIPHDA (Beta Ceti) ========
-    "FROG": SE_DIPHDA,
-    "BETA CETI": SE_DIPHDA,
-    "BETA CET": SE_DIPHDA,
-    "16 CET": SE_DIPHDA,
-    "β CET": SE_DIPHDA,
-    "BECET": SE_DIPHDA,
-    "DENEB KAITOS": SE_DIPHDA,
-    "DIFDA AL-THANI": SE_DIPHDA,
+    "FROG": DIPHDA,
+    "BETA CETI": DIPHDA,
+    "BETA CET": DIPHDA,
+    "16 CET": DIPHDA,
+    "β CET": DIPHDA,
+    "BECET": DIPHDA,
+    "DENEB KAITOS": DIPHDA,
+    "DIFDA AL-THANI": DIPHDA,
     # ======== ALPHARD (Alpha Hydrae) ========
-    "SOLITARY ONE": SE_ALPHARD,
-    "ALPHA HYDRAE": SE_ALPHARD,
-    "ALPHA HYA": SE_ALPHARD,
-    "30 HYA": SE_ALPHARD,
-    "α HYA": SE_ALPHARD,
-    "ALHYA": SE_ALPHARD,
-    "COR HYDRAE": SE_ALPHARD,
-    "AL-FARD": SE_ALPHARD,
+    "SOLITARY ONE": ALPHARD,
+    "ALPHA HYDRAE": ALPHARD,
+    "ALPHA HYA": ALPHARD,
+    "30 HYA": ALPHARD,
+    "α HYA": ALPHARD,
+    "ALHYA": ALPHARD,
+    "COR HYDRAE": ALPHARD,
+    "AL-FARD": ALPHARD,
     # ======== RASALHAGUE (Alpha Ophiuchi) ========
-    "HEAD OF SERPENT HOLDER": SE_RASALHAGUE,
-    "ALPHA OPHIUCHI": SE_RASALHAGUE,
-    "ALPHA OPH": SE_RASALHAGUE,
-    "55 OPH": SE_RASALHAGUE,
-    "α OPH": SE_RASALHAGUE,
-    "ALOPH": SE_RASALHAGUE,
-    "RAS AL-HAWWA": SE_RASALHAGUE,
+    "HEAD OF SERPENT HOLDER": RASALHAGUE,
+    "ALPHA OPHIUCHI": RASALHAGUE,
+    "ALPHA OPH": RASALHAGUE,
+    "55 OPH": RASALHAGUE,
+    "α OPH": RASALHAGUE,
+    "ALOPH": RASALHAGUE,
+    "RAS AL-HAWWA": RASALHAGUE,
     # ======== ETAMIN (Gamma Draconis) ========
-    "DRAGON'S HEAD": SE_ETAMIN,
-    "GAMMA DRACONIS": SE_ETAMIN,
-    "GAMMA DRA": SE_ETAMIN,
-    "33 DRA": SE_ETAMIN,
-    "γ DRA": SE_ETAMIN,
-    "GADORA": SE_ETAMIN,
-    "ELTANIN": SE_ETAMIN,
-    "AL-TINNIN": SE_ETAMIN,
+    "DRAGON'S HEAD": ETAMIN,
+    "GAMMA DRACONIS": ETAMIN,
+    "GAMMA DRA": ETAMIN,
+    "33 DRA": ETAMIN,
+    "γ DRA": ETAMIN,
+    "GADORA": ETAMIN,
+    "ELTANIN": ETAMIN,
+    "AL-TINNIN": ETAMIN,
     # ======== KOCHAB (Beta Ursae Minoris) ========
-    "BETA URSAE MINORIS": SE_KOCHAB,
-    "BETA UMI": SE_KOCHAB,
-    "7 UMI": SE_KOCHAB,
-    "β UMI": SE_KOCHAB,
-    "BEUMI": SE_KOCHAB,
-    "KAUKAB": SE_KOCHAB,
+    "BETA URSAE MINORIS": KOCHAB,
+    "BETA UMI": KOCHAB,
+    "7 UMI": KOCHAB,
+    "β UMI": KOCHAB,
+    "BEUMI": KOCHAB,
+    "KAUKAB": KOCHAB,
     # ======== ALKAID (Eta Ursae Majoris) ========
-    "END OF TAIL": SE_ALKAID,
-    "ETA URSAE MAJORIS": SE_ALKAID,
-    "ETA UMA": SE_ALKAID,
-    "85 UMA": SE_ALKAID,
-    "η UMA": SE_ALKAID,
-    "ETUMA": SE_ALKAID,
-    "BENETNASH": SE_ALKAID,
-    "AL-QA'ID": SE_ALKAID,
+    "END OF TAIL": ALKAID,
+    "ETA URSAE MAJORIS": ALKAID,
+    "ETA UMA": ALKAID,
+    "85 UMA": ALKAID,
+    "η UMA": ALKAID,
+    "ETUMA": ALKAID,
+    "BENETNASH": ALKAID,
+    "AL-QA'ID": ALKAID,
     # ======== DUBHE (Alpha Ursae Majoris) ========
-    "BEAR'S BACK": SE_DUBHE,
-    "ALPHA URSAE MAJORIS": SE_DUBHE,
-    "ALPHA UMA": SE_DUBHE,
-    "50 UMA": SE_DUBHE,
-    "α UMA": SE_DUBHE,
-    "ALUMA": SE_DUBHE,
-    "THAHR AL-DUBB AL-AKBAR": SE_DUBHE,
+    "BEAR'S BACK": DUBHE,
+    "ALPHA URSAE MAJORIS": DUBHE,
+    "ALPHA UMA": DUBHE,
+    "50 UMA": DUBHE,
+    "α UMA": DUBHE,
+    "ALUMA": DUBHE,
+    "THAHR AL-DUBB AL-AKBAR": DUBHE,
     # ======== MERAK (Beta Ursae Majoris) ========
-    "BETA URSAE MAJORIS": SE_MERAK,
-    "BETA UMA": SE_MERAK,
-    "48 UMA": SE_MERAK,
-    "β UMA": SE_MERAK,
-    "BEUMA": SE_MERAK,
-    "AL-MARAKK": SE_MERAK,
+    "BETA URSAE MAJORIS": MERAK,
+    "BETA UMA": MERAK,
+    "48 UMA": MERAK,
+    "β UMA": MERAK,
+    "BEUMA": MERAK,
+    "AL-MARAKK": MERAK,
     # ======== ALIOTH (Epsilon Ursae Majoris) ========
-    "EPSILON URSAE MAJORIS": SE_ALIOTH,
-    "EPSILON UMA": SE_ALIOTH,
-    "77 UMA": SE_ALIOTH,
-    "ε UMA": SE_ALIOTH,
-    "EPUMA": SE_ALIOTH,
-    "ALIATH": SE_ALIOTH,
+    "EPSILON URSAE MAJORIS": ALIOTH,
+    "EPSILON UMA": ALIOTH,
+    "77 UMA": ALIOTH,
+    "ε UMA": ALIOTH,
+    "EPUMA": ALIOTH,
+    "ALIATH": ALIOTH,
     # ======== MIZAR (Zeta Ursae Majoris) ========
-    "ZETA URSAE MAJORIS": SE_MIZAR,
-    "ZETA UMA": SE_MIZAR,
-    "79 UMA": SE_MIZAR,
-    "ζ UMA": SE_MIZAR,
-    "ZEUMA": SE_MIZAR,
-    "HORSE AND RIDER": SE_MIZAR,
+    "ZETA URSAE MAJORIS": MIZAR,
+    "ZETA UMA": MIZAR,
+    "79 UMA": MIZAR,
+    "ζ UMA": MIZAR,
+    "ZEUMA": MIZAR,
+    "HORSE AND RIDER": MIZAR,
     # ======== ALCOR (80 Ursae Majoris) ========
-    "80 URSAE MAJORIS": SE_ALCOR,
-    "80 UMA": SE_ALCOR,
-    "G UMA": SE_ALCOR,
-    "SAIDAK": SE_ALCOR,
-    "SUHA": SE_ALCOR,
-    "AL-SAHJA": SE_ALCOR,
+    "80 URSAE MAJORIS": ALCOR,
+    "80 UMA": ALCOR,
+    "G UMA": ALCOR,
+    "SAIDAK": ALCOR,
+    "SUHA": ALCOR,
+    "AL-SAHJA": ALCOR,
     # ======== PHECDA (Gamma Ursae Majoris) ========
-    "GAMMA URSAE MAJORIS": SE_PHECDA,
-    "GAMMA UMA": SE_PHECDA,
-    "64 UMA": SE_PHECDA,
-    "γ UMA": SE_PHECDA,
-    "GAUMA": SE_PHECDA,
-    "PHAD": SE_PHECDA,
-    "PHEKDA": SE_PHECDA,
-    "PHACD": SE_PHECDA,
+    "GAMMA URSAE MAJORIS": PHECDA,
+    "GAMMA UMA": PHECDA,
+    "64 UMA": PHECDA,
+    "γ UMA": PHECDA,
+    "GAUMA": PHECDA,
+    "PHAD": PHECDA,
+    "PHEKDA": PHECDA,
+    "PHACD": PHECDA,
     # ======== MEGREZ (Delta Ursae Majoris) ========
-    "DELTA URSAE MAJORIS": SE_MEGREZ,
-    "DELTA UMA": SE_MEGREZ,
-    "69 UMA": SE_MEGREZ,
-    "δ UMA": SE_MEGREZ,
-    "DEUMA": SE_MEGREZ,
-    "KAFFA": SE_MEGREZ,
+    "DELTA URSAE MAJORIS": MEGREZ,
+    "DELTA UMA": MEGREZ,
+    "69 UMA": MEGREZ,
+    "δ UMA": MEGREZ,
+    "DEUMA": MEGREZ,
+    "KAFFA": MEGREZ,
     # ======== VINDEMIATRIX (Epsilon Virginis) ========
-    "GRAPE GATHERER": SE_VINDEMIATRIX,
-    "EPSILON VIRGINIS": SE_VINDEMIATRIX,
-    "EPSILON VIR": SE_VINDEMIATRIX,
-    "47 VIR": SE_VINDEMIATRIX,
-    "ε VIR": SE_VINDEMIATRIX,
-    "EPVIR": SE_VINDEMIATRIX,
-    "ALMUREDIN": SE_VINDEMIATRIX,
+    "GRAPE GATHERER": VINDEMIATRIX,
+    "EPSILON VIRGINIS": VINDEMIATRIX,
+    "EPSILON VIR": VINDEMIATRIX,
+    "47 VIR": VINDEMIATRIX,
+    "ε VIR": VINDEMIATRIX,
+    "EPVIR": VINDEMIATRIX,
+    "ALMUREDIN": VINDEMIATRIX,
     # ======== ZUBENELGENUBI (Alpha Librae) ========
-    "SOUTHERN CLAW": SE_ZUBENELGENUBI,
-    "ALPHA LIBRAE": SE_ZUBENELGENUBI,
-    "ALPHA LIB": SE_ZUBENELGENUBI,
-    "9 LIB": SE_ZUBENELGENUBI,
-    "α LIB": SE_ZUBENELGENUBI,
-    "ALLIB": SE_ZUBENELGENUBI,
-    "KIFFA AUSTRALIS": SE_ZUBENELGENUBI,
+    "SOUTHERN CLAW": ZUBENELGENUBI,
+    "ALPHA LIBRAE": ZUBENELGENUBI,
+    "ALPHA LIB": ZUBENELGENUBI,
+    "9 LIB": ZUBENELGENUBI,
+    "α LIB": ZUBENELGENUBI,
+    "ALLIB": ZUBENELGENUBI,
+    "KIFFA AUSTRALIS": ZUBENELGENUBI,
     # ======== ZUBENESCHAMALI (Beta Librae) ========
-    "NORTHERN CLAW": SE_ZUBENESCHAMALI,
-    "BETA LIBRAE": SE_ZUBENESCHAMALI,
-    "BETA LIB": SE_ZUBENESCHAMALI,
-    "27 LIB": SE_ZUBENESCHAMALI,
-    "β LIB": SE_ZUBENESCHAMALI,
-    "BELIB": SE_ZUBENESCHAMALI,
-    "KIFFA BOREALIS": SE_ZUBENESCHAMALI,
+    "NORTHERN CLAW": ZUBENESCHAMALI,
+    "BETA LIBRAE": ZUBENESCHAMALI,
+    "BETA LIB": ZUBENESCHAMALI,
+    "27 LIB": ZUBENESCHAMALI,
+    "β LIB": ZUBENESCHAMALI,
+    "BELIB": ZUBENESCHAMALI,
+    "KIFFA BOREALIS": ZUBENESCHAMALI,
     # ======== UNUKALHAI (Alpha Serpentis) ========
-    "SERPENT'S NECK": SE_UNUKALHAI,
-    "ALPHA SERPENTIS": SE_UNUKALHAI,
-    "ALPHA SER": SE_UNUKALHAI,
-    "24 SER": SE_UNUKALHAI,
-    "α SER": SE_UNUKALHAI,
-    "ALSER": SE_UNUKALHAI,
-    "COR SERPENTIS": SE_UNUKALHAI,
+    "SERPENT'S NECK": UNUKALHAI,
+    "ALPHA SERPENTIS": UNUKALHAI,
+    "ALPHA SER": UNUKALHAI,
+    "24 SER": UNUKALHAI,
+    "α SER": UNUKALHAI,
+    "ALSER": UNUKALHAI,
+    "COR SERPENTIS": UNUKALHAI,
     # ======== ALGIEBA (Gamma Leonis) ========
-    "LION'S MANE": SE_ALGIEBA,
-    "GAMMA LEONIS": SE_ALGIEBA,
-    "GAMMA LEO": SE_ALGIEBA,
-    "41 LEO": SE_ALGIEBA,
-    "γ LEO": SE_ALGIEBA,
-    "GALEO": SE_ALGIEBA,
-    "AL-JABHAH": SE_ALGIEBA,
+    "LION'S MANE": ALGIEBA,
+    "GAMMA LEONIS": ALGIEBA,
+    "GAMMA LEO": ALGIEBA,
+    "41 LEO": ALGIEBA,
+    "γ LEO": ALGIEBA,
+    "GALEO": ALGIEBA,
+    "AL-JABHAH": ALGIEBA,
     # ======== DENEBOLA (Beta Leonis) ========
-    "LION'S TAIL": SE_DENEBOLA,
-    "BETA LEONIS": SE_DENEBOLA,
-    "BETA LEO": SE_DENEBOLA,
-    "94 LEO": SE_DENEBOLA,
-    "β LEO": SE_DENEBOLA,
-    "BELEO": SE_DENEBOLA,
-    "DHANAB AL-ASAD": SE_DENEBOLA,
+    "LION'S TAIL": DENEBOLA,
+    "BETA LEONIS": DENEBOLA,
+    "BETA LEO": DENEBOLA,
+    "94 LEO": DENEBOLA,
+    "β LEO": DENEBOLA,
+    "BELEO": DENEBOLA,
+    "DHANAB AL-ASAD": DENEBOLA,
     # ======== MARKAB (Alpha Pegasi) ========
-    "SADDLE": SE_MARKAB,
-    "ALPHA PEGASI": SE_MARKAB,
-    "ALPHA PEG": SE_MARKAB,
-    "54 PEG": SE_MARKAB,
-    "α PEG": SE_MARKAB,
-    "ALPEG": SE_MARKAB,
-    "MANKIB AL-FARAS": SE_MARKAB,
+    "SADDLE": MARKAB,
+    "ALPHA PEGASI": MARKAB,
+    "ALPHA PEG": MARKAB,
+    "54 PEG": MARKAB,
+    "α PEG": MARKAB,
+    "ALPEG": MARKAB,
+    "MANKIB AL-FARAS": MARKAB,
     # ======== SCHEAT (Beta Pegasi) ========
-    "LEG": SE_SCHEAT,
-    "BETA PEGASI": SE_SCHEAT,
-    "BETA PEG": SE_SCHEAT,
-    "53 PEG": SE_SCHEAT,
-    "β PEG": SE_SCHEAT,
-    "BEPEG": SE_SCHEAT,
-    "SAQ AL-FARAS": SE_SCHEAT,
+    "LEG": SCHEAT,
+    "BETA PEGASI": SCHEAT,
+    "BETA PEG": SCHEAT,
+    "53 PEG": SCHEAT,
+    "β PEG": SCHEAT,
+    "BEPEG": SCHEAT,
+    "SAQ AL-FARAS": SCHEAT,
     # ======== ALCYONE (Eta Tauri - Pleiades) - BEHENIAN ========
-    "PLEIADES": SE_ALCYONE,
-    "ETA TAURI": SE_ALCYONE,
-    "ETA TAU": SE_ALCYONE,
-    "25 TAU": SE_ALCYONE,
-    "η TAU": SE_ALCYONE,
-    "ETTAU": SE_ALCYONE,
-    "SEVEN SISTERS": SE_ALCYONE,
-    "KIMAH": SE_ALCYONE,
-    "AL-THURAYYA": SE_ALCYONE,
+    "PLEIADES": ALCYONE,
+    "ETA TAURI": ALCYONE,
+    "ETA TAU": ALCYONE,
+    "25 TAU": ALCYONE,
+    "η TAU": ALCYONE,
+    "ETTAU": ALCYONE,
+    "SEVEN SISTERS": ALCYONE,
+    "KIMAH": ALCYONE,
+    "AL-THURAYYA": ALCYONE,
     # ======== ALGORAB (Delta Corvi) - BEHENIAN ========
-    "CROW'S WING": SE_ALGORAB,
-    "DELTA CORVI": SE_ALGORAB,
-    "DELTA CRV": SE_ALGORAB,
-    "7 CRV": SE_ALGORAB,
-    "δ CRV": SE_ALGORAB,
-    "DECRV": SE_ALGORAB,
-    "AL-GHIRAB": SE_ALGORAB,
-    "GIENAH CORVI": SE_ALGORAB,
+    "CROW'S WING": ALGORAB,
+    "DELTA CORVI": ALGORAB,
+    "DELTA CRV": ALGORAB,
+    "7 CRV": ALGORAB,
+    "δ CRV": ALGORAB,
+    "DECRV": ALGORAB,
+    "AL-GHIRAB": ALGORAB,
+    "GIENAH CORVI": ALGORAB,
     # ======== ALPHECCA (Alpha Coronae Borealis) - BEHENIAN ========
-    "GEMMA": SE_ALPHECCA,
-    "ALPHA CORONAE BOREALIS": SE_ALPHECCA,
-    "ALPHA CRB": SE_ALPHECCA,
-    "5 CRB": SE_ALPHECCA,
-    "α CRB": SE_ALPHECCA,
-    "ALCRB": SE_ALPHECCA,
-    "GNOSIA STELLA": SE_ALPHECCA,
-    "MUNIR AL-FAKKAH": SE_ALPHECCA,
-    "ASHTAROTH": SE_ALPHECCA,
+    "GEMMA": ALPHECCA,
+    "ALPHA CORONAE BOREALIS": ALPHECCA,
+    "ALPHA CRB": ALPHECCA,
+    "5 CRB": ALPHECCA,
+    "α CRB": ALPHECCA,
+    "ALCRB": ALPHECCA,
+    "GNOSIA STELLA": ALPHECCA,
+    "MUNIR AL-FAKKAH": ALPHECCA,
+    "ASHTAROTH": ALPHECCA,
     # ======== DENEB ALGEDI (Delta Capricorni) - BEHENIAN ========
-    "TAIL OF THE GOAT": SE_DENEB_ALGEDI,
-    "DELTA CAPRICORNI": SE_DENEB_ALGEDI,
-    "DELTA CAP": SE_DENEB_ALGEDI,
-    "49 CAP": SE_DENEB_ALGEDI,
-    "δ CAP": SE_DENEB_ALGEDI,
-    "DECAP": SE_DENEB_ALGEDI,
-    "SCHEDDI": SE_DENEB_ALGEDI,
-    "DHANAB AL-JADY": SE_DENEB_ALGEDI,
+    "TAIL OF THE GOAT": DENEB_ALGEDI,
+    "DELTA CAPRICORNI": DENEB_ALGEDI,
+    "DELTA CAP": DENEB_ALGEDI,
+    "49 CAP": DENEB_ALGEDI,
+    "δ CAP": DENEB_ALGEDI,
+    "DECAP": DENEB_ALGEDI,
+    "SCHEDDI": DENEB_ALGEDI,
+    "DHANAB AL-JADY": DENEB_ALGEDI,
     # ======== ASTEROPE (21 Tauri - Pleiades) ========
-    "21 TAURI": SE_ASTEROPE,
-    "21 TAU": SE_ASTEROPE,
-    "STEROPE": SE_ASTEROPE,
-    "STEROPE I": SE_ASTEROPE,
+    "21 TAURI": ASTEROPE,
+    "21 TAU": ASTEROPE,
+    "STEROPE": ASTEROPE,
+    "STEROPE I": ASTEROPE,
     # ======== CELAENO (16 Tauri - Pleiades) ========
-    "16 TAURI": SE_CELAENO,
-    "16 TAU": SE_CELAENO,
-    "CELENO": SE_CELAENO,
+    "16 TAURI": CELAENO,
+    "16 TAU": CELAENO,
+    "CELENO": CELAENO,
     # ======== ELECTRA (17 Tauri - Pleiades) ========
-    "17 TAURI": SE_ELECTRA,
-    "17 TAU": SE_ELECTRA,
+    "17 TAURI": ELECTRA,
+    "17 TAU": ELECTRA,
     # ======== MAIA (20 Tauri - Pleiades) ========
-    "20 TAURI": SE_MAIA,
-    "20 TAU": SE_MAIA,
+    "20 TAURI": MAIA,
+    "20 TAU": MAIA,
     # ======== MEROPE (23 Tauri - Pleiades) ========
-    "23 TAURI": SE_MEROPE,
-    "23 TAU": SE_MEROPE,
+    "23 TAURI": MEROPE,
+    "23 TAU": MEROPE,
     # ======== TAYGETA (19 Tauri - Pleiades) ========
-    "19 TAURI": SE_TAYGETA,
-    "19 TAU": SE_TAYGETA,
-    "TAYGETE": SE_TAYGETA,
+    "19 TAURI": TAYGETA,
+    "19 TAU": TAYGETA,
+    "TAYGETE": TAYGETA,
     # ======== ATLAS (27 Tauri - Pleiades) ========
-    "27 TAURI": SE_ATLAS,
-    "27 TAU": SE_ATLAS,
+    "27 TAURI": ATLAS,
+    "27 TAU": ATLAS,
     # ======== PLEIONE (28 Tauri - Pleiades) ========
-    "28 TAURI": SE_PLEIONE,
-    "28 TAU": SE_PLEIONE,
+    "28 TAURI": PLEIONE,
+    "28 TAU": PLEIONE,
     # ======== PRIMA HYADUM (Gamma Tauri - Hyades) ========
-    "GAMMA TAURI": SE_PRIMA_HYADUM,
-    "GAMMA TAU": SE_PRIMA_HYADUM,
-    "54 TAU": SE_PRIMA_HYADUM,
-    "γ TAU": SE_PRIMA_HYADUM,
-    "GATAU": SE_PRIMA_HYADUM,
-    "HYADUM I": SE_PRIMA_HYADUM,
-    "FIRST HYAD": SE_PRIMA_HYADUM,
+    "GAMMA TAURI": PRIMA_HYADUM,
+    "GAMMA TAU": PRIMA_HYADUM,
+    "54 TAU": PRIMA_HYADUM,
+    "γ TAU": PRIMA_HYADUM,
+    "GATAU": PRIMA_HYADUM,
+    "HYADUM I": PRIMA_HYADUM,
+    "FIRST HYAD": PRIMA_HYADUM,
     # ======== SECUNDA HYADUM (Delta^1 Tauri - Hyades) ========
-    "DELTA TAURI": SE_SECUNDA_HYADUM,
-    "DELTA TAU": SE_SECUNDA_HYADUM,
-    "DELTA1 TAURI": SE_SECUNDA_HYADUM,
-    "DELTA1 TAU": SE_SECUNDA_HYADUM,
-    "61 TAU": SE_SECUNDA_HYADUM,
-    "δ TAU": SE_SECUNDA_HYADUM,
-    "DETAU": SE_SECUNDA_HYADUM,
-    "HYADUM II": SE_SECUNDA_HYADUM,
-    "SECOND HYAD": SE_SECUNDA_HYADUM,
+    "DELTA TAURI": SECUNDA_HYADUM,
+    "DELTA TAU": SECUNDA_HYADUM,
+    "DELTA1 TAURI": SECUNDA_HYADUM,
+    "DELTA1 TAU": SECUNDA_HYADUM,
+    "61 TAU": SECUNDA_HYADUM,
+    "δ TAU": SECUNDA_HYADUM,
+    "DETAU": SECUNDA_HYADUM,
+    "HYADUM II": SECUNDA_HYADUM,
+    "SECOND HYAD": SECUNDA_HYADUM,
     # ======== THETA TAURI (Theta^2 Tauri - Hyades) ========
-    "THETA2 TAURI": SE_THETA_TAURI,
-    "THETA2 TAU": SE_THETA_TAURI,
-    "78 TAU": SE_THETA_TAURI,
-    "θ TAU": SE_THETA_TAURI,
-    "THTAU": SE_THETA_TAURI,
-    "THETA^2 TAURI": SE_THETA_TAURI,
-    "THETA^2 TAU": SE_THETA_TAURI,
+    "THETA2 TAURI": THETA_TAURI,
+    "THETA2 TAU": THETA_TAURI,
+    "78 TAU": THETA_TAURI,
+    "θ TAU": THETA_TAURI,
+    "THTAU": THETA_TAURI,
+    "THETA^2 TAURI": THETA_TAURI,
+    "THETA^2 TAU": THETA_TAURI,
     # ======== AIN (Epsilon Tauri - Hyades) ========
-    "EPSILON TAURI": SE_AIN,
-    "EPSILON TAU": SE_AIN,
-    "74 TAU": SE_AIN,
-    "ε TAU": SE_AIN,
-    "EPTAU": SE_AIN,
-    "OCULUS BOREALIS": SE_AIN,
-    "BULL'S EYE": SE_AIN,
+    "EPSILON TAURI": AIN,
+    "EPSILON TAU": AIN,
+    "74 TAU": AIN,
+    "ε TAU": AIN,
+    "EPTAU": AIN,
+    "OCULUS BOREALIS": AIN,
+    "BULL'S EYE": AIN,
     # ======== SARGAS (Theta Scorpii) ========
-    "THETA SCORPII": SE_SARGAS,
-    "THETA SCO": SE_SARGAS,
-    "θ SCO": SE_SARGAS,
-    "THSCO": SE_SARGAS,
-    "GIRTAB": SE_SARGAS,
-    "SCORPION'S TAIL": SE_SARGAS,
+    "THETA SCORPII": SARGAS,
+    "THETA SCO": SARGAS,
+    "θ SCO": SARGAS,
+    "THSCO": SARGAS,
+    "GIRTAB": SARGAS,
+    "SCORPION'S TAIL": SARGAS,
     # ======== DSCHUBBA (Delta Scorpii) ========
-    "DELTA SCORPII": SE_DSCHUBBA,
-    "DELTA SCO": SE_DSCHUBBA,
-    "δ SCO": SE_DSCHUBBA,
-    "DESCO": SE_DSCHUBBA,
-    "ICLARCRAU": SE_DSCHUBBA,
-    "ICLARKRAV": SE_DSCHUBBA,
-    "SCORPION'S FOREHEAD": SE_DSCHUBBA,
+    "DELTA SCORPII": DSCHUBBA,
+    "DELTA SCO": DSCHUBBA,
+    "δ SCO": DSCHUBBA,
+    "DESCO": DSCHUBBA,
+    "ICLARCRAU": DSCHUBBA,
+    "ICLARKRAV": DSCHUBBA,
+    "SCORPION'S FOREHEAD": DSCHUBBA,
     # ======== GRAFFIAS (Beta Scorpii) ========
-    "BETA SCORPII": SE_GRAFFIAS,
-    "BETA SCO": SE_GRAFFIAS,
-    "β SCO": SE_GRAFFIAS,
-    "BESCO": SE_GRAFFIAS,
-    "ACRAB": SE_GRAFFIAS,
-    "AKRAB": SE_GRAFFIAS,
-    "ELACRAB": SE_GRAFFIAS,
+    "BETA SCORPII": GRAFFIAS,
+    "BETA SCO": GRAFFIAS,
+    "β SCO": GRAFFIAS,
+    "BESCO": GRAFFIAS,
+    "ACRAB": GRAFFIAS,
+    "AKRAB": GRAFFIAS,
+    "ELACRAB": GRAFFIAS,
     # ======== LESATH (Upsilon Scorpii) ========
-    "UPSILON SCORPII": SE_LESATH,
-    "UPSILON SCO": SE_LESATH,
-    "υ SCO": SE_LESATH,
-    "UPSCO": SE_LESATH,
-    "STINGER": SE_LESATH,
-    "34 SCO": SE_LESATH,
+    "UPSILON SCORPII": LESATH,
+    "UPSILON SCO": LESATH,
+    "υ SCO": LESATH,
+    "UPSCO": LESATH,
+    "STINGER": LESATH,
+    "34 SCO": LESATH,
     # ======== ZOSMA (Delta Leonis) ========
-    "DELTA LEONIS": SE_ZOSMA,
-    "DELTA LEO": SE_ZOSMA,
-    "68 LEO": SE_ZOSMA,
-    "δ LEO": SE_ZOSMA,
-    "DELEO": SE_ZOSMA,
-    "DHUR": SE_ZOSMA,
-    "DUHR": SE_ZOSMA,
-    "LION'S HIP": SE_ZOSMA,
-    "LION'S BACK": SE_ZOSMA,
+    "DELTA LEONIS": ZOSMA,
+    "DELTA LEO": ZOSMA,
+    "68 LEO": ZOSMA,
+    "δ LEO": ZOSMA,
+    "DELEO": ZOSMA,
+    "DHUR": ZOSMA,
+    "DUHR": ZOSMA,
+    "LION'S HIP": ZOSMA,
+    "LION'S BACK": ZOSMA,
     # ======== ZODIACAL CONSTELLATION BRIGHT STARS ========
     # ======== HAMAL (Alpha Arietis) ========
-    "ALPHA ARIETIS": SE_HAMAL,
-    "ALPHA ARI": SE_HAMAL,
-    "13 ARI": SE_HAMAL,
-    "α ARI": SE_HAMAL,
-    "ALARI": SE_HAMAL,
-    "RAM'S HEAD": SE_HAMAL,
+    "ALPHA ARIETIS": HAMAL,
+    "ALPHA ARI": HAMAL,
+    "13 ARI": HAMAL,
+    "α ARI": HAMAL,
+    "ALARI": HAMAL,
+    "RAM'S HEAD": HAMAL,
     # ======== SHERATAN (Beta Arietis) ========
-    "BETA ARIETIS": SE_SHERATAN,
-    "BETA ARI": SE_SHERATAN,
-    "6 ARI": SE_SHERATAN,
-    "β ARI": SE_SHERATAN,
-    "BEARI": SE_SHERATAN,
-    "SHARATAN": SE_SHERATAN,
-    "AL-SHARATAIN": SE_SHERATAN,
+    "BETA ARIETIS": SHERATAN,
+    "BETA ARI": SHERATAN,
+    "6 ARI": SHERATAN,
+    "β ARI": SHERATAN,
+    "BEARI": SHERATAN,
+    "SHARATAN": SHERATAN,
+    "AL-SHARATAIN": SHERATAN,
     # ======== MESARTHIM (Gamma Arietis) ========
-    "GAMMA ARIETIS": SE_MESARTHIM,
-    "GAMMA ARI": SE_MESARTHIM,
-    "5 ARI": SE_MESARTHIM,
-    "γ ARI": SE_MESARTHIM,
-    "GAARI": SE_MESARTHIM,
-    "MESARTIM": SE_MESARTHIM,
-    "FIRST STAR OF ARIES": SE_MESARTHIM,
+    "GAMMA ARIETIS": MESARTHIM,
+    "GAMMA ARI": MESARTHIM,
+    "5 ARI": MESARTHIM,
+    "γ ARI": MESARTHIM,
+    "GAARI": MESARTHIM,
+    "MESARTIM": MESARTHIM,
+    "FIRST STAR OF ARIES": MESARTHIM,
     # ======== ACUBENS (Alpha Cancri) ========
-    "ALPHA CANCRI": SE_ACUBENS,
-    "ALPHA CNC": SE_ACUBENS,
-    "65 CNC": SE_ACUBENS,
-    "α CNC": SE_ACUBENS,
-    "ALCNC": SE_ACUBENS,
-    "SERTAN": SE_ACUBENS,
-    "AL ZUBANAH": SE_ACUBENS,
+    "ALPHA CANCRI": ACUBENS,
+    "ALPHA CNC": ACUBENS,
+    "65 CNC": ACUBENS,
+    "α CNC": ACUBENS,
+    "ALCNC": ACUBENS,
+    "SERTAN": ACUBENS,
+    "AL ZUBANAH": ACUBENS,
     # ======== TARF (Beta Cancri) ========
-    "BETA CANCRI": SE_TARF,
-    "BETA CNC": SE_TARF,
-    "17 CNC": SE_TARF,
-    "β CNC": SE_TARF,
-    "BECNC": SE_TARF,
-    "AL TARF": SE_TARF,
+    "BETA CANCRI": TARF,
+    "BETA CNC": TARF,
+    "17 CNC": TARF,
+    "β CNC": TARF,
+    "BECNC": TARF,
+    "AL TARF": TARF,
     # ======== ASELLUS BOREALIS (Gamma Cancri) ========
-    "GAMMA CANCRI": SE_ASELLUS_BOREALIS,
-    "GAMMA CNC": SE_ASELLUS_BOREALIS,
-    "43 CNC": SE_ASELLUS_BOREALIS,
-    "γ CNC": SE_ASELLUS_BOREALIS,
-    "GACNC": SE_ASELLUS_BOREALIS,
-    "NORTHERN DONKEY": SE_ASELLUS_BOREALIS,
-    "NORTHERN ASS": SE_ASELLUS_BOREALIS,
+    "GAMMA CANCRI": ASELLUS_BOREALIS,
+    "GAMMA CNC": ASELLUS_BOREALIS,
+    "43 CNC": ASELLUS_BOREALIS,
+    "γ CNC": ASELLUS_BOREALIS,
+    "GACNC": ASELLUS_BOREALIS,
+    "NORTHERN DONKEY": ASELLUS_BOREALIS,
+    "NORTHERN ASS": ASELLUS_BOREALIS,
     # ======== ASELLUS AUSTRALIS (Delta Cancri) ========
-    "DELTA CANCRI": SE_ASELLUS_AUSTRALIS,
-    "DELTA CNC": SE_ASELLUS_AUSTRALIS,
-    "47 CNC": SE_ASELLUS_AUSTRALIS,
-    "δ CNC": SE_ASELLUS_AUSTRALIS,
-    "DECNC": SE_ASELLUS_AUSTRALIS,
-    "SOUTHERN DONKEY": SE_ASELLUS_AUSTRALIS,
-    "SOUTHERN ASS": SE_ASELLUS_AUSTRALIS,
+    "DELTA CANCRI": ASELLUS_AUSTRALIS,
+    "DELTA CNC": ASELLUS_AUSTRALIS,
+    "47 CNC": ASELLUS_AUSTRALIS,
+    "δ CNC": ASELLUS_AUSTRALIS,
+    "DECNC": ASELLUS_AUSTRALIS,
+    "SOUTHERN DONKEY": ASELLUS_AUSTRALIS,
+    "SOUTHERN ASS": ASELLUS_AUSTRALIS,
     # ======== KAUS AUSTRALIS (Epsilon Sagittarii) ========
-    "EPSILON SAGITTARII": SE_KAUS_AUSTRALIS,
-    "EPSILON SGR": SE_KAUS_AUSTRALIS,
-    "20 SGR": SE_KAUS_AUSTRALIS,
-    "ε SGR": SE_KAUS_AUSTRALIS,
-    "EPSGR": SE_KAUS_AUSTRALIS,
-    "SOUTHERN BOW": SE_KAUS_AUSTRALIS,
+    "EPSILON SAGITTARII": KAUS_AUSTRALIS,
+    "EPSILON SGR": KAUS_AUSTRALIS,
+    "20 SGR": KAUS_AUSTRALIS,
+    "ε SGR": KAUS_AUSTRALIS,
+    "EPSGR": KAUS_AUSTRALIS,
+    "SOUTHERN BOW": KAUS_AUSTRALIS,
     # ======== NUNKI (Sigma Sagittarii) ========
-    "SIGMA SAGITTARII": SE_NUNKI,
-    "SIGMA SGR": SE_NUNKI,
-    "34 SGR": SE_NUNKI,
-    "σ SGR": SE_NUNKI,
-    "SISGR": SE_NUNKI,
-    "PELAGUS": SE_NUNKI,
+    "SIGMA SAGITTARII": NUNKI,
+    "SIGMA SGR": NUNKI,
+    "34 SGR": NUNKI,
+    "σ SGR": NUNKI,
+    "SISGR": NUNKI,
+    "PELAGUS": NUNKI,
     # ======== KAUS MEDIA (Delta Sagittarii) ========
-    "DELTA SAGITTARII": SE_KAUS_MEDIA,
-    "DELTA SGR": SE_KAUS_MEDIA,
-    "19 SGR": SE_KAUS_MEDIA,
-    "δ SGR": SE_KAUS_MEDIA,
-    "DESGR": SE_KAUS_MEDIA,
-    "MIDDLE BOW": SE_KAUS_MEDIA,
+    "DELTA SAGITTARII": KAUS_MEDIA,
+    "DELTA SGR": KAUS_MEDIA,
+    "19 SGR": KAUS_MEDIA,
+    "δ SGR": KAUS_MEDIA,
+    "DESGR": KAUS_MEDIA,
+    "MIDDLE BOW": KAUS_MEDIA,
     # ======== KAUS BOREALIS (Lambda Sagittarii) ========
-    "LAMBDA SAGITTARII": SE_KAUS_BOREALIS,
-    "LAMBDA SGR": SE_KAUS_BOREALIS,
-    "22 SGR": SE_KAUS_BOREALIS,
-    "λ SGR": SE_KAUS_BOREALIS,
-    "LASGR": SE_KAUS_BOREALIS,
-    "NORTHERN BOW": SE_KAUS_BOREALIS,
+    "LAMBDA SAGITTARII": KAUS_BOREALIS,
+    "LAMBDA SGR": KAUS_BOREALIS,
+    "22 SGR": KAUS_BOREALIS,
+    "λ SGR": KAUS_BOREALIS,
+    "LASGR": KAUS_BOREALIS,
+    "NORTHERN BOW": KAUS_BOREALIS,
     # ======== ASCELLA (Zeta Sagittarii) ========
-    "ZETA SAGITTARII": SE_ASCELLA,
-    "ZETA SGR": SE_ASCELLA,
-    "38 SGR": SE_ASCELLA,
-    "ζ SGR": SE_ASCELLA,
-    "ZESGR": SE_ASCELLA,
-    "ARMPIT": SE_ASCELLA,
+    "ZETA SAGITTARII": ASCELLA,
+    "ZETA SGR": ASCELLA,
+    "38 SGR": ASCELLA,
+    "ζ SGR": ASCELLA,
+    "ZESGR": ASCELLA,
+    "ARMPIT": ASCELLA,
     # ======== ALGEDI (Alpha Capricorni) ========
-    "ALPHA CAPRICORNI": SE_ALGEDI,
-    "ALPHA CAP": SE_ALGEDI,
-    "6 CAP": SE_ALGEDI,
-    "α CAP": SE_ALGEDI,
-    "ALCAP": SE_ALGEDI,
-    "GIEDI": SE_ALGEDI,
-    "PRIMA GIEDI": SE_ALGEDI,
-    "THE GOAT": SE_ALGEDI,
+    "ALPHA CAPRICORNI": ALGEDI,
+    "ALPHA CAP": ALGEDI,
+    "6 CAP": ALGEDI,
+    "α CAP": ALGEDI,
+    "ALCAP": ALGEDI,
+    "GIEDI": ALGEDI,
+    "PRIMA GIEDI": ALGEDI,
+    "THE GOAT": ALGEDI,
     # ======== DABIH (Beta Capricorni) ========
-    "BETA CAPRICORNI": SE_DABIH,
-    "BETA CAP": SE_DABIH,
-    "9 CAP": SE_DABIH,
-    "β CAP": SE_DABIH,
-    "BECAP": SE_DABIH,
-    "AL-DHABIH": SE_DABIH,
-    "LUCKY ONE OF SLAUGHTERER": SE_DABIH,
+    "BETA CAPRICORNI": DABIH,
+    "BETA CAP": DABIH,
+    "9 CAP": DABIH,
+    "β CAP": DABIH,
+    "BECAP": DABIH,
+    "AL-DHABIH": DABIH,
+    "LUCKY ONE OF SLAUGHTERER": DABIH,
     # ======== NASHIRA (Gamma Capricorni) ========
-    "GAMMA CAPRICORNI": SE_NASHIRA,
-    "GAMMA CAP": SE_NASHIRA,
-    "40 CAP": SE_NASHIRA,
-    "γ CAP": SE_NASHIRA,
-    "GACAP": SE_NASHIRA,
-    "FORTUNATE ONE": SE_NASHIRA,
-    "SA'D NASHIRAH": SE_NASHIRA,
+    "GAMMA CAPRICORNI": NASHIRA,
+    "GAMMA CAP": NASHIRA,
+    "40 CAP": NASHIRA,
+    "γ CAP": NASHIRA,
+    "GACAP": NASHIRA,
+    "FORTUNATE ONE": NASHIRA,
+    "SA'D NASHIRAH": NASHIRA,
     # ======== SADALSUUD (Beta Aquarii) ========
-    "BETA AQUARII": SE_SADALSUUD,
-    "BETA AQR": SE_SADALSUUD,
-    "22 AQR": SE_SADALSUUD,
-    "β AQR": SE_SADALSUUD,
-    "BEAQR": SE_SADALSUUD,
-    "LUCKIEST OF LUCKY STARS": SE_SADALSUUD,
-    "SA'D AL-SU'UD": SE_SADALSUUD,
+    "BETA AQUARII": SADALSUUD,
+    "BETA AQR": SADALSUUD,
+    "22 AQR": SADALSUUD,
+    "β AQR": SADALSUUD,
+    "BEAQR": SADALSUUD,
+    "LUCKIEST OF LUCKY STARS": SADALSUUD,
+    "SA'D AL-SU'UD": SADALSUUD,
     # ======== SADALMELIK (Alpha Aquarii) ========
-    "ALPHA AQUARII": SE_SADALMELIK,
-    "ALPHA AQR": SE_SADALMELIK,
-    "34 AQR": SE_SADALMELIK,
-    "α AQR": SE_SADALMELIK,
-    "ALAQR": SE_SADALMELIK,
-    "LUCKY STAR OF KING": SE_SADALMELIK,
-    "SA'D AL-MALIK": SE_SADALMELIK,
+    "ALPHA AQUARII": SADALMELIK,
+    "ALPHA AQR": SADALMELIK,
+    "34 AQR": SADALMELIK,
+    "α AQR": SADALMELIK,
+    "ALAQR": SADALMELIK,
+    "LUCKY STAR OF KING": SADALMELIK,
+    "SA'D AL-MALIK": SADALMELIK,
     # ======== SKAT (Delta Aquarii) ========
-    "DELTA AQUARII": SE_SKAT,
-    "DELTA AQR": SE_SKAT,
-    "76 AQR": SE_SKAT,
-    "δ AQR": SE_SKAT,
-    "DEAQR": SE_SKAT,
-    "SCHEAT AQUARII": SE_SKAT,
-    "SHIN": SE_SKAT,
+    "DELTA AQUARII": SKAT,
+    "DELTA AQR": SKAT,
+    "76 AQR": SKAT,
+    "δ AQR": SKAT,
+    "DEAQR": SKAT,
+    "SCHEAT AQUARII": SKAT,
+    "SHIN": SKAT,
     # ======== ETA PISCIUM ========
-    "ETA PISCIUM": SE_ETA_PISCIUM,
-    "ETA PSC": SE_ETA_PISCIUM,
-    "99 PSC": SE_ETA_PISCIUM,
-    "η PSC": SE_ETA_PISCIUM,
-    "ETPSC": SE_ETA_PISCIUM,
-    "KULLAT NUNU": SE_ETA_PISCIUM,
+    "ETA PISCIUM": ETA_PISCIUM,
+    "ETA PSC": ETA_PISCIUM,
+    "99 PSC": ETA_PISCIUM,
+    "η PSC": ETA_PISCIUM,
+    "ETPSC": ETA_PISCIUM,
+    "KULLAT NUNU": ETA_PISCIUM,
     # ======== ALRESCHA (Alpha Piscium) ========
-    "ALPHA PISCIUM": SE_ALRESCHA,
-    "ALPHA PSC": SE_ALRESCHA,
-    "113 PSC": SE_ALRESCHA,
-    "α PSC": SE_ALRESCHA,
-    "ALPSC": SE_ALRESCHA,
-    "AL-RISHA": SE_ALRESCHA,
-    "THE KNOT": SE_ALRESCHA,
-    "THE CORD": SE_ALRESCHA,
+    "ALPHA PISCIUM": ALRESCHA,
+    "ALPHA PSC": ALRESCHA,
+    "113 PSC": ALRESCHA,
+    "α PSC": ALRESCHA,
+    "ALPSC": ALRESCHA,
+    "AL-RISHA": ALRESCHA,
+    "THE KNOT": ALRESCHA,
+    "THE CORD": ALRESCHA,
     # ======== ALTERNATE SPELLINGS / COMMON MISSPELLINGS ========
     # Betelgeuse variants (Arabic: yad al-jawza / ibt al-jawza)
-    "BETELGEUX": SE_BETELGEUSE,
-    "BEETLEJUICE": SE_BETELGEUSE,
-    "BETELGUESE": SE_BETELGEUSE,
-    "BETELGUEUSE": SE_BETELGEUSE,
-    "BETELEGEUSE": SE_BETELGEUSE,
-    "BETEIGEUZE": SE_BETELGEUSE,
+    "BETELGEUX": BETELGEUSE,
+    "BEETLEJUICE": BETELGEUSE,
+    "BETELGUESE": BETELGEUSE,
+    "BETELGUEUSE": BETELGEUSE,
+    "BETELEGEUSE": BETELGEUSE,
+    "BETEIGEUZE": BETELGEUSE,
     # Fomalhaut variants (Arabic: fum al-hut)
-    "FORMALHAUT": SE_FOMALHAUT,
-    "FOMALHUT": SE_FOMALHAUT,
-    "FOMALAUT": SE_FOMALHAUT,
-    "FOMALHAULT": SE_FOMALHAUT,
-    "FUMALHAUT": SE_FOMALHAUT,
+    "FORMALHAUT": FOMALHAUT,
+    "FOMALHUT": FOMALHAUT,
+    "FOMALAUT": FOMALHAUT,
+    "FOMALHAULT": FOMALHAUT,
+    "FUMALHAUT": FOMALHAUT,
     # Aldebaran variants (Arabic: al-dabaran)
-    "ALDEBRAN": SE_ALDEBARAN,
-    "ALDEBERON": SE_ALDEBARAN,
-    "ALDEBERAN": SE_ALDEBARAN,
-    "ALDERBARAN": SE_ALDEBARAN,
-    "ALDEBARIN": SE_ALDEBARAN,
+    "ALDEBRAN": ALDEBARAN,
+    "ALDEBERON": ALDEBARAN,
+    "ALDEBERAN": ALDEBARAN,
+    "ALDERBARAN": ALDEBARAN,
+    "ALDEBARIN": ALDEBARAN,
     # Algol variants (Arabic: ra's al-ghul)
-    "ALGOL": SE_ALGOL,  # Already canonical but ensure alias exists
-    "ALGHOL": SE_ALGOL,
-    "ALGOUL": SE_ALGOL,
-    "AL-GHUL": SE_ALGOL,
+    "ALGOL": ALGOL,  # Already canonical but ensure alias exists
+    "ALGHOL": ALGOL,
+    "ALGOUL": ALGOL,
+    "AL-GHUL": ALGOL,
     # Arcturus variants (Greek: arktos + ouros = bear guard)
-    "ARCHTURUS": SE_ARCTURUS,
-    "ARTURUS": SE_ARCTURUS,
-    "ARKCTURUS": SE_ARCTURUS,
-    "ARCTUROS": SE_ARCTURUS,
+    "ARCHTURUS": ARCTURUS,
+    "ARTURUS": ARCTURUS,
+    "ARKCTURUS": ARCTURUS,
+    "ARCTUROS": ARCTURUS,
     # Antares variants (Greek: anti + Ares = rival of Mars)
-    "ANTARIES": SE_ANTARES,
-    "ANTARAS": SE_ANTARES,
-    "ANTARRES": SE_ANTARES,
+    "ANTARIES": ANTARES,
+    "ANTARAS": ANTARES,
+    "ANTARRES": ANTARES,
     # Rigel variants (Arabic: rijl = foot)
-    "RIEGEL": SE_RIGEL,
-    "RIJEL": SE_RIGEL,
-    "RIGIL": SE_RIGEL,
+    "RIEGEL": RIGEL,
+    "RIJEL": RIGEL,
+    "RIGIL": RIGEL,
     # Vega variants (Arabic: an-nasr al-waqi)
-    "VEGHA": SE_VEGA,
+    "VEGHA": VEGA,
     # Polaris variants
-    "POLARRIS": SE_POLARIS,
-    "POLARIUS": SE_POLARIS,
+    "POLARRIS": POLARIS,
+    "POLARIUS": POLARIS,
     # Procyon variants (Greek: pro + kyon = before the dog)
-    "PROCION": SE_PROCYON,
-    "PROCIAN": SE_PROCYON,
+    "PROCION": PROCYON,
+    "PROCIAN": PROCYON,
     # Capella variants (Latin: she-goat)
-    "CAPELA": SE_CAPELLA,
-    "CAPPELLA": SE_CAPELLA,
+    "CAPELA": CAPELLA,
+    "CAPPELLA": CAPELLA,
     # Deneb variants (Arabic: dhanab = tail)
-    "DANEB": SE_DENEB,
-    "DHENEB": SE_DENEB,
+    "DANEB": DENEB,
+    "DHENEB": DENEB,
     # Altair variants (Arabic: al-nasr al-ta'ir = flying eagle)
-    "ALTIAR": SE_ALTAIR,
-    "ALTARE": SE_ALTAIR,
+    "ALTIAR": ALTAIR,
+    "ALTARE": ALTAIR,
     # Sirius variants (Greek: seirios = scorching)
-    "SYRIUS": SE_SIRIUS,
-    "SIRUIS": SE_SIRIUS,
-    "SIRUS": SE_SIRIUS,
+    "SYRIUS": SIRIUS,
+    "SIRUIS": SIRIUS,
+    "SIRUS": SIRIUS,
     # Spica variants (Latin: ear of wheat)
-    "SPIKA": SE_SPICA_STAR,
-    "SPICCA": SE_SPICA_STAR,
+    "SPIKA": SPICA_STAR,
+    "SPICCA": SPICA_STAR,
     # Regulus variants (Latin: little king)
-    "REGULAS": SE_REGULUS,
-    "REGULIS": SE_REGULUS,
+    "REGULAS": REGULUS,
+    "REGULIS": REGULUS,
     # Canopus variants
-    "CANOPIS": SE_CANOPUS,
-    "CANPOUS": SE_CANOPUS,
-    "CANOPOS": SE_CANOPUS,
+    "CANOPIS": CANOPUS,
+    "CANPOUS": CANOPUS,
+    "CANOPOS": CANOPUS,
     # Achernar variants (Arabic: akhir an-nahr = end of river)
-    "ACHENAR": SE_ACHERNAR,
-    "ARCHENAR": SE_ACHERNAR,
-    "ACHERNAN": SE_ACHERNAR,
+    "ACHENAR": ACHERNAR,
+    "ARCHENAR": ACHERNAR,
+    "ACHERNAN": ACHERNAR,
     # Castor/Pollux variants
-    "CASTOR": SE_CASTOR,  # Ensure canonical exists
-    "KASTOR": SE_CASTOR,
-    "POLUX": SE_POLLUX,
-    "POLLUCKS": SE_POLLUX,
+    "CASTOR": CASTOR,  # Ensure canonical exists
+    "KASTOR": CASTOR,
+    "POLUX": POLLUX,
+    "POLLUCKS": POLLUX,
     # Alpheratz variants (Alpha Andromedae)
-    "ALPHERATZ": SE_ALPHERATZ,
-    "SIRRAH": SE_ALPHERATZ,
-    "SIRAH": SE_ALPHERATZ,
-    "ALPHERAT": SE_ALPHERATZ,
-    "ALPHA ANDROMEDAE": SE_ALPHERATZ,
+    "ALPHERATZ": ALPHERATZ,
+    "SIRRAH": ALPHERATZ,
+    "SIRAH": ALPHERATZ,
+    "ALPHERAT": ALPHERATZ,
+    "ALPHA ANDROMEDAE": ALPHERATZ,
     # Algenib variants (Gamma Pegasi)
-    "ALGENIB": SE_ALGENIB,
-    "GAMMA PEGASI": SE_ALGENIB,
+    "ALGENIB": ALGENIB,
+    "GAMMA PEGASI": ALGENIB,
     # Propus variants (Eta Geminorum)
-    "PROPUS": SE_PROPUS,
-    "ETA GEMINORUM": SE_PROPUS,
+    "PROPUS": PROPUS,
+    "ETA GEMINORUM": PROPUS,
     # Tejat variants (Mu Geminorum)
-    "TEJAT": SE_TEJAT,
-    "TEJAT POSTERIOR": SE_TEJAT,
-    "MU GEMINORUM": SE_TEJAT,
+    "TEJAT": TEJAT,
+    "TEJAT POSTERIOR": TEJAT,
+    "MU GEMINORUM": TEJAT,
     # Alhena variants (Gamma Geminorum)
-    "ALHENA": SE_ALHENA,
-    "ALMEISAN": SE_ALHENA,
-    "GAMMA GEMINORUM": SE_ALHENA,
+    "ALHENA": ALHENA,
+    "ALMEISAN": ALHENA,
+    "GAMMA GEMINORUM": ALHENA,
     # Wasat variants (Delta Geminorum)
-    "WASAT": SE_WASAT,
-    "DELTA GEMINORUM": SE_WASAT,
+    "WASAT": WASAT,
+    "DELTA GEMINORUM": WASAT,
     # Adhara variants (Epsilon Canis Majoris)
-    "ADHARA": SE_ADHARA,
-    "ADARA": SE_ADHARA,
-    "EPSILON CANIS MAJORIS": SE_ADHARA,
+    "ADHARA": ADHARA,
+    "ADARA": ADHARA,
+    "EPSILON CANIS MAJORIS": ADHARA,
     # Wezen variants (Delta Canis Majoris)
-    "WEZEN": SE_WEZEN,
-    "WESEN": SE_WEZEN,
-    "DELTA CANIS MAJORIS": SE_WEZEN,
+    "WEZEN": WEZEN,
+    "WESEN": WEZEN,
+    "DELTA CANIS MAJORIS": WEZEN,
     # Thuban variants (Alpha Draconis)
-    "THUBAN": SE_THUBAN,
-    "ALPHA DRACONIS": SE_THUBAN,
+    "THUBAN": THUBAN,
+    "ALPHA DRACONIS": THUBAN,
     # Rasalgethi variants (Alpha Herculis)
-    "RASALGETHI": SE_RASALGETHI,
-    "RAS ALGETHI": SE_RASALGETHI,
-    "ALPHA HERCULIS": SE_RASALGETHI,
+    "RASALGETHI": RASALGETHI,
+    "RAS ALGETHI": RASALGETHI,
+    "ALPHA HERCULIS": RASALGETHI,
     # Albireo variants (Beta Cygni)
-    "ALBIREO": SE_ALBIREO,
-    "BETA CYGNI": SE_ALBIREO,
+    "ALBIREO": ALBIREO,
+    "BETA CYGNI": ALBIREO,
     # Mirach variants (Beta Andromedae)
-    "MIRACH": SE_MIRACH,
-    "BETA ANDROMEDAE": SE_MIRACH,
-    "BETA AND": SE_MIRACH,
-    "β AND": SE_MIRACH,
-    "BEAND": SE_MIRACH,
-    "MIRAK": SE_MIRACH,
-    "MIRAC": SE_MIRACH,
+    "MIRACH": MIRACH,
+    "BETA ANDROMEDAE": MIRACH,
+    "BETA AND": MIRACH,
+    "β AND": MIRACH,
+    "BEAND": MIRACH,
+    "MIRAK": MIRACH,
+    "MIRAC": MIRACH,
     # Almach variants (Gamma Andromedae)
-    "ALMACH": SE_ALMACH,
-    "ALAMAK": SE_ALMACH,
-    "ALMAAK": SE_ALMACH,
-    "GAMMA ANDROMEDAE": SE_ALMACH,
-    "GAMMA AND": SE_ALMACH,
-    "γ AND": SE_ALMACH,
-    "GA1AND": SE_ALMACH,
+    "ALMACH": ALMACH,
+    "ALAMAK": ALMACH,
+    "ALMAAK": ALMACH,
+    "GAMMA ANDROMEDAE": ALMACH,
+    "GAMMA AND": ALMACH,
+    "γ AND": ALMACH,
+    "GA1AND": ALMACH,
     # Menkar variants (Alpha Ceti)
-    "MENKAR": SE_MENKAR,
-    "MENKAB": SE_MENKAR,
-    "ALPHA CETI": SE_MENKAR,
-    "ALPHA CET": SE_MENKAR,
-    "α CET": SE_MENKAR,
-    "ALCET": SE_MENKAR,
+    "MENKAR": MENKAR,
+    "MENKAB": MENKAR,
+    "ALPHA CETI": MENKAR,
+    "ALPHA CET": MENKAR,
+    "α CET": MENKAR,
+    "ALCET": MENKAR,
 }
 
 
@@ -3635,9 +3635,9 @@ def _fuzzy_match_star(name: str) -> int | None:
 
     Examples:
         >>> _fuzzy_match_star("Betelgeux")  # Alternate spelling
-        SE_BETELGEUSE
+        BETELGEUSE
         >>> _fuzzy_match_star("Formalhaut")  # Common misspelling
-        SE_FOMALHAUT
+        FOMALHAUT
     """
     normalized_input = _normalize_phonetic(name)
 
@@ -3705,9 +3705,9 @@ def resolve_star_name(name: str) -> int | None:
         >>> resolve_star_name("SIRIUS")
         1000004
         >>> resolve_star_name("Betelgeux")  # Alternate spelling
-        SE_BETELGEUSE
+        BETELGEUSE
         >>> resolve_star_name("Formalhaut")  # Common misspelling
-        SE_FOMALHAUT
+        FOMALHAUT
     """
     if not name:
         return None
@@ -3900,10 +3900,10 @@ def _calc_star_position_leb(
         raise ValueError(f"could not find star name {star_id}")
 
     star_data = FIXED_STARS[star_id]
-    from .constants import SE_EARTH
+    from .constants import EARTH
 
     # 1. Earth position and velocity from LEB (ICRS barycentric)
-    earth_pos, earth_vel = reader.eval_body(SE_EARTH, jd_tt)
+    earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
 
     # 2. Propagate proper motion from J2000 to observation date
     ra_date, dec_date = propagate_proper_motion(
@@ -4043,7 +4043,7 @@ def calc_fixed_star_position(
     - Gravitational light deflection (by default)
 
     Args:
-        star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
+        star_id: Star identifier (REGULUS, SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
@@ -4074,7 +4074,7 @@ def calc_fixed_star_position(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame
             )
         except KeyError:
-            pass  # Body (SE_EARTH) not in LEB file
+            pass  # Body (EARTH) not in LEB file
         except ValueError as _leb_err:
             if "outside range" not in str(_leb_err).lower():
                 raise  # Re-raise unexpected ValueError
@@ -4108,7 +4108,7 @@ def calc_fixed_star_velocity(
     degrees/day in longitude.
 
     Args:
-        star_id: Star identifier (SE_REGULUS, SE_SPICA_STAR, etc.)
+        star_id: Star identifier (REGULUS, SPICA_STAR, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
         noaberr: If True, skip aberration correction (astrometric position)
         nogdefl: If True, skip gravitational deflection but keep aberration
@@ -4188,7 +4188,7 @@ def _preprocess_flags(iflag: int) -> int:
     """Preprocess calculation flags for fixed star functions.
 
     Strips ephemeris selection flags (MOSEPH) and converts SPEED3 to SPEED.
-    SEFLG_TOPOCTR is accepted silently (stars at infinite distance).
+    FLG_TOPOCTR is accepted silently (stars at infinite distance).
 
     Args:
         iflag: Raw input flags
@@ -4196,13 +4196,13 @@ def _preprocess_flags(iflag: int) -> int:
     Returns:
         Cleaned flags
     """
-    # Strip SEFLG_MOSEPH — accepted for compatibility, always uses Skyfield
-    iflag = iflag & ~SEFLG_MOSEPH
-    # SEFLG_SPEED3: treat as SEFLG_SPEED
-    if iflag & SEFLG_SPEED3:
-        iflag = (iflag & ~SEFLG_SPEED3) | SEFLG_SPEED
-    # SEFLG_TOPOCTR: silently accept (stars at infinite distance, no parallax)
-    iflag = iflag & ~SEFLG_TOPOCTR
+    # Strip FLG_MOSEPH — accepted for compatibility, always uses Skyfield
+    iflag = iflag & ~FLG_MOSEPH
+    # FLG_SPEED3: treat as FLG_SPEED
+    if iflag & FLG_SPEED3:
+        iflag = (iflag & ~FLG_SPEED3) | FLG_SPEED
+    # FLG_TOPOCTR: silently accept (stars at infinite distance, no parallax)
+    iflag = iflag & ~FLG_TOPOCTR
     return iflag
 
 
@@ -4238,19 +4238,19 @@ def _apply_fixstar_flags(
 
     lon, lat, dist, speed_lon, speed_lat, speed_dist = result
 
-    is_equatorial = bool(iflag & SEFLG_EQUATORIAL)
+    is_equatorial = bool(iflag & FLG_EQUATORIAL)
 
     # ---- 1. Frame selection ----
     # J2000: precess from ecliptic-of-date back to J2000 ecliptic
     # NONUT: remove nutation from ecliptic longitude (mean ecliptic of date)
     # These apply regardless of equatorial output (adjust ecliptic first).
-    if iflag & SEFLG_J2000:
+    if iflag & FLG_J2000:
         if not j2000_native:
             from .astrometry import _precess_ecliptic
 
             lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
         # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
-    elif iflag & SEFLG_NONUT:
+    elif iflag & FLG_NONUT:
         # Skyfield returns positions on the true ecliptic of date (with nutation).
         # NONUT means output on the mean ecliptic of date, so subtract dpsi
         # (nutation in longitude) from the ecliptic longitude.
@@ -4261,10 +4261,10 @@ def _apply_fixstar_flags(
 
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
-        if iflag & SEFLG_J2000:
+        if iflag & FLG_J2000:
             # J2000 obliquity for J2000 equatorial frame
             eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
-        elif iflag & SEFLG_NONUT:
+        elif iflag & FLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
             eps = get_mean_obliquity(jd_tt)
         else:
@@ -4279,22 +4279,22 @@ def _apply_fixstar_flags(
     # For fixed stars, SE subtracts ayanamsha from the first coordinate
     # (ecliptic longitude or RA) AFTER equatorial conversion. This differs
     # from planets where SE ignores sidereal for equatorial output entirely.
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         from .state import get_timescale
 
         ts = get_timescale()
         t = ts.tt_jd(jd_tt)
         tjd_ut = t.ut1
 
-        from .planets import swe_get_ayanamsa_ut
+        from .planets import get_ayanamsa_ut
 
-        ayanamsa = swe_get_ayanamsa_ut(tjd_ut)
+        ayanamsa = get_ayanamsa_ut(tjd_ut)
         lon = (lon - ayanamsa) % 360.0
 
     # ---- 4. Output format conversion ----
     result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
-    if iflag & SEFLG_XYZ:
+    if iflag & FLG_XYZ:
         lon_rad = math.radians(lon)
         lat_rad = math.radians(lat)
         cos_lat = math.cos(lat_rad)
@@ -4323,7 +4323,7 @@ def _apply_fixstar_flags(
 
         return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
-    if iflag & SEFLG_RADIANS:
+    if iflag & FLG_RADIANS:
         return (
             math.radians(lon),
             math.radians(lat),
@@ -4336,8 +4336,8 @@ def _apply_fixstar_flags(
     return result
 
 
-def swe_fixstar_ut(
-    star: str, tjdut: float, flags: int = SEFLG_SWIEPH
+def fixstar_ut(
+    star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time.
@@ -4364,7 +4364,7 @@ def swe_fixstar_ut(
         Delta T is about 69 seconds (as of 2020).
 
     Example:
-        >>> pos, name, retflag = swe_fixstar_ut("Regulus", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     flags = _preprocess_flags(flags)
@@ -4379,14 +4379,14 @@ def swe_fixstar_ut(
     t = get_timescale().ut1_jd(tjdut)
 
     try:
-        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
-        nogdefl = bool(flags & SEFLG_NOGDEFL)
+        noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
+        nogdefl = bool(flags & FLG_NOGDEFL)
         # Compute natively in J2000 ecliptic frame when requested.
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
-        use_j2000 = bool(flags & SEFLG_J2000)
+        use_j2000 = bool(flags & FLG_J2000)
 
-        if flags & SEFLG_SPEED:
+        if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -4406,10 +4406,10 @@ def swe_fixstar_ut(
         raise Error(str(e)) from e
 
 
-def swe_batch_fixstars_ut(
+def batch_fixstars_ut(
     stars: Sequence[str],
     tjdut: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     *,
     skip_errors: bool = False,
 ) -> Tuple[
@@ -4439,10 +4439,10 @@ def swe_batch_fixstars_ut(
 
     from .state import get_leb_reader, get_timescale
 
-    noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
-    nogdefl = bool(flags & SEFLG_NOGDEFL)
-    use_j2000 = bool(flags & SEFLG_J2000)
-    want_speed = bool(flags & SEFLG_SPEED)
+    noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
+    nogdefl = bool(flags & FLG_NOGDEFL)
+    use_j2000 = bool(flags & FLG_J2000)
+    want_speed = bool(flags & FLG_SPEED)
 
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
@@ -4546,16 +4546,16 @@ def swe_batch_fixstars_ut(
     return tuple(results)
 
 
-batch_fixstars_ut = swe_batch_fixstars_ut
+batch_fixstars_ut = batch_fixstars_ut
 
 
-def swe_fixstar(
-    star: str, tjdet: float, flags: int = SEFLG_SWIEPH
+def fixstar(
+    star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time (TT).
 
-    Reference API compatible function. Similar to swe_fixstar_ut() but takes
+    Reference API compatible function. Similar to fixstar_ut() but takes
     Terrestrial Time (TT, also known as Ephemeris Time) instead of Universal Time.
 
     Args:
@@ -4575,10 +4575,10 @@ def swe_fixstar(
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use swe_fixstar_ut() instead.
+        For most astrological applications, use fixstar_ut() instead.
 
     Example:
-        >>> pos, name, retflag = swe_fixstar("Regulus", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
     flags = _preprocess_flags(flags)
@@ -4588,11 +4588,11 @@ def swe_fixstar(
         raise Error(error)
 
     try:
-        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
-        nogdefl = bool(flags & SEFLG_NOGDEFL)
-        use_j2000 = bool(flags & SEFLG_J2000)
+        noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
+        nogdefl = bool(flags & FLG_NOGDEFL)
+        use_j2000 = bool(flags & FLG_J2000)
 
-        if flags & SEFLG_SPEED:
+        if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -4758,13 +4758,13 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     return None, f"could not find star name {star_name.lower()}"
 
 
-def swe_fixstar2_ut(
-    star: str, tjdut: float, flags: int = SEFLG_SWIEPH
+def fixstar2_ut(
+    star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Universal Time with flexible lookup.
 
-    Enhanced version of swe_fixstar_ut() that supports flexible star lookup:
+    Enhanced version of fixstar_ut() that supports flexible star lookup:
     - Star name (full or partial): "Regulus", "Reg"
     - Hipparcos catalog number: "49669", ",49669"
     - Hipparcos with HIP prefix: "HIP 49669", "HIP65474"
@@ -4793,11 +4793,11 @@ def swe_fixstar2_ut(
         using Delta T before calculating the star position.
 
     Example:
-        >>> pos, name, retflag = swe_fixstar2_ut("Reg", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2_ut("Reg", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = swe_fixstar2_ut("49669", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
     flags = _preprocess_flags(flags)
@@ -4812,11 +4812,11 @@ def swe_fixstar2_ut(
     t = ts.ut1_jd(tjdut)
 
     try:
-        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
-        nogdefl = bool(flags & SEFLG_NOGDEFL)
-        use_j2000 = bool(flags & SEFLG_J2000)
+        noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
+        nogdefl = bool(flags & FLG_NOGDEFL)
+        use_j2000 = bool(flags & FLG_J2000)
 
-        if flags & SEFLG_SPEED:
+        if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -4837,13 +4837,13 @@ def swe_fixstar2_ut(
         raise Error(str(e)) from e
 
 
-def swe_fixstar2(
-    star: str, tjdet: float, flags: int = SEFLG_SWIEPH
+def fixstar2(
+    star: str, tjdet: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
     """
     Calculate position of a fixed star for Terrestrial Time with flexible lookup.
 
-    Enhanced version of swe_fixstar() that supports flexible star lookup:
+    Enhanced version of fixstar() that supports flexible star lookup:
     - Star name (full or partial): "Regulus", "Reg"
     - Hipparcos catalog number: "49669", ",49669"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
@@ -4868,14 +4868,14 @@ def swe_fixstar2(
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T.
-        For most astrological applications, use swe_fixstar2_ut() instead.
+        For most astrological applications, use fixstar2_ut() instead.
 
     Example:
-        >>> pos, name, retflag = swe_fixstar2("Spica", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2("Spica", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir"
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
 
-        >>> pos, name, retflag = swe_fixstar2("65474", 2451545.0, 0)
+        >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
     flags = _preprocess_flags(flags)
@@ -4885,11 +4885,11 @@ def swe_fixstar2(
         raise Error(error or "could not find star name")
 
     try:
-        noaberr = bool(flags & SEFLG_NOABERR) or bool(flags & SEFLG_TRUEPOS)
-        nogdefl = bool(flags & SEFLG_NOGDEFL)
-        use_j2000 = bool(flags & SEFLG_J2000)
+        noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
+        nogdefl = bool(flags & FLG_NOGDEFL)
+        use_j2000 = bool(flags & FLG_J2000)
 
-        if flags & SEFLG_SPEED:
+        if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
                 entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
             )
@@ -6041,7 +6041,7 @@ def get_hip_from_star_name(name: str) -> int | None:
     return None
 
 
-def swe_fixstar_mag(star: str) -> Tuple[float, str]:
+def fixstar_mag(star: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star without calculating position.
 
@@ -6064,7 +6064,7 @@ def swe_fixstar_mag(star: str) -> Tuple[float, str]:
         Error: If the star cannot be found or magnitude is unavailable.
 
     Example:
-        >>> mag, name = swe_fixstar_mag("Regulus")
+        >>> mag, name = fixstar_mag("Regulus")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
     star_id, error, canonical_name = _resolve_star_id(star)
@@ -6085,11 +6085,11 @@ def swe_fixstar_mag(star: str) -> Tuple[float, str]:
     return (_STAR_MAGNITUDES[star_id], name_out)
 
 
-def swe_fixstar2_mag(star: str) -> Tuple[float, str]:
+def fixstar2_mag(star: str) -> Tuple[float, str]:
     """
     Get the visual magnitude of a fixed star with flexible lookup.
 
-    Enhanced version that supports flexible star lookup like swe_fixstar2:
+    Enhanced version that supports flexible star lookup like fixstar2:
     - Star name (full or partial): "Regulus", "Reg"
     - Hipparcos catalog number: "49669", ",49669"
     - Bayer/Flamsteed designation: "alLeo", "alVir"
@@ -6113,10 +6113,10 @@ def swe_fixstar2_mag(star: str) -> Tuple[float, str]:
         Error: If the star cannot be found.
 
     Example:
-        >>> mag, name = swe_fixstar2_mag("Reg")
+        >>> mag, name = fixstar2_mag("Reg")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
 
-        >>> mag, name = swe_fixstar2_mag("49669")
+        >>> mag, name = fixstar2_mag("49669")
         >>> print(f"{name}: {mag}")  # "Regulus,alLeo: 1.40"
     """
     entry, error = _resolve_star2(star)

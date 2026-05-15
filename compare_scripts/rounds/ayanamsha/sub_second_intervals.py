@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Round 162: Ayanamsha at sub-second time intervals.
 
-Compare swe_get_ayanamsa_ut at very fine time intervals (sub-second)
+Compare get_ayanamsa_ut at very fine time intervals (sub-second)
 to verify interpolation smoothness and precision. Tests that both
 libraries produce consistent, smooth ayanamsha values.
 """
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,7 +16,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 SIDM_MODES = [(0, "Fagan"), (1, "Lahiri"), (3, "Raman"), (27, "TrueCitra")]
 
@@ -52,13 +56,13 @@ print("=" * 90)
 
 for sidm, sname in SIDM_MODES:
     swe.set_sid_mode(sidm)
-    ephem.swe_set_sid_mode(sidm, 0, 0)
+    ephem.set_sid_mode(sidm, 0, 0)
 
     for jd in test_cases:
         total += 1
         try:
             se_aya = swe.get_ayanamsa_ut(jd)
-            le_aya = ephem.swe_get_ayanamsa_ut(jd)
+            le_aya = ephem.get_ayanamsa_ut(jd)
             diff = abs(le_aya - se_aya) * 3600.0  # to arcsec
             if diff <= TOL:
                 passed += 1
@@ -72,7 +76,7 @@ for sidm, sname in SIDM_MODES:
             errors += 1
 
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0, 0, 0)
+ephem.set_sid_mode(0, 0, 0)
 
 print(f"\n{'=' * 90}")
 print(

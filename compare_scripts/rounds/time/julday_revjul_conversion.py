@@ -8,8 +8,8 @@ Tests all time/date conversion functions comprehensively.
 Parts:
   P1: julday / revjul round-trip across centuries
   P2: utc_to_jd / jdet_to_utc round-trip
-  P3: swe_deltat across epochs (1600-2100)
-  P4: swe_deltat_ex with different ephemeris flags
+  P3: deltat across epochs (1600-2100)
+  P4: deltat_ex with different ephemeris flags
   P5: Gregorian/Julian calendar boundary (Oct 1582)
   P6: Negative years (BCE dates)
   P7: sidtime / sidtime0 comparison
@@ -102,7 +102,7 @@ def run_part1():
 
         # SE julday
         se_jd = swe.julday(y, m, d, h)
-        le_jd = ephem.swe_julday(y, m, d, h)
+        le_jd = ephem.julday(y, m, d, h)
 
         jd_diff = abs(se_jd - le_jd)
         if jd_diff > 1e-10:
@@ -112,7 +112,7 @@ def run_part1():
 
         # SE revjul
         se_rev = swe.revjul(se_jd)
-        le_rev = ephem.swe_revjul(le_jd)
+        le_rev = ephem.revjul(le_jd)
 
         # Compare year, month, day
         if (
@@ -167,7 +167,7 @@ def run_part2():
             continue
 
         try:
-            le_result = ephem.swe_utc_to_jd(y, m, d, h, mi, s, 1)
+            le_result = ephem.utc_to_jd(y, m, d, h, mi, s, 1)
             le_jd_et = le_result[0]
             le_jd_ut = le_result[1]
         except Exception:
@@ -193,11 +193,11 @@ def run_part2():
 
 
 # ============================================================
-# PART 3: swe_deltat across epochs
+# PART 3: deltat across epochs
 # ============================================================
 def run_part3():
     print("\n" + "=" * 70)
-    print("PART 3: swe_deltat across epochs (1600-2100)")
+    print("PART 3: deltat across epochs (1600-2100)")
     print("=" * 70)
 
     r = R("P3: deltat")
@@ -210,7 +210,7 @@ def run_part3():
         label = f"deltat {y}"
 
         se_dt = swe.deltat(jd)
-        le_dt = ephem.swe_deltat(jd)
+        le_dt = ephem.deltat(jd)
 
         diff_sec = abs(se_dt - le_dt) * 86400.0  # Convert days to seconds
 
@@ -231,11 +231,11 @@ def run_part3():
 
 
 # ============================================================
-# PART 4: swe_deltat_ex
+# PART 4: deltat_ex
 # ============================================================
 def run_part4():
     print("\n" + "=" * 70)
-    print("PART 4: swe_deltat_ex with different flags")
+    print("PART 4: deltat_ex with different flags")
     print("=" * 70)
 
     r = R("P4: deltat_ex")
@@ -257,7 +257,7 @@ def run_part4():
             continue
 
         try:
-            le_val = ephem.swe_deltat_ex(jd, -1)
+            le_val = ephem.deltat_ex(jd, -1)
             if isinstance(le_val, tuple):
                 le_val = le_val[0]
         except Exception:
@@ -300,7 +300,7 @@ def run_part5():
         label = f"boundary {desc}"
 
         se_jd = swe.julday(y, m, d, h)
-        le_jd = ephem.swe_julday(y, m, d, h)
+        le_jd = ephem.julday(y, m, d, h)
 
         diff = abs(se_jd - le_jd)
         if diff > 1e-10:
@@ -342,7 +342,7 @@ def run_part6():
             r.skip(f"{label}: SE error")
             continue
         try:
-            le_jd = ephem.swe_julday(y, m, d, h)
+            le_jd = ephem.julday(y, m, d, h)
         except Exception:
             r.skip(f"{label}: LE error")
             continue
@@ -356,7 +356,7 @@ def run_part6():
         # Also test revjul round-trip
         try:
             se_rev = swe.revjul(se_jd)
-            le_rev = ephem.swe_revjul(le_jd)
+            le_rev = ephem.revjul(le_jd)
             if int(se_rev[0]) != int(le_rev[0]) or se_rev[1] != le_rev[1]:
                 r.fail(f"{label} revjul: SE={se_rev[:3]} LE={le_rev[:3]}")
             else:
@@ -394,7 +394,7 @@ def run_part7():
             continue
 
         try:
-            le_st = ephem.swe_sidtime(jd)
+            le_st = ephem.sidtime(jd)
         except Exception:
             r.skip(f"{label}: LE error")
             continue

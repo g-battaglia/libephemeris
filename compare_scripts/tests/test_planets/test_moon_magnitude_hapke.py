@@ -2,7 +2,7 @@
 Tests for Moon magnitude calculation using Hapke photometric model.
 
 This module tests the implementation of the Hapke-based lunar magnitude
-calculation in swe_pheno_ut(), which provides improved accuracy over the
+calculation in pheno_ut(), which provides improved accuracy over the
 simplified phase-only formula.
 
 The Hapke model accounts for:
@@ -20,7 +20,7 @@ import pytest
 import math
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SE_MOON
+from libephemeris.constants import MOON
 
 
 class TestMoonMagnitudeHapkeBasic:
@@ -33,7 +33,7 @@ class TestMoonMagnitudeHapkeBasic:
         # Full Moon around Jan 21, 2000
         jd_full = 2451564.7
 
-        attr = ephem.pheno_ut(jd_full, SE_MOON, 0)
+        attr = ephem.pheno_ut(jd_full, MOON, 0)
         magnitude = attr[4]
 
         # Full Moon is typically -12.5 to -12.9 depending on distance
@@ -47,7 +47,7 @@ class TestMoonMagnitudeHapkeBasic:
         # Near new moon around Jan 6, 2000
         jd_new = 2451550.1
 
-        attr = ephem.pheno_ut(jd_new, SE_MOON, 0)
+        attr = ephem.pheno_ut(jd_new, MOON, 0)
         magnitude = attr[4]
         phase_angle = attr[0]
 
@@ -71,7 +71,7 @@ class TestMoonMagnitudeHapkeBasic:
 
         for i in range(30):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             magnitudes.append(attr[4])
 
         mag_range = max(magnitudes) - min(magnitudes)
@@ -88,7 +88,7 @@ class TestMoonMagnitudeHapkeBasic:
 
         for i in range(30):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
 
             # Looking for phase angle near 90 degrees
@@ -97,7 +97,7 @@ class TestMoonMagnitudeHapkeBasic:
                 break
 
         if quarter_jd is not None:
-            attr = ephem.pheno_ut(quarter_jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(quarter_jd, MOON, 0)
             magnitude = attr[4]
 
             # Quarter moon typically around -9 to -11 mag
@@ -124,7 +124,7 @@ class TestMoonMagnitudeHapkePhysics:
 
         for i in range(200):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
             magnitude = attr[4]
             distance = attr[3]  # We'll use diameter as proxy for distance
@@ -158,7 +158,7 @@ class TestMoonMagnitudeHapkePhysics:
         # Collect magnitude data for similar phase angles at different times
         for i in range(200):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
             magnitude = attr[4]
 
@@ -198,7 +198,7 @@ class TestMoonMagnitudeHapkeAccuracy:
 
         for i in range(400):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
 
             if phase_angle < 5:
@@ -225,7 +225,7 @@ class TestMoonMagnitudeHapkeAccuracy:
 
         for i in range(400):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
 
             if 85 < phase_angle < 95:
@@ -254,7 +254,7 @@ class TestMoonMagnitudeHapkeAccuracy:
 
         for i in range(200):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_mag_data.append((attr[0], attr[4]))
 
         # Sort by phase angle
@@ -301,8 +301,8 @@ class TestMoonMagnitudeComparisonWithSwissEph:
         jd_full = 2451564.7  # Near full moon
 
         swe.set_ephe_path(None)
-        swe_attr = swe.pheno_ut(jd_full, SE_MOON, 0)
-        lib_attr = ephem.pheno_ut(jd_full, SE_MOON, 0)
+        swe_attr = swe.pheno_ut(jd_full, MOON, 0)
+        lib_attr = ephem.pheno_ut(jd_full, MOON, 0)
 
         swe_mag = swe_attr[4]
         lib_mag = lib_attr[4]
@@ -331,8 +331,8 @@ class TestMoonMagnitudeComparisonWithSwissEph:
 
         for i in range(30):
             jd = jd_start + i
-            swe_attr = swe.pheno_ut(jd, SE_MOON, 0)
-            lib_attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            swe_attr = swe.pheno_ut(jd, MOON, 0)
+            lib_attr = ephem.pheno_ut(jd, MOON, 0)
 
             swe_mags.append(swe_attr[4])
             lib_mags.append(lib_attr[4])
@@ -366,7 +366,7 @@ class TestMoonMagnitudeHapkeEdgeCases:
 
         for i in range(400):
             jd = jd_start + i
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             phase_angle = attr[0]
             magnitude = attr[4]
 
@@ -399,7 +399,7 @@ class TestMoonMagnitudeHapkeEdgeCases:
 
         for i in range(100):
             jd = jd_start + i * 0.5  # Half-day steps
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             magnitude = attr[4]
 
             if prev_mag is not None:
@@ -427,7 +427,7 @@ class TestMoonMagnitudeHapkeEdgeCases:
         ]
 
         for jd in test_dates:
-            attr = ephem.pheno_ut(jd, SE_MOON, 0)
+            attr = ephem.pheno_ut(jd, MOON, 0)
             magnitude = attr[4]
 
             assert math.isfinite(magnitude), (

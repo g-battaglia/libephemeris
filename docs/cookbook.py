@@ -28,27 +28,28 @@ from __future__ import annotations
 import libephemeris as ephem
 from libephemeris.constants import (
     # Planet IDs
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
-    SE_CHIRON,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
+    CHIRON,
     # Calculation flags
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_SIDEREAL,
     # Sidereal modes
-    SE_SIDM_LAHIRI,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
+    SIDM_LAHIRI,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
 )
 
 # =============================================================================
@@ -189,14 +190,14 @@ def calculate_natal_chart(
     """
     # Step 1: Convert date/time to Julian Day
     # The Julian Day is the standard time format for astronomical calculations
-    jd = ephem.swe_julday(year, month, day, hour)
+    jd = ephem.julday(year, month, day, hour)
 
     # Step 2: Set up sidereal mode if requested
-    calc_flags = SEFLG_SWIEPH | SEFLG_SPEED
+    calc_flags = FLG_SWIEPH | FLG_SPEED
     if sidereal:
-        ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        calc_flags |= SEFLG_SIDEREAL
-        ayanamsha = ephem.swe_get_ayanamsa_ut(jd)
+        ephem.set_sid_mode(SIDM_LAHIRI)
+        calc_flags |= FLG_SIDEREAL
+        ayanamsha = ephem.get_ayanamsa_ut(jd)
     else:
         # Reset to tropical (Fagan-Bradley is default, but we use 0 offset)
         ayanamsha = 0.0
@@ -204,25 +205,25 @@ def calculate_natal_chart(
     # Step 3: Calculate planetary positions
     # List of planets to calculate
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
-        (SE_TRUE_NODE, "North Node"),
-        (SE_CHIRON, "Chiron"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
+        (TRUE_NODE, "North Node"),
+        (CHIRON, "Chiron"),
     ]
 
     planet_positions = {}
     for planet_id, planet_name in planets:
-        # swe_calc_ut returns (position_tuple, flags_used)
+        # calc_ut returns (position_tuple, flags_used)
         # position_tuple = (longitude, latitude, distance, lon_speed, lat_speed, dist_speed)
-        pos, _ = ephem.swe_calc_ut(jd, planet_id, calc_flags)
+        pos, _ = ephem.calc_ut(jd, planet_id, calc_flags)
 
         # Determine if planet is retrograde (negative longitude speed)
         is_retrograde = pos[3] < 0
@@ -238,10 +239,10 @@ def calculate_natal_chart(
         }
 
     # Step 4: Calculate house cusps and angles
-    # swe_houses returns (cusps, ascmc)
+    # houses returns (cusps, ascmc)
     # cusps = tuple of 12 house cusp longitudes (index 0-11 for houses 1-12)
     # ascmc = tuple of important points: [0]=ASC, [1]=MC, [2]=ARMC, [3]=Vertex, etc.
-    cusps, ascmc = ephem.swe_houses(jd, latitude, longitude, house_system)
+    cusps, ascmc = ephem.houses(jd, latitude, longitude, house_system)
 
     # Note: Some house systems may have issues at extreme latitudes
     # (> 66.5° North/South). In such cases, consider using Whole Sign houses.
@@ -341,13 +342,13 @@ def find_next_transit(
     - Specific degree transits
 
     This example demonstrates:
-    - Using swe_cross_ut for generic planet crossings
-    - Using swe_solcross_ut for Sun crossings (optimized)
-    - Using swe_mooncross_ut for Moon crossings (optimized)
+    - Using cross_ut for generic planet crossings
+    - Using solcross_ut for Sun crossings (optimized)
+    - Using mooncross_ut for Moon crossings (optimized)
     - Converting Julian Day back to calendar date
 
     Args:
-        planet_id: Planet ID constant (e.g., SE_SUN, SE_MOON, SE_MARS)
+        planet_id: Planet ID constant (e.g., SUN, MOON, MARS)
         target_longitude: Target longitude in degrees (0-360)
         start_year: Year to start searching from
         start_month: Month to start searching from
@@ -363,54 +364,54 @@ def find_next_transit(
 
     Example:
         >>> # Find next Sun ingress into Aries (0° Aries = vernal equinox)
-        >>> result = find_next_transit(SE_SUN, 0.0, 2024, 1, 1)
+        >>> result = find_next_transit(SUN, 0.0, 2024, 1, 1)
         >>> print(f"Vernal Equinox: {result['date']}")
         Vernal Equinox: 2024-03-20 03:06
 
         >>> # Find next Mars ingress into Leo (120° = Leo)
-        >>> result = find_next_transit(SE_MARS, 120.0, 2024, 1, 1)
+        >>> result = find_next_transit(MARS, 120.0, 2024, 1, 1)
     """
     # Convert start date to Julian Day
-    start_jd = ephem.swe_julday(start_year, start_month, start_day, start_hour)
+    start_jd = ephem.julday(start_year, start_month, start_day, start_hour)
 
     # Normalize target longitude to 0-360
     target_longitude = target_longitude % 360
 
     # Use optimized function for Sun and Moon, generic function for others
-    if planet_id == SE_SUN:
-        # swe_solcross_ut is optimized for Sun crossings
-        crossing_jd = ephem.swe_solcross_ut(target_longitude, start_jd, SEFLG_SWIEPH)
-    elif planet_id == SE_MOON:
-        # swe_mooncross_ut is optimized for Moon crossings
-        crossing_jd = ephem.swe_mooncross_ut(target_longitude, start_jd, SEFLG_SWIEPH)
+    if planet_id == SUN:
+        # solcross_ut is optimized for Sun crossings
+        crossing_jd = ephem.solcross_ut(target_longitude, start_jd, FLG_SWIEPH)
+    elif planet_id == MOON:
+        # mooncross_ut is optimized for Moon crossings
+        crossing_jd = ephem.mooncross_ut(target_longitude, start_jd, FLG_SWIEPH)
     else:
-        # swe_cross_ut works for any planet
-        crossing_jd = ephem.swe_cross_ut(
-            planet_id, target_longitude, start_jd, SEFLG_SWIEPH
+        # cross_ut works for any planet
+        crossing_jd = ephem.cross_ut(
+            planet_id, target_longitude, start_jd, FLG_SWIEPH
         )
 
     # Convert Julian Day back to calendar date
-    year, month, day, hour = ephem.swe_revjul(crossing_jd)
+    year, month, day, hour = ephem.revjul(crossing_jd)
 
     # Format time
     hour_int = int(hour)
     minute = int((hour - hour_int) * 60)
 
     # Get planet position at crossing to verify
-    pos, _ = ephem.swe_calc_ut(crossing_jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(crossing_jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
     # Planet names for display
     planet_names = {
-        SE_SUN: "Sun",
-        SE_MOON: "Moon",
-        SE_MERCURY: "Mercury",
-        SE_VENUS: "Venus",
-        SE_MARS: "Mars",
-        SE_JUPITER: "Jupiter",
-        SE_SATURN: "Saturn",
-        SE_URANUS: "Uranus",
-        SE_NEPTUNE: "Neptune",
-        SE_PLUTO: "Pluto",
+        SUN: "Sun",
+        MOON: "Moon",
+        MERCURY: "Mercury",
+        VENUS: "Venus",
+        MARS: "Mars",
+        JUPITER: "Jupiter",
+        SATURN: "Saturn",
+        URANUS: "Uranus",
+        NEPTUNE: "Neptune",
+        PLUTO: "Pluto",
     }
     planet_name = planet_names.get(planet_id, f"Planet {planet_id}")
 
@@ -451,7 +452,7 @@ def find_planetary_return(
 
     Example:
         >>> # Find 2024 Solar Return for someone born with Sun at 15° Leo
-        >>> result = find_planetary_return(SE_SUN, 135.0, 2024)
+        >>> result = find_planetary_return(SUN, 135.0, 2024)
         >>> print(f"Solar Return: {result['date']}")
     """
     return find_next_transit(planet_id, natal_longitude, search_year, 1, 1, 0.0)
@@ -470,29 +471,29 @@ def find_sign_ingresses(planet_id: int, year: int) -> list[dict]:
 
     Example:
         >>> # Find all Sun ingresses (zodiac sign changes) in 2024
-        >>> ingresses = find_sign_ingresses(SE_SUN, 2024)
+        >>> ingresses = find_sign_ingresses(SUN, 2024)
         >>> for ing in ingresses:
         ...     print(f"{ing['target_formatted']}: {ing['date']}")
     """
     ingresses = []
-    start_jd = ephem.swe_julday(year, 1, 1, 0.0)
-    end_jd = ephem.swe_julday(year + 1, 1, 1, 0.0)
+    start_jd = ephem.julday(year, 1, 1, 0.0)
+    end_jd = ephem.julday(year + 1, 1, 1, 0.0)
 
     # Sign boundaries (0° of each sign)
     for sign_num in range(12):
         target = sign_num * 30  # 0, 30, 60, ... 330
 
         # Use the optimized crossing function
-        if planet_id == SE_SUN:
-            crossing_jd = ephem.swe_solcross_ut(target, start_jd, SEFLG_SWIEPH)
-        elif planet_id == SE_MOON:
-            crossing_jd = ephem.swe_mooncross_ut(target, start_jd, SEFLG_SWIEPH)
+        if planet_id == SUN:
+            crossing_jd = ephem.solcross_ut(target, start_jd, FLG_SWIEPH)
+        elif planet_id == MOON:
+            crossing_jd = ephem.mooncross_ut(target, start_jd, FLG_SWIEPH)
         else:
-            crossing_jd = ephem.swe_cross_ut(planet_id, target, start_jd, SEFLG_SWIEPH)
+            crossing_jd = ephem.cross_ut(planet_id, target, start_jd, FLG_SWIEPH)
 
         # Check if crossing is within the year
         if start_jd <= crossing_jd < end_jd:
-            year_c, month, day, hour = ephem.swe_revjul(crossing_jd)
+            year_c, month, day, hour = ephem.revjul(crossing_jd)
             hour_int = int(hour)
             minute = int((hour - hour_int) * 60)
 
@@ -709,9 +710,9 @@ def find_next_solar_eclipse(
         start_month: Month to start searching from
         start_day: Day to start searching from
         eclipse_type: Optional filter for eclipse type:
-            - SE_ECL_TOTAL: Total eclipses only
-            - SE_ECL_ANNULAR: Annular eclipses only
-            - SE_ECL_PARTIAL: Partial eclipses only
+            - ECL_TOTAL: Total eclipses only
+            - ECL_ANNULAR: Annular eclipses only
+            - ECL_PARTIAL: Partial eclipses only
             - None: Any eclipse type
 
     Returns:
@@ -723,12 +724,12 @@ def find_next_solar_eclipse(
 
     Example:
         >>> # Find next total solar eclipse
-        >>> eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+        >>> eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
         >>> print(f"Next total solar eclipse: {eclipse['maximum']}")
         Next total solar eclipse: 2024-04-08 18:17
     """
     # Convert start date to Julian Day
-    start_jd = ephem.swe_julday(start_year, start_month, start_day, 0.0)
+    start_jd = ephem.julday(start_year, start_month, start_day, 0.0)
 
     # Search for eclipse
     # Returns (times_tuple, eclipse_type_flags)
@@ -743,23 +744,23 @@ def find_next_solar_eclipse(
     #   [7] = unused
     if eclipse_type:
         ecl_flags, times = ephem.sol_eclipse_when_glob(
-            start_jd, flags=SEFLG_SWIEPH, ecltype=eclipse_type
+            start_jd, flags=FLG_SWIEPH, ecltype=eclipse_type
         )
     else:
-        ecl_flags, times = ephem.sol_eclipse_when_glob(start_jd, flags=SEFLG_SWIEPH)
+        ecl_flags, times = ephem.sol_eclipse_when_glob(start_jd, flags=FLG_SWIEPH)
 
     # Interpret eclipse type
-    if ecl_flags & SE_ECL_TOTAL:
+    if ecl_flags & ECL_TOTAL:
         type_str = "Total Solar Eclipse"
-    elif ecl_flags & SE_ECL_ANNULAR:
+    elif ecl_flags & ECL_ANNULAR:
         type_str = "Annular Solar Eclipse"
-    elif ecl_flags & SE_ECL_PARTIAL:
+    elif ecl_flags & ECL_PARTIAL:
         type_str = "Partial Solar Eclipse"
     else:
         type_str = "Solar Eclipse (type unknown)"
 
     # Convert maximum time to date
-    year, month, day, hour = ephem.swe_revjul(times[0])
+    year, month, day, hour = ephem.revjul(times[0])
     hour_int = int(hour)
     minute = int((hour - hour_int) * 60)
 
@@ -807,25 +808,23 @@ def find_next_lunar_eclipse(
         >>> eclipse = find_next_lunar_eclipse(2024, 1, 1)
         >>> print(f"Next lunar eclipse: {eclipse['maximum']}")
     """
-    start_jd = ephem.swe_julday(start_year, start_month, start_day, 0.0)
+    start_jd = ephem.julday(start_year, start_month, start_day, 0.0)
 
     # lun_eclipse_when returns (eclipse_type_flags, times)
     ecl_flags, times = ephem.lun_eclipse_when(start_jd)
 
     # Interpret eclipse type
-    from libephemeris.constants import SE_ECL_PENUMBRAL
-
-    if ecl_flags & SE_ECL_TOTAL:
+    if ecl_flags & ECL_TOTAL:
         type_str = "Total Lunar Eclipse"
-    elif ecl_flags & SE_ECL_PARTIAL:
+    elif ecl_flags & ECL_PARTIAL:
         type_str = "Partial Lunar Eclipse"
-    elif ecl_flags & SE_ECL_PENUMBRAL:
+    elif ecl_flags & ECL_PENUMBRAL:
         type_str = "Penumbral Lunar Eclipse"
     else:
         type_str = "Lunar Eclipse (type unknown)"
 
     # Convert maximum time to date
-    year, month, day, hour = ephem.swe_revjul(times[0])
+    year, month, day, hour = ephem.revjul(times[0])
     hour_int = int(hour)
     minute = int((hour - hour_int) * 60)
 
@@ -856,7 +855,7 @@ def find_eclipse_visibility(
         Dictionary with visibility information including magnitude and obscuration
 
     Example:
-        >>> eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+        >>> eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
         >>> visibility = find_eclipse_visibility(
         ...     eclipse['maximum_jd'], 32.7767, -96.7970  # Dallas
         ... )
@@ -878,9 +877,9 @@ def find_eclipse_visibility(
     #   [9] = saros series number
     #   [10] = inex series number
 
-    from libephemeris.constants import SE_ECL_VISIBLE
+    from libephemeris.constants import ECL_VISIBLE
 
-    is_visible = bool(ecl_flags & SE_ECL_VISIBLE)
+    is_visible = bool(ecl_flags & ECL_VISIBLE)
 
     return {
         "visible": is_visible,
@@ -890,9 +889,9 @@ def find_eclipse_visibility(
         "sun_azimuth": attr[3],
         "eclipse_type_local": (
             "Total"
-            if ecl_flags & SE_ECL_TOTAL
+            if ecl_flags & ECL_TOTAL
             else "Annular"
-            if ecl_flags & SE_ECL_ANNULAR
+            if ecl_flags & ECL_ANNULAR
             else "Partial"
         ),
     }
@@ -936,34 +935,34 @@ def calculate_monthly_ephemeris(
     """
     # Determine number of days in month
     if month == 12:
-        next_month_jd = ephem.swe_julday(year + 1, 1, 1, 0.0)
+        next_month_jd = ephem.julday(year + 1, 1, 1, 0.0)
     else:
-        next_month_jd = ephem.swe_julday(year, month + 1, 1, 0.0)
-    first_day_jd = ephem.swe_julday(year, month, 1, 0.0)
+        next_month_jd = ephem.julday(year, month + 1, 1, 0.0)
+    first_day_jd = ephem.julday(year, month, 1, 0.0)
     days_in_month = int(next_month_jd - first_day_jd)
 
     # Planets to calculate
     planets = [
-        (SE_SUN, "Sun"),
-        (SE_MOON, "Moon"),
-        (SE_MERCURY, "Mercury"),
-        (SE_VENUS, "Venus"),
-        (SE_MARS, "Mars"),
-        (SE_JUPITER, "Jupiter"),
-        (SE_SATURN, "Saturn"),
-        (SE_URANUS, "Uranus"),
-        (SE_NEPTUNE, "Neptune"),
-        (SE_PLUTO, "Pluto"),
+        (SUN, "Sun"),
+        (MOON, "Moon"),
+        (MERCURY, "Mercury"),
+        (VENUS, "Venus"),
+        (MARS, "Mars"),
+        (JUPITER, "Jupiter"),
+        (SATURN, "Saturn"),
+        (URANUS, "Uranus"),
+        (NEPTUNE, "Neptune"),
+        (PLUTO, "Pluto"),
     ]
 
     if include_asteroids:
-        planets.append((SE_CHIRON, "Chiron"))
+        planets.append((CHIRON, "Chiron"))
 
     # Calculate for each day at noon (12:00)
     ephemeris = []
 
     for day in range(1, days_in_month + 1):
-        jd = ephem.swe_julday(year, month, day, 12.0)  # Noon UTC
+        jd = ephem.julday(year, month, day, 12.0)  # Noon UTC
 
         day_data = {
             "date": f"{year}-{month:02d}-{day:02d}",
@@ -971,7 +970,7 @@ def calculate_monthly_ephemeris(
         }
 
         for planet_id, planet_name in planets:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+            pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
             day_data[planet_name] = {
                 "longitude": pos[0],
@@ -1000,13 +999,13 @@ def find_retrograde_periods(year: int, planet_id: int) -> list[dict]:
 
     Example:
         >>> # Find Mercury retrograde periods in 2024
-        >>> retrogrades = find_retrograde_periods(2024, SE_MERCURY)
+        >>> retrogrades = find_retrograde_periods(2024, MERCURY)
         >>> for period in retrogrades:
         ...     print(f"{period['start']} to {period['end']}")
     """
     # Calculate positions for each day of the year
-    start_jd = ephem.swe_julday(year, 1, 1, 12.0)
-    end_jd = ephem.swe_julday(year + 1, 1, 1, 12.0)
+    start_jd = ephem.julday(year, 1, 1, 12.0)
+    end_jd = ephem.julday(year + 1, 1, 1, 12.0)
 
     periods = []
     in_retrograde = False
@@ -1014,7 +1013,7 @@ def find_retrograde_periods(year: int, planet_id: int) -> list[dict]:
 
     jd = start_jd
     while jd < end_jd:
-        pos, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+        pos, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
         is_retrograde = pos[3] < 0
 
         if is_retrograde and not in_retrograde:
@@ -1026,15 +1025,15 @@ def find_retrograde_periods(year: int, planet_id: int) -> list[dict]:
             in_retrograde = False
 
             # Get start date
-            y1, m1, d1, _ = ephem.swe_revjul(retrograde_start)
+            y1, m1, d1, _ = ephem.revjul(retrograde_start)
             # Get end date
-            y2, m2, d2, _ = ephem.swe_revjul(jd)
+            y2, m2, d2, _ = ephem.revjul(jd)
 
             # Get station positions
-            pos_start, _ = ephem.swe_calc_ut(
-                retrograde_start, planet_id, SEFLG_SWIEPH | SEFLG_SPEED
+            pos_start, _ = ephem.calc_ut(
+                retrograde_start, planet_id, FLG_SWIEPH | FLG_SPEED
             )
-            pos_end, _ = ephem.swe_calc_ut(jd, planet_id, SEFLG_SWIEPH | SEFLG_SPEED)
+            pos_end, _ = ephem.calc_ut(jd, planet_id, FLG_SWIEPH | FLG_SPEED)
 
             periods.append(
                 {
@@ -1137,13 +1136,13 @@ def main():
 
     # Find next vernal equinox
     print("Finding next vernal equinox (Sun at 0 Aries)...")
-    transit = find_next_transit(SE_SUN, 0.0, 2024, 1, 1)
+    transit = find_next_transit(SUN, 0.0, 2024, 1, 1)
     print(f"  {transit['planet']} enters Aries: {transit['date']}")
     print()
 
     # Find Sun sign ingresses for 2024
     print("Sun sign ingresses for 2024:")
-    ingresses = find_sign_ingresses(SE_SUN, 2024)
+    ingresses = find_sign_ingresses(SUN, 2024)
     for ing in ingresses:
         print(f"  {ing['target_formatted']}: {ing['date']}")
 
@@ -1185,7 +1184,7 @@ def main():
 
     # Find next total solar eclipse
     print("Searching for next total solar eclipse from 2024...")
-    eclipse = find_next_solar_eclipse(2024, 1, 1, SE_ECL_TOTAL)
+    eclipse = find_next_solar_eclipse(2024, 1, 1, ECL_TOTAL)
     print(f"  Type: {eclipse['type']}")
     print(f"  Maximum: {eclipse['maximum']} UTC")
     if eclipse["duration"]:
@@ -1226,7 +1225,7 @@ def main():
 
     # Find Mercury retrograde periods
     print("Mercury retrograde periods in 2024:")
-    retrogrades = find_retrograde_periods(2024, SE_MERCURY)
+    retrogrades = find_retrograde_periods(2024, MERCURY)
     for period in retrogrades:
         print(
             f"  {period['start']} to {period['end']} ({period['duration_days']} days)"

@@ -227,7 +227,7 @@ def clear_caches() -> None:
 
     Call this when:
     - Changing ephemeris files
-    - After calling swe_close()
+    - After calling close()
     - When memory needs to be freed
     """
     get_cached_nutation.cache_clear()

@@ -33,8 +33,8 @@ class TestJuldayRevjul:
     )
     def test_julday_revjul_roundtrip(self, y: int, m: int, d: int, h: float):
         """julday -> revjul should recover original date."""
-        jd = swe.swe_julday(y, m, d, h)
-        ry, rm, rd, rh = swe.swe_revjul(jd)
+        jd = swe.julday(y, m, d, h)
+        ry, rm, rd, rh = swe.revjul(jd)
         assert ry == y, f"Year: {ry} != {y}"
         assert rm == m, f"Month: {rm} != {m}"
         assert rd == d, f"Day: {rd} != {d}"
@@ -43,39 +43,39 @@ class TestJuldayRevjul:
     @pytest.mark.unit
     def test_j2000_jd(self):
         """J2000.0 should be JD 2451545.0."""
-        jd = swe.swe_julday(2000, 1, 1, 12.0)
+        jd = swe.julday(2000, 1, 1, 12.0)
         assert abs(jd - 2451545.0) < 1e-6
 
     @pytest.mark.unit
     def test_unix_epoch_jd(self):
         """Unix epoch (1970-01-01 00:00) should be JD 2440587.5."""
-        jd = swe.swe_julday(1970, 1, 1, 0.0)
+        jd = swe.julday(1970, 1, 1, 0.0)
         assert abs(jd - 2440587.5) < 1e-6
 
     @pytest.mark.unit
     def test_julday_returns_float(self):
         """julday should return a native Python float."""
-        jd = swe.swe_julday(2000, 1, 1, 12.0)
+        jd = swe.julday(2000, 1, 1, 12.0)
         assert type(jd) is float
 
     @pytest.mark.unit
     def test_revjul_returns_4_values(self):
         """revjul should return (year, month, day, hour)."""
-        result = swe.swe_revjul(2451545.0)
+        result = swe.revjul(2451545.0)
         assert len(result) == 4
 
     @pytest.mark.unit
     def test_julday_consecutive_days(self):
         """Consecutive days should differ by exactly 1.0."""
-        jd1 = swe.swe_julday(2024, 3, 15, 12.0)
-        jd2 = swe.swe_julday(2024, 3, 16, 12.0)
+        jd1 = swe.julday(2024, 3, 15, 12.0)
+        jd2 = swe.julday(2024, 3, 16, 12.0)
         assert abs(jd2 - jd1 - 1.0) < 1e-10
 
     @pytest.mark.unit
     def test_julday_12_hours_is_half_day(self):
         """12 hours should be 0.5 JD."""
-        jd1 = swe.swe_julday(2024, 3, 15, 0.0)
-        jd2 = swe.swe_julday(2024, 3, 15, 12.0)
+        jd1 = swe.julday(2024, 3, 15, 0.0)
+        jd2 = swe.julday(2024, 3, 15, 12.0)
         assert abs(jd2 - jd1 - 0.5) < 1e-10
 
 
@@ -85,19 +85,19 @@ class TestDeltaT:
     @pytest.mark.unit
     def test_deltat_returns_float(self):
         """deltat should return a native Python float."""
-        dt = swe.swe_deltat(2451545.0)
+        dt = swe.deltat(2451545.0)
         assert type(dt) is float
 
     @pytest.mark.unit
     def test_deltat_finite(self):
         """deltat should return a finite value."""
-        dt = swe.swe_deltat(2451545.0)
+        dt = swe.deltat(2451545.0)
         assert math.isfinite(dt)
 
     @pytest.mark.unit
     def test_deltat_j2000_positive(self):
         """Delta T at J2000.0 should be positive (~63.8s)."""
-        dt = swe.swe_deltat(2451545.0)
+        dt = swe.deltat(2451545.0)
         # dt is in days, ~63.8s = ~0.000739 days
         dt_seconds = dt * 86400
         assert 60 < dt_seconds < 70, (
@@ -109,8 +109,8 @@ class TestDeltaT:
         """Delta T should generally increase over centuries."""
         jd_2000 = 2451545.0
         jd_2100 = jd_2000 + 36525.0
-        dt_2000 = swe.swe_deltat(jd_2000)
-        dt_2100 = swe.swe_deltat(jd_2100)
+        dt_2000 = swe.deltat(jd_2000)
+        dt_2100 = swe.deltat(jd_2100)
         assert dt_2100 > dt_2000, f"Delta T not increasing: {dt_2000} -> {dt_2100}"
 
     @pytest.mark.unit
@@ -124,8 +124,8 @@ class TestDeltaT:
     )
     def test_deltat_historical_values(self, year: int, min_s: float, max_s: float):
         """Delta T at historical dates should be in expected range."""
-        jd = swe.swe_julday(year, 1, 1, 12.0)
-        dt = swe.swe_deltat(jd)
+        jd = swe.julday(year, 1, 1, 12.0)
+        dt = swe.deltat(jd)
         dt_seconds = dt * 86400
         assert min_s < dt_seconds < max_s, (
             f"Year {year}: Delta T = {dt_seconds:.1f}s, expected [{min_s}, {max_s}]"
@@ -138,13 +138,13 @@ class TestSidtime:
     @pytest.mark.unit
     def test_sidtime_returns_float(self):
         """sidtime should return a native Python float."""
-        st = swe.swe_sidtime(2451545.0)
+        st = swe.sidtime(2451545.0)
         assert type(st) is float
 
     @pytest.mark.unit
     def test_sidtime_in_range(self):
         """Sidereal time should be 0-24 hours."""
-        st = swe.swe_sidtime(2451545.0)
+        st = swe.sidtime(2451545.0)
         assert 0 <= st < 24, f"Sidereal time {st} out of [0,24)"
 
     @pytest.mark.unit
@@ -154,7 +154,7 @@ class TestSidtime:
     )
     def test_sidtime_various_dates(self, jd: float):
         """Sidereal time valid at various dates."""
-        st = swe.swe_sidtime(jd)
+        st = swe.sidtime(jd)
         assert 0 <= st < 24, f"JD {jd}: sidtime={st}"
         assert math.isfinite(st)
 
@@ -164,8 +164,8 @@ class TestSidtime:
         jd1 = 2451545.0
         jd2 = jd1 + 1.0  # Next day
 
-        st1 = swe.swe_sidtime(jd1)
-        st2 = swe.swe_sidtime(jd2)
+        st1 = swe.sidtime(jd1)
+        st2 = swe.sidtime(jd2)
 
         # Sidereal day is ~23h 56m, so sidtime gains ~3.94 min/day
         # In 1 solar day, sidtime advances by ~24h 3.94m => wraps around
@@ -183,13 +183,13 @@ class TestUtcToJd:
     @pytest.mark.unit
     def test_utc_to_jd_returns_tuple(self):
         """utc_to_jd should return a tuple of 2 JD values."""
-        result = swe.swe_utc_to_jd(2000, 1, 1, 12, 0, 0.0)
+        result = swe.utc_to_jd(2000, 1, 1, 12, 0, 0.0)
         assert len(result) >= 2
 
     @pytest.mark.unit
     def test_utc_to_jd_j2000(self):
         """UTC 2000-01-01 12:00:00 should be close to JD 2451545.0."""
-        result = swe.swe_utc_to_jd(2000, 1, 1, 12, 0, 0.0)
+        result = swe.utc_to_jd(2000, 1, 1, 12, 0, 0.0)
         # result[0] is JD in ET, result[1] is JD in UT
         jd_ut = result[1]
         assert abs(jd_ut - 2451545.0) < 0.01, f"JD_UT={jd_ut}"
@@ -208,7 +208,7 @@ class TestUtcToJd:
         self, y: int, m: int, d: int, h: int, mi: int, s: float
     ):
         """utc_to_jd works for various dates."""
-        result = swe.swe_utc_to_jd(y, m, d, h, mi, s)
+        result = swe.utc_to_jd(y, m, d, h, mi, s)
         assert len(result) >= 2
         jd_ut = result[1]
         assert math.isfinite(jd_ut)
@@ -221,13 +221,13 @@ class TestJdut1ToUtc:
     @pytest.mark.unit
     def test_jdut1_to_utc_returns_tuple(self):
         """jdut1_to_utc returns a tuple."""
-        result = swe.swe_jdut1_to_utc(2451545.0)
+        result = swe.jdut1_to_utc(2451545.0)
         assert len(result) >= 5  # year, month, day, hour, minute, second
 
     @pytest.mark.unit
     def test_jdut1_to_utc_j2000(self):
         """JD 2451545.0 should convert to ~2000-01-01."""
-        result = swe.swe_jdut1_to_utc(2451545.0)
+        result = swe.jdut1_to_utc(2451545.0)
         y, m, d = result[0], result[1], result[2]
         assert y == 2000
         assert m == 1
@@ -240,13 +240,13 @@ class TestJdetToUtc:
     @pytest.mark.unit
     def test_jdet_to_utc_returns_tuple(self):
         """jdet_to_utc returns a tuple."""
-        result = swe.swe_jdet_to_utc(2451545.0)
+        result = swe.jdet_to_utc(2451545.0)
         assert len(result) >= 5
 
     @pytest.mark.unit
     def test_jdet_to_utc_j2000(self):
         """JD ET 2451545.0 should convert to ~2000-01-01."""
-        result = swe.swe_jdet_to_utc(2451545.0)
+        result = swe.jdet_to_utc(2451545.0)
         y, m = result[0], result[1]
         assert y == 2000
         assert m == 1
@@ -268,8 +268,8 @@ class TestUtcRoundTrip:
         self, y: int, m: int, d: int, h: int, mi: int, s: float
     ):
         """UTC -> JD_UT -> UTC should roughly recover original date."""
-        jd_et, jd_ut = swe.swe_utc_to_jd(y, m, d, h, mi, s)
-        result = swe.swe_jdut1_to_utc(jd_ut)
+        jd_et, jd_ut = swe.utc_to_jd(y, m, d, h, mi, s)
+        result = swe.jdut1_to_utc(jd_ut)
         ry, rm, rd = int(result[0]), int(result[1]), int(result[2])
         assert ry == y, f"Year: {ry} != {y}"
         assert rm == m, f"Month: {rm} != {m}"

@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256 | 32768  # SEFLG_SPEED | SEFLG_TOPOCTR
+FLAGS = 256 | 32768  # FLG_SPEED | FLG_TOPOCTR
 
 LOCATIONS = [
     (12.50, 41.90, 50.0, "Rome"),
@@ -33,12 +37,12 @@ print("=" * 70)
 print("\n=== P1: Topocentric Moon ===")
 for lon, lat, alt, name in LOCATIONS:
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
     loc_pass = loc_fail = 0
     for jd in DATES:
         try:
             se = swe.calc_ut(jd, 1, FLAGS)
-            le = ephem.swe_calc_ut(jd, 1, FLAGS)
+            le = ephem.calc_ut(jd, 1, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -63,11 +67,11 @@ print(f"  After P1: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P2: Topocentric Sun ===")
 for lon, lat, alt, name in LOCATIONS:
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
     for jd in DATES:
         try:
             se = swe.calc_ut(jd, 0, FLAGS)
-            le = ephem.swe_calc_ut(jd, 0, FLAGS)
+            le = ephem.calc_ut(jd, 0, FLAGS)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -83,12 +87,12 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P3: Topocentric planets ===")
 for lon, lat, alt, name in LOCATIONS[:4]:
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
     for jd in DATES[:10]:
         for body in [2, 3, 4, 5, 6]:
             try:
                 se = swe.calc_ut(jd, body, FLAGS)
-                le = ephem.swe_calc_ut(jd, body, FLAGS)
+                le = ephem.calc_ut(jd, body, FLAGS)
                 diff = abs(se[0][0] - le[0][0])
                 if diff > 180:
                     diff = 360 - diff
@@ -103,11 +107,11 @@ print(f"  After P3: {passed} passed, {failed} failed, {errors} errors")
 # P4: Moon parallax magnitude check (should be ~0.5-1°)
 print("\n=== P4: Moon parallax magnitude ===")
 swe.set_topo(12.50, 41.90, 50.0)
-ephem.swe_set_topo(12.50, 41.90, 50.0)
+ephem.set_topo(12.50, 41.90, 50.0)
 for jd in DATES[:20]:
     try:
-        geo = ephem.swe_calc_ut(jd, 1, 256)  # geocentric
-        topo = ephem.swe_calc_ut(jd, 1, FLAGS)  # topocentric
+        geo = ephem.calc_ut(jd, 1, 256)  # geocentric
+        topo = ephem.calc_ut(jd, 1, FLAGS)  # topocentric
         parallax = abs(geo[0][0] - topo[0][0])
         if parallax > 180:
             parallax = 360 - parallax
@@ -125,12 +129,12 @@ print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P5: Topocentric latitude ===")
 for lon, lat, alt, name in LOCATIONS[:4]:
     swe.set_topo(lon, lat, alt)
-    ephem.swe_set_topo(lon, lat, alt)
+    ephem.set_topo(lon, lat, alt)
     for jd in DATES[:10]:
         for body in [0, 1]:
             try:
                 se = swe.calc_ut(jd, body, FLAGS)
-                le = ephem.swe_calc_ut(jd, body, FLAGS)
+                le = ephem.calc_ut(jd, body, FLAGS)
                 diff = abs(se[0][1] - le[0][1]) * 3600
                 if diff < 1.0:
                     passed += 1

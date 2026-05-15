@@ -12,25 +12,25 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_EARTH,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    EARTH,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    FLG_SPEED,
+    FLG_HELCTR,
 )
 
 from tests.test_leb.compare.conftest import (
@@ -43,34 +43,34 @@ from .conftest import TOLS_EXT
 
 
 DISTANCE_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 ECLIPTIC_DISTANCE_BODIES = [
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_INTP_APOG, "IntpApog"),
-    (SE_INTP_PERG, "IntpPerg"),
+    (TRUE_NODE, "TrueNode"),
+    (OSCU_APOG, "OscuApog"),
+    (INTP_APOG, "IntpApog"),
+    (INTP_PERG, "IntpPerg"),
 ]
 
 HELIO_BODIES = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 
@@ -91,8 +91,8 @@ class TestExtGeocentricPrecision:
         worst_speed = (0.0, 0.0)
 
         for jd in ext_dates_200:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err_dist = abs(ref[2] - leb[2])
             if err_dist > worst_dist[0]:
@@ -132,8 +132,8 @@ class TestExtEclipticBodyDistance:
         worst_jd = 0.0
 
         for jd in ext_dates_200:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[2] - leb[2])
             if err > max_err:
@@ -147,7 +147,7 @@ class TestExtEclipticBodyDistance:
 
 
 class TestExtHeliocentricDistance:
-    """Heliocentric distance precision (SEFLG_HELCTR)."""
+    """Heliocentric distance precision (FLG_HELCTR)."""
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
@@ -159,13 +159,13 @@ class TestExtHeliocentricDistance:
         body_id: int,
         body_name: str,
     ):
-        flags = SEFLG_SPEED | SEFLG_HELCTR
+        flags = FLG_SPEED | FLG_HELCTR
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_100:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[2] - leb[2])
             if err > max_err:

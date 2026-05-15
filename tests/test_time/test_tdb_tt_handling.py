@@ -7,7 +7,7 @@ between TDB and TT where relevant.
 Background:
 -----------
 - TT (Terrestrial Time): A theoretical ideal atomic clock on Earth's geoid.
-  Used as input for the swe_calc() function (pyswisseph-compatible API).
+  Used as input for the calc() function (pyswisseph-compatible API).
 - TDB (Barycentric Dynamical Time): Time used for planetary ephemerides.
   It's the independent variable in the equations of motion.
 - The difference TDB - TT is a periodic function with maximum amplitude of
@@ -66,7 +66,7 @@ class TestTDBTTBasics:
         ]
 
         for year, month, day, hour in test_dates:
-            jd_tt = ephem.swe_julday(year, month, day, hour)
+            jd_tt = ephem.julday(year, month, day, hour)
             t = ts.tt_jd(jd_tt)
 
             # TDB and TT values in Julian Days
@@ -89,7 +89,7 @@ class TestTDBTTBasics:
         ts = get_timescale()
 
         # Sample multiple points through a year
-        jd_start = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_start = ephem.julday(2020, 1, 1, 12.0)
         differences = []
 
         for day_offset in range(0, 365, 30):  # Sample every 30 days
@@ -119,9 +119,9 @@ class TestTDBTTBasics:
         dt_tdb_tt = 0.0017 / 86400  # 1.7 ms in days
 
         # Get Moon position (fastest moving body)
-        pos_tt, _ = ephem.swe_calc(jd_tt, ephem.SE_MOON, ephem.SEFLG_SPEED)
-        pos_offset, _ = ephem.swe_calc(
-            jd_tt + dt_tdb_tt, ephem.SE_MOON, ephem.SEFLG_SPEED
+        pos_tt, _ = ephem.calc(jd_tt, ephem.MOON, ephem.FLG_SPEED)
+        pos_offset, _ = ephem.calc(
+            jd_tt + dt_tdb_tt, ephem.MOON, ephem.FLG_SPEED
         )
 
         # Position difference in arcseconds
@@ -134,15 +134,15 @@ class TestTDBTTBasics:
 
 
 class TestSweCalcTimeScales:
-    """Test that swe_calc and swe_calc_ut use correct time scales."""
+    """Test that calc and calc_ut use correct time scales."""
 
     @pytest.mark.unit
     def test_swe_calc_uses_tt_input(self):
-        """swe_calc() should accept TT as input."""
+        """calc() should accept TT as input."""
         jd_tt = 2451545.0  # J2000.0 in TT
 
         # This should work without error
-        pos, flag = ephem.swe_calc(jd_tt, ephem.SE_SUN, ephem.SEFLG_SPEED)
+        pos, flag = ephem.calc(jd_tt, ephem.SUN, ephem.FLG_SPEED)
 
         # Should return valid position
         assert len(pos) == 6
@@ -152,11 +152,11 @@ class TestSweCalcTimeScales:
 
     @pytest.mark.unit
     def test_swe_calc_ut_uses_ut1_input(self):
-        """swe_calc_ut() should accept UT1 as input."""
+        """calc_ut() should accept UT1 as input."""
         jd_ut = 2451545.0  # J2000.0 as UT1
 
         # This should work without error
-        pos, flag = ephem.swe_calc_ut(jd_ut, ephem.SE_SUN, ephem.SEFLG_SPEED)
+        pos, flag = ephem.calc_ut(jd_ut, ephem.SUN, ephem.FLG_SPEED)
 
         # Should return valid position
         assert len(pos) == 6
@@ -166,32 +166,32 @@ class TestSweCalcTimeScales:
 
     @pytest.mark.unit
     def test_swe_calc_vs_swe_calc_ut_consistency(self):
-        """swe_calc(TT) should match swe_calc_ut(UT) when adjusted by Delta T."""
-        jd_ut = ephem.swe_julday(2000, 1, 1, 12.0)
-        delta_t = ephem.swe_deltat(jd_ut)
+        """calc(TT) should match calc_ut(UT) when adjusted by Delta T."""
+        jd_ut = ephem.julday(2000, 1, 1, 12.0)
+        delta_t = ephem.deltat(jd_ut)
         jd_tt = jd_ut + delta_t
 
         # Calculate using both methods
-        pos_tt, _ = ephem.swe_calc(jd_tt, ephem.SE_SUN, ephem.SEFLG_SPEED)
-        pos_ut, _ = ephem.swe_calc_ut(jd_ut, ephem.SE_SUN, ephem.SEFLG_SPEED)
+        pos_tt, _ = ephem.calc(jd_tt, ephem.SUN, ephem.FLG_SPEED)
+        pos_ut, _ = ephem.calc_ut(jd_ut, ephem.SUN, ephem.FLG_SPEED)
 
         # Positions should match closely (within a few arcseconds due to
         # the way Delta T is computed at slightly different times)
         lon_diff_arcsec = abs(pos_tt[0] - pos_ut[0]) * 3600
         assert lon_diff_arcsec < 1.0, (
-            f"swe_calc(TT) and swe_calc_ut(UT) differ by {lon_diff_arcsec:.4f} arcsec"
+            f"calc(TT) and calc_ut(UT) differ by {lon_diff_arcsec:.4f} arcsec"
         )
 
     @pytest.mark.unit
     def test_swe_calc_and_swe_calc_ut_differ_by_delta_t(self):
-        """Using same JD with swe_calc and swe_calc_ut should show Delta T offset."""
+        """Using same JD with calc and calc_ut should show Delta T offset."""
         jd = 2451545.0  # Same numeric value for both
-        delta_t = ephem.swe_deltat(jd)
+        delta_t = ephem.deltat(jd)
         delta_t_seconds = delta_t * 86400
 
         # Calculate Sun position with both functions using same numeric JD
-        pos_tt, _ = ephem.swe_calc(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
-        pos_ut, _ = ephem.swe_calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+        pos_tt, _ = ephem.calc(jd, ephem.SUN, ephem.FLG_SPEED)
+        pos_ut, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 
         # They should differ because one interprets JD as TT, other as UT1
         # Sun moves about 1 degree per day, Delta T is ~64 seconds
@@ -223,36 +223,36 @@ class TestUtcToJdTimeScales:
 
     @pytest.mark.unit
     def test_utc_to_jd_tt_for_swe_calc(self):
-        """jd_tt from utc_to_jd is suitable for swe_calc()."""
+        """jd_tt from utc_to_jd is suitable for calc()."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2020, 6, 15, 12, 0, 0.0)
 
-        # Should work correctly with swe_calc
-        pos, flag = ephem.swe_calc(jd_tt, ephem.SE_VENUS, ephem.SEFLG_SPEED)
+        # Should work correctly with calc
+        pos, flag = ephem.calc(jd_tt, ephem.VENUS, ephem.FLG_SPEED)
         assert len(pos) == 6
         assert 0 <= pos[0] < 360
 
     @pytest.mark.unit
     def test_utc_to_jd_ut1_for_swe_calc_ut(self):
-        """jd_ut1 from utc_to_jd is suitable for swe_calc_ut()."""
+        """jd_ut1 from utc_to_jd is suitable for calc_ut()."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2020, 6, 15, 12, 0, 0.0)
 
-        # Should work correctly with swe_calc_ut
-        pos, flag = ephem.swe_calc_ut(jd_ut1, ephem.SE_VENUS, ephem.SEFLG_SPEED)
+        # Should work correctly with calc_ut
+        pos, flag = ephem.calc_ut(jd_ut1, ephem.VENUS, ephem.FLG_SPEED)
         assert len(pos) == 6
         assert 0 <= pos[0] < 360
 
     @pytest.mark.unit
     def test_utc_to_jd_consistency_with_swe_calc_methods(self):
-        """Using jd_tt with swe_calc and jd_ut1 with swe_calc_ut should match."""
+        """Using jd_tt with calc and jd_ut1 with calc_ut should match."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2020, 6, 15, 12, 0, 0.0)
 
-        pos_from_tt, _ = ephem.swe_calc(jd_tt, ephem.SE_VENUS, ephem.SEFLG_SPEED)
-        pos_from_ut, _ = ephem.swe_calc_ut(jd_ut1, ephem.SE_VENUS, ephem.SEFLG_SPEED)
+        pos_from_tt, _ = ephem.calc(jd_tt, ephem.VENUS, ephem.FLG_SPEED)
+        pos_from_ut, _ = ephem.calc_ut(jd_ut1, ephem.VENUS, ephem.FLG_SPEED)
 
         # Both should give same position (within floating-point tolerance)
         lon_diff_arcsec = abs(pos_from_tt[0] - pos_from_ut[0]) * 3600
         assert lon_diff_arcsec < 0.1, (
-            f"swe_calc(jd_tt) and swe_calc_ut(jd_ut1) should match, "
+            f"calc(jd_tt) and calc_ut(jd_ut1) should match, "
             f"diff = {lon_diff_arcsec:.6f} arcsec"
         )
 
@@ -264,7 +264,7 @@ class TestTDBApproximation:
     def test_tdb_tt_max_difference(self):
         """Document the maximum TDB - TT difference throughout a year."""
         ts = get_timescale()
-        jd_start = ephem.swe_julday(2020, 1, 1, 0.0)
+        jd_start = ephem.julday(2020, 1, 1, 0.0)
 
         max_diff_ms = 0
         max_diff_date = None
@@ -277,7 +277,7 @@ class TestTDBApproximation:
 
             if diff_ms > max_diff_ms:
                 max_diff_ms = diff_ms
-                max_diff_date = ephem.swe_revjul(jd)
+                max_diff_date = ephem.revjul(jd)
 
         # Maximum should be around 1.6-1.7 ms
         assert 1.0 < max_diff_ms < 2.0, (
@@ -297,12 +297,12 @@ class TestTDBApproximation:
 
         # Calculate positions at both times
         for planet, max_speed_arcsec_per_second in [
-            (ephem.SE_MOON, 0.55),  # Moon: ~0.55 arcsec/s
-            (ephem.SE_MERCURY, 0.05),  # Mercury: ~4 deg/day max
-            (ephem.SE_SUN, 0.01),  # Sun: ~1 deg/day
+            (ephem.MOON, 0.55),  # Moon: ~0.55 arcsec/s
+            (ephem.MERCURY, 0.05),  # Mercury: ~4 deg/day max
+            (ephem.SUN, 0.01),  # Sun: ~1 deg/day
         ]:
-            pos_tt, _ = ephem.swe_calc(tt_jd, planet, ephem.SEFLG_SPEED)
-            pos_tdb, _ = ephem.swe_calc(tdb_jd, planet, ephem.SEFLG_SPEED)
+            pos_tt, _ = ephem.calc(tt_jd, planet, ephem.FLG_SPEED)
+            pos_tdb, _ = ephem.calc(tdb_jd, planet, ephem.FLG_SPEED)
 
             lon_diff_arcsec = abs(pos_tt[0] - pos_tdb[0]) * 3600
 
@@ -326,7 +326,7 @@ class TestSkyfieldTimeIntegration:
         t = ts.ut1_jd(jd_ut)
 
         # TT should be UT1 + Delta T
-        expected_delta_t = ephem.swe_deltat(jd_ut)  # in days
+        expected_delta_t = ephem.deltat(jd_ut)  # in days
         actual_delta_t = float(t.tt) - float(t.ut1)
 
         # Should match within 1 second

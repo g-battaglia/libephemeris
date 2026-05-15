@@ -48,7 +48,7 @@ def test_houses_famous_people(name, year, month, day, hour, lat, lon, hsys):
 
     # Python Ephemeris
     try:
-        cusps_py, ascmc_py = pyephem.swe_houses(jd, lat, lon, ord(hsys))
+        cusps_py, ascmc_py = pyephem.houses(jd, lat, lon, ord(hsys))
     except Exception as e:
         pytest.fail(f"PythonEphemeris Error for {hsys} at {lat}: {e}")
 
@@ -76,7 +76,7 @@ def test_houses_famous_people(name, year, month, day, hour, lat, lon, hsys):
 
     # Compare Asc/MC
     # Note: Asc/MC should be same for most quadrant systems, but might differ for some (e.g. Vehlow, Morinus?)
-    # swe_houses returns standard Asc/MC in ascmc array regardless of system?
+    # houses returns standard Asc/MC in ascmc array regardless of system?
     # Usually yes.
 
     diff_asc = abs(ascmc_swe[0] - ascmc_py[0])

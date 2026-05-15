@@ -1,7 +1,7 @@
 """
 Tests for sidtime (sidereal time) accuracy and consistency.
 
-Verifies swe_sidtime and swe_sidtime0 across dates,
+Verifies sidtime and sidtime0 across dates,
 consistency between the two functions, and known values.
 """
 
@@ -17,14 +17,14 @@ import libephemeris as swe
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
 
 
 class TestSidtime:
-    """Test swe_sidtime (Greenwich Mean Sidereal Time)."""
+    """Test sidtime (Greenwich Mean Sidereal Time)."""
 
     @pytest.mark.unit
     def test_returns_float(self):
@@ -82,7 +82,7 @@ class TestSidtime:
 
 
 class TestSidtime0:
-    """Test swe_sidtime0 (GMST from obliquity and nutation)."""
+    """Test sidtime0 (GMST from obliquity and nutation)."""
 
     @pytest.mark.unit
     def test_returns_float(self):

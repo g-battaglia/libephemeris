@@ -4,17 +4,17 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_HELCTR,
-    SEFLG_BARYCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_NOABERR,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_HELCTR,
+    FLG_BARYCTR,
+    FLG_TRUEPOS,
+    FLG_NOABERR,
 )
 
 from tests.test_leb.compare.conftest import (
@@ -25,21 +25,21 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_BASE
 
 FLAG_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 FLAG_COMBINATIONS = [
-    (SEFLG_SPEED, "default"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "equatorial"),
-    (SEFLG_SPEED | SEFLG_J2000, "J2000"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_J2000, "equatorial_J2000"),
-    (SEFLG_SPEED | SEFLG_HELCTR, "heliocentric"),
-    (SEFLG_SPEED | SEFLG_BARYCTR, "barycentric"),
-    (SEFLG_SPEED | SEFLG_TRUEPOS, "truepos"),
-    (SEFLG_SPEED | SEFLG_NOABERR, "noaberr"),
+    (FLG_SPEED, "default"),
+    (FLG_SPEED | FLG_EQUATORIAL, "equatorial"),
+    (FLG_SPEED | FLG_J2000, "J2000"),
+    (FLG_SPEED | FLG_EQUATORIAL | FLG_J2000, "equatorial_J2000"),
+    (FLG_SPEED | FLG_HELCTR, "heliocentric"),
+    (FLG_SPEED | FLG_BARYCTR, "barycentric"),
+    (FLG_SPEED | FLG_TRUEPOS, "truepos"),
+    (FLG_SPEED | FLG_NOABERR, "noaberr"),
 ]
 
 
@@ -62,8 +62,8 @@ class TestBaseFlagCombinations:
         worst_jd = 0.0
 
         for jd in base_dates_100:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
             lat_err = abs(ref[1] - leb[1]) * 3600.0

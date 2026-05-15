@@ -13,17 +13,17 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_TRUE_NODE,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    TRUE_NODE,
 )
 
 
@@ -75,17 +75,17 @@ MAJOR_ASPECTS = [
 
 # Planets for aspect calculation (excluding Chiron to avoid SPK requirement)
 ASPECT_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_TRUE_NODE, "TrueNode"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (TRUE_NODE, "TrueNode"),
 ]
 
 
@@ -166,14 +166,14 @@ class TestNatalAspectsCount:
         This test validates that planetary positions are accurate enough that
         aspects at the edge of orb tolerances are detected identically.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         # Calculate positions with libephemeris
         positions_lib = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions_lib[planet_name] = pos[0]
 
         # Calculate positions with Swiss Ephemeris
@@ -204,14 +204,14 @@ class TestNatalAspectsMatch:
 
         Each aspect is identified by the pair of planets and the aspect type.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         # Calculate positions with libephemeris
         positions_lib = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions_lib[planet_name] = pos[0]
 
         # Calculate positions with Swiss Ephemeris
@@ -250,14 +250,14 @@ class TestNatalAspectByIndex:
 
         The orb difference should be less than 1 arcsecond for each aspect.
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         # Calculate positions with libephemeris
         positions_lib = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions_lib[planet_name] = pos[0]
 
         # Calculate positions with Swiss Ephemeris
@@ -300,14 +300,14 @@ class TestAspectMovement:
         An aspect found at time T should also be found at T +/- 1 hour
         (unless it's at the very edge of the orb).
         """
-        jd = ephem.swe_julday(
+        jd = ephem.julday(
             person["year"], person["month"], person["day"], person["hour"]
         )
 
         # Calculate positions at base time
         positions_base = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd, planet_id, 0)
             positions_base[planet_name] = pos[0]
 
         aspects_base = calculate_all_aspects(positions_base)
@@ -316,7 +316,7 @@ class TestAspectMovement:
         jd_plus1 = jd + 1 / 24
         positions_plus1 = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd_plus1, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd_plus1, planet_id, 0)
             positions_plus1[planet_name] = pos[0]
 
         aspects_plus1 = calculate_all_aspects(positions_plus1)
@@ -348,10 +348,10 @@ class TestSynastryAspects:
         john = ASPECT_TEST_PEOPLE[0]  # john_lennon
         paul = ASPECT_TEST_PEOPLE[2]  # paul_mccartney
 
-        jd_john = ephem.swe_julday(
+        jd_john = ephem.julday(
             john["year"], john["month"], john["day"], john["hour"]
         )
-        jd_paul = ephem.swe_julday(
+        jd_paul = ephem.julday(
             paul["year"], paul["month"], paul["day"], paul["hour"]
         )
 
@@ -359,9 +359,9 @@ class TestSynastryAspects:
         positions_john_lib = {}
         positions_paul_lib = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd_john, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd_john, planet_id, 0)
             positions_john_lib[planet_name] = pos[0]
-            pos, _ = ephem.swe_calc_ut(jd_paul, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd_paul, planet_id, 0)
             positions_paul_lib[planet_name] = pos[0]
 
         # Calculate positions with Swiss Ephemeris
@@ -401,10 +401,10 @@ class TestSynastryAspects:
         john = ASPECT_TEST_PEOPLE[0]
         paul = ASPECT_TEST_PEOPLE[2]
 
-        jd_john = ephem.swe_julday(
+        jd_john = ephem.julday(
             john["year"], john["month"], john["day"], john["hour"]
         )
-        jd_paul = ephem.swe_julday(
+        jd_paul = ephem.julday(
             paul["year"], paul["month"], paul["day"], paul["hour"]
         )
 
@@ -412,9 +412,9 @@ class TestSynastryAspects:
         positions_john = {}
         positions_paul = {}
         for planet_id, planet_name in ASPECT_PLANETS:
-            pos, _ = ephem.swe_calc_ut(jd_john, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd_john, planet_id, 0)
             positions_john[planet_name] = pos[0]
-            pos, _ = ephem.swe_calc_ut(jd_paul, planet_id, 0)
+            pos, _ = ephem.calc_ut(jd_paul, planet_id, 0)
             positions_paul[planet_name] = pos[0]
 
         # Calculate synastry aspects

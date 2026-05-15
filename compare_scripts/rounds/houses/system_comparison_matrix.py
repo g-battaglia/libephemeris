@@ -8,6 +8,7 @@ each against SE.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,7 +16,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 HOUSE_SYSTEMS = {
     "P": "Placidus",
@@ -68,7 +72,7 @@ for date_str, jd in TEST_DATES:
                 continue
 
             try:
-                le_r = ephem.swe_houses_ex2(jd, lat, lon, ord(hsys_ch), 0)
+                le_r = ephem.houses_ex2(jd, lat, lon, ord(hsys_ch), 0)
                 le_cusps = le_r[0]
                 le_ascmc = le_r[1]
             except Exception:

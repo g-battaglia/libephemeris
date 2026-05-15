@@ -58,7 +58,7 @@ class TestPerformanceBaselines:
         """calc_ut should complete in reasonable time."""
 
         def calc():
-            swe.calc_ut(J2000, swe.SE_SUN, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.SUN, swe.FLG_SPEED)
 
         us = measure_us(calc)
         print(f"\n  calc_ut (Sun, SPEED): {us:.1f} us")
@@ -68,7 +68,7 @@ class TestPerformanceBaselines:
         """calc_ut Moon performance."""
 
         def calc():
-            swe.calc_ut(J2000, swe.SE_MOON, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.MOON, swe.FLG_SPEED)
 
         us = measure_us(calc)
         print(f"\n  calc_ut (Moon, SPEED): {us:.1f} us")
@@ -137,7 +137,7 @@ class TestLEBSpeedupRatio:
         swe.set_calc_mode("skyfield")
 
         def calc_sky():
-            swe.calc_ut(J2000, swe.SE_SUN, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.SUN, swe.FLG_SPEED)
 
         us_sky = measure_us(calc_sky)
 
@@ -146,7 +146,7 @@ class TestLEBSpeedupRatio:
         swe.set_leb_file(leb_path)
 
         def calc_leb():
-            swe.calc_ut(J2000, swe.SE_SUN, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.SUN, swe.FLG_SPEED)
 
         us_leb = measure_us(calc_leb)
 
@@ -170,7 +170,7 @@ class TestLEBSpeedupRatio:
         swe.set_calc_mode("skyfield")
 
         def calc_sky():
-            swe.calc_ut(J2000, swe.SE_MARS, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.MARS, swe.FLG_SPEED)
 
         us_sky = measure_us(calc_sky)
 
@@ -179,7 +179,7 @@ class TestLEBSpeedupRatio:
         swe.set_leb_file(leb_path)
 
         def calc_leb():
-            swe.calc_ut(J2000, swe.SE_MARS, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.MARS, swe.FLG_SPEED)
 
         us_leb = measure_us(calc_leb)
 
@@ -203,7 +203,7 @@ class TestLEBSpeedupRatio:
         swe.set_calc_mode("skyfield")
 
         def calc_sky():
-            swe.calc_ut(J2000, swe.SE_MOON, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.MOON, swe.FLG_SPEED)
 
         us_sky = measure_us(calc_sky)
 
@@ -212,7 +212,7 @@ class TestLEBSpeedupRatio:
         swe.set_leb_file(leb_path)
 
         def calc_leb():
-            swe.calc_ut(J2000, swe.SE_MOON, swe.SEFLG_SPEED)
+            swe.calc_ut(J2000, swe.MOON, swe.FLG_SPEED)
 
         us_leb = measure_us(calc_leb)
 
@@ -249,14 +249,14 @@ class TestPerformanceSummary:
         # Skyfield calc_ut (use explicit mode for accurate comparison)
         swe.set_calc_mode("skyfield")
         for body, name in [
-            (swe.SE_SUN, "Sun"),
-            (swe.SE_MOON, "Moon"),
-            (swe.SE_MARS, "Mars"),
-            (swe.SE_JUPITER, "Jupiter"),
+            (swe.SUN, "Sun"),
+            (swe.MOON, "Moon"),
+            (swe.MARS, "Mars"),
+            (swe.JUPITER, "Jupiter"),
         ]:
 
             def calc(b=body):
-                swe.calc_ut(J2000, b, swe.SEFLG_SPEED)
+                swe.calc_ut(J2000, b, swe.FLG_SPEED)
 
             us = measure_us(calc)
             results.append(("calc_ut Skyfield", name, us))
@@ -266,14 +266,14 @@ class TestPerformanceSummary:
             swe.set_calc_mode("leb")
             swe.set_leb_file(leb_path)
             for body, name in [
-                (swe.SE_SUN, "Sun"),
-                (swe.SE_MOON, "Moon"),
-                (swe.SE_MARS, "Mars"),
-                (swe.SE_JUPITER, "Jupiter"),
+                (swe.SUN, "Sun"),
+                (swe.MOON, "Moon"),
+                (swe.MARS, "Mars"),
+                (swe.JUPITER, "Jupiter"),
             ]:
 
                 def calc(b=body):
-                    swe.calc_ut(J2000, b, swe.SEFLG_SPEED)
+                    swe.calc_ut(J2000, b, swe.FLG_SPEED)
 
                 us = measure_us(calc)
                 results.append(("calc_ut LEB", name, us))

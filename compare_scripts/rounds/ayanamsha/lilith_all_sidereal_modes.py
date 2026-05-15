@@ -15,26 +15,29 @@ os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_SIDEREAL,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_EQUATORIAL,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_TRUE_NODE,
-    SE_MEAN_NODE,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_SIDEREAL,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_EQUATORIAL,
+    MEAN_APOG,
+    OSCU_APOG,
+    TRUE_NODE,
+    MEAN_NODE,
 )
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 BODIES = {
-    SE_MEAN_APOG: "MeanLilith",
-    SE_OSCU_APOG: "OscuLilith",
-    SE_MEAN_NODE: "MeanNode",
-    SE_TRUE_NODE: "TrueNode",
+    MEAN_APOG: "MeanLilith",
+    OSCU_APOG: "OscuLilith",
+    MEAN_NODE: "MeanNode",
+    TRUE_NODE: "TrueNode",
 }
 
 TEST_JDS = [
@@ -71,9 +74,9 @@ SIDEREAL_MODES = [
 ]
 
 FLAG_COMBOS = {
-    "SID": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL,
-    "SID+NONUT": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_NONUT,
-    "SID+EQUAT": SEFLG_SWIEPH | SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL,
+    "SID": FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL,
+    "SID+NONUT": FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL | FLG_NONUT,
+    "SID+EQUAT": FLG_SWIEPH | FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL,
 }
 
 passed = 0
@@ -84,14 +87,14 @@ worst_cases = []
 
 for sid_mode, sid_name in SIDEREAL_MODES:
     swe.set_sid_mode(sid_mode)
-    ephem.swe_set_sid_mode(sid_mode)
+    ephem.set_sid_mode(sid_mode)
 
     for jd in TEST_JDS:
         for body, bname in BODIES.items():
             for flag_name, flags in FLAG_COMBOS.items():
                 try:
                     se_result = swe.calc_ut(jd, body, flags)
-                    le_result = ephem.swe_calc_ut(jd, body, flags)
+                    le_result = ephem.calc_ut(jd, body, flags)
 
                     for i, comp in enumerate(
                         ["lon", "lat", "dist", "lon_spd", "lat_spd", "dist_spd"]
@@ -108,7 +111,7 @@ for sid_mode, sid_name in SIDEREAL_MODES:
                             diff_arcsec = diff * 3600.0
                             if comp in ("lon", "lat"):
                                 tol = 60.0  # 1 arcmin for sidereal (known ~14" offset)
-                            elif body == SE_OSCU_APOG and "spd" in comp:
+                            elif body == OSCU_APOG and "spd" in comp:
                                 tol = 200.0  # OscuLilith speed known diff
                             else:
                                 tol = 60.0
@@ -131,7 +134,7 @@ for sid_mode, sid_name in SIDEREAL_MODES:
 
 # Reset sidereal mode
 swe.set_sid_mode(0)
-ephem.swe_set_sid_mode(0)
+ephem.set_sid_mode(0)
 
 print(f"\n{'=' * 60}")
 print(f"Round 137: Lilith Sidereal Mode Deep Sweep")

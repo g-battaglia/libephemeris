@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Ayanamsha Values.
 
-Validates swe_get_ayanamsa_ut() LEB dispatch directly.
+Validates get_ayanamsa_ut() LEB dispatch directly.
 """
 
 from __future__ import annotations
@@ -42,8 +42,8 @@ class TestAyanamshaValues:
         for jd in ayanamsha_dates:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref = compare.skyfield(ephem.swe_get_ayanamsa_ut, jd)
-            leb = compare.leb(ephem.swe_get_ayanamsa_ut, jd)
+            ref = compare.skyfield(ephem.get_ayanamsa_ut, jd)
+            leb = compare.leb(ephem.get_ayanamsa_ut, jd)
 
             err = abs(ref - leb) * 3600.0  # Convert to arcsec
             if err > max_err:
@@ -68,11 +68,11 @@ class TestAyanamshaConsistency:
         The sidereal offset = (tropical_lon - sidereal_lon) mod 360.
         LEB and Skyfield must produce identical offsets since both use
         the same formula-based ayanamsha.  We compare the offsets rather
-        than comparing against swe_get_ayanamsa_ex_ut() because the
+        than comparing against get_ayanamsa_ex_ut() because the
         nutation component in the ayanamsha is handled differently
         (known limitation: ~17" dpsi*cos(eps) architectural difference).
         """
-        from libephemeris.constants import SE_SUN, SEFLG_SPEED, SEFLG_SIDEREAL
+        from libephemeris.constants import SUN, FLG_SPEED, FLG_SIDEREAL
 
         max_err = 0.0
 
@@ -80,16 +80,16 @@ class TestAyanamshaConsistency:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
             # LEB: tropical - sidereal offset
-            trop_leb, _ = compare.leb(ephem.swe_calc_ut, jd, SE_SUN, SEFLG_SPEED)
+            trop_leb, _ = compare.leb(ephem.calc_ut, jd, SUN, FLG_SPEED)
             sid_leb, _ = compare.leb(
-                ephem.swe_calc_ut, jd, SE_SUN, SEFLG_SPEED | SEFLG_SIDEREAL
+                ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL
             )
             offset_leb = (trop_leb[0] - sid_leb[0]) % 360.0
 
             # Skyfield: tropical - sidereal offset
-            trop_sky, _ = compare.skyfield(ephem.swe_calc_ut, jd, SE_SUN, SEFLG_SPEED)
+            trop_sky, _ = compare.skyfield(ephem.calc_ut, jd, SUN, FLG_SPEED)
             sid_sky, _ = compare.skyfield(
-                ephem.swe_calc_ut, jd, SE_SUN, SEFLG_SPEED | SEFLG_SIDEREAL
+                ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL
             )
             offset_sky = (trop_sky[0] - sid_sky[0]) % 360.0
 
@@ -113,8 +113,8 @@ class TestStarBasedAyanamshaFallback:
         for jd in ayanamsha_dates[:5]:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref = compare.skyfield(ephem.swe_get_ayanamsa_ut, jd)
-            leb = compare.leb(ephem.swe_get_ayanamsa_ut, jd)
+            ref = compare.skyfield(ephem.get_ayanamsa_ut, jd)
+            leb = compare.leb(ephem.get_ayanamsa_ut, jd)
 
             assert ref == pytest.approx(leb, rel=1e-10), (
                 f"Star-based mode {sid_mode} differs at JD {jd}"

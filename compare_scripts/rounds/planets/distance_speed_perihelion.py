@@ -8,6 +8,7 @@ and distance at extremes. Tests precision of orbital mechanics near turning poin
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
@@ -15,9 +16,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SEFLG_SPEED = 256
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+FLG_SPEED = 256
 
 BODIES = {
     0: "Sun",
@@ -92,8 +96,8 @@ print("=" * 90)
 
 for label, jd, body in test_cases:
     try:
-        se_r = swe.calc_ut(jd, body, SEFLG_SPEED)
-        le_r = ephem.swe_calc_ut(jd, body, SEFLG_SPEED)
+        se_r = swe.calc_ut(jd, body, FLG_SPEED)
+        le_r = ephem.calc_ut(jd, body, FLG_SPEED)
 
         se_data = se_r[0]
         le_data = le_r[0]

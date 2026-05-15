@@ -14,7 +14,7 @@ import pytest
 import swisseph as swe_ref
 
 import libephemeris as swe
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ class TestJulday:
     @pytest.mark.parametrize("y,m,d,h", JULDAY_DATES)
     def test_julday_matches(self, y: int, m: int, d: int, h: float):
         """julday matches pyswisseph to within 1e-6 days (~0.09s)."""
-        lib_jd = swe.swe_julday(y, m, d, h)
+        lib_jd = swe.julday(y, m, d, h)
         ref_jd = swe_ref.julday(y, m, d, h)
         assert abs(lib_jd - ref_jd) < 1e-6, (
             f"julday({y},{m},{d},{h}): lib={lib_jd}, ref={ref_jd}"
@@ -120,12 +120,12 @@ class TestJulday:
     @pytest.mark.unit
     def test_julday_j2000_exact(self):
         """J2000.0 epoch is exactly 2451545.0."""
-        assert swe.swe_julday(2000, 1, 1, 12.0) == 2451545.0
+        assert swe.julday(2000, 1, 1, 12.0) == 2451545.0
 
     @pytest.mark.unit
     def test_julday_returns_float(self):
         """julday returns a native Python float."""
-        result = swe.swe_julday(2000, 1, 1, 12.0)
+        result = swe.julday(2000, 1, 1, 12.0)
         assert type(result) is float
 
 
@@ -136,8 +136,8 @@ class TestRevjul:
     @pytest.mark.parametrize("y,m,d,h", JULDAY_DATES)
     def test_revjul_roundtrip(self, y: int, m: int, d: int, h: float):
         """julday -> revjul recovers the original date components."""
-        jd = swe.swe_julday(y, m, d, h)
-        ry, rm, rd, rh = swe.swe_revjul(jd)
+        jd = swe.julday(y, m, d, h)
+        ry, rm, rd, rh = swe.revjul(jd)
         assert ry == y, f"Year: {ry} != {y}"
         assert rm == m, f"Month: {rm} != {m}"
         assert rd == d, f"Day: {rd} != {d}"
@@ -148,7 +148,7 @@ class TestRevjul:
     def test_revjul_matches_swisseph(self, y: int, m: int, d: int, h: float):
         """revjul produces the same result as pyswisseph."""
         jd = swe_ref.julday(y, m, d, h)
-        lib_result = swe.swe_revjul(jd)
+        lib_result = swe.revjul(jd)
         ref_result = swe_ref.revjul(jd)
         assert lib_result[0] == ref_result[0], (
             f"Year: {lib_result[0]} != {ref_result[0]}"
@@ -176,7 +176,7 @@ class TestDeltat:
         libephemeris uses SMH-2016 / IERS data while pyswisseph uses its
         own internal polynomial fit.
         """
-        lib_dt = swe.swe_deltat(jd)
+        lib_dt = swe.deltat(jd)
         ref_dt = swe_ref.deltat(jd)
         assert abs(lib_dt - ref_dt) < 1e-4, (
             f"jd={jd}: lib={lib_dt:.10f}, ref={ref_dt:.10f}, "
@@ -186,13 +186,13 @@ class TestDeltat:
     @pytest.mark.unit
     def test_deltat_returns_float(self):
         """deltat returns a native Python float."""
-        dt = swe.swe_deltat(2451545.0)
+        dt = swe.deltat(2451545.0)
         assert type(dt) is float
 
     @pytest.mark.unit
     def test_deltat_j2000_positive(self):
         """Delta T at J2000.0 should be positive (~63.8 seconds)."""
-        dt = swe.swe_deltat(2451545.0)
+        dt = swe.deltat(2451545.0)
         assert dt > 0
         # ~63.8 seconds = ~0.000738 days
         assert 0.0005 < dt < 0.001
@@ -201,7 +201,7 @@ class TestDeltat:
     def test_deltat_monotone_modern_era(self):
         """Delta T increases monotonically in the modern era (1960-2020)."""
         modern_jds = [jd for jd in JD_VALUES if 2436934.5 <= jd <= 2458849.5]
-        dts = [swe.swe_deltat(jd) for jd in modern_jds]
+        dts = [swe.deltat(jd) for jd in modern_jds]
         for i in range(1, len(dts)):
             assert dts[i] >= dts[i - 1], (
                 f"Delta T not monotone: dt[{i - 1}]={dts[i - 1]} > dt[{i}]={dts[i]}"
@@ -253,8 +253,8 @@ class TestUtcToJd:
 
         Returns (jd_et, jd_ut1); we compare both components.
         """
-        lib_result = swe.utc_to_jd(y, m, d, h, mi, s, SE_GREG_CAL)
-        ref_result = swe_ref.utc_to_jd(y, m, d, h, mi, s, SE_GREG_CAL)
+        lib_result = swe.utc_to_jd(y, m, d, h, mi, s, GREG_CAL)
+        ref_result = swe_ref.utc_to_jd(y, m, d, h, mi, s, GREG_CAL)
 
         # jd_et (TT)
         assert abs(lib_result[0] - ref_result[0]) < 1e-4, (
@@ -269,7 +269,7 @@ class TestUtcToJd:
     @pytest.mark.unit
     def test_utc_to_jd_returns_tuple(self):
         """utc_to_jd returns a 2-tuple of floats."""
-        result = swe.utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_GREG_CAL)
+        result = swe.utc_to_jd(2000, 1, 1, 12, 0, 0.0, GREG_CAL)
         assert isinstance(result, tuple)
         assert len(result) == 2
         assert all(type(v) is float for v in result)
@@ -284,7 +284,7 @@ class TestDayOfWeek:
         self, y: int, m: int, d: int, h: float, expected_dow: int
     ):
         """day_of_week matches known calendar day for specific dates."""
-        jd = swe.swe_julday(y, m, d, h)
+        jd = swe.julday(y, m, d, h)
         dow = swe.day_of_week(jd)
         assert dow == expected_dow, (
             f"{y}-{m:02d}-{d:02d}: got {dow}, expected {expected_dow}"
@@ -304,7 +304,7 @@ class TestDayOfWeek:
     @pytest.mark.unit
     def test_day_of_week_returns_int(self):
         """day_of_week returns a native Python int in [0, 6]."""
-        jd = swe.swe_julday(2000, 1, 1, 12.0)
+        jd = swe.julday(2000, 1, 1, 12.0)
         dow = swe.day_of_week(jd)
         assert type(dow) is int
         assert 0 <= dow <= 6

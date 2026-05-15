@@ -3,7 +3,7 @@
 Comprehensive comparison of libephemeris vs pyswisseph for:
 - lun_eclipse_when: global lunar eclipse search
 - lun_eclipse_when_loc: local lunar eclipse search with visibility
-- lun_eclipse_how / swe_lun_eclipse_how: lunar eclipse circumstances at a given time
+- lun_eclipse_how / lun_eclipse_how: lunar eclipse circumstances at a given time
 - Attribute comparison: umbral magnitude, penumbral magnitude, Moon position
 - Contact time comparison: all 7 contact times
 - Sequential eclipse search: consecutive eclipses at multiple locations
@@ -21,9 +21,13 @@ import swisseph as swe
 
 sys.path.insert(0, ".")
 import libephemeris as ephem
+import os
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 # Test locations: (name, lon, lat, alt)
 LOCATIONS = [
@@ -209,11 +213,11 @@ print()
 print("Part 1 summary: {}/{} passed".format(part1_pass, part1_total))
 
 # ============================================================================
-# PART 2: swe_lun_eclipse_how — attribute comparison at known eclipse times
+# PART 2: lun_eclipse_how — attribute comparison at known eclipse times
 # ============================================================================
 print()
 print("=" * 80)
-print("PART 2: swe_lun_eclipse_how — attribute comparison")
+print("PART 2: lun_eclipse_how — attribute comparison")
 print("=" * 80)
 
 part2_pass = 0
@@ -258,7 +262,7 @@ for ecl_name, jd_approx in known_eclipses:
             continue
 
         try:
-            le_how = ephem.swe_lun_eclipse_how(se_max, 0, geopos=geopos)
+            le_how = ephem.lun_eclipse_how(se_max, 0, geopos=geopos)
             le_attr = le_how[1]
         except Exception as e:
             print("    LE error at {}: {}".format(loc_name, e))

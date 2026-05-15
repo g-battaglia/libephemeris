@@ -17,7 +17,7 @@ import libephemeris as swe
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0  # 2000-01-01 12:00 UT
@@ -130,14 +130,14 @@ class TestSweAliases:
 
     @pytest.mark.unit
     def test_swe_lat_to_lmt_exists(self):
-        """swe_lat_to_lmt is an alias for lat_to_lmt."""
+        """lat_to_lmt is an alias for lat_to_lmt."""
         r1 = swe.lat_to_lmt(JD_J2000, 10.0)
-        r2 = swe.swe_lat_to_lmt(JD_J2000, 10.0)
+        r2 = swe.lat_to_lmt(JD_J2000, 10.0)
         assert r1 == r2
 
     @pytest.mark.unit
     def test_swe_lmt_to_lat_exists(self):
-        """swe_lmt_to_lat is an alias for lmt_to_lat."""
+        """lmt_to_lat is an alias for lmt_to_lat."""
         r1 = swe.lmt_to_lat(JD_J2000, 10.0)
-        r2 = swe.swe_lmt_to_lat(JD_J2000, 10.0)
+        r2 = swe.lmt_to_lat(JD_J2000, 10.0)
         assert r1 == r2

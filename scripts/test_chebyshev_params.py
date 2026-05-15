@@ -33,7 +33,7 @@ import numpy as np
 from numpy.polynomial.chebyshev import chebfit, chebval
 
 sys.path.insert(0, ".")
-from libephemeris import set_calc_mode, swe_calc
+from libephemeris import set_calc_mode, calc
 
 # ── Body name mapping ───────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ def _test_segment(
     # Evaluate at Chebyshev nodes
     values = np.zeros((degree + 1, 3))
     for i, jd in enumerate(jd_nodes):
-        result, _ = swe_calc(float(jd), body_id, 256)
+        result, _ = calc(float(jd), body_id, 256)
         values[i] = [result[0], result[1], result[2]]
 
     # Unwrap longitude to remove 360° jumps before fitting
@@ -108,7 +108,7 @@ def _test_segment(
         jd = seg_start + frac * (seg_end - seg_start)
         tau = (jd - mid) / half
 
-        ref, _ = swe_calc(float(jd), body_id, 256)
+        ref, _ = calc(float(jd), body_id, 256)
 
         # Longitude: re-wrap for comparison
         fitted_lon = float(chebval(tau, coeffs[0])) % 360.0

@@ -22,18 +22,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0
 failed = 0
 errors = 0
 
-SEFLG_SPEED = 256
-SEFLG_HELCTR = 8
-SEFLG_J2000 = 32
-SEFLG_NONUT = 64
-SEFLG_EQUATORIAL = 2048
-SE_CHIRON = 15
+FLG_SPEED = 256
+FLG_HELCTR = 8
+FLG_J2000 = 32
+FLG_NONUT = 64
+FLG_EQUATORIAL = 2048
+CHIRON = 15
 
 
 def run_test(label, condition, detail=""):
@@ -54,8 +57,8 @@ for year in range(1970, 2071):
     for month in [1, 7]:
         jd = swe.julday(year, month, 1, 12.0)
         try:
-            se_result = swe.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
-            le_result = ephem.swe_calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+            se_result = swe.calc_ut(jd, CHIRON, FLG_SPEED)
+            le_result = ephem.calc_ut(jd, CHIRON, FLG_SPEED)
 
             se_lon, se_lat = se_result[0][0], se_result[0][1]
             le_lon, le_lat = le_result[0][0], le_result[0][1]
@@ -119,13 +122,13 @@ print(f"  After P1: {passed} passed, {failed} failed, {errors} errors")
 # ============================================================
 print("\n=== P2: Chiron heliocentric ===")
 
-HELIO_FLAG = SEFLG_SPEED | SEFLG_HELCTR
+HELIO_FLAG = FLG_SPEED | FLG_HELCTR
 
 for year in range(1970, 2071, 2):
     jd = swe.julday(year, 6, 15, 12.0)
     try:
-        se_result = swe.calc_ut(jd, SE_CHIRON, HELIO_FLAG)
-        le_result = ephem.swe_calc_ut(jd, SE_CHIRON, HELIO_FLAG)
+        se_result = swe.calc_ut(jd, CHIRON, HELIO_FLAG)
+        le_result = ephem.calc_ut(jd, CHIRON, HELIO_FLAG)
 
         se_lon = se_result[0][0]
         le_lon = le_result[0][0]
@@ -171,11 +174,11 @@ print(f"  After P2: {passed} passed, {failed} failed, {errors} errors")
 print("\n=== P3: Chiron with different flags ===")
 
 FLAG_COMBOS = [
-    (SEFLG_SPEED, "default"),
-    (SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT, "J2000"),
-    (SEFLG_SPEED | SEFLG_NONUT, "NONUT"),
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "EQUATORIAL"),
-    (SEFLG_SPEED | SEFLG_HELCTR, "HELIO"),
+    (FLG_SPEED, "default"),
+    (FLG_SPEED | FLG_J2000 | FLG_NONUT, "J2000"),
+    (FLG_SPEED | FLG_NONUT, "NONUT"),
+    (FLG_SPEED | FLG_EQUATORIAL, "EQUATORIAL"),
+    (FLG_SPEED | FLG_HELCTR, "HELIO"),
 ]
 
 test_jds = [
@@ -189,8 +192,8 @@ test_jds = [
 for flags, flag_label in FLAG_COMBOS:
     for jd, epoch_label in test_jds:
         try:
-            se_result = swe.calc_ut(jd, SE_CHIRON, flags)
-            le_result = ephem.swe_calc_ut(jd, SE_CHIRON, flags)
+            se_result = swe.calc_ut(jd, CHIRON, flags)
+            le_result = ephem.calc_ut(jd, CHIRON, flags)
 
             for idx, comp_name in [(0, "lon/RA"), (1, "lat/Dec")]:
                 se_val = se_result[0][idx]
@@ -231,8 +234,8 @@ jd_start = swe.julday(1995, 6, 1, 12.0)
 for day in range(0, 730, 5):  # 2 years at 5-day intervals
     jd = jd_start + day
     try:
-        se_result = swe.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
-        le_result = ephem.swe_calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        se_result = swe.calc_ut(jd, CHIRON, FLG_SPEED)
+        le_result = ephem.calc_ut(jd, CHIRON, FLG_SPEED)
 
         se_lon = se_result[0][0]
         le_lon = le_result[0][0]
@@ -265,8 +268,8 @@ jd_start = swe.julday(2020, 1, 1, 12.0)
 for day in range(0, 730, 5):
     jd = jd_start + day
     try:
-        se_result = swe.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
-        le_result = ephem.swe_calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        se_result = swe.calc_ut(jd, CHIRON, FLG_SPEED)
+        le_result = ephem.calc_ut(jd, CHIRON, FLG_SPEED)
 
         se_lon = se_result[0][0]
         le_lon = le_result[0][0]
@@ -299,8 +302,8 @@ jd_start = swe.julday(2020, 1, 1, 12.0)
 for day in range(0, 365 * 3, 3):  # 3 years at 3-day intervals
     jd = jd_start + day
     try:
-        se_result = swe.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
-        le_result = ephem.swe_calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        se_result = swe.calc_ut(jd, CHIRON, FLG_SPEED)
+        le_result = ephem.calc_ut(jd, CHIRON, FLG_SPEED)
 
         se_spd = se_result[0][3]
         le_spd = le_result[0][3]

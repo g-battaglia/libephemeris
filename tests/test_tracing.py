@@ -10,7 +10,7 @@ import threading
 
 import libephemeris as ephem
 from libephemeris.tracing import _record, _trace_data, start_tracing, get_trace_results
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MERCURY, SE_MARS, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, MERCURY, MARS, FLG_SPEED
 
 
 # ============================================================================
@@ -100,12 +100,12 @@ class TestTracingPrimitives:
 
 
 # ============================================================================
-# Integration tests — tracing through swe_calc_ut
+# Integration tests — tracing through calc_ut
 # ============================================================================
 
 
 class TestTracingIntegration:
-    """Verify that swe_calc_ut actually records trace data."""
+    """Verify that calc_ut actually records trace data."""
 
     # J2000.0
     JD = 2451545.0
@@ -114,20 +114,20 @@ class TestTracingIntegration:
         """Computing Sun position should record a trace entry."""
         token = start_tracing()
         try:
-            ephem.swe_calc_ut(self.JD, SE_SUN, SEFLG_SPEED)
+            ephem.calc_ut(self.JD, SUN, FLG_SPEED)
             results = get_trace_results()
-            assert SE_SUN in results
-            assert results[SE_SUN] in ("LEB", "Skyfield", "Horizons")
+            assert SUN in results
+            assert results[SUN] in ("LEB", "Skyfield", "Horizons")
         finally:
             token.var.reset(token)
 
     def test_multiple_bodies_traced(self):
         """Computing multiple bodies records all of them."""
-        bodies = [SE_SUN, SE_MOON, SE_MERCURY, SE_MARS]
+        bodies = [SUN, MOON, MERCURY, MARS]
         token = start_tracing()
         try:
             for body in bodies:
-                ephem.swe_calc_ut(self.JD, body, SEFLG_SPEED)
+                ephem.calc_ut(self.JD, body, FLG_SPEED)
             results = get_trace_results()
             for body in bodies:
                 assert body in results, f"body {body} not in trace results"
@@ -135,20 +135,20 @@ class TestTracingIntegration:
             token.var.reset(token)
 
     def test_no_trace_when_inactive(self):
-        """swe_calc_ut works normally when tracing is off."""
+        """calc_ut works normally when tracing is off."""
         _trace_data.set(None)
-        pos, flags = ephem.swe_calc_ut(self.JD, SE_SUN, SEFLG_SPEED)
+        pos, flags = ephem.calc_ut(self.JD, SUN, FLG_SPEED)
         # Should work fine, no trace data
         assert pos[0] != 0.0
         assert get_trace_results() == {}
 
     def test_tracing_does_not_affect_result(self):
         """Results are identical with and without tracing."""
-        pos_without, _ = ephem.swe_calc_ut(self.JD, SE_SUN, SEFLG_SPEED)
+        pos_without, _ = ephem.calc_ut(self.JD, SUN, FLG_SPEED)
 
         token = start_tracing()
         try:
-            pos_with, _ = ephem.swe_calc_ut(self.JD, SE_SUN, SEFLG_SPEED)
+            pos_with, _ = ephem.calc_ut(self.JD, SUN, FLG_SPEED)
         finally:
             token.var.reset(token)
 
@@ -173,14 +173,14 @@ class TestTracingThreadSafety:
         def worker(name: str, body: int):
             try:
                 token = start_tracing()
-                ephem.swe_calc_ut(self.JD, body, SEFLG_SPEED)
+                ephem.calc_ut(self.JD, body, FLG_SPEED)
                 results_by_thread[name] = get_trace_results()
                 token.var.reset(token)
             except Exception as e:
                 errors.append(e)
 
-        t1 = threading.Thread(target=worker, args=("t1", SE_SUN))
-        t2 = threading.Thread(target=worker, args=("t2", SE_MOON))
+        t1 = threading.Thread(target=worker, args=("t1", SUN))
+        t2 = threading.Thread(target=worker, args=("t2", MOON))
         t1.start()
         t2.start()
         t1.join()
@@ -188,10 +188,10 @@ class TestTracingThreadSafety:
 
         assert not errors, f"Thread errors: {errors}"
         # Each thread should have only its own body
-        assert SE_SUN in results_by_thread["t1"]
-        assert SE_MOON not in results_by_thread["t1"]
-        assert SE_MOON in results_by_thread["t2"]
-        assert SE_SUN not in results_by_thread["t2"]
+        assert SUN in results_by_thread["t1"]
+        assert MOON not in results_by_thread["t1"]
+        assert MOON in results_by_thread["t2"]
+        assert SUN not in results_by_thread["t2"]
 
 
 # ============================================================================
@@ -213,8 +213,8 @@ class TestPublicAPI:
     def test_roundtrip_via_public_api(self):
         token = ephem.start_tracing()
         try:
-            ephem.swe_calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+            ephem.calc_ut(2451545.0, SUN, FLG_SPEED)
             results = ephem.get_trace_results()
-            assert SE_SUN in results
+            assert SUN in results
         finally:
             token.var.reset(token)

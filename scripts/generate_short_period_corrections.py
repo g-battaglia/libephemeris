@@ -36,12 +36,12 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from libephemeris.constants import (
-    SE_CERES,
-    SE_CHIRON,
-    SE_JUNO,
-    SE_PALLAS,
-    SE_PHOLUS,
-    SE_VESTA,
+    CERES,
+    CHIRON,
+    JUNO,
+    PALLAS,
+    PHOLUS,
+    VESTA,
 )
 from libephemeris.minor_bodies import (
     JUPITER_N,
@@ -70,12 +70,12 @@ SPK_DIR = Path(os.path.expanduser("~/.libephemeris/spk"))
 
 # Bodies to fit — (body_id, name, spk_prefix)
 BODIES = [
-    (SE_CERES, "Ceres", "ceres"),
-    (SE_PALLAS, "Pallas", "pallas"),
-    (SE_JUNO, "Juno", "juno"),
-    (SE_VESTA, "Vesta", "vesta"),
-    (SE_CHIRON, "Chiron", "2060"),
-    (SE_PHOLUS, "Pholus", "5145"),
+    (CERES, "Ceres", "ceres"),
+    (PALLAS, "Pallas", "pallas"),
+    (JUNO, "Juno", "juno"),
+    (VESTA, "Vesta", "vesta"),
+    (CHIRON, "Chiron", "2060"),
+    (PHOLUS, "Pholus", "5145"),
 ]
 
 # Fitting parameters

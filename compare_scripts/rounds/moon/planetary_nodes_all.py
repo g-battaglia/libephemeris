@@ -3,14 +3,18 @@
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 passed = failed = errors = 0
-FLAGS = 256  # SEFLG_SPEED
+FLAGS = 256  # FLG_SPEED
 
 NAMES = {
     0: "Sun",
@@ -24,7 +28,7 @@ NAMES = {
     8: "Neptune",
     9: "Pluto",
 }
-# SE_TRUE_NODE=11, SE_MEAN_NODE=10, SE_MEAN_APOG=12, SE_OSCU_APOG=13
+# TRUE_NODE=11, MEAN_NODE=10, MEAN_APOG=12, OSCU_APOG=13
 DATES = [2451545.0 + i * 365.25 for i in range(25)]
 
 print("=" * 70)
@@ -36,7 +40,7 @@ print("\n=== P1: True Node ===")
 for jd in DATES:
     try:
         se = swe.calc_ut(jd, 11, FLAGS)
-        le = ephem.swe_calc_ut(jd, 11, FLAGS)
+        le = ephem.calc_ut(jd, 11, FLAGS)
         diff = abs(se[0][0] - le[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -56,7 +60,7 @@ print("\n=== P2: Mean Node ===")
 for jd in DATES:
     try:
         se = swe.calc_ut(jd, 10, FLAGS)
-        le = ephem.swe_calc_ut(jd, 10, FLAGS)
+        le = ephem.calc_ut(jd, 10, FLAGS)
         diff = abs(se[0][0] - le[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -73,7 +77,7 @@ print("\n=== P3: Mean Apogee (Lilith) ===")
 for jd in DATES:
     try:
         se = swe.calc_ut(jd, 12, FLAGS)
-        le = ephem.swe_calc_ut(jd, 12, FLAGS)
+        le = ephem.calc_ut(jd, 12, FLAGS)
         diff = abs(se[0][0] - le[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -90,7 +94,7 @@ print("\n=== P4: Osculating Apogee (True Lilith) ===")
 for jd in DATES:
     try:
         se = swe.calc_ut(jd, 13, FLAGS)
-        le = ephem.swe_calc_ut(jd, 13, FLAGS)
+        le = ephem.calc_ut(jd, 13, FLAGS)
         diff = abs(se[0][0] - le[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -106,13 +110,13 @@ for jd in DATES:
         errors += 1
 print(f"  After P4: {passed} passed, {failed} failed, {errors} errors")
 
-# P5: Node/Apsides via swe_nod_aps_ut for all planets
+# P5: Node/Apsides via nod_aps_ut for all planets
 print("\n=== P5: nod_aps_ut for planets ===")
 for body in range(0, 10):
     for jd in DATES[:10]:
         try:
             se = swe.nod_aps_ut(jd, body, FLAGS, 0)  # method 0 = osculating
-            le = ephem.swe_nod_aps_ut(jd, body, FLAGS, 0)
+            le = ephem.nod_aps_ut(jd, body, FLAGS, 0)
             # Compare ascending node longitude
             se_asc = se[0][0]
             le_asc = le[0][0]
@@ -137,7 +141,7 @@ for body in [1, 2, 3, 4, 5, 6]:
     for jd in DATES[:10]:
         try:
             se = swe.nod_aps_ut(jd, body, FLAGS, 1)  # method 1 = mean
-            le = ephem.swe_nod_aps_ut(jd, body, FLAGS, 1)
+            le = ephem.nod_aps_ut(jd, body, FLAGS, 1)
             diff = abs(se[0][0] - le[0][0])
             if diff > 180:
                 diff = 360 - diff
@@ -155,7 +159,7 @@ for i in range(365):
     jd = 2451545.0 + i
     try:
         se = swe.calc_ut(jd, 11, FLAGS)
-        le = ephem.swe_calc_ut(jd, 11, FLAGS)
+        le = ephem.calc_ut(jd, 11, FLAGS)
         diff = abs(se[0][0] - le[0][0])
         if diff > 180:
             diff = 360 - diff
@@ -172,7 +176,7 @@ print("\n=== P8: True Node speed ===")
 for jd in DATES:
     try:
         se = swe.calc_ut(jd, 11, FLAGS)
-        le = ephem.swe_calc_ut(jd, 11, FLAGS)
+        le = ephem.calc_ut(jd, 11, FLAGS)
         diff = abs(se[0][3] - le[0][3])
         if diff < 0.001:
             passed += 1

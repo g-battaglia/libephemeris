@@ -34,8 +34,8 @@ results = []
 for i in range(730):  # 2 years of daily samples
     jd = jd_start + i * 0.5  # every 12 hours for finer sampling
     try:
-        se_attr = swe.pheno_ut(jd, SE_MOON, 0)
-        le_attr, _ = ephem.swe_pheno_ut(jd, SE_MOON, 0)
+        se_attr = swe.pheno_ut(jd, MOON, 0)
+        le_attr, _ = ephem.pheno_ut(jd, MOON, 0)
     except Exception:
         continue
 

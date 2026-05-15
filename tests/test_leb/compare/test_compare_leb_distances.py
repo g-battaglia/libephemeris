@@ -4,13 +4,13 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
+    FLG_SPEED,
+    FLG_HELCTR,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
 )
 
 from .conftest import (
@@ -23,11 +23,11 @@ from .conftest import (
 
 DISTANCE_BODIES = ICRS_PLANETS + [(15, "Chiron"), (17, "Ceres")]
 HELIO_BODIES = [
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
 ]
 
 
@@ -47,8 +47,8 @@ class TestGeocentricDistance:
 
         dates = filter_asteroid_dates(test_dates_100, body_id)
         for jd in dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[2] - leb[2])
             if err > max_err:
@@ -71,13 +71,13 @@ class TestHeliocentricDistance:
         body_id: int,
         body_name: str,
     ):
-        flags = SEFLG_SPEED | SEFLG_HELCTR
+        flags = FLG_SPEED | FLG_HELCTR
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in test_dates_100:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[2] - leb[2])
             if err > max_err:

@@ -1,21 +1,25 @@
 """Round 144: Fixed Star Catalog Completeness.
 
-Tests that all stars in our catalog are found by swe_fixstar2_ut and
+Tests that all stars in our catalog are found by fixstar2_ut and
 that positions match pyswisseph for the full catalog at multiple epochs.
 """
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
 
 import swisseph as swe
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED, SEFLG_SWIEPH
+from libephemeris.constants import FLG_SPEED, FLG_SWIEPH
 
-swe.set_ephe_path("swisseph/ephe")
-ephem.swe_set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
+ephem.set_ephe_path(_REF_EPHE_PATH)
 
 # Major stars to test
 STARS = [
@@ -139,7 +143,7 @@ STARS = list(dict.fromkeys(STARS))
 
 TEST_JDS = [2451545.0, 2455197.5, 2458849.5, 2460676.5, 2466154.5]
 
-flags = SEFLG_SWIEPH | SEFLG_SPEED
+flags = FLG_SWIEPH | FLG_SPEED
 
 passed = 0
 failed = 0
@@ -160,7 +164,7 @@ for jd in TEST_JDS:
             continue
 
         try:
-            le_result = ephem.swe_fixstar2_ut(star_name, jd, flags)
+            le_result = ephem.fixstar2_ut(star_name, jd, flags)
             le_lon = le_result[0][0]
             le_lat = le_result[0][1]
         except Exception as e:

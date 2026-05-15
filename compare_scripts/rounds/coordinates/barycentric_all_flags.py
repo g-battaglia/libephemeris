@@ -9,7 +9,10 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
+swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = failed = errors = 0
 F = 2
@@ -56,7 +59,7 @@ for flags, flag_name in flag_combos:
             label = f"{name} {year} {flag_name}"
             try:
                 se = swe.calc_ut(jd, body_id, flags)
-                le = ephem.swe_calc_ut(jd, body_id, flags)
+                le = ephem.calc_ut(jd, body_id, flags)
                 for i in range(3):
                     if is_xyz:
                         diff = abs(se[0][i] - le[0][i])

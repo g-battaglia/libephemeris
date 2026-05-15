@@ -5,7 +5,7 @@ Compare mean obliquity, true obliquity, and nutation components between
 libephemeris and pyswisseph across a wide range of epochs, focusing on
 extreme dates where polynomial divergence is most likely.
 
-SE_ECL_NUT (-1) returns: (true_obl, mean_obl, nut_lon, nut_obl, 0, 0)
+ECL_NUT (-1) returns: (true_obl, mean_obl, nut_lon, nut_obl, 0, 0)
 """
 
 from __future__ import annotations
@@ -18,9 +18,12 @@ os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 import swisseph as swe
 import libephemeris as ephem
 
-swe.set_ephe_path("swisseph/ephe")
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
-SE_ECL_NUT = -1
+swe.set_ephe_path(_REF_EPHE_PATH)
+
+ECL_NUT = -1
 
 # Test dates spanning from ~5000 BCE to ~3000 CE
 # Focus on extreme dates + standard epochs
@@ -87,7 +90,7 @@ print("=" * 90)
 for label, jd in test_dates:
     try:
         # pyswisseph: returns ((true_obl, mean_obl, nut_lon, nut_obl, 0, 0), retflag)
-        se_result = swe.calc_ut(jd, SE_ECL_NUT)
+        se_result = swe.calc_ut(jd, ECL_NUT)
         se_data = se_result[0]
         se_true_obl = se_data[0]
         se_mean_obl = se_data[1]
@@ -95,7 +98,7 @@ for label, jd in test_dates:
         se_nut_obl = se_data[3]
 
         # libephemeris: same format
-        le_result = ephem.swe_calc_ut(jd, SE_ECL_NUT, 0)
+        le_result = ephem.calc_ut(jd, ECL_NUT, 0)
         le_data = le_result[0]
         le_true_obl = le_data[0]
         le_mean_obl = le_data[1]

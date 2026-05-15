@@ -26,21 +26,25 @@ G02: calc_ut Positions (~1500 checks)
 
 from __future__ import annotations
 
+import os
 import math
 import random
 import sys
 import time
 import traceback
 
-sys.path.insert(0, "/Users/giacomo/dev/libephemeris")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import libephemeris as lib
 import swisseph as swe_ref
 
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-swe_ref.set_ephe_path("/Users/giacomo/dev/libephemeris/swisseph/ephe")
+swe_ref.set_ephe_path(_REF_EPHE_PATH)
 lib.set_calc_mode("skyfield")
 
 random.seed(42)
@@ -84,11 +88,11 @@ def angular_diff(a: float, b: float) -> float:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-SE_GREG_CAL = 1
-SE_JUL_CAL = 0
-SEFLG_SPEED = 256
-SEFLG_SWIEPH = 2
-SEFLG_JPLEPH = 1
+GREG_CAL = 1
+JUL_CAL = 0
+FLG_SPEED = 256
+FLG_SWIEPH = 2
+FLG_JPLEPH = 1
 
 JD_MIN = 2415020.5  # ~1900-01-01
 JD_MAX = 2488069.5  # ~2100-01-01
@@ -147,16 +151,16 @@ for y, m, d, h in KNOWN_DATES:
             f"julday({y},{m},{d},{h}): lib={jd_lib} ref={jd_ref} diff={abs(jd_lib - jd_ref)}",
         )
 
-        # 2) swe_julday alias
-        jd_alias = lib.swe_julday(y, m, d, h)
-        check(jd_alias == jd_lib, f"swe_julday alias mismatch for ({y},{m},{d},{h})")
+        # 2) julday alias
+        jd_alias = lib.julday(y, m, d, h)
+        check(jd_alias == jd_lib, f"julday alias mismatch for ({y},{m},{d},{h})")
 
         # 3) Gregorian vs Julian calendar flag
         if y > 300:  # only meaningful for dates where cal matters
-            jd_greg = lib.julday(y, m, d, h, SE_GREG_CAL)
-            jd_jul = lib.julday(y, m, d, h, SE_JUL_CAL)
-            jd_greg_ref = swe_ref.julday(y, m, d, h, SE_GREG_CAL)
-            jd_jul_ref = swe_ref.julday(y, m, d, h, SE_JUL_CAL)
+            jd_greg = lib.julday(y, m, d, h, GREG_CAL)
+            jd_jul = lib.julday(y, m, d, h, JUL_CAL)
+            jd_greg_ref = swe_ref.julday(y, m, d, h, GREG_CAL)
+            jd_jul_ref = swe_ref.julday(y, m, d, h, JUL_CAL)
             check(
                 jd_greg == jd_greg_ref and jd_jul == jd_jul_ref,
                 f"cal flag mismatch for ({y},{m},{d},{h}): greg diff={abs(jd_greg - jd_greg_ref)}, jul diff={abs(jd_jul - jd_jul_ref)}",
@@ -227,11 +231,11 @@ for jd in REVJUL_JDS:
             f"revjul({jd}) hour: lib={h_lib} ref={h_ref} diff={abs(h_lib - h_ref)}",
         )
 
-        # Also test swe_revjul alias
-        y2, m2, d2, h2 = lib.swe_revjul(jd)
+        # Also test revjul alias
+        y2, m2, d2, h2 = lib.revjul(jd)
         check(
             y2 == y_lib and m2 == m_lib and d2 == d_lib and h2 == h_lib,
-            f"swe_revjul alias mismatch at jd={jd}",
+            f"revjul alias mismatch at jd={jd}",
         )
     except Exception as e:
         for _ in range(5):
@@ -315,8 +319,8 @@ set_section("G01.05 deltat_ex")
 
 for jd in deltat_jds:
     try:
-        dt_lib = lib.deltat_ex(jd, SEFLG_SWIEPH)
-        dt_ref = swe_ref.deltat_ex(jd, SEFLG_SWIEPH)
+        dt_lib = lib.deltat_ex(jd, FLG_SWIEPH)
+        dt_ref = swe_ref.deltat_ex(jd, FLG_SWIEPH)
 
         diff = abs(dt_lib - dt_ref)
         check(
@@ -441,8 +445,8 @@ UTC_DATES = [
 
 for y, mo, d, h, mi, s in UTC_DATES:
     try:
-        jd_et_lib, jd_ut_lib = lib.utc_to_jd(y, mo, d, h, mi, s, SE_GREG_CAL)
-        jd_et_ref, jd_ut_ref = swe_ref.utc_to_jd(y, mo, d, h, mi, s, SE_GREG_CAL)
+        jd_et_lib, jd_ut_lib = lib.utc_to_jd(y, mo, d, h, mi, s, GREG_CAL)
+        jd_et_ref, jd_ut_ref = swe_ref.utc_to_jd(y, mo, d, h, mi, s, GREG_CAL)
 
         diff_et = abs(jd_et_lib - jd_et_ref)
         diff_ut = abs(jd_ut_lib - jd_ut_ref)
@@ -471,11 +475,11 @@ for y, mo, d, h, mi, s in UTC_DATES:
         else:
             check(True, "skip jd_et>=jd_ut for pre-1800")
 
-        # swe_utc_to_jd alias
-        jd_et_a, jd_ut_a = lib.swe_utc_to_jd(y, mo, d, h, mi, s, SE_GREG_CAL)
+        # utc_to_jd alias
+        jd_et_a, jd_ut_a = lib.utc_to_jd(y, mo, d, h, mi, s, GREG_CAL)
         check(
             jd_et_a == jd_et_lib and jd_ut_a == jd_ut_lib,
-            "swe_utc_to_jd alias mismatch",
+            "utc_to_jd alias mismatch",
         )
     except Exception as e:
         for _ in range(5):
@@ -864,8 +868,8 @@ for body in BODIES_MAIN:
 
     for jd in g02_jds:
         try:
-            r_lib = lib.calc_ut(jd, body, SEFLG_SPEED)
-            r_ref = swe_ref.calc_ut(jd, body, SEFLG_SPEED)
+            r_lib = lib.calc_ut(jd, body, FLG_SPEED)
+            r_ref = swe_ref.calc_ut(jd, body, FLG_SPEED)
 
             lon_lib, lat_lib, dist_lib = r_lib[0][0], r_lib[0][1], r_lib[0][2]
             lon_ref, lat_ref, dist_ref = r_ref[0][0], r_ref[0][1], r_ref[0][2]
@@ -930,8 +934,8 @@ g02_02_jds = [random_jd() for _ in range(40)]
 for body_id, (bname, tol_arcsec) in NODE_BODIES.items():
     for jd in g02_02_jds:
         try:
-            r_lib = lib.calc_ut(jd, body_id, SEFLG_SPEED)
-            r_ref = swe_ref.calc_ut(jd, body_id, SEFLG_SPEED)
+            r_lib = lib.calc_ut(jd, body_id, FLG_SPEED)
+            r_ref = swe_ref.calc_ut(jd, body_id, FLG_SPEED)
 
             lon_diff = angular_diff(r_lib[0][0], r_ref[0][0]) * 3600.0
             check(
@@ -967,8 +971,8 @@ g02_03_jds = [random_jd() for _ in range(40)]
 for body_id, bname in ASTEROID_BODIES.items():
     for jd in g02_03_jds:
         try:
-            r_lib = lib.calc_ut(jd, body_id, SEFLG_SPEED)
-            r_ref = swe_ref.calc_ut(jd, body_id, SEFLG_SPEED)
+            r_lib = lib.calc_ut(jd, body_id, FLG_SPEED)
+            r_ref = swe_ref.calc_ut(jd, body_id, FLG_SPEED)
 
             lon_diff = angular_diff(r_lib[0][0], r_ref[0][0]) * 3600.0
             check(
@@ -999,12 +1003,12 @@ for body in SPEED_BODIES:
     bn = BODY_NAMES[body]
     for jd in g02_04_jds:
         try:
-            r0 = lib.calc_ut(jd, body, SEFLG_SPEED)
-            speed_lon = r0[0][3]  # speed in longitude from SEFLG_SPEED
+            r0 = lib.calc_ut(jd, body, FLG_SPEED)
+            speed_lon = r0[0][3]  # speed in longitude from FLG_SPEED
 
             # Numerical derivative
-            r_plus = lib.calc_ut(jd + H, body, SEFLG_SPEED)
-            r_minus = lib.calc_ut(jd - H, body, SEFLG_SPEED)
+            r_plus = lib.calc_ut(jd + H, body, FLG_SPEED)
+            r_minus = lib.calc_ut(jd - H, body, FLG_SPEED)
 
             lon_plus = r_plus[0][0]
             lon_minus = r_minus[0][0]
