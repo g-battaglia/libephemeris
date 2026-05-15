@@ -8,12 +8,16 @@ Formula: antiscia_lon = (360 - lon) % 360 applied to sidereal positions.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
 
 import swisseph as swe
 import libephemeris as ephem
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 swe.set_ephe_path(_REF_EPHE_PATH)
 

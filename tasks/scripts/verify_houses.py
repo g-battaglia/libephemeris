@@ -22,6 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 import libephemeris as lib
 import swisseph as swe_ref
 
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
 # Point pyswisseph at its ephemeris files
 swe_ref.set_ephe_path(_REF_EPHE_PATH)
 

@@ -26,6 +26,7 @@ G02: calc_ut Positions (~1500 checks)
 
 from __future__ import annotations
 
+import os
 import math
 import random
 import sys
@@ -36,6 +37,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import libephemeris as lib
 import swisseph as swe_ref
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 # ---------------------------------------------------------------------------
 # Setup

@@ -354,7 +354,9 @@ def degsplit(deg: float) -> tuple[int, int, int, int]:
     arcseconds).
 
     Pure positional decomposition; no normalization performed beyond
-    bringing the input into [0, 360)."""
+    bringing the input into [0, 360). Rounded seconds at the 60 mark
+    are carried into the minute / degree / sign fields so the returned
+    tuple is always a valid sexagesimal value."""
     norm = _normalize_longitude(deg)
     sign = int(norm // 30.0)
     within = norm - sign * 30.0
@@ -363,6 +365,17 @@ def degsplit(deg: float) -> tuple[int, int, int, int]:
     m = int(rem_min)
     rem_sec = (rem_min - m) * 60.0
     s = int(round(rem_sec))
+    # Carry rounded overflow through s → m → d → sign so we never
+    # emit s == 60 or m == 60 (invalid sexagesimal forms).
+    if s >= 60:
+        s -= 60
+        m += 1
+    if m >= 60:
+        m -= 60
+        d += 1
+    if d >= 30:
+        d -= 30
+        sign = (sign + 1) % 12
     return (d, sign, m, s)
 
 
@@ -604,20 +617,28 @@ def geoc2d(coord: str) -> float:
 
 
 def geolat2c(lat: float) -> str:
-    """Decimal latitude → 'DDNMM' / 'DDSMM' string."""
+    """Decimal latitude → 'DDNMM' / 'DDSMM' string. Rounded minutes
+    that hit 60 are carried into the degree component."""
     hem = "N" if lat >= 0 else "S"
     val = abs(lat)
     d = int(val)
     m = int(round((val - d) * 60.0))
+    if m >= 60:
+        m -= 60
+        d += 1
     return f"{d}{hem}{m:02d}"
 
 
 def geolon2c(lon: float) -> str:
-    """Decimal longitude → 'DDDEMM' / 'DDDWMM' string."""
+    """Decimal longitude → 'DDDEMM' / 'DDDWMM' string. Rounded minutes
+    that hit 60 are carried into the degree component."""
     hem = "E" if lon >= 0 else "W"
     val = abs(lon)
     d = int(val)
     m = int(round((val - d) * 60.0))
+    if m >= 60:
+        m -= 60
+        d += 1
     return f"{d}{hem}{m:02d}"
 
 

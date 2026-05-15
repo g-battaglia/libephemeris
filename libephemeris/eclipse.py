@@ -5047,7 +5047,15 @@ def lun_eclipse_when(
 
     Returns:
         Tuple of (retflag, tret) matching pyswisseph.
+
+    Raises:
+        NotImplementedError: when ``backwards=True`` (backward search
+            is not yet supported by the underlying implementation).
     """
+    if backwards:
+        raise NotImplementedError(
+            "backward lunar eclipse search is not implemented"
+        )
     return _lun_eclipse_when_pythonic(tjdut, flags=flags, eclipse_type=ecltype)
 
 

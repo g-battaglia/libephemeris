@@ -4,6 +4,7 @@ Tests for the compare_lunar.py comparison script.
 Validates that the True Node precision comparison function works correctly.
 """
 
+import os
 import sys
 import pytest
 

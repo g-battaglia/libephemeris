@@ -4219,7 +4219,10 @@ def _calc_nod_aps(
     # This matches pyswisseph behavior.
     if ipl == MOON:
         jd_ut = t.ut1
-        calc_flags = iflag & ~FLG_SPEED
+        # Strip output-format bits (FLG_RADIANS / FLG_XYZ) and FLG_SPEED:
+        # we need calc_ut() to return spherical (lon_deg, lat_deg, dist)
+        # below so we can re-assemble nod_aps output in those units.
+        calc_flags = iflag & ~FLG_SPEED & ~FLG_RADIANS & ~FLG_XYZ
 
         # Select node and apogee bodies based on method
         if method & NODBIT_OSCU:

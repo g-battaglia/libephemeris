@@ -7,6 +7,7 @@ G04.01: 24 house systems x 5 locations x 10 dates     = 1200  checks
                                                  Total >= 2710 checks
 """
 
+import os
 import math
 import random
 import sys
@@ -16,6 +17,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import libephemeris as lib
 import swisseph as swe_ref
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 # ── Setup ────────────────────────────────────────────────────────────────
 swe_ref.set_ephe_path(_REF_EPHE_PATH)

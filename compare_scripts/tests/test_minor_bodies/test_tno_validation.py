@@ -16,6 +16,7 @@ Precision targets:
 Note: For research-grade precision, SPK kernels should be used instead.
 """
 
+import os
 import pytest
 import math
 import sys

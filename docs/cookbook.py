@@ -49,6 +49,7 @@ from libephemeris.constants import (
     ECL_TOTAL,
     ECL_ANNULAR,
     ECL_PARTIAL,
+    ECL_PENUMBRAL,
 )
 
 # =============================================================================
@@ -813,8 +814,6 @@ def find_next_lunar_eclipse(
     ecl_flags, times = ephem.lun_eclipse_when(start_jd)
 
     # Interpret eclipse type
-    from libephemeris.constants import ECL_PENUMBRAL
-
     if ecl_flags & ECL_TOTAL:
         type_str = "Total Lunar Eclipse"
     elif ecl_flags & ECL_PARTIAL:

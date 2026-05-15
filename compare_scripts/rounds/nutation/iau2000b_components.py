@@ -32,6 +32,9 @@ from libephemeris.cache import (
     get_true_obliquity,
 )
 
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
 swe.set_ephe_path(_REF_EPHE_PATH)
 
 passed = 0

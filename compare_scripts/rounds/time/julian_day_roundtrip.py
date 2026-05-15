@@ -114,6 +114,9 @@ print("\n=== Test 2: JD -> revjul -> julday -> revjul consistency ===")
 
 import random
 
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
+
 random.seed(42)
 
 # Generate random JDs spanning full range

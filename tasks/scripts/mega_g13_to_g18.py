@@ -5,6 +5,7 @@ Constants & Aliases, Arabic Parts, LEB Backend, Edge Cases & Stress.
 Target: >= 2500 checks across 6 groups.
 """
 
+import os
 import math
 import random
 import sys
@@ -17,6 +18,9 @@ import libephemeris as lib
 from libephemeris.state import get_topo, get_sid_mode
 
 import swisseph as swe_ref
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 swe_ref.set_ephe_path(_REF_EPHE_PATH)
 

@@ -27,6 +27,8 @@ from .constants import (
     IC,
     _VERTEX_ANGLE_ID,
     ANTIVERTEX,
+    MC,
+    VERTEX,
 )
 from .houses import houses_with_fallback
 
@@ -99,6 +101,13 @@ def get_angle_value(angle_id: int, jd_ut: float, lat: float, lon: float) -> floa
         IC: "IC",
         _VERTEX_ANGLE_ID: "Vertex",
         ANTIVERTEX: "AntiVertex",
+        # Accept the public reference-API cusp indices too, so callers
+        # using MC/VERTEX (the names exported at top level) reach the
+        # right angle. MC is also the ASCMC index 1 in the reference
+        # API, but here it doubles as a convenient public alias for the
+        # Midheaven angle lookup.
+        MC: "MC",
+        VERTEX: "Vertex",
     }
 
     if angle_id in angle_map:

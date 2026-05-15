@@ -6,6 +6,7 @@ house systems, locations, and ayanamsha modes.
 
 from __future__ import annotations
 import sys, os
+import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("LIBEPHEMERIS_MODE", "skyfield")
@@ -24,6 +25,9 @@ from libephemeris.constants import (
     JUPITER,
     SATURN,
 )
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 swe.set_ephe_path(_REF_EPHE_PATH)
 ephem.set_ephe_path(_REF_EPHE_PATH)

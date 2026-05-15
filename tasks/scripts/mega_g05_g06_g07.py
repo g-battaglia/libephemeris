@@ -24,6 +24,7 @@ G07: Rise/Set/Transit (~507 checks)
   G07.04: Twilight — civil/nautical/astronomical dawn/dusk (~57 checks)
 """
 
+import os
 import math
 import random
 import sys
@@ -33,6 +34,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import libephemeris as lib
 import swisseph as swe_ref
+
+# Reference ephemeris data path (set via REF_EPHE_PATH env var)
+_REF_EPHE_PATH = os.environ.get("REF_EPHE_PATH", "./ephe")
 
 swe_ref.set_ephe_path(_REF_EPHE_PATH)
 
