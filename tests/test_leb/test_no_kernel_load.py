@@ -23,6 +23,15 @@ def leb_mode(test_leb_file):
     import libephemeris
     from libephemeris import state
 
+    # Restore the previous calc-mode after the test. An earlier test in
+    # the suite may have forced the process into ``"skyfield"`` (e.g.
+    # via ``LIBEPHEMERIS_MODE=skyfield``), in which case
+    # ``get_leb_reader()`` will ignore the explicit ``set_leb_file()``
+    # below and silently fall back to the DE kernel — defeating the
+    # very assertion this fixture is meant to enforce.
+    _prev_mode = state.get_calc_mode()
+    libephemeris.set_calc_mode("leb")
+
     state._PLANETS = None
     libephemeris.set_leb_file(test_leb_file)
 
@@ -52,6 +61,7 @@ def leb_mode(test_leb_file):
         p.stop()
 
     state._PLANETS = None
+    libephemeris.set_calc_mode(_prev_mode)
     libephemeris.set_leb_file("")
 
 

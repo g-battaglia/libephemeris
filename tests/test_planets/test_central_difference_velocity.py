@@ -10,6 +10,7 @@ approximately 100x better numerical precision for the same timestep.
 """
 
 import math
+import os
 import pytest
 import swisseph as swe
 
