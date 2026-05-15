@@ -30,13 +30,37 @@ All astronomical computations are based on:
 
 LibEphemeris provides an API that is **signature-compatible** with
 [pyswisseph](https://github.com/astrorigin/pyswisseph) (the Python binding
-for Swiss Ephemeris). Function names use the `swe_` prefix and accept the
-same parameters and flags to allow drop-in migration.
+for Swiss Ephemeris). Function names follow the canonical bare-name form
+of the upstream reference API (e.g., `calc_ut`, `houses`, `julday`), with
+matching parameters and flag constants to allow drop-in migration.
 
 API compatibility does not imply code derivation. The underlying algorithms,
 data sources, and implementation are entirely independent. API signatures
 and interface conventions are not copyrightable subject matter
-(see *Google LLC v. Oracle America, Inc.*, 593 U.S. 1 (2021)).
+(see *Google LLC v. Oracle America, Inc.*, 593 U.S. 1 (2021); EU Directive
+2009/24/EC art. 1.2).
+
+## Extended Astrology Helpers (`contrib` submodule)
+
+The `libephemeris.contrib` submodule provides extended astrology helpers
+(zodiac sign and nakshatra constants, aspect angles, Vedic dignity
+calculations, longitude-to-rasi conversions, antiscion arithmetic, etc.).
+
+These are **independently reimplemented in pure Python** from public
+astrological tradition and standard zodiacal geometry. Specifically:
+
+- Sign and nakshatra divisions follow the standard zodiacal partitions
+  (12 × 30° and 27 × 13°20') documented in any classical astrology text.
+- Vedic dignity tables (exaltation, debilitation, lordship, naisargika
+  friendships) derive from traditional Vedic astrology (Parashara,
+  Varahamihira) and are in the public domain.
+- Aspect angles (conjunction, sextile, square, etc.) are geometric
+  constants of pure mathematics.
+
+No source code from the upstream pyswisseph contrib submodule (the C
+``swephelp`` library) was consulted or copied during implementation.
+API names and signatures match the upstream reference only at the
+interface level, which is not copyrightable subject matter.
 
 ## Development History
 

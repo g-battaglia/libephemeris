@@ -1,10 +1,10 @@
 """libephemeris.contrib — extended astrology helpers.
 
-This module mirrors the public surface of the upstream reference contrib
-namespace at the level of names, values, and signatures. All numerical
-constants, name lookups, and computational helpers are reimplemented
-from first principles (zodiac geometry, nakshatra divisions, aspect
-arithmetic) without copying any C source.
+Zodiac and nakshatra constants, Vedic planet IDs, classical aspect
+angles, longitude conversions, dignity calculations, and a small set
+of time/coordinate utilities. Names and signatures follow established
+conventions in Python astrology tooling; implementations are derived
+from standard zodiacal arithmetic and classical/Vedic tradition.
 
 Contents
 --------
