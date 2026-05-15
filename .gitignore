@@ -9,8 +9,11 @@ wheels/
 # Virtual environments
 .venv
 de421.bsp
-swisseph
 stuff
+
+# Local-only reference data (never bundled)
+_ref/
+_local_*/
 
 # Hypothesis test database
 .hypothesis/

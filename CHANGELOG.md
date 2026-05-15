@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-05-14
+
+### Breaking changes
+
+This release removes ~520 legacy alias forms (`swe_*`, `SE_*`,
+`SEFLG_*`) from the public namespace. The canonical bare-name API
+(e.g., `calc_ut`, `houses`, `julday`, `SUN`, `FLG_SPEED`) is
+unchanged — same names, same values, same signatures, same
+behaviour. SemVer requires a major bump for any removal of public
+names, even when no known downstream client uses them.
+
+If you have legacy code using the removed prefixed forms, replace
+them with the bare-name equivalents:
+
+| Was               | Now           |
+|-------------------|---------------|
+| `swe_calc_ut(...)`| `calc_ut(...)`|
+| `SE_SUN`          | `SUN`         |
+| `SEFLG_SPEED`     | `FLG_SPEED`   |
+| `swe_version()`   | `version` (string) |
+
+The single allowed exception is `SE_FNAME_DE431`: the upstream
+reference distribution itself exposes that one constant under the
+SE_ prefix, and we mirror it for parity.
+
+### Added
+
+- **`libephemeris.contrib` submodule** with 147 extended astrology
+  helpers: 12 zodiac sign constants (English + Sanskrit Rasi names),
+  27 nakshatra constants, classical aspect angle constants (including
+  septile and undecile families), Vedic planet identifiers, plus
+  calculation helpers — `long2rasi`, `long2nakshatra`, `long2navamsa`,
+  `lord`, `ochchabala`, `naisargika_relation`, `tatkalika_relation`,
+  `raman_houses`, `saturn_4_stars`, `match_aspect` family,
+  `next_aspect` family, `next_retro`, `antiscion`, `degsplit`,
+  `signtostr`, `get_nakshatra_name`, `house_system_name`, `jdnow`,
+  `geoc2d`, and the rest of the upstream reference contrib API.
+  Closes the last gap in upstream reference-API coverage (100% now).
+  Database/atlas/timezone helpers (`atlas_*`, `db_*`, `tzabbr_*`,
+  `years_diff`) are exposed as `NotImplementedError` stubs — they
+  require optional SQLite databases not bundled here.
+- **`tests/test_api_compat/test_api_surface.py`** — 122 contract tests
+  asserting (a) no legacy prefixed names leak into the public surface,
+  (b) the upstream reference-API surface is mirrored 1:1 at top level
+  and in `contrib`, (c) shared constants have matching values, and
+  (d) the 66-name kerykeion v6 contract is frozen.
+
+### Changed
+
+- **Simplified public namespace.** Removed legacy alias forms that
+  weren't part of the upstream reference API and weren't used by any
+  known downstream client. The canonical bare-name API (e.g.,
+  `calc_ut`, `houses`, `julday`, `SUN`, `FLG_SPEED`) is unchanged —
+  same names, same values, same signatures, same behaviour.
+- **Internal definitions renamed** from prefixed to canonical bare
+  names. Invisible to consumers; impact is limited to clearer
+  tracebacks and shorter error message strings.
+- **`__version__` and `pyproject.toml` version** both bumped to 2.0.0
+  in lockstep (closes the recurring desync called out in 1.6.0).
+
+### Removed
+
+- All `swe_*` prefixed function aliases (126 names). The bare-name
+  forms (`calc_ut`, `houses`, `julday`, …) are unchanged.
+- All `SE_*` prefixed constant aliases (≈373 names). The bare-name
+  forms (`SUN`, `MOON`, `ECL_TOTAL`, …) are unchanged. The single
+  exception is `SE_FNAME_DE431`, which the upstream reference
+  distribution itself exposes with the `SE_` prefix; mirrored for
+  parity.
+- All `SEFLG_*` prefixed flag aliases (19 names). The `FLG_*` forms
+  (`FLG_SPEED`, `FLG_SWIEPH`, …) are unchanged.
+- `swe_version()` function. The `version` and `__version__` string
+  variables are unchanged.
+
+### Migration
+
+No action required for clients using the standard bare-name API
+(which mirrors the upstream reference API). If you have legacy code
+using the removed prefixed forms, replace them with the bare-name
+equivalents: `calc_ut` instead of `swe_calc_ut`, `SUN` instead of
+`SE_SUN`, `FLG_SPEED` instead of `SEFLG_SPEED`.
+
+### Compatibility
+
+- Upstream reference-API surface coverage: 100% (was 99.76% in 1.6.0;
+  closed by the new `contrib` submodule).
+- Downstream kerykeion v6/alpha test suite: 9116 passed / 0 failed
+  with this release installed (verified end-to-end).
+
 ## [1.6.0] - 2026-05-14
 
 ### Fixed

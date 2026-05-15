@@ -50,7 +50,7 @@ poe test:leb                # LEB-specific unit tests (no slow)
 - Line length 88, Python 3.12+, double quotes, Ruff formatter
 - Google-style docstrings with Args/Returns/Raises
 - Naming: `snake_case` functions, `PascalCase` classes, `SCREAMING_SNAKE_CASE` constants, `_underscore` private
-- Swiss Ephemeris compatible functions use `swe_` prefix
+- Public API uses canonical bare names matching the upstream reference API (no `swe_`/`SE_`/`SEFLG_` prefixes). Single allowed exception: `SE_FNAME_DE431` (mirrored from upstream).
 - Always return native Python floats (not numpy types)
 - Exceptions in `libephemeris/exceptions.py`: `Error`, `CoordinateError`, `UnknownBodyError`, `EphemerisRangeError`, `PolarCircleError`
 
