@@ -1,7 +1,7 @@
 """Tests for backward crossing search.
 
-Covers ``backwards=True`` in ``swe_solcross_ut``, ``swe_mooncross_ut``,
-``swe_mooncross_node_ut`` (and their TT variants), added for planetary
+Covers ``backwards=True`` in ``solcross_ut``, ``mooncross_ut``,
+``mooncross_node_ut`` (and their TT variants), added for planetary
 return navigation where users step backward through past returns.
 """
 
@@ -10,10 +10,10 @@ from __future__ import annotations
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 JD_J2000 = 2451545.0
@@ -31,10 +31,10 @@ class TestSolcrossBackwards:
     @pytest.mark.parametrize("degree", [0.0, 90.0, 180.0, 270.0])
     def test_solcross_backwards_within_year(self, degree):
         """Previous Sun crossing must be within the past year."""
-        jd = swe.solcross_ut(degree, JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd = swe.solcross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
         assert JD_J2000 - jd < 370, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
-        sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+        sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
         err = abs(sun[0] - degree)
         if err > 180:
             err = 360 - err
@@ -74,10 +74,10 @@ class TestMooncrossBackwards:
     @pytest.mark.parametrize("degree", [0.0, 90.0, 180.0, 270.0])
     def test_mooncross_backwards_within_month(self, degree):
         """Previous Moon crossing must be within the past sidereal month."""
-        jd = swe.mooncross_ut(degree, JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd = swe.mooncross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
         assert JD_J2000 - jd < 30, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
-        moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SWIEPH)
+        moon, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH)
         err = abs(moon[0] - degree)
         if err > 180:
             err = 360 - err
@@ -107,7 +107,7 @@ class TestMooncrossNodeBackwards:
 
     def test_mooncross_node_backwards_within_half_month(self):
         """Previous node crossing must be in [JD0 - 14d, JD0)."""
-        jd, _, lat = swe.mooncross_node_ut(JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd, _, lat = swe.mooncross_node_ut(JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
         assert JD_J2000 - jd < NODAL_HALF_MONTH + 2
         assert abs(lat) < 1e-4
@@ -134,15 +134,15 @@ class TestTTVariantsBackwards:
     """TT (Terrestrial Time) variants must also support backwards."""
 
     def test_solcross_tt_backwards(self):
-        jd = swe.solcross(0.0, JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd = swe.solcross(0.0, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
 
     def test_mooncross_tt_backwards(self):
-        jd = swe.mooncross(0.0, JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd = swe.mooncross(0.0, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
 
     def test_mooncross_node_tt_backwards(self):
-        jd, _, lat = swe.mooncross_node(JD_J2000, SEFLG_SWIEPH, backwards=True)
+        jd, _, lat = swe.mooncross_node(JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
         assert abs(lat) < 1e-4
 

@@ -1,8 +1,8 @@
 """
 Tests for the interpolated apogee/perigee correction tables (BUG-001 fix).
 
-Verifies that the correction-table-based interpolated apogee (SE_INTP_APOG)
-and perigee (SE_INTP_PERG) produce positions within expected tolerances
+Verifies that the correction-table-based interpolated apogee (INTP_APOG)
+and perigee (INTP_PERG) produce positions within expected tolerances
 across multiple date ranges, flag variants, and edge cases.
 
 The correction tables provide sub-arcminute precision for longitude
@@ -18,20 +18,20 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SE_OSCU_APOG,
-    SE_MEAN_APOG,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_NOGDEFL,
-    SEFLG_NONUT,
-    SEFLG_HELCTR,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    INTP_APOG,
+    INTP_PERG,
+    OSCU_APOG,
+    MEAN_APOG,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NOGDEFL,
+    FLG_NONUT,
+    FLG_HELCTR,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -75,7 +75,7 @@ class TestInterpolatedApogeeCorrections:
     )
     def test_apogee_returns_valid_position(self, jd: float):
         """Interpolated apogee returns valid 6-element tuple."""
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_APOG, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, INTP_APOG, FLG_SPEED)
         assert len(result) == 6
         lon, lat, dist, slon, slat, sdist = result
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
@@ -87,8 +87,8 @@ class TestInterpolatedApogeeCorrections:
         """Apogee longitude advances over time (~40°/year)."""
         jd1 = 2451545.0
         jd2 = jd1 + 365.25
-        r1, _ = swe.swe_calc_ut(jd1, SE_INTP_APOG, 0)
-        r2, _ = swe.swe_calc_ut(jd2, SE_INTP_APOG, 0)
+        r1, _ = swe.calc_ut(jd1, INTP_APOG, 0)
+        r2, _ = swe.calc_ut(jd2, INTP_APOG, 0)
         # Mean apogee moves ~40.7°/year
         diff = (r2[0] - r1[0]) % 360
         assert 30 < diff < 55, f"Annual motion {diff}° outside expected range"
@@ -99,7 +99,7 @@ class TestInterpolatedApogeeCorrections:
         jds = _random_jds(50, seed=100)
         positive_count = 0
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, INTP_APOG, FLG_SPEED)
             speed = result[3]
             # Speed should be in a reasonable range
             assert abs(speed) < 1.0, f"Speed {speed}°/day unreasonable at JD {jd}"
@@ -129,7 +129,7 @@ class TestInterpolatedApogeeCorrections:
     def test_apogee_no_crash_across_centuries(self, year: int):
         """Apogee calculation doesn't crash for dates across centuries."""
         jd = _jd_from_year(year)
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_APOG, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, INTP_APOG, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
 
@@ -140,7 +140,7 @@ class TestInterpolatedApogeeCorrections:
         prev_lon = None
         for i in range(100):
             jd = jd_start + i * 1.0
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            result, _ = swe.calc_ut(jd, INTP_APOG, 0)
             lon = result[0]
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -157,8 +157,8 @@ class TestInterpolatedApogeeCorrections:
         """Interpolated apogee should be near osculating apogee (within ~25°)."""
         jds = _random_jds(30, seed=200)
         for jd in jds:
-            r_intp, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
-            r_oscu, _ = swe.swe_calc_ut(jd, SE_OSCU_APOG, 0)
+            r_intp, _ = swe.calc_ut(jd, INTP_APOG, 0)
+            r_oscu, _ = swe.calc_ut(jd, OSCU_APOG, 0)
             diff = abs(r_intp[0] - r_oscu[0])
             if diff > 180:
                 diff = 360 - diff
@@ -173,7 +173,7 @@ class TestInterpolatedApogeeCorrections:
         """Distance should be approximately constant at mean apogee distance."""
         jds = _random_jds(50, seed=300)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            result, _ = swe.calc_ut(jd, INTP_APOG, 0)
             dist = result[2]
             # Mean apogee distance is ~0.0027099 AU
             assert abs(dist - 0.0027099) < 0.0002, (
@@ -185,18 +185,18 @@ class TestInterpolatedApogeeCorrections:
         "flags,desc",
         [
             (0, "default"),
-            (SEFLG_SPEED, "with speed"),
-            (SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_J2000, "J2000"),
-            (SEFLG_NOABERR, "no aberration"),
-            (SEFLG_NONUT, "no nutation"),
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "speed+equatorial"),
+            (FLG_SPEED, "with speed"),
+            (FLG_EQUATORIAL, "equatorial"),
+            (FLG_J2000, "J2000"),
+            (FLG_NOABERR, "no aberration"),
+            (FLG_NONUT, "no nutation"),
+            (FLG_SPEED | FLG_EQUATORIAL, "speed+equatorial"),
         ],
     )
     def test_apogee_flag_variants(self, flags: int, desc: str):
         """Apogee calculation works with various flag combinations."""
         jd = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_APOG, flags)
+        result, retflag = swe.calc_ut(jd, INTP_APOG, flags)
         assert len(result) == 6
         # All values should be finite
         for i, val in enumerate(result):
@@ -208,12 +208,12 @@ class TestInterpolatedApogeeCorrections:
     def test_apogee_sidereal_mode(self):
         """Apogee works in sidereal mode."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         try:
-            result_sid, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, SEFLG_SIDEREAL)
-            result_trop, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            result_sid, _ = swe.calc_ut(jd, INTP_APOG, FLG_SIDEREAL)
+            result_trop, _ = swe.calc_ut(jd, INTP_APOG, 0)
             # Sidereal should differ from tropical by roughly the ayanamsha
-            ayan = swe.swe_get_ayanamsa_ut(jd)
+            ayan = swe.get_ayanamsa_ut(jd)
             diff = (result_trop[0] - result_sid[0]) % 360
             if diff > 180:
                 diff = 360 - diff
@@ -221,7 +221,7 @@ class TestInterpolatedApogeeCorrections:
                 f"Sidereal offset {diff:.3f} vs ayanamsha {ayan:.3f}"
             )
         finally:
-            swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+            swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
 
 class TestInterpolatedApogeeHighVolume:
@@ -231,7 +231,7 @@ class TestInterpolatedApogeeHighVolume:
     @pytest.mark.parametrize("jd", _random_jds(200, seed=1000))
     def test_apogee_valid_position_200_dates(self, jd: float):
         """Apogee returns valid position for 200 random dates."""
-        result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, INTP_APOG, FLG_SPEED)
         lon, lat, dist, slon, slat, sdist = result
         assert 0 <= lon < 360
         assert -10 < lat < 10
@@ -261,7 +261,7 @@ class TestInterpolatedPerigeeCorrections:
     )
     def test_perigee_returns_valid_position(self, jd: float):
         """Interpolated perigee returns valid 6-element tuple."""
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_PERG, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, INTP_PERG, FLG_SPEED)
         assert len(result) == 6
         lon, lat, dist, slon, slat, sdist = result
         assert 0 <= lon < 360, f"Longitude {lon} out of range"
@@ -277,8 +277,8 @@ class TestInterpolatedPerigeeCorrections:
         """
         jd1 = 2451545.0
         jd2 = jd1 + 365.25 * 5  # 5 years
-        r1, _ = swe.swe_calc_ut(jd1, SE_INTP_PERG, 0)
-        r2, _ = swe.swe_calc_ut(jd2, SE_INTP_PERG, 0)
+        r1, _ = swe.calc_ut(jd1, INTP_PERG, 0)
+        r2, _ = swe.calc_ut(jd2, INTP_PERG, 0)
         diff = (r2[0] - r1[0]) % 360
         # Over 5 years, expect ~200° of mean motion (40°/yr * 5)
         assert 100 < diff < 300, f"5-year motion {diff}° outside expected range"
@@ -292,7 +292,7 @@ class TestInterpolatedPerigeeCorrections:
         """
         jds = _random_jds(50, seed=400)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, INTP_PERG, FLG_SPEED)
             speed = result[3]
             assert abs(speed) < 3.0, f"Speed {speed}°/day unreasonable at JD {jd}"
 
@@ -316,7 +316,7 @@ class TestInterpolatedPerigeeCorrections:
     def test_perigee_no_crash_across_centuries(self, year: int):
         """Perigee calculation doesn't crash for dates across centuries."""
         jd = _jd_from_year(year)
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_PERG, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, INTP_PERG, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
 
@@ -327,7 +327,7 @@ class TestInterpolatedPerigeeCorrections:
         prev_lon = None
         for i in range(100):
             jd = jd_start + i * 1.0
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, 0)
+            result, _ = swe.calc_ut(jd, INTP_PERG, 0)
             lon = result[0]
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -343,7 +343,7 @@ class TestInterpolatedPerigeeCorrections:
         """Distance should be approximately constant at mean perigee distance."""
         jds = _random_jds(50, seed=500)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, 0)
+            result, _ = swe.calc_ut(jd, INTP_PERG, 0)
             dist = result[2]
             # Mean perigee distance is ~0.0024222 AU
             assert abs(dist - 0.0024222) < 0.0002, (
@@ -355,18 +355,18 @@ class TestInterpolatedPerigeeCorrections:
         "flags,desc",
         [
             (0, "default"),
-            (SEFLG_SPEED, "with speed"),
-            (SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_J2000, "J2000"),
-            (SEFLG_NOABERR, "no aberration"),
-            (SEFLG_NONUT, "no nutation"),
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "speed+equatorial"),
+            (FLG_SPEED, "with speed"),
+            (FLG_EQUATORIAL, "equatorial"),
+            (FLG_J2000, "J2000"),
+            (FLG_NOABERR, "no aberration"),
+            (FLG_NONUT, "no nutation"),
+            (FLG_SPEED | FLG_EQUATORIAL, "speed+equatorial"),
         ],
     )
     def test_perigee_flag_variants(self, flags: int, desc: str):
         """Perigee calculation works with various flag combinations."""
         jd = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd, SE_INTP_PERG, flags)
+        result, retflag = swe.calc_ut(jd, INTP_PERG, flags)
         assert len(result) == 6
         for i, val in enumerate(result):
             assert math.isfinite(val), (
@@ -381,7 +381,7 @@ class TestInterpolatedPerigeeHighVolume:
     @pytest.mark.parametrize("jd", _random_jds(200, seed=2000))
     def test_perigee_valid_position_200_dates(self, jd: float):
         """Perigee returns valid position for 200 random dates."""
-        result, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, INTP_PERG, FLG_SPEED)
         lon, lat, dist, slon, slat, sdist = result
         assert 0 <= lon < 360
         assert -10 < lat < 10
@@ -401,8 +401,8 @@ class TestApogeePerigeeRelationship:
     @pytest.mark.parametrize("jd", _random_jds(50, seed=3000))
     def test_apogee_perigee_roughly_opposite(self, jd: float):
         """Apogee and perigee should be roughly 180° apart (within ~30°)."""
-        r_apo, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
-        r_per, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, 0)
+        r_apo, _ = swe.calc_ut(jd, INTP_APOG, 0)
+        r_per, _ = swe.calc_ut(jd, INTP_PERG, 0)
         diff = abs(r_apo[0] - r_per[0])
         if diff > 180:
             diff = 360 - diff
@@ -416,8 +416,8 @@ class TestApogeePerigeeRelationship:
     def test_apogee_perigee_different_distances(self):
         """Apogee distance should be larger than perigee distance."""
         jd = 2451545.0
-        r_apo, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
-        r_per, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, 0)
+        r_apo, _ = swe.calc_ut(jd, INTP_APOG, 0)
+        r_per, _ = swe.calc_ut(jd, INTP_PERG, 0)
         assert r_apo[2] > r_per[2], (
             f"Apogee dist {r_apo[2]} should be > perigee dist {r_per[2]}"
         )
@@ -427,8 +427,8 @@ class TestApogeePerigeeRelationship:
         """Interpolated apogee should be within ~15° of mean apogee."""
         jds = _random_jds(30, seed=3100)
         for jd in jds:
-            r_intp, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
-            r_mean, _ = swe.swe_calc_ut(jd, SE_MEAN_APOG, 0)
+            r_intp, _ = swe.calc_ut(jd, INTP_APOG, 0)
+            r_mean, _ = swe.calc_ut(jd, MEAN_APOG, 0)
             diff = abs(r_intp[0] - r_mean[0])
             if diff > 180:
                 diff = 360 - diff
@@ -451,7 +451,7 @@ class TestApseLatitudeModel:
         """Apogee latitude should be bounded by ~±5.15°."""
         jds = _random_jds(100, seed=4000)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            result, _ = swe.calc_ut(jd, INTP_APOG, 0)
             lat = result[1]
             assert abs(lat) < 6.0, f"Apogee latitude {lat}° exceeds bounds at JD {jd}"
 
@@ -460,7 +460,7 @@ class TestApseLatitudeModel:
         """Perigee latitude should be bounded by ~±5.15°."""
         jds = _random_jds(100, seed=4100)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_PERG, 0)
+            result, _ = swe.calc_ut(jd, INTP_PERG, 0)
             lat = result[1]
             assert abs(lat) < 6.0, f"Perigee latitude {lat}° exceeds bounds at JD {jd}"
 
@@ -472,7 +472,7 @@ class TestApseLatitudeModel:
         lats = []
         for i in range(100):
             jd = jd_start + i * 33.0  # ~9 years
-            result, _ = swe.swe_calc_ut(jd, SE_INTP_APOG, 0)
+            result, _ = swe.calc_ut(jd, INTP_APOG, 0)
             lats.append(result[1])
         # Should see both positive and negative latitudes
         has_positive = any(lat > 1.0 for lat in lats)

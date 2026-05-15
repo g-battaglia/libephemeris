@@ -1,5 +1,5 @@
 """
-Tests for lunar nodes and apsides (swe_nod_aps_ut).
+Tests for lunar nodes and apsides (nod_aps_ut).
 
 Verifies that the node/apse calculation returns valid results
 for the Moon and planets, and that values are physically plausible.
@@ -13,27 +13,27 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_NODBIT_MEAN,
-    SE_NODBIT_OSCU,
-    SE_NODBIT_OSCU_BAR,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_OSCU_BAR,
+    FLG_SPEED,
 )
 
 
 PLANETS_FOR_NODES = [
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 
@@ -44,7 +44,7 @@ class TestNodApsBasic:
     def test_nod_aps_moon_returns_4_tuples(self):
         """nod_aps_ut for Moon returns 4 tuples of 6 elements each."""
         jd = 2451545.0
-        result = swe.swe_nod_aps_ut(jd, SE_MOON, 0, SE_NODBIT_MEAN)
+        result = swe.nod_aps_ut(jd, MOON, 0, NODBIT_MEAN)
         assert len(result) == 4, f"Expected 4 tuples, got {len(result)}"
         for i, tup in enumerate(result):
             assert len(tup) == 6, f"Tuple {i} has {len(tup)} elements, expected 6"
@@ -53,8 +53,8 @@ class TestNodApsBasic:
     def test_nod_aps_moon_ascending_node(self):
         """Ascending node longitude should be valid."""
         jd = 2451545.0
-        asc_node, desc_node, perihelion, aphelion = swe.swe_nod_aps_ut(
-            jd, SE_MOON, 0, SE_NODBIT_MEAN
+        asc_node, desc_node, perihelion, aphelion = swe.nod_aps_ut(
+            jd, MOON, 0, NODBIT_MEAN
         )
         lon = float(asc_node[0])
         assert 0 <= lon < 360, f"Ascending node lon {lon} out of range"
@@ -63,8 +63,8 @@ class TestNodApsBasic:
     def test_nod_aps_moon_nodes_opposite(self):
         """Ascending and descending nodes should be ~180° apart."""
         jd = 2451545.0
-        asc_node, desc_node, perihelion, aphelion = swe.swe_nod_aps_ut(
-            jd, SE_MOON, 0, SE_NODBIT_MEAN
+        asc_node, desc_node, perihelion, aphelion = swe.nod_aps_ut(
+            jd, MOON, 0, NODBIT_MEAN
         )
         asc_lon = float(asc_node[0])
         desc_lon = float(desc_node[0])
@@ -80,7 +80,7 @@ class TestNodApsBasic:
     def test_nod_aps_returns_valid(self, body_id: int, name: str):
         """nod_aps_ut returns valid results for each planet."""
         jd = 2451545.0
-        result = swe.swe_nod_aps_ut(jd, body_id, 0, SE_NODBIT_MEAN)
+        result = swe.nod_aps_ut(jd, body_id, 0, NODBIT_MEAN)
         assert len(result) == 4
         for i, tup in enumerate(result):
             assert len(tup) == 6
@@ -93,15 +93,15 @@ class TestNodApsBasic:
     @pytest.mark.parametrize(
         "method,name",
         [
-            (SE_NODBIT_MEAN, "mean"),
-            (SE_NODBIT_OSCU, "osculating"),
-            (SE_NODBIT_OSCU_BAR, "osculating barycentric"),
+            (NODBIT_MEAN, "mean"),
+            (NODBIT_OSCU, "osculating"),
+            (NODBIT_OSCU_BAR, "osculating barycentric"),
         ],
     )
     def test_nod_aps_methods(self, method: int, name: str):
         """Different calculation methods all return valid results."""
         jd = 2451545.0
-        result = swe.swe_nod_aps_ut(jd, SE_MOON, 0, method)
+        result = swe.nod_aps_ut(jd, MOON, 0, method)
         assert len(result) == 4
         asc_lon = float(result[0][0])
         assert 0 <= asc_lon < 360, f"Method {name}: asc node lon {asc_lon} out of range"
@@ -114,8 +114,8 @@ class TestNodApsDateRange:
     @pytest.mark.parametrize("year", [1800, 1900, 1950, 2000, 2050, 2100, 2200])
     def test_moon_nodes_across_centuries(self, year: int):
         """Moon nodes valid across centuries."""
-        jd = swe.swe_julday(year, 1, 1, 12.0)
-        asc, desc, peri, aph = swe.swe_nod_aps_ut(jd, SE_MOON, 0, SE_NODBIT_MEAN)
+        jd = swe.julday(year, 1, 1, 12.0)
+        asc, desc, peri, aph = swe.nod_aps_ut(jd, MOON, 0, NODBIT_MEAN)
         asc_lon = float(asc[0])
         assert 0 <= asc_lon < 360, f"Year {year}: asc node lon {asc_lon}"
 
@@ -124,8 +124,8 @@ class TestNodApsDateRange:
         """Moon's mean node regresses ~19.35°/year."""
         jd1 = 2451545.0
         jd2 = jd1 + 365.25
-        asc1 = swe.swe_nod_aps_ut(jd1, SE_MOON, 0, SE_NODBIT_MEAN)
-        asc2 = swe.swe_nod_aps_ut(jd2, SE_MOON, 0, SE_NODBIT_MEAN)
+        asc1 = swe.nod_aps_ut(jd1, MOON, 0, NODBIT_MEAN)
+        asc2 = swe.nod_aps_ut(jd2, MOON, 0, NODBIT_MEAN)
         lon1 = float(asc1[0][0])
         lon2 = float(asc2[0][0])
         motion = (lon2 - lon1) % 360
@@ -144,21 +144,21 @@ class TestNodApsConsistency:
     def test_perihelion_closer_than_aphelion(self):
         """Moon mean perihelion/aphelion distances are equal (constant mean distance).
 
-        For SE_NODBIT_MEAN, both perihelion and aphelion return the same
+        For NODBIT_MEAN, both perihelion and aphelion return the same
         constant mean lunar distance. For osculating elements the same
         may hold depending on the implementation. We verify both are
         positive and finite.
         """
         jd = 2451545.0
         # Mean: distances are equal (constant mean distance)
-        asc, desc, peri, aph = swe.swe_nod_aps_ut(jd, SE_MOON, 0, SE_NODBIT_MEAN)
+        asc, desc, peri, aph = swe.nod_aps_ut(jd, MOON, 0, NODBIT_MEAN)
         peri_dist = float(peri[2])
         aph_dist = float(aph[2])
         assert peri_dist > 0, f"Mean perihelion dist {peri_dist} not positive"
         assert aph_dist > 0, f"Mean aphelion dist {aph_dist} not positive"
 
         # For planets, verify osculating apse distances are positive and distinct
-        asc, desc, peri, aph = swe.swe_nod_aps_ut(jd, SE_MARS, 0, SE_NODBIT_OSCU)
+        asc, desc, peri, aph = swe.nod_aps_ut(jd, MARS, 0, NODBIT_OSCU)
         peri_dist = float(peri[2])
         aph_dist = float(aph[2])
         assert peri_dist > 0, f"Mars oscu perihelion dist {peri_dist} not positive"
@@ -172,16 +172,16 @@ class TestNodApsConsistency:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_planet_nodes_stable(self, body_id: int, name: str):
         """Planet nodes should be relatively stable over 1 year."""
         jd1 = 2451545.0
         jd2 = jd1 + 365.25
-        r1 = swe.swe_nod_aps_ut(jd1, body_id, 0, SE_NODBIT_MEAN)
-        r2 = swe.swe_nod_aps_ut(jd2, body_id, 0, SE_NODBIT_MEAN)
+        r1 = swe.nod_aps_ut(jd1, body_id, 0, NODBIT_MEAN)
+        r2 = swe.nod_aps_ut(jd2, body_id, 0, NODBIT_MEAN)
         lon1 = float(r1[0][0])
         lon2 = float(r2[0][0])
         diff = abs(lon2 - lon1)

@@ -15,23 +15,23 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MERCURY,
-    SE_VENUS,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_TRUEPOS,
-    SEFLG_J2000,
-    SEFLG_NONUT,
-    SEFLG_NOGDEFL,
-    SEFLG_NOABERR,
-    SEFLG_EQUATORIAL,
-    SEFLG_XYZ,
-    SEFLG_RADIANS,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    MERCURY,
+    VENUS,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_TRUEPOS,
+    FLG_J2000,
+    FLG_NONUT,
+    FLG_NOGDEFL,
+    FLG_NOABERR,
+    FLG_EQUATORIAL,
+    FLG_XYZ,
+    FLG_RADIANS,
 )
 
 # ---------------------------------------------------------------------------
@@ -39,20 +39,20 @@ from libephemeris.constants import (
 # ---------------------------------------------------------------------------
 
 BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Bodies valid for heliocentric (not Sun or Moon)
 HELIO_BODIES = [
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
 ]
 
 DATES = [
@@ -65,44 +65,44 @@ DATES = [
 
 # ~30 flag pair combinations (geocentric-safe, no HELCTR with Sun/Moon)
 GEOCENTRIC_FLAG_PAIRS = [
-    (SEFLG_SPEED | SEFLG_EQUATORIAL, "SPEED+EQUATORIAL"),
-    (SEFLG_SPEED | SEFLG_TRUEPOS, "SPEED+TRUEPOS"),
-    (SEFLG_SPEED | SEFLG_J2000, "SPEED+J2000"),
-    (SEFLG_SPEED | SEFLG_NONUT, "SPEED+NONUT"),
-    (SEFLG_SPEED | SEFLG_NOGDEFL, "SPEED+NOGDEFL"),
-    (SEFLG_SPEED | SEFLG_NOABERR, "SPEED+NOABERR"),
-    (SEFLG_SPEED | SEFLG_RADIANS, "SPEED+RADIANS"),
-    (SEFLG_EQUATORIAL | SEFLG_NONUT, "EQUATORIAL+NONUT"),
-    (SEFLG_EQUATORIAL | SEFLG_J2000, "EQUATORIAL+J2000"),
-    (SEFLG_EQUATORIAL | SEFLG_TRUEPOS, "EQUATORIAL+TRUEPOS"),
-    (SEFLG_EQUATORIAL | SEFLG_RADIANS, "EQUATORIAL+RADIANS"),
-    (SEFLG_XYZ | SEFLG_SPEED, "XYZ+SPEED"),
-    (SEFLG_XYZ | SEFLG_EQUATORIAL, "XYZ+EQUATORIAL"),
-    (SEFLG_XYZ | SEFLG_NONUT, "XYZ+NONUT"),
-    (SEFLG_XYZ | SEFLG_J2000, "XYZ+J2000"),
-    (SEFLG_XYZ | SEFLG_TRUEPOS, "XYZ+TRUEPOS"),
-    (SEFLG_TRUEPOS | SEFLG_NONUT, "TRUEPOS+NONUT"),
-    (SEFLG_TRUEPOS | SEFLG_J2000, "TRUEPOS+J2000"),
-    (SEFLG_TRUEPOS | SEFLG_NOGDEFL, "TRUEPOS+NOGDEFL"),
-    (SEFLG_TRUEPOS | SEFLG_NOABERR, "TRUEPOS+NOABERR"),
-    (SEFLG_NONUT | SEFLG_NOGDEFL, "NONUT+NOGDEFL"),
-    (SEFLG_NONUT | SEFLG_NOABERR, "NONUT+NOABERR"),
-    (SEFLG_J2000 | SEFLG_NONUT, "J2000+NONUT"),
-    (SEFLG_J2000 | SEFLG_NOGDEFL, "J2000+NOGDEFL"),
-    (SEFLG_J2000 | SEFLG_NOABERR, "J2000+NOABERR"),
-    (SEFLG_NOGDEFL | SEFLG_NOABERR, "NOGDEFL+NOABERR"),
-    (SEFLG_RADIANS | SEFLG_NONUT, "RADIANS+NONUT"),
-    (SEFLG_RADIANS | SEFLG_J2000, "RADIANS+J2000"),
+    (FLG_SPEED | FLG_EQUATORIAL, "SPEED+EQUATORIAL"),
+    (FLG_SPEED | FLG_TRUEPOS, "SPEED+TRUEPOS"),
+    (FLG_SPEED | FLG_J2000, "SPEED+J2000"),
+    (FLG_SPEED | FLG_NONUT, "SPEED+NONUT"),
+    (FLG_SPEED | FLG_NOGDEFL, "SPEED+NOGDEFL"),
+    (FLG_SPEED | FLG_NOABERR, "SPEED+NOABERR"),
+    (FLG_SPEED | FLG_RADIANS, "SPEED+RADIANS"),
+    (FLG_EQUATORIAL | FLG_NONUT, "EQUATORIAL+NONUT"),
+    (FLG_EQUATORIAL | FLG_J2000, "EQUATORIAL+J2000"),
+    (FLG_EQUATORIAL | FLG_TRUEPOS, "EQUATORIAL+TRUEPOS"),
+    (FLG_EQUATORIAL | FLG_RADIANS, "EQUATORIAL+RADIANS"),
+    (FLG_XYZ | FLG_SPEED, "XYZ+SPEED"),
+    (FLG_XYZ | FLG_EQUATORIAL, "XYZ+EQUATORIAL"),
+    (FLG_XYZ | FLG_NONUT, "XYZ+NONUT"),
+    (FLG_XYZ | FLG_J2000, "XYZ+J2000"),
+    (FLG_XYZ | FLG_TRUEPOS, "XYZ+TRUEPOS"),
+    (FLG_TRUEPOS | FLG_NONUT, "TRUEPOS+NONUT"),
+    (FLG_TRUEPOS | FLG_J2000, "TRUEPOS+J2000"),
+    (FLG_TRUEPOS | FLG_NOGDEFL, "TRUEPOS+NOGDEFL"),
+    (FLG_TRUEPOS | FLG_NOABERR, "TRUEPOS+NOABERR"),
+    (FLG_NONUT | FLG_NOGDEFL, "NONUT+NOGDEFL"),
+    (FLG_NONUT | FLG_NOABERR, "NONUT+NOABERR"),
+    (FLG_J2000 | FLG_NONUT, "J2000+NONUT"),
+    (FLG_J2000 | FLG_NOGDEFL, "J2000+NOGDEFL"),
+    (FLG_J2000 | FLG_NOABERR, "J2000+NOABERR"),
+    (FLG_NOGDEFL | FLG_NOABERR, "NOGDEFL+NOABERR"),
+    (FLG_RADIANS | FLG_NONUT, "RADIANS+NONUT"),
+    (FLG_RADIANS | FLG_J2000, "RADIANS+J2000"),
 ]
 
 # Heliocentric flag pairs (only for bodies that support HELCTR)
 HELIOCENTRIC_FLAG_PAIRS = [
-    (SEFLG_HELCTR | SEFLG_SPEED, "HELCTR+SPEED"),
-    (SEFLG_HELCTR | SEFLG_EQUATORIAL, "HELCTR+EQUATORIAL"),
-    (SEFLG_HELCTR | SEFLG_NONUT, "HELCTR+NONUT"),
-    (SEFLG_HELCTR | SEFLG_J2000, "HELCTR+J2000"),
-    (SEFLG_HELCTR | SEFLG_TRUEPOS, "HELCTR+TRUEPOS"),
-    (SEFLG_HELCTR | SEFLG_XYZ, "HELCTR+XYZ"),
+    (FLG_HELCTR | FLG_SPEED, "HELCTR+SPEED"),
+    (FLG_HELCTR | FLG_EQUATORIAL, "HELCTR+EQUATORIAL"),
+    (FLG_HELCTR | FLG_NONUT, "HELCTR+NONUT"),
+    (FLG_HELCTR | FLG_J2000, "HELCTR+J2000"),
+    (FLG_HELCTR | FLG_TRUEPOS, "HELCTR+TRUEPOS"),
+    (FLG_HELCTR | FLG_XYZ, "HELCTR+XYZ"),
 ]
 
 
@@ -127,7 +127,7 @@ class TestGeocentricFlagPairs:
         jd: float,
     ):
         """Flag pair produces a (6-tuple, int) with all finite values."""
-        result = swe.swe_calc_ut(jd, body_id, flags)
+        result = swe.calc_ut(jd, body_id, flags)
         assert isinstance(result, tuple), f"Expected tuple, got {type(result)}"
         assert len(result) == 2, f"Expected 2-element tuple, got {len(result)}"
 
@@ -156,7 +156,7 @@ class TestHeliocentricFlagPairs:
         jd: float,
     ):
         """Heliocentric flag pair produces valid finite output."""
-        result = swe.swe_calc_ut(jd, body_id, flags)
+        result = swe.calc_ut(jd, body_id, flags)
         values, retflag = result
         assert len(values) == 6
         for i, val in enumerate(values):
@@ -174,11 +174,11 @@ class TestXYZCoherence:
     def test_xyz_vs_spherical_distance(self, body_id: int, body_name: str, jd: float):
         """XYZ magnitude matches spherical distance within 1e-8 AU."""
         # Get spherical coordinates to extract distance
-        sph_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        sph_vals, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         dist_sph = sph_vals[2]
 
         # Get Cartesian coordinates
-        xyz_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_XYZ)
+        xyz_vals, _ = swe.calc_ut(jd, body_id, FLG_XYZ)
         x, y, z = xyz_vals[0], xyz_vals[1], xyz_vals[2]
         dist_xyz = math.sqrt(x * x + y * y + z * z)
 
@@ -192,8 +192,8 @@ class TestXYZCoherence:
     def test_xyz_equatorial_vs_ecliptic(self, body_id: int, body_name: str):
         """XYZ ecliptic and XYZ equatorial magnitudes match."""
         jd = 2451545.0
-        ecl_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_XYZ)
-        equ_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_XYZ | SEFLG_EQUATORIAL)
+        ecl_vals, _ = swe.calc_ut(jd, body_id, FLG_XYZ)
+        equ_vals, _ = swe.calc_ut(jd, body_id, FLG_XYZ | FLG_EQUATORIAL)
 
         r_ecl = math.sqrt(sum(v * v for v in ecl_vals[:3]))
         r_equ = math.sqrt(sum(v * v for v in equ_vals[:3]))
@@ -211,8 +211,8 @@ class TestRadiansCoherence:
     @pytest.mark.parametrize("jd", DATES)
     def test_radians_vs_degrees(self, body_id: int, body_name: str, jd: float):
         """Radians result equals degrees * pi/180 within 1e-10."""
-        deg_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
-        rad_vals, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED | SEFLG_RADIANS)
+        deg_vals, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
+        rad_vals, _ = swe.calc_ut(jd, body_id, FLG_SPEED | FLG_RADIANS)
 
         # lon and lat (indices 0, 1) should convert; distance (index 2) stays the same.
         # Tolerance of 1e-8 rad (~0.002 arcsec) accounts for the fact that
@@ -235,11 +235,11 @@ class TestRadiansCoherence:
     def test_equatorial_radians_vs_degrees(self, body_id: int, body_name: str):
         """Equatorial RADIANS result equals degrees * pi/180."""
         jd = 2451545.0
-        flags_deg = SEFLG_SPEED | SEFLG_EQUATORIAL
-        flags_rad = flags_deg | SEFLG_RADIANS
+        flags_deg = FLG_SPEED | FLG_EQUATORIAL
+        flags_rad = flags_deg | FLG_RADIANS
 
-        deg_vals, _ = swe.swe_calc_ut(jd, body_id, flags_deg)
-        rad_vals, _ = swe.swe_calc_ut(jd, body_id, flags_rad)
+        deg_vals, _ = swe.calc_ut(jd, body_id, flags_deg)
+        rad_vals, _ = swe.calc_ut(jd, body_id, flags_rad)
 
         # RA and Dec (indices 0, 1)
         for i in (0, 1):
@@ -254,30 +254,30 @@ class TestTripleFlagCombinations:
     """Test selected three-flag combinations for robustness."""
 
     TRIPLE_COMBOS = [
-        (SEFLG_SPEED | SEFLG_EQUATORIAL | SEFLG_NONUT, "SPEED+EQ+NONUT"),
-        (SEFLG_SPEED | SEFLG_J2000 | SEFLG_NONUT, "SPEED+J2000+NONUT"),
-        (SEFLG_SPEED | SEFLG_TRUEPOS | SEFLG_NOABERR, "SPEED+TRUE+NOABERR"),
-        (SEFLG_XYZ | SEFLG_SPEED | SEFLG_EQUATORIAL, "XYZ+SPEED+EQ"),
-        (SEFLG_XYZ | SEFLG_SPEED | SEFLG_J2000, "XYZ+SPEED+J2000"),
-        (SEFLG_EQUATORIAL | SEFLG_NONUT | SEFLG_NOABERR, "EQ+NONUT+NOABERR"),
-        (SEFLG_J2000 | SEFLG_NONUT | SEFLG_NOGDEFL, "J2000+NONUT+NOGDEFL"),
-        (SEFLG_SPEED | SEFLG_NOGDEFL | SEFLG_NOABERR, "SPEED+NOGDEFL+NOABERR"),
-        (SEFLG_RADIANS | SEFLG_SPEED | SEFLG_NONUT, "RAD+SPEED+NONUT"),
-        (SEFLG_XYZ | SEFLG_J2000 | SEFLG_NONUT, "XYZ+J2000+NONUT"),
+        (FLG_SPEED | FLG_EQUATORIAL | FLG_NONUT, "SPEED+EQ+NONUT"),
+        (FLG_SPEED | FLG_J2000 | FLG_NONUT, "SPEED+J2000+NONUT"),
+        (FLG_SPEED | FLG_TRUEPOS | FLG_NOABERR, "SPEED+TRUE+NOABERR"),
+        (FLG_XYZ | FLG_SPEED | FLG_EQUATORIAL, "XYZ+SPEED+EQ"),
+        (FLG_XYZ | FLG_SPEED | FLG_J2000, "XYZ+SPEED+J2000"),
+        (FLG_EQUATORIAL | FLG_NONUT | FLG_NOABERR, "EQ+NONUT+NOABERR"),
+        (FLG_J2000 | FLG_NONUT | FLG_NOGDEFL, "J2000+NONUT+NOGDEFL"),
+        (FLG_SPEED | FLG_NOGDEFL | FLG_NOABERR, "SPEED+NOGDEFL+NOABERR"),
+        (FLG_RADIANS | FLG_SPEED | FLG_NONUT, "RAD+SPEED+NONUT"),
+        (FLG_XYZ | FLG_J2000 | FLG_NONUT, "XYZ+J2000+NONUT"),
     ]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("flags,desc", TRIPLE_COMBOS)
     @pytest.mark.parametrize(
         "body_id,body_name",
-        [(SE_SUN, "Sun"), (SE_MOON, "Moon"), (SE_MARS, "Mars")],
+        [(SUN, "Sun"), (MOON, "Moon"), (MARS, "Mars")],
     )
     def test_triple_flag_valid_output(
         self, body_id: int, body_name: str, flags: int, desc: str
     ):
         """Triple flag combination produces valid finite 6-tuple."""
         jd = 2451545.0
-        values, retflag = swe.swe_calc_ut(jd, body_id, flags)
+        values, retflag = swe.calc_ut(jd, body_id, flags)
         assert len(values) == 6
         for i, val in enumerate(values):
             assert math.isfinite(val), (

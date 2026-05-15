@@ -4,12 +4,12 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    FLG_SPEED,
+    FLG_SIDEREAL,
 )
 
 from tests.test_leb.compare.conftest import (
@@ -23,10 +23,10 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_BASE
 
 SIDEREAL_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 
@@ -48,7 +48,7 @@ class TestBaseSiderealPrecision:
         body_name: str,
         sid_mode: int,
     ):
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_lon_err = 0.0
         max_speed_err = 0.0
         worst_lon_jd = 0.0
@@ -56,8 +56,8 @@ class TestBaseSiderealPrecision:
         for jd in base_sidereal_dates:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
             speed_err = abs(ref[3] - leb[3])

@@ -1,7 +1,7 @@
 """
 Comprehensive precision test suite for LEB binary ephemeris.
 
-Validates that fast_calc_ut() results match swe_calc_ut() (Skyfield reference)
+Validates that fast_calc_ut() results match calc_ut() (Skyfield reference)
 across wide date ranges for each ephemeris tier. Tests cover:
 
 - All major planets (Sun through Pluto + Earth)
@@ -33,31 +33,31 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "scripts"
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_EARTH,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SE_JUPITER,
-    SE_MARS,
-    SE_MEAN_APOG,
-    SE_MEAN_NODE,
-    SE_MERCURY,
-    SE_MOON,
-    SE_NEPTUNE,
-    SE_OSCU_APOG,
-    SE_PALLAS,
-    SE_PLUTO,
-    SE_SATURN,
-    SE_SUN,
-    SE_TRUE_NODE,
-    SE_URANUS,
-    SE_VENUS,
-    SEFLG_BARYCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_HELCTR,
-    SEFLG_J2000,
-    SEFLG_SPEED,
+    CHIRON,
+    CERES,
+    EARTH,
+    INTP_APOG,
+    INTP_PERG,
+    JUPITER,
+    MARS,
+    MEAN_APOG,
+    MEAN_NODE,
+    MERCURY,
+    MOON,
+    NEPTUNE,
+    OSCU_APOG,
+    PALLAS,
+    PLUTO,
+    SATURN,
+    SUN,
+    TRUE_NODE,
+    URANUS,
+    VENUS,
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_SPEED,
 )
 from libephemeris.fast_calc import fast_calc_ut
 from libephemeris.leb_format import BODY_PARAMS
@@ -78,30 +78,30 @@ TIER_CONFIGS = {
 
 # Bodies grouped by coordinate pipeline
 ICRS_PLANETS = [
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_EARTH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    EARTH,
 ]
 
 ECLIPTIC_BODIES = [
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
 ]
 
-ASTEROID_BODIES = [SE_CHIRON, SE_CERES, SE_PALLAS]
-# SE_JUNO (19) and SE_VESTA (20) may not have SPK coverage for all tiers;
+ASTEROID_BODIES = [CHIRON, CERES, PALLAS]
+# JUNO (19) and VESTA (20) may not have SPK coverage for all tiers;
 # include them conditionally
 
 # Uranian hypotheticals (40-48) are heliocentric analytical, always available
@@ -115,13 +115,13 @@ DISTANCE_TOLERANCE_AU = 1e-4  # 0.0001 AU for distance
 # InterpApogee/InterpPerigee: LEB data predates apse correction tables,
 # Chebyshev fits diverge from current Skyfield reference. Tighten after LEB regen.
 _ECLIPTIC_BODY_TOLERANCE = {
-    SE_INTP_APOG: 3600.0,  # ~1° (pre-regen)
-    SE_INTP_PERG: 7200.0,  # ~2° (pre-regen)
+    INTP_APOG: 3600.0,  # ~1° (pre-regen)
+    INTP_PERG: 7200.0,  # ~2° (pre-regen)
 }
 # InterpApogee/InterpPerigee speed tolerance: pre-regen LEB data diverges.
 _ECLIPTIC_SPEED_TOLERANCE = {
-    SE_INTP_APOG: 1.0,  # pre-regen
-    SE_INTP_PERG: 1.0,  # pre-regen
+    INTP_APOG: 1.0,  # pre-regen
+    INTP_PERG: 1.0,  # pre-regen
 }
 EQUATORIAL_TOLERANCE_ARCSEC = 0.2  # Equatorial transform adds small error
 
@@ -133,9 +133,9 @@ EQUATORIAL_TOLERANCE_ARCSEC = 0.2  # Equatorial transform adds small error
 
 def _year_to_jd(year: int) -> float:
     """Convert a year to Julian Day (January 1.0)."""
-    from libephemeris.time_utils import swe_julday
+    from libephemeris.time_utils import julday
 
-    return swe_julday(year, 1, 1, 0.0)
+    return julday(year, 1, 1, 0.0)
 
 
 def _generate_test_dates(jd_start: float, jd_end: float, n: int) -> list[float]:
@@ -195,8 +195,8 @@ def _make_leb_fixture(tier_name: str):
         bodies = sorted(
             set(
                 ICRS_PLANETS
-                + [SE_MEAN_NODE, SE_TRUE_NODE, SE_MEAN_APOG, SE_INTP_APOG, SE_INTP_PERG]
-                + [SE_CHIRON, SE_CERES]
+                + [MEAN_NODE, TRUE_NODE, MEAN_APOG, INTP_APOG, INTP_PERG]
+                + [CHIRON, CERES]
                 + [40, 48]  # Cupido + Transpluto (helio pipeline)
             )
         )
@@ -303,8 +303,8 @@ class TestBaseTierPrecision:
         worst_jd = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_base, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_base, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             lat_err = abs(fast[1] - ref[1]) * 3600.0
@@ -347,8 +347,8 @@ class TestBaseTierPrecision:
         max_speed_err = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_base, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_base, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             speed_err = abs(fast[3] - ref[3])
             if speed_err > max_speed_err:
@@ -368,8 +368,8 @@ class TestBaseTierPrecision:
         for ipl in available:
             max_err = 0.0
             for jd in dates:
-                fast, _ = fast_calc_ut(reader_base, jd, ipl, SEFLG_SPEED)
-                ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                fast, _ = fast_calc_ut(reader_base, jd, ipl, FLG_SPEED)
+                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
                 lon_err = _lon_error_arcsec(fast[0], ref[0])
                 if lon_err > max_err:
@@ -424,8 +424,8 @@ class TestMediumTierPrecision:
         worst_jd = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             lat_err = abs(fast[1] - ref[1]) * 3600.0
@@ -468,8 +468,8 @@ class TestMediumTierPrecision:
         max_speed_err = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             speed_err = abs(fast[3] - ref[3])
             if speed_err > max_speed_err:
@@ -504,8 +504,8 @@ class TestMediumTierPrecision:
         max_dist_err = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             dist_err = abs(fast[2] - ref[2])
             if dist_err > max_dist_err:
@@ -526,8 +526,8 @@ class TestMediumTierPrecision:
             max_err = 0.0
             worst_jd = 0.0
             for jd in dates:
-                fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-                ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
                 lon_err = _lon_error_arcsec(fast[0], ref[0])
                 if lon_err > max_err:
@@ -549,8 +549,8 @@ class TestMediumTierPrecision:
         for ipl in available:
             max_err = 0.0
             for jd in dates:
-                fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-                ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
                 speed_err = abs(fast[3] - ref[3])
                 if speed_err > max_err:
@@ -573,11 +573,11 @@ class TestMediumTierPrecision:
             worst_jd = 0.0
             for jd in dates:
                 try:
-                    fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
+                    fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
                 except (KeyError, ValueError):
                     continue
                 try:
-                    ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                    ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
                 except Exception:
                     continue
 
@@ -602,8 +602,8 @@ class TestMediumTierPrecision:
         for ipl in helio_in_leb:
             max_err = 0.0
             for jd in dates:
-                fast, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
-                ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                fast, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
+                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
                 lon_err = _lon_error_arcsec(fast[0], ref[0])
                 if lon_err > max_err:
@@ -634,7 +634,7 @@ class TestMediumTierFlags:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER],
+        [SUN, MOON, MARS, JUPITER],
         ids=[
             "Sun",
             "Moon",
@@ -643,14 +643,14 @@ class TestMediumTierFlags:
         ],
     )
     def test_equatorial(self, reader_medium, dates, ipl):
-        """SEFLG_EQUATORIAL results match Skyfield across wide range."""
+        """FLG_EQUATORIAL results match Skyfield across wide range."""
         ephem.set_jpl_file("de440.bsp")
-        flags = SEFLG_SPEED | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_EQUATORIAL
         max_err = 0.0
 
         for jd in dates:
             fast, _ = fast_calc_ut(reader_medium, jd, ipl, flags)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            ref, _ = ephem.calc_ut(jd, ipl, flags)
 
             ra_err = _lon_error_arcsec(fast[0], ref[0])
             dec_err = abs(fast[1] - ref[1]) * 3600.0
@@ -667,7 +667,7 @@ class TestMediumTierFlags:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER],
+        [SUN, MOON, MARS, JUPITER],
         ids=[
             "Sun",
             "Moon",
@@ -676,14 +676,14 @@ class TestMediumTierFlags:
         ],
     )
     def test_j2000(self, reader_medium, dates, ipl):
-        """SEFLG_J2000 results match Skyfield across wide range."""
+        """FLG_J2000 results match Skyfield across wide range."""
         ephem.set_jpl_file("de440.bsp")
-        flags = SEFLG_SPEED | SEFLG_J2000
+        flags = FLG_SPEED | FLG_J2000
         max_err = 0.0
 
         for jd in dates:
             fast, _ = fast_calc_ut(reader_medium, jd, ipl, flags)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            ref, _ = ephem.calc_ut(jd, ipl, flags)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             lat_err = abs(fast[1] - ref[1]) * 3600.0
@@ -700,7 +700,7 @@ class TestMediumTierFlags:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER],
+        [SUN, MOON, MARS, JUPITER],
         ids=[
             "Sun",
             "Moon",
@@ -709,14 +709,14 @@ class TestMediumTierFlags:
         ],
     )
     def test_j2000_equatorial(self, reader_medium, dates, ipl):
-        """SEFLG_J2000 | SEFLG_EQUATORIAL results match Skyfield."""
+        """FLG_J2000 | FLG_EQUATORIAL results match Skyfield."""
         ephem.set_jpl_file("de440.bsp")
-        flags = SEFLG_SPEED | SEFLG_J2000 | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_J2000 | FLG_EQUATORIAL
         max_err = 0.0
 
         for jd in dates:
             fast, _ = fast_calc_ut(reader_medium, jd, ipl, flags)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            ref, _ = ephem.calc_ut(jd, ipl, flags)
 
             ra_err = _lon_error_arcsec(fast[0], ref[0])
             dec_err = abs(fast[1] - ref[1]) * 3600.0
@@ -733,7 +733,7 @@ class TestMediumTierFlags:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_MARS, SE_JUPITER, SE_SATURN],
+        [MARS, JUPITER, SATURN],
         ids=[
             "Mars",
             "Jupiter",
@@ -741,14 +741,14 @@ class TestMediumTierFlags:
         ],
     )
     def test_heliocentric(self, reader_medium, dates, ipl):
-        """SEFLG_HELCTR results match Skyfield across wide range."""
+        """FLG_HELCTR results match Skyfield across wide range."""
         ephem.set_jpl_file("de440.bsp")
-        flags = SEFLG_SPEED | SEFLG_HELCTR
+        flags = FLG_SPEED | FLG_HELCTR
         max_err = 0.0
 
         for jd in dates:
             fast, _ = fast_calc_ut(reader_medium, jd, ipl, flags)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            ref, _ = ephem.calc_ut(jd, ipl, flags)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             if lon_err > max_err:
@@ -762,7 +762,7 @@ class TestMediumTierFlags:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_MARS, SE_JUPITER, SE_SATURN],
+        [MARS, JUPITER, SATURN],
         ids=[
             "Mars",
             "Jupiter",
@@ -770,14 +770,14 @@ class TestMediumTierFlags:
         ],
     )
     def test_barycentric(self, reader_medium, dates, ipl):
-        """SEFLG_BARYCTR results match Skyfield across wide range."""
+        """FLG_BARYCTR results match Skyfield across wide range."""
         ephem.set_jpl_file("de440.bsp")
-        flags = SEFLG_SPEED | SEFLG_BARYCTR
+        flags = FLG_SPEED | FLG_BARYCTR
         max_err = 0.0
 
         for jd in dates:
             fast, _ = fast_calc_ut(reader_medium, jd, ipl, flags)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, flags)
+            ref, _ = ephem.calc_ut(jd, ipl, flags)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             if lon_err > max_err:
@@ -833,8 +833,8 @@ class TestExtendedTierPrecision:
         worst_jd = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_extended, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_extended, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             lon_err = _lon_error_arcsec(fast[0], ref[0])
             lat_err = abs(fast[1] - ref[1]) * 3600.0
@@ -877,8 +877,8 @@ class TestExtendedTierPrecision:
         max_speed_err = 0.0
 
         for jd in dates:
-            fast, _ = fast_calc_ut(reader_extended, jd, ipl, SEFLG_SPEED)
-            ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            fast, _ = fast_calc_ut(reader_extended, jd, ipl, FLG_SPEED)
+            ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
             speed_err = abs(fast[3] - ref[3])
             if speed_err > max_speed_err:
@@ -899,8 +899,8 @@ class TestExtendedTierPrecision:
             max_err = 0.0
             worst_jd = 0.0
             for jd in dates:
-                fast, _ = fast_calc_ut(reader_extended, jd, ipl, SEFLG_SPEED)
-                ref, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                fast, _ = fast_calc_ut(reader_extended, jd, ipl, FLG_SPEED)
+                ref, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
                 lon_err = _lon_error_arcsec(fast[0], ref[0])
                 if lon_err > max_err:
@@ -930,7 +930,7 @@ class TestCrossTierConsistency:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SE_SATURN],
+        [SUN, MOON, MARS, JUPITER, SATURN],
         ids=["Sun", "Moon", "Mars", "Jupiter", "Saturn"],
     )
     def test_base_vs_medium_overlap(
@@ -940,8 +940,8 @@ class TestCrossTierConsistency:
         max_err = 0.0
 
         for jd in overlap_dates:
-            base_result, _ = fast_calc_ut(reader_base, jd, ipl, SEFLG_SPEED)
-            med_result, _ = fast_calc_ut(reader_medium, jd, ipl, SEFLG_SPEED)
+            base_result, _ = fast_calc_ut(reader_base, jd, ipl, FLG_SPEED)
+            med_result, _ = fast_calc_ut(reader_medium, jd, ipl, FLG_SPEED)
 
             lon_err = _lon_error_arcsec(base_result[0], med_result[0])
             if lon_err > max_err:
@@ -973,7 +973,7 @@ class TestPublicAPIPrecision:
     @pytest.mark.precision
     @pytest.mark.parametrize(
         "ipl",
-        [SE_SUN, SE_MOON, SE_MARS],
+        [SUN, MOON, MARS],
         ids=[
             "Sun",
             "Moon",
@@ -987,14 +987,14 @@ class TestPublicAPIPrecision:
         # Collect reference results (Skyfield)
         ref_results = {}
         for jd in dates:
-            ref_results[jd] = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+            ref_results[jd] = ephem.calc_ut(jd, ipl, FLG_SPEED)
 
         # Now activate LEB mode and compare
         ephem.set_leb_file(leb_file_medium)
         try:
             max_err = 0.0
             for jd in dates:
-                leb_result, _ = ephem.swe_calc_ut(jd, ipl, SEFLG_SPEED)
+                leb_result, _ = ephem.calc_ut(jd, ipl, FLG_SPEED)
                 ref, _ = ref_results[jd]
 
                 lon_err = _lon_error_arcsec(leb_result[0], ref[0])

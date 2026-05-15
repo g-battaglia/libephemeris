@@ -14,19 +14,19 @@ import pytest
 
 from libephemeris.context import EphemerisContext
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SEFLG_HELCTR,
-    SEFLG_TOPOCTR,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_RAMAN,
+    SUN,
+    MOON,
+    MERCURY,
+    MARS,
+    JUPITER,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    FLG_HELCTR,
+    FLG_TOPOCTR,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_RAMAN,
 )
 
 
@@ -43,7 +43,7 @@ class TestContextBasic:
     def test_context_calc_ut_returns_valid(self):
         """Context calc_ut returns valid 6-element tuple."""
         ctx = EphemerisContext()
-        result, retflag = ctx.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+        result, retflag = ctx.calc_ut(2451545.0, SUN, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
         assert result[2] > 0
@@ -52,17 +52,17 @@ class TestContextBasic:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_context_all_planets(self, body_id: int, name: str):
         """Context calc_ut works for multiple planets."""
         ctx = EphemerisContext()
-        result, _ = ctx.calc_ut(2451545.0, body_id, SEFLG_SPEED)
+        result, _ = ctx.calc_ut(2451545.0, body_id, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360, f"{name}: lon={result[0]}"
 
@@ -93,10 +93,10 @@ class TestContextSetTopo:
         ctx = EphemerisContext()
         jd = 2451545.0
 
-        geo_result, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        geo_result, _ = ctx.calc_ut(jd, MOON, FLG_SPEED)
 
         ctx.set_topo(12.5, 41.9, 50.0)
-        topo_result, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_TOPOCTR | SEFLG_SPEED)
+        topo_result, _ = ctx.calc_ut(jd, MOON, FLG_TOPOCTR | FLG_SPEED)
 
         # Moon positions should differ between geo and topo
         lon_diff = abs(geo_result[0] - topo_result[0])
@@ -115,7 +115,7 @@ class TestContextSidereal:
     def test_context_set_sid_mode(self):
         """Context set_sid_mode accepts valid mode IDs."""
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SE_SIDM_LAHIRI)
+        ctx.set_sid_mode(SIDM_LAHIRI)
         # Should not raise
 
     @pytest.mark.unit
@@ -124,10 +124,10 @@ class TestContextSidereal:
         ctx = EphemerisContext()
         jd = 2451545.0
 
-        tropical, _ = ctx.calc_ut(jd, SE_SUN, 0)
+        tropical, _ = ctx.calc_ut(jd, SUN, 0)
 
-        ctx.set_sid_mode(SE_SIDM_LAHIRI)
-        sidereal, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx.set_sid_mode(SIDM_LAHIRI)
+        sidereal, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         diff = abs(tropical[0] - sidereal[0])
         if diff > 180:
@@ -139,9 +139,9 @@ class TestContextSidereal:
     def test_context_get_sid_mode(self):
         """Context get_sid_mode returns the set mode."""
         ctx = EphemerisContext()
-        ctx.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ctx.set_sid_mode(SIDM_FAGAN_BRADLEY)
         mode = ctx.get_sid_mode()
-        assert mode == SE_SIDM_FAGAN_BRADLEY
+        assert mode == SIDM_FAGAN_BRADLEY
 
 
 class TestContextFlagCombinations:
@@ -152,16 +152,16 @@ class TestContextFlagCombinations:
         "flags,desc",
         [
             (0, "default"),
-            (SEFLG_SPEED, "speed"),
-            (SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_HELCTR, "heliocentric"),
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "speed+equatorial"),
+            (FLG_SPEED, "speed"),
+            (FLG_EQUATORIAL, "equatorial"),
+            (FLG_HELCTR, "heliocentric"),
+            (FLG_SPEED | FLG_EQUATORIAL, "speed+equatorial"),
         ],
     )
     def test_context_flag_combos(self, flags: int, desc: str):
         """Context calc_ut works with various flag combinations."""
         ctx = EphemerisContext()
-        result, _ = ctx.calc_ut(2451545.0, SE_MARS, flags)
+        result, _ = ctx.calc_ut(2451545.0, MARS, flags)
         assert len(result) == 6
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{desc}: result[{i}]={val}"
@@ -176,11 +176,11 @@ class TestContextIndependence:
         ctx1 = EphemerisContext()
         ctx2 = EphemerisContext()
 
-        ctx1.set_sid_mode(SE_SIDM_LAHIRI)
-        ctx2.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+        ctx1.set_sid_mode(SIDM_LAHIRI)
+        ctx2.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
-        assert ctx1.get_sid_mode() == SE_SIDM_LAHIRI
-        assert ctx2.get_sid_mode() == SE_SIDM_FAGAN_BRADLEY
+        assert ctx1.get_sid_mode() == SIDM_LAHIRI
+        assert ctx2.get_sid_mode() == SIDM_FAGAN_BRADLEY
 
     @pytest.mark.unit
     def test_two_contexts_independent_results(self):
@@ -188,12 +188,12 @@ class TestContextIndependence:
         jd = 2451545.0
 
         ctx1 = EphemerisContext()
-        ctx1.set_sid_mode(SE_SIDM_LAHIRI)
-        r1, _ = ctx1.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx1.set_sid_mode(SIDM_LAHIRI)
+        r1, _ = ctx1.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         ctx2 = EphemerisContext()
-        ctx2.set_sid_mode(SE_SIDM_RAMAN)
-        r2, _ = ctx2.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx2.set_sid_mode(SIDM_RAMAN)
+        r2, _ = ctx2.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # Lahiri and Raman ayanamshas differ by ~1-2°
         diff = abs(r1[0] - r2[0])
@@ -217,7 +217,7 @@ class TestContextThreadSafety:
                 ctx.set_sid_mode(sid_mode)
                 jd = 2451545.0
                 for _ in range(20):
-                    result, _ = ctx.calc_ut(jd, body_id, SEFLG_SIDEREAL | SEFLG_SPEED)
+                    result, _ = ctx.calc_ut(jd, body_id, FLG_SIDEREAL | FLG_SPEED)
                     assert 0 <= result[0] < 360
                     jd += 30.0
                 results[thread_id] = True
@@ -226,13 +226,13 @@ class TestContextThreadSafety:
                 results[thread_id] = False
 
         threads = [
-            threading.Thread(target=calc_in_thread, args=(0, SE_SUN, SE_SIDM_LAHIRI)),
+            threading.Thread(target=calc_in_thread, args=(0, SUN, SIDM_LAHIRI)),
             threading.Thread(
-                target=calc_in_thread, args=(1, SE_MOON, SE_SIDM_FAGAN_BRADLEY)
+                target=calc_in_thread, args=(1, MOON, SIDM_FAGAN_BRADLEY)
             ),
-            threading.Thread(target=calc_in_thread, args=(2, SE_MARS, SE_SIDM_RAMAN)),
+            threading.Thread(target=calc_in_thread, args=(2, MARS, SIDM_RAMAN)),
             threading.Thread(
-                target=calc_in_thread, args=(3, SE_JUPITER, SE_SIDM_LAHIRI)
+                target=calc_in_thread, args=(3, JUPITER, SIDM_LAHIRI)
             ),
         ]
 
@@ -290,5 +290,5 @@ class TestContextDateRange:
         """Context works across centuries."""
         ctx = EphemerisContext()
         jd = 2451545.0 + (year - 2000) * 365.25
-        result, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
         assert 0 <= result[0] < 360

@@ -95,10 +95,10 @@ class TestCoreFunctionsDocumented:
     def test_time_functions_documented(self, api_content):
         """Verify time functions are documented."""
         time_functions = [
-            "swe_julday",
-            "swe_revjul",
-            "swe_deltat",
-            "swe_deltat_ex",
+            "julday",
+            "revjul",
+            "deltat",
+            "deltat_ex",
             "date_conversion",
             "day_of_week",
             "utc_to_jd",
@@ -113,13 +113,13 @@ class TestCoreFunctionsDocumented:
     def test_planet_functions_documented(self, api_content):
         """Verify planet calculation functions are documented."""
         planet_functions = [
-            "swe_calc_ut",
-            "swe_calc",
-            "swe_calc_pctr",
+            "calc_ut",
+            "calc",
+            "calc_pctr",
             "get_planet_name",
-            "swe_nod_aps",
-            "swe_get_orbital_elements",
-            "swe_pheno",
+            "nod_aps",
+            "get_orbital_elements",
+            "pheno",
         ]
 
         for func in planet_functions:
@@ -128,12 +128,12 @@ class TestCoreFunctionsDocumented:
     def test_house_functions_documented(self, api_content):
         """Verify house functions are documented."""
         house_functions = [
-            "swe_houses",
-            "swe_houses_ex",
-            "swe_houses_ex2",
-            "swe_houses_armc",
-            "swe_house_pos",
-            "swe_house_name",
+            "houses",
+            "houses_ex",
+            "houses_ex2",
+            "houses_armc",
+            "house_pos",
+            "house_name",
             "gauquelin_sector",
         ]
 
@@ -143,11 +143,11 @@ class TestCoreFunctionsDocumented:
     def test_ayanamsha_functions_documented(self, api_content):
         """Verify ayanamsha functions are documented."""
         ayanamsha_functions = [
-            "swe_set_sid_mode",
-            "swe_get_ayanamsa_ut",
-            "swe_get_ayanamsa",
-            "swe_get_ayanamsa_ex",
-            "swe_get_ayanamsa_name",
+            "set_sid_mode",
+            "get_ayanamsa_ut",
+            "get_ayanamsa",
+            "get_ayanamsa_ex",
+            "get_ayanamsa_name",
         ]
 
         for func in ayanamsha_functions:
@@ -280,19 +280,19 @@ class TestConstantsDocumented:
     def test_planet_ids_documented(self, api_content):
         """Verify planet IDs are documented."""
         planet_ids = [
-            "SE_SUN",
-            "SE_MOON",
-            "SE_MERCURY",
-            "SE_VENUS",
-            "SE_MARS",
-            "SE_JUPITER",
-            "SE_SATURN",
-            "SE_URANUS",
-            "SE_NEPTUNE",
-            "SE_PLUTO",
-            "SE_MEAN_NODE",
-            "SE_TRUE_NODE",
-            "SE_CHIRON",
+            "SUN",
+            "MOON",
+            "MERCURY",
+            "VENUS",
+            "MARS",
+            "JUPITER",
+            "SATURN",
+            "URANUS",
+            "NEPTUNE",
+            "PLUTO",
+            "MEAN_NODE",
+            "TRUE_NODE",
+            "CHIRON",
         ]
 
         for planet_id in planet_ids:
@@ -301,13 +301,13 @@ class TestConstantsDocumented:
     def test_calculation_flags_documented(self, api_content):
         """Verify calculation flags are documented."""
         flags = [
-            "SEFLG_SPEED",
-            "SEFLG_HELCTR",
-            "SEFLG_TOPOCTR",
-            "SEFLG_SIDEREAL",
-            "SEFLG_EQUATORIAL",
-            "SEFLG_J2000",
-            "SEFLG_TRUEPOS",
+            "FLG_SPEED",
+            "FLG_HELCTR",
+            "FLG_TOPOCTR",
+            "FLG_SIDEREAL",
+            "FLG_EQUATORIAL",
+            "FLG_J2000",
+            "FLG_TRUEPOS",
         ]
 
         for flag in flags:
@@ -316,12 +316,12 @@ class TestConstantsDocumented:
     def test_sidereal_modes_documented(self, api_content):
         """Verify sidereal modes are documented."""
         sidereal_modes = [
-            "SE_SIDM_FAGAN_BRADLEY",
-            "SE_SIDM_LAHIRI",
-            "SE_SIDM_RAMAN",
-            "SE_SIDM_KRISHNAMURTI",
-            "SE_SIDM_TRUE_CITRA",
-            "SE_SIDM_USER",
+            "SIDM_FAGAN_BRADLEY",
+            "SIDM_LAHIRI",
+            "SIDM_RAMAN",
+            "SIDM_KRISHNAMURTI",
+            "SIDM_TRUE_CITRA",
+            "SIDM_USER",
         ]
 
         for mode in sidereal_modes:
@@ -330,10 +330,10 @@ class TestConstantsDocumented:
     def test_eclipse_flags_documented(self, api_content):
         """Verify eclipse flags are documented."""
         eclipse_flags = [
-            "SE_ECL_TOTAL",
-            "SE_ECL_ANNULAR",
-            "SE_ECL_PARTIAL",
-            "SE_ECL_PENUMBRAL",
+            "ECL_TOTAL",
+            "ECL_ANNULAR",
+            "ECL_PARTIAL",
+            "ECL_PENUMBRAL",
         ]
 
         for flag in eclipse_flags:
@@ -346,18 +346,18 @@ class TestDocumentedFunctionsExist:
     def test_core_exports_exist(self):
         """Verify core documented exports exist."""
         core_exports = [
-            "swe_julday",
-            "swe_revjul",
-            "swe_calc_ut",
-            "swe_calc",
-            "swe_houses",
-            "swe_set_sid_mode",
-            "swe_get_ayanamsa_ut",
-            "swe_fixstar_ut",
-            "swe_solcross_ut",
+            "julday",
+            "revjul",
+            "calc_ut",
+            "calc",
+            "houses",
+            "set_sid_mode",
+            "get_ayanamsa_ut",
+            "fixstar_ut",
+            "solcross_ut",
             "sol_eclipse_when_glob",
             "rise_trans",
-            "swe_set_topo",
+            "set_topo",
             "EphemerisContext",
             "Error",
         ]
@@ -514,8 +514,8 @@ class TestPolishLatitudeDocumented:
     def test_polar_functions_documented(self, api_content):
         """Verify polar latitude functions are documented."""
         polar_functions = [
-            "swe_houses_with_fallback",
-            "swe_houses_armc_with_fallback",
+            "houses_with_fallback",
+            "houses_armc_with_fallback",
             "get_polar_latitude_threshold",
             "PolarCircleError",
         ]

@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
@@ -69,12 +69,12 @@ class TestAllTierConsistency:
             max_be_err = 0.0
 
             for jd in all_overlap_dates:
-                base, _ = helper_base.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+                base, _ = helper_base.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
                 medium, _ = helper_medium.leb(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
                 extended, _ = helper_extended.leb(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
 
                 bm = lon_error_arcsec(base[0], medium[0])
@@ -119,9 +119,9 @@ class TestAllTierDeltaT:
         try:
             max_err = 0.0
             for jd in all_overlap_dates:
-                dt_base = helper_base.leb(ephem.swe_deltat, jd)
-                dt_medium = helper_medium.leb(ephem.swe_deltat, jd)
-                dt_extended = helper_extended.leb(ephem.swe_deltat, jd)
+                dt_base = helper_base.leb(ephem.deltat, jd)
+                dt_medium = helper_medium.leb(ephem.deltat, jd)
+                dt_extended = helper_extended.leb(ephem.deltat, jd)
 
                 bm = abs(dt_base - dt_medium) * 86400.0  # seconds
                 me = abs(dt_medium - dt_extended) * 86400.0

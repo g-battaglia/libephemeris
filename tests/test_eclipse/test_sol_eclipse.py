@@ -4,19 +4,17 @@ Tests for solar eclipse calculations.
 
 from libephemeris import (
     sol_eclipse_when_glob,
-    swe_sol_eclipse_when_glob,
     sol_eclipse_when_loc,
-    swe_sol_eclipse_when_loc,
-    swe_julday,
-    swe_revjul,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
-    SE_ECL_CENTRAL,
-    SE_ECL_VISIBLE,
-    SE_ECL_1ST_VISIBLE,
-    SE_ECL_4TH_VISIBLE,
-    SEFLG_SWIEPH,
+    julday,
+    revjul,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
+    ECL_CENTRAL,
+    ECL_VISIBLE,
+    ECL_1ST_VISIBLE,
+    ECL_4TH_VISIBLE,
+    FLG_SWIEPH,
 )
 
 
@@ -26,7 +24,7 @@ class TestSolEclipseWhenGlob:
     def test_finds_eclipse_after_start_date(self):
         """Should find an eclipse after the start date."""
         # Start from Jan 1, 2024
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         ecl_type, times = sol_eclipse_when_glob(jd_start)
 
@@ -37,7 +35,7 @@ class TestSolEclipseWhenGlob:
 
     def test_returns_ten_time_values(self):
         """Should return tuple of 10 time values like pyswisseph."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         _, times = sol_eclipse_when_glob(jd_start)
 
@@ -53,7 +51,7 @@ class TestSolEclipseWhenGlob:
           [3] = time of eclipse end (last contact globally)
           [4] = time of totality begin
         """
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         ecl_type, times = sol_eclipse_when_glob(jd_start)
 
@@ -68,28 +66,28 @@ class TestSolEclipseWhenGlob:
 
     def test_filter_by_total_eclipse(self):
         """Should filter for total eclipses only."""
-        jd_start = swe_julday(2020, 1, 1, 0)
+        jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Should have total eclipse flag set
-        assert ecl_type & SE_ECL_TOTAL
+        assert ecl_type & ECL_TOTAL
 
     def test_filter_by_annular_eclipse(self):
         """Should filter for annular eclipses only."""
-        jd_start = swe_julday(2020, 1, 1, 0)
+        jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         # Should have annular eclipse flag set
-        assert ecl_type & SE_ECL_ANNULAR
+        assert ecl_type & ECL_ANNULAR
 
     def test_filter_accepts_partial_eclipse_type(self):
         """Should accept partial eclipse filter parameter."""
         # Note: Pure partial solar eclipses (not central) are rare.
         # This test verifies the function accepts the parameter and either
         # finds a partial eclipse or times out (both are valid behaviors).
-        jd_start = swe_julday(2020, 1, 1, 0)
+        jd_start = julday(2020, 1, 1, 0)
 
         # Test that the function accepts the parameter - we check for any eclipse
         # that includes partial (since many eclipses have partial phases)
@@ -101,12 +99,12 @@ class TestSolEclipseWhenGlob:
     def test_known_eclipse_april_2024(self):
         """Test against known total solar eclipse of April 8, 2024."""
         # Start search before the eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Convert JD to date
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
 
         # The April 8, 2024 total solar eclipse
         # Allow for some tolerance in the search
@@ -118,12 +116,12 @@ class TestSolEclipseWhenGlob:
     def test_known_eclipse_october_2023(self):
         """Test against known annular solar eclipse of October 14, 2023."""
         # Start search before the eclipse
-        jd_start = swe_julday(2023, 9, 1, 0)
+        jd_start = julday(2023, 9, 1, 0)
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         # Convert JD to date
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
 
         # The October 14, 2023 annular solar eclipse
         assert year == 2023
@@ -133,13 +131,13 @@ class TestSolEclipseWhenGlob:
 
     def test_central_eclipse_has_second_third_contact(self):
         """Central eclipses should have second and third contact times."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         ecl_type, times = sol_eclipse_when_glob(
-            jd_start, ecltype=SE_ECL_TOTAL | SE_ECL_ANNULAR
+            jd_start, ecltype=ECL_TOTAL | ECL_ANNULAR
         )
 
-        if ecl_type & SE_ECL_CENTRAL:
+        if ecl_type & ECL_CENTRAL:
             # Second contact (total/annular begins)
             t_second = times[2]
             # Third contact (total/annular ends)
@@ -152,11 +150,11 @@ class TestSolEclipseWhenGlob:
             assert t_second < t_third
 
     def test_swe_wrapper_produces_same_results(self):
-        """swe_sol_eclipse_when_glob should produce same results as sol_eclipse_when_glob."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        """sol_eclipse_when_glob should produce same results as sol_eclipse_when_glob."""
+        jd_start = julday(2024, 1, 1, 0)
 
         ecl_type1, times1 = sol_eclipse_when_glob(jd_start)
-        ecl_type2, times2 = swe_sol_eclipse_when_glob(jd_start)
+        ecl_type2, times2 = sol_eclipse_when_glob(jd_start)
 
         # Same eclipse should be found
         assert abs(times1[0] - times2[0]) < 0.001
@@ -164,16 +162,16 @@ class TestSolEclipseWhenGlob:
 
     def test_flags_parameter_accepted(self):
         """Should accept flags parameter without error."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         # Should not raise
-        ecl_type, times = sol_eclipse_when_glob(jd_start, flags=SEFLG_SWIEPH)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, flags=FLG_SWIEPH)
 
         assert times[0] > jd_start
 
     def test_multiple_eclipses_in_sequence(self):
         """Finding consecutive eclipses should return different events."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
 
         # Find first eclipse
         _, times1 = sol_eclipse_when_glob(jd_start)
@@ -190,51 +188,51 @@ class TestSolEclipseWhenGlob:
     def test_search_direction_forward(self):
         """Forward search should find eclipse at or after start date."""
         # Start from Aug 10, 2017 (10 days before Aug 21, 2017 eclipse)
-        jd_start = swe_julday(2017, 8, 10, 0)
+        jd_start = julday(2017, 8, 10, 0)
 
         ecl_type, times = sol_eclipse_when_glob(
-            jd_start, ecltype=SE_ECL_TOTAL, backwards=False
+            jd_start, ecltype=ECL_TOTAL, backwards=False
         )
 
         # Should find Aug 21, 2017 eclipse
-        year, month, day, _ = swe_revjul(times[0])
+        year, month, day, _ = revjul(times[0])
         assert (year, month, day) == (2017, 8, 21)
 
     def test_search_direction_backward(self):
         """Backward search should find eclipse before start date."""
         # Start from Sep 1, 2017 (after Aug 21, 2017 eclipse)
-        jd_start = swe_julday(2017, 9, 1, 0)
+        jd_start = julday(2017, 9, 1, 0)
 
         ecl_type, times = sol_eclipse_when_glob(
-            jd_start, ecltype=SE_ECL_TOTAL, backwards=True
+            jd_start, ecltype=ECL_TOTAL, backwards=True
         )
 
         # Should find Aug 21, 2017 eclipse
-        year, month, day, _ = swe_revjul(times[0])
+        year, month, day, _ = revjul(times[0])
         assert (year, month, day) == (2017, 8, 21)
 
     def test_search_direction_bidirectional_finds_nearby_eclipse(self):
         """Bidirectional search should find eclipse within 15 days even if forward search would miss."""
         # Start from Aug 15, 2017 (6 days before Aug 21, 2017 eclipse)
         # In this case, the eclipse maximum is after the start date, so bidirectional should find it
-        jd_start = swe_julday(2017, 8, 15, 0)
+        jd_start = julday(2017, 8, 15, 0)
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Should find Aug 21, 2017 eclipse
-        year, month, day, _ = swe_revjul(times[0])
+        year, month, day, _ = revjul(times[0])
         assert (year, month, day) == (2017, 8, 21)
 
     def test_backward_false_is_default(self):
         """Default search should use forward mode (backwards=False)."""
-        jd_start = swe_julday(2017, 8, 1, 0)
+        jd_start = julday(2017, 8, 1, 0)
 
         # Both calls should return the same result
         ecl_type_default, times_default = sol_eclipse_when_glob(
-            jd_start, ecltype=SE_ECL_TOTAL
+            jd_start, ecltype=ECL_TOTAL
         )
         ecl_type_explicit, times_explicit = sol_eclipse_when_glob(
-            jd_start, ecltype=SE_ECL_TOTAL, backwards=False
+            jd_start, ecltype=ECL_TOTAL, backwards=False
         )
 
         assert times_default[0] == times_explicit[0]
@@ -243,11 +241,11 @@ class TestSolEclipseWhenGlob:
         """Aug 2017 total eclipse should be found regardless of exact start date in August."""
         # This is the key regression test for the bug fix
         for day in [1, 5, 10, 15, 20]:
-            jd_start = swe_julday(2017, 8, day, 0)
+            jd_start = julday(2017, 8, day, 0)
 
-            ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+            ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
-            year, month, eclipse_day, _ = swe_revjul(times[0])
+            year, month, eclipse_day, _ = revjul(times[0])
             assert (year, month, eclipse_day) == (2017, 8, 21), (
                 f"Starting from Aug {day}, expected to find Aug 21 eclipse, "
                 f"but found {year}-{month}-{eclipse_day}"
@@ -259,14 +257,14 @@ class TestNewMoonFinding:
 
     def test_eclipse_occurs_near_new_moon(self):
         """Eclipse should occur very close to a New Moon."""
-        from libephemeris import swe_calc_ut, SE_SUN, SE_MOON
+        from libephemeris import calc_ut, SUN, MOON
 
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         # Get Sun and Moon positions at eclipse maximum
-        sun_pos, _ = swe_calc_ut(times[0], SE_SUN, SEFLG_SWIEPH)
-        moon_pos, _ = swe_calc_ut(times[0], SE_MOON, SEFLG_SWIEPH)
+        sun_pos, _ = calc_ut(times[0], SUN, FLG_SWIEPH)
+        moon_pos, _ = calc_ut(times[0], MOON, FLG_SWIEPH)
 
         # Calculate elongation (should be very close to 0 at New Moon)
         elongation = abs((moon_pos[0] - sun_pos[0] + 180) % 360 - 180)
@@ -281,7 +279,7 @@ class TestSolEclipseWhenLoc:
     def test_finds_eclipse_visible_from_location(self):
         """Should find an eclipse visible from the given location."""
         # Start from Jan 1, 2024, search from a central US location
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0  # Central US
 
         ecl_type, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
@@ -289,13 +287,13 @@ class TestSolEclipseWhenLoc:
         # Should return valid eclipse time
         assert times[0] > jd_start
         # Eclipse should be visible
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         # Magnitude should be positive
         assert attr[0] > 0
 
     def test_returns_correct_tuple_sizes(self):
         """Should return times tuple of 10 and attr tuple of 11 elements."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 41.9028, 12.4964  # Rome
 
         _, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
@@ -305,7 +303,7 @@ class TestSolEclipseWhenLoc:
 
     def test_time_order_is_correct(self):
         """Eclipse phase times should be in chronological order."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         ecl_type, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
@@ -334,7 +332,7 @@ class TestSolEclipseWhenLoc:
           [6]: apparent altitude of sun with refraction (degrees)
           [7]: angular distance of moon center from sun center (degrees)
         """
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         ecl_type, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
@@ -358,7 +356,7 @@ class TestSolEclipseWhenLoc:
     def test_known_eclipse_april_2024_texas(self):
         """Test April 8, 2024 total eclipse from Dallas, Texas."""
         # Dallas was in the path of totality
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         dallas_lat, dallas_lon = 32.7767, -96.7970
 
         ecl_type, times, attr = sol_eclipse_when_loc(
@@ -366,7 +364,7 @@ class TestSolEclipseWhenLoc:
         )
 
         # Convert JD to date
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
 
         # Should find the April 8, 2024 eclipse
         assert year == 2024
@@ -381,7 +379,7 @@ class TestSolEclipseWhenLoc:
         """Test April 8, 2024 eclipse from Europe (should not be visible)."""
         # The April 2024 eclipse was only visible in North America
         # From Europe, this eclipse is not visible, so we should find a different one
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         rome_lat, rome_lon = 41.9028, 12.4964
 
         ecl_type, times, attr = sol_eclipse_when_loc(
@@ -391,13 +389,13 @@ class TestSolEclipseWhenLoc:
         # Should find some eclipse visible from Rome
         assert times[0] > jd_start
         # It may or may not be April 2024 - the important thing is it's visible
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
 
     def test_partial_eclipse_location(self):
         """Location far from centerline should see partial eclipse."""
         # Start before April 2024 eclipse and search from a location
         # that's away from the path of totality
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         # Location in Florida (gets partial coverage)
         florida_lat, florida_lon = 25.7617, -80.1918
 
@@ -407,25 +405,25 @@ class TestSolEclipseWhenLoc:
 
         # Should have visibility flags
         if times[0] > jd_start:
-            assert ecl_type & SE_ECL_VISIBLE
+            assert ecl_type & ECL_VISIBLE
 
     def test_visibility_flags_set(self):
         """Contact visibility flags should be set appropriately."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         ecl_type, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
 
         # If first contact time is set, flag should be set
         if times[1] > 0:
-            assert ecl_type & SE_ECL_1ST_VISIBLE
+            assert ecl_type & ECL_1ST_VISIBLE
         # If fourth contact time is set, flag should be set
         if times[4] > 0:
-            assert ecl_type & SE_ECL_4TH_VISIBLE
+            assert ecl_type & ECL_4TH_VISIBLE
 
     def test_altitude_parameter(self):
         """Should accept altitude parameter."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
         altitude = 1000.0  # 1000 meters
 
@@ -436,45 +434,45 @@ class TestSolEclipseWhenLoc:
 
     def test_flags_parameter_accepted(self):
         """Should accept flags parameter."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         # Should not raise
         ecl_type, times, attr = sol_eclipse_when_loc(
-            jd_start, (lon, lat, 0.0), flags=SEFLG_SWIEPH
+            jd_start, (lon, lat, 0.0), flags=FLG_SWIEPH
         )
 
         assert times[0] > jd_start
 
     def test_swe_version_provides_pyswisseph_compatible_interface(self):
-        """swe_sol_eclipse_when_loc provides pyswisseph-compatible interface.
+        """sol_eclipse_when_loc provides pyswisseph-compatible interface.
 
-        Note: Both sol_eclipse_when_loc and swe_sol_eclipse_when_loc now use the
+        Note: Both sol_eclipse_when_loc and sol_eclipse_when_loc now use the
         same swe_-compatible signature with geopos tuple.
         """
-        from libephemeris import SEFLG_SWIEPH
+        from libephemeris import FLG_SWIEPH
 
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon, altitude = 35.0, -100.0, 0.0
         geopos = (lon, lat, altitude)  # geopos uses (lon, lat, alt) order
 
         # Call sol_eclipse_when_loc (now uses swe_ signature)
         ecl_type1, times1, attr1 = sol_eclipse_when_loc(jd_start, geopos)
 
-        # Call swe_sol_eclipse_when_loc (pyswisseph-style with geopos sequence)
-        ecl_type2, times2, attr2 = swe_sol_eclipse_when_loc(
-            jd_start, geopos, SEFLG_SWIEPH
+        # Call sol_eclipse_when_loc (pyswisseph-style with geopos sequence)
+        ecl_type2, times2, attr2 = sol_eclipse_when_loc(
+            jd_start, geopos, FLG_SWIEPH
         )
 
         # Both should find the same eclipse (same maximum time within tolerance)
         assert abs(times1[0] - times2[0]) < 0.01  # Within ~15 minutes
         # Both should return eclipse visibility flags
-        assert ecl_type1 & SE_ECL_VISIBLE
-        assert ecl_type2 & SE_ECL_VISIBLE
+        assert ecl_type1 & ECL_VISIBLE
+        assert ecl_type2 & ECL_VISIBLE
 
     def test_multiple_locations_same_eclipse(self):
         """Same eclipse should show different circumstances at different locations."""
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
 
         # Dallas and Miami
         dallas_lat, dallas_lon = 32.7767, -96.7970
@@ -493,7 +491,7 @@ class TestSolEclipseWhenLoc:
 
     def test_sun_must_be_above_horizon(self):
         """Eclipse should only be returned if Sun is visible."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         ecl_type, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
@@ -504,7 +502,7 @@ class TestSolEclipseWhenLoc:
 
     def test_sequential_eclipses(self):
         """Finding consecutive eclipses should return different events."""
-        jd_start = swe_julday(2024, 1, 1, 0)
+        jd_start = julday(2024, 1, 1, 0)
         lat, lon = 35.0, -100.0
 
         # Find first eclipse
@@ -526,8 +524,8 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # First find an eclipse to get a valid time
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
@@ -539,13 +537,13 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # Find a total eclipse (which is central)
-        jd_start = swe_julday(2024, 3, 1, 0)
-        global_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        global_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
         # If eclipse is central, we should get valid coordinates
-        if ecl_type & SE_ECL_CENTRAL:
+        if ecl_type & ECL_CENTRAL:
             lon, lat = geopos[0], geopos[1]
             # Longitude should be -180 to 180
             assert -180 <= lon <= 180
@@ -557,16 +555,16 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # Find a total eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
         # Should have central flag for central eclipse
         if ecl_type != 0:
-            assert ecl_type & SE_ECL_CENTRAL
+            assert ecl_type & ECL_CENTRAL
             # Should have either total or annular flag
-            assert ecl_type & (SE_ECL_TOTAL | SE_ECL_ANNULAR)
+            assert ecl_type & (ECL_TOTAL | ECL_ANNULAR)
 
     def test_attributes_have_valid_ranges(self):
         """Eclipse attributes should be within valid ranges.
@@ -583,8 +581,8 @@ class TestSolEclipseWhere:
         """
         from libephemeris import sol_eclipse_where
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
@@ -608,7 +606,7 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # Random time not during an eclipse (full moon time)
-        jd_non_eclipse = swe_julday(2024, 4, 23, 12)  # Near full moon
+        jd_non_eclipse = julday(2024, 4, 23, 12)  # Near full moon
 
         ecl_type, geopos, attr = sol_eclipse_where(jd_non_eclipse)
 
@@ -622,12 +620,12 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # April 8, 2024 eclipse maximum around 18:18 UT
-        jd_eclipse = swe_julday(2024, 4, 8, 18.3)
+        jd_eclipse = julday(2024, 4, 8, 18.3)
 
         ecl_type, geopos, attr = sol_eclipse_where(jd_eclipse)
 
         # Should be a total eclipse
-        if ecl_type & SE_ECL_TOTAL:
+        if ecl_type & ECL_TOTAL:
             lon, lat = geopos[0], geopos[1]
             # The path crossed Mexico, US, and Eastern Canada
             # Central line was roughly around:
@@ -651,30 +649,30 @@ class TestSolEclipseWhere:
         """
         from libephemeris import sol_eclipse_where
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
-        if ecl_type & SE_ECL_CENTRAL:
+        if ecl_type & ECL_CENTRAL:
             path_width = attr[3]
             # Core shadow diameter should be non-zero for central eclipse
             assert path_width != 0
 
     def test_swe_version_provides_pyswisseph_compatible_interface(self):
-        """swe_sol_eclipse_where and sol_eclipse_where produce equivalent results.
+        """sol_eclipse_where and sol_eclipse_where produce equivalent results.
 
-        Note: sol_eclipse_where is a wrapper that calls swe_sol_eclipse_where internally.
+        Note: sol_eclipse_where is a wrapper that calls sol_eclipse_where internally.
         They are distinct functions with the same interface that produce identical results.
         """
-        from libephemeris import sol_eclipse_where, swe_sol_eclipse_where
+        from libephemeris import sol_eclipse_where
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Call both versions
         geopos1, attr1, ecl_type1 = sol_eclipse_where(times[0])
-        geopos2, attr2, ecl_type2 = swe_sol_eclipse_where(times[0], SEFLG_SWIEPH)
+        geopos2, attr2, ecl_type2 = sol_eclipse_where(times[0], FLG_SWIEPH)
 
         # Results should be identical
         assert geopos1 == geopos2
@@ -685,24 +683,24 @@ class TestSolEclipseWhere:
         """Should accept flags parameter without error."""
         from libephemeris import sol_eclipse_where
 
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         # Should not raise
-        ecl_type, geopos, attr = sol_eclipse_where(times[0], flags=SEFLG_SWIEPH)
+        ecl_type, geopos, attr = sol_eclipse_where(times[0], flags=FLG_SWIEPH)
 
     def test_annular_eclipse(self):
         """Test with annular eclipse."""
         from libephemeris import sol_eclipse_where
 
         # October 14, 2023 annular eclipse
-        jd_start = swe_julday(2023, 9, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        jd_start = julday(2023, 9, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         ecl_type, geopos, attr = sol_eclipse_where(times[0])
 
         # Should be annular
-        if ecl_type & SE_ECL_ANNULAR:
+        if ecl_type & ECL_ANNULAR:
             # Moon/Sun ratio should be < 1 for annular
             ratio = attr[1]
             assert ratio < 1.0
@@ -712,8 +710,8 @@ class TestSolEclipseWhere:
         from libephemeris import sol_eclipse_where
 
         # Find an eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Check positions at different times
         jd_max = times[0]
@@ -724,7 +722,7 @@ class TestSolEclipseWhere:
         type3, geopos3, _ = sol_eclipse_where(jd_max + delta)
 
         # If all are central, positions should differ
-        if type1 & SE_ECL_CENTRAL and type2 & SE_ECL_CENTRAL and type3 & SE_ECL_CENTRAL:
+        if type1 & ECL_CENTRAL and type2 & ECL_CENTRAL and type3 & ECL_CENTRAL:
             # Longitudes should be different (shadow moves westward)
             # The shadow moves about 0.25 degrees per minute in longitude
             assert geopos1[0] != geopos2[0] or geopos1[1] != geopos2[1]
@@ -738,8 +736,8 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # Find an eclipse to get a valid time
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Calculate circumstances at Dallas
         dallas_lat, dallas_lon = 32.7767, -96.7970
@@ -752,15 +750,15 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # April 8, 2024 total eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Dallas was in path of totality
         dallas_lat, dallas_lon = 32.7767, -96.7970
         ecl_type, attr = sol_eclipse_how(times[0], (dallas_lon, dallas_lat, 0.0))
 
         # Should have visibility
-        if ecl_type & SE_ECL_VISIBLE:
+        if ecl_type & ECL_VISIBLE:
             magnitude = attr[0]
             assert magnitude > 0
 
@@ -769,7 +767,7 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # Random time during full moon (no solar eclipse possible)
-        jd_full_moon = swe_julday(2024, 4, 23, 12)  # Near full moon
+        jd_full_moon = julday(2024, 4, 23, 12)  # Near full moon
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
         ecl_type, attr = sol_eclipse_how(jd_full_moon, (dallas_lon, dallas_lat, 0.0))
@@ -782,8 +780,8 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # Find an eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
         ecl_type, attr = sol_eclipse_how(times[0], (dallas_lon, dallas_lat, 0.0))
@@ -810,8 +808,8 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # Find an eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Check from a location on opposite side of Earth (Sun below horizon)
         # For an eclipse happening in North America around 18 UT,
@@ -824,15 +822,15 @@ class TestSolEclipseHow:
         sun_alt = attr[5]
         if sun_alt < -1.0:
             # Sun below horizon, should have no visible eclipse
-            assert attr[0] == 0.0 or not (ecl_type & SE_ECL_VISIBLE)
+            assert attr[0] == 0.0 or not (ecl_type & ECL_VISIBLE)
 
     def test_different_locations_different_magnitudes(self):
         """Different locations should show different eclipse magnitudes."""
         from libephemeris import sol_eclipse_how
 
         # Find an eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Dallas (in path of totality)
         dallas_lat, dallas_lon = 32.7767, -96.7970
@@ -845,7 +843,7 @@ class TestSolEclipseHow:
         type_miami, attr_miami = sol_eclipse_how(times[0], (miami_lon, miami_lat, 0.0))
 
         # If both visible, Dallas should have higher magnitude (closer to center)
-        if (type_dallas & SE_ECL_VISIBLE) and (type_miami & SE_ECL_VISIBLE):
+        if (type_dallas & ECL_VISIBLE) and (type_miami & ECL_VISIBLE):
             # The magnitudes should be different
             # (may not always be true depending on exact timing)
             assert attr_dallas[0] != attr_miami[0] or attr_dallas[2] != attr_miami[2]
@@ -855,44 +853,44 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # Find a total eclipse
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # From a location in the path
         # Use local time found by sol_eclipse_when_loc for better timing
         _, times_loc, attr_loc = sol_eclipse_when_loc(
-            swe_julday(2024, 3, 1, 0), (-96.7970, 32.7767, 0.0)
+            julday(2024, 3, 1, 0), (-96.7970, 32.7767, 0.0)
         )
 
         if times_loc[0] > 0:
             ecl_type, attr = sol_eclipse_how(times_loc[0], (-96.7970, 32.7767, 0.0))
 
-            if ecl_type & SE_ECL_TOTAL:
+            if ecl_type & ECL_TOTAL:
                 # Should also have central and visible flags
-                assert ecl_type & SE_ECL_CENTRAL
-                assert ecl_type & SE_ECL_VISIBLE
+                assert ecl_type & ECL_CENTRAL
+                assert ecl_type & ECL_VISIBLE
 
     def test_partial_eclipse_type_flags(self):
         """Partial eclipse should have partial flag."""
         from libephemeris import sol_eclipse_how
 
         # Find an eclipse and check from edge location
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # NYC is far from totality path for April 2024 eclipse
         nyc_lat, nyc_lon = 40.7128, -74.0060
         ecl_type, attr = sol_eclipse_how(times[0], (nyc_lon, nyc_lat, 0.0))
 
         # If visible and not central, should be partial
-        if (ecl_type & SE_ECL_VISIBLE) and not (ecl_type & SE_ECL_CENTRAL):
-            assert ecl_type & SE_ECL_PARTIAL
+        if (ecl_type & ECL_VISIBLE) and not (ecl_type & ECL_CENTRAL):
+            assert ecl_type & ECL_PARTIAL
 
     def test_altitude_parameter(self):
         """Should accept altitude parameter."""
         from libephemeris import sol_eclipse_how
 
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         # Should not raise
@@ -904,34 +902,34 @@ class TestSolEclipseHow:
         """Should accept flags parameter."""
         from libephemeris import sol_eclipse_how
 
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         # Should not raise
         ecl_type, attr = sol_eclipse_how(
-            times[0], (-96.7970, 32.7767, 0.0), flags=SEFLG_SWIEPH
+            times[0], (-96.7970, 32.7767, 0.0), flags=FLG_SWIEPH
         )
 
         assert len(attr) == 20
 
     def test_swe_version_provides_pyswisseph_compatible_interface(self):
-        """swe_sol_eclipse_how and sol_eclipse_how produce equivalent results.
+        """sol_eclipse_how and sol_eclipse_how produce equivalent results.
 
-        Note: Both sol_eclipse_how and swe_sol_eclipse_how now use the same
+        Note: Both sol_eclipse_how and sol_eclipse_how now use the same
         swe_-compatible signature with geopos tuple.
         They produce identical results for the same location.
         """
-        from libephemeris import sol_eclipse_how, swe_sol_eclipse_how
+        from libephemeris import sol_eclipse_how
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         lat, lon, altitude = 32.7767, -96.7970, 0.0
         geopos = (lon, lat, altitude)  # geopos uses (lon, lat, alt) order
 
         # Call both versions
         ecl_type1, attr1 = sol_eclipse_how(times[0], geopos)
-        ecl_type2, attr2 = swe_sol_eclipse_how(times[0], geopos, SEFLG_SWIEPH)
+        ecl_type2, attr2 = sol_eclipse_how(times[0], geopos, FLG_SWIEPH)
 
         # Results should be identical
         assert attr1 == attr2
@@ -942,26 +940,26 @@ class TestSolEclipseHow:
         from libephemeris import sol_eclipse_how
 
         # During the April 2024 eclipse, around 18:40 UT
-        jd_eclipse = swe_julday(2024, 4, 8, 18.67)  # ~18:40 UT
+        jd_eclipse = julday(2024, 4, 8, 18.67)  # ~18:40 UT
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
         ecl_type, attr = sol_eclipse_how(jd_eclipse, (dallas_lon, dallas_lat, 0.0))
 
         # Should have significant magnitude (Dallas was in path of totality)
-        if ecl_type & SE_ECL_VISIBLE:
+        if ecl_type & ECL_VISIBLE:
             assert attr[0] > 0.8  # High magnitude expected
 
     def test_obscuration_consistent_with_magnitude(self):
         """Obscuration should be consistent with magnitude."""
         from libephemeris import sol_eclipse_how
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
         ecl_type, attr = sol_eclipse_how(times[0], (dallas_lon, dallas_lat, 0.0))
 
-        if ecl_type & SE_ECL_VISIBLE:
+        if ecl_type & ECL_VISIBLE:
             magnitude = attr[0]
             obscuration = attr[2]
 
@@ -1002,7 +1000,7 @@ class TestKnownEclipseValidation:
         )
 
         # Should be a total eclipse
-        assert ecl_type & SE_ECL_TOTAL
+        assert ecl_type & ECL_TOTAL
 
     def test_october_2023_annular_eclipse_timing(self):
         """Validate October 14, 2023 annular eclipse maximum time.
@@ -1012,16 +1010,16 @@ class TestKnownEclipseValidation:
         """
         jd_start = 2460200.0  # About 32 days before
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         # Verify the correct date was found
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
         assert year == 2023
         assert month == 10
         assert 13 <= day <= 15  # October 14
 
         # Should be an annular eclipse
-        assert ecl_type & SE_ECL_ANNULAR
+        assert ecl_type & ECL_ANNULAR
 
     def test_august_2017_total_eclipse_timing(self):
         """Validate August 21, 2017 total eclipse maximum time.
@@ -1039,13 +1037,13 @@ class TestKnownEclipseValidation:
         ecl_type, times = sol_eclipse_when_glob(jd_start)
 
         # Verify the correct date was found
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
         assert year == 2017
         assert month == 8
         assert 20 <= day <= 22  # August 21
 
         # Should be a central eclipse (either total or annular)
-        assert ecl_type & SE_ECL_CENTRAL, "August 2017 eclipse should be central"
+        assert ecl_type & ECL_CENTRAL, "August 2017 eclipse should be central"
 
     def test_june_2021_annular_eclipse_timing(self):
         """Validate June 10, 2021 annular eclipse maximum time.
@@ -1055,28 +1053,28 @@ class TestKnownEclipseValidation:
         """
         jd_start = 2459350.0  # About 26 days before
 
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         # Verify the correct date was found
-        year, month, day, hour = swe_revjul(times[0])
+        year, month, day, hour = revjul(times[0])
         assert year == 2021
         assert month == 6
         assert 9 <= day <= 11  # June 10
 
         # Should be an annular eclipse
-        assert ecl_type & SE_ECL_ANNULAR
+        assert ecl_type & ECL_ANNULAR
 
     def test_eclipse_type_classification_consistency(self):
         """Verify eclipse type classification is consistent for known eclipses."""
         # Total eclipse 2024
-        ecl_type1, times1 = sol_eclipse_when_glob(2460400.0, ecltype=SE_ECL_TOTAL)
-        assert ecl_type1 & SE_ECL_TOTAL, (
+        ecl_type1, times1 = sol_eclipse_when_glob(2460400.0, ecltype=ECL_TOTAL)
+        assert ecl_type1 & ECL_TOTAL, (
             "April 2024 eclipse should be classified as TOTAL"
         )
 
         # Annular eclipse 2023
-        ecl_type2, times2 = sol_eclipse_when_glob(2460200.0, ecltype=SE_ECL_ANNULAR)
-        assert ecl_type2 & SE_ECL_ANNULAR, (
+        ecl_type2, times2 = sol_eclipse_when_glob(2460200.0, ecltype=ECL_ANNULAR)
+        assert ecl_type2 & ECL_ANNULAR, (
             "October 2023 eclipse should be classified as ANNULAR"
         )
 
@@ -1104,8 +1102,8 @@ class TestSolEclipseMaxTime:
         from libephemeris import sol_eclipse_max_time
 
         # Use a known eclipse - April 8, 2024
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max, gamma = sol_eclipse_max_time(times[0])
 
@@ -1117,8 +1115,8 @@ class TestSolEclipseMaxTime:
         """Global maximum time should be close to input approximation."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max, _ = sol_eclipse_max_time(times[0])
 
@@ -1129,8 +1127,8 @@ class TestSolEclipseMaxTime:
         """Refined maximum should be more precise than New Moon estimate."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Get refined maximum
         jd_max, gamma = sol_eclipse_max_time(times[0])
@@ -1144,7 +1142,7 @@ class TestSolEclipseMaxTime:
         from libephemeris import sol_eclipse_max_time
         from libephemeris.eclipse import _calc_gamma
 
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         jd_max, gamma_at_max = sol_eclipse_max_time(times[0])
@@ -1161,8 +1159,8 @@ class TestSolEclipseMaxTime:
         """Local maximum should return tuple of (jd_max, separation)."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Dallas, Texas - was in path of totality
         dallas_lat, dallas_lon = 32.7767, -96.7970
@@ -1178,8 +1176,8 @@ class TestSolEclipseMaxTime:
         """Separation at local maximum should be minimum."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
 
@@ -1196,8 +1194,8 @@ class TestSolEclipseMaxTime:
         """Local maximum time can differ from global maximum."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Get global maximum
         jd_global_max, _ = sol_eclipse_max_time(times[0])
@@ -1214,7 +1212,7 @@ class TestSolEclipseMaxTime:
         """Should raise ValueError if only one of lat/lon provided."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
+        jd_start = julday(2024, 3, 1, 0)
         _, times = sol_eclipse_when_glob(jd_start)
 
         # Only lat provided
@@ -1235,8 +1233,8 @@ class TestSolEclipseMaxTime:
         """Should accept altitude parameter for local calculations."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         dallas_lat, dallas_lon = 32.7767, -96.7970
 
@@ -1251,8 +1249,8 @@ class TestSolEclipseMaxTime:
         """Should respect custom search_range parameter."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Use smaller search range
         jd_max1, _ = sol_eclipse_max_time(times[0], search_range=0.05)
@@ -1264,10 +1262,9 @@ class TestSolEclipseMaxTime:
         assert abs(jd_max1 - jd_max2) < 0.001
 
     def test_swe_alias_exists(self):
-        """swe_sol_eclipse_max_time should be an alias."""
-        from libephemeris import sol_eclipse_max_time, swe_sol_eclipse_max_time
+        """sol_eclipse_max_time should be an alias."""
+        from libephemeris import sol_eclipse_max_time
 
-        assert swe_sol_eclipse_max_time is sol_eclipse_max_time
 
     def test_known_eclipse_april_2024_precision(self):
         """Test precision against known April 8, 2024 eclipse."""
@@ -1275,12 +1272,12 @@ class TestSolEclipseMaxTime:
 
         # NASA gives maximum at approximately 18:18 UT
         # JD 2460409.26 corresponds to ~18:17 UT
-        jd_approx = swe_julday(2024, 4, 8, 18.3)
+        jd_approx = julday(2024, 4, 8, 18.3)
 
         jd_max, gamma = sol_eclipse_max_time(jd_approx)
 
         # Convert to hours for comparison
-        _, _, _, hour = swe_revjul(jd_max)
+        _, _, _, hour = revjul(jd_max)
 
         # Should be very close to 18:17-18:18 UT
         assert 18.2 < hour < 18.4, f"Expected ~18.3 hours, got {hour}"
@@ -1289,8 +1286,8 @@ class TestSolEclipseMaxTime:
         """Different locations should have different local maximum times."""
         from libephemeris import sol_eclipse_max_time
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         # Dallas, Texas
         dallas_lat, dallas_lon = 32.7767, -96.7970
@@ -1313,8 +1310,8 @@ class TestSolEclipseMaxTime:
         from libephemeris import sol_eclipse_max_time
 
         # October 14, 2023 annular eclipse
-        jd_start = swe_julday(2023, 9, 1, 0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        jd_start = julday(2023, 9, 1, 0)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
         jd_max, gamma = sol_eclipse_max_time(times[0])
 
@@ -1327,8 +1324,8 @@ class TestSolEclipseMaxTime:
         from libephemeris import sol_eclipse_max_time
         from libephemeris.eclipse import _calc_gamma
 
-        jd_start = swe_julday(2024, 3, 1, 0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
         jd_max, gamma_at_max = sol_eclipse_max_time(times[0])
 

@@ -13,9 +13,9 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -40,12 +40,12 @@ class TestSiderealHousesRoundTrip:
         jd = 2451545.0
         lat, lon = 41.9, 12.5
 
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
 
-        cusps_trop, _ = swe.swe_houses_ex(jd, lat, lon, hsys, 0)
-        cusps_sid, _ = swe.swe_houses_ex(jd, lat, lon, hsys, SEFLG_SIDEREAL)
+        cusps_trop, _ = swe.houses_ex(jd, lat, lon, hsys, 0)
+        cusps_sid, _ = swe.houses_ex(jd, lat, lon, hsys, FLG_SIDEREAL)
 
-        ayan = swe.swe_get_ayanamsa_ut(jd)
+        ayan = swe.get_ayanamsa_ut(jd)
 
         # For most systems, cusp_sid ≈ cusp_trop - ayan (mod 360)
         # Whole Sign is special — recalculated from sidereal ASC
@@ -69,8 +69,8 @@ class TestSiderealHousesRoundTrip:
     def test_sidereal_cusps_in_range(self):
         """All sidereal cusps should be [0, 360)."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"Sidereal cusp {i + 1}: {c} deg"
 
@@ -83,11 +83,11 @@ class TestSiderealModesHouses:
         """Lahiri and Fagan-Bradley should produce different sidereal cusps."""
         jd = 2451545.0
 
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        cusps_lahiri, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps_lahiri, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
 
-        swe.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-        cusps_fagan, _ = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        cusps_fagan, _ = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
 
         # Difference should be ~0.9 deg (difference between ayanamshas)
         diffs = []
@@ -108,9 +108,9 @@ class TestSiderealHousesAcrossDates:
     @pytest.mark.parametrize("year", [1900, 1950, 2000, 2050, 2100])
     def test_sidereal_placidus_across_years(self, year: int):
         """Sidereal Placidus valid across years."""
-        jd = swe.swe_julday(year, 6, 21, 12.0)
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, ascmc = swe.swe_houses_ex(jd, 41.9, 12.5, ord("P"), SEFLG_SIDEREAL)
+        jd = swe.julday(year, 6, 21, 12.0)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, ascmc = swe.houses_ex(jd, 41.9, 12.5, ord("P"), FLG_SIDEREAL)
         assert len(cusps) >= 12
         for i, c in enumerate(cusps[:12]):
             assert 0 <= c < 360, f"Year {year}: cusp {i + 1} = {c}"
@@ -128,8 +128,8 @@ class TestSiderealHousesAcrossDates:
     def test_sidereal_various_locations(self, lat: float, lon: float, name: str):
         """Sidereal houses valid at various locations."""
         jd = 2451545.0
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
-        cusps, _ = swe.swe_houses_ex(jd, lat, lon, ord("R"), SEFLG_SIDEREAL)
+        swe.set_sid_mode(SIDM_LAHIRI)
+        cusps, _ = swe.houses_ex(jd, lat, lon, ord("R"), FLG_SIDEREAL)
         assert len(cusps) >= 12
         for c in cusps[:12]:
             assert 0 <= c < 360, f"{name}: cusp out of range"

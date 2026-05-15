@@ -12,11 +12,11 @@ import os
 import pytest
 import libephemeris as eph
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_ERIS,
-    SE_PHOLUS,
-    SEFLG_SPEED,
+    CHIRON,
+    CERES,
+    ERIS,
+    PHOLUS,
+    FLG_SPEED,
 )
 from libephemeris import state
 from unittest.mock import patch
@@ -115,25 +115,25 @@ class TestSPKRequiredError:
         """Chiron without SPK should raise SPKRequiredError in strict mode."""
         eph.set_strict_precision(True)
         with pytest.raises(eph.SPKRequiredError) as exc_info:
-            eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+            eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
         assert exc_info.value.body_name == "Chiron"
-        assert exc_info.value.body_id == SE_CHIRON
+        assert exc_info.value.body_id == CHIRON
         assert "2060" in str(exc_info.value)  # Horizons ID
 
     def test_error_raised_for_ceres_without_spk(self):
         """Ceres without SPK should raise SPKRequiredError in strict mode."""
         eph.set_strict_precision(True)
         with pytest.raises(eph.SPKRequiredError) as exc_info:
-            eph.calc_ut(2451545.0, SE_CERES, SEFLG_SPEED)
+            eph.calc_ut(2451545.0, CERES, FLG_SPEED)
 
         assert exc_info.value.body_name == "Ceres"
-        assert exc_info.value.body_id == SE_CERES
+        assert exc_info.value.body_id == CERES
 
     def test_no_error_with_strict_disabled(self):
         """Chiron should work with Keplerian fallback when strict disabled."""
         eph.set_strict_precision(False)
-        pos, flags = eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+        pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
         # Should return valid position
         assert 0 <= pos[0] < 360  # Longitude in range
@@ -144,13 +144,13 @@ class TestSPKRequiredError:
         """Pholus requires SPK in strict mode (it's in SPK_BODY_NAME_MAP)."""
         eph.set_strict_precision(True)
         with pytest.raises(eph.SPKRequiredError):
-            eph.calc_ut(2451545.0, SE_PHOLUS, SEFLG_SPEED)
+            eph.calc_ut(2451545.0, PHOLUS, FLG_SPEED)
 
     def test_eris_requires_spk_in_strict_mode(self):
         """Eris requires SPK in strict mode (it's in SPK_BODY_NAME_MAP)."""
         eph.set_strict_precision(True)
         with pytest.raises(eph.SPKRequiredError):
-            eph.calc_ut(2451545.0, SE_ERIS, SEFLG_SPEED)
+            eph.calc_ut(2451545.0, ERIS, FLG_SPEED)
 
 
 class TestExportedFunctions:

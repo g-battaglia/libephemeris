@@ -1,5 +1,5 @@
 """
-Tests for swe_pheno_ut: planetary phenomena (phase angle, illumination,
+Tests for pheno_ut: planetary phenomena (phase angle, illumination,
 elongation, diameter, magnitude) across planets and dates.
 """
 
@@ -11,25 +11,25 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_CHIRON,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    CHIRON,
+    FLG_SWIEPH,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -38,25 +38,25 @@ JD_2023 = 2460000.0
 
 
 class TestPhenoReturnFormat:
-    """Test return format of swe_pheno_ut."""
+    """Test return format of pheno_ut."""
 
     @pytest.mark.unit
     def test_returns_20_floats(self):
-        """swe_pheno_ut returns tuple of 20 floats."""
-        result = swe.pheno_ut(JD_J2000, SE_MARS)
+        """pheno_ut returns tuple of 20 floats."""
+        result = swe.pheno_ut(JD_J2000, MARS)
         assert len(result) == 20
 
     @pytest.mark.unit
     def test_all_values_are_floats(self):
         """All returned values are Python floats."""
-        result = swe.pheno_ut(JD_J2000, SE_MARS)
+        result = swe.pheno_ut(JD_J2000, MARS)
         for i, val in enumerate(result):
             assert isinstance(val, float), f"Index {i} is {type(val)}, not float"
 
     @pytest.mark.unit
     def test_reserved_fields_zero(self):
         """Fields [5]-[19] are reserved and should be 0."""
-        result = swe.pheno_ut(JD_J2000, SE_MARS)
+        result = swe.pheno_ut(JD_J2000, MARS)
         for i in range(5, 20):
             assert result[i] == 0.0, f"Reserved field [{i}] = {result[i]}"
 
@@ -67,13 +67,13 @@ class TestPhenoSun:
     @pytest.mark.unit
     def test_sun_elongation_zero(self):
         """Sun elongation from Sun should be 0."""
-        result = swe.pheno_ut(JD_J2000, SE_SUN)
+        result = swe.pheno_ut(JD_J2000, SUN)
         assert result[2] == pytest.approx(0.0, abs=0.01)
 
     @pytest.mark.unit
     def test_sun_magnitude(self):
         """Sun apparent magnitude should be near -26.7."""
-        result = swe.pheno_ut(JD_J2000, SE_SUN)
+        result = swe.pheno_ut(JD_J2000, SUN)
         # Sun V magnitude ~ -26.7 to -26.8
         assert -27.5 < result[4] < -26.0, f"Sun magnitude: {result[4]}"
 
@@ -84,7 +84,7 @@ class TestPhenoMoon:
     @pytest.mark.unit
     def test_moon_phase_range(self):
         """Moon illumination is between 0 and 1."""
-        result = swe.pheno_ut(JD_J2000, SE_MOON)
+        result = swe.pheno_ut(JD_J2000, MOON)
         assert 0.0 <= result[1] <= 1.0
 
     @pytest.mark.unit
@@ -92,7 +92,7 @@ class TestPhenoMoon:
         """Moon illumination changes across the month."""
         phases = []
         for offset in range(0, 30, 3):
-            result = swe.pheno_ut(JD_J2000 + offset, SE_MOON)
+            result = swe.pheno_ut(JD_J2000 + offset, MOON)
             phases.append(result[1])
         # Should see variation
         assert max(phases) - min(phases) > 0.3
@@ -100,7 +100,7 @@ class TestPhenoMoon:
     @pytest.mark.unit
     def test_moon_diameter(self):
         """Moon apparent diameter should be reasonable."""
-        result = swe.pheno_ut(JD_J2000, SE_MOON)
+        result = swe.pheno_ut(JD_J2000, MOON)
         diameter = result[3]
         # Moon diameter ~0.5° = 1800 arcsec (but API returns degrees for Moon)
         # If in degrees: ~0.5; if in arcsec: ~1800
@@ -109,14 +109,14 @@ class TestPhenoMoon:
     @pytest.mark.unit
     def test_moon_elongation_range(self):
         """Moon elongation should be 0-180 degrees."""
-        result = swe.pheno_ut(JD_J2000, SE_MOON)
+        result = swe.pheno_ut(JD_J2000, MOON)
         assert 0.0 <= result[2] <= 180.0
 
 
 class TestPhenoOuterPlanets:
     """Test phenomena for outer planets across dates."""
 
-    OUTER_PLANETS = [SE_MARS, SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE, SE_PLUTO]
+    OUTER_PLANETS = [MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", OUTER_PLANETS)
@@ -156,8 +156,8 @@ class TestPhenoOuterPlanets:
     @pytest.mark.unit
     def test_jupiter_brighter_than_saturn(self):
         """Jupiter should generally be brighter (lower mag) than Saturn."""
-        j_result = swe.pheno_ut(JD_J2000, SE_JUPITER)
-        s_result = swe.pheno_ut(JD_J2000, SE_SATURN)
+        j_result = swe.pheno_ut(JD_J2000, JUPITER)
+        s_result = swe.pheno_ut(JD_J2000, SATURN)
         # Not always true but generally Jupiter is brighter
         # Use a loose check — just verify both have reasonable magnitudes
         assert j_result[4] < 0.0, f"Jupiter mag should be negative: {j_result[4]}"
@@ -166,7 +166,7 @@ class TestPhenoOuterPlanets:
     @pytest.mark.unit
     def test_outer_planet_illumination_high(self):
         """Outer planets are nearly fully illuminated (small phase angle)."""
-        for body in [SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]:
+        for body in [JUPITER, SATURN, URANUS, NEPTUNE]:
             result = swe.pheno_ut(JD_J2000, body)
             # Outer planets have small phase angles, high illumination
             assert result[1] > 0.8, (
@@ -178,7 +178,7 @@ class TestPhenoMagnitudeVariation:
     """Test magnitude variation over time for outer planets."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("body", [SE_MARS, SE_JUPITER, SE_SATURN])
+    @pytest.mark.parametrize("body", [MARS, JUPITER, SATURN])
     def test_magnitude_varies_over_year(self, body):
         """Planet magnitude varies across a year."""
         mags = []
@@ -197,7 +197,7 @@ class TestPhenoMagnitudeVariation:
         mags = []
         # Sample over 2+ years (Mars opposition ~every 26 months)
         for i in range(0, 800, 30):
-            result = swe.pheno_ut(JD_J2000 + i, SE_MARS)
+            result = swe.pheno_ut(JD_J2000 + i, MARS)
             mags.append(result[4])
         # Mars ranges from about -2.9 at opposition to +1.9
         assert min(mags) < 1.0, f"Mars min mag {min(mags)} — expected brighter"
@@ -208,14 +208,14 @@ class TestPhenoInnerPlanets:
     """Test inner planet phenomena."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("body", [SE_MERCURY, SE_VENUS])
+    @pytest.mark.parametrize("body", [MERCURY, VENUS])
     def test_max_elongation_bounded(self, body):
         """Inner planets have bounded elongation from Sun."""
         max_elong = 0.0
         for i in range(0, 365, 5):
             result = swe.pheno_ut(JD_J2000 + i, body)
             max_elong = max(max_elong, result[2])
-        if body == SE_MERCURY:
+        if body == MERCURY:
             assert max_elong < 30.0, f"Mercury max elongation {max_elong} > 30°"
         else:
             assert max_elong < 50.0, f"Venus max elongation {max_elong} > 50°"
@@ -225,18 +225,18 @@ class TestPhenoInnerPlanets:
         """Venus magnitude can reach about -4.5."""
         min_mag = 999.0
         for i in range(0, 600, 10):
-            result = swe.pheno_ut(JD_J2000 + i, SE_VENUS)
+            result = swe.pheno_ut(JD_J2000 + i, VENUS)
             min_mag = min(min_mag, result[4])
         assert min_mag < -3.0, f"Venus min magnitude {min_mag} — expected < -3"
 
 
 class TestPhenoETVariant:
-    """Test the ET variant swe_pheno."""
+    """Test the ET variant pheno."""
 
     @pytest.mark.unit
     def test_pheno_et_works(self):
-        """swe_pheno (ET variant) returns valid results."""
-        result = swe.pheno(JD_J2000, SE_MARS)
+        """pheno (ET variant) returns valid results."""
+        result = swe.pheno(JD_J2000, MARS)
         assert len(result) == 20
         assert 0.0 <= result[0] <= 180.0  # phase angle
         assert 0.0 <= result[1] <= 1.0  # illumination

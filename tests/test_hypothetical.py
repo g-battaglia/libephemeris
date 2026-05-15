@@ -1,8 +1,8 @@
 """
 Tests for hypothetical planets (Hamburg School Uranian planets + Transpluto).
 
-This module provides sanity checks for all 8 Uranian planets (SE_CUPIDO through
-SE_POSEIDON) and Transpluto to ensure the orbital elements and calculations
+This module provides sanity checks for all 8 Uranian planets (CUPIDO through
+POSEIDON) and Transpluto to ensure the orbital elements and calculations
 produce plausible positions.
 
 Tests verify:
@@ -16,16 +16,16 @@ import pytest
 
 from libephemeris.hypothetical import (
     # Uranian planet IDs
-    SE_CUPIDO,
-    SE_HADES,
-    SE_ZEUS,
-    SE_KRONOS,
-    SE_APOLLON,
-    SE_ADMETOS,
-    SE_VULKANUS,
-    SE_POSEIDON,
-    SE_ISIS,
-    SE_TRANSPLUTO,
+    CUPIDO,
+    HADES,
+    ZEUS,
+    KRONOS,
+    APOLLON,
+    ADMETOS,
+    VULKANUS,
+    POSEIDON,
+    ISIS,
+    TRANSPLUTO,
     # Calculation functions
     calc_cupido,
     calc_hades,
@@ -60,34 +60,34 @@ class TestUranianPlanetConstants:
 
     @pytest.mark.unit
     def test_uranian_planet_ids_are_sequential(self):
-        """Uranian planet IDs should be SE_FICT_OFFSET + index."""
-        assert SE_CUPIDO == 40
-        assert SE_HADES == 41
-        assert SE_ZEUS == 42
-        assert SE_KRONOS == 43
-        assert SE_APOLLON == 44
-        assert SE_ADMETOS == 45
-        assert SE_VULKANUS == 46
-        assert SE_POSEIDON == 47
+        """Uranian planet IDs should be FICT_OFFSET + index."""
+        assert CUPIDO == 40
+        assert HADES == 41
+        assert ZEUS == 42
+        assert KRONOS == 43
+        assert APOLLON == 44
+        assert ADMETOS == 45
+        assert VULKANUS == 46
+        assert POSEIDON == 47
 
     @pytest.mark.unit
     def test_transpluto_aliases(self):
-        """SE_ISIS and SE_TRANSPLUTO should be the same."""
-        assert SE_ISIS == SE_TRANSPLUTO
-        assert SE_ISIS == 48
+        """ISIS and TRANSPLUTO should be the same."""
+        assert ISIS == TRANSPLUTO
+        assert ISIS == 48
 
     @pytest.mark.unit
     def test_all_uranian_planets_in_keplerian_elements(self):
         """All 8 Uranian planets should have Keplerian elements."""
         uranian_ids = [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ]
         for planet_id in uranian_ids:
             assert planet_id in URANIAN_KEPLERIAN_ELEMENTS, (
@@ -98,14 +98,14 @@ class TestUranianPlanetConstants:
     def test_all_uranian_planets_in_uranian_elements(self):
         """All 8 Uranian planets should have polynomial elements."""
         uranian_ids = [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ]
         for planet_id in uranian_ids:
             assert planet_id in URANIAN_ELEMENTS, (
@@ -121,14 +121,14 @@ class TestUranianPlanetKeplerianElements:
         "planet_id,planet_name,expected_a,period_years",
         [
             # Semi-major axes from Hamburg School published orbital elements (Witte/Lefeldt, Regelwerk fur Planetenbilder)
-            (SE_CUPIDO, "Cupido", 40.99837, 262.5),
-            (SE_HADES, "Hades", 50.66744, 360.7),
-            (SE_ZEUS, "Zeus", 59.21436, 455.9),
-            (SE_KRONOS, "Kronos", 64.81690, 522.0),
-            (SE_APOLLON, "Apollon", 70.29949, 590.0),
-            (SE_ADMETOS, "Admetos", 73.62765, 633.0),
-            (SE_VULKANUS, "Vulkanus", 77.25568, 681.7),
-            (SE_POSEIDON, "Poseidon", 83.66907, 765.3),
+            (CUPIDO, "Cupido", 40.99837, 262.5),
+            (HADES, "Hades", 50.66744, 360.7),
+            (ZEUS, "Zeus", 59.21436, 455.9),
+            (KRONOS, "Kronos", 64.81690, 522.0),
+            (APOLLON, "Apollon", 70.29949, 590.0),
+            (ADMETOS, "Admetos", 73.62765, 633.0),
+            (VULKANUS, "Vulkanus", 77.25568, 681.7),
+            (POSEIDON, "Poseidon", 83.66907, 765.3),
         ],
     )
     def test_semi_major_axis_plausible(
@@ -156,10 +156,10 @@ class TestUranianPlanetKeplerianElements:
         "planet_id,planet_name",
         [
             # Apollon, Admetos, Vulkanus, Poseidon: zero eccentricity in Hamburg School published elements
-            (SE_APOLLON, "Apollon"),
-            (SE_ADMETOS, "Admetos"),
-            (SE_VULKANUS, "Vulkanus"),
-            (SE_POSEIDON, "Poseidon"),
+            (APOLLON, "Apollon"),
+            (ADMETOS, "Admetos"),
+            (VULKANUS, "Vulkanus"),
+            (POSEIDON, "Poseidon"),
         ],
     )
     def test_circular_orbit_elements(self, planet_id, planet_name):
@@ -177,7 +177,7 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.unit
     def test_hades_elliptic_orbit(self):
         """Hades has a small eccentricity (e~0.00245)."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_HADES]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[HADES]
 
         # Hades has small but non-zero eccentricity
         assert elements.e == pytest.approx(0.00245, rel=1e-3), (
@@ -192,7 +192,7 @@ class TestUranianPlanetKeplerianElements:
     @pytest.mark.unit
     def test_cupido_small_eccentricity(self):
         """Cupido has small eccentricity (e=0.0046) from Hamburg School published elements."""
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_CUPIDO]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[CUPIDO]
 
         # Cupido has small non-zero eccentricity from Hamburg School published elements
         assert elements.e == pytest.approx(0.00460, rel=1e-2), (
@@ -208,14 +208,14 @@ class TestUranianPlanetKeplerianElements:
     def test_zeus_kronos_small_eccentricity(self):
         """Zeus and Kronos have small eccentricities from Hamburg School published elements."""
         # Zeus
-        zeus_elements = URANIAN_KEPLERIAN_ELEMENTS[SE_ZEUS]
+        zeus_elements = URANIAN_KEPLERIAN_ELEMENTS[ZEUS]
         assert zeus_elements.e == pytest.approx(0.00120, rel=0.1), (
             "Zeus eccentricity mismatch"
         )
         assert zeus_elements.omega != 0.0, "Zeus omega should be non-zero"
 
         # Kronos
-        kronos_elements = URANIAN_KEPLERIAN_ELEMENTS[SE_KRONOS]
+        kronos_elements = URANIAN_KEPLERIAN_ELEMENTS[KRONOS]
         assert kronos_elements.e == pytest.approx(0.00305, rel=0.1), (
             "Kronos eccentricity mismatch"
         )
@@ -310,14 +310,14 @@ class TestUranianPlanetAngularVelocity:
         "planet_id,planet_name,expected_period_years",
         [
             # Period calculated from a^(3/2) where a is semi-major axis in AU
-            (SE_CUPIDO, "Cupido", 262.5),
-            (SE_HADES, "Hades", 360.7),
-            (SE_ZEUS, "Zeus", 455.9),
-            (SE_KRONOS, "Kronos", 522.0),
-            (SE_APOLLON, "Apollon", 590.0),
-            (SE_ADMETOS, "Admetos", 633.0),
-            (SE_VULKANUS, "Vulkanus", 681.7),
-            (SE_POSEIDON, "Poseidon", 765.3),
+            (CUPIDO, "Cupido", 262.5),
+            (HADES, "Hades", 360.7),
+            (ZEUS, "Zeus", 455.9),
+            (KRONOS, "Kronos", 522.0),
+            (APOLLON, "Apollon", 590.0),
+            (ADMETOS, "Admetos", 633.0),
+            (VULKANUS, "Vulkanus", 681.7),
+            (POSEIDON, "Poseidon", 765.3),
         ],
     )
     def test_angular_velocity_consistent_with_period(
@@ -563,14 +563,14 @@ class TestCalcUranianPlanetGeneric:
     @pytest.mark.parametrize(
         "planet_id,expected_name",
         [
-            (SE_CUPIDO, "Cupido"),
-            (SE_HADES, "Hades"),
-            (SE_ZEUS, "Zeus"),
-            (SE_KRONOS, "Kronos"),
-            (SE_APOLLON, "Apollon"),
-            (SE_ADMETOS, "Admetos"),
-            (SE_VULKANUS, "Vulkanus"),
-            (SE_POSEIDON, "Poseidon"),
+            (CUPIDO, "Cupido"),
+            (HADES, "Hades"),
+            (ZEUS, "Zeus"),
+            (KRONOS, "Kronos"),
+            (APOLLON, "Apollon"),
+            (ADMETOS, "Admetos"),
+            (VULKANUS, "Vulkanus"),
+            (POSEIDON, "Poseidon"),
         ],
     )
     def test_generic_function_handles_all_uranian_planets(
@@ -595,7 +595,7 @@ class TestCalcUranianPlanetGeneric:
     def test_generic_function_rejects_transpluto(self):
         """calc_uranian_planet should reject Transpluto (use calc_transpluto)."""
         with pytest.raises(ValueError):
-            calc_uranian_planet(SE_TRANSPLUTO, J2000)
+            calc_uranian_planet(TRANSPLUTO, J2000)
 
 
 class TestCalcUranianLongitude:
@@ -605,14 +605,14 @@ class TestCalcUranianLongitude:
     @pytest.mark.parametrize(
         "planet_id",
         [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ],
     )
     def test_longitude_in_range(self, planet_id):
@@ -636,14 +636,14 @@ class TestCalcUranianPosition:
     @pytest.mark.parametrize(
         "planet_id",
         [
-            SE_CUPIDO,
-            SE_HADES,
-            SE_ZEUS,
-            SE_KRONOS,
-            SE_APOLLON,
-            SE_ADMETOS,
-            SE_VULKANUS,
-            SE_POSEIDON,
+            CUPIDO,
+            HADES,
+            ZEUS,
+            KRONOS,
+            APOLLON,
+            ADMETOS,
+            VULKANUS,
+            POSEIDON,
         ],
     )
     def test_position_returns_6_elements(self, planet_id):
@@ -667,14 +667,14 @@ class TestKeplerianVsPolynomialElements:
     @pytest.mark.parametrize(
         "planet_id,planet_name",
         [
-            (SE_CUPIDO, "Cupido"),
-            (SE_HADES, "Hades"),
-            (SE_ZEUS, "Zeus"),
-            (SE_KRONOS, "Kronos"),
-            (SE_APOLLON, "Apollon"),
-            (SE_ADMETOS, "Admetos"),
-            (SE_VULKANUS, "Vulkanus"),
-            (SE_POSEIDON, "Poseidon"),
+            (CUPIDO, "Cupido"),
+            (HADES, "Hades"),
+            (ZEUS, "Zeus"),
+            (KRONOS, "Kronos"),
+            (APOLLON, "Apollon"),
+            (ADMETOS, "Admetos"),
+            (VULKANUS, "Vulkanus"),
+            (POSEIDON, "Poseidon"),
         ],
     )
     def test_both_element_sets_give_similar_longitude_at_j2000(
@@ -713,25 +713,25 @@ class TestCalcUranianPlanetKeplerianFormula:
 
     # All 8 Uranian planet IDs with their names
     ALL_URANIAN_PLANETS = [
-        (SE_CUPIDO, "Cupido"),
-        (SE_HADES, "Hades"),
-        (SE_ZEUS, "Zeus"),
-        (SE_KRONOS, "Kronos"),
-        (SE_APOLLON, "Apollon"),
-        (SE_ADMETOS, "Admetos"),
-        (SE_VULKANUS, "Vulkanus"),
-        (SE_POSEIDON, "Poseidon"),
+        (CUPIDO, "Cupido"),
+        (HADES, "Hades"),
+        (ZEUS, "Zeus"),
+        (KRONOS, "Kronos"),
+        (APOLLON, "Apollon"),
+        (ADMETOS, "Admetos"),
+        (VULKANUS, "Vulkanus"),
+        (POSEIDON, "Poseidon"),
     ]
 
     # Circular orbit planets (e=0) - excludes Hades
     CIRCULAR_ORBIT_PLANETS = [
-        (SE_CUPIDO, "Cupido"),
-        (SE_ZEUS, "Zeus"),
-        (SE_KRONOS, "Kronos"),
-        (SE_APOLLON, "Apollon"),
-        (SE_ADMETOS, "Admetos"),
-        (SE_VULKANUS, "Vulkanus"),
-        (SE_POSEIDON, "Poseidon"),
+        (CUPIDO, "Cupido"),
+        (ZEUS, "Zeus"),
+        (KRONOS, "Kronos"),
+        (APOLLON, "Apollon"),
+        (ADMETOS, "Admetos"),
+        (VULKANUS, "Vulkanus"),
+        (POSEIDON, "Poseidon"),
     ]
 
     @pytest.mark.unit
@@ -742,7 +742,7 @@ class TestCalcUranianPlanetKeplerianFormula:
         Reference value independently verified against professional ephemeris
         software (heliocentric J2000 ecliptic frame).
         """
-        result = calc_uranian_planet(SE_CUPIDO, J2000)
+        result = calc_uranian_planet(CUPIDO, J2000)
         calculated_lon = result[0]
 
         # Heliocentric J2000 ecliptic longitude ~ 243.087 deg
@@ -760,7 +760,7 @@ class TestCalcUranianPlanetKeplerianFormula:
         then PQR transformation + equinox precession maps to J2000 frame.
         This is NOT simply M0 because of the coordinate frame change.
         """
-        result = calc_uranian_planet(SE_CUPIDO, J1900)
+        result = calc_uranian_planet(CUPIDO, J1900)
         calculated_lon = result[0]
 
         # At epoch, position is M0 in J1900 frame, then precessed to J2000
@@ -845,13 +845,13 @@ class TestCalcUranianPlanetKeplerianFormula:
         2. Latitude is non-zero due to inclination (i=1.05 deg)
         3. Distance varies due to eccentricity
         """
-        elements = URANIAN_KEPLERIAN_ELEMENTS[SE_HADES]
+        elements = URANIAN_KEPLERIAN_ELEMENTS[HADES]
 
         # Test at multiple dates
         test_dates = [J1900, J2000, J2000 + 36525]  # Epoch, J2000, J2100
 
         for jd in test_dates:
-            lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(SE_HADES, jd)
+            lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(HADES, jd)
 
             # Longitude must be valid
             assert 0.0 <= lon < 360.0, f"Hades longitude {lon} outside [0, 360)"
@@ -930,7 +930,7 @@ class TestCalcUranianPlanetKeplerianFormula:
         ]
 
         for jd, expected_lon, tol in test_cases:
-            result = calc_uranian_planet(SE_CUPIDO, jd)
+            result = calc_uranian_planet(CUPIDO, jd)
             calculated_lon = result[0]
 
             assert calculated_lon == pytest.approx(expected_lon, abs=tol), (

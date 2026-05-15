@@ -13,10 +13,10 @@ pytestmark = pytest.mark.slow
 from libephemeris import (
     get_saros_number,
     SAROS_CYCLE_DAYS,
-    swe_julday,
+    julday,
     sol_eclipse_when_glob,
     lun_eclipse_when,
-    SE_ECL_TOTAL,
+    ECL_TOTAL,
 )
 
 
@@ -68,8 +68,8 @@ class TestSolarSarosNumber:
     def test_integration_with_sol_eclipse_when_glob(self):
         """Test that get_saros_number works with sol_eclipse_when_glob output."""
         # Find the April 2024 eclipse
-        jd_start = swe_julday(2024, 3, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0.0)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         saros = get_saros_number(jd_max, eclipse_type="solar")
@@ -130,8 +130,8 @@ class TestLunarSarosNumber:
     def test_integration_with_lun_eclipse_when(self):
         """Test that get_saros_number works with lun_eclipse_when output."""
         # Find a lunar eclipse starting from 2022
-        jd_start = swe_julday(2022, 4, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2022, 4, 1, 0.0)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         saros = get_saros_number(jd_max, eclipse_type="lunar")
@@ -172,7 +172,7 @@ class TestSarosEdgeCases:
     def test_distant_past_eclipse(self):
         """Should handle eclipses far in the past."""
         # The 1999 August 11 total solar eclipse (Saros 145)
-        jd_1999 = swe_julday(1999, 8, 11, 11.0)
+        jd_1999 = julday(1999, 8, 11, 11.0)
         saros = get_saros_number(jd_1999, "solar")
         assert saros == 145
 
@@ -203,7 +203,7 @@ class TestSarosMultipleEclipses:
 
     def test_multiple_solar_eclipses_different_series(self):
         """Find multiple consecutive solar eclipses and verify different series."""
-        jd_start = swe_julday(2024, 1, 1, 0.0)
+        jd_start = julday(2024, 1, 1, 0.0)
 
         eclipses = []
         jd = jd_start
@@ -225,7 +225,7 @@ class TestSarosMultipleEclipses:
 
     def test_multiple_lunar_eclipses_different_series(self):
         """Find multiple consecutive lunar eclipses and verify different series."""
-        jd_start = swe_julday(2022, 1, 1, 0.0)
+        jd_start = julday(2022, 1, 1, 0.0)
 
         eclipses = []
         jd = jd_start

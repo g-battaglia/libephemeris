@@ -25,7 +25,7 @@ class TestLmtToLatBasicValues:
     @pytest.mark.unit
     def test_lmt_to_lat_at_greenwich(self):
         """Test LMT to LAT conversion at Greenwich (0 longitude)."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         # The difference should be approximately the Equation of Time
         # In mid-June, EoT is near zero
@@ -38,7 +38,7 @@ class TestLmtToLatBasicValues:
     def test_lmt_to_lat_february_minimum(self):
         """Test LMT to LAT at February minimum (EoT ~-14 min)."""
         # Feb 11, 2000 - EoT minimum
-        jd_lmt = ephem.swe_julday(2000, 2, 11, 12.0)
+        jd_lmt = ephem.julday(2000, 2, 11, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         # EoT is negative (~-14 min), so LAT = LMT + EoT means LAT < LMT
         diff_minutes = (jd_lat - jd_lmt) * 1440
@@ -51,7 +51,7 @@ class TestLmtToLatBasicValues:
     def test_lmt_to_lat_november_maximum(self):
         """Test LMT to LAT at November maximum (EoT ~+16 min)."""
         # Nov 3, 2000 - EoT maximum
-        jd_lmt = ephem.swe_julday(2000, 11, 3, 12.0)
+        jd_lmt = ephem.julday(2000, 11, 3, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         # EoT is positive (~+16 min), so LAT = LMT + EoT means LAT > LMT
         diff_minutes = (jd_lat - jd_lmt) * 1440
@@ -67,7 +67,7 @@ class TestLmtToLatProperties:
     def test_difference_in_valid_range(self):
         """LAT-LMT difference should be within +/-17 minutes."""
         for month in range(1, 13):
-            jd_lmt = ephem.swe_julday(2000, month, 15, 12.0)
+            jd_lmt = ephem.julday(2000, month, 15, 12.0)
             jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
             diff_minutes = abs(jd_lat - jd_lmt) * 1440
             assert diff_minutes < 17, (
@@ -77,7 +77,7 @@ class TestLmtToLatProperties:
     @pytest.mark.unit
     def test_continuous_over_year(self):
         """LAT-LMT difference should change smoothly over the year."""
-        jd_start = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_start = ephem.julday(2000, 1, 1, 12.0)
         prev_lat = ephem.lmt_to_lat(jd_start, 0.0)
         prev_diff = prev_lat - jd_start
 
@@ -95,8 +95,8 @@ class TestLmtToLatProperties:
     @pytest.mark.unit
     def test_periodic_over_years(self):
         """LAT-LMT difference should be similar after one year."""
-        jd_lmt_2000 = ephem.swe_julday(2000, 6, 15, 12.0)
-        jd_lmt_2001 = ephem.swe_julday(2001, 6, 15, 12.0)
+        jd_lmt_2000 = ephem.julday(2000, 6, 15, 12.0)
+        jd_lmt_2001 = ephem.julday(2001, 6, 15, 12.0)
 
         diff_2000 = ephem.lmt_to_lat(jd_lmt_2000, 0.0) - jd_lmt_2000
         diff_2001 = ephem.lmt_to_lat(jd_lmt_2001, 0.0) - jd_lmt_2001
@@ -114,7 +114,7 @@ class TestLmtToLatDifferentLongitudes:
     @pytest.mark.unit
     def test_east_longitude(self):
         """Test LMT to LAT at eastern longitude (Rome, 12.5E)."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 12.5)
         # The difference should still be approximately the Equation of Time
         diff_minutes = (jd_lat - jd_lmt) * 1440
@@ -126,7 +126,7 @@ class TestLmtToLatDifferentLongitudes:
     @pytest.mark.unit
     def test_west_longitude(self):
         """Test LMT to LAT at western longitude (New York, -74W)."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, -74.0)
         # The difference should still be approximately the Equation of Time
         diff_minutes = (jd_lat - jd_lmt) * 1440
@@ -138,7 +138,7 @@ class TestLmtToLatDifferentLongitudes:
     @pytest.mark.unit
     def test_180_longitude(self):
         """Test LMT to LAT at date line (180 longitude)."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 180.0)
         diff_minutes = (jd_lat - jd_lmt) * 1440
         # In June, EoT is near zero
@@ -147,7 +147,7 @@ class TestLmtToLatDifferentLongitudes:
     @pytest.mark.unit
     def test_minus_180_longitude(self):
         """Test LMT to LAT at date line (-180 longitude)."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, -180.0)
         diff_minutes = (jd_lat - jd_lmt) * 1440
         # In June, EoT is near zero
@@ -179,7 +179,7 @@ class TestLmtToLatDifferentLongitudes:
     def test_various_longitudes_same_eot(self, longitude):
         """LAT-LMT difference should be similar regardless of longitude."""
         # The Equation of Time depends on the date, not on the observer's longitude
-        jd_lmt = ephem.swe_julday(2000, 11, 3, 12.0)  # Nov 3 - EoT max
+        jd_lmt = ephem.julday(2000, 11, 3, 12.0)  # Nov 3 - EoT max
         jd_lat = ephem.lmt_to_lat(jd_lmt, longitude)
         diff_minutes = (jd_lat - jd_lmt) * 1440
         # EoT at Nov 3 is ~+16 minutes, with some variation due to the
@@ -195,7 +195,7 @@ class TestLmtToLatConsistencyWithTimeEqu:
     @pytest.mark.unit
     def test_difference_equals_time_equ_at_greenwich(self):
         """At Greenwich (0), LAT-LMT should equal time_equ."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
 
         # LAT - LMT = EoT
@@ -220,7 +220,7 @@ class TestLmtToLatConsistencyWithTimeEqu:
             (2000, 12, 25),  # Christmas
         ]
         for year, month, day in dates:
-            jd_lmt = ephem.swe_julday(year, month, day, 12.0)
+            jd_lmt = ephem.julday(year, month, day, 12.0)
             jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
             lat_lmt_diff = jd_lat - jd_lmt
             eot = ephem.time_equ(jd_lmt)
@@ -235,7 +235,7 @@ class TestLmtToLatInverseOfLatToLmt:
     @pytest.mark.unit
     def test_roundtrip_lat_to_lmt_to_lat(self):
         """Converting LAT -> LMT -> LAT should return the original value."""
-        jd_lat_original = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lat_original = ephem.julday(2000, 6, 15, 12.0)
         longitude = 12.5  # Rome
 
         # LAT -> LMT
@@ -250,7 +250,7 @@ class TestLmtToLatInverseOfLatToLmt:
     @pytest.mark.unit
     def test_roundtrip_lmt_to_lat_to_lmt(self):
         """Converting LMT -> LAT -> LMT should return the original value."""
-        jd_lmt_original = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt_original = ephem.julday(2000, 6, 15, 12.0)
         longitude = -74.0  # New York
 
         # LMT -> LAT
@@ -276,7 +276,7 @@ class TestLmtToLatInverseOfLatToLmt:
     def test_roundtrip_various_dates_and_longitudes(self, date, longitude):
         """Roundtrip should work for various dates and longitudes."""
         year, month, day, hour = date
-        jd_lat_original = ephem.swe_julday(year, month, day, hour)
+        jd_lat_original = ephem.julday(year, month, day, hour)
 
         # LAT -> LMT -> LAT
         jd_lmt = ephem.lat_to_lmt(jd_lat_original, longitude)
@@ -294,7 +294,7 @@ class TestLmtToLatEdgeCases:
     @pytest.mark.edge_case
     def test_de421_range_start(self):
         """Test at DE421 range start (1900)."""
-        jd_lmt = ephem.swe_julday(1900, 1, 1, 12.0)
+        jd_lmt = ephem.julday(1900, 1, 1, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         diff_minutes = abs(jd_lat - jd_lmt) * 1440
         # Should be within valid range
@@ -303,7 +303,7 @@ class TestLmtToLatEdgeCases:
     @pytest.mark.edge_case
     def test_de421_range_end(self):
         """Test at DE421 range end (2050)."""
-        jd_lmt = ephem.swe_julday(2050, 1, 1, 12.0)
+        jd_lmt = ephem.julday(2050, 1, 1, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         diff_minutes = abs(jd_lat - jd_lmt) * 1440
         # Should be within valid range
@@ -313,7 +313,7 @@ class TestLmtToLatEdgeCases:
     def test_various_years(self):
         """LMT to LAT should work for various years."""
         for year in [1920, 1960, 2000, 2020, 2040]:
-            jd_lmt = ephem.swe_julday(year, 6, 15, 12.0)
+            jd_lmt = ephem.julday(year, 6, 15, 12.0)
             jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
             diff_minutes = abs(jd_lat - jd_lmt) * 1440
             assert diff_minutes < 17, (
@@ -323,7 +323,7 @@ class TestLmtToLatEdgeCases:
     @pytest.mark.edge_case
     def test_extreme_longitudes(self):
         """Test with extreme longitude values."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
 
         # 180 degrees
         jd_lat_180 = ephem.lmt_to_lat(jd_lmt, 180.0)
@@ -348,7 +348,7 @@ class TestLmtToLatOutputFormat:
     @pytest.mark.unit
     def test_output_preserves_scale(self):
         """Output JD should be in the same scale as input."""
-        jd_lmt = ephem.swe_julday(2000, 6, 15, 12.0)
+        jd_lmt = ephem.julday(2000, 6, 15, 12.0)
         jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
         # The difference should be the EoT in days
         diff_days = jd_lat - jd_lmt

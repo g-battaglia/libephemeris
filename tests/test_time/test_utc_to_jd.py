@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 
 
 class TestUtcToJdBasic:
@@ -113,7 +113,7 @@ class TestUtcToJdVsJulday:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
 
         jd_tt, jd_ut = ephem.utc_to_jd(year, month, day, hour, minute, second)
-        jd_julday = ephem.swe_julday(year, month, day, decimal_hour)
+        jd_julday = ephem.julday(year, month, day, decimal_hour)
 
         # julday assumes UT1 input, utc_to_jd returns proper UT1
         # For modern dates, UTC and UT1 differ by less than 0.9 seconds
@@ -131,7 +131,7 @@ class TestUtcToJdVsJulday:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
 
         jd_tt, jd_ut = ephem.utc_to_jd(year, month, day, hour, minute, second)
-        jd_julday = ephem.swe_julday(year, month, day, decimal_hour)
+        jd_julday = ephem.julday(year, month, day, decimal_hour)
 
         # TT differs from UT1 by Delta T (~64 seconds in 2000)
         diff_seconds = (jd_tt - jd_julday) * 86400
@@ -145,15 +145,15 @@ class TestUtcToJdCalendars:
     def test_gregorian_default(self):
         """Gregorian calendar should be default."""
         jd_tt_default, jd_ut_default = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0)
-        jd_tt_greg, jd_ut_greg = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_GREG_CAL)
+        jd_tt_greg, jd_ut_greg = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, GREG_CAL)
         assert jd_tt_default == jd_tt_greg
         assert jd_ut_default == jd_ut_greg
 
     @pytest.mark.unit
     def test_julian_calendar_differs(self):
         """Julian calendar should give different result for modern dates."""
-        jd_tt_greg, jd_ut_greg = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_GREG_CAL)
-        jd_tt_jul, jd_ut_jul = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_JUL_CAL)
+        jd_tt_greg, jd_ut_greg = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, GREG_CAL)
+        jd_tt_jul, jd_ut_jul = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0, JUL_CAL)
         # Julian calendar is ~13 days behind Gregorian in 2000
         diff_days = abs(jd_ut_greg - jd_ut_jul)
         assert diff_days > 10
@@ -162,7 +162,7 @@ class TestUtcToJdCalendars:
     def test_julian_calendar_before_reform(self):
         """Test Julian calendar for dates before Gregorian reform."""
         # Oct 5, 1582 Julian = Oct 15, 1582 Gregorian
-        jd_tt, jd_ut = ephem.utc_to_jd(1582, 10, 5, 12, 0, 0.0, SE_JUL_CAL)
+        jd_tt, jd_ut = ephem.utc_to_jd(1582, 10, 5, 12, 0, 0.0, JUL_CAL)
         # Should produce valid JD
         assert jd_ut > 0
 

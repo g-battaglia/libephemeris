@@ -48,10 +48,10 @@ class TestValidateJdRangeFunction:
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            validate_jd_range(far_future_jd, body_id=eph.SE_SUN)
+            validate_jd_range(far_future_jd, body_id=eph.SUN)
 
         err = exc_info.value
-        assert err.body_id == eph.SE_SUN
+        assert err.body_id == eph.SUN
         assert err.body_name == "Sun"
         assert "Sun" in str(err)
 
@@ -109,38 +109,38 @@ class TestProactiveValidation:
     """Test that validation happens before calculation (proactive, not reactive)."""
 
     def test_calc_ut_validates_jd_range(self):
-        """swe_calc_ut should validate JD range before calculation."""
+        """calc_ut should validate JD range before calculation."""
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_ut(far_future_jd, eph.SE_SUN, 0)
+            eph.calc_ut(far_future_jd, eph.SUN, 0)
 
         err = exc_info.value
         # Error should be raised with body info (proactive validation)
-        assert err.body_id == eph.SE_SUN
-        assert "swe_calc_ut" in str(err)
+        assert err.body_id == eph.SUN
+        assert "calc_ut" in str(err)
 
     def test_calc_validates_jd_range(self):
-        """swe_calc should validate JD range before calculation."""
+        """calc should validate JD range before calculation."""
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc(far_future_jd, eph.SE_MOON, 0)
+            eph.calc(far_future_jd, eph.MOON, 0)
 
         err = exc_info.value
-        assert err.body_id == eph.SE_MOON
-        assert "swe_calc" in str(err)
+        assert err.body_id == eph.MOON
+        assert "calc" in str(err)
 
     def test_calc_pctr_validates_jd_range(self):
-        """swe_calc_pctr should validate JD range before calculation."""
+        """calc_pctr should validate JD range before calculation."""
         far_future_jd = 3000000.0
 
         with pytest.raises(EphemerisRangeError) as exc_info:
-            eph.calc_pctr(far_future_jd, eph.SE_MARS, eph.SE_JUPITER, 0)
+            eph.calc_pctr(far_future_jd, eph.MARS, eph.JUPITER, 0)
 
         err = exc_info.value
-        assert err.body_id == eph.SE_MARS
-        assert "swe_calc_pctr" in str(err)
+        assert err.body_id == eph.MARS
+        assert "calc_pctr" in str(err)
 
 
 class TestNonJplBodiesNotValidated:
@@ -154,7 +154,7 @@ class TestNonJplBodiesNotValidated:
         # This should not raise EphemerisRangeError
         # (it may use other bodies internally, so this tests the entry point)
         try:
-            pos, _ = eph.calc_ut(far_future_jd, eph.SE_MEAN_NODE, 0)
+            pos, _ = eph.calc_ut(far_future_jd, eph.MEAN_NODE, 0)
             # If it succeeds, verify we got a result
             assert 0 <= pos[0] < 360
         except EphemerisRangeError:
@@ -166,7 +166,7 @@ class TestNonJplBodiesNotValidated:
         far_future_jd = 3000000.0
 
         try:
-            pos, _ = eph.calc_ut(far_future_jd, eph.SE_MEAN_APOG, 0)
+            pos, _ = eph.calc_ut(far_future_jd, eph.MEAN_APOG, 0)
             assert 0 <= pos[0] < 360
         except EphemerisRangeError:
             pass
@@ -178,41 +178,41 @@ class TestEdgeCases:
     def test_jd_exactly_at_start(self):
         """JD at the exact start of range should work."""
         # Get the actual range from the ephemeris
-        eph.calc_ut(2451545.0, eph.SE_SUN, 0)  # Ensure loaded
+        eph.calc_ut(2451545.0, eph.SUN, 0)  # Ensure loaded
         path, start_jd, end_jd, denum = eph.get_current_file_data(0)
 
         if start_jd > 0:
             # Test JD at start should work
-            pos, _ = eph.calc_ut(start_jd + 1.0, eph.SE_SUN, 0)
+            pos, _ = eph.calc_ut(start_jd + 1.0, eph.SUN, 0)
             assert 0 <= pos[0] < 360
 
     def test_jd_exactly_at_end(self):
         """JD at the exact end of range should work."""
-        eph.calc_ut(2451545.0, eph.SE_SUN, 0)  # Ensure loaded
+        eph.calc_ut(2451545.0, eph.SUN, 0)  # Ensure loaded
         path, start_jd, end_jd, denum = eph.get_current_file_data(0)
 
         if end_jd > 0:
             # Test JD just before end should work
-            pos, _ = eph.calc_ut(end_jd - 1.0, eph.SE_SUN, 0)
+            pos, _ = eph.calc_ut(end_jd - 1.0, eph.SUN, 0)
             assert 0 <= pos[0] < 360
 
     def test_jd_just_outside_start(self):
         """JD just before start should raise error."""
-        eph.calc_ut(2451545.0, eph.SE_SUN, 0)  # Ensure loaded
+        eph.calc_ut(2451545.0, eph.SUN, 0)  # Ensure loaded
         path, start_jd, end_jd, denum = eph.get_current_file_data(0)
 
         if start_jd > 0:
             with pytest.raises(EphemerisRangeError):
-                eph.calc_ut(start_jd - 1.0, eph.SE_SUN, 0)
+                eph.calc_ut(start_jd - 1.0, eph.SUN, 0)
 
     def test_jd_just_outside_end(self):
         """JD just after end should raise error."""
-        eph.calc_ut(2451545.0, eph.SE_SUN, 0)  # Ensure loaded
+        eph.calc_ut(2451545.0, eph.SUN, 0)  # Ensure loaded
         path, start_jd, end_jd, denum = eph.get_current_file_data(0)
 
         if end_jd > 0:
             with pytest.raises(EphemerisRangeError):
-                eph.calc_ut(end_jd + 1.0, eph.SE_SUN, 0)
+                eph.calc_ut(end_jd + 1.0, eph.SUN, 0)
 
 
 class TestMultiplePlanets:
@@ -221,16 +221,16 @@ class TestMultiplePlanets:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (eph.SE_SUN, "Sun"),
-            (eph.SE_MOON, "Moon"),
-            (eph.SE_MERCURY, "Mercury"),
-            (eph.SE_VENUS, "Venus"),
-            (eph.SE_MARS, "Mars"),
-            (eph.SE_JUPITER, "Jupiter"),
-            (eph.SE_SATURN, "Saturn"),
-            (eph.SE_URANUS, "Uranus"),
-            (eph.SE_NEPTUNE, "Neptune"),
-            (eph.SE_PLUTO, "Pluto"),
+            (eph.SUN, "Sun"),
+            (eph.MOON, "Moon"),
+            (eph.MERCURY, "Mercury"),
+            (eph.VENUS, "Venus"),
+            (eph.MARS, "Mars"),
+            (eph.JUPITER, "Jupiter"),
+            (eph.SATURN, "Saturn"),
+            (eph.URANUS, "Uranus"),
+            (eph.NEPTUNE, "Neptune"),
+            (eph.PLUTO, "Pluto"),
         ],
     )
     def test_all_planets_validate_range(self, body_id, body_name):

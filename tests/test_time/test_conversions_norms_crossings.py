@@ -15,7 +15,7 @@ from libephemeris.utils import degnorm, radnorm
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -295,7 +295,7 @@ class TestCrossingPrecision:
         jd_start = swe.julday(2000, 3, 1, 0.0)
         jd_cross = swe.solcross_ut(0.0, jd_start, 0)
         # Verify Sun is near 0° at crossing
-        pos, _ = swe.calc_ut(jd_cross, 0, 256)  # SE_SUN=0, SEFLG_SPEED=256
+        pos, _ = swe.calc_ut(jd_cross, 0, 256)  # SUN=0, FLG_SPEED=256
         lon = pos[0]
         diff = min(lon, 360 - lon)
         assert diff < 0.001, f"Sun at crossing: {lon}°"
@@ -314,7 +314,7 @@ class TestCrossingPrecision:
         """Moon crossing 0° near J2000."""
         jd_start = JD_J2000
         jd_cross = swe.mooncross_ut(0.0, jd_start, 0)
-        pos, _ = swe.calc_ut(jd_cross, 1, 256)  # SE_MOON=1
+        pos, _ = swe.calc_ut(jd_cross, 1, 256)  # MOON=1
         lon = pos[0]
         diff = min(lon, 360 - lon)
         assert diff < 0.01, f"Moon at crossing: {lon}°"

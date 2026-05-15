@@ -13,15 +13,15 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SPEED,
+    FLG_SWIEPH,
 )
 
 
@@ -31,12 +31,12 @@ class TestSolcross:
     @pytest.mark.unit
     def test_solcross_vernal_equinox(self):
         """Sun crosses 0 Aries near March 20."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(0.0, jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross = swe.solcross_ut(0.0, jd_start, FLG_SWIEPH)
         assert isinstance(jd_cross, float)
         assert math.isfinite(jd_cross)
         # Should be around March 20, 2024
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 3
         assert 19 <= d <= 21, f"Vernal equinox: {y}-{m}-{d}"
@@ -44,9 +44,9 @@ class TestSolcross:
     @pytest.mark.unit
     def test_solcross_summer_solstice(self):
         """Sun crosses 90 deg near June 21."""
-        jd_start = swe.swe_julday(2024, 4, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(90.0, jd_start, SEFLG_SWIEPH)
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        jd_start = swe.julday(2024, 4, 1, 0.0)
+        jd_cross = swe.solcross_ut(90.0, jd_start, FLG_SWIEPH)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 6
         assert 20 <= d <= 22
@@ -54,9 +54,9 @@ class TestSolcross:
     @pytest.mark.unit
     def test_solcross_autumnal_equinox(self):
         """Sun crosses 180 deg near September 22."""
-        jd_start = swe.swe_julday(2024, 7, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(180.0, jd_start, SEFLG_SWIEPH)
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        jd_start = swe.julday(2024, 7, 1, 0.0)
+        jd_cross = swe.solcross_ut(180.0, jd_start, FLG_SWIEPH)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 9
         assert 21 <= d <= 23
@@ -64,9 +64,9 @@ class TestSolcross:
     @pytest.mark.unit
     def test_solcross_winter_solstice(self):
         """Sun crosses 270 deg near December 21."""
-        jd_start = swe.swe_julday(2024, 10, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(270.0, jd_start, SEFLG_SWIEPH)
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        jd_start = swe.julday(2024, 10, 1, 0.0)
+        jd_cross = swe.solcross_ut(270.0, jd_start, FLG_SWIEPH)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 12
         assert 20 <= d <= 22
@@ -78,8 +78,8 @@ class TestSolcross:
     )
     def test_solcross_all_signs(self, degree: float):
         """Sun should cross every 30 degree mark within a year."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(degree, jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross = swe.solcross_ut(degree, jd_start, FLG_SWIEPH)
         assert math.isfinite(jd_cross)
         assert jd_cross > jd_start
         # Should be within ~366 days
@@ -92,8 +92,8 @@ class TestMooncross:
     @pytest.mark.unit
     def test_mooncross_0_aries(self):
         """Moon crosses 0 Aries within ~28 days."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = swe.swe_mooncross_ut(0.0, jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross = swe.mooncross_ut(0.0, jd_start, FLG_SWIEPH)
         assert isinstance(jd_cross, float)
         assert math.isfinite(jd_cross)
         assert jd_cross > jd_start
@@ -104,8 +104,8 @@ class TestMooncross:
     @pytest.mark.parametrize("degree", [0.0, 90.0, 180.0, 270.0])
     def test_mooncross_quadrants(self, degree: float):
         """Moon crosses quadrant points within ~28 days."""
-        jd_start = swe.swe_julday(2024, 6, 1, 0.0)
-        jd_cross = swe.swe_mooncross_ut(degree, jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 6, 1, 0.0)
+        jd_cross = swe.mooncross_ut(degree, jd_start, FLG_SWIEPH)
         assert math.isfinite(jd_cross)
         assert jd_cross > jd_start
         assert jd_cross - jd_start < 29
@@ -113,9 +113,9 @@ class TestMooncross:
     @pytest.mark.unit
     def test_mooncross_consecutive(self):
         """Two consecutive Moon crossings of same point ~27.3 days apart."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd1 = swe.swe_mooncross_ut(90.0, jd_start, SEFLG_SWIEPH)
-        jd2 = swe.swe_mooncross_ut(90.0, jd1 + 1.0, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd1 = swe.mooncross_ut(90.0, jd_start, FLG_SWIEPH)
+        jd2 = swe.mooncross_ut(90.0, jd1 + 1.0, FLG_SWIEPH)
         gap = jd2 - jd1
         assert 26 < gap < 29, f"Gap between Moon crossings: {gap:.2f} days"
 
@@ -126,8 +126,8 @@ class TestMooncrossNode:
     @pytest.mark.unit
     def test_mooncross_node_returns_tuple(self):
         """mooncross_node_ut returns (jd, lon, lat)."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        result = swe.swe_mooncross_node_ut(jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        result = swe.mooncross_node_ut(jd_start, FLG_SWIEPH)
         assert len(result) == 3
         jd_cross, lon, lat = result
         assert math.isfinite(jd_cross)
@@ -137,16 +137,16 @@ class TestMooncrossNode:
     @pytest.mark.unit
     def test_mooncross_node_lat_near_zero(self):
         """At node crossing, latitude should be near 0."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross, lon, lat = swe.swe_mooncross_node_ut(jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross, lon, lat = swe.mooncross_node_ut(jd_start, FLG_SWIEPH)
         # At the node, latitude should be very close to 0
         assert abs(lat) < 0.1, f"Moon lat at node: {lat} deg"
 
     @pytest.mark.unit
     def test_mooncross_node_within_month(self):
         """Moon should cross a node within ~14 days."""
-        jd_start = swe.swe_julday(2024, 6, 1, 0.0)
-        jd_cross, _, _ = swe.swe_mooncross_node_ut(jd_start, SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 6, 1, 0.0)
+        jd_cross, _, _ = swe.mooncross_node_ut(jd_start, FLG_SWIEPH)
         assert jd_cross > jd_start
         # Moon crosses nodes roughly every 13.6 days
         assert jd_cross - jd_start < 15
@@ -158,8 +158,8 @@ class TestFindStation:
     @pytest.mark.unit
     def test_mercury_station_found(self):
         """Mercury stations should be found within ~4 months."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        result = swe.swe_find_station_ut(SE_MERCURY, jd_start, "any", SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        result = swe.find_station_ut(MERCURY, jd_start, "any", FLG_SWIEPH)
         # Returns (jd, station_type_str)
         jd_station, stype = result
         assert isinstance(jd_station, float)
@@ -172,8 +172,8 @@ class TestFindStation:
     @pytest.mark.unit
     def test_mars_station_found(self):
         """Mars station should be found."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        result = swe.swe_find_station_ut(SE_MARS, jd_start, "any", SEFLG_SWIEPH)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        result = swe.find_station_ut(MARS, jd_start, "any", FLG_SWIEPH)
         jd_station, stype = result
         assert isinstance(jd_station, float)
         assert math.isfinite(jd_station)
@@ -184,9 +184,9 @@ class TestFindStation:
     @pytest.mark.parametrize("station_type", ["SR", "SD"])
     def test_mercury_station_types(self, station_type: str):
         """Mercury SR and SD stations should be findable."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        result = swe.swe_find_station_ut(
-            SE_MERCURY, jd_start, station_type, SEFLG_SWIEPH
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        result = swe.find_station_ut(
+            MERCURY, jd_start, station_type, FLG_SWIEPH
         )
         jd_station, stype = result
         assert isinstance(jd_station, float)

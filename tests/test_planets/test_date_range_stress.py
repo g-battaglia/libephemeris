@@ -16,28 +16,28 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_CHIRON,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    CHIRON,
+    FLG_SPEED,
 )
 
 
 def _jd_from_ymd(y: int, m: int, d: int, h: float = 12.0) -> float:
     """Convert Y/M/D to JD via libephemeris."""
-    return swe.swe_julday(y, m, d, h)
+    return swe.julday(y, m, d, h)
 
 
 def _random_jds_in_range(
@@ -51,30 +51,30 @@ def _random_jds_in_range(
         m = rng.randint(1, 12)
         d = rng.randint(1, 28)
         h = rng.uniform(0, 24)
-        jd = swe.swe_julday(y, m, d, h)
+        jd = swe.julday(y, m, d, h)
         results.append((jd, f"{y}-{m:02d}-{d:02d}"))
     return results
 
 
 CORE_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 EXTENDED_BODIES = [
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanApog"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_CHIRON, "Chiron"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanApog"),
+    (OSCU_APOG, "OscuApog"),
+    (CHIRON, "Chiron"),
 ]
 
 
@@ -104,7 +104,7 @@ class TestCenturyByCentury:
     ):
         """Core planet returns valid position at each century mark."""
         jd = _jd_from_ymd(year, 1, 1)
-        result, retflag = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, body_id, FLG_SPEED)
         assert len(result) == 6, f"{body_name} @ {era}"
         lon, lat, dist = result[0], result[1], result[2]
         assert 0 <= lon < 360, f"{body_name} @ {era}: lon={lon}"
@@ -122,7 +122,7 @@ class TestBoundaryDates:
     def test_de440_start_boundary(self, body_id: int, body_name: str):
         """Position valid near DE440 start (1550 CE)."""
         jd = _jd_from_ymd(1550, 6, 15)
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
 
@@ -131,7 +131,7 @@ class TestBoundaryDates:
     def test_de440_end_boundary(self, body_id: int, body_name: str):
         """Position valid near DE440 end (2650 CE)."""
         jd = _jd_from_ymd(2649, 6, 15)
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
 
@@ -140,7 +140,7 @@ class TestBoundaryDates:
         """All core bodies valid at J2000.0."""
         jd = 2451545.0
         for body_id, name in CORE_BODIES:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert len(result) == 6, f"{name} at J2000"
             assert 0 <= result[0] < 360, f"{name} at J2000: lon={result[0]}"
 
@@ -149,7 +149,7 @@ class TestBoundaryDates:
         """All core bodies valid at Unix epoch (1970-01-01)."""
         jd = 2440587.5
         for body_id, name in CORE_BODIES:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert len(result) == 6, f"{name} at Unix epoch"
 
 
@@ -162,7 +162,7 @@ class TestHighVolumeRandomDates:
         """100 random dates in 1800-2200 range."""
         dates = _random_jds_in_range(100, 1800, 2200, seed=body_id * 7)
         for jd, label in dates:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert len(result) == 6, f"{body_name} @ {label}"
             assert 0 <= result[0] < 360, f"{body_name} @ {label}: lon={result[0]}"
             assert math.isfinite(result[2]), f"{body_name} @ {label}: dist not finite"
@@ -173,7 +173,7 @@ class TestHighVolumeRandomDates:
         """50 random dates in full DE440 range (1550-2649)."""
         dates = _random_jds_in_range(50, 1550, 2649, seed=body_id * 13)
         for jd, label in dates:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert len(result) == 6, f"{body_name} @ {label}"
             assert 0 <= result[0] < 360
 
@@ -183,7 +183,7 @@ class TestHighVolumeRandomDates:
         """50 random dates for extended bodies (nodes, apogee, Chiron)."""
         dates = _random_jds_in_range(50, 1800, 2200, seed=body_id * 17)
         for jd, label in dates:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert len(result) == 6, f"{body_name} @ {label}"
             assert 0 <= result[0] < 360
 
@@ -195,10 +195,10 @@ class TestContinuityAcrossDecades:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_no_jumps_across_centuries(self, body_id: int, body_name: str):
@@ -207,9 +207,9 @@ class TestContinuityAcrossDecades:
         prev_lon = None
         for year in years:
             jd = _jd_from_ymd(year, 6, 15)
-            result, _ = swe.swe_calc_ut(jd, body_id, 0)
+            result, _ = swe.calc_ut(jd, body_id, 0)
             lon = result[0]
-            if prev_lon is not None and body_id != SE_MOON:
+            if prev_lon is not None and body_id != MOON:
                 # For slow planets, check no huge jumps
                 diff = abs(lon - prev_lon)
                 if diff > 180:
@@ -223,8 +223,8 @@ class TestContinuityAcrossDecades:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MARS, "Mars"),
         ],
     )
     def test_daily_continuity_100_days(self, body_id: int, body_name: str):
@@ -233,7 +233,7 @@ class TestContinuityAcrossDecades:
         prev_lon = None
         for i in range(100):
             jd = jd_start + i
-            result, _ = swe.swe_calc_ut(jd, body_id, 0)
+            result, _ = swe.calc_ut(jd, body_id, 0)
             lon = result[0]
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -257,7 +257,7 @@ class TestMoonHighVolume:
     )
     def test_moon_200_dates(self, jd: float, label: str):
         """Moon valid at 200 random dates."""
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
         lon, lat, dist, slon, slat, sdist = result
         assert 0 <= lon < 360, f"Moon @ {label}: lon={lon}"
         assert -7 < lat < 7, f"Moon @ {label}: lat={lat}"

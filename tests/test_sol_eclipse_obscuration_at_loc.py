@@ -1,5 +1,5 @@
 """
-Tests for sol_eclipse_obscuration_at_loc and swe_sol_eclipse_obscuration_at_loc.
+Tests for sol_eclipse_obscuration_at_loc and sol_eclipse_obscuration_at_loc.
 
 These tests validate the eclipse obscuration calculation at specific locations.
 Eclipse obscuration is the fraction of the Sun's disc AREA covered by the Moon,
@@ -15,10 +15,11 @@ import pytest
 from libephemeris import (
     julday,
     sol_eclipse_obscuration_at_loc,
-    swe_sol_eclipse_obscuration_at_loc,
+    _sol_eclipse_obscuration_at_loc_pythonic,
     sol_eclipse_magnitude_at_loc,
-    swe_sol_eclipse_how,
-    SEFLG_SWIEPH,
+    _sol_eclipse_magnitude_at_loc_pythonic,
+    sol_eclipse_how,
+    FLG_SWIEPH,
 )
 
 
@@ -39,9 +40,9 @@ class TestSolEclipseObscurationAtLocSignature:
 
     def test_swe_version_exported(self):
         """Test that swe_ prefixed version is exported."""
-        from libephemeris import swe_sol_eclipse_obscuration_at_loc
+        from libephemeris import sol_eclipse_obscuration_at_loc
 
-        assert callable(swe_sol_eclipse_obscuration_at_loc)
+        assert callable(sol_eclipse_obscuration_at_loc)
 
     def test_returns_float(self):
         """Test that function returns a float."""
@@ -49,7 +50,7 @@ class TestSolEclipseObscurationAtLocSignature:
         jd = 2460409.28
         dallas_lat, dallas_lon = 32.7767, -96.797
 
-        result = sol_eclipse_obscuration_at_loc(jd, dallas_lat, dallas_lon)
+        result = _sol_eclipse_obscuration_at_loc_pythonic(jd, dallas_lat, dallas_lon)
 
         assert isinstance(result, float)
 
@@ -58,7 +59,7 @@ class TestSolEclipseObscurationAtLocSignature:
         jd = 2460409.28
         dallas_lat, dallas_lon = 32.7767, -96.797
 
-        result = sol_eclipse_obscuration_at_loc(
+        result = _sol_eclipse_obscuration_at_loc_pythonic(
             jd, dallas_lat, dallas_lon, altitude=500.0
         )
 
@@ -69,28 +70,28 @@ class TestSolEclipseObscurationAtLocSignature:
         jd = 2460409.28
         dallas_lat, dallas_lon = 32.7767, -96.797
 
-        result = sol_eclipse_obscuration_at_loc(
-            jd, dallas_lat, dallas_lon, flags=SEFLG_SWIEPH
+        result = _sol_eclipse_obscuration_at_loc_pythonic(
+            jd, dallas_lat, dallas_lon, flags=FLG_SWIEPH
         )
 
         assert isinstance(result, float)
 
 
 class TestSweObscurationAtLocSignature:
-    """Test swe_sol_eclipse_obscuration_at_loc function signature."""
+    """Test sol_eclipse_obscuration_at_loc function signature."""
 
     def test_function_exists(self):
-        """Test that swe_sol_eclipse_obscuration_at_loc function exists."""
-        from libephemeris.eclipse import swe_sol_eclipse_obscuration_at_loc
+        """Test that sol_eclipse_obscuration_at_loc function exists."""
+        from libephemeris.eclipse import sol_eclipse_obscuration_at_loc
 
-        assert callable(swe_sol_eclipse_obscuration_at_loc)
+        assert callable(sol_eclipse_obscuration_at_loc)
 
     def test_returns_float(self):
         """Test that function returns a float."""
         jd = 2460409.28
         dallas_geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_obscuration_at_loc(jd, dallas_geopos, SEFLG_SWIEPH)
+        result = sol_eclipse_obscuration_at_loc(jd, dallas_geopos, FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -99,7 +100,7 @@ class TestSweObscurationAtLocSignature:
         jd = 2460409.28
 
         with pytest.raises(ValueError):
-            swe_sol_eclipse_obscuration_at_loc(jd, [0, 0], SEFLG_SWIEPH)
+            sol_eclipse_obscuration_at_loc(jd, [0, 0], FLG_SWIEPH)
 
 
 class TestObscurationDuringTotalEclipse:
@@ -115,7 +116,7 @@ class TestObscurationDuringTotalEclipse:
 
     def test_obscuration_is_positive_during_eclipse(self):
         """Test that obscuration is positive during eclipse."""
-        obscuration = sol_eclipse_obscuration_at_loc(
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(
             self.tjd_ut, self.dallas_lat, self.dallas_lon
         )
 
@@ -123,7 +124,7 @@ class TestObscurationDuringTotalEclipse:
 
     def test_obscuration_near_total_at_dallas(self):
         """Test that obscuration approaches 1.0 for total eclipse at Dallas."""
-        obscuration = sol_eclipse_obscuration_at_loc(
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(
             self.tjd_ut, self.dallas_lat, self.dallas_lon
         )
 
@@ -134,7 +135,7 @@ class TestObscurationDuringTotalEclipse:
 
     def test_obscuration_valid_range(self):
         """Test that obscuration is in valid range [0, 1]."""
-        obscuration = sol_eclipse_obscuration_at_loc(
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(
             self.tjd_ut, self.dallas_lat, self.dallas_lon
         )
 
@@ -156,7 +157,7 @@ class TestObscurationAtPartialEclipseLocation:
 
     def test_partial_eclipse_obscuration(self):
         """Test that NYC sees partial eclipse with obscuration < 1.0."""
-        obscuration = sol_eclipse_obscuration_at_loc(
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(
             self.tjd_ut, self.nyc_lat, self.nyc_lon
         )
 
@@ -167,7 +168,7 @@ class TestObscurationAtPartialEclipseLocation:
 
     def test_partial_eclipse_significant_coverage(self):
         """Test that partial eclipse has significant coverage."""
-        obscuration = sol_eclipse_obscuration_at_loc(
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(
             self.tjd_ut, self.nyc_lat, self.nyc_lon
         )
 
@@ -184,8 +185,8 @@ class TestObscurationVsMagnitude:
         jd = 2460409.30
         lat, lon = 40.7128, -74.006
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-        magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+        magnitude = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
 
         # For partial eclipses, obscuration is always less than magnitude
         # due to the non-linear relationship between diameter and area
@@ -202,8 +203,8 @@ class TestObscurationVsMagnitude:
 
         # Find a time when magnitude is > 1.0
         for jd in [2460409.27, 2460409.275, 2460409.28, 2460409.285]:
-            magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
-            obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
+            magnitude = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
+            obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
 
             if magnitude >= 1.0:
                 assert obscuration == 1.0 or obscuration > 0.98, (
@@ -217,8 +218,8 @@ class TestObscurationVsMagnitude:
         jd = julday(2024, 6, 15, 12.0)
         lat, lon = 32.7767, -96.797
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-        magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+        magnitude = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
 
         assert obscuration == 0.0, "Obscuration should be 0 when no eclipse"
         assert magnitude == 0.0, "Magnitude should be 0 when no eclipse"
@@ -233,7 +234,7 @@ class TestObscurationNoEclipse:
         jd = julday(2024, 6, 15, 12.0)
         lat, lon = 32.7767, -96.797
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
 
         assert obscuration == 0.0, "Obscuration should be 0 when no eclipse"
 
@@ -243,28 +244,28 @@ class TestObscurationNoEclipse:
         jd = 2460409.28
         tokyo_lat, tokyo_lon = 35.6762, 139.6503
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, tokyo_lat, tokyo_lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, tokyo_lat, tokyo_lon)
 
         # Tokyo is outside the eclipse path
         assert obscuration == 0.0, "Tokyo should have no eclipse visibility"
 
 
 class TestConsistencyWithSweEclipseHow:
-    """Test consistency with swe_sol_eclipse_how function."""
+    """Test consistency with sol_eclipse_how function."""
 
     def test_obscuration_matches_eclipse_how(self):
-        """Test that obscuration matches attr[2] from swe_sol_eclipse_how."""
+        """Test that obscuration matches attr[2] from sol_eclipse_how."""
         jd = 2460409.28
         lat, lon = 32.7767, -96.797
         geopos = [lon, lat, 0]
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-        _, attr = swe_sol_eclipse_how(jd, geopos, SEFLG_SWIEPH)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+        _, attr = sol_eclipse_how(jd, geopos, FLG_SWIEPH)
 
-        # Obscuration is attr[2] in swe_sol_eclipse_how
+        # Obscuration is attr[2] in sol_eclipse_how
         assert abs(obscuration - attr[2]) < 0.01, (
             f"Obscuration {obscuration:.4f} should match "
-            f"swe_sol_eclipse_how attr[2]={attr[2]:.4f}"
+            f"sol_eclipse_how attr[2]={attr[2]:.4f}"
         )
 
     def test_consistency_at_multiple_times(self):
@@ -276,12 +277,12 @@ class TestConsistencyWithSweEclipseHow:
         test_times = [2460409.26, 2460409.28, 2460409.30]
 
         for jd in test_times:
-            obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-            _, attr = swe_sol_eclipse_how(jd, geopos, SEFLG_SWIEPH)
+            obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+            _, attr = sol_eclipse_how(jd, geopos, FLG_SWIEPH)
 
             assert abs(obscuration - attr[2]) < 0.01, (
                 f"At JD {jd}: obscuration {obscuration:.4f} differs from "
-                f"swe_sol_eclipse_how attr[2]={attr[2]:.4f}"
+                f"sol_eclipse_how attr[2]={attr[2]:.4f}"
             )
 
 
@@ -294,11 +295,11 @@ class TestSweApiConvention:
         dallas_lat, dallas_lon = 32.7767, -96.797
 
         # Legacy function: lat, lon order
-        result_legacy = sol_eclipse_obscuration_at_loc(jd, dallas_lat, dallas_lon)
+        result_legacy = _sol_eclipse_obscuration_at_loc_pythonic(jd, dallas_lat, dallas_lon)
 
         # swe version: geopos = [lon, lat, alt]
-        result_swe = swe_sol_eclipse_obscuration_at_loc(
-            jd, [dallas_lon, dallas_lat, 0], SEFLG_SWIEPH
+        result_swe = sol_eclipse_obscuration_at_loc(
+            jd, [dallas_lon, dallas_lat, 0], FLG_SWIEPH
         )
 
         # Results should be equivalent
@@ -313,8 +314,8 @@ class TestEdgeCases:
         jd = 2460409.28
         lat, lon = 32.7767, -96.797
 
-        obscuration_sea_level = sol_eclipse_obscuration_at_loc(jd, lat, lon, altitude=0)
-        obscuration_high_alt = sol_eclipse_obscuration_at_loc(
+        obscuration_sea_level = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon, altitude=0)
+        obscuration_high_alt = _sol_eclipse_obscuration_at_loc_pythonic(
             jd, lat, lon, altitude=5000
         )
 
@@ -329,7 +330,7 @@ class TestEdgeCases:
         lat, lon = 80.0, 0.0  # Near North Pole
 
         # Should not crash
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
         assert isinstance(obscuration, float)
         assert 0 <= obscuration <= 1.0
 
@@ -338,7 +339,7 @@ class TestEdgeCases:
         jd = 2460409.28
         lat, lon = 0.0, 0.0  # Null Island
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
         assert isinstance(obscuration, float)
         assert 0 <= obscuration <= 1.0
 
@@ -347,7 +348,7 @@ class TestEdgeCases:
         jd = 2460409.28
         geopos = (-96.797, 32.7767, 0)
 
-        result = swe_sol_eclipse_obscuration_at_loc(jd, geopos, SEFLG_SWIEPH)
+        result = sol_eclipse_obscuration_at_loc(jd, geopos, FLG_SWIEPH)
         assert isinstance(result, float)
 
     def test_accepts_list_geopos(self):
@@ -355,7 +356,7 @@ class TestEdgeCases:
         jd = 2460409.28
         geopos = [-96.797, 32.7767, 0]
 
-        result = swe_sol_eclipse_obscuration_at_loc(jd, geopos, SEFLG_SWIEPH)
+        result = sol_eclipse_obscuration_at_loc(jd, geopos, FLG_SWIEPH)
         assert isinstance(result, float)
 
 
@@ -369,7 +370,7 @@ class TestObscurationPhysicalProperties:
         # Times before maximum (increasing obscuration)
         times_before_max = [2460409.24, 2460409.26, 2460409.28]
         obscurations = [
-            sol_eclipse_obscuration_at_loc(jd, lat, lon) for jd in times_before_max
+            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon) for jd in times_before_max
         ]
 
         # Check increasing trend (with some tolerance for edge effects)
@@ -386,7 +387,7 @@ class TestObscurationPhysicalProperties:
         # Times after maximum (decreasing obscuration)
         times_after_max = [2460409.28, 2460409.30, 2460409.32]
         obscurations = [
-            sol_eclipse_obscuration_at_loc(jd, lat, lon) for jd in times_after_max
+            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon) for jd in times_after_max
         ]
 
         # Check decreasing trend
@@ -412,7 +413,7 @@ class TestObscurationPhysicalProperties:
         ]
 
         for jd in test_times:
-            obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
+            obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
             # For total eclipses, obscuration = (r_moon/r_sun)^2 can exceed 1.0
             assert obscuration <= 1.3, (
                 f"Obscuration {obscuration:.4f} at JD {jd} should not exceed 1.3"
@@ -431,8 +432,8 @@ class TestMathematicalRelationship:
         jd = 2460409.30  # Partial eclipse at NYC
         lat, lon = 40.7128, -74.006
 
-        obscuration = sol_eclipse_obscuration_at_loc(jd, lat, lon)
-        magnitude = sol_eclipse_magnitude_at_loc(jd, lat, lon)
+        obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+        magnitude = _sol_eclipse_magnitude_at_loc_pythonic(jd, lat, lon)
 
         if 0 < magnitude < 1.0:
             # For equal-sized disks, obscuration follows lens formula

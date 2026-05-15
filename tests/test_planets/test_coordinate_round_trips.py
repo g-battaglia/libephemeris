@@ -2,8 +2,8 @@
 Coordinate round-trip tests.
 
 Verifies that ecliptic-to-equatorial and equatorial-to-ecliptic
-coordinate transforms via swe_cotrans are invertible, and that
-the SEFLG_EQUATORIAL flag produces results consistent with cotrans.
+coordinate transforms via cotrans are invertible, and that
+the FLG_EQUATORIAL flag produces results consistent with cotrans.
 """
 
 from __future__ import annotations
@@ -15,15 +15,15 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MERCURY,
-    SE_VENUS,
-    SEFLG_EQUATORIAL,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    MERCURY,
+    VENUS,
+    FLG_EQUATORIAL,
+    FLG_SPEED,
 )
 
 
@@ -40,7 +40,7 @@ def _angle_diff(a: float, b: float) -> float:
 
 
 class TestCotransRoundTrip:
-    """Test ecliptic <-> equatorial round trips via swe_cotrans."""
+    """Test ecliptic <-> equatorial round trips via cotrans."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -65,11 +65,11 @@ class TestCotransRoundTrip:
         eps = 23.4392911  # Mean obliquity at J2000
 
         # Ecliptic to equatorial: negative epsilon
-        equ = swe.swe_cotrans((lon, lat, 1.0), -eps)
+        equ = swe.cotrans((lon, lat, 1.0), -eps)
         ra, dec = equ[0], equ[1]
 
         # Equatorial to ecliptic: positive epsilon
-        ecl = swe.swe_cotrans((ra, dec, 1.0), eps)
+        ecl = swe.cotrans((ra, dec, 1.0), eps)
         lon2, lat2 = ecl[0], ecl[1]
 
         tol = 1e-8  # degrees
@@ -99,9 +99,9 @@ class TestCotransRoundTrip:
         eps = 23.4392911
 
         # Equatorial to ecliptic: positive epsilon
-        ecl = swe.swe_cotrans((ra, dec, 1.0), eps)
+        ecl = swe.cotrans((ra, dec, 1.0), eps)
         # Ecliptic to equatorial: negative epsilon
-        equ = swe.swe_cotrans((ecl[0], ecl[1], 1.0), -eps)
+        equ = swe.cotrans((ecl[0], ecl[1], 1.0), -eps)
 
         tol = 1e-8
         assert _angle_diff(ra, equ[0]) < tol, (
@@ -116,7 +116,7 @@ class TestCotransRoundTrip:
         """Coordinate transform should preserve the distance component."""
         eps = 23.4392911
         lon, lat, dist = 123.456, 7.89, 1.23456
-        result = swe.swe_cotrans((lon, lat, dist), -eps)
+        result = swe.cotrans((lon, lat, dist), -eps)
         assert abs(result[2] - dist) < 1e-10, f"Distance changed: {dist} -> {result[2]}"
 
     @pytest.mark.unit
@@ -128,8 +128,8 @@ class TestCotransRoundTrip:
         lat = rng.uniform(-89, 89)
         eps = 23.4392911
 
-        equ = swe.swe_cotrans((lon, lat, 1.0), -eps)
-        ecl = swe.swe_cotrans((equ[0], equ[1], 1.0), eps)
+        equ = swe.cotrans((lon, lat, 1.0), -eps)
+        ecl = swe.cotrans((equ[0], equ[1], 1.0), eps)
 
         tol = 1e-8
         assert _angle_diff(lon, ecl[0]) < tol
@@ -137,32 +137,32 @@ class TestCotransRoundTrip:
 
 
 class TestEquatorialFlagConsistency:
-    """Test SEFLG_EQUATORIAL matches cotrans of default ecliptic output."""
+    """Test FLG_EQUATORIAL matches cotrans of default ecliptic output."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_equatorial_flag_matches_cotrans(self, body_id: int, body_name: str):
-        """SEFLG_EQUATORIAL output should match manual cotrans."""
+        """FLG_EQUATORIAL output should match manual cotrans."""
         jd = 2451545.0
 
         # Get ecliptic position
-        r_ecl, _ = swe.swe_calc_ut(jd, body_id, 0)
+        r_ecl, _ = swe.calc_ut(jd, body_id, 0)
         # Get equatorial position via flag
-        r_equ, _ = swe.swe_calc_ut(jd, body_id, SEFLG_EQUATORIAL)
+        r_equ, _ = swe.calc_ut(jd, body_id, FLG_EQUATORIAL)
 
         # Manual cotrans
-        eps = swe.swe_calc_ut(jd, SE_SUN, 0)  # just need obliquity
+        eps = swe.calc_ut(jd, SUN, 0)  # just need obliquity
         # Use the library's obliquity
         # Actually, let's just verify the equatorial result is valid
         # and differs appropriately from ecliptic
@@ -182,16 +182,16 @@ class TestEquatorialFlagConsistency:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_equatorial_at_multiple_dates(self, body_id: int, body_name: str):
         """Equatorial coordinates valid at multiple dates."""
         jds = _random_jds(30, seed=body_id * 37)
         for jd in jds:
-            r_equ, _ = swe.swe_calc_ut(jd, body_id, SEFLG_EQUATORIAL)
+            r_equ, _ = swe.calc_ut(jd, body_id, FLG_EQUATORIAL)
             assert 0 <= r_equ[0] < 360, (
                 f"{body_name} @ JD {jd}: RA {r_equ[0]} out of range"
             )
@@ -207,7 +207,7 @@ class TestCotransSpecialCases:
     def test_vernal_equinox_point(self):
         """At the vernal equinox (0,0), RA should also be 0."""
         eps = 23.4392911
-        result = swe.swe_cotrans((0.0, 0.0, 1.0), -eps)
+        result = swe.cotrans((0.0, 0.0, 1.0), -eps)
         assert abs(result[0]) < 1e-10 or abs(result[0] - 360) < 1e-10, (
             f"Vernal equinox RA should be 0, got {result[0]}"
         )
@@ -219,7 +219,7 @@ class TestCotransSpecialCases:
     def test_summer_solstice_point(self):
         """At (90, 0) ecliptic, RA=90 and Dec=obliquity."""
         eps = 23.4392911
-        result = swe.swe_cotrans((90.0, 0.0, 1.0), -eps)
+        result = swe.cotrans((90.0, 0.0, 1.0), -eps)
         assert abs(result[0] - 90.0) < 1e-6, (
             f"Summer solstice RA should be 90, got {result[0]}"
         )
@@ -231,7 +231,7 @@ class TestCotransSpecialCases:
     def test_autumnal_equinox_point(self):
         """At (180, 0) ecliptic, RA=180 and Dec=0."""
         eps = 23.4392911
-        result = swe.swe_cotrans((180.0, 0.0, 1.0), -eps)
+        result = swe.cotrans((180.0, 0.0, 1.0), -eps)
         assert abs(result[0] - 180.0) < 1e-6, (
             f"Autumnal equinox RA should be 180, got {result[0]}"
         )
@@ -243,7 +243,7 @@ class TestCotransSpecialCases:
     def test_winter_solstice_point(self):
         """At (270, 0) ecliptic, RA=270 and Dec=-obliquity."""
         eps = 23.4392911
-        result = swe.swe_cotrans((270.0, 0.0, 1.0), -eps)
+        result = swe.cotrans((270.0, 0.0, 1.0), -eps)
         assert abs(result[0] - 270.0) < 1e-6, (
             f"Winter solstice RA should be 270, got {result[0]}"
         )
@@ -255,7 +255,7 @@ class TestCotransSpecialCases:
     def test_ecliptic_pole(self):
         """At ecliptic north pole (any lon, 90), should map to equatorial pole."""
         eps = 23.4392911
-        result = swe.swe_cotrans((0.0, 90.0, 1.0), -eps)
+        result = swe.cotrans((0.0, 90.0, 1.0), -eps)
         # Ecliptic north pole maps to RA=270, Dec=90-eps
         dec = result[1]
         expected_dec = 90.0 - eps
@@ -276,8 +276,8 @@ class TestHighVolumeRoundTrips:
         lat = rng.uniform(-85, 85)
         eps = 23.4392911
 
-        equ = swe.swe_cotrans((lon, lat, 1.0), -eps)
-        ecl = swe.swe_cotrans((equ[0], equ[1], 1.0), eps)
+        equ = swe.cotrans((lon, lat, 1.0), -eps)
+        ecl = swe.cotrans((equ[0], equ[1], 1.0), eps)
 
         tol = 1e-7
         assert _angle_diff(lon, ecl[0]) < tol, f"#{idx}: lon {lon:.6f} -> {ecl[0]:.6f}"

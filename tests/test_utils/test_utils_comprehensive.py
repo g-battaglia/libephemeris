@@ -130,7 +130,7 @@ class TestWrapAround:
         jds = rng.uniform(jd_start, jd_end, 50)
 
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), 0, 256)  # Sun + SPEED
+            result, _ = swe.calc_ut(float(jd), 0, 256)  # Sun + SPEED
             lon = result[0]
             assert 0 <= lon < 360, f"JD {jd}: Sun lon = {lon}"
 
@@ -143,7 +143,7 @@ class TestWrapAround:
         jds = rng.uniform(2451545.0, 2451545.0 + 365, 30)
 
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), 1, 256)  # Moon + SPEED
+            result, _ = swe.calc_ut(float(jd), 1, 256)  # Moon + SPEED
             lon = result[0]
             assert 0 <= lon < 360, f"JD {jd}: Moon lon = {lon}"
 
@@ -154,16 +154,16 @@ class TestEarthGeocentric:
     @pytest.mark.unit
     def test_earth_geocentric_all_zeros(self):
         """Earth geocentric should return all zeros."""
-        result, _ = swe.swe_calc_ut(2451545.0, 14, 256)
+        result, _ = swe.calc_ut(2451545.0, 14, 256)
         for i in range(6):
             assert result[i] == 0.0, f"Earth result[{i}] = {result[i]}"
 
     @pytest.mark.unit
     def test_earth_heliocentric_nonzero(self):
         """Earth heliocentric should return nonzero values."""
-        from libephemeris.constants import SEFLG_HELCTR, SEFLG_SPEED
+        from libephemeris.constants import FLG_HELCTR, FLG_SPEED
 
-        result, _ = swe.swe_calc_ut(2451545.0, 14, SEFLG_HELCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(2451545.0, 14, FLG_HELCTR | FLG_SPEED)
         # Heliocentric Earth should have nonzero distance
         assert result[2] > 0, f"Earth helio dist = {result[2]}"
 
@@ -174,26 +174,26 @@ class TestEarthGeocentric:
             ("SPEED", 256),
             ("SWIEPH", 2),
             ("SWIEPH+SPEED", 258),
-            ("J2000", 32768),  # SEFLG_J2000
-            ("ICRS", 131072),  # SEFLG_ICRS
+            ("J2000", 32768),  # FLG_J2000
+            ("ICRS", 131072),  # FLG_ICRS
         ],
     )
     def test_earth_geocentric_various_flags(self, flags_name: str, flags_val: int):
         """Earth geocentric with various flags should return zeros without error."""
-        result, _ = swe.swe_calc_ut(2451545.0, 14, flags_val)
+        result, _ = swe.calc_ut(2451545.0, 14, flags_val)
         for i in range(6):
             assert result[i] == 0.0, f"Earth ({flags_name}) result[{i}] = {result[i]}"
 
 
 class TestCotransComprehensive:
-    """Extended tests for swe_cotrans."""
+    """Extended tests for cotrans."""
 
     @pytest.mark.unit
     def test_identity_at_zero_obliquity(self):
         """With eps=0, cotrans should return unchanged coordinates."""
         lon, lat, dist = 120.0, 30.0, 1.5
         # Negative eps = ecliptic to equatorial
-        result = swe.swe_cotrans((lon, lat, dist), 0.0)
+        result = swe.cotrans((lon, lat, dist), 0.0)
         assert abs(result[0] - lon) < 1e-8
         assert abs(result[1] - lat) < 1e-8
         assert abs(result[2] - dist) < 1e-8
@@ -205,9 +205,9 @@ class TestCotransComprehensive:
         eps = 23.44
 
         # Ecliptic to equatorial (negative eps)
-        equ = swe.swe_cotrans((lon, lat, dist), -eps)
+        equ = swe.cotrans((lon, lat, dist), -eps)
         # Equatorial to ecliptic (positive eps)
-        ecl = swe.swe_cotrans((equ[0], equ[1], equ[2]), eps)
+        ecl = swe.cotrans((equ[0], equ[1], equ[2]), eps)
 
         assert abs(ecl[0] - lon) < 1e-6, f"Lon: {ecl[0]} != {lon}"
         assert abs(ecl[1] - lat) < 1e-6, f"Lat: {ecl[1]} != {lat}"
@@ -217,7 +217,7 @@ class TestCotransComprehensive:
     def test_ecliptic_pole_to_equatorial(self):
         """Ecliptic north pole (lat=90) should map to specific equatorial coords."""
         eps = 23.44
-        result = swe.swe_cotrans((0.0, 90.0, 1.0), -eps)
+        result = swe.cotrans((0.0, 90.0, 1.0), -eps)
         # Ecliptic pole should have equatorial declination = 90 - eps
         assert abs(result[1] - (90.0 - eps)) < 0.01, (
             f"Ecliptic pole dec: {result[1]} (expected ~{90.0 - eps})"

@@ -14,27 +14,27 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SEFLG_SIDEREAL,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_SIDEREAL,
+    FLG_J2000,
+    FLG_NOABERR,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 from libephemeris.state import get_calc_mode
 
@@ -53,19 +53,19 @@ def _angle_diff(a: float, b: float) -> float:
 
 # Bodies supported by both Skyfield and LEB
 LEB_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanApog"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanApog"),
 ]
 
 
@@ -79,10 +79,10 @@ class TestSkyfieldVsLEB:
         jd = 2451545.0
 
         swe.set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        r_sky, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
         swe.set_calc_mode("leb")
-        r_leb, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        r_leb, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
         # Longitude agreement
         lon_diff = _angle_diff(r_sky[0], r_leb[0])
@@ -103,10 +103,10 @@ class TestSkyfieldVsLEB:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_skyfield_leb_agree_20_dates(self, body_id: int, body_name: str):
@@ -116,10 +116,10 @@ class TestSkyfieldVsLEB:
 
         for jd in jds:
             swe.set_calc_mode("skyfield")
-            r_sky, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            r_sky, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
             swe.set_calc_mode("leb")
-            r_leb, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            r_leb, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
             lon_diff = _angle_diff(r_sky[0], r_leb[0])
             assert lon_diff < tol, (
@@ -130,9 +130,9 @@ class TestSkyfieldVsLEB:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_skyfield_leb_distance_agree(self, body_id: int, body_name: str):
@@ -140,10 +140,10 @@ class TestSkyfieldVsLEB:
         jd = 2451545.0
 
         swe.set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, body_id, 0)
+        r_sky, _ = swe.calc_ut(jd, body_id, 0)
 
         swe.set_calc_mode("leb")
-        r_leb, _ = swe.swe_calc_ut(jd, body_id, 0)
+        r_leb, _ = swe.calc_ut(jd, body_id, 0)
 
         dist_diff = abs(r_sky[2] - r_leb[2])
         assert dist_diff < 1e-7, f"{body_name}: distance diff {dist_diff} AU"
@@ -152,9 +152,9 @@ class TestSkyfieldVsLEB:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
         ],
     )
     def test_skyfield_leb_speed_agree(self, body_id: int, body_name: str):
@@ -162,23 +162,23 @@ class TestSkyfieldVsLEB:
         jd = 2451545.0
 
         swe.set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        r_sky, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
         swe.set_calc_mode("leb")
-        r_leb, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        r_leb, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
 
         speed_diff = abs(r_sky[3] - r_leb[3])
         # Moon speed can differ slightly more between backends (~1e-3)
-        tol = 1e-3 if body_id == SE_MOON else 1e-4
+        tol = 1e-3 if body_id == MOON else 1e-4
         assert speed_diff < tol, f"{body_name}: speed diff {speed_diff}°/day"
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
         "flags,desc",
         [
-            (SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_J2000, "J2000"),
-            (SEFLG_NOABERR, "no aberration"),
+            (FLG_EQUATORIAL, "equatorial"),
+            (FLG_J2000, "J2000"),
+            (FLG_NOABERR, "no aberration"),
         ],
     )
     def test_skyfield_leb_flag_variants(self, flags: int, desc: str):
@@ -187,10 +187,10 @@ class TestSkyfieldVsLEB:
         tol = 2 / 3600  # 2"
 
         swe.set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, SE_MARS, flags)
+        r_sky, _ = swe.calc_ut(jd, MARS, flags)
 
         swe.set_calc_mode("leb")
-        r_leb, _ = swe.swe_calc_ut(jd, SE_MARS, flags)
+        r_leb, _ = swe.calc_ut(jd, MARS, flags)
 
         lon_diff = _angle_diff(r_sky[0], r_leb[0])
         assert lon_diff < tol, f'Mars {desc}: lon diff {lon_diff * 3600:.3f}"'
@@ -198,15 +198,15 @@ class TestSkyfieldVsLEB:
     @pytest.mark.unit
     def test_skyfield_leb_sidereal_agree(self):
         """Skyfield and LEB agree in sidereal mode."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         jd = 2451545.0
         tol = 2 / 3600
 
         swe.set_calc_mode("skyfield")
-        r_sky, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        r_sky, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         swe.set_calc_mode("leb")
-        r_leb, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        r_leb, _ = swe.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         lon_diff = _angle_diff(r_sky[0], r_leb[0])
         assert lon_diff < tol, f'Sun sidereal: lon diff {lon_diff * 3600:.3f}"'

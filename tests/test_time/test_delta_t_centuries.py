@@ -27,7 +27,7 @@ class TestDeltaTBasic:
     def test_deltat_returns_float(self):
         """deltat returns a float value."""
         jd = 2451545.0
-        dt = swe.swe_deltat(jd)
+        dt = swe.deltat(jd)
         assert isinstance(dt, float)
         assert math.isfinite(dt)
 
@@ -35,7 +35,7 @@ class TestDeltaTBasic:
     def test_deltat_at_j2000(self):
         """Delta T at J2000 should be approximately 63.8 seconds."""
         jd = 2451545.0
-        dt = swe.swe_deltat(jd)
+        dt = swe.deltat(jd)
         dt_seconds = dt * 86400.0
         assert 60 < dt_seconds < 70, (
             f"Delta T at J2000 = {dt_seconds:.1f}s, expected ~63.8s"
@@ -46,7 +46,7 @@ class TestDeltaTBasic:
         """Delta T should be positive for modern dates after 1902 (TT > UT)."""
         for year in [1950, 2000, 2024]:
             jd = _jd_from_year(year)
-            dt = swe.swe_deltat(jd)
+            dt = swe.deltat(jd)
             assert dt > 0, f"Delta T negative at year {year}: {dt}"
 
 
@@ -69,7 +69,7 @@ class TestDeltaTAcrossCenturies:
     def test_deltat_approximate_value(self, year: int, min_sec: float, max_sec: float):
         """Delta T at known epochs should be within expected range."""
         jd = _jd_from_year(year)
-        dt_seconds = swe.swe_deltat(jd) * 86400.0
+        dt_seconds = swe.deltat(jd) * 86400.0
         assert min_sec <= dt_seconds <= max_sec, (
             f"Delta T at {year} = {dt_seconds:.1f}s, expected [{min_sec}, {max_sec}]"
         )
@@ -80,7 +80,7 @@ class TestDeltaTAcrossCenturies:
         prev_dt = None
         for year in range(1960, 2025, 5):
             jd = _jd_from_year(year)
-            dt = swe.swe_deltat(jd)
+            dt = swe.deltat(jd)
             if prev_dt is not None:
                 assert dt >= prev_dt - 1e-6, (
                     f"Delta T decreased from {year - 5} to {year}"
@@ -96,7 +96,7 @@ class TestDeltaTFinite:
     def test_deltat_finite_at_century(self, year: int):
         """Delta T is finite at each 50-year interval."""
         jd = _jd_from_year(year)
-        dt = swe.swe_deltat(jd)
+        dt = swe.deltat(jd)
         assert math.isfinite(dt), f"Delta T not finite at year {year}"
         # Should be a reasonable number of days (< 1 day)
         assert abs(dt) < 1.0, f"Delta T = {dt} days at year {year} too large"
@@ -107,8 +107,8 @@ class TestDeltaTFinite:
         """Delta T should change smoothly (no huge jumps between decades)."""
         jd1 = _jd_from_year(year)
         jd2 = _jd_from_year(year + 10)
-        dt1 = swe.swe_deltat(jd1) * 86400.0
-        dt2 = swe.swe_deltat(jd2) * 86400.0
+        dt1 = swe.deltat(jd1) * 86400.0
+        dt2 = swe.deltat(jd2) * 86400.0
         diff = abs(dt2 - dt1)
         # Over 10 years, Delta T change grows with distance from present.
         # Far-future extrapolation can change ~45s/decade. Use 60s limit.
@@ -125,7 +125,7 @@ class TestDeltaTHighVolume:
         rng = random.Random(idx + 8888)
         year = rng.uniform(1550, 2650)
         jd = _jd_from_year(year)
-        dt = swe.swe_deltat(jd)
+        dt = swe.deltat(jd)
         assert math.isfinite(dt), f"Delta T not finite at year {year:.1f}"
         # Delta T can be up to ~2000s (~0.023 days) at far-future/past dates
         assert abs(dt) < 0.03, (

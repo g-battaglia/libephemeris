@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Elongation Helpers.
 
-Validates elongation functions that call swe_calc_ut internally.
+Validates elongation functions that call calc_ut internally.
 """
 
 from __future__ import annotations
@@ -10,22 +10,22 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
 )
 
 from .conftest import TOLS, CompareHelper, year_to_jd, generate_test_dates, angular_diff
 
 
 ELONGATION_BODIES = [
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 

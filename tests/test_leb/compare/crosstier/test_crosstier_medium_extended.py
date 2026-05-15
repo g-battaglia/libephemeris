@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SEFLG_SPEED
+from libephemeris.constants import FLG_SPEED
 from libephemeris.exceptions import EphemerisRangeError
 
 from tests.test_leb.compare.conftest import (
@@ -46,10 +46,10 @@ class TestMediumExtendedPosition:
         for jd in medium_ext_dates:
             try:
                 medium, _ = cross_medium_extended.tier_a(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
                 extended, _ = cross_medium_extended.tier_b(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
             except (KeyError, ValueError, EphemerisRangeError):
                 continue
@@ -85,10 +85,10 @@ class TestMediumExtendedSpeed:
         for jd in medium_ext_dates:
             try:
                 medium, _ = cross_medium_extended.tier_a(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
                 extended, _ = cross_medium_extended.tier_b(
-                    ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                    ephem.calc_ut, jd, body_id, FLG_SPEED
                 )
             except (KeyError, ValueError, EphemerisRangeError):
                 continue
@@ -123,10 +123,10 @@ class TestMediumExtendedDistance:
 
         for jd in medium_ext_dates:
             medium, _ = cross_medium_extended.tier_a(
-                ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                ephem.calc_ut, jd, body_id, FLG_SPEED
             )
             extended, _ = cross_medium_extended.tier_b(
-                ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED
+                ephem.calc_ut, jd, body_id, FLG_SPEED
             )
 
             err = abs(medium[2] - extended[2])

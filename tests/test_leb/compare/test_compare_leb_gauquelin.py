@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Gauquelin Sectors.
 
-Validates swe_gauquelin_sector which calls swe_calc_ut for planet positions.
+Validates gauquelin_sector which calls calc_ut for planet positions.
 """
 
 from __future__ import annotations
@@ -9,16 +9,16 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_JUPITER
+from libephemeris.constants import SUN, MOON, MARS, JUPITER
 
 from .conftest import TOLS, CompareHelper, year_to_jd
 
 
 GAUQUELIN_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 TEST_LOCATIONS = [
@@ -61,10 +61,10 @@ class TestGauquelinSector:
         """Gauquelin sector matches within tolerance."""
         geopos = (lat, lon, alt)
         ref_sector = compare.skyfield(
-            ephem.swe_gauquelin_sector, jd, body_id, method, geopos
+            ephem.gauquelin_sector, jd, body_id, method, geopos
         )
         leb_sector = compare.leb(
-            ephem.swe_gauquelin_sector, jd, body_id, method, geopos
+            ephem.gauquelin_sector, jd, body_id, method, geopos
         )
 
         # Function returns float directly (sector number with decimal position)

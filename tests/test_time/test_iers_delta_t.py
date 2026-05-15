@@ -10,7 +10,7 @@ import os
 import tempfile
 import shutil
 
-from libephemeris import swe_julday
+from libephemeris import julday
 from libephemeris.iers_data import (
     download_delta_t_data,
     get_observed_delta_t,
@@ -230,7 +230,7 @@ class TestObservedDeltaTLookup:
     def test_get_observed_delta_t_exact_date(self):
         """Test getting Delta T for an exact date in the data."""
         # Jan 1, 2000
-        jd = swe_julday(2000, 1, 1, 0.0)
+        jd = julday(2000, 1, 1, 0.0)
         dt = get_observed_delta_t(jd)
         assert dt is not None
         assert dt == pytest.approx(63.8285, abs=0.001)
@@ -239,7 +239,7 @@ class TestObservedDeltaTLookup:
     def test_get_observed_delta_t_interpolated(self):
         """Test interpolation between data points."""
         # Mid-January 2000 (between Jan 1 and Feb 1)
-        jd = swe_julday(2000, 1, 15, 12.0)
+        jd = julday(2000, 1, 15, 12.0)
         dt = get_observed_delta_t(jd)
         assert dt is not None
         # Should be between 63.8285 and 63.8557
@@ -248,27 +248,27 @@ class TestObservedDeltaTLookup:
     @pytest.mark.unit
     def test_get_observed_delta_t_out_of_range_before(self):
         """Test that None is returned for dates before data range."""
-        jd = swe_julday(1970, 1, 1, 0.0)  # Before 1973
+        jd = julday(1970, 1, 1, 0.0)  # Before 1973
         dt = get_observed_delta_t(jd)
         assert dt is None
 
     @pytest.mark.unit
     def test_get_observed_delta_t_out_of_range_after(self):
         """Test that None is returned for dates after data range."""
-        jd = swe_julday(2025, 1, 1, 0.0)  # After our test data
+        jd = julday(2025, 1, 1, 0.0)  # After our test data
         dt = get_observed_delta_t(jd)
         assert dt is None
 
     @pytest.mark.unit
     def test_is_observed_delta_t_available_in_range(self):
         """Test checking if observed data is available for a date in range."""
-        jd = swe_julday(2000, 6, 15, 12.0)
+        jd = julday(2000, 6, 15, 12.0)
         assert is_observed_delta_t_available(jd) is True
 
     @pytest.mark.unit
     def test_is_observed_delta_t_available_out_of_range(self):
         """Test checking if observed data is available for a date out of range."""
-        jd = swe_julday(1960, 1, 1, 0.0)
+        jd = julday(1960, 1, 1, 0.0)
         assert is_observed_delta_t_available(jd) is False
 
     @pytest.mark.unit
@@ -278,8 +278,8 @@ class TestObservedDeltaTLookup:
         assert data_range is not None
         jd_start, jd_end = data_range
         # Should cover 1973 to 2020 based on our test data
-        assert jd_start < swe_julday(1973, 3, 1, 0.0)
-        assert jd_end > swe_julday(2020, 11, 1, 0.0)
+        assert jd_start < julday(1973, 3, 1, 0.0)
+        assert jd_end > julday(2020, 11, 1, 0.0)
 
 
 class TestDeltaTIERSIntegration:
@@ -313,7 +313,7 @@ class TestDeltaTIERSIntegration:
     @pytest.mark.unit
     def test_get_delta_t_iers_uses_observed(self):
         """Test that get_delta_t_iers uses observed data when available."""
-        jd = swe_julday(2000, 1, 1, 0.0)
+        jd = julday(2000, 1, 1, 0.0)
         dt = get_delta_t_iers(jd)
         assert dt is not None
         # Should match our observed data
@@ -322,7 +322,7 @@ class TestDeltaTIERSIntegration:
     @pytest.mark.unit
     def test_get_delta_t_iers_returns_none_out_of_range(self):
         """Test that get_delta_t_iers returns None for dates outside data."""
-        jd = swe_julday(1960, 1, 1, 0.0)
+        jd = julday(1960, 1, 1, 0.0)
         dt = get_delta_t_iers(jd)
         # Should return None as we don't have UT1-UTC data either
         assert dt is None
@@ -407,14 +407,14 @@ class TestDeltaTNetworkIntegration:
             assert info["delta_t_entries"] > 100  # Should have many entries
 
             # Look up a known date (J2000)
-            jd = swe_julday(2000, 1, 1, 0.0)
+            jd = julday(2000, 1, 1, 0.0)
             dt = get_observed_delta_t(jd)
             assert dt is not None
             # Delta T at J2000 should be around 63.8 seconds
             assert dt == pytest.approx(63.8285, abs=0.1)
 
             # Look up a recent date
-            jd_recent = swe_julday(2020, 1, 1, 0.0)
+            jd_recent = julday(2020, 1, 1, 0.0)
             dt_recent = get_observed_delta_t(jd_recent)
             assert dt_recent is not None
             # Delta T in 2020 should be around 69 seconds
@@ -442,7 +442,7 @@ class TestDeltaTNetworkIntegration:
             ]
 
             for year, month, day, expected in known_values:
-                jd = swe_julday(year, month, day, 0.0)
+                jd = julday(year, month, day, 0.0)
                 dt = get_observed_delta_t(jd)
                 if dt is not None:
                     assert dt == pytest.approx(expected, abs=0.2), (
@@ -457,7 +457,7 @@ class TestDeltaTNetworkIntegration:
 
 
 class TestDeltatExWithIERS:
-    """Test that swe_deltat_ex() also uses IERS Delta T when enabled."""
+    """Test that deltat_ex() also uses IERS Delta T when enabled."""
 
     @pytest.fixture(autouse=True)
     def setup_data(self, tmp_path):
@@ -490,15 +490,15 @@ class TestDeltatExWithIERS:
 
     @pytest.mark.unit
     def test_swe_deltat_ex_uses_iers_when_enabled(self):
-        """Test that swe_deltat_ex uses IERS data when enabled."""
-        from libephemeris import swe_deltat_ex, set_iers_delta_t_enabled
+        """Test that deltat_ex uses IERS data when enabled."""
+        from libephemeris import deltat_ex, set_iers_delta_t_enabled
 
-        jd = swe_julday(2000, 1, 1, 0.0)
+        jd = julday(2000, 1, 1, 0.0)
 
         # Enable IERS Delta T
         set_iers_delta_t_enabled(True)
 
-        dt = swe_deltat_ex(jd)
+        dt = deltat_ex(jd)
         dt_seconds = dt * 86400
 
         # Should match our observed data (63.8285 seconds)
@@ -506,16 +506,16 @@ class TestDeltatExWithIERS:
 
     @pytest.mark.unit
     def test_swe_deltat_and_swe_deltat_ex_consistent(self):
-        """Test that swe_deltat and swe_deltat_ex return the same value."""
-        from libephemeris import swe_deltat, swe_deltat_ex, set_iers_delta_t_enabled
+        """Test that deltat and deltat_ex return the same value."""
+        from libephemeris import deltat, deltat_ex, set_iers_delta_t_enabled
 
-        jd = swe_julday(2000, 1, 1, 0.0)
+        jd = julday(2000, 1, 1, 0.0)
 
         # Enable IERS Delta T
         set_iers_delta_t_enabled(True)
 
-        dt = swe_deltat(jd)
-        dt_ex = swe_deltat_ex(jd)
+        dt = deltat(jd)
+        dt_ex = deltat_ex(jd)
 
         # Both should return identical values
         assert dt == pytest.approx(dt_ex, abs=1e-10)

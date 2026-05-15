@@ -16,27 +16,27 @@ import pytest
 from libephemeris.leb_reader import open_leb
 from libephemeris.leb_composite import CompositeLEBReader
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_CHIRON,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -77,24 +77,24 @@ class TestFromDirectory:
             # Should have opened at least the 4 base files
             assert reader is not None
             # Core bodies must be present
-            assert reader.has_body(SE_SUN)
-            assert reader.has_body(SE_MOON)
+            assert reader.has_body(SUN)
+            assert reader.has_body(MOON)
 
     @pytest.mark.unit
     def test_from_directory_has_core_bodies(self):
         """Core planets are accessible from composite reader."""
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
             for body in [
-                SE_SUN,
-                SE_MOON,
-                SE_MERCURY,
-                SE_VENUS,
-                SE_MARS,
-                SE_JUPITER,
-                SE_SATURN,
-                SE_URANUS,
-                SE_NEPTUNE,
-                SE_PLUTO,
+                SUN,
+                MOON,
+                MERCURY,
+                VENUS,
+                MARS,
+                JUPITER,
+                SATURN,
+                URANUS,
+                NEPTUNE,
+                PLUTO,
             ]:
                 assert reader.has_body(body), f"Missing core body {body}"
 
@@ -104,7 +104,7 @@ class TestFromDirectory:
         if not os.path.exists(LEB2_BASE_ASTEROIDS):
             pytest.skip("base_asteroids.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            for body in [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]:
+            for body in [CHIRON, CERES, PALLAS, JUNO, VESTA]:
                 assert reader.has_body(body), f"Missing asteroid body {body}"
 
     @pytest.mark.unit
@@ -113,14 +113,14 @@ class TestFromDirectory:
         if not os.path.exists(LEB2_BASE_APOGEE):
             pytest.skip("base_apogee.leb2 not found")
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            for body in [SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG]:
+            for body in [OSCU_APOG, INTP_APOG, INTP_PERG]:
                 assert reader.has_body(body), f"Missing apogee body {body}"
 
     @pytest.mark.unit
     def test_from_directory_eval_body_returns_valid(self):
         """eval_body returns valid position/velocity tuples."""
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            pos, vel = reader.eval_body(SE_SUN, JD_J2000)
+            pos, vel = reader.eval_body(SUN, JD_J2000)
             assert len(pos) == 3
             assert len(vel) == 3
             # eval_body returns raw Chebyshev coords (may be cartesian AU or ecliptic)
@@ -179,11 +179,11 @@ class TestFromFileWithCompanions:
         """from_file_with_companions discovers other base_*.leb files."""
         with CompositeLEBReader.from_file_with_companions(LEB2_BASE_CORE) as reader:
             # Should have core bodies
-            assert reader.has_body(SE_SUN)
-            assert reader.has_body(SE_MOON)
+            assert reader.has_body(SUN)
+            assert reader.has_body(MOON)
             # If companion files exist, should also have those bodies
             if os.path.exists(LEB2_BASE_ASTEROIDS):
-                assert reader.has_body(SE_CHIRON)
+                assert reader.has_body(CHIRON)
 
     @pytest.mark.unit
     def test_core_only_when_no_companions(self, tmp_path):
@@ -195,10 +195,10 @@ class TestFromFileWithCompanions:
         shutil.copy2(LEB2_BASE_CORE, str(isolated))
 
         with CompositeLEBReader.from_file_with_companions(str(isolated)) as reader:
-            assert reader.has_body(SE_SUN)
-            assert reader.has_body(SE_MOON)
+            assert reader.has_body(SUN)
+            assert reader.has_body(MOON)
             # Should NOT have asteroid bodies since companion not present
-            assert not reader.has_body(SE_CHIRON)
+            assert not reader.has_body(CHIRON)
 
     @pytest.mark.unit
     def test_eval_body_across_groups(self):
@@ -208,12 +208,12 @@ class TestFromFileWithCompanions:
 
         with CompositeLEBReader.from_file_with_companions(LEB2_BASE_CORE) as reader:
             # Core body — eval_body returns raw coords (cartesian AU or ecliptic)
-            pos_sun, vel_sun = reader.eval_body(SE_SUN, JD_J2000)
+            pos_sun, vel_sun = reader.eval_body(SUN, JD_J2000)
             for v in pos_sun + vel_sun:
                 assert math.isfinite(v)
 
             # Asteroid body (from different file)
-            pos_chi, vel_chi = reader.eval_body(SE_CHIRON, JD_J2000)
+            pos_chi, vel_chi = reader.eval_body(CHIRON, JD_J2000)
             for v in pos_chi + vel_chi:
                 assert math.isfinite(v)
 
@@ -241,22 +241,22 @@ class TestBodyDispatch:
     """Test that bodies are dispatched to correct readers."""
 
     CORE_BODIES = [
-        SE_SUN,
-        SE_MOON,
-        SE_MERCURY,
-        SE_VENUS,
-        SE_MARS,
-        SE_JUPITER,
-        SE_SATURN,
-        SE_URANUS,
-        SE_NEPTUNE,
-        SE_PLUTO,
-        SE_MEAN_NODE,
-        SE_TRUE_NODE,
-        SE_MEAN_APOG,
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+        MEAN_NODE,
+        TRUE_NODE,
+        MEAN_APOG,
     ]
-    ASTEROID_BODIES = [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]
-    APOGEE_BODIES = [SE_OSCU_APOG, SE_INTP_APOG, SE_INTP_PERG]
+    ASTEROID_BODIES = [CHIRON, CERES, PALLAS, JUNO, VESTA]
+    APOGEE_BODIES = [OSCU_APOG, INTP_APOG, INTP_PERG]
 
     TEST_DATES = [
         2451545.0,  # J2000
@@ -312,7 +312,7 @@ class TestBodyDispatch:
     def test_sun_across_dates(self, jd):
         """Sun position varies sensibly across dates."""
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            pos, vel = reader.eval_body(SE_SUN, jd)
+            pos, vel = reader.eval_body(SUN, jd)
             # eval_body returns raw cartesian AU coords, not ecliptic degrees
             for v in pos + vel:
                 assert math.isfinite(v)
@@ -327,7 +327,7 @@ class TestBodyDispatch:
             pytest.skip("LEB2 core not found")
         with open_leb(LEB2_BASE_CORE) as single:
             with CompositeLEBReader.from_file_with_companions(LEB2_BASE_CORE) as comp:
-                for body in [SE_SUN, SE_MOON, SE_MARS]:
+                for body in [SUN, MOON, MARS]:
                     pos_s, vel_s = single.eval_body(body, JD_J2000)
                     pos_c, vel_c = comp.eval_body(body, JD_J2000)
                     for i in range(3):
@@ -388,7 +388,7 @@ class TestContextManager:
     def test_context_manager_protocol(self):
         """Composite reader supports with-statement."""
         with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
         # After exit, reader should be closed
         # Accessing may or may not raise -- just verify no crash on exit
 
@@ -396,7 +396,7 @@ class TestContextManager:
     def test_explicit_close(self):
         """Explicit close() doesn't crash."""
         reader = CompositeLEBReader.from_directory(LEB2_DIR)
-        reader.eval_body(SE_SUN, JD_J2000)
+        reader.eval_body(SUN, JD_J2000)
         reader.close()
 
     @pytest.mark.unit
@@ -408,8 +408,8 @@ class TestContextManager:
             readers.append(open_leb(LEB2_BASE_ASTEROIDS))
 
         comp = CompositeLEBReader(readers)
-        assert comp.has_body(SE_SUN)
-        pos, vel = comp.eval_body(SE_SUN, JD_J2000)
+        assert comp.has_body(SUN)
+        pos, vel = comp.eval_body(SUN, JD_J2000)
         # eval_body returns raw cartesian AU — just verify finite values
         for v in pos + vel:
             assert math.isfinite(v)

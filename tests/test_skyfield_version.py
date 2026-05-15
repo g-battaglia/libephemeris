@@ -249,7 +249,7 @@ class TestSkyfieldIntegrationWithLibephemeris:
 
         # Calculate a planet position
         jd = 2460500.5  # Mid-2024
-        result, flags = ephem.swe_calc_ut(jd, ephem.SE_MARS, 0)
+        result, flags = ephem.calc_ut(jd, ephem.MARS, 0)
 
         # Should get valid position
         assert result is not None
@@ -264,7 +264,7 @@ class TestSkyfieldIntegrationWithLibephemeris:
         # Calculate Sun position
         jd = 2460500.5  # Mid-2024
 
-        result, flags = ephem.swe_calc_ut(jd, ephem.SE_SUN, 0)
+        result, flags = ephem.calc_ut(jd, ephem.SUN, 0)
 
         # Should work correctly
         assert result is not None

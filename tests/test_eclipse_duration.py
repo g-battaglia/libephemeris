@@ -27,10 +27,10 @@ from libephemeris import (
     calc_lunar_eclipse_umbral_fourth_contact_u4,
     sol_eclipse_when_glob,
     lun_eclipse_when,
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
-    SE_ECL_PARTIAL,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_ANNULAR,
+    ECL_PARTIAL,
 )
 
 pytestmark = pytest.mark.slow
@@ -55,7 +55,7 @@ class TestSolarEclipseDurationBasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total eclipse maximum (duration exists for total eclipses)
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_solar_eclipse_duration(jd_max)
@@ -65,10 +65,10 @@ class TestSolarEclipseDurationBasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
-        result = calc_solar_eclipse_duration(jd_max, flags=SEFLG_SWIEPH)
+        result = calc_solar_eclipse_duration(jd_max, flags=FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -89,7 +89,7 @@ class TestSolarEclipseDurationTotalEclipses:
         to differences in shadow radius calculation methods.
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_solar_eclipse_duration(jd_max)
@@ -105,7 +105,7 @@ class TestSolarEclipseDurationTotalEclipses:
     def test_total_eclipse_duration_consistency(self):
         """Test that duration equals C3 - C2 in minutes."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_solar_eclipse_duration(jd_max)
@@ -131,7 +131,7 @@ class TestSolarEclipseDurationAnnularEclipses:
         like total eclipses. The duration should be positive and reasonable.
         """
         jd_start = julday(2023, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
         jd_max = times[0]
 
         duration = calc_solar_eclipse_duration(jd_max)
@@ -161,14 +161,14 @@ class TestSolarEclipseDurationPartialEclipses:
         jd_start = julday(2020, 1, 1, 0.0)
 
         try:
-            ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_PARTIAL)
+            ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_PARTIAL)
         except RuntimeError:
             # No partial-only eclipse found in search period, skip test
             pytest.skip("No partial-only solar eclipse found in search period")
             return
 
         # Only test if we found a partial eclipse
-        if ecl_type & SE_ECL_PARTIAL:
+        if ecl_type & ECL_PARTIAL:
             jd_max = times[0]
             duration = calc_solar_eclipse_duration(jd_max)
 
@@ -185,8 +185,8 @@ class TestSolarEclipseDurationMultipleEclipses:
         jd = julday(2020, 1, 1, 0.0)
 
         for _ in range(3):  # Test 3 total eclipses
-            ecl_type, times = sol_eclipse_when_glob(jd, ecltype=SE_ECL_TOTAL)
-            if not (ecl_type & SE_ECL_TOTAL):
+            ecl_type, times = sol_eclipse_when_glob(jd, ecltype=ECL_TOTAL)
+            if not (ecl_type & ECL_TOTAL):
                 break
 
             jd_max = times[0]
@@ -219,7 +219,7 @@ class TestLunarEclipseTotalDurationBasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total lunar eclipse maximum
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_total_duration(jd_max)
@@ -239,7 +239,7 @@ class TestLunarEclipseTotalDuration:
         We allow 5-minute tolerance for differences in calculation methods.
         """
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_lunar_eclipse_total_duration(jd_max)
@@ -255,7 +255,7 @@ class TestLunarEclipseTotalDuration:
     def test_total_duration_consistency(self):
         """Test that duration equals U3 - U2 in minutes."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_lunar_eclipse_total_duration(jd_max)
@@ -290,7 +290,7 @@ class TestLunarEclipseUmbralDurationBasicFunctionality:
         """Test that function returns a float value."""
         # Get a known total lunar eclipse maximum (umbral duration exists)
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         result = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -310,7 +310,7 @@ class TestLunarEclipseUmbralDuration:
         We allow generous tolerance for differences in calculation methods.
         """
         jd_start = julday(2022, 10, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -328,7 +328,7 @@ class TestLunarEclipseUmbralDuration:
     def test_umbral_duration_consistency(self):
         """Test that duration equals U4 - U1 in minutes."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -346,7 +346,7 @@ class TestLunarEclipseUmbralDuration:
     def test_umbral_duration_longer_than_total_duration(self):
         """Test that umbral duration is longer than total duration."""
         jd_start = julday(2022, 10, 1, 0.0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         umbral_duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -364,10 +364,10 @@ class TestLunarEclipseDurationPartialEclipses:
     def test_partial_lunar_eclipse_has_umbral_duration(self):
         """Test that partial lunar eclipses have umbral duration but no totality."""
         jd_start = julday(2020, 1, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PARTIAL)
 
         # Only test if we found a partial lunar eclipse
-        if ecl_type & SE_ECL_PARTIAL:
+        if ecl_type & ECL_PARTIAL:
             jd_max = times[0]
 
             umbral_duration = calc_lunar_eclipse_umbral_duration(jd_max)
@@ -384,7 +384,7 @@ class TestEclipseDurationPhysicalConstraints:
     def test_solar_eclipse_duration_positive_for_central(self):
         """Test that central solar eclipses have positive duration."""
         jd_start = julday(2020, 1, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_solar_eclipse_duration(jd_max)
@@ -404,8 +404,8 @@ class TestEclipseDurationPhysicalConstraints:
         valid_count = 0
 
         for _ in range(5):  # Try up to 5 to get at least 2 valid
-            ecl_type, times = lun_eclipse_when(jd, ecltype=SE_ECL_TOTAL)
-            if not (ecl_type & SE_ECL_TOTAL):
+            ecl_type, times = lun_eclipse_when(jd, ecltype=ECL_TOTAL)
+            if not (ecl_type & ECL_TOTAL):
                 break
 
             jd_max = times[0]
@@ -435,8 +435,8 @@ class TestEclipseDurationPhysicalConstraints:
         jd = julday(2020, 1, 1, 0.0)
 
         for _ in range(3):  # Test 3 total lunar eclipses
-            ecl_type, times = lun_eclipse_when(jd, ecltype=SE_ECL_TOTAL)
-            if not (ecl_type & SE_ECL_TOTAL):
+            ecl_type, times = lun_eclipse_when(jd, ecltype=ECL_TOTAL)
+            if not (ecl_type & ECL_TOTAL):
                 break
 
             jd_max = times[0]

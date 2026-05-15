@@ -18,9 +18,9 @@ from libephemeris import (
     julday,
     calc_eclipse_central_line,
     sol_eclipse_when_glob,
-    SEFLG_SWIEPH,
-    SE_ECL_TOTAL,
-    SE_ECL_ANNULAR,
+    FLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_ANNULAR,
 )
 
 
@@ -40,15 +40,15 @@ class TestEclipseCentralLineBasicFunctionality:
         assert callable(func)
 
     def test_swe_alias_exists(self):
-        """Test that swe_calc_eclipse_central_line alias exists."""
-        from libephemeris import swe_calc_eclipse_central_line
+        """Test that calc_eclipse_central_line alias exists."""
+        from libephemeris import calc_eclipse_central_line
 
-        assert callable(swe_calc_eclipse_central_line)
+        assert callable(calc_eclipse_central_line)
 
     def test_returns_three_tuples(self):
         """Test that function returns a tuple of three tuples."""
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_begin = times_ecl[2]  # Eclipse begin
         jd_end = times_ecl[3]  # Eclipse end
 
@@ -64,7 +64,7 @@ class TestEclipseCentralLineBasicFunctionality:
     def test_returns_same_length_tuples(self):
         """Test that all returned tuples have the same length."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -75,12 +75,12 @@ class TestEclipseCentralLineBasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
         result = calc_eclipse_central_line(
-            jd_c1, jd_c4, step_minutes=30.0, flags=SEFLG_SWIEPH
+            jd_c1, jd_c4, step_minutes=30.0, flags=FLG_SWIEPH
         )
 
         assert isinstance(result, tuple)
@@ -98,9 +98,9 @@ class TestEclipseCentralLineTotalEclipse:
         - Central line passes through Cleveland, Ohio area (~41.5°N, ~81.7°W)
         """
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
-        assert ecl_type & SE_ECL_TOTAL, "Should find a total eclipse"
+        assert ecl_type & ECL_TOTAL, "Should find a total eclipse"
 
         jd_c1 = times_ecl[2]  # First contact
         jd_c4 = times_ecl[3]  # Fourth contact
@@ -123,7 +123,7 @@ class TestEclipseCentralLineTotalEclipse:
     def test_central_line_times_monotonic(self):
         """Test that times are monotonically increasing."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -138,7 +138,7 @@ class TestEclipseCentralLineTotalEclipse:
     def test_central_line_latitudes_valid(self):
         """Test that all latitudes are in valid range."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -150,7 +150,7 @@ class TestEclipseCentralLineTotalEclipse:
     def test_central_line_longitudes_normalized(self):
         """Test that all longitudes are normalized to [-180, 180]."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -166,9 +166,9 @@ class TestEclipseCentralLineAnnularEclipse:
     def test_annular_eclipse_central_line(self):
         """Test annular eclipse central line calculation."""
         jd_start = julday(2023, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_ANNULAR)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_ANNULAR)
 
-        if ecl_type & SE_ECL_ANNULAR:
+        if ecl_type & ECL_ANNULAR:
             jd_c1 = times_ecl[2]
             jd_c4 = times_ecl[3]
 
@@ -192,7 +192,7 @@ class TestEclipseCentralLineStepSize:
     def test_smaller_step_gives_more_points(self):
         """Test that smaller step size produces more points."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -205,7 +205,7 @@ class TestEclipseCentralLineStepSize:
     def test_default_step_is_one_minute(self):
         """Test that default step size is 1 minute."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_c1 = times_ecl[2]
         jd_c4 = times_ecl[3]
 
@@ -238,7 +238,7 @@ class TestEclipseCentralLineEdgeCases:
     def test_single_point_for_very_short_range(self):
         """Test that very short time range gives at least one point if valid."""
         jd_start = julday(2024, 1, 1, 0.0)
-        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times_ecl[0]  # Maximum eclipse time
 
         # Calculate at just the maximum moment
@@ -263,9 +263,9 @@ class TestEclipseCentralLineConsistency:
         from libephemeris import sol_eclipse_where
 
         jd_start = julday(2024, 1, 1, 0.0)
-        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
 
-        if ecl_type & SE_ECL_TOTAL:
+        if ecl_type & ECL_TOTAL:
             jd_max = times_ecl[0]
 
             # Get central location from sol_eclipse_where
@@ -308,11 +308,11 @@ class TestEclipseCentralLineMultipleEclipses:
 
         for _ in range(3):  # Test 3 total eclipses
             try:
-                ecl_type, times_ecl = sol_eclipse_when_glob(jd, ecltype=SE_ECL_TOTAL)
+                ecl_type, times_ecl = sol_eclipse_when_glob(jd, ecltype=ECL_TOTAL)
             except RuntimeError:
                 break
 
-            if not (ecl_type & SE_ECL_TOTAL):
+            if not (ecl_type & ECL_TOTAL):
                 break
 
             jd_c1 = times_ecl[2]

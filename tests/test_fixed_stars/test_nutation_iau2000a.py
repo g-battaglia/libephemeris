@@ -21,7 +21,7 @@ class TestIAU2000ANutation:
         Nutation causes oscillations in star positions up to ~9" in obliquity,
         which affects the ecliptic latitude and longitude transformation.
         """
-        pos, name, retflag = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos, name, retflag = ephem.fixstar("Regulus", standard_jd, 0)
 
         # Regulus should be around 149-150 degrees at J2000
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.6f} out of range"
@@ -30,7 +30,7 @@ class TestIAU2000ANutation:
 
     def test_nutation_applied_to_spica(self, standard_jd):
         """Test that nutation is applied to Spica position."""
-        pos, name, retflag = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos, name, retflag = ephem.fixstar("Spica", standard_jd, 0)
 
         # Spica should be around 203-204 degrees at J2000
         assert 203 < pos[0] < 205, f"Spica lon: {pos[0]:.6f} out of range"
@@ -45,12 +45,12 @@ class TestIAU2000ANutation:
         Positions at different phases of this cycle should differ slightly.
         """
         # J2000.0
-        jd_2000 = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_2000 = ephem.julday(2000, 1, 1, 12.0)
         # About 9 years later (half of 18.6-year cycle)
-        jd_2009 = ephem.swe_julday(2009, 4, 1, 12.0)
+        jd_2009 = ephem.julday(2009, 4, 1, 12.0)
 
-        pos_2000, _, _ = ephem.swe_fixstar("Regulus", jd_2000, 0)
-        pos_2009, _, _ = ephem.swe_fixstar("Regulus", jd_2009, 0)
+        pos_2000, _, _ = ephem.fixstar("Regulus", jd_2000, 0)
+        pos_2009, _, _ = ephem.fixstar("Regulus", jd_2009, 0)
 
         # The difference should include precession (~9 years * 50"/year = ~450")
         # plus nutation effects. Total should be noticeable.
@@ -72,7 +72,7 @@ class TestIAU2000ANutation:
         This test verifies the implementation uses the full model by checking
         that results differ from what the simple 2-term model would give.
         """
-        jd = ephem.swe_julday(2010, 6, 21, 12.0)  # Summer solstice 2010
+        jd = ephem.julday(2010, 6, 21, 12.0)  # Summer solstice 2010
 
         # Calculate T for the simple 2-term model
         T = (jd - 2451545.0) / 36525.0
@@ -92,7 +92,7 @@ class TestIAU2000ANutation:
         # because it includes 1363 additional terms
         # We can't directly compare the nutation values, but we can verify
         # the calculation completes successfully with the new model
-        pos, _, _ = ephem.swe_fixstar("Regulus", jd, 0)
+        pos, _, _ = ephem.fixstar("Regulus", jd, 0)
 
         # Verify position is reasonable
         assert 149 < pos[0] < 152, f"Regulus lon: {pos[0]:.6f}"
@@ -108,8 +108,8 @@ class TestIAU2000ANutation:
         ]
 
         for year, month, day, hour in test_dates:
-            jd = ephem.swe_julday(year, month, day, hour)
-            pos, _, _ = ephem.swe_fixstar("Regulus", jd, 0)
+            jd = ephem.julday(year, month, day, hour)
+            pos, _, _ = ephem.fixstar("Regulus", jd, 0)
 
             # Regulus longitude changes with precession (~1.4 deg/century)
             # At 1950 it would be ~0.7 deg less than J2000
@@ -125,8 +125,8 @@ class TestIAU2000ANutation:
         Both stars should use the same nutation model and thus the same
         true obliquity for coordinate transformation.
         """
-        pos_regulus, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
-        pos_spica, _, _ = ephem.swe_fixstar("Spica", standard_jd, 0)
+        pos_regulus, _, _ = ephem.fixstar("Regulus", standard_jd, 0)
+        pos_spica, _, _ = ephem.fixstar("Spica", standard_jd, 0)
 
         # Both calculations should succeed with valid positions
         assert 0 <= pos_regulus[0] < 360
@@ -147,8 +147,8 @@ class TestIAU2000ANutation:
         through the calculation chain.
         """
         # Calculate position twice - should be identical
-        pos1, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
-        pos2, _, _ = ephem.swe_fixstar("Regulus", standard_jd, 0)
+        pos1, _, _ = ephem.fixstar("Regulus", standard_jd, 0)
+        pos2, _, _ = ephem.fixstar("Regulus", standard_jd, 0)
 
         # Positions should be exactly identical (same input, deterministic)
         assert pos1[0] == pos2[0], "Longitude should be deterministic"

@@ -8,15 +8,15 @@ These tests verify the 9 visible Pleiades stars are correctly defined and calcul
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_ALCYONE,
-    SE_ASTEROPE,
-    SE_CELAENO,
-    SE_ELECTRA,
-    SE_MAIA,
-    SE_MEROPE,
-    SE_TAYGETA,
-    SE_ATLAS,
-    SE_PLEIONE,
+    ALCYONE,
+    ASTEROPE,
+    CELAENO,
+    ELECTRA,
+    MAIA,
+    MEROPE,
+    TAYGETA,
+    ATLAS,
+    PLEIONE,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -29,15 +29,15 @@ from libephemeris.fixed_stars import (
 # All Pleiades stars are located near ~60° ecliptic longitude (near 0° Gemini)
 PLEIADES_STARS = [
     # (constant, name, hip_number, magnitude)
-    (SE_ALCYONE, "Alcyone", 17702, 2.87),  # Brightest, Eta Tauri
-    (SE_ASTEROPE, "Asterope", 17579, 5.76),  # 21 Tauri
-    (SE_CELAENO, "Celaeno", 17489, 5.45),  # 16 Tauri
-    (SE_ELECTRA, "Electra", 17499, 3.70),  # 17 Tauri
-    (SE_MAIA, "Maia", 17573, 3.87),  # 20 Tauri
-    (SE_MEROPE, "Merope", 17608, 4.14),  # 23 Tauri
-    (SE_TAYGETA, "Taygeta", 17531, 4.30),  # 19 Tauri
-    (SE_ATLAS, "Atlas", 17847, 3.62),  # 27 Tauri
-    (SE_PLEIONE, "Pleione", 17851, 5.09),  # 28 Tauri
+    (ALCYONE, "Alcyone", 17702, 2.87),  # Brightest, Eta Tauri
+    (ASTEROPE, "Asterope", 17579, 5.76),  # 21 Tauri
+    (CELAENO, "Celaeno", 17489, 5.45),  # 16 Tauri
+    (ELECTRA, "Electra", 17499, 3.70),  # 17 Tauri
+    (MAIA, "Maia", 17573, 3.87),  # 20 Tauri
+    (MEROPE, "Merope", 17608, 4.14),  # 23 Tauri
+    (TAYGETA, "Taygeta", 17531, 4.30),  # 19 Tauri
+    (ATLAS, "Atlas", 17847, 3.62),  # 27 Tauri
+    (PLEIONE, "Pleione", 17851, 5.09),  # 28 Tauri
 ]
 
 
@@ -64,7 +64,7 @@ class TestPleiadesStarsCatalog:
         other_mags = []
 
         for star_id, name, _, mag in PLEIADES_STARS:
-            if star_id == SE_ALCYONE:
+            if star_id == ALCYONE:
                 alcyone_mag = mag
             else:
                 other_mags.append((name, mag))
@@ -117,7 +117,7 @@ class TestPleiadesStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", PLEIADES_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each Pleiades star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -132,7 +132,7 @@ class TestPleiadesStarsCalculation:
         """Test that all Pleiades stars are clustered together in the sky."""
         positions = []
         for star_id, name, _, _ in PLEIADES_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions.append((name, pos[0], pos[1]))
 
         # All Pleiades stars should be within ~5 degrees of each other
@@ -149,7 +149,7 @@ class TestPleiadesStarsCalculation:
     def test_pleiades_near_taurus(self, standard_jd):
         """Test that Pleiades are located in Taurus region (~60 deg ecliptic)."""
         # Alcyone is the reference point for the Pleiades
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_ALCYONE, 0)
+        pos, _ = ephem.calc_ut(standard_jd, ALCYONE, 0)
 
         # Should be near 60 degrees ecliptic (late Taurus / early Gemini)
         # Allow some tolerance for precession
@@ -164,61 +164,61 @@ class TestPleiadesStarsNameResolution:
 
     def test_resolve_alcyone(self):
         """Test Alcyone name resolution (already tested in behenian, but verify)."""
-        assert resolve_star_name("Alcyone") == SE_ALCYONE
-        assert resolve_star_name("Eta Tauri") == SE_ALCYONE
-        assert resolve_star_name("Pleiades") == SE_ALCYONE
-        assert resolve_star_name("Seven Sisters") == SE_ALCYONE
+        assert resolve_star_name("Alcyone") == ALCYONE
+        assert resolve_star_name("Eta Tauri") == ALCYONE
+        assert resolve_star_name("Pleiades") == ALCYONE
+        assert resolve_star_name("Seven Sisters") == ALCYONE
 
     def test_resolve_asterope(self):
         """Test Asterope name resolution."""
-        assert resolve_star_name("Asterope") == SE_ASTEROPE
-        assert resolve_star_name("21 Tauri") == SE_ASTEROPE
-        assert resolve_star_name("21 Tau") == SE_ASTEROPE
-        assert resolve_star_name("Sterope") == SE_ASTEROPE
+        assert resolve_star_name("Asterope") == ASTEROPE
+        assert resolve_star_name("21 Tauri") == ASTEROPE
+        assert resolve_star_name("21 Tau") == ASTEROPE
+        assert resolve_star_name("Sterope") == ASTEROPE
 
     def test_resolve_celaeno(self):
         """Test Celaeno name resolution."""
-        assert resolve_star_name("Celaeno") == SE_CELAENO
-        assert resolve_star_name("16 Tauri") == SE_CELAENO
-        assert resolve_star_name("16 Tau") == SE_CELAENO
-        assert resolve_star_name("Celeno") == SE_CELAENO
+        assert resolve_star_name("Celaeno") == CELAENO
+        assert resolve_star_name("16 Tauri") == CELAENO
+        assert resolve_star_name("16 Tau") == CELAENO
+        assert resolve_star_name("Celeno") == CELAENO
 
     def test_resolve_electra(self):
         """Test Electra name resolution."""
-        assert resolve_star_name("Electra") == SE_ELECTRA
-        assert resolve_star_name("17 Tauri") == SE_ELECTRA
-        assert resolve_star_name("17 Tau") == SE_ELECTRA
+        assert resolve_star_name("Electra") == ELECTRA
+        assert resolve_star_name("17 Tauri") == ELECTRA
+        assert resolve_star_name("17 Tau") == ELECTRA
 
     def test_resolve_maia(self):
         """Test Maia name resolution."""
-        assert resolve_star_name("Maia") == SE_MAIA
-        assert resolve_star_name("20 Tauri") == SE_MAIA
-        assert resolve_star_name("20 Tau") == SE_MAIA
+        assert resolve_star_name("Maia") == MAIA
+        assert resolve_star_name("20 Tauri") == MAIA
+        assert resolve_star_name("20 Tau") == MAIA
 
     def test_resolve_merope(self):
         """Test Merope name resolution."""
-        assert resolve_star_name("Merope") == SE_MEROPE
-        assert resolve_star_name("23 Tauri") == SE_MEROPE
-        assert resolve_star_name("23 Tau") == SE_MEROPE
+        assert resolve_star_name("Merope") == MEROPE
+        assert resolve_star_name("23 Tauri") == MEROPE
+        assert resolve_star_name("23 Tau") == MEROPE
 
     def test_resolve_taygeta(self):
         """Test Taygeta name resolution."""
-        assert resolve_star_name("Taygeta") == SE_TAYGETA
-        assert resolve_star_name("19 Tauri") == SE_TAYGETA
-        assert resolve_star_name("19 Tau") == SE_TAYGETA
-        assert resolve_star_name("Taygete") == SE_TAYGETA
+        assert resolve_star_name("Taygeta") == TAYGETA
+        assert resolve_star_name("19 Tauri") == TAYGETA
+        assert resolve_star_name("19 Tau") == TAYGETA
+        assert resolve_star_name("Taygete") == TAYGETA
 
     def test_resolve_atlas(self):
         """Test Atlas name resolution."""
-        assert resolve_star_name("Atlas") == SE_ATLAS
-        assert resolve_star_name("27 Tauri") == SE_ATLAS
-        assert resolve_star_name("27 Tau") == SE_ATLAS
+        assert resolve_star_name("Atlas") == ATLAS
+        assert resolve_star_name("27 Tauri") == ATLAS
+        assert resolve_star_name("27 Tau") == ATLAS
 
     def test_resolve_pleione(self):
         """Test Pleione name resolution."""
-        assert resolve_star_name("Pleione") == SE_PLEIONE
-        assert resolve_star_name("28 Tauri") == SE_PLEIONE
-        assert resolve_star_name("28 Tau") == SE_PLEIONE
+        assert resolve_star_name("Pleione") == PLEIONE
+        assert resolve_star_name("28 Tauri") == PLEIONE
+        assert resolve_star_name("28 Tau") == PLEIONE
 
     @pytest.mark.parametrize("star_id,name,hip,mag", PLEIADES_STARS)
     def test_canonical_name_retrieval(self, star_id, name, hip, mag):
@@ -235,7 +235,7 @@ class TestPleiadesStarsData:
         """Test Alcyone catalog entry."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ALCYONE:
+            if e.id == ALCYONE:
                 entry = e
                 break
 
@@ -251,7 +251,7 @@ class TestPleiadesStarsData:
         """Test Electra catalog entry (third brightest)."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ELECTRA:
+            if e.id == ELECTRA:
                 entry = e
                 break
 
@@ -267,7 +267,7 @@ class TestPleiadesStarsData:
         """Test Atlas catalog entry (second brightest)."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_ATLAS:
+            if e.id == ATLAS:
                 entry = e
                 break
 
@@ -283,7 +283,7 @@ class TestPleiadesStarsData:
         """Test Pleione catalog entry (mother of the Pleiades)."""
         entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_PLEIONE:
+            if e.id == PLEIONE:
                 entry = e
                 break
 

@@ -14,20 +14,20 @@ import pytest
 
 from libephemeris.leb_reader import open_leb
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_CHIRON,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    CHIRON,
 )
 
 
@@ -115,13 +115,13 @@ class TestLEBReaderHasBody:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_core_bodies_present(self, body_id: int, name: str):
@@ -144,7 +144,7 @@ class TestLEBReaderEvalBody:
     def test_eval_body_returns_pos_vel(self):
         """eval_body returns ((x,y,z), (vx,vy,vz))."""
         with open_leb(LEB_BASE_PATH) as reader:
-            result = reader.eval_body(SE_SUN, 2451545.0)
+            result = reader.eval_body(SUN, 2451545.0)
             assert len(result) == 2
             pos, vel = result
             assert len(pos) == 3
@@ -154,7 +154,7 @@ class TestLEBReaderEvalBody:
     def test_eval_body_finite_values(self):
         """All returned values should be finite."""
         with open_leb(LEB_BASE_PATH) as reader:
-            pos, vel = reader.eval_body(SE_SUN, 2451545.0)
+            pos, vel = reader.eval_body(SUN, 2451545.0)
             for v in pos:
                 assert math.isfinite(v), f"Non-finite position: {v}"
             for v in vel:
@@ -164,10 +164,10 @@ class TestLEBReaderEvalBody:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_eval_body_various_bodies(self, body_id: int, name: str):
@@ -190,14 +190,14 @@ class TestLEBReaderEvalBody:
         """eval_body raises ValueError for JD outside range."""
         with open_leb(LEB_BASE_PATH) as reader:
             with pytest.raises(ValueError):
-                reader.eval_body(SE_SUN, 1000000.0)  # Way before coverage
+                reader.eval_body(SUN, 1000000.0)  # Way before coverage
 
     @pytest.mark.unit
     def test_eval_body_at_multiple_dates(self):
         """Positions at different dates should differ."""
         with open_leb(LEB_BASE_PATH) as reader:
-            pos1, _ = reader.eval_body(SE_MARS, 2451545.0)
-            pos2, _ = reader.eval_body(SE_MARS, 2451545.0 + 30.0)
+            pos1, _ = reader.eval_body(MARS, 2451545.0)
+            pos2, _ = reader.eval_body(MARS, 2451545.0 + 30.0)
             # At least one coordinate should differ
             diffs = [abs(a - b) for a, b in zip(pos1, pos2)]
             assert max(diffs) > 0.001, f"Positions identical after 30 days: {diffs}"

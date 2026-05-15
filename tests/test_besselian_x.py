@@ -14,7 +14,7 @@ Reference data sources:
 
 import pytest
 import math
-from libephemeris import julday, calc_besselian_x, SEFLG_SWIEPH
+from libephemeris import julday, calc_besselian_x, FLG_SWIEPH
 
 
 class TestBesselianXBasicFunctionality:
@@ -42,7 +42,7 @@ class TestBesselianXBasicFunctionality:
     def test_accepts_flags_parameter(self):
         """Test that function accepts optional flags parameter."""
         jd = julday(2024, 4, 8, 18.0)
-        result = calc_besselian_x(jd, flags=SEFLG_SWIEPH)
+        result = calc_besselian_x(jd, flags=FLG_SWIEPH)
 
         assert isinstance(result, float)
 

@@ -15,7 +15,7 @@ from libephemeris.fixed_stars import (
     StarData,
     FIXED_STARS,
 )
-from libephemeris.constants import SE_REGULUS, SE_SPICA_STAR
+from libephemeris.constants import REGULUS, SPICA_STAR
 
 
 def _linear_proper_motion(star: StarData, t_years: float) -> tuple[float, float]:
@@ -142,7 +142,7 @@ class TestFixedStarsProperMotionRigorous:
 
     def test_zero_time_returns_j2000(self):
         """At J2000.0 epoch (t_years=0), result should equal input exactly."""
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
 
         ra_pm, dec_pm = _second_order_proper_motion(star, 0.0)
 
@@ -152,7 +152,7 @@ class TestFixedStarsProperMotionRigorous:
 
     def test_short_time_matches_linear(self):
         """For short periods (1 year), rigorous and linear should agree well."""
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
         t_years = 1.0
 
         ra_rig, dec_rig = _second_order_proper_motion(star, t_years)
@@ -195,7 +195,7 @@ class TestFixedStarsProperMotionRigorous:
 
     def test_preserves_unit_vector_norm(self):
         """The rigorous method should maintain unit vector normalization."""
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
         t_years = 100.0
 
         ra_pm, dec_pm = _second_order_proper_motion(star, t_years)
@@ -213,7 +213,7 @@ class TestFixedStarsProperMotionRigorous:
 
     def test_symmetric_time_direction(self):
         """Forward and backward propagation should be symmetric."""
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
         t_years = 50.0
 
         # Go forward then backward
@@ -283,7 +283,7 @@ class TestCalcFixedStarPositionIntegration:
         # JD for J2000.0
         jd_tt = 2451545.0
 
-        lon, lat, dist = calc_fixed_star_position(SE_REGULUS, jd_tt)
+        lon, lat, dist = calc_fixed_star_position(REGULUS, jd_tt)
 
         # Regulus is at approximately 150 deg ecliptic longitude at J2000
         assert 149 < lon < 151, f"Regulus ecliptic longitude: {lon}"
@@ -296,7 +296,7 @@ class TestCalcFixedStarPositionIntegration:
         """Test Spica ecliptic position at J2000.0."""
         jd_tt = 2451545.0
 
-        lon, lat, dist = calc_fixed_star_position(SE_SPICA_STAR, jd_tt)
+        lon, lat, dist = calc_fixed_star_position(SPICA_STAR, jd_tt)
 
         # Spica is at approximately 203-204 deg ecliptic longitude at J2000
         assert 202 < lon < 205, f"Spica ecliptic longitude: {lon}"
@@ -307,8 +307,8 @@ class TestCalcFixedStarPositionIntegration:
         # Use year 2050 which is within ephemeris range (1899-2053)
         jd_2050 = 2451545.0 + 50 * 365.25
 
-        lon_2000, _, _ = calc_fixed_star_position(SE_SPICA_STAR, jd_2000)
-        lon_2050, _, _ = calc_fixed_star_position(SE_SPICA_STAR, jd_2050)
+        lon_2000, _, _ = calc_fixed_star_position(SPICA_STAR, jd_2000)
+        lon_2050, _, _ = calc_fixed_star_position(SPICA_STAR, jd_2050)
 
         # Position should have changed due to proper motion + precession
         # Over 50 years, expect at least 0.05 degrees change
@@ -320,8 +320,8 @@ class TestCalcFixedStarPositionIntegration:
         jd_2000 = 2451545.0
         jd_1900 = 2451545.0 - 100 * 365.25
 
-        lon_2000, _, _ = calc_fixed_star_position(SE_REGULUS, jd_2000)
-        lon_1900, _, _ = calc_fixed_star_position(SE_REGULUS, jd_1900)
+        lon_2000, _, _ = calc_fixed_star_position(REGULUS, jd_2000)
+        lon_1900, _, _ = calc_fixed_star_position(REGULUS, jd_1900)
 
         # Position should have changed
         diff = abs(lon_2000 - lon_1900)
@@ -354,7 +354,7 @@ class TestProperMotionAccuracy:
         Verify that the rigorous method maintains sub-0.1 arcsec accuracy
         over 100 years compared to what would accumulate with linear method.
         """
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
         t_years = 100.0
 
         ra_rig, dec_rig = _second_order_proper_motion(star, t_years)
@@ -557,7 +557,7 @@ class TestSecondOrderProperMotion:
         For typical stars over 100 years, second-order error should be < 0.01 arcsec.
         This is the accuracy target mentioned in the updated docstring.
         """
-        star = FIXED_STARS[SE_SPICA_STAR]
+        star = FIXED_STARS[SPICA_STAR]
         t_years = 100.0
 
         # Reference: step-wise integration

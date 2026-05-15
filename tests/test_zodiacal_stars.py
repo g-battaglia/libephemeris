@@ -24,32 +24,32 @@ import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
     # Aries
-    SE_HAMAL,
-    SE_SHERATAN,
-    SE_MESARTHIM,
+    HAMAL,
+    SHERATAN,
+    MESARTHIM,
     # Cancer
-    SE_ACUBENS,
-    SE_TARF,
-    SE_ASELLUS_BOREALIS,
-    SE_ASELLUS_AUSTRALIS,
+    ACUBENS,
+    TARF,
+    ASELLUS_BOREALIS,
+    ASELLUS_AUSTRALIS,
     # Sagittarius
-    SE_KAUS_AUSTRALIS,
-    SE_NUNKI,
-    SE_KAUS_MEDIA,
-    SE_KAUS_BOREALIS,
-    SE_ASCELLA,
+    KAUS_AUSTRALIS,
+    NUNKI,
+    KAUS_MEDIA,
+    KAUS_BOREALIS,
+    ASCELLA,
     # Capricornus
-    SE_DENEB_ALGEDI,
-    SE_ALGEDI,
-    SE_DABIH,
-    SE_NASHIRA,
+    DENEB_ALGEDI,
+    ALGEDI,
+    DABIH,
+    NASHIRA,
     # Aquarius
-    SE_SADALSUUD,
-    SE_SADALMELIK,
-    SE_SKAT,
+    SADALSUUD,
+    SADALMELIK,
+    SKAT,
     # Pisces
-    SE_ETA_PISCIUM,
-    SE_ALRESCHA,
+    ETA_PISCIUM,
+    ALRESCHA,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -60,52 +60,52 @@ from libephemeris.fixed_stars import (
 
 # ======== ARIES CONSTELLATION STARS ========
 ARIES_STARS = [
-    (SE_HAMAL, "Hamal", 9884, 2.00),  # Alpha Ari - brightest
-    (SE_SHERATAN, "Sheratan", 8903, 2.64),  # Beta Ari
-    (SE_MESARTHIM, "Mesarthim", 8832, 3.88),  # Gamma Ari
+    (HAMAL, "Hamal", 9884, 2.00),  # Alpha Ari - brightest
+    (SHERATAN, "Sheratan", 8903, 2.64),  # Beta Ari
+    (MESARTHIM, "Mesarthim", 8832, 3.88),  # Gamma Ari
 ]
 
 
 # ======== CANCER CONSTELLATION STARS ========
 CANCER_STARS = [
-    (SE_TARF, "Tarf", 42911, 3.52),  # Beta Cnc - brightest
-    (SE_ASELLUS_AUSTRALIS, "Asellus Australis", 42911, 3.94),  # Delta Cnc
-    (SE_ACUBENS, "Acubens", 44066, 4.25),  # Alpha Cnc
-    (SE_ASELLUS_BOREALIS, "Asellus Borealis", 42806, 4.66),  # Gamma Cnc
+    (TARF, "Tarf", 42911, 3.52),  # Beta Cnc - brightest
+    (ASELLUS_AUSTRALIS, "Asellus Australis", 42911, 3.94),  # Delta Cnc
+    (ACUBENS, "Acubens", 44066, 4.25),  # Alpha Cnc
+    (ASELLUS_BOREALIS, "Asellus Borealis", 42806, 4.66),  # Gamma Cnc
 ]
 
 
 # ======== SAGITTARIUS CONSTELLATION STARS ========
 SAGITTARIUS_STARS = [
-    (SE_KAUS_AUSTRALIS, "Kaus Australis", 90185, 1.85),  # Epsilon Sgr - brightest
-    (SE_NUNKI, "Nunki", 92855, 2.02),  # Sigma Sgr
-    (SE_ASCELLA, "Ascella", 93506, 2.59),  # Zeta Sgr
-    (SE_KAUS_MEDIA, "Kaus Media", 89931, 2.70),  # Delta Sgr
-    (SE_KAUS_BOREALIS, "Kaus Borealis", 90496, 2.81),  # Lambda Sgr
+    (KAUS_AUSTRALIS, "Kaus Australis", 90185, 1.85),  # Epsilon Sgr - brightest
+    (NUNKI, "Nunki", 92855, 2.02),  # Sigma Sgr
+    (ASCELLA, "Ascella", 93506, 2.59),  # Zeta Sgr
+    (KAUS_MEDIA, "Kaus Media", 89931, 2.70),  # Delta Sgr
+    (KAUS_BOREALIS, "Kaus Borealis", 90496, 2.81),  # Lambda Sgr
 ]
 
 
 # ======== CAPRICORNUS CONSTELLATION STARS ========
 CAPRICORNUS_STARS = [
-    (SE_DENEB_ALGEDI, "Deneb Algedi", 107556, 2.81),  # Delta Cap - brightest
-    (SE_DABIH, "Dabih", 100345, 3.08),  # Beta Cap
-    (SE_ALGEDI, "Algedi", 100064, 3.57),  # Alpha Cap
-    (SE_NASHIRA, "Nashira", 106985, 3.68),  # Gamma Cap
+    (DENEB_ALGEDI, "Deneb Algedi", 107556, 2.81),  # Delta Cap - brightest
+    (DABIH, "Dabih", 100345, 3.08),  # Beta Cap
+    (ALGEDI, "Algedi", 100064, 3.57),  # Alpha Cap
+    (NASHIRA, "Nashira", 106985, 3.68),  # Gamma Cap
 ]
 
 
 # ======== AQUARIUS CONSTELLATION STARS ========
 AQUARIUS_STARS = [
-    (SE_SADALSUUD, "Sadalsuud", 106278, 2.87),  # Beta Aqr - brightest
-    (SE_SADALMELIK, "Sadalmelik", 109074, 2.96),  # Alpha Aqr
-    (SE_SKAT, "Skat", 113136, 3.27),  # Delta Aqr
+    (SADALSUUD, "Sadalsuud", 106278, 2.87),  # Beta Aqr - brightest
+    (SADALMELIK, "Sadalmelik", 109074, 2.96),  # Alpha Aqr
+    (SKAT, "Skat", 113136, 3.27),  # Delta Aqr
 ]
 
 
 # ======== PISCES CONSTELLATION STARS ========
 PISCES_STARS = [
-    (SE_ETA_PISCIUM, "Eta Piscium", 5742, 3.62),  # Eta Psc - brightest
-    (SE_ALRESCHA, "Alrescha", 7097, 3.82),  # Alpha Psc
+    (ETA_PISCIUM, "Eta Piscium", 5742, 3.62),  # Eta Psc - brightest
+    (ALRESCHA, "Alrescha", 7097, 3.82),  # Alpha Psc
 ]
 
 
@@ -175,7 +175,7 @@ class TestZodiacalStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", ALL_NEW_ZODIACAL_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each zodiacal star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -189,7 +189,7 @@ class TestZodiacalStarsCalculation:
     def test_aries_stars_in_aries_region(self, standard_jd):
         """Test that Aries stars are in the Aries/Taurus ecliptic region."""
         for star_id, name, _, _ in ARIES_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             # Aries stars should be between ~0 and ~45 degrees ecliptic
             assert 0 < pos[0] < 50, (
                 f"{name} should be in Aries region, got {pos[0]:.1f} degrees"
@@ -198,7 +198,7 @@ class TestZodiacalStarsCalculation:
     def test_sagittarius_stars_in_sagittarius_region(self, standard_jd):
         """Test that Sagittarius stars are in the Sagittarius ecliptic region."""
         for star_id, name, _, _ in SAGITTARIUS_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             # Sagittarius stars should be between ~260 and ~300 degrees ecliptic
             assert 255 < pos[0] < 310, (
                 f"{name} should be in Sagittarius region, got {pos[0]:.1f} degrees"
@@ -208,14 +208,14 @@ class TestZodiacalStarsCalculation:
         """Test that Kaus Australis is the brightest Sagittarius star."""
         kaus_entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_KAUS_AUSTRALIS:
+            if e.id == KAUS_AUSTRALIS:
                 kaus_entry = e
                 break
 
         assert kaus_entry is not None, "Kaus Australis not found"
 
         for star_id, name, _, mag in SAGITTARIUS_STARS:
-            if star_id != SE_KAUS_AUSTRALIS:
+            if star_id != KAUS_AUSTRALIS:
                 assert kaus_entry.magnitude < mag, (
                     f"Kaus Australis ({kaus_entry.magnitude}) "
                     f"should be brighter than {name} ({mag})"
@@ -225,14 +225,14 @@ class TestZodiacalStarsCalculation:
         """Test that Hamal is the brightest Aries star."""
         hamal_entry = None
         for e in STAR_CATALOG:
-            if e.id == SE_HAMAL:
+            if e.id == HAMAL:
                 hamal_entry = e
                 break
 
         assert hamal_entry is not None, "Hamal not found"
 
         for star_id, name, _, mag in ARIES_STARS:
-            if star_id != SE_HAMAL:
+            if star_id != HAMAL:
                 assert hamal_entry.magnitude < mag, (
                     f"Hamal ({hamal_entry.magnitude}) "
                     f"should be brighter than {name} ({mag})"
@@ -246,90 +246,90 @@ class TestZodiacalStarsNameResolution:
     # Aries
     def test_resolve_hamal(self):
         """Test Hamal name resolution."""
-        assert resolve_star_name("Hamal") == SE_HAMAL
-        assert resolve_star_name("Alpha Arietis") == SE_HAMAL
-        assert resolve_star_name("Alpha Ari") == SE_HAMAL
+        assert resolve_star_name("Hamal") == HAMAL
+        assert resolve_star_name("Alpha Arietis") == HAMAL
+        assert resolve_star_name("Alpha Ari") == HAMAL
 
     def test_resolve_sheratan(self):
         """Test Sheratan name resolution."""
-        assert resolve_star_name("Sheratan") == SE_SHERATAN
-        assert resolve_star_name("Beta Arietis") == SE_SHERATAN
-        assert resolve_star_name("Beta Ari") == SE_SHERATAN
+        assert resolve_star_name("Sheratan") == SHERATAN
+        assert resolve_star_name("Beta Arietis") == SHERATAN
+        assert resolve_star_name("Beta Ari") == SHERATAN
 
     # Cancer
     def test_resolve_tarf(self):
         """Test Tarf name resolution."""
-        assert resolve_star_name("Tarf") == SE_TARF
-        assert resolve_star_name("Beta Cancri") == SE_TARF
-        assert resolve_star_name("Beta Cnc") == SE_TARF
+        assert resolve_star_name("Tarf") == TARF
+        assert resolve_star_name("Beta Cancri") == TARF
+        assert resolve_star_name("Beta Cnc") == TARF
 
     def test_resolve_asellus_stars(self):
         """Test Asellus (donkey) stars name resolution."""
-        assert resolve_star_name("Asellus Borealis") == SE_ASELLUS_BOREALIS
-        assert resolve_star_name("Northern Donkey") == SE_ASELLUS_BOREALIS
-        assert resolve_star_name("Asellus Australis") == SE_ASELLUS_AUSTRALIS
-        assert resolve_star_name("Southern Donkey") == SE_ASELLUS_AUSTRALIS
+        assert resolve_star_name("Asellus Borealis") == ASELLUS_BOREALIS
+        assert resolve_star_name("Northern Donkey") == ASELLUS_BOREALIS
+        assert resolve_star_name("Asellus Australis") == ASELLUS_AUSTRALIS
+        assert resolve_star_name("Southern Donkey") == ASELLUS_AUSTRALIS
 
     # Sagittarius
     def test_resolve_kaus_australis(self):
         """Test Kaus Australis name resolution."""
-        assert resolve_star_name("Kaus Australis") == SE_KAUS_AUSTRALIS
-        assert resolve_star_name("Epsilon Sagittarii") == SE_KAUS_AUSTRALIS
-        assert resolve_star_name("Epsilon Sgr") == SE_KAUS_AUSTRALIS
+        assert resolve_star_name("Kaus Australis") == KAUS_AUSTRALIS
+        assert resolve_star_name("Epsilon Sagittarii") == KAUS_AUSTRALIS
+        assert resolve_star_name("Epsilon Sgr") == KAUS_AUSTRALIS
 
     def test_resolve_nunki(self):
         """Test Nunki name resolution."""
-        assert resolve_star_name("Nunki") == SE_NUNKI
-        assert resolve_star_name("Sigma Sagittarii") == SE_NUNKI
-        assert resolve_star_name("Sigma Sgr") == SE_NUNKI
+        assert resolve_star_name("Nunki") == NUNKI
+        assert resolve_star_name("Sigma Sagittarii") == NUNKI
+        assert resolve_star_name("Sigma Sgr") == NUNKI
 
     # Capricornus
     def test_resolve_algedi(self):
         """Test Algedi name resolution."""
-        assert resolve_star_name("Algedi") == SE_ALGEDI
-        assert resolve_star_name("Alpha Capricorni") == SE_ALGEDI
-        assert resolve_star_name("Alpha Cap") == SE_ALGEDI
-        assert resolve_star_name("Giedi") == SE_ALGEDI
+        assert resolve_star_name("Algedi") == ALGEDI
+        assert resolve_star_name("Alpha Capricorni") == ALGEDI
+        assert resolve_star_name("Alpha Cap") == ALGEDI
+        assert resolve_star_name("Giedi") == ALGEDI
 
     def test_resolve_nashira(self):
         """Test Nashira name resolution."""
-        assert resolve_star_name("Nashira") == SE_NASHIRA
-        assert resolve_star_name("Gamma Capricorni") == SE_NASHIRA
-        assert resolve_star_name("Fortunate One") == SE_NASHIRA
+        assert resolve_star_name("Nashira") == NASHIRA
+        assert resolve_star_name("Gamma Capricorni") == NASHIRA
+        assert resolve_star_name("Fortunate One") == NASHIRA
 
     # Aquarius
     def test_resolve_sadalsuud(self):
         """Test Sadalsuud name resolution."""
-        assert resolve_star_name("Sadalsuud") == SE_SADALSUUD
-        assert resolve_star_name("Beta Aquarii") == SE_SADALSUUD
-        assert resolve_star_name("Beta Aqr") == SE_SADALSUUD
+        assert resolve_star_name("Sadalsuud") == SADALSUUD
+        assert resolve_star_name("Beta Aquarii") == SADALSUUD
+        assert resolve_star_name("Beta Aqr") == SADALSUUD
 
     def test_resolve_sadalmelik(self):
         """Test Sadalmelik name resolution."""
-        assert resolve_star_name("Sadalmelik") == SE_SADALMELIK
-        assert resolve_star_name("Alpha Aquarii") == SE_SADALMELIK
-        assert resolve_star_name("Alpha Aqr") == SE_SADALMELIK
+        assert resolve_star_name("Sadalmelik") == SADALMELIK
+        assert resolve_star_name("Alpha Aquarii") == SADALMELIK
+        assert resolve_star_name("Alpha Aqr") == SADALMELIK
 
     # Pisces
     def test_resolve_alrescha(self):
         """Test Alrescha name resolution."""
-        assert resolve_star_name("Alrescha") == SE_ALRESCHA
-        assert resolve_star_name("Alpha Piscium") == SE_ALRESCHA
-        assert resolve_star_name("The Knot") == SE_ALRESCHA
+        assert resolve_star_name("Alrescha") == ALRESCHA
+        assert resolve_star_name("Alpha Piscium") == ALRESCHA
+        assert resolve_star_name("The Knot") == ALRESCHA
 
     def test_resolve_eta_piscium(self):
         """Test Eta Piscium name resolution."""
-        assert resolve_star_name("Eta Piscium") == SE_ETA_PISCIUM
-        assert resolve_star_name("Eta Psc") == SE_ETA_PISCIUM
+        assert resolve_star_name("Eta Piscium") == ETA_PISCIUM
+        assert resolve_star_name("Eta Psc") == ETA_PISCIUM
 
     # Canonical names
     def test_canonical_names(self):
         """Test canonical name retrieval for new zodiacal stars."""
-        assert get_canonical_star_name(SE_HAMAL) == "Hamal"
-        assert get_canonical_star_name(SE_TARF) == "Tarf"
-        assert get_canonical_star_name(SE_KAUS_AUSTRALIS) == "Kaus Australis"
-        assert get_canonical_star_name(SE_SADALSUUD) == "Sadalsuud"
-        assert get_canonical_star_name(SE_ALRESCHA) == "Alrescha"
+        assert get_canonical_star_name(HAMAL) == "Hamal"
+        assert get_canonical_star_name(TARF) == "Tarf"
+        assert get_canonical_star_name(KAUS_AUSTRALIS) == "Kaus Australis"
+        assert get_canonical_star_name(SADALSUUD) == "Sadalsuud"
+        assert get_canonical_star_name(ALRESCHA) == "Alrescha"
 
 
 @pytest.mark.unit

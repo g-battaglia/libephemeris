@@ -1,7 +1,7 @@
 """
 LEB vs Skyfield Comparison: Crossing Functions.
 
-Validates that crossing functions (iterative solvers using swe_calc_ut
+Validates that crossing functions (iterative solvers using calc_ut
 internally) produce consistent timing in both modes.
 """
 
@@ -11,12 +11,12 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
 )
 
 from .conftest import TOLS, CompareHelper, year_to_jd
@@ -38,8 +38,8 @@ class TestSunCrossings:
     ):
         """Sun crossing timing matches within tolerance."""
         for jd_start in crossing_dates:
-            ref_jd = compare.skyfield(ephem.swe_solcross_ut, target_lon, jd_start, 0)
-            leb_jd = compare.leb(ephem.swe_solcross_ut, target_lon, jd_start, 0)
+            ref_jd = compare.skyfield(ephem.solcross_ut, target_lon, jd_start, 0)
+            leb_jd = compare.leb(ephem.solcross_ut, target_lon, jd_start, 0)
 
             diff_sec = abs(ref_jd - leb_jd) * 86400.0
             assert diff_sec < TOLS.CROSSING_SUN_SEC, (
@@ -52,8 +52,8 @@ class TestSunCrossings:
         target = 45.0
         jd_start = year_to_jd(2024)
 
-        leb_jd = compare.leb(ephem.swe_solcross_ut, target, jd_start, 0)
-        pos, _ = compare.leb(ephem.swe_calc_ut, leb_jd, SE_SUN, 0)
+        leb_jd = compare.leb(ephem.solcross_ut, target, jd_start, 0)
+        pos, _ = compare.leb(ephem.calc_ut, leb_jd, SUN, 0)
 
         lon_diff = abs(pos[0] - target)
         if lon_diff > 180:
@@ -72,8 +72,8 @@ class TestMoonCrossings:
     ):
         """Moon crossing timing matches within tolerance."""
         for jd_start in crossing_dates:
-            ref_jd = compare.skyfield(ephem.swe_mooncross_ut, target_lon, jd_start, 0)
-            leb_jd = compare.leb(ephem.swe_mooncross_ut, target_lon, jd_start, 0)
+            ref_jd = compare.skyfield(ephem.mooncross_ut, target_lon, jd_start, 0)
+            leb_jd = compare.leb(ephem.mooncross_ut, target_lon, jd_start, 0)
 
             diff_sec = abs(ref_jd - leb_jd) * 86400.0
             assert diff_sec < TOLS.CROSSING_MOON_SEC, (
@@ -92,9 +92,9 @@ class TestMoonNodeCrossings:
         """Moon node crossing timing matches within tolerance."""
         for jd_start in crossing_dates:
             ref_result = compare.skyfield(
-                ephem.swe_mooncross_node_ut, jd_start, node_type
+                ephem.mooncross_node_ut, jd_start, node_type
             )
-            leb_result = compare.leb(ephem.swe_mooncross_node_ut, jd_start, node_type)
+            leb_result = compare.leb(ephem.mooncross_node_ut, jd_start, node_type)
 
             diff_sec = abs(ref_result[0] - leb_result[0]) * 86400.0
             assert diff_sec < TOLS.CROSSING_MOON_NODE_SEC, (
@@ -107,12 +107,12 @@ class TestPlanetCrossings:
 
     # Jupiter and Saturn crossing searches diverge even in pure Skyfield mode
     # (pre-existing solver bug in crossing.py, not LEB-related).
-    _XFAIL_BODIES = {SE_JUPITER, SE_SATURN}
+    _XFAIL_BODIES = {JUPITER, SATURN}
 
     @pytest.mark.leb_compare
     @pytest.mark.parametrize(
         "body_id,body_name",
-        [(SE_MARS, "Mars"), (SE_JUPITER, "Jupiter"), (SE_SATURN, "Saturn")],
+        [(MARS, "Mars"), (JUPITER, "Jupiter"), (SATURN, "Saturn")],
     )
     @pytest.mark.parametrize("target_lon", [0, 90, 180, 270])
     def test_cross_ut(
@@ -126,10 +126,10 @@ class TestPlanetCrossings:
 
         try:
             ref_jd = compare.skyfield(
-                ephem.swe_cross_ut, body_id, target_lon, jd_start, SEFLG_SWIEPH
+                ephem.cross_ut, body_id, target_lon, jd_start, FLG_SWIEPH
             )
             leb_jd = compare.leb(
-                ephem.swe_cross_ut, body_id, target_lon, jd_start, SEFLG_SWIEPH
+                ephem.cross_ut, body_id, target_lon, jd_start, FLG_SWIEPH
             )
         except RuntimeError:
             pytest.xfail(
@@ -149,7 +149,7 @@ class TestHelioCrossings:
     @pytest.mark.leb_compare
     @pytest.mark.parametrize(
         "body_id,body_name",
-        [(SE_MARS, "Mars"), (SE_JUPITER, "Jupiter"), (SE_SATURN, "Saturn")],
+        [(MARS, "Mars"), (JUPITER, "Jupiter"), (SATURN, "Saturn")],
     )
     @pytest.mark.parametrize("target_lon", [0, 90, 180, 270])
     def test_helio_cross_ut(
@@ -160,10 +160,10 @@ class TestHelioCrossings:
 
         try:
             ref_jd = compare.skyfield(
-                ephem.swe_helio_cross_ut, body_id, target_lon, jd_start, SEFLG_SWIEPH
+                ephem.helio_cross_ut, body_id, target_lon, jd_start, FLG_SWIEPH
             )
             leb_jd = compare.leb(
-                ephem.swe_helio_cross_ut, body_id, target_lon, jd_start, SEFLG_SWIEPH
+                ephem.helio_cross_ut, body_id, target_lon, jd_start, FLG_SWIEPH
             )
         except RuntimeError:
             pytest.xfail(

@@ -25,15 +25,13 @@ pytestmark = pytest.mark.slow
 from libephemeris import (
     julday,
     planet_occult_when_glob,
-    swe_planet_occult_when_glob,
     planet_occult_when_loc,
-    swe_planet_occult_when_loc,
-    SE_SUN,
-    SE_MOON,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    VENUS,
+    MARS,
+    JUPITER,
+    FLG_SWIEPH,
 )
 
 
@@ -45,42 +43,42 @@ class TestPlanetOccultWhenGlob:
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            planet_occult_when_glob(jd_start, SE_VENUS, 0, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, VENUS, 0, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_sun_as_occulting_body(self):
         """Test that Sun cannot be the occulting body."""
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError, match="Sun cannot be"):
-            planet_occult_when_glob(jd_start, SE_SUN, SE_VENUS, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, SUN, VENUS, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_moon_as_occulting_body(self):
         """Test that Moon cannot be the occulting body."""
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError, match="Moon cannot be"):
-            planet_occult_when_glob(jd_start, SE_MOON, SE_VENUS, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, MOON, VENUS, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_same_planet(self):
         """Test that occulting and occulted cannot be the same."""
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError, match="cannot be the same"):
-            planet_occult_when_glob(jd_start, SE_VENUS, SE_VENUS, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, VENUS, VENUS, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_invalid_occulting_planet(self):
         """Test that invalid planet ID raises appropriate error."""
         jd_start = julday(2020, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            planet_occult_when_glob(jd_start, 999, SE_JUPITER, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, 999, JUPITER, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_invalid_occulted_planet(self):
         """Test that invalid occulted planet ID raises appropriate error."""
         jd_start = julday(2020, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            planet_occult_when_glob(jd_start, SE_VENUS, 999, "", SEFLG_SWIEPH, 0)
+            planet_occult_when_glob(jd_start, VENUS, 999, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
@@ -88,12 +86,11 @@ class TestPlanetOccultWhenGlob:
 
         with pytest.raises(ValueError):
             planet_occult_when_glob(
-                jd_start, SE_VENUS, 0, "UnknownStar123", SEFLG_SWIEPH, 0
+                jd_start, VENUS, 0, "UnknownStar123", FLG_SWIEPH, 0
             )
 
     def test_swe_alias(self):
-        """Test that swe_planet_occult_when_glob is an alias."""
-        assert planet_occult_when_glob is swe_planet_occult_when_glob
+        """Test that planet_occult_when_glob is an alias."""
 
     def test_search_terminates_properly(self):
         """Test that search terminates when no event found or event found.
@@ -108,7 +105,7 @@ class TestPlanetOccultWhenGlob:
         try:
             # This will either find an event or raise RuntimeError
             retflags, tret = planet_occult_when_glob(
-                jd_start, SE_VENUS, SE_MARS, "", SEFLG_SWIEPH, 0
+                jd_start, VENUS, MARS, "", FLG_SWIEPH, 0
             )
             # If it returns, verify structure
             assert len(tret) == 10
@@ -127,7 +124,7 @@ class TestPlanetOccultWhenLoc:
 
         with pytest.raises(ValueError):
             planet_occult_when_loc(
-                jd_start, SE_VENUS, 0, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_start, VENUS, 0, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     def test_raises_error_for_sun_as_occulting_body(self):
@@ -136,7 +133,7 @@ class TestPlanetOccultWhenLoc:
 
         with pytest.raises(ValueError, match="Sun cannot be"):
             planet_occult_when_loc(
-                jd_start, SE_SUN, SE_VENUS, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_start, SUN, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     def test_raises_error_for_moon_as_occulting_body(self):
@@ -145,7 +142,7 @@ class TestPlanetOccultWhenLoc:
 
         with pytest.raises(ValueError, match="Moon cannot be"):
             planet_occult_when_loc(
-                jd_start, SE_MOON, SE_VENUS, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_start, MOON, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     def test_raises_error_for_same_planet(self):
@@ -154,12 +151,11 @@ class TestPlanetOccultWhenLoc:
 
         with pytest.raises(ValueError, match="cannot be the same"):
             planet_occult_when_loc(
-                jd_start, SE_VENUS, SE_VENUS, "", 40.0, -74.0, 0, SEFLG_SWIEPH
+                jd_start, VENUS, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
             )
 
     def test_swe_alias(self):
-        """Test that swe_planet_occult_when_loc is an alias."""
-        assert planet_occult_when_loc is swe_planet_occult_when_loc
+        """Test that planet_occult_when_loc is an alias."""
 
 
 class TestPlanetOccultStarOccultation:
@@ -171,7 +167,7 @@ class TestPlanetOccultStarOccultation:
 
         with pytest.raises(ValueError):
             planet_occult_when_glob(
-                jd_start, SE_VENUS, 0, "NonexistentStar", SEFLG_SWIEPH, 0
+                jd_start, VENUS, 0, "NonexistentStar", FLG_SWIEPH, 0
             )
 
 
@@ -186,7 +182,7 @@ class TestPlanetOccultReturnStructure:
         # (it will raise RuntimeError because no occultation found, which is expected)
         try:
             retflags, tret = planet_occult_when_glob(
-                jd_start, SE_VENUS, SE_MARS, "", SEFLG_SWIEPH, 0
+                jd_start, VENUS, MARS, "", FLG_SWIEPH, 0
             )
             # If we somehow found an event, verify structure
             assert len(tret) == 10
@@ -201,7 +197,7 @@ class TestPlanetOccultReturnStructure:
 
         try:
             retflag, times, attr = planet_occult_when_loc(
-                jd_start, SE_VENUS, SE_MARS, "", 40.0, -74.0, 100.0, SEFLG_SWIEPH
+                jd_start, VENUS, MARS, "", 40.0, -74.0, 100.0, FLG_SWIEPH
             )
             # If we somehow found an event, verify structure
             assert isinstance(retflag, int)
@@ -220,26 +216,20 @@ class TestPlanetOccultImports:
         from libephemeris import (
             planet_occult_when_glob,
             planet_occult_when_loc,
-            swe_planet_occult_when_glob,
-            swe_planet_occult_when_loc,
         )
 
         assert callable(planet_occult_when_glob)
         assert callable(planet_occult_when_loc)
-        assert callable(swe_planet_occult_when_glob)
-        assert callable(swe_planet_occult_when_loc)
+        assert callable(planet_occult_when_glob)
+        assert callable(planet_occult_when_loc)
 
     def test_swe_aliases_are_same_function(self):
         """Test that swe_* are aliases to base functions."""
         from libephemeris import (
             planet_occult_when_glob,
             planet_occult_when_loc,
-            swe_planet_occult_when_glob,
-            swe_planet_occult_when_loc,
         )
 
-        assert planet_occult_when_glob is swe_planet_occult_when_glob
-        assert planet_occult_when_loc is swe_planet_occult_when_loc
 
 
 class TestPlanetOccultDocumentation:
@@ -248,14 +238,14 @@ class TestPlanetOccultDocumentation:
     def test_documentation_example_valid(self):
         """Test that documentation example syntax is valid."""
         # This verifies the example in the docstring is syntactically correct
-        from libephemeris import julday, planet_occult_when_glob, SE_VENUS, SE_JUPITER
+        from libephemeris import julday, planet_occult_when_glob, VENUS, JUPITER
 
         jd = julday(2000, 1, 1, 0)
 
         # Function should be callable with these arguments
         # (may find an event or raise RuntimeError - both are valid)
         try:
-            retflags, tret = planet_occult_when_glob(jd, SE_VENUS, SE_JUPITER)
+            retflags, tret = planet_occult_when_glob(jd, VENUS, JUPITER)
             assert len(tret) == 10
         except RuntimeError:
             pass  # Expected if no occultation found

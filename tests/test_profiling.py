@@ -195,11 +195,11 @@ class TestPlanetaryProfiling:
     @pytest.mark.slow
     def test_profile_planetary_with_planets_subset(self):
         """Test profiling with specific planets."""
-        from libephemeris.constants import SE_SUN, SE_MOON
+        from libephemeris.constants import SUN, MOON
 
         report = profile_planetary_calculations(
             iterations=10,
-            planets=[SE_SUN, SE_MOON],
+            planets=[SUN, MOON],
         )
 
         assert report is not None

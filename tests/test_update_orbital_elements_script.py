@@ -432,9 +432,9 @@ class TestGeneratePythonCode:
             n=0.2142971214271186,
         )
 
-        code = generate_python_code(fetched, "SE_CERES")
+        code = generate_python_code(fetched, "CERES")
 
-        assert "SE_CERES: OrbitalElements(" in code
+        assert "CERES: OrbitalElements(" in code
         assert 'name="Ceres"' in code
         assert "epoch=2461000.5" in code
         assert "a=2.765615651508659" in code

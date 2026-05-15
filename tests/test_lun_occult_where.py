@@ -16,14 +16,13 @@ pytestmark = pytest.mark.slow
 from libephemeris import (
     julday,
     lun_occult_where,
-    swe_lun_occult_where,
     lun_occult_when_glob,
-    SE_ECL_TOTAL,
-    SE_ECL_PARTIAL,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_PARTIAL,
+    VENUS,
+    MARS,
+    JUPITER,
+    FLG_SWIEPH,
 )
 
 
@@ -34,11 +33,11 @@ class TestLunOccultWhere:
         """Test that return values have correct structure."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert len(geopos) == 10
         assert all(isinstance(g, float) for g in geopos)
@@ -52,11 +51,11 @@ class TestLunOccultWhere:
         """Test that function finds valid location during a known occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert ocl_type != 0
 
@@ -68,7 +67,7 @@ class TestLunOccultWhere:
         """Test that function returns 0 when no occultation is happening."""
         jd = julday(2024, 1, 1, 12)
 
-        ocl_type, geopos, attr = lun_occult_where(jd, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd, "Regulus", FLG_SWIEPH)
 
         assert ocl_type == 0
 
@@ -78,23 +77,23 @@ class TestLunOccultWhere:
         """Test that occultation type flags are set correctly."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
-        assert (ocl_type & SE_ECL_TOTAL) or (ocl_type & SE_ECL_PARTIAL)
+        assert (ocl_type & ECL_TOTAL) or (ocl_type & ECL_PARTIAL)
 
     def test_geographic_limits_reasonable(self):
         """Test that geographic limits are reasonable."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             central_lon, central_lat = geopos[0], geopos[1]
@@ -115,11 +114,11 @@ class TestLunOccultWhere:
         """Test that occultation attributes are reasonable."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             assert 0.0 <= attr[0] <= 1.0
@@ -134,26 +133,26 @@ class TestLunOccultWhere:
         jd = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_where(jd, 0, SEFLG_SWIEPH)
+            lun_occult_where(jd, 0, FLG_SWIEPH)
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd = julday(2017, 6, 28, 10)
 
         with pytest.raises(ValueError):
-            lun_occult_where(jd, "UnknownStar123", SEFLG_SWIEPH)
+            lun_occult_where(jd, "UnknownStar123", FLG_SWIEPH)
 
     def test_swe_alias(self):
-        """Test that swe_lun_occult_where is an alias."""
+        """Test that lun_occult_where is an alias."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type1, geopos1, attr1 = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
-        ocl_type2, geopos2, attr2 = swe_lun_occult_where(
-            jd_max, "Regulus", SEFLG_SWIEPH
+        ocl_type1, geopos1, attr1 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
+        ocl_type2, geopos2, attr2 = lun_occult_where(
+            jd_max, "Regulus", FLG_SWIEPH
         )
 
         assert geopos1 == geopos2
@@ -169,11 +168,11 @@ class TestLunOccultWhere:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             central_lat = geopos[1]
@@ -187,11 +186,11 @@ class TestLunOccultWhereEdgeCases:
         """Test occultation location changes during an event."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type_max, geopos_max, _ = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type_max, geopos_max, _ = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type_max != 0:
             assert geopos_max[0] != 0.0 or geopos_max[1] != 0.0
@@ -204,26 +203,26 @@ class TestLunOccultWhereEdgeCases:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
-            assert ocl_type & SE_ECL_TOTAL
+            assert ocl_type & ECL_TOTAL
 
     def test_fraction_covered_during_total_occultation(self):
         """Test that fraction covered is 1.0 for total occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
-        if ocl_type & SE_ECL_TOTAL:
+        if ocl_type & ECL_TOTAL:
             assert attr[0] >= 0.99
 
 
@@ -242,29 +241,29 @@ class TestLunOccultWhereIntegration:
         """
         jd_start = julday(2017, 1, 1, 0)
         glob_type, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert glob_type != 0
         assert ocl_type != 0
 
-        assert (ocl_type & SE_ECL_TOTAL) or (ocl_type & SE_ECL_PARTIAL)
-        assert (glob_type & SE_ECL_TOTAL) or (glob_type & SE_ECL_PARTIAL)
+        assert (ocl_type & ECL_TOTAL) or (ocl_type & ECL_PARTIAL)
+        assert (glob_type & ECL_TOTAL) or (glob_type & ECL_PARTIAL)
 
     def test_multiple_calls_same_result(self):
         """Test that calling the function multiple times gives same result."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        result1 = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
-        result2 = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
-        result3 = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        result1 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
+        result2 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
+        result3 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert result1 == result2
         assert result2 == result3
@@ -280,11 +279,11 @@ class TestLunOccultWherePySwissephAPI:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert ocl_type != 0
         assert -180.0 <= geopos[0] <= 180.0
@@ -294,7 +293,7 @@ class TestLunOccultWherePySwissephAPI:
         """Test that planet ID works as body parameter."""
         jd = julday(2024, 1, 1, 12)
 
-        ocl_type, geopos, attr = lun_occult_where(jd, SE_VENUS, SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd, VENUS, FLG_SWIEPH)
 
         assert isinstance(ocl_type, int)
         assert len(geopos) == 10
@@ -310,12 +309,12 @@ class TestLunOccultWherePlanetOccultations:
 
         try:
             retflags, times = lun_occult_when_glob(
-                jd_start, SE_VENUS, SEFLG_SWIEPH, 0, False
+                jd_start, VENUS, FLG_SWIEPH, 0, False
             )
             if retflags != 0:
                 jd_max = times[0]
                 ocl_type, geopos, attr = lun_occult_where(
-                    jd_max, SE_VENUS, SEFLG_SWIEPH
+                    jd_max, VENUS, FLG_SWIEPH
                 )
 
                 assert len(geopos) == 10
@@ -329,7 +328,7 @@ class TestLunOccultWherePlanetOccultations:
         jd = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            lun_occult_where(jd, 999, SEFLG_SWIEPH)
+            lun_occult_where(jd, 999, FLG_SWIEPH)
 
     def test_mars_occultation_structure(self):
         """Test Mars occultation returns valid structure.
@@ -340,7 +339,7 @@ class TestLunOccultWherePlanetOccultations:
         jd = julday(2024, 6, 1, 12)
 
         try:
-            ocl_type, geopos, attr = lun_occult_where(jd, SE_MARS, SEFLG_SWIEPH)
+            ocl_type, geopos, attr = lun_occult_where(jd, MARS, FLG_SWIEPH)
             assert isinstance(ocl_type, int)
             assert len(geopos) == 10
             assert len(attr) == 20
@@ -356,7 +355,7 @@ class TestLunOccultWherePlanetOccultations:
         jd = julday(2024, 6, 1, 12)
 
         try:
-            ocl_type, geopos, attr = lun_occult_where(jd, SE_JUPITER, SEFLG_SWIEPH)
+            ocl_type, geopos, attr = lun_occult_where(jd, JUPITER, FLG_SWIEPH)
             assert isinstance(ocl_type, int)
             assert len(geopos) == 10
             assert len(attr) == 20
@@ -375,11 +374,11 @@ class TestLunOccultWhereAttributes:
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             assert attr[1] > 100
@@ -388,11 +387,11 @@ class TestLunOccultWhereAttributes:
         """Test that apparent altitude includes refraction correction."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             true_alt = attr[5]
@@ -405,11 +404,11 @@ class TestLunOccultWhereAttributes:
         """Test that angular separation is small during occultation."""
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(
-            jd_start, "Regulus", SEFLG_SWIEPH, 0, False
+            jd_start, "Regulus", FLG_SWIEPH, 0, False
         )
         jd_max = times[0]
 
-        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", SEFLG_SWIEPH)
+        ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
             assert attr[7] < 0.5

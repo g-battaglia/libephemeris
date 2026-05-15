@@ -1,5 +1,5 @@
 """
-Tests for lun_eclipse_gamma and swe_lun_eclipse_gamma functions.
+Tests for lun_eclipse_gamma and lun_eclipse_gamma functions.
 
 These functions calculate the gamma parameter (distance of Moon's center
 from Earth's shadow axis in Earth radii) for lunar eclipses.
@@ -12,13 +12,11 @@ import pytest
 from libephemeris import (
     julday,
     lun_eclipse_when,
-    swe_lun_eclipse_when,
     lun_eclipse_gamma,
-    swe_lun_eclipse_gamma,
-    SE_ECL_TOTAL,
-    SE_ECL_PARTIAL,
-    SE_ECL_PENUMBRAL,
-    SEFLG_SWIEPH,
+    ECL_TOTAL,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
+    FLG_SWIEPH,
 )
 
 pytestmark = pytest.mark.slow
@@ -41,9 +39,9 @@ class TestLunEclipseGammaFunctionSignature:
 
     def test_swe_function_exists_in_package(self):
         """Test that swe_ prefixed function is exported."""
-        from libephemeris import swe_lun_eclipse_gamma
+        from libephemeris import lun_eclipse_gamma
 
-        assert callable(swe_lun_eclipse_gamma)
+        assert callable(lun_eclipse_gamma)
 
     def test_returns_float(self):
         """Test that function returns a float."""
@@ -58,25 +56,25 @@ class TestLunEclipseGammaFunctionSignature:
         """Test that function accepts optional flags parameter."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
-        result = lun_eclipse_gamma(jd_eclipse, flags=SEFLG_SWIEPH)
+        result = lun_eclipse_gamma(jd_eclipse, ifl=FLG_SWIEPH)
 
         assert isinstance(result, float)
 
 
 class TestSweLunEclipseGammaFunctionSignature:
-    """Test swe_lun_eclipse_gamma function signature."""
+    """Test lun_eclipse_gamma function signature."""
 
     def test_function_exists_in_module(self):
-        """Test that swe_lun_eclipse_gamma function exists in eclipse module."""
-        from libephemeris.eclipse import swe_lun_eclipse_gamma
+        """Test that lun_eclipse_gamma function exists in eclipse module."""
+        from libephemeris.eclipse import lun_eclipse_gamma
 
-        assert callable(swe_lun_eclipse_gamma)
+        assert callable(lun_eclipse_gamma)
 
     def test_returns_float(self):
         """Test that function returns a float."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
-        result = swe_lun_eclipse_gamma(jd_eclipse, SEFLG_SWIEPH)
+        result = lun_eclipse_gamma(jd_eclipse, FLG_SWIEPH)
 
         assert isinstance(result, float)
 
@@ -88,7 +86,7 @@ class TestGammaValues:
         """Test that total lunar eclipse has |gamma| < ~0.75 at maximum."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -102,7 +100,7 @@ class TestGammaValues:
         """Test that partial lunar eclipse has moderate gamma value."""
         # Find a partial lunar eclipse
         jd_start = julday(2023, 10, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PARTIAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -116,7 +114,7 @@ class TestGammaValues:
         """Test that penumbral-only eclipse has larger |gamma|."""
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PENUMBRAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -179,7 +177,7 @@ class TestGammaConsistency:
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         result_legacy = lun_eclipse_gamma(jd_eclipse)
-        result_swe = swe_lun_eclipse_gamma(jd_eclipse, SEFLG_SWIEPH)
+        result_swe = lun_eclipse_gamma(jd_eclipse, FLG_SWIEPH)
 
         assert result_legacy == result_swe, (
             f"Results should match: legacy={result_legacy}, swe={result_swe}"
@@ -191,7 +189,7 @@ class TestGammaConsistency:
 
         # For a total eclipse, gamma should be smaller
         jd_start = julday(2022, 5, 1, 0)
-        _, times_total = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times_total = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_total = times_total[0]
 
         gamma_total = lun_eclipse_gamma(jd_total)
@@ -199,7 +197,7 @@ class TestGammaConsistency:
 
         # For a partial eclipse, gamma should be larger
         jd_start = julday(2023, 10, 1, 0)
-        _, times_partial = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
+        _, times_partial = lun_eclipse_when(jd_start, ecltype=ECL_PARTIAL)
         jd_partial = times_partial[0]
 
         gamma_partial = lun_eclipse_gamma(jd_partial)
@@ -250,7 +248,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 5, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -267,7 +265,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2022, 11, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_TOTAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -284,7 +282,7 @@ class TestKnownEclipses:
         """
         # Find the eclipse
         jd_start = julday(2023, 10, 1, 0)
-        _, times = swe_lun_eclipse_when(jd_start, SEFLG_SWIEPH, SE_ECL_PARTIAL)
+        _, times = lun_eclipse_when(jd_start, FLG_SWIEPH, ECL_PARTIAL)
         jd_max = times[0]
 
         gamma = lun_eclipse_gamma(jd_max)
@@ -328,7 +326,7 @@ class TestEdgeCases:
         """Test gamma calculation at various times during eclipse."""
         # Find a total lunar eclipse
         jd_start = julday(2022, 5, 1, 0)
-        _, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        _, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         # Calculate gamma at different phases

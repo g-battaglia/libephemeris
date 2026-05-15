@@ -10,12 +10,12 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    FLG_SPEED,
+    FLG_SIDEREAL,
 )
 
 from .conftest import (
@@ -29,10 +29,10 @@ from .conftest import (
 )
 
 SIDEREAL_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 
@@ -58,15 +58,15 @@ class TestSiderealPosition:
         sid_mode: int,
     ):
         """Sidereal longitude matches Skyfield within tolerance."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in sidereal_dates:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -94,14 +94,14 @@ class TestSiderealSpeed:
         sid_mode: int,
     ):
         """Sidereal speed matches Skyfield within tolerance."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
 
         for jd in sidereal_dates:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[3] - leb[3])
             max_err = max(max_err, err)
@@ -115,7 +115,7 @@ class TestStarBasedFallback:
     """Star-based sidereal modes should produce identical results (both fallback)."""
 
     @pytest.mark.leb_compare
-    @pytest.mark.parametrize("body_id,body_name", [(SE_SUN, "Sun")])
+    @pytest.mark.parametrize("body_id,body_name", [(SUN, "Sun")])
     @pytest.mark.parametrize("sid_mode", STAR_BASED_SIDEREAL_MODES)
     def test_star_based_identical(
         self,
@@ -126,13 +126,13 @@ class TestStarBasedFallback:
         sid_mode: int,
     ):
         """Star-based modes produce identical results (both fallback to Skyfield)."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
 
         for jd in sidereal_dates[:5]:  # Fewer dates for fallback modes
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             assert ref[0] == pytest.approx(leb[0], rel=1e-10), (
                 f"{body_name} star-based mode {sid_mode} differs at JD {jd}"

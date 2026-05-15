@@ -17,10 +17,10 @@ as it helps locate the South Celestial Pole. The two brightest stars
 import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_ACRUX,
-    SE_MIMOSA,
-    SE_GACRUX,
-    SE_DELTA_CRUCIS,
+    ACRUX,
+    MIMOSA,
+    GACRUX,
+    DELTA_CRUCIS,
 )
 from libephemeris.fixed_stars import (
     STAR_CATALOG,
@@ -32,10 +32,10 @@ from libephemeris.fixed_stars import (
 # The 4 Southern Cross stars
 # (constant, name, hip_number, magnitude)
 CRUX_STARS = [
-    (SE_ACRUX, "Acrux", 60718, 0.76),  # Alpha Cru - brightest, south point
-    (SE_MIMOSA, "Mimosa", 62434, 1.25),  # Beta Cru - east arm
-    (SE_GACRUX, "Gacrux", 61084, 1.64),  # Gamma Cru - north point
-    (SE_DELTA_CRUCIS, "Delta Crucis", 59747, 2.80),  # Delta Cru - west arm
+    (ACRUX, "Acrux", 60718, 0.76),  # Alpha Cru - brightest, south point
+    (MIMOSA, "Mimosa", 62434, 1.25),  # Beta Cru - east arm
+    (GACRUX, "Gacrux", 61084, 1.64),  # Gamma Cru - north point
+    (DELTA_CRUCIS, "Delta Crucis", 59747, 2.80),  # Delta Cru - west arm
 ]
 
 
@@ -62,7 +62,7 @@ class TestCruxStarsCatalog:
         other_mags = []
 
         for star_id, name, _, mag in CRUX_STARS:
-            if star_id == SE_ACRUX:
+            if star_id == ACRUX:
                 acrux_mag = mag
             else:
                 other_mags.append((name, mag))
@@ -129,7 +129,7 @@ class TestCruxStarsCalculation:
     @pytest.mark.parametrize("star_id,name,hip,mag", CRUX_STARS)
     def test_star_position_reasonable(self, standard_jd, star_id, name, hip, mag):
         """Test each Crux star returns a reasonable position."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+        pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
 
         # Longitude should be 0-360
         assert 0 <= pos[0] < 360, f"{name} longitude {pos[0]}deg out of range"
@@ -143,7 +143,7 @@ class TestCruxStarsCalculation:
     def test_crux_stars_in_southern_sky(self, standard_jd):
         """Test that all Crux stars have negative ecliptic latitude (southern sky)."""
         for star_id, name, _, _ in CRUX_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             # Crux stars are all in the southern sky (negative ecliptic latitude)
             assert pos[1] < 0, (
                 f"{name} should be in southern sky, got latitude {pos[1]:.2f}"
@@ -153,7 +153,7 @@ class TestCruxStarsCalculation:
         """Test that the Crux stars form a rough cross pattern."""
         positions = {}
         for star_id, name, _, _ in CRUX_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions[name] = (pos[0], pos[1])
 
         # All four stars should be in a compact region
@@ -170,7 +170,7 @@ class TestCruxStarsCalculation:
         """Test that Gacrux is the northernmost Crux star (largest latitude)."""
         positions = {}
         for star_id, name, _, _ in CRUX_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions[name] = (pos[0], pos[1])
 
         gacrux_lat = positions["Gacrux"][1]
@@ -185,7 +185,7 @@ class TestCruxStarsCalculation:
         """Test that Acrux is the southernmost Crux star (smallest latitude)."""
         positions = {}
         for star_id, name, _, _ in CRUX_STARS:
-            pos, _ = ephem.swe_calc_ut(standard_jd, star_id, 0)
+            pos, _ = ephem.calc_ut(standard_jd, star_id, 0)
             positions[name] = (pos[0], pos[1])
 
         acrux_lat = positions["Acrux"][1]
@@ -198,7 +198,7 @@ class TestCruxStarsCalculation:
 
     def test_delta_crucis_position(self, standard_jd):
         """Test that Delta Crucis is positioned correctly in the cross."""
-        pos, _ = ephem.swe_calc_ut(standard_jd, SE_DELTA_CRUCIS, 0)
+        pos, _ = ephem.calc_ut(standard_jd, DELTA_CRUCIS, 0)
 
         # Delta Crucis should be in the Virgo/Libra ecliptic region
         assert 170 < pos[0] < 220, (
@@ -217,33 +217,33 @@ class TestCruxStarsNameResolution:
 
     def test_resolve_acrux(self):
         """Test Acrux name resolution."""
-        assert resolve_star_name("Acrux") == SE_ACRUX
-        assert resolve_star_name("Alpha Crucis") == SE_ACRUX
-        assert resolve_star_name("Alpha Cru") == SE_ACRUX
+        assert resolve_star_name("Acrux") == ACRUX
+        assert resolve_star_name("Alpha Crucis") == ACRUX
+        assert resolve_star_name("Alpha Cru") == ACRUX
 
     def test_resolve_mimosa(self):
         """Test Mimosa name resolution."""
-        assert resolve_star_name("Mimosa") == SE_MIMOSA
-        assert resolve_star_name("Beta Crucis") == SE_MIMOSA
-        assert resolve_star_name("Beta Cru") == SE_MIMOSA
-        assert resolve_star_name("Becrux") == SE_MIMOSA
+        assert resolve_star_name("Mimosa") == MIMOSA
+        assert resolve_star_name("Beta Crucis") == MIMOSA
+        assert resolve_star_name("Beta Cru") == MIMOSA
+        assert resolve_star_name("Becrux") == MIMOSA
 
     def test_resolve_gacrux(self):
         """Test Gacrux name resolution."""
-        assert resolve_star_name("Gacrux") == SE_GACRUX
-        assert resolve_star_name("Gamma Crucis") == SE_GACRUX
-        assert resolve_star_name("Gamma Cru") == SE_GACRUX
-        assert resolve_star_name("Rubidea") == SE_GACRUX
+        assert resolve_star_name("Gacrux") == GACRUX
+        assert resolve_star_name("Gamma Crucis") == GACRUX
+        assert resolve_star_name("Gamma Cru") == GACRUX
+        assert resolve_star_name("Rubidea") == GACRUX
 
     def test_resolve_delta_crucis(self):
         """Test Delta Crucis name resolution."""
-        assert resolve_star_name("Delta Crucis") == SE_DELTA_CRUCIS
-        assert resolve_star_name("Delta Cru") == SE_DELTA_CRUCIS
-        assert resolve_star_name("Decrux") == SE_DELTA_CRUCIS
+        assert resolve_star_name("Delta Crucis") == DELTA_CRUCIS
+        assert resolve_star_name("Delta Cru") == DELTA_CRUCIS
+        assert resolve_star_name("Decrux") == DELTA_CRUCIS
 
     def test_canonical_names(self):
         """Test canonical name retrieval for Crux stars."""
-        assert get_canonical_star_name(SE_ACRUX) == "Acrux"
-        assert get_canonical_star_name(SE_MIMOSA) == "Mimosa"
-        assert get_canonical_star_name(SE_GACRUX) == "Gacrux"
-        assert get_canonical_star_name(SE_DELTA_CRUCIS) == "Delta Crucis"
+        assert get_canonical_star_name(ACRUX) == "Acrux"
+        assert get_canonical_star_name(MIMOSA) == "Mimosa"
+        assert get_canonical_star_name(GACRUX) == "Gacrux"
+        assert get_canonical_star_name(DELTA_CRUCIS) == "Delta Crucis"

@@ -19,11 +19,11 @@ from libephemeris import (
     sol_eclipse_when_loc,
     lun_eclipse_when,
     lun_eclipse_when_loc,
-    SE_ECL_TOTAL,
-    SE_ECL_PARTIAL,
-    SE_ECL_PENUMBRAL,
-    SE_ECL_GRAZING,
-    SE_ECL_ANNULAR,
+    ECL_TOTAL,
+    ECL_PARTIAL,
+    ECL_PENUMBRAL,
+    ECL_GRAZING,
+    ECL_ANNULAR,
 )
 from libephemeris.eclipse import (
     _is_shallow_eclipse,
@@ -305,10 +305,10 @@ class TestLunarEclipseEdgeCases:
         # Find a penumbral lunar eclipse
         jd_start = julday(2020, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PENUMBRAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PENUMBRAL)
 
         # Should find a penumbral eclipse
-        assert ecl_type & SE_ECL_PENUMBRAL
+        assert ecl_type & ECL_PENUMBRAL
         # Eclipse maximum should be valid
         assert times[0] > jd_start
         # Penumbral times should be valid
@@ -320,10 +320,10 @@ class TestLunarEclipseEdgeCases:
         # Find a partial lunar eclipse
         jd_start = julday(2021, 1, 1, 0)
 
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_PARTIAL)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_PARTIAL)
 
         # Should find a partial eclipse
-        assert ecl_type & SE_ECL_PARTIAL
+        assert ecl_type & ECL_PARTIAL
         # Maximum time should be valid
         assert times[0] > jd_start
         # Partial phase times should be present

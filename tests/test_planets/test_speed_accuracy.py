@@ -15,22 +15,22 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_CHIRON,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    CHIRON,
+    FLG_SPEED,
 )
 
 
@@ -42,42 +42,42 @@ def _random_jds(n: int, seed: int = 42) -> list[float]:
 
 # Expected speed ranges (degrees/day) for each body
 SPEED_RANGES = {
-    SE_SUN: (0.9, 1.1),
-    SE_MOON: (10.0, 16.0),
-    SE_MERCURY: (-1.5, 2.3),  # Can retrograde
-    SE_VENUS: (-0.7, 1.3),  # Can retrograde
-    SE_MARS: (-0.5, 0.8),  # Can retrograde
-    SE_JUPITER: (-0.15, 0.25),
-    SE_SATURN: (-0.12, 0.15),
-    SE_URANUS: (-0.05, 0.07),
-    SE_NEPTUNE: (-0.03, 0.04),
-    SE_PLUTO: (-0.04, 0.04),
-    SE_MEAN_NODE: (-0.06, -0.04),  # Always retrograde
-    SE_TRUE_NODE: (-0.3, 0.2),  # Oscillates
-    SE_MEAN_APOG: (0.10, 0.12),
-    SE_OSCU_APOG: (-2.0, 2.5),  # Highly variable
-    SE_CHIRON: (-0.1, 0.15),
+    SUN: (0.9, 1.1),
+    MOON: (10.0, 16.0),
+    MERCURY: (-1.5, 2.3),  # Can retrograde
+    VENUS: (-0.7, 1.3),  # Can retrograde
+    MARS: (-0.5, 0.8),  # Can retrograde
+    JUPITER: (-0.15, 0.25),
+    SATURN: (-0.12, 0.15),
+    URANUS: (-0.05, 0.07),
+    NEPTUNE: (-0.03, 0.04),
+    PLUTO: (-0.04, 0.04),
+    MEAN_NODE: (-0.06, -0.04),  # Always retrograde
+    TRUE_NODE: (-0.3, 0.2),  # Oscillates
+    MEAN_APOG: (0.10, 0.12),
+    OSCU_APOG: (-2.0, 2.5),  # Highly variable
+    CHIRON: (-0.1, 0.15),
 }
 
 CORE_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MERCURY, "Mercury"),
-    (SE_VENUS, "Venus"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
-    (SE_URANUS, "Uranus"),
-    (SE_NEPTUNE, "Neptune"),
-    (SE_PLUTO, "Pluto"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MERCURY, "Mercury"),
+    (VENUS, "Venus"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
+    (URANUS, "Uranus"),
+    (NEPTUNE, "Neptune"),
+    (PLUTO, "Pluto"),
 ]
 
 ALL_BODIES = CORE_BODIES + [
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_MEAN_APOG, "MeanApog"),
-    (SE_OSCU_APOG, "OscuApog"),
-    (SE_CHIRON, "Chiron"),
+    (MEAN_NODE, "MeanNode"),
+    (TRUE_NODE, "TrueNode"),
+    (MEAN_APOG, "MeanApog"),
+    (OSCU_APOG, "OscuApog"),
+    (CHIRON, "Chiron"),
 ]
 
 
@@ -89,7 +89,7 @@ class TestSpeedPlausibility:
     def test_speed_in_range_at_j2000(self, body_id: int, body_name: str):
         """Speed at J2000 should be within expected range."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         speed = result[3]
         lo, hi = SPEED_RANGES[body_id]
         assert lo <= speed <= hi, (
@@ -103,7 +103,7 @@ class TestSpeedPlausibility:
         jds = _random_jds(50, seed=body_id * 11)
         lo, hi = SPEED_RANGES[body_id]
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             speed = result[3]
             assert lo <= speed <= hi, (
                 f"{body_name}: speed {speed}°/day outside range at JD {jd:.1f}"
@@ -120,11 +120,11 @@ class TestSpeedNumericalDerivative:
         jd = 2451545.0
         dt = 0.01  # 0.01 day = ~14.4 minutes
 
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         analytical_speed = result[3]
 
-        r_plus, _ = swe.swe_calc_ut(jd + dt, body_id, 0)
-        r_minus, _ = swe.swe_calc_ut(jd - dt, body_id, 0)
+        r_plus, _ = swe.calc_ut(jd + dt, body_id, 0)
+        r_minus, _ = swe.calc_ut(jd - dt, body_id, 0)
 
         # Handle wrapping at 0/360
         num_diff = r_plus[0] - r_minus[0]
@@ -135,7 +135,7 @@ class TestSpeedNumericalDerivative:
         numerical_speed = num_diff / (2 * dt)
 
         # Tolerance: 0.001°/day for most bodies
-        tol = 0.005 if body_id == SE_MOON else 0.001
+        tol = 0.005 if body_id == MOON else 0.001
         assert abs(analytical_speed - numerical_speed) < tol, (
             f"{body_name}: analytical {analytical_speed:.6f} vs "
             f"numerical {numerical_speed:.6f}°/day"
@@ -147,14 +147,14 @@ class TestSpeedNumericalDerivative:
         """Speed matches numerical derivative at 20 dates per planet."""
         jds = _random_jds(20, seed=body_id * 23)
         dt = 0.01
-        tol = 0.01 if body_id == SE_MOON else 0.002
+        tol = 0.01 if body_id == MOON else 0.002
 
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             analytical = result[3]
 
-            rp, _ = swe.swe_calc_ut(jd + dt, body_id, 0)
-            rm, _ = swe.swe_calc_ut(jd - dt, body_id, 0)
+            rp, _ = swe.calc_ut(jd + dt, body_id, 0)
+            rm, _ = swe.calc_ut(jd - dt, body_id, 0)
 
             num_diff = rp[0] - rm[0]
             if num_diff > 180:
@@ -176,10 +176,10 @@ class TestLatitudeSpeed:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_lat_speed_numerical_derivative(self, body_id: int, body_name: str):
@@ -187,11 +187,11 @@ class TestLatitudeSpeed:
         jd = 2451545.0
         dt = 0.01
 
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         analytical = result[4]  # lat speed
 
-        rp, _ = swe.swe_calc_ut(jd + dt, body_id, 0)
-        rm, _ = swe.swe_calc_ut(jd - dt, body_id, 0)
+        rp, _ = swe.calc_ut(jd + dt, body_id, 0)
+        rm, _ = swe.calc_ut(jd - dt, body_id, 0)
         numerical = (rp[1] - rm[1]) / (2 * dt)
 
         tol = 0.01
@@ -208,10 +208,10 @@ class TestDistanceSpeed:
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_dist_speed_numerical_derivative(self, body_id: int, body_name: str):
@@ -219,11 +219,11 @@ class TestDistanceSpeed:
         jd = 2451545.0
         dt = 0.01
 
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         analytical = result[5]  # dist speed
 
-        rp, _ = swe.swe_calc_ut(jd + dt, body_id, 0)
-        rm, _ = swe.swe_calc_ut(jd - dt, body_id, 0)
+        rp, _ = swe.calc_ut(jd + dt, body_id, 0)
+        rm, _ = swe.calc_ut(jd - dt, body_id, 0)
         numerical = (rp[2] - rm[2]) / (2 * dt)
 
         tol = 1e-5
@@ -243,7 +243,7 @@ class TestSpeedHighVolume:
     )
     def test_sun_speed_100_dates(self, jd: float):
         """Sun speed is valid at 100 random dates."""
-        result, _ = swe.swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
         assert 0.9 < result[3] < 1.1, f"Sun speed {result[3]} at JD {jd}"
 
     @pytest.mark.unit
@@ -253,16 +253,16 @@ class TestSpeedHighVolume:
     )
     def test_moon_speed_100_dates(self, jd: float):
         """Moon speed is valid at 100 random dates."""
-        result, _ = swe.swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
         assert 10.0 < result[3] < 16.0, f"Moon speed {result[3]} at JD {jd}"
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
         "body_id,body_name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
         ],
     )
     def test_inner_planet_speed_50_dates(self, body_id: int, body_name: str):
@@ -270,5 +270,5 @@ class TestSpeedHighVolume:
         jds = _random_jds(50, seed=body_id * 31)
         lo, hi = SPEED_RANGES[body_id]
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert lo <= result[3] <= hi, f"{body_name} speed {result[3]} at JD {jd}"

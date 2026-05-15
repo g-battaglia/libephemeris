@@ -51,8 +51,8 @@ class TestDeltaTValues:
         worst_jd = 0.0
 
         for jd in deltat_dates:
-            ref_dt = compare.skyfield(ephem.swe_deltat, jd)
-            leb_dt = compare.leb(ephem.swe_deltat, jd)
+            ref_dt = compare.skyfield(ephem.deltat, jd)
+            leb_dt = compare.leb(ephem.deltat, jd)
 
             # Delta-T is in fractional days, convert to seconds
             err_sec = abs(ref_dt - leb_dt) * 86400.0
@@ -80,8 +80,8 @@ class TestDeltaTEdges:
         worst_jd = 0.0
 
         for jd in deltat_edge_dates:
-            ref_dt = compare.skyfield(ephem.swe_deltat, jd)
-            leb_dt = compare.leb(ephem.swe_deltat, jd)
+            ref_dt = compare.skyfield(ephem.deltat, jd)
+            leb_dt = compare.leb(ephem.deltat, jd)
 
             err_sec = abs(ref_dt - leb_dt) * 86400.0
             if err_sec > max_err_sec:
@@ -107,8 +107,8 @@ class TestDeltaTStatistics:
         errors_sec: list[float] = []
 
         for jd in deltat_dates:
-            ref_dt = compare.skyfield(ephem.swe_deltat, jd)
-            leb_dt = compare.leb(ephem.swe_deltat, jd)
+            ref_dt = compare.skyfield(ephem.deltat, jd)
+            leb_dt = compare.leb(ephem.deltat, jd)
 
             err_sec = abs(ref_dt - leb_dt) * 86400.0
             errors_sec.append(err_sec)

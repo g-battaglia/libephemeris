@@ -147,10 +147,10 @@ class TestParseOrbitalElements:
     def test_parse_real_seorbel_file(self):
         """Test parsing the actual Swiss Ephemeris seorbel.txt file."""
         seorbel_path = (
-            Path(__file__).parent.parent / "swisseph" / "ephe" / "seorbel.txt"
+            Path(__file__).parent.parent / "ephe" / "seorbel.txt"
         )
         if not seorbel_path.exists():
-            pytest.skip("seorbel.txt not found in swisseph/ephe/")
+            pytest.skip("seorbel.txt not found in reference ephemeris dir")
 
         elements = parse_orbital_elements(seorbel_path)
 
@@ -526,10 +526,10 @@ class TestCalcOrbitalPosition:
     def test_position_matches_cupido(self):
         """Test that calculated position is reasonable for Cupido."""
         seorbel_path = (
-            Path(__file__).parent.parent / "swisseph" / "ephe" / "seorbel.txt"
+            Path(__file__).parent.parent / "ephe" / "seorbel.txt"
         )
         if not seorbel_path.exists():
-            pytest.skip("seorbel.txt not found in swisseph/ephe/")
+            pytest.skip("seorbel.txt not found in reference ephemeris dir")
 
         elements = parse_orbital_elements(seorbel_path)
         cupido = get_orbital_body_by_name(elements, "Cupido")

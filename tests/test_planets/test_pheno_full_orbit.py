@@ -1,4 +1,4 @@
-"""Tests for swe_pheno_ut across all planets over extended date ranges."""
+"""Tests for pheno_ut across all planets over extended date ranges."""
 
 from __future__ import annotations
 
@@ -6,17 +6,17 @@ import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    FLG_SWIEPH,
 )
 
 JD_J2000 = 2451545.0
@@ -24,52 +24,52 @@ JD_J2000 = 2451545.0
 
 @pytest.mark.unit
 class TestPhenoBasic:
-    """Basic swe_pheno_ut functionality."""
+    """Basic pheno_ut functionality."""
 
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_pheno_returns_values(self, body, name):
-        """swe_pheno_ut returns values for planets."""
-        result = swe.swe_pheno_ut(JD_J2000, body, SEFLG_SWIEPH)
+        """pheno_ut returns values for planets."""
+        result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
         assert len(result) >= 5, f"Not enough values for {name}"
 
     def test_pheno_sun_illumination_zero(self):
         """Sun illumination should be 0 (undefined)."""
-        result = swe.swe_pheno_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH)
+        result = swe.pheno_ut(JD_J2000, SUN, FLG_SWIEPH)
         assert result[1] == 0.0 or math.isnan(result[1])
 
     def test_pheno_moon_phase_angle(self):
         """Moon phase angle should be in [0, 180]."""
-        result = swe.swe_pheno_ut(JD_J2000, SE_MOON, SEFLG_SWIEPH)
+        result = swe.pheno_ut(JD_J2000, MOON, FLG_SWIEPH)
         phase_angle = result[0]
         assert 0 <= phase_angle <= 180, f"Phase angle {phase_angle}° out of range"
 
     def test_pheno_moon_illumination(self):
         """Moon illumination should be in [0, 1]."""
-        result = swe.swe_pheno_ut(JD_J2000, SE_MOON, SEFLG_SWIEPH)
+        result = swe.pheno_ut(JD_J2000, MOON, FLG_SWIEPH)
         illum = result[1]
         assert 0 <= illum <= 1, f"Illumination {illum} out of range"
 
     def test_pheno_elongation_range(self):
         """Elongation should be in [0, 180]."""
-        for body in [SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
-            result = swe.swe_pheno_ut(JD_J2000, body, SEFLG_SWIEPH)
+        for body in [MERCURY, VENUS, MARS, JUPITER]:
+            result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
             elong = result[2]
             assert 0 <= elong <= 180, f"Elongation {elong}° for body {body}"
 
     def test_pheno_diameter_positive(self):
         """Apparent diameter should be positive."""
-        for body in [SE_MOON, SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER]:
-            result = swe.swe_pheno_ut(JD_J2000, body, SEFLG_SWIEPH)
+        for body in [MOON, MERCURY, VENUS, MARS, JUPITER]:
+            result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
             diam = result[3]
             assert diam > 0, f"Diameter {diam} for body {body} not positive"
 
@@ -83,13 +83,13 @@ class TestPhenoMoonPhases:
         # Find a point where Moon is near 180° from Sun
         for offset in range(30):
             jd = JD_J2000 + offset
-            sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-            moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SWIEPH)
+            sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+            moon, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH)
             elong = abs(moon[0] - sun[0])
             if elong > 180:
                 elong = 360 - elong
             if elong > 170:
-                result = swe.swe_pheno_ut(jd, SE_MOON, SEFLG_SWIEPH)
+                result = swe.pheno_ut(jd, MOON, FLG_SWIEPH)
                 assert result[1] > 0.9, f"Full moon illumination {result[1]} too low"
                 return
         pytest.skip("No full moon found in 30-day window")
@@ -98,13 +98,13 @@ class TestPhenoMoonPhases:
         """Near new Moon, illumination should be near 0.0."""
         for offset in range(30):
             jd = JD_J2000 + offset
-            sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
-            moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SWIEPH)
+            sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
+            moon, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH)
             elong = abs(moon[0] - sun[0])
             if elong > 180:
                 elong = 360 - elong
             if elong < 10:
-                result = swe.swe_pheno_ut(jd, SE_MOON, SEFLG_SWIEPH)
+                result = swe.pheno_ut(jd, MOON, FLG_SWIEPH)
                 assert result[1] < 0.1, f"New moon illumination {result[1]} too high"
                 return
         pytest.skip("No new moon found in 30-day window")
@@ -114,7 +114,7 @@ class TestPhenoMoonPhases:
         illuminations = []
         for offset in range(0, 30):
             jd = JD_J2000 + offset
-            result = swe.swe_pheno_ut(jd, SE_MOON, SEFLG_SWIEPH)
+            result = swe.pheno_ut(jd, MOON, FLG_SWIEPH)
             illuminations.append(result[1])
         # Should see both high and low illumination values
         assert max(illuminations) > 0.8, "Never saw high illumination"
@@ -126,22 +126,22 @@ class TestPhenoInnerPlanets:
     """Phenomena for inner planets (Mercury, Venus)."""
 
     @pytest.mark.parametrize(
-        "body,name", [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]
+        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
     )
     def test_max_elongation_bounded(self, body, name):
         """Inner planet elongation should be bounded (< 90°)."""
         max_elong = 0
         for offset in range(0, 365, 5):
             jd = JD_J2000 + offset
-            result = swe.swe_pheno_ut(jd, body, SEFLG_SWIEPH)
+            result = swe.pheno_ut(jd, body, FLG_SWIEPH)
             max_elong = max(max_elong, result[2])
-        if body == SE_MERCURY:
+        if body == MERCURY:
             assert max_elong < 30, f"Mercury max elongation {max_elong}° > 30"
         else:
             assert max_elong < 50, f"Venus max elongation {max_elong}° > 50"
 
     @pytest.mark.parametrize(
-        "body,name", [(SE_MERCURY, "Mercury"), (SE_VENUS, "Venus")]
+        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
     )
     def test_illumination_varies_with_elongation(self, body, name):
         """Inner planet illumination should correlate with elongation."""
@@ -151,7 +151,7 @@ class TestPhenoInnerPlanets:
         illuminations = []
         for offset in range(0, 365, 10):
             jd = JD_J2000 + offset
-            result = swe.swe_pheno_ut(jd, body, SEFLG_SWIEPH)
+            result = swe.pheno_ut(jd, body, FLG_SWIEPH)
             elongations.append(result[2])
             illuminations.append(result[1])
         # Just verify range exists
@@ -165,9 +165,9 @@ class TestPhenoOuterPlanets:
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_elongation_reaches_180(self, body, name):
@@ -175,22 +175,22 @@ class TestPhenoOuterPlanets:
         max_elong = 0
         for offset in range(0, 730, 5):  # Search 2 years
             jd = JD_J2000 + offset
-            result = swe.swe_pheno_ut(jd, body, SEFLG_SWIEPH)
+            result = swe.pheno_ut(jd, body, FLG_SWIEPH)
             max_elong = max(max_elong, result[2])
         assert max_elong > 150, f"{name} max elongation {max_elong}° too low"
 
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_illumination_nearly_full(self, body, name):
         """Far outer planets should always be nearly fully illuminated."""
         for offset in range(0, 365, 30):
             jd = JD_J2000 + offset
-            result = swe.swe_pheno_ut(jd, body, SEFLG_SWIEPH)
+            result = swe.pheno_ut(jd, body, FLG_SWIEPH)
             illum = result[1]
             assert illum > 0.85, (
                 f"{name} illumination {illum} too low at offset {offset}"
@@ -199,15 +199,15 @@ class TestPhenoOuterPlanets:
     @pytest.mark.parametrize(
         "body,name,mag_range",
         [
-            (SE_VENUS, "Venus", (-5.0, -3.0)),
-            (SE_JUPITER, "Jupiter", (-3.0, -1.0)),
-            (SE_SATURN, "Saturn", (-1.0, 2.0)),
-            (SE_MARS, "Mars", (-3.0, 2.5)),
+            (VENUS, "Venus", (-5.0, -3.0)),
+            (JUPITER, "Jupiter", (-3.0, -1.0)),
+            (SATURN, "Saturn", (-1.0, 2.0)),
+            (MARS, "Mars", (-3.0, 2.5)),
         ],
     )
     def test_magnitude_reasonable(self, body, name, mag_range):
         """Apparent magnitude should be within expected range."""
-        result = swe.swe_pheno_ut(JD_J2000, body, SEFLG_SWIEPH)
+        result = swe.pheno_ut(JD_J2000, body, FLG_SWIEPH)
         mag = result[4]
         if not math.isnan(mag):
             lo, hi = mag_range

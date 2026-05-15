@@ -4,7 +4,7 @@ Unit tests for Bayer designation star search.
 Tests the ability to search for stars by their Bayer designations using
 full Greek letter names, e.g., "Alpha Leonis", "Beta Persei", "Gamma Virginis".
 
-This feature is required for swe_fixstar2 compatibility with designation search.
+This feature is required for fixstar2 compatibility with designation search.
 """
 
 import pytest
@@ -14,24 +14,24 @@ from libephemeris.fixed_stars import (
     _parse_bayer_designation,
     resolve_star_name,
     _resolve_star2,
-    swe_fixstar2_ut,
-    swe_fixstar2,
+    fixstar2_ut,
+    fixstar2,
     GREEK_LETTER_ABBREV,
     CONSTELLATION_ABBREV,
 )
 from libephemeris.constants import (
-    SE_REGULUS,
-    SE_SPICA_STAR,
-    SE_ALGOL,
-    SE_SIRIUS,
-    SE_ALDEBARAN,
-    SE_ANTARES,
-    SE_VEGA,
-    SE_BETELGEUSE,
-    SE_RIGEL,
-    SE_BELLATRIX,
-    SE_DENEB,
-    SE_ALTAIR,
+    REGULUS,
+    SPICA_STAR,
+    ALGOL,
+    SIRIUS,
+    ALDEBARAN,
+    ANTARES,
+    VEGA,
+    BETELGEUSE,
+    RIGEL,
+    BELLATRIX,
+    DENEB,
+    ALTAIR,
 )
 
 
@@ -206,64 +206,64 @@ class TestResolveStarNameWithBayer:
     """Tests for resolve_star_name with Bayer designations."""
 
     def test_resolve_alpha_leonis(self):
-        """Alpha Leonis should resolve to SE_REGULUS."""
+        """Alpha Leonis should resolve to REGULUS."""
         result = resolve_star_name("Alpha Leonis")
-        assert result == SE_REGULUS
+        assert result == REGULUS
 
     def test_resolve_beta_persei(self):
-        """Beta Persei should resolve to SE_ALGOL."""
+        """Beta Persei should resolve to ALGOL."""
         result = resolve_star_name("Beta Persei")
-        assert result == SE_ALGOL
+        assert result == ALGOL
 
     def test_resolve_alpha_virginis(self):
-        """Alpha Virginis should resolve to SE_SPICA_STAR."""
+        """Alpha Virginis should resolve to SPICA_STAR."""
         result = resolve_star_name("Alpha Virginis")
-        assert result == SE_SPICA_STAR
+        assert result == SPICA_STAR
 
     def test_resolve_alpha_scorpii(self):
-        """Alpha Scorpii should resolve to SE_ANTARES."""
+        """Alpha Scorpii should resolve to ANTARES."""
         result = resolve_star_name("Alpha Scorpii")
-        assert result == SE_ANTARES
+        assert result == ANTARES
 
     def test_resolve_alpha_tauri(self):
-        """Alpha Tauri should resolve to SE_ALDEBARAN."""
+        """Alpha Tauri should resolve to ALDEBARAN."""
         result = resolve_star_name("Alpha Tauri")
-        assert result == SE_ALDEBARAN
+        assert result == ALDEBARAN
 
     def test_resolve_alpha_lyrae(self):
-        """Alpha Lyrae should resolve to SE_VEGA."""
+        """Alpha Lyrae should resolve to VEGA."""
         result = resolve_star_name("Alpha Lyrae")
-        assert result == SE_VEGA
+        assert result == VEGA
 
     def test_resolve_alpha_orionis(self):
-        """Alpha Orionis should resolve to SE_BETELGEUSE."""
+        """Alpha Orionis should resolve to BETELGEUSE."""
         result = resolve_star_name("Alpha Orionis")
-        assert result == SE_BETELGEUSE
+        assert result == BETELGEUSE
 
     def test_resolve_beta_orionis(self):
-        """Beta Orionis should resolve to SE_RIGEL."""
+        """Beta Orionis should resolve to RIGEL."""
         result = resolve_star_name("Beta Orionis")
-        assert result == SE_RIGEL
+        assert result == RIGEL
 
     def test_resolve_gamma_orionis(self):
-        """Gamma Orionis should resolve to SE_BELLATRIX."""
+        """Gamma Orionis should resolve to BELLATRIX."""
         result = resolve_star_name("Gamma Orionis")
-        assert result == SE_BELLATRIX
+        assert result == BELLATRIX
 
     def test_resolve_alpha_cygni(self):
-        """Alpha Cygni should resolve to SE_DENEB."""
+        """Alpha Cygni should resolve to DENEB."""
         result = resolve_star_name("Alpha Cygni")
-        assert result == SE_DENEB
+        assert result == DENEB
 
     def test_resolve_alpha_aquilae(self):
-        """Alpha Aquilae should resolve to SE_ALTAIR."""
+        """Alpha Aquilae should resolve to ALTAIR."""
         result = resolve_star_name("Alpha Aquilae")
-        assert result == SE_ALTAIR
+        assert result == ALTAIR
 
     def test_resolve_alpha_canis_majoris(self):
-        """Alpha Canis Majoris should resolve to SE_SIRIUS."""
+        """Alpha Canis Majoris should resolve to SIRIUS."""
         result = resolve_star_name("Alpha Canis Majoris")
-        assert result == SE_SIRIUS
+        assert result == SIRIUS
 
 
 @pytest.mark.unit
@@ -311,12 +311,12 @@ class TestResolveStar2WithBayer:
 
 @pytest.mark.unit
 class TestSweFixstar2WithBayer:
-    """Tests for swe_fixstar2 and swe_fixstar2_ut with Bayer designations."""
+    """Tests for fixstar2 and fixstar2_ut with Bayer designations."""
 
     def test_swe_fixstar2_ut_alpha_leonis(self):
-        """swe_fixstar2_ut should find Regulus via 'Alpha Leonis'."""
+        """fixstar2_ut should find Regulus via 'Alpha Leonis'."""
         jd = 2451545.0  # J2000
-        pos, name, flag = swe_fixstar2_ut("Alpha Leonis", jd, 0)
+        pos, name, flag = fixstar2_ut("Alpha Leonis", jd, 0)
 
         assert "Regulus" in name
         assert "alLeo" in name
@@ -324,9 +324,9 @@ class TestSweFixstar2WithBayer:
         assert 149 < pos[0] < 151
 
     def test_swe_fixstar2_ut_beta_persei(self):
-        """swe_fixstar2_ut should find Algol via 'Beta Persei'."""
+        """fixstar2_ut should find Algol via 'Beta Persei'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2_ut("Beta Persei", jd, 0)
+        pos, name, flag = fixstar2_ut("Beta Persei", jd, 0)
 
         assert "Algol" in name
         assert "bePer" in name
@@ -334,9 +334,9 @@ class TestSweFixstar2WithBayer:
         assert 55 < pos[0] < 58
 
     def test_swe_fixstar2_alpha_virginis(self):
-        """swe_fixstar2 (TT) should find Spica via 'Alpha Virginis'."""
+        """fixstar2 (TT) should find Spica via 'Alpha Virginis'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2("Alpha Virginis", jd, 0)
+        pos, name, flag = fixstar2("Alpha Virginis", jd, 0)
 
         assert "Spica" in name
         assert "alVir" in name
@@ -344,18 +344,18 @@ class TestSweFixstar2WithBayer:
         assert 203 < pos[0] < 205
 
     def test_swe_fixstar2_gamma_orionis(self):
-        """swe_fixstar2 should find Bellatrix via 'Gamma Orionis'."""
+        """fixstar2 should find Bellatrix via 'Gamma Orionis'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2("Gamma Orionis", jd, 0)
+        pos, name, flag = fixstar2("Gamma Orionis", jd, 0)
 
         assert "Bellatrix" in name
         assert "gaOri" in name
 
     def test_swe_fixstar2_ut_star_not_found(self):
-        """swe_fixstar2_ut should raise error for star not in catalog."""
+        """fixstar2_ut should raise error for star not in catalog."""
         jd = 2451545.0
         with pytest.raises(Error):
-            swe_fixstar2_ut("Gamma Virginis", jd, 0)
+            fixstar2_ut("Gamma Virginis", jd, 0)
 
 
 @pytest.mark.unit
@@ -375,10 +375,10 @@ class TestBayerDesignationEdgeCases:
     def test_resolve_with_mixed_case(self):
         """resolve_star_name should work with mixed case Bayer designation."""
         result = resolve_star_name("ALPHA LEONIS")
-        assert result == SE_REGULUS
+        assert result == REGULUS
 
         result = resolve_star_name("alpha leonis")
-        assert result == SE_REGULUS
+        assert result == REGULUS
 
     def test_all_greek_letters_parse(self):
         """All Greek letters should parse correctly with a known constellation."""

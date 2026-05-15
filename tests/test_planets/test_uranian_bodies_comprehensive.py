@@ -15,14 +15,14 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
-    SEFLG_NOABERR,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_FAGAN_BRADLEY,
+    FLG_SPEED,
+    FLG_HELCTR,
+    FLG_EQUATORIAL,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -66,7 +66,7 @@ class TestUranianBasic:
     def test_uranian_returns_valid_position(self, body_id: int, name: str):
         """Each Uranian body returns valid 6-element tuple."""
         jd = 2451545.0
-        result, retflag = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, retflag = swe.calc_ut(jd, body_id, FLG_SPEED)
         assert len(result) == 6, f"{name}: expected 6 elements"
         lon, lat, dist = result[0], result[1], result[2]
         assert 0 <= lon < 360, f"{name}: lon {lon} out of range"
@@ -78,7 +78,7 @@ class TestUranianBasic:
     def test_uranian_speed_nonzero(self, body_id: int, name: str):
         """Uranian body speeds should be non-zero."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         speed = result[3]
         assert abs(speed) > 1e-8, f"{name}: speed {speed} is zero"
         # Uranian bodies are very distant, speeds should be small
@@ -89,7 +89,7 @@ class TestUranianBasic:
     def test_uranian_latitude_small(self, body_id: int, name: str):
         """Uranian body latitude should be small (hypothetical near-ecliptic)."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, 0)
+        result, _ = swe.calc_ut(jd, body_id, 0)
         lat = result[1]
         # Transpluto has exactly 0 latitude; others have small inclinations
         assert abs(lat) < 5.0, f"{name}: latitude {lat}° too large"
@@ -99,7 +99,7 @@ class TestUranianBasic:
     def test_uranian_all_finite(self, body_id: int, name: str):
         """All output values should be finite."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{name}: result[{i}] = {val} not finite"
 
@@ -112,7 +112,7 @@ class TestUranianDistances:
     def test_uranian_distance_range(self, body_id: int, name: str):
         """Uranian body geocentric distance should be in expected range."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, 0)
+        result, _ = swe.calc_ut(jd, body_id, 0)
         dist = result[2]
         lo, hi = URANIAN_DISTANCES[body_id]
         assert lo * 0.7 <= dist <= hi * 1.3, (
@@ -128,7 +128,7 @@ class TestUranianHeliocentric:
     def test_uranian_heliocentric_valid(self, body_id: int, name: str):
         """Heliocentric positions valid for all Uranian bodies."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR | SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, body_id, FLG_HELCTR | FLG_SPEED)
         assert len(result) == 6
         assert 0 <= result[0] < 360
         assert math.isfinite(result[2])
@@ -138,8 +138,8 @@ class TestUranianHeliocentric:
     def test_uranian_helio_vs_geo_distance(self, body_id: int, name: str):
         """Helio and geo distances should differ (parallax from Earth)."""
         jd = 2451545.0
-        r_geo, _ = swe.swe_calc_ut(jd, body_id, 0)
-        r_helio, _ = swe.swe_calc_ut(jd, body_id, SEFLG_HELCTR)
+        r_geo, _ = swe.calc_ut(jd, body_id, 0)
+        r_helio, _ = swe.calc_ut(jd, body_id, FLG_HELCTR)
         # For very distant bodies, the difference is small but nonzero
         assert abs(r_geo[2] - r_helio[2]) > 0.01, (
             f"{name}: geo dist {r_geo[2]} == helio dist {r_helio[2]}"
@@ -154,13 +154,13 @@ class TestUranianFlagCombinations:
         "flags,desc",
         [
             (0, "default"),
-            (SEFLG_SPEED, "speed"),
-            (SEFLG_EQUATORIAL, "equatorial"),
-            (SEFLG_J2000, "J2000"),
-            (SEFLG_NOABERR, "no aberration"),
-            (SEFLG_HELCTR, "heliocentric"),
-            (SEFLG_SPEED | SEFLG_EQUATORIAL, "speed+equatorial"),
-            (SEFLG_HELCTR | SEFLG_SPEED, "helio+speed"),
+            (FLG_SPEED, "speed"),
+            (FLG_EQUATORIAL, "equatorial"),
+            (FLG_J2000, "J2000"),
+            (FLG_NOABERR, "no aberration"),
+            (FLG_HELCTR, "heliocentric"),
+            (FLG_SPEED | FLG_EQUATORIAL, "speed+equatorial"),
+            (FLG_HELCTR | FLG_SPEED, "helio+speed"),
         ],
     )
     @pytest.mark.parametrize(
@@ -174,7 +174,7 @@ class TestUranianFlagCombinations:
     def test_uranian_flag_combo(self, body_id: int, name: str, flags: int, desc: str):
         """Uranian body works with various flag combinations."""
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, flags)
+        result, _ = swe.calc_ut(jd, body_id, flags)
         assert len(result) == 6
         for i, val in enumerate(result):
             assert math.isfinite(val), f"{name}+{desc}: result[{i}] = {val}"
@@ -187,9 +187,9 @@ class TestUranianSidereal:
     @pytest.mark.parametrize("body_id,name", URANIAN_BODIES)
     def test_uranian_sidereal_valid(self, body_id: int, name: str):
         """Sidereal positions valid for all Uranian bodies."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         jd = 2451545.0
-        result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SIDEREAL)
+        result, _ = swe.calc_ut(jd, body_id, FLG_SIDEREAL)
         assert 0 <= result[0] < 360, f"{name}: sidereal lon {result[0]}"
 
 
@@ -201,8 +201,8 @@ class TestUranianDateRange:
     def test_uranian_across_centuries(self, body_id: int, name: str):
         """Uranian bodies valid from 1600 to 2500."""
         for year in [1600, 1800, 1900, 2000, 2100, 2300, 2500]:
-            jd = swe.swe_julday(year, 1, 1, 12.0)
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            jd = swe.julday(year, 1, 1, 12.0)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert 0 <= result[0] < 360, f"{name} @ {year}: lon={result[0]}"
 
     @pytest.mark.unit
@@ -211,7 +211,7 @@ class TestUranianDateRange:
         """Uranian bodies valid at 50 random dates."""
         jds = _random_jds(50, seed=body_id * 37)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(jd, body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(jd, body_id, FLG_SPEED)
             assert 0 <= result[0] < 360
             assert math.isfinite(result[3])
 
@@ -230,7 +230,7 @@ class TestUranianDateRange:
         prev_lon = None
         for i in range(100):
             jd = jd_start + i * 30.0  # monthly
-            result, _ = swe.swe_calc_ut(jd, body_id, 0)
+            result, _ = swe.calc_ut(jd, body_id, 0)
             lon = result[0]
             if prev_lon is not None:
                 diff = abs(lon - prev_lon)
@@ -248,7 +248,7 @@ class TestUranianHighVolume:
     @pytest.mark.parametrize("jd", _random_jds(100, seed=4444))
     def test_cupido_100_dates(self, jd: float):
         """Cupido valid at 100 random dates."""
-        result, _ = swe.swe_calc_ut(jd, 40, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, 40, FLG_SPEED)
         assert 0 <= result[0] < 360
         assert abs(result[3]) < 0.1
 
@@ -256,7 +256,7 @@ class TestUranianHighVolume:
     @pytest.mark.parametrize("jd", _random_jds(100, seed=5555))
     def test_transpluto_100_dates(self, jd: float):
         """Transpluto valid at 100 random dates."""
-        result, _ = swe.swe_calc_ut(jd, 48, SEFLG_SPEED)
+        result, _ = swe.calc_ut(jd, 48, FLG_SPEED)
         assert 0 <= result[0] < 360
         # Transpluto latitude is near 0 but not always exactly 0
         assert abs(result[1]) < 0.02

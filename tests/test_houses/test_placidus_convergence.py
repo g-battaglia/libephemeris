@@ -39,7 +39,7 @@ class TestPlacidusConvergence:
     def test_placidus_high_precision_match(self, name, jd, lat, lon):
         """Test that Placidus cusps match pyswisseph within 0.0001°."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, lon, ord("P"))
 
         max_diff = 0.0
         worst_cusp = 0
@@ -81,7 +81,7 @@ class TestPlacidusConvergence:
         jd = swe.julday(year, month, day, hour)
 
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, lon, ord("P"))
 
         max_diff = 0.0
         for i in range(12):
@@ -112,7 +112,7 @@ class TestPlacidusIntermediateCusps:
     def test_intermediate_cusps_precision(self, name, jd, lat, lon):
         """Test that intermediate cusps (calculated iteratively) are precise."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, lon, ord("P"))
 
         # Intermediate cusps (not Asc/IC/Dsc/MC)
         intermediate_cusps = [2, 3, 5, 6, 8, 9, 11, 12]
@@ -162,7 +162,7 @@ class TestPolarAdjacentLatitudes:
     def test_placidus_polar_adjacent_match(self, name, jd, lat, lon):
         """Test that Placidus cusps at polar-adjacent latitudes match pyswisseph."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, lon, ord("P"))
 
         max_diff = 0.0
         worst_cusp = 0
@@ -191,7 +191,7 @@ class TestPolarAdjacentLatitudes:
     def test_koch_polar_adjacent_match(self, name, jd, lat, lon):
         """Test that Koch cusps at polar-adjacent latitudes match pyswisseph."""
         cusps_swe, _ = swe.houses(jd, lat, lon, b"K")
-        cusps_py, _ = ephem.swe_houses(jd, lat, lon, ord("K"))
+        cusps_py, _ = ephem.houses(jd, lat, lon, ord("K"))
 
         max_diff = 0.0
         worst_cusp = 0
@@ -225,7 +225,7 @@ class TestPlacidusConvergenceStability:
         jd = 2451545.0  # J2000
 
         cusps_swe, _ = swe.houses(jd, lat, 0.0, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, 0.0, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, 0.0, ord("P"))
 
         max_diff = 0.0
         for i in range(12):
@@ -247,7 +247,7 @@ class TestPlacidusConvergenceStability:
         lat = 66.0
 
         cusps_swe, _ = swe.houses(jd, lat, 0.0, b"P")
-        cusps_py, _ = ephem.swe_houses(jd, lat, 0.0, ord("P"))
+        cusps_py, _ = ephem.houses(jd, lat, 0.0, ord("P"))
 
         max_diff = 0.0
         for i in range(12):

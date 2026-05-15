@@ -14,22 +14,22 @@ import pytest
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_MEAN_APOG,
-    SE_OSCU_APOG,
-    SE_INTP_APOG,
-    SE_INTP_PERG,
-    SE_CHIRON,
-    SEFLG_SPEED,
-    SEFLG_SIDEREAL,
-    SEFLG_EQUATORIAL,
-    SEFLG_J2000,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    SATURN,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    OSCU_APOG,
+    INTP_APOG,
+    INTP_PERG,
+    CHIRON,
+    FLG_SPEED,
+    FLG_SIDEREAL,
+    FLG_EQUATORIAL,
+    FLG_J2000,
 )
 
 from tests.test_leb.compare.conftest import (
@@ -48,29 +48,29 @@ from .conftest import TOLS_EXT, NUTATION_FLOOR_ARCSEC
 
 # Pipeline A (ICRS barycentric)
 PIPELINE_A_BODIES = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
-    (SE_SATURN, "Saturn"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
+    (SATURN, "Saturn"),
 ]
 
 # Pipeline B (ecliptic direct) — mean bodies
 PIPELINE_B_MEAN = [
-    (SE_MEAN_NODE, "MeanNode"),
-    (SE_MEAN_APOG, "MeanApog"),
+    (MEAN_NODE, "MeanNode"),
+    (MEAN_APOG, "MeanApog"),
 ]
 
 # Pipeline B (ecliptic direct) — true/osculating bodies
 PIPELINE_B_TRUE = [
-    (SE_TRUE_NODE, "TrueNode"),
-    (SE_OSCU_APOG, "OscuApog"),
+    (TRUE_NODE, "TrueNode"),
+    (OSCU_APOG, "OscuApog"),
 ]
 
 # Pipeline B (ecliptic direct) — interpolated bodies
 PIPELINE_B_INTERP = [
-    (SE_INTP_APOG, "IntpApog"),
-    (SE_INTP_PERG, "IntpPerg"),
+    (INTP_APOG, "IntpApog"),
+    (INTP_PERG, "IntpPerg"),
 ]
 
 ALL_ECLIPTIC_BODIES = PIPELINE_B_MEAN + PIPELINE_B_TRUE + PIPELINE_B_INTERP
@@ -102,7 +102,7 @@ SID_MODES_SUBSET = [
 
 
 # ============================================================================
-# SIDEREAL ECLIPTIC (SEFLG_SIDEREAL only)
+# SIDEREAL ECLIPTIC (FLG_SIDEREAL only)
 # ============================================================================
 
 
@@ -122,15 +122,15 @@ class TestExtSiderealEcliptic:
         sid_mode: int,
     ):
         """Pipeline A sidereal lon matches Skyfield within tolerance."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -153,15 +153,15 @@ class TestExtSiderealEcliptic:
         body_name: str,
     ):
         """Pipeline B sidereal lon matches Skyfield within tolerance."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)  # Lahiri
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -194,15 +194,15 @@ class TestExtSiderealEquatorial:
         body_name: str,
     ):
         """Pipeline A SID+EQ RA matches Skyfield (Bug 1 regression)."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -224,15 +224,15 @@ class TestExtSiderealEquatorial:
         body_name: str,
     ):
         """Pipeline B SID+EQ RA matches Skyfield (Bug 2 regression)."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -263,15 +263,15 @@ class TestExtSiderealJ2000:
         body_name: str,
     ):
         """Pipeline A SID+J2K lon matches Skyfield."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -294,20 +294,20 @@ class TestExtSiderealJ2000:
     ):
         """True bodies SID+J2K: LEB vs Skyfield (SE bug fix applied).
 
-        LibEphemeris intentionally honors SEFLG_J2000 for TrueNode/OscuApog
+        LibEphemeris intentionally honors FLG_J2000 for TrueNode/OscuApog
         (pyswisseph silently ignores it — this is a behavioral bug).
         Both LEB and Skyfield paths must produce consistent results.
         See docs/reference/se-bug-sidereal-j2000-nodes.md
         """
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50[:10]:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -330,15 +330,15 @@ class TestExtSiderealJ2000:
         body_name: str,
     ):
         """Mean bodies SID+J2K: LEB vs Skyfield (Bug 4 regression)."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -369,15 +369,15 @@ class TestExtSiderealEqJ2k:
         body_name: str,
     ):
         """Pipeline A SID+EQ+J2K RA matches Skyfield."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -400,15 +400,15 @@ class TestExtSiderealEqJ2k:
         body_name: str,
     ):
         """Mean bodies SID+EQ+J2K: LEB vs Skyfield."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | SEFLG_EQUATORIAL | SEFLG_J2000
+        flags = FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL | FLG_J2000
         max_err = 0.0
         worst_jd = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -436,9 +436,9 @@ class TestExtSiderealSpeed:
         "extra_flags,flag_name",
         [
             (0, "SID"),
-            (SEFLG_EQUATORIAL, "SID+EQ"),
-            (SEFLG_J2000, "SID+J2K"),
-            (SEFLG_EQUATORIAL | SEFLG_J2000, "SID+EQ+J2K"),
+            (FLG_EQUATORIAL, "SID+EQ"),
+            (FLG_J2000, "SID+J2K"),
+            (FLG_EQUATORIAL | FLG_J2000, "SID+EQ+J2K"),
         ],
     )
     def test_sidereal_speed(
@@ -451,14 +451,14 @@ class TestExtSiderealSpeed:
         flag_name: str,
     ):
         """Sidereal speed matches Skyfield within tolerance."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL | extra_flags
+        flags = FLG_SPEED | FLG_SIDEREAL | extra_flags
         max_err = 0.0
 
         for jd in ext_dates_50:
             ephem.set_sid_mode(1, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = abs(ref[3] - leb[3])
             max_err = max(max_err, err)
@@ -478,7 +478,7 @@ class TestExtSiderealMultiAyanamsha:
 
     @pytest.mark.leb_compare_extended
     @pytest.mark.slow
-    @pytest.mark.parametrize("body_id,body_name", [(SE_SUN, "Sun"), (SE_MARS, "Mars")])
+    @pytest.mark.parametrize("body_id,body_name", [(SUN, "Sun"), (MARS, "Mars")])
     @pytest.mark.parametrize("sid_mode", FORMULA_SIDEREAL_MODES)
     def test_all_formula_modes(
         self,
@@ -489,14 +489,14 @@ class TestExtSiderealMultiAyanamsha:
         sid_mode: int,
     ):
         """Sidereal lon matches Skyfield for all formula-based modes."""
-        flags = SEFLG_SPEED | SEFLG_SIDEREAL
+        flags = FLG_SPEED | FLG_SIDEREAL
         max_err = 0.0
 
         for jd in ext_dates_50[:10]:  # Reduced for combinatorial test
             ephem.set_sid_mode(sid_mode, 2451545.0, 0.0)
 
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, flags)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, flags)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, flags)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             err = lon_error_arcsec(ref[0], leb[0])
             max_err = max(max_err, err)

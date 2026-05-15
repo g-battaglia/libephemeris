@@ -26,21 +26,21 @@ import pytest
 
 from libephemeris import EphemerisContext
 from libephemeris.constants import (
-    SE_JUPITER,
-    SE_MERCURY,
-    SE_MOON,
-    SE_SATURN,
-    SE_SUN,
-    SE_VENUS,
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SEFLG_TOPOCTR,
-    SE_SIDM_FAGAN_BRADLEY,
-    SE_SIDM_KRISHNAMURTI,
-    SE_SIDM_LAHIRI,
-    SE_SIDM_RAMAN,
-    SE_SIDM_TRUE_CITRA,
-    SE_SIDM_YUKTESHWAR,
+    JUPITER,
+    MERCURY,
+    MOON,
+    SATURN,
+    SUN,
+    VENUS,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_KRISHNAMURTI,
+    SIDM_LAHIRI,
+    SIDM_RAMAN,
+    SIDM_TRUE_CITRA,
+    SIDM_YUKTESHWAR,
 )
 
 pytestmark = pytest.mark.slow
@@ -109,10 +109,10 @@ class TestLockCorrectness:
 
         # Two very different ayanamsha configurations
         configs = [
-            (SE_SIDM_LAHIRI, "Lahiri"),
-            (SE_SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
-            (SE_SIDM_RAMAN, "Raman"),
-            (SE_SIDM_KRISHNAMURTI, "Krishnamurti"),
+            (SIDM_LAHIRI, "Lahiri"),
+            (SIDM_FAGAN_BRADLEY, "Fagan-Bradley"),
+            (SIDM_RAMAN, "Raman"),
+            (SIDM_KRISHNAMURTI, "Krishnamurti"),
         ]
 
         # Pre-calculate expected values for each config
@@ -120,7 +120,7 @@ class TestLockCorrectness:
         for mode, _ in configs:
             ctx = EphemerisContext()
             ctx.set_sid_mode(mode)
-            pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+            pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
             expected[mode] = pos[0]
 
         def worker(thread_id: int, mode: int, mode_name: str):
@@ -130,7 +130,7 @@ class TestLockCorrectness:
                 ctx.set_sid_mode(mode)
 
                 for i in range(num_iterations):
-                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
                     # Verify the result matches what we expect for this mode
                     if abs(pos[0] - expected[mode]) > 1e-6:
@@ -169,20 +169,20 @@ class TestLockCorrectness:
         def nested_calculation():
             try:
                 ctx = EphemerisContext()
-                ctx.set_sid_mode(SE_SIDM_LAHIRI)
+                ctx.set_sid_mode(SIDM_LAHIRI)
 
                 # First calculation
-                pos1, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                pos1, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
 
                 # Second calculation (same thread, same lock)
-                pos2, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_SIDEREAL)
+                pos2, _ = ctx.calc_ut(jd, MOON, FLG_SIDEREAL)
 
                 # House calculation (also uses the lock)
                 cusps, ascmc = ctx.houses(jd, 41.9, 12.5, ord("P"))
 
                 # Planet-centric calculation (also uses the lock)
-                # Note: Using SE_SUN as center since SE_MARS may not be in all kernels
-                pos3, _ = ctx.calc_pctr(jd, SE_MOON, SE_SUN, SEFLG_SIDEREAL)
+                # Note: Using SUN as center since MARS may not be in all kernels
+                pos3, _ = ctx.calc_pctr(jd, MOON, SUN, FLG_SIDEREAL)
 
                 return True
             except Exception as e:
@@ -229,15 +229,15 @@ class TestNoDeadlocks:
         def worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                mode = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN][
+                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN][
                     thread_id % 3
                 ]
                 ctx.set_sid_mode(mode)
 
                 # Perform a few calculations
                 for _ in range(10):
-                    ctx.calc_ut(jd + thread_id * 0.1, SE_SUN, SEFLG_SIDEREAL)
-                    ctx.calc_ut(jd + thread_id * 0.1, SE_MOON, SEFLG_SIDEREAL)
+                    ctx.calc_ut(jd + thread_id * 0.1, SUN, FLG_SIDEREAL)
+                    ctx.calc_ut(jd + thread_id * 0.1, MOON, FLG_SIDEREAL)
 
                 with completed_lock:
                     completed[0] += 1
@@ -285,9 +285,9 @@ class TestNoDeadlocks:
         def planet_worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                ctx.set_sid_mode(SE_SIDM_LAHIRI)
+                ctx.set_sid_mode(SIDM_LAHIRI)
                 for _ in range(5):
-                    ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL | SEFLG_SPEED)
+                    ctx.calc_ut(jd, SUN, FLG_SIDEREAL | FLG_SPEED)
                 with completed_lock:
                     completed[0] += 1
             except Exception as e:
@@ -297,7 +297,7 @@ class TestNoDeadlocks:
         def house_worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                ctx.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+                ctx.set_sid_mode(SIDM_FAGAN_BRADLEY)
                 for _ in range(5):
                     ctx.houses(jd, 41.9, 12.5, ord("P"))
                 with completed_lock:
@@ -309,10 +309,10 @@ class TestNoDeadlocks:
         def pctr_worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                ctx.set_sid_mode(SE_SIDM_RAMAN)
+                ctx.set_sid_mode(SIDM_RAMAN)
                 for _ in range(5):
-                    # Use SE_SUN as center since SE_MARS may not be in all kernels
-                    ctx.calc_pctr(jd, SE_MOON, SE_SUN, SEFLG_SIDEREAL)
+                    # Use SUN as center since MARS may not be in all kernels
+                    ctx.calc_pctr(jd, MOON, SUN, FLG_SIDEREAL)
                 with completed_lock:
                     completed[0] += 1
             except Exception as e:
@@ -363,12 +363,12 @@ class TestStateIsolationVerification:
         errors_lock = threading.Lock()
 
         modes = [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
-            SE_SIDM_KRISHNAMURTI,
-            SE_SIDM_YUKTESHWAR,
-            SE_SIDM_TRUE_CITRA,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
+            SIDM_KRISHNAMURTI,
+            SIDM_YUKTESHWAR,
+            SIDM_TRUE_CITRA,
         ]
 
         def worker(thread_id: int):
@@ -388,7 +388,7 @@ class TestStateIsolationVerification:
                         return
 
                     # Perform calculation
-                    ctx.calc_ut(2451545.0, SE_SUN, SEFLG_SIDEREAL)
+                    ctx.calc_ut(2451545.0, SUN, FLG_SIDEREAL)
 
                     # Verify mode after calculation
                     if ctx.get_sid_mode() != mode:
@@ -454,7 +454,7 @@ class TestStateIsolationVerification:
                         return
 
                     # Perform calculation
-                    ctx.calc_ut(2451545.0, SE_SUN, SEFLG_TOPOCTR | SEFLG_SPEED)
+                    ctx.calc_ut(2451545.0, SUN, FLG_TOPOCTR | FLG_SPEED)
 
                     # Verify topo after calculation
                     topo = ctx.get_topo()
@@ -511,7 +511,7 @@ class TestStateIsolationVerification:
                         return
 
                     # Do a calculation that uses global state
-                    ctx.calc_ut(2451545.0, SE_SUN, SEFLG_SIDEREAL)
+                    ctx.calc_ut(2451545.0, SUN, FLG_SIDEREAL)
 
                     # Verify our cache is still intact
                     cached = ctx.get_angles_cache()
@@ -556,15 +556,15 @@ class TestResultConsistencyUnderConcurrency:
         """
         jd = 2451545.0
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            # Note: SE_MARS may not be directly available in all ephemeris kernels
-            SE_JUPITER,
-            SE_SATURN,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            # Note: MARS may not be directly available in all ephemeris kernels
+            JUPITER,
+            SATURN,
         ]
-        modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
+        modes = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]
 
         # Pre-calculate expected results
         expected: Dict[Tuple[int, int], float] = {}
@@ -572,7 +572,7 @@ class TestResultConsistencyUnderConcurrency:
             ctx = EphemerisContext()
             ctx.set_sid_mode(mode)
             for planet in planets:
-                pos, _ = ctx.calc_ut(jd, planet, SEFLG_SIDEREAL)
+                pos, _ = ctx.calc_ut(jd, planet, FLG_SIDEREAL)
                 expected[(mode, planet)] = pos[0]
 
         num_iterations = 100
@@ -587,7 +587,7 @@ class TestResultConsistencyUnderConcurrency:
             try:
                 for i in range(num_iterations):
                     planet = planets[i % len(planets)]
-                    pos, _ = ctx.calc_ut(jd, planet, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, planet, FLG_SIDEREAL)
 
                     exp = expected[(mode, planet)]
                     if abs(pos[0] - exp) > 1e-8:
@@ -618,7 +618,7 @@ class TestResultConsistencyUnderConcurrency:
             (-0.1, 51.5),  # London
             (139.7, 35.7),  # Tokyo
         ]
-        modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY]
+        modes = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY]
 
         # Pre-calculate expected results
         expected: Dict[Tuple[int, float, float], Tuple[float, ...]] = {}
@@ -677,8 +677,8 @@ class TestResultConsistencyUnderConcurrency:
         errors_lock = threading.Lock()
 
         # All threads use the same configuration
-        mode = SE_SIDM_LAHIRI
-        planet = SE_SUN
+        mode = SIDM_LAHIRI
+        planet = SUN
 
         def worker(thread_id: int):
             ctx = EphemerisContext()
@@ -686,7 +686,7 @@ class TestResultConsistencyUnderConcurrency:
 
             try:
                 for _ in range(num_iterations):
-                    pos, _ = ctx.calc_ut(jd, planet, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, planet, FLG_SIDEREAL)
                     with results_lock:
                         results.append(pos[0])
 
@@ -737,12 +737,12 @@ class TestMemoryVisibility:
 
         # Pre-calculate expected difference between two modes
         ctx_lahiri = EphemerisContext()
-        ctx_lahiri.set_sid_mode(SE_SIDM_LAHIRI)
-        pos_lahiri, _ = ctx_lahiri.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx_lahiri.set_sid_mode(SIDM_LAHIRI)
+        pos_lahiri, _ = ctx_lahiri.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         ctx_fagan = EphemerisContext()
-        ctx_fagan.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
-        pos_fagan, _ = ctx_fagan.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+        ctx_fagan.set_sid_mode(SIDM_FAGAN_BRADLEY)
+        pos_fagan, _ = ctx_fagan.calc_ut(jd, SUN, FLG_SIDEREAL)
 
         # The two should be different
         assert abs(pos_lahiri[0] - pos_fagan[0]) > 0.1, (
@@ -757,13 +757,13 @@ class TestMemoryVisibility:
             try:
                 ctx = EphemerisContext()
                 if use_lahiri:
-                    ctx.set_sid_mode(SE_SIDM_LAHIRI)
+                    ctx.set_sid_mode(SIDM_LAHIRI)
                 else:
-                    ctx.set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+                    ctx.set_sid_mode(SIDM_FAGAN_BRADLEY)
 
                 # Verify the calculation uses the mode we just set
                 for i in range(100):
-                    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
                     if abs(pos[0] - expected) > 1e-6:
                         with errors_lock:
                             mode_name = "Lahiri" if use_lahiri else "Fagan-Bradley"
@@ -808,9 +808,9 @@ class TestStressConditions:
         errors: List[str] = []
         errors_lock = threading.Lock()
 
-        modes = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY, SE_SIDM_RAMAN]
-        # Note: Avoid SE_MARS which may not be directly available in all kernels
-        planets = [SE_SUN, SE_MOON, SE_VENUS, SE_JUPITER]
+        modes = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN]
+        # Note: Avoid MARS which may not be directly available in all kernels
+        planets = [SUN, MOON, VENUS, JUPITER]
 
         def worker(thread_id: int):
             try:
@@ -819,7 +819,7 @@ class TestStressConditions:
 
                 for i in range(calculations_per_thread):
                     planet = planets[i % len(planets)]
-                    pos, _ = ctx.calc_ut(jd + i * 0.1, planet, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd + i * 0.1, planet, FLG_SIDEREAL)
 
                     if not (0 <= pos[0] < 360):
                         with errors_lock:
@@ -867,13 +867,13 @@ class TestStressConditions:
         completed_lock = threading.Lock()
 
         modes = [
-            SE_SIDM_LAHIRI,
-            SE_SIDM_FAGAN_BRADLEY,
-            SE_SIDM_RAMAN,
-            SE_SIDM_KRISHNAMURTI,
+            SIDM_LAHIRI,
+            SIDM_FAGAN_BRADLEY,
+            SIDM_RAMAN,
+            SIDM_KRISHNAMURTI,
         ]
-        # Note: Avoid SE_MARS which may not be directly available in all kernels
-        planets = [SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS, SE_JUPITER]
+        # Note: Avoid MARS which may not be directly available in all kernels
+        planets = [SUN, MOON, MERCURY, VENUS, JUPITER]
         locations = [
             (12.5, 41.9, 50),
             (-0.1, 51.5, 10),
@@ -891,12 +891,12 @@ class TestStressConditions:
 
                     if operation == "calc":
                         planet = rng.choice(planets)
-                        ctx.calc_ut(jd + rng.random() * 100, planet, SEFLG_SPEED)
+                        ctx.calc_ut(jd + rng.random() * 100, planet, FLG_SPEED)
 
                     elif operation == "calc_sidereal":
                         ctx.set_sid_mode(rng.choice(modes))
                         planet = rng.choice(planets)
-                        ctx.calc_ut(jd + rng.random() * 100, planet, SEFLG_SIDEREAL)
+                        ctx.calc_ut(jd + rng.random() * 100, planet, FLG_SIDEREAL)
 
                     elif operation == "houses":
                         ctx.set_sid_mode(rng.choice(modes))
@@ -907,9 +907,9 @@ class TestStressConditions:
                         ctx.set_sid_mode(rng.choice(modes))
                         ctx.calc_pctr(
                             jd + rng.random() * 100,
-                            rng.choice([SE_MOON, SE_VENUS]),
-                            rng.choice([SE_SUN, SE_JUPITER]),
-                            SEFLG_SIDEREAL,
+                            rng.choice([MOON, VENUS]),
+                            rng.choice([SUN, JUPITER]),
+                            FLG_SIDEREAL,
                         )
 
                 with completed_lock:
@@ -945,7 +945,7 @@ class TestStressConditions:
 
         def worker(thread_id: int):
             try:
-                mode = [SE_SIDM_LAHIRI, SE_SIDM_FAGAN_BRADLEY][thread_id % 2]
+                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY][thread_id % 2]
 
                 for i in range(contexts_per_thread):
                     # Create a fresh context each iteration
@@ -953,7 +953,7 @@ class TestStressConditions:
                     ctx.set_sid_mode(mode)
 
                     # Use it for a calculation
-                    pos, _ = ctx.calc_ut(jd + i * 0.01, SE_SUN, SEFLG_SIDEREAL)
+                    pos, _ = ctx.calc_ut(jd + i * 0.01, SUN, FLG_SIDEREAL)
 
                     if not (0 <= pos[0] < 360):
                         with errors_lock:

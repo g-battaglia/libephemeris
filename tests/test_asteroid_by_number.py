@@ -17,7 +17,7 @@ from libephemeris.minor_bodies import (
     OrbitalElements,
     _ASTEROID_ELEMENTS_CACHE,
 )
-from libephemeris.constants import SE_AST_OFFSET
+from libephemeris.constants import AST_OFFSET
 
 
 # Sample SBDB API response for Eros (433)
@@ -268,12 +268,12 @@ class TestCalcAsteroidConsistency:
     def test_asteroid_position_consistency_ceres(self):
         """Test that calc_asteroid_by_number gives same result as calc_minor_body_heliocentric for Ceres."""
         from libephemeris.minor_bodies import calc_minor_body_heliocentric
-        from libephemeris.constants import SE_CERES
+        from libephemeris.constants import CERES
 
         jd = 2451545.0  # J2000.0
 
         lon1, lat1, dist1 = calc_asteroid_by_number(1, jd)
-        lon2, lat2, dist2 = calc_minor_body_heliocentric(SE_CERES, jd)
+        lon2, lat2, dist2 = calc_minor_body_heliocentric(CERES, jd)
 
         # Should be identical
         assert abs(lon1 - lon2) < 1e-10
@@ -283,12 +283,12 @@ class TestCalcAsteroidConsistency:
     def test_asteroid_position_consistency_eros(self):
         """Test consistency for Eros (433) which is in MINOR_BODY_ELEMENTS."""
         from libephemeris.minor_bodies import calc_minor_body_heliocentric
-        from libephemeris.constants import SE_EROS
+        from libephemeris.constants import EROS
 
         jd = 2451545.0
 
         lon1, lat1, dist1 = calc_asteroid_by_number(433, jd)
-        lon2, lat2, dist2 = calc_minor_body_heliocentric(SE_EROS, jd)
+        lon2, lat2, dist2 = calc_minor_body_heliocentric(EROS, jd)
 
         # Should be identical
         assert abs(lon1 - lon2) < 1e-10

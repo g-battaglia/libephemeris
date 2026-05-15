@@ -36,28 +36,28 @@ class TestGetTaiUtcForJd:
     @pytest.mark.unit
     def test_modern_date_2020(self):
         """TAI-UTC should be 37 seconds for dates after 2017."""
-        jd = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd = ephem.julday(2020, 1, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 37.0
 
     @pytest.mark.unit
     def test_modern_date_2024(self):
         """TAI-UTC should be 37 seconds for 2024."""
-        jd = ephem.swe_julday(2024, 6, 15, 12.0)
+        jd = ephem.julday(2024, 6, 15, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 37.0
 
     @pytest.mark.unit
     def test_before_2017_leap_second(self):
         """TAI-UTC should be 36 seconds before 2017-01-01."""
-        jd = ephem.swe_julday(2016, 12, 31, 12.0)
+        jd = ephem.julday(2016, 12, 31, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 36.0
 
     @pytest.mark.unit
     def test_2015_leap_second(self):
         """TAI-UTC should be 35 seconds between 2015-07-01 and 2017-01-01."""
-        jd = ephem.swe_julday(2015, 8, 1, 12.0)
+        jd = ephem.julday(2015, 8, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         # After 2015-07-01 leap second, before 2017-01-01
         assert tai_utc == 36.0
@@ -65,21 +65,21 @@ class TestGetTaiUtcForJd:
     @pytest.mark.unit
     def test_year_2000(self):
         """TAI-UTC should be 32 seconds around J2000."""
-        jd = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd = ephem.julday(2000, 1, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 32.0
 
     @pytest.mark.unit
     def test_year_1990(self):
         """TAI-UTC should be 25 seconds in 1990."""
-        jd = ephem.swe_julday(1990, 6, 1, 12.0)
+        jd = ephem.julday(1990, 6, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 25.0
 
     @pytest.mark.unit
     def test_returns_float(self):
         """Function should return a float."""
-        jd = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd = ephem.julday(2020, 1, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert isinstance(tai_utc, float)
 
@@ -92,7 +92,7 @@ class TestUtcToTaiJd:
         """Basic UTC to TAI conversion should work."""
         jd_tai = ephem.utc_to_tai_jd(2020, 1, 1, 0, 0, 0.0)
         # TAI should be ahead of UTC by 37 seconds in 2020
-        jd_utc = ephem.swe_julday(2020, 1, 1, 0.0)
+        jd_utc = ephem.julday(2020, 1, 1, 0.0)
         diff_seconds = (jd_tai - jd_utc) * 86400
         assert diff_seconds == pytest.approx(37.0, abs=0.1)
 
@@ -101,7 +101,7 @@ class TestUtcToTaiJd:
         """Test TAI for J2000 epoch."""
         jd_tai = ephem.utc_to_tai_jd(2000, 1, 1, 12, 0, 0.0)
         # TAI should be ahead of UTC by 32 seconds in 2000
-        jd_utc = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_utc = ephem.julday(2000, 1, 1, 12.0)
         diff_seconds = (jd_tai - jd_utc) * 86400
         assert diff_seconds == pytest.approx(32.0, abs=0.1)
 
@@ -121,7 +121,7 @@ class TestUtcToTaiJd:
         ]
         for date in dates:
             jd_tai = ephem.utc_to_tai_jd(*date)
-            jd_utc = ephem.swe_julday(
+            jd_utc = ephem.julday(
                 date[0], date[1], date[2], date[3] + date[4] / 60.0 + date[5] / 3600.0
             )
             assert jd_tai > jd_utc, f"TAI should be > UTC for {date}"
@@ -247,7 +247,7 @@ class TestTaiToUtcJd:
     @pytest.mark.unit
     def test_basic_conversion(self):
         """Basic TAI to UTC JD conversion."""
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         jd_utc_back = ephem.tai_to_utc_jd(jd_tai)
         assert jd_utc_back == pytest.approx(jd_utc, abs=1e-9)
@@ -262,7 +262,7 @@ class TestTaiToUtcJd:
     @pytest.mark.unit
     def test_round_trip(self):
         """Round-trip UTC -> TAI -> UTC should preserve value."""
-        jd_utc_orig = ephem.swe_julday(2020, 6, 15, 12.0)
+        jd_utc_orig = ephem.julday(2020, 6, 15, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc_orig)
         jd_utc_back = ephem.tai_to_utc_jd(jd_tai)
         assert jd_utc_back == pytest.approx(jd_utc_orig, abs=1e-9)
@@ -274,7 +274,7 @@ class TestUtcJdToTai:
     @pytest.mark.unit
     def test_basic_conversion(self):
         """Basic UTC JD to TAI conversion."""
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         # Should be 37 seconds ahead
         diff_seconds = (jd_tai - jd_utc) * 86400
@@ -283,14 +283,14 @@ class TestUtcJdToTai:
     @pytest.mark.unit
     def test_tai_greater_than_utc(self):
         """TAI JD should be greater than UTC JD."""
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         assert jd_tai > jd_utc
 
     @pytest.mark.unit
     def test_j2000(self):
         """Test for J2000 epoch."""
-        jd_utc = ephem.swe_julday(2000, 1, 1, 12.0)
+        jd_utc = ephem.julday(2000, 1, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         diff_seconds = (jd_tai - jd_utc) * 86400
         assert diff_seconds == pytest.approx(32.0, abs=0.1)
@@ -310,7 +310,7 @@ class TestTAITimeScaleRelationships:
     @pytest.mark.unit
     def test_tai_equals_utc_plus_leap_seconds(self):
         """TAI = UTC + leap_seconds."""
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         leap_seconds = ephem.get_tai_utc_for_jd(jd_utc)
         expected_tai = jd_utc + leap_seconds / 86400.0
@@ -321,10 +321,10 @@ class TestTAITimeScaleRelationships:
         """TT - UT1 should approximately equal Delta T."""
         # Get JD values
         jd_tt, jd_ut1 = ephem.utc_to_jd(2020, 1, 1, 12, 0, 0.0)
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
 
         # Get Delta T
-        delta_t_days = ephem.swe_deltat(jd_ut1)
+        delta_t_days = ephem.deltat(jd_ut1)
         delta_t_seconds = delta_t_days * 86400
 
         # TT - UT1 should be Delta T
@@ -335,7 +335,7 @@ class TestTAITimeScaleRelationships:
     def test_full_chain_conversion(self):
         """Test UTC -> TAI -> TT chain."""
         # Start with UTC
-        jd_utc = ephem.swe_julday(2020, 1, 1, 12.0)
+        jd_utc = ephem.julday(2020, 1, 1, 12.0)
 
         # Convert to TAI
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
@@ -365,11 +365,11 @@ class TestTAILeapSecondBoundaries:
     def test_before_and_after_2017_leap_second(self):
         """TAI-UTC should change across the 2017-01-01 leap second."""
         # Just before leap second
-        jd_before = ephem.swe_julday(2016, 12, 31, 23.0)
+        jd_before = ephem.julday(2016, 12, 31, 23.0)
         tai_utc_before = ephem.get_tai_utc_for_jd(jd_before)
 
         # Just after leap second
-        jd_after = ephem.swe_julday(2017, 1, 1, 1.0)
+        jd_after = ephem.julday(2017, 1, 1, 1.0)
         tai_utc_after = ephem.get_tai_utc_for_jd(jd_after)
 
         assert tai_utc_before == 36.0
@@ -378,8 +378,8 @@ class TestTAILeapSecondBoundaries:
     @pytest.mark.unit
     def test_before_and_after_2012_leap_second(self):
         """TAI-UTC should change across the 2012-07-01 leap second."""
-        jd_before = ephem.swe_julday(2012, 6, 30, 12.0)
-        jd_after = ephem.swe_julday(2012, 7, 1, 12.0)
+        jd_before = ephem.julday(2012, 6, 30, 12.0)
+        jd_after = ephem.julday(2012, 7, 1, 12.0)
 
         tai_utc_before = ephem.get_tai_utc_for_jd(jd_before)
         tai_utc_after = ephem.get_tai_utc_for_jd(jd_after)
@@ -394,21 +394,21 @@ class TestTAIHistoricalDates:
     @pytest.mark.unit
     def test_year_1972_start_of_leap_seconds(self):
         """Test the beginning of the leap second era (1972)."""
-        jd = ephem.swe_julday(1972, 1, 1, 12.0)
+        jd = ephem.julday(1972, 1, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 10.0  # TAI-UTC was 10 seconds on 1972-01-01
 
     @pytest.mark.unit
     def test_year_1980(self):
         """Test TAI-UTC for 1980."""
-        jd = ephem.swe_julday(1980, 6, 1, 12.0)
+        jd = ephem.julday(1980, 6, 1, 12.0)
         tai_utc = ephem.get_tai_utc_for_jd(jd)
         assert tai_utc == 19.0
 
     @pytest.mark.unit
     def test_utc_to_tai_1980(self):
         """Test UTC to TAI conversion for 1980."""
-        jd_utc = ephem.swe_julday(1980, 6, 1, 12.0)
+        jd_utc = ephem.julday(1980, 6, 1, 12.0)
         jd_tai = ephem.utc_jd_to_tai(jd_utc)
         diff_seconds = (jd_tai - jd_utc) * 86400
         assert diff_seconds == pytest.approx(19.0, abs=0.1)

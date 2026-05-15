@@ -16,23 +16,22 @@ from libephemeris import (
     julday,
     revjul,
     heliacal_ut,
-    swe_heliacal_ut,
     heliacal_pheno_ut,
     is_fixed_star,
-    SE_SIRIUS,
-    SE_ALDEBARAN,
-    SE_REGULUS,
-    SE_VEGA,
-    SE_ARCTURUS,
-    SE_SPICA_STAR,
-    SE_BETELGEUSE,
-    SE_ANTARES,
-    SE_FOMALHAUT,
-    SE_HELIACAL_RISING,
-    SE_HELIACAL_SETTING,
-    SE_EVENING_FIRST,
-    SE_MORNING_LAST,
-    SE_FIXSTAR_OFFSET,
+    SIRIUS,
+    ALDEBARAN,
+    REGULUS,
+    VEGA,
+    ARCTURUS,
+    SPICA_STAR,
+    BETELGEUSE,
+    ANTARES,
+    FOMALHAUT,
+    HELIACAL_RISING,
+    HELIACAL_SETTING,
+    EVENING_FIRST,
+    MORNING_LAST,
+    FIXSTAR_OFFSET,
 )
 
 
@@ -41,30 +40,30 @@ class TestIsFixedStar:
 
     def test_sirius_is_fixed_star(self):
         """Test that Sirius is identified as a fixed star."""
-        assert is_fixed_star(SE_SIRIUS)
+        assert is_fixed_star(SIRIUS)
 
     def test_regulus_is_fixed_star(self):
         """Test that Regulus is identified as a fixed star."""
-        assert is_fixed_star(SE_REGULUS)
+        assert is_fixed_star(REGULUS)
 
     def test_planet_is_not_fixed_star(self):
         """Test that planets are not identified as fixed stars."""
-        from libephemeris import SE_VENUS, SE_MARS, SE_JUPITER
+        from libephemeris import VENUS, MARS, JUPITER
 
-        assert not is_fixed_star(SE_VENUS)
-        assert not is_fixed_star(SE_MARS)
-        assert not is_fixed_star(SE_JUPITER)
+        assert not is_fixed_star(VENUS)
+        assert not is_fixed_star(MARS)
+        assert not is_fixed_star(JUPITER)
 
     def test_sun_is_not_fixed_star(self):
         """Test that the Sun is not identified as a fixed star."""
-        from libephemeris import SE_SUN
+        from libephemeris import SUN
 
-        assert not is_fixed_star(SE_SUN)
+        assert not is_fixed_star(SUN)
 
     def test_fixstar_offset(self):
         """Test that the fixed star offset is correctly applied."""
-        assert SE_SIRIUS >= SE_FIXSTAR_OFFSET
-        assert SE_REGULUS >= SE_FIXSTAR_OFFSET
+        assert SIRIUS >= FIXSTAR_OFFSET
+        assert REGULUS >= FIXSTAR_OFFSET
 
 
 class TestStarHeliacalRising:
@@ -83,7 +82,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Should find an event within a year
@@ -107,7 +106,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -124,7 +123,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Aldebaran",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -141,7 +140,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Regulus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -158,7 +157,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Vega",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Vega may or may not be found depending on position
@@ -177,7 +176,7 @@ class TestStarHeliacalRising:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Arcturus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Arcturus may or may not be found depending on position
@@ -200,7 +199,7 @@ class TestStarHeliacalSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         assert result[0] > jd_start
@@ -216,7 +215,7 @@ class TestStarHeliacalSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Regulus",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         assert result[0] > jd_start
@@ -226,7 +225,7 @@ class TestStarHeliacalValidation:
     """Test input validation for star heliacal calculations."""
 
     def test_star_evening_first_raises_error(self):
-        """Test that SE_EVENING_FIRST raises ValueError for fixed stars."""
+        """Test that EVENING_FIRST raises ValueError for fixed stars."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -237,11 +236,11 @@ class TestStarHeliacalValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Sirius",
-                SE_EVENING_FIRST,
+                EVENING_FIRST,
             )
 
     def test_star_morning_last_raises_error(self):
-        """Test that SE_MORNING_LAST raises ValueError for fixed stars."""
+        """Test that MORNING_LAST raises ValueError for fixed stars."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -252,22 +251,22 @@ class TestStarHeliacalValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Sirius",
-                SE_MORNING_LAST,
+                MORNING_LAST,
             )
 
 
 class TestSweHeliacalUtStars:
-    """Test swe_heliacal_ut API with fixed star names."""
+    """Test heliacal_ut API with fixed star names."""
 
     def test_sirius_by_name(self):
-        """Test swe_heliacal_ut with Sirius by name."""
+        """Test heliacal_ut with Sirius by name."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Sirius", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
@@ -276,42 +275,42 @@ class TestSweHeliacalUtStars:
             assert result[0] > jd_start
 
     def test_regulus_by_name(self):
-        """Test swe_heliacal_ut with Regulus by name."""
+        """Test heliacal_ut with Regulus by name."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Regulus", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Regulus", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_aldebaran_by_name(self):
-        """Test swe_heliacal_ut with Aldebaran by name."""
+        """Test heliacal_ut with Aldebaran by name."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Aldebaran", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Aldebaran", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_vega_by_name(self):
-        """Test swe_heliacal_ut with Vega by name."""
+        """Test heliacal_ut with Vega by name."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Vega", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Vega", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
@@ -325,30 +324,30 @@ class TestSweHeliacalUtStars:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Lowercase
-        result1 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "sirius", SE_HELIACAL_RISING
+        result1 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "sirius", HELIACAL_RISING
         )
         # Uppercase
-        result2 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "SIRIUS", SE_HELIACAL_RISING
+        result2 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "SIRIUS", HELIACAL_RISING
         )
         # Mixed case
-        result3 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Sirius", SE_HELIACAL_RISING
+        result3 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING
         )
 
         # All should return same result
         assert result1[0] == result2[0] == result3[0]
 
     def test_star_evening_first_by_name_raises_error(self):
-        """Test that SE_EVENING_FIRST raises ValueError for stars via swe API."""
+        """Test that EVENING_FIRST raises ValueError for stars via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="fixed stars"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Sirius", SE_EVENING_FIRST)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Sirius", EVENING_FIRST)
 
 
 class TestStarHeliacalPhenoUt:
@@ -365,7 +364,7 @@ class TestStarHeliacalPhenoUt:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
@@ -383,7 +382,7 @@ class TestStarHeliacalPhenoUt:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         magnitude = dret[20]
@@ -401,7 +400,7 @@ class TestStarHeliacalPhenoUt:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         parallax = dret[19]
@@ -419,7 +418,7 @@ class TestStarHeliacalPhenoUt:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Regulus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
@@ -444,7 +443,7 @@ class TestStarMagnitudeVisibility:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Check that magnitude is correctly retrieved
@@ -466,7 +465,7 @@ class TestStarHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Should find event (or not found, depending on visibility)
@@ -484,7 +483,7 @@ class TestStarHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Vega",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(result, tuple)
@@ -501,7 +500,7 @@ class TestStarHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Arcturus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(result, tuple)
@@ -522,7 +521,7 @@ class TestStarHeliacalAtmospheric:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Sirius",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -539,7 +538,7 @@ class TestStarHeliacalAtmospheric:
             (1013.25, 15.0, 80.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Regulus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(result, tuple)
@@ -573,7 +572,7 @@ class TestMultipleStars:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 star_name,
-                SE_HELIACAL_RISING,
+                HELIACAL_RISING,
             )
 
             # Should return a valid 3-tuple

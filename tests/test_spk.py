@@ -24,14 +24,14 @@ import jplephem
 import libephemeris as eph
 from libephemeris import spk, state
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SE_ERIS,
+    CHIRON,
+    CERES,
+    ERIS,
     NAIF_CHIRON,
     NAIF_CERES,
     NAIF_ERIS,
     NAIF_ASTEROID_OFFSET,
-    SEFLG_SPEED,
+    FLG_SPEED,
 )
 from libephemeris.exceptions import SPKNotFoundError
 
@@ -177,16 +177,16 @@ class TestSpkRegistration:
 
     def test_get_spk_body_info_not_registered(self):
         """Get info for unregistered body."""
-        assert eph.get_spk_body_info(SE_CHIRON) is None
+        assert eph.get_spk_body_info(CHIRON) is None
 
     def test_unregister_nonexistent(self):
         """Unregister non-existent body (should not error)."""
-        eph.unregister_spk_body(SE_CHIRON)  # Should not raise
+        eph.unregister_spk_body(CHIRON)  # Should not raise
 
     def test_register_file_not_found(self):
         """Register with non-existent file raises SPKNotFoundError."""
         with pytest.raises(SPKNotFoundError) as exc_info:
-            eph.register_spk_body(SE_CHIRON, "/nonexistent/file.bsp", NAIF_CHIRON)
+            eph.register_spk_body(CHIRON, "/nonexistent/file.bsp", NAIF_CHIRON)
 
         # Verify the error contains helpful information
         error = exc_info.value
@@ -196,7 +196,7 @@ class TestSpkRegistration:
     def test_register_file_not_found_with_body_name(self):
         """SPKNotFoundError includes body name when available."""
         with pytest.raises(SPKNotFoundError) as exc_info:
-            eph.register_spk_body(SE_CHIRON, "/path/to/missing.bsp", NAIF_CHIRON)
+            eph.register_spk_body(CHIRON, "/path/to/missing.bsp", NAIF_CHIRON)
 
         error = exc_info.value
         # Should have Chiron as body name
@@ -207,9 +207,9 @@ class TestSpkRegistration:
         assert "download_spk" in str(error)
 
     def test_register_file_not_found_with_eris(self):
-        """SPKNotFoundError works for SE_ERIS (TNO with high ID offset)."""
+        """SPKNotFoundError works for ERIS (TNO with high ID offset)."""
         with pytest.raises(SPKNotFoundError) as exc_info:
-            eph.register_spk_body(SE_ERIS, "/path/to/missing_eris.bsp", NAIF_ERIS)
+            eph.register_spk_body(ERIS, "/path/to/missing_eris.bsp", NAIF_ERIS)
 
         error = exc_info.value
         assert error.body_name == "Eris"
@@ -218,7 +218,7 @@ class TestSpkRegistration:
     def test_spk_not_found_error_helpful_message(self):
         """SPKNotFoundError message includes multiple options to obtain SPK."""
         with pytest.raises(SPKNotFoundError) as exc_info:
-            eph.register_spk_body(SE_CERES, "/missing/ceres.bsp", NAIF_CERES)
+            eph.register_spk_body(CERES, "/missing/ceres.bsp", NAIF_CERES)
 
         message = str(exc_info.value)
         # Check that key instructions are included
@@ -243,7 +243,7 @@ class TestCalcWithoutSpk:
         """Calculate Chiron position using Keplerian model."""
         # J2000.0 epoch
         jd = 2451545.0
-        pos, flags = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        pos, flags = eph.calc_ut(jd, CHIRON, FLG_SPEED)
 
         # Should return valid position
         assert 0 <= pos[0] < 360  # Longitude in range
@@ -253,7 +253,7 @@ class TestCalcWithoutSpk:
     def test_ceres_keplerian(self):
         """Calculate Ceres position using Keplerian model."""
         jd = 2451545.0
-        pos, flags = eph.calc_ut(jd, SE_CERES, SEFLG_SPEED)
+        pos, flags = eph.calc_ut(jd, CERES, FLG_SPEED)
 
         assert 0 <= pos[0] < 360
         assert -90 <= pos[1] <= 90
@@ -280,7 +280,7 @@ class TestSpkCalcIntegration:
         """calc_spk_body_position returns None for unregistered bodies."""
         ts = state.get_timescale()
         t = ts.tt_jd(2451545.0)
-        result = spk.calc_spk_body_position(t, SE_CHIRON, 0)
+        result = spk.calc_spk_body_position(t, CHIRON, 0)
         assert result is None
 
 
@@ -333,7 +333,7 @@ class TestEphemerisContextSpk:
     def test_context_get_spk_body_info_not_registered(self):
         """Context returns None for unregistered body."""
         ctx = eph.EphemerisContext()
-        assert ctx.get_spk_body_info(SE_CHIRON) is None
+        assert ctx.get_spk_body_info(CHIRON) is None
 
 
 # =============================================================================
@@ -378,18 +378,18 @@ class TestSpkDownloadIntegration:
         """Download and register Chiron SPK."""
         path = eph.download_and_register_spk(
             body="2060",
-            ipl=SE_CHIRON,
+            ipl=CHIRON,
             start="2020-01-01",
             end="2025-01-01",
             path=str(tmp_path),
         )
 
         assert os.path.exists(path)
-        assert eph.get_spk_body_info(SE_CHIRON) is not None
+        assert eph.get_spk_body_info(CHIRON) is not None
 
         # Calculate position using SPK
         jd = 2459215.5  # 2021-01-01
-        pos, _ = eph.calc_ut(jd, SE_CHIRON, SEFLG_SPEED)
+        pos, _ = eph.calc_ut(jd, CHIRON, FLG_SPEED)
 
         assert 0 <= pos[0] < 360
         assert pos[2] > 0

@@ -41,13 +41,13 @@ class TestDocstringPresence:
     def test_core_functions_have_detailed_docstrings(self):
         """Core functions should have detailed docstrings with Args/Returns."""
         core_functions = [
-            "swe_calc_ut",
-            "swe_calc",
-            "swe_julday",
-            "swe_revjul",
-            "swe_houses",
-            "swe_set_sid_mode",
-            "swe_get_ayanamsa_ut",
+            "calc_ut",
+            "calc",
+            "julday",
+            "revjul",
+            "houses",
+            "set_sid_mode",
+            "get_ayanamsa_ut",
         ]
 
         for func_name in core_functions:
@@ -68,31 +68,31 @@ class TestDocstringFormat:
     def test_args_section_format(self):
         """Check that Args sections are properly formatted."""
         # Test a function known to have Args section
-        docstring = libephemeris.swe_calc_ut.__doc__
+        docstring = libephemeris.calc_ut.__doc__
         assert docstring is not None
-        assert "Args:" in docstring, "swe_calc_ut should have Args section"
+        assert "Args:" in docstring, "calc_ut should have Args section"
 
     def test_returns_section_format(self):
         """Check that Returns sections are properly formatted."""
-        docstring = libephemeris.swe_calc_ut.__doc__
+        docstring = libephemeris.calc_ut.__doc__
         assert docstring is not None
-        assert "Returns:" in docstring, "swe_calc_ut should have Returns section"
+        assert "Returns:" in docstring, "calc_ut should have Returns section"
 
     def test_example_section_format(self):
         """Check that Example sections are present in key functions."""
-        docstring = libephemeris.swe_calc_ut.__doc__
+        docstring = libephemeris.calc_ut.__doc__
         assert docstring is not None
         assert "Example:" in docstring or ">>>" in docstring, (
-            "swe_calc_ut should have Example section"
+            "calc_ut should have Example section"
         )
 
     def test_docstring_has_parameter_types(self):
         """Docstrings should include type information for parameters."""
-        docstring = libephemeris.swe_julday.__doc__
+        docstring = libephemeris.julday.__doc__
         assert docstring is not None
         # Check for typical type indicators
         assert "int" in docstring.lower() or "float" in docstring.lower(), (
-            "swe_julday docstring should mention parameter types"
+            "julday docstring should mention parameter types"
         )
 
 
@@ -100,29 +100,29 @@ class TestDocstringContent:
     """Test that docstrings contain accurate information."""
 
     def test_julday_docstring_mentions_julian_day(self):
-        """swe_julday docstring should explain Julian Day."""
-        docstring = libephemeris.swe_julday.__doc__
+        """julday docstring should explain Julian Day."""
+        docstring = libephemeris.julday.__doc__
         assert docstring is not None
-        assert "Julian" in docstring, "swe_julday should mention Julian Day"
+        assert "Julian" in docstring, "julday should mention Julian Day"
 
     def test_calc_ut_docstring_mentions_universal_time(self):
-        """swe_calc_ut docstring should explain Universal Time."""
-        docstring = libephemeris.swe_calc_ut.__doc__
+        """calc_ut docstring should explain Universal Time."""
+        docstring = libephemeris.calc_ut.__doc__
         assert docstring is not None
         assert "Universal Time" in docstring or "UT" in docstring, (
-            "swe_calc_ut should mention Universal Time"
+            "calc_ut should mention Universal Time"
         )
 
     def test_houses_docstring_mentions_house_systems(self):
-        """swe_houses docstring should explain house systems."""
-        docstring = libephemeris.swe_houses.__doc__
+        """houses docstring should explain house systems."""
+        docstring = libephemeris.houses.__doc__
         assert docstring is not None
         # Should mention at least one house system
         assert (
             "Placidus" in docstring
             or "house" in docstring.lower()
             or "cusp" in docstring.lower()
-        ), "swe_houses should mention house systems"
+        ), "houses should mention house systems"
 
 
 class TestDocumentationFiles:
@@ -163,9 +163,9 @@ class TestDocumentationFiles:
             )
 
             # Should document key functions
-            assert "swe_calc_ut" in content, "API reference should document swe_calc_ut"
-            assert "swe_julday" in content, "API reference should document swe_julday"
-            assert "swe_houses" in content, "API reference should document swe_houses"
+            assert "calc_ut" in content, "API reference should document calc_ut"
+            assert "julday" in content, "API reference should document julday"
+            assert "houses" in content, "API reference should document houses"
 
     def test_api_reference_has_sections(self):
         """API reference should be organized in sections."""

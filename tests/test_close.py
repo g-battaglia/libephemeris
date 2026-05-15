@@ -9,9 +9,8 @@ context loading issues in the codebase.
 import libephemeris
 from libephemeris import (
     close,
-    swe_close,
-    swe_calc_ut,
-    SE_SUN,
+    calc_ut,
+    SUN,
 )
 from libephemeris import state
 
@@ -21,7 +20,7 @@ class TestCloseFunction:
 
     def test_close_resets_planets(self):
         """close() should reset the _PLANETS global to None."""
-        # Explicitly load planets (swe_calc_ut may use LEB fast path)
+        # Explicitly load planets (calc_ut may use LEB fast path)
         state.get_planets()
         assert state._PLANETS is not None
 
@@ -34,7 +33,7 @@ class TestCloseFunction:
     def test_close_resets_timescale(self):
         """close() should reset the _TS global to None."""
         # Ensure timescale is loaded
-        swe_calc_ut(2451545.0, SE_SUN, 0)
+        calc_ut(2451545.0, SUN, 0)
         assert state._TS is not None
 
         # Call close
@@ -133,13 +132,13 @@ class TestCloseFunction:
     def test_calculations_work_after_close(self):
         """Calculations should work normally after calling close()."""
         # First calculation loads ephemeris
-        pos1, _ = swe_calc_ut(2451545.0, SE_SUN, 0)
+        pos1, _ = calc_ut(2451545.0, SUN, 0)
 
         # Close releases resources
         close()
 
         # Second calculation should reload and produce same results
-        pos2, _ = swe_calc_ut(2451545.0, SE_SUN, 0)
+        pos2, _ = calc_ut(2451545.0, SUN, 0)
 
         # Compare longitude to high precision (LEB vs Skyfield may differ
         # at sub-arcsecond level after close() clears cached state)
@@ -153,6 +152,3 @@ class TestCloseFunction:
             f"Distance differs after close(): {pos1[2]} vs {pos2[2]}"
         )
 
-    def test_swe_close_alias(self):
-        """swe_close should be an alias for close."""
-        assert swe_close is close

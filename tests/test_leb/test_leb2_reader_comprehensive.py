@@ -14,14 +14,14 @@ import pytest
 
 from libephemeris.leb_reader import open_leb
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
+    SUN,
+    MOON,
+    MERCURY,
+    MARS,
+    JUPITER,
+    SATURN,
+    MEAN_NODE,
+    TRUE_NODE,
 )
 
 
@@ -92,11 +92,11 @@ class TestLEB2Bodies:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_core_bodies_present(self, body_id: int, name: str):
@@ -108,7 +108,7 @@ class TestLEB2Bodies:
     def test_eval_body_returns_pos_vel(self):
         """eval_body returns ((x,y,z), (vx,vy,vz))."""
         with open_leb(LEB2_BASE_CORE) as reader:
-            pos, vel = reader.eval_body(SE_SUN, 2451545.0)
+            pos, vel = reader.eval_body(SUN, 2451545.0)
             assert len(pos) == 3
             assert len(vel) == 3
             for v in pos:
@@ -128,7 +128,7 @@ class TestLEB2Bodies:
         """JD out of range raises ValueError."""
         with open_leb(LEB2_BASE_CORE) as reader:
             with pytest.raises(ValueError):
-                reader.eval_body(SE_SUN, 1000000.0)
+                reader.eval_body(SUN, 1000000.0)
 
 
 @SKIP_NO_LEB2
@@ -140,10 +140,10 @@ class TestLEB2VsLEB1:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_leb2_matches_leb1(self, body_id: int, name: str):
@@ -198,11 +198,11 @@ class TestLEB2DateRange:
         """Sun position valid across years in LEB2."""
         import libephemeris as swe
 
-        jd = swe.swe_julday(year, 6, 21, 12.0)
+        jd = swe.julday(year, 6, 21, 12.0)
         with open_leb(LEB2_BASE_CORE) as reader:
             jd_start, jd_end = reader.jd_range
             if jd < jd_start or jd > jd_end:
                 pytest.skip(f"JD {jd} outside LEB2 range")
-            pos, vel = reader.eval_body(SE_SUN, jd)
+            pos, vel = reader.eval_body(SUN, jd)
             for v in pos:
                 assert math.isfinite(v)

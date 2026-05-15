@@ -11,16 +11,16 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SWIEPH,
-    SEFLG_TOPOCTR,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
+    FLG_TOPOCTR,
+    FLG_SPEED,
 )
 
 
@@ -28,7 +28,7 @@ from libephemeris.constants import (
 def _reset_state():
     """Reset ephemeris state between tests."""
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -119,21 +119,21 @@ class TestGauquelinCusps:
 
 
 class TestGauquelinSectorFunction:
-    """Test swe_gauquelin_sector() for body placement."""
+    """Test gauquelin_sector() for body placement."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("body", [SE_SUN, SE_MOON, SE_MARS, SE_JUPITER])
+    @pytest.mark.parametrize("body", [SUN, MOON, MARS, JUPITER])
     def test_sector_returns_valid_range(self, body):
         """gauquelin_sector returns value in [1, 37)."""
         geopos = (2.35, 48.85, 0.0)  # Paris (lon, lat, alt)
-        sector = swe.swe_gauquelin_sector(JD_J2000, body, 0, geopos, 1013.25, 15.0)
+        sector = swe.gauquelin_sector(JD_J2000, body, 0, geopos, 1013.25, 15.0)
         assert 1.0 <= sector < 37.0, f"Sector {sector} out of range for body {body}"
 
     @pytest.mark.unit
     def test_sector_integer_part_is_sector_number(self):
         """Integer part of result is the sector number (1-36)."""
         geopos = (2.35, 48.85, 0.0)
-        sector = swe.swe_gauquelin_sector(JD_J2000, SE_MARS, 0, geopos, 1013.25, 15.0)
+        sector = swe.gauquelin_sector(JD_J2000, MARS, 0, geopos, 1013.25, 15.0)
         sector_num = int(sector)
         assert 1 <= sector_num <= 36
 
@@ -142,8 +142,8 @@ class TestGauquelinSectorFunction:
     def test_different_methods(self, method):
         """Methods 0 and 1 both return valid sectors."""
         geopos = (2.35, 48.85, 0.0)
-        sector = swe.swe_gauquelin_sector(
-            JD_J2000, SE_MARS, method, geopos, 1013.25, 15.0
+        sector = swe.gauquelin_sector(
+            JD_J2000, MARS, method, geopos, 1013.25, 15.0
         )
         assert 1.0 <= sector < 37.0
 
@@ -153,7 +153,7 @@ class TestGauquelinSectorFunction:
         geopos = (2.35, 48.85, 0.0)
         sectors = []
         for jd in [JD_J2000, JD_J2000 + 0.5, JD_J2000 + 1.0, JD_J2000 + 5.0]:
-            s = swe.swe_gauquelin_sector(jd, SE_SUN, 0, geopos, 1013.25, 15.0)
+            s = swe.gauquelin_sector(jd, SUN, 0, geopos, 1013.25, 15.0)
             sectors.append(s)
         # At least some sectors should differ
         assert len(set(int(s) for s in sectors)) > 1
@@ -161,11 +161,11 @@ class TestGauquelinSectorFunction:
     @pytest.mark.unit
     def test_sector_varies_with_location(self):
         """Sector depends on geographic location."""
-        s1 = swe.swe_gauquelin_sector(
-            JD_J2000, SE_MARS, 0, (2.35, 48.85, 0.0), 1013.25, 15.0
+        s1 = swe.gauquelin_sector(
+            JD_J2000, MARS, 0, (2.35, 48.85, 0.0), 1013.25, 15.0
         )
-        s2 = swe.swe_gauquelin_sector(
-            JD_J2000, SE_MARS, 0, (139.69, 35.68, 0.0), 1013.25, 15.0
+        s2 = swe.gauquelin_sector(
+            JD_J2000, MARS, 0, (139.69, 35.68, 0.0), 1013.25, 15.0
         )
         # Different locations should give different sectors
         assert abs(s1 - s2) > 0.01
@@ -176,6 +176,6 @@ class TestGauquelinHouseName:
 
     @pytest.mark.unit
     def test_house_name_gauquelin(self):
-        """swe_house_name returns 'Gauquelin sectors' for 'G'."""
-        name = swe.swe_house_name(ord("G"))
+        """house_name returns 'Gauquelin sectors' for 'G'."""
+        name = swe.house_name(ord("G"))
         assert "Gauquelin" in name or "gauquelin" in name.lower()

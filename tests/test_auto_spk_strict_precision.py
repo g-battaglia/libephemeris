@@ -15,9 +15,9 @@ from unittest.mock import patch, MagicMock
 import libephemeris as eph
 from libephemeris import state
 from libephemeris.constants import (
-    SE_CHIRON,
-    SE_CERES,
-    SEFLG_SPEED,
+    CHIRON,
+    CERES,
+    FLG_SPEED,
 )
 
 
@@ -57,7 +57,7 @@ class TestAutoDownloadInStrictMode:
             mock_download.side_effect = RuntimeError("Network error")
 
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
             mock_download.assert_called_once()
 
@@ -81,7 +81,7 @@ class TestAutoDownloadInStrictMode:
             with patch(
                 "libephemeris.spk.calc_spk_body_position", side_effect=mock_calc_spk
             ):
-                pos, flags = eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
                 assert pos[0] == pytest.approx(100.0)
                 assert pos[1] == pytest.approx(5.0)
@@ -94,7 +94,7 @@ class TestAutoDownloadInStrictMode:
 
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
             mock_download.assert_not_called()
 
@@ -111,7 +111,7 @@ class TestAutoDownloadInStrictMode:
                 mock_get_logger.return_value = mock_logger
 
                 with pytest.raises(eph.SPKRequiredError):
-                    eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                    eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
                 mock_logger.info.assert_called()
                 log_calls = [call[0][0] for call in mock_logger.info.call_args_list]
@@ -126,7 +126,7 @@ class TestAutoDownloadInStrictMode:
             mock_download.side_effect = RuntimeError("Network error")
 
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
     def test_ceres_requires_spk_in_strict_mode(self):
         """Ceres requires SPK in strict mode (it's in SPK_BODY_NAME_MAP).
@@ -142,7 +142,7 @@ class TestAutoDownloadInStrictMode:
 
             # Ceres is in SPK_BODY_NAME_MAP, so it requires SPK
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CERES, SEFLG_SPEED)
+                eph.calc_ut(2451545.0, CERES, FLG_SPEED)
 
             mock_download.assert_called_once()
 
@@ -156,7 +156,7 @@ class TestAutoDownloadWithStrictDisabled:
         eph.set_auto_spk_download(True)
 
         # Even without SPK, should get a result via Keplerian fallback
-        pos, flags = eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+        pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
         # Should return valid position
         assert 0 <= pos[0] < 360  # Longitude in range
@@ -176,7 +176,7 @@ class TestAutoDownloadWithFirstTryPath:
             mock_try.return_value = None
 
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, SE_CHIRON, SEFLG_SPEED)
+                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
             mock_try.assert_called_once()
 
@@ -195,7 +195,7 @@ class TestAutoDownloadJDPassthrough:
             mock_download.side_effect = RuntimeError("Network error")
 
             with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(test_jd, SE_CHIRON, SEFLG_SPEED)
+                eph.calc_ut(test_jd, CHIRON, FLG_SPEED)
 
             mock_download.assert_called_once()
             call_kwargs = mock_download.call_args[1]

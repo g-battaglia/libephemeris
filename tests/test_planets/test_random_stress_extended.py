@@ -14,23 +14,23 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
-    SEFLG_HELCTR,
-    SEFLG_SIDEREAL,
-    SE_SIDM_LAHIRI,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    FLG_SPEED,
+    FLG_SWIEPH,
+    FLG_HELCTR,
+    FLG_SIDEREAL,
+    SIDM_LAHIRI,
 )
 
 # DE440 base range: ~1849 to ~2150
@@ -47,7 +47,7 @@ class TestRandomDateStress:
         rng = np.random.default_rng(42)
         jds = rng.uniform(JD_1900, JD_2100, 100)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), SE_SUN, SEFLG_SPEED)
+            result, _ = swe.calc_ut(float(jd), SUN, FLG_SPEED)
             assert 0 <= result[0] < 360, f"JD {jd}: lon={result[0]}"
             assert abs(result[1]) < 1, f"JD {jd}: lat={result[1]}"
             assert 0.98 < result[2] < 1.02, f"JD {jd}: dist={result[2]}"
@@ -59,7 +59,7 @@ class TestRandomDateStress:
         rng = np.random.default_rng(43)
         jds = rng.uniform(JD_1900, JD_2100, 100)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), SE_MOON, SEFLG_SPEED)
+            result, _ = swe.calc_ut(float(jd), MOON, FLG_SPEED)
             assert 0 <= result[0] < 360
             assert abs(result[1]) < 6  # Moon lat < ~5.3 deg
             assert 0.002 < result[2] < 0.003  # Moon dist ~0.0024-0.0028 AU
@@ -69,11 +69,11 @@ class TestRandomDateStress:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_planet_50_random_dates(self, body_id: int, name: str):
@@ -81,7 +81,7 @@ class TestRandomDateStress:
         rng = np.random.default_rng(body_id * 100 + 44)
         jds = rng.uniform(JD_1900, JD_2100, 50)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(float(jd), body_id, FLG_SPEED)
             assert 0 <= result[0] < 360, f"{name} JD {jd}: lon={result[0]}"
             assert abs(result[1]) < 10, f"{name} JD {jd}: lat={result[1]}"
             assert result[2] > 0, f"{name} JD {jd}: dist={result[2]}"
@@ -94,9 +94,9 @@ class TestRandomHeliocentricStress:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_helio_30_random_dates(self, body_id: int, name: str):
@@ -104,7 +104,7 @@ class TestRandomHeliocentricStress:
         rng = np.random.default_rng(body_id * 200 + 55)
         jds = rng.uniform(JD_1900, JD_2100, 30)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), body_id, SEFLG_SPEED | SEFLG_HELCTR)
+            result, _ = swe.calc_ut(float(jd), body_id, FLG_SPEED | FLG_HELCTR)
             assert 0 <= result[0] < 360, f"{name} helio lon={result[0]}"
             assert result[2] > 0, f"{name} helio dist={result[2]}"
 
@@ -115,11 +115,11 @@ class TestRandomSiderealStress:
     @pytest.mark.unit
     def test_sidereal_sun_50_random_dates(self):
         """Sidereal Sun positions valid at 50 random dates."""
-        swe.swe_set_sid_mode(SE_SIDM_LAHIRI)
+        swe.set_sid_mode(SIDM_LAHIRI)
         rng = np.random.default_rng(66)
         jds = rng.uniform(JD_1900, JD_2100, 50)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), SE_SUN, SEFLG_SPEED | SEFLG_SIDEREAL)
+            result, _ = swe.calc_ut(float(jd), SUN, FLG_SPEED | FLG_SIDEREAL)
             assert 0 <= result[0] < 360, f"Sid Sun lon={result[0]}"
             assert math.isfinite(result[3])
 
@@ -131,8 +131,8 @@ class TestRandomNodesStress:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MEAN_NODE, "Mean Node"),
-            (SE_TRUE_NODE, "True Node"),
+            (MEAN_NODE, "Mean Node"),
+            (TRUE_NODE, "True Node"),
         ],
     )
     def test_nodes_50_random_dates(self, body_id: int, name: str):
@@ -140,7 +140,7 @@ class TestRandomNodesStress:
         rng = np.random.default_rng(body_id * 300 + 77)
         jds = rng.uniform(JD_1900, JD_2100, 50)
         for jd in jds:
-            result, _ = swe.swe_calc_ut(float(jd), body_id, SEFLG_SPEED)
+            result, _ = swe.calc_ut(float(jd), body_id, FLG_SPEED)
             assert 0 <= result[0] < 360, f"{name} lon={result[0]}"
             # Node latitude is 0 by definition
             assert abs(result[1]) < 0.01, f"{name} lat={result[1]}"
@@ -158,7 +158,7 @@ class TestRandomHousesStress:
         lons = rng.uniform(-180, 180, 50)
 
         for jd, lat, lon in zip(jds, lats, lons):
-            cusps, ascmc = swe.swe_houses(float(jd), float(lat), float(lon), ord("P"))
+            cusps, ascmc = swe.houses(float(jd), float(lat), float(lon), ord("P"))
             assert len(cusps) >= 12
             for i, c in enumerate(cusps[:12]):
                 assert 0 <= c < 360, (

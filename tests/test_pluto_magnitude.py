@@ -9,7 +9,7 @@ is correctly implemented with accuracy to ±0.2 magnitudes.
 import math
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SE_PLUTO, SE_JUPITER, SE_SATURN
+from libephemeris.constants import PLUTO, JUPITER, SATURN
 from libephemeris import julday
 
 
@@ -31,9 +31,9 @@ class TestPlutoMagnitudeFormula:
         """
         # 2024-07-01 - Pluto near opposition, good observing conditions
         jd = julday(2024, 7, 1, 0)
-        result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+        result = ephem.pheno_ut(jd, PLUTO, 0)
 
-        # swe_pheno_ut returns a flat tuple of 20 floats; magnitude is at index 4
+        # pheno_ut returns a flat tuple of 20 floats; magnitude is at index 4
         magnitude = result[4]
 
         # Pluto should be around magnitude 14.0-15.0 at typical distances
@@ -90,7 +90,7 @@ class TestPlutoMagnitudeFormula:
         Reference: JPL Horizons and observational reports.
         """
         jd = julday(2020, 7, 15, 12)  # Opposition date
-        result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+        result = ephem.pheno_ut(jd, PLUTO, 0)
 
         magnitude = result[4]
         phase_angle = result[0]
@@ -116,7 +116,7 @@ class TestPlutoMagnitudeFormula:
 
         for year, month, day, hour in epochs:
             jd = julday(year, month, day, hour)
-            result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+            result = ephem.pheno_ut(jd, PLUTO, 0)
 
             magnitude = result[4]
 
@@ -138,11 +138,11 @@ class TestPlutoMagnitudeFormula:
         # Compare magnitude at different times of year
         # Near opposition (low phase angle)
         jd_opposition = julday(2024, 7, 15, 0)
-        result_opp = ephem.swe_pheno_ut(jd_opposition, SE_PLUTO, 0)
+        result_opp = ephem.pheno_ut(jd_opposition, PLUTO, 0)
 
         # Away from opposition (higher phase angle)
         jd_quadrature = julday(2024, 4, 1, 0)
-        result_quad = ephem.swe_pheno_ut(jd_quadrature, SE_PLUTO, 0)
+        result_quad = ephem.pheno_ut(jd_quadrature, PLUTO, 0)
 
         mag_opp = result_opp[4]
         phase_opp = result_opp[0]
@@ -171,9 +171,9 @@ class TestPlutoMagnitudeVsOtherPlanets:
         """Verify Pluto is fainter than Jupiter, Saturn, Uranus, Neptune."""
         jd = julday(2024, 1, 1, 0)
 
-        result_pluto = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
-        result_jupiter = ephem.swe_pheno_ut(jd, SE_JUPITER, 0)
-        result_saturn = ephem.swe_pheno_ut(jd, SE_SATURN, 0)
+        result_pluto = ephem.pheno_ut(jd, PLUTO, 0)
+        result_jupiter = ephem.pheno_ut(jd, JUPITER, 0)
+        result_saturn = ephem.pheno_ut(jd, SATURN, 0)
 
         mag_pluto = result_pluto[4]
         mag_jupiter = result_jupiter[4]
@@ -198,7 +198,7 @@ class TestPlutoMagnitudeAccuracy:
         Our implementation should match within ±0.2 magnitudes.
         """
         jd = julday(2020, 7, 15, 12)
-        result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+        result = ephem.pheno_ut(jd, PLUTO, 0)
 
         magnitude = result[4]
         expected = 14.3  # JPL Horizons reference value
@@ -217,7 +217,7 @@ class TestPlutoMagnitudeAccuracy:
         - Expected magnitude: ~13.7-14.0
         """
         jd = 2451545.0  # J2000.0
-        result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+        result = ephem.pheno_ut(jd, PLUTO, 0)
 
         magnitude = result[4]
 
@@ -232,12 +232,12 @@ class TestPlutoMagnitudeReturnFormat:
     """Test that Pluto magnitude is returned in correct format."""
 
     def test_pheno_ut_returns_correct_structure(self):
-        """Verify swe_pheno_ut returns correct flat tuple structure for Pluto.
+        """Verify pheno_ut returns correct flat tuple structure for Pluto.
 
         pyswisseph returns a flat tuple of 20 floats (not a tuple-of-tuples).
         """
         jd = julday(2024, 1, 1, 0)
-        result = ephem.swe_pheno_ut(jd, SE_PLUTO, 0)
+        result = ephem.pheno_ut(jd, PLUTO, 0)
 
         assert isinstance(result, tuple)
         assert len(result) == 20

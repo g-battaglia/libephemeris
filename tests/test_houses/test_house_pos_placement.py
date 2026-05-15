@@ -6,14 +6,14 @@ import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    FLG_SWIEPH,
+    FLG_SPEED,
 )
 
 JD_J2000 = 2451545.0
@@ -21,7 +21,7 @@ JD_J2000 = 2451545.0
 
 @pytest.mark.unit
 class TestHousePos:
-    """Test swe_house_pos for body house placement."""
+    """Test house_pos for body house placement."""
 
     @pytest.mark.parametrize(
         "hsys",
@@ -45,19 +45,19 @@ class TestHousePos:
         armc = ascmc[2]
         eps = ascmc[8] if len(ascmc) > 8 else 23.4393
 
-        sun, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH | SEFLG_SPEED)
+        sun, _ = swe.calc_ut(JD_J2000, SUN, FLG_SWIEPH | FLG_SPEED)
         pos = swe.house_pos(armc, 41.9, eps, (sun[0], sun[1]), hsys)
         assert 1.0 <= pos < 13.0, f"House pos {pos} out of range for {hsys}"
 
     @pytest.mark.parametrize(
         "body,name",
         [
-            (SE_SUN, "Sun"),
-            (SE_MOON, "Moon"),
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
+            (SUN, "Sun"),
+            (MOON, "Moon"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
         ],
     )
     def test_house_pos_all_planets(self, body, name):
@@ -66,7 +66,7 @@ class TestHousePos:
         armc = ascmc[2]
         eps = ascmc[8] if len(ascmc) > 8 else 23.4393
 
-        result, _ = swe.calc_ut(JD_J2000, body, SEFLG_SWIEPH | SEFLG_SPEED)
+        result, _ = swe.calc_ut(JD_J2000, body, FLG_SWIEPH | FLG_SPEED)
         pos = swe.house_pos(armc, 41.9, eps, (result[0], result[1]), "P")
         assert 1.0 <= pos < 13.0, f"{name} house pos {pos} out of range"
 
@@ -131,7 +131,7 @@ class TestHousePosMultipleLocations:
         armc = ascmc[2]
         eps = ascmc[8] if len(ascmc) > 8 else 23.4393
 
-        sun, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH)
+        sun, _ = swe.calc_ut(JD_J2000, SUN, FLG_SWIEPH)
         pos = swe.house_pos(armc, lat, eps, (sun[0], sun[1]), "P")
         assert 1.0 <= pos < 13.0, f"Sun house pos {pos} at {name}"
 
@@ -146,7 +146,7 @@ class TestHousePosConsistency:
         armc = ascmc[2]
         eps = ascmc[8] if len(ascmc) > 8 else 23.4393
 
-        sun, _ = swe.calc_ut(JD_J2000, SE_SUN, SEFLG_SWIEPH)
+        sun, _ = swe.calc_ut(JD_J2000, SUN, FLG_SWIEPH)
         pos = swe.house_pos(armc, 41.9, eps, (sun[0], sun[1]), "P")
         house_num = int(pos)  # 1-12
 
@@ -162,6 +162,6 @@ class TestHousePosConsistency:
         armc = ascmc[2]
         eps = ascmc[8] if len(ascmc) > 8 else 23.4393
 
-        sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SWIEPH)
+        sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
         pos = swe.house_pos(armc, 41.9, eps, (sun[0], sun[1]), "P")
         assert 1.0 <= pos < 13.0

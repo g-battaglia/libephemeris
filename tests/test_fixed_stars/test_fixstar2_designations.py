@@ -1,5 +1,5 @@
 """
-Tests for swe_fixstar2_ut with Bayer and Flamsteed designations.
+Tests for fixstar2_ut with Bayer and Flamsteed designations.
 
 Verifies lookup by Greek letter name, Flamsteed number,
 and various naming conventions.
@@ -10,13 +10,13 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import SEFLG_SWIEPH
+from libephemeris.constants import FLG_SWIEPH
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0

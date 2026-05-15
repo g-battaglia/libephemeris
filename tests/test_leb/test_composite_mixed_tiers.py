@@ -13,12 +13,12 @@ import pytest
 from libephemeris.leb_reader import open_leb
 from libephemeris.leb_composite import CompositeLEBReader
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SE_JUPITER,
-    SE_CHIRON,
-    SE_CERES,
+    SUN,
+    MOON,
+    MARS,
+    JUPITER,
+    CHIRON,
+    CERES,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -47,8 +47,8 @@ class TestMixedLEB1LEB2:
         r1 = open_leb(LEB1_BASE)
         r2 = open_leb(LEB2_BASE_CORE)
         comp = CompositeLEBReader([r1, r2])
-        assert comp.has_body(SE_SUN)
-        assert comp.has_body(SE_MOON)
+        assert comp.has_body(SUN)
+        assert comp.has_body(MOON)
         comp.close()
 
     @pytest.mark.unit
@@ -59,10 +59,10 @@ class TestMixedLEB1LEB2:
     def test_mixed_eval_body_consistent(self):
         """Mixed composite gives same Sun position as individual readers."""
         with open_leb(LEB1_BASE) as leb1:
-            pos1, vel1 = leb1.eval_body(SE_SUN, JD_J2000)
+            pos1, vel1 = leb1.eval_body(SUN, JD_J2000)
 
         with open_leb(LEB2_BASE_CORE) as leb2:
-            pos2, vel2 = leb2.eval_body(SE_SUN, JD_J2000)
+            pos2, vel2 = leb2.eval_body(SUN, JD_J2000)
 
         # LEB1 and LEB2 positions should be very close (LEB2 is compressed LEB1)
         for i in range(3):
@@ -81,13 +81,13 @@ class TestMixedLEB1LEB2:
         r2 = open_leb(LEB2_BASE_ASTEROIDS)
         comp = CompositeLEBReader([r1, r2])
         # Core from LEB1
-        assert comp.has_body(SE_SUN)
-        pos, vel = comp.eval_body(SE_SUN, JD_J2000)
+        assert comp.has_body(SUN)
+        pos, vel = comp.eval_body(SUN, JD_J2000)
         for v in pos + vel:
             assert math.isfinite(v)
         # Asteroids from LEB2
-        if comp.has_body(SE_CHIRON):
-            pos, vel = comp.eval_body(SE_CHIRON, JD_J2000)
+        if comp.has_body(CHIRON):
+            pos, vel = comp.eval_body(CHIRON, JD_J2000)
             for v in pos + vel:
                 assert math.isfinite(v)
         comp.close()
@@ -104,7 +104,7 @@ class TestMediumTier:
     def test_medium_tier_opens(self):
         """Medium tier LEB1 file opens correctly."""
         with open_leb(LEB1_MEDIUM) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
             jd_start, jd_end = reader.jd_range
             # Medium tier covers 1550-2650
             assert (jd_end - jd_start) > 365.25 * 500
@@ -117,7 +117,7 @@ class TestMediumTier:
     def test_medium_tier_eval(self):
         """Medium tier produces valid positions."""
         with open_leb(LEB1_MEDIUM) as reader:
-            pos, vel = reader.eval_body(SE_SUN, JD_J2000)
+            pos, vel = reader.eval_body(SUN, JD_J2000)
             for v in pos + vel:
                 assert math.isfinite(v)
 
@@ -129,7 +129,7 @@ class TestMediumTier:
     def test_medium_tier_leb2_opens(self):
         """Medium tier LEB2 file opens correctly."""
         with open_leb(LEB2_MEDIUM_CORE) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
 
     @pytest.mark.unit
     @pytest.mark.skipif(
@@ -139,8 +139,8 @@ class TestMediumTier:
     def test_medium_tier_leb2_companions(self):
         """Medium tier LEB2 discovers companions."""
         with CompositeLEBReader.from_file_with_companions(LEB2_MEDIUM_CORE) as reader:
-            assert reader.has_body(SE_SUN)
-            pos, vel = reader.eval_body(SE_SUN, JD_J2000)
+            assert reader.has_body(SUN)
+            pos, vel = reader.eval_body(SUN, JD_J2000)
             for v in pos + vel:
                 assert math.isfinite(v)
 
@@ -156,7 +156,7 @@ class TestExtendedTier:
     def test_extended_tier_opens(self):
         """Extended tier LEB2 file opens correctly."""
         with open_leb(LEB2_EXTENDED_CORE) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
             jd_start, jd_end = reader.jd_range
             # Extended tier covers -13200 to +17191
             assert (jd_end - jd_start) > 365.25 * 1000
@@ -169,7 +169,7 @@ class TestExtendedTier:
     def test_extended_tier_eval(self):
         """Extended tier produces valid positions."""
         with open_leb(LEB2_EXTENDED_CORE) as reader:
-            pos, vel = reader.eval_body(SE_SUN, JD_J2000)
+            pos, vel = reader.eval_body(SUN, JD_J2000)
             for v in pos + vel:
                 assert math.isfinite(v)
 
@@ -181,7 +181,7 @@ class TestExtendedTier:
     def test_extended_tier_companions(self):
         """Extended tier LEB2 discovers companions."""
         with CompositeLEBReader.from_file_with_companions(LEB2_EXTENDED_CORE) as reader:
-            assert reader.has_body(SE_SUN)
+            assert reader.has_body(SUN)
 
 
 class TestJdRangeMerging:

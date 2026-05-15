@@ -17,20 +17,18 @@ from libephemeris import (
     julday,
     revjul,
     heliacal_ut,
-    swe_heliacal_ut,
     heliacal_pheno_ut,
-    swe_heliacal_pheno_ut,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_SUN,
-    SE_MOON,
-    SE_HELIACAL_RISING,
-    SE_HELIACAL_SETTING,
-    SE_EVENING_FIRST,
-    SE_MORNING_LAST,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    SUN,
+    MOON,
+    HELIACAL_RISING,
+    HELIACAL_SETTING,
+    EVENING_FIRST,
+    MORNING_LAST,
 )
 
 
@@ -50,7 +48,7 @@ class TestHeliacalBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Venus synodic period is ~584 days, so the next heliacal rising
@@ -69,7 +67,7 @@ class TestHeliacalBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Mercury has ~3 synodic periods per year, so should find one quickly
@@ -87,7 +85,7 @@ class TestHeliacalBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -104,7 +102,7 @@ class TestHeliacalBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Saturn",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Saturn may not have heliacal rising within search window for all start dates
@@ -124,7 +122,7 @@ class TestHeliacalBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mars",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Mars has ~780 day synodic period, may not have event in window
@@ -147,7 +145,7 @@ class TestHeliacalEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         assert result[0] > jd_start
@@ -163,7 +161,7 @@ class TestHeliacalEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_EVENING_FIRST,
+            EVENING_FIRST,
         )
 
         # May or may not find this event depending on current position
@@ -182,7 +180,7 @@ class TestHeliacalEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_MORNING_LAST,
+            MORNING_LAST,
         )
 
         # May or may not find this event
@@ -205,7 +203,7 @@ class TestHeliacalValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Sun",
-                SE_HELIACAL_RISING,
+                HELIACAL_RISING,
             )
 
     def test_moon_raises_error(self):
@@ -220,7 +218,7 @@ class TestHeliacalValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Moon",
-                SE_HELIACAL_RISING,
+                HELIACAL_RISING,
             )
 
     def test_invalid_event_type_raises_error(self):
@@ -253,7 +251,7 @@ class TestHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # High latitude summer nights are short, may affect visibility
@@ -271,7 +269,7 @@ class TestHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # In the southern hemisphere, twilight times differ
@@ -290,7 +288,7 @@ class TestHeliacalLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Saturn",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Equatorial locations have consistent twilight times
@@ -312,7 +310,7 @@ class TestHeliacalAtmosphericConditions:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -328,7 +326,7 @@ class TestHeliacalAtmosphericConditions:
             (1000.0, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
@@ -344,17 +342,17 @@ class TestHeliacalAtmosphericConditions:
             (1013.25, 15.0, 80.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert result[0] > jd_start
 
 
 class TestSweHeliacalUt:
-    """Test swe_heliacal_ut pyswisseph-compatible API."""
+    """Test heliacal_ut pyswisseph-compatible API."""
 
     def test_swe_heliacal_ut_basic_call(self):
-        """Test basic swe_heliacal_ut call with array parameters."""
+        """Test basic heliacal_ut call with array parameters."""
         jd_start = julday(2024, 1, 1, 0)
         # Geographic position: Rome (lon, lat, altitude)
         geopos = (12.4964, 41.9028, 0.0)
@@ -363,8 +361,8 @@ class TestSweHeliacalUt:
         # Observer: age, Snellen ratio, and optical params
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         # Should return a tuple of 3 floats (jd1, jd2, jd3)
@@ -377,14 +375,14 @@ class TestSweHeliacalUt:
             assert result[0] < jd_start + 600
 
     def test_swe_heliacal_ut_with_planet_name_mercury(self):
-        """Test swe_heliacal_ut with Mercury."""
+        """Test heliacal_ut with Mercury."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
@@ -395,84 +393,84 @@ class TestSweHeliacalUt:
             assert result[0] < jd_start + 120
 
     def test_swe_heliacal_ut_with_planet_name_mars(self):
-        """Test swe_heliacal_ut with Mars."""
+        """Test heliacal_ut with Mars."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mars", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mars", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_name_jupiter(self):
-        """Test swe_heliacal_ut with Jupiter."""
+        """Test heliacal_ut with Jupiter."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (-0.1278, 51.5074, 0.0)  # London
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Jupiter", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Jupiter", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_name_saturn(self):
-        """Test swe_heliacal_ut with Saturn."""
+        """Test heliacal_ut with Saturn."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Saturn", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Saturn", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_heliacal_setting(self):
-        """Test swe_heliacal_ut for heliacal setting event."""
+        """Test heliacal_ut for heliacal setting event."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_SETTING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_SETTING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_evening_first(self):
-        """Test swe_heliacal_ut for evening first event."""
+        """Test heliacal_ut for evening first event."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_EVENING_FIRST
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", EVENING_FIRST
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_morning_last(self):
-        """Test swe_heliacal_ut for morning last event."""
+        """Test heliacal_ut for morning last event."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", SE_MORNING_LAST
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", MORNING_LAST
         )
 
         assert isinstance(result, tuple)
@@ -486,7 +484,7 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="Sun"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Sun", SE_HELIACAL_RISING)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Sun", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_moon_raises_error(self):
         """Test that Moon raises ValueError."""
@@ -496,7 +494,7 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="Moon"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Moon", SE_HELIACAL_RISING)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Moon", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_invalid_event_type(self):
         """Test that invalid event type raises ValueError."""
@@ -506,7 +504,7 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="Invalid event_type"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Venus", 99)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Venus", 99)
 
     def test_swe_heliacal_ut_invalid_object_name(self):
         """Test that unknown object name raises ValueError."""
@@ -516,8 +514,8 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="not recognized"):
-            swe_heliacal_ut(
-                jd_start, geopos, datm, dobs, "InvalidPlanet", SE_HELIACAL_RISING
+            heliacal_ut(
+                jd_start, geopos, datm, dobs, "InvalidPlanet", HELIACAL_RISING
             )
 
     def test_swe_heliacal_ut_case_insensitive(self):
@@ -528,16 +526,16 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should work with lowercase
-        result1 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "venus", SE_HELIACAL_RISING
+        result1 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "venus", HELIACAL_RISING
         )
         # Should work with uppercase
-        result2 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "VENUS", SE_HELIACAL_RISING
+        result2 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "VENUS", HELIACAL_RISING
         )
         # Should work with mixed case
-        result3 = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result3 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         # All should return same result
@@ -551,50 +549,50 @@ class TestSweHeliacalUt:
         datm = (0, 0, 0, 0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_with_altitude(self):
-        """Test swe_heliacal_ut with observer at altitude."""
+        """Test heliacal_ut with observer at altitude."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 2000.0)  # 2000m altitude
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_southern_hemisphere(self):
-        """Test swe_heliacal_ut in southern hemisphere."""
+        """Test heliacal_ut in southern hemisphere."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (151.2093, -33.8688, 0.0)  # Sydney
         datm = (1013.25, 25.0, 60.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_swe_heliacal_ut_with_planet_id_string(self):
-        """Test swe_heliacal_ut with planet ID as string."""
+        """Test heliacal_ut with planet ID as string."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Venus is planet ID 3
-        result = swe_heliacal_ut(jd_start, geopos, datm, dobs, "3", SE_HELIACAL_RISING)
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "3", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -614,7 +612,7 @@ class TestHeliacalDateValidation:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -645,7 +643,7 @@ class TestHeliacalPhenoBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Should return a tuple of 50 floats
@@ -664,7 +662,7 @@ class TestHeliacalPhenoBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
@@ -681,7 +679,7 @@ class TestHeliacalPhenoBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert isinstance(dret, tuple)
@@ -698,7 +696,7 @@ class TestHeliacalPhenoBasic:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mars",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         assert isinstance(dret, tuple)
@@ -719,7 +717,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Altitudes should be in -90 to +90 range
@@ -744,7 +742,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         azi_o = dret[3]  # Object azimuth
@@ -764,7 +762,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         tav_act = dret[6]  # Topocentric arcus visionis
@@ -786,7 +784,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         k_act = dret[10]  # Extinction coefficient
@@ -805,7 +803,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         magnitude = dret[20]
@@ -825,7 +823,7 @@ class TestHeliacalPhenoValues:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         parallax = dret[19]
@@ -838,7 +836,7 @@ class TestHeliacalPhenoEventTypes:
     """Test different event types for heliacal_pheno_ut."""
 
     def test_morning_first_event(self):
-        """Test SE_HELIACAL_RISING (morning first) event type."""
+        """Test HELIACAL_RISING (morning first) event type."""
         jd = julday(2024, 3, 1, 5)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -848,13 +846,13 @@ class TestHeliacalPhenoEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert len(dret) == 50
 
     def test_evening_last_event(self):
-        """Test SE_HELIACAL_SETTING (evening last) event type."""
+        """Test HELIACAL_SETTING (evening last) event type."""
         jd = julday(2024, 3, 1, 19)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -864,13 +862,13 @@ class TestHeliacalPhenoEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         assert len(dret) == 50
 
     def test_evening_first_event(self):
-        """Test SE_EVENING_FIRST event type."""
+        """Test EVENING_FIRST event type."""
         jd = julday(2024, 3, 1, 19)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -880,13 +878,13 @@ class TestHeliacalPhenoEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_EVENING_FIRST,
+            EVENING_FIRST,
         )
 
         assert len(dret) == 50
 
     def test_morning_last_event(self):
-        """Test SE_MORNING_LAST event type."""
+        """Test MORNING_LAST event type."""
         jd = julday(2024, 3, 1, 5)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -896,7 +894,7 @@ class TestHeliacalPhenoEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_MORNING_LAST,
+            MORNING_LAST,
         )
 
         assert len(dret) == 50
@@ -917,7 +915,7 @@ class TestHeliacalPhenoValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "InvalidBody",
-                SE_HELIACAL_RISING,
+                HELIACAL_RISING,
             )
 
     def test_invalid_event_type_raises_error(self):
@@ -950,7 +948,7 @@ class TestHeliacalPhenoLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -966,7 +964,7 @@ class TestHeliacalPhenoLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Saturn",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -982,7 +980,7 @@ class TestHeliacalPhenoLocations:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mars",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -1003,7 +1001,7 @@ class TestHeliacalPhenoAtmospheric:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         assert len(dret) == 50
@@ -1016,7 +1014,7 @@ class TestHeliacalPhenoAtmospheric:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
         k_low = dret_low[10]
 
@@ -1033,7 +1031,7 @@ class TestHeliacalPhenoAtmospheric:
             (1013.25, 15.0, 20.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
         dret_high = heliacal_pheno_ut(
             jd,
@@ -1041,7 +1039,7 @@ class TestHeliacalPhenoAtmospheric:
             (1013.25, 15.0, 90.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Higher humidity should increase extinction
@@ -1061,7 +1059,7 @@ class TestHeliacalPhenoAtmospheric:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
         dret_low = heliacal_pheno_ut(
             jd,
@@ -1069,7 +1067,7 @@ class TestHeliacalPhenoAtmospheric:
             (800.0, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         # Lower pressure should decrease extinction
@@ -1080,19 +1078,19 @@ class TestHeliacalPhenoAtmospheric:
 
 
 class TestHeliacalPhenoAlias:
-    """Test swe_heliacal_pheno_ut alias."""
+    """Test heliacal_pheno_ut alias."""
 
     def test_swe_alias_works(self):
-        """Test that heliacal_pheno_ut and swe_heliacal_pheno_ut return same data."""
+        """Test that heliacal_pheno_ut and heliacal_pheno_ut return same data."""
         jd = julday(2024, 1, 15, 6)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 50.0, 0.0)
         dobs = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-        result1 = heliacal_pheno_ut(jd, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING)
+        result1 = heliacal_pheno_ut(jd, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
-        result2 = swe_heliacal_pheno_ut(
-            jd, geopos, datm, dobs, "Venus", SE_HELIACAL_RISING
+        result2 = heliacal_pheno_ut(
+            jd, geopos, datm, dobs, "Venus", HELIACAL_RISING
         )
 
         # Both should return 50-element tuples with matching key fields
@@ -1118,7 +1116,7 @@ class TestHeliacalPhenoMoon:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Moon",
-            SE_EVENING_FIRST,
+            EVENING_FIRST,
         )
 
         w_moon = dret[16]  # Crescent width
@@ -1145,40 +1143,40 @@ class TestHeliacalInnerOuterPlanets:
         """Test that Mercury is identified as an inner planet."""
         from libephemeris import is_inner_planet, INNER_PLANETS
 
-        assert is_inner_planet(SE_MERCURY)
-        assert SE_MERCURY in INNER_PLANETS
+        assert is_inner_planet(MERCURY)
+        assert MERCURY in INNER_PLANETS
 
     def test_is_inner_planet_venus(self):
         """Test that Venus is identified as an inner planet."""
         from libephemeris import is_inner_planet, INNER_PLANETS
 
-        assert is_inner_planet(SE_VENUS)
-        assert SE_VENUS in INNER_PLANETS
+        assert is_inner_planet(VENUS)
+        assert VENUS in INNER_PLANETS
 
     def test_is_inner_planet_mars(self):
         """Test that Mars is NOT an inner planet."""
         from libephemeris import is_inner_planet
 
-        assert not is_inner_planet(SE_MARS)
+        assert not is_inner_planet(MARS)
 
     def test_is_inner_planet_jupiter(self):
         """Test that Jupiter is NOT an inner planet."""
         from libephemeris import is_inner_planet
 
-        assert not is_inner_planet(SE_JUPITER)
+        assert not is_inner_planet(JUPITER)
 
     def test_is_inner_planet_saturn(self):
         """Test that Saturn is NOT an inner planet."""
         from libephemeris import is_inner_planet
 
-        assert not is_inner_planet(SE_SATURN)
+        assert not is_inner_planet(SATURN)
 
 
 class TestHeliacalOuterPlanetValidation:
     """Test that outer planets reject invalid event types."""
 
     def test_mars_evening_first_raises_error(self):
-        """Test that Mars with SE_EVENING_FIRST raises ValueError."""
+        """Test that Mars with EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1189,11 +1187,11 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Mars",
-                SE_EVENING_FIRST,
+                EVENING_FIRST,
             )
 
     def test_mars_morning_last_raises_error(self):
-        """Test that Mars with SE_MORNING_LAST raises ValueError."""
+        """Test that Mars with MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1204,11 +1202,11 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Mars",
-                SE_MORNING_LAST,
+                MORNING_LAST,
             )
 
     def test_jupiter_evening_first_raises_error(self):
-        """Test that Jupiter with SE_EVENING_FIRST raises ValueError."""
+        """Test that Jupiter with EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1219,11 +1217,11 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Jupiter",
-                SE_EVENING_FIRST,
+                EVENING_FIRST,
             )
 
     def test_jupiter_morning_last_raises_error(self):
-        """Test that Jupiter with SE_MORNING_LAST raises ValueError."""
+        """Test that Jupiter with MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1234,11 +1232,11 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Jupiter",
-                SE_MORNING_LAST,
+                MORNING_LAST,
             )
 
     def test_saturn_evening_first_raises_error(self):
-        """Test that Saturn with SE_EVENING_FIRST raises ValueError."""
+        """Test that Saturn with EVENING_FIRST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1249,11 +1247,11 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Saturn",
-                SE_EVENING_FIRST,
+                EVENING_FIRST,
             )
 
     def test_saturn_morning_last_raises_error(self):
-        """Test that Saturn with SE_MORNING_LAST raises ValueError."""
+        """Test that Saturn with MORNING_LAST raises ValueError."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1264,7 +1262,7 @@ class TestHeliacalOuterPlanetValidation:
                 (1013.25, 15.0, 50.0, 0.0),
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
                 "Saturn",
-                SE_MORNING_LAST,
+                MORNING_LAST,
             )
 
 
@@ -1282,7 +1280,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -1299,7 +1297,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         if result[0] > 0:
@@ -1316,7 +1314,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_EVENING_FIRST,
+            EVENING_FIRST,
         )
 
         # Should not raise an error - inner planets can use this event type
@@ -1334,7 +1332,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mercury",
-            SE_MORNING_LAST,
+            MORNING_LAST,
         )
 
         # Should not raise an error - inner planets can use this event type
@@ -1352,7 +1350,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_EVENING_FIRST,
+            EVENING_FIRST,
         )
 
         # Should not raise an error - inner planets can use this event type
@@ -1370,7 +1368,7 @@ class TestHeliacalInnerPlanetEventTypes:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Venus",
-            SE_MORNING_LAST,
+            MORNING_LAST,
         )
 
         # Should not raise an error - inner planets can use this event type
@@ -1392,7 +1390,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mars",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -1409,7 +1407,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Mars",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         if result[0] > 0:
@@ -1426,7 +1424,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -1443,7 +1441,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Jupiter",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         if result[0] > 0:
@@ -1460,7 +1458,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Saturn",
-            SE_HELIACAL_RISING,
+            HELIACAL_RISING,
         )
 
         if result[0] > 0:
@@ -1477,7 +1475,7 @@ class TestHeliacalOuterPlanetRisingSetting:
             (1013.25, 15.0, 50.0, 0.0),
             (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             "Saturn",
-            SE_HELIACAL_SETTING,
+            HELIACAL_SETTING,
         )
 
         if result[0] > 0:
@@ -1485,62 +1483,62 @@ class TestHeliacalOuterPlanetRisingSetting:
 
 
 class TestSweHeliacalUtOuterPlanetValidation:
-    """Test that swe_heliacal_ut also validates inner/outer planet constraints."""
+    """Test that heliacal_ut also validates inner/outer planet constraints."""
 
     def test_mars_evening_first_via_swe_api_raises_error(self):
-        """Test that Mars with SE_EVENING_FIRST raises ValueError via swe API."""
+        """Test that Mars with EVENING_FIRST raises ValueError via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="inner planets"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Mars", SE_EVENING_FIRST)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Mars", EVENING_FIRST)
 
     def test_jupiter_morning_last_via_swe_api_raises_error(self):
-        """Test that Jupiter with SE_MORNING_LAST raises ValueError via swe API."""
+        """Test that Jupiter with MORNING_LAST raises ValueError via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="inner planets"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Jupiter", SE_MORNING_LAST)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Jupiter", MORNING_LAST)
 
     def test_saturn_evening_first_via_swe_api_raises_error(self):
-        """Test that Saturn with SE_EVENING_FIRST raises ValueError via swe API."""
+        """Test that Saturn with EVENING_FIRST raises ValueError via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(ValueError, match="inner planets"):
-            swe_heliacal_ut(jd_start, geopos, datm, dobs, "Saturn", SE_EVENING_FIRST)
+            heliacal_ut(jd_start, geopos, datm, dobs, "Saturn", EVENING_FIRST)
 
     def test_mercury_evening_first_via_swe_api_works(self):
-        """Test that Mercury with SE_EVENING_FIRST works via swe API."""
+        """Test that Mercury with EVENING_FIRST works via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should not raise an error
-        result = swe_heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", SE_EVENING_FIRST
+        result = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Mercury", EVENING_FIRST
         )
 
         assert isinstance(result, tuple)
         assert len(result) == 3
 
     def test_venus_morning_last_via_swe_api_works(self):
-        """Test that Venus with SE_MORNING_LAST works via swe API."""
+        """Test that Venus with MORNING_LAST works via swe API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should not raise an error
-        result = swe_heliacal_ut(jd_start, geopos, datm, dobs, "Venus", SE_MORNING_LAST)
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", MORNING_LAST)
 
         assert isinstance(result, tuple)
         assert len(result) == 3

@@ -1,5 +1,5 @@
 """
-Tests for swe_nod_aps_ut edge cases.
+Tests for nod_aps_ut edge cases.
 
 Verifies OSCU_BAR method, FOPOINT combinations, bodies returning zeros,
 multiple method bitflags, and boundary dates.
@@ -13,34 +13,34 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_EARTH,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_PLUTO,
-    SE_CHIRON,
-    SE_MEAN_NODE,
-    SE_TRUE_NODE,
-    SE_NODBIT_MEAN,
-    SE_NODBIT_OSCU,
-    SE_NODBIT_OSCU_BAR,
-    SE_NODBIT_FOPOINT,
-    SEFLG_SWIEPH,
-    SEFLG_SPEED,
-    SEFLG_HELCTR,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    EARTH,
+    MARS,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    PLUTO,
+    CHIRON,
+    MEAN_NODE,
+    TRUE_NODE,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_OSCU_BAR,
+    NODBIT_FOPOINT,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_HELCTR,
 )
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
     yield
-    swe.swe_close()
+    swe.close()
 
 
 JD_J2000 = 2451545.0
@@ -52,11 +52,11 @@ class TestNodApsOscuBar:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "planet", [SE_MARS, SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]
+        "planet", [MARS, JUPITER, SATURN, URANUS, NEPTUNE]
     )
     def test_oscu_bar_returns_valid(self, planet):
         """OSCU_BAR returns valid 4-tuple of 6-tuples."""
-        result = swe.nod_aps_ut(JD_J2000, planet, SE_NODBIT_OSCU_BAR)
+        result = swe.nod_aps_ut(JD_J2000, planet, NODBIT_OSCU_BAR)
         assert len(result) == 4
         for i, tup in enumerate(result):
             assert len(tup) == 6
@@ -66,8 +66,8 @@ class TestNodApsOscuBar:
     @pytest.mark.unit
     def test_oscu_bar_differs_from_oscu(self):
         """Barycentric osculating should differ from geocentric osculating."""
-        oscu = swe.nod_aps_ut(JD_J2000, SE_JUPITER, SE_NODBIT_OSCU)
-        oscu_bar = swe.nod_aps_ut(JD_J2000, SE_JUPITER, SE_NODBIT_OSCU_BAR)
+        oscu = swe.nod_aps_ut(JD_J2000, JUPITER, NODBIT_OSCU)
+        oscu_bar = swe.nod_aps_ut(JD_J2000, JUPITER, NODBIT_OSCU_BAR)
         # At least distance should differ (barycentric vs heliocentric)
         node_diff = abs(oscu[0][0] - oscu_bar[0][0])
         dist_diff = abs(oscu[0][2] - oscu_bar[0][2])
@@ -80,19 +80,19 @@ class TestNodApsFopoint:
     """Test FOPOINT (focal point) method combinations."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("planet", [SE_MARS, SE_JUPITER, SE_SATURN])
+    @pytest.mark.parametrize("planet", [MARS, JUPITER, SATURN])
     def test_fopoint_with_mean(self, planet):
         """FOPOINT + MEAN returns valid results."""
-        result = swe.nod_aps_ut(JD_J2000, planet, SE_NODBIT_MEAN | SE_NODBIT_FOPOINT)
+        result = swe.nod_aps_ut(JD_J2000, planet, NODBIT_MEAN | NODBIT_FOPOINT)
         assert len(result) == 4
         # Aphelion (index 3) should have focal point data
         assert 0.0 <= result[3][0] < 360.0 or result[3][0] == 0.0
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("planet", [SE_MARS, SE_JUPITER, SE_SATURN])
+    @pytest.mark.parametrize("planet", [MARS, JUPITER, SATURN])
     def test_fopoint_with_oscu(self, planet):
         """FOPOINT + OSCU returns valid results."""
-        result = swe.nod_aps_ut(JD_J2000, planet, SE_NODBIT_OSCU | SE_NODBIT_FOPOINT)
+        result = swe.nod_aps_ut(JD_J2000, planet, NODBIT_OSCU | NODBIT_FOPOINT)
         assert len(result) == 4
         for tup in result:
             assert len(tup) == 6
@@ -100,9 +100,9 @@ class TestNodApsFopoint:
     @pytest.mark.unit
     def test_fopoint_perihelion_unchanged(self):
         """FOPOINT should not change perihelion — only aphelion."""
-        normal = swe.nod_aps_ut(JD_J2000, SE_JUPITER, SE_NODBIT_OSCU)
+        normal = swe.nod_aps_ut(JD_J2000, JUPITER, NODBIT_OSCU)
         fopoint = swe.nod_aps_ut(
-            JD_J2000, SE_JUPITER, SE_NODBIT_OSCU | SE_NODBIT_FOPOINT
+            JD_J2000, JUPITER, NODBIT_OSCU | NODBIT_FOPOINT
         )
         # Perihelion (index 2) should be the same
         assert normal[2][0] == pytest.approx(fopoint[2][0], abs=0.01)
@@ -117,7 +117,7 @@ class TestNodApsZeroBodies:
     @pytest.mark.unit
     def test_sun_nod_aps(self):
         """Sun nod_aps returns some result (may be zeros)."""
-        result = swe.nod_aps_ut(JD_J2000, SE_SUN, SE_NODBIT_MEAN)
+        result = swe.nod_aps_ut(JD_J2000, SUN, NODBIT_MEAN)
         assert len(result) == 4
         for tup in result:
             assert len(tup) == 6
@@ -125,13 +125,13 @@ class TestNodApsZeroBodies:
     @pytest.mark.unit
     def test_earth_nod_aps(self):
         """Earth nod_aps returns some result."""
-        result = swe.nod_aps_ut(JD_J2000, SE_EARTH, SE_NODBIT_MEAN)
+        result = swe.nod_aps_ut(JD_J2000, EARTH, NODBIT_MEAN)
         assert len(result) == 4
 
     @pytest.mark.unit
     def test_mean_node_body_nod_aps(self):
         """Mean Node body in nod_aps returns some result."""
-        result = swe.nod_aps_ut(JD_J2000, SE_MEAN_NODE, SE_NODBIT_MEAN)
+        result = swe.nod_aps_ut(JD_J2000, MEAN_NODE, NODBIT_MEAN)
         assert len(result) == 4
 
 
@@ -149,15 +149,15 @@ class TestNodApsBoundaryDates:
     @pytest.mark.parametrize("jd", BOUNDARY_DATES)
     def test_mars_across_dates(self, jd):
         """Mars nod_aps works at various dates."""
-        result = swe.nod_aps_ut(jd, SE_MARS, SE_NODBIT_OSCU)
+        result = swe.nod_aps_ut(jd, MARS, NODBIT_OSCU)
         assert len(result) == 4
         assert 0.0 <= result[0][0] < 360.0  # ascending node lon
 
     @pytest.mark.unit
     def test_node_precession_over_time(self):
         """Jupiter's ascending node should precess over 100 years."""
-        r1 = swe.nod_aps_ut(2415020.0, SE_JUPITER, SE_NODBIT_MEAN)
-        r2 = swe.nod_aps_ut(2451545.0, SE_JUPITER, SE_NODBIT_MEAN)
+        r1 = swe.nod_aps_ut(2415020.0, JUPITER, NODBIT_MEAN)
+        r2 = swe.nod_aps_ut(2451545.0, JUPITER, NODBIT_MEAN)
         # Node should have moved at least slightly
         diff = abs(r1[0][0] - r2[0][0])
         if diff > 180:
@@ -170,19 +170,19 @@ class TestNodApsAllMethods:
     """Test all method constants produce valid output."""
 
     METHODS = [
-        SE_NODBIT_MEAN,
-        SE_NODBIT_OSCU,
-        SE_NODBIT_OSCU_BAR,
-        SE_NODBIT_MEAN | SE_NODBIT_FOPOINT,
-        SE_NODBIT_OSCU | SE_NODBIT_FOPOINT,
-        SE_NODBIT_OSCU_BAR | SE_NODBIT_FOPOINT,
+        NODBIT_MEAN,
+        NODBIT_OSCU,
+        NODBIT_OSCU_BAR,
+        NODBIT_MEAN | NODBIT_FOPOINT,
+        NODBIT_OSCU | NODBIT_FOPOINT,
+        NODBIT_OSCU_BAR | NODBIT_FOPOINT,
     ]
 
     @pytest.mark.unit
     @pytest.mark.parametrize("method", METHODS)
     def test_saturn_all_methods(self, method):
         """Saturn nod_aps works with all method combinations."""
-        result = swe.nod_aps_ut(JD_J2000, SE_SATURN, method)
+        result = swe.nod_aps_ut(JD_J2000, SATURN, method)
         assert len(result) == 4
         for i, tup in enumerate(result):
             assert len(tup) == 6

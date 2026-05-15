@@ -8,16 +8,14 @@ users can configure which ephemeris file to use.
 import os
 import pytest
 from libephemeris import (
-    swe_calc_ut,
-    SE_SUN,
-    SEFLG_SPEED,
-    swe_julday,
+    calc_ut,
+    SUN,
+    FLG_SPEED,
+    julday,
     set_ephemeris_file,
     set_ephe_path,
     set_jpl_file,
-    swe_set_jpl_file,
     get_library_path,
-    swe_get_library_path,
 )
 from libephemeris.state import get_planets
 
@@ -73,10 +71,10 @@ def test_calculation_works_with_default_de440():
 
     # Date within DE440 range (1550-2650)
     year, month, day = 2025, 11, 29
-    tjd_ut = swe_julday(year, month, day, 0.0)
+    tjd_ut = julday(year, month, day, 0.0)
 
     # Should work without error
-    pos, retflag = swe_calc_ut(tjd_ut, SE_SUN, SEFLG_SPEED)
+    pos, retflag = calc_ut(tjd_ut, SUN, FLG_SPEED)
 
     # Verify we got a valid result
     assert len(pos) == 6
@@ -92,11 +90,11 @@ def test_calculation_fails_with_de440_out_of_range():
 
     # Date outside DE440 range
     year, month, day = 3000, 1, 1
-    tjd_ut = swe_julday(year, month, day, 0.0)
+    tjd_ut = julday(year, month, day, 0.0)
 
     # Should raise an error about date range
     with pytest.raises(Exception) as exc_info:
-        pos, retflag = swe_calc_ut(tjd_ut, SE_SUN, SEFLG_SPEED)
+        pos, retflag = calc_ut(tjd_ut, SUN, FLG_SPEED)
 
     # Verify error message mentions date range (may use different wording)
     error_msg = str(exc_info.value).lower()
@@ -122,10 +120,10 @@ def test_set_jpl_file_changes_file():
 
 
 def test_swe_set_jpl_file_alias_works():
-    """Test that swe_set_jpl_file() alias works the same as set_jpl_file()"""
+    """Test that set_jpl_file() alias works the same as set_jpl_file()"""
 
     # Set a different file using the swe_ prefixed version
-    swe_set_jpl_file("de430.bsp")
+    set_jpl_file("de430.bsp")
 
     # Verify the global variable was updated
     from libephemeris import state
@@ -136,7 +134,7 @@ def test_swe_set_jpl_file_alias_works():
     assert state._PLANETS is None
 
     # Reset to default
-    swe_set_jpl_file("de440.bsp")
+    set_jpl_file("de440.bsp")
 
 
 def test_set_jpl_file_with_local_path():
@@ -210,12 +208,12 @@ def test_get_library_path_returns_absolute_path():
 
 
 def test_swe_get_library_path_alias():
-    """Test that swe_get_library_path() is an alias for get_library_path()"""
+    """Test that get_library_path() is an alias for get_library_path()"""
     # Reset to default
     set_ephe_path(None)
 
     path1 = get_library_path()
-    path2 = swe_get_library_path()
+    path2 = get_library_path()
 
     # Both should return the same path
     assert path1 == path2

@@ -13,14 +13,14 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_MARS,
-    SE_JUPITER,
-    SE_SATURN,
-    SEFLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SPEED,
 )
 
 
@@ -31,7 +31,7 @@ class TestSolcross:
     def test_solcross_returns_jd(self):
         """solcross_ut returns a Julian Day number."""
         jd_start = 2451545.0
-        result = swe.swe_solcross_ut(0.0, jd_start, 0)
+        result = swe.solcross_ut(0.0, jd_start, 0)
         assert isinstance(result, float)
         assert result > jd_start, "Crossing should be after start"
 
@@ -40,13 +40,13 @@ class TestSolcross:
     def test_solcross_at_various_degrees(self, degree: int):
         """Sun crossing found at various longitudes."""
         jd_start = 2451545.0
-        jd_cross = swe.swe_solcross_ut(float(degree), jd_start, 0)
+        jd_cross = swe.solcross_ut(float(degree), jd_start, 0)
         assert jd_cross > jd_start
         # Sun should be within 1 year
         assert jd_cross - jd_start < 366
 
         # Verify Sun is actually near the target degree
-        result, _ = swe.swe_calc_ut(jd_cross, SE_SUN, 0)
+        result, _ = swe.calc_ut(jd_cross, SUN, 0)
         diff = abs(result[0] - degree)
         if diff > 180:
             diff = 360 - diff
@@ -58,10 +58,10 @@ class TestSolcross:
     def test_solcross_vernal_equinox(self):
         """Find vernal equinox (Sun at 0° Aries)."""
         # Search from 2024-01-01
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(0.0, jd_start, 0)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross = swe.solcross_ut(0.0, jd_start, 0)
         # Should be around March 20, 2024
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 3
         assert 19 <= d <= 21, f"Vernal equinox on March {d}"
@@ -69,9 +69,9 @@ class TestSolcross:
     @pytest.mark.unit
     def test_solcross_summer_solstice(self):
         """Find summer solstice (Sun at 90°)."""
-        jd_start = swe.swe_julday(2024, 1, 1, 0.0)
-        jd_cross = swe.swe_solcross_ut(90.0, jd_start, 0)
-        y, m, d, h = swe.swe_revjul(jd_cross)
+        jd_start = swe.julday(2024, 1, 1, 0.0)
+        jd_cross = swe.solcross_ut(90.0, jd_start, 0)
+        y, m, d, h = swe.revjul(jd_cross)
         assert y == 2024
         assert m == 6
         assert 20 <= d <= 22, f"Summer solstice on June {d}"
@@ -84,7 +84,7 @@ class TestMooncross:
     def test_mooncross_returns_jd(self):
         """mooncross_ut returns a Julian Day number."""
         jd_start = 2451545.0
-        result = swe.swe_mooncross_ut(0.0, jd_start, 0)
+        result = swe.mooncross_ut(0.0, jd_start, 0)
         assert isinstance(result, float)
         assert result > jd_start
 
@@ -93,13 +93,13 @@ class TestMooncross:
     def test_mooncross_at_cardinal_degrees(self, degree: int):
         """Moon crossing found at cardinal longitudes."""
         jd_start = 2451545.0
-        jd_cross = swe.swe_mooncross_ut(float(degree), jd_start, 0)
+        jd_cross = swe.mooncross_ut(float(degree), jd_start, 0)
         assert jd_cross > jd_start
         # Moon should cross within ~28 days
         assert jd_cross - jd_start < 30
 
         # Verify Moon is near target
-        result, _ = swe.swe_calc_ut(jd_cross, SE_MOON, 0)
+        result, _ = swe.calc_ut(jd_cross, MOON, 0)
         diff = abs(result[0] - degree)
         if diff > 180:
             diff = 360 - diff
@@ -111,7 +111,7 @@ class TestMooncross:
         jd = 2451545.0
         crossings = []
         for _ in range(3):
-            jd_cross = swe.swe_mooncross_ut(0.0, jd, 0)
+            jd_cross = swe.mooncross_ut(0.0, jd, 0)
             crossings.append(jd_cross)
             jd = jd_cross + 1.0
 
@@ -128,14 +128,14 @@ class TestMooncrossNode:
     def test_mooncross_node_returns_tuple(self):
         """mooncross_node_ut returns (jd, longitude, latitude)."""
         jd_start = 2451545.0
-        result = swe.swe_mooncross_node_ut(jd_start, 0)
+        result = swe.mooncross_node_ut(jd_start, 0)
         assert len(result) >= 2, f"Expected >= 2 elements, got {len(result)}"
 
     @pytest.mark.unit
     def test_mooncross_node_after_start(self):
         """Node crossing should be after search start."""
         jd_start = 2451545.0
-        result = swe.swe_mooncross_node_ut(jd_start, 0)
+        result = swe.mooncross_node_ut(jd_start, 0)
         jd_cross = result[0]
         assert jd_cross > jd_start
 
@@ -143,7 +143,7 @@ class TestMooncrossNode:
     def test_mooncross_node_within_month(self):
         """Node crossing should be within ~15 days (half nodal period)."""
         jd_start = 2451545.0
-        result = swe.swe_mooncross_node_ut(jd_start, 0)
+        result = swe.mooncross_node_ut(jd_start, 0)
         jd_cross = result[0]
         assert jd_cross - jd_start < 16, (
             f"Node crossing {jd_cross - jd_start:.1f} days after start"
@@ -155,7 +155,7 @@ class TestMooncrossNode:
         jd = 2451545.0
         crossings = []
         for _ in range(4):
-            result = swe.swe_mooncross_node_ut(jd, 0)
+            result = swe.mooncross_node_ut(jd, 0)
             crossings.append(result[0])
             jd = result[0] + 1.0
 
@@ -172,17 +172,17 @@ class TestFindStation:
     @pytest.mark.parametrize(
         "body_id,name",
         [
-            (SE_MERCURY, "Mercury"),
-            (SE_VENUS, "Venus"),
-            (SE_MARS, "Mars"),
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
+            (MERCURY, "Mercury"),
+            (VENUS, "Venus"),
+            (MARS, "Mars"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
         ],
     )
     def test_find_station_returns_valid(self, body_id: int, name: str):
         """find_station_ut returns (jd, type_str) for each planet."""
         jd_start = 2451545.0
-        result = swe.swe_find_station_ut(body_id, jd_start, "any", 0)
+        result = swe.find_station_ut(body_id, jd_start, "any", 0)
         assert len(result) >= 2, f"{name}: expected >= 2 elements"
         jd_station = result[0]
         assert jd_station > jd_start, (
@@ -193,9 +193,9 @@ class TestFindStation:
     @pytest.mark.parametrize(
         "body_id,name,max_days",
         [
-            (SE_MERCURY, "Mercury", 120),  # Mercury stations ~3-4 times/year
-            (SE_JUPITER, "Jupiter", 400),  # Jupiter stations ~once/year
-            (SE_SATURN, "Saturn", 400),  # Saturn stations ~once/year
+            (MERCURY, "Mercury", 120),  # Mercury stations ~3-4 times/year
+            (JUPITER, "Jupiter", 400),  # Jupiter stations ~once/year
+            (SATURN, "Saturn", 400),  # Saturn stations ~once/year
         ],
     )
     def test_station_within_reasonable_time(
@@ -203,7 +203,7 @@ class TestFindStation:
     ):
         """Station should be found within reasonable time."""
         jd_start = 2451545.0
-        result = swe.swe_find_station_ut(body_id, jd_start, "any", 0)
+        result = swe.find_station_ut(body_id, jd_start, "any", 0)
         jd_station = result[0]
         gap = jd_station - jd_start
         assert gap < max_days, f"{name}: station {gap:.1f} days after start"
@@ -212,11 +212,11 @@ class TestFindStation:
     def test_mercury_station_speed_near_zero(self):
         """At a station, Mercury's speed should be near zero."""
         jd_start = 2451545.0
-        result = swe.swe_find_station_ut(SE_MERCURY, jd_start, "any", 0)
+        result = swe.find_station_ut(MERCURY, jd_start, "any", 0)
         jd_station = result[0]
 
         # Check speed at station
-        pos, _ = swe.swe_calc_ut(jd_station, SE_MERCURY, SEFLG_SPEED)
+        pos, _ = swe.calc_ut(jd_station, MERCURY, FLG_SPEED)
         speed = pos[3]
         assert abs(speed) < 0.05, (
             f"Mercury speed at station: {speed}°/day (expected ~0)"

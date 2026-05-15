@@ -30,8 +30,8 @@ class TestLunarEclipseGlobal:
         """Lunar eclipse global timing matches within tolerance."""
         jd_start = year_to_jd(2024)
 
-        ref_result = compare.skyfield(ephem.swe_lun_eclipse_when, jd_start, 2, 0)
-        leb_result = compare.leb(ephem.swe_lun_eclipse_when, jd_start, 2, 0)
+        ref_result = compare.skyfield(ephem.lun_eclipse_when, jd_start, 2, 0)
+        leb_result = compare.leb(ephem.lun_eclipse_when, jd_start, 2, 0)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]
@@ -57,9 +57,9 @@ class TestLunarEclipseLocal:
 
         geopos = (lon, lat, alt)
         ref_result = compare.skyfield(
-            ephem.swe_lun_eclipse_when_loc, jd_start, geopos, 2
+            ephem.lun_eclipse_when_loc, jd_start, geopos, 2
         )
-        leb_result = compare.leb(ephem.swe_lun_eclipse_when_loc, jd_start, geopos, 2)
+        leb_result = compare.leb(ephem.lun_eclipse_when_loc, jd_start, geopos, 2)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]
@@ -83,8 +83,8 @@ class TestLunarEclipseHow:
         jd = year_to_jd(2025) + 90  # March 2025 lunar eclipse
         geopos = (lat, lon, alt)
 
-        ref_result = compare.skyfield(ephem.swe_lun_eclipse_how, jd, geopos)
-        leb_result = compare.leb(ephem.swe_lun_eclipse_how, jd, geopos)
+        ref_result = compare.skyfield(ephem.lun_eclipse_how, jd, geopos)
+        leb_result = compare.leb(ephem.lun_eclipse_how, jd, geopos)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_mag = ref_result[1][0]

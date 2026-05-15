@@ -10,10 +10,10 @@ import pytest
 from libephemeris import (
     get_inex_number,
     INEX_CYCLE_DAYS,
-    swe_julday,
+    julday,
     sol_eclipse_when_glob,
     lun_eclipse_when,
-    SE_ECL_TOTAL,
+    ECL_TOTAL,
 )
 
 pytestmark = pytest.mark.slow
@@ -67,8 +67,8 @@ class TestSolarInexNumber:
     def test_integration_with_sol_eclipse_when_glob(self):
         """Test that get_inex_number works with sol_eclipse_when_glob output."""
         # Find the April 2024 eclipse
-        jd_start = swe_julday(2024, 3, 1, 0.0)
-        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2024, 3, 1, 0.0)
+        ecl_type, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         inex = get_inex_number(jd_max, eclipse_type="solar")
@@ -128,8 +128,8 @@ class TestLunarInexNumber:
     def test_integration_with_lun_eclipse_when(self):
         """Test that get_inex_number works with lun_eclipse_when output."""
         # Find a lunar eclipse starting from 2022
-        jd_start = swe_julday(2022, 4, 1, 0.0)
-        ecl_type, times = lun_eclipse_when(jd_start, ecltype=SE_ECL_TOTAL)
+        jd_start = julday(2022, 4, 1, 0.0)
+        ecl_type, times = lun_eclipse_when(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         inex = get_inex_number(jd_max, eclipse_type="lunar")
@@ -170,7 +170,7 @@ class TestInexEdgeCases:
     def test_distant_past_eclipse(self):
         """Should handle eclipses far in the past."""
         # The 1999 August 11 total solar eclipse (Inex 49 - same as 2017)
-        jd_1999 = swe_julday(1999, 8, 11, 11.0)
+        jd_1999 = julday(1999, 8, 11, 11.0)
         inex = get_inex_number(jd_1999, "solar")
         # Both 1999 and 2017 eclipses are in Saros 136, but Inex may differ
         # 1999 Aug 11 is about 18 years before 2017 Aug 21 (one Saros)
@@ -204,7 +204,7 @@ class TestInexMultipleEclipses:
 
     def test_multiple_solar_eclipses_different_series(self):
         """Find multiple consecutive solar eclipses and verify Inex numbers."""
-        jd_start = swe_julday(2024, 1, 1, 0.0)
+        jd_start = julday(2024, 1, 1, 0.0)
 
         eclipses = []
         jd = jd_start
@@ -224,7 +224,7 @@ class TestInexMultipleEclipses:
 
     def test_multiple_lunar_eclipses_different_series(self):
         """Find multiple consecutive lunar eclipses and verify Inex numbers."""
-        jd_start = swe_julday(2022, 1, 1, 0.0)
+        jd_start = julday(2022, 1, 1, 0.0)
 
         eclipses = []
         jd = jd_start

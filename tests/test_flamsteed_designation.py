@@ -4,7 +4,7 @@ Unit tests for Flamsteed designation star search.
 Tests the ability to search for stars by their Flamsteed designations using
 number + constellation genitive form, e.g., "32 Leonis", "87 Virginis".
 
-This feature is required for swe_fixstar2 compatibility with designation search.
+This feature is required for fixstar2 compatibility with designation search.
 """
 
 import pytest
@@ -14,32 +14,32 @@ from libephemeris.fixed_stars import (
     _parse_flamsteed_designation,
     resolve_star_name,
     _resolve_star2,
-    swe_fixstar2_ut,
-    swe_fixstar2,
+    fixstar2_ut,
+    fixstar2,
     CONSTELLATION_ABBREV,
 )
 from libephemeris.constants import (
-    SE_REGULUS,
-    SE_SPICA_STAR,
-    SE_ALGOL,
-    SE_SIRIUS,
-    SE_ALDEBARAN,
-    SE_ANTARES,
-    SE_VEGA,
-    SE_POLARIS,
-    SE_ARCTURUS,
-    SE_DENEB,
-    SE_CASTOR,
-    SE_POLLUX,
-    SE_ALCYONE,
-    SE_ASTEROPE,
-    SE_CELAENO,
-    SE_ELECTRA,
-    SE_MAIA,
-    SE_MEROPE,
-    SE_TAYGETA,
-    SE_ATLAS,
-    SE_PLEIONE,
+    REGULUS,
+    SPICA_STAR,
+    ALGOL,
+    SIRIUS,
+    ALDEBARAN,
+    ANTARES,
+    VEGA,
+    POLARIS,
+    ARCTURUS,
+    DENEB,
+    CASTOR,
+    POLLUX,
+    ALCYONE,
+    ASTEROPE,
+    CELAENO,
+    ELECTRA,
+    MAIA,
+    MEROPE,
+    TAYGETA,
+    ATLAS,
+    PLEIONE,
 )
 
 
@@ -204,87 +204,87 @@ class TestResolveStarNameWithFlamsteed:
     """Tests for resolve_star_name with Flamsteed designations."""
 
     def test_resolve_87_leonis(self):
-        """87 Leonis should resolve to Regulus (SE_REGULUS)."""
+        """87 Leonis should resolve to Regulus (REGULUS)."""
         result = resolve_star_name("87 Leonis")
-        assert result == SE_REGULUS
+        assert result == REGULUS
 
     def test_resolve_87_leo(self):
         """87 Leo should also resolve to Regulus."""
         result = resolve_star_name("87 Leo")
-        assert result == SE_REGULUS
+        assert result == REGULUS
 
     def test_resolve_67_virginis(self):
-        """67 Virginis should resolve to Spica (SE_SPICA_STAR)."""
+        """67 Virginis should resolve to Spica (SPICA_STAR)."""
         result = resolve_star_name("67 Virginis")
-        assert result == SE_SPICA_STAR
+        assert result == SPICA_STAR
 
     def test_resolve_26_persei(self):
-        """26 Persei should resolve to Algol (SE_ALGOL)."""
+        """26 Persei should resolve to Algol (ALGOL)."""
         result = resolve_star_name("26 Persei")
-        assert result == SE_ALGOL
+        assert result == ALGOL
 
     def test_resolve_9_canis_majoris(self):
-        """9 Canis Majoris should resolve to Sirius (SE_SIRIUS)."""
+        """9 Canis Majoris should resolve to Sirius (SIRIUS)."""
         result = resolve_star_name("9 Canis Majoris")
-        assert result == SE_SIRIUS
+        assert result == SIRIUS
 
     def test_resolve_87_tauri(self):
-        """87 Tauri should resolve to Aldebaran (SE_ALDEBARAN)."""
+        """87 Tauri should resolve to Aldebaran (ALDEBARAN)."""
         result = resolve_star_name("87 Tauri")
-        assert result == SE_ALDEBARAN
+        assert result == ALDEBARAN
 
     def test_resolve_21_scorpii(self):
-        """21 Scorpii should resolve to Antares (SE_ANTARES)."""
+        """21 Scorpii should resolve to Antares (ANTARES)."""
         result = resolve_star_name("21 Scorpii")
-        assert result == SE_ANTARES
+        assert result == ANTARES
 
     def test_resolve_3_lyrae(self):
-        """3 Lyrae should resolve to Vega (SE_VEGA)."""
+        """3 Lyrae should resolve to Vega (VEGA)."""
         result = resolve_star_name("3 Lyrae")
-        assert result == SE_VEGA
+        assert result == VEGA
 
     def test_resolve_1_ursae_minoris(self):
-        """1 Ursae Minoris should resolve to Polaris (SE_POLARIS)."""
+        """1 Ursae Minoris should resolve to Polaris (POLARIS)."""
         result = resolve_star_name("1 Ursae Minoris")
-        assert result == SE_POLARIS
+        assert result == POLARIS
 
     def test_resolve_16_bootis(self):
-        """16 Bootis should resolve to Arcturus (SE_ARCTURUS)."""
+        """16 Bootis should resolve to Arcturus (ARCTURUS)."""
         result = resolve_star_name("16 Bootis")
-        assert result == SE_ARCTURUS
+        assert result == ARCTURUS
 
     def test_resolve_50_cygni(self):
-        """50 Cygni should resolve to Deneb (SE_DENEB)."""
+        """50 Cygni should resolve to Deneb (DENEB)."""
         result = resolve_star_name("50 Cygni")
-        assert result == SE_DENEB
+        assert result == DENEB
 
     def test_resolve_66_geminorum(self):
-        """66 Geminorum should resolve to Castor (SE_CASTOR)."""
+        """66 Geminorum should resolve to Castor (CASTOR)."""
         result = resolve_star_name("66 Geminorum")
-        assert result == SE_CASTOR
+        assert result == CASTOR
 
     def test_resolve_78_geminorum(self):
-        """78 Geminorum should resolve to Pollux (SE_POLLUX)."""
+        """78 Geminorum should resolve to Pollux (POLLUX)."""
         result = resolve_star_name("78 Geminorum")
-        assert result == SE_POLLUX
+        assert result == POLLUX
 
     # Pleiades cluster tests
     def test_resolve_25_tauri(self):
-        """25 Tauri should resolve to Alcyone (SE_ALCYONE)."""
+        """25 Tauri should resolve to Alcyone (ALCYONE)."""
         result = resolve_star_name("25 Tauri")
-        assert result == SE_ALCYONE
+        assert result == ALCYONE
 
     def test_resolve_21_tauri(self):
-        """21 Tauri should resolve to Asterope (SE_ASTEROPE)."""
+        """21 Tauri should resolve to Asterope (ASTEROPE)."""
         result = resolve_star_name("21 Tauri")
-        assert result == SE_ASTEROPE
+        assert result == ASTEROPE
 
     def test_resolve_case_insensitive(self):
         """Resolution should be case-insensitive."""
         result1 = resolve_star_name("87 LEONIS")
         result2 = resolve_star_name("87 leonis")
         result3 = resolve_star_name("87 Leonis")
-        assert result1 == result2 == result3 == SE_REGULUS
+        assert result1 == result2 == result3 == REGULUS
 
 
 @pytest.mark.unit
@@ -296,7 +296,7 @@ class TestResolve2StarWithFlamsteed:
         entry, err = _resolve_star2("87 Leonis")
         assert err is None
         assert entry is not None
-        assert entry.id == SE_REGULUS
+        assert entry.id == REGULUS
         assert entry.name == "Regulus"
 
     def test_resolve2_67_virginis(self):
@@ -304,7 +304,7 @@ class TestResolve2StarWithFlamsteed:
         entry, err = _resolve_star2("67 Virginis")
         assert err is None
         assert entry is not None
-        assert entry.id == SE_SPICA_STAR
+        assert entry.id == SPICA_STAR
         assert entry.name == "Spica"
 
     def test_resolve2_26_persei(self):
@@ -312,7 +312,7 @@ class TestResolve2StarWithFlamsteed:
         entry, err = _resolve_star2("26 Persei")
         assert err is None
         assert entry is not None
-        assert entry.id == SE_ALGOL
+        assert entry.id == ALGOL
         assert entry.name == "Algol"
 
     def test_resolve2_star_not_in_catalog(self):
@@ -325,39 +325,39 @@ class TestResolve2StarWithFlamsteed:
 
 @pytest.mark.unit
 class TestSweFixstar2WithFlamsteed:
-    """Tests for swe_fixstar2 and swe_fixstar2_ut with Flamsteed designations."""
+    """Tests for fixstar2 and fixstar2_ut with Flamsteed designations."""
 
     def test_swe_fixstar2_ut_87_leonis(self):
-        """swe_fixstar2_ut should find Regulus via '87 Leonis'."""
+        """fixstar2_ut should find Regulus via '87 Leonis'."""
         jd = 2451545.0  # J2000.0
-        pos, name, flag = swe_fixstar2_ut("87 Leonis", jd, 0)
+        pos, name, flag = fixstar2_ut("87 Leonis", jd, 0)
         assert "Regulus" in name
         assert 110 < pos[0] < 160  # Rough longitude check
 
     def test_swe_fixstar2_ut_67_virginis(self):
-        """swe_fixstar2_ut should find Spica via '67 Virginis'."""
+        """fixstar2_ut should find Spica via '67 Virginis'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2_ut("67 Virginis", jd, 0)
+        pos, name, flag = fixstar2_ut("67 Virginis", jd, 0)
         assert "Spica" in name
         assert 200 < pos[0] < 210  # Rough longitude check
 
     def test_swe_fixstar2_26_persei(self):
-        """swe_fixstar2 (TT) should find Algol via '26 Persei'."""
+        """fixstar2 (TT) should find Algol via '26 Persei'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2("26 Persei", jd, 0)
+        pos, name, flag = fixstar2("26 Persei", jd, 0)
         assert "Algol" in name
 
     def test_swe_fixstar2_21_tauri(self):
-        """swe_fixstar2 should find Asterope via '21 Tauri'."""
+        """fixstar2 should find Asterope via '21 Tauri'."""
         jd = 2451545.0
-        pos, name, flag = swe_fixstar2("21 Tauri", jd, 0)
+        pos, name, flag = fixstar2("21 Tauri", jd, 0)
         assert "Asterope" in name
 
     def test_swe_fixstar2_ut_star_not_found(self):
-        """swe_fixstar2_ut should raise error for star not in catalog."""
+        """fixstar2_ut should raise error for star not in catalog."""
         jd = 2451545.0
         with pytest.raises(Error):
-            swe_fixstar2_ut("99 Leonis", jd, 0)
+            fixstar2_ut("99 Leonis", jd, 0)
 
 
 @pytest.mark.unit

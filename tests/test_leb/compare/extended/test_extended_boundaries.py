@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as ephem
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SE_JUPITER, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, MARS, JUPITER, FLG_SPEED
 
 from tests.test_leb.compare.conftest import (
     ICRS_PLANETS,
@@ -22,10 +22,10 @@ from tests.test_leb.compare.conftest import (
 from .conftest import TOLS_EXT
 
 BOUNDARY_PLANETS = [
-    (SE_SUN, "Sun"),
-    (SE_MOON, "Moon"),
-    (SE_MARS, "Mars"),
-    (SE_JUPITER, "Jupiter"),
+    (SUN, "Sun"),
+    (MOON, "Moon"),
+    (MARS, "Mars"),
+    (JUPITER, "Jupiter"),
 ]
 
 
@@ -47,8 +47,8 @@ class TestBoundaryPosition:
         worst_jd = 0.0
 
         for jd in ext_boundary_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = lon_error_arcsec(ref[0], leb[0])
             if err > max_err:
@@ -78,8 +78,8 @@ class TestBoundarySpeed:
         worst_jd = 0.0
 
         for jd in ext_boundary_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(ref[3] - leb[3])
             if err > max_err:
@@ -110,8 +110,8 @@ class TestBoundaryAllPlanets:
         max_dist_err = 0.0
 
         for jd in ext_boundary_dates:
-            ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-            leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+            ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             lon_err = lon_error_arcsec(ref[0], leb[0])
             dist_err = abs(ref[2] - leb[2])

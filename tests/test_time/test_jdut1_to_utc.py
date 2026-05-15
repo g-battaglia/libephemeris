@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 import libephemeris as ephem
-from libephemeris.constants import SE_GREG_CAL, SE_JUL_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 
 
 class TestJdut1ToUtcBasic:
@@ -181,7 +181,7 @@ class TestJdut1ToUtcDut1:
             utc_seconds = hour * 3600 + minute * 60 + second
 
             # Get the UT1 time by reversing the JD
-            y, m, d, decimal_hour = ephem.swe_revjul(jd_ut1)
+            y, m, d, decimal_hour = ephem.revjul(jd_ut1)
             ut1_seconds = decimal_hour * 3600
 
             # The difference should be very small (essentially the DUT1 value)
@@ -203,7 +203,7 @@ class TestJdut1ToUtcCalendars:
         """Gregorian calendar should be default."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2020, 6, 15, 12, 0, 0.0)
         result_default = ephem.jdut1_to_utc(jd_ut1)
-        result_greg = ephem.jdut1_to_utc(jd_ut1, SE_GREG_CAL)
+        result_greg = ephem.jdut1_to_utc(jd_ut1, GREG_CAL)
         assert result_default == result_greg
 
     @pytest.mark.unit
@@ -211,9 +211,9 @@ class TestJdut1ToUtcCalendars:
         """Julian calendar should give different date for modern dates."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(2000, 1, 1, 12, 0, 0.0)
         year_greg, month_greg, day_greg, _, _, _ = ephem.jdut1_to_utc(
-            jd_ut1, SE_GREG_CAL
+            jd_ut1, GREG_CAL
         )
-        year_jul, month_jul, day_jul, _, _, _ = ephem.jdut1_to_utc(jd_ut1, SE_JUL_CAL)
+        year_jul, month_jul, day_jul, _, _, _ = ephem.jdut1_to_utc(jd_ut1, JUL_CAL)
 
         # In 2000, Julian calendar is 13 days behind Gregorian
         # Gregorian 2000-01-01 = Julian 1999-12-19
@@ -237,9 +237,9 @@ class TestJdut1ToUtcCalendars:
             orig_hour,
             orig_minute,
             orig_second,
-            calendar=SE_JUL_CAL,
+            calendar=JUL_CAL,
         )
-        year, month, day, hour, minute, second = ephem.jdut1_to_utc(jd_ut1, SE_JUL_CAL)
+        year, month, day, hour, minute, second = ephem.jdut1_to_utc(jd_ut1, JUL_CAL)
 
         assert year == orig_year
         assert month == orig_month
@@ -392,8 +392,8 @@ class TestJdut1ToUtcConsistency:
         y1, m1, d1, _, _, _ = ephem.jdut1_to_utc(jd_ut1_1)
 
         # Convert to JD for comparison (ignoring time)
-        jd_date_0 = ephem.swe_julday(y0, m0, d0, 0.0)
-        jd_date_1 = ephem.swe_julday(y1, m1, d1, 0.0)
+        jd_date_0 = ephem.julday(y0, m0, d0, 0.0)
+        jd_date_1 = ephem.julday(y1, m1, d1, 0.0)
 
         # Should differ by 1 day
         assert jd_date_1 - jd_date_0 == pytest.approx(1.0, abs=0.01)

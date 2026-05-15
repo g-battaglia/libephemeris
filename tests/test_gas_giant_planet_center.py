@@ -20,17 +20,17 @@ References:
 import pytest
 import libephemeris as ephem
 from libephemeris import (
-    swe_calc_ut,
-    swe_calc,
-    swe_calc_pctr,
-    SE_JUPITER,
-    SE_SATURN,
-    SE_URANUS,
-    SE_NEPTUNE,
-    SE_SUN,
-    SE_MOON,
-    SE_MARS,
-    SEFLG_SPEED,
+    calc_ut,
+    calc,
+    calc_pctr,
+    JUPITER,
+    SATURN,
+    URANUS,
+    NEPTUNE,
+    SUN,
+    MOON,
+    MARS,
+    FLG_SPEED,
 )
 from libephemeris.planets import (
     get_planet_target,
@@ -80,7 +80,7 @@ class TestGasGiantPlanetCenter:
         jd_ut = 2451545.0
 
         # Get Jupiter position from libephemeris (should use planet center)
-        pos, _ = swe_calc_ut(jd_ut, SE_JUPITER, SEFLG_SPEED)
+        pos, _ = calc_ut(jd_ut, JUPITER, FLG_SPEED)
         jupiter_lon = pos[0]
         jupiter_lat = pos[1]
 
@@ -93,14 +93,14 @@ class TestGasGiantPlanetCenter:
         jd_ut = 2451545.0  # J2000.0
 
         gas_giants = [
-            (SE_JUPITER, "Jupiter"),
-            (SE_SATURN, "Saturn"),
-            (SE_URANUS, "Uranus"),
-            (SE_NEPTUNE, "Neptune"),
+            (JUPITER, "Jupiter"),
+            (SATURN, "Saturn"),
+            (URANUS, "Uranus"),
+            (NEPTUNE, "Neptune"),
         ]
 
         for planet_id, planet_name in gas_giants:
-            pos, flag = swe_calc_ut(jd_ut, planet_id, SEFLG_SPEED)
+            pos, flag = calc_ut(jd_ut, planet_id, FLG_SPEED)
 
             # Verify position is valid
             lon, lat, dist = pos[0], pos[1], pos[2]
@@ -119,11 +119,11 @@ class TestGasGiantPlanetCenter:
             )
 
     def test_swe_calc_uses_planet_center(self):
-        """Test that swe_calc (TT time) also uses planet centers."""
+        """Test that calc (TT time) also uses planet centers."""
         jd_tt = 2451545.0  # J2000.0 in TT
 
-        for planet_id in [SE_JUPITER, SE_SATURN, SE_URANUS, SE_NEPTUNE]:
-            pos, _ = swe_calc(jd_tt, planet_id, SEFLG_SPEED)
+        for planet_id in [JUPITER, SATURN, URANUS, NEPTUNE]:
+            pos, _ = calc(jd_tt, planet_id, FLG_SPEED)
 
             lon, lat, dist = pos[0], pos[1], pos[2]
             assert 0 <= lon < 360
@@ -131,11 +131,11 @@ class TestGasGiantPlanetCenter:
             assert dist > 0
 
     def test_swe_calc_pctr_uses_planet_center(self):
-        """Test that swe_calc_pctr uses planet centers for both target and observer."""
+        """Test that calc_pctr uses planet centers for both target and observer."""
         jd_ut = 2451545.0
 
         # Calculate Moon position as seen from Jupiter
-        pos, _ = swe_calc_pctr(jd_ut, SE_MOON, SE_JUPITER, SEFLG_SPEED)
+        pos, _ = calc_pctr(jd_ut, MOON, JUPITER, FLG_SPEED)
 
         lon, lat, dist = pos[0], pos[1], pos[2]
         assert 0 <= lon < 360, f"Invalid longitude: {lon}"
@@ -147,7 +147,7 @@ class TestGasGiantPlanetCenter:
         jd_ut = 2451545.0
 
         # Mars as seen from Jupiter center
-        pos, _ = swe_calc_pctr(jd_ut, SE_MARS, SE_JUPITER, SEFLG_SPEED)
+        pos, _ = calc_pctr(jd_ut, MARS, JUPITER, FLG_SPEED)
 
         lon, lat, dist = pos[0], pos[1], pos[2]
         assert 0 <= lon < 360
@@ -159,7 +159,7 @@ class TestGasGiantPlanetCenter:
         jd_ut = 2451545.0
 
         # Sun as seen from Saturn center
-        pos, _ = swe_calc_pctr(jd_ut, SE_SUN, SE_SATURN, SEFLG_SPEED)
+        pos, _ = calc_pctr(jd_ut, SUN, SATURN, FLG_SPEED)
 
         lon, lat, dist = pos[0], pos[1], pos[2]
         assert 0 <= lon < 360
@@ -176,7 +176,7 @@ class TestGasGiantPlanetCenter:
 
         prev_lon = None
         for jd in dates:
-            pos, _ = swe_calc_ut(jd, SE_JUPITER, SEFLG_SPEED)
+            pos, _ = calc_ut(jd, JUPITER, FLG_SPEED)
             lon = pos[0]
 
             assert 0 <= lon < 360

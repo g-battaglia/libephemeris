@@ -38,14 +38,13 @@ from libephemeris import (
     julday,
     revjul,
     lun_eclipse_when_loc,
-    swe_lun_eclipse_when_loc,
-    SE_ECL_TOTAL,
-    SE_ECL_VISIBLE,
-    SE_ECL_MAX_VISIBLE,
-    SE_ECL_1ST_VISIBLE,
-    SE_ECL_2ND_VISIBLE,
-    SE_ECL_3RD_VISIBLE,
-    SE_ECL_4TH_VISIBLE,
+    ECL_TOTAL,
+    ECL_VISIBLE,
+    ECL_MAX_VISIBLE,
+    ECL_1ST_VISIBLE,
+    ECL_2ND_VISIBLE,
+    ECL_3RD_VISIBLE,
+    ECL_4TH_VISIBLE,
 )
 
 
@@ -67,7 +66,7 @@ class TestLunEclipseWhenLoc:
         assert times[0] > jd_start  # Maximum should be after start
         assert times[0] > 0  # Should have valid maximum time
         # Should be marked as visible
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
 
     def test_returns_correct_tuple_structure(self):
         """Test that return values have correct structure."""
@@ -149,8 +148,8 @@ class TestLunEclipseWhenLoc:
         )
 
         # Both should find eclipses (may be same or different)
-        assert ecl_type_ny & SE_ECL_VISIBLE
-        assert ecl_type_bj & SE_ECL_VISIBLE
+        assert ecl_type_ny & ECL_VISIBLE
+        assert ecl_type_bj & ECL_VISIBLE
 
     def test_visibility_flags_are_set(self):
         """Test that visibility flags are properly set."""
@@ -161,16 +160,16 @@ class TestLunEclipseWhenLoc:
             jd_start, (berlin_lon, berlin_lat, 0.0)
         )
 
-        # SE_ECL_VISIBLE should always be set for returned eclipses
-        assert ecl_type & SE_ECL_VISIBLE
+        # ECL_VISIBLE should always be set for returned eclipses
+        assert ecl_type & ECL_VISIBLE
 
         # At least some visibility flags should be set
         visibility_flags = (
-            SE_ECL_MAX_VISIBLE
-            | SE_ECL_1ST_VISIBLE
-            | SE_ECL_2ND_VISIBLE
-            | SE_ECL_3RD_VISIBLE
-            | SE_ECL_4TH_VISIBLE
+            ECL_MAX_VISIBLE
+            | ECL_1ST_VISIBLE
+            | ECL_2ND_VISIBLE
+            | ECL_3RD_VISIBLE
+            | ECL_4TH_VISIBLE
         )
         # At least one phase should be visible
         assert ecl_type & visibility_flags
@@ -192,7 +191,7 @@ class TestLunEclipseWhenLoc:
         assert -90 <= moon_alt <= 90
 
     def test_swe_alias(self):
-        """Test that swe_lun_eclipse_when_loc matches lun_eclipse_when_loc."""
+        """Test that lun_eclipse_when_loc matches lun_eclipse_when_loc."""
         jd_start = julday(2024, 1, 1, 0)
         cape_town_lat, cape_town_lon = -33.9249, 18.4241
 
@@ -201,7 +200,7 @@ class TestLunEclipseWhenLoc:
         )
         # swe_ version takes geopos tuple: [lon, lat, alt]
         geopos = [cape_town_lon, cape_town_lat, 0]
-        ecl_type2, times2, attr2 = swe_lun_eclipse_when_loc(jd_start, geopos)
+        ecl_type2, times2, attr2 = lun_eclipse_when_loc(jd_start, geopos)
 
         assert times1 == times2
         assert attr1 == attr2
@@ -240,8 +239,8 @@ class TestLunEclipseWhenLoc:
         ecl_type, times, attr = lun_eclipse_when_loc(jd_start, (rio_lon, rio_lat, 0.0))
 
         # Should be a total eclipse
-        assert ecl_type & SE_ECL_TOTAL
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_TOTAL
+        assert ecl_type & ECL_VISIBLE
 
         # Check maximum is on May 16, 2022
         year, month, day, hour = revjul(times[0])
@@ -260,7 +259,7 @@ class TestLunEclipseWhenLoc:
         )
 
         # Should find an eclipse
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_southern_hemisphere(self):
@@ -274,7 +273,7 @@ class TestLunEclipseWhenLoc:
         )
 
         # Should find an eclipse
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_high_latitude_location(self):
@@ -288,7 +287,7 @@ class TestLunEclipseWhenLoc:
         )
 
         # Should find an eclipse (might take longer due to polar location)
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
 
@@ -305,7 +304,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (quito_lon, quito_lat, 0.0)
         )
 
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_prime_meridian(self):
@@ -318,7 +317,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (greenwich_lon, greenwich_lat, 0.0)
         )
 
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_international_date_line(self):
@@ -331,7 +330,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (fiji_lon, fiji_lat, 0.0)
         )
 
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_early_20th_century(self):
@@ -344,7 +343,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (london_lon, london_lat, 0.0)
         )
 
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_mid_21st_century(self):
@@ -357,7 +356,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (new_york_lon, new_york_lat, 0.0)
         )
 
-        assert ecl_type & SE_ECL_VISIBLE
+        assert ecl_type & ECL_VISIBLE
         assert times[0] > jd_start
 
     def test_moonrise_moonset_during_eclipse(self):
