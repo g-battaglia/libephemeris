@@ -115,7 +115,7 @@ class CoordinateError(InputValidationError):
 
     See Also:
         set_topo: Sets observer location (validates coordinates)
-        swe_houses: House calculation (validates latitude)
+        houses: House calculation (validates latitude)
     """
 
     def __init__(
@@ -165,7 +165,7 @@ class InvalidBodyError(InputValidationError):
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.heliacal_ut(jd, geo, atmo, obs, ephem.SE_SUN, ...)
+        ...     ephem.heliacal_ut(jd, geo, atmo, obs, ephem.SUN, ...)
         ... except ephem.InvalidBodyError as e:
         ...     print(f"Cannot use {e.body_name} for {e.operation}")
         Cannot use Sun for heliacal rising
@@ -245,7 +245,7 @@ class UnknownBodyError(DataNotFoundError):
 
     See Also:
         get_planet_name: Get name for a valid body ID
-        SE_SUN, SE_MOON, etc.: Valid body ID constants
+        SUN, MOON, etc.: Valid body ID constants
         InvalidBodyError: For valid bodies used in unsupported operations
     """
 
@@ -285,8 +285,8 @@ class StarNotFoundError(DataNotFoundError):
         ...     print(f"Star not found: {e.star_id}")
 
     See Also:
-        swe_fixstar_ut: Fixed star position calculation
-        swe_fixstar2_ut: Fixed star position with HIP identifier
+        fixstar_ut: Fixed star position calculation
+        fixstar2_ut: Fixed star position with HIP identifier
     """
 
     def __init__(
@@ -329,7 +329,7 @@ class SPKNotFoundError(DataNotFoundError):
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.register_spk_body(ephem.SE_CHIRON, "/path/to/chiron.bsp", 2002060)
+        ...     ephem.register_spk_body(ephem.CHIRON, "/path/to/chiron.bsp", 2002060)
         ... except ephem.SPKNotFoundError as e:
         ...     print(f"Missing SPK: {e.filepath}")
         ...     print("Instructions:", e.message)
@@ -431,7 +431,7 @@ class SPKRequiredError(DataNotFoundError):
     several degrees.
 
     Attributes:
-        body_id: The libephemeris body ID (SE_CHIRON, SE_CERES, etc.)
+        body_id: The libephemeris body ID (CHIRON, CERES, etc.)
         body_name: Human-readable name of the body
         message: Human-readable error message with instructions
 
@@ -439,7 +439,7 @@ class SPKRequiredError(DataNotFoundError):
         >>> import libephemeris as eph
         >>> eph.set_strict_precision(True)  # Enable strict mode
         >>> try:
-        ...     eph.calc_ut(jd, eph.SE_CHIRON, 0)  # No SPK registered
+        ...     eph.calc_ut(jd, eph.CHIRON, 0)  # No SPK registered
         ... except eph.SPKRequiredError as e:
         ...     print(f"SPK required for {e.body_name}")
         ...     # Either register SPK or disable strict mode
@@ -480,7 +480,7 @@ class SPKRequiredError(DataNotFoundError):
         """Create an SPKRequiredError with helpful instructions.
 
         Args:
-            body_id: libephemeris body ID (SE_CHIRON, etc.)
+            body_id: libephemeris body ID (CHIRON, etc.)
             body_name: Human-readable body name
             horizons_id: JPL Horizons identifier for downloading
 
@@ -525,7 +525,7 @@ class CalculationError(Error):
 
     Example:
         >>> try:
-        ...     ephem.swe_houses(jd, 70.0, 0.0, ord('P'))  # Polar latitude
+        ...     ephem.houses(jd, 70.0, 0.0, ord('P'))  # Polar latitude
         ... except ephem.CalculationError as e:
         ...     print(f"Calculation failed: {e}")
     """
@@ -554,14 +554,14 @@ class PolarCircleError(CalculationError):
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.swe_houses(jd, 70.0, 0.0, ord('P'))
+        ...     ephem.houses(jd, 70.0, 0.0, ord('P'))
         ... except ephem.PolarCircleError as e:
         ...     print(f"Polar error at {e.latitude}° (threshold: {e.threshold}°)")
         ...     # Use fallback house system
-        ...     cusps, ascmc = ephem.swe_houses(jd, 70.0, 0.0, ord('O'))
+        ...     cusps, ascmc = ephem.houses(jd, 70.0, 0.0, ord('O'))
 
     See Also:
-        swe_houses_with_fallback: Automatically falls back to Porphyry
+        houses_with_fallback: Automatically falls back to Porphyry
         get_polar_latitude_threshold: Returns the threshold for a given obliquity
     """
 
@@ -615,7 +615,7 @@ class EphemerisRangeError(CalculationError):
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.calc_ut(5000000.0, ephem.SE_SUN, 0)  # Year ~8827 AD
+        ...     ephem.calc_ut(5000000.0, ephem.SUN, 0)  # Year ~8827 AD
         ... except ephem.EphemerisRangeError as e:
         ...     print(f"Date JD {e.requested_jd} is outside range")
         ...     print(f"Supported: JD {e.start_jd} to {e.end_jd}")
@@ -684,13 +684,13 @@ class ConvergenceError(CalculationError):
     Example:
         >>> import libephemeris as ephem
         >>> try:
-        ...     ephem.swe_solcross_ut(360.0, jd, 0)  # Search for crossing
+        ...     ephem.solcross_ut(360.0, jd, 0)  # Search for crossing
         ... except ephem.ConvergenceError as e:
         ...     print(f"Algorithm '{e.algorithm}' failed after {e.iterations} iterations")
 
     See Also:
-        swe_solcross_ut: Sun crossing a longitude
-        swe_mooncross_ut: Moon crossing a longitude
+        solcross_ut: Sun crossing a longitude
+        mooncross_ut: Moon crossing a longitude
     """
 
     def __init__(
@@ -744,7 +744,7 @@ class ConfigurationError(Error):
         >>> import libephemeris as ephem
         >>> try:
         ...     # Trying topocentric calc without setting location
-        ...     ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_TOPOCTR)
+        ...     ephem.calc_ut(jd, ephem.MOON, ephem.FLG_TOPOCTR)
         ... except ephem.ConfigurationError as e:
         ...     print(f"Missing: {e.missing_config}")
         ...     print(f"Suggestion: {e.suggestion}")
@@ -905,15 +905,15 @@ def validate_jd_range(
     # Check if JD is within range
     if jd < start_jd or jd > end_jd:
         # Convert JD to calendar date for message
-        from .time_utils import swe_revjul
+        from .time_utils import revjul
 
-        req_year, req_month, req_day, req_hour = swe_revjul(jd, 1)  # Gregorian
+        req_year, req_month, req_day, req_hour = revjul(jd, 1)  # Gregorian
         req_date_str = f"{req_year}-{req_month:02d}-{req_day:02d}"
 
-        start_year, start_month, start_day, _ = swe_revjul(start_jd, 1)
+        start_year, start_month, start_day, _ = revjul(start_jd, 1)
         start_date = f"{start_year}-{start_month:02d}-{start_day:02d}"
 
-        end_year, end_month, end_day, _ = swe_revjul(end_jd, 1)
+        end_year, end_month, end_day, _ = revjul(end_jd, 1)
         end_date = f"{end_year}-{end_month:02d}-{end_day:02d}"
 
         # Get body name if available

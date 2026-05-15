@@ -29,10 +29,10 @@ Implements 25 distinct house systems across 26 character codes (A as alias of E)
 - Savard-A (J)
 
 Main Functions:
-- swe_houses(): Calculate house cusps and angles (ASCMC)
-- swe_houses_ex(): Extended version with sidereal support
-- swe_house_pos(): Find which house a point is in
-- swe_house_name(): Get house system name
+- houses(): Calculate house cusps and angles (ASCMC)
+- houses_ex(): Extended version with sidereal support
+- house_pos(): Find which house a point is in
+- house_name(): Get house system name
 
 Precision Notes:
 Core Calculations (Phase 1 improved):
@@ -78,16 +78,16 @@ import math
 from typing import Any, List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import (
-    SEFLG_SIDEREAL,
-    SEFLG_SPEED,
-    SEFLG_EQUATORIAL,
-    SE_SUN,
-    SEFLG_JPLEPH,
-    SEFLG_SWIEPH,
-    SEFLG_TOPOCTR,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    SUN,
+    FLG_JPLEPH,
+    FLG_SWIEPH,
+    FLG_TOPOCTR,
 )
 from .state import get_timescale
-from .planets import swe_get_ayanamsa_ut, swe_calc_ut
+from .planets import get_ayanamsa_ut, calc_ut
 from .cache import get_true_obliquity, get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
 
@@ -362,7 +362,7 @@ def _raise_polar_circle_error(
         f"latitude {abs(lat):.2f}°{info['hemisphere']} (within {hemisphere} polar circle). "
         f"Polar threshold for obliquity {eps:.2f}° is ±{threshold:.2f}°. "
         f"Consider using Porphyry ('O'), Equal ('E'), or Whole Sign ('W') house systems "
-        f"which work at all latitudes, or use swe_houses_with_fallback() for automatic fallback."
+        f"which work at all latitudes, or use houses_with_fallback() for automatic fallback."
     )
 
     raise PolarCircleError(
@@ -531,7 +531,7 @@ def _calc_ascendant(
     )
 
 
-def swe_houses(
+def houses(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), iflag: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
@@ -545,7 +545,7 @@ def swe_houses(
         lat: Geographic latitude in degrees (positive North, negative South)
         lon: Geographic longitude in degrees (positive East, negative West)
         hsys: House system identifier (e.g., ord('P') for Placidus, ord('K') for Koch)
-        iflag: Calculation flags (optional, default 0). Use SEFLG_MOSEPH for extended
+        iflag: Calculation flags (optional, default 0). Use FLG_MOSEPH for extended
                date range (-3000 to +3000 CE). The ephemeris flag is propagated to
                internal calculations (e.g., Sun position for Sunshine houses).
 
@@ -562,12 +562,12 @@ def swe_houses(
         'Y' = APC, 'N' = Natural Gradient
 
     Example:
-        >>> cusps, ascmc = swe_houses(2451545.0, 51.5, -0.12, ord('P'))  # London, Placidus
+        >>> cusps, ascmc = houses(2451545.0, 51.5, -0.12, ord('P'))  # London, Placidus
         >>> asc, mc = ascmc[0], ascmc[1]
         >>> house_1_start = cusps[0]  # First house cusp
     """
     # Validate latitude and longitude ranges
-    validate_coordinates(lat, lon, "swe_houses")
+    validate_coordinates(lat, lon, "houses")
 
     # 1. Calculate Sidereal Time (ARMC)
     # ARMC = GMST + lon
@@ -768,16 +768,16 @@ def swe_houses(
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Raise detailed PolarCircleError with useful information
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
-        _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses")
+        _raise_polar_circle_error(lat, eps, hsys_char, "houses")
 
     # Calculate Sun's declination for Sunshine houses ('I' or 'i')
-    # This is needed before the house dispatch since only swe_houses has jd_ut
+    # This is needed before the house dispatch since only houses has jd_ut
     sun_dec = 0.0
     if hsys_char in ("I", "i"):
         try:
-            # Extract ephemeris flags: SEFLG_JPLEPH=1, SEFLG_SWIEPH=2
-            eph_flags = iflag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
-            sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
+            # Extract ephemeris flags: FLG_JPLEPH=1, FLG_SWIEPH=2
+            eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
+            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
         except (IndexError, TypeError, ValueError):
             # Fallback to 0 declination (same as equinox behavior)
@@ -869,7 +869,7 @@ def swe_houses(
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
-def swe_houses_with_fallback(
+def houses_with_fallback(
     jd_ut: float,
     lat: float,
     lon: float,
@@ -915,21 +915,21 @@ def swe_houses_with_fallback(
         >>> import libephemeris as ephem
         >>> jd = 2451545.0
         >>> # This would fail with Placidus at 70°N, but uses fallback
-        >>> cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        >>> cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
         ...     jd, 70.0, 0.0, ord('P')
         ... )
         >>> if used_fallback:
         ...     print(f"Used fallback: {warning}")
         >>>
         >>> # At extreme latitudes (>80°), you may get a warning even for non-failing systems
-        >>> cusps, ascmc, used_fallback, warning = ephem.swe_houses_with_fallback(
+        >>> cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
         ...     jd, 85.0, 0.0, ord('C')  # Campanus at 85°N
         ... )
         >>> if warning:
         ...     print(f"Warning: {warning}")
 
     See Also:
-        swe_houses: Standard function that raises PolarCircleError at polar latitudes
+        houses: Standard function that raises PolarCircleError at polar latitudes
         get_polar_latitude_threshold: Returns the threshold for a given obliquity
         get_extreme_latitude_info: Returns detailed latitude classification information
     """
@@ -966,14 +966,14 @@ def swe_houses_with_fallback(
     is_extreme = _is_extreme_latitude(lat)
 
     try:
-        cusps, ascmc = swe_houses(jd_ut, lat, lon, hsys)
+        cusps, ascmc = houses(jd_ut, lat, lon, hsys)
 
         # Validate cusps if requested
         if validate_cusps:
             is_valid, validation_error = _validate_cusps(cusps)
             if not is_valid:
                 # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = swe_houses(jd_ut, lat, lon, fallback_hsys)
+                cusps, ascmc = houses(jd_ut, lat, lon, fallback_hsys)
                 warning = (
                     f"{primary_name} house system produced invalid cusps at latitude "
                     f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
@@ -994,7 +994,7 @@ def swe_houses_with_fallback(
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
-        cusps, ascmc = swe_houses(jd_ut, lat, lon, fallback_hsys)
+        cusps, ascmc = houses(jd_ut, lat, lon, fallback_hsys)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
@@ -1004,7 +1004,7 @@ def swe_houses_with_fallback(
         return cusps, ascmc, True, warning
 
 
-def swe_houses_armc_with_fallback(
+def houses_armc_with_fallback(
     armc: float,
     lat: float,
     eps: float,
@@ -1015,7 +1015,7 @@ def swe_houses_armc_with_fallback(
     """
     Calculate house cusps from ARMC with automatic fallback for polar latitudes.
 
-    Similar to swe_houses_with_fallback, but calculates from ARMC instead of
+    Similar to houses_with_fallback, but calculates from ARMC instead of
     Julian Day. Includes the same extreme latitude handling and cusp validation.
 
     Args:
@@ -1037,7 +1037,7 @@ def swe_houses_armc_with_fallback(
                                extreme latitude warning, else None
 
     See Also:
-        swe_houses_armc: Standard function that raises PolarCircleError at polar latitudes
+        houses_armc: Standard function that raises PolarCircleError at polar latitudes
         get_extreme_latitude_info: Returns detailed latitude classification information
     """
     # House system names for error messages
@@ -1073,14 +1073,14 @@ def swe_houses_armc_with_fallback(
     is_extreme = _is_extreme_latitude(lat)
 
     try:
-        cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
+        cusps, ascmc = houses_armc(armc, lat, eps, hsys)
 
         # Validate cusps if requested
         if validate_cusps:
             is_valid, validation_error = _validate_cusps(cusps)
             if not is_valid:
                 # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = swe_houses_armc(armc, lat, eps, fallback_hsys)
+                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
                 warning = (
                     f"{primary_name} house system produced invalid cusps at latitude "
                     f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
@@ -1101,7 +1101,7 @@ def swe_houses_armc_with_fallback(
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
-        cusps, ascmc = swe_houses_armc(armc, lat, eps, fallback_hsys)
+        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
@@ -1111,7 +1111,7 @@ def swe_houses_armc_with_fallback(
         return cusps, ascmc, True, warning
 
 
-def swe_houses_armc(
+def houses_armc(
     armc: float, lat: float, eps: float, hsys: int = ord("P"), ascmc9: float = 0.0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
@@ -1121,7 +1121,7 @@ def swe_houses_armc(
     from a Julian Day. This is useful when you have a pre-calculated ARMC or when
     working with house systems that depend only on ARMC, latitude, and obliquity.
 
-    Reference API compatible function (swe_houses_armc equivalent).
+    Reference API compatible function (houses_armc equivalent).
 
     Args:
         armc: Right Ascension of Medium Coeli in degrees (0-360)
@@ -1145,13 +1145,13 @@ def swe_houses_armc(
         >>> # Calculate obliquity for J2000.0
         >>> eps = 23.4393  # approximate true obliquity
         >>> armc = 292.957  # ARMC in degrees
-        >>> cusps, ascmc = swe_houses_armc(armc, 41.9, eps, ord('P'))
+        >>> cusps, ascmc = houses_armc(armc, 41.9, eps, ord('P'))
         >>> asc, mc = ascmc[0], ascmc[1]
     """
     # Validate latitude range (must be in [-90, 90])
     from .exceptions import validate_latitude
 
-    validate_latitude(lat, "swe_houses_armc")
+    validate_latitude(lat, "houses_armc")
 
     # Normalize ARMC to 0-360
     armc_deg = armc % 360.0
@@ -1319,7 +1319,7 @@ def swe_houses_armc(
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Raise detailed PolarCircleError with useful information
     if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
-        _raise_polar_circle_error(lat, eps, hsys_char, "swe_houses_armc")
+        _raise_polar_circle_error(lat, eps, hsys_char, "houses_armc")
 
     cusps = [0.0] * 13
 
@@ -1403,7 +1403,7 @@ def swe_houses_armc(
     return tuple(cusps[1:13]), tuple(ascmc)
 
 
-def swe_houses_armc_ex2(
+def houses_armc_ex2(
     armc: float,
     lat: float,
     eps: float,
@@ -1413,8 +1413,8 @@ def swe_houses_armc_ex2(
     """
     Extended house calculation from ARMC returning cusps, angles, and their velocities.
 
-    This function combines swe_houses_armc() with velocity calculations similar to
-    swe_houses_ex2(). It calculates house cusps directly from the ARMC value and
+    This function combines houses_armc() with velocity calculations similar to
+    houses_ex2(). It calculates house cusps directly from the ARMC value and
     also returns the velocities (derivatives) of house cusps and angles.
 
     Velocities are always calculated, matching pyswisseph behavior.
@@ -1424,7 +1424,7 @@ def swe_houses_armc_ex2(
     Velocities are calculated using centered finite differences, with ARMC
     shifted by ±1 second (Koch/Placidus) or ±1 minute (other systems).
 
-    Note: The sidereal flag (SEFLG_SIDEREAL) has no effect since sidereal mode
+    Note: The sidereal flag (FLG_SIDEREAL) has no effect since sidereal mode
     requires a Julian Day for ayanamsa calculation, which is not available when
     using ARMC directly.
 
@@ -1445,13 +1445,13 @@ def swe_houses_armc_ex2(
     Example:
         >>> eps = 23.4393  # true obliquity
         >>> armc = 292.957  # ARMC in degrees
-        >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_armc_ex2(
+        >>> cusps, ascmc, cusps_speed, ascmc_speed = houses_armc_ex2(
         ...     armc, 41.9, eps, ord('P')
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
     """
     # Calculate positions at current ARMC
-    cusps, ascmc = swe_houses_armc(armc, lat, eps, hsys)
+    cusps, ascmc = houses_armc(armc, lat, eps, hsys)
 
     # Always calculate velocities (matching pyswisseph behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
@@ -1473,8 +1473,8 @@ def swe_houses_armc_ex2(
         d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
 
     # Calculate positions at ARMC ± d_armc
-    cusps_before, ascmc_before = swe_houses_armc(armc - d_armc, lat, eps, hsys)
-    cusps_after, ascmc_after = swe_houses_armc(armc + d_armc, lat, eps, hsys)
+    cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys)
+    cusps_after, ascmc_after = houses_armc(armc + d_armc, lat, eps, hsys)
 
     def angular_diff_local(pos2: float, pos1: float) -> float:
         """Calculate angular difference handling 360° wraparound."""
@@ -1525,13 +1525,13 @@ def swe_houses_armc_ex2(
     return cusps, ascmc, cusps_speed, ascmc_speed
 
 
-def swe_houses_ex(
+def houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation with sidereal zodiac support.
 
-    Similar to swe_houses() but applies ayanamsa correction when SEFLG_SIDEREAL
+    Similar to houses() but applies ayanamsa correction when FLG_SIDEREAL
     flag is set, converting tropical positions to sidereal.
 
     For Ascendant-based house systems (Whole Sign, Equal, Vehlow), the cusps
@@ -1542,8 +1542,8 @@ def swe_houses_ex(
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask (e.g., SEFLG_SIDEREAL, SEFLG_MOSEPH).
-               Use SEFLG_MOSEPH for extended date range (-3000 to +3000 CE).
+        flags: Calculation flags bitmask (e.g., FLG_SIDEREAL, FLG_MOSEPH).
+               Use FLG_MOSEPH for extended date range (-3000 to +3000 CE).
                The ephemeris flag is propagated to all internal calculations.
 
     Returns:
@@ -1552,15 +1552,15 @@ def swe_houses_ex(
             - ascmc: Tuple of 8 angles (Asc, MC corrected if sidereal)
 
     Example:
-        >>> from libephemeris import swe_set_sid_mode, SE_SIDM_LAHIRI
-        >>> swe_set_sid_mode(SE_SIDM_LAHIRI)
-        >>> cusps, ascmc = swe_houses_ex(2451545.0, 51.5, -0.12, ord('P'), SEFLG_SIDEREAL)
+        >>> from libephemeris import set_sid_mode, SIDM_LAHIRI
+        >>> set_sid_mode(SIDM_LAHIRI)
+        >>> cusps, ascmc = houses_ex(2451545.0, 51.5, -0.12, ord('P'), FLG_SIDEREAL)
     """
-    # Propagate flags to swe_houses() so ephemeris flags (SEFLG_MOSEPH etc.) are used
-    cusps, ascmc = swe_houses(tjdut, lat, lon, hsys, flags)
+    # Propagate flags to houses() so ephemeris flags (FLG_MOSEPH etc.) are used
+    cusps, ascmc = houses(tjdut, lat, lon, hsys, flags)
 
-    if flags & SEFLG_SIDEREAL:
-        ayanamsa = swe_get_ayanamsa_ut(tjdut)
+    if flags & FLG_SIDEREAL:
+        ayanamsa = get_ayanamsa_ut(tjdut)
 
         # Compute sidereal angles
         # All ecliptic longitudes in ascmc get ayanamsa correction EXCEPT
@@ -1604,8 +1604,8 @@ def swe_houses_ex(
             # Sunshine: Recalculate using sidereal Asc/MC
             # 'I' = Treindl algorithm, 'i' = Makransky algorithm
             try:
-                eph_flags = flags & (SEFLG_JPLEPH | SEFLG_SWIEPH)
-                sun_pos, _ = swe_calc_ut(tjdut, SE_SUN, SEFLG_EQUATORIAL | eph_flags)
+                eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
+                sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
             except (IndexError, TypeError, ValueError):
                 sun_dec = 0.0
@@ -1638,22 +1638,22 @@ def swe_houses_ex(
     return cusps, ascmc
 
 
-def swe_houses_ex2(
+def houses_ex2(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
     """
     Extended house calculation returning cusps, angles, and their velocities.
 
-    This function is an extended version of swe_houses_ex() that also returns
+    This function is an extended version of houses_ex() that also returns
     the velocities (derivatives) of house cusps and angles.
 
-    Velocities are only calculated when the SEFLG_SPEED flag is set in the flags
-    parameter. When SEFLG_SPEED is not set, zero velocities are returned for
+    Velocities are only calculated when the FLG_SPEED flag is set in the flags
+    parameter. When FLG_SPEED is not set, zero velocities are returned for
     efficiency. This is useful for progressed chart applications where the rate
     of change of house cusps is needed.
 
     Velocities are computed via the ARMC-based derivative path
-    (swe_houses_armc_ex2), which varies ARMC with fixed obliquity and
+    (houses_armc_ex2), which varies ARMC with fixed obliquity and
     scales by the sidereal rotation rate (~360.986°/day).
 
     Args:
@@ -1661,24 +1661,24 @@ def swe_houses_ex2(
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask. Use SEFLG_SPEED to compute velocities.
-               SEFLG_SIDEREAL can also be used for sidereal calculations.
+        flags: Calculation flags bitmask. Use FLG_SPEED to compute velocities.
+               FLG_SIDEREAL can also be used for sidereal calculations.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, etc.)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if SEFLG_SPEED not set)
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if SEFLG_SPEED not set)
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if FLG_SPEED not set)
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if FLG_SPEED not set)
 
     Example:
-        >>> cusps, ascmc, cusps_speed, ascmc_speed = swe_houses_ex2(
-        ...     2451545.0, 41.9, 12.5, ord('P'), SEFLG_SPEED
+        >>> cusps, ascmc, cusps_speed, ascmc_speed = houses_ex2(
+        ...     2451545.0, 41.9, 12.5, ord('P'), FLG_SPEED
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (ASC)
     """
     # Calculate positions at current time
-    cusps, ascmc = swe_houses_ex(tjdut, lat, lon, hsys, flags)
+    cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, flags)
 
     # Always calculate velocities (matching pyswisseph behavior).
     # Delegate speed computation to the ARMC-based path.
@@ -1689,25 +1689,25 @@ def swe_houses_ex2(
     # ~0.003 deg/day offsets on angular cusps.
     #
     # We extract ARMC and true obliquity from the ascmc tuple returned
-    # by swe_houses_ex (index 2 = ARMC) and compute obliquity via the
-    # same cached path used by swe_houses().
-    armc_val = ascmc[2]  # ARMC stored by swe_houses
+    # by houses_ex (index 2 = ARMC) and compute obliquity via the
+    # same cached path used by houses().
+    armc_val = ascmc[2]  # ARMC stored by houses
     ts = get_timescale()
     t = ts.ut1_jd(tjdut)
     eps = get_true_obliquity(t.tt)
 
-    _, _, cusps_speed, ascmc_speed = swe_houses_armc_ex2(armc_val, lat, eps, hsys)
+    _, _, cusps_speed, ascmc_speed = houses_armc_ex2(armc_val, lat, eps, hsys)
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
 
-def _swe_houses_with_context(
+def _houses_with_context(
     tjdut: float, lat: float, lon: float, hsys: int, ctx
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """
     Calculate houses using an explicit EphemerisContext (thread-safe).
 
-    Thread-safe wrapper around swe_houses that uses context state.
+    Thread-safe wrapper around houses that uses context state.
 
     Args:
         tjdut: Julian Day in Universal Time
@@ -1717,7 +1717,7 @@ def _swe_houses_with_context(
         ctx: EphemerisContext instance
 
     Returns:
-        Same as swe_houses: (cusps, ascmc)
+        Same as houses: (cusps, ascmc)
 
     Thread Safety:
         This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
@@ -1738,7 +1738,7 @@ def _swe_houses_with_context(
             state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
 
             # Use existing house calculation logic
-            return swe_houses(tjdut, lat, lon, hsys)
+            return houses(tjdut, lat, lon, hsys)
         finally:
             # Restore global state
             state._SIDEREAL_MODE = old_sid_mode
@@ -1746,7 +1746,7 @@ def _swe_houses_with_context(
             state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
 
 
-def swe_house_name(hsys: int) -> str:
+def house_name(hsys: int) -> str:
     """
     Get the name of a house system.
     """
@@ -1824,9 +1824,9 @@ def _houses_placidus(
 
     Note: Polar latitude handling
         Placidus is undefined at latitudes > ~66° where some ecliptic points never
-        rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
+        rise/set (circumpolar behavior). At polar latitudes, houses() raises
         PolarCircleError with detailed information about the threshold and
-        recommended alternatives. Use swe_houses_with_fallback() for automatic
+        recommended alternatives. Use houses_with_fallback() for automatic
         fallback to Porphyry. The polar threshold is approximately 90° - obliquity.
         Internal fallback to Porphyry is retained as a safety net.
 
@@ -2187,9 +2187,9 @@ def _houses_koch(
 
     Note: Polar latitude handling
         Koch is undefined at latitudes > ~66 deg where some ecliptic points never
-        rise/set (circumpolar behavior). At polar latitudes, swe_houses() raises
+        rise/set (circumpolar behavior). At polar latitudes, houses() raises
         PolarCircleError with detailed information about the threshold and
-        recommended alternatives. Use swe_houses_with_fallback() for automatic
+        recommended alternatives. Use houses_with_fallback() for automatic
         fallback to Porphyry. The polar threshold is approximately 90 deg - obliquity.
         Internal fallback to Porphyry is retained as a safety net.
 
@@ -3041,7 +3041,7 @@ def _houses_morinus(
     # tan(lon) = tan(ra) * cos(eps).
 
     cusps = [0.0] * 13
-    # Morinus Ascendant? Standard swe_houses returns standard Asc.
+    # Morinus Ascendant? Standard houses returns standard Asc.
     # But cusps[1] should be Morinus Ascendant (RAMC+90 projected).
     # Let's follow standard behavior: cusps array contains system cusps.
 
@@ -4397,7 +4397,7 @@ def _houses_apc(
 
 
 @overload
-def house_pos(
+def _house_pos_pythonic(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4408,7 +4408,7 @@ def house_pos(
 
 
 @overload
-def house_pos(
+def _house_pos_pythonic(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4419,7 +4419,7 @@ def house_pos(
 
 
 @overload
-def house_pos(
+def _house_pos_pythonic(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4430,7 +4430,7 @@ def house_pos(
 
 
 @overload
-def house_pos(
+def _house_pos_pythonic(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4440,7 +4440,7 @@ def house_pos(
 ) -> float: ...
 
 
-def house_pos(
+def _house_pos_pythonic(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4458,11 +4458,11 @@ def house_pos(
     This function supports two calling conventions:
 
     1. Reference API compatible (5 args):
-       house_pos(armc, lat, obliquity, objcoord, hsys)
+       _house_pos_pythonic(armc, lat, obliquity, objcoord, hsys)
        where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
 
     2. Extended signature (6 args):
-       house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+       _house_pos_pythonic(armc, lat, obliquity, hsys, lon, lat_body)
        where hsys is int/bytes/str and lon/lat_body are separate floats
 
     Args:
@@ -4480,9 +4480,9 @@ def house_pos(
 
     Example:
         >>> # Sun at 15° Aries, Placidus houses, Rome (5-arg reference API form)
-        >>> pos = house_pos(292.957, 41.9, 23.4393, (15.0, 0.0), b'P')
+        >>> pos = _house_pos_pythonic(292.957, 41.9, 23.4393, (15.0, 0.0), b'P')
         >>> # Or 6-arg extended form:
-        >>> pos = house_pos(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
+        >>> pos = _house_pos_pythonic(292.957, 41.9, 23.4393, ord('P'), 15.0, 0.0)
         >>> house = int(pos)  # House number (e.g., 10)
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
@@ -4847,8 +4847,8 @@ def house_pos(
     elif hsys_char == "B":
         # Alcabitius house position.
         # Alcabitius cusps are equally spaced in RA within each quadrant.
-        # For house_pos, we interpolate the body's RA between the cusp RAs.
-        cusps, _ = swe_houses_armc(armc, lat, obliquity, hsys_int)
+        # For _house_pos_pythonic, we interpolate the body's RA between the cusp RAs.
+        cusps, _ = houses_armc(armc, lat, obliquity, hsys_int)
 
         # Convert cusp ecliptic longitudes to RA
         cusp_ras = []
@@ -4879,7 +4879,7 @@ def house_pos(
 
     # Default fallback: use cusp-based method (ecliptic longitude interpolation)
     # This applies to H, F, I, i, J, S, L, Q, Y, and others
-    cusps, ascmc = swe_houses_armc(armc, lat, obliquity, hsys_int)
+    cusps, ascmc = houses_armc(armc, lat, obliquity, hsys_int)
 
     # Find the house containing this longitude
     for i in range(12):
@@ -4920,7 +4920,7 @@ def _armc_to_mc(armc: float, eps: float) -> float:
 
 
 @overload
-def swe_house_pos(
+def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4931,7 +4931,7 @@ def swe_house_pos(
 
 
 @overload
-def swe_house_pos(
+def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4942,7 +4942,7 @@ def swe_house_pos(
 
 
 @overload
-def swe_house_pos(
+def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4953,7 +4953,7 @@ def swe_house_pos(
 
 
 @overload
-def swe_house_pos(
+def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4963,7 +4963,7 @@ def swe_house_pos(
 ) -> float: ...
 
 
-def swe_house_pos(
+def house_pos(
     armc: float,
     lat: float,
     obliquity: float,
@@ -4977,11 +4977,11 @@ def swe_house_pos(
     This function supports two calling conventions:
 
     1. Reference API compatible (5 args):
-       swe_house_pos(armc, lat, obliquity, objcoord, hsys)
+       house_pos(armc, lat, obliquity, objcoord, hsys)
        where objcoord is a tuple (lon, lat_body) and hsys is bytes/str
 
     2. Extended signature (6 args):
-       swe_house_pos(armc, lat, obliquity, hsys, lon, lat_body)
+       house_pos(armc, lat, obliquity, hsys, lon, lat_body)
        where hsys is int/bytes/str and lon/lat_body are separate floats
 
     Returns a decimal value where the integer part is the house number (1-12)
@@ -4998,9 +4998,9 @@ def swe_house_pos(
     Returns:
         Decimal value: integer part = house number, decimal part = position within house
     """
-    # Delegate to house_pos which now supports both calling conventions
+    # Delegate to _house_pos_pythonic which now supports both calling conventions
     # Use type: ignore since the overloads cover all valid combinations
-    return house_pos(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)  # type: ignore[arg-type]
+    return _house_pos_pythonic(armc, lat, obliquity, hsys_or_objcoord, lon_or_hsys, lat_body)  # type: ignore[arg-type]
 
 
 def _gauquelin_sector_from_rise_set(
@@ -5034,26 +5034,26 @@ def _gauquelin_sector_from_rise_set(
     """
     from .eclipse import rise_trans
     from .constants import (
-        SE_CALC_RISE,
-        SE_CALC_SET,
-        SE_BIT_DISC_CENTER,
-        SE_BIT_NO_REFRACTION,
+        CALC_RISE,
+        CALC_SET,
+        BIT_DISC_CENTER,
+        BIT_NO_REFRACTION,
     )
 
     def fallback() -> float:
         """Fall back to method 0 (hour angle approximation)."""
-        return gauquelin_sector(
+        return _gauquelin_sector_pythonic(
             jd, planet, lat, lon, altitude, pressure, temperature, flags, 0
         )
 
     # Determine rise_trans flags based on method
     rsmi_flags = 0
     if method in (2, 3):  # Disc center
-        rsmi_flags |= SE_BIT_DISC_CENTER
+        rsmi_flags |= BIT_DISC_CENTER
     # Methods 4, 5 use disc edge (upper limb) which is the default
 
     if method in (2, 4):  # No refraction
-        rsmi_flags |= SE_BIT_NO_REFRACTION
+        rsmi_flags |= BIT_NO_REFRACTION
     # Methods 3, 5 include refraction (default when flag not set)
 
     # Strategy: Find the next rise and next set after jd, then find the
@@ -5066,7 +5066,7 @@ def _gauquelin_sector_from_rise_set(
         retflag, tret = rise_trans(
             jd,
             planet,
-            SE_CALC_RISE | rsmi_flags,
+            CALC_RISE | rsmi_flags,
             [lon, lat, altitude],
             pressure,
             temperature,
@@ -5080,7 +5080,7 @@ def _gauquelin_sector_from_rise_set(
         retflag, tret = rise_trans(
             jd,
             planet,
-            SE_CALC_SET | rsmi_flags,
+            CALC_SET | rsmi_flags,
             [lon, lat, altitude],
             pressure,
             temperature,
@@ -5096,7 +5096,7 @@ def _gauquelin_sector_from_rise_set(
         retflag, tret = rise_trans(
             jd_next_rise - 1.5,
             planet,
-            SE_CALC_RISE | rsmi_flags,
+            CALC_RISE | rsmi_flags,
             [lon, lat, altitude],
             pressure,
             temperature,
@@ -5111,7 +5111,7 @@ def _gauquelin_sector_from_rise_set(
             retflag, tret = rise_trans(
                 jd_next_rise - 2.5,
                 planet,
-                SE_CALC_RISE | rsmi_flags,
+                CALC_RISE | rsmi_flags,
                 [lon, lat, altitude],
                 pressure,
                 temperature,
@@ -5125,7 +5125,7 @@ def _gauquelin_sector_from_rise_set(
         retflag, tret = rise_trans(
             jd_next_set - 1.5,
             planet,
-            SE_CALC_SET | rsmi_flags,
+            CALC_SET | rsmi_flags,
             [lon, lat, altitude],
             pressure,
             temperature,
@@ -5140,7 +5140,7 @@ def _gauquelin_sector_from_rise_set(
             retflag, tret = rise_trans(
                 jd_next_set - 2.5,
                 planet,
-                SE_CALC_SET | rsmi_flags,
+                CALC_SET | rsmi_flags,
                 [lon, lat, altitude],
                 pressure,
                 temperature,
@@ -5194,7 +5194,7 @@ def _gauquelin_sector_from_rise_set(
     return sector
 
 
-def gauquelin_sector(
+def _gauquelin_sector_pythonic(
     jd: float,
     planet: "int | str",
     lat: float,
@@ -5216,19 +5216,19 @@ def gauquelin_sector(
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
 
-    Reference API compatible function (swe_gauquelin_sector equivalent).
+    Reference API compatible function (gauquelin_sector equivalent).
 
     Args:
         jd: Julian Day in Universal Time (UT)
-        planet: Planet/body ID (int, e.g. SE_SUN, SE_MOON) or star name (str)
+        planet: Planet/body ID (int, e.g. SUN, MOON) or star name (str)
         lat: Geographic latitude in degrees (positive North)
         lon: Geographic longitude in degrees (positive East)
         altitude: Geographic altitude in meters above sea level (default 0.0)
         pressure: Atmospheric pressure in mbar (default 1013.25)
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
-        flags: Calculation flags (SEFLG_SWIEPH, SEFLG_TOPOCTR, etc.)
-            Note: The swe_gauquelin_sector() wrapper defaults to
-            SEFLG_SWIEPH | SEFLG_TOPOCTR (32770) per pyswisseph.
+        flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
+            Note: The gauquelin_sector() wrapper defaults to
+            FLG_SWIEPH | FLG_TOPOCTR (32770) per pyswisseph.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude
@@ -5250,23 +5250,23 @@ def gauquelin_sector(
         latitude), methods 2-5 fall back to method 0.
 
     Example:
-        >>> sector = gauquelin_sector(2451545.0, SE_MARS, 48.85, 2.35)
+        >>> sector = _gauquelin_sector_pythonic(2451545.0, MARS, 48.85, 2.35)
         >>> print(f"Mars is in sector {int(sector)}")
     """
     # Methods 2-5: Use actual rise/set times
     if method in (2, 3, 4, 5):
         if isinstance(planet, str):
             raise NotImplementedError(
-                "Star names are not supported with methods 2-5 for gauquelin_sector"
+                "Star names are not supported with methods 2-5 for _gauquelin_sector_pythonic"
             )
         return _gauquelin_sector_from_rise_set(
             jd, planet, lat, lon, altitude, pressure, temperature, flags, method
         )
 
-    # Methods 0-1: Use house_pos with Gauquelin house system ('G')
+    # Methods 0-1: Use _house_pos_pythonic with Gauquelin house system ('G')
     # This computes Gauquelin sectors from house position
-    from .planets import swe_calc_ut
-    from .fixed_stars import swe_fixstar_ut
+    from .planets import calc_ut
+    from .fixed_stars import fixstar_ut
     from .cache import get_true_obliquity
 
     ts = get_timescale()
@@ -5281,11 +5281,11 @@ def gauquelin_sector(
 
     # Get body position - planet (int) or star (str)
     if isinstance(planet, str):
-        pos, _star_name, retflag = swe_fixstar_ut(planet, jd, flags | SEFLG_SPEED)
+        pos, _star_name, retflag = fixstar_ut(planet, jd, flags | FLG_SPEED)
         planet_lon = float(pos[0])
         planet_lat = float(pos[1])
     else:
-        pos, retflag = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
+        pos, retflag = calc_ut(jd, planet, flags | FLG_SPEED)
         planet_lon = pos[0]
         planet_lat = pos[1]
 
@@ -5293,21 +5293,21 @@ def gauquelin_sector(
     if method == 1:
         planet_lat = 0.0
 
-    # Use house_pos with 'G' (Gauquelin sectors) to get the sector position
-    # house_pos returns values in [1, 37) for Gauquelin
-    sector = house_pos(armc_deg, lat, eps, (planet_lon, planet_lat), "G")
+    # Use _house_pos_pythonic with 'G' (Gauquelin sectors) to get the sector position
+    # _house_pos_pythonic returns values in [1, 37) for Gauquelin
+    sector = _house_pos_pythonic(armc_deg, lat, eps, (planet_lon, planet_lat), "G")
 
     return sector
 
 
-def swe_gauquelin_sector(
+def gauquelin_sector(
     tjdut: float,
     body: "int | str",
     method: int,
     geopos: tuple[float, float, float],
     atpress: float = 0.0,
     attemp: float = 0.0,
-    flags: int = SEFLG_SWIEPH | SEFLG_TOPOCTR,
+    flags: int = FLG_SWIEPH | FLG_TOPOCTR,
 ) -> float:
     """
     Calculate the Gauquelin sector (1-36) in which a planet is located.
@@ -5320,19 +5320,19 @@ def swe_gauquelin_sector(
     - Sector 19: Setting (Descendant)
     - Sector 28: Lower culmination (IC)
 
-    Reference API compatible function (swe_gauquelin_sector equivalent).
+    Reference API compatible function (gauquelin_sector equivalent).
 
     Args:
         jd: Julian Day in Universal Time (UT)
-        planet: Planet/body ID (SE_SUN, SE_MOON, etc.)
+        planet: Planet/body ID (SUN, MOON, etc.)
         lat: Geographic latitude in degrees (positive North)
         lon: Geographic longitude in degrees (positive East)
         altitude: Geographic altitude in meters above sea level (default 0.0)
         pressure: Atmospheric pressure in mbar (default 1013.25)
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
-        flags: Calculation flags (SEFLG_SWIEPH, SEFLG_TOPOCTR, etc.)
-            Note: The swe_gauquelin_sector() wrapper defaults to
-            SEFLG_SWIEPH | SEFLG_TOPOCTR (32770) per pyswisseph.
+        flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
+            Note: The gauquelin_sector() wrapper defaults to
+            FLG_SWIEPH | FLG_TOPOCTR (32770) per pyswisseph.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude
@@ -5346,14 +5346,14 @@ def swe_gauquelin_sector(
             - altitude: geographic altitude in meters above sea level
         atpress: Atmospheric pressure in mbar (if 0, default 1013.25 is used)
         attemp: Atmospheric temperature in degrees Celsius (if 0, default 15 is used)
-        flags: Bit flags for ephemeris (SEFLG_SWIEPH, etc.)
+        flags: Bit flags for ephemeris (FLG_SWIEPH, etc.)
 
     Returns:
         Sector position as float in range [1, 37).
         Integer part is sector number (1-36), decimal part is position within sector.
 
     Note:
-        This function matches the swe_gauquelin_sector() API signature.
+        This function matches the gauquelin_sector() API signature.
         Sectors are numbered clockwise from the Ascendant:
         - Sector 1: Rising (Ascendant)
         - Sector 10: Upper culmination (MC)
@@ -5362,13 +5362,13 @@ def swe_gauquelin_sector(
 
     Example:
         >>> geopos = (2.35, 48.85, 0.0)  # Paris: (lon, lat, alt)
-        >>> sector = swe_gauquelin_sector(2451545.0, SE_MARS, 0, geopos)
+        >>> sector = gauquelin_sector(2451545.0, MARS, 0, geopos)
     """
     lon, lat, altitude = geopos
     # Use defaults if 0 is passed (standard API behavior)
     pressure = atpress if atpress != 0.0 else 1013.25
     temperature = attemp if attemp != 0.0 else 15.0
 
-    return gauquelin_sector(
+    return _gauquelin_sector_pythonic(
         tjdut, body, lat, lon, altitude, pressure, temperature, flags, method
     )

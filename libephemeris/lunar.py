@@ -2180,7 +2180,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     lat = math.degrees(math.asin(apogee_z / apogee_mag))
 
     # Compute apogee distance in AU from orbital elements.
-    # SE_OSCU_APOG returns Earth-to-apogee distance, not eccentricity magnitude.
+    # OSCU_APOG returns Earth-to-apogee distance, not eccentricity magnitude.
     # Semi-latus rectum: p = h²/μ
     # Apogee distance: r_apogee = p / (1 - e)  [= a(1+e)]
     h_mag = math.sqrt(float(h_x**2 + h_y**2 + h_z**2))

@@ -17,48 +17,48 @@ imports (OrbitalElements is defined in minor_bodies.py).
 from __future__ import annotations
 
 from .constants import (
-    SE_AMOR,
-    SE_APOPHIS,
-    SE_ASBOLUS,
-    SE_CERES,
-    SE_CHARIKLO,
-    SE_CHIRON,
-    SE_DAVIDA,
-    SE_ERIS,
-    SE_EROS,
-    SE_EUROPA_AST,
-    SE_GONGGONG,
-    SE_HAUMEA,
-    SE_HIDALGO,
-    SE_HYGIEA,
-    SE_ICARUS,
-    SE_INTERAMNIA,
-    SE_ITOKAWA,
-    SE_IXION,
-    SE_JUNO,
-    SE_LILITH_AST,
-    SE_MAKEMAKE,
-    SE_NESSUS,
-    SE_ORCUS,
-    SE_PALLAS,
-    SE_PANDORA_AST,
-    SE_PHOLUS,
-    SE_PSYCHE,
-    SE_QUAOAR,
-    SE_RYUGU,
-    SE_SAPPHO,
-    SE_SEDNA,
-    SE_SYLVIA,
-    SE_TORO,
-    SE_TOUTATIS,
-    SE_VARUNA,
-    SE_VESTA,
+    AMOR,
+    APOPHIS,
+    ASBOLUS,
+    CERES,
+    CHARIKLO,
+    CHIRON,
+    DAVIDA,
+    ERIS,
+    EROS,
+    EUROPA_AST,
+    GONGGONG,
+    HAUMEA,
+    HIDALGO,
+    HYGIEA,
+    ICARUS,
+    INTERAMNIA,
+    ITOKAWA,
+    IXION,
+    JUNO,
+    LILITH_AST,
+    MAKEMAKE,
+    NESSUS,
+    ORCUS,
+    PALLAS,
+    PANDORA_AST,
+    PHOLUS,
+    PSYCHE,
+    QUAOAR,
+    RYUGU,
+    SAPPHO,
+    SEDNA,
+    SYLVIA,
+    TORO,
+    TOUTATIS,
+    VARUNA,
+    VESTA,
 )
 from .minor_bodies import OrbitalElements
 
 
 MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
-    SE_AMOR: [
+    AMOR: [
         OrbitalElements(
             name="Amor",
             epoch=2323707.5,
@@ -951,7 +951,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.36884082342493146,
         ),  # ~2450
     ],
-    SE_APOPHIS: [
+    APOPHIS: [
         OrbitalElements(
             name="Apophis",
             epoch=2323707.5,
@@ -1844,7 +1844,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.85225358865772538,
         ),  # ~2450
     ],
-    SE_ASBOLUS: [
+    ASBOLUS: [
         OrbitalElements(
             name="Asbolus",
             epoch=2323707.5,
@@ -2737,7 +2737,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.014102476392684384,
         ),  # ~2450
     ],
-    SE_CERES: [
+    CERES: [
         OrbitalElements(
             name="Ceres",
             epoch=2323707.5,
@@ -3630,7 +3630,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.21422050412347093,
         ),  # ~2450
     ],
-    SE_CHARIKLO: [
+    CHARIKLO: [
         OrbitalElements(
             name="Chariklo",
             epoch=2323707.5,
@@ -4523,7 +4523,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.01576612379802823,
         ),  # ~2450
     ],
-    SE_CHIRON: [
+    CHIRON: [
         OrbitalElements(
             name="Chiron",
             epoch=2323707.5,
@@ -5416,7 +5416,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.020643172259747683,
         ),  # ~2450
     ],
-    SE_DAVIDA: [
+    DAVIDA: [
         OrbitalElements(
             name="Davida",
             epoch=2323707.5,
@@ -6309,7 +6309,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.17338027534326131,
         ),  # ~2450
     ],
-    SE_ERIS: [
+    ERIS: [
         OrbitalElements(
             name="Eris",
             epoch=2323707.5,
@@ -7202,7 +7202,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0017583395990942057,
         ),  # ~2450
     ],
-    SE_EROS: [
+    EROS: [
         OrbitalElements(
             name="Eros",
             epoch=2323707.5,
@@ -8095,7 +8095,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.55963406968943186,
         ),  # ~2450
     ],
-    SE_EUROPA_AST: [
+    EUROPA_AST: [
         OrbitalElements(
             name="Europa",
             epoch=2323707.5,
@@ -8988,7 +8988,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.18062614120400117,
         ),  # ~2450
     ],
-    SE_GONGGONG: [
+    GONGGONG: [
         OrbitalElements(
             name="Gonggong",
             epoch=2323707.5,
@@ -9881,7 +9881,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0018052226875982888,
         ),  # ~2450
     ],
-    SE_HAUMEA: [
+    HAUMEA: [
         OrbitalElements(
             name="Haumea",
             epoch=2323707.5,
@@ -10774,7 +10774,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0034489313495560722,
         ),  # ~2450
     ],
-    SE_HIDALGO: [
+    HIDALGO: [
         OrbitalElements(
             name="Hidalgo",
             epoch=2323707.5,
@@ -11667,7 +11667,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.071641732980035108,
         ),  # ~2450
     ],
-    SE_HYGIEA: [
+    HYGIEA: [
         OrbitalElements(
             name="Hygiea",
             epoch=2323707.5,
@@ -12560,7 +12560,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.17750539880671404,
         ),  # ~2450
     ],
-    SE_ICARUS: [
+    ICARUS: [
         OrbitalElements(
             name="Icarus",
             epoch=2323707.5,
@@ -13453,7 +13453,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.88165198178469362,
         ),  # ~2450
     ],
-    SE_INTERAMNIA: [
+    INTERAMNIA: [
         OrbitalElements(
             name="Interamnia",
             epoch=2323707.5,
@@ -14346,7 +14346,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.18402348969367105,
         ),  # ~2450
     ],
-    SE_ITOKAWA: [
+    ITOKAWA: [
         OrbitalElements(
             name="Itokawa",
             epoch=2323707.5,
@@ -15239,7 +15239,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.64914539841196073,
         ),  # ~2450
     ],
-    SE_IXION: [
+    IXION: [
         OrbitalElements(
             name="Ixion",
             epoch=2323707.5,
@@ -16132,7 +16132,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0039871191960775872,
         ),  # ~2450
     ],
-    SE_JUNO: [
+    JUNO: [
         OrbitalElements(
             name="Juno",
             epoch=2323707.5,
@@ -17025,7 +17025,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.22604775915641742,
         ),  # ~2450
     ],
-    SE_LILITH_AST: [
+    LILITH_AST: [
         OrbitalElements(
             name="Lilith",
             epoch=2323707.5,
@@ -17918,7 +17918,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.22662215088953991,
         ),  # ~2450
     ],
-    SE_MAKEMAKE: [
+    MAKEMAKE: [
         OrbitalElements(
             name="Makemake",
             epoch=2323707.5,
@@ -18811,7 +18811,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.003193541891467764,
         ),  # ~2450
     ],
-    SE_NESSUS: [
+    NESSUS: [
         OrbitalElements(
             name="Nessus",
             epoch=2323707.5,
@@ -19704,7 +19704,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0080469974642078581,
         ),  # ~2450
     ],
-    SE_ORCUS: [
+    ORCUS: [
         OrbitalElements(
             name="Orcus",
             epoch=2323707.5,
@@ -20597,7 +20597,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.0039836919025200727,
         ),  # ~2450
     ],
-    SE_PALLAS: [
+    PALLAS: [
         OrbitalElements(
             name="Pallas",
             epoch=2323707.5,
@@ -21490,7 +21490,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.2139365988643645,
         ),  # ~2450
     ],
-    SE_PANDORA_AST: [
+    PANDORA_AST: [
         OrbitalElements(
             name="Pandora",
             epoch=2323707.5,
@@ -22383,7 +22383,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.21503293208141733,
         ),  # ~2450
     ],
-    SE_PHOLUS: [
+    PHOLUS: [
         OrbitalElements(
             name="Pholus",
             epoch=2323707.5,
@@ -23276,7 +23276,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.011525064297328955,
         ),  # ~2450
     ],
-    SE_PSYCHE: [
+    PSYCHE: [
         OrbitalElements(
             name="Psyche",
             epoch=2323707.5,
@@ -24169,7 +24169,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.19721021977917333,
         ),  # ~2450
     ],
-    SE_QUAOAR: [
+    QUAOAR: [
         OrbitalElements(
             name="Quaoar",
             epoch=2323707.5,
@@ -25062,7 +25062,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.003443441150285438,
         ),  # ~2450
     ],
-    SE_RYUGU: [
+    RYUGU: [
         OrbitalElements(
             name="Ryugu",
             epoch=2323707.5,
@@ -25955,7 +25955,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.75221182635452399,
         ),  # ~2450
     ],
-    SE_SAPPHO: [
+    SAPPHO: [
         OrbitalElements(
             name="Sappho",
             epoch=2323707.5,
@@ -26848,7 +26848,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.28329133653761607,
         ),  # ~2450
     ],
-    SE_SEDNA: [
+    SEDNA: [
         OrbitalElements(
             name="Sedna",
             epoch=2323707.5,
@@ -27741,7 +27741,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=8.8880843968642344e-05,
         ),  # ~2450
     ],
-    SE_SYLVIA: [
+    SYLVIA: [
         OrbitalElements(
             name="Sylvia",
             epoch=2323707.5,
@@ -28634,7 +28634,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.1515166009883292,
         ),  # ~2450
     ],
-    SE_TORO: [
+    TORO: [
         OrbitalElements(
             name="Toro",
             epoch=2323707.5,
@@ -29527,7 +29527,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.61686455332745171,
         ),  # ~2450
     ],
-    SE_TOUTATIS: [
+    TOUTATIS: [
         OrbitalElements(
             name="Toutatis",
             epoch=2323707.5,
@@ -30420,7 +30420,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.25378109189921166,
         ),  # ~2450
     ],
-    SE_VARUNA: [
+    VARUNA: [
         OrbitalElements(
             name="Varuna",
             epoch=2323707.5,
@@ -31313,7 +31313,7 @@ MINOR_BODY_ELEMENTS_MULTI: dict[int, list[OrbitalElements]] = {
             n=0.003487537067213923,
         ),  # ~2450
     ],
-    SE_VESTA: [
+    VESTA: [
         OrbitalElements(
             name="Vesta",
             epoch=2323707.5,

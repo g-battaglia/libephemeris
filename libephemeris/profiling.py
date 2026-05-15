@@ -326,7 +326,7 @@ def profile_planetary_calculations(
 
     Args:
         iterations: Number of date iterations
-        include_speed: Include velocity calculations (SEFLG_SPEED)
+        include_speed: Include velocity calculations (FLG_SPEED)
         planets: List of planet IDs to calculate (default: all major planets)
 
     Returns:
@@ -334,39 +334,39 @@ def profile_planetary_calculations(
     """
     import libephemeris as ephem
     from libephemeris.constants import (
-        SE_SUN,
-        SE_MOON,
-        SE_MERCURY,
-        SE_VENUS,
-        SE_MARS,
-        SE_JUPITER,
-        SE_SATURN,
-        SE_URANUS,
-        SE_NEPTUNE,
-        SE_PLUTO,
-        SEFLG_SPEED,
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+        FLG_SPEED,
     )
 
     if planets is None:
         planets = [
-            SE_SUN,
-            SE_MOON,
-            SE_MERCURY,
-            SE_VENUS,
-            SE_MARS,
-            SE_JUPITER,
-            SE_SATURN,
-            SE_URANUS,
-            SE_NEPTUNE,
-            SE_PLUTO,
+            SUN,
+            MOON,
+            MERCURY,
+            VENUS,
+            MARS,
+            JUPITER,
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
         ]
 
-    flags = SEFLG_SPEED if include_speed else 0
+    flags = FLG_SPEED if include_speed else 0
     jd_start = 2451545.0  # J2000.0
 
     # Warmup to load ephemeris
     for planet in planets:
-        ephem.swe_calc_ut(jd_start, planet, flags)
+        ephem.calc_ut(jd_start, planet, flags)
 
     # Profile the main calculation loop
     with ProfileContext(
@@ -375,7 +375,7 @@ def profile_planetary_calculations(
         for i in range(iterations):
             jd = jd_start + i
             for planet in planets:
-                ephem.swe_calc_ut(jd, planet, flags)
+                ephem.calc_ut(jd, planet, flags)
 
     return p.get_report()
 
@@ -403,7 +403,7 @@ def profile_house_calculations(
     lat, lon = 41.9028, 12.4964  # Rome
 
     # Warmup
-    ephem.swe_houses(jd_start, lat, lon, ord("P"))
+    ephem.houses(jd_start, lat, lon, ord("P"))
 
     with ProfileContext(
         name=f"House Calculations ({iterations} dates x {len(house_systems)} systems)"
@@ -411,7 +411,7 @@ def profile_house_calculations(
         for i in range(iterations):
             jd = jd_start + i
             for hsys in house_systems:
-                ephem.swe_houses(jd, lat, lon, ord(hsys))
+                ephem.houses(jd, lat, lon, ord(hsys))
 
     return p.get_report()
 

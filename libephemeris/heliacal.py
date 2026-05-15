@@ -5,12 +5,12 @@ Calculates heliacal risings and settings, visual limiting magnitude,
 and related heliacal phenomena for celestial bodies.
 
 Functions:
-- heliacal_ut: Find heliacal rising/setting time for a body
-- swe_heliacal_ut: Alias for heliacal_ut
-- heliacal_pheno_ut: Calculate detailed heliacal phenomena
-- swe_heliacal_pheno_ut: Alias for heliacal_pheno_ut
+- _heliacal_ut_pythonic: Find heliacal rising/setting time for a body
+- heliacal_ut: Alias for _heliacal_ut_pythonic
+- _heliacal_pheno_ut_pythonic: Calculate detailed heliacal phenomena
+- heliacal_pheno_ut: Alias for _heliacal_pheno_ut_pythonic
 - vis_limit_mag: Calculate visual limiting magnitude
-- swe_vis_limit_mag: Alias for vis_limit_mag
+- vis_limit_mag: Alias for vis_limit_mag
 
 Historical Note:
     Heliacal risings were crucial for ancient calendars. The heliacal
@@ -33,19 +33,19 @@ from typing import Tuple, NamedTuple, Optional
 import numpy as np
 
 from .constants import (
-    SE_SUN,
-    SE_MOON,
-    SE_MERCURY,
-    SE_VENUS,
-    SE_FIXSTAR_OFFSET,
-    SEFLG_SPEED,
-    SEFLG_SWIEPH,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    FIXSTAR_OFFSET,
+    FLG_SPEED,
+    FLG_SWIEPH,
 )
 
 # Inner planets (orbit inside Earth's orbit)
 # These have both inferior conjunction (between Earth and Sun)
 # and superior conjunction (behind the Sun)
-INNER_PLANETS = {SE_MERCURY, SE_VENUS}
+INNER_PLANETS = {MERCURY, VENUS}
 
 
 # =============================================================================
@@ -787,7 +787,7 @@ def create_schaefer_model(
 
 # Outer planets (orbit outside Earth's orbit)
 # These only have one type of conjunction (behind the Sun)
-# SE_EVENING_FIRST and SE_MORNING_LAST are not applicable to these
+# EVENING_FIRST and MORNING_LAST are not applicable to these
 
 
 def is_fixed_star(body: int) -> bool:
@@ -798,9 +798,9 @@ def is_fixed_star(body: int) -> bool:
         body: Body ID constant
 
     Returns:
-        True if the body is a fixed star (ID >= SE_FIXSTAR_OFFSET), False otherwise
+        True if the body is a fixed star (ID >= FIXSTAR_OFFSET), False otherwise
     """
-    return body >= SE_FIXSTAR_OFFSET
+    return body >= FIXSTAR_OFFSET
 
 
 def _get_star_magnitude(star_id: int) -> float:
@@ -808,7 +808,7 @@ def _get_star_magnitude(star_id: int) -> float:
     Get the visual magnitude of a fixed star from the catalog.
 
     Args:
-        star_id: Star ID (SE_* constant, e.g., SE_SIRIUS)
+        star_id: Star ID (SE_* constant, e.g., SIRIUS)
 
     Returns:
         Visual magnitude of the star. Brighter stars have lower/negative values.
@@ -831,7 +831,7 @@ def is_inner_planet(body: int) -> bool:
     morning and evening stars.
 
     Args:
-        body: Planet ID constant (SE_MERCURY, SE_VENUS, etc.)
+        body: Planet ID constant (MERCURY, VENUS, etc.)
 
     Returns:
         True if the body is Mercury or Venus, False otherwise
@@ -845,7 +845,7 @@ def is_inner_planet(body: int) -> bool:
 #
 # These private functions replicate the Skyfield-based heliacal logic
 # using the LEB fast_calc pipeline.  They are called from the three public
-# entry-points (heliacal_ut, heliacal_pheno_ut, vis_limit_mag) when a
+# entry-points (_heliacal_ut_pythonic, _heliacal_pheno_ut_pythonic, vis_limit_mag) when a
 # LEBReader is available, avoiding the 3 GB DE-kernel load entirely.
 # =============================================================================
 
@@ -885,24 +885,24 @@ def _leb_body_altaz(
     Returns:
         (azimuth, true_altitude, apparent_altitude) in degrees.
     """
-    from .utils import azalt, SE_ECL2HOR
+    from .utils import azalt, ECL2HOR
 
     if is_star:
-        from .fixed_stars import swe_fixstar_ut
+        from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        pos, _name, _flags = swe_fixstar_ut(star_name, jd_ut, SEFLG_SPEED)
+        pos, _name, _flags = fixstar_ut(star_name, jd_ut, FLG_SPEED)
         ecl_lon, ecl_lat, ecl_dist = pos[0], pos[1], pos[2]
     else:
         from .fast_calc import _topo_ecliptic
-        from .time_utils import swe_deltat
+        from .time_utils import deltat
 
-        jd_tt = jd_ut + swe_deltat(jd_ut)
+        jd_tt = jd_ut + deltat(jd_ut)
         topo = _topo_ecliptic(reader, jd_tt, jd_ut, body_id, geopos_lonlat)
         ecl_lon, ecl_lat, ecl_dist = topo[0], topo[1], topo[2]
 
     az, alt_true, alt_app = azalt(
-        jd_ut, SE_ECL2HOR, geopos_lonlat, atpress, attemp,
+        jd_ut, ECL2HOR, geopos_lonlat, atpress, attemp,
         (ecl_lon, ecl_lat, ecl_dist),
     )
     # Convert SE convention (S=0, westward) to Skyfield convention (N=0, eastward)
@@ -922,19 +922,19 @@ def _leb_ecliptic_pos(
     """Return ecliptic (lon, lat, dist) for a body via LEB.
 
     For planets this is topocentric ecliptic of date; for stars it
-    uses the already-LEB-ported swe_fixstar_ut.
+    uses the already-LEB-ported fixstar_ut.
     """
     if is_star:
-        from .fixed_stars import swe_fixstar_ut
+        from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        pos, _name, _flags = swe_fixstar_ut(star_name, jd_ut, SEFLG_SPEED)
+        pos, _name, _flags = fixstar_ut(star_name, jd_ut, FLG_SPEED)
         return pos[0], pos[1], pos[2]
     else:
         from .fast_calc import _topo_ecliptic
-        from .time_utils import swe_deltat
+        from .time_utils import deltat
 
-        jd_tt = jd_ut + swe_deltat(jd_ut)
+        jd_tt = jd_ut + deltat(jd_ut)
         topo = _topo_ecliptic(reader, jd_tt, jd_ut, body_id, geopos_lonlat)
         return topo[0], topo[1], topo[2]
 
@@ -952,45 +952,45 @@ def _heliacal_ut_leb(
     event_type: int,
     flags: int,
 ) -> tuple:
-    """LEB-backed implementation of heliacal_ut().
+    """LEB-backed implementation of _heliacal_ut_pythonic().
 
     Mirrors the Skyfield version but obtains all positions via
-    _topo_ecliptic / swe_fixstar_ut / azalt / angular_separation.
+    _topo_ecliptic / fixstar_ut / azalt / angular_separation.
     """
     from .constants import (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, pheno_ut
     from .utils import angular_separation
 
     # --- validation (same as Skyfield path) ---
     if event_type not in (
-        SE_HELIACAL_RISING, SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST, SE_MORNING_LAST,
+        HELIACAL_RISING, HELIACAL_SETTING,
+        EVENING_FIRST, MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
-            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
-    if event_type in (SE_EVENING_FIRST, SE_MORNING_LAST):
+    if event_type in (EVENING_FIRST, MORNING_LAST):
         if is_fixed_star(body):
             raise ValueError(
-                "SE_EVENING_FIRST and SE_MORNING_LAST are not valid for fixed stars. "
-                "For fixed stars, use SE_HELIACAL_RISING or SE_HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
+                "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
             )
         if not is_inner_planet(body):
             raise ValueError(
-                "SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus). For outer planets, use SE_HELIACAL_RISING or "
-                "SE_HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
+                "(Mercury, Venus). For outer planets, use HELIACAL_RISING or "
+                "HELIACAL_SETTING."
             )
-    if body == SE_SUN:
-        raise ValueError("SE_SUN is not valid for heliacal calculations")
-    if body == SE_MOON:
-        raise ValueError("SE_MOON is not valid for heliacal calculations")
+    if body == SUN:
+        raise ValueError("SUN is not valid for heliacal calculations")
+    if body == MOON:
+        raise ValueError("MOON is not valid for heliacal calculations")
 
     is_star = is_fixed_star(body)
     if not is_star and body not in _PLANET_MAP:
@@ -1010,7 +1010,7 @@ def _heliacal_ut_leb(
     def _get_altitudes(jd: float):
         """Return (sun_alt, body_alt, body_az)."""
         _, sun_alt, _ = _leb_body_altaz(
-            reader, jd, SE_SUN, geopos, pressure, temperature,
+            reader, jd, SUN, geopos, pressure, temperature,
         )
         az, body_alt, _ = _leb_body_altaz(
             reader, jd, body, geopos, pressure, temperature,
@@ -1021,12 +1021,12 @@ def _heliacal_ut_leb(
     def _get_elongation(jd: float) -> float:
         if not is_star:
             try:
-                pheno = swe_pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, flags)
                 return pheno[2]
             except (ValueError, TypeError, ArithmeticError):
                 pass
         # Manual elongation from ecliptic coords
-        sun_ecl = _leb_ecliptic_pos(reader, jd, SE_SUN, geopos)
+        sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
         body_ecl = _leb_ecliptic_pos(
             reader, jd, body, geopos,
             is_star=is_star, star_name=star_name,
@@ -1037,7 +1037,7 @@ def _heliacal_ut_leb(
         if is_star:
             return star_magnitude
         try:
-            pheno = swe_pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, flags)
             return pheno[4]
         except (ValueError, TypeError, ArithmeticError):
             return 0.0
@@ -1052,17 +1052,17 @@ def _heliacal_ut_leb(
     def _get_moon_data(jd: float):
         """Return (moon_alt, phase, moon_body_sep)."""
         _, moon_alt, _ = _leb_body_altaz(
-            reader, jd, SE_MOON, geopos, pressure, temperature,
+            reader, jd, MOON, geopos, pressure, temperature,
         )
         # Moon phase from geocentric elongation (matching Skyfield path)
-        from .planets import swe_calc_ut as _scu_md
-        _sun_geo, _ = _scu_md(jd, SE_SUN, SEFLG_SPEED)
-        _moon_geo, _ = _scu_md(jd, SE_MOON, SEFLG_SPEED)
+        from .planets import calc_ut as _scu_md
+        _sun_geo, _ = _scu_md(jd, SUN, FLG_SPEED)
+        _moon_geo, _ = _scu_md(jd, MOON, FLG_SPEED)
         elong_moon = angular_separation(
             _sun_geo[0], _sun_geo[1], _moon_geo[0], _moon_geo[1],
         )
         phase = (1.0 - math.cos(math.radians(elong_moon))) / 2.0
-        moon_ecl = _leb_ecliptic_pos(reader, jd, SE_MOON, geopos)
+        moon_ecl = _leb_ecliptic_pos(reader, jd, MOON, geopos)
 
         body_ecl = _leb_ecliptic_pos(
             reader, jd, body, geopos,
@@ -1250,13 +1250,13 @@ def _heliacal_ut_leb(
         return last_visible_jd if last_visible_jd > 0 else 0.0
 
     # --- main dispatch ---
-    if event_type == SE_HELIACAL_RISING:
+    if event_type == HELIACAL_RISING:
         jd_event = _search_heliacal_rising(jd_start)
-    elif event_type == SE_HELIACAL_SETTING:
+    elif event_type == HELIACAL_SETTING:
         jd_event = _search_heliacal_setting(jd_start)
-    elif event_type == SE_EVENING_FIRST:
+    elif event_type == EVENING_FIRST:
         jd_event = _search_evening_first(jd_start)
-    elif event_type == SE_MORNING_LAST:
+    elif event_type == MORNING_LAST:
         jd_event = _search_morning_last(jd_start)
     else:
         jd_event = 0.0
@@ -1280,23 +1280,23 @@ def _heliacal_pheno_ut_leb(
     event_type: int,
     flags: int,
 ) -> tuple:
-    """LEB-backed implementation of heliacal_pheno_ut()."""
+    """LEB-backed implementation of _heliacal_pheno_ut_pythonic()."""
     from .constants import (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, pheno_ut
     from .utils import angular_separation
 
     if event_type not in (
-        SE_HELIACAL_RISING, SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST, SE_MORNING_LAST,
+        HELIACAL_RISING, HELIACAL_SETTING,
+        EVENING_FIRST, MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
-            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
 
     is_star = is_fixed_star(body)
@@ -1314,7 +1314,7 @@ def _heliacal_pheno_ut_leb(
     # --- positions via LEB ---
     # Sun
     sun_az, sun_alt_deg, _ = _leb_body_altaz(
-        reader, jd, SE_SUN, geopos, pressure, temperature,
+        reader, jd, SUN, geopos, pressure, temperature,
     )
 
     # Body
@@ -1338,25 +1338,25 @@ def _heliacal_pheno_ut_leb(
         reader, jd, body, geopos,
         is_star=is_star, star_name=star_name,
     )
-    sun_ecl = _leb_ecliptic_pos(reader, jd, SE_SUN, geopos)
+    sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
 
     # Geocentric altitude from equatorial coords (matching Skyfield path)
-    from .constants import SEFLG_EQUATORIAL
+    from .constants import FLG_EQUATORIAL
 
     # Use J2000 equatorial (ICRS) to match the Skyfield path's .radec()
     # default frame for geocentric altitude calculation.
-    from .constants import SEFLG_J2000
+    from .constants import FLG_J2000
 
     if is_star:
-        from .fixed_stars import swe_fixstar_ut
-        _eq_pos, _, _ = swe_fixstar_ut(
-            star_name, jd, SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
+        from .fixed_stars import fixstar_ut
+        _eq_pos, _, _ = fixstar_ut(
+            star_name, jd, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
-        from .planets import swe_calc_ut as _scu_hp
+        from .planets import calc_ut as _scu_hp
         _eq_pos, _ = _scu_hp(
-            jd, body, SEFLG_EQUATORIAL | SEFLG_J2000 | SEFLG_SPEED
+            jd, body, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
 
@@ -1396,7 +1396,7 @@ def _heliacal_pheno_ut_leb(
         phase_angle = 0.0
     else:
         try:
-            pheno = swe_pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, flags)
             elongation = pheno[2]
             magnitude = pheno[4]
             phase_angle = pheno[0]
@@ -1424,8 +1424,8 @@ def _heliacal_pheno_ut_leb(
     else:
         earth_radius_au = 6371.0 / 149597870.7
         # Use geocentric distance (not topocentric) for parallax, matching Skyfield
-        from .planets import swe_calc_ut as _scu_par
-        _geo_pos, _ = _scu_par(jd, body, SEFLG_SPEED)
+        from .planets import calc_ut as _scu_par
+        _geo_pos, _ = _scu_par(jd, body, FLG_SPEED)
         dist_au = _geo_pos[2]
         if dist_au > 0:
             parallax = math.degrees(math.asin(earth_radius_au / dist_au))
@@ -1433,7 +1433,7 @@ def _heliacal_pheno_ut_leb(
             parallax = 0.0
 
     # Rise/set estimates (same simplified logic as Skyfield path)
-    is_morning = event_type in (SE_HELIACAL_RISING, SE_MORNING_LAST)
+    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
     rise_set_correction = -0.833
     lat_rad = math.radians(lat)
 
@@ -1479,9 +1479,9 @@ def _heliacal_pheno_ut_leb(
 
     w_moon = 0.0
     l_moon = 0.0
-    if body == SE_MOON:
+    if body == MOON:
         try:
-            moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, flags)
             phase_angle_deg = moon_pheno[0]
             illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
             if phase_angle_deg > 0:
@@ -1494,7 +1494,7 @@ def _heliacal_pheno_ut_leb(
         except (ValueError, TypeError, ArithmeticError):
             pass
 
-    if body == SE_MOON:
+    if body == MOON:
         w = w_moon * 60.0
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
@@ -1563,18 +1563,18 @@ def _vis_limit_mag_leb(
     flags: int,
 ) -> tuple:
     """LEB-backed implementation of vis_limit_mag()."""
-    from .planets import _PLANET_MAP, swe_pheno_ut
-    from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
-    from .utils import azalt, angular_separation, SE_ECL2HOR
+    from .planets import _PLANET_MAP, pheno_ut
+    from .fixed_stars import fixstar2_ut, fixstar2_mag
+    from .utils import azalt, angular_separation, ECL2HOR
     from .constants import (
-        SE_SUN,
-        SE_MOON,
-        SE_HELFLAG_VISLIM_DARK,
-        SE_HELFLAG_VISLIM_NOMOON,
-        SE_HELFLAG_BELOW_HORIZON,
-        SE_HELFLAG_PHOTOPIC,
-        SE_HELFLAG_SCOTOPIC,
-        SE_HELFLAG_MIXED,
+        SUN,
+        MOON,
+        HELFLAG_VISLIM_DARK,
+        HELFLAG_VISLIM_NOMOON,
+        HELFLAG_BELOW_HORIZON,
+        HELFLAG_PHOTOPIC,
+        HELFLAG_SCOTOPIC,
+        HELFLAG_MIXED,
     )
 
     if not objname:
@@ -1596,12 +1596,12 @@ def _vis_limit_mag_leb(
 
     # Sun position
     sun_az, sun_alt, _ = _leb_body_altaz(
-        reader, tjdut, SE_SUN, geopos_ll, pressure, temperature,
+        reader, tjdut, SUN, geopos_ll, pressure, temperature,
     )
 
     # Moon position
     moon_az, moon_alt, _ = _leb_body_altaz(
-        reader, tjdut, SE_MOON, geopos_ll, pressure, temperature,
+        reader, tjdut, MOON, geopos_ll, pressure, temperature,
     )
 
     # Determine object
@@ -1613,7 +1613,7 @@ def _vis_limit_mag_leb(
     except ValueError:
         name_upper = objname.upper().strip()
         planet_names = {
-            "SUN": SE_SUN, "MOON": SE_MOON,
+            "SUN": SUN, "MOON": MOON,
             "MERCURY": 2, "VENUS": 3, "MARS": 4,
             "JUPITER": 5, "SATURN": 6, "URANUS": 7,
             "NEPTUNE": 8, "PLUTO": 9,
@@ -1629,20 +1629,20 @@ def _vis_limit_mag_leb(
 
     if is_star_flag:
         try:
-            star_result, _star_name_out, _retflag = swe_fixstar2_ut(
+            star_result, _star_name_out, _retflag = fixstar2_ut(
                 objname, tjdut, flags & 0xFF
             )
             star_lon = star_result[0]
             star_lat = star_result[1]
 
             try:
-                star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
+                star_mag_val, _star_name_mag = fixstar2_mag(objname)
                 obj_mag = star_mag_val
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 2.0
 
             hor_result = azalt(
-                tjdut, SE_ECL2HOR, geopos_ll, pressure, temperature,
+                tjdut, ECL2HOR, geopos_ll, pressure, temperature,
                 (star_lon, star_lat, 1.0),
             )
             obj_az = hor_result[0]
@@ -1663,7 +1663,7 @@ def _vis_limit_mag_leb(
             obj_az = az
 
             try:
-                pheno_result = swe_pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, flags)
                 obj_mag = pheno_result[4]
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0
@@ -1672,10 +1672,10 @@ def _vis_limit_mag_leb(
 
     if obj_alt < 0:
         dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        return float(SE_HELFLAG_BELOW_HORIZON), dret
+        return float(HELFLAG_BELOW_HORIZON), dret
 
-    use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
-    exclude_moon = bool(flags & SE_HELFLAG_VISLIM_NOMOON)
+    use_dark_sky = bool(flags & HELFLAG_VISLIM_DARK)
+    exclude_moon = bool(flags & HELFLAG_VISLIM_NOMOON)
 
     if use_dark_sky:
         sun_alt = -90.0
@@ -1697,19 +1697,19 @@ def _vis_limit_mag_leb(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = swe_pheno_ut(tjdut, SE_MOON, flags & 0xFF)
+        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 
         if is_star_flag:
-            from .fixed_stars import swe_fixstar_ut as _sfut_vlm
-            _star_ecl, _, _ = _sfut_vlm(objname, tjdut, SEFLG_SPEED)
+            from .fixed_stars import fixstar_ut as _sfut_vlm
+            _star_ecl, _, _ = _sfut_vlm(objname, tjdut, FLG_SPEED)
             _star_pos = (_star_ecl[0], _star_ecl[1])
         else:
             _body_ecl = _leb_ecliptic_pos(reader, tjdut, body_id, geopos_ll)
             _star_pos = (_body_ecl[0], _body_ecl[1])
-        moon_ecl = _leb_ecliptic_pos(reader, tjdut, SE_MOON, geopos_ll)
-        sun_ecl = _leb_ecliptic_pos(reader, tjdut, SE_SUN, geopos_ll)
+        moon_ecl = _leb_ecliptic_pos(reader, tjdut, MOON, geopos_ll)
+        sun_ecl = _leb_ecliptic_pos(reader, tjdut, SUN, geopos_ll)
         moon_obj_angle = angular_separation(
             _star_pos[0], _star_pos[1], moon_ecl[0], moon_ecl[1],
         )
@@ -1731,11 +1731,11 @@ def _vis_limit_mag_leb(
     apparent_obj_mag = obj_mag + schaefer.extinction(obj_alt)
 
     if sun_alt >= -6:
-        vision_type = SE_HELFLAG_PHOTOPIC
+        vision_type = HELFLAG_PHOTOPIC
     elif sun_alt >= -12:
-        vision_type = SE_HELFLAG_MIXED
+        vision_type = HELFLAG_MIXED
     else:
-        vision_type = SE_HELFLAG_SCOTOPIC
+        vision_type = HELFLAG_SCOTOPIC
 
     dret = (
         limiting_mag, obj_alt, obj_az,
@@ -1745,7 +1745,7 @@ def _vis_limit_mag_leb(
     return float(vision_type), dret
 
 
-def heliacal_ut(
+def _heliacal_ut_pythonic(
     jd_start: float,
     lat: float,
     lon: float,
@@ -1753,9 +1753,9 @@ def heliacal_ut(
     pressure: float = 1013.25,
     temperature: float = 15.0,
     humidity: float = 0.5,
-    body: int = SE_SUN,
+    body: int = SUN,
     event_type: int = 1,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
 ) -> Tuple[float, int]:
     """
     Calculate heliacal rising or setting time for a celestial body.
@@ -1773,16 +1773,16 @@ def heliacal_ut(
         pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
         temperature: Temperature in Celsius for refraction (default 15)
         humidity: Relative humidity 0.0-1.0 for atmospheric extinction (default 0.5)
-        body: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN,
-              or fixed stars). Note: SE_SUN and SE_MOON are not valid for heliacal events.
+        body: Planet/body ID (MERCURY, VENUS, MARS, JUPITER, SATURN,
+              or fixed stars). Note: SUN and MOON are not valid for heliacal events.
         event_type: Type of heliacal event:
-            - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
-            - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
-            - SE_EVENING_FIRST (3): First evening visibility (after superior conjunction)
+            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
+            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
+            - EVENING_FIRST (3): First evening visibility (after superior conjunction)
               Note: Only valid for inner planets (Mercury, Venus)
-            - SE_MORNING_LAST (4): Last morning visibility (before superior conjunction)
+            - MORNING_LAST (4): Last morning visibility (before superior conjunction)
               Note: Only valid for inner planets (Mercury, Venus)
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
         Tuple containing:
@@ -1790,7 +1790,7 @@ def heliacal_ut(
             - retflag: Return flag (event_type on success, negative on error)
 
     Raises:
-        ValueError: If invalid body ID, event_type, or if SE_EVENING_FIRST/SE_MORNING_LAST
+        ValueError: If invalid body ID, event_type, or if EVENING_FIRST/MORNING_LAST
             is used with an outer planet (Mars, Jupiter, Saturn, etc.)
 
     Algorithm:
@@ -1816,15 +1816,15 @@ def heliacal_ut(
         positions without modern instruments.
 
     Example:
-        >>> from libephemeris import julday, heliacal_ut, SE_VENUS, SE_HELIACAL_RISING
+        >>> from libephemeris import julday, _heliacal_ut_pythonic, VENUS, HELIACAL_RISING
         >>> jd = julday(2024, 1, 1, 0)
         >>> # Find next heliacal rising of Venus from Rome
-        >>> jd_event, flag = heliacal_ut(jd, 41.9, 12.5, body=SE_VENUS,
-        ...                              event_type=SE_HELIACAL_RISING)
+        >>> jd_event, flag = _heliacal_ut_pythonic(jd, 41.9, 12.5, body=VENUS,
+        ...                              event_type=HELIACAL_RISING)
         >>> print(f"Heliacal rising at JD {jd_event:.5f}")
 
     References:
-        - Reference API: swe_heliacal_ut()
+        - Reference API: heliacal_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
         - Ptolemy's criteria for heliacal visibility
     """
@@ -1848,49 +1848,49 @@ def heliacal_ut(
     # --- END LEB fast path ---
 
     from .constants import (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, pheno_ut
     from .state import get_planets, get_timescale
     from skyfield.api import wgs84
 
     # Validate event type
     if event_type not in (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
-            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
 
-    # SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets
+    # EVENING_FIRST and MORNING_LAST are only valid for inner planets
     # (Mercury and Venus) because they relate to superior conjunction visibility.
     # Outer planets only have one type of conjunction and these events don't apply.
     # Fixed stars only have heliacal rising and setting.
-    if event_type in (SE_EVENING_FIRST, SE_MORNING_LAST):
+    if event_type in (EVENING_FIRST, MORNING_LAST):
         if is_fixed_star(body):
             raise ValueError(
-                "SE_EVENING_FIRST and SE_MORNING_LAST are not valid for fixed stars. "
-                "For fixed stars, use SE_HELIACAL_RISING or SE_HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
+                "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
             )
         if not is_inner_planet(body):
             raise ValueError(
-                "SE_EVENING_FIRST and SE_MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus). For outer planets, use SE_HELIACAL_RISING or "
-                "SE_HELIACAL_SETTING."
+                "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
+                "(Mercury, Venus). For outer planets, use HELIACAL_RISING or "
+                "HELIACAL_SETTING."
             )
 
     # Sun and Moon are not valid for heliacal events
-    if body == SE_SUN:
-        raise ValueError("SE_SUN is not valid for heliacal calculations")
-    if body == SE_MOON:
-        raise ValueError("SE_MOON is not valid for heliacal calculations")
+    if body == SUN:
+        raise ValueError("SUN is not valid for heliacal calculations")
+    if body == MOON:
+        raise ValueError("MOON is not valid for heliacal calculations")
 
     # Check if this is a fixed star
     is_star = is_fixed_star(body)
@@ -1977,7 +1977,7 @@ def heliacal_ut(
         """Get the elongation of body from Sun in degrees."""
         if not is_star:
             try:
-                pheno = swe_pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, flags)
                 return pheno[2]  # Elongation
             except (ValueError, TypeError, ArithmeticError):
                 pass
@@ -1997,7 +1997,7 @@ def heliacal_ut(
             # For fixed stars, return the catalog magnitude
             return star_magnitude
         try:
-            pheno = swe_pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
         except (ValueError, TypeError, ArithmeticError):
             return 0.0  # Default to bright magnitude
@@ -2411,7 +2411,7 @@ def heliacal_ut(
         elongations = np.degrees(np.arccos(_cos_elong))
 
         # -- Phase 4: body magnitude --
-        # For planets swe_pheno_ut is expensive (~5ms). Sample every 10 days
+        # For planets pheno_ut is expensive (~5ms). Sample every 10 days
         # and interpolate; magnitude changes by <0.1 mag over 10 days for
         # most planets, well within the Schaefer detection margin.
         day_mags: dict[int, float] = {}
@@ -2602,13 +2602,13 @@ def heliacal_ut(
         return (jd_low + jd_high) / 2
 
     # Main search logic based on event type
-    if event_type == SE_HELIACAL_RISING:
+    if event_type == HELIACAL_RISING:
         jd_event = _search_heliacal_rising(jd_start)
-    elif event_type == SE_HELIACAL_SETTING:
+    elif event_type == HELIACAL_SETTING:
         jd_event = _search_heliacal_setting(jd_start)
-    elif event_type == SE_EVENING_FIRST:
+    elif event_type == EVENING_FIRST:
         jd_event = _search_evening_first(jd_start)
-    elif event_type == SE_MORNING_LAST:
+    elif event_type == MORNING_LAST:
         jd_event = _search_morning_last(jd_start)
     else:
         jd_event = 0.0
@@ -2619,19 +2619,19 @@ def heliacal_ut(
         return 0.0, -1  # Not found
 
 
-def swe_heliacal_ut(
+def heliacal_ut(
     tjdut: float,
     geopos: tuple,
     atmo: tuple,
     observer: tuple,
     objname: str,
     eventtype: int,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
 ) -> Tuple[float, float, float]:
     """
     Calculate heliacal rising or setting time for a celestial body.
 
-    This function implements the swe_heliacal_ut() API,
+    This function implements the heliacal_ut() API,
     finding the Julian day of the next heliacal phenomenon after a given
     start date. It works between geographic latitudes 60S - 60N.
 
@@ -2651,7 +2651,7 @@ def swe_heliacal_ut(
         observer: Observer description as a sequence of at least 6 values:
             - [0]: Age of observer in years (default: 36)
             - [1]: Snellen ratio of observer's eyes (default: 1.0 = normal)
-            - [2]: 0 = monocular, 1 = binocular (used if SE_HELFLAG_OPTICAL_PARAMS)
+            - [2]: 0 = monocular, 1 = binocular (used if HELFLAG_OPTICAL_PARAMS)
             - [3]: Telescope magnification (0 = naked eye)
             - [4]: Optical aperture (telescope diameter) in mm
             - [5]: Optical transmission coefficient
@@ -2662,31 +2662,31 @@ def swe_heliacal_ut(
             Note: Sun and Moon are not valid for heliacal calculations
               and will raise a ValueError.
         eventtype: Type of heliacal event:
-            - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
+            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
               Exists for all visible planets and stars.
-            - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
+            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
               Exists for all visible planets and stars.
-            - SE_EVENING_FIRST (3): First evening visibility after superior
+            - EVENING_FIRST (3): First evening visibility after superior
               conjunction. Only valid for inner planets (Mercury, Venus).
-            - SE_MORNING_LAST (4): Last morning visibility before superior
+            - MORNING_LAST (4): Last morning visibility before superior
               conjunction. Only valid for inner planets (Mercury, Venus).
         flags: Calculation flags (bitmap). Contains ephemeris flags like
-            SEFLG_SWIEPH, plus heliacal-specific flags:
-            - SE_HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters
+            FLG_SWIEPH, plus heliacal-specific flags:
+            - HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters
               from observer[2-5]. Without this flag, those values are ignored.
-            - SE_HELFLAG_NO_DETAILS (1024): Provide date only, skip visibility
+            - HELFLAG_NO_DETAILS (1024): Provide date only, skip visibility
               start/optimum/end details. Makes calculation faster.
-            - SE_HELFLAG_VISLIM_DARK (4096): Function behaves as if Sun at nadir.
-            - SE_HELFLAG_VISLIM_NOMOON (8192): Exclude Moon's brightness
+            - HELFLAG_VISLIM_DARK (4096): Function behaves as if Sun at nadir.
+            - HELFLAG_VISLIM_NOMOON (8192): Exclude Moon's brightness
               contribution (useful for calculating epoch heliacal dates).
 
     Returns:
         Tuple of 3 floats:
             - [0]: Start of visibility (Julian day number)
             - [1]: Optimum visibility (Julian day number),
-                   zero if SE_HELFLAG_NO_DETAILS is set
+                   zero if HELFLAG_NO_DETAILS is set
             - [2]: End of visibility (Julian day number),
-                   zero if SE_HELFLAG_NO_DETAILS is set
+                   zero if HELFLAG_NO_DETAILS is set
 
     Raises:
         ValueError: If invalid object_name, body ID, or event_type.
@@ -2716,8 +2716,8 @@ def swe_heliacal_ut(
         positions without modern instruments.
 
     Example:
-        >>> from libephemeris import julday, swe_heliacal_ut
-        >>> from libephemeris import SE_HELIACAL_RISING, SEFLG_SWIEPH
+        >>> from libephemeris import julday, heliacal_ut
+        >>> from libephemeris import HELIACAL_RISING, FLG_SWIEPH
         >>> jd = julday(2024, 1, 1, 0)
         >>> # Geographic position: Rome (lon, lat, altitude)
         >>> geopos = (12.5, 41.9, 0)
@@ -2726,14 +2726,14 @@ def swe_heliacal_ut(
         >>> # Observer: age 36, normal vision
         >>> dobs = (36.0, 1.0, 0, 0, 0, 0)
         >>> # Find next heliacal rising of Venus
-        >>> jd1, jd2, jd3 = swe_heliacal_ut(jd, geopos, datm, dobs,
-        ...                                  "Venus", SE_HELIACAL_RISING)
+        >>> jd1, jd2, jd3 = heliacal_ut(jd, geopos, datm, dobs,
+        ...                                  "Venus", HELIACAL_RISING)
         >>> if jd1 > 0:
         ...     print(f"Venus heliacal rising at JD {jd1:.5f}")
 
     See Also:
-        - heliacal_ut: Internal function using planet ID instead of name
-        - heliacal_pheno_ut: Detailed heliacal phenomena calculation
+        - _heliacal_ut_pythonic: Internal function using planet ID instead of name
+        - _heliacal_pheno_ut_pythonic: Detailed heliacal phenomena calculation
         - vis_limit_mag: Calculate limiting visual magnitude
 
     References:
@@ -2742,23 +2742,23 @@ def swe_heliacal_ut(
         - Ptolemy's criteria for heliacal visibility
     """
     from .constants import (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
-        SE_HELFLAG_NO_DETAILS,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
+        HELFLAG_NO_DETAILS,
     )
 
     # Validate event type
     if eventtype not in (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {eventtype}. Use SE_HELIACAL_RISING, "
-            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+            f"Invalid event_type: {eventtype}. Use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
 
     # Parse geopos
@@ -2778,8 +2778,8 @@ def swe_heliacal_ut(
     # Parse objname to get body ID
     body_id = _parse_object_name(objname)
 
-    # Call the internal heliacal_ut function
-    jd_event, retflag = heliacal_ut(
+    # Call the internal _heliacal_ut_pythonic function
+    jd_event, retflag = _heliacal_ut_pythonic(
         jd_start=tjdut,
         lat=lat,
         lon=lon,
@@ -2801,7 +2801,7 @@ def swe_heliacal_ut(
         jd1 = jd_event  # Start visibility
 
         # Calculate optimum and end visibility if details requested
-        if not (flags & SE_HELFLAG_NO_DETAILS):
+        if not (flags & HELFLAG_NO_DETAILS):
             # For detailed calculation, we estimate optimum and end times
             # based on typical visibility window durations
             # This is an approximation; full implementation would require
@@ -2818,7 +2818,7 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
     Args:
         object_name: Name of planet or fixed star (e.g., "Venus", "Sirius")
-        allow_moon: If True, allow Moon as a valid body (for heliacal_pheno_ut
+        allow_moon: If True, allow Moon as a valid body (for _heliacal_pheno_ut_pythonic
             which supports Moon crescent calculations)
 
     Returns:
@@ -2829,16 +2829,16 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     """
     # Import planet constants
     from .constants import (
-        SE_SUN,
-        SE_MOON,
-        SE_MERCURY,
-        SE_VENUS,
-        SE_MARS,
-        SE_JUPITER,
-        SE_SATURN,
-        SE_URANUS,
-        SE_NEPTUNE,
-        SE_PLUTO,
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
     )
 
     # Normalize name
@@ -2846,16 +2846,16 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
     # Planet name to ID mapping
     planet_map = {
-        "SUN": SE_SUN,
-        "MOON": SE_MOON,
-        "MERCURY": SE_MERCURY,
-        "VENUS": SE_VENUS,
-        "MARS": SE_MARS,
-        "JUPITER": SE_JUPITER,
-        "SATURN": SE_SATURN,
-        "URANUS": SE_URANUS,
-        "NEPTUNE": SE_NEPTUNE,
-        "PLUTO": SE_PLUTO,
+        "SUN": SUN,
+        "MOON": MOON,
+        "MERCURY": MERCURY,
+        "VENUS": VENUS,
+        "MARS": MARS,
+        "JUPITER": JUPITER,
+        "SATURN": SATURN,
+        "URANUS": URANUS,
+        "NEPTUNE": NEPTUNE,
+        "PLUTO": PLUTO,
     }
 
     # Check if it's a planet
@@ -2863,9 +2863,9 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
         body_id = planet_map[name_upper]
 
         # Sun is not valid for heliacal calculations
-        if body_id == SE_SUN:
+        if body_id == SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == SE_MOON and not allow_moon:
+        if body_id == MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
 
         return body_id
@@ -2873,9 +2873,9 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     # Try to parse as planet number
     try:
         body_id = int(object_name)
-        if body_id == SE_SUN:
+        if body_id == SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == SE_MOON and not allow_moon:
+        if body_id == MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
         return body_id
     except ValueError:
@@ -2897,7 +2897,7 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     )
 
 
-def heliacal_pheno_ut(
+def _heliacal_pheno_ut_pythonic(
     jd: float,
     lat: float,
     lon: float,
@@ -2905,9 +2905,9 @@ def heliacal_pheno_ut(
     pressure: float = 1013.25,
     temperature: float = 15.0,
     humidity: float = 0.5,
-    body: int = SE_SUN,
+    body: int = SUN,
     event_type: int = 1,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
 ) -> Tuple[Tuple[float, ...], int]:
     """
     Provides data relevant for the calculation of heliacal risings and settings.
@@ -2924,13 +2924,13 @@ def heliacal_pheno_ut(
         pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
         temperature: Temperature in Celsius for refraction (default 15)
         humidity: Relative humidity 0.0-1.0 for atmospheric extinction (default 0.5)
-        body: Planet/body ID (SE_MERCURY, SE_VENUS, SE_MARS, SE_JUPITER, SE_SATURN, etc.)
+        body: Planet/body ID (MERCURY, VENUS, MARS, JUPITER, SATURN, etc.)
         event_type: Type of heliacal event:
-            - SE_HELIACAL_RISING (1): Morning first visibility (heliacal rising)
-            - SE_HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
-            - SE_EVENING_FIRST (3): First evening visibility (after superior conjunction)
-            - SE_MORNING_LAST (4): Last morning visibility (before superior conjunction)
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
+            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
+            - EVENING_FIRST (3): First evening visibility (after superior conjunction)
+            - MORNING_LAST (4): Last morning visibility (before superior conjunction)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
         Tuple containing:
@@ -2968,15 +2968,15 @@ def heliacal_pheno_ut(
         ValueError: If invalid body ID or event_type
 
     Example:
-        >>> from libephemeris import julday, heliacal_pheno_ut, SE_VENUS, SE_HELIACAL_RISING
+        >>> from libephemeris import julday, _heliacal_pheno_ut_pythonic, VENUS, HELIACAL_RISING
         >>> jd = julday(2024, 1, 1, 0)
         >>> # Get heliacal phenomena for Venus at Rome
-        >>> dret, flag = heliacal_pheno_ut(jd, 41.9, 12.5, body=SE_VENUS,
-        ...                                 event_type=SE_HELIACAL_RISING)
+        >>> dret, flag = _heliacal_pheno_ut_pythonic(jd, 41.9, 12.5, body=VENUS,
+        ...                                 event_type=HELIACAL_RISING)
         >>> print(f"Object altitude: {dret[0]:.2f}, Sun altitude: {dret[4]:.2f}")
 
     References:
-        - Reference API: swe_heliacal_pheno_ut()
+        - Reference API: heliacal_pheno_ut()
         - Schoch "Planets in Mesopotamian Astral Science"
     """
     # --- LEB fast path ---
@@ -2999,25 +2999,25 @@ def heliacal_pheno_ut(
     # --- END LEB fast path ---
 
     from .constants import (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     )
-    from .planets import _PLANET_MAP, swe_pheno_ut
+    from .planets import _PLANET_MAP, pheno_ut
     from .state import get_planets, get_timescale
     from skyfield.api import wgs84
 
     # Validate event type
     if event_type not in (
-        SE_HELIACAL_RISING,
-        SE_HELIACAL_SETTING,
-        SE_EVENING_FIRST,
-        SE_MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
-            f"Invalid event_type: {event_type}. Use SE_HELIACAL_RISING, "
-            "SE_HELIACAL_SETTING, SE_EVENING_FIRST, or SE_MORNING_LAST."
+            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
+            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
 
     # Check if this is a fixed star
@@ -3156,7 +3156,7 @@ def heliacal_pheno_ut(
     daz_act = abs(daz_act)
 
     # Get elongation (longitude difference) from Sun
-    # For fixed stars, always calculate manually since swe_pheno_ut doesn't support them
+    # For fixed stars, always calculate manually since pheno_ut doesn't support them
     if is_star:
         # Calculate elongation manually for stars
         sun_geo = earth.at(t).observe(sun).apparent()
@@ -3165,7 +3165,7 @@ def heliacal_pheno_ut(
         phase_angle = 0.0  # Stars don't have phase angle
     else:
         try:
-            pheno = swe_pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, flags)
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
             phase_angle = pheno[0]  # Phase angle (index 0, not 1)
@@ -3205,7 +3205,7 @@ def heliacal_pheno_ut(
 
     # Calculate rise/set times for object and Sun
     # For morning events, we look for rise times; for evening, set times
-    is_morning = event_type in (SE_HELIACAL_RISING, SE_MORNING_LAST)
+    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
 
     # Use a simple estimate for rise/set time based on altitude
     # Rise/set occurs when altitude crosses 0 (corrected for refraction)
@@ -3273,10 +3273,10 @@ def heliacal_pheno_ut(
     w_moon = 0.0  # Crescent width
     l_moon = 0.0  # Crescent length
 
-    if body == SE_MOON:
+    if body == MOON:
         # Calculate Moon phase and crescent geometry
         try:
-            moon_pheno = swe_pheno_ut(jd, SE_MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, flags)
             phase_angle_deg = moon_pheno[0]  # [0] = phase angle in degrees
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
@@ -3288,7 +3288,7 @@ def heliacal_pheno_ut(
 
             # Crescent length (semicircle approximation)
             # L = pi * D / 2 where D is diameter
-            # Use actual distance-based apparent diameter from swe_pheno_ut
+            # Use actual distance-based apparent diameter from pheno_ut
             # (varies 0.49° at apogee to 0.56° at perigee)
             moon_diameter = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
@@ -3300,7 +3300,7 @@ def heliacal_pheno_ut(
     # Yallop q-test (for lunar crescent visibility)
     # q = (ARCV - (11.8371 - 6.3226*W + 0.7319*W^2 - 0.1018*W^3)) / 10
     # Simplified version
-    if body == SE_MOON:
+    if body == MOON:
         w = w_moon * 60.0  # Convert to arcminutes for formula
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
@@ -3366,20 +3366,20 @@ def heliacal_pheno_ut(
     return tuple(dret), flags
 
 
-def swe_heliacal_pheno_ut(
+def heliacal_pheno_ut(
     tjdut: float,
     geopos: tuple,
     atmo: tuple,
     observer: tuple,
     objname: str,
     eventtype: int,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
 ) -> Tuple[float, ...]:
     """
     Provides data relevant for the calculation of heliacal risings and settings.
 
-    This is the reference-compatible wrapper around heliacal_pheno_ut(). It
-    accepts the same parameter layout as pyswisseph's swe_heliacal_pheno_ut
+    This is the reference-compatible wrapper around _heliacal_pheno_ut_pythonic(). It
+    accepts the same parameter layout as pyswisseph's heliacal_pheno_ut
     and returns a flat 50-element tuple.
 
     Args:
@@ -3411,7 +3411,7 @@ def swe_heliacal_pheno_ut(
     body_id = _parse_object_name(objname, allow_moon=True)
 
     # Call internal function
-    dret, retflag = heliacal_pheno_ut(
+    dret, retflag = _heliacal_pheno_ut_pythonic(
         jd=tjdut,
         lat=lat,
         lon=lon,
@@ -3434,7 +3434,7 @@ def vis_limit_mag(
     atmo: tuple,
     observer: tuple,
     objname: str,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
 ) -> Tuple[float, Tuple[float, ...]]:
     """
     Calculate the limiting visual magnitude for observing a celestial body.
@@ -3470,7 +3470,7 @@ def vis_limit_mag(
             - Fixed star name (e.g., "Sirius", "Aldebaran")
             - Planet number as string (e.g., "2" for Venus)
         flags: Calculation flags combining ephemeris and heliacal flags:
-            - SEFLG_SWIEPH, SEFLG_JPLEPH, etc. for ephemeris
+            - FLG_SWIEPH, FLG_JPLEPH, etc. for ephemeris
             - HELFLAG_OPTICAL_PARAMS: Use optical instrument parameters
             - HELFLAG_NO_DETAILS: Skip detailed calculations
             - HELFLAG_VISLIM_DARK: Assume Sun at nadir (dark sky)
@@ -3525,7 +3525,7 @@ def vis_limit_mag(
         ...     print("Venus is not visible")
 
     References:
-        - Reference API: swe_vis_limit_mag()
+        - Reference API: vis_limit_mag()
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
     """
@@ -3547,18 +3547,18 @@ def vis_limit_mag(
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
-    from .planets import _PLANET_MAP, swe_pheno_ut
-    from .fixed_stars import swe_fixstar2_ut, swe_fixstar2_mag
+    from .planets import _PLANET_MAP, pheno_ut
+    from .fixed_stars import fixstar2_ut, fixstar2_mag
     from .state import get_planets, get_timescale
     from .constants import (
-        SE_SUN,
-        SE_MOON,
-        SE_HELFLAG_VISLIM_DARK,
-        SE_HELFLAG_VISLIM_NOMOON,
-        SE_HELFLAG_BELOW_HORIZON,
-        SE_HELFLAG_PHOTOPIC,
-        SE_HELFLAG_SCOTOPIC,
-        SE_HELFLAG_MIXED,
+        SUN,
+        MOON,
+        HELFLAG_VISLIM_DARK,
+        HELFLAG_VISLIM_NOMOON,
+        HELFLAG_BELOW_HORIZON,
+        HELFLAG_PHOTOPIC,
+        HELFLAG_SCOTOPIC,
+        HELFLAG_MIXED,
     )
     from skyfield.api import wgs84
 
@@ -3616,8 +3616,8 @@ def vis_limit_mag(
         # Try to find planet by name
         name_upper = objname.upper().strip()
         planet_names = {
-            "SUN": SE_SUN,
-            "MOON": SE_MOON,
+            "SUN": SUN,
+            "MOON": MOON,
             "MERCURY": 2,
             "VENUS": 3,
             "MARS": 4,
@@ -3641,7 +3641,7 @@ def vis_limit_mag(
     if is_fixed_star:
         # Fixed star calculation
         try:
-            star_result, _star_name_out, _retflag = swe_fixstar2_ut(
+            star_result, _star_name_out, _retflag = fixstar2_ut(
                 objname, tjdut, flags & 0xFF
             )
 
@@ -3652,18 +3652,18 @@ def vis_limit_mag(
 
             # Get star magnitude
             try:
-                star_mag_val, _star_name_mag = swe_fixstar2_mag(objname)
+                star_mag_val, _star_name_mag = fixstar2_mag(objname)
                 obj_mag = star_mag_val
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal
             # Simplified: use azalt function if available
-            from .utils import azalt, SE_ECL2HOR
+            from .utils import azalt, ECL2HOR
 
             hor_result = azalt(
                 tjdut,
-                SE_ECL2HOR,
+                ECL2HOR,
                 (lon, lat, alt_m),
                 pressure,
                 temperature,
@@ -3704,7 +3704,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result = swe_pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0  # Default bright
@@ -3715,11 +3715,11 @@ def vis_limit_mag(
     if obj_alt < 0:
         # Match reference API: return all zeros in data when below horizon
         dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-        return float(SE_HELFLAG_BELOW_HORIZON), dret
+        return float(HELFLAG_BELOW_HORIZON), dret
 
     # Apply HELFLAG options
-    use_dark_sky = bool(flags & SE_HELFLAG_VISLIM_DARK)
-    exclude_moon = bool(flags & SE_HELFLAG_VISLIM_NOMOON)
+    use_dark_sky = bool(flags & HELFLAG_VISLIM_DARK)
+    exclude_moon = bool(flags & HELFLAG_VISLIM_NOMOON)
 
     if use_dark_sky:
         sun_alt = -90.0  # Assume Sun at nadir
@@ -3743,7 +3743,7 @@ def vis_limit_mag(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = swe_pheno_ut(tjdut, SE_MOON, flags & 0xFF)
+        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 
@@ -3780,11 +3780,11 @@ def vis_limit_mag(
 
     # Determine vision type based on sky brightness
     if sun_alt >= -6:
-        vision_type = SE_HELFLAG_PHOTOPIC
+        vision_type = HELFLAG_PHOTOPIC
     elif sun_alt >= -12:
-        vision_type = SE_HELFLAG_MIXED
+        vision_type = HELFLAG_MIXED
     else:
-        vision_type = SE_HELFLAG_SCOTOPIC
+        vision_type = HELFLAG_SCOTOPIC
 
     # Build result tuple (10 elements to match reference API)
     dret = (
@@ -3804,4 +3804,4 @@ def vis_limit_mag(
 
 
 # Alias for reference API compatibility
-swe_vis_limit_mag = vis_limit_mag
+vis_limit_mag = vis_limit_mag

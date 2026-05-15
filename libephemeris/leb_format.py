@@ -209,63 +209,63 @@ class NutationHeader:
 # This is the single source of truth for Chebyshev parameters.
 
 BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
-    # SE_SUN through SE_MARS, SE_EARTH: ICRS barycentric planet center
+    # SUN through MARS, EARTH: ICRS barycentric planet center
     # Parameters: (interval_days, degree, coord_type, components)
     # Smooth barycentric trajectories fit Chebyshev polynomials well.
     # Runtime pipeline applies gravitational deflection + SR aberration
     # for <0.001" total error vs Skyfield apparent().
-    0: (32, 13, COORD_ICRS_BARY, 3),  # SE_SUN       — <0.001"
+    0: (32, 13, COORD_ICRS_BARY, 3),  # SUN       — <0.001"
     1: (
         4,
         13,
         COORD_ICRS_BARY,
         3,
-    ),  # SE_MOON      — <0.001" (margin 2.8x, DO NOT CHANGE)
-    2: (16, 15, COORD_ICRS_BARY, 3),  # SE_MERCURY   — <0.001"
-    3: (16, 13, COORD_ICRS_BARY, 3),  # SE_VENUS     — <0.001"
-    4: (16, 13, COORD_ICRS_BARY, 3),  # SE_MARS      — <0.001"
+    ),  # MOON      — <0.001" (margin 2.8x, DO NOT CHANGE)
+    2: (16, 15, COORD_ICRS_BARY, 3),  # MERCURY   — <0.001"
+    3: (16, 13, COORD_ICRS_BARY, 3),  # VENUS     — <0.001"
+    4: (16, 13, COORD_ICRS_BARY, 3),  # MARS      — <0.001"
     # Outer planets: ICRS system barycenter — COB correction applied at runtime.
-    5: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_JUPITER — <0.001"
-    6: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_SATURN  — <0.001"
-    7: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_URANUS  — <0.001"
-    8: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SE_NEPTUNE — <0.001"
-    9: (64, 11, COORD_ICRS_BARY_SYSTEM, 3),  # SE_PLUTO   — 0.0005" fit error
-    14: (4, 13, COORD_ICRS_BARY, 3),  # SE_EARTH     — <0.001" (mirror of Moon)
+    5: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # JUPITER — <0.001"
+    6: (32, 13, COORD_ICRS_BARY_SYSTEM, 3),  # SATURN  — <0.001"
+    7: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # URANUS  — <0.001"
+    8: (64, 13, COORD_ICRS_BARY_SYSTEM, 3),  # NEPTUNE — <0.001"
+    9: (64, 11, COORD_ICRS_BARY_SYSTEM, 3),  # PLUTO   — 0.0005" fit error
+    14: (4, 13, COORD_ICRS_BARY, 3),  # EARTH     — <0.001" (mirror of Moon)
     # Lunar nodes/Lilith: ecliptic direct
     # These have complex oscillations from lunar perturbations/precession —
     # keep conservative params. Will optimize after dedicated sweep.
-    10: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_NODE  — keep current
-    11: (8, 13, COORD_ECLIPTIC, 3),  # SE_TRUE_NODE  — keep current
-    12: (8, 13, COORD_ECLIPTIC, 3),  # SE_MEAN_APOG  — keep current
-    13: (4, 15, COORD_ECLIPTIC, 3),  # SE_OSCU_APOG  — keep current
+    10: (8, 13, COORD_ECLIPTIC, 3),  # MEAN_NODE  — keep current
+    11: (8, 13, COORD_ECLIPTIC, 3),  # TRUE_NODE  — keep current
+    12: (8, 13, COORD_ECLIPTIC, 3),  # MEAN_APOG  — keep current
+    13: (4, 15, COORD_ECLIPTIC, 3),  # OSCU_APOG  — keep current
     21: (
         1,
         17,
         COORD_ECLIPTIC,
         3,
-    ),  # SE_INTP_APOG  — 1d interval for rapid oscillations
+    ),  # INTP_APOG  — 1d interval for rapid oscillations
     22: (
         1,
         17,
         COORD_ECLIPTIC,
         3,
-    ),  # SE_INTP_PERG  — 1d interval for rapid oscillations
+    ),  # INTP_PERG  — 1d interval for rapid oscillations
     # Main asteroids: ICRS barycentric — keep current (16d fails: 15-321")
-    15: (8, 13, COORD_ICRS_BARY, 3),  # SE_CHIRON
-    17: (8, 13, COORD_ICRS_BARY, 3),  # SE_CERES
-    18: (8, 13, COORD_ICRS_BARY, 3),  # SE_PALLAS
-    19: (8, 13, COORD_ICRS_BARY, 3),  # SE_JUNO
-    20: (8, 13, COORD_ICRS_BARY, 3),  # SE_VESTA
+    15: (8, 13, COORD_ICRS_BARY, 3),  # CHIRON
+    17: (8, 13, COORD_ICRS_BARY, 3),  # CERES
+    18: (8, 13, COORD_ICRS_BARY, 3),  # PALLAS
+    19: (8, 13, COORD_ICRS_BARY, 3),  # JUNO
+    20: (8, 13, COORD_ICRS_BARY, 3),  # VESTA
     # Uranian hypotheticals: heliocentric ecliptic — pure analytical, ~0" error
-    40: (256, 7, COORD_HELIO_ECL, 3),  # SE_CUPIDO
-    41: (256, 7, COORD_HELIO_ECL, 3),  # SE_HADES
-    42: (256, 7, COORD_HELIO_ECL, 3),  # SE_ZEUS
-    43: (256, 7, COORD_HELIO_ECL, 3),  # SE_KRONOS
-    44: (256, 7, COORD_HELIO_ECL, 3),  # SE_APOLLON
-    45: (256, 7, COORD_HELIO_ECL, 3),  # SE_ADMETOS
-    46: (256, 7, COORD_HELIO_ECL, 3),  # SE_VULKANUS
-    47: (256, 7, COORD_HELIO_ECL, 3),  # SE_POSEIDON
-    48: (256, 7, COORD_HELIO_ECL, 3),  # SE_ISIS
+    40: (256, 7, COORD_HELIO_ECL, 3),  # CUPIDO
+    41: (256, 7, COORD_HELIO_ECL, 3),  # HADES
+    42: (256, 7, COORD_HELIO_ECL, 3),  # ZEUS
+    43: (256, 7, COORD_HELIO_ECL, 3),  # KRONOS
+    44: (256, 7, COORD_HELIO_ECL, 3),  # APOLLON
+    45: (256, 7, COORD_HELIO_ECL, 3),  # ADMETOS
+    46: (256, 7, COORD_HELIO_ECL, 3),  # VULKANUS
+    47: (256, 7, COORD_HELIO_ECL, 3),  # POSEIDON
+    48: (256, 7, COORD_HELIO_ECL, 3),  # ISIS
 }
 
 

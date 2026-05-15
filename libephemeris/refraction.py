@@ -42,8 +42,8 @@ where C = n_obs * r_obs * sin(z_obs) is the Bouguer (Snell) invariant.
 This integral is evaluated using Gauss-Legendre quadrature with 200
 points, giving machine-precision convergence even at the horizon.
 
-For the SE_APP_TO_TRUE direction the function inverts the
-SE_TRUE_TO_APP computation numerically via Newton-Raphson iteration
+For the APP_TO_TRUE direction the function inverts the
+TRUE_TO_APP computation numerically via Newton-Raphson iteration
 (typically 4-5 steps to full float64 convergence).
 
 References

@@ -17,7 +17,7 @@ Usage:
     >>> # Register satellite SPK file
     >>> eph.register_moon_spk("jup365.bsp")
     >>> # Calculate Io's position
-    >>> pos, _ = eph.calc_ut(2451545.0, eph.SE_MOON_IO, eph.SEFLG_SPEED)
+    >>> pos, _ = eph.calc_ut(2451545.0, eph.MOON_IO, eph.FLG_SPEED)
     >>> print(f"Io longitude: {pos[0]:.4f}")
 
 SPK File Sources:
@@ -40,7 +40,7 @@ from typing import Any, Optional, Tuple
 from skyfield.framelib import ecliptic_frame
 from skyfield.positionlib import ICRF
 
-from .constants import SEFLG_HELCTR, SEFLG_SPEED, SEFLG_SIDEREAL
+from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
 from .state import get_loader, get_planets, get_timescale
 
 
@@ -48,45 +48,45 @@ from .state import get_loader, get_planets, get_timescale
 # PLANETARY MOON CONSTANTS
 # =============================================================================
 # Body IDs following reference API 2.10+ convention
-# Moon IDs start at SE_MOON_OFFSET (9000) to avoid collision with other bodies
+# Moon IDs start at MOON_OFFSET (9000) to avoid collision with other bodies
 
-SE_MOON_OFFSET: int = 9000
+MOON_OFFSET: int = 9000
 
 # Jupiter's Galilean Moons (discovered by Galileo in 1610)
-SE_MOON_IO: int = SE_MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
-SE_MOON_EUROPA: int = SE_MOON_OFFSET + 2  # Jupiter II - potential for life
-SE_MOON_GANYMEDE: int = SE_MOON_OFFSET + 3  # Jupiter III - largest moon in solar system
-SE_MOON_CALLISTO: int = SE_MOON_OFFSET + 4  # Jupiter IV - heavily cratered
+MOON_IO: int = MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
+MOON_EUROPA: int = MOON_OFFSET + 2  # Jupiter II - potential for life
+MOON_GANYMEDE: int = MOON_OFFSET + 3  # Jupiter III - largest moon in solar system
+MOON_CALLISTO: int = MOON_OFFSET + 4  # Jupiter IV - heavily cratered
 
 # Saturn's Major Moons
-SE_MOON_MIMAS: int = SE_MOON_OFFSET + 11  # Saturn I - "Death Star" moon
-SE_MOON_ENCELADUS: int = SE_MOON_OFFSET + 12  # Saturn II - geysers, potential life
-SE_MOON_TETHYS: int = SE_MOON_OFFSET + 13  # Saturn III - icy moon
-SE_MOON_DIONE: int = SE_MOON_OFFSET + 14  # Saturn IV - icy moon
-SE_MOON_RHEA: int = SE_MOON_OFFSET + 15  # Saturn V - second largest Saturn moon
-SE_MOON_TITAN: int = (
-    SE_MOON_OFFSET + 16
+MOON_MIMAS: int = MOON_OFFSET + 11  # Saturn I - "Death Star" moon
+MOON_ENCELADUS: int = MOON_OFFSET + 12  # Saturn II - geysers, potential life
+MOON_TETHYS: int = MOON_OFFSET + 13  # Saturn III - icy moon
+MOON_DIONE: int = MOON_OFFSET + 14  # Saturn IV - icy moon
+MOON_RHEA: int = MOON_OFFSET + 15  # Saturn V - second largest Saturn moon
+MOON_TITAN: int = (
+    MOON_OFFSET + 16
 )  # Saturn VI - largest Saturn moon, thick atmosphere
-SE_MOON_HYPERION: int = SE_MOON_OFFSET + 17  # Saturn VII - irregularly shaped
-SE_MOON_IAPETUS: int = SE_MOON_OFFSET + 18  # Saturn VIII - two-toned coloring
+MOON_HYPERION: int = MOON_OFFSET + 17  # Saturn VII - irregularly shaped
+MOON_IAPETUS: int = MOON_OFFSET + 18  # Saturn VIII - two-toned coloring
 
 # Uranus' Major Moons
-SE_MOON_MIRANDA: int = SE_MOON_OFFSET + 21  # Uranus V - extreme geological features
-SE_MOON_ARIEL: int = SE_MOON_OFFSET + 22  # Uranus I - brightest Uranian moon
-SE_MOON_UMBRIEL: int = SE_MOON_OFFSET + 23  # Uranus II - darkest Uranian moon
-SE_MOON_TITANIA: int = SE_MOON_OFFSET + 24  # Uranus III - largest Uranian moon
-SE_MOON_OBERON: int = SE_MOON_OFFSET + 25  # Uranus IV - outermost major Uranian moon
+MOON_MIRANDA: int = MOON_OFFSET + 21  # Uranus V - extreme geological features
+MOON_ARIEL: int = MOON_OFFSET + 22  # Uranus I - brightest Uranian moon
+MOON_UMBRIEL: int = MOON_OFFSET + 23  # Uranus II - darkest Uranian moon
+MOON_TITANIA: int = MOON_OFFSET + 24  # Uranus III - largest Uranian moon
+MOON_OBERON: int = MOON_OFFSET + 25  # Uranus IV - outermost major Uranian moon
 
 # Neptune's Major Moon
-SE_MOON_TRITON: int = SE_MOON_OFFSET + 31  # Neptune I - retrograde orbit, captured KBO
+MOON_TRITON: int = MOON_OFFSET + 31  # Neptune I - retrograde orbit, captured KBO
 
 # Mars' Moons
-SE_MOON_PHOBOS: int = SE_MOON_OFFSET + 41  # Mars I - larger, closer moon
-SE_MOON_DEIMOS: int = SE_MOON_OFFSET + 42  # Mars II - smaller, farther moon
+MOON_PHOBOS: int = MOON_OFFSET + 41  # Mars I - larger, closer moon
+MOON_DEIMOS: int = MOON_OFFSET + 42  # Mars II - smaller, farther moon
 
 # Pluto's Moon
-SE_MOON_CHARON: int = (
-    SE_MOON_OFFSET + 51
+MOON_CHARON: int = (
+    MOON_OFFSET + 51
 )  # Pluto I - Pluto's largest moon (binary system)
 
 
@@ -143,88 +143,88 @@ NAIF_PLUTO_BARYCENTER: int = 9
 
 MOON_NAIF_MAP: dict[int, int] = {
     # Jupiter's Galilean moons
-    SE_MOON_IO: NAIF_IO,
-    SE_MOON_EUROPA: NAIF_EUROPA,
-    SE_MOON_GANYMEDE: NAIF_GANYMEDE,
-    SE_MOON_CALLISTO: NAIF_CALLISTO,
+    MOON_IO: NAIF_IO,
+    MOON_EUROPA: NAIF_EUROPA,
+    MOON_GANYMEDE: NAIF_GANYMEDE,
+    MOON_CALLISTO: NAIF_CALLISTO,
     # Saturn's major moons
-    SE_MOON_MIMAS: NAIF_MIMAS,
-    SE_MOON_ENCELADUS: NAIF_ENCELADUS,
-    SE_MOON_TETHYS: NAIF_TETHYS,
-    SE_MOON_DIONE: NAIF_DIONE,
-    SE_MOON_RHEA: NAIF_RHEA,
-    SE_MOON_TITAN: NAIF_TITAN,
-    SE_MOON_HYPERION: NAIF_HYPERION,
-    SE_MOON_IAPETUS: NAIF_IAPETUS,
+    MOON_MIMAS: NAIF_MIMAS,
+    MOON_ENCELADUS: NAIF_ENCELADUS,
+    MOON_TETHYS: NAIF_TETHYS,
+    MOON_DIONE: NAIF_DIONE,
+    MOON_RHEA: NAIF_RHEA,
+    MOON_TITAN: NAIF_TITAN,
+    MOON_HYPERION: NAIF_HYPERION,
+    MOON_IAPETUS: NAIF_IAPETUS,
     # Uranus' major moons
-    SE_MOON_MIRANDA: NAIF_MIRANDA,
-    SE_MOON_ARIEL: NAIF_ARIEL,
-    SE_MOON_UMBRIEL: NAIF_UMBRIEL,
-    SE_MOON_TITANIA: NAIF_TITANIA,
-    SE_MOON_OBERON: NAIF_OBERON,
+    MOON_MIRANDA: NAIF_MIRANDA,
+    MOON_ARIEL: NAIF_ARIEL,
+    MOON_UMBRIEL: NAIF_UMBRIEL,
+    MOON_TITANIA: NAIF_TITANIA,
+    MOON_OBERON: NAIF_OBERON,
     # Neptune's major moon
-    SE_MOON_TRITON: NAIF_TRITON,
+    MOON_TRITON: NAIF_TRITON,
     # Mars' moons
-    SE_MOON_PHOBOS: NAIF_PHOBOS,
-    SE_MOON_DEIMOS: NAIF_DEIMOS,
+    MOON_PHOBOS: NAIF_PHOBOS,
+    MOON_DEIMOS: NAIF_DEIMOS,
     # Pluto's moon
-    SE_MOON_CHARON: NAIF_CHARON,
+    MOON_CHARON: NAIF_CHARON,
 }
 
 # Moon ID to human-readable name mapping
 MOON_NAMES: dict[int, str] = {
-    SE_MOON_IO: "Io",
-    SE_MOON_EUROPA: "Europa",
-    SE_MOON_GANYMEDE: "Ganymede",
-    SE_MOON_CALLISTO: "Callisto",
-    SE_MOON_MIMAS: "Mimas",
-    SE_MOON_ENCELADUS: "Enceladus",
-    SE_MOON_TETHYS: "Tethys",
-    SE_MOON_DIONE: "Dione",
-    SE_MOON_RHEA: "Rhea",
-    SE_MOON_TITAN: "Titan",
-    SE_MOON_HYPERION: "Hyperion",
-    SE_MOON_IAPETUS: "Iapetus",
-    SE_MOON_MIRANDA: "Miranda",
-    SE_MOON_ARIEL: "Ariel",
-    SE_MOON_UMBRIEL: "Umbriel",
-    SE_MOON_TITANIA: "Titania",
-    SE_MOON_OBERON: "Oberon",
-    SE_MOON_TRITON: "Triton",
-    SE_MOON_PHOBOS: "Phobos",
-    SE_MOON_DEIMOS: "Deimos",
-    SE_MOON_CHARON: "Charon",
+    MOON_IO: "Io",
+    MOON_EUROPA: "Europa",
+    MOON_GANYMEDE: "Ganymede",
+    MOON_CALLISTO: "Callisto",
+    MOON_MIMAS: "Mimas",
+    MOON_ENCELADUS: "Enceladus",
+    MOON_TETHYS: "Tethys",
+    MOON_DIONE: "Dione",
+    MOON_RHEA: "Rhea",
+    MOON_TITAN: "Titan",
+    MOON_HYPERION: "Hyperion",
+    MOON_IAPETUS: "Iapetus",
+    MOON_MIRANDA: "Miranda",
+    MOON_ARIEL: "Ariel",
+    MOON_UMBRIEL: "Umbriel",
+    MOON_TITANIA: "Titania",
+    MOON_OBERON: "Oberon",
+    MOON_TRITON: "Triton",
+    MOON_PHOBOS: "Phobos",
+    MOON_DEIMOS: "Deimos",
+    MOON_CHARON: "Charon",
 }
 
 # Moon ID to parent planet barycenter NAIF ID mapping
 MOON_PARENT_MAP: dict[int, int] = {
     # Jupiter's moons
-    SE_MOON_IO: NAIF_JUPITER_BARYCENTER,
-    SE_MOON_EUROPA: NAIF_JUPITER_BARYCENTER,
-    SE_MOON_GANYMEDE: NAIF_JUPITER_BARYCENTER,
-    SE_MOON_CALLISTO: NAIF_JUPITER_BARYCENTER,
+    MOON_IO: NAIF_JUPITER_BARYCENTER,
+    MOON_EUROPA: NAIF_JUPITER_BARYCENTER,
+    MOON_GANYMEDE: NAIF_JUPITER_BARYCENTER,
+    MOON_CALLISTO: NAIF_JUPITER_BARYCENTER,
     # Saturn's moons
-    SE_MOON_MIMAS: NAIF_SATURN_BARYCENTER,
-    SE_MOON_ENCELADUS: NAIF_SATURN_BARYCENTER,
-    SE_MOON_TETHYS: NAIF_SATURN_BARYCENTER,
-    SE_MOON_DIONE: NAIF_SATURN_BARYCENTER,
-    SE_MOON_RHEA: NAIF_SATURN_BARYCENTER,
-    SE_MOON_TITAN: NAIF_SATURN_BARYCENTER,
-    SE_MOON_HYPERION: NAIF_SATURN_BARYCENTER,
-    SE_MOON_IAPETUS: NAIF_SATURN_BARYCENTER,
+    MOON_MIMAS: NAIF_SATURN_BARYCENTER,
+    MOON_ENCELADUS: NAIF_SATURN_BARYCENTER,
+    MOON_TETHYS: NAIF_SATURN_BARYCENTER,
+    MOON_DIONE: NAIF_SATURN_BARYCENTER,
+    MOON_RHEA: NAIF_SATURN_BARYCENTER,
+    MOON_TITAN: NAIF_SATURN_BARYCENTER,
+    MOON_HYPERION: NAIF_SATURN_BARYCENTER,
+    MOON_IAPETUS: NAIF_SATURN_BARYCENTER,
     # Uranus' moons
-    SE_MOON_MIRANDA: NAIF_URANUS_BARYCENTER,
-    SE_MOON_ARIEL: NAIF_URANUS_BARYCENTER,
-    SE_MOON_UMBRIEL: NAIF_URANUS_BARYCENTER,
-    SE_MOON_TITANIA: NAIF_URANUS_BARYCENTER,
-    SE_MOON_OBERON: NAIF_URANUS_BARYCENTER,
+    MOON_MIRANDA: NAIF_URANUS_BARYCENTER,
+    MOON_ARIEL: NAIF_URANUS_BARYCENTER,
+    MOON_UMBRIEL: NAIF_URANUS_BARYCENTER,
+    MOON_TITANIA: NAIF_URANUS_BARYCENTER,
+    MOON_OBERON: NAIF_URANUS_BARYCENTER,
     # Neptune's moons
-    SE_MOON_TRITON: NAIF_NEPTUNE_BARYCENTER,
+    MOON_TRITON: NAIF_NEPTUNE_BARYCENTER,
     # Mars' moons
-    SE_MOON_PHOBOS: NAIF_MARS_BARYCENTER,
-    SE_MOON_DEIMOS: NAIF_MARS_BARYCENTER,
+    MOON_PHOBOS: NAIF_MARS_BARYCENTER,
+    MOON_DEIMOS: NAIF_MARS_BARYCENTER,
     # Pluto's moons
-    SE_MOON_CHARON: NAIF_PLUTO_BARYCENTER,
+    MOON_CHARON: NAIF_PLUTO_BARYCENTER,
 }
 
 
@@ -249,7 +249,7 @@ def register_moon_spk(
     """
     Register a satellite SPK kernel file for planetary moon calculations.
 
-    After registration, swe_calc_ut() will automatically use the SPK kernel
+    After registration, calc_ut() will automatically use the SPK kernel
     for the moons contained in the file.
 
     Args:
@@ -264,7 +264,7 @@ def register_moon_spk(
 
     Example:
         >>> register_moon_spk("jup365.bsp")  # Auto-detect Jupiter moons
-        >>> register_moon_spk("sat441.bsp", [SE_MOON_TITAN, SE_MOON_ENCELADUS])
+        >>> register_moon_spk("sat441.bsp", [MOON_TITAN, MOON_ENCELADUS])
     """
     from . import state
 
@@ -359,13 +359,13 @@ def get_moon_name(moon_id: int) -> str:
     Get the human-readable name of a planetary moon.
 
     Args:
-        moon_id: Moon ID (SE_MOON_*)
+        moon_id: Moon ID (MOON_*)
 
     Returns:
         Moon name as string, or "Unknown Moon (ID)" if not recognized.
 
     Example:
-        >>> get_moon_name(SE_MOON_IO)
+        >>> get_moon_name(MOON_IO)
         'Io'
     """
     return MOON_NAMES.get(moon_id, f"Unknown Moon ({moon_id})")
@@ -379,12 +379,12 @@ def is_planetary_moon(ipl: int) -> bool:
         ipl: Body ID to check
 
     Returns:
-        True if the ID is a planetary moon ID (SE_MOON_*), False otherwise.
+        True if the ID is a planetary moon ID (MOON_*), False otherwise.
 
     Example:
-        >>> is_planetary_moon(SE_MOON_TITAN)
+        >>> is_planetary_moon(MOON_TITAN)
         True
-        >>> is_planetary_moon(SE_SATURN)
+        >>> is_planetary_moon(SATURN)
         False
     """
     return ipl in MOON_NAIF_MAP
@@ -407,8 +407,8 @@ def calc_moon_position(
 
     Args:
         t: Skyfield Time object
-        moon_id: Planetary moon ID (SE_MOON_*)
-        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+        moon_id: Planetary moon ID (MOON_*)
+        iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
 
     Returns:
         Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -417,7 +417,7 @@ def calc_moon_position(
     Raises:
         ValueError: If JD is outside SPK coverage
     """
-    from .planets import swe_get_ayanamsa_ut
+    from .planets import get_ayanamsa_ut
 
     # Check if moon is registered
     if moon_id not in _MOON_SPK_BY_BODY:
@@ -467,7 +467,7 @@ def calc_moon_position(
     planets = get_planets()
 
     # Determine observer
-    is_heliocentric = bool(iflag & SEFLG_HELCTR)
+    is_heliocentric = bool(iflag & FLG_HELCTR)
 
     if is_heliocentric:
         observer = planets["sun"]
@@ -509,7 +509,7 @@ def calc_moon_position(
     # Calculate speeds if requested
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
-    if iflag & SEFLG_SPEED:
+    if iflag & FLG_SPEED:
         # Central difference numerical differentiation (1 second timestep)
         ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
@@ -567,8 +567,8 @@ def calc_moon_position(
             speed_lon += 360.0 / (2.0 * dt)
 
     # Apply sidereal correction if requested
-    if iflag & SEFLG_SIDEREAL:
-        ayanamsa = swe_get_ayanamsa_ut(t.ut1)
+    if iflag & FLG_SIDEREAL:
+        ayanamsa = get_ayanamsa_ut(t.ut1)
         lon = (lon - ayanamsa) % 360.0
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -579,14 +579,14 @@ def get_moon_coverage(moon_id: int) -> Optional[Tuple[float, float]]:
     Get the time coverage for a registered planetary moon.
 
     Args:
-        moon_id: Planetary moon ID (SE_MOON_*)
+        moon_id: Planetary moon ID (MOON_*)
 
     Returns:
         Tuple of (start_jd, end_jd) Julian Day coverage, or None if not registered.
 
     Example:
         >>> register_moon_spk("jup365.bsp")
-        >>> start, end = get_moon_coverage(SE_MOON_IO)
+        >>> start, end = get_moon_coverage(MOON_IO)
         >>> print(f"Io coverage: JD {start:.1f} to {end:.1f}")
     """
     if moon_id not in _MOON_SPK_BY_BODY:

@@ -499,10 +499,10 @@ def compare_houses() -> None:
 
     \b
     Coverage:
-      - swe_houses: 24 systems × 8 locations × 12 dates (cusps + 8 ASCMC)
-      - swe_houses_armc: 24 systems × 12 ARMC × 4 latitudes
-      - swe_house_pos: 12 systems × 18 longitudes × 3 body latitudes
-      - swe_houses_ex sidereal: 8 systems × 3 ayanamshas × 6 dates
+      - houses: 24 systems × 8 locations × 12 dates (cusps + 8 ASCMC)
+      - houses_armc: 24 systems × 12 ARMC × 4 latitudes
+      - house_pos: 12 systems × 18 longitudes × 3 body latitudes
+      - houses_ex sidereal: 8 systems × 3 ayanamshas × 6 dates
     """
     _pytest([
         "compare_scripts/tests/test_houses_comprehensive.py",

@@ -18,11 +18,11 @@ from typing import Any, Optional
 import math
 
 from .constants import (
-    SE_GREG_CAL,
-    SE_JUL_CAL,
-    SEFLG_EQUATORIAL,
-    SEFLG_JPLEPH,
-    SEFLG_SWIEPH,
+    GREG_CAL,
+    JUL_CAL,
+    FLG_EQUATORIAL,
+    FLG_JPLEPH,
+    FLG_SWIEPH,
 )
 from .cache import get_cached_time_ut1
 from .state import get_delta_t_userdef, get_iers_delta_t_enabled, get_timescale
@@ -31,8 +31,8 @@ from .state import get_delta_t_userdef, get_iers_delta_t_enabled, get_timescale
 JD_GREGORIAN_REFORM = 2299161
 
 
-def swe_julday(
-    year: int, month: int, day: int, hour: float = 12.0, cal: int = SE_GREG_CAL
+def julday(
+    year: int, month: int, day: int, hour: float = 12.0, cal: int = GREG_CAL
 ) -> float:
     """
     Convert calendar date to Julian Day number.
@@ -42,7 +42,7 @@ def swe_julday(
         month: Month (1-12)
         day: Day of month (1-31)
         hour: Decimal hour (0.0-23.999...)
-        cal: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        cal: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         float: Julian Day number (days since JD 0.0 = noon Jan 1, 4713 BCE)
@@ -51,7 +51,7 @@ def swe_julday(
         Transition date: Oct 15, 1582 (Gregorian) = Oct 5, 1582 (Julian)
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
-    if cal not in (SE_GREG_CAL, SE_JUL_CAL):
+    if cal not in (GREG_CAL, JUL_CAL):
         raise ValueError(f"swisseph.julday: invalid calendar ({cal})")
 
     if month <= 2:
@@ -63,7 +63,7 @@ def swe_julday(
     # for negative years (e.g. int(-30/4)=-7 but floor(-30/4)=-8).
     a = _floor(year / 100)
 
-    if cal == SE_GREG_CAL:
+    if cal == GREG_CAL:
         b = 2 - a + _floor(a / 4)
     else:
         b = 0
@@ -79,13 +79,13 @@ def swe_julday(
     return jd
 
 
-def swe_revjul(jd: float, cal: int = SE_GREG_CAL) -> tuple[int, int, int, float]:
+def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     """
     Convert Julian Day number to calendar date.
 
     Args:
         jd: Julian Day number
-        cal: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        cal: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         tuple: (year, month, day, hour) where:
@@ -98,7 +98,7 @@ def swe_revjul(jd: float, cal: int = SE_GREG_CAL) -> tuple[int, int, int, float]
         Automatic Gregorian calendar used for JD >= 2299161 (Oct 15, 1582)
         unless Julian calendar explicitly requested.
     """
-    if cal not in (SE_GREG_CAL, SE_JUL_CAL):
+    if cal not in (GREG_CAL, JUL_CAL):
         raise ValueError(f"swisseph.revjul: invalid calendar ({cal})")
 
     jd = jd + 0.5
@@ -106,8 +106,8 @@ def swe_revjul(jd: float, cal: int = SE_GREG_CAL) -> tuple[int, int, int, float]
     f = jd - z
 
     # Always respect cal — SE uses proleptic Gregorian for ancient dates
-    # when SE_GREG_CAL is requested, not auto-detection by JD threshold.
-    if cal == SE_GREG_CAL:
+    # when GREG_CAL is requested, not auto-detection by JD threshold.
+    if cal == GREG_CAL:
         alpha = _floor((z - 1867216.25) / 36524.25)
         a = z + 1 + alpha - _floor(alpha / 4)
     else:
@@ -137,7 +137,7 @@ def swe_revjul(jd: float, cal: int = SE_GREG_CAL) -> tuple[int, int, int, float]
     return year, month, day, hour
 
 
-def swe_deltat(tjdut: float) -> float:
+def deltat(tjdut: float) -> float:
     """
     Calculate Delta T (TT - UT1) for a given Julian Day.
 
@@ -216,19 +216,19 @@ def swe_deltat(tjdut: float) -> float:
     return delta_t_seconds / 86400.0
 
 
-def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
+def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
     """
     Calculate Delta T (TT - UT1) with explicit ephemeris source specification.
 
-    Extended version of swe_deltat() that allows specifying the ephemeris
+    Extended version of deltat() that allows specifying the ephemeris
     source for Delta T calculation.
 
     Args:
         tjdut: Julian Day number in UT1
         flag: Ephemeris selection flag:
-            - SEFLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
-            - SEFLG_JPLEPH (1): Use JPL ephemeris
-            - SEFLG_MOSEPH (4): Accepted for compatibility (same Delta T)
+            - FLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
+            - FLG_JPLEPH (1): Use JPL ephemeris
+            - FLG_MOSEPH (4): Accepted for compatibility (same Delta T)
 
     Returns:
         float: Delta T in days (TT - UT1)
@@ -250,9 +250,9 @@ def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
             Hohenkerk (2016) model.
 
         Since libephemeris uses Skyfield which internally uses JPL data,
-        SEFLG_SWIEPH and SEFLG_JPLEPH produce identical results.
+        FLG_SWIEPH and FLG_JPLEPH produce identical results.
 
-        SEFLG_MOSEPH uses the same Skyfield Delta T model and returns the
+        FLG_MOSEPH uses the same Skyfield Delta T model and returns the
         default Delta T value (this flag only affects position calculations,
         not time conversions).
 
@@ -260,8 +260,8 @@ def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
         that value will be returned instead of the computed value.
 
     Example:
-        >>> from libephemeris import swe_deltat_ex, SEFLG_SWIEPH, SEFLG_JPLEPH
-        >>> dt = swe_deltat_ex(2451545.0, SEFLG_SWIEPH)
+        >>> from libephemeris import deltat_ex, FLG_SWIEPH, FLG_JPLEPH
+        >>> dt = deltat_ex(2451545.0, FLG_SWIEPH)
         >>> print(f"Delta T: {dt * 86400:.2f} seconds")
         Delta T: 63.83 seconds
 
@@ -276,11 +276,11 @@ def swe_deltat_ex(tjdut: float, flag: int = SEFLG_SWIEPH) -> float:
         return userdef_dt
 
     # Check for valid ephemeris flags
-    ephe_selection = flag & (SEFLG_JPLEPH | SEFLG_SWIEPH)
+    ephe_selection = flag & (FLG_JPLEPH | FLG_SWIEPH)
 
     # All ephemeris modes use the same Skyfield Delta T model
-    # SEFLG_SWIEPH and SEFLG_JPLEPH both use Skyfield/JPL internally
-    # SEFLG_MOSEPH is accepted for compatibility but ignored
+    # FLG_SWIEPH and FLG_JPLEPH both use Skyfield/JPL internally
+    # FLG_MOSEPH is accepted for compatibility but ignored
     _ = ephe_selection  # Explicitly unused: all modes use same Delta T
 
     # Check for IERS Delta T if enabled
@@ -348,25 +348,25 @@ def date_conversion(
 
     # Determine the input calendar based on the date
     # First convert to JD using Gregorian to check the date
-    jd_as_greg = swe_julday(year, month, day, hour, SE_GREG_CAL)
+    jd_as_greg = julday(year, month, day, hour, GREG_CAL)
 
     # If the date is before Oct 15, 1582, assume Julian input
     if jd_as_greg < JD_GREGORIAN_REFORM:
-        input_cal = SE_JUL_CAL
-        jd = swe_julday(year, month, day, hour, SE_JUL_CAL)
+        input_cal = JUL_CAL
+        jd = julday(year, month, day, hour, JUL_CAL)
     else:
-        input_cal = SE_GREG_CAL
+        input_cal = GREG_CAL
         jd = jd_as_greg
 
     # Determine target calendar flag
-    target_cal = SE_JUL_CAL if calendar == "j" else SE_GREG_CAL
+    target_cal = JUL_CAL if calendar == "j" else GREG_CAL
 
     # If input and target are the same, just return the original values
     if input_cal == target_cal:
         return year, month, day, hour
 
     # Convert via Julian Day to target calendar
-    return swe_revjul(jd, target_cal)
+    return revjul(jd, target_cal)
 
 
 # Dates on which a positive leap second was inserted at 23:59:60 UTC.
@@ -417,7 +417,7 @@ def utc_to_jd(
     hour: int,
     minute: int,
     second: float,
-    calendar: int = SE_GREG_CAL,
+    calendar: int = GREG_CAL,
 ) -> tuple[float, float]:
     """
     Convert UTC date/time to Julian Day numbers, properly handling leap seconds.
@@ -433,7 +433,7 @@ def utc_to_jd(
         hour: Hour (0-23)
         minute: Minute (0-59)
         second: Second (0-60, allowing for leap seconds)
-        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        calendar: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         tuple: (jd_et, jd_ut) where:
@@ -449,9 +449,9 @@ def utc_to_jd(
           TT/UT1 conversion using historical Delta T values
 
     Example:
-        >>> from libephemeris import utc_to_jd, SE_GREG_CAL
+        >>> from libephemeris import utc_to_jd, GREG_CAL
         >>> # J2000.0 epoch: Jan 1, 2000 12:00:00 UTC
-        >>> jd_tt, jd_ut = utc_to_jd(2000, 1, 1, 12, 0, 0.0, SE_GREG_CAL)
+        >>> jd_tt, jd_ut = utc_to_jd(2000, 1, 1, 12, 0, 0.0, GREG_CAL)
         >>> print(f"JD(TT): {jd_tt:.6f}, JD(UT1): {jd_ut:.6f}")
         JD(TT): 2451545.000743, JD(UT1): 2451545.000004
     """
@@ -471,12 +471,12 @@ def utc_to_jd(
 
     ts = get_timescale()
 
-    if calendar == SE_JUL_CAL:
+    if calendar == JUL_CAL:
         # Convert Julian calendar date to Gregorian for Skyfield
         # Skyfield's utc() expects proleptic Gregorian calendar
         decimal_hour = hour + minute / 60.0 + second / 3600.0
-        jd = swe_julday(year, month, day, decimal_hour, SE_JUL_CAL)
-        g_year, g_month, g_day, g_hour = swe_revjul(jd, SE_GREG_CAL)
+        jd = julday(year, month, day, decimal_hour, JUL_CAL)
+        g_year, g_month, g_day, g_hour = revjul(jd, GREG_CAL)
         # Extract hour, minute, second from decimal hour
         g_minute_frac = (g_hour % 1) * 60
         g_second = (g_minute_frac % 1) * 60
@@ -492,7 +492,7 @@ def utc_to_jd(
 
 
 def jdet_to_utc(
-    jd_et: float, calendar: int = SE_GREG_CAL
+    jd_et: float, calendar: int = GREG_CAL
 ) -> tuple[int, int, int, int, int, float]:
     """
     Convert Julian Day in Ephemeris Time (TT/ET) to UTC date/time.
@@ -504,7 +504,7 @@ def jdet_to_utc(
 
     Args:
         jd_et: Julian Day number in TT (Terrestrial Time / Ephemeris Time)
-        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        calendar: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         tuple: (year, month, day, hour, minute, second) where:
@@ -522,7 +522,7 @@ def jdet_to_utc(
         - Delta-T (TT - UT1) is automatically applied using IERS data
 
     Example:
-        >>> from libephemeris import jdet_to_utc, utc_to_jd, SE_GREG_CAL
+        >>> from libephemeris import jdet_to_utc, utc_to_jd, GREG_CAL
         >>> # Convert J2000.0 epoch (JD 2451545.0 TT) to UTC
         >>> year, month, day, hour, minute, second = jdet_to_utc(2451545.0)
         >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
@@ -544,13 +544,13 @@ def jdet_to_utc(
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
 
-    if calendar == SE_JUL_CAL:
+    if calendar == JUL_CAL:
         # Convert Gregorian date to Julian calendar
         # First compute the JD for this Gregorian date
         decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
-        jd_greg = swe_julday(g_year, g_month, g_day, decimal_hour, SE_GREG_CAL)
+        jd_greg = julday(g_year, g_month, g_day, decimal_hour, GREG_CAL)
         # Convert to Julian calendar
-        j_year, j_month, j_day, j_decimal_hour = swe_revjul(jd_greg, SE_JUL_CAL)
+        j_year, j_month, j_day, j_decimal_hour = revjul(jd_greg, JUL_CAL)
         # Extract time components from decimal hour
         j_hour = int(j_decimal_hour)
         j_minute_frac = (j_decimal_hour - j_hour) * 60.0
@@ -562,7 +562,7 @@ def jdet_to_utc(
 
 
 def jdut1_to_utc(
-    jd_ut1: float, calendar: int = SE_GREG_CAL
+    jd_ut1: float, calendar: int = GREG_CAL
 ) -> tuple[int, int, int, int, int, float]:
     """
     Convert Julian Day in UT1 (Universal Time) to UTC date/time.
@@ -573,7 +573,7 @@ def jdut1_to_utc(
 
     Args:
         jd_ut1: Julian Day number in UT1 (Universal Time)
-        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        calendar: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         tuple: (year, month, day, hour, minute, second) where:
@@ -591,7 +591,7 @@ def jdut1_to_utc(
         - For high-precision astronomical work, this difference matters
 
     Example:
-        >>> from libephemeris import jdut1_to_utc, utc_to_jd, SE_GREG_CAL
+        >>> from libephemeris import jdut1_to_utc, utc_to_jd, GREG_CAL
         >>> # Get JD(UT1) for a date, then convert back
         >>> jd_tt, jd_ut1 = utc_to_jd(2020, 6, 15, 14, 30, 0.0)
         >>> year, month, day, hour, minute, second = jdut1_to_utc(jd_ut1)
@@ -614,13 +614,13 @@ def jdut1_to_utc(
     g_minute = int(utc_data[4])
     g_second = float(utc_data[5])
 
-    if calendar == SE_JUL_CAL:
+    if calendar == JUL_CAL:
         # Convert Gregorian date to Julian calendar
         # First compute the JD for this Gregorian date
         decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
-        jd_greg = swe_julday(g_year, g_month, g_day, decimal_hour, SE_GREG_CAL)
+        jd_greg = julday(g_year, g_month, g_day, decimal_hour, GREG_CAL)
         # Convert to Julian calendar
-        j_year, j_month, j_day, j_decimal_hour = swe_revjul(jd_greg, SE_JUL_CAL)
+        j_year, j_month, j_day, j_decimal_hour = revjul(jd_greg, JUL_CAL)
         # Extract time components from decimal hour
         j_hour = int(j_decimal_hour)
         j_minute_frac = (j_decimal_hour - j_hour) * 60.0
@@ -652,9 +652,9 @@ def day_of_week(jd: float) -> int:
             - 6 = Sunday
 
     Example:
-        >>> from libephemeris import day_of_week, swe_julday
+        >>> from libephemeris import day_of_week, julday
         >>> # J2000.0 epoch: Jan 1, 2000 was a Saturday
-        >>> jd = swe_julday(2000, 1, 1, 12.0)
+        >>> jd = julday(2000, 1, 1, 12.0)
         >>> day_of_week(jd)
         5
     """
@@ -687,9 +687,9 @@ def time_equ(jd: float) -> float:
         - Mid-April, mid-June, early September, late December: ~0 minutes
 
     Example:
-        >>> from libephemeris import time_equ, swe_julday
+        >>> from libephemeris import time_equ, julday
         >>> # Calculate equation of time for Jan 1, 2000
-        >>> jd = swe_julday(2000, 1, 1, 12.0)
+        >>> jd = julday(2000, 1, 1, 12.0)
         >>> eot = time_equ(jd)
         >>> eot_minutes = eot * 1440
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
@@ -704,9 +704,9 @@ def time_equ(jd: float) -> float:
 
     # Get Sun's apparent right ascension via equatorial coordinates
     # Import here to avoid circular import
-    from . import swe_calc_ut
+    from . import calc_ut
 
-    sun_result = swe_calc_ut(jd, 0, SEFLG_EQUATORIAL)
+    sun_result = calc_ut(jd, 0, FLG_EQUATORIAL)
     ra_hours = sun_result[0][0] / 15.0  # RA in degrees -> hours
 
     # Greenwich Apparent Sidereal Time (in hours)
@@ -754,9 +754,9 @@ def lat_to_lmt(jd_lat: float, longitude: float) -> float:
           throughout the year.
 
     Example:
-        >>> from libephemeris import lat_to_lmt, swe_julday
+        >>> from libephemeris import lat_to_lmt, julday
         >>> # Convert LAT to LMT for Rome (12.5°E longitude)
-        >>> jd_lat = swe_julday(2000, 6, 15, 12.0)  # Noon LAT
+        >>> jd_lat = julday(2000, 6, 15, 12.0)  # Noon LAT
         >>> jd_lmt = lat_to_lmt(jd_lat, 12.5)
         >>> # The difference should be approximately the Equation of Time
     """
@@ -807,9 +807,9 @@ def lmt_to_lat(jd_lmt: float, longitude: float) -> float:
           throughout the year.
 
     Example:
-        >>> from libephemeris import lmt_to_lat, swe_julday
+        >>> from libephemeris import lmt_to_lat, julday
         >>> # Convert LMT to LAT for Rome (12.5°E longitude)
-        >>> jd_lmt = swe_julday(2000, 6, 15, 12.0)  # Noon LMT
+        >>> jd_lmt = julday(2000, 6, 15, 12.0)  # Noon LMT
         >>> jd_lat = lmt_to_lat(jd_lmt, 12.5)
         >>> # The difference should be approximately the Equation of Time
     """
@@ -897,7 +897,7 @@ def _gmst06(jd_ut1: float) -> float:
     import math
 
     # IAU 2006 GMST requires both UT1 and TT.  Compute Delta-T to get TT.
-    delta_t = swe_deltat(jd_ut1)  # days
+    delta_t = deltat(jd_ut1)  # days
     jd_tt = jd_ut1 + delta_t
 
     try:
@@ -967,11 +967,11 @@ def sidtime(
     # If obliquity or nutation not provided, get from ephemeris
     if obliquity is None or nutation is None:
         # Import here to avoid circular imports
-        from .planets import swe_calc_ut
-        from .constants import SE_ECL_NUT
+        from .planets import calc_ut
+        from .constants import ECL_NUT
 
         # Get nutation and obliquity
-        nut_data, _ = swe_calc_ut(jd, SE_ECL_NUT, 0)
+        nut_data, _ = calc_ut(jd, ECL_NUT, 0)
         # nut_data[0] = true obliquity, nut_data[1] = mean obliquity
         # nut_data[2] = nutation in longitude, nut_data[3] = nutation in obliquity
         if obliquity is None:
@@ -988,7 +988,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
 
     This is the sidereal time at Greenwich (longitude 0°) and is the base
     for calculating local sidereal time at any other longitude. Compatible
-    with swe_sidtime0().
+    with sidtime0().
 
     The calculation uses the IAU formula for Greenwich Mean Sidereal Time (GMST)
     and applies the equation of equinoxes to get Greenwich Apparent Sidereal
@@ -1051,9 +1051,9 @@ def get_tai_utc_for_jd(jd: float) -> float:
         - As of 2017, TAI-UTC = 37 seconds.
 
     Example:
-        >>> from libephemeris import get_tai_utc_for_jd, swe_julday
+        >>> from libephemeris import get_tai_utc_for_jd, julday
         >>> # Get TAI-UTC for Jan 1, 2020
-        >>> jd = swe_julday(2020, 1, 1, 12.0)
+        >>> jd = julday(2020, 1, 1, 12.0)
         >>> tai_utc = get_tai_utc_for_jd(jd)
         >>> print(f"TAI-UTC: {tai_utc:.0f} seconds")
         TAI-UTC: 37 seconds
@@ -1071,7 +1071,7 @@ def utc_to_tai_jd(
     hour: int,
     minute: int,
     second: float,
-    calendar: int = SE_GREG_CAL,
+    calendar: int = GREG_CAL,
 ) -> float:
     """
     Convert UTC date/time to Julian Day number in TAI (International Atomic Time).
@@ -1086,7 +1086,7 @@ def utc_to_tai_jd(
         hour: Hour (0-23)
         minute: Minute (0-59)
         second: Second (0-60, allowing for leap seconds in UTC)
-        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        calendar: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         float: Julian Day number in TAI
@@ -1104,7 +1104,7 @@ def utc_to_tai_jd(
     """
     # First get the JD in UTC (using UT1 as approximation since UTC ≈ UT1)
     decimal_hour = hour + minute / 60.0 + second / 3600.0
-    jd_utc = swe_julday(year, month, day, decimal_hour, calendar)
+    jd_utc = julday(year, month, day, decimal_hour, calendar)
 
     # Get TAI-UTC offset (leap seconds) for this date
     tai_utc_seconds = get_tai_utc_for_jd(jd_utc)
@@ -1116,7 +1116,7 @@ def utc_to_tai_jd(
 
 
 def tai_jd_to_utc(
-    jd_tai: float, calendar: int = SE_GREG_CAL
+    jd_tai: float, calendar: int = GREG_CAL
 ) -> tuple[int, int, int, int, int, float]:
     """
     Convert Julian Day in TAI (International Atomic Time) to UTC date/time.
@@ -1126,7 +1126,7 @@ def tai_jd_to_utc(
 
     Args:
         jd_tai: Julian Day number in TAI
-        calendar: SE_GREG_CAL (1) for Gregorian, SE_JUL_CAL (0) for Julian
+        calendar: GREG_CAL (1) for Gregorian, JUL_CAL (0) for Julian
 
     Returns:
         tuple: (year, month, day, hour, minute, second) in UTC where:
@@ -1163,7 +1163,7 @@ def tai_jd_to_utc(
     jd_utc = jd_tai - tai_utc_seconds_refined / 86400.0
 
     # Convert JD to calendar date
-    year, month, day, decimal_hour = swe_revjul(jd_utc, calendar)
+    year, month, day, decimal_hour = revjul(jd_utc, calendar)
 
     # Extract time components
     hour = int(decimal_hour)
@@ -1251,8 +1251,8 @@ def tai_to_utc_jd(jd_tai: float) -> float:
         - This is a simpler version of tai_jd_to_utc() that returns JD directly
 
     Example:
-        >>> from libephemeris import tai_to_utc_jd, utc_to_tai_jd, swe_julday
-        >>> jd_utc = swe_julday(2020, 1, 1, 12.0)
+        >>> from libephemeris import tai_to_utc_jd, utc_to_tai_jd, julday
+        >>> jd_utc = julday(2020, 1, 1, 12.0)
         >>> jd_tai = utc_to_tai_jd(2020, 1, 1, 12, 0, 0.0)
         >>> jd_utc_back = tai_to_utc_jd(jd_tai)
         >>> print(f"Difference: {abs(jd_utc - jd_utc_back) * 86400:.6f} seconds")
@@ -1283,8 +1283,8 @@ def utc_jd_to_tai(jd_utc: float) -> float:
         - This is a simpler version of utc_to_tai_jd() that takes JD directly
 
     Example:
-        >>> from libephemeris import utc_jd_to_tai, swe_julday
-        >>> jd_utc = swe_julday(2020, 1, 1, 12.0)
+        >>> from libephemeris import utc_jd_to_tai, julday
+        >>> jd_utc = julday(2020, 1, 1, 12.0)
         >>> jd_tai = utc_jd_to_tai(jd_utc)
         >>> print(f"JD(UTC): {jd_utc:.6f}, JD(TAI): {jd_tai:.6f}")
         >>> print(f"TAI is ahead by: {(jd_tai - jd_utc) * 86400:.0f} seconds")
@@ -1345,14 +1345,14 @@ def utc_time_zone(
     decimal_hour = hour + minute / 60.0 + second / 3600.0
 
     # Convert to Julian Day
-    jd = swe_julday(year, month, day, decimal_hour, SE_GREG_CAL)
+    jd = julday(year, month, day, decimal_hour, GREG_CAL)
 
     # Subtract timezone offset to get UTC (convert hours to days)
     jd_local = jd - timezone_offset / 24.0
 
     # Convert back to calendar date
-    local_year, local_month, local_day, local_decimal_hour = swe_revjul(
-        jd_local, SE_GREG_CAL
+    local_year, local_month, local_day, local_decimal_hour = revjul(
+        jd_local, GREG_CAL
     )
 
     # Extract time components from decimal hour with rounding to avoid
@@ -1376,7 +1376,7 @@ def utc_time_zone(
         local_hour += 1
     if local_hour >= 24:
         local_hour -= 24
-        # Day already handled by swe_revjul, this shouldn't happen
+        # Day already handled by revjul, this shouldn't happen
         # but included for safety
 
     return local_year, local_month, local_day, local_hour, local_minute, local_second

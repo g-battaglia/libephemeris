@@ -12,24 +12,24 @@ import erfa
 from typing import Optional, Sequence, Tuple, Union
 
 # Azalt calculation method flags (compatible with the reference API)
-SE_ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
-SE_EQU2HOR: int = 1  # Equatorial coordinates to horizontal
+ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
+EQU2HOR: int = 1  # Equatorial coordinates to horizontal
 
 # Azalt_rev calculation method flags (compatible with the reference API)
-SE_HOR2ECL: int = 0  # Horizontal to ecliptic coordinates
-SE_HOR2EQU: int = 1  # Horizontal to equatorial coordinates
+HOR2ECL: int = 0  # Horizontal to ecliptic coordinates
+HOR2EQU: int = 1  # Horizontal to equatorial coordinates
 
 # Refraction calculation flags (compatible with the reference API)
-SE_TRUE_TO_APP: int = 0  # True altitude to apparent altitude
-SE_APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
+TRUE_TO_APP: int = 0  # True altitude to apparent altitude
+APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
 
 # reference API-compatible aliases (without SE_ prefix)
-ECL2HOR: int = SE_ECL2HOR
-EQU2HOR: int = SE_EQU2HOR
-HOR2ECL: int = SE_HOR2ECL
-HOR2EQU: int = SE_HOR2EQU
-TRUE_TO_APP: int = SE_TRUE_TO_APP
-APP_TO_TRUE: int = SE_APP_TO_TRUE
+ECL2HOR: int = ECL2HOR
+EQU2HOR: int = EQU2HOR
+HOR2ECL: int = HOR2ECL
+HOR2EQU: int = HOR2EQU
+TRUE_TO_APP: int = TRUE_TO_APP
+APP_TO_TRUE: int = APP_TO_TRUE
 
 
 def cotrans_sp(
@@ -192,8 +192,8 @@ def azalt(
     Args:
         tjdut: Julian Day in Universal Time (UT1)
         flag: Coordinate type flag:
-            - SE_ECL2HOR (0): Input is ecliptic (longitude, latitude, distance)
-            - SE_EQU2HOR (1): Input is equatorial (RA, Dec, distance)
+            - ECL2HOR (0): Input is ecliptic (longitude, latitude, distance)
+            - EQU2HOR (1): Input is equatorial (RA, Dec, distance)
         geopos: Tuple of (longitude, latitude, altitude):
             - longitude: Geographic longitude of observer in degrees (East positive)
             - latitude: Geographic latitude of observer in degrees (North positive)
@@ -219,11 +219,11 @@ def azalt(
           extrapolated but becomes less accurate.
 
     Example:
-        >>> from libephemeris import azalt, SE_EQU2HOR, julday
+        >>> from libephemeris import azalt, EQU2HOR, julday
         >>> jd = julday(2024, 6, 15, 12.0)
         >>> # RA=90°, Dec=23.5°, observer at lat=41.9°N, lon=12.5°E
         >>> geopos = (12.5, 41.9, 0)  # (lon, lat, altitude)
-        >>> az, alt_true, alt_app = azalt(jd, SE_EQU2HOR, geopos, 1013.25, 15, (90, 23.5, 1))
+        >>> az, alt_true, alt_app = azalt(jd, EQU2HOR, geopos, 1013.25, 15, (90, 23.5, 1))
     """
     # Extract geopos components
     lon = geopos[0]
@@ -253,7 +253,7 @@ def azalt(
     eps = eps0 + deps_deg  # True obliquity
 
     # Convert input coordinates to equatorial (RA, Dec) if ecliptic
-    if flag == SE_ECL2HOR:
+    if flag == ECL2HOR:
         # Input is ecliptic: convert to equatorial
         ecl_lon = coord[0]
         ecl_lat = coord[1]
@@ -322,7 +322,7 @@ def azalt(
             altitude,
             pressure,
             temperature,
-            flag=SE_TRUE_TO_APP,
+            flag=TRUE_TO_APP,
         )
     else:
         # No refraction correction
@@ -354,8 +354,8 @@ def azalt_rev(
     Args:
         tjdut: Julian Day in Universal Time (UT1)
         flag: Output coordinate type flag:
-            - SE_HOR2EQU (1): Output is equatorial (RA, Dec)
-            - SE_HOR2ECL (0): Output is ecliptic (longitude, latitude)
+            - HOR2EQU (1): Output is equatorial (RA, Dec)
+            - HOR2ECL (0): Output is ecliptic (longitude, latitude)
         geopos: Tuple of (longitude, latitude, altitude):
             - longitude: Geographic longitude of observer in degrees (East positive)
             - latitude: Geographic latitude of observer in degrees (North positive)
@@ -365,15 +365,15 @@ def azalt_rev(
 
     Returns:
         Tuple of (x1, x2) where:
-            - If flag == SE_HOR2EQU: (Right Ascension, Declination) in degrees
-            - If flag == SE_HOR2ECL: (Ecliptic longitude, Ecliptic latitude) in degrees
+            - If flag == HOR2EQU: (Right Ascension, Declination) in degrees
+            - If flag == HOR2ECL: (Ecliptic longitude, Ecliptic latitude) in degrees
 
     Example:
-        >>> from libephemeris import azalt_rev, SE_HOR2EQU, julday
+        >>> from libephemeris import azalt_rev, HOR2EQU, julday
         >>> jd = julday(2024, 6, 15, 12.0)
         >>> # Object at azimuth 90° (West), altitude 45°, observer at Rome
         >>> geopos = (12.5, 41.9, 0)  # (lon, lat, altitude)
-        >>> ra, dec = azalt_rev(jd, SE_HOR2EQU, geopos, 90.0, 45.0)
+        >>> ra, dec = azalt_rev(jd, HOR2EQU, geopos, 90.0, 45.0)
     """
     # Extract geopos components
     lon = geopos[0]
@@ -449,11 +449,11 @@ def azalt_rev(
     # Calculate Right Ascension: RA = LST - H
     ra = (lst_deg - ha) % 360.0
 
-    if flag == SE_HOR2EQU:
+    if flag == HOR2EQU:
         # Return equatorial coordinates (RA, Dec)
         return (ra, dec)
     else:
-        # SE_HOR2ECL: Convert equatorial to ecliptic
+        # HOR2ECL: Convert equatorial to ecliptic
         # cotrans with positive obliquity converts equatorial to ecliptic
         ecl_coord = cotrans((ra, dec, 1.0), eps)
         return (ecl_coord[0], ecl_coord[1])
@@ -463,7 +463,7 @@ def refrac(
     alt: float,
     atpress: float = 1013.25,
     attemp: float = 15.0,
-    flag: int = SE_TRUE_TO_APP,
+    flag: int = TRUE_TO_APP,
 ) -> float:
     """
     Calculate true altitude from apparent altitude, or vice-versa.
@@ -478,22 +478,22 @@ def refrac(
     Compatible with the reference swe.refrac() API.
 
     Args:
-        alt: Altitude in degrees. For SE_TRUE_TO_APP, this is the true
-                  (geometric) altitude. For SE_APP_TO_TRUE, this is the apparent
+        alt: Altitude in degrees. For TRUE_TO_APP, this is the true
+                  (geometric) altitude. For APP_TO_TRUE, this is the apparent
                   (observed) altitude.
         atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
                   Use 0 to disable refraction correction (returns input altitude).
         attemp: Atmospheric temperature in Celsius. Default is 15.0.
         flag: Direction of conversion:
-            - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
+            - TRUE_TO_APP (0): Convert true altitude to apparent altitude
               (add refraction - object appears higher)
-            - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
+            - APP_TO_TRUE (1): Convert apparent altitude to true altitude
               (subtract refraction - object's true position)
 
     Returns:
         The converted altitude in degrees:
-        - For SE_TRUE_TO_APP: apparent altitude (= true altitude + refraction)
-        - For SE_APP_TO_TRUE: true altitude (= apparent altitude - refraction)
+        - For TRUE_TO_APP: apparent altitude (= true altitude + refraction)
+        - For APP_TO_TRUE: true altitude (= apparent altitude - refraction)
 
     Notes:
         - At the horizon (0 degrees), refraction is approximately 34 arcminutes
@@ -506,13 +506,13 @@ def refrac(
 
     Examples:
         >>> # True altitude at horizon -> apparent altitude is higher
-        >>> refrac(0.0, 1013.25, 15.0, SE_TRUE_TO_APP)
+        >>> refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
         0.476...  # apparent altitude
         >>> # Apparent altitude at horizon -> true altitude (0° apparent = ~-0.5° true)
-        >>> refrac(0.5, 1013.25, 15.0, SE_APP_TO_TRUE)
+        >>> refrac(0.5, 1013.25, 15.0, APP_TO_TRUE)
         0.0...  # approximately 0° true altitude
         >>> # No refraction when pressure is 0
-        >>> refrac(10.0, 0, 15.0, SE_TRUE_TO_APP)
+        >>> refrac(10.0, 0, 15.0, TRUE_TO_APP)
         10.0  # returns input altitude unchanged
     """
     from .refraction import calc_refraction_true_to_app, calc_refraction_app_to_true
@@ -521,7 +521,7 @@ def refrac(
     if atpress <= 0:
         return alt
 
-    if flag == SE_TRUE_TO_APP:
+    if flag == TRUE_TO_APP:
         refr = calc_refraction_true_to_app(alt, atpress, attemp)
         apparent = alt + refr
         # Match reference API behaviour: if refraction can't bring
@@ -531,7 +531,7 @@ def refrac(
         return apparent
 
     else:
-        # SE_APP_TO_TRUE
+        # APP_TO_TRUE
         # Compute the refraction at the geometric horizon to establish a
         # threshold: apparent altitudes below this value are returned
         # unchanged (the object is geometrically below the horizon).
@@ -550,7 +550,7 @@ def refrac_extended(
     atpress: float = 1013.25,
     attemp: float = 15.0,
     lapserate: Optional[float] = None,
-    flag: int = SE_TRUE_TO_APP,
+    flag: int = TRUE_TO_APP,
 ) -> Tuple[float, Tuple[float, float, float, float]]:
     """
     Calculate true altitude from apparent altitude, or vice-versa (extended).
@@ -564,8 +564,8 @@ def refrac_extended(
 
     Args:
         alt: Altitude of object above geometric horizon in degrees.
-                  For SE_TRUE_TO_APP, this is the true (geometric) altitude.
-                  For SE_APP_TO_TRUE, this is the apparent (observed) altitude.
+                  For TRUE_TO_APP, this is the true (geometric) altitude.
+                  For APP_TO_TRUE, this is the apparent (observed) altitude.
         geoalt: Altitude of observer above sea level in meters.
         atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
                   Use 0 to disable refraction correction.
@@ -576,8 +576,8 @@ def refrac_extended(
                     or 0.0065 K/m if not set).
                     Typical values range from 0.0034 to 0.010 K/m.
         flag: Direction of conversion:
-            - SE_TRUE_TO_APP (0): Convert true altitude to apparent altitude
-            - SE_APP_TO_TRUE (1): Convert apparent altitude to true altitude
+            - TRUE_TO_APP (0): Convert true altitude to apparent altitude
+            - APP_TO_TRUE (1): Convert apparent altitude to true altitude
 
     Returns:
         A tuple of (converted_altitude, details) where:
@@ -623,7 +623,7 @@ def refrac_extended(
         lapserate = get_lapse_rate()
 
     # Compute refraction via ICAO ray-tracing (observer altitude aware)
-    if flag == SE_TRUE_TO_APP:
+    if flag == TRUE_TO_APP:
         true_alt = alt
         refraction = calc_refraction_true_to_app(
             alt, atpress, attemp, geoalt, lapserate
@@ -640,7 +640,7 @@ def refrac_extended(
     dip = calc_dip(geoalt, lapserate)
 
     # Return the converted altitude and detail tuple
-    if flag == SE_TRUE_TO_APP:
+    if flag == TRUE_TO_APP:
         return (apparent_alt, (true_alt, apparent_alt, refraction, dip))
     else:
         return (true_alt, (true_alt, apparent_alt, refraction, dip))
@@ -1528,7 +1528,7 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     its constituent parts: zodiac sign (or nakshatra), degrees within that sign,
     minutes, seconds, and fraction of second.
 
-    Compatible with swe_split_deg().
+    Compatible with split_deg().
 
     Args:
         degree: Position in decimal degrees (can be negative or > 360)
@@ -1620,7 +1620,7 @@ def split_deg(degree: float, roundflag: int = 0) -> Tuple[int, int, int, float, 
     return (ideg, imin, isec, secfr, sign_out)
 
 
-def swe_calc_angles(jd_ut: float, lat: float, lon: float):
+def calc_angles(jd_ut: float, lat: float, lon: float):
     """
     Pre-calculate and cache astrological angles and planet positions
     for use with Arabic parts.
@@ -1635,8 +1635,8 @@ def swe_calc_angles(jd_ut: float, lat: float, lon: float):
     """
     from .state import set_angles_cache, set_topo
     from .angles import calc_angles
-    from .planets import swe_calc_ut
-    from .constants import SE_SUN, SE_MOON, SE_MERCURY, SE_VENUS
+    from .planets import calc_ut
+    from .constants import SUN, MOON, MERCURY, VENUS
 
     # Set observer location
     set_topo(lon, lat, 0)
@@ -1645,10 +1645,10 @@ def swe_calc_angles(jd_ut: float, lat: float, lon: float):
     angles_dict = calc_angles(jd_ut, lat, lon)
 
     # Calculate and add planet positions for Arabic parts
-    sun_pos, _ = swe_calc_ut(jd_ut, SE_SUN, 0)
-    moon_pos, _ = swe_calc_ut(jd_ut, SE_MOON, 0)
-    mercury_pos, _ = swe_calc_ut(jd_ut, SE_MERCURY, 0)
-    venus_pos, _ = swe_calc_ut(jd_ut, SE_VENUS, 0)
+    sun_pos, _ = calc_ut(jd_ut, SUN, 0)
+    moon_pos, _ = calc_ut(jd_ut, MOON, 0)
+    mercury_pos, _ = calc_ut(jd_ut, MERCURY, 0)
+    venus_pos, _ = calc_ut(jd_ut, VENUS, 0)
 
     angles_dict["Sun"] = sun_pos[0]
     angles_dict["Moon"] = moon_pos[0]

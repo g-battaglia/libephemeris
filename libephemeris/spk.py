@@ -23,12 +23,12 @@ Usage:
     >>> # Download and register in one step
     >>> eph.download_and_register_spk(
     ...     body="Chiron",
-    ...     ipl=eph.SE_CHIRON,
+    ...     ipl=eph.CHIRON,
     ...     start="2000-01-01",
     ...     end="2100-01-01",
     ... )
     >>> # Now calc_ut uses SPK automatically
-    >>> pos, _ = eph.calc_ut(2451545.0, eph.SE_CHIRON, eph.SEFLG_SPEED)
+    >>> pos, _ = eph.calc_ut(2451545.0, eph.CHIRON, eph.FLG_SPEED)
 
 References:
     - JPL Horizons API: https://ssd-api.jpl.nasa.gov/doc/horizons.html
@@ -215,27 +215,27 @@ def _find_naif_id_for_asteroid(filepath: str, asteroid_number: int) -> Optional[
 # Mapping from body IDs to human-readable names for helpful error messages
 # This complements the SPK_BODY_NAME_MAP in constants.py which maps to Horizons IDs
 _BODY_NAMES: dict[int, str] = {
-    15: "Chiron",  # SE_CHIRON
-    16: "Pholus",  # SE_PHOLUS
-    17: "Ceres",  # SE_CERES
-    18: "Pallas",  # SE_PALLAS
-    19: "Juno",  # SE_JUNO
-    20: "Vesta",  # SE_VESTA
-    10000 + 136199: "Eris",  # SE_ERIS
-    10000 + 90377: "Sedna",  # SE_SEDNA
-    10000 + 136108: "Haumea",  # SE_HAUMEA
-    10000 + 136472: "Makemake",  # SE_MAKEMAKE
-    10000 + 28978: "Ixion",  # SE_IXION
-    10000 + 90482: "Orcus",  # SE_ORCUS
-    10000 + 50000: "Quaoar",  # SE_QUAOAR
-    10000 + 20000: "Varuna",  # SE_VARUNA
-    10000 + 7066: "Nessus",  # SE_NESSUS
-    10000 + 8405: "Asbolus",  # SE_ASBOLUS
-    10000 + 10199: "Chariklo",  # SE_CHARIKLO
-    10000 + 225088: "Gonggong",  # SE_GONGGONG
-    10000 + 99942: "Apophis",  # SE_APOPHIS
-    10000 + 10: "Hygiea",  # SE_HYGIEA
-    10000 + 433: "Eros",  # SE_EROS
+    15: "Chiron",  # CHIRON
+    16: "Pholus",  # PHOLUS
+    17: "Ceres",  # CERES
+    18: "Pallas",  # PALLAS
+    19: "Juno",  # JUNO
+    20: "Vesta",  # VESTA
+    10000 + 136199: "Eris",  # ERIS
+    10000 + 90377: "Sedna",  # SEDNA
+    10000 + 136108: "Haumea",  # HAUMEA
+    10000 + 136472: "Makemake",  # MAKEMAKE
+    10000 + 28978: "Ixion",  # IXION
+    10000 + 90482: "Orcus",  # ORCUS
+    10000 + 50000: "Quaoar",  # QUAOAR
+    10000 + 20000: "Varuna",  # VARUNA
+    10000 + 7066: "Nessus",  # NESSUS
+    10000 + 8405: "Asbolus",  # ASBOLUS
+    10000 + 10199: "Chariklo",  # CHARIKLO
+    10000 + 225088: "Gonggong",  # GONGGONG
+    10000 + 99942: "Apophis",  # APOPHIS
+    10000 + 10: "Hygiea",  # HYGIEA
+    10000 + 433: "Eros",  # EROS
 }
 
 
@@ -542,11 +542,11 @@ def register_spk_body(
     """
     Register a mapping between a libephemeris body ID and an SPK kernel target.
 
-    After registration, swe_calc_ut() and swe_calc() will automatically use the
+    After registration, calc_ut() and calc() will automatically use the
     SPK kernel for this body instead of the Keplerian approximation.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+        ipl: libephemeris body ID (e.g., CHIRON, ERIS)
         spk_file: Path to the SPK file, or filename if in library path
         naif_id: NAIF ID of the body in the SPK kernel.
             For numbered asteroids: asteroid_number + 2000000
@@ -557,8 +557,8 @@ def register_spk_body(
         ValueError: If naif_id not found in SPK kernel
 
     Example:
-        >>> register_spk_body(SE_CHIRON, "/path/to/chiron.bsp", 2002060)
-        >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data
+        >>> register_spk_body(CHIRON, "/path/to/chiron.bsp", 2002060)
+        >>> # Now calc_ut(jd, CHIRON, ...) uses SPK data
     """
     from . import state
 
@@ -646,7 +646,7 @@ def unregister_spk_body(ipl: int) -> None:
     After unregistration, the body will use Keplerian approximation again.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
     """
     from . import state
 
@@ -973,7 +973,7 @@ def get_spk_type21_target(ipl: int):
     pipeline, or None if the body is not registered or not type 21.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON=15, SE_CERES=17)
+        ipl: libephemeris body ID (e.g., CHIRON=15, CERES=17)
 
     Returns:
         _SpkType21Target or None
@@ -1012,10 +1012,10 @@ def _calc_type21_position(
 
     This function uses the spktype21 library to compute heliocentric
     coordinates, then converts to geocentric apparent positions with:
-    - Light-time correction (unless SEFLG_TRUEPOS)
-    - Aberration correction (unless SEFLG_NOABERR)
-    - Precession to equinox of date (unless SEFLG_J2000)
-    - Nutation (unless SEFLG_NONUT or SEFLG_J2000)
+    - Light-time correction (unless FLG_TRUEPOS)
+    - Aberration correction (unless FLG_NOABERR)
+    - Precession to equinox of date (unless FLG_J2000)
+    - Nutation (unless FLG_NONUT or FLG_J2000)
 
     Args:
         kernel: SPKType21 object
@@ -1029,13 +1029,13 @@ def _calc_type21_position(
     """
     from . import state
     from .constants import (
-        SEFLG_HELCTR,
-        SEFLG_J2000,
-        SEFLG_NOABERR,
-        SEFLG_NONUT,
-        SEFLG_SIDEREAL,
-        SEFLG_SPEED,
-        SEFLG_TRUEPOS,
+        FLG_HELCTR,
+        FLG_J2000,
+        FLG_NOABERR,
+        FLG_NONUT,
+        FLG_SIDEREAL,
+        FLG_SPEED,
+        FLG_TRUEPOS,
     )
     from .astrometry import (
         nutation_angles,
@@ -1052,11 +1052,11 @@ def _calc_type21_position(
     C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 
     # Check flags
-    is_heliocentric = bool(iflag & SEFLG_HELCTR)
-    apply_light_time = not (iflag & SEFLG_TRUEPOS) and not is_heliocentric
-    apply_aberration = not (iflag & SEFLG_NOABERR) and not is_heliocentric
-    apply_precession = not (iflag & SEFLG_J2000)
-    apply_nutation = not (iflag & SEFLG_NONUT) and apply_precession
+    is_heliocentric = bool(iflag & FLG_HELCTR)
+    apply_light_time = not (iflag & FLG_TRUEPOS) and not is_heliocentric
+    apply_aberration = not (iflag & FLG_NOABERR) and not is_heliocentric
+    apply_precession = not (iflag & FLG_J2000)
+    apply_nutation = not (iflag & FLG_NONUT) and apply_precession
 
     # Get Earth position and velocity for geocentric calculations
     planets = state.get_planets()
@@ -1073,7 +1073,7 @@ def _calc_type21_position(
     earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
 
     # Earth velocity (needed for aberration)
-    if apply_aberration or (iflag & SEFLG_SPEED):
+    if apply_aberration or (iflag & FLG_SPEED):
         earth_vel_icrs = np.array(earth.at(t).velocity.au_per_d) - np.array(
             sun.at(t).velocity.au_per_d
         )
@@ -1188,7 +1188,7 @@ def _calc_type21_position(
     # =========================================================================
     # Step 7: Calculate speeds if requested
     # =========================================================================
-    if iflag & SEFLG_SPEED:
+    if iflag & FLG_SPEED:
         # Calculate speed in J2000 frame first, then approximate in precessed frame
         # Note: For full accuracy, speeds should also be precessed, but the
         # difference is small (~0.01%/century)
@@ -1212,7 +1212,7 @@ def _calc_type21_position(
     # =========================================================================
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         # Use true ayanamsa (mean + nutation) so that nutation cancels
         # from the ecliptic longitude, consistent with planets.py path.
         ayanamsa = _get_true_ayanamsa(t.ut1)
@@ -1244,7 +1244,7 @@ def download_and_register_spk(
 
     Args:
         body: Target body identifier (see download_spk)
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
         start: Start date (YYYY-MM-DD)
         end: End date (YYYY-MM-DD)
         naif_id: NAIF ID in the kernel. If None, auto-detected from SPK file.
@@ -1263,7 +1263,7 @@ def download_and_register_spk(
     Example:
         >>> download_and_register_spk(
         ...     body="Chiron",
-        ...     ipl=SE_CHIRON,
+        ...     ipl=CHIRON,
         ...     start="2000-01-01",
         ...     end="2100-01-01",
         ... )
@@ -1336,7 +1336,7 @@ def calc_spk_body_position(
     Args:
         t: Skyfield Time object
         ipl: libephemeris body ID
-        iflag: Calculation flags (SEFLG_SPEED, SEFLG_HELCTR, etc.)
+        iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
 
     Returns:
         Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -1346,7 +1346,7 @@ def calc_spk_body_position(
         ValueError: If JD is outside SPK coverage
     """
     from . import state
-    from .constants import SEFLG_HELCTR, SEFLG_SPEED, SEFLG_SIDEREAL
+    from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
     from .planets import _get_true_ayanamsa
 
     # Check if body is registered
@@ -1393,7 +1393,7 @@ def calc_spk_body_position(
     planets = state.get_planets()
 
     # Determine observer
-    is_heliocentric = bool(iflag & SEFLG_HELCTR)
+    is_heliocentric = bool(iflag & FLG_HELCTR)
 
     if is_heliocentric:
         observer = planets["sun"]
@@ -1432,7 +1432,7 @@ def calc_spk_body_position(
     # Calculate speeds if requested
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
-    if iflag & SEFLG_SPEED:
+    if iflag & FLG_SPEED:
         # Central difference numerical differentiation (1 second timestep)
         ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
@@ -1484,7 +1484,7 @@ def calc_spk_body_position(
             speed_lon += 360.0 / (2.0 * dt)
 
     # Apply sidereal correction if requested
-    if iflag & SEFLG_SIDEREAL:
+    if iflag & FLG_SIDEREAL:
         # Use true ayanamsa (mean + nutation) so that nutation cancels
         # from the ecliptic longitude, consistent with planets.py path.
         ayanamsa = _get_true_ayanamsa(t.ut1)

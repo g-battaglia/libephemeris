@@ -45,43 +45,43 @@ from dataclasses import dataclass
 from typing import Tuple, Optional, NamedTuple
 from .logging_config import get_logger
 from .constants import (
-    SE_CHIRON,
-    SE_PHOLUS,
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_ERIS,
-    SE_SEDNA,
-    SE_HAUMEA,
-    SE_MAKEMAKE,
-    SE_IXION,
-    SE_ORCUS,
-    SE_QUAOAR,
-    SE_NESSUS,
-    SE_ASBOLUS,
-    SE_CHARIKLO,
-    SE_GONGGONG,
-    SE_VARUNA,
-    SE_APOPHIS,
-    SE_HYGIEA,
-    SE_INTERAMNIA,
-    SE_DAVIDA,
-    SE_EUROPA_AST,
-    SE_SYLVIA,
-    SE_PSYCHE,
-    SE_EROS,
-    SE_AMOR,
-    SE_ICARUS,
-    SE_TORO,
-    SE_SAPPHO,
-    SE_PANDORA_AST,
-    SE_LILITH_AST,
-    SE_HIDALGO,
-    SE_TOUTATIS,
-    SE_ITOKAWA,
-    SE_BENNU,
-    SE_RYUGU,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    ERIS,
+    SEDNA,
+    HAUMEA,
+    MAKEMAKE,
+    IXION,
+    ORCUS,
+    QUAOAR,
+    NESSUS,
+    ASBOLUS,
+    CHARIKLO,
+    GONGGONG,
+    VARUNA,
+    APOPHIS,
+    HYGIEA,
+    INTERAMNIA,
+    DAVIDA,
+    EUROPA_AST,
+    SYLVIA,
+    PSYCHE,
+    EROS,
+    AMOR,
+    ICARUS,
+    TORO,
+    SAPPHO,
+    PANDORA_AST,
+    LILITH_AST,
+    HIDALGO,
+    TOUTATIS,
+    ITOKAWA,
+    BENNU,
+    RYUGU,
 )
 
 
@@ -381,7 +381,7 @@ PLUTINO_LIBRATION_PARAMS: dict[int, LibrationParameters] = {
     # Ixion (28978): Well-characterized plutino (2:3 Neptune resonance)
     # Libration amplitude ~78°, period ~19,800 years
     # Center at 180° (anti-aligned with Neptune)
-    SE_IXION: LibrationParameters(
+    IXION: LibrationParameters(
         amplitude=78.0,  # degrees
         period=7_233_000.0,  # ~19,800 years in days
         center=180.0,  # degrees (anti-aligned libration)
@@ -392,7 +392,7 @@ PLUTINO_LIBRATION_PARAMS: dict[int, LibrationParameters] = {
     # Orcus (90482): Anti-Pluto plutino (2:3, opposite orbital phase from Pluto)
     # Libration amplitude ~68°, period ~20,200 years
     # Center at 180° (anti-aligned with Neptune)
-    SE_ORCUS: LibrationParameters(
+    ORCUS: LibrationParameters(
         amplitude=68.0,  # degrees
         period=7_379_000.0,  # ~20,200 years in days
         center=180.0,  # degrees (anti-aligned libration)
@@ -405,7 +405,7 @@ PLUTINO_LIBRATION_PARAMS: dict[int, LibrationParameters] = {
     # Center at 180° (symmetric libration)
     # Parameters estimated from orbital integration studies
     # (Bannister et al. 2018, Brown & Butler 2018)
-    SE_GONGGONG: LibrationParameters(
+    GONGGONG: LibrationParameters(
         amplitude=30.0,  # degrees
         period=9_131_000.0,  # ~25,000 years in days
         center=180.0,  # degrees
@@ -560,7 +560,7 @@ def detect_mean_motion_resonance(
 
     Example:
         >>> from libephemeris.minor_bodies import detect_mean_motion_resonance
-        >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[SE_IXION])
+        >>> result = detect_mean_motion_resonance(MINOR_BODY_ELEMENTS[IXION])
         >>> result.is_resonant
         True
         >>> result.resonance.name
@@ -633,7 +633,7 @@ def is_body_resonant(
     and checks for resonance.
 
     Args:
-        body_id: Minor body identifier (SE_IXION, SE_ORCUS, etc.)
+        body_id: Minor body identifier (IXION, ORCUS, etc.)
         tolerance: Fractional tolerance for detecting resonance (default 2%)
 
     Returns:
@@ -644,10 +644,10 @@ def is_body_resonant(
 
     Example:
         >>> from libephemeris.minor_bodies import is_body_resonant
-        >>> from libephemeris.constants import SE_IXION, SE_CERES
-        >>> is_body_resonant(SE_IXION)
+        >>> from libephemeris.constants import IXION, CERES
+        >>> is_body_resonant(IXION)
         True
-        >>> is_body_resonant(SE_CERES)
+        >>> is_body_resonant(CERES)
         False
     """
     if body_id not in MINOR_BODY_ELEMENTS:
@@ -663,15 +663,15 @@ def get_resonance_info(body_id: int) -> Optional[ResonanceResult]:
     Get detailed resonance information for a minor body.
 
     Args:
-        body_id: Minor body identifier (SE_IXION, SE_ORCUS, etc.)
+        body_id: Minor body identifier (IXION, ORCUS, etc.)
 
     Returns:
         ResonanceResult: Detailed resonance detection result, or None if body unknown
 
     Example:
         >>> from libephemeris.minor_bodies import get_resonance_info
-        >>> from libephemeris.constants import SE_ORCUS
-        >>> info = get_resonance_info(SE_ORCUS)
+        >>> from libephemeris.constants import ORCUS
+        >>> info = get_resonance_info(ORCUS)
         >>> if info and info.is_resonant:
         ...     print(f"{info.resonance.name}: deviation {info.deviation:.2%}")
         plutino: deviation 0.15%
@@ -1512,17 +1512,17 @@ def apply_secular_perturbations(
 # for small NEAs over decade timescales.
 YARKOVSKY_DA_DT: dict[int, float] = {
     # Apophis: da/dt = -2.899e-4 AU/My (Chesley et al. 2014, Brozovic et al. 2018)
-    SE_APOPHIS: -2.899e-4,
+    APOPHIS: -2.899e-4,
     # Bennu: da/dt = -18.99e-4 AU/My (Chesley et al. 2014, OSIRIS-REx)
-    SE_BENNU: -18.99e-4,
+    BENNU: -18.99e-4,
     # Ryugu: da/dt = -3.5e-4 AU/My (estimated from Hayabusa2 data)
-    SE_RYUGU: -3.5e-4,
+    RYUGU: -3.5e-4,
     # Itokawa: da/dt = -3.5e-4 AU/My (Vokrouhlicky et al. 2008)
-    SE_ITOKAWA: -3.5e-4,
+    ITOKAWA: -3.5e-4,
     # Eros: da/dt = -0.5e-4 AU/My (estimated, large body = weak Yarkovsky)
-    SE_EROS: -0.5e-4,
+    EROS: -0.5e-4,
     # Toutatis: da/dt = -1.5e-4 AU/My (estimated)
-    SE_TOUTATIS: -1.5e-4,
+    TOUTATIS: -1.5e-4,
 }
 
 
@@ -1567,7 +1567,7 @@ def _apply_yarkovsky_correction(
 # For dates >10 years from epoch, consider updating elements.
 
 MINOR_BODY_ELEMENTS = {
-    SE_CHIRON: OrbitalElements(
+    CHIRON: OrbitalElements(
         name="Chiron",
         epoch=2461000.5,
         a=13.69219896172984,  # AU - between Saturn and Uranus
@@ -1578,7 +1578,7 @@ MINOR_BODY_ELEMENTS = {
         M0=212.8397717853335,
         n=0.01945334424082164,  # ~51 year period
     ),
-    SE_PHOLUS: OrbitalElements(
+    PHOLUS: OrbitalElements(
         name="Pholus",
         epoch=2461000.5,
         a=20.28340105547402,
@@ -1589,7 +1589,7 @@ MINOR_BODY_ELEMENTS = {
         M0=134.470501527666,
         n=0.01078929100989589,  # ~91 year period
     ),
-    SE_CERES: OrbitalElements(
+    CERES: OrbitalElements(
         name="Ceres",
         epoch=2461000.5,
         a=2.765615651508659,
@@ -1600,7 +1600,7 @@ MINOR_BODY_ELEMENTS = {
         M0=231.5397330043706,
         n=0.2142971214271186,  # ~4.6 year period
     ),
-    SE_PALLAS: OrbitalElements(
+    PALLAS: OrbitalElements(
         name="Pallas",
         epoch=2461000.5,
         a=2.76992582511479,
@@ -1611,7 +1611,7 @@ MINOR_BODY_ELEMENTS = {
         M0=211.5297778033731,
         n=0.2137971269626138,  # ~4.6 year period
     ),
-    SE_JUNO: OrbitalElements(
+    JUNO: OrbitalElements(
         name="Juno",
         epoch=2461000.5,
         a=2.670879058906207,
@@ -1622,7 +1622,7 @@ MINOR_BODY_ELEMENTS = {
         M0=217.5909617686606,
         n=0.2257993770223806,  # ~4.4 year period
     ),
-    SE_VESTA: OrbitalElements(
+    VESTA: OrbitalElements(
         name="Vesta",
         epoch=2461000.5,
         a=2.361541280084789,
@@ -1633,7 +1633,7 @@ MINOR_BODY_ELEMENTS = {
         M0=26.80967220901607,
         n=0.2715881155129186,  # ~3.6 year period
     ),
-    SE_ERIS: OrbitalElements(
+    ERIS: OrbitalElements(
         name="Eris",
         epoch=2461000.5,
         a=67.99636506315233,  # Highly distant
@@ -1644,7 +1644,7 @@ MINOR_BODY_ELEMENTS = {
         M0=211.4489901906776,
         n=0.001757824561999289,  # ~561 year period
     ),
-    SE_SEDNA: OrbitalElements(
+    SEDNA: OrbitalElements(
         name="Sedna",
         epoch=2461000.5,
         a=549.5405279241455,  # Extreme distance (detached object)
@@ -1655,7 +1655,7 @@ MINOR_BODY_ELEMENTS = {
         M0=358.6072615114487,
         n=7.650758332945998e-05,  # ~12,880 year period
     ),
-    SE_HAUMEA: OrbitalElements(
+    HAUMEA: OrbitalElements(
         name="Haumea",
         epoch=2461000.5,
         a=43.00549881333706,
@@ -1666,7 +1666,7 @@ MINOR_BODY_ELEMENTS = {
         M0=222.3276474703985,
         n=0.003494765903502902,  # ~282 year period
     ),
-    SE_MAKEMAKE: OrbitalElements(
+    MAKEMAKE: OrbitalElements(
         name="Makemake",
         epoch=2461000.5,
         a=45.51068175675377,
@@ -1677,7 +1677,7 @@ MINOR_BODY_ELEMENTS = {
         M0=169.3202841867025,
         n=0.003210214572603997,  # ~307 year period
     ),
-    SE_IXION: OrbitalElements(
+    IXION: OrbitalElements(
         name="Ixion",
         epoch=2461000.5,
         a=39.35053706213409,  # Plutino (2:3 resonance with Neptune)
@@ -1688,7 +1688,7 @@ MINOR_BODY_ELEMENTS = {
         M0=294.2004612799266,
         n=0.003992804789574964,  # ~247 year period
     ),
-    SE_ORCUS: OrbitalElements(
+    ORCUS: OrbitalElements(
         name="Orcus",
         epoch=2461000.5,
         a=39.33577647200568,  # Plutino (anti-Pluto phase)
@@ -1699,7 +1699,7 @@ MINOR_BODY_ELEMENTS = {
         M0=188.1111318293787,
         n=0.003995052426031791,  # ~247 year period
     ),
-    SE_QUAOAR: OrbitalElements(
+    QUAOAR: OrbitalElements(
         name="Quaoar",
         epoch=2461000.5,
         a=43.1476797802032,
@@ -1710,7 +1710,7 @@ MINOR_BODY_ELEMENTS = {
         M0=291.4818844949103,
         n=0.003477506123841158,  # ~284 year period
     ),
-    SE_NESSUS: OrbitalElements(
+    NESSUS: OrbitalElements(
         name="Nessus",
         epoch=2461000.5,
         a=24.51657596400793,  # Centaur orbit
@@ -1721,7 +1721,7 @@ MINOR_BODY_ELEMENTS = {
         M0=100.5239875112597,
         n=0.008119220769969982,  # ~121 year period
     ),
-    SE_ASBOLUS: OrbitalElements(
+    ASBOLUS: OrbitalElements(
         name="Asbolus",
         epoch=2461000.5,
         a=18.06355955222326,  # Centaur orbit
@@ -1732,7 +1732,7 @@ MINOR_BODY_ELEMENTS = {
         M0=109.6324751756823,
         n=0.01283805024514489,  # ~77 year period
     ),
-    SE_CHARIKLO: OrbitalElements(
+    CHARIKLO: OrbitalElements(
         name="Chariklo",
         epoch=2461000.5,
         a=15.73995155535189,  # Centaur orbit, largest known centaur (~250 km)
@@ -1743,7 +1743,7 @@ MINOR_BODY_ELEMENTS = {
         M0=126.9607903541095,
         n=0.01578334271898484,  # ~62 year period, has ring system discovered 2014
     ),
-    SE_GONGGONG: OrbitalElements(
+    GONGGONG: OrbitalElements(
         name="Gonggong",
         epoch=2461000.5,
         a=66.89366871435344,  # TNO, dwarf planet candidate (~1230 km diameter)
@@ -1754,7 +1754,7 @@ MINOR_BODY_ELEMENTS = {
         M0=111.3903730396343,
         n=0.001801467997135536,  # ~547 year period (formerly 2007 OR10)
     ),
-    SE_VARUNA: OrbitalElements(
+    VARUNA: OrbitalElements(
         name="Varuna",
         epoch=2461000.5,
         a=43.17823437208563,  # Classical KBO (~670 km diameter)
@@ -1769,7 +1769,7 @@ MINOR_BODY_ELEMENTS = {
     # NOTE: Apophis orbital elements change measurably with each refinement due to
     # close Earth approaches in 2029 and 2036. These elements are from JPL SBDB
     # solution 220 (2024-06-25). For critical applications, use SPK files.
-    SE_APOPHIS: OrbitalElements(
+    APOPHIS: OrbitalElements(
         name="Apophis",
         epoch=2461000.5,
         a=0.9223803173917017,  # Aten-class NEA (~0.34 km diameter)
@@ -1781,7 +1781,7 @@ MINOR_BODY_ELEMENTS = {
         n=1.11259994308075,  # ~0.89 year period, close approach 2029-04-13
     ),
     # Main Belt Asteroids - Large bodies
-    SE_HYGIEA: OrbitalElements(
+    HYGIEA: OrbitalElements(
         name="Hygiea",
         epoch=2461000.5,
         a=3.147591335345947,  # Fourth largest asteroid, dwarf planet candidate (~430 km)
@@ -1792,7 +1792,7 @@ MINOR_BODY_ELEMENTS = {
         M0=216.6903206124055,
         n=0.1764966888337409,  # ~5.6 year period
     ),
-    SE_INTERAMNIA: OrbitalElements(
+    INTERAMNIA: OrbitalElements(
         name="Interamnia",
         epoch=2461000.5,
         a=3.056218782582974,  # Fifth largest asteroid (~320 km diameter)
@@ -1803,7 +1803,7 @@ MINOR_BODY_ELEMENTS = {
         M0=184.2054144782699,
         n=0.1844707074261051,  # ~5.3 year period
     ),
-    SE_DAVIDA: OrbitalElements(
+    DAVIDA: OrbitalElements(
         name="Davida",
         epoch=2461000.5,
         a=3.163619117539836,  # Seventh largest asteroid (~270 km diameter)
@@ -1814,7 +1814,7 @@ MINOR_BODY_ELEMENTS = {
         M0=35.24757453107242,
         n=0.1751571164581395,  # ~5.6 year period
     ),
-    SE_EUROPA_AST: OrbitalElements(
+    EUROPA_AST: OrbitalElements(
         name="Europa",
         epoch=2461000.5,
         a=3.092193380509604,  # Main belt asteroid (~300 km diameter, not Jupiter's moon)
@@ -1825,7 +1825,7 @@ MINOR_BODY_ELEMENTS = {
         M0=312.5276379313007,
         n=0.1812608885921891,  # ~5.4 year period
     ),
-    SE_SYLVIA: OrbitalElements(
+    SYLVIA: OrbitalElements(
         name="Sylvia",
         epoch=2461000.5,
         a=3.484518782251748,  # Outer main belt asteroid (~280 km, triple system with moons Romulus and Remus)
@@ -1836,7 +1836,7 @@ MINOR_BODY_ELEMENTS = {
         M0=94.95962367758351,
         n=0.151526942166858,  # ~6.5 year period
     ),
-    SE_PSYCHE: OrbitalElements(
+    PSYCHE: OrbitalElements(
         name="Psyche",
         epoch=2461000.5,
         a=2.923314514376521,  # Main belt asteroid (~226 km, metallic M-type, NASA Psyche mission target)
@@ -1847,7 +1847,7 @@ MINOR_BODY_ELEMENTS = {
         M0=40.63883784197816,
         n=0.1971926664511637,  # ~5.0 year period
     ),
-    SE_EROS: OrbitalElements(
+    EROS: OrbitalElements(
         name="Eros",
         epoch=2461000.5,
         a=1.458120998474684,  # Near-Earth asteroid (Amor class, NEAR Shoemaker mission target)
@@ -1858,7 +1858,7 @@ MINOR_BODY_ELEMENTS = {
         M0=310.5543277370992,
         n=0.5597752949285997,  # ~1.76 year period
     ),
-    SE_AMOR: OrbitalElements(
+    AMOR: OrbitalElements(
         name="Amor",
         epoch=2461000.5,
         a=1.919831260906931,  # Amor-class NEA prototype (~1 km diameter)
@@ -1869,7 +1869,7 @@ MINOR_BODY_ELEMENTS = {
         M0=59.87048521279021,
         n=0.3705181485730381,  # ~2.66 year period (972 days)
     ),
-    SE_ICARUS: OrbitalElements(
+    ICARUS: OrbitalElements(
         name="Icarus",
         epoch=2461000.5,
         a=1.078037837567316,  # Apollo asteroid (~1.4 km, perihelion inside Mercury's orbit)
@@ -1880,7 +1880,7 @@ MINOR_BODY_ELEMENTS = {
         M0=153.0789301425594,
         n=0.8805480660198883,  # ~1.12 year period (409 days)
     ),
-    SE_TORO: OrbitalElements(
+    TORO: OrbitalElements(
         name="Toro",
         epoch=2461000.5,
         a=1.367838675762221,  # Apollo asteroid, near-Earth asteroid (~3.4 km)
@@ -1891,7 +1891,7 @@ MINOR_BODY_ELEMENTS = {
         M0=82.68163042845468,
         n=0.6161007748143977,  # ~1.6 year period (584 days)
     ),
-    SE_SAPPHO: OrbitalElements(
+    SAPPHO: OrbitalElements(
         name="Sappho",
         epoch=2461000.5,
         a=2.296282028063693,  # Main belt asteroid (~69 km, artistic expression, same-sex love)
@@ -1902,7 +1902,7 @@ MINOR_BODY_ELEMENTS = {
         M0=57.25859931389674,
         n=0.2832475967264622,  # ~3.5 year period (1271 days)
     ),
-    SE_PANDORA_AST: OrbitalElements(
+    PANDORA_AST: OrbitalElements(
         name="Pandora",
         epoch=2461000.5,
         a=2.75784980823487,  # Main belt asteroid (~67 km, distinct from Saturn moon Pandora)
@@ -1913,7 +1913,7 @@ MINOR_BODY_ELEMENTS = {
         M0=157.5343526907893,
         n=0.2152029188679012,  # ~4.6 year period (1673 days)
     ),
-    SE_LILITH_AST: OrbitalElements(
+    LILITH_AST: OrbitalElements(
         name="Lilith",
         epoch=2461000.5,
         a=2.664645194686444,  # Main belt asteroid (~30 km, not lunar apogee Lilith)
@@ -1924,7 +1924,7 @@ MINOR_BODY_ELEMENTS = {
         M0=311.9465725963339,
         n=0.2265922174357816,  # ~4.35 year period (1589 days)
     ),
-    SE_HIDALGO: OrbitalElements(
+    HIDALGO: OrbitalElements(
         name="Hidalgo",
         epoch=2461000.5,
         a=5.728305724964734,  # Centaur-class asteroid with comet-like orbit
@@ -1935,7 +1935,7 @@ MINOR_BODY_ELEMENTS = {
         M0=185.3374947174508,
         n=0.07188938874958553,  # ~13.7 year period (5008 days)
     ),
-    SE_TOUTATIS: OrbitalElements(
+    TOUTATIS: OrbitalElements(
         name="Toutatis",
         epoch=2461000.5,
         a=2.543029853370523,  # Apollo PHA, radar and spacecraft target (~5.4 km)
@@ -1946,7 +1946,7 @@ MINOR_BODY_ELEMENTS = {
         M0=76.89343773316328,
         n=0.2430395129094619,  # ~4.05 year period (1481 days), tumbling rotation
     ),
-    SE_ITOKAWA: OrbitalElements(
+    ITOKAWA: OrbitalElements(
         name="Itokawa",
         epoch=2461000.5,
         a=1.324135178668783,  # Apollo PHA, Hayabusa sample return mission target (~535 m)
@@ -1957,7 +1957,7 @@ MINOR_BODY_ELEMENTS = {
         M0=41.26158479412086,
         n=0.646852987504302,  # ~1.52 year period (557 days), elongated shape
     ),
-    SE_BENNU: OrbitalElements(
+    BENNU: OrbitalElements(
         name="Bennu",
         epoch=2461000.5,
         a=1.126391025894812,  # Apollo PHA, OSIRIS-REx sample return mission target (~490 m)
@@ -1968,7 +1968,7 @@ MINOR_BODY_ELEMENTS = {
         M0=265.1247751080418,  # Propagated from epoch 2455562.5
         n=0.8244613503320309,  # ~1.20 year period (437 days)
     ),
-    SE_RYUGU: OrbitalElements(
+    RYUGU: OrbitalElements(
         name="Ryugu",
         epoch=2461000.5,
         a=1.190921090916117,  # Apollo PHA, Hayabusa2 sample return mission target (~900 m)
@@ -2004,7 +2004,7 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
     Sedna) and 3-4x for main-belt bodies at certain offsets.
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+        body_id: Minor body identifier (CERES, CHIRON, etc.)
         jd_tt: Target Julian Day in Terrestrial Time
 
     Returns:
@@ -2613,7 +2613,7 @@ def calc_minor_body_heliocentric(
     calculations with secular perturbations (~10-30 arcsec precision).
 
     Args:
-        body_id: Minor body identifier (SE_CHIRON, SE_ERIS, etc.)
+        body_id: Minor body identifier (CHIRON, ERIS, etc.)
         jd_tt: Julian Day in Terrestrial Time (TT)
         use_spk: If True (default), attempt to use SPK kernels for
             high-precision positions. If False, always use Keplerian.
@@ -2640,8 +2640,8 @@ def calc_minor_body_heliocentric(
 
     Example:
         >>> from libephemeris.minor_bodies import calc_minor_body_heliocentric
-        >>> from libephemeris.constants import SE_CERES
-        >>> lon, lat, dist = calc_minor_body_heliocentric(SE_CERES, 2451545.0)
+        >>> from libephemeris.constants import CERES
+        >>> lon, lat, dist = calc_minor_body_heliocentric(CERES, 2451545.0)
         >>> print(f"Ceres: {lon:.4f}° lon, {lat:.4f}° lat, {dist:.4f} AU")
     """
     if body_id not in MINOR_BODY_ELEMENTS:
@@ -2652,13 +2652,13 @@ def calc_minor_body_heliocentric(
         try:
             from . import state
             from .spk import calc_spk_body_position
-            from .constants import SEFLG_HELCTR
+            from .constants import FLG_HELCTR
 
             # Check if SPK is already registered for this body
             if body_id in state._SPK_BODY_MAP:
                 ts = state.get_timescale()
                 t = ts.tt_jd(jd_tt)
-                result = calc_spk_body_position(t, body_id, SEFLG_HELCTR)
+                result = calc_spk_body_position(t, body_id, FLG_HELCTR)
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
@@ -3030,11 +3030,11 @@ def clear_asteroid_name_cache() -> int:
 # Format: body_id -> (asteroid_number, horizons_id, naif_id, body_name)
 
 from .constants import (
-    SE_CERES,
-    SE_PALLAS,
-    SE_JUNO,
-    SE_VESTA,
-    SE_CHIRON,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    CHIRON,
     NAIF_CERES,
     NAIF_PALLAS,
     NAIF_JUNO,
@@ -3047,11 +3047,11 @@ from .constants import (
 # downloaded using the name syntax (e.g., "Ceres;") which bypasses the major body
 # index restriction. See SPK_BODY_NAME_MAP in constants.py for Horizons IDs.
 SPK_DOWNLOADABLE_ASTEROIDS: dict[int, tuple[int, str, int, str]] = {
-    SE_CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
-    SE_PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
-    SE_JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
-    SE_VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
-    SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
+    CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
+    PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
+    JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
+    VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
+    CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
 }
 
 # Combined info for all major asteroids (for backward compatibility and info lookup)
@@ -3059,11 +3059,11 @@ SPK_DOWNLOADABLE_ASTEROIDS: dict[int, tuple[int, str, int, str]] = {
 # Bare numeric IDs ("1", "2", "3", "4") collide with planet barycenter IDs and cause
 # "SPK creation is not available for pre-computed objects" errors from Horizons.
 MAJOR_ASTEROID_SPK_INFO: dict[int, tuple[int, str, int, str]] = {
-    SE_CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
-    SE_PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
-    SE_JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
-    SE_VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
-    SE_CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
+    CERES: (1, "Ceres;", NAIF_CERES, "Ceres"),
+    PALLAS: (2, "Pallas;", NAIF_PALLAS, "Pallas"),
+    JUNO: (3, "Juno;", NAIF_JUNO, "Juno"),
+    VESTA: (4, "Vesta;", NAIF_VESTA, "Vesta"),
+    CHIRON: (2060, "2060", NAIF_CHIRON, "Chiron"),
 }
 
 
@@ -3076,17 +3076,17 @@ def is_major_asteroid(body_id: int) -> bool:
     is_spk_downloadable() to check if Horizons can generate SPK for a body.
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+        body_id: Minor body identifier (CERES, VESTA, etc.)
 
     Returns:
         bool: True if body is a major asteroid
 
     Example:
         >>> from libephemeris.minor_bodies import is_major_asteroid
-        >>> from libephemeris.constants import SE_CERES, SE_ERIS
-        >>> is_major_asteroid(SE_CERES)
+        >>> from libephemeris.constants import CERES, ERIS
+        >>> is_major_asteroid(CERES)
         True
-        >>> is_major_asteroid(SE_ERIS)
+        >>> is_major_asteroid(ERIS)
         False
     """
     return body_id in MAJOR_ASTEROID_SPK_INFO
@@ -3104,17 +3104,17 @@ def is_spk_downloadable(body_id: int) -> bool:
     unless it appears in SPK_AUTO_DOWNLOAD_BLOCKED (e.g., Bennu).
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+        body_id: Minor body identifier (CERES, CHIRON, etc.)
 
     Returns:
         bool: True if Horizons can generate SPK for this body
 
     Example:
         >>> from libephemeris.minor_bodies import is_spk_downloadable
-        >>> from libephemeris.constants import SE_CERES, SE_BENNU
-        >>> is_spk_downloadable(SE_CERES)
+        >>> from libephemeris.constants import CERES, BENNU
+        >>> is_spk_downloadable(CERES)
         True
-        >>> is_spk_downloadable(SE_BENNU)
+        >>> is_spk_downloadable(BENNU)
         False
     """
     from .constants import SPK_AUTO_DOWNLOAD_BLOCKED, SPK_BODY_NAME_MAP
@@ -3149,7 +3149,7 @@ def get_major_asteroid_info(
     Get SPK download information for a major asteroid.
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_VESTA, etc.)
+        body_id: Minor body identifier (CERES, VESTA, etc.)
 
     Returns:
         Tuple of (asteroid_number, horizons_id, naif_id, body_name) if
@@ -3157,8 +3157,8 @@ def get_major_asteroid_info(
 
     Example:
         >>> from libephemeris.minor_bodies import get_major_asteroid_info
-        >>> from libephemeris.constants import SE_CERES
-        >>> info = get_major_asteroid_info(SE_CERES)
+        >>> from libephemeris.constants import CERES
+        >>> info = get_major_asteroid_info(CERES)
         >>> if info:
         ...     ast_num, horizons_id, naif_id, name = info
         ...     print(f"{name}: asteroid #{ast_num}, NAIF ID {naif_id}")
@@ -3186,7 +3186,7 @@ def auto_download_asteroid_spk(
     SPK_BODY_NAME_MAP (constants.py).
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_VESTA, SE_CHIRON, etc.)
+        body_id: Minor body identifier (CERES, VESTA, CHIRON, etc.)
         jd_start: Start Julian Day for SPK coverage. If None, uses 10 years
             before current date.
         jd_end: End Julian Day for SPK coverage. If None, uses 10 years
@@ -3203,8 +3203,8 @@ def auto_download_asteroid_spk(
 
     Example:
         >>> from libephemeris.minor_bodies import auto_download_asteroid_spk
-        >>> from libephemeris.constants import SE_CERES
-        >>> spk_path = auto_download_asteroid_spk(SE_CERES)
+        >>> from libephemeris.constants import CERES
+        >>> spk_path = auto_download_asteroid_spk(CERES)
         >>> if spk_path:
         ...     print(f"SPK downloaded: {spk_path}")
 
@@ -3298,15 +3298,15 @@ def is_spk_available_for_body(body_id: int) -> bool:
     for the given body, enabling high-precision calculations.
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_CHIRON, etc.)
+        body_id: Minor body identifier (CERES, CHIRON, etc.)
 
     Returns:
         bool: True if SPK is registered and available for this body
 
     Example:
         >>> from libephemeris.minor_bodies import is_spk_available_for_body
-        >>> from libephemeris.constants import SE_CERES
-        >>> if is_spk_available_for_body(SE_CERES):
+        >>> from libephemeris.constants import CERES
+        >>> if is_spk_available_for_body(CERES):
         ...     print("Using high-precision SPK data")
         ... else:
         ...     print("Using Keplerian approximation")
@@ -3334,8 +3334,8 @@ def ensure_major_asteroid_spk(
     dwarf planets) and any body in SPK_BODY_NAME_MAP.
 
     Args:
-        body_id: Minor body identifier (SE_CERES, SE_VESTA, SE_CHIRON,
-            SE_PHOLUS, SE_NESSUS, SE_ERIS, etc.)
+        body_id: Minor body identifier (CERES, VESTA, CHIRON,
+            PHOLUS, NESSUS, ERIS, etc.)
         jd: Optional Julian Day to center the SPK coverage around.
             If None, uses current date.
 
@@ -3345,9 +3345,9 @@ def ensure_major_asteroid_spk(
 
     Example:
         >>> from libephemeris.minor_bodies import ensure_major_asteroid_spk
-        >>> from libephemeris.constants import SE_CERES, REQUIRED_SPK_BODIES
+        >>> from libephemeris.constants import CERES, REQUIRED_SPK_BODIES
         >>> # Ensure SPK is available for Ceres
-        >>> if ensure_major_asteroid_spk(SE_CERES):
+        >>> if ensure_major_asteroid_spk(CERES):
         ...     print("High-precision SPK available")
         ... else:
         ...     print("Will use Keplerian approximation")
@@ -3477,7 +3477,7 @@ def calc_asteroid_by_number(
         calc_minor_body_heliocentric: For bodies with pre-defined orbital elements
         fetch_orbital_elements_from_sbdb: To fetch elements without calculating position
     """
-    from .constants import SE_AST_OFFSET
+    from .constants import AST_OFFSET
 
     # Validate asteroid number
     if not isinstance(asteroid_number, int) or asteroid_number <= 0:
@@ -3486,28 +3486,28 @@ def calc_asteroid_by_number(
         )
 
     # Check if we have this asteroid in the predefined MINOR_BODY_ELEMENTS
-    body_id = asteroid_number + SE_AST_OFFSET
+    body_id = asteroid_number + AST_OFFSET
     if body_id in MINOR_BODY_ELEMENTS:
         return calc_minor_body_heliocentric(body_id, jd_tt)
 
     # Check special cases for low-numbered asteroids that use different IDs
     # (Chiron, Pholus, Ceres, Pallas, Juno, Vesta have dedicated SE_* constants)
     from .constants import (
-        SE_CHIRON,
-        SE_PHOLUS,
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
+        CHIRON,
+        PHOLUS,
+        CERES,
+        PALLAS,
+        JUNO,
+        VESTA,
     )
 
     special_mapping = {
-        2060: SE_CHIRON,  # Chiron
-        5145: SE_PHOLUS,  # Pholus
-        1: SE_CERES,  # Ceres
-        2: SE_PALLAS,  # Pallas
-        3: SE_JUNO,  # Juno
-        4: SE_VESTA,  # Vesta
+        2060: CHIRON,  # Chiron
+        5145: PHOLUS,  # Pholus
+        1: CERES,  # Ceres
+        2: PALLAS,  # Pallas
+        3: JUNO,  # Juno
+        4: VESTA,  # Vesta
     }
 
     if asteroid_number in special_mapping:
@@ -3519,7 +3519,7 @@ def calc_asteroid_by_number(
     if use_spk:
         try:
             from . import state
-            from .constants import SEFLG_HELCTR
+            from .constants import FLG_HELCTR
             from .spk import calc_spk_body_position
 
             # Check if there's a registered SPK for this body
@@ -3529,7 +3529,7 @@ def calc_asteroid_by_number(
                 t = ts.tt_jd(jd_tt)
 
                 # Calculate heliocentric position using SPK
-                result = calc_spk_body_position(t, body_id, SEFLG_HELCTR)
+                result = calc_spk_body_position(t, body_id, FLG_HELCTR)
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist

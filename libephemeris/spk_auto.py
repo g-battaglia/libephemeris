@@ -13,13 +13,13 @@ Usage:
     >>> from libephemeris import spk_auto
     >>> # Enable auto-downloading for a body
     >>> spk_auto.enable_auto_spk(
-    ...     ipl=SE_CHIRON,
+    ...     ipl=CHIRON,
     ...     body_id="2060",  # Horizons identifier
     ...     start="2000-01-01",
     ...     end="2100-01-01",
     ... )
     >>> # Now calc_ut automatically downloads and uses SPK if needed
-    >>> pos, _ = calc_ut(2451545.0, SE_CHIRON, 0)
+    >>> pos, _ = calc_ut(2451545.0, CHIRON, 0)
 
 Requirements:
     pip install astroquery
@@ -204,7 +204,7 @@ class AutoSpkConfig:
     """Configuration for automatic SPK download for a minor body.
 
     Attributes:
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
         body_id: JPL Horizons identifier (e.g., "2060", "Chiron")
         naif_id: NAIF ID for SPK lookup (e.g., 2002060)
         start: Start date for SPK coverage (YYYY-MM-DD)
@@ -363,7 +363,7 @@ def enable_auto_spk(
     kernel from JPL Horizons when the body's position is calculated.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON, SE_ERIS)
+        ipl: libephemeris body ID (e.g., CHIRON, ERIS)
         body_id: JPL Horizons target identifier. Can be:
             - Asteroid number: "2060", "136199"
             - Name: "Chiron", "Eris"
@@ -376,9 +376,9 @@ def enable_auto_spk(
             Default: {library_path}/spk_cache/
 
     Example:
-        >>> from libephemeris import spk_auto, SE_CHIRON
+        >>> from libephemeris import spk_auto, CHIRON
         >>> spk_auto.enable_auto_spk(
-        ...     ipl=SE_CHIRON,
+        ...     ipl=CHIRON,
         ...     body_id="2060",
         ...     start="2000-01-01",
         ...     end="2100-01-01",
@@ -418,7 +418,7 @@ def disable_auto_spk(ipl: int) -> None:
     already-downloaded SPK files or unregister them from the SPK registry.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
     """
     with _AUTO_SPK_LOCK:
         if ipl in _AUTO_SPK_REGISTRY:
@@ -998,14 +998,14 @@ def enable_common_bodies(
         >>> # Now all common minor bodies use SPK automatically
     """
     from .constants import (
-        SE_CHIRON,
-        SE_PHOLUS,
-        SE_CERES,
-        SE_PALLAS,
-        SE_JUNO,
-        SE_VESTA,
-        SE_ERIS,
-        SE_SEDNA,
+        CHIRON,
+        PHOLUS,
+        CERES,
+        PALLAS,
+        JUNO,
+        VESTA,
+        ERIS,
+        SEDNA,
         NAIF_CHIRON,
         NAIF_PHOLUS,
         NAIF_CERES,
@@ -1017,14 +1017,14 @@ def enable_common_bodies(
     )
 
     common_bodies = [
-        (SE_CHIRON, "2060", NAIF_CHIRON),
-        (SE_PHOLUS, "5145", NAIF_PHOLUS),
-        (SE_CERES, "1", NAIF_CERES),
-        (SE_PALLAS, "2", NAIF_PALLAS),
-        (SE_JUNO, "3", NAIF_JUNO),
-        (SE_VESTA, "4", NAIF_VESTA),
-        (SE_ERIS, "136199", NAIF_ERIS),
-        (SE_SEDNA, "90377", NAIF_SEDNA),
+        (CHIRON, "2060", NAIF_CHIRON),
+        (PHOLUS, "5145", NAIF_PHOLUS),
+        (CERES, "1", NAIF_CERES),
+        (PALLAS, "2", NAIF_PALLAS),
+        (JUNO, "3", NAIF_JUNO),
+        (VESTA, "4", NAIF_VESTA),
+        (ERIS, "136199", NAIF_ERIS),
+        (SEDNA, "90377", NAIF_SEDNA),
     ]
 
     for ipl, body_id, naif_id in common_bodies:
@@ -1324,7 +1324,7 @@ def auto_get_spk(
         cache_dir: Directory for storing/finding SPK files.
             Default: Uses set_spk_cache_dir() value if set, otherwise
             ~/.libephemeris/spk/
-        ipl: Optional libephemeris body ID (e.g., SE_CHIRON). If provided,
+        ipl: Optional libephemeris body ID (e.g., CHIRON). If provided,
             the SPK body is automatically registered after download.
         naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
             the NAIF ID is deduced from body_id using the convention:
@@ -1344,14 +1344,14 @@ def auto_get_spk(
 
     Example:
         >>> from libephemeris.spk_auto import auto_get_spk
-        >>> from libephemeris.constants import SE_CHIRON
+        >>> from libephemeris.constants import CHIRON
         >>> # Get SPK for Chiron covering 2020-2030 and register it
         >>> jd_start = 2458849.5  # 2020-01-01
         >>> jd_end = 2462502.5    # 2030-01-01
-        >>> spk_path = auto_get_spk("2060", jd_start, jd_end, ipl=SE_CHIRON)
+        >>> spk_path = auto_get_spk("2060", jd_start, jd_end, ipl=CHIRON)
         >>> print(spk_path)
         /home/user/.libephemeris/spk/2060_2458849_2462502.bsp
-        >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data automatically
+        >>> # Now calc_ut(jd, CHIRON, ...) uses SPK data automatically
     """
     # Validate inputs
     if jd_end <= jd_start:
@@ -1441,7 +1441,7 @@ def _register_spk_after_download(
     Args:
         spk_path: Path to the downloaded SPK file
         body_id: JPL Horizons body identifier (used for NAIF ID deduction)
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
         naif_id: Optional NAIF ID. If not provided, deduced from body_id.
 
     Raises:
@@ -1496,7 +1496,7 @@ def download_spk_from_horizons(
         jd_end: End of the date range (Julian Day)
         output_path: Full path where the SPK file should be saved (including filename)
         location: Observer location code for Horizons (default: "@0" = solar system barycenter)
-        ipl: Optional libephemeris body ID (e.g., SE_CHIRON). If provided,
+        ipl: Optional libephemeris body ID (e.g., CHIRON). If provided,
             the SPK body is automatically registered after download.
         naif_id: Optional NAIF ID for SPK lookup. If not provided but ipl is,
             the NAIF ID is deduced from body_id using the convention:
@@ -1513,7 +1513,7 @@ def download_spk_from_horizons(
 
     Example:
         >>> from libephemeris.spk_auto import download_spk_from_horizons
-        >>> from libephemeris.constants import SE_CHIRON
+        >>> from libephemeris.constants import CHIRON
         >>> # Download Chiron SPK for 2020-2030 and register it
         >>> jd_start = 2458849.5  # 2020-01-01
         >>> jd_end = 2462502.5    # 2030-01-01
@@ -1522,11 +1522,11 @@ def download_spk_from_horizons(
         ...     jd_start=jd_start,
         ...     jd_end=jd_end,
         ...     output_path="/path/to/chiron.bsp",
-        ...     ipl=SE_CHIRON,  # Automatically registers the SPK
+        ...     ipl=CHIRON,  # Automatically registers the SPK
         ... )
         >>> print(path)
         /path/to/chiron.bsp
-        >>> # Now calc_ut(jd, SE_CHIRON, ...) uses SPK data automatically
+        >>> # Now calc_ut(jd, CHIRON, ...) uses SPK data automatically
 
     Notes:
         - Horizons has limits on the date range for SPK generation. For most

@@ -55,7 +55,7 @@ def _is_sun_above_horizon_3d(
     Returns:
         bool: True if Sun altitude >= 0 (above or on horizon)
     """
-    from .utils import azalt, SE_ECL2HOR
+    from .utils import azalt, ECL2HOR
 
     # geopos: (longitude, latitude, altitude_meters)
     geopos = (geo_lon, geo_lat, 0.0)
@@ -70,7 +70,7 @@ def _is_sun_above_horizon_3d(
     xin = (sun_lon, sun_lat, 1.0)
 
     # azalt returns (azimuth, true_altitude, apparent_altitude)
-    _, true_altitude, _ = azalt(jd, SE_ECL2HOR, geopos, atpress, attemp, xin)
+    _, true_altitude, _ = azalt(jd, ECL2HOR, geopos, atpress, attemp, xin)
 
     return true_altitude >= 0.0
 

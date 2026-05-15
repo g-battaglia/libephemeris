@@ -160,12 +160,12 @@ class LEBReader:
 
     Usage:
         reader = LEBReader("/path/to/ephemeris.leb")
-        pos, vel = reader.eval_body(SE_SUN, jd_tt)
+        pos, vel = reader.eval_body(SUN, jd_tt)
         reader.close()
 
     Or as context manager:
         with LEBReader("/path/to/ephemeris.leb") as reader:
-            pos, vel = reader.eval_body(SE_SUN, jd_tt)
+            pos, vel = reader.eval_body(SUN, jd_tt)
     """
 
     def __init__(self, path: str) -> None:
@@ -323,7 +323,7 @@ class LEBReader:
         """Evaluate a body's position and velocity at a given Julian Day.
 
         Args:
-            body_id: SE_* body constant (e.g., SE_SUN=0, SE_MOON=1).
+            body_id: SE_* body constant (e.g., SUN=0, MOON=1).
             jd: Julian Day in TT (Terrestrial Time).
 
         Returns:

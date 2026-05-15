@@ -198,7 +198,7 @@ if TYPE_CHECKING:
 def set_calc_mode(mode: Optional[str]) -> None:
     """Set the calculation mode for the library.
 
-    Controls how swe_calc_ut() and swe_calc() resolve positions:
+    Controls how calc_ut() and calc() resolve positions:
 
     - ``"auto"`` (default): Try LEB first, then Horizons API (if no
       local DE440), then Skyfield. This is the standard behavior.
@@ -275,7 +275,7 @@ def get_calc_mode() -> str:
 def set_leb_file(filepath: Optional[str]) -> None:
     """Set the .leb file path for binary ephemeris mode.
 
-    When a .leb file is configured, swe_calc_ut() and swe_calc() will
+    When a .leb file is configured, calc_ut() and calc() will
     attempt to use precomputed Chebyshev polynomials for fast evaluation
     before falling back to the Skyfield pipeline.
 
@@ -283,9 +283,9 @@ def set_leb_file(filepath: Optional[str]) -> None:
         filepath: Path to a .leb file, or None to disable binary mode.
 
     Example:
-        >>> from libephemeris import set_leb_file, calc_ut, SE_SUN
+        >>> from libephemeris import set_leb_file, calc_ut, SUN
         >>> set_leb_file("/path/to/ephemeris.leb")
-        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # uses .leb fast path
+        >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # uses .leb fast path
         >>> set_leb_file(None)  # disable binary mode
     """
     global _LEB_FILE, _LEB_READER
@@ -1091,7 +1091,7 @@ def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
                         longitude is outside [-180, 180]
 
     Note:
-        Required for topocentric calculations (SEFLG_TOPOCTR),
+        Required for topocentric calculations (FLG_TOPOCTR),
         angles (Ascendant, MC), and Arabic parts.
 
     Example:
@@ -1132,13 +1132,13 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     Set the sidereal mode (ayanamsha system) for calculations.
 
     Args:
-        mode: Sidereal mode ID (SE_SIDM_*) or 255 for custom
+        mode: Sidereal mode ID (SIDM_*) or 255 for custom
         t0: Reference epoch (Julian Day) for custom ayanamsha (default: J2000.0)
         ayan_t0: Ayanamsha value at t0 in degrees (for custom mode)
 
     Note:
-        Affects all position calculations when SEFLG_SIDEREAL is set.
-        Default is Lahiri (SE_SIDM_LAHIRI) if never set.
+        Affects all position calculations when FLG_SIDEREAL is set.
+        Default is Lahiri (SIDM_LAHIRI) if never set.
     """
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
     with _STATE_LOCK:
@@ -1166,7 +1166,7 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
         int or tuple: Sidereal mode ID, or full configuration tuple
 
     Note:
-        Returns SE_SIDM_LAHIRI (1) by default if never set.
+        Returns SIDM_LAHIRI (1) by default if never set.
     """
     with _STATE_LOCK:
         mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
@@ -1361,8 +1361,8 @@ def set_tid_acc(acc: float) -> None:
 
     Args:
         acc: Tidal acceleration in arcsec/century^2.
-             Use SE_TIDAL_* constants for standard ephemeris values,
-             or SE_TIDAL_AUTOMATIC (999999) to use the default.
+             Use TIDAL_* constants for standard ephemeris values,
+             or TIDAL_AUTOMATIC (999999) to use the default.
 
     Note:
         - The default value is based on DE440 (-25.936 arcsec/cy^2)
@@ -1376,18 +1376,18 @@ def set_tid_acc(acc: float) -> None:
 
     Example:
         >>> from libephemeris import set_tid_acc, get_tid_acc
-        >>> from libephemeris import SE_TIDAL_DE421, SE_TIDAL_DE440
-        >>> set_tid_acc(SE_TIDAL_DE421)  # Use DE421 tidal acceleration
+        >>> from libephemeris import TIDAL_DE421, TIDAL_DE440
+        >>> set_tid_acc(TIDAL_DE421)  # Use DE421 tidal acceleration
         >>> get_tid_acc()
         -25.85
-        >>> set_tid_acc(SE_TIDAL_DE440)  # Use DE440 tidal acceleration
+        >>> set_tid_acc(TIDAL_DE440)  # Use DE440 tidal acceleration
         >>> get_tid_acc()
         -25.936
     """
     global _TIDAL_ACCELERATION
-    from .constants import SE_TIDAL_AUTOMATIC
+    from .constants import TIDAL_AUTOMATIC
 
-    _TIDAL_ACCELERATION = acc if acc != SE_TIDAL_AUTOMATIC else None
+    _TIDAL_ACCELERATION = acc if acc != TIDAL_AUTOMATIC else None
 
 
 def get_tid_acc() -> float:
@@ -1396,28 +1396,28 @@ def get_tid_acc() -> float:
 
     Returns:
         float: The tidal acceleration in arcsec/century^2.
-               Returns SE_TIDAL_DEFAULT (-25.8) if not explicitly set.
+               Returns TIDAL_DEFAULT (-25.8) if not explicitly set.
 
     Note:
         The tidal acceleration affects how Delta T is extrapolated for dates
         outside the range of direct observations. This is particularly
         important for historical astronomical calculations.
 
-        If set_tid_acc() was called with SE_TIDAL_AUTOMATIC (999999),
+        If set_tid_acc() was called with TIDAL_AUTOMATIC (999999),
         this returns the default value.
 
     Example:
-        >>> from libephemeris import get_tid_acc, set_tid_acc, SE_TIDAL_DE441
+        >>> from libephemeris import get_tid_acc, set_tid_acc, TIDAL_DE441
         >>> get_tid_acc()  # Default value
         -25.936
-        >>> set_tid_acc(SE_TIDAL_DE441)
+        >>> set_tid_acc(TIDAL_DE441)
         >>> get_tid_acc()
         -25.936
     """
-    from .constants import SE_TIDAL_DEFAULT
+    from .constants import TIDAL_DEFAULT
 
     if _TIDAL_ACCELERATION is None:
-        return SE_TIDAL_DEFAULT
+        return TIDAL_DEFAULT
     return _TIDAL_ACCELERATION
 
 
@@ -1425,7 +1425,7 @@ def set_delta_t_userdef(acc: Optional[float]) -> None:
     """
     Set a user-defined Delta T value to use instead of computed values.
 
-    When set, swe_deltat() and swe_deltat_ex() will return this fixed value
+    When set, deltat() and deltat_ex() will return this fixed value
     instead of computing Delta T from IERS data. This is useful for:
     - Testing and reproducibility
     - Very ancient dates where Delta T is highly uncertain
@@ -1435,7 +1435,7 @@ def set_delta_t_userdef(acc: Optional[float]) -> None:
     Args:
         acc: Delta T value in days (TT - UT1), or None to clear and resume
              using computed values. The value should be in the same units
-             as returned by swe_deltat() (days, not seconds).
+             as returned by deltat() (days, not seconds).
 
     Note:
         - To convert from seconds to days, divide by 86400
@@ -1444,12 +1444,12 @@ def set_delta_t_userdef(acc: Optional[float]) -> None:
         - Use get_delta_t_userdef() to check if a user-defined value is active
 
     Example:
-        >>> from libephemeris import set_delta_t_userdef, get_delta_t_userdef, swe_deltat
+        >>> from libephemeris import set_delta_t_userdef, get_delta_t_userdef, deltat
         >>> # Set a fixed Delta T of 65 seconds (in days)
         >>> set_delta_t_userdef(65.0 / 86400.0)
         >>> get_delta_t_userdef()
         7.523148148148148e-04
-        >>> swe_deltat(2451545.0)  # Now returns fixed value
+        >>> deltat(2451545.0)  # Now returns fixed value
         7.523148148148148e-04
         >>> # Clear to resume computed values
         >>> set_delta_t_userdef(None)
@@ -1469,8 +1469,8 @@ def get_delta_t_userdef() -> Optional[float]:
                         or None if using computed values.
 
     Note:
-        When this returns None, swe_deltat() computes Delta T from IERS data.
-        When this returns a float, that value is used directly by swe_deltat().
+        When this returns None, deltat() computes Delta T from IERS data.
+        When this returns a float, that value is used directly by deltat().
 
     Example:
         >>> from libephemeris import set_delta_t_userdef, get_delta_t_userdef
@@ -1487,7 +1487,7 @@ def get_delta_t_userdef() -> Optional[float]:
 
 
 # Default atmospheric lapse rate in K/m (standard atmosphere)
-SE_LAPSE_RATE_DEFAULT: float = 0.0065
+LAPSE_RATE_DEFAULT: float = 0.0065
 
 
 def set_lapse_rate(lrate: Optional[float]) -> None:
@@ -1546,7 +1546,7 @@ def get_lapse_rate() -> float:
         0.008
     """
     if _LAPSE_RATE is None:
-        return SE_LAPSE_RATE_DEFAULT
+        return LAPSE_RATE_DEFAULT
     return _LAPSE_RATE
 
 
@@ -1599,10 +1599,10 @@ def close() -> None:
           - Ensuring clean state in test suites
 
     Example:
-        >>> from libephemeris import calc_ut, close, SE_SUN
-        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Loads ephemeris
+        >>> from libephemeris import calc_ut, close, SUN
+        >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # Loads ephemeris
         >>> close()  # Close files and reset state
-        >>> pos, _ = calc_ut(2451545.0, SE_SUN, 0)  # Reloads ephemeris
+        >>> pos, _ = calc_ut(2451545.0, SUN, 0)  # Reloads ephemeris
     """
     global _EPHEMERIS_PATH, _EPHEMERIS_FILE, _EPHEMERIS_FILE_EXPLICIT
     global _LOADER, _PLANETS, _PLANET_CENTERS, _TS
@@ -1780,8 +1780,8 @@ def get_current_file_data(ifno: int = 0) -> tuple[str, float, float, int]:
           get_planets) before this function returns meaningful data.
 
     Example:
-        >>> from libephemeris import get_current_file_data, calc_ut, SE_SUN
-        >>> calc_ut(2451545.0, SE_SUN, 0)  # Triggers ephemeris loading
+        >>> from libephemeris import get_current_file_data, calc_ut, SUN
+        >>> calc_ut(2451545.0, SUN, 0)  # Triggers ephemeris loading
         >>> path, start, end, denum = get_current_file_data(0)
         >>> print(f"Using DE{denum}, covering JD {start:.1f} to {end:.1f}")
         Using DE421, covering JD 2414864.5 to 2471184.5
@@ -2293,7 +2293,7 @@ def _get_spk_target(ipl: int):
     Internal function used by planets.py for SPK-based calculations.
 
     Args:
-        ipl: libephemeris body ID (e.g., SE_CHIRON)
+        ipl: libephemeris body ID (e.g., CHIRON)
 
     Returns:
         Skyfield ephemeris target object, or None if not registered.

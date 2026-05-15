@@ -6,9 +6,9 @@ Uses Newton-Raphson iteration for sub-milliarcsecond precision, with Brent's met
 as a fallback near retrograde stations.
 
 Functions:
-- swe_solcross_ut: Sun crossing events (e.g., ingresses, equinoxes)
-- swe_mooncross_ut: Moon crossing events (for lunar mansion calculations)
-- swe_cross_ut: Generic planet crossing
+- solcross_ut: Sun crossing events (e.g., ingresses, equinoxes)
+- mooncross_ut: Moon crossing events (for lunar mansion calculations)
+- cross_ut: Generic planet crossing
 
 Precision: Newton-Raphson convergence tolerance
 Tolerance: 0.001 arcsecond (sub-milliarcsecond) for all bodies (Sun, Moon, planets)
@@ -36,9 +36,9 @@ from __future__ import annotations
 
 from typing import Callable, Tuple
 
-from .constants import SEFLG_SWIEPH, SEFLG_SPEED, SEFLG_HELCTR, SE_SUN, SE_MOON
+from .constants import FLG_SWIEPH, FLG_SPEED, FLG_HELCTR, SUN, MOON
 from .exceptions import EphemerisRangeError, CalculationError
-from .planets import swe_calc_ut, swe_calc
+from .planets import calc_ut, calc
 
 # Station detection threshold: speed below this indicates proximity to retrograde station
 # At stations, Newton-Raphson can fail due to near-zero derivative (speed)
@@ -292,10 +292,10 @@ def _find_bracket_for_crossing(
     )
 
 
-def swe_solcross_ut(
+def solcross_ut(
     x2cross: float,
     tjdut: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
@@ -306,7 +306,7 @@ def swe_solcross_ut(
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -326,16 +326,16 @@ def swe_solcross_ut(
 
     Example:
         >>> # Find next Aries ingress (0°)
-        >>> jd_ingress = swe_solcross_ut(0.0, jd_now)
+        >>> jd_ingress = solcross_ut(0.0, jd_now)
         >>> # Find summer solstice (90°)
-        >>> jd_solstice = swe_solcross_ut(90.0, jd_now)
+        >>> jd_solstice = solcross_ut(90.0, jd_now)
         >>> # Find PREVIOUS Aries ingress
-        >>> jd_prev = swe_solcross_ut(0.0, jd_now, backwards=True)
+        >>> jd_prev = solcross_ut(0.0, jd_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
     try:
-        pos, _ = swe_calc_ut(tjdut, SE_SUN, flags | SEFLG_SPEED)
+        pos, _ = calc_ut(tjdut, SUN, flags | FLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -384,7 +384,7 @@ def swe_solcross_ut(
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_SUN):
         try:
-            pos, _ = swe_calc_ut(jd, SE_SUN, flags | SEFLG_SPEED)
+            pos, _ = calc_ut(jd, SUN, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -414,16 +414,16 @@ def swe_solcross_ut(
     raise RuntimeError("Maximum iterations reached in solar crossing calculation")
 
 
-def swe_solcross(
+def solcross(
     x2cross: float,
     tjdet: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude (TT version).
 
-    This is the Terrestrial Time version of swe_solcross_ut(). Takes Julian Day
+    This is the Terrestrial Time version of solcross_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
     Searches forward (or backward if ``backwards=True``) in time from ``tjdet``.
@@ -431,7 +431,7 @@ def swe_solcross(
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -443,7 +443,7 @@ def swe_solcross(
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use swe_solcross_ut() instead.
+        For most astrological applications, use solcross_ut() instead.
 
     Algorithm:
         1. Get current Sun position and velocity
@@ -456,16 +456,16 @@ def swe_solcross(
 
     Example:
         >>> # Find next Aries ingress (0°) using TT
-        >>> jd_ingress_tt = swe_solcross(0.0, jd_tt_now)
+        >>> jd_ingress_tt = solcross(0.0, jd_tt_now)
         >>> # Find summer solstice (90°)
-        >>> jd_solstice_tt = swe_solcross(90.0, jd_tt_now)
+        >>> jd_solstice_tt = solcross(90.0, jd_tt_now)
         >>> # Find previous Aries ingress using TT
-        >>> jd_prev_tt = swe_solcross(0.0, jd_tt_now, backwards=True)
+        >>> jd_prev_tt = solcross(0.0, jd_tt_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
     try:
-        pos, _ = swe_calc(tjdet, SE_SUN, flags | SEFLG_SPEED)
+        pos, _ = calc(tjdet, SUN, flags | FLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -479,7 +479,7 @@ def swe_solcross(
     diff = (x2cross - lon_start) % 360.0
 
     if backwards:
-        # See swe_solcross_ut for the signed-normalization rationale.
+        # See solcross_ut for the signed-normalization rationale.
         signed = diff - 360.0 if diff > 180.0 else diff
         if abs(signed) < 1e-6:
             diff = -360.0
@@ -503,7 +503,7 @@ def swe_solcross(
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_SUN):
         try:
-            pos, _ = swe_calc(jd, SE_SUN, flags | SEFLG_SPEED)
+            pos, _ = calc(jd, SUN, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -533,10 +533,10 @@ def swe_solcross(
     raise RuntimeError("Maximum iterations reached in solar crossing calculation")
 
 
-def swe_mooncross_ut(
+def mooncross_ut(
     x2cross: float,
     tjdut: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
@@ -547,7 +547,7 @@ def swe_mooncross_ut(
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -565,15 +565,15 @@ def swe_mooncross_ut(
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude)
-        >>> sun_pos, _ = swe_calc_ut(jd_now, SE_SUN, SEFLG_SWIEPH)
-        >>> jd_new_moon = swe_mooncross_ut(sun_pos[0], jd_now)
+        >>> sun_pos, _ = calc_ut(jd_now, SUN, FLG_SWIEPH)
+        >>> jd_new_moon = mooncross_ut(sun_pos[0], jd_now)
         >>> # Find PREVIOUS Moon crossing of 0°
-        >>> jd_prev = swe_mooncross_ut(0.0, jd_now, backwards=True)
+        >>> jd_prev = mooncross_ut(0.0, jd_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
     try:
-        pos, _ = swe_calc_ut(tjdut, SE_MOON, flags | SEFLG_SPEED)
+        pos, _ = calc_ut(tjdut, MOON, flags | FLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -587,7 +587,7 @@ def swe_mooncross_ut(
     diff = (x2cross - lon_start) % 360.0
 
     if backwards:
-        # See swe_solcross_ut for the signed-normalization rationale.
+        # See solcross_ut for the signed-normalization rationale.
         signed = diff - 360.0 if diff > 180.0 else diff
         if abs(signed) < 1e-6:
             diff = -360.0
@@ -610,7 +610,7 @@ def swe_mooncross_ut(
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_MOON):
         try:
-            pos, _ = swe_calc_ut(jd, SE_MOON, flags | SEFLG_SPEED)
+            pos, _ = calc_ut(jd, MOON, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -640,16 +640,16 @@ def swe_mooncross_ut(
     raise RuntimeError("Maximum iterations reached in moon crossing calculation")
 
 
-def swe_mooncross(
+def mooncross(
     x2cross: float,
     tjdet: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude (TT version).
 
-    This is the Terrestrial Time version of swe_mooncross_ut(). Takes Julian Day
+    This is the Terrestrial Time version of mooncross_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
     Searches forward (or backward if ``backwards=True``) in time from ``tjdet``.
@@ -657,7 +657,7 @@ def swe_mooncross(
     Args:
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -669,7 +669,7 @@ def swe_mooncross(
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use swe_mooncross_ut() instead.
+        For most astrological applications, use mooncross_ut() instead.
 
         Moon moves ~13° per day (27.3 day cycle).
         More variable speed than Sun due to orbit eccentricity.
@@ -685,15 +685,15 @@ def swe_mooncross(
 
     Example:
         >>> # Find next new moon (Sun-Moon conjunction at same longitude) using TT
-        >>> sun_pos, _ = swe_calc(jd_tt_now, SE_SUN, SEFLG_SWIEPH)
-        >>> jd_new_moon_tt = swe_mooncross(sun_pos[0], jd_tt_now)
+        >>> sun_pos, _ = calc(jd_tt_now, SUN, FLG_SWIEPH)
+        >>> jd_new_moon_tt = mooncross(sun_pos[0], jd_tt_now)
         >>> # Find previous Moon crossing of 0° using TT
-        >>> jd_prev_tt = swe_mooncross(0.0, jd_tt_now, backwards=True)
+        >>> jd_prev_tt = mooncross(0.0, jd_tt_now, backwards=True)
     """
     x2cross = x2cross % 360.0
 
     try:
-        pos, _ = swe_calc(tjdet, SE_MOON, flags | SEFLG_SPEED)
+        pos, _ = calc(tjdet, MOON, flags | FLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -707,7 +707,7 @@ def swe_mooncross(
     diff = (x2cross - lon_start) % 360.0
 
     if backwards:
-        # See swe_solcross_ut for the signed-normalization rationale.
+        # See solcross_ut for the signed-normalization rationale.
         signed = diff - 360.0 if diff > 180.0 else diff
         if abs(signed) < 1e-6:
             diff = -360.0
@@ -729,7 +729,7 @@ def swe_mooncross(
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_MOON):
         try:
-            pos, _ = swe_calc(jd, SE_MOON, flags | SEFLG_SPEED)
+            pos, _ = calc(jd, MOON, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -759,9 +759,9 @@ def swe_mooncross(
     raise RuntimeError("Maximum iterations reached in moon crossing calculation")
 
 
-def swe_mooncross_node_ut(
+def mooncross_node_ut(
     tjdut: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> Tuple[float, float, float]:
     """
@@ -775,7 +775,7 @@ def swe_mooncross_node_ut(
 
     Args:
         tjdut: Julian Day (UT) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -787,7 +787,7 @@ def swe_mooncross_node_ut(
 
     Algorithm:
         1. Convert UT to TT for internal calculation
-        2. Delegate to swe_mooncross_node (TT version) for Newton-Raphson search
+        2. Delegate to mooncross_node (TT version) for Newton-Raphson search
         3. Convert result TT back to UT for return value
 
     Note:
@@ -800,12 +800,12 @@ def swe_mooncross_node_ut(
 
     Example:
         >>> # Find next lunar node crossing
-        >>> jd_node, xlon, xlat = swe_mooncross_node_ut(jd_now)
+        >>> jd_node, xlon, xlat = mooncross_node_ut(jd_now)
         >>> # Check if ascending or descending by examining latitude velocity
-        >>> pos, _ = swe_calc_ut(jd_node, SE_MOON, SEFLG_SPEED)
+        >>> pos, _ = calc_ut(jd_node, MOON, FLG_SPEED)
         >>> is_ascending = pos[4] > 0  # positive lat velocity = ascending
         >>> # Find PREVIOUS lunar node crossing
-        >>> jd_prev, _, _ = swe_mooncross_node_ut(jd_now, backwards=True)
+        >>> jd_prev, _, _ = mooncross_node_ut(jd_now, backwards=True)
     """
     from .state import get_timescale
 
@@ -815,7 +815,7 @@ def swe_mooncross_node_ut(
     jd_tt_start = t_start.tt
 
     # Delegate to the TT version
-    jd_tt_cross, xlon, xlat = swe_mooncross_node(jd_tt_start, flags, backwards=backwards)
+    jd_tt_cross, xlon, xlat = mooncross_node(jd_tt_start, flags, backwards=backwards)
 
     # Convert result from TT back to UT
     t_cross = ts.tt_jd(jd_tt_cross)
@@ -824,15 +824,15 @@ def swe_mooncross_node_ut(
     return (float(jd_ut_cross), xlon, xlat)
 
 
-def swe_mooncross_node(
+def mooncross_node(
     tjdet: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (TT version).
 
-    This is the Terrestrial Time version of swe_mooncross_node_ut(). Takes Julian Day
+    This is the Terrestrial Time version of mooncross_node_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
     The Moon crosses a node when its ecliptic latitude becomes zero - i.e., when
@@ -843,7 +843,7 @@ def swe_mooncross_node(
 
     Args:
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.)
+        flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -856,20 +856,20 @@ def swe_mooncross_node(
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use swe_mooncross_node_ut() instead.
+        For most astrological applications, use mooncross_node_ut() instead.
 
     Example:
         >>> # Find next lunar node crossing using TT
-        >>> jd_node_tt, xlon, xlat = swe_mooncross_node(jd_tt_now)
+        >>> jd_node_tt, xlon, xlat = mooncross_node(jd_tt_now)
         >>> # Find previous lunar node crossing using TT
-        >>> jd_prev_tt, _, _ = swe_mooncross_node(jd_tt_now, backwards=True)
+        >>> jd_prev_tt, _, _ = mooncross_node(jd_tt_now, backwards=True)
     """
     # Half nodal month - time between successive node crossings
     HALF_NODAL_MONTH = 13.6
     direction = -1.0 if backwards else 1.0
 
     try:
-        pos, _ = swe_calc(tjdet, SE_MOON, flags | SEFLG_SPEED)
+        pos, _ = calc(tjdet, MOON, flags | FLG_SPEED)
         lat = pos[1]  # ecliptic latitude
         lat_speed = pos[4]  # latitude velocity in degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -902,12 +902,12 @@ def swe_mooncross_node(
         if needs_scan:
             jd_search_start = tjdet + 0.5 * direction
 
-            pos_start, _ = swe_calc(jd_search_start, SE_MOON, flags | SEFLG_SPEED)
+            pos_start, _ = calc(jd_search_start, MOON, flags | FLG_SPEED)
             lat_sign = 1 if pos_start[1] >= 0 else -1
 
             for step in range(8):  # Up to 16 days in the requested direction
                 jd_check = jd_search_start + step * 2.0 * direction
-                pos_check, _ = swe_calc(jd_check, SE_MOON, flags | SEFLG_SPEED)
+                pos_check, _ = calc(jd_check, MOON, flags | FLG_SPEED)
                 current_sign = 1 if pos_check[1] >= 0 else -1
 
                 if current_sign != lat_sign:
@@ -923,7 +923,7 @@ def swe_mooncross_node(
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_MOON):
         try:
-            pos, _ = swe_calc(jd, SE_MOON, flags | SEFLG_SPEED)
+            pos, _ = calc(jd, MOON, flags | FLG_SPEED)
             lat = pos[1]
             lat_speed = pos[4]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -962,8 +962,8 @@ def swe_mooncross_node(
     raise RuntimeError("Maximum iterations reached in moon node crossing calculation")
 
 
-def swe_cross_ut(
-    planet: int, x2cross: float, tjdut: float, flags: int = SEFLG_SWIEPH
+def cross_ut(
+    planet: int, x2cross: float, tjdut: float, flags: int = FLG_SWIEPH
 ) -> float:
     """
     Find when any planet crosses a specific ecliptic longitude.
@@ -971,7 +971,7 @@ def swe_cross_ut(
     Generic version for all planets (Mercury, Venus, Mars, etc.).
 
     Args:
-        planet: Planet ID (SE_MERCURY, SE_VENUS, etc.)
+        planet: Planet ID (MERCURY, VENUS, etc.)
         x2cross: Target ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags
@@ -991,12 +991,12 @@ def swe_cross_ut(
 
     Example:
         >>> # Mars ingress into Aries
-        >>> jd_mars_aries = swe_cross_ut(SE_MARS, 0.0, jd_now)
+        >>> jd_mars_aries = cross_ut(MARS, 0.0, jd_now)
     """
     x2cross = x2cross % 360.0
 
     try:
-        pos, _ = swe_calc_ut(tjdut, planet, flags | SEFLG_SPEED)
+        pos, _ = calc_ut(tjdut, planet, flags | FLG_SPEED)
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1041,7 +1041,7 @@ def swe_cross_ut(
 
     # Helper function for Brent's method fallback
     def get_position(jd_time: float) -> Tuple[float, float]:
-        pos_result, _ = swe_calc_ut(jd_time, planet, flags | SEFLG_SPEED)
+        pos_result, _ = calc_ut(jd_time, planet, flags | FLG_SPEED)
         return pos_result[0], pos_result[3]
 
     # Check if we're near a retrograde station - use Brent's method for robustness
@@ -1090,7 +1090,7 @@ def swe_cross_ut(
 
     for iteration in range(max_iter):
         try:
-            pos, _ = swe_calc_ut(jd, planet, flags | SEFLG_SPEED)
+            pos, _ = calc_ut(jd, planet, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1174,11 +1174,11 @@ def swe_cross_ut(
     raise RuntimeError("Maximum iterations reached in planet crossing calculation")
 
 
-def swe_helio_cross_ut(
+def helio_cross_ut(
     planet: int,
     x2cross: float,
     tjdut: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
@@ -1191,12 +1191,12 @@ def swe_helio_cross_ut(
     Searches forward (or backward if backwards=True) in time from tjdut.
 
     Args:
-        planet: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
-                   Note: SE_EARTH can be used to find when Earth crosses a longitude
+        planet: Planet ID (MERCURY, VENUS, EARTH, MARS, etc.)
+                   Note: EARTH can be used to find when Earth crosses a longitude
                    as seen from the Sun.
         x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
         tjdut: Julian Day (UT) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+        flags: Calculation flags (FLG_SWIEPH, etc.). FLG_HELCTR is automatically added.
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -1220,17 +1220,17 @@ def swe_helio_cross_ut(
 
     Example:
         >>> # Find when Mars crosses 0° heliocentric longitude
-        >>> jd_cross = swe_helio_cross_ut(SE_MARS, 0.0, jd_now)
+        >>> jd_cross = helio_cross_ut(MARS, 0.0, jd_now)
         >>> # Find when Earth crosses 90° as seen from the Sun
-        >>> jd_earth_cross = swe_helio_cross_ut(SE_EARTH, 90.0, jd_now)
+        >>> jd_earth_cross = helio_cross_ut(EARTH, 90.0, jd_now)
     """
     x2cross = x2cross % 360.0
 
-    # Always add SEFLG_HELCTR for heliocentric calculations
-    helio_flag = flags | SEFLG_HELCTR | SEFLG_SPEED
+    # Always add FLG_HELCTR for heliocentric calculations
+    helio_flag = flags | FLG_HELCTR | FLG_SPEED
 
     try:
-        pos, _ = swe_calc_ut(tjdut, planet, helio_flag)
+        pos, _ = calc_ut(tjdut, planet, helio_flag)
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1280,7 +1280,7 @@ def swe_helio_cross_ut(
 
     # Helper function for Brent's method fallback (heliocentric)
     def get_helio_position(jd_time: float) -> Tuple[float, float]:
-        pos_result, _ = swe_calc_ut(jd_time, planet, helio_flag)
+        pos_result, _ = calc_ut(jd_time, planet, helio_flag)
         return pos_result[0], pos_result[3]
 
     # Check if we're dealing with a very slow planet - use Brent's method for robustness
@@ -1318,7 +1318,7 @@ def swe_helio_cross_ut(
     jd = jd_guess
     for iteration in range(max_iter):
         try:
-            pos, _ = swe_calc_ut(jd, planet, helio_flag)
+            pos, _ = calc_ut(jd, planet, helio_flag)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1356,17 +1356,17 @@ def swe_helio_cross_ut(
     )
 
 
-def swe_helio_cross(
+def helio_cross(
     planet: int,
     x2cross: float,
     tjdet: float,
-    flags: int = SEFLG_SWIEPH,
+    flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> float:
     """
     Find when a planet crosses a specific heliocentric ecliptic longitude (TT version).
 
-    This is the Terrestrial Time version of swe_helio_cross_ut(). Takes Julian Day
+    This is the Terrestrial Time version of helio_cross_ut(). Takes Julian Day
     in TT (Terrestrial Time, also known as Ephemeris Time) instead of UT.
 
     Calculates the time when a planet, as seen from the Sun (heliocentric
@@ -1375,10 +1375,10 @@ def swe_helio_cross(
     Searches forward (or backward if backwards=True) in time from tjdet.
 
     Args:
-        planet: Planet ID (SE_MERCURY, SE_VENUS, SE_EARTH, SE_MARS, etc.)
+        planet: Planet ID (MERCURY, VENUS, EARTH, MARS, etc.)
         x2cross: Target heliocentric ecliptic longitude in degrees (0-360)
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
-        flags: Calculation flags (SEFLG_SWIEPH, etc.). SEFLG_HELCTR is automatically added.
+        flags: Calculation flags (FLG_SWIEPH, etc.). FLG_HELCTR is automatically added.
         backwards: If True, search backward in time instead of forward.
 
     Returns:
@@ -1390,7 +1390,7 @@ def swe_helio_cross(
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
-        For most astrological applications, use swe_helio_cross_ut() instead.
+        For most astrological applications, use helio_cross_ut() instead.
 
     Algorithm:
         1. Get current heliocentric position and velocity
@@ -1400,15 +1400,15 @@ def swe_helio_cross(
 
     Example:
         >>> # Find when Mars crosses 0° heliocentric longitude using TT
-        >>> jd_cross_tt = swe_helio_cross(SE_MARS, 0.0, jd_tt_now)
+        >>> jd_cross_tt = helio_cross(MARS, 0.0, jd_tt_now)
     """
     x2cross = x2cross % 360.0
 
-    # Always add SEFLG_HELCTR for heliocentric calculations
-    helio_flag = flags | SEFLG_HELCTR | SEFLG_SPEED
+    # Always add FLG_HELCTR for heliocentric calculations
+    helio_flag = flags | FLG_HELCTR | FLG_SPEED
 
     try:
-        pos, _ = swe_calc(tjdet, planet, helio_flag)
+        pos, _ = calc(tjdet, planet, helio_flag)
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1456,7 +1456,7 @@ def swe_helio_cross(
 
     # Helper function for Brent's method fallback (heliocentric TT)
     def get_helio_position_tt(jd_time: float) -> Tuple[float, float]:
-        pos_result, _ = swe_calc(jd_time, planet, helio_flag)
+        pos_result, _ = calc(jd_time, planet, helio_flag)
         return pos_result[0], pos_result[3]
 
     # Check if we're dealing with a very slow planet - use Brent's method for robustness
@@ -1492,7 +1492,7 @@ def swe_helio_cross(
     jd = jd_guess
     for iteration in range(max_iter):
         try:
-            pos, _ = swe_calc(jd, planet, helio_flag)
+            pos, _ = calc(jd, planet, helio_flag)
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
@@ -1547,7 +1547,7 @@ def swe_helio_cross(
 STATION_VELOCITY_TOLERANCE = 1e-6  # degrees/day
 
 
-def is_retrograde(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> bool:
+def is_retrograde(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> bool:
     """
     Check if a planet is currently in retrograde motion.
 
@@ -1555,9 +1555,9 @@ def is_retrograde(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> boo
     (negative velocity in longitude).
 
     Args:
-        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        planet_id: Planet ID (MERCURY, VENUS, MARS, etc.)
         jd_ut: Julian Day (UT) to check
-        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+        flag: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
         bool: True if planet is retrograde (velocity < 0), False otherwise
@@ -1567,28 +1567,28 @@ def is_retrograde(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> boo
         Only planets beyond Earth (Mars-Pluto) and Mercury/Venus can appear retrograde.
 
     Example:
-        >>> is_retrograde(SE_MERCURY, jd_now)
+        >>> is_retrograde(MERCURY, jd_now)
         True  # Mercury is currently retrograde
     """
-    if planet_id in (SE_SUN, SE_MOON):
+    if planet_id in (SUN, MOON):
         # Sun and Moon are never retrograde from geocentric view
         return False
 
     try:
-        pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+        pos, _ = calc_ut(jd_ut, planet_id, flag | FLG_SPEED)
         return pos[3] < 0
     except (EphemerisRangeError, CalculationError, ValueError):
         return False
 
 
-def get_station_type(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> str:
+def get_station_type(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> str:
     """
     Determine if a planet is near a station and what type.
 
     Args:
-        planet_id: Planet ID (SE_MERCURY, SE_VENUS, SE_MARS, etc.)
+        planet_id: Planet ID (MERCURY, VENUS, MARS, etc.)
         jd_ut: Julian Day (UT) to check
-        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+        flag: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
         str: One of:
@@ -1598,22 +1598,22 @@ def get_station_type(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
             - "stationary_direct": Near station, about to resume direct motion
 
     Example:
-        >>> get_station_type(SE_MARS, jd_station)
+        >>> get_station_type(MARS, jd_station)
         'stationary_retrograde'
     """
-    if planet_id in (SE_SUN, SE_MOON):
+    if planet_id in (SUN, MOON):
         return "direct"
 
     try:
-        pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+        pos, _ = calc_ut(jd_ut, planet_id, flag | FLG_SPEED)
         speed = pos[3]
 
         if _is_near_station(speed):
             # Near station - determine type by checking velocity trend
             # Look at velocity slightly before and after
             dt = 1.0  # 1 day
-            pos_before, _ = swe_calc_ut(jd_ut - dt, planet_id, flag | SEFLG_SPEED)
-            pos_after, _ = swe_calc_ut(jd_ut + dt, planet_id, flag | SEFLG_SPEED)
+            pos_before, _ = calc_ut(jd_ut - dt, planet_id, flag | FLG_SPEED)
+            pos_after, _ = calc_ut(jd_ut + dt, planet_id, flag | FLG_SPEED)
 
             speed_before = pos_before[3]
             speed_after = pos_after[3]
@@ -1750,13 +1750,13 @@ def _find_station_bracket(
     """
     step = (jd_end - jd_start) / num_samples
 
-    pos_prev, _ = swe_calc_ut(jd_start, planet_id, flag | SEFLG_SPEED)
+    pos_prev, _ = calc_ut(jd_start, planet_id, flag | FLG_SPEED)
     speed_prev = pos_prev[3]
     jd_prev = jd_start
 
     for i in range(1, num_samples + 1):
         jd_curr = jd_start + i * step
-        pos_curr, _ = swe_calc_ut(jd_curr, planet_id, flag | SEFLG_SPEED)
+        pos_curr, _ = calc_ut(jd_curr, planet_id, flag | FLG_SPEED)
         speed_curr = pos_curr[3]
 
         # Check for sign change (station)
@@ -1771,11 +1771,11 @@ def _find_station_bracket(
     )
 
 
-def swe_find_station_ut(
+def find_station_ut(
     planet_id: int,
     jd_ut: float,
     station_type: str = "any",
-    flag: int = SEFLG_SWIEPH,
+    flag: int = FLG_SWIEPH,
 ) -> Tuple[float, str]:
     """
     Find the next planetary station (stationary point) after a given date.
@@ -1784,13 +1784,13 @@ def swe_find_station_ut(
     the transition between direct and retrograde motion (or vice versa).
 
     Args:
-        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        planet_id: Planet ID (MERCURY through PLUTO)
         jd_ut: Julian Day (UT) to start search from
         station_type: Type of station to find:
             - "any": Find next station regardless of type (default)
             - "retrograde" or "SR": Find next station where planet goes retrograde
             - "direct" or "SD": Find next station where planet resumes direct motion
-        flag: Calculation flags (SEFLG_SWIEPH, etc.)
+        flag: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
         Tuple[float, str]: (Julian Day of station, station type "SR" or "SD")
@@ -1816,10 +1816,10 @@ def swe_find_station_ut(
         Typically finds station to within ~1 minute of arc in velocity
 
     Example:
-        >>> jd_station, stype = swe_find_station_ut(SE_MERCURY, jd_now)
+        >>> jd_station, stype = find_station_ut(MERCURY, jd_now)
         >>> print(f"Mercury stations {stype} on JD {jd_station}")
     """
-    if planet_id in (SE_SUN, SE_MOON):
+    if planet_id in (SUN, MOON):
         raise ValueError("Sun and Moon do not have retrograde stations")
 
     # Normalize station_type
@@ -1846,7 +1846,7 @@ def swe_find_station_ut(
     search_window = synodic_periods.get(planet_id, 400) / 2
 
     def get_speed(jd: float) -> float:
-        pos, _ = swe_calc_ut(jd, planet_id, flag | SEFLG_SPEED)
+        pos, _ = calc_ut(jd, planet_id, flag | FLG_SPEED)
         return pos[3]
 
     # Get current motion direction
@@ -1895,8 +1895,8 @@ def swe_find_station_ut(
     raise RuntimeError(f"Could not find {station_type} station for planet {planet_id}")
 
 
-def swe_next_retrograde_ut(
-    planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH
+def next_retrograde_ut(
+    planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH
 ) -> Tuple[float, float]:
     """
     Find the next retrograde period for a planet.
@@ -1904,7 +1904,7 @@ def swe_next_retrograde_ut(
     Returns the start (SR) and end (SD) Julian Days for the next retrograde period.
 
     Args:
-        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        planet_id: Planet ID (MERCURY through PLUTO)
         jd_ut: Julian Day (UT) to start search from
         flag: Calculation flags
 
@@ -1916,27 +1916,27 @@ def swe_next_retrograde_ut(
         RuntimeError: If stations cannot be found
 
     Example:
-        >>> jd_sr, jd_sd = swe_next_retrograde_ut(SE_MERCURY, jd_now)
+        >>> jd_sr, jd_sd = next_retrograde_ut(MERCURY, jd_now)
         >>> print(f"Mercury Rx: {jd_sr} to {jd_sd}")
     """
     # Check if currently retrograde
     if is_retrograde(planet_id, jd_ut, flag):
         # Find the end of current retrograde (SD), then find next SR
-        jd_sd, _ = swe_find_station_ut(planet_id, jd_ut, "direct", flag)
-        jd_sr, _ = swe_find_station_ut(planet_id, jd_sd + 1.0, "retrograde", flag)
-        jd_sd_next, _ = swe_find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
+        jd_sd, _ = find_station_ut(planet_id, jd_ut, "direct", flag)
+        jd_sr, _ = find_station_ut(planet_id, jd_sd + 1.0, "retrograde", flag)
+        jd_sd_next, _ = find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
         return (jd_sr, jd_sd_next)
     else:
         # Find next SR and then the following SD
-        jd_sr, _ = swe_find_station_ut(planet_id, jd_ut, "retrograde", flag)
-        jd_sd, _ = swe_find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
+        jd_sr, _ = find_station_ut(planet_id, jd_ut, "retrograde", flag)
+        jd_sd, _ = find_station_ut(planet_id, jd_sr + 1.0, "direct", flag)
         return (jd_sr, jd_sd)
 
 
 def calc_velocity_at_station(
     planet_id: int,
     jd_station: float,
-    flag: int = SEFLG_SWIEPH,
+    flag: int = FLG_SWIEPH,
     dt: float = 1.0,
 ) -> Tuple[float, float, float]:
     """
@@ -1959,15 +1959,15 @@ def calc_velocity_at_station(
     Note:
         The velocity_lon will be very close to 0 at the actual station point.
         This function is useful for getting stable readings when the standard
-        swe_calc_ut velocity might show numerical noise.
+        calc_ut velocity might show numerical noise.
 
     Example:
-        >>> vlon, vlat, vdist = calc_velocity_at_station(SE_MARS, jd_station)
+        >>> vlon, vlat, vdist = calc_velocity_at_station(MARS, jd_station)
         >>> print(f"Station velocity: {vlon:.6f} deg/day")  # Should be ~0
     """
     # Get positions at t-dt and t+dt
-    pos_before, _ = swe_calc_ut(jd_station - dt, planet_id, flag)
-    pos_after, _ = swe_calc_ut(jd_station + dt, planet_id, flag)
+    pos_before, _ = calc_ut(jd_station - dt, planet_id, flag)
+    pos_after, _ = calc_ut(jd_station + dt, planet_id, flag)
 
     # Calculate velocity using central difference
     lon_before, lat_before, dist_before = pos_before[0], pos_before[1], pos_before[2]
@@ -1987,7 +1987,7 @@ def calc_velocity_at_station(
     return (v_lon, v_lat, v_dist)
 
 
-def get_station_info(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> dict:
+def get_station_info(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> dict:
     """
     Get comprehensive information about the nearest station.
 
@@ -1995,7 +1995,7 @@ def get_station_info(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
     information about it.
 
     Args:
-        planet_id: Planet ID (SE_MERCURY through SE_PLUTO)
+        planet_id: Planet ID (MERCURY through PLUTO)
         jd_ut: Julian Day (UT)
         flag: Calculation flags
 
@@ -2009,23 +2009,23 @@ def get_station_info(planet_id: int, jd_ut: float, flag: int = SEFLG_SWIEPH) -> 
             - "velocity": Current velocity in deg/day
 
     Example:
-        >>> info = get_station_info(SE_MERCURY, jd_now)
+        >>> info = get_station_info(MERCURY, jd_now)
         >>> print(f"Next station: {info['station_type']} in {info['days_to_station']:.1f} days")
     """
-    if planet_id in (SE_SUN, SE_MOON):
+    if planet_id in (SUN, MOON):
         raise ValueError("Sun and Moon do not have stations")
 
     # Get current state
-    pos, _ = swe_calc_ut(jd_ut, planet_id, flag | SEFLG_SPEED)
+    pos, _ = calc_ut(jd_ut, planet_id, flag | FLG_SPEED)
     current_velocity = pos[3]
     current_retrograde = current_velocity < 0
 
     # Find next station
     try:
-        jd_next, stype_next = swe_find_station_ut(planet_id, jd_ut, "any", flag)
+        jd_next, stype_next = find_station_ut(planet_id, jd_ut, "any", flag)
 
         # Get position at station
-        pos_station, _ = swe_calc_ut(jd_next, planet_id, flag)
+        pos_station, _ = calc_ut(jd_next, planet_id, flag)
 
         return {
             "jd_station": jd_next,

@@ -69,7 +69,7 @@ class LEB2Reader:
 
     Usage:
         with LEB2Reader("ephemeris.leb2") as reader:
-            pos, vel = reader.eval_body(SE_SUN, jd_tt)
+            pos, vel = reader.eval_body(SUN, jd_tt)
     """
 
     def __init__(self, path: str) -> None:
