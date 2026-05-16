@@ -78,6 +78,49 @@ def _get_leb_reader_safe():
     return get_leb_reader()
 
 
+def _is_leb_out_of_range(exc: BaseException) -> bool:
+    """Return True if the exception is an LEB out-of-range error.
+
+    Recognises the ValueError raised by LEBReader / LEB2Reader / fast_calc
+    when a JD is probed outside the LEB file's coverage. Both bodies and
+    nutation coverage produce messages containing "outside range" or
+    "outside nutation range".
+    """
+    return isinstance(exc, (KeyError, ValueError)) and (
+        "outside" in str(exc).lower()
+    )
+
+
+def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
+    """Run ``impl(reader=...)``, retrying with ``reader=None`` on LEB out-of-range.
+
+    Eclipse / occultation / rise-transit search loops define LEB-backed inner
+    closures inside ``if reader is not None`` blocks. If a search probe lands
+    outside the LEB file's coverage, _topo_ecliptic raises ValueError. Without
+    this helper there was no fallback, so partial/custom LEB files shorter
+    than the search window would surface the underlying ValueError to callers.
+
+    Behaviour:
+        - If no LEB reader is available, run ``impl(reader=None)`` directly.
+        - Otherwise, run ``impl(reader=reader)`` first.
+        - If it raises an LEB out-of-range error, retry with ``reader=None``
+          to force the Skyfield path. Any other exception is re-raised.
+
+    Standard LEB files (base 1849-2150, medium 1550-2650, extended ±13000) all
+    accommodate the search windows in this module, so the fallback only fires
+    for custom files. The retry restarts computation from scratch (no shared
+    intermediate state), which is acceptable for the rare-fallback case.
+    """
+    reader = _get_leb_reader_safe()
+    if reader is not None:
+        try:
+            return impl(*args, reader=reader, **kwargs)
+        except (KeyError, ValueError) as exc:
+            if not _is_leb_out_of_range(exc):
+                raise
+    return impl(*args, reader=None, **kwargs)
+
+
 # Constants for eclipse calculations
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
@@ -1532,6 +1575,26 @@ def _calculate_local_eclipse_phases(
     lon: float,
     altitude: float,
 ) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
+    """Calculate eclipse phase times as seen from a specific location.
+
+    Wrapper around :func:`_calculate_local_eclipse_phases_impl` that adds
+    LEB→Skyfield fallback for partial/custom LEB files. See the impl
+    docstring for the full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _calculate_local_eclipse_phases_impl,
+        jd_max_global, lat, lon, altitude,
+    )
+
+
+def _calculate_local_eclipse_phases_impl(
+    jd_max_global: float,
+    lat: float,
+    lon: float,
+    altitude: float,
+    *,
+    reader=None,
+) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Calculate eclipse phase times as seen from a specific location.
 
@@ -1557,9 +1620,7 @@ def _calculate_local_eclipse_phases(
             [8]: Azimuth of Sun at maximum eclipse
             [9]: Altitude of Sun at maximum eclipse
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         try:
@@ -2078,6 +2139,25 @@ def sol_eclipse_when_loc(
     flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
+    """Find the next solar eclipse visible from a geographic location.
+
+    Wrapper around :func:`_sol_eclipse_when_loc_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _sol_eclipse_when_loc_impl, tjdut, geopos, flags, backwards,
+    )
+
+
+def _sol_eclipse_when_loc_impl(
+    tjdut: float,
+    geopos: "Sequence[float]",
+    flags: int = FLG_SWIEPH,
+    backwards: bool = False,
+    *,
+    reader,
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next solar eclipse visible from a specific geographic location.
 
@@ -2146,7 +2226,7 @@ def sol_eclipse_when_loc(
     """
     from typing import Sequence
 
-    from .state import get_leb_reader, set_topo
+    from .state import set_topo
 
     # Validate geopos
     if len(geopos) < 3:
@@ -2162,8 +2242,6 @@ def sol_eclipse_when_loc(
 
     # Set topocentric position for later calculations
     set_topo(lon, lat, altitude)
-
-    reader = get_leb_reader()
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -3433,6 +3511,24 @@ def sol_eclipse_how(
     geopos: Sequence[float],
     flags: int = FLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
+    """Calculate the circumstances of a solar eclipse at a location.
+
+    Wrapper around :func:`_sol_eclipse_how_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _sol_eclipse_how_impl, tjdut, geopos, flags,
+    )
+
+
+def _sol_eclipse_how_impl(
+    tjdut: float,
+    geopos: Sequence[float],
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a solar eclipse at a specific location and time.
 
@@ -3496,8 +3592,6 @@ def sol_eclipse_how(
         - Reference API: sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from .state import get_leb_reader
-
     # Validate and extract geopos
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
@@ -3506,7 +3600,7 @@ def sol_eclipse_how(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -3790,6 +3884,24 @@ def sol_eclipse_how_details(
     geopos: Sequence[float],
     ifl: int = 0,
 ) -> dict:
+    """Calculate comprehensive solar eclipse circumstances at a location.
+
+    Wrapper around :func:`_sol_eclipse_how_details_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _sol_eclipse_how_details_impl, tjd_ut, geopos, ifl,
+    )
+
+
+def _sol_eclipse_how_details_impl(
+    tjd_ut: float,
+    geopos: Sequence[float],
+    ifl: int = 0,
+    *,
+    reader=None,
+) -> dict:
     """
     Calculate comprehensive solar eclipse circumstances at a specific location.
 
@@ -3882,8 +3994,6 @@ def sol_eclipse_how_details(
         - Reference documentation
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from .state import get_leb_reader
-
     # Validate and extract geopos
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
@@ -3892,7 +4002,7 @@ def sol_eclipse_how_details(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -5065,6 +5175,8 @@ def _lun_eclipse_when_loc_pythonic(
     lon: float,
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar eclipse visible from a specific location.
@@ -5138,9 +5250,7 @@ def _lun_eclipse_when_loc_pythonic(
         MAX_SEARCH_YEARS * 2.4
     )  # ~2.4 lunar eclipses per year on average
 
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     # Geometric center altitude threshold for moonrise/moonset.
     # Atmospheric refraction near the horizon lifts the Moon's apparent
@@ -5478,7 +5588,9 @@ def lun_eclipse_when_loc(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    return _lun_eclipse_when_loc_pythonic(tjdut, lat, lon, altitude, flags)
+    return _call_with_leb_skyfield_fallback(
+        _lun_eclipse_when_loc_pythonic, tjdut, lat, lon, altitude, flags,
+    )
 
 
 def _lun_eclipse_how_pythonic(
@@ -5487,6 +5599,8 @@ def _lun_eclipse_how_pythonic(
     lon: float,
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate the circumstances of a lunar eclipse at a specific location and time.
@@ -5551,9 +5665,7 @@ def _lun_eclipse_how_pythonic(
         - Reference API: lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -5693,6 +5805,24 @@ def lun_eclipse_how(
     geopos: Sequence[float],
     flags: int = FLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
+    """Calculate detailed circumstances of a lunar eclipse from a location.
+
+    Wrapper around :func:`_lun_eclipse_how_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _lun_eclipse_how_impl, tjdut, geopos, flags,
+    )
+
+
+def _lun_eclipse_how_impl(
+    tjdut: float,
+    geopos: Sequence[float],
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate detailed circumstances of a lunar eclipse from a specific location.
 
@@ -5764,8 +5894,6 @@ def lun_eclipse_how(
         - Reference API: lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from .state import get_leb_reader
-
     # Validate and extract geopos
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
@@ -5774,7 +5902,7 @@ def lun_eclipse_how(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -6658,6 +6786,8 @@ def _lun_occult_when_loc_pythonic(
     alt: float = 0.0,
     flags: int = FLG_SWIEPH,
     backwards: bool = False,
+    *,
+    reader=None,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar occultation visible from a specific location.
@@ -6772,9 +6902,7 @@ def _lun_occult_when_loc_pythonic(
 
     MOON_MEAN_ANGULAR_RADIUS_DEG = 932.56 / 3600.0
 
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
     if reader is not None:
         from .fast_calc import _topo_ecliptic
         from .time_utils import deltat
@@ -7372,9 +7500,10 @@ def lun_occult_when_loc(
         planet = body
         star_name = ""
 
-    # Call the internal implementation
-    ecl_type, times, attr = _lun_occult_when_loc_pythonic(
-        tjdut, planet, star_name, lat, lon, altitude, flags, backwards
+    # Call the internal implementation with LEB→Skyfield fallback
+    ecl_type, times, attr = _call_with_leb_skyfield_fallback(
+        _lun_occult_when_loc_pythonic,
+        tjdut, planet, star_name, lat, lon, altitude, flags, backwards,
     )
 
     # Return in reference API order: (retflags, tret, attr)
@@ -7385,6 +7514,8 @@ def _lun_occult_where_pythonic(
     tjdut: float,
     body: Union[int, str],
     flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Calculate where on Earth a lunar occultation is visible at a given time.
@@ -7490,8 +7621,8 @@ def _lun_occult_where_pythonic(
     zero_geopos = (0.0,) * 10
     zero_attr = (0.0,) * 20
 
-    from .state import get_leb_reader
-    _reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
+    _reader = reader
     if _reader is not None:
         from .constants import FLG_EQUATORIAL
 
@@ -7871,7 +8002,9 @@ def lun_occult_where(
     Returns:
         Tuple of (retflag, geopos, attr) matching pyswisseph.
     """
-    return _lun_occult_where_internal(tjdut, body, flags)
+    return _call_with_leb_skyfield_fallback(
+        _lun_occult_where_internal, tjdut, body, flags,
+    )
 
 
 # =============================================================================
@@ -7887,6 +8020,27 @@ def rise_trans(
     atpress: float = 0.0,
     attemp: float = 0.0,
     flags: int = FLG_SWIEPH,
+) -> Tuple[int, Tuple[float, ...]]:
+    """Calculate rise, set, or transit time for a celestial body.
+
+    Wrapper around :func:`_rise_trans_impl` that adds LEB→Skyfield fallback
+    for partial/custom LEB files. See the impl docstring for the full API.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _rise_trans_impl, tjdut, body, rsmi, geopos, atpress, attemp, flags,
+    )
+
+
+def _rise_trans_impl(
+    tjdut: float,
+    body: "Union[int, str]",
+    rsmi: int,
+    geopos: Sequence[float],
+    atpress: float = 0.0,
+    attemp: float = 0.0,
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate rise, set, or transit time for a celestial body.
@@ -7999,9 +8153,8 @@ def rise_trans(
             % rsmi
         )
 
-    from .state import get_leb_reader as _get_leb_reader_rt
-
-    _reader_rt = _get_leb_reader_rt()
+    # reader is provided by the caller (None forces Skyfield path)
+    _reader_rt = reader
     _use_leb_rt = _reader_rt is not None
 
     if _use_leb_rt:
@@ -8477,6 +8630,30 @@ def rise_trans_true_hor(
     horhgt: float = 0.0,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...]]:
+    """Calculate rise, set, or transit with custom horizon altitude.
+
+    Wrapper around :func:`_rise_trans_true_hor_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _rise_trans_true_hor_impl,
+        tjdut, body, rsmi, geopos, atpress, attemp, horhgt, flags,
+    )
+
+
+def _rise_trans_true_hor_impl(
+    tjdut: float,
+    body: "Union[int, str]",
+    rsmi: int,
+    geopos: Sequence[float],
+    atpress: float = 0.0,
+    attemp: float = 0.0,
+    horhgt: float = 0.0,
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
+) -> Tuple[int, Tuple[float, ...]]:
     """
     Calculate rise, set, or transit time with a custom horizon altitude.
 
@@ -8591,9 +8768,8 @@ def rise_trans_true_hor(
             % rsmi
         )
 
-    from .state import get_leb_reader as _get_leb_reader_rt
-
-    _reader_rt = _get_leb_reader_rt()
+    # reader is provided by the caller (None forces Skyfield path)
+    _reader_rt = reader
     _use_leb_rt = _reader_rt is not None
 
     if _use_leb_rt:
@@ -13111,6 +13287,25 @@ def calc_eclipse_path_width(
     lon: float | None = None,
     flags: int = FLG_SWIEPH,
 ) -> float:
+    """Calculate the width of the central eclipse path at a location.
+
+    Wrapper around :func:`_calc_eclipse_path_width_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _calc_eclipse_path_width_impl, jd, lat, lon, flags,
+    )
+
+
+def _calc_eclipse_path_width_impl(
+    jd: float,
+    lat: float | None = None,
+    lon: float | None = None,
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
+) -> float:
     """
     Calculate the width of the path of totality or annularity for a central solar eclipse.
 
@@ -13199,7 +13394,7 @@ def calc_eclipse_path_width(
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
+    # reader is provided by the caller (None forces Skyfield path)
 
     # Constants
     AU_TO_KM = 149597870.7
@@ -13220,8 +13415,6 @@ def calc_eclipse_path_width(
         # Check if this is a central eclipse
         if not (ecl_type & ECL_CENTRAL):
             return 0.0
-
-    reader = get_leb_reader()
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -14182,6 +14375,8 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
     lon: float,
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> float:
     """
     Calculate the eclipse magnitude at a specific geographic location and time.
@@ -14240,9 +14435,7 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Reference documentation
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -14388,7 +14581,10 @@ def sol_eclipse_magnitude_at_loc(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    return _sol_eclipse_magnitude_at_loc_pythonic(tjd_ut, lat, lon, altitude, ifl)
+    return _call_with_leb_skyfield_fallback(
+        _sol_eclipse_magnitude_at_loc_pythonic,
+        tjd_ut, lat, lon, altitude, ifl,
+    )
 
 
 def _sol_eclipse_obscuration_at_loc_pythonic(
@@ -14397,6 +14593,8 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
     lon: float,
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
 ) -> float:
     """
     Calculate the eclipse obscuration at a specific geographic location and time.
@@ -14466,9 +14664,7 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         - Reference documentation
         - Intersection of two circles formula (computational geometry)
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -14648,7 +14844,10 @@ def sol_eclipse_obscuration_at_loc(
     lat = float(geopos[1])
     altitude = float(geopos[2])
 
-    return _sol_eclipse_obscuration_at_loc_pythonic(tjd_ut, lat, lon, altitude, ifl)
+    return _call_with_leb_skyfield_fallback(
+        _sol_eclipse_obscuration_at_loc_pythonic,
+        tjd_ut, lat, lon, altitude, ifl,
+    )
 
 
 def _lun_eclipse_umbral_magnitude_pythonic(
@@ -15387,6 +15586,31 @@ def planet_occult_when_loc(
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
+    """Find the next planetary occultation visible from a specific location.
+
+    Wrapper around :func:`_planet_occult_when_loc_impl` that adds LEB→Skyfield
+    fallback for partial/custom LEB files. See the impl docstring for the
+    full API contract.
+    """
+    return _call_with_leb_skyfield_fallback(
+        _planet_occult_when_loc_impl,
+        jd_start, occulting_planet, occulted_planet, star_name,
+        lat, lon, altitude, flags,
+    )
+
+
+def _planet_occult_when_loc_impl(
+    jd_start: float,
+    occulting_planet: int,
+    occulted_planet: int = 0,
+    star_name: str = "",
+    lat: float = 0.0,
+    lon: float = 0.0,
+    altitude: float = 0.0,
+    flags: int = FLG_SWIEPH,
+    *,
+    reader=None,
+) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next planetary occultation visible from a specific location.
 
@@ -15486,9 +15710,8 @@ def planet_occult_when_loc(
     MAX_SEARCH_YEARS = 150
     MAX_GLOBAL_SEARCHES = 100
 
-    from .state import get_leb_reader
-
-    _reader = get_leb_reader()
+    # reader is provided by the caller (None forces Skyfield path)
+    _reader = reader
     if _reader is not None:
         from .fast_calc import _topo_ecliptic
         from .time_utils import deltat
