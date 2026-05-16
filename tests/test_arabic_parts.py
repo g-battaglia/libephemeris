@@ -34,41 +34,41 @@ from libephemeris import julday
 class TestIsDayChart:
     """Tests for is_day_chart() function."""
 
-    def test_sun_above_horizon_normal_case(self):
-        """Sun between ASC and DSC is a day chart (normal case: ASC < DSC)."""
+    def test_sun_below_horizon_normal_case(self):
+        """Sun between ASC and DSC (lower hemisphere, near IC) is a night chart."""
         # ASC at 0°, DSC at 180°
-        # Sun at 90° (between them) = day chart
+        # Sun at 90° (≈IC, below horizon) = night chart
         asc = 0.0
         sun = 90.0
-        assert is_day_chart(sun, asc) is True
-
-    def test_sun_below_horizon_normal_case(self):
-        """Sun outside ASC-DSC range is a night chart (normal case)."""
-        # ASC at 0°, DSC at 180°
-        # Sun at 270° (below horizon) = night chart
-        asc = 0.0
-        sun = 270.0
         assert is_day_chart(sun, asc) is False
 
-    def test_sun_above_horizon_wrapped_case(self):
-        """Sun above horizon when ASC > DSC (wrapped case)."""
-        # ASC at 350°, DSC at 170°
-        # Sun at 355° (above horizon) = day chart
-        asc = 350.0
-        sun = 355.0
-        assert is_day_chart(sun, asc) is True
-
-        # Sun at 100° (also above horizon in wrapped case)
-        sun = 100.0
+    def test_sun_above_horizon_normal_case(self):
+        """Sun outside ASC-DSC arc (upper hemisphere, near MC) is a day chart."""
+        # ASC at 0°, DSC at 180°
+        # Sun at 270° (≈MC, above horizon) = day chart
+        asc = 0.0
+        sun = 270.0
         assert is_day_chart(sun, asc) is True
 
     def test_sun_below_horizon_wrapped_case(self):
-        """Sun below horizon when ASC > DSC (wrapped case)."""
+        """Sun in lower hemisphere when ASC > DSC (wrapped case)."""
         # ASC at 350°, DSC at 170°
-        # Sun at 250° (below horizon) = night chart
+        # Sun at 355° (just past ASC, house 1, below horizon) = night chart
+        asc = 350.0
+        sun = 355.0
+        assert is_day_chart(sun, asc) is False
+
+        # Sun at 100° (≈IC, below horizon in wrapped case) = night chart
+        sun = 100.0
+        assert is_day_chart(sun, asc) is False
+
+    def test_sun_above_horizon_wrapped_case(self):
+        """Sun in upper hemisphere when ASC > DSC (wrapped case)."""
+        # ASC at 350°, DSC at 170°
+        # Sun at 250° (between DSC=170° and ASC=350°, near MC) = day chart
         asc = 350.0
         sun = 250.0
-        assert is_day_chart(sun, asc) is False
+        assert is_day_chart(sun, asc) is True
 
     def test_sun_exactly_on_asc(self):
         """Sun exactly on Ascendant is considered a day chart (sunrise)."""
@@ -82,6 +82,66 @@ class TestIsDayChart:
         desc = (asc + 180.0) % 360.0  # 195°
         sun = desc
         assert is_day_chart(sun, asc) is True
+
+    def test_issue_1_regression(self):
+        """GH issue #1: is_day_chart(352, 153) must be True (reported by @Blu)."""
+        # ASC=153°, DSC=333°. Sun at 352° is in upper hemisphere (between DSC and ASC
+        # going CCW through MC). 3D method confirms day chart.
+        assert is_day_chart(352.0, 153.0) is True
+
+    @pytest.mark.parametrize(
+        "asc", [0.0, 45.0, 90.0, 135.0, 153.0, 180.0, 225.0, 270.0, 315.0, 350.0]
+    )
+    def test_sun_near_mc_is_day(self, asc):
+        """Sun near MC (~ASC+270° in idealized chart) is always above horizon."""
+        # In the simplified 2D model, MC is opposite IC, roughly at (ASC - 90°) mod 360 = (ASC + 270°) mod 360
+        mc_approx = (asc + 270.0) % 360.0
+        assert is_day_chart(mc_approx, asc) is True, (
+            f"MC at ASC={asc} should be day chart"
+        )
+
+    @pytest.mark.parametrize(
+        "asc", [0.0, 45.0, 90.0, 135.0, 153.0, 180.0, 225.0, 270.0, 315.0, 350.0]
+    )
+    def test_sun_near_ic_is_night(self, asc):
+        """Sun near IC (~ASC+90°) is always below horizon."""
+        ic_approx = (asc + 90.0) % 360.0
+        assert is_day_chart(ic_approx, asc) is False, (
+            f"IC at ASC={asc} should be night chart"
+        )
+
+    @pytest.mark.parametrize(
+        "asc", [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0]
+    )
+    @pytest.mark.parametrize(
+        "offset", [10.0, 45.0, 80.0, 100.0, 135.0, 170.0, 190.0, 225.0, 260.0, 280.0, 315.0, 350.0]
+    )
+    def test_symmetry_180_rotation(self, asc, offset):
+        """Rotating both Sun and ASC by 180° preserves the day/night result."""
+        sun = (asc + offset) % 360.0
+        asc_rot = (asc + 180.0) % 360.0
+        sun_rot = (sun + 180.0) % 360.0
+        assert is_day_chart(sun, asc) == is_day_chart(sun_rot, asc_rot)
+
+    @pytest.mark.parametrize(
+        "asc", [0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0]
+    )
+    @pytest.mark.parametrize(
+        "offset", [10.0, 45.0, 80.0, 100.0, 135.0, 170.0, 190.0, 225.0, 260.0, 280.0, 315.0, 350.0]
+    )
+    def test_complementary_offsets_opposite_sect(self, asc, offset):
+        """Sun at offset X and at 360-X from ASC are in opposite hemispheres.
+
+        Excludes boundary offsets 0 and 180 where both fall on the horizon
+        and are conventionally treated as day charts.
+        """
+        if offset in (0.0, 180.0):
+            return
+        sun_a = (asc + offset) % 360.0
+        sun_b = (asc + (360.0 - offset)) % 360.0
+        assert is_day_chart(sun_a, asc) != is_day_chart(sun_b, asc), (
+            f"ASC={asc}, offsets {offset} and {360-offset} should be opposite"
+        )
 
 
 class TestCalcArabicPartOfFortune:
@@ -227,9 +287,9 @@ class TestCalcArabicPartOfFaith:
 class TestCalcAllArabicParts:
     """Tests for calc_all_arabic_parts() function using position dictionaries."""
 
-    def test_diurnal_chart_sun_above_horizon(self):
-        """Test with Sun above horizon (day chart)."""
-        # ASC at 15°, Sun at 90° (between ASC=15° and DSC=195°) = day chart
+    def test_nocturnal_chart_sun_near_ic(self):
+        """Test with Sun in lower hemisphere (night chart)."""
+        # ASC at 15°, Sun at 90° is between ASC=15° and DSC=195° (lower hemisphere, near IC)
         positions = {
             "Asc": 15.0,
             "Sun": 90.0,
@@ -240,14 +300,14 @@ class TestCalcAllArabicParts:
 
         parts = calc_all_arabic_parts(positions)
 
-        # Verify this is treated as a day chart
-        assert is_day_chart(positions["Sun"], positions["Asc"]) is True
+        # Verify this is treated as a night chart
+        assert is_day_chart(positions["Sun"], positions["Asc"]) is False
 
-        # Day formula for Fortune: ASC + Moon - Sun = 15 + 240 - 90 = 165
-        assert parts["Pars_Fortunae"] == pytest.approx(165.0)
+        # Night formula for Fortune: ASC + Sun - Moon = 15 + 90 - 240 = -135 => 225
+        assert parts["Pars_Fortunae"] == pytest.approx(225.0)
 
-        # Day formula for Spirit: ASC + Sun - Moon = 15 + 90 - 240 = -135 => 225
-        assert parts["Pars_Spiritus"] == pytest.approx(225.0)
+        # Night formula for Spirit: ASC + Moon - Sun = 15 + 240 - 90 = 165
+        assert parts["Pars_Spiritus"] == pytest.approx(165.0)
 
         # Part of Love: ASC + Venus - Sun = 15 + 80 - 90 = 5
         assert parts["Pars_Amoris"] == pytest.approx(5.0)
@@ -255,9 +315,9 @@ class TestCalcAllArabicParts:
         # Part of Faith: ASC + Mercury - Moon = 15 + 100 - 240 = -125 => 235
         assert parts["Pars_Fidei"] == pytest.approx(235.0)
 
-    def test_nocturnal_chart_sun_below_horizon(self):
-        """Test with Sun below horizon (night chart)."""
-        # ASC at 15°, Sun at 270° (outside ASC=15° to DSC=195°) = night chart
+    def test_diurnal_chart_sun_near_mc(self):
+        """Test with Sun in upper hemisphere (day chart)."""
+        # ASC at 15°, Sun at 270° is outside ASC=15° to DSC=195° (upper hemisphere, near MC)
         positions = {
             "Asc": 15.0,
             "Sun": 270.0,
@@ -268,14 +328,14 @@ class TestCalcAllArabicParts:
 
         parts = calc_all_arabic_parts(positions)
 
-        # Verify this is treated as a night chart
-        assert is_day_chart(positions["Sun"], positions["Asc"]) is False
+        # Verify this is treated as a day chart
+        assert is_day_chart(positions["Sun"], positions["Asc"]) is True
 
-        # Night formula for Fortune: ASC + Sun - Moon = 15 + 270 - 240 = 45
-        assert parts["Pars_Fortunae"] == pytest.approx(45.0)
+        # Day formula for Fortune: ASC + Moon - Sun = 15 + 240 - 270 = -15 => 345
+        assert parts["Pars_Fortunae"] == pytest.approx(345.0)
 
-        # Night formula for Spirit: ASC + Moon - Sun = 15 + 240 - 270 = -15 => 345
-        assert parts["Pars_Spiritus"] == pytest.approx(345.0)
+        # Day formula for Spirit: ASC + Sun - Moon = 15 + 270 - 240 = 45
+        assert parts["Pars_Spiritus"] == pytest.approx(45.0)
 
         # Part of Love (not sect-dependent): ASC + Venus - Sun = 15 + 80 - 270 = -175 => 185
         assert parts["Pars_Amoris"] == pytest.approx(185.0)
@@ -293,25 +353,23 @@ class TestCalcAllArabicParts:
             "Venus": 60.0,
         }
 
-        # Day chart: Sun at 90° (above horizon)
-        day_positions = {**base_positions, "Sun": 90.0}
-        day_parts = calc_all_arabic_parts(day_positions)
-
-        # Night chart: Sun at 270° (below horizon)
-        night_positions = {**base_positions, "Sun": 270.0}
+        # Night chart: Sun at 90° (lower hemisphere, near IC)
+        night_positions = {**base_positions, "Sun": 90.0}
         night_parts = calc_all_arabic_parts(night_positions)
 
-        # The difference between Fortune and Spirit should be inverted
-        # Day Fortune uses Moon, Night Fortune uses Sun (and vice versa for Spirit)
-        # Day Fortune: 0 + 180 - 90 = 90
-        # Day Spirit: 0 + 90 - 180 = -90 => 270
-        assert day_parts["Pars_Fortunae"] == pytest.approx(90.0)
-        assert day_parts["Pars_Spiritus"] == pytest.approx(270.0)
+        # Day chart: Sun at 270° (upper hemisphere, near MC)
+        day_positions = {**base_positions, "Sun": 270.0}
+        day_parts = calc_all_arabic_parts(day_positions)
 
-        # Night Fortune: 0 + 270 - 180 = 90
-        # Night Spirit: 0 + 180 - 270 = -90 => 270
-        assert night_parts["Pars_Fortunae"] == pytest.approx(90.0)
-        assert night_parts["Pars_Spiritus"] == pytest.approx(270.0)
+        # Night Fortune: ASC + Sun - Moon = 0 + 90 - 180 = -90 => 270
+        # Night Spirit: ASC + Moon - Sun = 0 + 180 - 90 = 90
+        assert night_parts["Pars_Fortunae"] == pytest.approx(270.0)
+        assert night_parts["Pars_Spiritus"] == pytest.approx(90.0)
+
+        # Day Fortune: ASC + Moon - Sun = 0 + 180 - 270 = -90 => 270
+        # Day Spirit: ASC + Sun - Moon = 0 + 270 - 180 = 90
+        assert day_parts["Pars_Fortunae"] == pytest.approx(270.0)
+        assert day_parts["Pars_Spiritus"] == pytest.approx(90.0)
 
         # Note: In this particular case values are the same due to symmetric positions
         # Let's verify with asymmetric values
@@ -325,23 +383,23 @@ class TestCalcAllArabicParts:
             "Venus": 60.0,
         }
 
-        # Day chart: Sun at 60°
-        day_positions = {**base_positions, "Sun": 60.0}
-        day_parts = calc_all_arabic_parts(day_positions)
-
-        # Day Fortune: 30 + 120 - 60 = 90
-        # Day Spirit: 30 + 60 - 120 = -30 => 330
-        assert day_parts["Pars_Fortunae"] == pytest.approx(90.0)
-        assert day_parts["Pars_Spiritus"] == pytest.approx(330.0)
-
-        # Night chart: Sun at 300° (below horizon)
-        night_positions = {**base_positions, "Sun": 300.0}
+        # Night chart: Sun at 60° (lower hemisphere)
+        night_positions = {**base_positions, "Sun": 60.0}
         night_parts = calc_all_arabic_parts(night_positions)
 
-        # Night Fortune: ASC + Sun - Moon = 30 + 300 - 120 = 210
-        # Night Spirit: ASC + Moon - Sun = 30 + 120 - 300 = -150 => 210
-        assert night_parts["Pars_Fortunae"] == pytest.approx(210.0)
-        assert night_parts["Pars_Spiritus"] == pytest.approx(210.0)
+        # Night Fortune: ASC + Sun - Moon = 30 + 60 - 120 = -30 => 330
+        # Night Spirit: ASC + Moon - Sun = 30 + 120 - 60 = 90
+        assert night_parts["Pars_Fortunae"] == pytest.approx(330.0)
+        assert night_parts["Pars_Spiritus"] == pytest.approx(90.0)
+
+        # Day chart: Sun at 300° (upper hemisphere)
+        day_positions = {**base_positions, "Sun": 300.0}
+        day_parts = calc_all_arabic_parts(day_positions)
+
+        # Day Fortune: ASC + Moon - Sun = 30 + 120 - 300 = -150 => 210
+        # Day Spirit: ASC + Sun - Moon = 30 + 300 - 120 = 210
+        assert day_parts["Pars_Fortunae"] == pytest.approx(210.0)
+        assert day_parts["Pars_Spiritus"] == pytest.approx(210.0)
 
         # Day and Night should produce different results for Fortune
         assert day_parts["Pars_Fortunae"] != night_parts["Pars_Fortunae"]
@@ -374,10 +432,11 @@ class TestCalcAllArabicParts:
 
         parts = calc_all_arabic_parts(positions)
 
-        # With all other values as 0, Sun=0 is not between ASC=90 and DSC=270
-        # So this is a night chart
-        # Night Fortune: 90 + 0 - 0 = 90
-        # Night Spirit: 90 + 0 - 0 = 90
+        # With all other values as 0, Sun=0 is in upper hemisphere relative to
+        # ASC=90 (sun_rel = -90 % 360 = 270), so this is a day chart.
+        # Since Sun=Moon=0, day/night formulas are symmetric:
+        # Day Fortune:   ASC + Moon - Sun = 90 + 0 - 0 = 90
+        # Day Spirit:    ASC + Sun - Moon = 90 + 0 - 0 = 90
         assert parts["Pars_Fortunae"] == pytest.approx(90.0)
         assert parts["Pars_Spiritus"] == pytest.approx(90.0)
 
@@ -430,8 +489,8 @@ class TestIsDayChart3D:
         sun_lon = 90.0  # ~Cancer (summer solstice)
         asc = 180.0  # Libra rising
 
-        # 2D method: Sun at 90° is not between ASC=180° and DSC=0°/360°
-        # So 2D says night chart (which may be wrong for actual Rome noon)
+        # 2D method: sun_rel = (90 - 180) % 360 = 270, which is > 180.
+        # So 2D correctly says day chart (matching actual Rome noon).
         result_2d = is_day_chart(sun_lon, asc)
 
         # With location at moderate latitude, should still use 2D
@@ -578,10 +637,9 @@ class TestCalcAllArabicPartsWithLocation:
             geo_lon=19.0,
         )
 
-        # 2D: Sun at 90° is NOT between ASC=270° and DSC=90° (it's exactly on DSC)
-        # Actually with wrapped logic: ASC=270, DSC=90
-        # sun_lon >= asc OR sun_lon <= desc => 90 >= 270 (False) OR 90 <= 90 (True)
-        # So 2D says day chart
+        # 2D: ASC=270, Sun=90. sun_rel = (90 - 270) % 360 = 180.
+        # Lower hemisphere is open arc (0, 180), so sun_rel=180 is on boundary (DSC).
+        # not (0.0 < 180.0 < 180.0) = not False = True => day chart.
 
         # 3D should also say day chart (Sun above horizon in Arctic summer)
         # Verify 3D is being used (latitude > 60)
@@ -618,3 +676,68 @@ class TestCalcAllArabicPartsWithLocation:
         )
 
         assert "Pars_Fortunae" in parts
+
+
+class TestIsDayChart2D3DAgreement:
+    """Verify 2D and 3D methods agree at moderate latitudes using real ephemeris data.
+
+    The 2D method is a simplified ecliptic comparison; the 3D method uses a full
+    coordinate transformation. They should agree everywhere except very close to
+    the horizon, where sub-arcminute precision differences can occur.
+    """
+
+    @pytest.mark.parametrize("hour", [0, 3, 6, 9, 12, 15, 18, 21])
+    @pytest.mark.parametrize("month", [3, 6, 9, 12])
+    def test_rome_agreement(self, month, hour):
+        """At Rome (lat 41.9°N, moderate), 2D and 3D agree away from horizon."""
+        from libephemeris import calc_ut, houses
+        from libephemeris.utils import azalt, ECL2HOR
+
+        geo_lat, geo_lon = 41.9, 12.5
+        jd = julday(2024, month, 21, float(hour))
+        _, ascmc = houses(jd, geo_lat, geo_lon, ord("P"))
+        asc = ascmc[0]
+        sun_pos, _ = calc_ut(jd, 0, 0)
+        sun_lon = sun_pos[0]
+
+        geopos = (geo_lon, geo_lat, 0.0)
+        xin = (sun_lon, 0.0, 1.0)
+        _, true_altitude, _ = azalt(jd, ECL2HOR, geopos, 0.0, 0.0, xin)
+        if abs(true_altitude) < 1.0:
+            pytest.skip(f"Sun too close to horizon ({true_altitude:.3f}°)")
+
+        result_2d = is_day_chart(sun_lon, asc)
+        result_3d = _is_sun_above_horizon_3d(jd, sun_lon, 0.0, geo_lat, geo_lon)
+        assert result_2d == result_3d, (
+            f"2D/3D disagree at 2024-{month:02d}-21 {hour:02d}:00 UTC, Rome: "
+            f"ASC={asc:.2f}, Sun={sun_lon:.2f}, alt={true_altitude:.3f}, "
+            f"2D={result_2d}, 3D={result_3d}"
+        )
+
+    @pytest.mark.parametrize("hour", [0, 6, 12, 18])
+    @pytest.mark.parametrize("month", [3, 6, 9, 12])
+    def test_buenos_aires_agreement(self, month, hour):
+        """Southern hemisphere moderate latitude (Buenos Aires, lat -34.6°)."""
+        from libephemeris import calc_ut, houses
+        from libephemeris.utils import azalt, ECL2HOR
+
+        geo_lat, geo_lon = -34.6, -58.4
+        jd = julday(2024, month, 21, float(hour))
+        _, ascmc = houses(jd, geo_lat, geo_lon, ord("P"))
+        asc = ascmc[0]
+        sun_pos, _ = calc_ut(jd, 0, 0)
+        sun_lon = sun_pos[0]
+
+        geopos = (geo_lon, geo_lat, 0.0)
+        xin = (sun_lon, 0.0, 1.0)
+        _, true_altitude, _ = azalt(jd, ECL2HOR, geopos, 0.0, 0.0, xin)
+        if abs(true_altitude) < 1.0:
+            pytest.skip(f"Sun too close to horizon ({true_altitude:.3f}°)")
+
+        result_2d = is_day_chart(sun_lon, asc)
+        result_3d = _is_sun_above_horizon_3d(jd, sun_lon, 0.0, geo_lat, geo_lon)
+        assert result_2d == result_3d, (
+            f"2D/3D disagree at 2024-{month:02d}-21 {hour:02d}:00 UTC, BA: "
+            f"ASC={asc:.2f}, Sun={sun_lon:.2f}, alt={true_altitude:.3f}, "
+            f"2D={result_2d}, 3D={result_3d}"
+        )
