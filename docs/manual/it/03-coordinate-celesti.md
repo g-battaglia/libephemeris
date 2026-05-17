@@ -19,7 +19,7 @@ Il Sole ha sempre latitudine ~0° (per definizione, è lui che traccia l'eclitti
 import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, flag = ephem.calc_ut(jd, ephem.SE_MOON, 0)
+pos, flag = ephem.calc_ut(jd, ephem.MOON, 0)
 
 lon = pos[0]   # longitudine eclittica (gradi)
 lat = pos[1]   # latitudine eclittica (gradi)
@@ -52,8 +52,8 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
-# Flag SEFLG_EQUATORIAL: restituisce RA e Dec invece di lon e lat
-pos, flag = ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_EQUATORIAL)
+# Flag FLG_EQUATORIAL: restituisce RA e Dec invece di lon e lat
+pos, flag = ephem.calc_ut(jd, ephem.MOON, ephem.FLG_EQUATORIAL)
 
 ra = pos[0]    # Ascensione Retta in gradi (0–360)
 dec = pos[1]   # Declinazione in gradi (-90 a +90)
@@ -88,13 +88,13 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 9, 15, 21.0)
 
 # Giove in coordinate equatoriali
-pos, _ = ephem.calc_ut(jd, ephem.SE_JUPITER, ephem.SEFLG_EQUATORIAL)
+pos, _ = ephem.calc_ut(jd, ephem.JUPITER, ephem.FLG_EQUATORIAL)
 
 # Roma (lon Est, lat Nord, altitudine in metri)
 geopos = (12.4964, 41.9028, 50.0)
 
 # Da equatoriali a orizzontali (SE_EQU2HOR = 1)
-hor = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15.0,
+hor = ephem.azalt(jd, ephem.EQU2HOR, geopos, 1013.25, 15.0,
                   (pos[0], pos[1], pos[2]))
 
 print(f"Azimut: {hor[0]:.1f}° (da Sud)")
@@ -102,7 +102,7 @@ print(f"Altezza vera: {hor[1]:.1f}°")
 print(f"Altezza apparente: {hor[2]:.1f}° (con rifrazione)")
 
 # Operazione inversa: da orizzontali a equatoriali
-ra_dec = ephem.azalt_rev(jd, ephem.SE_HOR2EQU, geopos, hor[0], hor[1])
+ra_dec = ephem.azalt_rev(jd, ephem.HOR2EQU, geopos, hor[0], hor[1])
 print(f"RA recuperata: {ra_dec[0]:.4f}°, Dec: {ra_dec[1]:.4f}°")
 ```
 
@@ -135,14 +135,14 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Coordinate eclittiche "of date" (default)
-pos_date, _ = ephem.calc_ut(jd, ephem.SE_MARS, 0)
+pos_date, _ = ephem.calc_ut(jd, ephem.MARS, 0)
 
 # Coordinate eclittiche J2000
-pos_j2000, _ = ephem.calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_J2000)
+pos_j2000, _ = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_J2000)
 
 # Coordinate equatoriali ICRS
-pos_icrs, _ = ephem.calc_ut(jd, ephem.SE_MARS,
-                            ephem.SEFLG_EQUATORIAL | ephem.SEFLG_ICRS)
+pos_icrs, _ = ephem.calc_ut(jd, ephem.MARS,
+                            ephem.FLG_EQUATORIAL | ephem.FLG_ICRS)
 
 print(f"Marte of-date: {pos_date[0]:.4f}°")
 print(f"Marte J2000:   {pos_j2000[0]:.4f}°")
@@ -173,7 +173,7 @@ In 2000 anni, la precessione ha spostato il punto vernale di circa 28° — quas
 
 Sovrapposta alla precessione, l'asse terrestre compie piccole oscillazioni con periodo principale di ~18.6 anni (legate al ciclo dei nodi lunari). L'ampiezza è di ~9" in longitudine e ~17" in obliquità.
 
-Il flag `SEFLG_NONUT` calcola le coordinate "medie" (senza nutazione) invece di quelle "vere":
+Il flag `FLG_NONUT` calcola le coordinate "medie" (senza nutazione) invece di quelle "vere":
 
 ```python
 import libephemeris as ephem
@@ -181,10 +181,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Con nutazione (default = coordinate "vere")
-pos_vera, _ = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos_vera, _ = ephem.calc_ut(jd, ephem.SUN, 0)
 
 # Senza nutazione (coordinate "medie")
-pos_media, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_NONUT)
+pos_media, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_NONUT)
 
 diff_arcsec = (pos_vera[0] - pos_media[0]) * 3600
 print(f"Effetto nutazione: {diff_arcsec:.2f}\" d'arco")
@@ -196,7 +196,7 @@ Effetto nutazione: -5.30" d'arco
 
 ### Aberrazione
 
-La luce impiega tempo ad arrivare, e nel frattempo la Terra si muove. L'effetto è uno spostamento apparente fino a ~20" nella direzione del moto terrestre. Il flag `SEFLG_NOABERR` lo disabilita; `SEFLG_TRUEPOS` restituisce la posizione geometrica pura (senza correzione per il tempo-luce né per l'aberrazione).
+La luce impiega tempo ad arrivare, e nel frattempo la Terra si muove. L'effetto è uno spostamento apparente fino a ~20" nella direzione del moto terrestre. Il flag `FLG_NOABERR` lo disabilita; `FLG_TRUEPOS` restituisce la posizione geometrica pura (senza correzione per il tempo-luce né per l'aberrazione).
 
 ```python
 import libephemeris as ephem
@@ -204,10 +204,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Posizione apparente (default: con aberrazione)
-pos_app, _ = ephem.calc_ut(jd, ephem.SE_MARS, 0)
+pos_app, _ = ephem.calc_ut(jd, ephem.MARS, 0)
 
 # Posizione geometrica vera (senza aberrazione né tempo-luce)
-pos_true, _ = ephem.calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_TRUEPOS)
+pos_true, _ = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_TRUEPOS)
 
 diff = (pos_app[0] - pos_true[0]) * 3600
 print(f"Effetto aberrazione + tempo-luce: {diff:.1f}\" d'arco")
@@ -223,7 +223,7 @@ Effetto aberrazione + tempo-luce: -33.3" d'arco
 
 A volte servono le posizioni in coordinate cartesiane (X, Y, Z) invece che angolari. Utile per calcoli di distanza 3D, angoli di fase, o problemi geometrici.
 
-Il flag `SEFLG_XYZ` cambia il significato della tupla restituita: invece di (lon, lat, dist, vel_lon, vel_lat, vel_dist) si ottiene (x, y, z, vx, vy, vz) in unità astronomiche e UA/giorno.
+Il flag `FLG_XYZ` cambia il significato della tupla restituita: invece di (lon, lat, dist, vel_lon, vel_lat, vel_dist) si ottiene (x, y, z, vx, vy, vz) in unità astronomiche e UA/giorno.
 
 ```python
 import libephemeris as ephem
@@ -231,8 +231,8 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Posizione cartesiana equatoriale
-pos, _ = ephem.calc_ut(jd, ephem.SE_MARS,
-                       ephem.SEFLG_XYZ | ephem.SEFLG_EQUATORIAL)
+pos, _ = ephem.calc_ut(jd, ephem.MARS,
+                       ephem.FLG_XYZ | ephem.FLG_EQUATORIAL)
 
 x, y, z = pos[0], pos[1], pos[2]
 import math
@@ -272,11 +272,11 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 9, 15, 21.0)
 
 # 1. Posizione eclittica di Saturno
-pos, _ = ephem.calc_ut(jd, ephem.SE_SATURN, 0)
+pos, _ = ephem.calc_ut(jd, ephem.SATURN, 0)
 lon, lat, dist = pos[0], pos[1], pos[2]
 
 # 2. Otteniamo l'obliquità
-nut, _ = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+nut, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 obliquita = nut[0]
 
 # 3. Eclittica -> Equatoriale (obliquità negativa)
@@ -284,7 +284,7 @@ ra, dec, d = ephem.cotrans((lon, lat, dist), -obliquita)
 
 # 4. Equatoriale -> Orizzontale (Roma)
 geopos = (12.4964, 41.9028, 50.0)
-hor = ephem.azalt(jd, ephem.SE_EQU2HOR, geopos, 1013.25, 15.0,
+hor = ephem.azalt(jd, ephem.EQU2HOR, geopos, 1013.25, 15.0,
                   (ra, dec, d))
 
 print(f"Saturno: lon={lon:.2f}°, lat={lat:.2f}°")
@@ -305,9 +305,9 @@ Saturno: lon=345.44°, lat=-2.20°
 ## Riepilogo
 
 - **Eclittiche** (lon, lat): sistema dell'astrologia, basato sull'eclittica. Default di `calc_ut`.
-- **Equatoriali** (RA, Dec): sistema dei telescopi, basato sull'equatore celeste. Flag `SEFLG_EQUATORIAL`.
+- **Equatoriali** (RA, Dec): sistema dei telescopi, basato sull'equatore celeste. Flag `FLG_EQUATORIAL`.
 - **Orizzontali** (azimut, altezza): sistema pratico, dipende dal luogo. Funzione `azalt`.
-- **Of date** (default), **J2000** (`SEFLG_J2000`), **ICRS** (`SEFLG_ICRS`): tre sistemi di riferimento per lo zero delle coordinate.
+- **Of date** (default), **J2000** (`FLG_J2000`), **ICRS** (`FLG_ICRS`): tre sistemi di riferimento per lo zero delle coordinate.
 - **Precessione**: spostamento lento del punto zero (~50"/anno). **Nutazione**: oscillazione dell'asse (~9"). **Aberrazione**: spostamento dovuto al moto terrestre (~20").
 - `cotrans` converte tra eclittica ed equatoriale. `azalt` e `azalt_rev` convertono da/verso le coordinate orizzontali.
 
@@ -318,9 +318,9 @@ Saturno: lon=345.44°, lat=-2.20°
 | `cotrans(coord, obliquità)` | Eclittica ↔ Equatoriale |
 | `cotrans_sp(coord, speed, obliquità)` | Come sopra, con velocità |
 | `azalt_rev(jd, flag, geopos, az, alt)` | Orizzontale → Ecl/Eq |
-| `SEFLG_EQUATORIAL` | Coordinate equatoriali |
-| `SEFLG_XYZ` | Coordinate cartesiane |
-| `SEFLG_J2000`, `SEFLG_ICRS` | Sistemi di riferimento |
-| `SEFLG_NONUT`, `SEFLG_NOABERR`, `SEFLG_TRUEPOS` | Disabilita correzioni |
+| `FLG_EQUATORIAL` | Coordinate equatoriali |
+| `FLG_XYZ` | Coordinate cartesiane |
+| `FLG_J2000`, `FLG_ICRS` | Sistemi di riferimento |
+| `FLG_NONUT`, `FLG_NOABERR`, `FLG_TRUEPOS` | Disabilita correzioni |
 | `SE_ECL2HOR`, `SE_EQU2HOR` | Direzione per `azalt` |
 | `SE_HOR2ECL`, `SE_HOR2EQU` | Direzione per `azalt_rev` |

@@ -225,11 +225,11 @@ cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
 armc = ascmc[2]  # ARMC in gradi
 
 # 2. Ottieni l'obliquità dell'eclittica
-nut, _ = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+nut, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 obliquity = nut[0]  # obliquità vera
 
 # 3. Calcola la posizione del Sole
-sun, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+sun, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 sun_lon = sun[0]   # longitudine eclittica
 sun_lat = sun[1]   # latitudine eclittica (quasi zero per il Sole)
 
@@ -260,24 +260,24 @@ lat, lon = 41.9028, 12.4964
 # Calcola case e obliquità
 cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
 armc = ascmc[2]
-nut, _ = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+nut, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 obliquity = nut[0]
 
 segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 pianeti = [
-    (ephem.SE_SUN,      "Sole    "),
-    (ephem.SE_MOON,     "Luna    "),
-    (ephem.SE_MERCURY,  "Mercurio"),
-    (ephem.SE_VENUS,    "Venere  "),
-    (ephem.SE_MARS,     "Marte   "),
-    (ephem.SE_JUPITER,  "Giove   "),
-    (ephem.SE_SATURN,   "Saturno "),
+    (ephem.SUN,      "Sole    "),
+    (ephem.MOON,     "Luna    "),
+    (ephem.MERCURY,  "Mercurio"),
+    (ephem.VENUS,    "Venere  "),
+    (ephem.MARS,     "Marte   "),
+    (ephem.JUPITER,  "Giove   "),
+    (ephem.SATURN,   "Saturno "),
 ]
 
 for body_id, nome in pianeti:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     p_lon, p_lat = pos[0], pos[1]
 
     # Segno e gradi
@@ -321,7 +321,7 @@ lat, lon = 41.9028, 12.4964
 
 # Settore Gauquelin di Marte
 settore = ephem.gauquelin_sector(
-    jd, ephem.SE_MARS, 0,
+    jd, ephem.MARS, 0,
     geopos=(lon, lat, 0.0)
 )
 

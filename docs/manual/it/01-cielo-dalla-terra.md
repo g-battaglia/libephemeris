@@ -55,7 +55,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 3, 20, 3.1)
 
 # SE_ECL_NUT restituisce obliquità e nutazione
-nut, flag = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+nut, flag = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
 obliquita_vera = nut[0]    # obliquità vera (con nutazione)
 obliquita_media = nut[1]   # obliquità media (senza nutazione)
@@ -134,7 +134,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 9, 15, 21.0)
 
 # Posizione di Giove
-pos, flag = ephem.calc_ut(jd, ephem.SE_JUPITER, 0)
+pos, flag = ephem.calc_ut(jd, ephem.JUPITER, 0)
 
 # Posizione dell'osservatore: Roma
 # (longitudine Est, latitudine Nord, altitudine in metri)
@@ -144,7 +144,7 @@ geopos = (12.4964, 41.9028, 50.0)
 # SE_ECL2HOR = da eclittiche a orizzontali
 # atpress = 1013.25 mbar (pressione standard)
 # attemp = 15.0 °C (temperatura standard)
-hor = ephem.azalt(jd, ephem.SE_ECL2HOR, geopos, 1013.25, 15.0,
+hor = ephem.azalt(jd, ephem.ECL2HOR, geopos, 1013.25, 15.0,
                   (pos[0], pos[1], pos[2]))
 
 azimut = hor[0]            # da Sud, verso Ovest

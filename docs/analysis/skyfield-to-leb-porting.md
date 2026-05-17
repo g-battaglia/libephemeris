@@ -98,12 +98,12 @@ sostituire Skyfield.  Questa tabella elenca le equivalenze:
 
 | Operazione Skyfield | Funzione libephemeris | File:linea | Stato |
 |---------------------|----------------------|------------|-------|
-| `eph["sun"].at(t)` | `swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| `eph["moon"].at(t)` | `swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| `eph["earth"].at(t)` | `swe_calc_ut(jd, SE_EARTH, SEFLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| Topocentric position | `swe_calc_ut(jd, body, SEFLG_TOPOCTR)` | — | **KeyError in LEB mode** |
-| Cartesian XYZ | `swe_calc_ut(jd, body, SEFLG_XYZ)` | — | **KeyError in LEB mode** |
-| Equatoriale (RA/Dec) | `swe_calc_ut(jd, body, SEFLG_EQUATORIAL)` | `fast_calc.py:1105` | Pronta |
+| `eph["sun"].at(t)` | `swe_calc_ut(jd, SUN, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| `eph["moon"].at(t)` | `swe_calc_ut(jd, MOON, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| `eph["earth"].at(t)` | `swe_calc_ut(jd, EARTH, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| Topocentric position | `swe_calc_ut(jd, body, FLG_TOPOCTR)` | — | **KeyError in LEB mode** |
+| Cartesian XYZ | `swe_calc_ut(jd, body, FLG_XYZ)` | — | **KeyError in LEB mode** |
+| Equatoriale (RA/Dec) | `swe_calc_ut(jd, body, FLG_EQUATORIAL)` | `fast_calc.py:1105` | Pronta |
 
 ### Flag attualmente non supportati nel LEB path
 
@@ -111,15 +111,15 @@ sostituire Skyfield.  Questa tabella elenca le equivalenze:
 Skyfield** in modalità LEB:
 
 ```python
-if iflag & SEFLG_TOPOCTR:   raise KeyError(...)   # riga 1509
-if iflag & SEFLG_XYZ:       raise KeyError(...)   # riga 1511
-if iflag & SEFLG_RADIANS:   raise KeyError(...)   # riga 1513
-if iflag & SEFLG_NONUT:     raise KeyError(...)   # riga 1515
-if iflag & SEFLG_ICRS:      raise KeyError(...)   # riga 1517
+if iflag & FLG_TOPOCTR:   raise KeyError(...)   # riga 1509
+if iflag & FLG_XYZ:       raise KeyError(...)   # riga 1511
+if iflag & FLG_RADIANS:   raise KeyError(...)   # riga 1513
+if iflag & FLG_NONUT:     raise KeyError(...)   # riga 1515
+if iflag & FLG_ICRS:      raise KeyError(...)   # riga 1517
 ```
 
 Per il porting completo, sarà necessario implementare almeno
-`SEFLG_TOPOCTR` e `SEFLG_XYZ` nel path LEB.
+`FLG_TOPOCTR` e `FLG_XYZ` nel path LEB.
 
 ---
 
@@ -145,7 +145,7 @@ swe_fixstar_ut(star_name, jd, iflag)
 
 | Passo | Skyfield | Sostituto LEB |
 |-------|----------|---------------|
-| 1. Posizione Terra geocentrica | `earth.at(t)` | `swe_calc_ut(jd, SE_EARTH, SEFLG_SPEED)` |
+| 1. Posizione Terra geocentrica | `earth.at(t)` | `swe_calc_ut(jd, EARTH, FLG_SPEED)` |
 | 2. Moto proprio J2000→data | `Star(pm_ra, pm_dec)` | `propagate_proper_motion()` (`fixed_stars.py:257`) |
 | 3. Parallasse stellare | Interno a `Star()` | Formula: `dist_AU = 206265.0 / parallax_arcsec` |
 | 4. Aberrazione annuale | `.apparent()` | `_apply_aberration(geo, earth_vel, lt)` (`fast_calc.py:201`) |
@@ -166,7 +166,7 @@ swe_fixstar_ut(star_name, jd, iflag)
       4. Precessione J2000 → data: _precess_ecliptic(lon, lat, jd_tt)
       5. Nutazione: applicare dpsi da get_cached_nutation(jd_tt)
       6. Aberrazione: _apply_aberration(geo, earth_vel, lt)
-         - earth_vel da swe_calc_ut(jd, SE_EARTH, SEFLG_SPEED) → speed components
+         - earth_vel da swe_calc_ut(jd, EARTH, FLG_SPEED) → speed components
       7. Return (lon, lat, dist)
     → _apply_fixstar_flags(lon, lat, dist, ...)           # invariata
 ```
@@ -182,9 +182,9 @@ swe_fixstar_ut(star_name, jd, iflag)
 2. **Velocità della Terra** — `_apply_aberration()` richiede il vettore
    velocità della Terra in coordinate cartesiane ICRS.  Il path LEB
    restituisce velocità in eclittica.  Servono:
-   - `swe_calc_ut(jd, SE_EARTH, SEFLG_SPEED)` → (lon, lat, dist, dlon, dlat, ddist)
+   - `swe_calc_ut(jd, EARTH, FLG_SPEED)` → (lon, lat, dist, dlon, dlat, ddist)
    - Conversione delle velocità eclittiche in vettore ICRS (o usare
-     direttamente il vettore dal LEB reader: `reader.eval_body(SE_EARTH, jd)` 
+     direttamente il vettore dal LEB reader: `reader.eval_body(EARTH, jd)` 
      restituisce `((x, y, z), (vx, vy, vz))` in ICRS per corpi baricentici)
 
 ### Effort stimato: 1-2 giorni
@@ -224,9 +224,9 @@ heliacal_ut(jd_start, geopos, body, ...)
 
 | Passo | Skyfield | Sostituto LEB |
 |-------|----------|---------------|
-| 1. Posizione Sole | `observer_at.observe(sun).apparent()` | `swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)` → eclittica |
-| 2. Posizione corpo | `observer_at.observe(body).apparent()` | `swe_calc_ut(jd, body_id, SEFLG_SPEED)` → eclittica |
-| 3. Posizione Luna | `observer_at.observe(moon).apparent()` | `swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)` → eclittica |
+| 1. Posizione Sole | `observer_at.observe(sun).apparent()` | `swe_calc_ut(jd, SUN, FLG_SPEED)` → eclittica |
+| 2. Posizione corpo | `observer_at.observe(body).apparent()` | `swe_calc_ut(jd, body_id, FLG_SPEED)` → eclittica |
+| 3. Posizione Luna | `observer_at.observe(moon).apparent()` | `swe_calc_ut(jd, MOON, FLG_SPEED)` → eclittica |
 | 4. Altitudine/Azimut | `.altaz()` | `azalt(jd, SE_ECL2HOR, geopos, atpress, attemp, (lon, lat, dist))` (`utils.py:175`) |
 | 5. Separazione angolare | `.separation_from()` | Formula haversine su coordinate eclittiche |
 | 6. Posizione stelle fisse | `Star(ra, dec, pm_ra, pm_dec)` | `swe_fixstar_ut()` (dopo il porting del punto 3) |
@@ -239,9 +239,9 @@ heliacal_ut(jd_start, geopos, body, ...)
 heliacal_ut(jd_start, geopos, body, ...)
   → swe_set_topo(lon, lat, alt)                          # imposta osservatore
   → loop di ricerca:
-      sun_pos = swe_calc_ut(jd, SE_SUN, SEFLG_SPEED)     # → (lon, lat, dist, ...)
-      body_pos = swe_calc_ut(jd, body_id, SEFLG_SPEED)
-      moon_pos = swe_calc_ut(jd, SE_MOON, SEFLG_SPEED)
+      sun_pos = swe_calc_ut(jd, SUN, FLG_SPEED)     # → (lon, lat, dist, ...)
+      body_pos = swe_calc_ut(jd, body_id, FLG_SPEED)
+      moon_pos = swe_calc_ut(jd, MOON, FLG_SPEED)
       _, sun_alt, _ = azalt(jd, SE_ECL2HOR, geopos, 0, 0, sun_pos[:3])
       _, body_alt, body_az_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, body_pos[:3])
       elongation = _angular_separation(sun_pos[0], sun_pos[1], body_pos[0], body_pos[1])
@@ -277,7 +277,7 @@ eclittica.  Per le separazioni angolari la differenza è trascurabile
 2. **Coordinate geocentriche** — `heliacal_pheno_ut()` usa anche
    `.radec()` per calcolare l'altitudine geocentrica tramite angolo orario
    (riga 2165-2183).  Questo può essere ottenuto con
-   `swe_calc_ut(jd, body, SEFLG_EQUATORIAL)` che restituisce RA/Dec.
+   `swe_calc_ut(jd, body, FLG_EQUATORIAL)` che restituisce RA/Dec.
 
 3. **Nota su `azalt()`** — La funzione `azalt()` in `utils.py:175` accetta
    coordinate eclittiche (con `SE_ECL2HOR`) e include la rifrazione
@@ -330,8 +330,8 @@ moon_pos = moon_app.position.au
 sun_dist = sun_app.distance().au
 ```
 
-**Sostituto LEB:** `swe_calc_ut(jd, body, SEFLG_SPEED)` per distanze e
-coordinate eclittiche.  Per i vettori 3D ICRS, serve `SEFLG_XYZ`
+**Sostituto LEB:** `swe_calc_ut(jd, body, FLG_SPEED)` per distanze e
+coordinate eclittiche.  Per i vettori 3D ICRS, serve `FLG_XYZ`
 (attualmente non supportato in LEB mode).
 
 #### Pattern B — Topocentric con altaz (~8 siti)
@@ -343,9 +343,9 @@ sun_app = observer_at.at(t).observe(sun).apparent()
 sun_alt, sun_az, _ = sun_app.altaz()
 ```
 
-**Sostituto LEB:** `swe_calc_ut(jd, body, SEFLG_SPEED)` + 
+**Sostituto LEB:** `swe_calc_ut(jd, body, FLG_SPEED)` + 
 `azalt(jd, SE_ECL2HOR, geopos, 0, 0, (lon, lat, dist))`.  Non serve
-`SEFLG_TOPOCTR` se si usa `azalt()` che accetta coordinate geocentriche.
+`FLG_TOPOCTR` se si usa `azalt()` che accetta coordinate geocentriche.
 
 #### Pattern C — Separazioni angolari (~10 siti)
 
@@ -363,7 +363,7 @@ ra, dec, dist = moon_app.radec(epoch="date")
 ```
 
 **Sostituto LEB:**
-`swe_calc_ut(jd, body, SEFLG_EQUATORIAL)` restituisce RA/Dec (ma in J2000,
+`swe_calc_ut(jd, body, FLG_EQUATORIAL)` restituisce RA/Dec (ma in J2000,
 non epoch="date").  Per epoch="date" serve applicare la precessione IAU 2006
 manualmente: `_precess_ecliptic()` + `cotrans_sp()`.
 
@@ -469,7 +469,7 @@ rispetto al centro della Terra) alla posizione geocentrica.
 
 **Approccio proposto:**
 
-1. Ottenere posizione geocentrica eclittica: `fast_calc_ut(reader, jd, body, flags & ~SEFLG_TOPOCTR)`
+1. Ottenere posizione geocentrica eclittica: `fast_calc_ut(reader, jd, body, flags & ~FLG_TOPOCTR)`
 2. Convertire in vettore cartesiano
 3. Sottrarre il vettore posizione dell'osservatore (da `state._TOPO`)
 4. Riconvertire in coordinate eclittiche

@@ -75,7 +75,7 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Let's calculate the position of the Sun
 # The third argument (0) means: ecliptic coordinates, without extra options
-pos, flag = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos, flag = ephem.calc_ut(jd, ephem.SUN, 0)
 
 longitude = pos[0]  # degrees along the ecliptic (0–360)
 print(f"Sun at {longitude:.4f}° of ecliptic longitude")
@@ -89,7 +89,7 @@ What happened?
 
 1. `julday(2024, 4, 8, 12.0)` converted the date "April 8, 2024, 12:00 UT" into a **Julian Day** — a unique number that identifies that instant. We will learn all about Julian Days in Chapter 2.
 
-2. `calc_ut(jd, ephem.SE_SUN, 0)` calculated the Sun's position for that instant. The result is a tuple of 6 numbers: longitude, latitude, distance, and their respective daily velocities. The third parameter (`0`) tells the library to use standard settings. Calculation flags are covered in Chapter 5.
+2. `calc_ut(jd, ephem.SUN, 0)` calculated the Sun's position for that instant. The result is a tuple of 6 numbers: longitude, latitude, distance, and their respective daily velocities. The third parameter (`0`) tells the library to use standard settings. Calculation flags are covered in Chapter 5.
 
 3. The longitude `19.15°` tells us that the Sun was at about 19 degrees of the sign of Aries (the first sign goes from 0° to 30°). We will understand why in Chapter 1.
 
@@ -99,7 +99,7 @@ Let's take it one step further — let's show the position in zodiacal format:
 import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, flag = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos, flag = ephem.calc_ut(jd, ephem.SUN, 0)
 
 signs = [
     "Aries", "Taurus", "Gemini", "Cancer",

@@ -40,7 +40,7 @@ use different interpolation and integration methods.
 **Speed divergence:**
 - Most planets: 0.01–2.0"
 - Moon speed: up to ~5" (different numerical differentiation)
-- With `SEFLG_SPEED` flag: central finite difference vs analytical
+- With `FLG_SPEED` flag: central finite difference vs analytical
 
 **Future dates (>2050):** Up to 2" position divergence due to delta-T model
 extrapolation differences.
@@ -269,9 +269,9 @@ does not expose this attribute.
 unsigned integer overflow behavior in the C implementation of pyswisseph
 vs Python's native integer handling.
 
-### 14.4 `SEFLG_MOSEPH`
+### 14.4 `FLG_MOSEPH`
 
-`SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All
+`FLG_MOSEPH` is accepted for API compatibility but silently ignored. All
 calculations always use JPL DE440/DE441 via Skyfield — there is no Moshier
 ephemeris fallback.
 

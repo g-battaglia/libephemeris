@@ -27,19 +27,19 @@ lat, lon = 45.4642, 9.1900  # Milano
 
 # Alba (rise)
 jd_alba, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN,
+    jd, ephem.SUN,
     lat, lon,
     altitude=0.0,
     pressure=1013.25,
     temperature=15.0,
-    rsmi=ephem.SE_CALC_RISE
+    rsmi=ephem.CALC_RISE
 )
 
 # Tramonto (set)
 jd_tramonto, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN,
+    jd, ephem.SUN,
     lat, lon,
-    rsmi=ephem.SE_CALC_SET
+    rsmi=ephem.CALC_SET
 )
 
 # Converti in ore locali (CEST = UT + 2)
@@ -87,13 +87,13 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Roma
 
 jd_rise, ret = ephem.rise_trans(
-    jd, ephem.SE_MOON, lat, lon,
-    rsmi=ephem.SE_CALC_RISE
+    jd, ephem.MOON, lat, lon,
+    rsmi=ephem.CALC_RISE
 )
 
 jd_set, ret = ephem.rise_trans(
-    jd, ephem.SE_MOON, lat, lon,
-    rsmi=ephem.SE_CALC_SET
+    jd, ephem.MOON, lat, lon,
+    rsmi=ephem.CALC_SET
 )
 
 if jd_rise > 0 and jd_set > 0:
@@ -120,8 +120,8 @@ import libephemeris as ephem
 # Sole a Tromsø il 21 giugno — non tramonta mai
 jd = ephem.julday(2024, 6, 21, 0.0)
 jd_set, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN, 69.6, 19.0,
-    rsmi=ephem.SE_CALC_SET
+    jd, ephem.SUN, 69.6, 19.0,
+    rsmi=ephem.CALC_SET
 )
 
 if ret == -2:
@@ -146,8 +146,8 @@ lat, lon = 41.9028, 12.4964  # Roma
 
 # Transito del Sole al meridiano = mezzogiorno solare
 jd_transit, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_MTRANSIT
+    jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_MTRANSIT
 )
 
 _, _, _, h = ephem.revjul(jd_transit)
@@ -191,20 +191,20 @@ def ora_locale(jd_evento, fuso):
     return f"{int(h):02d}:{int((h % 1) * 60):02d}"
 
 # Tramonto
-jd_t, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET)
+jd_t, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET)
 
 # Fine crepuscolo civile (Sole a -6°)
-jd_civ, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_CIVIL_TWILIGHT)
+jd_civ, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT)
 
 # Fine crepuscolo nautico (Sole a -12°)
-jd_nau, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_NAUTIC_TWILIGHT)
+jd_nau, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT)
 
 # Fine crepuscolo astronomico (Sole a -18°)
-jd_ast, ret = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_ASTRO_TWILIGHT)
+jd_ast, ret = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT)
 
 print(f"Tramonto:                {ora_locale(jd_t, fuso)}")
 print(f"Fine crepuscolo civile:  {ora_locale(jd_civ, fuso)}")
@@ -243,13 +243,13 @@ import libephemeris as ephem
 
 # Da altezza vera ad apparente
 alt_vera = 0.0  # oggetto esattamente all'orizzonte geometrico
-alt_apparente = ephem.refrac(alt_vera, calc_flag=ephem.SE_TRUE_TO_APP)
+alt_apparente = ephem.refrac(alt_vera, calc_flag=ephem.TRUE_TO_APP)
 print(f"Altezza vera: {alt_vera:.2f}° → apparente: {alt_apparente:.2f}°")
 # → circa 0.57° (34 arcminuti sopra l'orizzonte)
 
 # Da apparente a vera
 alt_app = 5.0
-alt_true = ephem.refrac(alt_app, calc_flag=ephem.SE_APP_TO_TRUE)
+alt_true = ephem.refrac(alt_app, calc_flag=ephem.APP_TO_TRUE)
 print(f"Altezza apparente: {alt_app:.2f}° → vera: {alt_true:.2f}°")
 ```
 
@@ -320,9 +320,9 @@ lat, lon = 45.4642, 9.1900  # Milano
 
 # Le Alpi a nord alzano l'orizzonte di circa 2 gradi
 jd_alba, _ = ephem.rise_trans_true_hor(
-    jd, ephem.SE_SUN, lat, lon,
+    jd, ephem.SUN, lat, lon,
     horizon_altitude=2.0,  # orizzonte a 2° sopra il piano
-    rsmi=ephem.SE_CALC_RISE
+    rsmi=ephem.CALC_RISE
 )
 
 _, _, _, h = ephem.revjul(jd_alba)
@@ -360,7 +360,7 @@ jd_evento, *_ = ephem.heliacal_ut(
     datm=(1013.25, 25.0, 30.0, 0.0),  # pressione, temp, umidità%, lapse
     dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     object_name="Sirius",
-    event_type=ephem.SE_HELIACAL_RISING  # levata eliacale mattutina
+    event_type=ephem.HELIACAL_RISING  # levata eliacale mattutina
 )
 
 if jd_evento > 0:
@@ -402,7 +402,7 @@ dobs = (36.0, 1.0, 0, 0, 0, 0)
 result = ephem.swe_heliacal_ut(
     jd, geopos, datm, dobs,
     "Sirius",
-    ephem.SE_HELIACAL_RISING
+    ephem.HELIACAL_RISING
 )
 
 jd_inizio = result[0]

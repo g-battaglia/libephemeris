@@ -46,7 +46,7 @@ anywhere** in the code. The new constants `_PREC_C1`–`_PREC_C5` (IAU 2006) had
 been defined correctly but the old names had not been updated.
 
 This caused a `NameError` at runtime for **all** formula-based ayanamshas
-(Lahiri, Fagan-Bradley, Raman, etc.) and for `SE_SIDM_SURYASIDDHANTA_MSUN`.
+(Lahiri, Fagan-Bradley, Raman, etc.) and for `SIDM_SURYASIDDHANTA_MSUN`.
 
 Additionally, the original coefficients were slightly inaccurate
 (`PREC_RATE` = 5028.796273 was off by +0.000078″/cy from IAU 2006;
@@ -55,14 +55,14 @@ was truncated at 2 terms, missing T³, T⁴, and T⁵.
 
 **Fix applied (3 locations):**
 
-**1. `SE_SIDM_SURYASIDDHANTA_MSUN`** — replaced `PREC_RATE` with `_PREC_C1`:
+**1. `SIDM_SURYASIDDHANTA_MSUN`** — replaced `PREC_RATE` with `_PREC_C1`:
 
 ```python
 # Before (BROKEN):
-SE_SIDM_SURYASIDDHANTA_MSUN: (20.680425, PREC_RATE),
+SIDM_SURYASIDDHANTA_MSUN: (20.680425, PREC_RATE),
 
 # After (FIXED):
-SE_SIDM_SURYASIDDHANTA_MSUN: (20.680425, _PREC_C1),
+SIDM_SURYASIDDHANTA_MSUN: (20.680425, _PREC_C1),
 ```
 
 **2. General ayanamsha formula** — replaced the 2-term formula with the full
@@ -83,7 +83,7 @@ precession_arcsec = (
 ayanamsa = aya_j2000 + precession_arcsec / 3600.0
 ```
 
-**3. `SE_SIDM_J2000`** — upgraded from 2 terms to 5 terms:
+**3. `SIDM_J2000`** — upgraded from 2 terms to 5 terms:
 
 ```python
 # Before:

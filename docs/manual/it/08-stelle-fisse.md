@@ -75,7 +75,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Posizione di Regolo
-nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.SEFLG_SPEED)
+nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.FLG_SPEED)
 
 if not err:
     lon = pos[0]  # longitudine eclittica
@@ -185,7 +185,7 @@ Algol         magnitudine +2.12
 
 ### Coordinate equatoriali
 
-Se hai bisogno dell'Ascensione Retta e della Declinazione (per puntare un telescopio, per esempio), aggiungi il flag `SEFLG_EQUATORIAL`:
+Se hai bisogno dell'Ascensione Retta e della Declinazione (per puntare un telescopio, per esempio), aggiungi il flag `FLG_EQUATORIAL`:
 
 ```python
 import libephemeris as ephem
@@ -193,7 +193,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 nome, pos, flag, err = ephem.fixstar2_ut(
-    "Sirius", jd, ephem.SEFLG_EQUATORIAL
+    "Sirius", jd, ephem.FLG_EQUATORIAL
 )
 
 if not err:
@@ -247,19 +247,19 @@ stelle_da_cercare = [
 ]
 
 pianeti = [
-    (ephem.SE_SUN,     "Sole"),
-    (ephem.SE_MOON,    "Luna"),
-    (ephem.SE_MERCURY, "Mercurio"),
-    (ephem.SE_VENUS,   "Venere"),
-    (ephem.SE_MARS,    "Marte"),
-    (ephem.SE_JUPITER, "Giove"),
-    (ephem.SE_SATURN,  "Saturno"),
+    (ephem.SUN,     "Sole"),
+    (ephem.MOON,    "Luna"),
+    (ephem.MERCURY, "Mercurio"),
+    (ephem.VENUS,   "Venere"),
+    (ephem.MARS,    "Marte"),
+    (ephem.JUPITER, "Giove"),
+    (ephem.SATURN,  "Saturno"),
 ]
 
 # Calcola le posizioni dei pianeti
 pos_pianeti = {}
 for body_id, nome_p in pianeti:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     pos_pianeti[nome_p] = pos[0]  # longitudine eclittica
 
 # Controlla congiunzioni
@@ -384,6 +384,6 @@ In questo capitolo abbiamo imparato a lavorare con le stelle fisse.
 
 **Funzioni introdotte:**
 
-- `fixstar2_ut(nome, jd, flag)` — calcola la posizione eclittica (o equatoriale con `SEFLG_EQUATORIAL`) di una stella, accettando nomi in molti formati
+- `fixstar2_ut(nome, jd, flag)` — calcola la posizione eclittica (o equatoriale con `FLG_EQUATORIAL`) di una stella, accettando nomi in molti formati
 - `fixstar2_mag(nome)` — restituisce la magnitudine visuale di una stella
 - `propagate_proper_motion(ra, dec, pm_ra, pm_dec, from_jd, to_jd)` — propaga manualmente il moto proprio di una stella tra due epoche

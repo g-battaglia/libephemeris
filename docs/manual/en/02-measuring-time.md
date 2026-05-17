@@ -43,12 +43,12 @@ print(f"{day}/{month}/{year} hour {hour:.1f}")
 
 # Julian vs Gregorian calendar
 # October 4, 1582 (Julian) is the day before October 15, 1582 (Gregorian)
-jd_julian = ephem.julday(1582, 10, 4, 12.0, ephem.SE_JUL_CAL)
-jd_gregorian = ephem.julday(1582, 10, 15, 12.0, ephem.SE_GREG_CAL)
+jd_julian = ephem.julday(1582, 10, 4, 12.0, ephem.JUL_CAL)
+jd_gregorian = ephem.julday(1582, 10, 15, 12.0, ephem.GREG_CAL)
 print(f"Difference: {jd_gregorian - jd_julian} days")
 
 # How many days between Caesar and the moon landing?
-jd_caesar = ephem.julday(-43, 3, 15, 12.0, ephem.SE_JUL_CAL)
+jd_caesar = ephem.julday(-43, 3, 15, 12.0, ephem.JUL_CAL)
 jd_moon = ephem.julday(1969, 7, 20, 20.3)  # 20:17 UT
 print(f"Days elapsed: {jd_moon - jd_caesar:.0f}")
 ```
@@ -107,8 +107,8 @@ dt_seconds = dt_days * 86400
 print(f"Delta-T = {dt_seconds:.2f} seconds")
 
 # The two equivalent calls:
-pos_ut, _ = ephem.calc_ut(jd, ephem.SE_MOON, 0)        # pass JD in UT
-pos_tt, _ = ephem.calc(jd + dt_days, ephem.SE_MOON, 0)  # pass JD in TT
+pos_ut, _ = ephem.calc_ut(jd, ephem.MOON, 0)        # pass JD in UT
+pos_tt, _ = ephem.calc(jd + dt_days, ephem.MOON, 0)  # pass JD in TT
 
 print(f"Moon (via UT):  {pos_ut[0]:.6f}°")
 print(f"Moon (via TT):  {pos_tt[0]:.6f}°")

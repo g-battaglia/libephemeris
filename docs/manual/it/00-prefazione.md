@@ -75,7 +75,7 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Calcoliamo la posizione del Sole
 # Il terzo argomento (0) indica: coordinate eclittiche, senza opzioni extra
-pos, flag = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos, flag = ephem.calc_ut(jd, ephem.SUN, 0)
 
 longitudine = pos[0]  # gradi lungo l'eclittica (0–360)
 print(f"Sole a {longitudine:.4f}° di longitudine eclittica")
@@ -99,7 +99,7 @@ Facciamo un passo in più — mostriamo la posizione in formato zodiacale:
 import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, flag = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos, flag = ephem.calc_ut(jd, ephem.SUN, 0)
 
 segni = [
     "Ariete", "Toro", "Gemelli", "Cancro",

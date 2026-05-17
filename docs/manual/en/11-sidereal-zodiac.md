@@ -35,10 +35,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Tropical position (default)
-pos_trop, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+pos_trop, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 
 # Lahiri Ayanamsha
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 ayan = ephem.get_ayanamsa_ut(jd)
 
 # Sidereal position = tropical - ayanamsha
@@ -79,7 +79,7 @@ Today the ayanamsha is about 24°, and grows by about 50.3" per year (the preces
 ```python
 import libephemeris as ephem
 
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Ayanamsha in different epochs
 for year in [0, 500, 1000, 1500, 2000, 2024, 2100]:
@@ -100,7 +100,7 @@ Year  2100: ayanamsha =  +25.25°
 
 You will notice that the ayanamsha is negative in antiquity (the sidereal zodiac was "ahead" relative to the tropical one) and positive today (the tropical is "ahead").
 
-### Using the SEFLG_SIDEREAL flag
+### Using the FLG_SIDEREAL flag
 
 Instead of calculating the ayanamsha and subtracting it manually, you can ask the library directly to return positions in sidereal coordinates:
 
@@ -110,12 +110,12 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Set the sidereal system
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Calculate directly in sidereal
 pos_sid, _ = ephem.calc_ut(
-    jd, ephem.SE_SUN,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED
+    jd, ephem.SUN,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED
 )
 
 signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
@@ -131,7 +131,7 @@ print(f"Sidereal Sun (Lahiri): {degrees:.2f}° {sign}")
 Sidereal Sun (Lahiri): 24.95° Psc
 ```
 
-The flag `SEFLG_SIDEREAL` (65536) can be combined with any other flag: `SEFLG_SPEED`, `SEFLG_EQUATORIAL`, etc.
+The flag `FLG_SIDEREAL` (65536) can be combined with any other flag: `FLG_SPEED`, `FLG_EQUATORIAL`, etc.
 
 ---
 
@@ -183,13 +183,13 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 systems = [
-    (ephem.SE_SIDM_LAHIRI,         "Lahiri"),
-    (ephem.SE_SIDM_FAGAN_BRADLEY,  "Fagan-Bradley"),
-    (ephem.SE_SIDM_RAMAN,          "Raman"),
-    (ephem.SE_SIDM_KRISHNAMURTI,   "Krishnamurti"),
-    (ephem.SE_SIDM_TRUE_CITRA,     "True Citra"),
-    (ephem.SE_SIDM_TRUE_REVATI,    "True Revati"),
-    (ephem.SE_SIDM_GALCENT_0SAG,   "Galactic 0 Sag"),
+    (ephem.SIDM_LAHIRI,         "Lahiri"),
+    (ephem.SIDM_FAGAN_BRADLEY,  "Fagan-Bradley"),
+    (ephem.SIDM_RAMAN,          "Raman"),
+    (ephem.SIDM_KRISHNAMURTI,   "Krishnamurti"),
+    (ephem.SIDM_TRUE_CITRA,     "True Citra"),
+    (ephem.SIDM_TRUE_REVATI,    "True Revati"),
+    (ephem.SIDM_GALCENT_0SAG,   "Galactic 0 Sag"),
 ]
 
 print(f"Ayanamsha on {8}/04/2024:\n")
@@ -199,7 +199,7 @@ for mode, name in systems:
     print(f"  {name:20s}  {ayan:.4f}°")
 
 # The name of a system
-name = ephem.get_ayanamsa_name(ephem.SE_SIDM_LAHIRI)
+name = ephem.get_ayanamsa_name(ephem.SIDM_LAHIRI)
 print(f"\nName: {name}")
 ```
 
@@ -231,7 +231,7 @@ import libephemeris as ephem
 J2000 = 2451545.0
 
 ephem.set_sid_mode(
-    ephem.SE_SIDM_USER,
+    ephem.SIDM_USER,
     t0=J2000,       # reference epoch
     ayan_t0=23.5     # ayanamsha value at that epoch
 )
@@ -241,9 +241,9 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 ayan = ephem.get_ayanamsa_ut(jd)
 print(f"Custom ayanamsha in 2024: {ayan:.4f}°")
 
-# And use SEFLG_SIDEREAL for positions
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+# And use FLG_SIDEREAL for positions
+pos, _ = ephem.calc_ut(jd, ephem.SUN,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 print(f"Custom sidereal Sun: {pos[0]:.4f}°")
 ```
 
@@ -271,7 +271,7 @@ jd = ephem.julday(1947, 8, 14, 18.5)
 lat, lon = 28.6139, 77.2090  # New Delhi
 
 # Set Lahiri sidereal
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 signs = ["Mesha", "Vrishabha", "Mithuna", "Karka",
          "Simha", "Kanya", "Tula", "Vrischika",
@@ -279,27 +279,27 @@ signs = ["Mesha", "Vrishabha", "Mithuna", "Karka",
 
 # Planets in sidereal
 planets = [
-    (ephem.SE_SUN,      "Surya  "),
-    (ephem.SE_MOON,     "Chandra"),
-    (ephem.SE_MARS,     "Mangal "),
-    (ephem.SE_MERCURY,  "Budha  "),
-    (ephem.SE_JUPITER,  "Guru   "),
-    (ephem.SE_VENUS,    "Shukra "),
-    (ephem.SE_SATURN,   "Shani  "),
-    (ephem.SE_MEAN_NODE,"Rahu   "),
+    (ephem.SUN,      "Surya  "),
+    (ephem.MOON,     "Chandra"),
+    (ephem.MARS,     "Mangal "),
+    (ephem.MERCURY,  "Budha  "),
+    (ephem.JUPITER,  "Guru   "),
+    (ephem.VENUS,    "Shukra "),
+    (ephem.SATURN,   "Shani  "),
+    (ephem.MEAN_NODE,"Rahu   "),
 ]
 
 print("Sidereal birth chart (Lahiri):\n")
 for body_id, name in planets:
     pos, _ = ephem.calc_ut(jd, body_id,
-        ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+        ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
     sign = signs[int(pos[0] / 30)]
     degrees = pos[0] % 30
     print(f"  {name}  {degrees:5.1f}°  {sign}")
 
 # Ketu = opposite to Rahu
-rahu_pos, _ = ephem.calc_ut(jd, ephem.SE_MEAN_NODE,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+rahu_pos, _ = ephem.calc_ut(jd, ephem.MEAN_NODE,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 ketu_lon = (rahu_pos[0] + 180) % 360
 sign_k = signs[int(ketu_lon / 30)]
 degrees_k = ketu_lon % 30
@@ -347,11 +347,11 @@ rulers = [
 ]
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Moon's Nakshatra
-moon, _ = ephem.calc_ut(jd, ephem.SE_MOON,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+moon, _ = ephem.calc_ut(jd, ephem.MOON,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 
 nak_num = int(moon[0] / (360 / 27))  # 13°20' per Nakshatra
 nak_pos = moon[0] % (360 / 27)       # position in the Nakshatra
@@ -383,7 +383,7 @@ For advanced calculations where you need to specify additional flags or want the
 ```python
 import libephemeris as ephem
 
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
@@ -391,7 +391,7 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 ayan_simple = ephem.get_ayanamsa_ut(jd)
 
 # Extended version (also returns the flag)
-retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, ephem.SEFLG_SWIEPH)
+retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, ephem.FLG_SWIEPH)
 
 print(f"Ayanamsha (simple): {ayan_simple:.6f}°")
 print(f"Ayanamsha (extended):   {ayan_ex:.6f}°")
@@ -423,4 +423,4 @@ In this chapter, we explored the sidereal zodiac, which is fundamental to Vedic 
 - `get_ayanamsa_ut(jd)` — returns the ayanamsha in degrees for a date in UT.
 - `get_ayanamsa_ex_ut(jd, flags)` — extended version that also returns the return flag.
 - `get_ayanamsa_name(sid_mode)` — returns the readable name of an ayanamsha system (e.g. `"Lahiri"`).
-- `SEFLG_SIDEREAL` (65536) — flag to add to `calc_ut` to get positions directly in sidereal coordinates.
+- `FLG_SIDEREAL` (65536) — flag to add to `calc_ut` to get positions directly in sidereal coordinates.

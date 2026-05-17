@@ -145,10 +145,10 @@ The core of the infrastructure is the `CompareHelper` class in `conftest.py`. It
 
 ```python
 # Skyfield mode (reference): direct calculation from NASA ephemerides
-ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
 
 # LEB mode: calculation via precomputed Chebyshev polynomials
-leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
 ```
 
 Internally, `CompareHelper`:
@@ -168,8 +168,8 @@ def test_longitude(self, compare, test_dates_200, body_id, body_name):
     worst_jd = 0.0
 
     for jd in test_dates_200:
-        ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-        leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+        ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+        leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
 
         err = lon_error_arcsec(ref[0], leb[0])
         if err > max_err:

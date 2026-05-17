@@ -79,7 +79,7 @@ Resolution priority (highest to lowest):
 
 Swiss Ephemeris uses JPL DE431 (older generation, 2013) repackaged into its own binary format. DE440/DE441 (2021) incorporate 8 additional years of observational data, including improved Juno-era Jupiter observations and MESSENGER-era Mercury data, and use the updated ICRF 3.0 reference frame.
 
-When `SEFLG_MOSEPH` is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris (VSOP87 for planets, ELP2000-82B for Moon), which has errors of ~1 arcsecond for inner planets and ~10+ arcseconds for outer planets at historical dates. LibEphemeris accepts `SEFLG_MOSEPH` for API compatibility but silently ignores it -- all calculations always use the full JPL numerical integration.
+When `FLG_MOSEPH` is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris (VSOP87 for planets, ELP2000-82B for Moon), which has errors of ~1 arcsecond for inner planets and ~10+ arcseconds for outer planets at historical dates. LibEphemeris accepts `FLG_MOSEPH` for API compatibility but silently ignores it -- all calculations always use the full JPL numerical integration.
 
 ---
 
@@ -285,7 +285,7 @@ v_offset = [offset(t + 0.5s) - offset(t - 0.5s)] / 1s
 
 ### Swiss Ephemeris comparison
 
-Standard Swiss Ephemeris returns **system barycenters** for outer planets. The `SEFLG_CENTER_BODY` flag (a newer, less commonly used feature) enables planet center positions, but requires additional satellite ephemeris files. LibEphemeris applies the correction **transparently** to all calculations, achieving better default precision for Jupiter, Saturn, Neptune, and Pluto without requiring any user configuration.
+Standard Swiss Ephemeris returns **system barycenters** for outer planets. The `FLG_CENTER_BODY` flag (a newer, less commonly used feature) enables planet center positions, but requires additional satellite ephemeris files. LibEphemeris applies the correction **transparently** to all calculations, achieving better default precision for Jupiter, Saturn, Neptune, and Pluto without requiring any user configuration.
 
 ---
 
@@ -328,7 +328,7 @@ The full pipeline from JPL ephemeris to ecliptic longitude:
 4. **Apparent position** via Skyfield: annual aberration + gravitational deflection
 5. **Ecliptic of date** via `frame_latlon(ecliptic_frame)`: applies combined IAU 2006 precession + IAU 2006/2000A nutation matrix (`erfa.pnm06a()`) to rotate from ICRS to true ecliptic of date
 
-For J2000 ecliptic (`SEFLG_J2000`), step 5 uses a fixed rotation by the J2000 obliquity (23°26'21.406") without precession or nutation.
+For J2000 ecliptic (`FLG_J2000`), step 5 uses a fixed rotation by the J2000 obliquity (23°26'21.406") without precession or nutation.
 
 ### Mean obliquity of the ecliptic
 
@@ -471,7 +471,7 @@ Fundamental arguments include T⁵ corrections from Chapront et al. (2002).
 | Interpolated Apogee | ~1300 arcsec (0.36°) | ~350 arcsec (0.10°) | Genuine algorithm difference (JPL DE440 vs ELP2000). |
 | Interpolated Perigee | ~9400 arcsec (2.6°) | ~1650 arcsec (0.46°) | Intentional — JPL DE440 physical passages vs truncated ELP2000. |
 
-**J2000 frame (SEFLG_J2000) for lunar bodies:** LibEphemeris is **more accurate** than Swiss Ephemeris for J2000 frame transformations of analytically-computed bodies. At J2000.0 epoch, tropical and J2000 ecliptic coordinates are identical by definition (zero precession). LibEphemeris correctly returns zero shift; Swiss Ephemeris applies a spurious ~14" offset. Verified independently against astropy/ERFA.
+**J2000 frame (FLG_J2000) for lunar bodies:** LibEphemeris is **more accurate** than Swiss Ephemeris for J2000 frame transformations of analytically-computed bodies. At J2000.0 epoch, tropical and J2000 ecliptic coordinates are identical by definition (zero precession). LibEphemeris correctly returns zero shift; Swiss Ephemeris applies a spurious ~14" offset. Verified independently against astropy/ERFA.
 
 ---
 
@@ -553,7 +553,7 @@ Precision: <0.01 arcsec over ±100 years; <1 arcsec over ±500 years.
 
 Swiss Ephemeris uses a larger catalog (~1000+ stars from its own bundled star catalog). Both use Hipparcos data; LibEphemeris uses the updated van Leeuwen 2007 proper motions while Swiss Ephemeris uses original 1997 values. Star positions agree to < 0.51" for all 101 comparable stars. Five stars resolve to different physical components due to different IAU WGSN name conventions (Menkar, Algedi, Algieba, Albireo, Almach).
 
-All meaningful SEFLG flags are now supported for fixed star calculations: `SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_TRUEPOS`, `SEFLG_MOSEPH`, `SEFLG_SPEED3`, `SEFLG_TOPOCTR`.
+All meaningful FLG flags are now supported for fixed star calculations: `FLG_SIDEREAL`, `FLG_J2000`, `FLG_NONUT`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_TRUEPOS`, `FLG_MOSEPH`, `FLG_SPEED3`, `FLG_TOPOCTR`.
 
 ---
 
@@ -841,10 +841,10 @@ Tested all bodies with FLG_SPEED, FLG_SPEED|FLG_EQUATORIAL, and FLG_SPEED|FLG_NO
 
 | Mode | Bodies tested | Max dLon | Status |
 |------|--------------|----------|--------|
-| Heliocentric (SEFLG_HELCTR) | Mercury--Pluto | 0.00032° | All OK |
-| Barycentric (SEFLG_BARYCTR) | Sun--Pluto | <1" at J2000 | All OK |
-| Equatorial (SEFLG_EQUATORIAL) | Sun, Moon, Mars, Jupiter | 0.00047° (Moon) | All OK |
-| XYZ Cartesian (SEFLG_XYZ) | All bodies | 0.000033 AU (Pluto) | All OK |
+| Heliocentric (FLG_HELCTR) | Mercury--Pluto | 0.00032° | All OK |
+| Barycentric (FLG_BARYCTR) | Sun--Pluto | <1" at J2000 | All OK |
+| Equatorial (FLG_EQUATORIAL) | Sun, Moon, Mars, Jupiter | 0.00047° (Moon) | All OK |
+| XYZ Cartesian (FLG_XYZ) | All bodies | 0.000033 AU (Pluto) | All OK |
 
 Note: Barycentric Sun shows large angular differences (~100"+) at dates when the Sun is near the Solar System Barycenter (distance ~0.001 AU). This is a geometric amplification effect, not a precision issue -- the Cartesian positions agree to <0.000001 AU.
 
@@ -879,9 +879,9 @@ LibEphemeris uses the more recent Stephenson, Morrison & Hohenkerk (2016) model.
 
 Sub-milliarcsecond agreement across all tested dates (1800--2200). Both libraries implement IAU 2006/2000A correctly.
 
-### SEFLG_MOSEPH behavior
+### FLG_MOSEPH behavior
 
-When `SEFLG_MOSEPH` (flag value 4) is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris. LibEphemeris accepts this flag for API compatibility but always uses JPL DE440. The resulting differences (typically <0.2" for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug in either library.
+When `FLG_MOSEPH` (flag value 4) is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris. LibEphemeris accepts this flag for API compatibility but always uses JPL DE440. The resulting differences (typically <0.2" for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug in either library.
 
 ---
 

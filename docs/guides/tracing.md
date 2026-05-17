@@ -22,15 +22,15 @@ thread-safe, zero-overhead-when-inactive tracing.
 
 ```python
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, MARS, FLG_SPEED
 
 # Start tracing -- returns a token for cleanup
 token = swe.start_tracing()
 
 # Compute positions as usual
-swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
-swe.calc_ut(2451545.0, SE_MOON, SEFLG_SPEED)
-swe.calc_ut(2451545.0, SE_MARS, SEFLG_SPEED)
+swe.calc_ut(2451545.0, SUN, FLG_SPEED)
+swe.calc_ut(2451545.0, MOON, FLG_SPEED)
+swe.calc_ut(2451545.0, MARS, FLG_SPEED)
 
 # Retrieve results: {body_id: "source_name"}
 traces = swe.get_trace_results()
@@ -62,13 +62,13 @@ gets its own independent trace accumulator:
 ```python
 import threading
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SE_MOON, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, FLG_SPEED
 
 results = {}
 
 def worker(name, body):
     token = swe.start_tracing()
-    swe.calc_ut(2451545.0, body, SEFLG_SPEED)
+    swe.calc_ut(2451545.0, body, FLG_SPEED)
     results[name] = swe.get_trace_results()
     token.var.reset(token)
 
@@ -89,10 +89,10 @@ independent scope. Resetting the inner token restores the outer session:
 
 ```python
 token_outer = swe.start_tracing()
-swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+swe.calc_ut(2451545.0, SUN, FLG_SPEED)
 
 token_inner = swe.start_tracing()
-swe.calc_ut(2451545.0, SE_MOON, SEFLG_SPEED)
+swe.calc_ut(2451545.0, MOON, FLG_SPEED)
 print(swe.get_trace_results())  # {1: "LEB"} -- inner only
 token_inner.var.reset(token_inner)
 
@@ -106,8 +106,8 @@ If the same body is computed multiple times, the last source wins:
 
 ```python
 token = swe.start_tracing()
-swe.calc_ut(jd1, SE_SUN, SEFLG_SPEED)  # computed via LEB
-swe.calc_ut(jd2, SE_SUN, SEFLG_SPEED)  # computed via Skyfield
+swe.calc_ut(jd1, SUN, FLG_SPEED)  # computed via LEB
+swe.calc_ut(jd2, SUN, FLG_SPEED)  # computed via Skyfield
 traces = swe.get_trace_results()
 print(traces[SE_SUN])  # "Skyfield" (last call wins)
 token.var.reset(token)

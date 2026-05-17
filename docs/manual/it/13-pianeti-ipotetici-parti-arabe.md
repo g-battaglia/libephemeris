@@ -64,14 +64,14 @@ segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 uraniani = [
-    (ephem.SE_CUPIDO,   "Cupido"),
-    (ephem.SE_HADES,    "Hades"),
-    (ephem.SE_ZEUS,     "Zeus"),
-    (ephem.SE_KRONOS,   "Kronos"),
-    (ephem.SE_APOLLON,  "Apollon"),
-    (ephem.SE_ADMETOS,  "Admetos"),
-    (ephem.SE_VULKANUS, "Vulkanus"),
-    (ephem.SE_POSEIDON, "Poseidon"),
+    (ephem.CUPIDO,   "Cupido"),
+    (ephem.HADES,    "Hades"),
+    (ephem.ZEUS,     "Zeus"),
+    (ephem.KRONOS,   "Kronos"),
+    (ephem.APOLLON,  "Apollon"),
+    (ephem.ADMETOS,  "Admetos"),
+    (ephem.VULKANUS, "Vulkanus"),
+    (ephem.POSEIDON, "Poseidon"),
 ]
 
 for body_id, nome in uraniani:
@@ -150,7 +150,7 @@ import libephemeris as ephem
 jd_tt = ephem.julday(2024, 4, 8, 12.0) + ephem.deltat(ephem.julday(2024, 4, 8, 12.0))
 
 # Qualsiasi corpo ipotetico dato il suo ID
-pos = ephem.calc_hypothetical_position(ephem.SE_WALDEMATH, jd_tt)
+pos = ephem.calc_hypothetical_position(ephem.WALDEMATH, jd_tt)
 print(f"Luna di Waldemath: {pos[0]:.2f}°")
 ```
 
@@ -238,10 +238,10 @@ lat, lon = 41.9028, 12.4964  # Roma
 
 # Calcola le posizioni necessarie
 cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
-sole, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
-luna, _ = ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_SPEED)
-mercurio, _ = ephem.calc_ut(jd, ephem.SE_MERCURY, ephem.SEFLG_SPEED)
-venere, _ = ephem.calc_ut(jd, ephem.SE_VENUS, ephem.SEFLG_SPEED)
+sole, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
+luna, _ = ephem.calc_ut(jd, ephem.MOON, ephem.FLG_SPEED)
+mercurio, _ = ephem.calc_ut(jd, ephem.MERCURY, ephem.FLG_SPEED)
+venere, _ = ephem.calc_ut(jd, ephem.VENUS, ephem.FLG_SPEED)
 
 # Prepara le posizioni
 positions = {

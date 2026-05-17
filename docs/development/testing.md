@@ -189,7 +189,7 @@ Add this fixture to the project's `conftest.py`:
 ```python
 import pytest
 import libephemeris as eph
-from libephemeris.constants import SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA
+from libephemeris.constants import CHIRON, CERES, PALLAS, JUNO, VESTA
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -207,11 +207,11 @@ def setup_spk_for_tests():
     # Pre-download SPK kernels for commonly used major asteroids
     # These are the bodies with automatic SPK download support
     major_asteroids = [
-        SE_CHIRON,   # Centaur, commonly used in astrology
-        SE_CERES,    # Dwarf planet
-        SE_PALLAS,   # Main belt asteroid
-        SE_JUNO,     # Main belt asteroid
-        SE_VESTA,    # Main belt asteroid
+        CHIRON,   # Centaur, commonly used in astrology
+        CERES,    # Dwarf planet
+        PALLAS,   # Main belt asteroid
+        JUNO,     # Main belt asteroid
+        VESTA,    # Main belt asteroid
     ]
     
     for body in major_asteroids:
@@ -232,14 +232,14 @@ For projects that only need Chiron (the most commonly used minor body):
 ```python
 import pytest
 import libephemeris as eph
-from libephemeris.constants import SE_CHIRON
+from libephemeris.constants import CHIRON
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_chiron_spk():
     """Pre-download Chiron SPK for high-precision calculations."""
     eph.set_auto_spk_download(True)
-    eph.ensure_major_asteroid_spk(SE_CHIRON)
+    eph.ensure_major_asteroid_spk(CHIRON)
     yield
 ```
 
@@ -309,10 +309,10 @@ use `start_tracing()` / `get_trace_results()` instead of DEBUG logging:
 
 ```python
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SEFLG_SPEED
+from libephemeris.constants import SUN, FLG_SPEED
 
 token = swe.start_tracing()
-swe.calc_ut(2451545.0, SE_SUN, SEFLG_SPEED)
+swe.calc_ut(2451545.0, SUN, FLG_SPEED)
 traces = swe.get_trace_results()   # {0: "LEB"}
 token.var.reset(token)
 ```
@@ -343,8 +343,8 @@ def setup_spk_with_custom_cache(tmp_path_factory):
     eph.set_auto_spk_download(True)
     
     # Pre-download all major asteroids
-    from libephemeris.constants import SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA
-    for body in [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]:
+    from libephemeris.constants import CHIRON, CERES, PALLAS, JUNO, VESTA
+    for body in [CHIRON, CERES, PALLAS, JUNO, VESTA]:
         eph.ensure_major_asteroid_spk(body)
     
     yield
@@ -379,8 +379,8 @@ pytest configuration for a project using libephemeris.
 import pytest
 import libephemeris as eph
 from libephemeris.constants import (
-    SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA,
-    SE_SIDM_FAGAN_BRADLEY,
+    CHIRON, CERES, PALLAS, JUNO, VESTA,
+    SIDM_FAGAN_BRADLEY,
 )
 
 
@@ -399,7 +399,7 @@ def setup_libephemeris():
     eph.set_strict_precision(False)
     
     # Pre-download SPK for major asteroids
-    for body in [SE_CHIRON, SE_CERES, SE_PALLAS, SE_JUNO, SE_VESTA]:
+    for body in [CHIRON, CERES, PALLAS, JUNO, VESTA]:
         eph.ensure_major_asteroid_spk(body)
     
     yield
@@ -408,9 +408,9 @@ def setup_libephemeris():
 @pytest.fixture(autouse=True)
 def reset_sidereal_mode():
     """Reset sidereal mode between tests."""
-    eph.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    eph.swe_set_sid_mode(SIDM_FAGAN_BRADLEY)
     yield
-    eph.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    eph.swe_set_sid_mode(SIDM_FAGAN_BRADLEY)
 ```
 
 ### Checking SPK Availability in Tests
@@ -421,9 +421,9 @@ To verify SPK kernels are properly configured:
 def test_spk_available_for_chiron():
     """Verify SPK is available for Chiron."""
     from libephemeris import is_spk_available_for_body
-    from libephemeris.constants import SE_CHIRON
+    from libephemeris.constants import CHIRON
     
-    assert is_spk_available_for_body(SE_CHIRON), (
+    assert is_spk_available_for_body(CHIRON), (
         "Chiron SPK not available - ensure setup_spk fixture ran"
     )
 ```
@@ -434,11 +434,11 @@ The following bodies have automatic SPK download support:
 
 | Constant | Body | Asteroid # | Description |
 |----------|------|------------|-------------|
-| `SE_CERES` | Ceres | 1 | Dwarf planet in asteroid belt |
-| `SE_PALLAS` | Pallas | 2 | Second-largest asteroid |
-| `SE_JUNO` | Juno | 3 | Main belt asteroid |
-| `SE_VESTA` | Vesta | 4 | Second-most-massive asteroid |
-| `SE_CHIRON` | Chiron | 2060 | Centaur, important in astrology |
+| `CERES` | Ceres | 1 | Dwarf planet in asteroid belt |
+| `PALLAS` | Pallas | 2 | Second-largest asteroid |
+| `JUNO` | Juno | 3 | Main belt asteroid |
+| `VESTA` | Vesta | 4 | Second-most-massive asteroid |
+| `CHIRON` | Chiron | 2060 | Centaur, important in astrology |
 
 Other bodies (TNOs like Eris, Sedna, etc.) require manual SPK download using `download_and_register_spk()`.
 

@@ -28,24 +28,24 @@ def zodiac_format(lon):
     return f'{d:2d}° {m:02d}\' {s:02d}" {signs[sign_idx]}'
 
 bodies = [
-    (ephem.SE_SUN,       "Sun"),
-    (ephem.SE_MOON,      "Moon"),
-    (ephem.SE_MERCURY,   "Mercury"),
-    (ephem.SE_VENUS,     "Venus"),
-    (ephem.SE_MARS,      "Mars"),
-    (ephem.SE_JUPITER,   "Jupiter"),
-    (ephem.SE_SATURN,    "Saturn"),
-    (ephem.SE_URANUS,    "Uranus"),
-    (ephem.SE_NEPTUNE,   "Neptune"),
-    (ephem.SE_PLUTO,     "Pluto"),
-    (ephem.SE_MEAN_NODE, "North Node"),
-    (ephem.SE_CHIRON,    "Chiron"),
+    (ephem.SUN,       "Sun"),
+    (ephem.MOON,      "Moon"),
+    (ephem.MERCURY,   "Mercury"),
+    (ephem.VENUS,     "Venus"),
+    (ephem.MARS,      "Mars"),
+    (ephem.JUPITER,   "Jupiter"),
+    (ephem.SATURN,    "Saturn"),
+    (ephem.URANUS,    "Uranus"),
+    (ephem.NEPTUNE,   "Neptune"),
+    (ephem.PLUTO,     "Pluto"),
+    (ephem.MEAN_NODE, "North Node"),
+    (ephem.CHIRON,    "Chiron"),
 ]
 
 print("--- Birth Chart: Rome, April 8, 2024, 14:30 ---")
 print()
 for body_id, name in bodies:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     retro = " R" if pos[3] < 0 else ""
     print(f"{name:11s}  {zodiac_format(pos[0])}{retro}")
 
@@ -109,10 +109,10 @@ jd_natal = ephem.julday(1990, 3, 15, 10.0)
 jd_transit = ephem.julday(2024, 4, 8, 12.0)
 
 planets = [
-    (ephem.SE_SUN, "Sun"), (ephem.SE_MOON, "Moon"),
-    (ephem.SE_MERCURY, "Mercury"), (ephem.SE_VENUS, "Venus"),
-    (ephem.SE_MARS, "Mars"), (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN, "Saturn"),
+    (ephem.SUN, "Sun"), (ephem.MOON, "Moon"),
+    (ephem.MERCURY, "Mercury"), (ephem.VENUS, "Venus"),
+    (ephem.MARS, "Mars"), (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN, "Saturn"),
 ]
 
 # Calculate natal and transit positions
@@ -229,14 +229,14 @@ print("--- Mercury Retrogrades in 2024 ---")
 print()
 while jd < jd_end:
     jd_station, type_ = swe_find_station_ut(
-        ephem.SE_MERCURY, jd, "any"
+        ephem.MERCURY, jd, "any"
     )
     if jd_station >= jd_end:
         break
     year, month, day, hour = ephem.revjul(jd_station)
     hours = int(hour)
     minutes = int((hour - hours) * 60)
-    pos, _ = ephem.calc_ut(jd_station, ephem.SE_MERCURY, 0)
+    pos, _ = ephem.calc_ut(jd_station, ephem.MERCURY, 0)
     sign = signs[int(pos[0] / 30)]
     degrees = pos[0] % 30
     label = ("Retrograde Station" if type_ == "SR"
@@ -247,7 +247,7 @@ while jd < jd_end:
 
 # Point-in-time check
 print()
-retro = is_retrograde(ephem.SE_MERCURY,
+retro = is_retrograde(ephem.MERCURY,
                       ephem.julday(2024, 4, 8, 12.0))
 print(f"Is Mercury retrograde on 8/4/2024? {retro}")
 ```
@@ -289,7 +289,7 @@ print("--- New and Full Moons in 2024 ---")
 print()
 while jd < jd_end:
     # Sun's current longitude
-    pos_sun, _ = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+    pos_sun, _ = ephem.calc_ut(jd, ephem.SUN, 0)
     lon_sun = pos_sun[0]
 
     # New Moon: Moon conjuncts the Sun
@@ -298,7 +298,7 @@ while jd < jd_end:
         year, month, day, hour = ephem.revjul(jd_new)
         hours = int(hour)
         minutes = int((hour - hours) * 60)
-        pos_moon, _ = ephem.calc_ut(jd_new, ephem.SE_MOON, 0)
+        pos_moon, _ = ephem.calc_ut(jd_new, ephem.MOON, 0)
         sign = signs[int(pos_moon[0] / 30)]
         degrees = pos_moon[0] % 30
         print(f"New Moon    {day:2d}/{month:02d}/{year}"
@@ -312,7 +312,7 @@ while jd < jd_end:
         year, month, day, hour = ephem.revjul(jd_full)
         hours = int(hour)
         minutes = int((hour - hours) * 60)
-        pos_moon, _ = ephem.calc_ut(jd_full, ephem.SE_MOON, 0)
+        pos_moon, _ = ephem.calc_ut(jd_full, ephem.MOON, 0)
         sign = signs[int(pos_moon[0] / 30)]
         degrees = pos_moon[0] % 30
         print(f"Full Moon   {day:2d}/{month:02d}/{year}"
@@ -447,7 +447,7 @@ Partial      1/06/2030  05:04 UT  magnitude: 0.816
 ```python
 import libephemeris as ephem
 from libephemeris.constants import (SE_SIDM_LAHIRI,
-                                    SEFLG_SIDEREAL, SEFLG_SPEED)
+                                    FLG_SIDEREAL, FLG_SPEED)
 
 jd = ephem.julday(2024, 4, 8, 14.5)
 ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
@@ -468,14 +468,14 @@ signs = ["Mesh", "Vrish", "Mithun", "Kark", "Simha",
          "Kumbh", "Meen"]
 
 bodies = [
-    (ephem.SE_SUN,       "Surya"),
-    (ephem.SE_MOON,      "Chandra"),
-    (ephem.SE_MARS,      "Mangal"),
-    (ephem.SE_MERCURY,   "Budha"),
-    (ephem.SE_JUPITER,   "Guru"),
-    (ephem.SE_VENUS,     "Shukra"),
-    (ephem.SE_SATURN,    "Shani"),
-    (ephem.SE_MEAN_NODE, "Rahu"),
+    (ephem.SUN,       "Surya"),
+    (ephem.MOON,      "Chandra"),
+    (ephem.MARS,      "Mangal"),
+    (ephem.MERCURY,   "Budha"),
+    (ephem.JUPITER,   "Guru"),
+    (ephem.VENUS,     "Shukra"),
+    (ephem.SATURN,    "Shani"),
+    (ephem.MEAN_NODE, "Rahu"),
 ]
 
 ayan = ephem.swe_get_ayanamsa_ut(jd)
@@ -485,7 +485,7 @@ print()
 
 for body_id, name in bodies:
     pos, _ = ephem.calc_ut(jd, body_id,
-                           SEFLG_SPEED | SEFLG_SIDEREAL)
+                           FLG_SPEED | FLG_SIDEREAL)
     lon = pos[0]
     sign = signs[int(lon / 30)]
     degrees = lon % 30
@@ -496,8 +496,8 @@ for body_id, name in bodies:
           f"  Nakshatra: {nak} (Pada {pada})")
 
 # Ketu = opposite of Rahu
-pos_rahu, _ = ephem.calc_ut(jd, ephem.SE_MEAN_NODE,
-                            SEFLG_SPEED | SEFLG_SIDEREAL)
+pos_rahu, _ = ephem.calc_ut(jd, ephem.MEAN_NODE,
+                            FLG_SPEED | FLG_SIDEREAL)
 ketu = (pos_rahu[0] + 180) % 360
 sign_k = signs[int(ketu / 30)]
 degrees_k = ketu % 30
@@ -541,7 +541,7 @@ jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Find the exact sunset time
 jd_set, _ = ephem.rise_trans(
-    jd_noon, ephem.SE_SUN, lat, lon, rsmi=2
+    jd_noon, ephem.SUN, lat, lon, rsmi=2
 )
 year, month, day, hour = ephem.revjul(jd_set)
 hours_s = int(hour)
@@ -553,14 +553,14 @@ print()
 jd_evening = jd_set + 1.0 / 24.0
 ephem.set_topo(lon, lat, 0)
 
-pos_sun, _ = ephem.calc_ut(jd_evening, ephem.SE_SUN, 0)
+pos_sun, _ = ephem.calc_ut(jd_evening, ephem.SUN, 0)
 
 planets = [
-    (ephem.SE_MERCURY, "Mercury"),
-    (ephem.SE_VENUS,   "Venus"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN,  "Saturn"),
+    (ephem.MERCURY, "Mercury"),
+    (ephem.VENUS,   "Venus"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN,  "Saturn"),
 ]
 
 dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
@@ -624,19 +624,19 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 planets = [
-    (ephem.SE_SUN,     "Sun"),
-    (ephem.SE_MOON,    "Moon"),
-    (ephem.SE_MERCURY, "Mercury"),
-    (ephem.SE_VENUS,   "Venus"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN,  "Saturn"),
+    (ephem.SUN,     "Sun"),
+    (ephem.MOON,    "Moon"),
+    (ephem.MERCURY, "Mercury"),
+    (ephem.VENUS,   "Venus"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN,  "Saturn"),
 ]
 
 # Calculate positions and velocities
 positions = {}
 for body_id, name in planets:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     positions[name] = (pos[0], pos[3])  # longitude, velocity
 
 aspects = {0: "Conjunction", 60: "Sextile",
@@ -684,7 +684,7 @@ import libephemeris as ephem
 
 # Born March 15, 1990, 10:00 UT, Rome
 jd_natal = ephem.julday(1990, 3, 15, 10.0)
-pos_natal, _ = ephem.calc_ut(jd_natal, ephem.SE_SUN, 0)
+pos_natal, _ = ephem.calc_ut(jd_natal, ephem.SUN, 0)
 lon_natal = pos_natal[0]
 
 # Find the solar return for 2024
@@ -707,13 +707,13 @@ print(f"Return:    {day:2d}/{month:02d}/{year}"
 print()
 
 bodies = [
-    (ephem.SE_SUN,     "Sun"),
-    (ephem.SE_MOON,    "Moon"),
-    (ephem.SE_MERCURY, "Mercury"),
-    (ephem.SE_VENUS,   "Venus"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN,  "Saturn"),
+    (ephem.SUN,     "Sun"),
+    (ephem.MOON,    "Moon"),
+    (ephem.MERCURY, "Mercury"),
+    (ephem.VENUS,   "Venus"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN,  "Saturn"),
 ]
 
 for body_id, name in bodies:
@@ -768,13 +768,13 @@ jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Find sunrise, sunset, and next sunrise
 jd_rise, _ = ephem.rise_trans(
-    jd_noon - 0.5, ephem.SE_SUN, lat, lon, rsmi=1
+    jd_noon - 0.5, ephem.SUN, lat, lon, rsmi=1
 )
 jd_set, _ = ephem.rise_trans(
-    jd_noon, ephem.SE_SUN, lat, lon, rsmi=2
+    jd_noon, ephem.SUN, lat, lon, rsmi=2
 )
 jd_rise_tmrw, _ = ephem.rise_trans(
-    jd_set, ephem.SE_SUN, lat, lon, rsmi=1
+    jd_set, ephem.SUN, lat, lon, rsmi=1
 )
 
 _, _, _, h_rise = ephem.revjul(jd_rise)
@@ -886,13 +886,13 @@ def fmt(lon):
     return f"{d:5.1f}{s}"
 
 bodies = [
-    (ephem.SE_SUN,     "Sun"),
-    (ephem.SE_MOON,    "Moon"),
-    (ephem.SE_MERCURY, "Merc"),
-    (ephem.SE_VENUS,   "Venu"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupi"),
-    (ephem.SE_SATURN,  "Satu"),
+    (ephem.SUN,     "Sun"),
+    (ephem.MOON,    "Moon"),
+    (ephem.MERCURY, "Merc"),
+    (ephem.VENUS,   "Venu"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupi"),
+    (ephem.SATURN,  "Satu"),
 ]
 
 print("--- Ephemeris April 2024 (Noon UT) ---")

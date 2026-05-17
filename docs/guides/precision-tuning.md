@@ -54,13 +54,13 @@ spk_path = eph.download_spk(
 
 # Register the SPK for Chiron calculations
 eph.register_spk_body(
-    ipl=eph.SE_CHIRON,
+    ipl=eph.CHIRON,
     spk_path=spk_path,
     naif_id=eph.NAIF_CHIRON  # 2002060
 )
 
 # Now calc_ut automatically uses the SPK kernel
-pos, _ = eph.calc_ut(2451545.0, eph.SE_CHIRON, eph.SEFLG_SPEED)
+pos, _ = eph.calc_ut(2451545.0, eph.CHIRON, eph.FLG_SPEED)
 print(f"Chiron (SPK): {pos[0]:.6f}°")
 ```
 

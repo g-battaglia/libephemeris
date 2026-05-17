@@ -49,12 +49,12 @@ LibEphemeris provides the **same API** with a modern foundation:
 
 ```python
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SE_MOON, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, FLG_SPEED
 
 jd = swe.julday(2000, 1, 1, 12.0)  # J2000.0
 
-sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)
-moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
+sun, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
+moon, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
 
 print(f"Sun:  {sun[0]:.4f} deg, speed {sun[3]:.4f} deg/day")
 print(f"Moon: {moon[0]:.4f} deg, speed {moon[3]:.4f} deg/day")

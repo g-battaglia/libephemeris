@@ -25,7 +25,7 @@ import libephemeris as ephem
 
 # Posizione del Sole al J2000.0 (1 gennaio 2000, mezzogiorno)
 jd = ephem.julday(2000, 1, 1, 12.0)
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 print(f"Sole al J2000.0:")
 print(f"  Longitudine: {pos[0]:.9f}°")
 print(f"  Latitudine:  {pos[1]:.9f}°")
@@ -199,11 +199,11 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Calcolo con Skyfield
 ephem.set_calc_mode("skyfield")
-pos_sky, _ = ephem.calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_SPEED)
+pos_sky, _ = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_SPEED)
 
 # Calcolo con LEB
 ephem.set_calc_mode("leb")
-pos_leb, _ = ephem.calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_SPEED)
+pos_leb, _ = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_SPEED)
 
 diff_arcsec = abs(pos_sky[0] - pos_leb[0]) * 3600
 print(f"Marte (Skyfield): {pos_sky[0]:.9f}°")
@@ -256,10 +256,10 @@ Se hai scaricato un file LEB con `download_leb_for_tier()`, la libreria lo trova
 
 Non tutti i corpi e le combinazioni di flag sono supportati da LEB. In particolare, LEB **non** supporta:
 
-- `SEFLG_TOPOCTR` (posizioni topocentriche)
-- `SEFLG_XYZ` (coordinate cartesiane)
-- `SEFLG_RADIANS` (angoli in radianti)
-- `SEFLG_NONUT` (senza nutazione)
+- `FLG_TOPOCTR` (posizioni topocentriche)
+- `FLG_XYZ` (coordinate cartesiane)
+- `FLG_RADIANS` (angoli in radianti)
+- `FLG_NONUT` (senza nutazione)
 
 Quando incontri uno di questi casi, la libreria passa automaticamente a Skyfield senza errori — il passaggio è trasparente.
 
@@ -303,7 +303,7 @@ ephem.set_calc_mode("skyfield")
 print(f"Modalità: {ephem.get_calc_mode()}")
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 print(f"Sole (Skyfield forzato): {pos[0]:.6f}°")
 
 ephem.set_calc_mode("auto")  # ripristina
@@ -333,7 +333,7 @@ Modalità: leb
 
 ### `"horizons"`
 
-Usa sempre l'API REST NASA JPL Horizons per i calcoli. Questa modalità richiede una connessione internet e non necessita di file di efemeridi locali. Supporta pianeti, asteroidi, Nodo Medio, Apogeo Medio e Uraniani. Corpi o flag non supportati da Horizons (es. `SEFLG_TOPOCTR`, stelle fisse) passano automaticamente a Skyfield:
+Usa sempre l'API REST NASA JPL Horizons per i calcoli. Questa modalità richiede una connessione internet e non necessita di file di efemeridi locali. Supporta pianeti, asteroidi, Nodo Medio, Apogeo Medio e Uraniani. Corpi o flag non supportati da Horizons (es. `FLG_TOPOCTR`, stelle fisse) passano automaticamente a Skyfield:
 
 ```python
 import libephemeris as ephem
@@ -342,7 +342,7 @@ ephem.set_calc_mode("horizons")
 print(f"Modalità: {ephem.get_calc_mode()}")
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 print(f"Sole (Horizons): {pos[0]:.6f}°")
 
 ephem.set_calc_mode("auto")  # ripristina
@@ -371,13 +371,14 @@ Per applicazioni multi-thread (server web, API, calcoli paralleli), la libreria 
 
 ```python
 import libephemeris as ephem
-from libephemeris import EphemerisContext, SE_SUN, SEFLG_SPEED
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN, FLG_SPEED
 
 ctx = EphemerisContext()
 ctx.set_topo(12.5, 41.9, 0)  # Roma
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, flag = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+pos, flag = ctx.calc_ut(jd, SUN, FLG_SPEED)
 print(f"Sole (da Roma, via contesto): {pos[0]:.4f}°")
 ```
 
@@ -391,14 +392,15 @@ Ogni contesto può avere il proprio modo siderale:
 
 ```python
 import libephemeris as ephem
-from libephemeris import EphemerisContext, SE_SUN, SEFLG_SPEED, SEFLG_SIDEREAL
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN, FLG_SPEED, FLG_SIDEREAL
 from libephemeris.constants import SE_SIDM_LAHIRI
 
 ctx = EphemerisContext()
 ctx.set_sid_mode(SE_SIDM_LAHIRI)
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED | SEFLG_SIDEREAL)
+pos, _ = ctx.calc_ut(jd, SUN, FLG_SPEED | FLG_SIDEREAL)
 print(f"Sole siderale (Lahiri): {pos[0]:.4f}°")
 ```
 
@@ -429,7 +431,8 @@ Medio Cielo: 31.9078°
 
 ```python
 import libephemeris as ephem
-from libephemeris import EphemerisContext, SE_SUN, SEFLG_SPEED
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN, FLG_SPEED
 import threading
 
 risultati = {}
@@ -438,7 +441,7 @@ def calcola_per_citta(nome, lon, lat):
     ctx = EphemerisContext()
     ctx.set_topo(lon, lat, 0)
     jd = ephem.julday(2024, 4, 8, 12.0)
-    pos, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SPEED)
+    pos, _ = ctx.calc_ut(jd, SUN, FLG_SPEED)
     risultati[nome] = pos[0]
 
 citta = [
@@ -466,7 +469,7 @@ New York: Sole a 19.1404°
 Tokyo: Sole a 19.1404°
 ```
 
-> **Nota**: le posizioni geocentriche sono uguali per tutte le città perché il flag `SEFLG_TOPOCTR` non è stato usato. La differenza si vede nelle case e nelle posizioni topocentriche.
+> **Nota**: le posizioni geocentriche sono uguali per tutte le città perché il flag `FLG_TOPOCTR` non è stato usato. La differenza si vede nelle case e nelle posizioni topocentriche.
 
 ### LEB nel contesto
 
@@ -546,14 +549,14 @@ import libephemeris as ephem
 
 # Fai alcuni calcoli...
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos, _ = ephem.calc_ut(jd, ephem.SUN, 0)
 print(f"Prima di close: {pos[0]:.6f}°")
 
 # Chiudi tutto
 ephem.close()
 
 # Il prossimo calcolo ricarica automaticamente le efemeridi
-pos2, _ = ephem.calc_ut(jd, ephem.SE_SUN, 0)
+pos2, _ = ephem.calc_ut(jd, ephem.SUN, 0)
 print(f"Dopo close: {pos2[0]:.6f}°")
 print(f"Risultato identico: {abs(pos[0] - pos2[0]) < 0.000001}")
 ```

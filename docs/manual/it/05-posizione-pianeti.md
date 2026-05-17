@@ -42,11 +42,11 @@ Per capire questi valori, immagina lo zodiaco come una lunga strada circolare di
 
 I valori descritti sopra sono quelli che ottieni con il flag di default (`0`). Ma se passi certi flag, il **significato** dei 6 numeri cambia completamente — la struttura della tupla resta la stessa, ma i numeri dentro rappresentano cose diverse:
 
-- Con **`SEFLG_EQUATORIAL`**, `pos[0]` non è più la longitudine eclittica ma l'**Ascensione Retta** (la posizione lungo l'equatore celeste, da 0° a 360°), e `pos[1]` diventa la **Declinazione** (la distanza dall'equatore celeste, da -90° a +90°). Questo è il sistema usato dai telescopi. La distanza e le velocità mantengono lo stesso significato, ma riferite al sistema equatoriale.
+- Con **`FLG_EQUATORIAL`**, `pos[0]` non è più la longitudine eclittica ma l'**Ascensione Retta** (la posizione lungo l'equatore celeste, da 0° a 360°), e `pos[1]` diventa la **Declinazione** (la distanza dall'equatore celeste, da -90° a +90°). Questo è il sistema usato dai telescopi. La distanza e le velocità mantengono lo stesso significato, ma riferite al sistema equatoriale.
 
-- Con **`SEFLG_XYZ`**, tutti e 6 i valori diventano **coordinate cartesiane**: `pos[0]`, `pos[1]`, `pos[2]` sono le posizioni X, Y, Z in unità astronomiche, e `pos[3]`, `pos[4]`, `pos[5]` sono le velocità corrispondenti in UA/giorno. Non ci sono più gradi — solo distanze e velocità nello spazio tridimensionale.
+- Con **`FLG_XYZ`**, tutti e 6 i valori diventano **coordinate cartesiane**: `pos[0]`, `pos[1]`, `pos[2]` sono le posizioni X, Y, Z in unità astronomiche, e `pos[3]`, `pos[4]`, `pos[5]` sono le velocità corrispondenti in UA/giorno. Non ci sono più gradi — solo distanze e velocità nello spazio tridimensionale.
 
-- Con **`SEFLG_RADIANS`**, i valori angolari (longitudine, latitudine, velocità) sono espressi in **radianti** invece che in gradi (2π radianti = 360°). Utile se devi fare calcoli trigonometrici senza convertire.
+- Con **`FLG_RADIANS`**, i valori angolari (longitudine, latitudine, velocità) sono espressi in **radianti** invece che in gradi (2π radianti = 360°). Utile se devi fare calcoli trigonometrici senza convertire.
 
 Se non usi nessuno di questi flag (o passi `0`), ottieni sempre coordinate eclittiche in gradi — il sistema dell'astrologia.
 
@@ -77,18 +77,18 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Tutti i pianeti in un colpo
 corpi = [
-    (ephem.SE_SUN, "Sole"), (ephem.SE_MOON, "Luna"),
-    (ephem.SE_MERCURY, "Mercurio"), (ephem.SE_VENUS, "Venere"),
-    (ephem.SE_MARS, "Marte"), (ephem.SE_JUPITER, "Giove"),
-    (ephem.SE_SATURN, "Saturno"), (ephem.SE_URANUS, "Urano"),
-    (ephem.SE_NEPTUNE, "Nettuno"), (ephem.SE_PLUTO, "Plutone"),
+    (ephem.SUN, "Sole"), (ephem.MOON, "Luna"),
+    (ephem.MERCURY, "Mercurio"), (ephem.VENUS, "Venere"),
+    (ephem.MARS, "Marte"), (ephem.JUPITER, "Giove"),
+    (ephem.SATURN, "Saturno"), (ephem.URANUS, "Urano"),
+    (ephem.NEPTUNE, "Nettuno"), (ephem.PLUTO, "Plutone"),
 ]
 
 segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 for body_id, nome in corpi:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     lon = pos[0]
     segno = segni[int(lon / 30)]
     gradi = lon % 30
@@ -114,38 +114,38 @@ Plutone      2.0° Aqr  (vel: +0.0114°/g)
 
 Il terzo argomento di `calc_ut` è un numero intero che controlla *come* viene fatto il calcolo. Passare `0` significa "usa tutte le impostazioni di default": coordinate eclittiche, geocentriche, con aberrazione e nutazione.
 
-Per cambiare comportamento, usi le costanti `SEFLG_*` e le combini con l'operatore `|` (OR bit a bit). Ad esempio, `ephem.SEFLG_EQUATORIAL | ephem.SEFLG_SPEED` chiede coordinate equatoriali con velocità. Puoi combinarne quante ne vuoi.
+Per cambiare comportamento, usi le costanti `FLG_*` e le combini con l'operatore `|` (OR bit a bit). Ad esempio, `ephem.FLG_EQUATORIAL | ephem.FLG_SPEED` chiede coordinate equatoriali con velocità. Puoi combinarne quante ne vuoi.
 
 Ecco i più importanti, raggruppati per categoria.
 
 **Coordinate** — cambiano il significato dei valori restituiti:
 
 - Senza flag (default): coordinate **eclittiche** — longitudine, latitudine, distanza
-- `SEFLG_EQUATORIAL`: coordinate **equatoriali** — Ascensione Retta, Declinazione, distanza
-- `SEFLG_XYZ`: coordinate **cartesiane** — X, Y, Z in unità astronomiche
-- `SEFLG_RADIANS`: angoli in **radianti** invece di gradi
+- `FLG_EQUATORIAL`: coordinate **equatoriali** — Ascensione Retta, Declinazione, distanza
+- `FLG_XYZ`: coordinate **cartesiane** — X, Y, Z in unità astronomiche
+- `FLG_RADIANS`: angoli in **radianti** invece di gradi
 
 **Centro di osservazione** — da dove stai "guardando":
 
 - Senza flag (default): **geocentrico** — dal centro della Terra
-- `SEFLG_HELCTR`: **eliocentrico** — dal centro del Sole
-- `SEFLG_BARYCTR`: **baricentrico** — dal centro di massa del Sistema Solare
-- `SEFLG_TOPOCTR`: **topocentrico** — dalla tua posizione sulla superficie terrestre (richiede prima `set_topo()`)
+- `FLG_HELCTR`: **eliocentrico** — dal centro del Sole
+- `FLG_BARYCTR`: **baricentrico** — dal centro di massa del Sistema Solare
+- `FLG_TOPOCTR`: **topocentrico** — dalla tua posizione sulla superficie terrestre (richiede prima `set_topo()`)
 
 **Sistema di riferimento** — quale "punto zero" usare:
 
 - Senza flag (default): **equinozio del giorno** ("of date") — il sistema dell'astrologia
-- `SEFLG_J2000`: riferito al J2000.0 — il sistema dei cataloghi astronomici
-- `SEFLG_ICRS`: sistema ICRS — quasi identico a J2000
-- `SEFLG_SIDEREAL`: coordinate **siderali** — richiede prima `set_sid_mode()`
-- `SEFLG_NONUT`: senza nutazione — restituisce coordinate "medie" invece di "vere"
+- `FLG_J2000`: riferito al J2000.0 — il sistema dei cataloghi astronomici
+- `FLG_ICRS`: sistema ICRS — quasi identico a J2000
+- `FLG_SIDEREAL`: coordinate **siderali** — richiede prima `set_sid_mode()`
+- `FLG_NONUT`: senza nutazione — restituisce coordinate "medie" invece di "vere"
 
 **Correzioni** — attiva o disattiva effetti fisici:
 
-- `SEFLG_SPEED`: calcola anche le **velocità** (pos[3], pos[4], pos[5]). Quasi sempre utile.
-- `SEFLG_TRUEPOS`: posizione **geometrica vera**, senza correzione per il tempo-luce
-- `SEFLG_NOABERR`: senza **aberrazione** (lo spostamento dovuto al moto terrestre)
-- `SEFLG_NOGDEFL`: senza **deflessione gravitazionale** della luce
+- `FLG_SPEED`: calcola anche le **velocità** (pos[3], pos[4], pos[5]). Quasi sempre utile.
+- `FLG_TRUEPOS`: posizione **geometrica vera**, senza correzione per il tempo-luce
+- `FLG_NOABERR`: senza **aberrazione** (lo spostamento dovuto al moto terrestre)
+- `FLG_NOGDEFL`: senza **deflessione gravitazionale** della luce
 
 ```python
 import libephemeris as ephem
@@ -153,8 +153,8 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Combinazione comune: equatoriali con velocità
-pos, _ = ephem.calc_ut(jd, ephem.SE_MARS,
-                       ephem.SEFLG_EQUATORIAL | ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ephem.MARS,
+                       ephem.FLG_EQUATORIAL | ephem.FLG_SPEED)
 
 print(f"RA: {pos[0]:.4f}°, Dec: {pos[1]:+.4f}°")
 print(f"Vel RA: {pos[3]:+.4f}°/g, Vel Dec: {pos[4]:+.4f}°/g")
@@ -183,11 +183,11 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Controllare se Mercurio è retrogrado
-retro = ephem.is_retrograde(ephem.SE_MERCURY, jd)
+retro = ephem.is_retrograde(ephem.MERCURY, jd)
 print(f"Mercurio retrogrado: {retro}")
 
 # Trovare la prossima stazione di Mercurio
-jd_stazione, tipo = ephem.swe_find_station_ut(ephem.SE_MERCURY, jd)
+jd_stazione, tipo = ephem.swe_find_station_ut(ephem.MERCURY, jd)
 
 anno, mese, giorno, ore = ephem.revjul(jd_stazione)
 # tipo = "SR" (stazione retrograda) o "SD" (stazione diretta)
@@ -214,7 +214,7 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 21.0)
 
-attr, _ = ephem.pheno_ut(jd, ephem.SE_JUPITER, 0)
+attr, _ = ephem.pheno_ut(jd, ephem.JUPITER, 0)
 
 angolo_fase = attr[0]    # angolo Sole-Pianeta-Terra (gradi)
 fase = attr[1]           # frazione illuminata del disco (0.0–1.0)
@@ -251,7 +251,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 jd_tt = jd + ephem.deltat(jd)  # serve JD in TT
 
-elem = ephem.get_orbital_elements(jd_tt, ephem.SE_MARS, 0)
+elem = ephem.get_orbital_elements(jd_tt, ephem.MARS, 0)
 
 print(f"Marte - elementi orbitali:")
 print(f"  Semi-asse maggiore:  {elem[0]:.6f} UA")
@@ -278,7 +278,7 @@ Per ottenere le distanze massima e minima con un'unica chiamata:
 
 ```python
 d_max, d_min, d_now = ephem.orbit_max_min_true_distance(
-    jd, ephem.SE_MARS, 0
+    jd, ephem.MARS, 0
 )
 print(f"Marte: min {d_min:.4f} UA, max {d_max:.4f} UA, ora {d_now:.4f} UA")
 ```
@@ -301,7 +301,7 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 # nod_aps_ut restituisce 4 tuple di 6 valori ciascuna:
 # nodo ascendente, nodo discendente, perielio, afelio
 nasc, ndsc, peri, aphe = ephem.nod_aps_ut(
-    jd, ephem.SE_MARS, 0, 0  # method=0: medio
+    jd, ephem.MARS, 0, 0  # method=0: medio
 )
 
 print(f"Marte - nodo ascendente: {nasc[0]:.4f}°")

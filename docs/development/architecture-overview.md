@@ -21,15 +21,15 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 
 | Metric                      | Value                                  |
 |-----------------------------|----------------------------------------|
-| Package version             | 0.14.0                                 |
-| Python support              | 3.9 - 3.13                             |
-| Library source files        | 37 `.py` files in `libephemeris/`      |
-| Total library LOC           | ~69,000 lines                          |
-| Largest module              | `eclipse.py` (14,240 lines)            |
+| Package version             | 2.0.0                                  |
+| Python support              | 3.12 - 3.14                            |
+| Library source files        | 70+ `.py` files in `libephemeris/`     |
+| Total library LOC           | ~100,000 lines                         |
+| Largest module              | `eclipse.py` (15,700+ lines)           |
 | Unit test files             | ~150+ in `tests/`                      |
 | Comparison test files       | ~120 in `compare_scripts/tests/`       |
-| Public API entries (`__all__`)| 519                                  |
-| Constants defined           | ~300+ (SE_*, SEFLG_*, SIDM_*, etc.)   |
+| Public API entries (`__all__`)| 500+                                 |
+| Constants defined           | ~300+ (`SUN`, `MOON`, `FLG_*`, `SIDM_*`, etc.) |
 | Exception classes           | 12 (1 base + 4 categories + 7 specific)|
 | Runtime dependencies        | 6                                      |
 
@@ -40,7 +40,7 @@ all positional astronomy to **Skyfield** (which reads JPL DE440/DE441 SPK
 kernels via **jplephem**). The library provides:
 
 - A Swiss Ephemeris-compatible Python API (1:1 with pyswisseph)
-- 24 astrological house systems
+- 25 astrological house systems (26 codes)
 - 43 sidereal/ayanamsha modes
 - Solar/lunar eclipse search and contact point calculation
 - Besselian element computation
@@ -58,17 +58,19 @@ kernels via **jplephem**). The library provides:
 | `skyfield-data`| Skyfield data files                                  |
 | `astroquery`   | Auto SPK kernel downloads from JPL Horizons          |
 | `certifi`      | SSL certificates for HTTPS to JPL                    |
-| `spktype21`    | SPK type 21 files from JPL Horizons                  |
+| `zstandard`    | Zstandard compression for LEB2 format                |
 | `pyerfa`       | IAU ERFA nutation, obliquity, precession, aberration |
+
+> Note: `spktype21` is vendored at `libephemeris/vendor/spktype21.py` (upstream unmaintained since 2018, NumPy 2.x fix applied) — it is not a separate package dependency.
 
 ### Module Breakdown by LOC
 
 | Module              | LOC    | Domain                                  |
 |---------------------|--------|-----------------------------------------|
-| `eclipse.py`        | 14,240 | Solar/lunar eclipses, occultations      |
-| `fixed_stars.py`    | 5,224  | 102-star catalog, proper motion         |
-| `houses.py`         | 4,928  | 25 house systems (26 codes)                        |
-| `planets.py`        | 4,877  | Core planetary calculations             |
+| `eclipse.py`        | 15,700+ | Solar/lunar eclipses, occultations     |
+| `planets.py`        | 6,160  | Core planetary calculations             |
+| `fixed_stars.py`    | 6,127  | Star catalog, proper motion             |
+| `houses.py`         | 5,374  | 25 house systems (26 codes)             |
 | `hypothetical.py`   | 3,651  | Uranian planets, Transpluto             |
 | `lunar.py`          | 3,033  | Lunar nodes, Lilith (4 methods)         |
 | `minor_bodies.py`   | 2,649  | Asteroids, TNO, Kepler equation         |
@@ -83,7 +85,7 @@ kernels via **jplephem**). The library provides:
 | `spk.py`            | 1,304  | SPK kernel support                      |
 | `iers_data.py`      | 1,286  | IERS Delta-T data                       |
 | `__init__.py`       | 1,142  | Public API surface (519 exports)        |
-| `constants.py`      | 1,071  | All SE_*, SEFLG_*, SIDM_* constants     |
+| `constants.py`      | 1,071  | All body IDs, FLG_*, SIDM_*, etc. constants     |
 | `exceptions.py`     | 962    | Exception hierarchy                     |
 | `context.py`        | 547    | Thread-safe EphemerisContext             |
 | `profiling.py`      | 518    | Profiling infrastructure                |
@@ -103,7 +105,7 @@ C extensions, or compiled code exists anywhere in the project.
 
 | Operation                       | Cost     | Why                                           |
 |---------------------------------|----------|-----------------------------------------------|
-| `swe_calc_ut()` with `SEFLG_SPEED` | ~1ms  | 3 full Skyfield pipelines (9-12 Chebyshev evals + Python object overhead) |
+| `swe_calc_ut()` with `FLG_SPEED` | ~1ms  | 3 full Skyfield pipelines (9-12 Chebyshev evals + Python object overhead) |
 | `swe_calc_ut()` without speed   | ~350us   | 1 Skyfield pipeline                           |
 | `swe_houses()` (Placidus)       | ~500us   | Up to 50 trig iterations + GAST from Skyfield |
 | `sol_eclipse_when_glob()`       | ~500ms-2s| 600-1050 Skyfield pipelines (iterative search)|
@@ -128,11 +130,11 @@ result_next, _ = _calc_body(t_next, ipl, flags_no_speed)
 velocity = (result_next - result_prev) / (2 * dt)
 ```
 
-This means every `swe_calc_ut()` with `SEFLG_SPEED` costs **3x** the
+This means every `swe_calc_ut()` with `FLG_SPEED` costs **3x** the
 position-only cost. Each of the 3 calls runs the full Skyfield pipeline:
 `.at().observe().apparent()`.
 
-**Total Skyfield calls per `swe_calc_ut()` with SEFLG_SPEED:**
+**Total Skyfield calls per `swe_calc_ut()` with FLG_SPEED:**
 
 | Step                    | `.at()` | `.observe()` | `.apparent()` |
 |-------------------------|---------|--------------|---------------|
@@ -230,7 +232,7 @@ engine/
 │   ├── lunar.rs            # Lunar nodes, Lilith               (~400 lines)
 │   ├── hypothetical.rs     # Kepler equation, hypotheticals    (~300 lines)
 │   ├── stars.rs            # Fixed stars + proper motion       (~200 lines)
-│   ├── constants.rs        # All SE_*, SEFLG_*                 (~400 lines)
+│   ├── constants.rs        # All body IDs, FLG_*                 (~400 lines)
 │   ├── error.rs            # Error types                       (~100 lines)
 │   └── pymodule.rs         # PyO3 bindings                     (~800 lines)
 │
@@ -379,4 +381,4 @@ Categories:
 - **Formula-based** (Lahiri, Fagan-Bradley, Krishnamurti, etc.): `aya = offset + precession_polynomial(T)`
 - **Star-based** ("True" modes): compute apparent ecliptic longitude of reference star via Skyfield, subtract target position
 - **Galactic-based**: calibrated formulas or galactic pole computation
-- **User-defined** (`SE_SIDM_USER`): `aya = ayan_t0 + [p(T_now) - p(T0)]`
+- **User-defined** (`SIDM_USER`): `aya = ayan_t0 + [p(T_now) - p(T0)]`

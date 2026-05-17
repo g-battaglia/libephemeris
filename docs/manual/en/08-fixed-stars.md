@@ -75,7 +75,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Position of Regulus
-nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.SEFLG_SPEED)
+nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.FLG_SPEED)
 
 if not err:
     lon = pos[0]  # ecliptic longitude
@@ -185,7 +185,7 @@ Algol         magnitude +2.12
 
 ### Equatorial coordinates
 
-If you need Right Ascension and Declination (to point a telescope, for example), add the `SEFLG_EQUATORIAL` flag:
+If you need Right Ascension and Declination (to point a telescope, for example), add the `FLG_EQUATORIAL` flag:
 
 ```python
 import libephemeris as ephem
@@ -193,7 +193,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 nome, pos, flag, err = ephem.fixstar2_ut(
-    "Sirius", jd, ephem.SEFLG_EQUATORIAL
+    "Sirius", jd, ephem.FLG_EQUATORIAL
 )
 
 if not err:
@@ -247,19 +247,19 @@ stelle_da_cercare = [
 ]
 
 pianeti = [
-    (ephem.SE_SUN,     "Sun"),
-    (ephem.SE_MOON,    "Moon"),
-    (ephem.SE_MERCURY, "Mercury"),
-    (ephem.SE_VENUS,   "Venus"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN,  "Saturn"),
+    (ephem.SUN,     "Sun"),
+    (ephem.MOON,    "Moon"),
+    (ephem.MERCURY, "Mercury"),
+    (ephem.VENUS,   "Venus"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN,  "Saturn"),
 ]
 
 # Calculate planets' positions
 pos_pianeti = {}
 for body_id, nome_p in pianeti:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     pos_pianeti[nome_p] = pos[0]  # ecliptic longitude
 
 # Check conjunctions
@@ -384,6 +384,6 @@ In this chapter, we learned how to work with fixed stars.
 
 **Functions introduced:**
 
-- `fixstar2_ut(nome, jd, flag)` — calculates the ecliptic (or equatorial with `SEFLG_EQUATORIAL`) position of a star, accepting names in many formats
+- `fixstar2_ut(nome, jd, flag)` — calculates the ecliptic (or equatorial with `FLG_EQUATORIAL`) position of a star, accepting names in many formats
 - `fixstar2_mag(nome)` — returns the visual magnitude of a star
 - `propagate_proper_motion(ra, dec, pm_ra, pm_dec, from_jd, to_jd)` — manually propagates a star's proper motion between two epochs
