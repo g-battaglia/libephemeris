@@ -46,7 +46,7 @@ The ecliptic and the celestial equator intersect at two points:
 
 ### 💻 Code: obtaining the obliquity of the ecliptic
 
-With LibEphemeris you can get the exact value of the obliquity for any date. The "pseudo-planet" `SE_ECL_NUT` returns information about obliquity and nutation:
+With LibEphemeris you can get the exact value of the obliquity for any date. The "pseudo-planet" `ECL_NUT` returns information about obliquity and nutation:
 
 ```python
 import libephemeris as ephem
@@ -54,7 +54,7 @@ import libephemeris as ephem
 # Vernal equinox 2024 (March 20, 3:06 UT)
 jd = ephem.julday(2024, 3, 20, 3.1)
 
-# SE_ECL_NUT returns obliquity and nutation
+# ECL_NUT returns obliquity and nutation
 nut, flag = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
 true_obliquity = nut[0]    # true obliquity (with nutation)
