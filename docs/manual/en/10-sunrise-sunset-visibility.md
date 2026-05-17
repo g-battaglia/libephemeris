@@ -27,19 +27,19 @@ lat, lon = 45.4642, 9.1900  # Milan
 
 # Sunrise
 jd_sunrise, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN,
+    jd, ephem.SUN,
     lat, lon,
     altitude=0.0,
     pressure=1013.25,
     temperature=15.0,
-    rsmi=ephem.SE_CALC_RISE
+    rsmi=ephem.CALC_RISE
 )
 
 # Sunset
 jd_sunset, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN,
+    jd, ephem.SUN,
     lat, lon,
-    rsmi=ephem.SE_CALC_SET
+    rsmi=ephem.CALC_SET
 )
 
 # Convert to local time (CEST = UT + 2)
@@ -87,13 +87,13 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Rome
 
 jd_rise, ret = ephem.rise_trans(
-    jd, ephem.SE_MOON, lat, lon,
-    rsmi=ephem.SE_CALC_RISE
+    jd, ephem.MOON, lat, lon,
+    rsmi=ephem.CALC_RISE
 )
 
 jd_set, ret = ephem.rise_trans(
-    jd, ephem.SE_MOON, lat, lon,
-    rsmi=ephem.SE_CALC_SET
+    jd, ephem.MOON, lat, lon,
+    rsmi=ephem.CALC_SET
 )
 
 if jd_rise > 0 and jd_set > 0:
@@ -120,8 +120,8 @@ import libephemeris as ephem
 # Sun in Tromsø on June 21st — it never sets
 jd = ephem.julday(2024, 6, 21, 0.0)
 jd_set, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN, 69.6, 19.0,
-    rsmi=ephem.SE_CALC_SET
+    jd, ephem.SUN, 69.6, 19.0,
+    rsmi=ephem.CALC_SET
 )
 
 if ret == -2:
@@ -146,8 +146,8 @@ lat, lon = 41.9028, 12.4964  # Rome
 
 # Sun's meridian transit = solar noon
 jd_transit, ret = ephem.rise_trans(
-    jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_MTRANSIT
+    jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_MTRANSIT
 )
 
 _, _, _, h = ephem.revjul(jd_transit)
@@ -191,20 +191,20 @@ def local_time(jd_event, tz_offset):
     return f"{int(h):02d}:{int((h % 1) * 60):02d}"
 
 # Sunset
-jd_s, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET)
+jd_s, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET)
 
 # End of civil twilight (Sun at -6°)
-jd_civ, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_CIVIL_TWILIGHT)
+jd_civ, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT)
 
 # End of nautical twilight (Sun at -12°)
-jd_nau, _ = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_NAUTIC_TWILIGHT)
+jd_nau, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT)
 
 # End of astronomical twilight (Sun at -18°)
-jd_ast, ret = ephem.rise_trans(jd, ephem.SE_SUN, lat, lon,
-    rsmi=ephem.SE_CALC_SET | ephem.SE_BIT_ASTRO_TWILIGHT)
+jd_ast, ret = ephem.rise_trans(jd, ephem.SUN, lat, lon,
+    rsmi=ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT)
 
 print(f"Sunset:                       {local_time(jd_s, tz_offset)}")
 print(f"End of civil twilight:        {local_time(jd_civ, tz_offset)}")
@@ -243,13 +243,13 @@ import libephemeris as ephem
 
 # From true to apparent altitude
 true_alt = 0.0  # object exactly at the geometric horizon
-apparent_alt = ephem.refrac(true_alt, calc_flag=ephem.SE_TRUE_TO_APP)
+apparent_alt = ephem.refrac(true_alt, calc_flag=ephem.TRUE_TO_APP)
 print(f"True altitude: {true_alt:.2f}° → apparent: {apparent_alt:.2f}°")
 # → about 0.57° (34 arcminutes above the horizon)
 
 # From apparent to true
 app_alt = 5.0
-true_alt2 = ephem.refrac(app_alt, calc_flag=ephem.SE_APP_TO_TRUE)
+true_alt2 = ephem.refrac(app_alt, calc_flag=ephem.APP_TO_TRUE)
 print(f"Apparent altitude: {app_alt:.2f}° → true: {true_alt2:.2f}°")
 ```
 
@@ -320,9 +320,9 @@ lat, lon = 45.4642, 9.1900  # Milan
 
 # The Alps to the north raise the horizon by about 2 degrees
 jd_sunrise, _ = ephem.rise_trans_true_hor(
-    jd, ephem.SE_SUN, lat, lon,
+    jd, ephem.SUN, lat, lon,
     horizon_altitude=2.0,  # horizon at 2° above the plane
-    rsmi=ephem.SE_CALC_RISE
+    rsmi=ephem.CALC_RISE
 )
 
 _, _, _, h = ephem.revjul(jd_sunrise)
@@ -360,7 +360,7 @@ jd_event, *_ = ephem.heliacal_ut(
     datm=(1013.25, 25.0, 30.0, 0.0),  # pressure, temp, humidity%, lapse
     dobs=(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     object_name="Sirius",
-    event_type=ephem.SE_HELIACAL_RISING
+    event_type=ephem.HELIACAL_RISING
 )
 
 if jd_event > 0:
@@ -402,7 +402,7 @@ dobs = (36.0, 1.0, 0, 0, 0, 0)
 result = ephem.swe_heliacal_ut(
     jd, geopos, datm, dobs,
     "Sirius",
-    ephem.SE_HELIACAL_RISING
+    ephem.HELIACAL_RISING
 )
 
 jd_start = result[0]

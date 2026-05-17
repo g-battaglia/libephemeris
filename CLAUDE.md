@@ -25,22 +25,22 @@ pytest tests/test_file.py -v                          # Single file
 pytest tests/test_file.py::TestClass::test_method -v  # Single test
 pytest -k "pattern" -v                                # By keyword
 
-# Unit test suites
-poe test:unit               # All unit tests (no slow), sequential
-poe test:unit:fast           # All unit tests (no slow), parallel (-n auto)
-poe test:unit:full           # All unit tests including slow
+# Skyfield backend (main unit test suite)
+poe test:skyfield:core       # Essential ~490 tests, ~20s (parallel)
+poe test:skyfield:fast       # All unit tests ~5890, ~1 min (parallel, no @slow)
+poe test:skyfield:full       # ALL tests including @slow (parallel)
 
-# Unit tests in LEB mode (precomputed Chebyshev ephemeris, ~14x faster)
-poe test:unit:leb            # LEB mode, no slow, sequential
-poe test:unit:leb:fast       # LEB mode, no slow, parallel (-n auto)
-poe test:unit:leb:full       # LEB mode, including slow
+# LEB backend (precomputed Chebyshev ephemeris, ~14x faster)
+poe test:leb:core            # LEB essential ~490 tests, ~20s (parallel)
+poe test:leb:fast            # LEB unit tests ~5890, ~1 min (parallel, no @slow) [RECOMMENDED]
+poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
 
-# Feature-specific suites
-poe test:lunar              # All lunar tests (no slow)
-poe test:lunar:perigee      # Perigee tests only
-poe test:lunar:apogee       # Apogee tests only
-poe test:lunar:lilith       # Lilith tests only
-poe test:leb                # LEB-specific unit tests (no slow)
+# Feature-specific suites (via leph CLI)
+leph test lunar              # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
+leph test lunar perigee      # Perigee tests only
+leph test lunar apogee       # Apogee tests only
+leph test lunar lilith       # Lilith tests only (8 files)
+leph test leb2-format all    # LEB2 format unit tests (compression + reader)
 ```
 
 ## Code Style
@@ -58,7 +58,7 @@ poe test:leb                # LEB-specific unit tests (no slow)
 
 Three precision tiers: `base` (de440s.bsp, 1849-2150), `medium` (de440.bsp, 1550-2650, **default**), `extended` (de441.bsp, -13200 to +17191).
 
-`SEFLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL DE440/DE441 via Skyfield.
+`FLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL DE440/DE441 via Skyfield.
 
 ## LEB vs Skyfield Precision (Measured)
 
@@ -79,7 +79,7 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 
 ## Binary Ephemeris Mode (LEB)
 
-Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags (`SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_NONUT`).
+Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags (`FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_NONUT`).
 
 ```python
 from libephemeris import set_leb_file
@@ -89,9 +89,9 @@ set_leb_file("/path/to/ephemeris.leb")  # or env LIBEPHEMERIS_LEB=...
 Group workflow is **recommended** for generation (avoids macOS multiprocessing deadlocks):
 
 ```bash
-poe leb:generate:base:groups      # All 3 groups + merge for base tier
-poe leb:generate:medium:groups    # All 3 groups + merge for medium tier
-poe leb:generate:extended:groups  # All 3 groups + merge for extended tier
+poe leb:generate:base      # All 4 groups + merge for base tier
+poe leb:generate:medium    # All 4 groups + merge for medium tier
+poe leb:generate:extended  # All 4 groups + merge for extended tier
 ```
 
 Runtime always uses a **single merged file** for LEB1. See `docs/leb/guide.md` for details.
@@ -108,7 +108,7 @@ LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reo
 | `libephemeris/leb2_reader.py` | `LEB2Reader` — lazy per-body decompression, same interface as `LEBReader` |
 | `libephemeris/leb_composite.py` | `CompositeLEBReader` — wraps multiple LEB files, dispatches by body_id |
 | `libephemeris/leb_reader.py` | `open_leb()` factory auto-detects LEB1/LEB2 via magic bytes |
-| `scripts/generate_leb2.py` | CLI: `convert`, `convert-all`, `generate`, `verify` |
+| `scripts/generate_leb2.py` | LEB2 conversion engine (invoked via `leph leb2`) |
 | `scripts/test_leb2_precision.py` | Fast precision test: all bodies x 6 flags x N dates per tier |
 
 ### Body Groups
@@ -127,12 +127,12 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 ### Key Commands
 
 ```bash
-poe leb2:convert:base              # Convert LEB1 -> LEB2 (all groups)
-poe leb2:convert:base:core         # Core group only
+poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 4 groups)
+leph leb2 convert base-core        # Core group only (~10.6 MB)
 poe leb2:verify:base               # Verify against LEB1
-poe test:leb2                      # Unit tests (27)
-poe test:leb2:precision:base       # Fast precision test (~15s)
-poe test:leb2:precision:all        # All tiers (~45s)
+leph test leb2-format all          # Unit tests (compression + reader)
+leph test leb2-format precision-base   # Fast precision test (~15s)
+leph test leb2-format precision-all    # All tiers (~45s)
 ```
 
 ### Full documentation
@@ -168,16 +168,16 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 - Asteroids (Chiron, Ceres, Pallas, Juno, Vesta): via Horizons small-body syntax
 - Mean Node, Mean Apogee: analytical (no HTTP)
 - Uranians: analytical heliocentric (no HTTP)
-- NOT supported: fixed stars, planetary moons, SEFLG_TOPOCTR -> fallback to Skyfield
+- NOT supported: fixed stars, planetary moons, `FLG_TOPOCTR` -> fallback to Skyfield
 
 ### Full documentation
 - `proposals/horizons-live-backend.md` — Original proposal with detailed design
 
 ## Lunar Calibration Workflow
 
-1. `poe calibrate-perigee` (or `poe calibrate-perigee:quick`)
+1. `leph calibrate perigee` (or `leph calibrate perigee-quick` for quick 2-min run)
 2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. `poe generate-lunar-corrections` (regenerates `lunar_corrections.py`)
-4. `poe test:lunar:perigee`
+3. `leph generate lunar-corrections` (regenerates `lunar_corrections.py`)
+4. `leph test lunar perigee`
 
 See `docs/methodology/interpolated-perigee.md` for the full methodology.

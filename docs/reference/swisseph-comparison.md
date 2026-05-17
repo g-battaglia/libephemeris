@@ -156,7 +156,7 @@ For the modern era (1900--2020), where direct measurements exist, the two models
 
 ### 2.4. House cusp speeds — numerical vs analytical derivatives
 
-**What:** `swe_houses_ex2` and `swe_houses_armc_ex2` compute cusp velocities using centered finite differences when `SEFLG_SPEED` is set. The maximum difference from pyswisseph is ~0.7 deg/day (~0.2% relative).
+**What:** `swe_houses_ex2` and `swe_houses_armc_ex2` compute cusp velocities using centered finite differences when `FLG_SPEED` is set. The maximum difference from pyswisseph is ~0.7 deg/day (~0.2% relative).
 
 **Why:** The two libraries use different differentiation strategies:
 
@@ -166,7 +166,7 @@ For the modern era (1900--2020), where direct measurements exist, the two models
 
 Both approaches are valid. The numerical method introduces a small truncation error proportional to `dt²`, which at a 1-minute step produces differences of < 1 deg/day from the analytical result. Given that cusp speeds are ~280--340 deg/day, this corresponds to < 0.3% relative error.
 
-**Note:** Cusp speeds are only computed when `SEFLG_SPEED` is passed in the `flags` parameter. Without this flag, zero velocities are returned for efficiency.
+**Note:** Cusp speeds are only computed when `FLG_SPEED` is passed in the `flags` parameter. Without this flag, zero velocities are returned for efficiency.
 
 ### 2.5. Asteroids — Keplerian approximation vs integrated ephemerides
 
@@ -205,8 +205,8 @@ The deep validation effort uncovered 12 bugs in libephemeris, all of which have 
 
 | # | Bug | Fix | Commit |
 |---|-----|-----|--------|
-| 1 | `SEFLG_RADIANS` (8192) was silently ignored — positions always returned in degrees | Added `_apply_output_flags()` helper in `planets.py` that converts degrees to radians when the flag is set | `ef29a08` |
-| 2 | `SEFLG_XYZ` (4096) was silently ignored — positions always returned in spherical coordinates | Same helper converts spherical (lon, lat, dist) to Cartesian (x, y, z) in AU, including velocity transformation via the Jacobian matrix | `ef29a08` |
+| 1 | `FLG_RADIANS` (8192) was silently ignored — positions always returned in degrees | Added `_apply_output_flags()` helper in `planets.py` that converts degrees to radians when the flag is set | `ef29a08` |
+| 2 | `FLG_XYZ` (4096) was silently ignored — positions always returned in spherical coordinates | Same helper converts spherical (lon, lat, dist) to Cartesian (x, y, z) in AU, including velocity transformation via the Jacobian matrix | `ef29a08` |
 
 ### 3.2. Unit and threshold errors (2 bugs)
 
@@ -273,7 +273,7 @@ libephemeris aims for 1:1 API compatibility with pyswisseph, but some function s
 |----------|-----------|-------------|
 | `swe_get_orbital_elements` | Returns flat tuple | May return nested tuple — access via `result[0][i]` |
 | `swe_houses_armc` | `ascmc[3]` = obliquity | `ascmc[3]` = Vertex (not obliquity) |
-| `swe_houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `SEFLG_SPEED`) |
+| `swe_houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `FLG_SPEED`) |
 
 ### libephemeris-only extensions
 
@@ -316,7 +316,7 @@ The validation consists of 5 test suites totaling **1,619 automated tests**:
 - **Date range**: 1550--2650 CE (full DE440 range), with concentration around 1900--2100
 - **Sample density**: 100--210 dates per test, distributed to cover equinoxes, solstices, eclipses, and random dates
 - **Locations**: 11 global locations including equator, tropics, mid-latitudes, Arctic, and Antarctic
-- **Flags**: All individual flags (`SEFLG_SPEED`, `SEFLG_EQUATORIAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_NOABERR`, `SEFLG_NOGDEFL`, `SEFLG_TRUEPOS`, `SEFLG_RADIANS`, `SEFLG_XYZ`, `SEFLG_HELCTR`, `SEFLG_BARYCTR`, `SEFLG_ICRS`, `SEFLG_SIDEREAL`) and common combinations
+- **Flags**: All individual flags (`FLG_SPEED`, `FLG_EQUATORIAL`, `FLG_J2000`, `FLG_NONUT`, `FLG_NOABERR`, `FLG_NOGDEFL`, `FLG_TRUEPOS`, `FLG_RADIANS`, `FLG_XYZ`, `FLG_HELCTR`, `FLG_BARYCTR`, `FLG_ICRS`, `FLG_SIDEREAL`) and common combinations
 - **House systems**: All 24 supported systems
 
 ### What "pass" means
@@ -415,8 +415,8 @@ All previous tolerances (0.2–1.5°) were wildly over-conservative. Tightened t
 
 ### 6.5. Fixed star flags — previously silently ignored
 
-The `fixed_stars.py` module previously handled only 4 of 19 SEFLG flags. Most critically, `SEFLG_SIDEREAL` returned tropical coordinates without warning. This has been fixed — all meaningful flags are now handled:
-`SEFLG_SIDEREAL`, `SEFLG_J2000`, `SEFLG_NONUT`, `SEFLG_XYZ`, `SEFLG_RADIANS`, `SEFLG_TRUEPOS`, `SEFLG_MOSEPH`, `SEFLG_SPEED3`, `SEFLG_TOPOCTR`.
+The `fixed_stars.py` module previously handled only 4 of 19 SEFLG flags. Most critically, `FLG_SIDEREAL` returned tropical coordinates without warning. This has been fixed — all meaningful flags are now handled:
+`FLG_SIDEREAL`, `FLG_J2000`, `FLG_NONUT`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_TRUEPOS`, `FLG_MOSEPH`, `FLG_SPEED3`, `FLG_TOPOCTR`.
 
 ### 6.6. Fixed star catalog — cross-checked against Hipparcos/SIMBAD
 
@@ -456,23 +456,23 @@ All 116 catalog stars were independently verified against authoritative sources:
 
 Comprehensive testing across 4 coordinate modes, 10 bodies, 10 dates (1950–2050):
 
-**Heliocentric (SEFLG_HELCTR)** — bodies Mercury–Pluto:
+**Heliocentric (FLG_HELCTR)** — bodies Mercury–Pluto:
 - Position: < 0.0004° (1.1") max (Mercury), sub-arcsecond for all bodies
 - Speed: < 0.0002°/day
 
-**Barycentric (SEFLG_BARYCTR)** — bodies Moon–Pluto:
+**Barycentric (FLG_BARYCTR)** — bodies Moon–Pluto:
 - Position: < 0.001° for all bodies except Sun
 - Barycentric Sun: up to 0.04° (138") in angular terms, but this is a distance-amplification artifact. The actual 3D positional difference is only ~120 km (0.017% of the solar radius), amplified by the tiny Sun-SSB distance (~0.001–0.009 AU). Independent verification against raw Skyfield/JPL DE440 confirms libephemeris is closer to the source ephemeris at J2000.
 
-**Equatorial (SEFLG_EQUATORIAL)** — Sun, Moon, Mars, Jupiter:
+**Equatorial (FLG_EQUATORIAL)** — Sun, Moon, Mars, Jupiter:
 - RA: < 0.0005° (1.7") max (Moon)
 - Dec: < 0.0002° (0.6") max
 
-**XYZ Cartesian (SEFLG_XYZ)** — all bodies:
+**XYZ Cartesian (FLG_XYZ)** — all bodies:
 - Position: < 0.00005 AU for all bodies (< 0.00004 AU for Sun–Saturn)
 - Neptune/Pluto show ~0.00003 AU max, corresponding to sub-arcsecond angular difference at their distances (30+ AU)
 
-**Bug found and fixed**: `SEFLG_XYZ` and `SEFLG_RADIANS` flags were not preserved in the return flag of `swe_calc_ut()` / `swe_calc()`. These output format flags were stripped before calculation but not restored in the returned `retflag`. Now fixed.
+**Bug found and fixed**: `FLG_XYZ` and `FLG_RADIANS` flags were not preserved in the return flag of `swe_calc_ut()` / `swe_calc()`. These output format flags were stripped before calculation but not restored in the returned `retflag`. Now fixed.
 
 ---
 
@@ -486,9 +486,9 @@ prioritizes correctness over compatibility.
 
 **Status:** Intentional divergence since leb/precision branch.
 
-**Observed behavior:** pyswisseph silently ignores `SEFLG_J2000` for
+**Observed behavior:** pyswisseph silently ignores `FLG_J2000` for
 `SE_TRUE_NODE`, `SE_OSCU_APOG`, `SE_INTP_APOG`, and `SE_INTP_PERG` when
-`SEFLG_SIDEREAL` is also set. The same combination works correctly for
+`FLG_SIDEREAL` is also set. The same combination works correctly for
 `SE_MEAN_NODE` and `SE_MEAN_APOG`. No error or warning is emitted.
 
 **Why it is incorrect:** Ayanamsha (1D longitude zero-point shift) and
@@ -503,13 +503,13 @@ code-path bug rather than a design decision.
 impossible (the true node oscillates ±1.5° around the mean). With the
 LibEphemeris fix, the distance returns to ~1.04° (correct).
 
-**LibEphemeris fix:** `SEFLG_J2000` is honored for all bodies uniformly.
+**LibEphemeris fix:** `FLG_J2000` is honored for all bodies uniformly.
 The algorithm uses mean ayanamsha (no nutation component) and applies
 J2000 ecliptic precession after the sidereal correction — the same
 pipeline already used correctly for mean bodies.
 
-**Impact:** Only affects users who combine `SEFLG_SIDEREAL | SEFLG_J2000`
-on these four bodies. Using `SEFLG_SIDEREAL` alone (the standard
+**Impact:** Only affects users who combine `FLG_SIDEREAL | FLG_J2000`
+on these four bodies. Using `FLG_SIDEREAL` alone (the standard
 astrological use case) produces identical results to pyswisseph.
 
 **Full analysis:** [se-bug-sidereal-j2000-nodes.md](se-bug-sidereal-j2000-nodes.md)

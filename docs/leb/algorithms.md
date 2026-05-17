@@ -606,8 +606,8 @@ formula differs by less than 1 milliarcsecond, which is negligible for our
 ### When Applied
 
 - Only for geocentric calculations (default mode)
-- Skipped for heliocentric (`SEFLG_HELCTR`), barycentric (`SEFLG_BARYCTR`),
-  true position (`SEFLG_TRUEPOS`), and no-aberration (`SEFLG_NOABERR`) modes
+- Skipped for heliocentric (`FLG_HELCTR`), barycentric (`FLG_BARYCTR`),
+  true position (`FLG_TRUEPOS`), and no-aberration (`FLG_NOABERR`) modes
 
 ---
 

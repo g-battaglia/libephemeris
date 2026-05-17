@@ -67,7 +67,7 @@ swe.set_calc_mode("horizons")
 - **True Node, Osculating Apogee, Interpolated Apogee/Perigee** (11, 13, 21, 22) — require Moon state vectors
 - **Fixed stars** — no Horizons equivalent
 - **Planetary moons** — require satellite-specific SPK
-- **SEFLG_TOPOCTR** — requires Earth orientation parameters
+- **FLG_TOPOCTR** — requires Earth orientation parameters
 - **Uranian bodies in geocentric mode** — only heliocentric supported
 
 ## Pipeline Architecture
@@ -121,16 +121,16 @@ A typical astrological chart (15 bodies, same JD) requires:
 
 | Flag | Horizons behavior |
 |------|-------------------|
-| SEFLG_SPEED | Velocity from state vector differences |
-| SEFLG_HELCTR | center='@10' (Sun center) |
-| SEFLG_BARYCTR | center='@0' (SSB) |
-| SEFLG_SIDEREAL | Subtract ayanamsha after ecliptic conversion |
-| SEFLG_EQUATORIAL | Skip ecliptic rotation, output RA/Dec |
-| SEFLG_J2000 | Use J2000 ecliptic frame |
-| SEFLG_NOABERR | Skip aberration step |
-| SEFLG_NOGDEFL | Skip deflection step |
-| SEFLG_TRUEPOS | Skip light-time + aberration |
-| SEFLG_TOPOCTR | **raises KeyError** -> fallback to Skyfield |
+| FLG_SPEED | Velocity from state vector differences |
+| FLG_HELCTR | center='@10' (Sun center) |
+| FLG_BARYCTR | center='@0' (SSB) |
+| FLG_SIDEREAL | Subtract ayanamsha after ecliptic conversion |
+| FLG_EQUATORIAL | Skip ecliptic rotation, output RA/Dec |
+| FLG_J2000 | Use J2000 ecliptic frame |
+| FLG_NOABERR | Skip aberration step |
+| FLG_NOGDEFL | Skip deflection step |
+| FLG_TRUEPOS | Skip light-time + aberration |
+| FLG_TOPOCTR | **raises KeyError** -> fallback to Skyfield |
 
 ## Precision
 

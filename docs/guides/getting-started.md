@@ -54,14 +54,14 @@ swe.set_ephemeris_file("de441.bsp")
 
 ```python
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SE_MOON, SE_MARS, SEFLG_SPEED
+from libephemeris.constants import SUN, MOON, MARS, FLG_SPEED
 
 jd = swe.julday(2024, 3, 26, 12.0)
 
 # Planet positions with velocity
-sun, _ = swe.calc_ut(jd, SE_SUN, SEFLG_SPEED)
-moon, _ = swe.calc_ut(jd, SE_MOON, SEFLG_SPEED)
-mars, _ = swe.calc_ut(jd, SE_MARS, SEFLG_SPEED)
+sun, _ = swe.calc_ut(jd, SUN, FLG_SPEED)
+moon, _ = swe.calc_ut(jd, MOON, FLG_SPEED)
+mars, _ = swe.calc_ut(jd, MARS, FLG_SPEED)
 
 # Returns: (longitude, latitude, distance, speed_lon, speed_lat, speed_dist)
 print(f"Sun:  {sun[0]:.4f} deg, speed {sun[3]:.4f} deg/day")
@@ -89,11 +89,12 @@ The global API uses mutable global state (compatible with PySwissEph).
 For concurrent calculations, use `EphemerisContext`:
 
 ```python
-from libephemeris import EphemerisContext, SE_SUN
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN
 
 ctx = EphemerisContext()
 ctx.set_topo(12.5, 41.9, 0)
-pos, _ = ctx.calc_ut(2451545.0, SE_SUN, 0)
+pos, _ = ctx.calc_ut(2451545.0, SUN, 0)
 ```
 
 Each context has independent state (sidereal mode, topographic position, LEB reader).
@@ -105,7 +106,7 @@ Auto-download is supported:
 
 ```python
 swe.set_auto_spk_download(True)
-pos, _ = swe.calc_ut(2460000.0, swe.SE_CHIRON, 0)
+pos, _ = swe.calc_ut(2460000.0, swe.CHIRON, 0)
 ```
 
 Fallback chain: SPK kernel → auto-download → strict precision check → REBOUND/ASSIST → Keplerian propagation.

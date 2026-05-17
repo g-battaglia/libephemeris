@@ -69,8 +69,8 @@ For **modern astrology** (natal charts from 1900 onwards): `base` is sufficient.
 The calculated positions depend on **where** you imagine observing from:
 
 - **Geocentric** (default): viewed from the center of the Earth. It is the viewpoint of astrology — the sky as it appears from Earth.
-- **Heliocentric**: viewed from the center of the Sun. Flag `SEFLG_HELCTR`. Useful for celestial mechanics.
-- **Barycentric**: viewed from the barycenter (center of mass) of the Solar System. Flag `SEFLG_BARYCTR`. The Sun is not exactly at the barycenter: it "wobbles" by about 2 solar radii due to the gravitational pull of the giant planets.
+- **Heliocentric**: viewed from the center of the Sun. Flag `FLG_HELCTR`. Useful for celestial mechanics.
+- **Barycentric**: viewed from the barycenter (center of mass) of the Solar System. Flag `FLG_BARYCTR`. The Sun is not exactly at the barycenter: it "wobbles" by about 2 solar radii due to the gravitational pull of the giant planets.
 
 ```python
 import libephemeris as ephem
@@ -78,10 +78,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Geocentric Mars (default)
-geo, _ = ephem.calc_ut(jd, ephem.SE_MARS, 0)
+geo, _ = ephem.calc_ut(jd, ephem.MARS, 0)
 
 # Heliocentric Mars
-helio, _ = ephem.calc_ut(jd, ephem.SE_MARS, ephem.SEFLG_HELCTR)
+helio, _ = ephem.calc_ut(jd, ephem.MARS, ephem.FLG_HELCTR)
 
 print(f"Geocentric Mars:  {geo[0]:.4f}° (dist {geo[2]:.4f} AU)")
 print(f"Heliocentric Mars: {helio[0]:.4f}° (dist {helio[2]:.4f} AU)")
@@ -102,7 +102,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # The Sun as seen from Jupiter
-pos, _ = ephem.swe_calc_pctr(jd, ephem.SE_SUN, ephem.SE_JUPITER, 0)
+pos, _ = ephem.swe_calc_pctr(jd, ephem.SUN, ephem.JUPITER, 0)
 print(f"Sun seen from Jupiter: {pos[0]:.4f}°, dist {pos[2]:.4f} AU")
 ```
 
@@ -127,10 +127,10 @@ jd = ephem.julday(2024, 4, 8, 18.0)
 ephem.set_topo(12.4964, 41.9028, 50.0)
 
 # Geocentric Moon (default)
-moon_geo, _ = ephem.calc_ut(jd, ephem.SE_MOON, 0)
+moon_geo, _ = ephem.calc_ut(jd, ephem.MOON, 0)
 
 # Topocentric Moon
-moon_topo, _ = ephem.calc_ut(jd, ephem.SE_MOON, ephem.SEFLG_TOPOCTR)
+moon_topo, _ = ephem.calc_ut(jd, ephem.MOON, ephem.FLG_TOPOCTR)
 
 diff = moon_topo[0] - moon_geo[0]
 print(f"Geocentric Moon:  {moon_geo[0]:.4f}°")
@@ -154,8 +154,8 @@ The solar eclipse of April 8, 2024, was total in Dallas (Texas) but only partial
 
 - An **ephemeris** is a table of celestial positions. LibEphemeris uses NASA JPL DE440/DE441 ephemerides, read via Skyfield.
 - Three tiers: `base` (1849–2150), `medium` (1550–2650, default), `extended` (-13200 to +17191).
-- **Geocentric** (default): from the center of the Earth. **Heliocentric** (`SEFLG_HELCTR`): from the Sun. **Barycentric** (`SEFLG_BARYCTR`): from the center of mass of the Solar System.
-- **Topocentric** (`SEFLG_TOPOCTR`): from your location on the Earth's surface. Crucial for the Moon (~1° of parallax).
+- **Geocentric** (default): from the center of the Earth. **Heliocentric** (`FLG_HELCTR`): from the Sun. **Barycentric** (`FLG_BARYCTR`): from the center of mass of the Solar System.
+- **Topocentric** (`FLG_TOPOCTR`): from your location on the Earth's surface. Crucial for the Moon (~1° of parallax).
 
 ### Functions and constants introduced
 
@@ -165,6 +165,6 @@ The solar eclipse of April 8, 2024, was total in Dallas (Texas) but only partial
 | `download_for_tier(tier)` | Downloads the ephemeris files |
 | `set_topo(lon, lat, alt)` | Sets the observer's location |
 | `swe_calc_pctr(jd, body, center, flag)` | Position as seen from another planet |
-| `SEFLG_HELCTR` | Heliocentric coordinates |
-| `SEFLG_BARYCTR` | Barycentric coordinates |
-| `SEFLG_TOPOCTR` | Topocentric coordinates |
+| `FLG_HELCTR` | Heliocentric coordinates |
+| `FLG_BARYCTR` | Barycentric coordinates |
+| `FLG_TOPOCTR` | Topocentric coordinates |

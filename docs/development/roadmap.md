@@ -243,5 +243,5 @@ modules need.
 **Analysis document:** `docs/analysis/skyfield-to-leb-porting.md`
 
 **Estimated effort:** fixed_stars (1-2 days), heliacal (2-3 days),
-eclipse (2-4 weeks).  Requires implementing SEFLG_XYZ and
-SEFLG_TOPOCTR in the LEB fast_calc path.
+eclipse (2-4 weeks).  Requires implementing FLG_XYZ and
+FLG_TOPOCTR in the LEB fast_calc path.

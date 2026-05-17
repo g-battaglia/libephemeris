@@ -103,7 +103,7 @@ tests/test_leb/compare/
 ### Data Flow
 
 ```
-User calls swe_calc_ut(jd, SE_MARS, SEFLG_SPEED)
+User calls swe_calc_ut(jd, MARS, FLG_SPEED)
   |
   v
 planets.py: swe_calc_ut()
@@ -118,7 +118,7 @@ planets.py: swe_calc_ut()
   |     |     COORD_ECLIPTIC          -> _pipeline_ecliptic()              [Pipeline B]
   |     |     COORD_HELIO_ECL         -> _pipeline_helio()                 [Pipeline C]
   |     |-- Gravitational deflection (Sun, Jupiter, Saturn) [Pipeline A/A']
-  |     |-- Sidereal correction (if SEFLG_SIDEREAL)
+  |     |-- Sidereal correction (if FLG_SIDEREAL)
   |     |-- Return (lon, lat, dist, dlon, dlat, ddist), iflag
   |     |
   |     |-- [KeyError/ValueError] -> fall through to Skyfield
@@ -565,24 +565,24 @@ Both functions:
 
 | Flag | Reason |
 |------|--------|
-| `SEFLG_TOPOCTR` | Requires geographic coordinates not stored in LEB |
-| `SEFLG_XYZ` | Cartesian output not yet implemented |
-| `SEFLG_RADIANS` | Radian output not yet implemented |
-| `SEFLG_NONUT` | No-nutation mode not yet implemented |
+| `FLG_TOPOCTR` | Requires geographic coordinates not stored in LEB |
+| `FLG_XYZ` | Cartesian output not yet implemented |
+| `FLG_RADIANS` | Radian output not yet implemented |
+| `FLG_NONUT` | No-nutation mode not yet implemented |
 
 **Flags handled natively by LEB:**
 
 | Flag | Effect |
 |------|--------|
-| `SEFLG_SPEED` | Compute velocities (analytical Chebyshev derivative for all pipelines) |
-| `SEFLG_HELCTR` | Use Sun as observer instead of Earth; skip aberration |
-| `SEFLG_BARYCTR` | Use SSB as observer; skip aberration |
-| `SEFLG_TRUEPOS` | Skip light-time correction and aberration |
-| `SEFLG_NOABERR` | Skip aberration only |
-| `SEFLG_EQUATORIAL` | Output in equatorial coordinates instead of ecliptic |
-| `SEFLG_J2000` | Output in J2000 frame instead of of-date |
-| `SEFLG_SIDEREAL` | Apply ayanamsa correction |
-| `SEFLG_MOSEPH` | Silently stripped (always uses JPL data) |
+| `FLG_SPEED` | Compute velocities (analytical Chebyshev derivative for all pipelines) |
+| `FLG_HELCTR` | Use Sun as observer instead of Earth; skip aberration |
+| `FLG_BARYCTR` | Use SSB as observer; skip aberration |
+| `FLG_TRUEPOS` | Skip light-time correction and aberration |
+| `FLG_NOABERR` | Skip aberration only |
+| `FLG_EQUATORIAL` | Output in equatorial coordinates instead of ecliptic |
+| `FLG_J2000` | Output in J2000 frame instead of of-date |
+| `FLG_SIDEREAL` | Apply ayanamsa correction |
+| `FLG_MOSEPH` | Silently stripped (always uses JPL data) |
 
 ### 5.3 Pipeline A: ICRS Barycentric Bodies (Planet Centers)
 
@@ -596,10 +596,10 @@ Juno, Vesta (11 bodies)
 1. **Body position:** `reader.eval_body(ipl, jd_tt)` -> (x, y, z) in AU
 2. **Observer selection:**
    - Geocentric (default): Earth position from LEB
-   - Heliocentric (`SEFLG_HELCTR`): Sun position from LEB
-   - Barycentric (`SEFLG_BARYCTR`): origin (0, 0, 0)
+   - Heliocentric (`FLG_HELCTR`): Sun position from LEB
+   - Barycentric (`FLG_BARYCTR`): origin (0, 0, 0)
 3. **Geometric vector:** target - observer
-4. **Light-time correction** (unless `SEFLG_TRUEPOS`):
+4. **Light-time correction** (unless `FLG_TRUEPOS`):
    - 3 fixed-point iterations
    - `lt = dist / C_LIGHT_AU_DAY` (173.14 AU/day)
    - Re-evaluate body at `jd_tt - lt`
@@ -615,11 +615,11 @@ Juno, Vesta (11 bodies)
    - **True ecliptic of date** (default, most common):
      - Precess ICRS -> equatorial of date via `erfa.pnm06a()` matrix
      - Rotate equatorial -> ecliptic using true obliquity (mean + nutation deps)
-   - **J2000 ecliptic** (`SEFLG_J2000`):
+   - **J2000 ecliptic** (`FLG_J2000`):
      - Rotate ICRS -> ecliptic J2000 using J2000 obliquity (23.4392911 deg)
-   - **True equatorial of date** (`SEFLG_EQUATORIAL`):
+   - **True equatorial of date** (`FLG_EQUATORIAL`):
      - Precess ICRS -> equatorial of date via precession-nutation matrix
-   - **J2000 equatorial** (`SEFLG_EQUATORIAL | SEFLG_J2000`):
+   - **J2000 equatorial** (`FLG_EQUATORIAL | FLG_J2000`):
      - ICRS is already ~J2000 equatorial, just convert to spherical
 
 **Velocity** is computed via the **analytical Chebyshev derivative**,
@@ -678,13 +678,13 @@ Interpolated Apogee, Interpolated Perigee (6 bodies)
 1. **Direct read:** `reader.eval_body(ipl, jd_tt)` -> (lon, lat, dist) and
    (dlon, dlat, ddist) from Chebyshev analytical derivative
 2. **Coordinate transforms** (if requested):
-   - **True equatorial of date** (`SEFLG_EQUATORIAL`):
+   - **True equatorial of date** (`FLG_EQUATORIAL`):
      - Rotate ecliptic -> equatorial using true obliquity
      - Velocity via finite difference on the ecliptic coords (dt=0.001 days)
-   - **J2000 equatorial** (`SEFLG_EQUATORIAL | SEFLG_J2000`):
+   - **J2000 equatorial** (`FLG_EQUATORIAL | FLG_J2000`):
      - Precess ecliptic-of-date -> J2000 ecliptic, then rotate to J2000 equatorial
      - Velocity via finite difference
-   - **J2000 ecliptic** (`SEFLG_J2000`):
+   - **J2000 ecliptic** (`FLG_J2000`):
      - Precess ecliptic-of-date -> J2000 ecliptic
      - Velocity via finite difference
 
@@ -705,7 +705,7 @@ apply.
 
 ### 5.6 Sidereal Correction
 
-Applied after the pipeline, for any body, when `SEFLG_SIDEREAL` is set and
+Applied after the pipeline, for any body, when `FLG_SIDEREAL` is set and
 the output is ecliptic (not equatorial):
 
 ```python
@@ -721,7 +721,7 @@ dlon -= prec_rate
 **Ayanamsa computation** (`_calc_ayanamsa_from_leb`, line 335):
 
 - Supports **29 formula-based sidereal modes** (stored in `_AYANAMSHA_J2000` dict)
-- Supports `SE_SIDM_USER` (mode 255) with custom t0/ayan_t0
+- Supports `SIDM_USER` (mode 255) with custom t0/ayan_t0
 - **Star-based modes** (17, 27-36, 39-40, 42) raise `KeyError` to trigger
   Skyfield fallback
 - True ayanamsa = mean ayanamsa + nutation in longitude (from LEB nutation data)
@@ -1364,10 +1364,10 @@ This is completely transparent to the caller.
 
 The same fallback is triggered by:
 
-- **Unsupported flags:** `SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`,
-  `SEFLG_NONUT`
+- **Unsupported flags:** `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`,
+  `FLG_NONUT`
 - **JD out of range:** Julian Day outside the LEB file's coverage
-- **Star-based sidereal modes:** e.g., `SE_SIDM_TRUE_REVATI` (requires
+- **Star-based sidereal modes:** e.g., `SIDM_TRUE_REVATI` (requires
   fixed star position not available in LEB fast path)
 
 #### Bodies that always fall back to Skyfield
@@ -1379,7 +1379,7 @@ The same fallback is triggered by:
 | TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | SE_AST_OFFSET + n | 9 | SPK → ASSIST → Keplerian |
 | Additional asteroids | Nessus, Asbolus, Chariklo, Apophis, Hygiea, Interamnia, Davida, Europa (ast), Sylvia, Psyche, Eros, Amor, Icarus, Toro, Sappho, Pandora, Lilith (ast), Hidalgo, Toutatis, Itokawa, Bennu, Ryugu | SE_AST_OFFSET + n | 22 | SPK → ASSIST → Keplerian |
 | Fixed stars | 102 stars (Regulus, Spica, Aldebaran, …) | SE_FIXSTAR_OFFSET + n | 102 | `fixed_stars.py` (see §9.4) |
-| Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | SE_MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
+| Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
 | Arabic parts | Pars Fortunae, Pars Spiritus, Pars Amoris, Pars Fidei | 9100–9103 | 4 | `arabic_parts.py` (derived) |
 | Nutation/obliquity | SE_ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
@@ -1961,9 +1961,9 @@ swe.set_leb_file("data/leb2/base_core.leb2")  # companions auto-discovered
 swe.set_calc_mode("leb")
 
 # Bodies from different files work transparently
-swe.swe_calc_ut(2451545.0, swe.SE_SUN, swe.SEFLG_SPEED)     # from core
-swe.swe_calc_ut(2451545.0, swe.SE_CHIRON, swe.SEFLG_SPEED)   # from asteroids
-swe.swe_calc_ut(2451545.0, 40, swe.SEFLG_SPEED)              # from uranians
+swe.swe_calc_ut(2451545.0, swe.SUN, swe.FLG_SPEED)     # from core
+swe.swe_calc_ut(2451545.0, swe.CHIRON, swe.FLG_SPEED)   # from asteroids
+swe.swe_calc_ut(2451545.0, 40, swe.FLG_SPEED)              # from uranians
 ```
 
 **How it works:**
@@ -2138,7 +2138,7 @@ leph leb generate base groups
 - Ensure `set_leb_file()` is called before any `swe_calc_ut()` calls
 - Check that `get_leb_reader()` returns a non-None value
 - Verify the body you're computing is in the LEB file
-- If using `SEFLG_TOPOCTR`, `SEFLG_XYZ`, `SEFLG_RADIANS`, or `SEFLG_NONUT`,
+- If using `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, or `FLG_NONUT`,
   LEB always falls back to Skyfield
 
 ---

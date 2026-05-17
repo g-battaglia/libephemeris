@@ -258,19 +258,19 @@ import libephemeris as swe
 jd = 2460676.5  # 2025-01-01
 
 # Mean Lilith
-mean_pos, _ = swe.swe_calc_ut(jd, swe.SE_MEAN_APOG, swe.SEFLG_SPEED)
+mean_pos, _ = swe.swe_calc_ut(jd, swe.MEAN_APOG, swe.FLG_SPEED)
 print(f"Mean Lilith: {mean_pos[0]:.4f} deg, speed: {mean_pos[3]:.4f} deg/day")
 
 # Osculating (True) Lilith
-oscu_pos, _ = swe.swe_calc_ut(jd, swe.SE_OSCU_APOG, swe.SEFLG_SPEED)
+oscu_pos, _ = swe.swe_calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
 print(f"True Lilith: {oscu_pos[0]:.4f} deg, speed: {oscu_pos[3]:.4f} deg/day")
 
 # Interpolated (Natural) Lilith
-intp_pos, _ = swe.swe_calc_ut(jd, swe.SE_INTP_APOG, swe.SEFLG_SPEED)
+intp_pos, _ = swe.swe_calc_ut(jd, swe.INTP_APOG, swe.FLG_SPEED)
 print(f"Interpolated Lilith: {intp_pos[0]:.4f} deg, speed: {intp_pos[3]:.4f} deg/day")
 
 # Interpolated Perigee
-perg_pos, _ = swe.swe_calc_ut(jd, swe.SE_INTP_PERG, swe.SEFLG_SPEED)
+perg_pos, _ = swe.swe_calc_ut(jd, swe.INTP_PERG, swe.FLG_SPEED)
 print(f"Interpolated Perigee: {perg_pos[0]:.4f} deg, speed: {perg_pos[3]:.4f} deg/day")
 ```
 
@@ -305,7 +305,7 @@ All lunar apside functions return:
 - **Latitude**: Ecliptic latitude in degrees (typically small, < 5 degrees)
 - **Eccentricity/Distance**: Orbital eccentricity (~0.055 for Moon)
 
-When using `swe_calc_ut` with `SEFLG_SPEED`, velocity is also calculated:
+When using `swe_calc_ut` with `FLG_SPEED`, velocity is also calculated:
 - **Speed (longitude)**: Daily motion in degrees/day
 - **Speed (latitude)**: Daily change in latitude
 - **Speed (distance)**: Daily change in eccentricity

@@ -72,13 +72,13 @@ ecl_type, tret = ephem.sol_eclipse_when_glob(jd_start)
 
 # Decode the type
 tipi = []
-if ecl_type & ephem.SE_ECL_TOTAL:
+if ecl_type & ephem.ECL_TOTAL:
     tipi.append("total")
-if ecl_type & ephem.SE_ECL_ANNULAR:
+if ecl_type & ephem.ECL_ANNULAR:
     tipi.append("annular")
-if ecl_type & ephem.SE_ECL_PARTIAL:
+if ecl_type & ephem.ECL_PARTIAL:
     tipi.append("partial")
-if ecl_type & ephem.SE_ECL_ANNULAR_TOTAL:
+if ecl_type & ephem.ECL_ANNULAR_TOTAL:
     tipi.append("hybrid")
 
 # tret[0] = time of maximum eclipse
@@ -111,7 +111,7 @@ You can filter by eclipse type:
 # Search only for total eclipses
 ecl_type, tret = ephem.sol_eclipse_when_glob(
     jd_start,
-    ifltype=ephem.SE_ECL_TOTAL
+    ifltype=ephem.ECL_TOTAL
 )
 ```
 
@@ -129,11 +129,11 @@ for i in range(5):
     jd_max = tret[0]
 
     # Type
-    if ecl_type & ephem.SE_ECL_TOTAL:
+    if ecl_type & ephem.ECL_TOTAL:
         tipo = "Total"
-    elif ecl_type & ephem.SE_ECL_ANNULAR:
+    elif ecl_type & ephem.ECL_ANNULAR:
         tipo = "Annular"
-    elif ecl_type & ephem.SE_ECL_ANNULAR_TOTAL:
+    elif ecl_type & ephem.ECL_ANNULAR_TOTAL:
         tipo = "Hybrid"
     else:
         tipo = "Partial"
@@ -310,11 +310,11 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 ecl_type, tret = ephem.lun_eclipse_when(jd)
 
 # Type
-if ecl_type & ephem.SE_ECL_TOTAL:
+if ecl_type & ephem.ECL_TOTAL:
     tipo = "Total"
-elif ecl_type & ephem.SE_ECL_PARTIAL:
+elif ecl_type & ephem.ECL_PARTIAL:
     tipo = "Partial"
-elif ecl_type & ephem.SE_ECL_PENUMBRAL:
+elif ecl_type & ephem.ECL_PENUMBRAL:
     tipo = "Penumbral"
 else:
     tipo = "Unknown"
@@ -359,7 +359,7 @@ y, m, d, h = ephem.revjul(jd_max)
 mag_umbrale = attr[0]
 
 # Check visibility
-visibile = ecl_type & ephem.SE_ECL_VISIBLE
+visibile = ecl_type & ephem.ECL_VISIBLE
 
 print(f"Lunar eclipse: {d:.0f}/{m:.0f}/{y:.0f}")
 print(f"Umbral magnitude: {mag_umbrale:.3f}")
@@ -428,7 +428,7 @@ import libephemeris as ephem
 # Total eclipse of April 8, 2024
 jd_start = ephem.julday(2024, 4, 1, 0.0)
 ecl_type, tret = ephem.sol_eclipse_when_glob(
-    jd_start, eclipse_type=ephem.SE_ECL_TOTAL
+    jd_start, eclipse_type=ephem.ECL_TOTAL
 )
 jd_ecl = tret[0]
 
@@ -504,7 +504,7 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 
 ret, tret = ephem.lun_occult_when_glob(
     jd,
-    ipl=ephem.SE_JUPITER,  # planet
+    ipl=ephem.JUPITER,  # planet
     starname="",            # not a star
 )
 
@@ -564,7 +564,7 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 
 ret, tret = ephem.planet_occult_when_glob(
     jd,
-    occulting_planet=ephem.SE_VENUS,
+    occulting_planet=ephem.VENUS,
     occulted_planet=0,
     starname="Regulus"
 )

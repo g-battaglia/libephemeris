@@ -69,7 +69,7 @@ in order and uses the first one that succeeds:
 import libephemeris as swe
 
 swe.set_auto_spk_download(True)
-pos, _ = swe.calc_ut(2460000.0, swe.SE_CHIRON, 0)
+pos, _ = swe.calc_ut(2460000.0, swe.CHIRON, 0)
 ```
 
 SPK files are cached in `~/.libephemeris/spk/` and reused on subsequent
@@ -198,10 +198,10 @@ import libephemeris as swe
 
 swe.register_spk_body(
     "/path/to/bennu_refdrmc_v1.bsp",
-    ipl=swe.SE_BENNU,
+    ipl=swe.BENNU,
     naif_id=2101955,
 )
-pos, _ = swe.calc_ut(2458849.5, swe.SE_BENNU, 0)  # 2020-01-01
+pos, _ = swe.calc_ut(2458849.5, swe.BENNU, 0)  # 2020-01-01
 ```
 
 ### Keplerian precision varies by body class

@@ -25,13 +25,13 @@ All differences produce sub-arcsecond effects for the planets and sub-degree eff
 
 ### Ephemeris Foundation and Analytical Fallback
 
-Swiss Ephemeris supports three computation modes: (1) its own binary repackaging of JPL DE431, (2) a fallback to the Moshier semi-analytical ephemeris when binary files are absent (`SEFLG_MOSEPH`), and (3) direct JPL file reading.
+Swiss Ephemeris supports three computation modes: (1) its own binary repackaging of JPL DE431, (2) a fallback to the Moshier semi-analytical ephemeris when binary files are absent (`FLG_MOSEPH`), and (3) direct JPL file reading.
 
 The Moshier mode uses VSOP87 for the planets and ELP2000-82B for the Moon — analytical theories developed in the 1980s. These introduce errors on the order of 1 arcsecond for the inner planets and 10+ arcseconds for outer planets at dates far from the fitting epoch.
 
 LibEphemeris uses exclusively JPL DE440 (Park et al., 2021) or DE441, the most recent numerical planetary ephemerides. These are the same models used by NASA for spacecraft navigation.
 
-The `SEFLG_MOSEPH` flag is accepted for API compatibility but silently ignored. Every calculation — without exception — uses the full JPL numerical integration. There is no reduced-precision fallback.
+The `FLG_MOSEPH` flag is accepted for API compatibility but silently ignored. Every calculation — without exception — uses the full JPL numerical integration. There is no reduced-precision fallback.
 
 | Property            | Swiss Ephemeris                    | LibEphemeris           |
 | ------------------- | ---------------------------------- | ---------------------- |
@@ -55,7 +55,7 @@ The angular offset between barycenter and body center can be significant:
 | Pluto   | ~0.3"          | Charon (binary)      |
 | Uranus  | ~0.01"         | Major satellites     |
 
-Swiss Ephemeris returns system barycenters by default. A separate flag (`SEFLG_CENTER_BODY`) and additional satellite ephemeris files are required to obtain planet body centers.
+Swiss Ephemeris returns system barycenters by default. A separate flag (`FLG_CENTER_BODY`) and additional satellite ephemeris files are required to obtain planet body centers.
 
 LibEphemeris corrects to the true planet body center *automatically* for every calculation, using a three-tier fallback:
 

@@ -47,48 +47,48 @@ The `houses` function returns two sets of data:
 ```python
 import libephemeris as ephem
 
-# 8 aprile 2024, ore 14:30 UT — Roma
+# April 8 2024, 14:30 UT — Rome
 jd = ephem.julday(2024, 4, 8, 14.5)
 lat, lon = 41.9028, 12.4964
 
-# Calcola le case con il sistema Placidus
+# Calculate houses with Placidus system
 cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
 
-# Le 12 cuspidi
-segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+# The 12 cusps
+signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 for i in range(12):
     lon_c = cusps[i]
-    s = segni[int(lon_c / 30)]
-    g = lon_c % 30
-    print(f"Casa {i+1:2d}: {g:5.1f}° {s}")
+    sign = signs[int(lon_c / 30)]
+    deg = lon_c % 30
+    print(f"House {i+1:2d}: {deg:5.1f}° {sign}")
 
-# Gli angoli principali
-print(f"\nAscendente:  {ascmc[0]:.4f}°")
-print(f"Medio Cielo: {ascmc[1]:.4f}°")
-print(f"ARMC:        {ascmc[2]:.4f}°")  # Asc. Retta del MC
-print(f"Vertice:     {ascmc[3]:.4f}°")
+# Main angles
+print(f"\nAscendant:  {ascmc[0]:.4f}°")
+print(f"Midheaven:  {ascmc[1]:.4f}°")
+print(f"ARMC:       {ascmc[2]:.4f}°")
+print(f"Vertex:     {ascmc[3]:.4f}°")
 ```
 
 ```
-Casa  1:  12.2° Vir
-Casa  2:   6.3° Lib
-Casa  3:   5.5° Sco
-Casa  4:   9.0° Sgr
-Casa  5:  13.5° Cap
-Casa  6:  15.0° Aqr
-Casa  7:  12.2° Psc
-Casa  8:   6.3° Ari
-Casa  9:   5.5° Tau
-Casa 10:   9.0° Gem
-Casa 11:  13.5° Cnc
-Casa 12:  15.0° Leo
+House  1:  12.2° Vir
+House  2:   6.3° Lib
+House  3:   5.5° Sco
+House  4:   9.0° Sgr
+House  5:  13.5° Cap
+House  6:  15.0° Aqr
+House  7:  12.2° Psc
+House  8:   6.3° Ari
+House  9:   5.5° Tau
+House 10:   9.0° Gem
+House 11:  13.5° Cnc
+House 12:  15.0° Leo
 
-Ascendente:  162.2479°
-Medio Cielo: 69.0379°
-ARMC:        67.3366°
-Vertice:     316.3110°
+Ascendant:  162.2479°
+Midheaven:  69.0379°
+ARMC:       67.3366°
+Vertex:     316.3110°
 ```
 
 The **ARMC** (Right Ascension of the Midheaven) is the same concept as local sidereal time, expressed in degrees instead of hours (ARMC in degrees = sidereal time in hours × 15). It is the starting point for calculating all house systems.
@@ -127,60 +127,60 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 14.5)
 lat, lon = 41.9028, 12.4964
 
-# Confronto: Placidus vs Uguale vs Segno intero
-for lettera, nome in [('P', 'Placidus'), ('E', 'Uguale'), ('W', 'Segno intero')]:
-    cusps, ascmc = ephem.houses(jd, lat, lon, ord(lettera))
-    print(f"\n{nome} (cuspide 1a = ASC = {ascmc[0]:.1f}°):")
+# Comparison: Placidus vs Equal vs Whole Sign
+for letter, name in [('P', 'Placidus'), ('E', 'Equal'), ('W', 'Whole Sign')]:
+    cusps, ascmc = ephem.houses(jd, lat, lon, ord(letter))
+    print(f"\n{name} (1st cusp = ASC = {ascmc[0]:.1f}°):")
     for i in range(12):
-        print(f"  Casa {i+1:2d}: {cusps[i]:.1f}°")
+        print(f"  House {i+1:2d}: {cusps[i]:.1f}°")
 
-# Ottenere il nome del sistema da una lettera
+# Get system name from letter
 print(ephem.house_name(ord('P')))  # "Placidus"
 print(ephem.house_name(ord('W')))  # "Whole Sign"
 ```
 
 ```
-Placidus (cuspide 1a = ASC = 162.2°):
-  Casa  1: 162.2°
-  Casa  2: 186.3°
-  Casa  3: 215.5°
-  Casa  4: 249.0°
-  Casa  5: 283.5°
-  Casa  6: 315.0°
-  Casa  7: 342.2°
-  Casa  8: 6.3°
-  Casa  9: 35.5°
-  Casa 10: 69.0°
-  Casa 11: 103.5°
-  Casa 12: 135.0°
+Placidus (1st cusp = ASC = 162.2°):
+  House  1: 162.2°
+  House  2: 186.3°
+  House  3: 215.5°
+  House  4: 249.0°
+  House  5: 283.5°
+  House  6: 315.0°
+  House  7: 342.2°
+  House  8: 6.3°
+  House  9: 35.5°
+  House 10: 69.0°
+  House 11: 103.5°
+  House 12: 135.0°
 
-Uguale (cuspide 1a = ASC = 162.2°):
-  Casa  1: 162.2°
-  Casa  2: 192.2°
-  Casa  3: 222.2°
-  Casa  4: 252.2°
-  Casa  5: 282.2°
-  Casa  6: 312.2°
-  Casa  7: 342.2°
-  Casa  8: 12.2°
-  Casa  9: 42.2°
-  Casa 10: 72.2°
-  Casa 11: 102.2°
-  Casa 12: 132.2°
+Equal (1st cusp = ASC = 162.2°):
+  House  1: 162.2°
+  House  2: 192.2°
+  House  3: 222.2°
+  House  4: 252.2°
+  House  5: 282.2°
+  House  6: 312.2°
+  House  7: 342.2°
+  House  8: 12.2°
+  House  9: 42.2°
+  House 10: 72.2°
+  House 11: 102.2°
+  House 12: 132.2°
 
-Segno intero (cuspide 1a = ASC = 162.2°):
-  Casa  1: 150.0°
-  Casa  2: 180.0°
-  Casa  3: 210.0°
-  Casa  4: 240.0°
-  Casa  5: 270.0°
-  Casa  6: 300.0°
-  Casa  7: 330.0°
-  Casa  8: 0.0°
-  Casa  9: 30.0°
-  Casa 10: 60.0°
-  Casa 11: 90.0°
-  Casa 12: 120.0°
+Whole Sign (1st cusp = ASC = 162.2°):
+  House  1: 150.0°
+  House  2: 180.0°
+  House  3: 210.0°
+  House  4: 240.0°
+  House  5: 270.0°
+  House  6: 300.0°
+  House  7: 330.0°
+  House  8: 0.0°
+  House  9: 30.0°
+  House 10: 60.0°
+  House 11: 90.0°
+  House 12: 120.0°
 
 Placidus
 Whole Sign
@@ -209,42 +209,42 @@ The function requires:
 
 - **ARMC**: the Right Ascension of the Midheaven (obtained from `houses()` as `ascmc[2]`)
 - **Geographic latitude** of the observer
-- **Obliquity of the ecliptic** (can be obtained with `calc_ut(jd, SE_ECL_NUT)`)
+- **Obliquity of the ecliptic** (can be obtained with `calc_ut(jd, ECL_NUT)`)
 - **House system** (the letter, such as `ord('P')`)
 - **Ecliptic longitude and latitude** of the planet
 
 ```python
 import libephemeris as ephem
 
-# 8 aprile 2024, ore 14:30 UT — Roma
+# April 8 2024, 14:30 UT — Rome
 jd = ephem.julday(2024, 4, 8, 14.5)
 lat, lon = 41.9028, 12.4964
 
-# 1. Calcola le case per ottenere ARMC e cuspidi
+# 1. Calculate houses to get ARMC and cusps
 cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
-armc = ascmc[2]  # ARMC in gradi
+armc = ascmc[2]  # ARMC in degrees
 
-# 2. Ottieni l'obliquità dell'eclittica
-nut, _ = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
-obliquity = nut[0]  # obliquità vera
+# 2. Get ecliptic obliquity
+nut, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
+obliquity = nut[0]  # true obliquity
 
-# 3. Calcola la posizione del Sole
-sun, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
-sun_lon = sun[0]   # longitudine eclittica
-sun_lat = sun[1]   # latitudine eclittica (quasi zero per il Sole)
+# 3. Calculate Sun position
+sun, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
+sun_lon = sun[0]   # ecliptic longitude
+sun_lat = sun[1]   # ecliptic latitude (near zero for the Sun)
 
-# 4. Determina in quale casa cade
+# 4. Determine which house it falls in
 pos = ephem.house_pos(armc, lat, obliquity, ord('P'), sun_lon, sun_lat)
-casa = int(pos)
-posizione = pos - casa  # quanto "avanti" nella casa (0.0 - 0.99)
+house = int(pos)
+position = pos - house  # how far along in the house (0.0 - 0.99)
 
-print(f"Il Sole è nella {casa}a casa")
-print(f"Posizione nella casa: {posizione:.2%}")
+print(f"The Sun is in house {house}")
+print(f"Position within house: {position:.2%}")
 ```
 
 ```
-Il Sole è nella 8a casa
-Posizione nella casa: 46.37%
+The Sun is in house 8
+Position within house: 46.37%
 ```
 
 ### All Planets in Their Houses
@@ -257,48 +257,48 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 14.5)
 lat, lon = 41.9028, 12.4964
 
-# Calcola case e obliquità
+# Calculate houses and obliquity
 cusps, ascmc = ephem.houses(jd, lat, lon, ord('P'))
 armc = ascmc[2]
-nut, _ = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+nut, _ = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 obliquity = nut[0]
 
-segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
-pianeti = [
-    (ephem.SE_SUN,      "Sole    "),
-    (ephem.SE_MOON,     "Luna    "),
-    (ephem.SE_MERCURY,  "Mercurio"),
-    (ephem.SE_VENUS,    "Venere  "),
-    (ephem.SE_MARS,     "Marte   "),
-    (ephem.SE_JUPITER,  "Giove   "),
-    (ephem.SE_SATURN,   "Saturno "),
+planets = [
+    (ephem.SUN,      "Sun     "),
+    (ephem.MOON,     "Moon    "),
+    (ephem.MERCURY,  "Mercury "),
+    (ephem.VENUS,    "Venus   "),
+    (ephem.MARS,     "Mars    "),
+    (ephem.JUPITER,  "Jupiter "),
+    (ephem.SATURN,   "Saturn  "),
 ]
 
-for body_id, nome in pianeti:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+for body_id, name in planets:
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     p_lon, p_lat = pos[0], pos[1]
 
-    # Segno e gradi
-    segno = segni[int(p_lon / 30)]
-    gradi = p_lon % 30
+    # Sign and degrees
+    sign = signs[int(p_lon / 30)]
+    deg = p_lon % 30
 
-    # Casa
+    # House
     hp = ephem.house_pos(armc, lat, obliquity, ord('P'), p_lon, p_lat)
-    casa = int(hp)
+    house = int(hp)
 
-    print(f"{nome}  {gradi:5.1f}° {segno}  →  casa {casa:2d}")
+    print(f"{name}  {deg:5.1f}° {sign}  →  house {house:2d}")
 ```
 
 ```
-Sole       19.2° Ari  →  casa  8
-Luna       17.0° Ari  →  casa  8
-Mercurio   24.9° Ari  →  casa  8
-Venere      4.2° Ari  →  casa  7
-Marte      12.9° Psc  →  casa  7
-Giove      19.0° Tau  →  casa  9
-Saturno    14.4° Psc  →  casa  7
+Sun        19.2° Ari  →  house  8
+Moon       17.0° Ari  →  house  8
+Mercury    24.9° Ari  →  house  8
+Venus       4.2° Ari  →  house  7
+Mars       12.9° Psc  →  house  7
+Jupiter    19.0° Tau  →  house  9
+Saturn     14.4° Psc  →  house  7
 ```
 
 ### Does Ecliptic Latitude Matter?
@@ -319,20 +319,20 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 14.5)
 lat, lon = 41.9028, 12.4964
 
-# Settore Gauquelin di Marte
-settore = ephem.gauquelin_sector(
-    jd, ephem.SE_MARS, 0,
+# Gauquelin sector of Mars
+sector = ephem.gauquelin_sector(
+    jd, ephem.MARS, 0,
     geopos=(lon, lat, 0.0)
 )
 
-num = int(settore)
-print(f"Marte è nel settore Gauquelin {num}")
-print(f"Settore 1 = levata, 10 = culminazione, 19 = tramonto, 28 = IC")
+num = int(sector)
+print(f"Mars is in Gauquelin sector {num}")
+print(f"Sector 1 = rising, 10 = culmination, 19 = setting, 28 = IC")
 ```
 
 ```
-Marte è nel settore Gauquelin 18
-Settore 1 = levata, 10 = culminazione, 19 = tramonto, 28 = IC
+Mars is in Gauquelin sector 18
+Sector 1 = rising, 10 = culmination, 19 = setting, 28 = IC
 ```
 
 Sectors are counted clockwise from the Ascendant: sector 1 is the rising point (Ascendant), 10 is the upper culmination (MC), 19 is the setting point (Descendant), and 28 is the lower culmination (IC). The most significant "Gauquelin zones" are the sectors immediately after rising (1–3) and immediately after culmination (10–12).
@@ -375,24 +375,24 @@ You can verify the situation for any latitude using `get_extreme_latitude_info`:
 ```python
 import libephemeris as ephem
 
-# Tromsø, Norvegia — dentro il circolo polare
+# Tromsø, Norway — inside the polar circle
 info = ephem.get_extreme_latitude_info(69.6)
 
-print(f"Latitudine: {info['latitude']}°")
-print(f"È estrema (>80°)?     {info['is_extreme']}")
-print(f"È polare (>{info['polar_threshold']:.1f}°)? {info['is_polar_circle']}")
-print(f"Sistemi che falliscono:  {info['affected_systems']}")
-print(f"Sistemi instabili:       {info['unstable_systems']}")
-print(f"Sistemi sempre stabili:  {info['stable_systems']}")
+print(f"Latitude: {info['latitude']}°")
+print(f"Is extreme (>80°)?     {info['is_extreme']}")
+print(f"Is polar (>{info['polar_threshold']:.1f}°)?   {info['is_polar_circle']}")
+print(f"Systems that fail:       {info['affected_systems']}")
+print(f"Unstable systems:        {info['unstable_systems']}")
+print(f"Always stable systems:   {info['stable_systems']}")
 ```
 
 ```
-Latitudine: 69.6°
-È estrema (>80°)?     False
-È polare (>66.6°)? True
-Sistemi che falliscono:  ['P', 'K', 'G']
-Sistemi instabili:       []
-Sistemi sempre stabili:  ['E', 'W', 'O', 'M', 'X', 'V', 'N']
+Latitude: 69.6°
+Is extreme (>80°)?     False
+Is polar (>66.6°)?   True
+Systems that fail:       ['P', 'K', 'G']
+Unstable systems:        []
+Always stable systems:   ['E', 'W', 'O', 'M', 'X', 'V', 'N']
 ```
 
 ### What Happens If You Try Placidus at the Pole?
@@ -403,24 +403,24 @@ If you call `houses()` with Placidus at a polar latitude, the library raises a `
 import libephemeris as ephem
 from libephemeris.exceptions import PolarCircleError
 
-jd = ephem.julday(2024, 6, 21, 12.0)  # Solstizio d'estate
+jd = ephem.julday(2024, 6, 21, 12.0)  # Summer solstice
 
 try:
     cusps, ascmc = ephem.houses(jd, 69.6, 19.0, ord('P'))
 except PolarCircleError as e:
-    print(f"Errore: {e}")
-    print(f"Latitudine: {e.latitude}°")
-    print(f"Soglia polare: {e.threshold:.2f}°")
-    print(f"Sistema: {e.house_system}")
+    print(f"Error: {e}")
+    print(f"Latitude: {e.latitude}°")
+    print(f"Polar threshold: {e.threshold:.2f}°")
+    print(f"System: {e.house_system}")
 ```
 
 ```
-Errore: swe_houses: Placidus house system cannot be calculated at latitude
+Error: swe_houses: Placidus house system cannot be calculated at latitude
   69.60°N (within Northern polar circle). Polar threshold for obliquity
   23.44° is ±66.56°.
-Latitudine: 69.6°
-Soglia polare: 66.56°
-Sistema: P
+Latitude: 69.6°
+Polar threshold: 66.56°
+System: P
 ```
 
 ### The Solution: `houses_with_fallback`
@@ -432,54 +432,54 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 6, 21, 12.0)
 
-# Tromsø — Placidus fallirà, il fallback userà Porfirio
-cusps, ascmc, usato_fallback, avviso = ephem.swe_houses_with_fallback(
+# Tromsø — Placidus will fail, fallback uses Porphyry
+cusps, ascmc, used_fallback, warning = ephem.houses_with_fallback(
     jd, 69.6, 19.0,
     hsys=ord('P'),
-    fallback_hsys=ord('O')   # Porfirio come alternativa
+    fallback_hsys=ord('O')   # Porphyry as alternative
 )
 
-if usato_fallback:
-    print(f"Attenzione: {avviso}")
-    print("Usando Porfirio al posto di Placidus")
+if used_fallback:
+    print(f"Warning: {warning}")
+    print("Using Porphyry instead of Placidus")
 else:
-    print("Placidus calcolato normalmente")
+    print("Placidus calculated normally")
 
-# Le cuspidi sono comunque disponibili
-segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+# Cusps are available regardless
+signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 for i in range(12):
     lon_c = cusps[i]
-    s = segni[int(lon_c / 30)]
-    g = lon_c % 30
-    print(f"Casa {i+1:2d}: {g:5.1f}° {s}")
+    sign = signs[int(lon_c / 30)]
+    deg = lon_c % 30
+    print(f"House {i+1:2d}: {deg:5.1f}° {sign}")
 ```
 
 ```
-Attenzione: Placidus house system unavailable at latitude 69.60°
+Warning: Placidus house system unavailable at latitude 69.60°
   (polar circle threshold: 66.56°). Using Porphyry as fallback.
-Usando Porfirio al posto di Placidus
-Casa  1:   9.6° Lib
-Casa  2:  12.3° Sco
-Casa  3:  15.0° Sgr
-Casa  4:  17.7° Cap
-Casa  5:  15.0° Aqr
-Casa  6:  12.3° Psc
-Casa  7:   9.6° Ari
-Casa  8:  12.3° Tau
-Casa  9:  15.0° Gem
-Casa 10:  17.7° Cnc
-Casa 11:  15.0° Leo
-Casa 12:  12.3° Vir
+Using Porphyry instead of Placidus
+House  1:   9.6° Lib
+House  2:  12.3° Sco
+House  3:  15.0° Sgr
+House  4:  17.7° Cap
+House  5:  15.0° Aqr
+House  6:  12.3° Psc
+House  7:   9.6° Ari
+House  8:  12.3° Tau
+House  9:  15.0° Gem
+House 10:  17.7° Cnc
+House 11:  15.0° Leo
+House 12:  12.3° Vir
 ```
 
 The function returns four values:
 
 - **cusps** — the 12 cusps (calculated with the primary system or the fallback)
 - **ascmc** — the 8 angles (Ascendant, MC, ARMC, Vertex, etc.)
-- **usato_fallback** — `True` if it had to use the alternative system
-- **avviso** — a warning message explaining what happened, or `None` if everything went well
+- **used_fallback** — `True` if it had to use the alternative system
+- **warning** — a warning message explaining what happened, or `None` if everything went well
 
 ### Practical Advice
 
@@ -487,7 +487,7 @@ If your software needs to work for users all over the world, always use `houses_
 
 - For normal latitudes (the vast majority of cases), you get exactly the system you requested
 - For polar latitudes, you get a reasonable result with Porphyry, instead of a crash
-- The `usato_fallback` flag allows you to inform the user that the result uses a different system
+- The `used_fallback` flag allows you to inform the user that the result uses a different system
 
 Alternatively, if you work with Vedic or Hellenistic astrology, directly use the Whole Sign (`W`) or Equal (`E`) system — they work everywhere without needing a fallback.
 

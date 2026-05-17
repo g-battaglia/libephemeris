@@ -63,7 +63,7 @@ In daily practice, you will almost never need this function: `fixstar2_ut` does 
 
 The library includes an internal catalog of about 100 stars, based on data from ESA's **Hipparcos** satellite (1989–1993). Hipparcos measured the position, proper motion, and magnitude of over 118,000 stars with unprecedented precision (about 1 thousandth of an arcsecond).
 
-The catalog covers all the important stars for astrology and observational astronomy: the 15 Behenian fixed stars (stelle di Agrippa), the four "royal" stars (Aldebaran, Regulus, Antares, Fomalhaut), the brightest stars in the sky, and the most used zodiacal stars.
+The catalog covers all the important stars for astrology and observational astronomy: the 15 Behenian fixed stars, the four "royal" stars (Aldebaran, Regulus, Antares, Fomalhaut), the brightest stars in the sky, and the most used zodiacal stars.
 
 ### Calculating a star's position
 
@@ -75,20 +75,20 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Position of Regulus
-nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.SEFLG_SPEED)
+star_name, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.FLG_SPEED)
 
 if not err:
     lon = pos[0]  # ecliptic longitude
     lat = pos[1]  # ecliptic latitude
     vel = pos[3]  # speed in longitude (degrees/day)
 
-    segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+    signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
              "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
-    segno = segni[int(lon / 30)]
-    gradi = lon % 30
+    sign = signs[int(lon / 30)]
+    deg = lon % 30
 
-    print(f"{nome}")
-    print(f"Position: {gradi:.2f}° {segno}")
+    print(f"{star_name}")
+    print(f"Position: {deg:.2f}° {sign}")
     print(f"Latitude: {lat:.4f}°")
     print(f"Speed: {vel:.6f}°/day")
 else:
@@ -104,7 +104,7 @@ Speed: -0.000071°/day
 
 The function returns four values:
 
-- **nome** — the full name of the star in the `"Name,Nomenclature"` format (e.g. `"Regulus,alLeo"` where `alLeo` stands for "alpha Leonis")
+- **star_name** — the full name of the star in the `"Name,Nomenclature"` format (e.g. `"Regulus,alLeo"` where `alLeo` stands for "alpha Leonis")
 - **pos** — a tuple of 6 values: `(longitude, latitude, distance, lon_speed, lat_speed, dist_speed)`. The distance is fixed at 100,000 AU (stars are effectively at an infinite distance for our calculations)
 - **flag** — the returned flags (usually identical to those passed)
 - **err** — an error string, empty if everything went well
@@ -118,7 +118,7 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
-stelle = [
+stars = [
     "Aldebaran",    # Bull's Eye — "Watcher of the East"
     "Regulus",      # Lion's Heart — "Watcher of the North"
     "Antares",      # Scorpion's Heart — "Watcher of the West"
@@ -133,17 +133,17 @@ stelle = [
     "Canopus",      # The second brightest in the sky
 ]
 
-segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
-for star in stelle:
-    nome, pos, flag, err = ephem.fixstar2_ut(star, jd, 0)
+for star in stars:
+    star_name, pos, flag, err = ephem.fixstar2_ut(star, jd, 0)
     if not err:
         lon = pos[0]
-        segno = segni[int(lon / 30)]
-        gradi = lon % 30
-        nome_corto = nome.split(",")[0]
-        print(f"{nome_corto:12s}  {gradi:5.1f}° {segno}")
+        sign = signs[int(lon / 30)]
+        deg = lon % 30
+        short_name = star_name.split(",")[0]
+        print(f"{short_name:12s}  {deg:5.1f}° {sign}")
 ```
 
 ```
@@ -170,10 +170,10 @@ import libephemeris as ephem
 
 # Magnitude of some stars
 for star in ["Sirius", "Vega", "Polaris", "Algol"]:
-    nome, mag, err = ephem.fixstar2_mag(star)
+    star_name, mag, err = ephem.fixstar2_mag(star)
     if not err:
-        nome_corto = nome.split(",")[0]
-        print(f"{nome_corto:12s}  magnitude {mag:+.2f}")
+        short_name = star_name.split(",")[0]
+        print(f"{short_name:12s}  magnitude {mag:+.2f}")
 ```
 
 ```
@@ -185,7 +185,7 @@ Algol         magnitude +2.12
 
 ### Equatorial coordinates
 
-If you need Right Ascension and Declination (to point a telescope, for example), add the `SEFLG_EQUATORIAL` flag:
+If you need Right Ascension and Declination (to point a telescope, for example), add the `FLG_EQUATORIAL` flag:
 
 ```python
 import libephemeris as ephem
@@ -193,7 +193,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 nome, pos, flag, err = ephem.fixstar2_ut(
-    "Sirius", jd, ephem.SEFLG_EQUATORIAL
+    "Sirius", jd, ephem.FLG_EQUATORIAL
 )
 
 if not err:
@@ -241,46 +241,46 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Stars to check (the four royal stars + some important ones)
-stelle_da_cercare = [
+stars_to_check = [
     "Aldebaran", "Regulus", "Antares", "Fomalhaut",
     "Sirius", "Spica", "Algol", "Vega"
 ]
 
-pianeti = [
-    (ephem.SE_SUN,     "Sun"),
-    (ephem.SE_MOON,    "Moon"),
-    (ephem.SE_MERCURY, "Mercury"),
-    (ephem.SE_VENUS,   "Venus"),
-    (ephem.SE_MARS,    "Mars"),
-    (ephem.SE_JUPITER, "Jupiter"),
-    (ephem.SE_SATURN,  "Saturn"),
+planets = [
+    (ephem.SUN,     "Sun"),
+    (ephem.MOON,    "Moon"),
+    (ephem.MERCURY, "Mercury"),
+    (ephem.VENUS,   "Venus"),
+    (ephem.MARS,    "Mars"),
+    (ephem.JUPITER, "Jupiter"),
+    (ephem.SATURN,  "Saturn"),
 ]
 
 # Calculate planets' positions
-pos_pianeti = {}
-for body_id, nome_p in pianeti:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
-    pos_pianeti[nome_p] = pos[0]  # ecliptic longitude
+planet_lons = {}
+for body_id, planet_name in planets:
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
+    planet_lons[planet_name] = pos[0]  # ecliptic longitude
 
 # Check conjunctions
-orbe = 1.0  # 1 degree of tolerance
+orb = 1.0  # 1 degree of tolerance
 
-for star in stelle_da_cercare:
-    nome_s, pos_s, _, err = ephem.fixstar2_ut(star, jd, 0)
+for star in stars_to_check:
+    star_name, pos_s, _, err = ephem.fixstar2_ut(star, jd, 0)
     if err:
         continue
 
     lon_s = pos_s[0]
-    nome_corto = nome_s.split(",")[0]
+    short_name = star_name.split(",")[0]
 
-    for nome_p, lon_p in pos_pianeti.items():
+    for planet_name, lon_p in planet_lons.items():
         # Angular distance (handling the 360°→0° "jump")
         diff = abs(lon_p - lon_s)
         if diff > 180:
             diff = 360 - diff
 
-        if diff <= orbe:
-            print(f"★ {nome_p} conjunct {nome_corto}! "
+        if diff <= orb:
+            print(f"★ {planet_name} conjunct {short_name}! "
                   f"(distance: {diff:.2f}°)")
 ```
 
@@ -384,6 +384,6 @@ In this chapter, we learned how to work with fixed stars.
 
 **Functions introduced:**
 
-- `fixstar2_ut(nome, jd, flag)` — calculates the ecliptic (or equatorial with `SEFLG_EQUATORIAL`) position of a star, accepting names in many formats
+- `fixstar2_ut(nome, jd, flag)` — calculates the ecliptic (or equatorial with `FLG_EQUATORIAL`) position of a star, accepting names in many formats
 - `fixstar2_mag(nome)` — returns the visual magnitude of a star
 - `propagate_proper_motion(ra, dec, pm_ra, pm_dec, from_jd, to_jd)` — manually propagates a star's proper motion between two epochs

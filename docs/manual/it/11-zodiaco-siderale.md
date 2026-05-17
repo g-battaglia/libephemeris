@@ -35,10 +35,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Posizione tropicale (default)
-pos_trop, _ = ephem.calc_ut(jd, ephem.SE_SUN, ephem.SEFLG_SPEED)
+pos_trop, _ = ephem.calc_ut(jd, ephem.SUN, ephem.FLG_SPEED)
 
 # Ayanamsha Lahiri
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 ayan = ephem.get_ayanamsa_ut(jd)
 
 # Posizione siderale = tropicale - ayanamsha
@@ -79,7 +79,7 @@ Oggi l'ayanamsha è circa 24°, e cresce di circa 50.3" all'anno (il tasso di pr
 ```python
 import libephemeris as ephem
 
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Ayanamsha in diverse epoche
 for anno in [0, 500, 1000, 1500, 2000, 2024, 2100]:
@@ -100,7 +100,7 @@ Anno  2100: ayanamsha =  +25.25°
 
 Noterai che l'ayanamsha è negativa nell'antichità (lo zodiaco siderale era "avanti" rispetto al tropicale) e positiva oggi (il tropicale è "avanti").
 
-### Usare il flag SEFLG_SIDEREAL
+### Usare il flag FLG_SIDEREAL
 
 Invece di calcolare l'ayanamsha e sottrarla manualmente, puoi chiedere direttamente alla libreria di restituire le posizioni in coordinate siderali:
 
@@ -110,12 +110,12 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Imposta il sistema siderale
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Calcola direttamente in siderale
 pos_sid, _ = ephem.calc_ut(
-    jd, ephem.SE_SUN,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED
+    jd, ephem.SUN,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED
 )
 
 segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
@@ -131,7 +131,7 @@ print(f"Sole siderale (Lahiri): {gradi:.2f}° {segno}")
 Sole siderale (Lahiri): 24.95° Psc
 ```
 
-Il flag `SEFLG_SIDEREAL` (65536) può essere combinato con qualsiasi altro flag: `SEFLG_SPEED`, `SEFLG_EQUATORIAL`, ecc.
+Il flag `FLG_SIDEREAL` (65536) può essere combinato con qualsiasi altro flag: `FLG_SPEED`, `FLG_EQUATORIAL`, ecc.
 
 ---
 
@@ -183,13 +183,13 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 sistemi = [
-    (ephem.SE_SIDM_LAHIRI,         "Lahiri"),
-    (ephem.SE_SIDM_FAGAN_BRADLEY,  "Fagan-Bradley"),
-    (ephem.SE_SIDM_RAMAN,          "Raman"),
-    (ephem.SE_SIDM_KRISHNAMURTI,   "Krishnamurti"),
-    (ephem.SE_SIDM_TRUE_CITRA,     "True Citra"),
-    (ephem.SE_SIDM_TRUE_REVATI,    "True Revati"),
-    (ephem.SE_SIDM_GALCENT_0SAG,   "Galactic 0 Sag"),
+    (ephem.SIDM_LAHIRI,         "Lahiri"),
+    (ephem.SIDM_FAGAN_BRADLEY,  "Fagan-Bradley"),
+    (ephem.SIDM_RAMAN,          "Raman"),
+    (ephem.SIDM_KRISHNAMURTI,   "Krishnamurti"),
+    (ephem.SIDM_TRUE_CITRA,     "True Citra"),
+    (ephem.SIDM_TRUE_REVATI,    "True Revati"),
+    (ephem.SIDM_GALCENT_0SAG,   "Galactic 0 Sag"),
 ]
 
 print(f"Ayanamsha al {8}/04/2024:\n")
@@ -199,7 +199,7 @@ for modo, nome in sistemi:
     print(f"  {nome:20s}  {ayan:.4f}°")
 
 # Il nome di un sistema
-nome = ephem.get_ayanamsa_name(ephem.SE_SIDM_LAHIRI)
+nome = ephem.get_ayanamsa_name(ephem.SIDM_LAHIRI)
 print(f"\nNome: {nome}")
 ```
 
@@ -231,7 +231,7 @@ import libephemeris as ephem
 J2000 = 2451545.0
 
 ephem.set_sid_mode(
-    ephem.SE_SIDM_USER,
+    ephem.SIDM_USER,
     t0=J2000,       # epoca di riferimento
     ayan_t0=23.5     # valore dell'ayanamsha a quell'epoca
 )
@@ -241,9 +241,9 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 ayan = ephem.get_ayanamsa_ut(jd)
 print(f"Ayanamsha custom al 2024: {ayan:.4f}°")
 
-# E usa SEFLG_SIDEREAL per le posizioni
-pos, _ = ephem.calc_ut(jd, ephem.SE_SUN,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+# E usa FLG_SIDEREAL per le posizioni
+pos, _ = ephem.calc_ut(jd, ephem.SUN,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 print(f"Sole siderale custom: {pos[0]:.4f}°")
 ```
 
@@ -271,7 +271,7 @@ jd = ephem.julday(1947, 8, 14, 18.5)
 lat, lon = 28.6139, 77.2090  # Nuova Delhi
 
 # Imposta siderale Lahiri
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 segni = ["Mesha", "Vrishabha", "Mithuna", "Karka",
          "Simha", "Kanya", "Tula", "Vrischika",
@@ -279,27 +279,27 @@ segni = ["Mesha", "Vrishabha", "Mithuna", "Karka",
 
 # Pianeti in siderale
 pianeti = [
-    (ephem.SE_SUN,      "Surya  "),
-    (ephem.SE_MOON,     "Chandra"),
-    (ephem.SE_MARS,     "Mangal "),
-    (ephem.SE_MERCURY,  "Budha  "),
-    (ephem.SE_JUPITER,  "Guru   "),
-    (ephem.SE_VENUS,    "Shukra "),
-    (ephem.SE_SATURN,   "Shani  "),
-    (ephem.SE_MEAN_NODE,"Rahu   "),
+    (ephem.SUN,      "Surya  "),
+    (ephem.MOON,     "Chandra"),
+    (ephem.MARS,     "Mangal "),
+    (ephem.MERCURY,  "Budha  "),
+    (ephem.JUPITER,  "Guru   "),
+    (ephem.VENUS,    "Shukra "),
+    (ephem.SATURN,   "Shani  "),
+    (ephem.MEAN_NODE,"Rahu   "),
 ]
 
 print("Tema natale siderale (Lahiri):\n")
 for body_id, nome in pianeti:
     pos, _ = ephem.calc_ut(jd, body_id,
-        ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+        ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
     segno = segni[int(pos[0] / 30)]
     gradi = pos[0] % 30
     print(f"  {nome}  {gradi:5.1f}°  {segno}")
 
 # Ketu = opposto a Rahu
-rahu_pos, _ = ephem.calc_ut(jd, ephem.SE_MEAN_NODE,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+rahu_pos, _ = ephem.calc_ut(jd, ephem.MEAN_NODE,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 ketu_lon = (rahu_pos[0] + 180) % 360
 segno_k = segni[int(ketu_lon / 30)]
 gradi_k = ketu_lon % 30
@@ -347,11 +347,11 @@ reggenti = [
 ]
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 # Nakshatra della Luna
-moon, _ = ephem.calc_ut(jd, ephem.SE_MOON,
-    ephem.SEFLG_SIDEREAL | ephem.SEFLG_SPEED)
+moon, _ = ephem.calc_ut(jd, ephem.MOON,
+    ephem.FLG_SIDEREAL | ephem.FLG_SPEED)
 
 nak_num = int(moon[0] / (360 / 27))  # 13°20' per Nakshatra
 nak_pos = moon[0] % (360 / 27)       # posizione nel Nakshatra
@@ -383,7 +383,7 @@ Per calcoli avanzati dove hai bisogno di specificare flag aggiuntivi o vuoi il f
 ```python
 import libephemeris as ephem
 
-ephem.set_sid_mode(ephem.SE_SIDM_LAHIRI)
+ephem.set_sid_mode(ephem.SIDM_LAHIRI)
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
@@ -391,7 +391,7 @@ jd = ephem.julday(2024, 4, 8, 12.0)
 ayan_simple = ephem.get_ayanamsa_ut(jd)
 
 # Versione estesa (restituisce anche il flag)
-retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, ephem.SEFLG_SWIEPH)
+retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, ephem.FLG_SWIEPH)
 
 print(f"Ayanamsha (semplice): {ayan_simple:.6f}°")
 print(f"Ayanamsha (estesa):   {ayan_ex:.6f}°")
@@ -423,4 +423,4 @@ In questo capitolo abbiamo esplorato lo zodiaco siderale, fondamentale per l'ast
 - `get_ayanamsa_ut(jd)` — restituisce l'ayanamsha in gradi per una data in UT
 - `get_ayanamsa_ex_ut(jd, flags)` — versione estesa che restituisce anche il flag di ritorno
 - `get_ayanamsa_name(sid_mode)` — restituisce il nome leggibile di un sistema di ayanamsha (es. `"Lahiri"`)
-- `SEFLG_SIDEREAL` (65536) — flag da aggiungere a `calc_ut` per ottenere posizioni direttamente in coordinate siderali
+- `FLG_SIDEREAL` (65536) — flag da aggiungere a `calc_ut` per ottenere posizioni direttamente in coordinate siderali

@@ -27,12 +27,12 @@ import libephemeris as ephem
 
 # Dedicated IDs for the most important bodies
 bodies = [
-    (ephem.SE_CHIRON,  "Chiron"),
-    (ephem.SE_PHOLUS,  "Pholus"),
-    (ephem.SE_CERES,   "Ceres"),
-    (ephem.SE_PALLAS,  "Pallas"),
-    (ephem.SE_JUNO,    "Juno"),
-    (ephem.SE_VESTA,   "Vesta"),
+    (ephem.CHIRON,  "Chiron"),
+    (ephem.PHOLUS,  "Pholus"),
+    (ephem.CERES,   "Ceres"),
+    (ephem.PALLAS,  "Pallas"),
+    (ephem.JUNO,    "Juno"),
+    (ephem.VESTA,   "Vesta"),
 ]
 
 jd = ephem.julday(2024, 4, 8, 12.0)
@@ -41,7 +41,7 @@ signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 for body_id, name in bodies:
-    pos, _ = ephem.calc_ut(jd, body_id, ephem.SEFLG_SPEED)
+    pos, _ = ephem.calc_ut(jd, body_id, ephem.FLG_SPEED)
     sign = signs[int(pos[0] / 30)]
     degrees = pos[0] % 30
     print(f"{name:10s}  {degrees:5.1f}° {sign}")
@@ -62,10 +62,10 @@ For TNOs and other bodies without a dedicated ID, you use the **catalog number +
 import libephemeris as ephem
 
 # Eris (number 136199)
-SE_ERIS = ephem.SE_AST_OFFSET + 136199  # = 146199
+ERIS = ephem.AST_OFFSET + 136199  # = 146199
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, SE_ERIS, ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, SE_ERIS, ephem.FLG_SPEED)
 print(f"Eris: {pos[0]:.2f}°")
 ```
 
@@ -97,7 +97,7 @@ ephem.set_auto_spk_download(True)
 
 # Now calc_ut will download the SPK if necessary
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, ephem.SE_CERES, ephem.SEFLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ephem.CERES, ephem.FLG_SPEED)
 print(f"Ceres (with automatic SPK): {pos[0]:.4f}°")
 ```
 
@@ -119,7 +119,7 @@ import libephemeris as ephem
 # Download the SPK for Ceres and register it
 path = ephem.download_and_register_spk(
     "1;",             # identifier for JPL Horizons
-    ephem.SE_CERES,   # body ID in the library
+    ephem.CERES,   # body ID in the library
     "2000-01-01",     # start date
     "2050-01-01",     # end date
 )
@@ -142,7 +142,7 @@ for body_id, (path, naif_id) in bodies.items():
     print(f"Body {body_id}: NAIF={naif_id}, file={path}")
 
 # Does a specific body have the SPK?
-if ephem.is_spk_available_for_body(ephem.SE_CERES):
+if ephem.is_spk_available_for_body(ephem.CERES):
     print("Ceres: SPK available")
 ```
 
@@ -159,7 +159,7 @@ The library knows the SPK download parameters for 37+ bodies. You can ensure an 
 import libephemeris as ephem
 
 # Ensure Vesta's SPK is available
-success = ephem.ensure_major_asteroid_spk(ephem.SE_VESTA)
+success = ephem.ensure_major_asteroid_spk(ephem.VESTA)
 if success:
     print("Vesta's SPK ready")
 

@@ -34,8 +34,8 @@ The single largest time sink. The LEB comparison tests iterate over hundreds of 
 ```python
 # test_extended_lunar.py — runs for each of 6 ecliptic bodies × 6 test classes
 for jd in ext_dates_500:  # 500 dates!
-    ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
-    leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, SEFLG_SPEED)
+    ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+    leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
 ```
 
 Each `compare.skyfield()` call:

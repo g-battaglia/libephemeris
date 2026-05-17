@@ -10,7 +10,7 @@ This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephem
 - [Precision Differences](#precision-differences)
 - [Features Not Yet Implemented](#features-not-yet-implemented)
 - [Thread Safety with EphemerisContext](#thread-safety-with-ephemeriscontext)
-- [SEFLG_MOSEPH (Moshier Ephemeris Flag)](#seflg_moseph-moshier-ephemeris-flag)
+- [FLG_MOSEPH (Moshier Ephemeris Flag)](#flg_moseph-moshier-ephemeris-flag)
 - [Calculation Backend](#calculation-backend)
 - [Migration Checklist](#migration-checklist)
 - [Reporting Issues](#reporting-issues)
@@ -20,7 +20,7 @@ This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephem
 `libephemeris` is designed as a **drop-in replacement** for `pyswisseph` in most common use cases. It provides:
 
 - Same function names (with both `swe_` prefixed and unprefixed aliases)
-- Same flag constants (`SEFLG_*`, `SE_SIDM_*`, `SE_*`)
+- Same flag and body constants (`FLG_*`, `SIDM_*`, `SUN`, `MOON`, etc.)
 - Same return value structures
 - Same behavior for global state management
 
@@ -52,14 +52,14 @@ import swisseph as swe
 planet = swe.SUN
 flag = swe.FLG_SPEED
 
-# After (libephemeris) - Option 1: Same style
+# After (libephemeris) - Option 1: Same style (constants have identical names)
 import libephemeris as swe
-planet = swe.SE_SUN   # Note: SE_ prefix is used
-flag = swe.SEFLG_SPEED
+planet = swe.SUN
+flag = swe.FLG_SPEED
 
 # After (libephemeris) - Option 2: Explicit constants import (recommended)
 import libephemeris as swe
-from libephemeris.constants import SE_SUN, SEFLG_SPEED
+from libephemeris.constants import SUN, FLG_SPEED
 ```
 
 ---
@@ -80,16 +80,16 @@ Most functions are available with **both** the `swe_` prefix and without:
 
 ### Constant Names
 
-LibEphemeris uses `SE_` and `SEFLG_` prefixes consistently:
+LibEphemeris uses the **same constant names** as pyswisseph — no prefix changes needed:
 
 | pyswisseph | LibEphemeris |
 |------------|--------------|
-| `swe.SUN` | `SE_SUN` (0) |
-| `swe.MOON` | `SE_MOON` (1) |
-| `swe.FLG_SPEED` | `SEFLG_SPEED` |
-| `swe.FLG_SIDEREAL` | `SEFLG_SIDEREAL` |
-| `swe.FLG_TOPOCTR` | `SEFLG_TOPOCTR` |
-| `swe.SIDM_LAHIRI` | `SE_SIDM_LAHIRI` (1) |
+| `swe.SUN` | `SUN` (0) |
+| `swe.MOON` | `MOON` (1) |
+| `swe.FLG_SPEED` | `FLG_SPEED` |
+| `swe.FLG_SIDEREAL` | `FLG_SIDEREAL` |
+| `swe.FLG_TOPOCTR` | `FLG_TOPOCTR` |
+| `swe.SIDM_LAHIRI` | `SIDM_LAHIRI` (1) |
 
 ### House Cusp Array Indexing
 
@@ -187,7 +187,7 @@ Affected functions:
 Fixed star velocity calculations return 0:
 
 ```python
-pos, _ = ephem.fixstar_ut("Aldebaran", jd, SEFLG_SPEED)
+pos, _ = ephem.fixstar_ut("Aldebaran", jd, FLG_SPEED)
 # pos[3], pos[4], pos[5] are 0.0 (velocities not implemented)
 ```
 
@@ -267,7 +267,7 @@ import libephemeris as swe
 swe.set_topo(12.5, 41.9, 0)  # Rome
 swe.set_sid_mode(1)  # Lahiri
 
-pos, _ = swe.calc_ut(2451545.0, swe.SE_SUN, swe.SEFLG_SIDEREAL)
+pos, _ = swe.calc_ut(2451545.0, swe.SUN, swe.FLG_SIDEREAL)
 ```
 
 **Warning**: Do NOT use the global API in multi-threaded applications. Different threads modifying global state (topo, sidereal mode) will cause race conditions.
@@ -277,7 +277,8 @@ pos, _ = swe.calc_ut(2451545.0, swe.SE_SUN, swe.SEFLG_SIDEREAL)
 For multi-threaded applications, use `EphemerisContext`:
 
 ```python
-from libephemeris import EphemerisContext, SE_SUN, SE_MOON, SEFLG_SIDEREAL
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN, MOON, FLG_SIDEREAL
 
 # Each thread creates its own context with isolated state
 ctx = EphemerisContext()
@@ -285,15 +286,16 @@ ctx.set_topo(12.5, 41.9, 0)    # Rome - isolated to this context
 ctx.set_sid_mode(1)            # Lahiri - isolated to this context
 
 # Thread-safe calculations
-sun, _ = ctx.calc_ut(2451545.0, SE_SUN, SEFLG_SIDEREAL)
-moon, _ = ctx.calc_ut(2451545.0, SE_MOON, SEFLG_SIDEREAL)
+sun, _ = ctx.calc_ut(2451545.0, SUN, FLG_SIDEREAL)
+moon, _ = ctx.calc_ut(2451545.0, MOON, FLG_SIDEREAL)
 cusps, ascmc = ctx.houses(2451545.0, 41.9, 12.5, ord('P'))
 ```
 
 ### Multi-Threading Example
 
 ```python
-from libephemeris import EphemerisContext, SE_SUN, SE_MOON, SEFLG_SIDEREAL
+from libephemeris import EphemerisContext
+from libephemeris.constants import SUN, MOON, FLG_SIDEREAL
 from concurrent.futures import ThreadPoolExecutor
 
 def calculate_chart(location: dict, jd: float) -> dict:
@@ -303,8 +305,8 @@ def calculate_chart(location: dict, jd: float) -> dict:
     ctx.set_topo(location['lon'], location['lat'], 0)
     ctx.set_sid_mode(1)  # Lahiri
 
-    sun, _ = ctx.calc_ut(jd, SE_SUN, SEFLG_SIDEREAL)
-    moon, _ = ctx.calc_ut(jd, SE_MOON, SEFLG_SIDEREAL)
+    sun, _ = ctx.calc_ut(jd, SUN, FLG_SIDEREAL)
+    moon, _ = ctx.calc_ut(jd, MOON, FLG_SIDEREAL)
     cusps, ascmc = ctx.houses(jd, location['lat'], location['lon'], ord('P'))
 
     return {
@@ -374,15 +376,15 @@ ctx3.set_sid_mode(27) # True Citra
 
 ---
 
-## SEFLG_MOSEPH (Moshier Ephemeris Flag)
+## FLG_MOSEPH (Moshier Ephemeris Flag)
 
-The `SEFLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in LibEphemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `SEFLG_MOSEPH` is passed. Code that previously used `SEFLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
+The `FLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in LibEphemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `FLG_MOSEPH` is passed. Code that previously used `FLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
 
 ```python
-# This still works, but SEFLG_MOSEPH is silently ignored:
-pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_MOSEPH | swe.SEFLG_SPEED)
+# This still works, but FLG_MOSEPH is silently ignored:
+pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_MOSEPH | swe.FLG_SPEED)
 # Equivalent to:
-pos, _ = swe.calc_ut(jd, swe.SE_SUN, swe.SEFLG_SPEED)
+pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SPEED)
 ```
 
 ---
@@ -420,7 +422,7 @@ See the [LEB Technical Guide](../leb/guide.md) for details.
 ## Migration Checklist
 
 - [ ] Replace `import swisseph as swe` with `import libephemeris as swe`
-- [ ] Update constant names if using unprefixed versions (`SUN` -> `SE_SUN`)
+- [ ] Constants use the same names as pyswisseph (`SUN`, `MOON`, `FLG_SPEED`, etc.) — no changes needed
 - [ ] Check house cusp array indexing (0-based in LibEphemeris)
 - [ ] Verify date range is within ephemeris coverage (1550-2650 for DE440)
 - [ ] For multi-threaded apps: migrate to `EphemerisContext` API

@@ -22,7 +22,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 18.0)
 
 # Position of the Moon — note the speed
-pos, _ = ephem.calc_ut(jd, ephem.SE_MOON, 0)
+pos, _ = ephem.calc_ut(jd, ephem.MOON, 0)
 
 print(f"Moon: {pos[0]:.4f}° of ecliptic longitude")
 print(f"Latitude: {pos[1]:+.4f}°")
@@ -66,10 +66,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Mean node
-pos_mean, _ = ephem.calc_ut(jd, ephem.SE_MEAN_NODE, 0)
+pos_mean, _ = ephem.calc_ut(jd, ephem.MEAN_NODE, 0)
 
 # True node
-pos_true, _ = ephem.calc_ut(jd, ephem.SE_TRUE_NODE, 0)
+pos_true, _ = ephem.calc_ut(jd, ephem.TRUE_NODE, 0)
 
 diff = pos_true[0] - pos_mean[0]
 print(f"Mean node: {pos_mean[0]:.4f}°")
@@ -125,10 +125,10 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Mean apogee (via calc_ut)
-mean, _ = ephem.calc_ut(jd, ephem.SE_MEAN_APOG, 0)
+mean, _ = ephem.calc_ut(jd, ephem.MEAN_APOG, 0)
 
 # Osculating apogee (via calc_ut)
-oscu, _ = ephem.calc_ut(jd, ephem.SE_OSCU_APOG, 0)
+oscu, _ = ephem.calc_ut(jd, ephem.OSCU_APOG, 0)
 
 # Interpolated apogee (dedicated function, requires JD in TT)
 jd_tt = jd + ephem.deltat(jd)

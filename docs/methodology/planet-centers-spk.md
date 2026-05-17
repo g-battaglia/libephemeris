@@ -161,7 +161,7 @@ import libephemeris as eph
 
 # planet_centers.bsp is loaded automatically if present
 # Jupiter now returns planet center, not barycenter
-pos, _ = eph.swe_calc_ut(jd, eph.SE_JUPITER, 0)
+pos, _ = eph.swe_calc_ut(jd, eph.JUPITER, 0)
 ```
 
 ### Verifying Planet Centers

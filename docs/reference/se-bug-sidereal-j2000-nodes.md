@@ -2,8 +2,8 @@
 
 ## Summary
 
-pyswisseph silently ignores `SEFLG_J2000` for four lunar bodies when
-`SEFLG_SIDEREAL` is also set:
+pyswisseph silently ignores `FLG_J2000` for four lunar bodies when
+`FLG_SIDEREAL` is also set:
 
 | Body | `SIDEREAL + J2000` in pyswisseph |
 |------|----------------------------------|
@@ -14,12 +14,12 @@ pyswisseph silently ignores `SEFLG_J2000` for four lunar bodies when
 | `SE_INTP_APOG` (21) | **J2000 silently ignored** |
 | `SE_INTP_PERG` (22) | **J2000 silently ignored** |
 
-LibEphemeris intentionally corrects this: `SEFLG_J2000` is honored for
+LibEphemeris intentionally corrects this: `FLG_J2000` is honored for
 **all** bodies uniformly.
 
-**Impact for users:** If you use `SEFLG_SIDEREAL` without `SEFLG_J2000`
+**Impact for users:** If you use `FLG_SIDEREAL` without `FLG_J2000`
 (the vast majority of use cases), there is zero difference. The divergence
-only affects the specific combination `SEFLG_SIDEREAL | SEFLG_J2000` on
+only affects the specific combination `FLG_SIDEREAL | FLG_J2000` on
 these four bodies.
 
 ---
@@ -133,7 +133,7 @@ expected for a uniform coordinate transformation.
 ### Algorithm
 
 For all Pipeline B bodies (MeanNode, MeanApog, TrueNode, OscuApog,
-IntpApog, IntpPerg), when both `SEFLG_SIDEREAL` and `SEFLG_J2000` are
+IntpApog, IntpPerg), when both `FLG_SIDEREAL` and `FLG_J2000` are
 set:
 
 1. Compute tropical ecliptic-of-date position.
@@ -159,7 +159,7 @@ The fix touches two files:
     used for all bodies when J2000 is requested.
 
 - **`libephemeris/planets.py`** (Skyfield computation path):
-  - Removed `_eff_flags = iflag & ~SEFLG_J2000` logic from TrueNode,
+  - Removed `_eff_flags = iflag & ~FLG_J2000` logic from TrueNode,
     OscuApog, and IntpApog/IntpPerg handlers. These bodies now use
     `iflag` directly, matching the MeanNode/MeanApog pattern.
 

@@ -46,7 +46,7 @@ The ecliptic and the celestial equator intersect at two points:
 
 ### 💻 Code: obtaining the obliquity of the ecliptic
 
-With LibEphemeris you can get the exact value of the obliquity for any date. The "pseudo-planet" `SE_ECL_NUT` returns information about obliquity and nutation:
+With LibEphemeris you can get the exact value of the obliquity for any date. The "pseudo-planet" `ECL_NUT` returns information about obliquity and nutation:
 
 ```python
 import libephemeris as ephem
@@ -54,8 +54,8 @@ import libephemeris as ephem
 # Vernal equinox 2024 (March 20, 3:06 UT)
 jd = ephem.julday(2024, 3, 20, 3.1)
 
-# SE_ECL_NUT returns obliquity and nutation
-nut, flag = ephem.calc_ut(jd, ephem.SE_ECL_NUT, 0)
+# ECL_NUT returns obliquity and nutation
+nut, flag = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
 true_obliquity = nut[0]    # true obliquity (with nutation)
 mean_obliquity = nut[1]    # mean obliquity (without nutation)
@@ -134,7 +134,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 9, 15, 21.0)
 
 # Position of Jupiter
-pos, flag = ephem.calc_ut(jd, ephem.SE_JUPITER, 0)
+pos, flag = ephem.calc_ut(jd, ephem.JUPITER, 0)
 
 # Observer's position: Rome
 # (longitude East, latitude North, altitude in meters)
@@ -144,7 +144,7 @@ geopos = (12.4964, 41.9028, 50.0)
 # SE_ECL2HOR = from ecliptic to horizontal
 # atpress = 1013.25 mbar (standard pressure)
 # attemp = 15.0 °C (standard temperature)
-hor = ephem.azalt(jd, ephem.SE_ECL2HOR, geopos, 1013.25, 15.0,
+hor = ephem.azalt(jd, ephem.ECL2HOR, geopos, 1013.25, 15.0,
                   (pos[0], pos[1], pos[2]))
 
 azimuth = hor[0]           # from South, towards West
@@ -269,7 +269,7 @@ At very high latitudes (above the polar circle), at certain times of the year th
 
 | Function / Constant | Use |
 |---------------------|-----|
-| `calc_ut(jd, ephem.SE_ECL_NUT, 0)` | Obliquity of the ecliptic and nutation |
+| `calc_ut(jd, ephem.ECL_NUT, 0)` | Obliquity of the ecliptic and nutation |
 | `azalt(jd, calc_flag, geopos, atpress, attemp, xin)` | Ecliptic/equatorial → horizontal coordinates |
 | `houses(jd, lat, lon, ord('P'))` | House cusps and angles (ASC, MC, ...) |
 | `split_deg(degrees, flags)` | Zodiacal formatting |
