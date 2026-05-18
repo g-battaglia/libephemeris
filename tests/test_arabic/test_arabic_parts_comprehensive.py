@@ -254,11 +254,18 @@ class TestIsDayChart:
     """Tests for day/night chart determination."""
 
     @pytest.mark.unit
-    def test_sun_above_horizon_is_day(self):
-        """Sun above horizon (between Asc and Desc) is a day chart."""
-        # Sun at 120°, Asc at 90° => Sun is in upper hemisphere
+    def test_sun_in_lower_hemisphere_is_night(self):
+        """Sun between Asc and Desc (lower hemisphere, near IC) is a night chart."""
+        # Sun at 120°, Asc at 90°: sun_rel = 30, inside (0, 180) => night chart
         result = is_day_chart(120.0, 90.0)
-        assert isinstance(result, bool)
+        assert result is False
+
+    @pytest.mark.unit
+    def test_sun_in_upper_hemisphere_is_day(self):
+        """Sun outside the Asc->Desc arc (upper hemisphere, near MC) is a day chart."""
+        # Sun at 300°, Asc at 90°: sun_rel = 210, outside (0, 180) => day chart
+        result = is_day_chart(300.0, 90.0)
+        assert result is True
 
     @pytest.mark.unit
     def test_returns_bool(self):

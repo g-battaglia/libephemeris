@@ -245,17 +245,12 @@ def is_day_chart(
     ):
         return _is_sun_above_horizon_3d(jd, sun_lon, sun_lat, geo_lat, geo_lon)
 
-    # Traditional 2D calculation using ecliptic longitude
-    desc = (asc + 180.0) % 360.0
-
-    # Check if Sun is in upper hemisphere (ASC to DSC counter-clockwise)
-    if asc < desc:
-        # Normal case: e.g., ASC=0°, DSC=180°
-        return asc <= sun_lon <= desc
-    else:
-        # Wrapped case: e.g., ASC=350°, DSC=170°
-        # Sun is above if >= ASC (e.g., 350-360°) OR <= DSC (e.g., 0-170°)
-        return sun_lon >= asc or sun_lon <= desc
+    # Traditional 2D calculation using ecliptic longitude.
+    # The lower hemisphere (below horizon, houses 1-6) is the open arc
+    # (ASC, DSC) going counter-clockwise (increasing longitude through IC).
+    # Boundaries: Sun on ASC (sunrise) or DSC (sunset) count as day chart.
+    sun_rel = (sun_lon - asc) % 360.0
+    return not (0.0 < sun_rel < 180.0)
 
 
 def calc_all_arabic_parts(
@@ -291,7 +286,7 @@ def calc_all_arabic_parts(
         ... }
         >>> parts = calc_all_arabic_parts(positions)
         >>> print(parts['Pars_Fortunae'])
-        135.5
+        255.5
 
     Note:
         Missing keys will default to 0.0. Ensure all required positions
