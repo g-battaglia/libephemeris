@@ -43,9 +43,9 @@ class Tolerances:
     """Tolerance thresholds for different comparison types."""
 
     LONGITUDE_STRICT = 0.001  # For geocentric/topocentric
-    LONGITUDE_RELAXED = 0.03  # For heliocentric/barycentric
+    LONGITUDE_RELAXED = 0.04  # For heliocentric/barycentric (Einstein/Jupiter max ~0.037°)
     LATITUDE_STRICT = 0.001
-    LATITUDE_RELAXED = 0.03
+    LATITUDE_RELAXED = 0.04
     DISTANCE_STRICT = 0.0001  # AU
     DISTANCE_RELAXED = 0.01
     VELOCITY_ANGULAR = 0.01  # degrees/day

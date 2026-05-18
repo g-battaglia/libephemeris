@@ -219,6 +219,8 @@ class TestCompositeLEBReader:
         from libephemeris.leb_composite import CompositeLEBReader
 
         path = os.path.join(LEB2_DIR, "base_core.leb2")
+        if not os.path.isfile(path):
+            pytest.skip("base_core.leb2 not found")
         reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(0)  # from primary
         reader.close()
@@ -228,6 +230,8 @@ class TestCompositeLEBReader:
         from libephemeris.leb_composite import CompositeLEBReader
 
         path = os.path.join(LEB2_DIR, "base_core.leb2")
+        if not os.path.isfile(path):
+            pytest.skip("base_core.leb2 not found")
         reader = CompositeLEBReader.from_file_with_companions(path)
         assert reader.has_body(15)  # from companion
         reader.close()

@@ -157,6 +157,7 @@ class TestFromDirectory:
             # Base tier covers 1849-2150, so range should be at least 100 years
             assert (jd_end - jd_start) > 365.25 * 100
 
+    @SKIP_NO_LEB2_CORE
     @pytest.mark.unit
     def test_from_directory_path_property(self):
         """path property returns first reader's path."""
@@ -399,6 +400,7 @@ class TestContextManager:
         reader.eval_body(SUN, JD_J2000)
         reader.close()
 
+    @SKIP_NO_LEB2_CORE
     @pytest.mark.unit
     def test_manual_construction(self):
         """Constructing CompositeLEBReader from list of readers."""

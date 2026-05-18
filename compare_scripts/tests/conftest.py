@@ -51,7 +51,14 @@ elif _COMPARE_MODE == "horizons":
 # Without this, pyswisseph falls back to Moshier analytical ephemeris which
 # has a limited date range and crashes when star-based ayanamshas need to
 # compute star positions internally.
-_EPHE_PATH = str(Path(__file__).resolve().parents[2] / "swisseph" / "ephe")
+_EPHE_PATH = str(Path(__file__).resolve().parents[2] / "data" / "reference")
+if not Path(_EPHE_PATH).is_dir():
+    import warnings
+    warnings.warn(
+        f"Reference data directory not found: {_EPHE_PATH}\n"
+        "Run 'poe setup:reference' to download pyswisseph reference files.",
+        stacklevel=1,
+    )
 swe.set_ephe_path(_EPHE_PATH)
 
 # Enable automatic SPK download for common minor bodies (Chiron, Pholus,

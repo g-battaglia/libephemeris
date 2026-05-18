@@ -134,7 +134,7 @@ class TestNodAps:
         # perihelion directions, so use the relaxed PERI_ANGLE_DEGREES tolerance
         apse_tol = (
             OrbitalTolerance.PERI_ANGLE_DEGREES
-            if body_id in (JUPITER, SATURN)
+            if body_id in (VENUS, JUPITER, SATURN)
             else OrbitalTolerance.ANGLE_DEGREES
         )
 

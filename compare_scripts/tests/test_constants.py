@@ -206,7 +206,7 @@ class TestSiderealModes:
     @pytest.mark.unit
     def test_total_sidereal_modes(self):
         """Verify we have at least 43 sidereal modes defined."""
-        sidm_count = sum(1 for name in dir(constants) if name.startswith("SE_SIDM_"))
+        sidm_count = sum(1 for name in dir(constants) if name.startswith("SIDM_"))
         assert sidm_count >= 43, (
             f"Expected at least 43 sidereal modes, got {sidm_count}"
         )

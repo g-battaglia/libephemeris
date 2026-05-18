@@ -21,6 +21,8 @@ All tests use Skyfield mode only (not LEB).
 from __future__ import annotations
 
 import math
+import os
+from pathlib import Path
 from typing import Tuple
 
 import pytest
@@ -59,7 +61,8 @@ def jd_diff_minutes(jd1: float, jd2: float) -> float:
 @pytest.fixture(autouse=True)
 def setup_ephemeris():
     """Set up ephemeris paths for both libraries."""
-    swe.set_ephe_path(_os.environ.get("REF_EPHE_PATH", "./ephe"))
+    _ref = str(Path(__file__).resolve().parents[2] / "data" / "reference")
+    swe.set_ephe_path(os.environ.get("REF_EPHE_PATH", _ref))
     yield
     swe.close()
 
@@ -234,7 +237,7 @@ class TestSolEclipseObscuration:
 
         if abs(central_lon) > 0.01:
             obs = ephem.sol_eclipse_obscuration_at_loc(
-                jd_max, central_lat, central_lon, 0.0
+                jd_max, (central_lon, central_lat, 0.0)
             )
             # Should be very high at center of totality
             assert obs > 0.5, f"Obscuration at central line should be > 0.5, got {obs}"
@@ -243,7 +246,7 @@ class TestSolEclipseObscuration:
         """Obscuration should be ~0 when no eclipse is happening."""
         # Random non-eclipse date
         jd = ephem.julday(2024, 7, 15, 12.0)
-        obs = ephem.sol_eclipse_obscuration_at_loc(jd, 41.9, 12.5, 0.0)
+        obs = ephem.sol_eclipse_obscuration_at_loc(jd, (12.5, 41.9, 0.0))
         assert obs < 0.01, f"Obscuration should be ~0 outside eclipse, got {obs}"
 
     def test_obscuration_range(self):
@@ -254,7 +257,7 @@ class TestSolEclipseObscuration:
 
         # Test at various locations
         for lat, lon in [(41.9, 12.5), (0.0, 0.0), (35.0, -97.0), (-33.9, 18.4)]:
-            obs = ephem.sol_eclipse_obscuration_at_loc(jd_max, lat, lon, 0.0)
+            obs = ephem.sol_eclipse_obscuration_at_loc(jd_max, (lon, lat, 0.0))
             assert 0.0 <= obs <= 1.0, (
                 f"Obscuration at ({lat},{lon}) = {obs}, should be in [0,1]"
             )

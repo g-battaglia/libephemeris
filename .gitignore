@@ -57,6 +57,9 @@ data/leb2/*.leb2
 data/leb/.DS_Store
 data/.DS_Store
 
+# Reference ephemeris data for comparison tests (dev-only)
+data/reference/
+
 # Manual build output (EPUB/PDF)
 docs/build/
 /.opencode

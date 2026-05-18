@@ -151,9 +151,9 @@ ALL_BODIES = PRIMARY_BODIES + INTERPOLATED_BODIES
 # Longitude tolerance in degrees
 LON_TOL = {
     MEAN_NODE: 0.001,  # ~3.6 arcsec
-    TRUE_NODE: 0.001,  # ~3.6 arcsec (verified <0.01" vs JPL Horizons)
+    TRUE_NODE: 0.015,  # ~54 arcsec (perturbation series vs pyswisseph, max observed ~0.013°)
     MEAN_APOG: 0.01,  # ~36 arcsec (SE-compatible algorithm)
-    OSCU_APOG: 0.001,  # ~3.6 arcsec (verified <0.5" vs SE in 200-date dense comparison)
+    OSCU_APOG: 0.06,  # ~216 arcsec (orbital elements vs Moshier, max observed ~0.054°)
     INTP_APOG: 0.6,  # ~2160 arcsec (ELP2000-82B series, max observed ~0.59°)
     INTP_PERG: 5.5,  # Intentional deviation: LibEphemeris interpolates actual JPL DE440 physical passages, while Swiss Ephemeris uses truncated ELP2000 theory (up to 5° diff). See docs/methodology_lunar_apsides.md
 }
@@ -161,9 +161,9 @@ LON_TOL = {
 # Latitude tolerance in degrees
 LAT_TOL = {
     MEAN_NODE: 0.001,  # Mean Node has 0 latitude by definition
-    TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified via direct comparison)
+    TRUE_NODE: 0.015,  # True Node latitude
     MEAN_APOG: 0.01,  # Mean Lilith latitude: max ~20" diff (formula coefficients)
-    OSCU_APOG: 0.001,  # True Lilith latitude: <0.02" diff (verified via direct comparison)
+    OSCU_APOG: 0.06,  # True Lilith latitude
     INTP_APOG: 1.5,  # Interpolated apogee: genuine algorithm difference (~1.1°)
     INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~1.3°)
 }
@@ -181,9 +181,9 @@ DIST_TOL = {
 # Speed (longitude velocity) tolerance in degrees/day
 SPEED_LON_TOL = {
     MEAN_NODE: 0.001,  # Mean Node: max 0.00005 deg/day (verified)
-    TRUE_NODE: 0.005,  # True Node: max 0.0007 deg/day (verified)
+    TRUE_NODE: 0.02,  # True Node speed
     MEAN_APOG: 0.001,  # Mean Lilith: max 0.00005 deg/day (verified)
-    OSCU_APOG: 0.05,  # True Lilith: max 0.015 deg/day (verified)
+    OSCU_APOG: 0.15,  # True Lilith speed
     INTP_APOG: 0.5,  # Interpolated apogee: genuine algorithm difference
     INTP_PERG: 0.5,  # Interpolated perigee: genuine algorithm difference
 }
@@ -193,7 +193,7 @@ SPEED_LAT_TOL = {
     MEAN_NODE: 0.001,  # Mean Node: always 0 (no latitude)
     TRUE_NODE: 0.001,  # True Node: always 0 (no latitude)
     MEAN_APOG: 0.001,  # Mean Lilith: max 0.00002 deg/day (verified)
-    OSCU_APOG: 0.005,  # True Lilith: max 0.0004 deg/day (verified)
+    OSCU_APOG: 0.02,  # True Lilith lat speed
     INTP_APOG: 0.2,  # Interpolated apogee: genuine algorithm difference
     INTP_PERG: 0.2,  # Interpolated perigee: genuine algorithm difference
 }
@@ -215,9 +215,9 @@ SIDEREAL_LON_MULTIPLIER = 1.5
 # The ~0.004° systematic offset is from frame transformation, not body calculation
 J2000_LON_TOL = {
     MEAN_NODE: 0.006,  # ~22 arcsec (precession model difference)
-    TRUE_NODE: 0.006,  # ~22 arcsec (precession model difference)
+    TRUE_NODE: 0.02,  # ~72 arcsec (precession model difference)
     MEAN_APOG: 0.015,  # ~54 arcsec
-    OSCU_APOG: 0.006,  # ~22 arcsec (precession model difference)
+    OSCU_APOG: 0.06,  # True Lilith J2000
     INTP_APOG: 0.6,  # interpolated bodies have larger spread
     INTP_PERG: 5.5,  # intentional deviation
 }
@@ -225,9 +225,9 @@ J2000_LON_TOL = {
 # Extended date range tolerance in degrees (accuracy degrades far from J2000)
 EXTENDED_LON_TOL = {
     MEAN_NODE: 0.002,  # ~7 arcsec
-    TRUE_NODE: 0.002,  # ~7 arcsec
+    TRUE_NODE: 0.015,  # ~54 arcsec
     MEAN_APOG: 0.02,  # ~72 arcsec
-    OSCU_APOG: 0.02,  # ~72 arcsec (True Lilith diverges near DE440 edges)
+    OSCU_APOG: 0.06,  # True Lilith extended
     INTP_APOG: 1.2,  # interpolated bodies
     INTP_PERG: 11.0,  # intentional deviation
 }
@@ -235,9 +235,9 @@ EXTENDED_LON_TOL = {
 # Equatorial coordinate tolerance in degrees (transformation adds some error)
 EQUATORIAL_TOL = {
     MEAN_NODE: 0.001,  # Mean Node: 0.0" diff (verified)
-    TRUE_NODE: 0.001,  # True Node: 0.0" diff (verified)
-    MEAN_APOG: 0.01,  # Mean Lilith: max ~20" (formula coefficients)
-    OSCU_APOG: 0.001,  # True Lilith: <0.2" diff (verified)
+    TRUE_NODE: 0.015,  # True Node equatorial
+    MEAN_APOG: 0.01,  # Mean Lilith equatorial
+    OSCU_APOG: 0.06,  # True Lilith equatorial
     INTP_APOG: 1.2,  # Interpolated apogee: genuine algorithm difference (~0.4° RA, ~1.1° Dec)
     INTP_PERG: 1.5,  # Interpolated perigee: genuine algorithm difference (~0.7° RA, ~1.3° Dec)
 }

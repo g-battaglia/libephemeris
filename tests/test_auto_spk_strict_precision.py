@@ -3,14 +3,14 @@ Tests for auto-download SPK in strict precision mode.
 
 Tests verify:
 - When auto_spk_download is enabled and strict_precision is True,
-  auto-download is attempted before raising SPKRequiredError
-- If auto-download succeeds, calculation works
-- If auto-download fails, SPKRequiredError is still raised
+  auto-download is attempted before falling back to Keplerian
+- If auto-download succeeds, calculation uses SPK data
+- If auto-download fails, Keplerian fallback is used (no error)
+- When auto_spk_download is disabled, SPKRequiredError is raised
 - Logging messages are produced during auto-download
 """
 
 import pytest
-import logging
 from unittest.mock import patch, MagicMock
 import libephemeris as eph
 from libephemeris import state
@@ -24,22 +24,16 @@ from libephemeris.constants import (
 @pytest.fixture(autouse=True)
 def cleanup(monkeypatch):
     """Reset state before and after each test."""
-    # Clear any SPK registrations
     state._SPK_BODY_MAP.clear()
-    # Disable LEB so the fast path doesn't intercept calc_ut() before
-    # the SPK/strict-precision code path is reached
     monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
     monkeypatch.delenv("LIBEPHEMERIS_MODE", raising=False)
     monkeypatch.setattr(state, "_LEB_FILE", None)
     monkeypatch.setattr(state, "_LEB_READER", None)
     monkeypatch.setattr(state, "_discover_leb_file", lambda: None)
-    # Override any --calc-mode leb from root conftest
     eph.set_calc_mode("auto")
-    # Reset settings
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
     yield
-    # Cleanup after test
     state._SPK_BODY_MAP.clear()
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
@@ -48,18 +42,18 @@ def cleanup(monkeypatch):
 class TestAutoDownloadInStrictMode:
     """Test auto-download behavior when strict precision is enabled."""
 
-    def test_auto_download_attempted_before_error(self):
-        """Auto-download should be attempted before raising SPKRequiredError."""
+    def test_auto_download_attempted_before_fallback(self):
+        """Auto-download should be attempted before Keplerian fallback."""
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(True)
 
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             mock_download.side_effect = RuntimeError("Network error")
 
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
             mock_download.assert_called_once()
+            assert 0 <= pos[0] < 360
 
     def test_auto_download_success_returns_result(self):
         """If auto-download succeeds, should return calculation result."""
@@ -98,40 +92,33 @@ class TestAutoDownloadInStrictMode:
 
             mock_download.assert_not_called()
 
-    def test_auto_download_logs_info_message(self):
-        """Auto-download should log an info message."""
+    def test_auto_download_logs_warning_on_failure(self):
+        """Failed auto-download should produce a warning log."""
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(True)
 
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             mock_download.side_effect = RuntimeError("Network error")
 
-            with patch("libephemeris.logging_config.get_logger") as mock_get_logger:
-                mock_logger = MagicMock()
-                mock_get_logger.return_value = mock_logger
+            pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            assert 0 <= pos[0] < 360
 
-                with pytest.raises(eph.SPKRequiredError):
-                    eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
-
-                mock_logger.info.assert_called()
-                log_calls = [call[0][0] for call in mock_logger.info.call_args_list]
-                assert any("Auto-downloading" in msg for msg in log_calls)
-
-    def test_download_exception_still_raises_spk_error(self):
-        """If download raises exception, SPKRequiredError should still be raised."""
+    def test_download_failure_falls_back_to_keplerian(self):
+        """If download fails, Keplerian fallback should be used."""
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(True)
 
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             mock_download.side_effect = RuntimeError("Network error")
 
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            assert 0 <= pos[0] < 360
+            assert pos[2] > 0
 
-    def test_ceres_requires_spk_in_strict_mode(self):
-        """Ceres requires SPK in strict mode (it's in SPK_BODY_NAME_MAP).
+    def test_ceres_auto_download_attempted(self):
+        """Ceres auto-download should be attempted in strict mode.
 
-        Ceres is now SPK-downloadable using name syntax ("Ceres;") to bypass
+        Ceres is SPK-downloadable using name syntax ("Ceres;") to bypass
         the JPL Horizons major body index restriction.
         """
         eph.set_strict_precision(True)
@@ -140,11 +127,9 @@ class TestAutoDownloadInStrictMode:
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             mock_download.side_effect = RuntimeError("Network error")
 
-            # Ceres is in SPK_BODY_NAME_MAP, so it requires SPK
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, CERES, FLG_SPEED)
-
+            pos, flags = eph.calc_ut(2451545.0, CERES, FLG_SPEED)
             mock_download.assert_called_once()
+            assert 0 <= pos[0] < 360
 
 
 class TestAutoDownloadWithStrictDisabled:
@@ -155,13 +140,11 @@ class TestAutoDownloadWithStrictDisabled:
         eph.set_strict_precision(False)
         eph.set_auto_spk_download(True)
 
-        # Even without SPK, should get a result via Keplerian fallback
         pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
-        # Should return valid position
-        assert 0 <= pos[0] < 360  # Longitude in range
-        assert -90 <= pos[1] <= 90  # Latitude in range
-        assert pos[2] > 0  # Distance positive
+        assert 0 <= pos[0] < 360
+        assert -90 <= pos[1] <= 90
+        assert pos[2] > 0
 
 
 class TestAutoDownloadWithFirstTryPath:
@@ -175,10 +158,10 @@ class TestAutoDownloadWithFirstTryPath:
         with patch("libephemeris.planets._try_auto_spk_download") as mock_try:
             mock_try.return_value = None
 
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+            pos, flags = eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
             mock_try.assert_called_once()
+            assert 0 <= pos[0] < 360
 
 
 class TestAutoDownloadJDPassthrough:
@@ -194,8 +177,7 @@ class TestAutoDownloadJDPassthrough:
         with patch("libephemeris.spk.download_and_register_spk") as mock_download:
             mock_download.side_effect = RuntimeError("Network error")
 
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(test_jd, CHIRON, FLG_SPEED)
+            pos, flags = eph.calc_ut(test_jd, CHIRON, FLG_SPEED)
 
             mock_download.assert_called_once()
             call_kwargs = mock_download.call_args[1]

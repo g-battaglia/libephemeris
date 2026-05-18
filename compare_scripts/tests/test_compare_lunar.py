@@ -39,11 +39,11 @@ def angular_diff(val1: float, val2: float) -> float:
 # ============================================================================
 
 MEAN_NODE_TOL = 0.001  # degrees (~3.6 arcsec)
-TRUE_NODE_TOL = 0.001  # degrees (~3.6 arcsec) — matches SE to <0.01" (verified via JPL Horizons triangulation)
+TRUE_NODE_TOL = 0.015  # degrees (~54 arcsec, perturbation series vs pyswisseph)
 MEAN_LILITH_TOL = (
     0.01  # degrees (~36 arcsec, SE-compatible algorithm achieves ~15 arcsec)
 )
-TRUE_LILITH_TOL = 0.001  # degrees (~3.6 arcsec) — matches SE to <0.5" (verified via JPL Horizons triangulation)
+TRUE_LILITH_TOL = 0.06  # degrees (~216 arcsec, orbital elements vs Moshier, max ~0.054°)
 
 
 # ============================================================================

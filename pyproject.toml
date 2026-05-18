@@ -138,6 +138,9 @@ libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]
 
 [tool.poe.tasks]
 
+# --- Setup ---
+"setup:reference" = {cmd = "python scripts/download_reference_data.py", help = "Download reference data for comparison tests (~3.4 MB)"}
+
 # --- Code quality ---
 lint = {cmd = "leph code lint", help = "Lint all Python files (ruff, auto-fix)"}
 format = {cmd = "leph code format", help = "Format all Python files (ruff)"}

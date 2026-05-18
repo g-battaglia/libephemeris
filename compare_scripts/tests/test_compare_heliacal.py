@@ -23,7 +23,7 @@ pytestmark = pytest.mark.xfail(
 
 
 # Set Swiss Ephemeris data path for star catalog
-EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "swisseph", "ephe")
+EPHE_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "reference")
 if os.path.exists(EPHE_PATH):
     swe.set_ephe_path(EPHE_PATH)
 

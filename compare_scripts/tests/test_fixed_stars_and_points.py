@@ -6,6 +6,7 @@ import pytest
 import swisseph as swe
 import libephemeris as ephem
 from libephemeris.constants import *
+from libephemeris.constants import _MC_ANGLE_ID, _VERTEX_ANGLE_ID
 
 
 @pytest.mark.unit
