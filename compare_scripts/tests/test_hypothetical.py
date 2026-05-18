@@ -26,11 +26,9 @@ from libephemeris.hypothetical import (
     WALDEMATH,
     VULCAN,
     PROSERPINA,
+    NEPTUNE_LEVERRIER,
     PLANET_X_LEVERRIER,
-    SE_NEPTUNE_LEVERRIER,
-    PLANET_X_LEVERRIER,
-    PLANET_X_ADAMS,
-    SE_NEPTUNE_ADAMS,
+    NEPTUNE_ADAMS,
     PLANET_X_ADAMS,
     PLANET_X_LOWELL,
     PLANET_X_LOWELL,
@@ -124,8 +122,8 @@ class TestBodyIdentification:
         assert TRANSPLUTO == ISIS
 
     def test_planet_x_leverrier_alias(self):
-        """Test that PLANET_X_LEVERRIER is an alias for SE_NEPTUNE_LEVERRIER."""
-        assert PLANET_X_LEVERRIER == SE_NEPTUNE_LEVERRIER
+        """Test that PLANET_X_LEVERRIER is an alias for NEPTUNE_LEVERRIER."""
+        assert PLANET_X_LEVERRIER == NEPTUNE_LEVERRIER
         assert PLANET_X_LEVERRIER == FICT_OFFSET + 11
         assert PLANET_X_LEVERRIER == 51
 
@@ -138,8 +136,8 @@ class TestBodyIdentification:
         assert is_hypothetical_body(PLANET_X_LEVERRIER)
 
     def test_planet_x_adams_alias(self):
-        """Test that PLANET_X_ADAMS is an alias for SE_NEPTUNE_ADAMS."""
-        assert PLANET_X_ADAMS == SE_NEPTUNE_ADAMS
+        """Test that PLANET_X_ADAMS is an alias for NEPTUNE_ADAMS."""
+        assert PLANET_X_ADAMS == NEPTUNE_ADAMS
         assert PLANET_X_ADAMS == FICT_OFFSET + 12
         assert PLANET_X_ADAMS == 52
 
