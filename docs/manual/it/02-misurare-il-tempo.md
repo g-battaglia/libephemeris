@@ -363,4 +363,4 @@ ephem.download_delta_t_data()  # serie storica Delta-T
 | `utc_time_zone(anno, mese, giorno, ore, min, sec, offset)` | Fuso orario → UTC |
 | `set_iers_delta_t_enabled(True/False)` | Abilita/disabilita dati IERS |
 | `download_delta_t_data()` | Scarica i dati Delta-T osservati |
-| `SE_GREG_CAL`, `SE_JUL_CAL` | Calendario gregoriano / giuliano |
+| `GREG_CAL`, `JUL_CAL` | Calendario gregoriano / giuliano |

@@ -282,8 +282,8 @@ Possible `source` values:
 | `ASSIST (n-body)` | N-body integration via ASSIST |
 | `Keplerian (fallback)` | Analytical Keplerian orbit (last resort, logged at WARNING) |
 
-These log statements are emitted in `planets.py` (`swe_calc_ut()`,
-`swe_calc()`, `_calc_body()`) and `context.py` (`calc_ut()`, `calc()`).
+These log statements are emitted in `planets.py` (`calc_ut()`,
+`calc()`, `_calc_body()`) and `context.py` (`calc_ut()`, `calc()`).
 
 To enable source tracing during tests:
 
@@ -408,9 +408,9 @@ def setup_libephemeris():
 @pytest.fixture(autouse=True)
 def reset_sidereal_mode():
     """Reset sidereal mode between tests."""
-    eph.swe_set_sid_mode(SIDM_FAGAN_BRADLEY)
+    eph.set_sid_mode(SIDM_FAGAN_BRADLEY)
     yield
-    eph.swe_set_sid_mode(SIDM_FAGAN_BRADLEY)
+    eph.set_sid_mode(SIDM_FAGAN_BRADLEY)
 ```
 
 ### Checking SPK Availability in Tests

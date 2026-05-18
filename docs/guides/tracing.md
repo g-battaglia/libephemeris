@@ -72,8 +72,8 @@ def worker(name, body):
     results[name] = swe.get_trace_results()
     token.var.reset(token)
 
-t1 = threading.Thread(target=worker, args=("sun", SE_SUN))
-t2 = threading.Thread(target=worker, args=("moon", SE_MOON))
+t1 = threading.Thread(target=worker, args=("sun", SUN))
+t2 = threading.Thread(target=worker, args=("moon", MOON))
 t1.start(); t2.start()
 t1.join(); t2.join()
 
@@ -109,7 +109,7 @@ token = swe.start_tracing()
 swe.calc_ut(jd1, SUN, FLG_SPEED)  # computed via LEB
 swe.calc_ut(jd2, SUN, FLG_SPEED)  # computed via Skyfield
 traces = swe.get_trace_results()
-print(traces[SE_SUN])  # "Skyfield" (last call wins)
+print(traces[SUN])  # "Skyfield" (last call wins)
 token.var.reset(token)
 ```
 

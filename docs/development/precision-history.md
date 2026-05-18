@@ -21,8 +21,8 @@ future development.
    - [Central Difference Velocity](#central-difference-velocity)
    - [Cleanup and Code Restoration](#cleanup-and-code-restoration)
 2. [Investigations: ELP2000 Perturbations Not Applied](#investigations-elp2000-perturbations-not-applied)
-   - [True Node (SE_TRUE_NODE)](#true-node-se_true_node)
-   - [True Lilith (SE_OSCU_APOG)](#true-lilith-se_oscu_apog)
+   - [True Node (TRUE_NODE)](#true-node-true_node)
+   - [True Lilith (OSCU_APOG)](#true-lilith-oscu_apog)
 3. [Open Opportunities](#open-opportunities)
    - [Analytical Chebyshev Velocities](#analytical-chebyshev-velocities)
    - [True Node Precision Improvement](#true-node-precision-improvement)
@@ -416,7 +416,7 @@ removed (located between `_calc_body_special` and `_calc_body`):
 
 - `NutationFallbackWarning` (class) — Warning for degraded precision
 - `get_nutation_model()` — Check of the active nutation model
-- `_calc_nutation_obliquity()` — Nutation/obliquity calculation for `SE_ECL_NUT`
+- `_calc_nutation_obliquity()` — Nutation/obliquity calculation for `ECL_NUT`
 - `_maybe_equatorial_convert()` — Ecliptic→equatorial conversion
 
 All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
@@ -430,7 +430,7 @@ All four were **restored**, and `_calc_nutation_obliquity()` was updated to use
 
 **Date:** March 2026
 
-Six issues were identified and fixed in `swe_pheno_ut()` through systematic comparison
+Six issues were identified and fixed in `pheno_ut()` through systematic comparison
 with Swiss Ephemeris across 500 dates × 10 bodies, then cross-validated against
 Mallama & Hilton (2018) published formulas and IAU 2015 standards.
 
@@ -542,7 +542,7 @@ an intentional divergence where LibEphemeris is more accurate than Swiss Ephemer
 
 ## Investigations: ELP2000 Perturbations Not Applied
 
-### True Node (SE_TRUE_NODE)
+### True Node (TRUE_NODE)
 
 **File:** `libephemeris/lunar.py`, `calc_true_lunar_node()`
 
@@ -571,13 +571,13 @@ investigation revealed that:
 
 ---
 
-### True Lilith (SE_OSCU_APOG)
+### True Lilith (OSCU_APOG)
 
 **File:** `libephemeris/lunar.py`, `calc_true_lilith()`
 
 **Investigation:**
 Analogous situation to True Node. The function `_calc_elp2000_apogee_perturbations()`
-(~50 terms) is designed for the **interpolated apogee** (mean apogee, `SE_INTP_APOG`),
+(~50 terms) is designed for the **interpolated apogee** (mean apogee, `INTP_APOG`),
 not for the osculating apogee calculated with the eccentricity vector
 `e = (v×h)/μ − r/|r|`.
 

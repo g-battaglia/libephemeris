@@ -94,7 +94,7 @@ Heliocentric Mars: 317.5543° (dist 1.3879 AU)
 
 ### Planetocentric: observing from another planet
 
-With `swe_calc_pctr` you can calculate the position of a body as seen from another planet:
+With `calc_pctr` you can calculate the position of a body as seen from another planet:
 
 ```python
 import libephemeris as ephem
@@ -102,7 +102,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # The Sun as seen from Jupiter
-pos, _ = ephem.swe_calc_pctr(jd, ephem.SUN, ephem.JUPITER, 0)
+pos, _ = ephem.calc_pctr(jd, ephem.SUN, ephem.JUPITER, 0)
 print(f"Sun seen from Jupiter: {pos[0]:.4f}°, dist {pos[2]:.4f} AU")
 ```
 
@@ -164,7 +164,7 @@ The solar eclipse of April 8, 2024, was total in Dallas (Texas) but only partial
 | `set_precision_tier(tier)` | Chooses `"base"`, `"medium"`, or `"extended"` |
 | `download_for_tier(tier)` | Downloads the ephemeris files |
 | `set_topo(lon, lat, alt)` | Sets the observer's location |
-| `swe_calc_pctr(jd, body, center, flag)` | Position as seen from another planet |
+| `calc_pctr(jd, body, center, flag)` | Position as seen from another planet |
 | `FLG_HELCTR` | Heliocentric coordinates |
 | `FLG_BARYCTR` | Barycentric coordinates |
 | `FLG_TOPOCTR` | Topocentric coordinates |

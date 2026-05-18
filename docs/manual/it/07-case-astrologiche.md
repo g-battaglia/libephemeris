@@ -209,7 +209,7 @@ La funzione ha bisogno di:
 
 - **ARMC**: l'Ascensione Retta del Medio Cielo (la ottieni da `houses()` come `ascmc[2]`)
 - **Latitudine geografica** dell'osservatore
-- **Obliquità dell'eclittica** (la puoi ottenere con `calc_ut(jd, SE_ECL_NUT)`)
+- **Obliquità dell'eclittica** (la puoi ottenere con `calc_ut(jd, ECL_NUT)`)
 - **Sistema di case** (la lettera, come `ord('P')`)
 - **Longitudine e latitudine eclittica** del pianeta
 
@@ -415,7 +415,7 @@ except PolarCircleError as e:
 ```
 
 ```
-Errore: swe_houses: Placidus house system cannot be calculated at latitude
+PolarCircleError: Placidus house system cannot be calculated at latitude
   69.60°N (within Northern polar circle). Polar threshold for obliquity
   23.44° is ±66.56°.
 Latitudine: 69.6°
@@ -433,7 +433,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 6, 21, 12.0)
 
 # Tromsø — Placidus fallirà, il fallback userà Porfirio
-cusps, ascmc, usato_fallback, avviso = ephem.swe_houses_with_fallback(
+cusps, ascmc, usato_fallback, avviso = ephem.houses_with_fallback(
     jd, 69.6, 19.0,
     hsys=ord('P'),
     fallback_hsys=ord('O')   # Porfirio come alternativa

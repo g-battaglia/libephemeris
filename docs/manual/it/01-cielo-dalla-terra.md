@@ -46,7 +46,7 @@ L'eclittica e l'equatore celeste si intersecano in due punti:
 
 ### 💻 Codice: ottenere l'obliquità dell'eclittica
 
-Con LibEphemeris puoi ottenere il valore esatto dell'obliquità per qualsiasi data. La "pseudo-pianeta" `SE_ECL_NUT` restituisce le informazioni su obliquità e nutazione:
+Con LibEphemeris puoi ottenere il valore esatto dell'obliquità per qualsiasi data. La "pseudo-pianeta" `ECL_NUT` restituisce le informazioni su obliquità e nutazione:
 
 ```python
 import libephemeris as ephem
@@ -54,7 +54,7 @@ import libephemeris as ephem
 # Equinozio di primavera 2024 (20 marzo, ore 3:06 UT)
 jd = ephem.julday(2024, 3, 20, 3.1)
 
-# SE_ECL_NUT restituisce obliquità e nutazione
+# ECL_NUT restituisce obliquità e nutazione
 nut, flag = ephem.calc_ut(jd, ephem.ECL_NUT, 0)
 
 obliquita_vera = nut[0]    # obliquità vera (con nutazione)
@@ -141,7 +141,7 @@ pos, flag = ephem.calc_ut(jd, ephem.JUPITER, 0)
 geopos = (12.4964, 41.9028, 50.0)
 
 # Convertiamo da coordinate eclittiche a orizzontali
-# SE_ECL2HOR = da eclittiche a orizzontali
+# ECL2HOR = da eclittiche a orizzontali
 # atpress = 1013.25 mbar (pressione standard)
 # attemp = 15.0 °C (temperatura standard)
 hor = ephem.azalt(jd, ephem.ECL2HOR, geopos, 1013.25, 15.0,
@@ -269,8 +269,8 @@ A latitudini molto alte (sopra il circolo polare), in certi momenti dell'anno l'
 
 | Funzione / Costante | Uso |
 |---------------------|-----|
-| `calc_ut(jd, SE_ECL_NUT, 0)` | Obliquità dell'eclittica e nutazione |
+| `calc_ut(jd, ECL_NUT, 0)` | Obliquità dell'eclittica e nutazione |
 | `azalt(jd, calc_flag, geopos, atpress, attemp, xin)` | Coordinate eclittiche/equatoriali → orizzontali |
 | `houses(jd, lat, lon, ord('P'))` | Cuspidi delle case e angoli (ASC, MC, ...) |
 | `split_deg(gradi, flags)` | Formattazione zodiacale |
-| `SE_ECL2HOR`, `SE_EQU2HOR` | Flag per `azalt`: input eclittico o equatoriale |
+| `ECL2HOR`, `EQU2HOR` | Flag per `azalt`: input eclittico o equatoriale |

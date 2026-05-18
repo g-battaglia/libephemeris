@@ -156,7 +156,7 @@ For the modern era (1900--2020), where direct measurements exist, the two models
 
 ### 2.4. House cusp speeds — numerical vs analytical derivatives
 
-**What:** `swe_houses_ex2` and `swe_houses_armc_ex2` compute cusp velocities using centered finite differences when `FLG_SPEED` is set. The maximum difference from pyswisseph is ~0.7 deg/day (~0.2% relative).
+**What:** `houses_ex2` and `houses_armc_ex2` compute cusp velocities using centered finite differences when `FLG_SPEED` is set. The maximum difference from pyswisseph is ~0.7 deg/day (~0.2% relative).
 
 **Why:** The two libraries use different differentiation strategies:
 
@@ -212,7 +212,7 @@ The deep validation effort uncovered 12 bugs in libephemeris, all of which have 
 
 | # | Bug | Fix | Commit |
 |---|-----|-----|--------|
-| 3 | `swe_pheno_ut` returned apparent diameter in arcseconds; pyswisseph returns degrees | Divide by 3600.0 in `_calc_apparent_diameter()` | `ef29a08` |
+| 3 | `pheno_ut` returned apparent diameter in arcseconds; pyswisseph returns degrees | Divide by 3600.0 in `_calc_apparent_diameter()` | `ef29a08` |
 | 4 | Lunar eclipse penumbral detection missed eclipses near 12--18° from node — `ECLIPSE_LIMIT_LUNAR` was 12.0° but penumbral eclipses occur up to 18.02° from a lunar node | Changed limit to 18.5° | `ef29a08` |
 
 ### 3.3. House system bug (1 bug)
@@ -225,7 +225,7 @@ The deep validation effort uncovered 12 bugs in libephemeris, all of which have 
 
 | # | Bug | Fix | Commit |
 |---|-----|-----|--------|
-| 6 | `swe_fixstar_mag` returned 0.0 for most stars — the `_STAR_MAGNITUDES` dict only had 2 entries | Replaced with dict comprehension from the full `STAR_CATALOG` | `ef29a08` |
+| 6 | `fixstar_mag` returned 0.0 for most stars — the `_STAR_MAGNITUDES` dict only had 2 entries | Replaced with dict comprehension from the full `STAR_CATALOG` | `ef29a08` |
 | 7 | 11 fixed stars missing from catalog (Tejat, Propus, Wasat, Thuban, Rasalgethi, Albireo, Wezen, Adhara, Alhena, Alpheratz, Algenib) | Added all 11 with data sourced from ESA Hipparcos via SIMBAD/CDS. Also fixed Tejat's HIP number and a duplicate alias key | `ef29a08` |
 | 8 | `resolve_star_name()` used substring matching (`if normalized in alias`), causing false positives (e.g., "Al" matching "Aldebaran") | Changed to prefix matching (`if alias.startswith(normalized)`) | `ef29a08` |
 
@@ -243,7 +243,7 @@ The Danjon atmospheric shadow enlargement is a well-established correction: Eart
 | # | Bug | Fix | Commit |
 |---|-----|-----|--------|
 | 11 | `swe_cross_ut` diverged for slow outer planets (Saturn, Jupiter) near stations — the station detection threshold was too narrow and the Brent bracket search window too small | Widened `STATION_SPEED_THRESHOLD` from 0.001 to 0.01 °/day; expanded Brent bracket windows; increased `max_range` limits per planet speed category; scaled search window with `dt_guess * 1.5`; added antipodal-point wrapping filter to bracket scanner | `d39aaf8` |
-| 12 | `swe_orbit_max_min_true_distance` returned 2 values `(min, max)` in wrong order; pyswisseph returns 3 values `(max, min, true_dist)` | Changed return to 3-tuple `(max_dist, min_dist, true_dist)` with correct order, added true distance calculation from `swe_calc_ut` | `d39aaf8` |
+| 12 | `swe_orbit_max_min_true_distance` returned 2 values `(min, max)` in wrong order; pyswisseph returns 3 values `(max, min, true_dist)` | Changed return to 3-tuple `(max_dist, min_dist, true_dist)` with correct order, added true distance calculation from `calc_ut` | `d39aaf8` |
 
 ---
 
@@ -255,25 +255,25 @@ libephemeris aims for 1:1 API compatibility with pyswisseph, but some function s
 
 | Function | pyswisseph returns | libephemeris returns |
 |----------|-------------------|---------------------|
-| `swe_get_ayanamsa_ex_ut` | `(flags, ayanamsa)` | `(ayanamsa, eps_true, nut_long)` |
-| `swe_deltat_ex` | `float` | `(float, str)` — value + error message |
+| `get_ayanamsa_ex_ut` | `(flags, ayanamsa)` | `(ayanamsa, eps_true, nut_long)` |
+| `deltat_ex` | `float` | `(float, str)` — value + error message |
 | `swe_orbit_max_min_true_distance` | `(max, min, true)` | `(max, min, true)` — same after fix |
 
 ### Parameter differences
 
 | Function | pyswisseph signature | libephemeris signature |
 |----------|---------------------|----------------------|
-| `swe_get_ayanamsa_ex_ut` | `(tjd_ut, flags)` | `(tjd_ut, sid_mode, flags)` |
-| `swe_heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` ✅ |
-| `swe_lun_occult_when_loc` | body can be `int` or `str` | body can be `int` or `str` — same |
+| `get_ayanamsa_ex_ut` | `(tjd_ut, flags)` | `(tjd_ut, sid_mode, flags)` |
+| `heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` ✅ |
+| `lun_occult_when_loc` | body can be `int` or `str` | body can be `int` or `str` — same |
 
 ### Structural differences
 
 | Function | pyswisseph | libephemeris |
 |----------|-----------|-------------|
-| `swe_get_orbital_elements` | Returns flat tuple | May return nested tuple — access via `result[0][i]` |
-| `swe_houses_armc` | `ascmc[3]` = obliquity | `ascmc[3]` = Vertex (not obliquity) |
-| `swe_houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `FLG_SPEED`) |
+| `get_orbital_elements` | Returns flat tuple | May return nested tuple — access via `result[0][i]` |
+| `houses_armc` | `ascmc[3]` = obliquity | `ascmc[3]` = Vertex (not obliquity) |
+| `houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `FLG_SPEED`) |
 
 ### libephemeris-only extensions
 
@@ -281,10 +281,10 @@ These functions exist in libephemeris but have no pyswisseph equivalent:
 
 | Function | Description |
 |----------|-------------|
-| `swe_houses_with_fallback` | Houses with automatic polar-latitude fallback |
-| `swe_houses_armc_with_fallback` | ARMC houses with automatic polar-latitude fallback |
+| `houses_with_fallback` | Houses with automatic polar-latitude fallback |
+| `houses_armc_with_fallback` | ARMC houses with automatic polar-latitude fallback |
 | `swe_sol_eclipse_max_time` | Precise maximum eclipse timing |
-| `swe_sol_eclipse_how_details` | Comprehensive eclipse circumstances (dict) |
+| `sol_eclipse_how_details` | Comprehensive eclipse circumstances (dict) |
 | `swe_sol_eclipse_obscuration_at_loc` | Eclipse obscuration at a geographic location |
 | `swe_planet_occult_when_glob` | Planet-planet occultation search (global) |
 | `swe_planet_occult_when_loc` | Planet-planet occultation search (local) |
@@ -472,7 +472,7 @@ Comprehensive testing across 4 coordinate modes, 10 bodies, 10 dates (1950–205
 - Position: < 0.00005 AU for all bodies (< 0.00004 AU for Sun–Saturn)
 - Neptune/Pluto show ~0.00003 AU max, corresponding to sub-arcsecond angular difference at their distances (30+ AU)
 
-**Bug found and fixed**: `FLG_XYZ` and `FLG_RADIANS` flags were not preserved in the return flag of `swe_calc_ut()` / `swe_calc()`. These output format flags were stripped before calculation but not restored in the returned `retflag`. Now fixed.
+**Bug found and fixed**: `FLG_XYZ` and `FLG_RADIANS` flags were not preserved in the return flag of `calc_ut()` / `calc()`. These output format flags were stripped before calculation but not restored in the returned `retflag`. Now fixed.
 
 ---
 
@@ -487,9 +487,9 @@ prioritizes correctness over compatibility.
 **Status:** Intentional divergence since leb/precision branch.
 
 **Observed behavior:** pyswisseph silently ignores `FLG_J2000` for
-`SE_TRUE_NODE`, `SE_OSCU_APOG`, `SE_INTP_APOG`, and `SE_INTP_PERG` when
+`TRUE_NODE`, `OSCU_APOG`, `INTP_APOG`, and `INTP_PERG` when
 `FLG_SIDEREAL` is also set. The same combination works correctly for
-`SE_MEAN_NODE` and `SE_MEAN_APOG`. No error or warning is emitted.
+`MEAN_NODE` and `MEAN_APOG`. No error or warning is emitted.
 
 **Why it is incorrect:** Ayanamsha (1D longitude zero-point shift) and
 J2000 ecliptic precession (3D plane rotation) are geometrically distinct,

@@ -75,24 +75,21 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Posizione di Regolo
-nome, pos, flag, err = ephem.fixstar2_ut("Regulus", jd, ephem.FLG_SPEED)
+pos, nome, retflags = ephem.fixstar2_ut("Regulus", jd, ephem.FLG_SPEED)
 
-if not err:
-    lon = pos[0]  # longitudine eclittica
-    lat = pos[1]  # latitudine eclittica
-    vel = pos[3]  # velocità in longitudine (gradi/giorno)
+lon = pos[0]  # longitudine eclittica
+lat = pos[1]  # latitudine eclittica
+vel = pos[3]  # velocità in longitudine (gradi/giorno)
 
-    segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
-             "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
-    segno = segni[int(lon / 30)]
-    gradi = lon % 30
+segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
+         "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
+segno = segni[int(lon / 30)]
+gradi = lon % 30
 
-    print(f"{nome}")
-    print(f"Posizione: {gradi:.2f}° {segno}")
-    print(f"Latitudine: {lat:.4f}°")
-    print(f"Velocità: {vel:.6f}°/giorno")
-else:
-    print(f"Errore: {err}")
+print(f"{nome}")
+print(f"Posizione: {gradi:.2f}° {segno}")
+print(f"Latitudine: {lat:.4f}°")
+print(f"Velocità: {vel:.6f}°/giorno")
 ```
 
 ```
@@ -102,12 +99,13 @@ Latitudine: 0.4657°
 Velocità: -0.000071°/giorno
 ```
 
-La funzione restituisce quattro valori:
+La funzione restituisce tre valori:
 
-- **nome** — il nome completo della stella nel formato `"Nome,Nomenclatura"` (es. `"Regulus,alLeo"` dove `alLeo` sta per "alpha Leonis")
 - **pos** — una tupla di 6 valori: `(longitudine, latitudine, distanza, vel_lon, vel_lat, vel_dist)`. La distanza è fissata a 100.000 UA (le stelle sono effettivamente a distanza infinita per i nostri calcoli)
-- **flag** — i flag restituiti (di solito identici a quelli passati)
-- **err** — una stringa di errore, vuota se tutto è andato bene
+- **nome** — il nome completo della stella nel formato `"Nome,Nomenclatura"` (es. `"Regulus,alLeo"` dove `alLeo` sta per "alpha Leonis")
+- **retflags** — i flag restituiti (di solito identici a quelli passati)
+
+Se la stella non viene trovata, la funzione lancia un'eccezione `Error`.
 
 ### Le stelle principali dell'astrologia
 
@@ -137,13 +135,12 @@ segni = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
          "Lib", "Sco", "Sgr", "Cap", "Aqr", "Psc"]
 
 for star in stelle:
-    nome, pos, flag, err = ephem.fixstar2_ut(star, jd, 0)
-    if not err:
-        lon = pos[0]
-        segno = segni[int(lon / 30)]
-        gradi = lon % 30
-        nome_corto = nome.split(",")[0]
-        print(f"{nome_corto:12s}  {gradi:5.1f}° {segno}")
+    pos, nome, _ = ephem.fixstar2_ut(star, jd, 0)
+    lon = pos[0]
+    segno = segni[int(lon / 30)]
+    gradi = lon % 30
+    nome_corto = nome.split(",")[0]
+    print(f"{nome_corto:12s}  {gradi:5.1f}° {segno}")
 ```
 
 ```
@@ -170,10 +167,9 @@ import libephemeris as ephem
 
 # Magnitudine di alcune stelle
 for star in ["Sirius", "Vega", "Polaris", "Algol"]:
-    nome, mag, err = ephem.fixstar2_mag(star)
-    if not err:
-        nome_corto = nome.split(",")[0]
-        print(f"{nome_corto:12s}  magnitudine {mag:+.2f}")
+    mag, nome = ephem.fixstar2_mag(star)
+    nome_corto = nome.split(",")[0]
+    print(f"{nome_corto:12s}  magnitudine {mag:+.2f}")
 ```
 
 ```
@@ -192,21 +188,20 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
-nome, pos, flag, err = ephem.fixstar2_ut(
+pos, nome, _ = ephem.fixstar2_ut(
     "Sirius", jd, ephem.FLG_EQUATORIAL
 )
 
-if not err:
-    ra = pos[0]   # Ascensione Retta in gradi
-    dec = pos[1]  # Declinazione in gradi
+ra = pos[0]   # Ascensione Retta in gradi
+dec = pos[1]  # Declinazione in gradi
 
-    # Converti RA in ore, minuti, secondi
-    ra_ore = ra / 15.0
-    ore = int(ra_ore)
-    minuti = int((ra_ore - ore) * 60)
-    secondi = ((ra_ore - ore) * 60 - minuti) * 60
+# Converti RA in ore, minuti, secondi
+ra_ore = ra / 15.0
+ore = int(ra_ore)
+minuti = int((ra_ore - ore) * 60)
+secondi = ((ra_ore - ore) * 60 - minuti) * 60
 
-    print(f"Sirio: RA = {ore}h {minuti}m {secondi:.1f}s, Dec = {dec:+.4f}°")
+print(f"Sirio: RA = {ore}h {minuti}m {secondi:.1f}s, Dec = {dec:+.4f}°")
 ```
 
 ```
@@ -266,10 +261,7 @@ for body_id, nome_p in pianeti:
 orbe = 1.0  # 1 grado di tolleranza
 
 for star in stelle_da_cercare:
-    nome_s, pos_s, _, err = ephem.fixstar2_ut(star, jd, 0)
-    if err:
-        continue
-
+    pos_s, nome_s, _ = ephem.fixstar2_ut(star, jd, 0)
     lon_s = pos_s[0]
     nome_corto = nome_s.split(",")[0]
 
@@ -353,10 +345,10 @@ Il sistema fonetico normalizza il nome rimuovendo le doppie consonanti, unifican
 Quando la ricerca ha successo, il primo valore restituito è il nome completo nel formato `"Nome,Nomenclatura"`:
 
 ```python
-nome, pos, flag, err = ephem.fixstar2_ut("Sirius", jd, 0)
+pos, nome, _ = ephem.fixstar2_ut("Sirius", jd, 0)
 print(nome)  # "Sirius,alCMa" → alpha Canis Majoris
 
-nome, pos, flag, err = ephem.fixstar2_ut("Algol", jd, 0)
+pos, nome, _ = ephem.fixstar2_ut("Algol", jd, 0)
 print(nome)  # "Algol,bePer" → beta Persei
 ```
 

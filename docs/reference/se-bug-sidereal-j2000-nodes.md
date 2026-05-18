@@ -7,12 +7,12 @@ pyswisseph silently ignores `FLG_J2000` for four lunar bodies when
 
 | Body | `SIDEREAL + J2000` in pyswisseph |
 |------|----------------------------------|
-| `SE_MEAN_NODE` (10) | J2000 applied correctly |
-| `SE_MEAN_APOG` (12) | J2000 applied correctly |
-| `SE_TRUE_NODE` (11) | **J2000 silently ignored** |
-| `SE_OSCU_APOG` (13) | **J2000 silently ignored** |
-| `SE_INTP_APOG` (21) | **J2000 silently ignored** |
-| `SE_INTP_PERG` (22) | **J2000 silently ignored** |
+| `MEAN_NODE` (10) | J2000 applied correctly |
+| `MEAN_APOG` (12) | J2000 applied correctly |
+| `TRUE_NODE` (11) | **J2000 silently ignored** |
+| `OSCU_APOG` (13) | **J2000 silently ignored** |
+| `INTP_APOG` (21) | **J2000 silently ignored** |
+| `INTP_PERG` (22) | **J2000 silently ignored** |
 
 LibEphemeris intentionally corrects this: `FLG_J2000` is honored for
 **all** bodies uniformly.
@@ -29,9 +29,9 @@ these four bodies.
 During systematic validation of all sidereal flag combinations against
 pyswisseph, we observed an internal inconsistency:
 
-- `SE_MEAN_NODE` with `SIDEREAL | J2000` returns a **different** longitude
+- `MEAN_NODE` with `SIDEREAL | J2000` returns a **different** longitude
   than with `SIDEREAL` alone (J2000 precession is applied).
-- `SE_TRUE_NODE` with `SIDEREAL | J2000` returns the **same** longitude
+- `TRUE_NODE` with `SIDEREAL | J2000` returns the **same** longitude
   as with `SIDEREAL` alone (J2000 precession is not applied).
 
 Bodies from the same physical family respond differently to the same flag
@@ -65,7 +65,7 @@ If the design intent were that `SIDEREAL` and `J2000` are incompatible for
 lunar nodes/apsides, the behavior should be consistent across all bodies
 of the same type. Instead:
 
-- Mean bodies (`SE_MEAN_NODE`, `SE_MEAN_APOG`) apply J2000 correctly.
+- Mean bodies (`MEAN_NODE`, `MEAN_APOG`) apply J2000 correctly.
 - True/osculating/interpolated bodies do not.
 
 This pattern indicates a code-path issue, not a deliberate API decision.
@@ -104,7 +104,7 @@ With the LibEphemeris fix:
 
 ## Numerical evidence
 
-All measurements use Lahiri ayanamsha (`SE_SIDM_LAHIRI`).
+All measurements use Lahiri ayanamsha (`SIDM_LAHIRI`).
 
 ### A. SID+J2K vs SID-only (LibEphemeris, after fix)
 
@@ -143,8 +143,8 @@ set:
 4. If equatorial output is also requested, rotate to J2000 equatorial
    using J2000 obliquity.
 
-This is the same pipeline already used correctly for `SE_MEAN_NODE` and
-`SE_MEAN_APOG`. The fix simply extends it to the remaining four bodies.
+This is the same pipeline already used correctly for `MEAN_NODE` and
+`MEAN_APOG`. The fix simply extends it to the remaining four bodies.
 
 ### Code locations
 

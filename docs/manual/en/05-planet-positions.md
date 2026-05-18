@@ -15,7 +15,7 @@ pos, flag = ephem.calc_ut(jd_ut, body, iflag)
 ```
 
 - `jd_ut`: Julian Day in UT ("civil" time)
-- `body`: celestial body identifier (`SE_SUN`, `SE_MOON`, etc.)
+- `body`: celestial body identifier (`SUN`, `MOON`, etc.)
 - `iflag`: calculation flags (combined with `|`)
 
 The result consists of two parts: a `pos` tuple with 6 numbers and an integer `flag` confirming the calculation options used. The 6 numbers describe **where** the celestial body is located and **how it is moving**.
@@ -54,21 +54,21 @@ If you don't use any of these flags (or pass `0`), you always get ecliptic coord
 
 | Constant | Value | Body |
 |----------|-------|------|
-| `SE_SUN` | 0 | Sun |
-| `SE_MOON` | 1 | Moon |
-| `SE_MERCURY` | 2 | Mercury |
-| `SE_VENUS` | 3 | Venus |
-| `SE_MARS` | 4 | Mars |
-| `SE_JUPITER` | 5 | Jupiter |
-| `SE_SATURN` | 6 | Saturn |
-| `SE_URANUS` | 7 | Uranus |
-| `SE_NEPTUNE` | 8 | Neptune |
-| `SE_PLUTO` | 9 | Pluto |
-| `SE_MEAN_NODE` | 10 | Mean Lunar Node |
-| `SE_TRUE_NODE` | 11 | True Lunar Node |
-| `SE_MEAN_APOG` | 12 | Mean Lunar Apogee (Lilith) |
-| `SE_OSCU_APOG` | 13 | Osculating Lunar Apogee |
-| `SE_CHIRON` | 15 | Chiron |
+| `SUN` | 0 | Sun |
+| `MOON` | 1 | Moon |
+| `MERCURY` | 2 | Mercury |
+| `VENUS` | 3 | Venus |
+| `MARS` | 4 | Mars |
+| `JUPITER` | 5 | Jupiter |
+| `SATURN` | 6 | Saturn |
+| `URANUS` | 7 | Uranus |
+| `NEPTUNE` | 8 | Neptune |
+| `PLUTO` | 9 | Pluto |
+| `MEAN_NODE` | 10 | Mean Lunar Node |
+| `TRUE_NODE` | 11 | True Lunar Node |
+| `MEAN_APOG` | 12 | Mean Lunar Apogee (Lilith) |
+| `OSCU_APOG` | 13 | Osculating Lunar Apogee |
+| `CHIRON` | 15 | Chiron |
 
 ```python
 import libephemeris as ephem
@@ -179,19 +179,20 @@ Retrograde motion is an optical effect: when the Earth overtakes an outer planet
 
 ```python
 import libephemeris as ephem
+from libephemeris.crossing import is_retrograde
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Check if Mercury is retrograde
-retro = ephem.is_retrograde(ephem.MERCURY, jd)
+retro = is_retrograde(ephem.MERCURY, jd)
 print(f"Mercury retrograde: {retro}")
 
 # Find Mercury's next station
-jd_station, type = ephem.swe_find_station_ut(ephem.MERCURY, jd)
+jd_station, station_type = ephem.find_station_ut(ephem.MERCURY, jd)
 
 year, month, day, hours = ephem.revjul(jd_station)
-# type = "SR" (retrograde station) or "SD" (direct station)
-print(f"Next station: {day}/{month}/{year} ({type})")
+# station_type = "SR" (retrograde station) or "SD" (direct station)
+print(f"Next station: {day}/{month}/{year} ({station_type})")
 ```
 
 ```text
@@ -331,8 +332,8 @@ Mars - aphelion:   120.3522° (dist 1.1508 AU)
 ### Introduced Functions
 
 - `pheno_ut(jd, body, flag)` — phenomena: phase, elongation, magnitude
-- `is_retrograde(body, jd)` — is the planet currently retrograde?
-- `swe_find_station_ut(body, jd)` — finds the next station (retrograde or direct)
+- `is_retrograde(body, jd)` — is the planet currently retrograde? (import from `libephemeris.crossing`)
+- `find_station_ut(body, jd)` — finds the next station (retrograde or direct)
 - `get_orbital_elements(jd_tt, body, flag)` — Keplerian orbital elements
 - `orbit_max_min_true_distance(jd, body, flag)` — min, max, and current distances from Earth
 - `nod_aps_ut(jd, body, flag, method)` — orbit nodes and apsides

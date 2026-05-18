@@ -44,7 +44,7 @@ Il Capitolo 15 — il Ricettario — è pensato per chi ha fretta: ricette copia
 
 ## Prerequisiti
 
-- **Python 3.9** o superiore
+- **Python 3.12** o superiore
 - **Nessuna conoscenza astronomica** — questo manuale parte da zero
 - **Nessun altro pacchetto** — LibEphemeris si installa con un singolo comando e non ha dipendenze pesanti
 
@@ -54,7 +54,7 @@ Il Capitolo 15 — il Ricettario — è pensato per chi ha fretta: ricette copia
 pip install libephemeris
 ```
 
-Al primo utilizzo, la libreria scarica automaticamente i file di efemeridi necessari (il file DE440, circa 114 MB). Puoi anche forzare il download in anticipo:
+Il pacchetto PyPI include un LEB2 base-tier bundled per i 14 corpi principali (1850–2150). Per una copertura più ampia, puoi scaricare un tier di precisione completo:
 
 ```python
 import libephemeris as ephem
@@ -89,7 +89,7 @@ Che cosa è successo?
 
 1. `julday(2024, 4, 8, 12.0)` ha convertito la data "8 aprile 2024, ore 12:00 UT" in un **Giorno Giuliano** — un numero unico che identifica quell'istante. Impareremo tutto sui Giorni Giuliani nel Capitolo 2.
 
-2. `calc_ut(jd, SE_SUN, 0)` ha calcolato la posizione del Sole per quell'istante. Il risultato è una tupla di 6 numeri: longitudine, latitudine, distanza, e le rispettive velocità giornaliere. Il terzo parametro (`0`) dice alla libreria di usare le impostazioni standard. I flag di calcolo sono trattati nel Capitolo 5.
+2. `calc_ut(jd, SUN, 0)` ha calcolato la posizione del Sole per quell'istante. Il risultato è una tupla di 6 numeri: longitudine, latitudine, distanza, e le rispettive velocità giornaliere. Il terzo parametro (`0`) dice alla libreria di usare le impostazioni standard. I flag di calcolo sono trattati nel Capitolo 5.
 
 3. La longitudine `19.15°` ci dice che il Sole si trovava a circa 19 gradi del segno dell'Ariete (il primo segno va da 0° a 30°). Capiremo il perché nel Capitolo 1.
 

@@ -30,8 +30,8 @@ Each body in the LEB file has its own independent date range. Planets cover the 
 
 - **1.1 Discover maximum SPK range from Horizons** — Implemented `_get_asteroid_spk_range()` in `scripts/generate_leb.py` that opens SPK type 21 files, finds segments for the target NAIF ID (trying both 2M and 20M conventions), and returns the effective `(jd_start, jd_end)`.
 - **1.2 Generate asteroids with independent range** — Modified `assemble_leb()` to discover effective SPK range, intersect with tier range (1-day margin), exclude asteroids with less than 20 years of useful coverage, and write per-body ranges into `BodyEntry`.
-- **1.3 Update reader for per-body range** — Already implemented. The reader (`leb_reader.py:eval_body()`) uses per-body `jd_start`/`jd_end` fields and raises `ValueError` when out of range, caught by `swe_calc_ut()`/`swe_calc()` for Skyfield fallback.
-- **1.4 Transparent fallback for out-of-range bodies** — Already implemented. The dispatch in `swe_calc_ut()` and `swe_calc()` catches both `KeyError` (body not in LEB) and `ValueError` (JD out of per-body range) for transparent per-body fallback.
+- **1.3 Update reader for per-body range** — Already implemented. The reader (`leb_reader.py:eval_body()`) uses per-body `jd_start`/`jd_end` fields and raises `ValueError` when out of range, caught by `calc_ut()`/`calc()` for Skyfield fallback.
+- **1.4 Transparent fallback for out-of-range bodies** — Already implemented. The dispatch in `calc_ut()` and `calc()` catches both `KeyError` (body not in LEB) and `ValueError` (JD out of per-body range) for transparent per-body fallback.
 - **1.5 Abort if SPK missing (strict mode for generator)** — Removed scalar Keplerian fallback from `generate_body_icrs_asteroid()`. The generator now raises `RuntimeError` if SPK is unavailable; `assemble_leb()` excludes asteroids without SPK with an `(EXCLUDED)` message.
 - **1.6 Improve verify_leb() for asteroids and ecliptic bodies** — Rewrote `verify_leb()` with proper verification for all body types: planets (Skyfield), asteroids (`spktype21`), ecliptic bodies (analytic functions from `lunar.py`), heliocentric bodies (`calc_uranian_planet()`/`calc_transpluto()`). All body types report error in arcsec with PASS/FAIL status.
 - **1.7 Poe commands for medium and extended with adaptive range** — Commands for group generation already exist and work automatically with per-body range since the logic is entirely in the generator.
@@ -88,7 +88,7 @@ Make the library fully transparent without LEB. A user can use `libephemeris` by
 
 ### Completed Subtasks
 
-- **3.1 Verify LEB-free mode is complete** — Already implemented. `_LEB_FILE` and `_LEB_READER` initialize to `None`; `get_leb_reader()` returns `None` when no LEB is configured; the `if reader is not None:` guard in `swe_calc_ut()`/`swe_calc()` skips the entire LEB block. All non-LEB tests exercise this path.
+- **3.1 Verify LEB-free mode is complete** — Already implemented. `_LEB_FILE` and `_LEB_READER` initialize to `None`; `get_leb_reader()` returns `None` when no LEB is configured; the `if reader is not None:` guard in `calc_ut()`/`calc()` skips the entire LEB block. All non-LEB tests exercise this path.
 - **3.2 Document both modes** — Documented in `README.md` (new "Binary Ephemeris Mode (LEB)" section) and `docs/leb/guide.md` (Calculation Mode section with mode table, examples, env var documentation).
 - **3.3 Environment variable for explicit mode** — Implemented `LIBEPHEMERIS_MODE` with four values: `auto` (default: LEB → Horizons → Skyfield), `skyfield` (force Skyfield), `leb` (require LEB with auto-discovery/download), `horizons` (prefer Horizons API). Added `set_calc_mode()`/`get_calc_mode()` in `state.py`, exported in `__init__.py`, reset in `close()`.
 - **3.4 Graceful handling of missing LEB** — Already implemented. `get_leb_reader()` handles all edge cases: missing file (warning + `None`), corrupt file (warning + `None`), range too narrow (`ValueError` caught for per-body fallback), no file specified (`None` without warning).
@@ -223,7 +223,7 @@ no user action required.
   would mark them reclaimable.  Semantically OK because the kernel
   doesn't reclaim immediately — pages stay cached unless there's
   memory pressure.
-- Batch processing: thousands of consecutive `swe_calc_ut()` calls
+- Batch processing: thousands of consecutive `calc_ut()` calls
   without reset_session would accumulate page cache.  This is the
   expected fast path — cool() should NOT run per-calculation.
 - `release_data_cache()` walks the entire data directory — too heavy

@@ -14,7 +14,7 @@ Non tutti i corpi del Sistema Solare sono uguali in termini di precisione dispon
 
 **Plutone e Chirone**: inclusi nelle efemeridi JPL come i pianeti. Stessa precisione, stessi metodi.
 
-**Asteroidi maggiori (Cerere, Pallade, Giunone, Vesta)**: hanno ID dedicati (`SE_CERES=17`, `SE_PALLAS=18`, `SE_JUNO=19`, `SE_VESTA=20`). La libreria può scaricare kernel SPK ad alta precisione da NASA/JPL.
+**Asteroidi maggiori (Cerere, Pallade, Giunone, Vesta)**: hanno ID dedicati (`CERES=17`, `PALLAS=18`, `JUNO=19`, `VESTA=20`). La libreria può scaricare kernel SPK ad alta precisione da NASA/JPL.
 
 **Centauri (Pholus, Nessus, Chariklo)**: corpi con orbite tra Giove e Nettuno. Disponibili con kernel SPK scaricabili o con il fallback kepleriano.
 
@@ -56,16 +56,16 @@ Giunone       6.9° Vir
 Vesta         2.4° Cnc
 ```
 
-Per i TNO e gli altri corpi senza ID dedicato, usi il **numero del catalogo + `SE_AST_OFFSET`** (10000):
+Per i TNO e gli altri corpi senza ID dedicato, usi il **numero del catalogo + `AST_OFFSET`** (10000):
 
 ```python
 import libephemeris as ephem
 
 # Eris (numero 136199)
-SE_ERIS = ephem.AST_OFFSET + 136199  # = 146199
+ERIS = ephem.AST_OFFSET + 136199  # = 146199
 
 jd = ephem.julday(2024, 4, 8, 12.0)
-pos, _ = ephem.calc_ut(jd, SE_ERIS, ephem.FLG_SPEED)
+pos, _ = ephem.calc_ut(jd, ERIS, ephem.FLG_SPEED)
 print(f"Eris: {pos[0]:.2f}°")
 ```
 
@@ -271,11 +271,11 @@ In questo capitolo abbiamo imparato a lavorare con i corpi minori del Sistema So
 - I **kernel SPK** sono file binari NASA con traiettorie precise — il gold standard per posizioni sub-arcsecondo
 - La **strict precision** (default) solleva `SPKRequiredError` per i corpi mappati senza SPK, prevenendo perdite di precisione silenti. Disabilita con `set_strict_precision(False)`
 - Il **fallback kepleriano** funziona senza Internet ma è raggiungibile solo se la strict precision è disabilitata o il corpo non è nella mappa SPK
-- Per i corpi senza ID dedicato, usa `SE_AST_OFFSET + numero_catalogo`
+- Per i corpi senza ID dedicato, usa `AST_OFFSET + numero_catalogo`
 
 **Funzioni introdotte:**
 
-- `calc_ut(jd, SE_CERES, flag)` — calcola la posizione di un corpo minore con ID dedicato, proprio come per i pianeti
+- `calc_ut(jd, CERES, flag)` — calcola la posizione di un corpo minore con ID dedicato, proprio come per i pianeti
 - `download_and_register_spk(body_id, jd_start, jd_end)` — scarica e registra un kernel SPK da JPL
 - `ensure_major_asteroid_spk(body_id)` — si assicura che l'SPK sia disponibile, scaricandolo se necessario
 - `list_major_asteroids()` — lista i corpi con download SPK automatico supportato

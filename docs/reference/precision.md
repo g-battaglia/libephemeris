@@ -378,7 +378,7 @@ Iterative systems (Placidus, Koch) use a convergence threshold of 10⁻⁷ degre
 
 ### Polar latitude behavior
 
-Above the polar circle (~66.56° = 90° − obliquity), Placidus and Koch are geometrically undefined because some ecliptic points never rise or set. LibEphemeris raises `PolarCircleError` with the option to fall back to Porphyry via `swe_houses_with_fallback()`.
+Above the polar circle (~66.56° = 90° − obliquity), Placidus and Koch are geometrically undefined because some ecliptic points never rise or set. LibEphemeris raises `PolarCircleError` with the option to fall back to Porphyry via `houses_with_fallback()`.
 
 ### Measured precision vs Swiss Ephemeris
 
@@ -685,7 +685,7 @@ The differences between LibEphemeris and Swiss Ephemeris are **not errors** in e
 
 ## 17. Photometric Models (Phenomena)
 
-LibEphemeris implements `swe_pheno_ut()` / `swe_pheno()` for computing observable planetary phenomena: phase angle, phase (illuminated fraction), elongation, apparent diameter, and visual magnitude. The photometric models use peer-reviewed formulas from the astronomical literature, validated against astropy and the Astronomical Almanac.
+LibEphemeris implements `pheno_ut()` / `pheno()` for computing observable planetary phenomena: phase angle, phase (illuminated fraction), elongation, apparent diameter, and visual magnitude. The photometric models use peer-reviewed formulas from the astronomical literature, validated against astropy and the Astronomical Almanac.
 
 ### Phase Angle
 

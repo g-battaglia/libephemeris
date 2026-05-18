@@ -72,11 +72,11 @@ Most functions are available with **both** the `swe_` prefix and without:
 
 | pyswisseph | LibEphemeris |
 |------------|--------------|
-| `swe.calc_ut()` | `swe.calc_ut()` or `swe.swe_calc_ut()` |
-| `swe.houses()` | `swe.houses()` or `swe.swe_houses()` |
-| `swe.julday()` | `swe.julday()` or `swe.swe_julday()` |
-| `swe.set_sid_mode()` | `swe.set_sid_mode()` or `swe.swe_set_sid_mode()` |
-| `swe.get_ayanamsa_ut()` | `swe.get_ayanamsa_ut()` or `swe.swe_get_ayanamsa_ut()` |
+| `swe.calc_ut()` | `swe.calc_ut()` or `swe.calc_ut()` |
+| `swe.houses()` | `swe.houses()` or `swe.houses()` |
+| `swe.julday()` | `swe.julday()` or `swe.julday()` |
+| `swe.set_sid_mode()` | `swe.set_sid_mode()` or `swe.set_sid_mode()` |
+| `swe.get_ayanamsa_ut()` | `swe.get_ayanamsa_ut()` or `swe.get_ayanamsa_ut()` |
 
 ### Constant Names
 
@@ -101,7 +101,7 @@ cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b'P')
 cusp1_swe = cusps_swe[1]
 
 # libephemeris returns 12 elements (0-indexed)
-cusps, ascmc = ephem.swe_houses(jd, lat, lon, b'P')
+cusps, ascmc = ephem.houses(jd, lat, lon, b'P')
 cusp1 = cusps[0]  # First house cusp
 ```
 
@@ -162,7 +162,7 @@ The True Node (osculating node) shows larger differences due to different algori
 | Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
 | Osculating Apogee (True Lilith) | ~0.015° mean, ~0.065° max | Sub-arcminute precision |
 
-**Note**: True Lilith (SE_OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
+**Note**: True Lilith (OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
 
 ---
 
@@ -177,10 +177,10 @@ Eclipse functions are implemented but some return values are not yet calculated:
 - **Sunrise/sunset on central line**: Returns 0 for solar eclipses (not implemented)
 
 Affected functions:
-- `sol_eclipse_when_glob()` / `swe_sol_eclipse_when_glob()`
-- `sol_eclipse_when_loc()` / `swe_sol_eclipse_when_loc()`
-- `lun_eclipse_when()` / `swe_lun_eclipse_when()`
-- `lun_occult_when_glob()` / `swe_lun_occult_when_glob()`
+- `sol_eclipse_when_glob()` / `sol_eclipse_when_glob()`
+- `sol_eclipse_when_loc()` / `sol_eclipse_when_loc()`
+- `lun_eclipse_when()` / `lun_eclipse_when()`
+- `lun_occult_when_glob()` / `lun_occult_when_glob()`
 
 ### Fixed Star Velocities
 
@@ -198,7 +198,7 @@ LibEphemeris uses JPL DE ephemerides with specific date ranges:
 | Ephemeris | Date Range | Size | Notes |
 |-----------|-----------|------|-------|
 | DE440s | 1849-2150 | ~31 MB | Lightweight subset of DE440 |
-| DE440 (default) | 1550-2650 | ~128 MB | ICRF 3.0, recommended |
+| DE440 (default) | 1550-2650 | ~114 MB | ICRF 3.0, recommended |
 | DE441 | -13200 to 17191 | ~3.4 GB | Extended version of DE440 |
 
 ### Precision Tiers

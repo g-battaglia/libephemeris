@@ -34,8 +34,8 @@ The single largest time sink. The LEB comparison tests iterate over hundreds of 
 ```python
 # test_extended_lunar.py — runs for each of 6 ecliptic bodies × 6 test classes
 for jd in ext_dates_500:  # 500 dates!
-    ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
-    leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+    ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+    leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 ```
 
 Each `compare.skyfield()` call:
@@ -55,7 +55,7 @@ Each `compare.leb()` call:
 
 **Impact on `test_extended_lunar.py` alone:**
 
-- 6 bodies × 6 test classes × 500 dates × 2 calls = **36,000 `swe_calc_ut` invocations**
+- 6 bodies × 6 test classes × 500 dates × 2 calls = **36,000 `calc_ut` invocations**
 - Each with full mode switching + LEB reader re-creation
 - Estimated: **3-5 hours** for this single test file
 
@@ -68,7 +68,7 @@ This fixture runs **before and after every single test** (17,621 times):
 ```python
 @pytest.fixture(autouse=True)
 def reset_ephemeris_state():
-    ephem.swe_set_sid_mode(SE_SIDM_FAGAN_BRADLEY)
+    ephem.set_sid_mode(SIDM_FAGAN_BRADLEY)
     clear_caches()  # <-- NUKES ALL LRU CACHES
     yield
     # ... restore state
@@ -86,7 +86,7 @@ def reset_ephemeris_state():
 
 ### Bottleneck #3: Skyfield DE441 Is Intrinsically Slow
 
-Extended tier tests use DE441, which covers 10,000 years (-13200 to +17191). Each `swe_calc_ut` via Skyfield involves:
+Extended tier tests use DE441, which covers 10,000 years (-13200 to +17191). Each `calc_ut` via Skyfield involves:
 
 1. JD → TT conversion (with Delta-T lookup)
 2. SPK segment interpolation (DE441 has large segments)
@@ -107,7 +107,7 @@ The comparison tests split each body into 6 separate test classes (longitude, la
 For `test_extended_lunar.py`:
 
 - 6 classes × 6 bodies = 36 tests
-- Each test calls `swe_calc_ut()` 500×2 = 1,000 times
+- Each test calls `calc_ut()` 500×2 = 1,000 times
 - But all 6 classes compute identical results — they just assert on different indices
 
 A single test verifying all 6 components would reduce Skyfield calls by **6×**.
@@ -116,7 +116,7 @@ A single test verifying all 6 components would reduce Skyfield calls by **6×**.
 
 ## 3. Estimated Time Distribution
 
-| Test File/Area                             | # Tests    | Dates/Test | swe_calc_ut Calls | Est. Time   |
+| Test File/Area                             | # Tests    | Dates/Test | calc_ut Calls | Est. Time   |
 | ------------------------------------------ | ---------- | ---------- | ----------------- | ----------- |
 | `test_extended_lunar.py`                   | 36         | 500        | 36,000            | 3-5h        |
 | `test_leb_precision.py`                    | ~2,400     | 150-200    | ~480,000          | 1-2h        |
@@ -160,7 +160,7 @@ The reader cleanup should happen once in `teardown()`, not in every call.
 Instead of 6 separate test classes each iterating 500 dates:
 
 ```python
-# BEFORE: 6 tests × 500 dates × 2 calls = 6,000 swe_calc_ut per body
+# BEFORE: 6 tests × 500 dates × 2 calls = 6,000 calc_ut per body
 class TestLongitude: ...   # iterates 500 dates
 class TestLatitude: ...    # iterates same 500 dates (redundant!)
 class TestDistance: ...    # iterates same 500 dates (redundant!)
@@ -172,7 +172,7 @@ class TestSpeedDist: ...  # iterates same 500 dates (redundant!)
 Consolidate into one test per body that checks all 6 components:
 
 ```python
-# AFTER: 1 test × 500 dates × 2 calls = 1,000 swe_calc_ut per body
+# AFTER: 1 test × 500 dates × 2 calls = 1,000 calc_ut per body
 class TestExtLunarPrecision:
     def test_all_components(self, compare, ext_dates_500, body_id, body_name):
         for jd in ext_dates_500:

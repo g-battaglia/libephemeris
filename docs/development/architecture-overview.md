@@ -105,11 +105,11 @@ C extensions, or compiled code exists anywhere in the project.
 
 | Operation                       | Cost     | Why                                           |
 |---------------------------------|----------|-----------------------------------------------|
-| `swe_calc_ut()` with `FLG_SPEED` | ~1ms  | 3 full Skyfield pipelines (9-12 Chebyshev evals + Python object overhead) |
-| `swe_calc_ut()` without speed   | ~350us   | 1 Skyfield pipeline                           |
-| `swe_houses()` (Placidus)       | ~500us   | Up to 50 trig iterations + GAST from Skyfield |
+| `calc_ut()` with `FLG_SPEED` | ~1ms  | 3 full Skyfield pipelines (9-12 Chebyshev evals + Python object overhead) |
+| `calc_ut()` without speed   | ~350us   | 1 Skyfield pipeline                           |
+| `houses()` (Placidus)       | ~500us   | Up to 50 trig iterations + GAST from Skyfield |
 | `sol_eclipse_when_glob()`       | ~500ms-2s| 600-1050 Skyfield pipelines (iterative search)|
-| Full chart (10 planets + houses) | ~12ms   | 30x `swe_calc_ut` + 1x `swe_houses`          |
+| Full chart (10 planets + houses) | ~12ms   | 30x `calc_ut` + 1x `houses`          |
 
 ### 2.2 Where CPU Time Is Spent (Priority Order)
 
@@ -130,11 +130,11 @@ result_next, _ = _calc_body(t_next, ipl, flags_no_speed)
 velocity = (result_next - result_prev) / (2 * dt)
 ```
 
-This means every `swe_calc_ut()` with `FLG_SPEED` costs **3x** the
+This means every `calc_ut()` with `FLG_SPEED` costs **3x** the
 position-only cost. Each of the 3 calls runs the full Skyfield pipeline:
 `.at().observe().apparent()`.
 
-**Total Skyfield calls per `swe_calc_ut()` with FLG_SPEED:**
+**Total Skyfield calls per `calc_ut()` with FLG_SPEED:**
 
 | Step                    | `.at()` | `.observe()` | `.apparent()` |
 |-------------------------|---------|--------------|---------------|
@@ -145,13 +145,13 @@ position-only cost. Each of the 3 calls runs the full Skyfield pipeline:
 
 Each `.observe()` internally iterates light-time (~2-3 iterations), so
 the true count of JPL ephemeris segment evaluations is approximately
-**9-12 Chebyshev polynomial evaluations** per single `swe_calc_ut()` call.
+**9-12 Chebyshev polynomial evaluations** per single `calc_ut()` call.
 
 #### 3. Eclipse search (combinatorial explosion)
 
 `sol_eclipse_when_glob()` call breakdown:
 
-| Component           | `swe_calc_ut()` calls | Direct Skyfield pipelines |
+| Component           | `calc_ut()` calls | Direct Skyfield pipelines |
 |---------------------|-----------------------|---------------------------|
 | Find New Moon       | ~42                   | ~126                      |
 | Check eclipse       | ~3                    | ~18                       |
@@ -179,7 +179,7 @@ calculations. Cache hit: ~0.0001ms (200x speedup).
 | `get_cached_obliquity(jd_tt)`| 128 entries| `erfa.obl06()` + nutation | 200x |
 
 **What is NOT cached:**
-- Planet positions (every `swe_calc_ut()` hits Skyfield every time)
+- Planet positions (every `calc_ut()` hits Skyfield every time)
 - Skyfield Time objects (created fresh each call)
 - Earth position for observer (recomputed per planet)
 
@@ -260,9 +260,9 @@ Zero math dependencies: all trigonometry uses `f64::sin()`, `f64::cos()`, etc.
 
 | Operation                     | Python .leb | Rust .leb  | Total vs Skyfield |
 |-------------------------------|-------------|------------|-------------------|
-| `swe_calc_ut()` + speed       | ~75us       | ~1-5us     | **200-1000x**     |
-| `swe_calc_ut()` mean node     | ~5us        | ~0.1us     | **1000x**         |
-| `swe_houses()` Placidus       | ~400us      | ~1-5us     | **100-500x**      |
+| `calc_ut()` + speed       | ~75us       | ~1-5us     | **200-1000x**     |
+| `calc_ut()` mean node     | ~5us        | ~0.1us     | **1000x**         |
+| `houses()` Placidus       | ~400us      | ~1-5us     | **100-500x**      |
 | Eclipse search                | ~100ms      | ~0.5-2ms   | **500-2000x**     |
 | Full chart (10 planets+houses)| ~1ms        | ~20-50us   | **240-600x**      |
 
@@ -277,7 +277,7 @@ try:
 except ImportError:
     _HAS_ENGINE = False
 
-def swe_calc_ut(tjd_ut, ipl, iflag):
+def calc_ut(tjd_ut, ipl, iflag):
     if _HAS_ENGINE:
         return _engine.calc_ut(tjd_ut, ipl, iflag)
     reader = state.get_leb_reader()
@@ -315,12 +315,12 @@ calculation function, as found in the source code analysis:
 | Body                | Source Function                | Uses Skyfield? | Frame                  | Geocentric? |
 |---------------------|--------------------------------|----------------|------------------------|-------------|
 | Sun-Pluto           | Skyfield `.at().observe().apparent()` | Yes     | True ecliptic of date  | Yes         |
-| `SE_MEAN_NODE`      | `calc_mean_lunar_node()`       | No             | Mean ecliptic of date  | N/A         |
-| `SE_TRUE_NODE`      | `calc_true_lunar_node()`       | Yes            | True ecliptic of date  | Yes         |
-| `SE_MEAN_APOG`      | `calc_mean_lilith_with_latitude()` | No         | Mean ecliptic of date  | N/A         |
-| `SE_OSCU_APOG`      | `calc_true_lilith()`           | Yes            | True ecliptic of date  | Yes         |
-| `SE_INTP_APOG`      | `calc_interpolated_apogee()`   | No             | Mean ecliptic of date  | N/A         |
-| `SE_INTP_PERG`      | `calc_interpolated_perigee()`  | No             | Mean ecliptic of date  | N/A         |
+| `MEAN_NODE`      | `calc_mean_lunar_node()`       | No             | Mean ecliptic of date  | N/A         |
+| `TRUE_NODE`      | `calc_true_lunar_node()`       | Yes            | True ecliptic of date  | Yes         |
+| `MEAN_APOG`      | `calc_mean_lilith_with_latitude()` | No         | Mean ecliptic of date  | N/A         |
+| `OSCU_APOG`      | `calc_true_lilith()`           | Yes            | True ecliptic of date  | Yes         |
+| `INTP_APOG`      | `calc_interpolated_apogee()`   | No             | Mean ecliptic of date  | N/A         |
+| `INTP_PERG`      | `calc_interpolated_perigee()`  | No             | Mean ecliptic of date  | N/A         |
 | Uranians (40-47)     | `calc_uranian_planet()`        | No             | Heliocentric ecliptic  | Helio       |
 | Transpluto (48)     | `calc_transpluto()`            | No             | Heliocentric ecliptic  | Helio       |
 | Fixed stars         | `calc_fixed_star_position()`   | Yes            | True ecliptic of date  | Yes         |

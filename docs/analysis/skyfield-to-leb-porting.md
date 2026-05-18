@@ -48,11 +48,11 @@ disponibili per le feature avanzate.
 
 I file LEB/LEB2 contengono posizioni pre-calcolate per Sole, Terra, Luna e
 tutti i corpi planetari — sono letteralmente il risultato pre-computato dei
-calcoli Skyfield.  `swe_calc_ut()` legge questi dati senza toccare Skyfield.
+calcoli Skyfield.  `calc_ut()` legge questi dati senza toccare Skyfield.
 
 Il porting consiste nel sostituire le chiamate
 `eph["earth"].at(t).observe(body).apparent()` con chiamate a
-`swe_calc_ut()` + funzioni di trasformazione coordinate che **esistono già**
+`calc_ut()` + funzioni di trasformazione coordinate che **esistono già**
 in libephemeris.
 
 ### Fattibilità
@@ -74,8 +74,8 @@ sostituire Skyfield.  Questa tabella elenca le equivalenze:
 
 | Operazione Skyfield | Funzione libephemeris | File:linea | Stato |
 |---------------------|----------------------|------------|-------|
-| `.altaz()` — eclittica→orizzontale | `azalt(tjdut, SE_ECL2HOR, geopos, atpress, attemp, xin)` | `utils.py:175` | Pronta |
-| `.altaz()` — equatoriale→orizzontale | `azalt(tjdut, SE_EQU2HOR, geopos, atpress, attemp, xin)` | `utils.py:175` | Pronta |
+| `.altaz()` — eclittica→orizzontale | `azalt(tjdut, ECL2HOR, geopos, atpress, attemp, xin)` | `utils.py:175` | Pronta |
+| `.altaz()` — equatoriale→orizzontale | `azalt(tjdut, EQU2HOR, geopos, atpress, attemp, xin)` | `utils.py:175` | Pronta |
 | Reverse: orizzontale→equatoriale | `azalt_rev(tjdut, flag, geopos, xin)` | `utils.py:334` | Pronta |
 | Rifrazione atmosferica | `refrac(alt, atpress, attemp, flag)` | `utils.py:462` | Pronta |
 | Rifrazione estesa | `refrac_extended(alt, alt_geo, atpress, attemp, lapse_rate, flag)` | `utils.py:547` | Pronta |
@@ -98,12 +98,12 @@ sostituire Skyfield.  Questa tabella elenca le equivalenze:
 
 | Operazione Skyfield | Funzione libephemeris | File:linea | Stato |
 |---------------------|----------------------|------------|-------|
-| `eph["sun"].at(t)` | `swe_calc_ut(jd, SUN, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| `eph["moon"].at(t)` | `swe_calc_ut(jd, MOON, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| `eph["earth"].at(t)` | `swe_calc_ut(jd, EARTH, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
-| Topocentric position | `swe_calc_ut(jd, body, FLG_TOPOCTR)` | — | **KeyError in LEB mode** |
-| Cartesian XYZ | `swe_calc_ut(jd, body, FLG_XYZ)` | — | **KeyError in LEB mode** |
-| Equatoriale (RA/Dec) | `swe_calc_ut(jd, body, FLG_EQUATORIAL)` | `fast_calc.py:1105` | Pronta |
+| `eph["sun"].at(t)` | `calc_ut(jd, SUN, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| `eph["moon"].at(t)` | `calc_ut(jd, MOON, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| `eph["earth"].at(t)` | `calc_ut(jd, EARTH, FLG_SPEED)` | `planets.py:780` | Pronta (via LEB) |
+| Topocentric position | `calc_ut(jd, body, FLG_TOPOCTR)` | — | **KeyError in LEB mode** |
+| Cartesian XYZ | `calc_ut(jd, body, FLG_XYZ)` | — | **KeyError in LEB mode** |
+| Equatoriale (RA/Dec) | `calc_ut(jd, body, FLG_EQUATORIAL)` | `fast_calc.py:1105` | Pronta |
 
 ### Flag attualmente non supportati nel LEB path
 
@@ -128,7 +128,7 @@ Per il porting completo, sarà necessario implementare almeno
 ### Pipeline attuale (Skyfield)
 
 ```
-swe_fixstar_ut(star_name, jd, iflag)
+fixstar_ut(star_name, jd, iflag)
   → calc_fixed_star_position()                          [riga 3904]
     → _calc_star_position_skyfield()                    [riga 3861]
       → earth = get_planets()["earth"]                  [riga 3897]  ← CARICA DE KERNEL
@@ -145,7 +145,7 @@ swe_fixstar_ut(star_name, jd, iflag)
 
 | Passo | Skyfield | Sostituto LEB |
 |-------|----------|---------------|
-| 1. Posizione Terra geocentrica | `earth.at(t)` | `swe_calc_ut(jd, EARTH, FLG_SPEED)` |
+| 1. Posizione Terra geocentrica | `earth.at(t)` | `calc_ut(jd, EARTH, FLG_SPEED)` |
 | 2. Moto proprio J2000→data | `Star(pm_ra, pm_dec)` | `propagate_proper_motion()` (`fixed_stars.py:257`) |
 | 3. Parallasse stellare | Interno a `Star()` | Formula: `dist_AU = 206265.0 / parallax_arcsec` |
 | 4. Aberrazione annuale | `.apparent()` | `_apply_aberration(geo, earth_vel, lt)` (`fast_calc.py:201`) |
@@ -157,7 +157,7 @@ swe_fixstar_ut(star_name, jd, iflag)
 ### Pipeline LEB proposta
 
 ```
-swe_fixstar_ut(star_name, jd, iflag)
+fixstar_ut(star_name, jd, iflag)
   → calc_fixed_star_position()
     → _calc_star_position_leb(jd_tt, star_data, iflag)   # NUOVA FUNZIONE
       1. Leggere StarEntry dal LEB: reader.get_star(star_id)
@@ -166,7 +166,7 @@ swe_fixstar_ut(star_name, jd, iflag)
       4. Precessione J2000 → data: _precess_ecliptic(lon, lat, jd_tt)
       5. Nutazione: applicare dpsi da get_cached_nutation(jd_tt)
       6. Aberrazione: _apply_aberration(geo, earth_vel, lt)
-         - earth_vel da swe_calc_ut(jd, EARTH, FLG_SPEED) → speed components
+         - earth_vel da calc_ut(jd, EARTH, FLG_SPEED) → speed components
       7. Return (lon, lat, dist)
     → _apply_fixstar_flags(lon, lat, dist, ...)           # invariata
 ```
@@ -177,12 +177,12 @@ swe_fixstar_ut(star_name, jd, iflag)
    vicine al bordo solare, scende a < 0.004" per stelle a > 10° dal Sole.
    Per l'astrologia (precisione ~1') è trascurabile.  Se necessaria, si
    può implementare con la formula di Einstein usando la posizione del Sole
-   da `swe_calc_ut()`.
+   da `calc_ut()`.
 
 2. **Velocità della Terra** — `_apply_aberration()` richiede il vettore
    velocità della Terra in coordinate cartesiane ICRS.  Il path LEB
    restituisce velocità in eclittica.  Servono:
-   - `swe_calc_ut(jd, EARTH, FLG_SPEED)` → (lon, lat, dist, dlon, dlat, ddist)
+   - `calc_ut(jd, EARTH, FLG_SPEED)` → (lon, lat, dist, dlon, dlat, ddist)
    - Conversione delle velocità eclittiche in vettore ICRS (o usare
      direttamente il vettore dal LEB reader: `reader.eval_body(EARTH, jd)` 
      restituisce `((x, y, z), (vx, vy, vz))` in ICRS per corpi baricentici)
@@ -192,7 +192,7 @@ swe_fixstar_ut(star_name, jd, iflag)
 - Creare `_calc_star_position_leb()` (~50-80 righe)
 - Aggiungere dispatch in `calc_fixed_star_position()`: se LEB reader
   disponibile, usare path LEB; altrimenti fallback a Skyfield
-- Adattare `swe_batch_fixstars_ut()` per usare la nuova funzione
+- Adattare `batch_fixstars_ut()` per usare la nuova funzione
 - Test di confronto: output LEB vs output Skyfield, target < 1"
 
 ---
@@ -224,12 +224,12 @@ heliacal_ut(jd_start, geopos, body, ...)
 
 | Passo | Skyfield | Sostituto LEB |
 |-------|----------|---------------|
-| 1. Posizione Sole | `observer_at.observe(sun).apparent()` | `swe_calc_ut(jd, SUN, FLG_SPEED)` → eclittica |
-| 2. Posizione corpo | `observer_at.observe(body).apparent()` | `swe_calc_ut(jd, body_id, FLG_SPEED)` → eclittica |
-| 3. Posizione Luna | `observer_at.observe(moon).apparent()` | `swe_calc_ut(jd, MOON, FLG_SPEED)` → eclittica |
-| 4. Altitudine/Azimut | `.altaz()` | `azalt(jd, SE_ECL2HOR, geopos, atpress, attemp, (lon, lat, dist))` (`utils.py:175`) |
+| 1. Posizione Sole | `observer_at.observe(sun).apparent()` | `calc_ut(jd, SUN, FLG_SPEED)` → eclittica |
+| 2. Posizione corpo | `observer_at.observe(body).apparent()` | `calc_ut(jd, body_id, FLG_SPEED)` → eclittica |
+| 3. Posizione Luna | `observer_at.observe(moon).apparent()` | `calc_ut(jd, MOON, FLG_SPEED)` → eclittica |
+| 4. Altitudine/Azimut | `.altaz()` | `azalt(jd, ECL2HOR, geopos, atpress, attemp, (lon, lat, dist))` (`utils.py:175`) |
 | 5. Separazione angolare | `.separation_from()` | Formula haversine su coordinate eclittiche |
-| 6. Posizione stelle fisse | `Star(ra, dec, pm_ra, pm_dec)` | `swe_fixstar_ut()` (dopo il porting del punto 3) |
+| 6. Posizione stelle fisse | `Star(ra, dec, pm_ra, pm_dec)` | `fixstar_ut()` (dopo il porting del punto 3) |
 | 7. Rifrazione | Custom (Bennet) | Già custom, non dipende da Skyfield |
 | 8. Modello atmosferico | `SchaeferModel` | Già custom, non dipende da Skyfield |
 
@@ -237,13 +237,13 @@ heliacal_ut(jd_start, geopos, body, ...)
 
 ```
 heliacal_ut(jd_start, geopos, body, ...)
-  → swe_set_topo(lon, lat, alt)                          # imposta osservatore
+  → set_topo(lon, lat, alt)                          # imposta osservatore
   → loop di ricerca:
-      sun_pos = swe_calc_ut(jd, SUN, FLG_SPEED)     # → (lon, lat, dist, ...)
-      body_pos = swe_calc_ut(jd, body_id, FLG_SPEED)
-      moon_pos = swe_calc_ut(jd, MOON, FLG_SPEED)
-      _, sun_alt, _ = azalt(jd, SE_ECL2HOR, geopos, 0, 0, sun_pos[:3])
-      _, body_alt, body_az_app = azalt(jd, SE_ECL2HOR, geopos, 0, 0, body_pos[:3])
+      sun_pos = calc_ut(jd, SUN, FLG_SPEED)     # → (lon, lat, dist, ...)
+      body_pos = calc_ut(jd, body_id, FLG_SPEED)
+      moon_pos = calc_ut(jd, MOON, FLG_SPEED)
+      _, sun_alt, _ = azalt(jd, ECL2HOR, geopos, 0, 0, sun_pos[:3])
+      _, body_alt, body_az_app = azalt(jd, ECL2HOR, geopos, 0, 0, body_pos[:3])
       elongation = _angular_separation(sun_pos[0], sun_pos[1], body_pos[0], body_pos[1])
       → SchaeferModel.is_visible(...)                     # invariato
 ```
@@ -272,15 +272,15 @@ eclittica.  Per le separazioni angolari la differenza è trascurabile
 
 1. **Stelle fisse per heliacal** — `heliacal_ut()` gestisce anche stelle
    fisse (Sirio, Regolo, etc.) creando un oggetto `Star()` di Skyfield.
-   Dopo il porting di fixed\_stars.py, si può usare `swe_fixstar_ut()`.
+   Dopo il porting di fixed\_stars.py, si può usare `fixstar_ut()`.
 
 2. **Coordinate geocentriche** — `heliacal_pheno_ut()` usa anche
    `.radec()` per calcolare l'altitudine geocentrica tramite angolo orario
    (riga 2165-2183).  Questo può essere ottenuto con
-   `swe_calc_ut(jd, body, FLG_EQUATORIAL)` che restituisce RA/Dec.
+   `calc_ut(jd, body, FLG_EQUATORIAL)` che restituisce RA/Dec.
 
 3. **Nota su `azalt()`** — La funzione `azalt()` in `utils.py:175` accetta
-   coordinate eclittiche (con `SE_ECL2HOR`) e include la rifrazione
+   coordinate eclittiche (con `ECL2HOR`) e include la rifrazione
    atmosferica.  È l'equivalente diretto di Skyfield `.altaz()`.
 
 ### Effort stimato: 2-3 giorni
@@ -300,14 +300,14 @@ eclittica.  Per le separazioni angolari la differenza è trascurabile
 Le funzioni pubbliche sono:
 
 **Eclissi solari:**
-- `sol_eclipse_when_glob()` / `swe_sol_eclipse_when_glob()` — prossima eclissi globale
-- `sol_eclipse_when_loc()` / `swe_sol_eclipse_when_loc()` — prossima eclissi locale
-- `sol_eclipse_where()` / `swe_sol_eclipse_where()` — dove è visibile
-- `sol_eclipse_how()` / `swe_sol_eclipse_how()` — dettagli per location
-- `sol_eclipse_how_details()` / `swe_sol_eclipse_how_details()` — dettagli estesi
+- `sol_eclipse_when_glob()` / `sol_eclipse_when_glob()` — prossima eclissi globale
+- `sol_eclipse_when_loc()` / `sol_eclipse_when_loc()` — prossima eclissi locale
+- `sol_eclipse_where()` / `sol_eclipse_where()` — dove è visibile
+- `sol_eclipse_how()` / `sol_eclipse_how()` — dettagli per location
+- `sol_eclipse_how_details()` / `sol_eclipse_how_details()` — dettagli estesi
 
 **Eclissi lunari:**
-- `lun_eclipse_when()` / `swe_lun_eclipse_when()` — prossima eclissi lunare
+- `lun_eclipse_when()` / `lun_eclipse_when()` — prossima eclissi lunare
 - `lun_eclipse_when_loc()` — eclissi lunare locale
 
 **Occultazioni:**
@@ -330,7 +330,7 @@ moon_pos = moon_app.position.au
 sun_dist = sun_app.distance().au
 ```
 
-**Sostituto LEB:** `swe_calc_ut(jd, body, FLG_SPEED)` per distanze e
+**Sostituto LEB:** `calc_ut(jd, body, FLG_SPEED)` per distanze e
 coordinate eclittiche.  Per i vettori 3D ICRS, serve `FLG_XYZ`
 (attualmente non supportato in LEB mode).
 
@@ -343,8 +343,8 @@ sun_app = observer_at.at(t).observe(sun).apparent()
 sun_alt, sun_az, _ = sun_app.altaz()
 ```
 
-**Sostituto LEB:** `swe_calc_ut(jd, body, FLG_SPEED)` + 
-`azalt(jd, SE_ECL2HOR, geopos, 0, 0, (lon, lat, dist))`.  Non serve
+**Sostituto LEB:** `calc_ut(jd, body, FLG_SPEED)` + 
+`azalt(jd, ECL2HOR, geopos, 0, 0, (lon, lat, dist))`.  Non serve
 `FLG_TOPOCTR` se si usa `azalt()` che accetta coordinate geocentriche.
 
 #### Pattern C — Separazioni angolari (~10 siti)
@@ -363,7 +363,7 @@ ra, dec, dist = moon_app.radec(epoch="date")
 ```
 
 **Sostituto LEB:**
-`swe_calc_ut(jd, body, FLG_EQUATORIAL)` restituisce RA/Dec (ma in J2000,
+`calc_ut(jd, body, FLG_EQUATORIAL)` restituisce RA/Dec (ma in J2000,
 non epoch="date").  Per epoch="date" serve applicare la precessione IAU 2006
 manualmente: `_precess_ecliptic()` + `cotrans_sp()`.
 
@@ -404,7 +404,7 @@ solari operano su vettori 3D cartesiani ICRS.  Le coordinate eclittiche
 | Pattern B: topocentric altaz | 8 | Bassa | `azalt()` esiste |
 | Pattern C: separazioni | 10 | Bassa | Formula haversine |
 | Pattern D: RA/Dec epoch="date" | 6 | Media | Precessione + cotrans |
-| Pattern A: geocentrico base | 15 | Media | `swe_calc_ut()` |
+| Pattern A: geocentrico base | 15 | Media | `calc_ut()` |
 | Pattern E: vettori 3D ICRS | 14 | **Alta** | Richiede SEFLG\_XYZ in LEB |
 | Batch vettorizzati | 2 | Media | Loop scalare |
 | Stelle in occultazioni | 4 | Bassa | Dopo porting fixed\_stars |
@@ -420,7 +420,7 @@ solari operano su vettori 3D cartesiani ICRS.  Le coordinate eclittiche
    Necessario per le eclissi locali.  Richiede applicare la parallasse
    diurna alla posizione geocentrica usando la posizione dell'osservatore.
 
-3. **Batch vettorizzato** — `swe_calc_ut()` è scalare.  I 2 siti batch
+3. **Batch vettorizzato** — `calc_ut()` è scalare.  I 2 siti batch
    (righe ~6118-6165) dovranno usare un loop Python.  Impatto performance
    da valutare, ma i calcoli LEB per punto sono ~100x più veloci di
    Skyfield, quindi il loop potrebbe essere comunque più rapido.
@@ -520,7 +520,7 @@ Porting più semplice.  Nessuna dipendenza da flag mancanti.
 1. Creare `_calc_star_position_leb()` in `fixed_stars.py`
 2. Dispatch in `calc_fixed_star_position()`:
    LEB reader disponibile → path LEB; altrimenti → Skyfield
-3. Adattare `swe_batch_fixstars_ut()` per usare il nuovo path
+3. Adattare `batch_fixstars_ut()` per usare il nuovo path
 4. Test: confronto output LEB vs Skyfield per ~100 stelle, target < 1"
 
 ### Fase 2: heliacal.py (2-3 giorni)
@@ -528,7 +528,7 @@ Porting più semplice.  Nessuna dipendenza da flag mancanti.
 Dipendenza: Fase 1 (per le stelle fisse in heliacal).
 
 1. Creare varianti LEB delle tre funzioni pubbliche
-2. Usare `swe_calc_ut()` + `azalt()` + `_angular_separation()`
+2. Usare `calc_ut()` + `azalt()` + `_angular_separation()`
 3. Dispatch: LEB reader disponibile → path LEB
 4. Test: confronto heliacal events LEB vs Skyfield, target < 0.01° altitudine
 
@@ -618,10 +618,10 @@ testati e mantenuti (stessa base di `fast_calc.py`).
 | 1226 | `sol_eclipse_when_glob` | A+C | `.apparent()`, `.separation_from()` |
 | 1554 | `_calculate_local_eclipse_phases` | B | `wgs84`, `.altaz()`, `.separation_from()` |
 | 1917 | `sol_eclipse_when_loc` | B+C | `wgs84`, `.altaz()`, `.apparent()`, `.separation_from()` |
-| 2116 | `swe_sol_eclipse_when_loc` | B+C | `wgs84`, `.altaz()`, `.radec()`, `.separation_from()` |
+| 2116 | `sol_eclipse_when_loc` | B+C | `wgs84`, `.altaz()`, `.radec()`, `.separation_from()` |
 | 2779 | `sol_eclipse_where` | B+D | `wgs84`, `.radec(epoch="date")`, `.altaz()` |
 | 3326 | `sol_eclipse_how` | B+D | `wgs84`, `.altaz()`, `.radec(epoch="date")` |
-| 3701 | `swe_sol_eclipse_how_details` | B+D+E | `wgs84`, `.position.au`, `.altaz()`, `.radec()` |
+| 3701 | `sol_eclipse_how_details` | B+D+E | `wgs84`, `.position.au`, `.altaz()`, `.radec()` |
 | 4874 | `lun_eclipse_when` | A+E | `.position.au`, `.distance()`, `.apparent()` |
 | 5263 | `lun_eclipse_when_loc` | B+E | `wgs84`, `.position.au`, `.altaz()` |
 | 5462 | `lun_eclipse_when_loc` | B | `wgs84`, `.altaz()` |
@@ -650,7 +650,7 @@ testati e mantenuti (stessa base di `fast_calc.py`).
 | Riga | Funzione | Pattern |
 |-----:|----------|---------|
 | 3897 | `_calc_star_position_skyfield` | Star + earth.at().observe().apparent().frame_latlon() |
-| 4308 | `swe_batch_fixstars_ut` | Star + earth.at().observe().apparent().frame_latlon() |
+| 4308 | `batch_fixstars_ut` | Star + earth.at().observe().apparent().frame_latlon() |
 
 ### heliacal.py (3 siti)
 

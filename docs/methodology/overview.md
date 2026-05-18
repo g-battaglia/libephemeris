@@ -79,7 +79,7 @@ LibEphemeris grounds the interpolated apsides in the physical geometry of the JP
 4. A 61-term harmonic perturbation series is fitted to this function via least squares.
 5. A residual correction table absorbs remaining model error.
 
-The interpolated perigee (`SE_INTP_PERG`) differs from Swiss Ephemeris by up to ~5 degrees. This is the largest single discrepancy between the two libraries and reflects the different smoothing philosophies applied to the same physical phenomenon.
+The interpolated perigee (`INTP_PERG`) differs from Swiss Ephemeris by up to ~5 degrees. This is the largest single discrepancy between the two libraries and reflects the different smoothing philosophies applied to the same physical phenomenon.
 
 | Aspect                | Swiss Ephemeris                  | LibEphemeris                         |
 | --------------------- | -------------------------------- | ------------------------------------ |

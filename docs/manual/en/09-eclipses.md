@@ -30,21 +30,21 @@ In a typical year there are 2–5 solar eclipses and 0–3 lunar eclipses.
 
 The type of solar eclipse depends on the Moon's distance from the Earth at that moment (the Moon moves closer and farther away because its orbit is elliptical):
 
-- **Total** (`SE_ECL_TOTAL`): the Moon is close enough to *completely* cover the solar disk. For a few minutes, the sky turns dark and the solar corona becomes visible — one of nature's most extraordinary spectacles. The path of totality is narrow: typically 100–250 km wide.
+- **Total** (`ECL_TOTAL`): the Moon is close enough to *completely* cover the solar disk. For a few minutes, the sky turns dark and the solar corona becomes visible — one of nature's most extraordinary spectacles. The path of totality is narrow: typically 100–250 km wide.
 
-- **Annular** (`SE_ECL_ANNULAR`): the Moon is too far away and its disk appears smaller than the Sun's. A bright **ring of fire** ("annulus") remains around the lunar disk. Spectacular, but the sky does not turn dark like in a total eclipse.
+- **Annular** (`ECL_ANNULAR`): the Moon is too far away and its disk appears smaller than the Sun's. A bright **ring of fire** ("annulus") remains around the lunar disk. Spectacular, but the sky does not turn dark like in a total eclipse.
 
-- **Partial** (`SE_ECL_PARTIAL`): the Moon covers only a part of the Sun. It is the most common type to observe — you just need to be in the lunar penumbra, which covers a much wider area than the umbra.
+- **Partial** (`ECL_PARTIAL`): the Moon covers only a part of the Sun. It is the most common type to observe — you just need to be in the lunar penumbra, which covers a much wider area than the umbra.
 
-- **Hybrid** (`SE_ECL_ANNULAR_TOTAL`): a rare eclipse that is annular in some areas of the Earth and total in others. It happens when the Moon's shadow is at its limit — the apex of the umbral cone grazes the Earth's surface.
+- **Hybrid** (`ECL_ANNULAR_TOTAL`): a rare eclipse that is annular in some areas of the Earth and total in others. It happens when the Moon's shadow is at its limit — the apex of the umbral cone grazes the Earth's surface.
 
 ### Lunar eclipses
 
-- **Total** (`SE_ECL_TOTAL`): the Moon completely enters the Earth's umbral cone. It does not become invisible but takes on a **copper red** hue — sunlight filtered and refracted by the Earth's atmosphere dimly illuminates it. Every "Blood Moon" is a total lunar eclipse.
+- **Total** (`ECL_TOTAL`): the Moon completely enters the Earth's umbral cone. It does not become invisible but takes on a **copper red** hue — sunlight filtered and refracted by the Earth's atmosphere dimly illuminates it. Every "Blood Moon" is a total lunar eclipse.
 
-- **Partial** (`SE_ECL_PARTIAL`): only a part of the Moon enters the umbra. A dark "bite" is seen on the lunar disk.
+- **Partial** (`ECL_PARTIAL`): only a part of the Moon enters the umbra. A dark "bite" is seen on the lunar disk.
 
-- **Penumbral** (`SE_ECL_PENUMBRAL`): the Moon enters the Earth's penumbra (the partial shadow zone), but not the true umbra. The obscuration is so slight that it is often invisible to the naked eye.
+- **Penumbral** (`ECL_PENUMBRAL`): the Moon enters the Earth's penumbra (the partial shadow zone), but not the true umbra. The obscuration is so slight that it is often invisible to the naked eye.
 
 ### Magnitude and obscuration
 

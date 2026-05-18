@@ -17,12 +17,12 @@ Error reduced from 3.25e-4 AU to ~1.5e-7 AU (2000x improvement).
 
 ### Sun heliocentric (FIXED)
 
-Previously, `swe_calc(jd, SUN, FLG_HELCTR)` returned ~126° longitude
+Previously, `calc(jd, SUN, FLG_HELCTR)` returned ~126° longitude
 (garbage from `arctan2` of near-zero values). Now correctly returns (0,0,0,0,0,0).
 
 ### Uranian geocentric bodies (FIXED)
 
-Previously, `swe_calc(jd, 40, FLG_SPEED)` without `FLG_HELCTR` raised
+Previously, `calc(jd, 40, FLG_SPEED)` without `FLG_HELCTR` raised
 `UnknownBodyError`. Geocentric conversion path added for all 8 Uranians (40-47).
 
 ## Horizons Backend Limitations

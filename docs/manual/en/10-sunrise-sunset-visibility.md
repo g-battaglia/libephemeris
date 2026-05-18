@@ -65,16 +65,16 @@ Daylight duration: 15.7 hours
 
 The `rsmi` parameter accepts four base events:
 
-- `SE_CALC_RISE` (1) — rise (first ray at the horizon)
-- `SE_CALC_SET` (2) — set (last ray disappears)
-- `SE_CALC_MTRANSIT` (4) — upper meridian transit (highest point in the sky)
-- `SE_CALC_ITRANSIT` (8) — lower transit (lowest point, usually below the horizon)
+- `CALC_RISE` (1) — rise (first ray at the horizon)
+- `CALC_SET` (2) — set (last ray disappears)
+- `CALC_MTRANSIT` (4) — upper meridian transit (highest point in the sky)
+- `CALC_ITRANSIT` (8) — lower transit (lowest point, usually below the horizon)
 
 You can add modifiers to these (using the `|` operator):
 
-- `SE_BIT_DISC_CENTER` (256) — use the center of the disc instead of the upper edge
-- `SE_BIT_DISC_BOTTOM` (8192) — use the lower edge of the disc
-- `SE_BIT_NO_REFRACTION` (512) — do not apply atmospheric refraction
+- `BIT_DISC_CENTER` (256) — use the center of the disc instead of the upper edge
+- `BIT_DISC_BOTTOM` (8192) — use the lower edge of the disc
+- `BIT_NO_REFRACTION` (512) — do not apply atmospheric refraction
 
 ### Moonrise and moonset
 
@@ -374,17 +374,17 @@ Heliacal rising of Sirius in Cairo: 4/8/2024
 
 The four types of heliacal events are:
 
-- `SE_HELIACAL_RISING` (1) — **heliacal rising**: the first morning appearance. The object becomes visible at dawn after the period of invisibility near the Sun. Valid for all bodies.
+- `HELIACAL_RISING` (1) — **heliacal rising**: the first morning appearance. The object becomes visible at dawn after the period of invisibility near the Sun. Valid for all bodies.
 
-- `SE_HELIACAL_SETTING` (2) — **heliacal setting**: the last evening appearance. The object disappears into the Sun's glare at sunset. Valid for all bodies.
+- `HELIACAL_SETTING` (2) — **heliacal setting**: the last evening appearance. The object disappears into the Sun's glare at sunset. Valid for all bodies.
 
-- `SE_EVENING_FIRST` (3) — **evening first appearance**: for inner planets (Mercury, Venus), the first day they become visible in the evening after superior conjunction. Only for inner planets.
+- `EVENING_FIRST` (3) — **evening first appearance**: for inner planets (Mercury, Venus), the first day they become visible in the evening after superior conjunction. Only for inner planets.
 
-- `SE_MORNING_LAST` (4) — **morning last appearance**: for inner planets, the last day of visibility in the morning before inferior conjunction. Only for inner planets.
+- `MORNING_LAST` (4) — **morning last appearance**: for inner planets, the last day of visibility in the morning before inferior conjunction. Only for inner planets.
 
 ### The PySwissEph compatible API
 
-For complete control over atmospheric conditions and the capabilities of the observer, use `swe_heliacal_ut`:
+For complete control over atmospheric conditions and the capabilities of the observer, use `heliacal_ut`:
 
 ```python
 import libephemeris as ephem
@@ -399,7 +399,7 @@ datm = (1013.25, 25.0, 30.0, 0.0)
 dobs = (36.0, 1.0, 0, 0, 0, 0)
 #  age, visual acuity (Snellen), binocular, magnification, aperture, transmission
 
-result = ephem.swe_heliacal_ut(
+result = ephem.heliacal_ut(
     jd, geopos, datm, dobs,
     "Sirius",
     ephem.HELIACAL_RISING
@@ -558,12 +558,12 @@ In this chapter, we learned how to calculate when celestial bodies are visible i
 
 **Introduced functions:**
 
-- `rise_trans(jd, planet, lat, lon, rsmi=SE_CALC_RISE)` — finds the next rising, setting, or meridian transit of a celestial body
+- `rise_trans(jd, planet, lat, lon, rsmi=CALC_RISE)` — finds the next rising, setting, or meridian transit of a celestial body
 - `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — like `rise_trans` but with a custom horizon altitude
 - `refrac(altitude, pressure, temperature, calc_flag)` — converts between true and apparent altitude (or vice versa), taking refraction into account
 - `refrac_extended(altitude, altitude_geo, ...)` — extended refraction with dip of the horizon for observers at high altitudes
 - `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — finds the date of a heliacal event (first/last visibility)
-- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — same function (bare name is now an alias)
+- `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — same function (bare name is now an alias)
 - `vis_limit_mag(jd, geopos, atmo, observer, objname)` — determines whether an object is visible by comparing limiting magnitude and apparent magnitude
 - `calc_airmass(altitude)` — calculates the air mass the light passes through
 - `calc_extinction_magnitude(altitude)` — calculates how many magnitudes of light are lost due to atmospheric extinction

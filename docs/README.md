@@ -28,7 +28,7 @@
 - **[Overview](methodology/overview.md)** -- Principal computational approaches
 - **[Planet Centers](methodology/planet-centers-spk.md)** -- Barycenter vs body center corrections for outer planets
 - **[Lunar Apsides](methodology/lunar-apsides.md)** -- Perigee and apogee computation
-- **[Interpolated Apogee](methodology/interpolated-apogee.md)** -- SE_INTP_APOG and SE_INTP_PERG
+- **[Interpolated Apogee](methodology/interpolated-apogee.md)** -- INTP_APOG and INTP_PERG
 - **[Interpolated Perigee](methodology/interpolated-perigee.md)** -- Passage-interpolated harmonic fitting
 - **[True Lilith](methodology/true-lilith.md)** -- Osculating lunar apogee calculation
 - **[pyerfa Integration](methodology/pyerfa-integration.md)** -- IAU standard nutation, precession, obliquity

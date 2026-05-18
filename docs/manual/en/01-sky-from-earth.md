@@ -141,7 +141,7 @@ pos, flag = ephem.calc_ut(jd, ephem.JUPITER, 0)
 geopos = (12.4964, 41.9028, 50.0)
 
 # Convert from ecliptic to horizontal coordinates
-# SE_ECL2HOR = from ecliptic to horizontal
+# ECL2HOR = from ecliptic to horizontal
 # atpress = 1013.25 mbar (standard pressure)
 # attemp = 15.0 °C (standard temperature)
 hor = ephem.azalt(jd, ephem.ECL2HOR, geopos, 1013.25, 15.0,
@@ -273,4 +273,4 @@ At very high latitudes (above the polar circle), at certain times of the year th
 | `azalt(jd, calc_flag, geopos, atpress, attemp, xin)` | Ecliptic/equatorial → horizontal coordinates |
 | `houses(jd, lat, lon, ord('P'))` | House cusps and angles (ASC, MC, ...) |
 | `split_deg(degrees, flags)` | Zodiacal formatting |
-| `SE_ECL2HOR`, `SE_EQU2HOR` | Flags for `azalt`: ecliptic or equatorial input |
+| `ECL2HOR`, `EQU2HOR` | Flags for `azalt`: ecliptic or equatorial input |

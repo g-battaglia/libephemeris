@@ -30,21 +30,21 @@ In un anno tipico ci sono 2–5 eclissi solari e 0–3 eclissi lunari.
 
 Il tipo di eclissi solare dipende dalla distanza della Luna dalla Terra in quel momento (la Luna si avvicina e si allontana perché la sua orbita è ellittica):
 
-- **Totale** (`SE_ECL_TOTAL`): la Luna è abbastanza vicina da coprire *completamente* il disco solare. Per qualche minuto, il cielo diventa buio e la corona solare diventa visibile — uno degli spettacoli più straordinari della natura. La fascia di totalità è stretta: in genere 100–250 km di larghezza.
+- **Totale** (`ECL_TOTAL`): la Luna è abbastanza vicina da coprire *completamente* il disco solare. Per qualche minuto, il cielo diventa buio e la corona solare diventa visibile — uno degli spettacoli più straordinari della natura. La fascia di totalità è stretta: in genere 100–250 km di larghezza.
 
-- **Anulare** (`SE_ECL_ANNULAR`): la Luna è troppo lontana e il suo disco appare più piccolo del Sole. Resta un **anello di fuoco** ("annulus") luminoso attorno al disco lunare. Spettacolare, ma il cielo non diventa buio come nella totale.
+- **Anulare** (`ECL_ANNULAR`): la Luna è troppo lontana e il suo disco appare più piccolo del Sole. Resta un **anello di fuoco** ("annulus") luminoso attorno al disco lunare. Spettacolare, ma il cielo non diventa buio come nella totale.
 
-- **Parziale** (`SE_ECL_PARTIAL`): la Luna copre solo una parte del Sole. È il tipo più comune da osservare — basta trovarsi nella penombra lunare, che copre un'area molto più ampia dell'ombra.
+- **Parziale** (`ECL_PARTIAL`): la Luna copre solo una parte del Sole. È il tipo più comune da osservare — basta trovarsi nella penombra lunare, che copre un'area molto più ampia dell'ombra.
 
-- **Ibrida** (`SE_ECL_ANNULAR_TOTAL`): un'eclissi rara che è anulare in alcune zone della Terra e totale in altre. Succede quando l'ombra della Luna è al limite — l'apice del cono d'ombra sfiora la superficie terrestre.
+- **Ibrida** (`ECL_ANNULAR_TOTAL`): un'eclissi rara che è anulare in alcune zone della Terra e totale in altre. Succede quando l'ombra della Luna è al limite — l'apice del cono d'ombra sfiora la superficie terrestre.
 
 ### Eclissi lunari
 
-- **Totale** (`SE_ECL_TOTAL`): la Luna entra completamente nel cono d'ombra della Terra. Non diventa invisibile, ma assume un colore **rosso rame** — la luce solare filtrata e rifratta dall'atmosfera terrestre la illumina debolmente. Ogni "Luna di sangue" è un'eclissi lunare totale.
+- **Totale** (`ECL_TOTAL`): la Luna entra completamente nel cono d'ombra della Terra. Non diventa invisibile, ma assume un colore **rosso rame** — la luce solare filtrata e rifratta dall'atmosfera terrestre la illumina debolmente. Ogni "Luna di sangue" è un'eclissi lunare totale.
 
-- **Parziale** (`SE_ECL_PARTIAL`): solo una parte della Luna entra nell'ombra. Si vede un "morso" scuro sul disco lunare.
+- **Parziale** (`ECL_PARTIAL`): solo una parte della Luna entra nell'ombra. Si vede un "morso" scuro sul disco lunare.
 
-- **Penombrale** (`SE_ECL_PENUMBRAL`): la Luna entra nella penombra della Terra (la zona di ombra parziale), ma non nell'ombra vera. L'oscuramento è così lieve che spesso è invisibile a occhio nudo.
+- **Penombrale** (`ECL_PENUMBRAL`): la Luna entra nella penombra della Terra (la zona di ombra parziale), ma non nell'ombra vera. L'oscuramento è così lieve che spesso è invisibile a occhio nudo.
 
 ### Magnitudine e oscuramento
 

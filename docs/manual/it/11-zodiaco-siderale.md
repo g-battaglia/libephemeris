@@ -145,35 +145,35 @@ La libreria supporta **47 sistemi di ayanamsha**. Ecco i più importanti:
 
 ### Ayanamsha indiane (le più usate)
 
-**Lahiri** (`SE_SIDM_LAHIRI`, valore 1) è la più diffusa: è lo standard ufficiale del governo indiano, adottato nel 1955 dalla commissione del calendario indiano (N.C. Lahiri). Fissa Spica (Citra in sanscrito) a 180° di longitudine siderale. È usata dalla grande maggioranza degli astrologi vedici.
+**Lahiri** (`SIDM_LAHIRI`, valore 1) è la più diffusa: è lo standard ufficiale del governo indiano, adottato nel 1955 dalla commissione del calendario indiano (N.C. Lahiri). Fissa Spica (Citra in sanscrito) a 180° di longitudine siderale. È usata dalla grande maggioranza degli astrologi vedici.
 
-**Krishnamurti** (`SE_SIDM_KRISHNAMURTI`, valore 5) è usata nel sistema KP (Krishnamurti Paddhati), un metodo predittivo molto popolare in India del sud. Molto simile a Lahiri, con una differenza di pochi minuti d'arco.
+**Krishnamurti** (`SIDM_KRISHNAMURTI`, valore 5) è usata nel sistema KP (Krishnamurti Paddhati), un metodo predittivo molto popolare in India del sud. Molto simile a Lahiri, con una differenza di pochi minuti d'arco.
 
-**Raman** (`SE_SIDM_RAMAN`, valore 3) fu proposta da B.V. Raman, uno degli astrologi più influenti dell'India del XX secolo. Differisce da Lahiri di circa 1.5°.
+**Raman** (`SIDM_RAMAN`, valore 3) fu proposta da B.V. Raman, uno degli astrologi più influenti dell'India del XX secolo. Differisce da Lahiri di circa 1.5°.
 
-**Varianti Lahiri**: ci sono anche `SE_SIDM_LAHIRI_1940` (43), `SE_SIDM_LAHIRI_VP285` (44), e `SE_SIDM_LAHIRI_ICRC` (46), che differiscono per pochi secondi d'arco e riflettono diverse interpretazioni dei dati originali.
+**Varianti Lahiri**: ci sono anche `SIDM_LAHIRI_1940` (43), `SIDM_LAHIRI_VP285` (44), e `SIDM_LAHIRI_ICRC` (46), che differiscono per pochi secondi d'arco e riflettono diverse interpretazioni dei dati originali.
 
 ### Ayanamsha occidentale siderale
 
-**Fagan-Bradley** (`SE_SIDM_FAGAN_BRADLEY`, valore 0) fu sviluppata da Cyril Fagan e Donald Bradley negli anni '50 per l'astrologia siderale occidentale. Differisce da Lahiri di circa 1°. È poco usata al di fuori di un ristretto circolo di astrologi siderali occidentali.
+**Fagan-Bradley** (`SIDM_FAGAN_BRADLEY`, valore 0) fu sviluppata da Cyril Fagan e Donald Bradley negli anni '50 per l'astrologia siderale occidentale. Differisce da Lahiri di circa 1°. È poco usata al di fuori di un ristretto circolo di astrologi siderali occidentali.
 
 ### Ayanamsha basate su stelle vere
 
-**True Citra** (`SE_SIDM_TRUE_CITRA`, valore 27) fissa la posizione *vera* (con moto proprio) di Spica a esattamente 180°. A differenza di Lahiri, che usa una formula polinomiale calcolata una volta per tutte, True Citra ricalcola la posizione reale di Spica ad ogni data, seguendone il moto proprio.
+**True Citra** (`SIDM_TRUE_CITRA`, valore 27) fissa la posizione *vera* (con moto proprio) di Spica a esattamente 180°. A differenza di Lahiri, che usa una formula polinomiale calcolata una volta per tutte, True Citra ricalcola la posizione reale di Spica ad ogni data, seguendone il moto proprio.
 
-**True Revati** (`SE_SIDM_TRUE_REVATI`, valore 28) fissa la stella Revati (zeta Piscium) a 359°50'.
+**True Revati** (`SIDM_TRUE_REVATI`, valore 28) fissa la stella Revati (zeta Piscium) a 359°50'.
 
-**True Pushya** (`SE_SIDM_TRUE_PUSHYA`, valore 29) fissa la stella Pushya (delta Cancri) a 106°.
+**True Pushya** (`SIDM_TRUE_PUSHYA`, valore 29) fissa la stella Pushya (delta Cancri) a 106°.
 
 ### Ayanamsha galattiche
 
 Per chi cerca un punto zero "cosmico", ci sono diversi sistemi basati sulla posizione del centro galattico o dell'equatore galattico:
 
-**Galactic Center 0 Sag** (`SE_SIDM_GALCENT_0SAG`, valore 17) mette il centro galattico a 0° Sagittario.
+**Galactic Center 0 Sag** (`SIDM_GALCENT_0SAG`, valore 17) mette il centro galattico a 0° Sagittario.
 
 ### Ayanamsha babilonesi
 
-Per la ricerca storica sull'astronomia babilonese: `SE_SIDM_BABYL_KUGLER1` (9), `SE_SIDM_BABYL_KUGLER2` (10), `SE_SIDM_BABYL_KUGLER3` (11), `SE_SIDM_BABYL_HUBER` (12), `SE_SIDM_BABYL_ETPSC` (13), `SE_SIDM_BABYL_BRITTON` (38).
+Per la ricerca storica sull'astronomia babilonese: `SIDM_BABYL_KUGLER1` (9), `SIDM_BABYL_KUGLER2` (10), `SIDM_BABYL_KUGLER3` (11), `SIDM_BABYL_HUBER` (12), `SIDM_BABYL_ETPSC` (13), `SIDM_BABYL_BRITTON` (38).
 
 ### Confronto tra ayanamsha
 
@@ -221,7 +221,7 @@ Nome: Lahiri
 
 ## 11.4 Ayanamsha personalizzata
 
-Se nessuno dei 47 sistemi predefiniti soddisfa le tue esigenze, puoi definire la tua ayanamsha con `SE_SIDM_USER`:
+Se nessuno dei 47 sistemi predefiniti soddisfa le tue esigenze, puoi definire la tua ayanamsha con `SIDM_USER`:
 
 ```python
 import libephemeris as ephem
@@ -419,7 +419,7 @@ In questo capitolo abbiamo esplorato lo zodiaco siderale, fondamentale per l'ast
 
 **Funzioni introdotte:**
 
-- `set_sid_mode(sid_mode, t0=0.0, ayan_t0=0.0)` — imposta il sistema di ayanamsha. Usa `SE_SIDM_USER` con `t0` e `ayan_t0` per un'ayanamsha personalizzata
+- `set_sid_mode(sid_mode, t0=0.0, ayan_t0=0.0)` — imposta il sistema di ayanamsha. Usa `SIDM_USER` con `t0` e `ayan_t0` per un'ayanamsha personalizzata
 - `get_ayanamsa_ut(jd)` — restituisce l'ayanamsha in gradi per una data in UT
 - `get_ayanamsa_ex_ut(jd, flags)` — versione estesa che restituisce anche il flag di ritorno
 - `get_ayanamsa_name(sid_mode)` — restituisce il nome leggibile di un sistema di ayanamsha (es. `"Lahiri"`)

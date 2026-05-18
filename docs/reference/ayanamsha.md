@@ -913,7 +913,7 @@ import libephemeris as leph
 from libephemeris.constants import SIDM_USER
 
 # Lahiri parameters: ayan_t0 = 23.857092 at J2000
-leph.swe_set_sid_mode(SIDM_USER, t0=2451545.0, ayan_t0=23.857092)
+leph.set_sid_mode(SIDM_USER, t0=2451545.0, ayan_t0=23.857092)
 ```
 
 ---
@@ -949,7 +949,7 @@ For "True" modes, the actual stellar position is calculated:
 
 ### Mean vs True Ayanamsha
 
-- **Mean Ayanamsha**: `swe_get_ayanamsa_ut()` returns the mean ayanamsha (without nutation)
+- **Mean Ayanamsha**: `get_ayanamsa_ut()` returns the mean ayanamsha (without nutation)
 - **True Ayanamsha**: For sidereal planetary positions, LibEphemeris adds nutation in longitude to get the true ayanamsha (IAU 2006/2000A model, consistent with pyswisseph's behavior)
 
 ### Time System

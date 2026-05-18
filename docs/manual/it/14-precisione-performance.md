@@ -394,10 +394,10 @@ Ogni contesto può avere il proprio modo siderale:
 import libephemeris as ephem
 from libephemeris import EphemerisContext
 from libephemeris.constants import SUN, FLG_SPEED, FLG_SIDEREAL
-from libephemeris.constants import SE_SIDM_LAHIRI
+from libephemeris.constants import SIDM_LAHIRI
 
 ctx = EphemerisContext()
-ctx.set_sid_mode(SE_SIDM_LAHIRI)
+ctx.set_sid_mode(SIDM_LAHIRI)
 
 jd = ephem.julday(2024, 4, 8, 12.0)
 pos, _ = ctx.calc_ut(jd, SUN, FLG_SPEED | FLG_SIDEREAL)

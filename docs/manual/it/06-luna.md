@@ -54,9 +54,9 @@ I nodi non sono fissi: si spostano lentamente all'indietro lungo lo zodiaco, com
 
 LibEphemeris offre due versioni dei nodi lunari:
 
-- Il **nodo medio** (`SE_MEAN_NODE`) è calcolato con un polinomio matematico regolare. Si muove in modo uniforme e prevedibile — nessuna oscillazione, nessun sussulto. È come l'orologio perfetto del moto nodale.
+- Il **nodo medio** (`MEAN_NODE`) è calcolato con un polinomio matematico regolare. Si muove in modo uniforme e prevedibile — nessuna oscillazione, nessun sussulto. È come l'orologio perfetto del moto nodale.
 
-- Il **nodo vero** (`SE_TRUE_NODE`) tiene conto di tutte le perturbazioni reali. Il nodo vero oscilla avanti e indietro attorno alla posizione media con un'ampiezza di circa ±1.5°. Nelle efemeridi dettagliate, il nodo vero può muoversi brevemente in moto diretto (in avanti), cosa che il nodo medio non fa mai.
+- Il **nodo vero** (`TRUE_NODE`) tiene conto di tutte le perturbazioni reali. Il nodo vero oscilla avanti e indietro attorno alla posizione media con un'ampiezza di circa ±1.5°. Nelle efemeridi dettagliate, il nodo vero può muoversi brevemente in moto diretto (in avanti), cosa che il nodo medio non fa mai.
 
 In astrologia, la scelta tra nodo medio e vero è oggetto di dibattito. Molti astrologi usano il nodo medio per la sua regolarità; altri preferiscono il nodo vero perché riflette la realtà astronomica.
 
@@ -304,5 +304,5 @@ La Luna attraversa un nodo circa **due volte al mese** — una volta il nodo asc
 - `calc_interpolated_perigee(jd_tt)` — perigeo lunare interpolato
 - `calc_white_moon_position(jd_tt)` — Luna Bianca (Selena), opposta a Lilith
 - `mooncross_node_ut(jd_ut)` — prossimo attraversamento del nodo lunare
-- `SE_MEAN_NODE`, `SE_TRUE_NODE` — nodi lunari via `calc_ut`
-- `SE_MEAN_APOG`, `SE_OSCU_APOG` — apogeo lunare via `calc_ut`
+- `MEAN_NODE`, `TRUE_NODE` — nodi lunari via `calc_ut`
+- `MEAN_APOG`, `OSCU_APOG` — apogeo lunare via `calc_ut`

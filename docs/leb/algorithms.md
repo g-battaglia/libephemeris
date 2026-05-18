@@ -185,7 +185,7 @@ def _clenshaw(coeffs: tuple[float, ...], tau: float) -> float:
 
 ### Why Pure Python?
 
-For single-point evaluation (the common case in `swe_calc_ut()`), numpy array
+For single-point evaluation (the common case in `calc_ut()`), numpy array
 creation overhead (~5 us) would dominate the actual Clenshaw loop (~0.5 us for
 degree 13). Pure Python `float` operations avoid this overhead entirely.
 
@@ -555,7 +555,7 @@ where:
 
 ```python
 _DEFLECTORS = (
-    (SE_SUN,  1.0),       # Sun, mass ratio = 1.0 (reference)
+    (SUN,  1.0),       # Sun, mass ratio = 1.0 (reference)
     (5,       1047.3486),  # Jupiter barycenter, Sun/Jupiter mass ratio
     (6,       3497.898),   # Saturn barycenter, Sun/Saturn mass ratio
 )
@@ -864,14 +864,14 @@ of error near epochs where Delta-T changes rapidly (e.g., around 1985).
 
 **Critical**: The `fast_calc_ut()` entry point does **not** use
 `reader.delta_t()` for the UT->TT conversion. Instead, it uses
-`swe_deltat()` from `time_utils.py`, which provides the same high-precision
+`deltat()` from `time_utils.py`, which provides the same high-precision
 Delta-T model used by the Skyfield reference pipeline. This ensures exact
 agreement with the reference:
 
 ```python
 # fast_calc.py, fast_calc_ut():
-from .time_utils import swe_deltat
-delta_t = swe_deltat(tjd_ut)  # high-precision model
+from .time_utils import deltat
+delta_t = deltat(tjd_ut)  # high-precision model
 jd_tt = tjd_ut + delta_t
 ```
 
@@ -895,7 +895,7 @@ independent contributions:
 | COB correction (analytical fallback) | <0.01" | Jupiter-Pluto |
 | Gravitational deflection omission | Up to 0.004" | **Fixed**: now included |
 | Aberration formula (1st-order vs rigorous) | <0.001" | All ICRS bodies |
-| Delta-T interpolation | 0.004s -> 0.002" (Moon only) | **Fixed**: use swe_deltat() |
+| Delta-T interpolation | 0.004s -> 0.002" (Moon only) | **Fixed**: use deltat() |
 | Precession-nutation model | <0.001" | All (IAU 2006/2000A) |
 | Pipeline coordinate transform | <0.001" | All |
 
@@ -1017,5 +1017,5 @@ Bodies with non-standard params are routed to the scalar generation path.
 up to ~0.004 seconds of error near 1985. The Moon moves ~13 deg/day =
 0.00054 deg/sec, so a 0.004s error produces ~0.002" position error.
 
-**Solution**: `fast_calc_ut()` now uses `swe_deltat()` (Skyfield's precise
+**Solution**: `fast_calc_ut()` now uses `deltat()` (Skyfield's precise
 model) instead of `reader.delta_t()` for the UT->TT conversion.

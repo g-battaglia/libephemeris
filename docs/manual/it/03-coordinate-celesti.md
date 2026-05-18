@@ -93,7 +93,7 @@ pos, _ = ephem.calc_ut(jd, ephem.JUPITER, ephem.FLG_EQUATORIAL)
 # Roma (lon Est, lat Nord, altitudine in metri)
 geopos = (12.4964, 41.9028, 50.0)
 
-# Da equatoriali a orizzontali (SE_EQU2HOR = 1)
+# Da equatoriali a orizzontali (EQU2HOR = 1)
 hor = ephem.azalt(jd, ephem.EQU2HOR, geopos, 1013.25, 15.0,
                   (pos[0], pos[1], pos[2]))
 
@@ -257,10 +257,10 @@ LibEphemeris offre funzioni dedicate per le conversioni:
 | `cotrans(coord, -obliquità)` | Eclittica → Equatoriale |
 | `cotrans(coord, +obliquità)` | Equatoriale → Eclittica |
 | `cotrans_sp(coord, speed, obl)` | Come sopra, con velocità |
-| `azalt(jd, SE_ECL2HOR, ...)` | Eclittica → Orizzontale |
-| `azalt(jd, SE_EQU2HOR, ...)` | Equatoriale → Orizzontale |
-| `azalt_rev(jd, SE_HOR2ECL, ...)` | Orizzontale → Eclittica |
-| `azalt_rev(jd, SE_HOR2EQU, ...)` | Orizzontale → Equatoriale |
+| `azalt(jd, ECL2HOR, ...)` | Eclittica → Orizzontale |
+| `azalt(jd, EQU2HOR, ...)` | Equatoriale → Orizzontale |
+| `azalt_rev(jd, HOR2ECL, ...)` | Orizzontale → Eclittica |
+| `azalt_rev(jd, HOR2EQU, ...)` | Orizzontale → Equatoriale |
 
 Il segno dell'obliquità in `cotrans` controlla la direzione: **negativo** = eclittica→equatoriale, **positivo** = equatoriale→eclittica.
 
@@ -298,7 +298,7 @@ Saturno: lon=345.44°, lat=-2.20°
          Altezza=35.5°, Azimut=329.5° (da S)
 ```
 
-> **Scorciatoia**: puoi anche passare direttamente le coordinate eclittiche ad `azalt` con `SE_ECL2HOR`, evitando la conversione manuale. La conversione esplicita via `cotrans` è utile quando ti servono i valori intermedi.
+> **Scorciatoia**: puoi anche passare direttamente le coordinate eclittiche ad `azalt` con `ECL2HOR`, evitando la conversione manuale. La conversione esplicita via `cotrans` è utile quando ti servono i valori intermedi.
 
 ---
 
@@ -322,5 +322,5 @@ Saturno: lon=345.44°, lat=-2.20°
 | `FLG_XYZ` | Coordinate cartesiane |
 | `FLG_J2000`, `FLG_ICRS` | Sistemi di riferimento |
 | `FLG_NONUT`, `FLG_NOABERR`, `FLG_TRUEPOS` | Disabilita correzioni |
-| `SE_ECL2HOR`, `SE_EQU2HOR` | Direzione per `azalt` |
-| `SE_HOR2ECL`, `SE_HOR2EQU` | Direzione per `azalt_rev` |
+| `ECL2HOR`, `EQU2HOR` | Direzione per `azalt` |
+| `HOR2ECL`, `HOR2EQU` | Direzione per `azalt_rev` |

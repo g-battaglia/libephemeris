@@ -25,7 +25,7 @@ or the `LIBEPHEMERIS_MODE` environment variable:
 ### Auto Mode Flow
 
 ```
-swe_calc_ut(jd, body, flags)
+calc_ut(jd, body, flags)
     |
     +-> LEB fast path (if .leb file configured)
     |   |-> success: return result
@@ -58,8 +58,8 @@ swe.set_calc_mode("horizons")
 |----------|--------|--------|
 | Standard planets | Sun, Moon, Mercury-Pluto, Earth | Horizons VECTORS API |
 | Asteroids | Chiron, Ceres, Pallas, Juno, Vesta | Horizons small-body syntax |
-| Mean Node | SE_MEAN_NODE (10) | Analytical (Meeus polynomial, no HTTP) |
-| Mean Apogee/Lilith | SE_MEAN_APOG (12) | Analytical (no HTTP) |
+| Mean Node | MEAN_NODE (10) | Analytical (Meeus polynomial, no HTTP) |
+| Mean Apogee/Lilith | MEAN_APOG (12) | Analytical (no HTTP) |
 | Uranians | Cupido-Transpluto (40-48) | Analytical heliocentric (no HTTP) |
 
 ### Not Supported (fallback to Skyfield)

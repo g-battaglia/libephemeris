@@ -12,14 +12,14 @@ In the 1920s, the German astrologer Alfred Witte founded the **Hamburg School** 
 
 The eight Uranian planets are:
 
-- **Cupido** (`SE_CUPIDO`, ID 40) — associated with family, art, and groups
-- **Hades** (`SE_HADES`, ID 41) — associated with the past, poverty, disease
-- **Zeus** (`SE_ZEUS`, ID 42) — associated with fire, machines, driving force
-- **Kronos** (`SE_KRONOS`, ID 43) — associated with authority, government, excellence
-- **Apollon** (`SE_APOLLON`, ID 44) — associated with expansion, science, commerce
-- **Admetos** (`SE_ADMETOS`, ID 45) — associated with depth, concentration, blocks
-- **Vulkanus** (`SE_VULKANUS`, ID 46) — associated with power, intensity, force
-- **Poseidon** (`SE_POSEIDON`, ID 47) — associated with mind, enlightenment, truth
+- **Cupido** (`CUPIDO`, ID 40) — associated with family, art, and groups
+- **Hades** (`HADES`, ID 41) — associated with the past, poverty, disease
+- **Zeus** (`ZEUS`, ID 42) — associated with fire, machines, driving force
+- **Kronos** (`KRONOS`, ID 43) — associated with authority, government, excellence
+- **Apollon** (`APOLLON`, ID 44) — associated with expansion, science, commerce
+- **Admetos** (`ADMETOS`, ID 45) — associated with depth, concentration, blocks
+- **Vulkanus** (`VULKANUS`, ID 46) — associated with power, intensity, force
+- **Poseidon** (`POSEIDON`, ID 47) — associated with mind, enlightenment, truth
 
 ### Calculating the position
 
@@ -100,7 +100,7 @@ The Uranian planets can also be calculated with `calc_ut` using their IDs, but t
 
 Besides the Uranians, the library includes other hypothetical bodies that have been proposed throughout history but never observationally confirmed:
 
-**Transpluto / Isis** (`SE_ISIS`, ID 48) — A hypothetical planet beyond Pluto, postulated before the discovery of Eris. The orbit used is based on Theodore Landscheidt's proposal.
+**Transpluto / Isis** (`ISIS`, ID 48) — A hypothetical planet beyond Pluto, postulated before the discovery of Eris. The orbit used is based on Theodore Landscheidt's proposal.
 
 ```python
 import libephemeris as ephem
@@ -114,7 +114,7 @@ print(f"Transpluto: {pos[0]:.2f}°")
 Transpluto: 153.47°
 ```
 
-**Vulcan** (`SE_VULCAN`, ID 55) — A hypothetical planet between Mercury and the Sun, searched for throughout the 19th century to explain anomalies in Mercury's orbit. Einstein's general relativity later explained those anomalies without the need for an additional planet — but the concept remains in esoteric astrology.
+**Vulcan** (`VULCAN`, ID 55) — A hypothetical planet between Mercury and the Sun, searched for throughout the 19th century to explain anomalies in Mercury's orbit. Einstein's general relativity later explained those anomalies without the need for an additional planet — but the concept remains in esoteric astrology.
 
 ```python
 pos = ephem.calc_vulcan(jd_tt)
@@ -125,7 +125,7 @@ print(f"Vulcan: {pos[0]:.2f}°")
 Vulcan: 45.53°
 ```
 
-**White Moon / Selena** (`SE_WHITE_MOON`, ID 56) — The point diametrically opposite to the Black Moon Lilith (mean lunar apogee). It is not a physical body, but a symbolic point used in some schools of astrology as the "luminous complement" of Lilith.
+**White Moon / Selena** (`WHITE_MOON`, ID 56) — The point diametrically opposite to the Black Moon Lilith (mean lunar apogee). It is not a physical body, but a symbolic point used in some schools of astrology as the "luminous complement" of Lilith.
 
 ```python
 pos = ephem.calc_white_moon_position(jd_tt)

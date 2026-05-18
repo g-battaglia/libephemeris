@@ -12,14 +12,14 @@ Negli anni '20, l'astrologo tedesco Alfred Witte fondò la **Scuola di Amburgo**
 
 Gli otto pianeti uraniani sono:
 
-- **Cupido** (`SE_CUPIDO`, ID 40) — associato alla famiglia, all'arte e ai gruppi
-- **Hades** (`SE_HADES`, ID 41) — associato al passato, alla povertà, alla malattia
-- **Zeus** (`SE_ZEUS`, ID 42) — associato al fuoco, alle macchine, alla forza dirigente
-- **Kronos** (`SE_KRONOS`, ID 43) — associato all'autorità, al governo, all'eccellenza
-- **Apollon** (`SE_APOLLON`, ID 44) — associato all'espansione, alla scienza, al commercio
-- **Admetos** (`SE_ADMETOS`, ID 45) — associato alla profondità, alla concentrazione, ai blocchi
-- **Vulkanus** (`SE_VULKANUS`, ID 46) — associato alla potenza, all'intensità, alla forza
-- **Poseidon** (`SE_POSEIDON`, ID 47) — associato alla mente, all'illuminazione, alla verità
+- **Cupido** (`CUPIDO`, ID 40) — associato alla famiglia, all'arte e ai gruppi
+- **Hades** (`HADES`, ID 41) — associato al passato, alla povertà, alla malattia
+- **Zeus** (`ZEUS`, ID 42) — associato al fuoco, alle macchine, alla forza dirigente
+- **Kronos** (`KRONOS`, ID 43) — associato all'autorità, al governo, all'eccellenza
+- **Apollon** (`APOLLON`, ID 44) — associato all'espansione, alla scienza, al commercio
+- **Admetos** (`ADMETOS`, ID 45) — associato alla profondità, alla concentrazione, ai blocchi
+- **Vulkanus** (`VULKANUS`, ID 46) — associato alla potenza, all'intensità, alla forza
+- **Poseidon** (`POSEIDON`, ID 47) — associato alla mente, all'illuminazione, alla verità
 
 ### Calcolare la posizione
 
@@ -100,7 +100,7 @@ I pianeti uraniani possono anche essere calcolati con `calc_ut` usando i loro ID
 
 Oltre agli uraniani, la libreria include altri corpi ipotetici che sono stati proposti nel corso della storia ma mai confermati osservativamente:
 
-**Transpluto / Isis** (`SE_ISIS`, ID 48) — Un ipotetico pianeta oltre Plutone, postulato prima della scoperta di Eris. L'orbita usata è basata sulla proposta di Theodore Landscheidt.
+**Transpluto / Isis** (`ISIS`, ID 48) — Un ipotetico pianeta oltre Plutone, postulato prima della scoperta di Eris. L'orbita usata è basata sulla proposta di Theodore Landscheidt.
 
 ```python
 import libephemeris as ephem
@@ -114,7 +114,7 @@ print(f"Transpluto: {pos[0]:.2f}°")
 Transpluto: 153.47°
 ```
 
-**Vulcano** (`SE_VULCAN`, ID 55) — Un ipotetico pianeta tra Mercurio e il Sole, cercato per tutto il XIX secolo per spiegare le anomalie nell'orbita di Mercurio. La relatività generale di Einstein ha poi spiegato quelle anomalie senza bisogno di un pianeta aggiuntivo — ma il concetto resta nell'astrologia esoterica.
+**Vulcano** (`VULCAN`, ID 55) — Un ipotetico pianeta tra Mercurio e il Sole, cercato per tutto il XIX secolo per spiegare le anomalie nell'orbita di Mercurio. La relatività generale di Einstein ha poi spiegato quelle anomalie senza bisogno di un pianeta aggiuntivo — ma il concetto resta nell'astrologia esoterica.
 
 ```python
 pos = ephem.calc_vulcan(jd_tt)
@@ -125,7 +125,7 @@ print(f"Vulcano: {pos[0]:.2f}°")
 Vulcano: 45.53°
 ```
 
-**Luna Bianca / Selena** (`SE_WHITE_MOON`, ID 56) — Il punto diametralmente opposto alla Lilith Nera (l'apogeo lunare medio). Non è un corpo fisico, ma un punto simbolico usato in alcune scuole di astrologia come "complemento luminoso" di Lilith.
+**Luna Bianca / Selena** (`WHITE_MOON`, ID 56) — Il punto diametralmente opposto alla Lilith Nera (l'apogeo lunare medio). Non è un corpo fisico, ma un punto simbolico usato in alcune scuole di astrologia come "complemento luminoso" di Lilith.
 
 ```python
 pos = ephem.calc_white_moon_position(jd_tt)

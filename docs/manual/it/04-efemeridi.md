@@ -94,7 +94,7 @@ Marte eliocentrico: 317.5543° (dist 1.3879 UA)
 
 ### Planetocentrico: osservare da un altro pianeta
 
-Con `swe_calc_pctr` puoi calcolare la posizione di un corpo visto da un altro pianeta:
+Con `calc_pctr` puoi calcolare la posizione di un corpo visto da un altro pianeta:
 
 ```python
 import libephemeris as ephem
@@ -102,7 +102,7 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 12.0)
 
 # Il Sole visto da Giove
-pos, _ = ephem.swe_calc_pctr(jd, ephem.SUN, ephem.JUPITER, 0)
+pos, _ = ephem.calc_pctr(jd, ephem.SUN, ephem.JUPITER, 0)
 print(f"Sole visto da Giove: {pos[0]:.4f}°, dist {pos[2]:.4f} UA")
 ```
 
@@ -164,7 +164,7 @@ L'eclissi solare dell'8 aprile 2024 era totale a Dallas (Texas) ma solo parziale
 | `set_precision_tier(tier)` | Sceglie `"base"`, `"medium"` o `"extended"` |
 | `download_for_tier(tier)` | Scarica i file di efemeridi |
 | `set_topo(lon, lat, alt)` | Imposta la posizione dell'osservatore |
-| `swe_calc_pctr(jd, body, center, flag)` | Posizione vista da un altro pianeta |
+| `calc_pctr(jd, body, center, flag)` | Posizione vista da un altro pianeta |
 | `FLG_HELCTR` | Coordinate eliocentriche |
 | `FLG_BARYCTR` | Coordinate baricentriche |
 | `FLG_TOPOCTR` | Coordinate topocentriche |

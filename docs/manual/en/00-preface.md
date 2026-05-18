@@ -44,7 +44,7 @@ Chapter 15 — the Cookbook — is designed for those in a hurry: copy-paste rec
 
 ## Prerequisites
 
-- **Python 3.9** or higher
+- **Python 3.12** or higher
 - **No astronomical knowledge** — this manual starts from scratch
 - **No other packages** — LibEphemeris installs with a single command and has no heavy dependencies
 
@@ -54,7 +54,7 @@ Chapter 15 — the Cookbook — is designed for those in a hurry: copy-paste rec
 pip install libephemeris
 ```
 
-On first use, the library automatically downloads the necessary ephemeris files (the DE440 file, about 114 MB). You can also force the download in advance:
+The PyPI wheel includes a bundled LEB2 base-tier core for the 14 main bodies (1850–2150). For broader coverage, you can download a full precision tier:
 
 ```python
 import libephemeris as ephem

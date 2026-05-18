@@ -28,7 +28,7 @@ The result is a smooth apsidal curve anchored to the physical distance extrema o
 
 ### Measured Discrepancy
 
-The interpolated perigee (`SE_INTP_PERG`) in LibEphemeris differs from Swiss Ephemeris by up to approximately 5 degrees. This is the largest single discrepancy between the two libraries.
+The interpolated perigee (`INTP_PERG`) in LibEphemeris differs from Swiss Ephemeris by up to approximately 5 degrees. This is the largest single discrepancy between the two libraries.
 
 The difference arises from two distinct smoothing philosophies applied to the same underlying phenomenon:
 
@@ -40,7 +40,7 @@ The difference arises from two distinct smoothing philosophies applied to the sa
 | Apogee oscillation amplitude  | ~5 deg from mean                | ~5 deg from mean                        |
 | Date range                    | ~-5400 to +5400 CE              | 1550–2650 (DE440) / -13200 to +17191 (DE441) |
 
-The interpolated apogee (`SE_INTP_APOG`) shows a smaller discrepancy (~0.36 degrees maximum), as both approaches produce similar results for the apogee where perturbation amplitudes are smaller.
+The interpolated apogee (`INTP_APOG`) shows a smaller discrepancy (~0.36 degrees maximum), as both approaches produce similar results for the apogee where perturbation amplitudes are smaller.
 
 ### Rationale
 

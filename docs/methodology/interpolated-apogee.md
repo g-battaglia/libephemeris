@@ -34,10 +34,10 @@ LibEphemeris provides three variants for each apsidal point:
 
 | Body ID | Constant | Description |
 |---------|----------|-------------|
-| 12 | `SE_MEAN_APOG` | Mean Lunar Apogee (Mean Lilith) |
-| 13 | `SE_OSCU_APOG` | Osculating Lunar Apogee (True Lilith) |
-| 21 | `SE_INTP_APOG` | Interpolated Lunar Apogee (Natural Lilith) |
-| 22 | `SE_INTP_PERG` | Interpolated Lunar Perigee (Natural Priapus) |
+| 12 | `MEAN_APOG` | Mean Lunar Apogee (Mean Lilith) |
+| 13 | `OSCU_APOG` | Osculating Lunar Apogee (True Lilith) |
+| 21 | `INTP_APOG` | Interpolated Lunar Apogee (Natural Lilith) |
+| 22 | `INTP_PERG` | Interpolated Lunar Perigee (Natural Priapus) |
 
 ### The Problem with Osculating Apsides
 
@@ -181,7 +181,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 
 ## When to Use Each Variant
 
-### Mean Lilith (SE_MEAN_APOG)
+### Mean Lilith (MEAN_APOG)
 
 **Use when:**
 - Smooth, predictable motion is needed
@@ -194,7 +194,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 - No short-term oscillations
 - Does not represent actual apsidal position on any given day
 
-### True Lilith (SE_OSCU_APOG)
+### True Lilith (OSCU_APOG)
 
 **Use when:**
 - The instantaneous osculating elements are specifically needed
@@ -209,7 +209,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 
 **Caution:** For most astrological purposes, the osculating apogee is misleading because the 30-degree oscillations do not represent real apsidal motion.
 
-### Interpolated Lilith (SE_INTP_APOG)
+### Interpolated Lilith (INTP_APOG)
 
 **Use when:**
 - The "actual" apogee position (where the Moon reaches maximum distance) is desired
@@ -223,7 +223,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 - Represents the genuine apsidal line orientation
 - Available in LibEphemeris and pyswisseph (version 1.70+)
 
-### Interpolated Perigee (SE_INTP_PERG)
+### Interpolated Perigee (INTP_PERG)
 
 **Use when:**
 - The "actual" perigee position (where the Moon reaches minimum distance) is needed
@@ -250,7 +250,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 
 ## API Usage
 
-### Using swe_calc_ut / swe_calc
+### Using calc_ut / calc
 
 ```python
 import libephemeris as swe
@@ -258,19 +258,19 @@ import libephemeris as swe
 jd = 2460676.5  # 2025-01-01
 
 # Mean Lilith
-mean_pos, _ = swe.swe_calc_ut(jd, swe.MEAN_APOG, swe.FLG_SPEED)
+mean_pos, _ = swe.calc_ut(jd, swe.MEAN_APOG, swe.FLG_SPEED)
 print(f"Mean Lilith: {mean_pos[0]:.4f} deg, speed: {mean_pos[3]:.4f} deg/day")
 
 # Osculating (True) Lilith
-oscu_pos, _ = swe.swe_calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
+oscu_pos, _ = swe.calc_ut(jd, swe.OSCU_APOG, swe.FLG_SPEED)
 print(f"True Lilith: {oscu_pos[0]:.4f} deg, speed: {oscu_pos[3]:.4f} deg/day")
 
 # Interpolated (Natural) Lilith
-intp_pos, _ = swe.swe_calc_ut(jd, swe.INTP_APOG, swe.FLG_SPEED)
+intp_pos, _ = swe.calc_ut(jd, swe.INTP_APOG, swe.FLG_SPEED)
 print(f"Interpolated Lilith: {intp_pos[0]:.4f} deg, speed: {intp_pos[3]:.4f} deg/day")
 
 # Interpolated Perigee
-perg_pos, _ = swe.swe_calc_ut(jd, swe.INTP_PERG, swe.FLG_SPEED)
+perg_pos, _ = swe.calc_ut(jd, swe.INTP_PERG, swe.FLG_SPEED)
 print(f"Interpolated Perigee: {perg_pos[0]:.4f} deg, speed: {perg_pos[3]:.4f} deg/day")
 ```
 
@@ -305,7 +305,7 @@ All lunar apside functions return:
 - **Latitude**: Ecliptic latitude in degrees (typically small, < 5 degrees)
 - **Eccentricity/Distance**: Orbital eccentricity (~0.055 for Moon)
 
-When using `swe_calc_ut` with `FLG_SPEED`, velocity is also calculated:
+When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 - **Speed (longitude)**: Daily motion in degrees/day
 - **Speed (latitude)**: Daily change in latitude
 - **Speed (distance)**: Daily change in eccentricity

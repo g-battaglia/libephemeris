@@ -217,7 +217,7 @@ Pisces        18/02/2025  10:06 UT
 
 ```python
 import libephemeris as ephem
-from libephemeris.crossing import swe_find_station_ut, is_retrograde
+from libephemeris.crossing import find_station_ut, is_retrograde
 
 jd = ephem.julday(2024, 1, 1, 0.0)
 jd_end = ephem.julday(2025, 1, 1, 0.0)
@@ -228,7 +228,7 @@ signs = ["Ari", "Tau", "Gem", "Cnc", "Leo", "Vir",
 print("--- Mercury Retrogrades in 2024 ---")
 print()
 while jd < jd_end:
-    jd_station, type_ = swe_find_station_ut(
+    jd_station, type_ = find_station_ut(
         ephem.MERCURY, jd, "any"
     )
     if jd_station >= jd_end:
@@ -266,7 +266,7 @@ Direct Station      15/12/2024  20:56 UT  at   6.4° Sgr
 Is Mercury retrograde on 8/4/2024? True
 ```
 
-> **Note**: `swe_find_station_ut` and `is_retrograde` are imported from `libephemeris.crossing` because they are not exposed at the main module level.
+> **Note**: `find_station_ut` and `is_retrograde` are imported from `libephemeris.crossing` because they are not exposed at the main module level.
 
 ---
 
@@ -446,11 +446,11 @@ Partial      1/06/2030  05:04 UT  magnitude: 0.816
 
 ```python
 import libephemeris as ephem
-from libephemeris.constants import (SE_SIDM_LAHIRI,
+from libephemeris.constants import (SIDM_LAHIRI,
                                     FLG_SIDEREAL, FLG_SPEED)
 
 jd = ephem.julday(2024, 4, 8, 14.5)
-ephem.swe_set_sid_mode(SE_SIDM_LAHIRI)
+ephem.set_sid_mode(SIDM_LAHIRI)
 
 nakshatras = [
     "Ashwini", "Bharani", "Krittika", "Rohini",
@@ -478,7 +478,7 @@ bodies = [
     (ephem.MEAN_NODE, "Rahu"),
 ]
 
-ayan = ephem.swe_get_ayanamsa_ut(jd)
+ayan = ephem.get_ayanamsa_ut(jd)
 print("--- Sidereal Chart (Lahiri) ---")
 print(f"Ayanamsha: {ayan:.4f}°")
 print()
@@ -506,7 +506,7 @@ pada_k = int((ketu % (360 / 27)) / (360 / 108)) + 1
 print(f"Ketu      {degrees_k:5.1f}° {sign_k:10s}"
       f"  Nakshatra: {nak_k} (Pada {pada_k})")
 
-ephem.swe_set_sid_mode(0)  # reset
+ephem.set_sid_mode(0)  # reset
 ```
 
 ```
@@ -580,7 +580,7 @@ for body_id, name in planets:
     elong = abs(ephem.difdeg2n(pos[0], pos_sun[0]))
 
     # Apparent magnitude
-    pheno, _ = ephem.swe_pheno_ut(jd_evening, body_id, 0)
+    pheno, _ = ephem.pheno_ut(jd_evening, body_id, 0)
     mag = pheno[4]
 
     # Cardinal direction
@@ -981,11 +981,11 @@ Each recipe is self-contained and ready to use: just copy the code, modify the d
 - `difdeg2n(p1, p2)` — normalized angular difference [-180, 180]
 - `solcross_ut(x, jd)` — Sun crossing at a longitude
 - `mooncross_ut(x, jd)` — Moon crossing at a longitude
-- `swe_find_station_ut(body, jd, type)` — next retrograde/direct station (from `libephemeris.crossing`)
+- `find_station_ut(body, jd, type)` — next retrograde/direct station (from `libephemeris.crossing`)
 - `is_retrograde(body, jd)` — retrograde verification (from `libephemeris.crossing`)
 - `sol_eclipse_when_loc(jd, lat, lon, alt)` — local solar eclipse
-- `swe_set_sid_mode(mode)` / `swe_get_ayanamsa_ut(jd)` — sidereal zodiac
+- `set_sid_mode(mode)` / `get_ayanamsa_ut(jd)` — sidereal zodiac
 - `rise_trans(jd, body, lat, lon, rsmi=...)` — sunrise and sunset
 - `azalt(jd, flag, geopos, press, temp, xin)` — horizontal coordinates
-- `swe_pheno_ut(jd, body, flag)` — phenomena (magnitude, phase, elongation)
+- `pheno_ut(jd, body, flag)` — phenomena (magnitude, phase, elongation)
 - `set_topo(lon, lat, alt)` — observer's position

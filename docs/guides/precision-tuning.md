@@ -72,13 +72,13 @@ import libephemeris as eph
 # Download and register in one call
 eph.download_and_register_spk(
     body="Eris",
-    ipl=eph.SE_ERIS,
+    ipl=eph.ERIS,
     start="2000-01-01",
     end="2100-01-01",
 )
 
 # Calculations now use SPK automatically
-pos, _ = eph.calc_ut(2460000.0, eph.SE_ERIS, 0)
+pos, _ = eph.calc_ut(2460000.0, eph.ERIS, 0)
 ```
 
 ### NAIF ID Constants
@@ -114,14 +114,14 @@ NAIF_SEDNA = 2090377     # Sedna (90377)
 ### Thread-Safe SPK Usage
 
 ```python
-from libephemeris import EphemerisContext, SE_CHIRON
+from libephemeris import EphemerisContext, CHIRON
 
 ctx = EphemerisContext()
 
 # Register SPK in this context only
-ctx.register_spk_body(SE_CHIRON, "./chiron.bsp", 2002060)
+ctx.register_spk_body(CHIRON, "./chiron.bsp", 2002060)
 
-pos, _ = ctx.calc_ut(2451545.0, SE_CHIRON, 0)
+pos, _ = ctx.calc_ut(2451545.0, CHIRON, 0)
 ```
 
 ---
@@ -150,7 +150,7 @@ download_delta_t_data()
 # Enable IERS Delta T
 set_iers_delta_t_enabled(True)
 
-# Now swe_deltat() uses IERS observed values for recent dates
+# Now deltat() uses IERS observed values for recent dates
 ```
 
 ### Environment Variable Configuration
@@ -197,13 +197,13 @@ if is_observed_delta_t_available(jd):
 For special cases (testing, very ancient dates, future predictions):
 
 ```python
-from libephemeris import set_delta_t_userdef, get_delta_t_userdef, swe_deltat
+from libephemeris import set_delta_t_userdef, get_delta_t_userdef, deltat
 
 # Set a fixed Delta T of 65 seconds (in days)
 set_delta_t_userdef(65.0 / 86400.0)
 
 # All Delta T calculations now return this value
-dt = swe_deltat(2451545.0)
+dt = deltat(2451545.0)
 print(f"Delta T: {dt * 86400:.1f} seconds")  # 65.0 seconds
 
 # Clear to resume computed values
@@ -221,7 +221,7 @@ Different JPL Development Ephemeris (DE) files provide different date ranges and
 | File | Date Range | Size | Notes |
 |------|------------|------|-------|
 | **de440s.bsp** | 1849-2150 | ~31 MB | Lightweight subset of DE440 |
-| **de440.bsp** | 1550-2650 | ~128 MB | **Default**, ICRF 3.0 |
+| **de440.bsp** | 1550-2650 | ~114 MB | **Default**, ICRF 3.0 |
 | **de441.bsp** | -13200-17191 | ~3.4 GB | Extended version of DE440 |
 
 DE440 and DE441 have identical precision — DE441 is simply the extended-range version.
@@ -293,14 +293,14 @@ The tidal acceleration affects Delta T calculations for dates far from the prese
 
 ```python
 from libephemeris import set_tid_acc, get_tid_acc
-from libephemeris.constants import SE_TIDAL_DE440
+from libephemeris.constants import TIDAL_DE440
 
 # Match tidal acceleration to ephemeris file
-set_tid_acc(SE_TIDAL_DE440)  # When using de440.bsp (default)
+set_tid_acc(TIDAL_DE440)  # When using de440.bsp (default)
 print(f"Tidal acceleration: {get_tid_acc()}")
 
 # Use default (DE440-based)
-set_tid_acc(0.0)  # SE_TIDAL_AUTOMATIC
+set_tid_acc(0.0)  # TIDAL_AUTOMATIC
 ```
 
 ---
@@ -340,7 +340,7 @@ export LIBEPHEMERIS_AUTO_SPK=1
 
 ```python
 from libephemeris.spk_auto import auto_get_spk
-from libephemeris.constants import SE_CHIRON
+from libephemeris.constants import CHIRON
 
 # Automatically download and register SPK for a date range
 jd_start = 2458849.5  # 2020-01-01
@@ -350,11 +350,11 @@ spk_path = auto_get_spk(
     body_id="2060",  # Chiron
     jd_start=jd_start,
     jd_end=jd_end,
-    ipl=SE_CHIRON,  # Auto-register for calc_ut
+    ipl=CHIRON,  # Auto-register for calc_ut
 )
 
 # calc_ut now uses SPK data automatically
-pos, _ = eph.calc_ut(2460000.0, SE_CHIRON, 0)
+pos, _ = eph.calc_ut(2460000.0, CHIRON, 0)
 ```
 
 ### Enabling Common Bodies at Once
@@ -459,7 +459,7 @@ import libephemeris as eph
 eph.set_ephemeris_file("de441.bsp")
 
 # 2. Set matching tidal acceleration
-eph.set_tid_acc(eph.SE_TIDAL_DE440)  # DE441 uses same as DE440
+eph.set_tid_acc(eph.TIDAL_DE440)  # DE441 uses same as DE440
 
 # 3. Note: IERS Delta T not available before 1973
 # Skyfield model is used automatically for historical dates

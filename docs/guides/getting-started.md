@@ -31,7 +31,7 @@ pip install libephemeris[all]     # Everything
 | Tier | JPL File | Date Range | Size | Use Case |
 |------|----------|------------|------|----------|
 | `base` | de440s.bsp | 1849-2150 | ~31 MB | Modern-era, lightweight |
-| `medium` | de440.bsp | 1550-2650 | ~128 MB | General purpose **(default)** |
+| `medium` | de440.bsp | 1550-2650 | ~114 MB | General purpose **(default)** |
 | `extended` | de441.bsp | -13200 to +17191 | ~3.1 GB | Historical/far-future |
 
 DE440 and DE441 have identical precision -- DE441 is the extended-range version.

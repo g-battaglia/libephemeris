@@ -97,7 +97,7 @@ tests/test_leb/compare/
 ├── test_compare_leb_hypothetical.py     # Uranian bodies (Cupido, Hades, Zeus, ...)
 ├── test_compare_leb_velocities.py       # Speed lon/lat/dist for all 31 bodies
 ├── test_compare_leb_distances.py        # Geocentric and heliocentric distance
-├── test_compare_leb_crossings.py        # swe_cross_ut, swe_solcross_ut, ...
+├── test_compare_leb_crossings.py        # cross_ut, solcross_ut, ...
 ├── test_compare_leb_eclipses_solar.py   # Solar eclipses
 ├── test_compare_leb_eclipses_lunar.py   # Lunar eclipses
 ├── test_compare_leb_nutation.py         # Nutation
@@ -145,10 +145,10 @@ The core of the infrastructure is the `CompareHelper` class in `conftest.py`. It
 
 ```python
 # Skyfield mode (reference): direct calculation from NASA ephemerides
-ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
 # LEB mode: calculation via precomputed Chebyshev polynomials
-leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 ```
 
 Internally, `CompareHelper`:
@@ -168,8 +168,8 @@ def test_longitude(self, compare, test_dates_200, body_id, body_name):
     worst_jd = 0.0
 
     for jd in test_dates_200:
-        ref, _ = compare.skyfield(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
-        leb, _ = compare.leb(ephem.swe_calc_ut, jd, body_id, FLG_SPEED)
+        ref, _ = compare.skyfield(ephem.calc_ut, jd, body_id, FLG_SPEED)
+        leb, _ = compare.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
         err = lon_error_arcsec(ref[0], leb[0])
         if err > max_err:
@@ -283,12 +283,12 @@ base and medium tiers.
 
 | Field | Value | Unit | Tested function |
 |-------|-------|------|-----------------|
-| `CROSSING_SUN_SEC` | 1.0 | sec | `swe_solcross_ut` |
-| `CROSSING_MOON_SEC` | 5.0 | sec | `swe_mooncross_ut` |
-| `CROSSING_PLANET_SEC` | 30.0 | sec | `swe_cross_ut` |
-| `ECLIPSE_TIMING_SEC` | 1.0 | sec | `swe_sol_eclipse_*` |
+| `CROSSING_SUN_SEC` | 1.0 | sec | `solcross_ut` |
+| `CROSSING_MOON_SEC` | 5.0 | sec | `mooncross_ut` |
+| `CROSSING_PLANET_SEC` | 30.0 | sec | `cross_ut` |
+| `ECLIPSE_TIMING_SEC` | 1.0 | sec | `sol_eclipse_*` |
 | `STATION_TIMING_SEC` | 1.0 | sec | Retrograde stations |
-| `RISE_TRANSIT_SEC` | 1.0 | sec | `swe_rise_trans` |
+| `RISE_TRANSIT_SEC` | 1.0 | sec | `rise_trans` |
 
 ---
 

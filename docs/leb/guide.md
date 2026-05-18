@@ -35,8 +35,8 @@
 
 LEB is a precomputed binary ephemeris format that stores Chebyshev polynomial
 approximations of celestial body positions. When activated, it replaces the
-default Skyfield/JPL pipeline as the primary data source for `swe_calc_ut()`
-and `swe_calc()`, providing approximately **14x speedup** for typical
+default Skyfield/JPL pipeline as the primary data source for `calc_ut()`
+and `calc()`, providing approximately **14x speedup** for typical
 astrological chart calculations.
 
 ### Design Principles
@@ -48,7 +48,7 @@ astrological chart calculations.
   the Julian Day is out of range, or an unsupported flag combination is
   requested, the system silently falls back to the full Skyfield pipeline.
   Callers never need to know whether LEB is active.
-- **API-transparent.** The public API (`swe_calc_ut`, `swe_calc`, `calc_ut`,
+- **API-transparent.** The public API (`calc_ut`, `calc`, `calc_ut`,
   `calc`, `EphemerisContext.calc_ut`, etc.) remains unchanged. LEB is
   activated by setting a file path; no code changes are needed.
 - **Immutable after init.** Once a `LEBReader` is constructed, all its data
@@ -103,14 +103,14 @@ tests/test_leb/compare/
 ### Data Flow
 
 ```
-User calls swe_calc_ut(jd, MARS, FLG_SPEED)
+User calls calc_ut(jd, MARS, FLG_SPEED)
   |
   v
-planets.py: swe_calc_ut()
+planets.py: calc_ut()
   |-- state.get_leb_reader() -> LEBReader or None
   |
   |-- [LEB active] fast_calc.fast_calc_ut(reader, jd, ipl, iflag)
-  |     |-- Delta-T: swe_deltat(jd) -> jd_tt  (NOT reader.delta_t)
+  |     |-- Delta-T: deltat(jd) -> jd_tt  (NOT reader.delta_t)
   |     |-- Body lookup: reader._bodies[ipl] -> BodyEntry
   |     |-- Pipeline dispatch by coord_type:
   |     |     COORD_ICRS_BARY         -> _pipeline_icrs()                  [Pipeline A]
@@ -157,7 +157,7 @@ ctx.set_leb_file("/path/to/ephemeris.leb")
 
 ### Calculation Mode (`LIBEPHEMERIS_MODE`)
 
-The calculation mode controls how `swe_calc_ut()` and `swe_calc()` resolve
+The calculation mode controls how `calc_ut()` and `calc()` resolve
 positions. Set via `set_calc_mode()` or the `LIBEPHEMERIS_MODE` environment
 variable.
 
@@ -552,7 +552,7 @@ def fast_calc_tt(reader, tjd_tt, ipl, iflag, *,
 Both functions:
 1. Check for unsupported flags and raise `KeyError` to trigger fallback.
 2. Snapshot sidereal state at entry (thread-safe).
-3. Convert UT to TT via `swe_deltat()` from `time_utils` (high-precision
+3. Convert UT to TT via `deltat()` from `time_utils` (high-precision
    Skyfield model, **not** `reader.delta_t()` which uses linear interpolation
    on a sparse table and can introduce up to ~0.004s error near 1985).
    The `fast_calc_tt` path uses `reader.delta_t()` only for the reverse
@@ -915,7 +915,7 @@ body_jd_ranges[bid] = (eff_start, eff_end)
 ```
 
 **At runtime:** when a body's JD is outside its per-body range, `eval_body()`
-raises `ValueError`, which `swe_calc_ut()`/`swe_calc()` catches to fall
+raises `ValueError`, which `calc_ut()`/`calc()` catches to fall
 through to Skyfield. This is transparent to the caller.
 
 **Coverage by tier:**
@@ -1160,11 +1160,11 @@ _VALID_CALC_MODES = ("auto", "skyfield", "leb")
 - Creates `LEBReader(path)` on first access
 - Logs warning and returns `None` if file is invalid/corrupt (in `auto` mode)
 
-### 7.2 Dispatch in `swe_calc_ut()` (`planets.py:772-782`)
+### 7.2 Dispatch in `calc_ut()` (`planets.py:772-782`)
 
 ```python
-def swe_calc_ut(tjd_ut, ipl, iflag):
-    # ... SE_ECL_NUT handling, MOSEPH stripping ...
+def calc_ut(tjd_ut, ipl, iflag):
+    # ... ECL_NUT handling, MOSEPH stripping ...
 
     # --- LEB fast path ---
     reader = get_leb_reader()
@@ -1179,12 +1179,12 @@ def swe_calc_ut(tjd_ut, ipl, iflag):
     return _calc_body(t, ipl, iflag)
 ```
 
-The same pattern is used in `swe_calc()` (line 835-845), dispatching to
+The same pattern is used in `calc()` (line 835-845), dispatching to
 `fast_calc.fast_calc_tt()`.
 
 ### 7.3 Ayanamsa in LEB Mode
 
-When `swe_get_ayanamsa_ut()` or `swe_get_ayanamsa_ex_ut()` is called:
+When `get_ayanamsa_ut()` or `get_ayanamsa_ex_ut()` is called:
 ```python
 # planets.py line 2250
 reader = get_leb_reader()
@@ -1358,8 +1358,8 @@ orbital motion due to Earth's own motion and parallax effects.
 ### 9.3 Bodies NOT in LEB (Skyfield Fallback)
 
 When LEB is active and a body is **not** in `BODY_PARAMS`, the library
-raises `KeyError` internally, which is caught by `swe_calc_ut()` /
-`swe_calc()`, and the request falls through to the full Skyfield pipeline.
+raises `KeyError` internally, which is caught by `calc_ut()` /
+`calc()`, and the request falls through to the full Skyfield pipeline.
 This is completely transparent to the caller.
 
 The same fallback is triggered by:
@@ -1376,13 +1376,13 @@ The same fallback is triggered by:
 |----------|--------|-----|-------|--------------|
 | Centaur | Pholus | 16 | 1 | SPK → ASSIST → Keplerian |
 | Additional hypotheticals | Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 51–58 | 8 | Keplerian from `hypothetical.py` |
-| TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | SE_AST_OFFSET + n | 9 | SPK → ASSIST → Keplerian |
-| Additional asteroids | Nessus, Asbolus, Chariklo, Apophis, Hygiea, Interamnia, Davida, Europa (ast), Sylvia, Psyche, Eros, Amor, Icarus, Toro, Sappho, Pandora, Lilith (ast), Hidalgo, Toutatis, Itokawa, Bennu, Ryugu | SE_AST_OFFSET + n | 22 | SPK → ASSIST → Keplerian |
-| Fixed stars | 102 stars (Regulus, Spica, Aldebaran, …) | SE_FIXSTAR_OFFSET + n | 102 | `fixed_stars.py` (see §9.4) |
+| TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | AST_OFFSET + n | 9 | SPK → ASSIST → Keplerian |
+| Additional asteroids | Nessus, Asbolus, Chariklo, Apophis, Hygiea, Interamnia, Davida, Europa (ast), Sylvia, Psyche, Eros, Amor, Icarus, Toro, Sappho, Pandora, Lilith (ast), Hidalgo, Toutatis, Itokawa, Bennu, Ryugu | AST_OFFSET + n | 22 | SPK → ASSIST → Keplerian |
+| Fixed stars | 102 stars (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 102 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
 | Arabic parts | Pars Fortunae, Pars Spiritus, Pars Amoris, Pars Fidei | 9100–9103 | 4 | `arabic_parts.py` (derived) |
-| Nutation/obliquity | SE_ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
+| Nutation/obliquity | ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
 
 **Total bodies NOT in LEB Chebyshev data:** ~174 (1 centaur + 8 hypotheticals
 \+ 31 minor bodies/TNOs + 102 stars + 21 moons + 10 angles/parts + 1 nutation).
@@ -1424,14 +1424,14 @@ calculations.
 Stores a sparse table of historical Delta-T values (TT − UT1) at regular
 intervals. Used by `fast_calc_tt()` for reverse UT↔TT lookups, but
 **not** used by `fast_calc_ut()` for the forward UT→TT conversion (which
-uses `swe_deltat()` for higher precision — see §5).
+uses `deltat()` for higher precision — see §5).
 
 - **Format:** array of `(jd, delta_t_days)` pairs
 - **Interpolation:** linear between adjacent entries
 - **Access:** `reader.delta_t(jd)` → Delta-T in days
 - **Evaluation time:** ~0.3 µs
 - **Caveat:** Linear interpolation introduces up to ~0.004s error near 1985.
-  This is why `fast_calc_ut()` uses `swe_deltat()` instead.
+  This is why `fast_calc_ut()` uses `deltat()` instead.
 
 #### Star Catalog (Section 4)
 
@@ -1445,7 +1445,7 @@ that doesn't benefit from polynomial approximation.
   velocity, visual magnitude
 - **Access:** `reader.get_star(hip_number)` → star data dict
 - **Note:** Fixed star calculations still go through the full Skyfield
-  pipeline when called via `swe_calc_ut()`. The star catalog in LEB is
+  pipeline when called via `calc_ut()`. The star catalog in LEB is
   used internally for sidereal ayanamsha calculations involving reference
   stars.
 
@@ -1485,7 +1485,7 @@ on all three tiers (base, medium, and extended). This was accomplished through:
    oscillation fitting errors)
 2. PPN gravitational deflection (Sun, Jupiter, Saturn)
 3. Runtime COB correction at observer time (not retarded time)
-4. `swe_deltat()` for UT->TT conversion (not reader's sparse table)
+4. `deltat()` for UT->TT conversion (not reader's sparse table)
 5. Asteroid pipeline via `_SpkType21Target` VectorFunction wrapper
 6. Tightened Chebyshev parameters for bodies 13, 21, 22
 
@@ -1568,7 +1568,7 @@ without changing the storage format.
 Asteroid precision depends entirely on how the LEB file was generated:
 
 - **With spktype21 SPK:** Position errors <1" — excellent
-- **With scalar swe_calc() fallback:** Position errors can reach ~1500" — unacceptable
+- **With scalar calc() fallback:** Position errors can reach ~1500" — unacceptable
 - **With Keplerian fallback (no SPK):** Even worse
 
 Always ensure asteroid SPK files cover the full tier date range before
@@ -1588,7 +1588,7 @@ generating. Use `_spk_covers_range()` to verify.
 | `delta_t()` | ~0.3 us |
 | Pipeline A full (ICRS -> ecliptic of date, with speed) | ~8 us |
 | Pipeline B full (ecliptic direct, with speed) | ~2 us |
-| Skyfield swe_calc_ut() for comparison | ~120 us |
+| Skyfield calc_ut() for comparison | ~120 us |
 | **Speedup (Pipeline A)** | **~14x** |
 
 ### 11.2 Generation Performance
@@ -1609,7 +1609,7 @@ generating. Use `_spk_covers_range()` to verify.
 | Skyfield `target.at(t)` (Sun) | 61 us | 0.4 us | **150x** |
 | Skyfield `target.at(t)` (Moon) | 121 us | 0.7 us | **170x** |
 | `erfa.nut06a()` (nutation) | 32 us | ~0.5 us | **~50x** |
-| `spktype21.compute_type21()` | 65 us | N/A (scalar) | 36x vs swe_calc |
+| `spktype21.compute_type21()` | 65 us | N/A (scalar) | 36x vs calc |
 | True lunar node (pure Python) | 315 us | N/A | not vectorizable |
 | Interp perigee (pure Python) | 329 us | N/A | not vectorizable |
 
@@ -1961,9 +1961,9 @@ swe.set_leb_file("data/leb2/base_core.leb2")  # companions auto-discovered
 swe.set_calc_mode("leb")
 
 # Bodies from different files work transparently
-swe.swe_calc_ut(2451545.0, swe.SUN, swe.FLG_SPEED)     # from core
-swe.swe_calc_ut(2451545.0, swe.CHIRON, swe.FLG_SPEED)   # from asteroids
-swe.swe_calc_ut(2451545.0, 40, swe.FLG_SPEED)              # from uranians
+swe.calc_ut(2451545.0, swe.SUN, swe.FLG_SPEED)     # from core
+swe.calc_ut(2451545.0, swe.CHIRON, swe.FLG_SPEED)   # from asteroids
+swe.calc_ut(2451545.0, 40, swe.FLG_SPEED)              # from uranians
 ```
 
 **How it works:**
@@ -2066,7 +2066,7 @@ leph leb2 verify base               # 500 samples per body, compare vs LEB1
 # Unit tests
 leph test leb2-format all           # Compression round-trip + reader tests
 
-# Precision tests (end-to-end via swe_calc_ut)
+# Precision tests (end-to-end via calc_ut)
 leph test leb2-format precision-base       # Base tier (~15s)
 leph test leb2-format precision-all        # All tiers (~45s)
 ```
@@ -2135,7 +2135,7 @@ leph leb generate base groups
 
 ### 14.5 Performance Not Improved
 
-- Ensure `set_leb_file()` is called before any `swe_calc_ut()` calls
+- Ensure `set_leb_file()` is called before any `calc_ut()` calls
 - Check that `get_leb_reader()` returns a non-None value
 - Verify the body you're computing is in the LEB file
 - If using `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, or `FLG_NONUT`,

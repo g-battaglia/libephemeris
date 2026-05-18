@@ -65,16 +65,16 @@ Durata del giorno: 15.7 ore
 
 Il parametro `rsmi` accetta quattro eventi base:
 
-- `SE_CALC_RISE` (1) — levata (primo raggio all'orizzonte)
-- `SE_CALC_SET` (2) — tramonto (ultimo raggio scompare)
-- `SE_CALC_MTRANSIT` (4) — transito superiore al meridiano (punto più alto nel cielo)
-- `SE_CALC_ITRANSIT` (8) — transito inferiore (punto più basso, di solito sotto l'orizzonte)
+- `CALC_RISE` (1) — levata (primo raggio all'orizzonte)
+- `CALC_SET` (2) — tramonto (ultimo raggio scompare)
+- `CALC_MTRANSIT` (4) — transito superiore al meridiano (punto più alto nel cielo)
+- `CALC_ITRANSIT` (8) — transito inferiore (punto più basso, di solito sotto l'orizzonte)
 
 A questi puoi aggiungere (con l'operatore `|`) dei modificatori:
 
-- `SE_BIT_DISC_CENTER` (256) — usa il centro del disco invece del bordo superiore
-- `SE_BIT_DISC_BOTTOM` (8192) — usa il bordo inferiore del disco
-- `SE_BIT_NO_REFRACTION` (512) — non applicare la rifrazione atmosferica
+- `BIT_DISC_CENTER` (256) — usa il centro del disco invece del bordo superiore
+- `BIT_DISC_BOTTOM` (8192) — usa il bordo inferiore del disco
+- `BIT_NO_REFRACTION` (512) — non applicare la rifrazione atmosferica
 
 ### Levata e tramonto della Luna
 
@@ -374,17 +374,17 @@ Levata eliacale di Sirio al Cairo: 4/8/2024
 
 I quattro tipi di evento eliacale sono:
 
-- `SE_HELIACAL_RISING` (1) — **levata eliacale**: la prima apparizione mattutina. L'oggetto diventa visibile all'alba dopo il periodo di invisibilità vicino al Sole. Valido per tutti i corpi.
+- `HELIACAL_RISING` (1) — **levata eliacale**: la prima apparizione mattutina. L'oggetto diventa visibile all'alba dopo il periodo di invisibilità vicino al Sole. Valido per tutti i corpi.
 
-- `SE_HELIACAL_SETTING` (2) — **tramonto eliaco**: l'ultima apparizione serale. L'oggetto scompare nel bagliore del Sole al tramonto. Valido per tutti i corpi.
+- `HELIACAL_SETTING` (2) — **tramonto eliaco**: l'ultima apparizione serale. L'oggetto scompare nel bagliore del Sole al tramonto. Valido per tutti i corpi.
 
-- `SE_EVENING_FIRST` (3) — **prima apparizione serale**: per i pianeti interni (Mercurio, Venere), il primo giorno in cui diventano visibili la sera dopo la congiunzione superiore. Solo per pianeti interni.
+- `EVENING_FIRST` (3) — **prima apparizione serale**: per i pianeti interni (Mercurio, Venere), il primo giorno in cui diventano visibili la sera dopo la congiunzione superiore. Solo per pianeti interni.
 
-- `SE_MORNING_LAST` (4) — **ultima apparizione mattutina**: per i pianeti interni, l'ultimo giorno di visibilità al mattino prima della congiunzione inferiore. Solo per pianeti interni.
+- `MORNING_LAST` (4) — **ultima apparizione mattutina**: per i pianeti interni, l'ultimo giorno di visibilità al mattino prima della congiunzione inferiore. Solo per pianeti interni.
 
 ### L'API compatibile con PySwissEph
 
-Per controllo completo sulle condizioni atmosferiche e le capacità dell'osservatore, usa `swe_heliacal_ut`:
+Per controllo completo sulle condizioni atmosferiche e le capacità dell'osservatore, usa `heliacal_ut`:
 
 ```python
 import libephemeris as ephem
@@ -399,7 +399,7 @@ datm = (1013.25, 25.0, 30.0, 0.0)
 dobs = (36.0, 1.0, 0, 0, 0, 0)
 #  età, acuità visiva (Snellen), binoculare, ingrandimento, apertura, trasmissione
 
-result = ephem.swe_heliacal_ut(
+result = ephem.heliacal_ut(
     jd, geopos, datm, dobs,
     "Sirius",
     ephem.HELIACAL_RISING
@@ -558,12 +558,12 @@ In questo capitolo abbiamo imparato a calcolare quando i corpi celesti sono visi
 
 **Funzioni introdotte:**
 
-- `rise_trans(jd, planet, lat, lon, rsmi=SE_CALC_RISE)` — trova il prossimo sorgere, tramonto o transito al meridiano di un corpo celeste
+- `rise_trans(jd, planet, lat, lon, rsmi=CALC_RISE)` — trova il prossimo sorgere, tramonto o transito al meridiano di un corpo celeste
 - `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — come `rise_trans` ma con altezza personalizzata dell'orizzonte
 - `refrac(altitude, pressure, temperature, calc_flag)` — converte tra altezza vera e apparente (o viceversa), tenendo conto della rifrazione
 - `refrac_extended(altitude, altitude_geo, ...)` — rifrazione estesa con dip dell'orizzonte per osservatori in quota
 - `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — trova la data di un evento eliacale (prima/ultima visibilità)
-- `swe_heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — stessa funzione (il nome semplice è ora un alias)
+- `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — stessa funzione (il nome semplice è ora un alias)
 - `vis_limit_mag(jd, geopos, atmo, observer, objname)` — determina se un oggetto è visibile, confrontando magnitudine limite e magnitudine apparente
 - `calc_airmass(altitude)` — calcola la massa d'aria attraversata dalla luce
 - `calc_extinction_magnitude(altitude)` — calcola quante magnitudini di luce si perdono per estinzione atmosferica

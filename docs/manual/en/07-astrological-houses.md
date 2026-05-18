@@ -415,7 +415,7 @@ except PolarCircleError as e:
 ```
 
 ```
-Error: swe_houses: Placidus house system cannot be calculated at latitude
+PolarCircleError: Placidus house system cannot be calculated at latitude
   69.60°N (within Northern polar circle). Polar threshold for obliquity
   23.44° is ±66.56°.
 Latitude: 69.6°

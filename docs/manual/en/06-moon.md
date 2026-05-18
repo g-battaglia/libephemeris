@@ -54,9 +54,9 @@ The nodes are not fixed: they slowly move backwards along the zodiac, completing
 
 LibEphemeris offers two versions of the lunar nodes:
 
-- The **mean node** (`SE_MEAN_NODE`) is calculated using a regular mathematical polynomial. It moves in a uniform and predictable way — no oscillations, no jumps. It is like the perfect clock of nodal motion.
+- The **mean node** (`MEAN_NODE`) is calculated using a regular mathematical polynomial. It moves in a uniform and predictable way — no oscillations, no jumps. It is like the perfect clock of nodal motion.
 
-- The **true node** (`SE_TRUE_NODE`) takes into account all the real perturbations. The true node oscillates back and forth around the mean position with an amplitude of about ±1.5°. In detailed ephemerides, the true node can briefly move in direct motion (forward), something the mean node never does.
+- The **true node** (`TRUE_NODE`) takes into account all the real perturbations. The true node oscillates back and forth around the mean position with an amplitude of about ±1.5°. In detailed ephemerides, the true node can briefly move in direct motion (forward), something the mean node never does.
 
 In astrology, the choice between the mean and true node is a subject of debate. Many astrologers use the mean node because of its regularity; others prefer the true node because it reflects the astronomical reality.
 
@@ -304,5 +304,5 @@ The Moon crosses a node about **twice a month** — once at the ascending node (
 - `calc_interpolated_perigee(jd_tt)` — interpolated lunar perigee
 - `calc_white_moon_position(jd_tt)` — White Moon (Selena), opposite to Lilith
 - `mooncross_node_ut(jd_ut)` — next lunar node crossing
-- `SE_MEAN_NODE`, `SE_TRUE_NODE` — lunar nodes via `calc_ut`
-- `SE_MEAN_APOG`, `SE_OSCU_APOG` — lunar apogee via `calc_ut`
+- `MEAN_NODE`, `TRUE_NODE` — lunar nodes via `calc_ut`
+- `MEAN_APOG`, `OSCU_APOG` — lunar apogee via `calc_ut`

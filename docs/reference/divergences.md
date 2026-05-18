@@ -26,7 +26,7 @@ hyper-validation (4400+ comparison rounds across 29 API sections).
 
 ## 1. Ephemeris Engine Differences
 
-### 1.1 Planetary Positions (`swe_calc_ut`)
+### 1.1 Planetary Positions (`calc_ut`)
 
 libephemeris uses **Skyfield + JPL DE440/DE441** while pyswisseph uses the
 **Swiss Ephemeris** internal integration. Both are based on JPL ephemerides but
@@ -75,7 +75,7 @@ divergence is `ascmc[6]` (CoAsc Munkasey) for the Horizon (H) house system at
 lat=0, where pyswisseph returns 0° due to a C `tan(90°)` floating-point
 artifact, while the mathematical limit from any positive latitude is 180°.
 
-### 2.3 House Position (`swe_house_pos`)
+### 2.3 House Position (`house_pos`)
 
 For most house systems: <0.01" divergence.
 
@@ -97,16 +97,16 @@ IERS data) while pyswisseph uses the Espenak & Meeus (2006) polynomial model.
 | >2050 | ~1–10s | depends on extrapolation |
 
 This affects all functions that internally convert between UT and ET/TT:
-`swe_deltat`, `swe_deltat_ex`, `swe_utc_to_jd`, `swe_jdet_to_utc`,
-`swe_jdut1_to_utc`.
+`deltat`, `deltat_ex`, `utc_to_jd`, `jdet_to_utc`,
+`jdut1_to_utc`.
 
-### 3.2 Sidereal Time (`swe_sidtime`)
+### 3.2 Sidereal Time (`sidtime`)
 
 At modern dates: <0.001s divergence.
 At future dates (>2050): up to ~0.05s due to delta-T propagation into the
 GMST calculation.
 
-### 3.3 Equation of Time (`swe_time_equ`)
+### 3.3 Equation of Time (`time_equ`)
 
 At modern dates: <0.15s (matches well after the GAST-RA rewrite).
 At future dates (>2050): up to ~1.4s due to compounding delta-T and Sun RA
@@ -139,13 +139,13 @@ arise from different catalog versions.
 
 ## 5. Refraction and Horizontal Coordinates
 
-### 5.1 Atmospheric Refraction (`swe_refrac`)
+### 5.1 Atmospheric Refraction (`refrac`)
 
 Up to 15" divergence, primarily at low altitudes near the horizon. Both
 implementations use Bennett's formula but with slightly different coefficients
 and boundary handling.
 
-### 5.2 Azimuth/Altitude (`swe_azalt`)
+### 5.2 Azimuth/Altitude (`azalt`)
 
 Above-horizon bodies: typically <1" divergence.
 Below-horizon bodies: up to ~1654" (~27') divergence due to fundamentally
@@ -168,9 +168,9 @@ Similar to solar eclipses. Timing agrees within ~10s for most events.
 ### 6.3 Lunar Occultations
 
 Timing agrees within ~0.001 day (~86s) for most events.
-**Note:** `swe_lun_occult_when_glob` is computationally expensive (~6s/call).
+**Note:** `lun_occult_when_glob` is computationally expensive (~6s/call).
 
-## 7. Nodes and Apsides (`swe_nod_aps_ut`)
+## 7. Nodes and Apsides (`nod_aps_ut`)
 
 Nodal and apsidal positions can diverge by 20–700" (up to ~1°) for some bodies.
 This is because osculating orbital elements are derived differently from the
@@ -178,7 +178,7 @@ two ephemeris engines. The divergence is largest for:
 - Outer planets (different integration methods)
 - Bodies with high eccentricity (osculating elements more sensitive)
 
-## 8. Phenomena (`swe_pheno_ut`)
+## 8. Phenomena (`pheno_ut`)
 
 ### 8.1 Phase Angle
 
@@ -190,7 +190,7 @@ amplifies the small position differences between the two engines.
 
 Phase, elongation, apparent diameter, and magnitude generally agree well (<1").
 
-## 9. Orbital Elements (`swe_get_orbital_elements`)
+## 9. Orbital Elements (`get_orbital_elements`)
 
 Orbital elements for **inner planets** (Mercury–Mars) agree within ~1".
 
@@ -226,16 +226,16 @@ specific reference star positions or galactic frame definitions.
 
 ### 11.1 Solar/Lunar Crossings
 
-`swe_solcross_ut`, `swe_mooncross_ut`: typically <1s timing divergence.
+`solcross_ut`, `mooncross_ut`: typically <1s timing divergence.
 
 ### 11.2 Moon Node Crossings
 
-`swe_mooncross_node_ut`: up to ~69s divergence due to different lunar
+`mooncross_node_ut`: up to ~69s divergence due to different lunar
 node calculation methods.
 
-## 12. Asteroid Pipeline (`SE_AST_OFFSET`)
+## 12. Asteroid Pipeline (`AST_OFFSET`)
 
-When using `SE_AST_OFFSET + N` to access asteroids by number, libephemeris
+When using `AST_OFFSET + N` to access asteroids by number, libephemeris
 remaps to dedicated body IDs and uses its Skyfield/SPK pipeline. pyswisseph
 uses `.se1` ephemeris files with a different integration.
 
@@ -248,7 +248,7 @@ through its SPK pipeline.
 
 ## 13. Heliacal Events
 
-`swe_heliacal_ut` is computationally expensive (>90s per call for some
+`heliacal_ut` is computationally expensive (>90s per call for some
 configurations). Timing divergence: up to ~2 days for heliacal rising/setting
 events, due to different atmospheric extinction and visibility models.
 
@@ -265,7 +265,7 @@ does not expose this attribute.
 
 ### 14.3 `d2l` with Negative Values
 
-`swe_d2l()` for negative input values produces different results due to
+`d2l()` for negative input values produces different results due to
 unsigned integer overflow behavior in the C implementation of pyswisseph
 vs Python's native integer handling.
 
