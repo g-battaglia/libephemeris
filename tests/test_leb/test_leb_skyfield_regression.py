@@ -930,15 +930,15 @@ class TestVelocityPrecision:
         """Pipeline B velocity should match."""
         pos_leb, _ = _run_leb(calc_ut, JD_TEST, MEAN_NODE, FLG_SPEED)
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, MEAN_NODE, FLG_SPEED)
-        assert abs(pos_leb[3] - pos_sf[3]) < 0.0001, f"MeanNode dlon"
+        assert abs(pos_leb[3] - pos_sf[3]) < 0.0001, "MeanNode dlon"
 
     def test_velocity_star(self):
         """Fixed star velocity (from finite difference) should match."""
         from libephemeris.fixed_stars import fixstar_ut
         pos_leb, _, _ = _run_leb(fixstar_ut, "Regulus", JD_TEST, FLG_SPEED)
         pos_sf, _, _ = _run_skyfield(fixstar_ut, "Regulus", JD_TEST, FLG_SPEED)
-        assert abs(pos_leb[3] - pos_sf[3]) < 0.001, f"Star dlon"
-        assert abs(pos_leb[4] - pos_sf[4]) < 0.001, f"Star dlat"
+        assert abs(pos_leb[3] - pos_sf[3]) < 0.001, "Star dlon"
+        assert abs(pos_leb[4] - pos_sf[4]) < 0.001, "Star dlat"
 
 
 # =========================================================================
