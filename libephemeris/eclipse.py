@@ -5960,6 +5960,27 @@ def lun_eclipse_how(
     return eclipse_type, attr
 
 
+def _kernel_jd_bounds(eph) -> Tuple[float, float]:
+    """Return (earliest_start_jd, latest_end_jd) across all loaded SPK segments.
+
+    Used to clamp occultation searches to the loaded DE kernel's coverage so the
+    batch scan never requests JDs outside it. Split kernels (e.g. DE441, whose
+    every body is broken into two segments at JD 2440432.5 / 1969-07-30) expose
+    several end_jd values; the kernel's true upper bound is the *maximum* end_jd.
+    Taking the minimum would clamp the search to the split point (~1969) and drop
+    every later event.
+
+    Args:
+        eph: Loaded ephemeris object containing SPK segments.
+
+    Returns:
+        Tuple of (minimum segment start_jd, maximum segment end_jd).
+    """
+    starts = [seg.spk_segment.start_jd for seg in eph.segments]
+    ends = [seg.spk_segment.end_jd for seg in eph.segments]
+    return min(starts), max(ends)
+
+
 def lun_occult_when_glob(
     tjdut: float,
     body: "int | str",
@@ -6533,8 +6554,7 @@ def lun_occult_when_glob(
     jd_cursor = jd_start
 
     # Clamp search to the loaded DE kernel range to avoid EphemerisRangeError
-    _eph_jd_min = min(seg.spk_segment.start_jd for seg in eph.segments)
-    _eph_jd_max = min(seg.spk_segment.end_jd for seg in eph.segments)
+    _eph_jd_min, _eph_jd_max = _kernel_jd_bounds(eph)
 
     while abs(jd_cursor - jd_start) < search_limit:
         chunk_end = jd_cursor + direction * _SCAN_CHUNK * _SCAN_STEP

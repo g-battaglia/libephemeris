@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-06-03
+
+### Fixed
+
+- `lun_occult_when_glob`: corrected the search-range clamp that used the
+  *minimum* segment end date instead of the maximum. With split ephemeris
+  kernels (DE441 / `extended` tier, every body broken into two segments at
+  JD 2440432.5 = 1969-07-30) this clamped all global lunar-occultation
+  searches to 1969, so any search starting after that date raised "no
+  occultation within 20 years" even where events exist. The clamp now uses
+  the kernel's true upper bound (max end_jd). `base`/`medium` single-segment
+  DE440 kernels were unaffected.
+
 ## [2.0.0] - 2026-05-14
 
 ### Breaking changes
