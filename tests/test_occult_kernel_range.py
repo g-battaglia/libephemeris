@@ -12,6 +12,8 @@ These tests pin the bound via ``_kernel_jd_bounds`` with synthetic segments,
 so they run fast and deterministically without loading the 3.1 GB DE441 file.
 """
 
+from __future__ import annotations
+
 import types
 
 from libephemeris.eclipse import _kernel_jd_bounds

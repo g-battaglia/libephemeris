@@ -5969,6 +5969,12 @@ def _kernel_jd_bounds(eph) -> Tuple[float, float]:
     several end_jd values; the kernel's true upper bound is the *maximum* end_jd.
     Taking the minimum would clamp the search to the split point (~1969) and drop
     every later event.
+
+    Args:
+        eph: Loaded ephemeris object containing SPK segments.
+
+    Returns:
+        Tuple of (minimum segment start_jd, maximum segment end_jd).
     """
     starts = [seg.spk_segment.start_jd for seg in eph.segments]
     ends = [seg.spk_segment.end_jd for seg in eph.segments]
