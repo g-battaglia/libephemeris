@@ -995,7 +995,24 @@ def calc(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import FLG_MOSEPH
+    from .constants import ECL_NUT, FLG_MOSEPH
+
+    # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
+    # TT, so compute directly (calc_ut converts UT first; this mirror was
+    # missing here and ECL_NUT fell through to UnknownBodyError).
+    if planet == ECL_NUT:
+        mean_obliquity = math.degrees(erfa.obl06(2451545.0, tjdet - 2451545.0))
+        dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjdet - 2451545.0)
+        delta_psi = math.degrees(dpsi_rad)
+        delta_eps = math.degrees(deps_rad)
+        return (
+            mean_obliquity + delta_eps,
+            mean_obliquity,
+            delta_psi,
+            delta_eps,
+            0.0,
+            0.0,
+        ), flags
 
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
@@ -1003,6 +1020,22 @@ def calc(
     # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+
+    # --- South nodes: derive from the north node via the same dispatch
+    # path (see calc_ut for the backend-consistency rationale) ---
+    from .constants import MEAN_NODE, TRUE_NODE
+
+    if planet in (-MEAN_NODE, -TRUE_NODE):
+        north_result, retflag = calc(tjdet, abs(planet), flags)
+        south_lon = (north_result[0] + 180.0) % 360.0
+        return (
+            south_lon,
+            -north_result[1],
+            north_result[2],
+            north_result[3],
+            -north_result[4],
+            north_result[5],
+        ), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
