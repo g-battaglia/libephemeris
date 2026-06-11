@@ -601,8 +601,14 @@ class TestSolEclipseWhere:
             # Sun altitude at central line should be valid
             assert -90 <= sun_altitude <= 90
 
-    def test_non_eclipse_time_returns_zeros(self):
-        """Time far from any eclipse should return zeros."""
+    def test_non_eclipse_time_returns_zero_flag_with_proximity_point(self):
+        """A no-eclipse instant gives retflag 0 with the closest-approach point.
+
+        The reference convention (verified against pyswisseph 2.10.03) keeps
+        geopos[0..1] at the surface point of maximum proximity of the shadow
+        axis and reports a negative magnitude measure in attr[0]; only
+        geopos[2..9] stay zero.
+        """
         from libephemeris import sol_eclipse_where
 
         # Random time not during an eclipse (full moon time)
@@ -610,10 +616,12 @@ class TestSolEclipseWhere:
 
         ecl_type, geopos, attr = sol_eclipse_where(jd_non_eclipse)
 
-        # Should return zeros or partial flag
-        if ecl_type == 0:
-            assert geopos[0] == 0.0
-            assert geopos[1] == 0.0
+        assert ecl_type == 0
+        assert -180.0 <= geopos[0] <= 180.0
+        assert -90.0 <= geopos[1] <= 90.0
+        assert attr[0] < 0.0
+        for i in range(2, 10):
+            assert geopos[i] == 0.0
 
     def test_april_2024_eclipse_path(self):
         """Test April 8, 2024 total eclipse path."""

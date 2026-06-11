@@ -163,13 +163,22 @@ class TestLunEclipseWhenLoc:
         # ECL_VISIBLE should always be set for returned eclipses
         assert ecl_type & ECL_VISIBLE
 
-        # At least some visibility flags should be set
+        # At least some visibility flags should be set. The lunar bits
+        # span MAX plus the six phase bits including the penumbral ones
+        # (ECL_PENUMBBEG/PENUMBEND at 8192/16384).
+        from libephemeris import (
+            ECL_PENUMBBEG_VISIBLE,
+            ECL_PENUMBEND_VISIBLE,
+        )
+
         visibility_flags = (
             ECL_MAX_VISIBLE
             | ECL_1ST_VISIBLE
             | ECL_2ND_VISIBLE
             | ECL_3RD_VISIBLE
             | ECL_4TH_VISIBLE
+            | ECL_PENUMBBEG_VISIBLE
+            | ECL_PENUMBEND_VISIBLE
         )
         # At least one phase should be visible
         assert ecl_type & visibility_flags
