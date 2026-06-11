@@ -5003,12 +5003,13 @@ def _lun_eclipse_when_pythonic(
     jd_start: float,
     flags: int = FLG_SWIEPH,
     eclipse_type: int = 0,
+    backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
-    Find the next lunar eclipse after a given date.
+    Find the next (or previous) lunar eclipse from a given date.
 
-    Searches forward in time from jd_start to find the next lunar eclipse.
-    Can filter by eclipse type (total, partial, penumbral).
+    Searches forward (or backward when ``backwards`` is True) in time from
+    jd_start. Can filter by eclipse type (total, partial, penumbral).
 
     Args:
         jd_start: Julian Day (UT) to start search from
@@ -5074,8 +5075,11 @@ def _lun_eclipse_when_pythonic(
     jd = jd_start
 
     for _ in range(MAX_FULL_MOONS):
-        # Find next Full Moon
-        jd_full_moon = _find_next_full_moon(jd)
+        # Find next (or previous) Full Moon
+        if backwards:
+            jd_full_moon = _find_previous_full_moon(jd)
+        else:
+            jd_full_moon = _find_next_full_moon(jd)
 
         # Get Moon position at Full Moon
         moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
@@ -5091,6 +5095,15 @@ def _lun_eclipse_when_pythonic(
             # Eclipse maximum occurs when Moon is closest to shadow axis,
             # not exactly at Full Moon (opposition in longitude)
             jd_max = _refine_lunar_eclipse_maximum(jd_full_moon)
+
+            # Direction invariant: a forward search must return an eclipse
+            # after jd_start, a backward search one before it (refinement
+            # can drag the maximum across the start time).
+            if (not backwards and jd_max <= jd_start) or (
+                backwards and jd_max >= jd_start
+            ):
+                jd = jd_full_moon + (-25 if backwards else 25)
+                continue
 
             # Possible eclipse - check magnitude at refined maximum time
             (
@@ -5131,8 +5144,9 @@ def _lun_eclipse_when_pythonic(
                     # doesn't include it in the returned type
                     return ecl_type & ~ECL_GRAZING, times
 
-        # Advance to next lunation
-        jd = jd_full_moon + 25  # Skip ahead ~25 days to ensure we find next Full Moon
+        # Advance (or retreat) to the next lunation: ~25 days keeps us
+        # safely within one synodic month of the next Full Moon.
+        jd = jd_full_moon + (-25 if backwards else 25)
 
     raise RuntimeError(
         f"No matching lunar eclipse found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
@@ -5153,20 +5167,14 @@ def lun_eclipse_when(
         tjdut: Julian Day (UT) to start search from.
         flags: Calculation flags (default FLG_SWIEPH).
         ecltype: Eclipse type filter bitmask (0 = any).
-        backwards: If True, search backward in time (not yet implemented).
+        backwards: If True, search backward in time.
 
     Returns:
         Tuple of (retflag, tret) matching pyswisseph.
-
-    Raises:
-        NotImplementedError: when ``backwards=True`` (backward search
-            is not yet supported by the underlying implementation).
     """
-    if backwards:
-        raise NotImplementedError(
-            "backward lunar eclipse search is not implemented"
-        )
-    return _lun_eclipse_when_pythonic(tjdut, flags=flags, eclipse_type=ecltype)
+    return _lun_eclipse_when_pythonic(
+        tjdut, flags=flags, eclipse_type=ecltype, backwards=backwards
+    )
 
 
 def _lun_eclipse_when_loc_pythonic(
@@ -5175,6 +5183,7 @@ def _lun_eclipse_when_loc_pythonic(
     lon: float,
     altitude: float = 0.0,
     flags: int = FLG_SWIEPH,
+    backwards: bool = False,
     *,
     reader=None,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
@@ -5339,7 +5348,9 @@ def _lun_eclipse_when_loc_pythonic(
     for _ in range(MAX_ECLIPSES):
         # Find next global lunar eclipse
         try:
-            global_type, global_times = _lun_eclipse_when_pythonic(jd, flags)
+            global_type, global_times = _lun_eclipse_when_pythonic(
+                jd, flags, backwards=backwards
+            )
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar eclipse visible from lat={lat}, lon={lon} "
@@ -5382,7 +5393,7 @@ def _lun_eclipse_when_loc_pythonic(
 
         if not moon_visible:
             # Eclipse not visible from this location, try next
-            jd = jd_max + 25  # Skip ahead to find next eclipse
+            jd = jd_max + (-25 if backwards else 25)
             continue
 
         # Eclipse visible! Calculate local circumstances
@@ -5576,7 +5587,7 @@ def lun_eclipse_when_loc(
         tjdut: Julian Day (UT) to start search from.
         geopos: Sequence of [longitude, latitude, altitude].
         flags: Calculation flags (default FLG_SWIEPH).
-        backwards: If True, search backward in time (not yet implemented).
+        backwards: If True, search backward in time.
 
     Returns:
         Tuple of (retflag, tret, attr) matching pyswisseph.
@@ -5589,7 +5600,7 @@ def lun_eclipse_when_loc(
     altitude = float(geopos[2])
 
     return _call_with_leb_skyfield_fallback(
-        _lun_eclipse_when_loc_pythonic, tjdut, lat, lon, altitude, flags,
+        _lun_eclipse_when_loc_pythonic, tjdut, lat, lon, altitude, flags, backwards,
     )
 
 
@@ -7090,7 +7101,9 @@ def _lun_occult_when_loc_pythonic(
         # Find next global occultation
         try:
             _body = star_name if star_name else planet
-            global_type, global_times = lun_occult_when_glob(jd, _body, flags)
+            global_type, global_times = lun_occult_when_glob(
+                jd, _body, flags, 0, backwards
+            )
         except RuntimeError:
             raise RuntimeError(
                 f"No lunar occultation of {'star ' + star_name if planet == 0 else 'planet ' + str(planet)} "
@@ -7151,7 +7164,7 @@ def _lun_occult_when_loc_pythonic(
         # skip this event and search for the next one
         if not fourth_visible:
             # Fourth contact not visible - incomplete event, try next
-            jd = jd_max + 1  # Skip ahead to find next occultation
+            jd = jd_max + (-1 if backwards else 1)  # Step to the next event
             continue
 
         # Occultation visible! Calculate local circumstances with topocentric parallax
@@ -7247,7 +7260,7 @@ def _lun_occult_when_loc_pythonic(
 
         # Early check: if local maximum is not visible, skip to next event
         if not _is_visible(jd_max_local):
-            jd = jd_max + 1
+            jd = jd_max + (-1 if backwards else 1)
             continue
 
         # Get Moon's alt/az at local maximum
@@ -7269,7 +7282,7 @@ def _lun_occult_when_loc_pythonic(
 
         # Early check: if topocentric separation is too large, no occultation at this location
         if min_separation >= outer_threshold:
-            jd = jd_max + 1
+            jd = jd_max + (-1 if backwards else 1)
             continue
 
         jd_first_local = 0.0
@@ -7323,7 +7336,7 @@ def _lun_occult_when_loc_pythonic(
 
         # If there's no actual occultation at this location, skip to next global event
         if jd_first_local <= 0 or jd_fourth_local <= 0:
-            jd = jd_max + 1
+            jd = jd_max + (-1 if backwards else 1)
             continue
 
         # Check visibility at each phase using local times
@@ -7343,7 +7356,7 @@ def _lun_occult_when_loc_pythonic(
         # If fourth contact is not visible at this location, skip to next global event
         fourth_visible = jd_fourth_local > 0 and _is_visible(jd_fourth_local)
         if not fourth_visible:
-            jd = jd_max + 1
+            jd = jd_max + (-1 if backwards else 1)
             continue
 
         # Find moonrise/moonset during occultation
