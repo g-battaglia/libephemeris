@@ -802,20 +802,14 @@ def calc_libration_correction(
     omega_lib = 2.0 * math.pi / params.period
     libration_angle = omega_lib * dt + params.phase_j2000
 
-    # M2: Generalized resonance scaling
-    # For a p:q resonance: φ = (p+q)λ - qλ_N - pω
-    # Rearranging: λ = (φ + qλ_N + pω) / (p+q)
-    # So Δλ = Δφ / (p+q)
-    # For 2:3 resonance: Δλ = Δφ / 5... wait, that's wrong.
-    # Actually for 2:3: φ = 3λ - 2λ_N - ω, so λ = (φ + 2λ_N + ω) / 3
-    # So Δλ = Δφ / 3, i.e. we divide by q (the larger number in exterior resonance)
-    # More generally: Δλ = Δφ / (p + q) where p:q has p < q for exterior resonances
-    # But the original code used /3 for 2:3, which is dividing by q.
-    # The correct derivation: φ = (p+q)λ_body - q·λ_N - p·ω_body
-    # => λ_body = (φ + q·λ_N + p·ω_body) / (p+q)
-    # => Δλ_body = Δφ / (p+q)
-    resonance_sum = params.resonance_p + params.resonance_q
-    delta_lambda = (params.amplitude / float(resonance_sum)) * math.sin(libration_angle)
+    # Resonant-argument scaling: for an exterior p:q mean-motion
+    # resonance the argument is phi = q*lambda_body - p*lambda_N
+    # - (q - p)*pomega_body, so d(phi)/d(lambda_body) = q and a
+    # libration of the argument maps to the longitude as
+    # dlambda = dphi / q (for the 2:3 plutino resonance: /3).
+    delta_lambda = (params.amplitude / float(params.resonance_q)) * math.sin(
+        libration_angle
+    )
 
     return delta_lambda
 
@@ -2549,8 +2543,9 @@ def calc_minor_body_position(
             math.sqrt(e + 1) * math.sinh(H / 2),
             math.sqrt(e - 1) * math.cosh(H / 2),
         )
-        # Distance from hyperbolic anomaly
-        r = elements.a * (e * math.cosh(H) - 1)
+        # Distance from hyperbolic anomaly. Hyperbolic orbits carry
+        # a < 0, so the magnitude is needed: r = |a| (e cosh H - 1).
+        r = abs(elements.a) * (e * math.cosh(H) - 1)
 
     # Position in orbital plane (perifocal frame)
     x_orb = r * math.cos(nu)
@@ -2777,16 +2772,21 @@ def fetch_orbital_elements_from_sbdb(
 
         # Map SBDB element names to our structure
         # SBDB uses: e, a, q, i, om (node), w (arg peri), ma (mean anom), n (mean motion)
+        # A record missing any of the core elements cannot be propagated;
+        # zero-filling them would yield a fictitious orbit, so give None.
+        for _key in ("a", "e", "i", "n"):
+            if elem_dict.get(_key) is None:
+                return None
         orbital_elements = OrbitalElements(
             name=body_name,
             epoch=epoch_jd,
-            a=elem_dict.get("a", 0.0),  # Semi-major axis
-            e=elem_dict.get("e", 0.0),  # Eccentricity
-            i=elem_dict.get("i", 0.0),  # Inclination
+            a=elem_dict["a"],  # Semi-major axis
+            e=elem_dict["e"],  # Eccentricity
+            i=elem_dict["i"],  # Inclination
             omega=elem_dict.get("w", 0.0),  # Argument of perihelion
             Omega=elem_dict.get("om", 0.0),  # Longitude of ascending node
             M0=elem_dict.get("ma", 0.0),  # Mean anomaly
-            n=elem_dict.get("n", 0.0),  # Mean motion
+            n=elem_dict["n"],  # Mean motion
         )
 
         # Cache the result
