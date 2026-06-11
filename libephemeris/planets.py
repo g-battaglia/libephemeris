@@ -4275,6 +4275,34 @@ def _calc_nod_aps(
     if ipl in (SUN, EARTH):
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
+    # Speeds on request: differentiate the assembled outputs by central
+    # difference (the reference API computes near-instantaneous rates).
+    if iflag & FLG_SPEED:
+        ts = get_timescale()
+        dt_spd = 0.001  # days (~86 s)
+        base_flags = iflag & ~FLG_SPEED
+        now = _calc_nod_aps(t, ipl, base_flags, method)
+        prev = _calc_nod_aps(ts.tt_jd(t.tt - dt_spd), ipl, base_flags, method)
+        nxt = _calc_nod_aps(ts.tt_jd(t.tt + dt_spd), ipl, base_flags, method)
+
+        def _with_speed(cur: PosTuple, pre: PosTuple, nex: PosTuple) -> PosTuple:
+            dlon = (nex[0] - pre[0] + 180.0) % 360.0 - 180.0
+            return (
+                cur[0],
+                cur[1],
+                cur[2],
+                dlon / (2.0 * dt_spd),
+                (nex[1] - pre[1]) / (2.0 * dt_spd),
+                (nex[2] - pre[2]) / (2.0 * dt_spd),
+            )
+
+        return (
+            _with_speed(now[0], prev[0], nxt[0]),
+            _with_speed(now[1], prev[1], nxt[1]),
+            _with_speed(now[2], prev[2], nxt[2]),
+            _with_speed(now[3], prev[3], nxt[3]),
+        )
+
     planets = get_planets()
     jd_tt = t.tt
 
@@ -4350,8 +4378,21 @@ def _calc_nod_aps(
         apog_lat = apog_pos[1]
         apog_dist = apog_pos[2]
 
-        # Perigee is 180° from apogee
+        # Perigee: opposite point of the same orbit — longitude +180°,
+        # latitude mirrored, and the *perigee* distance (the reference API
+        # returns physically distinct apsis distances).
         peri_lon = (apog_lon + 180.0) % 360.0
+        peri_lat = -apog_lat
+        if method & NODBIT_OSCU:
+            # Distance of the osculating perigee from the instantaneous
+            # ellipse (lon/lat above already follow the apogee transform).
+            from .lunar import calc_osculating_perigee
+
+            peri_dist = calc_osculating_perigee(jd_tt)[2]
+        else:
+            # Mean ellipse identity: r_peri = 2a − r_apog with the
+            # reference constants a = 0.002569555, r_apog = 0.002710625 AU.
+            peri_dist = 2.0 * 0.002569555 - apog_dist
 
         # Build output: nodes and apsides from lunar theory
         xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
@@ -4363,7 +4404,7 @@ def _calc_nod_aps(
             0.0,
             0.0,
         )
-        xperi: PosTuple = (peri_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        xperi: PosTuple = (peri_lon, peri_lat, peri_dist, 0.0, 0.0, 0.0)
         xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
 
         return (xnasc, xndsc, xperi, xaphe)
@@ -4521,6 +4562,16 @@ def _calc_nod_aps(
     geo_dsc = _to_geo_lonlat(pos_dsc)
     geo_peri = _to_geo_lonlat(pos_peri)
     geo_aphe = _to_geo_lonlat(pos_aphe)
+
+    # Sidereal output: subtract the ayanamsha from the longitudes,
+    # consistent with calc_ut (issue #29: the flag was silently ignored
+    # for planetary nodes/apsides).
+    if iflag & FLG_SIDEREAL:
+        aya = _get_ayanamsa_for_flags(t.ut1, iflag)
+        geo_asc = ((geo_asc[0] - aya) % 360.0, geo_asc[1], geo_asc[2])
+        geo_dsc = ((geo_dsc[0] - aya) % 360.0, geo_dsc[1], geo_dsc[2])
+        geo_peri = ((geo_peri[0] - aya) % 360.0, geo_peri[1], geo_peri[2])
+        geo_aphe = ((geo_aphe[0] - aya) % 360.0, geo_aphe[1], geo_aphe[2])
 
     # Build output tuples (lon, lat, dist, speed_lon, speed_lat, speed_dist)
     xnasc: PosTuple = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)

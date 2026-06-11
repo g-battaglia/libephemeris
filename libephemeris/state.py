@@ -1218,7 +1218,8 @@ def reset_session() -> None:
     """Reset per-calculation state without closing files or clearing caches.
 
     Resets: topo, sidereal mode, angles cache, observer cache.
-    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches.
+    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches,
+    and process-level configuration (calculation mode, strict precision).
 
     Use this between independent calculations that may use different
     topo/sidereal settings. Use close() only for full teardown (e.g.
@@ -1585,14 +1586,19 @@ def close() -> None:
     """
     Close all opened ephemeris files and release resources.
 
-    This function closes the SPK kernel file handles and resets all global
-    state to its initial values. Call this when you're done using the library
-    or want to reload ephemeris files with different settings.
+    This function closes the SPK kernel file handles and resets session
+    state to its initial values. Call this when you're done using the
+    library or want to reload ephemeris files with different settings.
 
     Note:
         - This closes the underlying file handles in the JPL ephemeris kernel
         - After calling close(), the next ephemeris calculation will
           automatically reload the ephemeris files as needed
+        - Process-level configuration is preserved: the calculation mode
+          set via set_calc_mode() and the strict-precision setting survive
+          close() (they are re-resolved from env/TOML only if never set
+          explicitly). Per-session state (topo, sidereal mode, user
+          Delta-T, open files, caches) is cleared.
         - This is useful for:
           - Freeing memory and file handles in long-running applications
           - Switching to a different ephemeris file
@@ -1647,7 +1653,10 @@ def _close_inner() -> None:
             pass
     _LEB_FILE = None
     _LEB_READER = None
-    _CALC_MODE = None
+    # _CALC_MODE is deliberately preserved: the calculation mode chosen via
+    # set_calc_mode() is process-level configuration, not per-session state.
+    # Resetting it silently re-enabled the auto fallback chain (network
+    # downloads, backend switches) after every close() — see issue #30.
 
     # Clear fast_calc's cached reference to the closed LEB reader. Without
     # this, helpers like _frame_data() would still dispatch through a stale
