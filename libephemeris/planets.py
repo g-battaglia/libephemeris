@@ -910,6 +910,15 @@ def calc_ut(
                 tjdut,
                 _hz_err,
             )
+        except ConnectionError as _hz_err:
+            # Transient network/API failure — auto mode must keep working,
+            # so fall through to the Skyfield path.
+            get_logger().warning(
+                "body=%d jd=%.1f source=Horizons->fallback (network): %s",
+                planet,
+                tjdut,
+                _hz_err,
+            )
     # --- END Horizons path ---
 
     # Validate JD range for bodies that use the JPL ephemeris
@@ -1030,6 +1039,14 @@ def calc(
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
+                planet,
+                tjdet,
+                _hz_err,
+            )
+        except ConnectionError as _hz_err:
+            # Transient network/API failure — fall through to Skyfield.
+            get_logger().warning(
+                "body=%d jd=%.1f source=Horizons->fallback (network): %s",
                 planet,
                 tjdet,
                 _hz_err,
