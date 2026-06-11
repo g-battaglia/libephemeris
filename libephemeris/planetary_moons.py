@@ -436,33 +436,6 @@ def calc_moon_position(
     except KeyError:
         return None
 
-    # Get parent planet barycenter for proper coordinate calculation
-    # The satellite SPK uses planet barycenter as center
-    parent_naif = MOON_PARENT_MAP[moon_id]
-
-    # Get parent planet from satellite kernel (it should include planet barycenter)
-    try:
-        parent_target = kernel[parent_naif]
-    except KeyError:
-        # Fall back to main ephemeris for parent planet
-        planets = get_planets()
-        parent_names = {
-            NAIF_MARS_BARYCENTER: "mars barycenter",
-            NAIF_JUPITER_BARYCENTER: "jupiter barycenter",
-            NAIF_SATURN_BARYCENTER: "saturn barycenter",
-            NAIF_URANUS_BARYCENTER: "uranus barycenter",
-            NAIF_NEPTUNE_BARYCENTER: "neptune barycenter",
-            NAIF_PLUTO_BARYCENTER: "pluto barycenter",
-        }
-        parent_name = parent_names.get(parent_naif)
-        if parent_name:
-            try:
-                parent_target = planets[parent_name]
-            except KeyError:
-                return None
-        else:
-            return None
-
     # Get main ephemeris for Earth/Sun
     planets = get_planets()
 
@@ -474,22 +447,17 @@ def calc_moon_position(
     else:
         observer = planets["earth"]
 
-    # Calculate moon position relative to parent planet barycenter
-    # Then add parent planet's position relative to SSB
-    moon_at_parent = moon_target.at(t)
-    parent_at_ssb = parent_target.at(t)
+    # Skyfield chains SPK segments to the solar-system barycenter, so
+    # kernel[naif_id].at(t) is already SSB -> moon (satellite kernels like
+    # jup365/sat441 ship the SSB -> planet-barycenter segment; if a kernel
+    # cannot chain, kernel[naif_id] above raises KeyError and we returned
+    # None).  Adding the parent barycenter again would double-count it
+    # (~5-30 AU error).
+    moon_at_ssb = moon_target.at(t)
     observer_at_ssb = observer.at(t)
 
-    # Moon position = (moon relative to parent) + (parent relative to SSB)
-    # Observer position = (observer relative to SSB)
-    # Final position = moon_ssb - observer_ssb
-
-    moon_xyz = moon_at_parent.position.au
-    parent_xyz = parent_at_ssb.position.au
+    moon_ssb = moon_at_ssb.position.au
     observer_xyz = observer_at_ssb.position.au
-
-    # Moon position relative to SSB = moon relative to parent + parent relative to SSB
-    moon_ssb = [moon_xyz[i] + parent_xyz[i] for i in range(3)]
 
     # Moon position relative to observer
     rel_xyz = [moon_ssb[i] - observer_xyz[i] for i in range(3)]
@@ -518,15 +486,12 @@ def calc_moon_position(
         t_next = ts.tt_jd(t.tt + dt)
 
         # Position at t - dt
-        moon_at_parent_prev = moon_target.at(t_prev)
-        parent_at_ssb_prev = parent_target.at(t_prev)
+        moon_at_ssb_prev = moon_target.at(t_prev)
         observer_at_ssb_prev = observer.at(t_prev)
 
-        moon_xyz_prev = moon_at_parent_prev.position.au
-        parent_xyz_prev = parent_at_ssb_prev.position.au
+        moon_ssb_prev = moon_at_ssb_prev.position.au
         observer_xyz_prev = observer_at_ssb_prev.position.au
 
-        moon_ssb_prev = [moon_xyz_prev[i] + parent_xyz_prev[i] for i in range(3)]
         rel_xyz_prev = [moon_ssb_prev[i] - observer_xyz_prev[i] for i in range(3)]
 
         rel_pos_prev = ICRF(rel_xyz_prev, t=t_prev, center=399)
@@ -537,15 +502,12 @@ def calc_moon_position(
         dist_prev = ecl_pos_prev[2].au
 
         # Position at t + dt
-        moon_at_parent_next = moon_target.at(t_next)
-        parent_at_ssb_next = parent_target.at(t_next)
+        moon_at_ssb_next = moon_target.at(t_next)
         observer_at_ssb_next = observer.at(t_next)
 
-        moon_xyz_next = moon_at_parent_next.position.au
-        parent_xyz_next = parent_at_ssb_next.position.au
+        moon_ssb_next = moon_at_ssb_next.position.au
         observer_xyz_next = observer_at_ssb_next.position.au
 
-        moon_ssb_next = [moon_xyz_next[i] + parent_xyz_next[i] for i in range(3)]
         rel_xyz_next = [moon_ssb_next[i] - observer_xyz_next[i] for i in range(3)]
 
         rel_pos_next = ICRF(rel_xyz_next, t=t_next, center=399)
