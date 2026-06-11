@@ -3289,6 +3289,12 @@ def auto_download_asteroid_spk(
     except (ValueError, KeyError) as e:
         logger.warning("Auto SPK download failed for %s: %s", body_name, e)
         return None
+    except (ConnectionError, OSError) as e:
+        # Network failures and the downloader's not-found errors are the
+        # documented no-exception cases of this helper: log and let the
+        # caller fall back (Keplerian elements or UnknownBodyError).
+        logger.warning("Auto SPK download failed for %s: %s", body_name, e)
+        return None
 
 
 def is_spk_available_for_body(body_id: int) -> bool:
