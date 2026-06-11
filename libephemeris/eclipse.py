@@ -847,16 +847,16 @@ def _calculate_eclipse_phases_besselian(
     shadow boundaries cross Earth's limb.
 
     Phase indices (matching reference API tret array):
-        [0]: Time of maximum eclipse (tret[0])
-        [1]: Time of first contact - eclipse begins (tret[1])
-        [2]: Time of second contact - total/annular begins, if central (tret[2])
-        [3]: Time of third contact - total/annular ends, if central (tret[3])
-        [4]: Time of fourth contact - eclipse ends (tret[4])
-        [5]: Time of sunrise on central line (tret[5])
-        [6]: Time of sunset on central line (tret[6])
-        [7]: Time when annular-total eclipse starts (tret[7])
-        [8]: Time when annular-total eclipse ends (tret[8])
-        [9]: Reserved (tret[9])
+        [0]: Time of maximum eclipse
+        [1]: Time when eclipse takes place at local apparent noon
+        [2]: Eclipse begins (first penumbral contact with Earth, P1)
+        [3]: Eclipse ends (last penumbral contact with Earth, P4)
+        [4]: Totality/annularity begins anywhere on Earth (U1)
+        [5]: Totality/annularity ends (U4)
+        [6]: Center line begins
+        [7]: Center line ends
+        [8]: Annular-total eclipse becomes total
+        [9]: Annular-total eclipse becomes annular again
 
     Args:
         jd_max: Julian Day of eclipse maximum (refined using Besselian elements)
@@ -888,17 +888,20 @@ def _calculate_eclipse_phases_besselian(
         jd_max, penumbral_limit, search_before=False, search_range=0.15
     )
 
-    # For central eclipses, calculate second/third contacts
+    # For total/annular eclipses, calculate U1/U4 (totality begin/end
+    # anywhere on Earth)
     t_second_contact = 0.0
     t_third_contact = 0.0
 
-    if is_central and abs(l2) > 0:
-        # Umbral limit: when gamma = 1 - |l2|
-        # (umbra/antumbra fully on Earth)
-        umbral_limit = 1.0 - abs(l2)
+    if (is_total or is_annular) and abs(l2) > 0:
+        # The umbra/antumbra first and last touches Earth at EXTERIOR
+        # tangency: shadow-axis distance = 1 + |l2|. (The previous
+        # interior criterion 1 - |l2| — umbra entirely inside the disc —
+        # was ~2-4 minutes late/early systematically and returned zeros
+        # for grazing-central eclipses.)
+        umbral_limit = 1.0 + abs(l2)
 
         if gamma_max < umbral_limit:
-            # Central phase possible
             t_second_contact = _find_contact_time_besselian(
                 jd_max, umbral_limit, search_before=True, search_range=0.10
             )
@@ -906,23 +909,52 @@ def _calculate_eclipse_phases_besselian(
                 jd_max, umbral_limit, search_before=False, search_range=0.10
             )
 
-    # Sunrise/sunset on central line (not implemented - would require path calculation)
-    t_sunrise = 0.0
-    t_sunset = 0.0
+    # tret[1]: time when the eclipse takes place at local apparent noon —
+    # the shadow axis crosses the x = 0 plane (Besselian x sign change)
+    # within the eclipse window.
+    t_noon = 0.0
+    t_lo = t_first_contact if t_first_contact else jd_max - 0.15
+    t_hi = t_fourth_contact if t_fourth_contact else jd_max + 0.15
+    try:
+        x_lo = calc_besselian_x(t_lo)
+        x_hi = calc_besselian_x(t_hi)
+        if x_lo * x_hi < 0:
+            a, b, fa = t_lo, t_hi, x_lo
+            for _ in range(60):
+                mid = 0.5 * (a + b)
+                fm = calc_besselian_x(mid)
+                if fa * fm <= 0:
+                    b = mid
+                else:
+                    a, fa = mid, fm
+            t_noon = 0.5 * (a + b)
+    except (KeyError, ValueError, ArithmeticError) as _exc:
+        _reraise_if_leb_range_error(_exc)
+        t_noon = 0.0
+
+    # tret[6]/[7]: center-line begin/end — the shadow AXIS touches the
+    # fundamental-plane disc while gamma < 1.
+    t_cl_begin = 0.0
+    t_cl_end = 0.0
+    if (is_total or is_annular) and gamma_max < 1.0:
+        t_cl_begin = _find_contact_time_besselian(
+            jd_max, 1.0, search_before=True, search_range=0.10
+        )
+        t_cl_end = _find_contact_time_besselian(
+            jd_max, 1.0, search_before=False, search_range=0.10
+        )
 
     return (
         jd_max,  # [0] Time of maximum eclipse
-        0.0,  # [1] Time at local apparent noon (not implemented)
-        t_first_contact
-        if t_first_contact
-        else jd_max - 1.0 / 24.0,  # [2] Eclipse begin
-        t_fourth_contact
-        if t_fourth_contact
-        else jd_max + 1.0 / 24.0,  # [3] Eclipse end
+        t_noon,  # [1] Eclipse at local apparent noon
+        # No fabricated fallbacks: an unresolved contact stays 0.0 (the
+        # reference returns 0 rather than an invented +-1 h estimate)
+        t_first_contact if t_first_contact else 0.0,  # [2] Eclipse begin
+        t_fourth_contact if t_fourth_contact else 0.0,  # [3] Eclipse end
         t_second_contact,  # [4] Totality begin (or 0)
         t_third_contact,  # [5] Totality end (or 0)
-        0.0,  # [6] Center line begin (not implemented)
-        0.0,  # [7] Center line end (not implemented)
+        t_cl_begin,  # [6] Center line begin
+        t_cl_end,  # [7] Center line end
         0.0,  # [8] Annular-total becomes total
         0.0,  # [9] Annular-total becomes annular again
     )
@@ -1075,16 +1107,16 @@ def _calculate_eclipse_phases(
     Uses Besselian elements for high-precision timing (< 10 seconds).
 
     Phase indices (matching reference API tret array):
-        [0]: Time of maximum eclipse (tret[0])
-        [1]: Time of first contact - eclipse begins (tret[1])
-        [2]: Time of second contact - total/annular begins, if central (tret[2])
-        [3]: Time of third contact - total/annular ends, if central (tret[3])
-        [4]: Time of fourth contact - eclipse ends (tret[4])
-        [5]: Time of sunrise on central line (tret[5])
-        [6]: Time of sunset on central line (tret[6])
-        [7]: Time when annular-total eclipse starts (tret[7])
-        [8]: Time when annular-total eclipse ends (tret[8])
-        [9]: Reserved (tret[9])
+        [0]: Time of maximum eclipse
+        [1]: Time when eclipse takes place at local apparent noon
+        [2]: Eclipse begins (first penumbral contact with Earth, P1)
+        [3]: Eclipse ends (last penumbral contact with Earth, P4)
+        [4]: Totality/annularity begins anywhere on Earth (U1)
+        [5]: Totality/annularity ends (U4)
+        [6]: Center line begins
+        [7]: Center line ends
+        [8]: Annular-total eclipse becomes total
+        [9]: Annular-total eclipse becomes annular again
 
     Args:
         jd_max: Julian Day of maximum eclipse
@@ -1514,12 +1546,25 @@ def _sol_eclipse_when_glob_pythonic(
 
     # Handle backward-only search
     if search_direction == "backward":
+        # The conjunction in longitude can lie AFTER jd_start while the
+        # eclipse maximum lies a few minutes BEFORE it: probe the next
+        # conjunction first so that eclipse is not skipped.
+        jd_next_nm = _find_next_new_moon(jd_start)
+        if jd_next_nm - jd_start <= BIDIRECTIONAL_WINDOW:
+            result = _check_new_moon_for_eclipse(jd_next_nm)
+            if result is not None and result[1][0] < jd_start:
+                return result
+
         jd = jd_start
         for _ in range(MAX_NEW_MOONS):
             jd_prev_new_moon = _find_previous_new_moon(jd)
             result = _check_new_moon_for_eclipse(jd_prev_new_moon)
             if result is not None:
-                return result
+                # Direction invariant: a backward search must return an
+                # eclipse whose maximum precedes jd_start (refinement can
+                # drag the maximum across the start time).
+                if result[1][0] < jd_start:
+                    return result
             # Go further back
             jd = jd_prev_new_moon - 1
 
@@ -1535,6 +1580,13 @@ def _sol_eclipse_when_glob_pythonic(
         jd_new_moon = _find_next_new_moon(jd)
 
         result = _check_new_moon_for_eclipse(jd_new_moon)
+        if result is not None and result[1][0] <= jd_start:
+            # Direction invariant: a forward search must return an eclipse
+            # whose maximum follows jd_start. The conjunction-anchored
+            # candidate can refine to a maximum a few minutes BEFORE the
+            # start time; skip to the next lunation instead of returning
+            # a past eclipse (or looping forever in tret[0]+eps scans).
+            result = None
         if result is not None:
             # For bidirectional mode, we have a forward result
             # Check if we had a backward result that might be closer
@@ -11951,13 +12003,14 @@ def calc_eclipse_second_contact_c2(
     # Get gamma at maximum to check if central phase is possible
     gamma_max = _calc_gamma(jd_max)
 
-    # For central eclipse, second contact occurs when gamma = 1 - |l2|
-    # (umbral/antumbral shadow touches Earth's limb from outside)
-    umbral_limit = 1.0 - abs(l2)  # Earth radius minus umbra/antumbra radius
+    # The umbra/antumbra first touches Earth at EXTERIOR tangency:
+    # shadow-axis distance = 1 + |l2| (consistent with tret[4] of
+    # sol_eclipse_when_glob and with NASA's U1 convention).
+    umbral_limit = 1.0 + abs(l2)
 
-    # Check if central phase is possible (gamma at max must be less than umbral limit)
+    # Check if a total/annular phase is possible anywhere on Earth
     if gamma_max >= umbral_limit:
-        # No central phase - eclipse is partial only
+        # No umbral contact - eclipse is partial only
         return 0.0
 
     # Calculate second contact (umbra/antumbra first touches Earth)
@@ -12056,7 +12109,8 @@ def calc_eclipse_third_contact_c3(
 
     # For central eclipse, third contact occurs when gamma = 1 - |l2|
     # (umbral/antumbral shadow leaves Earth's limb from inside)
-    umbral_limit = 1.0 - abs(l2)  # Earth radius minus umbra/antumbra radius
+    # Exterior tangency, consistent with tret[5]/U4 (see C2 helper)
+    umbral_limit = 1.0 + abs(l2)
 
     # Check if central phase is possible (gamma at max must be less than umbral limit)
     if gamma_max >= umbral_limit:
