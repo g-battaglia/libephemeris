@@ -8131,6 +8131,102 @@ class BesselianElements:
     dmu_dt: float  # Rate of change of mu (degrees/hour)
 
 
+_BESSELIAN_CACHE: dict = {}
+
+
+def _besselian_core(
+    jd: float, flags: int = FLG_SWIEPH
+) -> Tuple[float, float, float, float, float, float, float, float, float]:
+    """Besselian elements on the true equator of date.
+
+    Conventions (Explanatory Supplement ch. 11 / NASA eclipse bulletins):
+    the positive z-axis of the fundamental frame is parallel to the
+    shadow axis and points from the fundamental plane toward the Sun;
+    the x-axis is the intersection with the equator, positive east; the
+    y-axis completes the system toward north. (x, y) is the shadow-axis
+    intersection with the fundamental plane in Earth equatorial radii;
+    d and mu are the declination and Greenwich hour angle of the axis;
+    l1/l2 are the penumbral/umbral radii on the fundamental plane, l2
+    negative while the umbral vertex lies beyond the plane (total
+    eclipse). Lunar radius ratios k = 0.2725076 (penumbra) and
+    0.272281 (umbra) follow the NASA convention.
+
+    Returns (x, y, d_deg, mu_deg, l1, l2, tan_f1, tan_f2, z_moon_er).
+    """
+    from .time_utils import sidtime
+
+    key = (round(jd, 9), flags & 0xFF)
+    cached = _BESSELIAN_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    base = _ecl_eph_flags(flags) | FLG_EQUATORIAL
+    sun_p, _ = calc_ut(jd, SUN, base)
+    moon_p, _ = calc_ut(jd, MOON, base)
+
+    def _cart(p):
+        ra = math.radians(p[0])
+        dec = math.radians(p[1])
+        r = p[2]
+        return (
+            r * math.cos(dec) * math.cos(ra),
+            r * math.cos(dec) * math.sin(ra),
+            r * math.sin(dec),
+        )
+
+    rs = _cart(sun_p)
+    rm = _cart(moon_p)
+
+    # Shadow-axis direction, positive toward the Sun.
+    gx, gy, gz = rs[0] - rm[0], rs[1] - rm[1], rs[2] - rm[2]
+    g_len = math.sqrt(gx * gx + gy * gy + gz * gz)
+    gx, gy, gz = gx / g_len, gy / g_len, gz / g_len
+
+    d_rad = math.asin(max(-1.0, min(1.0, gz)))
+    a_rad = math.atan2(gy, gx)
+
+    # East axis: unit(k x g); north axis completes the triad.
+    exy = math.hypot(gx, gy)
+    if exy < 1e-12:
+        ex = (1.0, 0.0, 0.0)
+    else:
+        ex = (-gy / exy, gx / exy, 0.0)
+    ey = (
+        gy * ex[2] - gz * ex[1],
+        gz * ex[0] - gx * ex[2],
+        gx * ex[1] - gy * ex[0],
+    )
+
+    re_au = _ECL_REARTH_AU
+    x = (rm[0] * ex[0] + rm[1] * ex[1] + rm[2] * ex[2]) / re_au
+    y = (rm[0] * ey[0] + rm[1] * ey[1] + rm[2] * ey[2]) / re_au
+    z = (rm[0] * gx + rm[1] * gy + rm[2] * gz) / re_au
+
+    gast_deg = sidtime(jd) * 15.0
+    mu_deg = (gast_deg - math.degrees(a_rad)) % 360.0
+
+    # Shadow-cone half angles from the solar radius and the NASA lunar
+    # radius ratios, with distances in Earth radii.
+    g_er = g_len / re_au
+    rsun_er = _ECL_RSUN_AU / re_au
+    k_pen = 0.2725076
+    k_umb = 0.272281
+    sin_f1 = (rsun_er + k_pen) / g_er
+    sin_f2 = (rsun_er - k_umb) / g_er
+    cos_f1 = math.sqrt(1.0 - sin_f1 * sin_f1)
+    cos_f2 = math.sqrt(1.0 - sin_f2 * sin_f2)
+    tan_f1 = sin_f1 / cos_f1
+    tan_f2 = sin_f2 / cos_f2
+    l1 = z * tan_f1 + k_pen / cos_f1
+    l2 = z * tan_f2 - k_umb / cos_f2
+
+    result = (x, y, math.degrees(d_rad), mu_deg, l1, l2, tan_f1, tan_f2, z)
+    if len(_BESSELIAN_CACHE) > 512:
+        _BESSELIAN_CACHE.clear()
+    _BESSELIAN_CACHE[key] = result
+    return result
+
+
 def calc_besselian_x(jd: float, flags: int = FLG_SWIEPH) -> float:
     """
     Calculate the Besselian x coordinate for a solar eclipse.
@@ -8187,111 +8283,7 @@ def calc_besselian_x(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    # AU to km conversion
-    AU_TO_KM = 149597870.7
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        # Get ephemeris and timescale
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        # Get Earth, Sun, Moon
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        # Get geocentric positions in AU (ICRS/J2000 equatorial frame)
-        earth_at = earth.at(t)
-
-        # Geocentric apparent positions
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        # Get Cartesian positions in AU
-        sun_pos = sun_apparent.position.au  # [x, y, z] in AU
-        moon_pos = moon_apparent.position.au  # [x, y, z] in AU
-
-    # Shadow axis direction: from Sun toward Moon
-    # This is the direction of the shadow cone axis
-    shadow_dir = [
-        moon_pos[0] - sun_pos[0],
-        moon_pos[1] - sun_pos[1],
-        moon_pos[2] - sun_pos[2],
-    ]
-
-    # Normalize to get unit vector
-    shadow_len = math.sqrt(shadow_dir[0] ** 2 + shadow_dir[1] ** 2 + shadow_dir[2] ** 2)
-    shadow_unit = [
-        shadow_dir[0] / shadow_len,
-        shadow_dir[1] / shadow_len,
-        shadow_dir[2] / shadow_len,
-    ]
-
-    # The fundamental plane passes through Earth's center and is perpendicular
-    # to the shadow axis. We need to define an x-axis in this plane pointing
-    # eastward (in the direction of increasing RA).
-
-    # The conventional Besselian x-axis is perpendicular to the shadow axis
-    # and lies in the equatorial plane (or as close to it as possible).
-    # We use cross product: x_axis = k × shadow_axis (where k = [0, 0, 1])
-    # This gives a vector pointing eastward, perpendicular to shadow axis.
-
-    # Cross product of [0, 0, 1] × shadow_unit
-    x_axis_raw = [-shadow_unit[1], shadow_unit[0], 0.0]
-
-    # Normalize x-axis
-    x_axis_len = math.sqrt(x_axis_raw[0] ** 2 + x_axis_raw[1] ** 2)
-
-    # Handle edge case where shadow axis is nearly parallel to z-axis
-    if x_axis_len < 1e-10:
-        x_axis = [1.0, 0.0, 0.0]
-    else:
-        x_axis = [x_axis_raw[0] / x_axis_len, x_axis_raw[1] / x_axis_len, 0.0]
-
-    # Project Moon's position onto the fundamental plane
-    # Dot product of Moon position with shadow axis unit vector
-    moon_along_axis = (
-        moon_pos[0] * shadow_unit[0]
-        + moon_pos[1] * shadow_unit[1]
-        + moon_pos[2] * shadow_unit[2]
-    )
-
-    # The perpendicular component (projection onto fundamental plane)
-    # is the Moon position minus the along-axis component
-    moon_perp = [
-        moon_pos[0] - moon_along_axis * shadow_unit[0],
-        moon_pos[1] - moon_along_axis * shadow_unit[1],
-        moon_pos[2] - moon_along_axis * shadow_unit[2],
-    ]
-
-    # The x coordinate is the dot product with the x-axis
-    x_au = (
-        moon_perp[0] * x_axis[0] + moon_perp[1] * x_axis[1] + moon_perp[2] * x_axis[2]
-    )
-
-    # Convert from AU to Earth radii
-    x_km = x_au * AU_TO_KM
-    x_earth_radii = x_km / EARTH_RADIUS_KM
-
-    return x_earth_radii
+    return _besselian_core(jd, flags)[0]
 
 
 def calc_besselian_y(jd: float, flags: int = FLG_SWIEPH) -> float:
@@ -8350,111 +8342,7 @@ def calc_besselian_y(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    # AU to km conversion
-    AU_TO_KM = 149597870.7
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        earth_at = earth.at(t)
-
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        sun_pos = sun_apparent.position.au
-        moon_pos = moon_apparent.position.au
-
-    # Shadow axis direction: from Sun toward Moon
-    shadow_dir = [
-        moon_pos[0] - sun_pos[0],
-        moon_pos[1] - sun_pos[1],
-        moon_pos[2] - sun_pos[2],
-    ]
-
-    # Normalize to get unit vector
-    shadow_len = math.sqrt(shadow_dir[0] ** 2 + shadow_dir[1] ** 2 + shadow_dir[2] ** 2)
-    shadow_unit = [
-        shadow_dir[0] / shadow_len,
-        shadow_dir[1] / shadow_len,
-        shadow_dir[2] / shadow_len,
-    ]
-
-    x_axis_raw = [-shadow_unit[1], shadow_unit[0], 0.0]
-
-    # Normalize x-axis
-    x_axis_len = math.sqrt(x_axis_raw[0] ** 2 + x_axis_raw[1] ** 2)
-
-    # Handle edge case where shadow axis is nearly parallel to z-axis
-    # (extremely rare for solar eclipses)
-    if x_axis_len < 1e-10:
-        # Shadow axis nearly vertical - use y-axis as x instead
-        x_axis = [1.0, 0.0, 0.0]
-    else:
-        x_axis = [x_axis_raw[0] / x_axis_len, x_axis_raw[1] / x_axis_len, 0.0]
-
-    # Compute y-axis to complete right-handed system: y = shadow_unit × x_axis
-    # This gives a vector pointing toward the north celestial pole in the
-    # fundamental plane (perpendicular to both shadow axis and x-axis)
-    y_axis = [
-        shadow_unit[1] * x_axis[2] - shadow_unit[2] * x_axis[1],
-        shadow_unit[2] * x_axis[0] - shadow_unit[0] * x_axis[2],
-        shadow_unit[0] * x_axis[1] - shadow_unit[1] * x_axis[0],
-    ]
-
-    # Project Moon's position onto the fundamental plane
-    # The Moon's position in the fundamental plane coordinate system:
-    # - Find how far Moon is along the shadow axis from Earth's center
-    # - The projection onto the fundamental plane gives us the displacement
-
-    # Dot product of Moon position with shadow axis unit vector
-    # This gives the component along the shadow axis
-    moon_along_axis = (
-        moon_pos[0] * shadow_unit[0]
-        + moon_pos[1] * shadow_unit[1]
-        + moon_pos[2] * shadow_unit[2]
-    )
-
-    # The perpendicular component (projection onto fundamental plane)
-    # is the Moon position minus the along-axis component
-    moon_perp = [
-        moon_pos[0] - moon_along_axis * shadow_unit[0],
-        moon_pos[1] - moon_along_axis * shadow_unit[1],
-        moon_pos[2] - moon_along_axis * shadow_unit[2],
-    ]
-
-    # The y coordinate is the dot product with the y-axis
-    y_au = (
-        moon_perp[0] * y_axis[0] + moon_perp[1] * y_axis[1] + moon_perp[2] * y_axis[2]
-    )
-
-    # Convert from AU to Earth radii
-    y_km = y_au * AU_TO_KM
-    y_earth_radii = y_km / EARTH_RADIUS_KM
-
-    return y_earth_radii
+    return _besselian_core(jd, flags)[1]
 
 
 def calc_besselian_d(jd: float, flags: int = FLG_SWIEPH) -> float:
@@ -8511,66 +8399,7 @@ def calc_besselian_d(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        earth_at = earth.at(t)
-
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        sun_pos = sun_apparent.position.au
-        moon_pos = moon_apparent.position.au
-
-    # Shadow axis direction: from Sun toward Moon
-    shadow_dir = [
-        moon_pos[0] - sun_pos[0],
-        moon_pos[1] - sun_pos[1],
-        moon_pos[2] - sun_pos[2],
-    ]
-
-    # Normalize to get unit vector
-    shadow_len = math.sqrt(shadow_dir[0] ** 2 + shadow_dir[1] ** 2 + shadow_dir[2] ** 2)
-
-    # In Besselian element convention, d is the declination of the shadow axis
-    # pointing FROM the Moon TOWARD Earth (the direction the shadow travels).
-    # The shadow_dir computed above (Moon - Sun) points in the opposite direction,
-    # so we negate the z-component when computing the declination.
-    shadow_unit_z = -shadow_dir[2] / shadow_len
-
-    # The declination is the angle from the equatorial plane
-    # For a unit vector in equatorial coordinates, dec = arcsin(z)
-    # Clamp to [-1, 1] to avoid numerical issues with arcsin
-    shadow_unit_z = max(-1.0, min(1.0, shadow_unit_z))
-    d_rad = math.asin(shadow_unit_z)
-
-    # Convert to degrees
-    d_deg = math.degrees(d_rad)
-
-    return d_deg
+    return _besselian_core(jd, flags)[2]
 
 
 def calc_besselian_l1(jd: float, flags: int = FLG_SWIEPH) -> float:
@@ -8642,96 +8471,7 @@ def calc_besselian_l1(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    # Physical constants
-    AU_TO_KM = 149597870.7  # km per AU
-    SUN_RADIUS_KM = 696000.0  # IAU nominal solar radius
-    MOON_RADIUS_KM = 1737.4  # Mean lunar radius
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        earth_at = earth.at(t)
-
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        sun_pos = sun_apparent.position.au
-        moon_pos = moon_apparent.position.au
-
-    # Calculate distances
-    # Sun distance from Earth (geocentric)
-    sun_dist_au = math.sqrt(sun_pos[0] ** 2 + sun_pos[1] ** 2 + sun_pos[2] ** 2)
-
-    # Moon distance from Earth (geocentric)
-    moon_dist_au = math.sqrt(moon_pos[0] ** 2 + moon_pos[1] ** 2 + moon_pos[2] ** 2)
-
-    # Shadow axis direction: from Sun toward Moon
-    shadow_dir = [
-        moon_pos[0] - sun_pos[0],
-        moon_pos[1] - sun_pos[1],
-        moon_pos[2] - sun_pos[2],
-    ]
-
-    # Distance from Sun to Moon (in AU)
-    sun_moon_dist_au = math.sqrt(
-        shadow_dir[0] ** 2 + shadow_dir[1] ** 2 + shadow_dir[2] ** 2
-    )
-
-    # Convert to km
-    sun_dist_km = sun_dist_au * AU_TO_KM
-    sun_moon_dist_km = sun_moon_dist_au * AU_TO_KM
-
-    # Calculate the penumbral cone semi-angle f1
-    # The penumbral cone is formed by external tangent lines from Sun's limb to Moon's limb
-    # sin(f1) = (R_sun + R_moon) / D_sun-moon
-    sum_radii = SUN_RADIUS_KM + MOON_RADIUS_KM
-    sin_f1 = sum_radii / sun_moon_dist_km
-
-    # Clamp to valid range for asin (numerical safety)
-    sin_f1 = max(-1.0, min(1.0, sin_f1))
-    f1_rad = math.asin(sin_f1)
-    tan_f1 = math.tan(f1_rad)
-
-    # The penumbral cone vertex is located at distance k1 from the Sun center
-    # along the shadow axis (toward the Moon):
-    # k1 = R_sun / sin(f1)
-    k1_km = SUN_RADIUS_KM / sin_f1
-
-    # The distance from the penumbral vertex to Earth's center (fundamental plane)
-    # is the Sun's distance minus the vertex offset
-    vertex_to_earth_km = sun_dist_km - k1_km
-
-    # The penumbral shadow radius at the fundamental plane is:
-    # l1 = vertex_to_earth * tan(f1)
-    l1_km = vertex_to_earth_km * tan_f1
-
-    # Convert to Earth radii
-    l1_earth_radii = l1_km / EARTH_RADIUS_KM
-
-    return l1_earth_radii
+    return _besselian_core(jd, flags)[4]
 
 
 def calc_besselian_l2(jd: float, flags: int = FLG_SWIEPH) -> float:
@@ -8810,97 +8550,7 @@ def calc_besselian_l2(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    # Physical constants
-    AU_TO_KM = 149597870.7  # km per AU
-    SUN_RADIUS_KM = 696000.0  # IAU nominal solar radius
-    MOON_RADIUS_KM = 1737.4  # Mean lunar radius
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        earth_at = earth.at(t)
-
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        sun_pos = sun_apparent.position.au
-        moon_pos = moon_apparent.position.au
-
-    # Calculate distances
-    # Moon distance from Earth (geocentric)
-    moon_dist_au = math.sqrt(moon_pos[0] ** 2 + moon_pos[1] ** 2 + moon_pos[2] ** 2)
-
-    # Shadow axis direction: from Sun toward Moon
-    shadow_dir = [
-        moon_pos[0] - sun_pos[0],
-        moon_pos[1] - sun_pos[1],
-        moon_pos[2] - sun_pos[2],
-    ]
-
-    # Distance from Sun to Moon (in AU)
-    sun_moon_dist_au = math.sqrt(
-        shadow_dir[0] ** 2 + shadow_dir[1] ** 2 + shadow_dir[2] ** 2
-    )
-
-    # Convert to km
-    moon_dist_km = moon_dist_au * AU_TO_KM
-    sun_moon_dist_km = sun_moon_dist_au * AU_TO_KM
-
-    # Calculate the umbral cone semi-angle f2
-    # The umbral cone is formed by internal tangent lines from Sun's limb to Moon's limb
-    # sin(f2) = (R_sun - R_moon) / D_sun-moon
-    diff_radii = SUN_RADIUS_KM - MOON_RADIUS_KM
-    sin_f2 = diff_radii / sun_moon_dist_km
-
-    # Clamp to valid range for asin (numerical safety)
-    sin_f2 = max(-1.0, min(1.0, sin_f2))
-    f2_rad = math.asin(sin_f2)
-    tan_f2 = math.tan(f2_rad)
-
-    # The umbral cone vertex is located at distance c2 from the Moon center
-    # along the shadow axis (toward Earth):
-    # c2 = R_moon / sin(f2)
-    c2_km = MOON_RADIUS_KM / sin_f2
-
-    # The distance from Earth's center to the umbral vertex
-    # c2 is the distance from Moon to the umbral cone vertex (toward Earth)
-    # For total eclipse: vertex is beyond Earth, so c2 > moon_dist → l2 > 0
-    # For annular eclipse: vertex is between Moon and Earth, so c2 < moon_dist → l2 < 0
-    vertex_to_earth_km = c2_km - moon_dist_km
-
-    # The umbral/antumbral shadow radius at the fundamental plane is:
-    # l2 = vertex_to_earth * tan(f2)
-    # Positive l2 = umbral shadow (total eclipse)
-    # Negative l2 = antumbral shadow (annular eclipse)
-    l2_km = vertex_to_earth_km * tan_f2
-
-    # Convert to Earth radii
-    l2_earth_radii = l2_km / EARTH_RADIUS_KM
-
-    return l2_earth_radii
+    return _besselian_core(jd, flags)[5]
 
 
 def calc_besselian_mu(jd: float, flags: int = FLG_SWIEPH) -> float:
@@ -8969,86 +8619,7 @@ def calc_besselian_mu(jd: float, flags: int = FLG_SWIEPH) -> float:
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
         - Chauvenet's "Manual of Spherical and Practical Astronomy", Vol. 1
     """
-    from .state import get_leb_reader
-
-    reader = get_leb_reader()
-    _leb_ok = False
-    if reader is not None:
-        try:
-            from .fast_calc import _apparent_icrs_cartesian
-            from .time_utils import deltat
-
-            jd_tt = jd + deltat(jd)
-            sun_pos = _apparent_icrs_cartesian(reader, jd_tt, SUN)
-            moon_pos = _apparent_icrs_cartesian(reader, jd_tt, MOON)
-            _leb_ok = True
-        except (KeyError, ValueError):
-            pass
-    if not _leb_ok:
-        from .state import get_planets, get_timescale
-
-        eph = get_planets()
-        ts = get_timescale()
-        t = ts.ut1_jd(jd)
-
-        earth = eph["earth"]
-        sun = eph["sun"]
-        moon = eph["moon"]
-
-        earth_at = earth.at(t)
-
-        sun_apparent = earth_at.observe(sun).apparent()
-        moon_apparent = earth_at.observe(moon).apparent()
-
-        sun_pos = sun_apparent.position.au
-        moon_pos = moon_apparent.position.au
-
-    # Shadow axis direction: from Moon toward Sun
-    # This is the conventional Besselian axis direction (toward Earth/observer)
-    # Same convention as used in calc_besselian_d
-    shadow_dir = [
-        sun_pos[0] - moon_pos[0],
-        sun_pos[1] - moon_pos[1],
-        sun_pos[2] - moon_pos[2],
-    ]
-
-    # Calculate the right ascension of the shadow axis
-    # RA = atan2(y, x) in the equatorial coordinate system
-    # The x-axis points toward the vernal equinox, y-axis at RA=90 degrees
-    ra_rad = math.atan2(shadow_dir[1], shadow_dir[0])
-    ra_deg = math.degrees(ra_rad)
-
-    # Normalize RA to 0-360 degrees
-    if ra_deg < 0:
-        ra_deg += 360.0
-
-    # Calculate Greenwich Apparent Sidereal Time (GAST)
-    from .state import get_timescale as _get_ts_mu
-
-    ts_mu = _get_ts_mu()
-    t_mu = ts_mu.ut1_jd(jd)
-    gast = t_mu.gast  # Greenwich Apparent Sidereal Time in hours
-
-    # Convert GAST from hours to degrees (1 hour = 15 degrees)
-    gast_deg = gast * 15.0
-
-    # Calculate Greenwich hour angle: mu = GAST - RA
-    mu_deg = gast_deg - ra_deg
-
-    # Normalize to 0-360 degrees
-    mu_deg = mu_deg % 360.0
-    if mu_deg < 0:
-        mu_deg += 360.0
-
-    return mu_deg
-
-
-# =============================================================================
-# BESSELIAN ELEMENT TIME DERIVATIVES
-# =============================================================================
-# These functions calculate the hourly rates of change for each Besselian
-# element. These derivatives are essential for interpolating element values
-# during an eclipse and for calculating eclipse contact times.
+    return _besselian_core(jd, flags)[3]
 
 
 def calc_besselian_dx_dt(jd: float, flags: int = FLG_SWIEPH) -> float:
