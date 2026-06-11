@@ -790,7 +790,7 @@ STAR_CATALOG: List[StarCatalogEntry] = [
     StarCatalogEntry(
         id=MIRA,
         name="Mira",
-        nomenclature="omCet",
+        nomenclature="omiCet",
         hip_number=10826,
         data=StarData(
             ra_j2000=34.836617,  # 02h 19m 20.8s
@@ -2171,7 +2171,7 @@ GREEK_LETTER_ABBREV: dict[str, str] = {
     "MU": "mu",
     "NU": "nu",
     "XI": "xi",
-    "OMICRON": "om",
+    "OMICRON": "omi",
     "PI": "pi",
     "RHO": "rh",
     "SIGMA": "si",
@@ -2180,7 +2180,7 @@ GREEK_LETTER_ABBREV: dict[str, str] = {
     "PHI": "ph",
     "CHI": "ch",
     "PSI": "ps",
-    "OMEGA": "om",  # Note: same abbrev as omicron in some catalogs
+    "OMEGA": "om",  # omicron is "omi"; only omega abbreviates to "om"
 }
 
 # Constellation names (genitive and nominative forms) to 3-letter IAU abbreviations
@@ -3830,7 +3830,9 @@ def _calc_star_position_from_observer(
         dec_degrees=star_data.dec_j2000,
         ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
         dec_mas_per_year=star_data.pm_dec * 1000.0,
-        parallax_mas=star_data.parallax_mas,  # Trigonometric parallax for distance
+        # Stars without a measured parallax get the reference default
+        # (0.0001249 arcsec = 0.1249 mas).
+        parallax_mas=star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249,
         radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
     )
 
@@ -3853,11 +3855,10 @@ def _calc_star_position_from_observer(
     # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
     lat = ecl[0].degrees
     lon = ecl[1].degrees % 360.0
-    # Distance from parallax (AU). Stars without parallax data (parallax_mas=0)
-    # will have a very large distance from Skyfield; cap at 100000 AU for those.
+    # Distance from parallax (AU). Stars without measured parallax use
+    # the reference's default of 0.0001249 arcsec (the Star object below
+    # already received it), so the distance stays finite and consistent.
     dist = ecl[2].au
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
 
     return lon, lat, dist
 
@@ -3923,7 +3924,9 @@ def _calc_star_position_leb(
     if star_data.parallax_mas > 0.0:
         dist_internal = 206265000.0 / star_data.parallax_mas
     else:
-        dist_internal = 1e12
+        # Reference default parallax 0.0001249 arcsec for stars without
+        # a measured value.
+        dist_internal = 206265000.0 / 0.1249
 
     # Apply radial velocity correction to distance (matching Skyfield Star behavior)
     if star_data.radial_km_per_s != 0.0 and dist_internal < 1e11:
@@ -3993,6 +3996,7 @@ def _calc_star_position_skyfield(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position using Skyfield Star class with proper aberration.
@@ -4024,7 +4028,13 @@ def _calc_star_position_skyfield(
 
     t = get_timescale().tt_jd(jd_tt)
     earth = get_planets()["earth"]
-    earth_at_t = earth.at(t)
+    if topo is not None:
+        from skyfield.api import wgs84
+
+        observer = earth + wgs84.latlon(topo[1], topo[0], topo[2])
+        earth_at_t = observer.at(t)
+    else:
+        earth_at_t = earth.at(t)
     return _calc_star_position_from_observer(
         star_id, earth_at_t, noaberr, nogdefl, j2000_frame
     )
@@ -4036,6 +4046,7 @@ def calc_fixed_star_position(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
@@ -4072,7 +4083,9 @@ def calc_fixed_star_position(
     """
     from .state import get_leb_reader
 
-    if get_leb_reader() is not None:
+    # The LEB star path is geocentric; topocentric requests go through
+    # Skyfield (same convention as the planet pipeline).
+    if topo is None and get_leb_reader() is not None:
         try:
             return _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame
@@ -4085,7 +4098,9 @@ def calc_fixed_star_position(
             from .logging_config import get_logger
 
             get_logger().debug("LEB star fallback: %s", _leb_err)
-    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl, j2000_frame)
+    return _calc_star_position_skyfield(
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
+    )
 
 
 def calc_fixed_star_velocity(
@@ -4094,6 +4109,7 @@ def calc_fixed_star_velocity(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
@@ -4132,15 +4148,15 @@ def calc_fixed_star_velocity(
 
     # Calculate position at current time (for return value)
     lon, lat, dist = calc_fixed_star_position(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
     )
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
     lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo
     )
     lon_next, lat_next, dist_next = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo
     )
 
     # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
@@ -4155,8 +4171,9 @@ def calc_fixed_star_velocity(
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
     speed_lat = lat_next - lat_prev
 
-    # pyswisseph returns 0.0 for fixed star distance speed
-    speed_dist = 0.0
+    # Distance speed: radial motion (the star's radial velocity plus the
+    # Earth's orbital radial component) - the reference reports it.
+    speed_dist = dist_next - dist_prev
 
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
@@ -4296,7 +4313,8 @@ def _preprocess_flags(iflag: int) -> int:
     """Preprocess calculation flags for fixed star functions.
 
     Strips ephemeris selection flags (MOSEPH) and converts SPEED3 to SPEED.
-    FLG_TOPOCTR is accepted silently (stars at infinite distance).
+    FLG_TOPOCTR is kept: the observer position contributes diurnal
+    aberration (and, for the nearest stars, a tiny diurnal parallax).
 
     Args:
         iflag: Raw input flags
@@ -4309,9 +4327,41 @@ def _preprocess_flags(iflag: int) -> int:
     # FLG_SPEED3: treat as FLG_SPEED
     if iflag & FLG_SPEED3:
         iflag = (iflag & ~FLG_SPEED3) | FLG_SPEED
-    # FLG_TOPOCTR: silently accept (stars at infinite distance, no parallax)
-    iflag = iflag & ~FLG_TOPOCTR
     return iflag
+
+
+def _fixstar_ret_flags(flags_in: int) -> int:
+    """Return flags echoed to the caller (reference convention).
+
+    The input flags come back verbatim, with FLG_SWIEPH added when no
+    ephemeris-selection bit was given (MOSEPH echoes as given).
+    """
+    from .constants import FLG_JPLEPH
+
+    if not (flags_in & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
+        return flags_in | FLG_SWIEPH
+    return flags_in
+
+
+def _fixstar_topo() -> tuple:
+    """(lon, lat, alt) for FLG_TOPOCTR star calculations.
+
+    Raises Error when no geographic position has been set, like the
+    planet path does.
+    """
+    from .state import get_topo
+
+    topo = get_topo()
+    if topo is None:
+        raise Error(
+            "topocentric position requested (FLG_TOPOCTR) but no "
+            "geographic position set; call set_topo() first"
+        )
+    return (
+        topo.longitude.degrees,
+        topo.latitude.degrees,
+        topo.elevation.m,
+    )
 
 
 def _apply_fixstar_flags(
@@ -4475,6 +4525,7 @@ def fixstar_ut(
         >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     star_id, error, canonical_name = _resolve_star_id(star)
@@ -4493,21 +4544,22 @@ def fixstar_ut(
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", flags)
+        return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -4528,6 +4580,7 @@ def batch_fixstars_ut(
     The result order matches the input order. When ``skip_errors`` is True,
     unresolved stars keep their input slot as ``None``.
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     results: list[
@@ -4565,10 +4618,10 @@ def batch_fixstars_ut(
                     star_id, jd_tt, noaberr, nogdefl, use_j2000
                 )
                 if want_speed:
-                    lon_prev, lat_prev, _ = _calc_star_position_leb(
+                    lon_prev, lat_prev, dist_prev = _calc_star_position_leb(
                         star_id, jd_tt - 0.5, noaberr, nogdefl, use_j2000
                     )
-                    lon_next, lat_next, _ = _calc_star_position_leb(
+                    lon_next, lat_next, dist_next = _calc_star_position_leb(
                         star_id, jd_tt + 0.5, noaberr, nogdefl, use_j2000
                     )
                     speed_lon = lon_next - lon_prev
@@ -4577,7 +4630,7 @@ def batch_fixstars_ut(
                     elif speed_lon < -180.0:
                         speed_lon += 360.0
                     speed_lat = lat_next - lat_prev
-                    speed_dist = 0.0
+                    speed_dist = dist_next - dist_prev
                 else:
                     speed_lon = 0.0
                     speed_lat = 0.0
@@ -4587,7 +4640,7 @@ def batch_fixstars_ut(
                 result = _apply_fixstar_flags(
                     result, jd_tt, flags, j2000_native=use_j2000
                 )
-                results[index] = (result, canonical_name, flags)
+                results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
         except KeyError:
             pass  # Body not in LEB file
@@ -4619,10 +4672,10 @@ def batch_fixstars_ut(
                 star_id, earth_at_t, noaberr, nogdefl, use_j2000
             )
             if want_speed:
-                lon_prev, lat_prev, _dist_prev = _calc_star_position_from_observer(
+                lon_prev, lat_prev, dist_prev = _calc_star_position_from_observer(
                     star_id, earth_at_prev, noaberr, nogdefl, use_j2000
                 )
-                lon_next, lat_next, _dist_next = _calc_star_position_from_observer(
+                lon_next, lat_next, dist_next = _calc_star_position_from_observer(
                     star_id, earth_at_next, noaberr, nogdefl, use_j2000
                 )
                 speed_lon = lon_next - lon_prev
@@ -4631,7 +4684,7 @@ def batch_fixstars_ut(
                 elif speed_lon < -180.0:
                     speed_lon += 360.0
                 speed_lat = lat_next - lat_prev
-                speed_dist = 0.0
+                speed_dist = dist_next - dist_prev
             else:
                 speed_lon = 0.0
                 speed_lat = 0.0
@@ -4639,7 +4692,7 @@ def batch_fixstars_ut(
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
             result = _apply_fixstar_flags(result, jd_tt, flags, j2000_native=use_j2000)
-            results[index] = (result, canonical_name, flags)
+            results[index] = (result, canonical_name, ret_flags)
         except Error:
             if skip_errors:
                 continue
@@ -4687,6 +4740,7 @@ def fixstar(
         >>> pos, name, retflag = fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     star_id, error, canonical_name = _resolve_star_id(star)
@@ -4697,21 +4751,22 @@ def fixstar(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", flags)
+        return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:

@@ -156,10 +156,18 @@ class TestGreekLetterMappings:
         }
         assert expected_letters.issubset(set(GREEK_LETTER_ABBREV.keys()))
 
-    def test_abbreviations_are_two_chars(self):
-        """All abbreviations should be 2 characters."""
+    def test_abbreviations_are_two_or_three_chars(self):
+        """Abbreviations are 2 chars, except omicron's 3-char 'omi'.
+
+        The reference catalog distinguishes omicron ('omi') from omega
+        ('om'), so a single 2-char rule cannot hold for both.
+        """
         for letter, abbrev in GREEK_LETTER_ABBREV.items():
-            assert len(abbrev) == 2, f"{letter} abbreviation '{abbrev}' is not 2 chars"
+            assert 2 <= len(abbrev) <= 3, (
+                f"{letter} abbreviation '{abbrev}' is not 2-3 chars"
+            )
+        assert GREEK_LETTER_ABBREV["OMICRON"] == "omi"
+        assert GREEK_LETTER_ABBREV["OMEGA"] == "om"
 
 
 @pytest.mark.unit
