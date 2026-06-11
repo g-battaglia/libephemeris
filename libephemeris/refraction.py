@@ -570,8 +570,19 @@ def calc_refraction_app_to_true(
     return max(0.0, apparent_alt - true_est)
 
 
-def calc_dip(obs_alt: float, lapse_rate: float = 0.0065) -> float:
+def calc_dip(
+    obs_alt: float,
+    lapse_rate: float = 0.0065,
+    atpress: float = 1013.25,
+    attemp: float = 10.0,
+) -> float:
     """Dip of the horizon for an elevated observer.
+
+    Uses A. Thom's refraction-corrected dip: the geometric dip
+    arccos(R/(R+h)) is scaled by sqrt(1 - 1.848*k*P/(273.16+T)^2)
+    with k = (0.0342 + lapse)/(0.154*0.0238). The atmospheric scaling
+    matters: at 1000 m the dip moves by ~190" between (700 mbar, 30 degC)
+    and standard conditions.
 
     Parameters
     ----------
@@ -579,6 +590,10 @@ def calc_dip(obs_alt: float, lapse_rate: float = 0.0065) -> float:
         Observer altitude above sea level in metres.
     lapse_rate : float
         Tropospheric lapse rate in K/m.
+    atpress : float
+        Atmospheric pressure at the observer in mbar.
+    attemp : float
+        Atmospheric temperature at the observer in degrees Celsius.
 
     Returns
     -------
@@ -588,20 +603,27 @@ def calc_dip(obs_alt: float, lapse_rate: float = 0.0065) -> float:
 
     References
     ----------
+    Thom, A. (1971), "Megalithic Lunar Observatories", Oxford, ch. 3
     Bomford, "Geodesy" (1980), 4th ed., §2.17-2.20
-    Torge, "Geodesy" (2001), 3rd ed., §5.1.1
     """
     if obs_alt <= 0:
         return 0.0
 
-    ratio = _R_EARTH / (_R_EARTH + obs_alt)
+    # Equatorial radius for the geometric dip (the conventional choice in
+    # the dip literature; the mean radius shifts the dip ~2" at 1000 m)
+    _r_dip = 6_378_136.6
+    ratio = _r_dip / (_r_dip + obs_alt)
     if ratio >= 1.0:
         return 0.0
     dip_geometric = math.degrees(math.acos(ratio))
 
-    if lapse_rate > 0:
-        k = 0.1117 + 3.5516 * lapse_rate
-    else:
-        k = 0.0
+    # Refraction coefficient after Thom (1971); the lapse-rate term keeps
+    # the conventional 0.0065 K/m default consistent with the standard
+    # atmosphere used elsewhere in this module.
+    krefr = (0.0342 + lapse_rate) / (0.154 * 0.0238)
+    t_kelvin = 273.16 + attemp
+    d = 1.0 - 1.8480 * krefr * atpress / (t_kelvin * t_kelvin)
+    if d < 0.0:
+        d = 0.0
 
-    return -dip_geometric * (1.0 - k)
+    return -dip_geometric * math.sqrt(d)

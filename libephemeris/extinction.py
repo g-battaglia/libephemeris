@@ -1020,9 +1020,10 @@ def calc_twilight_sky_brightness(
     limiting_mag = max(-2.0, min(limiting_mag, 7.0))
 
     # Convert mag/arcsec^2 to nanoLamberts
-    # Using: log10(nL) = 35.96 - 0.4 * B
-    # where B is surface brightness in mag/arcsec^2
-    nanolamberts = 10 ** (35.96 - 0.4 * surface_brightness)
+    # Standard photometric relation: nL = 10^((26.33 - B)/2.5)
+    # (B = 26.33 mag/arcsec^2 corresponds to 1 nL; the previous
+    # 10^(35.96 - 0.4*B) form was off by ~25 orders of magnitude)
+    nanolamberts = 10 ** ((26.33 - surface_brightness) / 2.5)
 
     return TwilightSkyBrightness(
         surface_brightness=surface_brightness,

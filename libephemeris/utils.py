@@ -631,8 +631,9 @@ def refrac_extended(
         )
         true_alt = apparent_alt - refraction
 
-    # Dip of the horizon for elevated observers
-    dip = calc_dip(geoalt, lapserate)
+    # Dip of the horizon for elevated observers (pressure/temperature
+    # scale the refraction part of the dip — up to ~190" at 1000 m)
+    dip = calc_dip(geoalt, lapserate, atpress, attemp)
 
     # Return the converted altitude and detail tuple
     if flag == TRUE_TO_APP:

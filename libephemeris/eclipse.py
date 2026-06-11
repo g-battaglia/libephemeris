@@ -2240,8 +2240,6 @@ def _sol_eclipse_when_loc_impl(
     """
     from typing import Sequence
 
-    from .state import set_topo
-
     # Validate geopos
     if len(geopos) < 3:
         raise ValueError("geopos must be a sequence of [longitude, latitude, altitude]")
@@ -2254,8 +2252,11 @@ def _sol_eclipse_when_loc_impl(
     MAX_SEARCH_YEARS = 50
     MAX_ECLIPSES = int(MAX_SEARCH_YEARS * 2.4)
 
-    # Set topocentric position for later calculations
-    set_topo(lon, lat, altitude)
+    # NOTE: the observer position is threaded through explicitly (LEB path
+    # geopos tuples / Skyfield wgs84.latlon); the reference API's
+    # swe_sol_eclipse_when_loc does not touch the global set_topo state,
+    # and neither do we (a previous set_topo() call here leaked the
+    # eclipse observer into subsequent FLG_TOPOCTR calculations).
 
     if reader is not None:
         from .fast_calc import _topo_ecliptic
@@ -8427,8 +8428,11 @@ def _calculate_transit_leb(
         ra_hours, _ = get_ra_dec(jd)
         ra_deg = ra_hours * 15.0
         t = get_timescale().ut1_jd(jd)
-        gmst = t.gmst
-        lst = gmst + lon / 15.0
+        # Apparent sidereal time: the RA is apparent (equinox of date with
+        # nutation), so GAST is the consistent pairing — GMST left a ~1.1 s
+        # equation-of-equinoxes error in transit times.
+        gast = t.gast
+        lst = gast + lon / 15.0
         lst_deg = lst * 15.0
         ha = (lst_deg - ra_deg) % 360.0
         if ha > 180:
@@ -8486,9 +8490,10 @@ def _calculate_transit(
         ra, _, _ = body_app.radec(epoch="date")
         ra_deg = ra.hours * 15.0  # Convert to degrees
 
-        # Get Local Sidereal Time
-        gmst = t.gmst  # in hours
-        lst = gmst + lon / 15.0  # in hours
+        # Get Local APPARENT Sidereal Time (apparent RA pairs with GAST;
+        # GMST left a ~1.1 s equation-of-equinoxes error in transits)
+        gast = t.gast  # in hours
+        lst = gast + lon / 15.0  # in hours
         lst_deg = lst * 15.0  # Convert to degrees
 
         # Hour angle = LST - RA (normalized to -180 to +180)
