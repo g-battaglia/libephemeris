@@ -68,7 +68,7 @@ ARIES_STARS = [
 
 # ======== CANCER CONSTELLATION STARS ========
 CANCER_STARS = [
-    (TARF, "Tarf", 42911, 3.52),  # Beta Cnc - brightest
+    (TARF, "Tarf", 40526, 3.52),  # Beta Cnc - brightest
     (ASELLUS_AUSTRALIS, "Asellus Australis", 42911, 3.94),  # Delta Cnc
     (ACUBENS, "Acubens", 44066, 4.25),  # Alpha Cnc
     (ASELLUS_BOREALIS, "Asellus Borealis", 42806, 4.66),  # Gamma Cnc
@@ -104,8 +104,8 @@ AQUARIUS_STARS = [
 
 # ======== PISCES CONSTELLATION STARS ========
 PISCES_STARS = [
-    (ETA_PISCIUM, "Eta Piscium", 5742, 3.62),  # Eta Psc - brightest
-    (ALRESCHA, "Alrescha", 7097, 3.82),  # Alpha Psc
+    (ETA_PISCIUM, "Eta Piscium", 7097, 3.62),  # Eta Psc - brightest
+    (ALRESCHA, "Alrescha", 9487, 3.82),  # Alpha Psc
 ]
 
 

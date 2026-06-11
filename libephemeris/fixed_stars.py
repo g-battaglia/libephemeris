@@ -1670,12 +1670,14 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         id=TARF,
         name="Tarf",
         nomenclature="beCnc",
-        hip_number=42911,
+        hip_number=40526,
         data=StarData(
-            ra_j2000=130.821442,  # 08h 43m 17.1s (Beta Cancri)
+            ra_j2000=124.128837,  # 08h 16m 30.9s (Beta Cancri, SIMBAD/ICRS)
             dec_j2000=9.185544,  # +09° 11' 08"
-            pm_ra=-0.01767,  # -17.67 mas/yr
-            pm_dec=-0.22926,  # -229.26 mas/yr
+            pm_ra=-0.045679,  # -45.679 mas/yr (SIMBAD)
+            pm_dec=-0.049505,  # -49.505 mas/yr (SIMBAD)
+            parallax_mas=10.10,
+            radial_km_per_s=22.94,
         ),
         magnitude=3.52,
     ),
@@ -1886,12 +1888,14 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         id=ETA_PISCIUM,
         name="Eta Piscium",
         nomenclature="etPsc",
-        hip_number=5742,
+        hip_number=7097,
         data=StarData(
-            ra_j2000=18.437089,  # 01h 13m 44.9s (Eta Piscium)
-            dec_j2000=15.345823,  # +15° 20' 45"
-            pm_ra=0.01750,  # 17.50 mas/yr
-            pm_dec=-0.02204,  # -22.04 mas/yr
+            ra_j2000=22.870867,  # 01h 31m 29.0s (Eta Piscium, SIMBAD/ICRS)
+            dec_j2000=15.345832,  # +15° 20' 45"
+            pm_ra=0.028584,  # 28.584 mas/yr (SIMBAD)
+            pm_dec=-0.003217,  # -3.217 mas/yr (SIMBAD)
+            parallax_mas=8.73,
+            radial_km_per_s=13.78,
         ),
         magnitude=3.62,
     ),
@@ -1899,14 +1903,14 @@ STAR_CATALOG: List[StarCatalogEntry] = [
         id=ALRESCHA,
         name="Alrescha",
         nomenclature="alPsc",
-        hip_number=7097,
+        hip_number=9487,
         data=StarData(
-            ra_j2000=30.511749,  # 02h 02m 02.8s (ICRS, Hipparcos HIP 7097)
+            ra_j2000=30.511749,  # 02h 02m 02.8s (ICRS, alpha Piscium)
             dec_j2000=2.763761,  # +02° 45' 49.5"
-            pm_ra=0.02714,  # 27.14 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.00264,  # -2.64 mas/yr (Hipparcos, van Leeuwen 2007)
+            pm_ra=0.03245,  # 32.45 mas/yr (SIMBAD)
+            pm_dec=0.00004,  # 0.04 mas/yr (SIMBAD)
             parallax_mas=21.66,
-            radial_km_per_s=31.77,
+            radial_km_per_s=7.5,
         ),
         magnitude=3.82,
     ),
@@ -4988,7 +4992,7 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ALPHERATZ": 677,  # Alpha Andromedae
     "ALPHERG": 7097,  # Eta Piscium
     "ALRAKIS": 83608,  # Mu Draconis
-    "ALRESCHA": 7097,  # Alpha Piscium (IAU: HIP 9487 for A component, HIP 7097 is the catalog entry)
+    "ALRESCHA": 9487,  # Alpha Piscium (HIP 7097 is Alpherg/Eta Piscium)
     "ALRUBA": 86782,  # Draconis
     "ALSAFI": 96100,  # Sigma Draconis
     "ALSCIAUKAT": 41075,  # 31 Lyncis
