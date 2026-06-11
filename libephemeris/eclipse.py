@@ -1048,52 +1048,43 @@ def _calculate_eclipse_type_and_magnitude(
         # No eclipse
         return 0, 0.0, gamma, moon_sun_ratio
 
-    # Edge case: near-miss eclipse (gamma very close to limit)
+    # Edge case: near-miss eclipse (gamma very close to limit).
+    # The reference returns PARTIAL|NONCENTRAL (retflag 18) for shallow
+    # partials; the non-reference ECL_GRAZING bit is no longer leaked
+    # into any public retflag.
     if _is_near_miss_eclipse(gamma, gamma_limit_partial):
-        # Use safe magnitude calculation for smooth transition
-        eclipse_type = ECL_PARTIAL
+        eclipse_type = ECL_PARTIAL | ECL_NONCENTRAL
         magnitude = _calculate_magnitude_safe(
             gamma, moon_sun_ratio, gamma_limit_partial
         )
-        # Mark as grazing if magnitude is very small
-        if _is_shallow_eclipse(magnitude):
-            eclipse_type |= ECL_GRAZING
         return eclipse_type, magnitude, gamma, moon_sun_ratio
 
     eclipse_type = ECL_PARTIAL | ECL_NONCENTRAL
 
-    # Central eclipses: shadow axis intersects Earth's surface.
-    # For a spherical Earth this occurs when |gamma| < 1.0.
-    # For the oblate Earth the limit varies with latitude (up to ~0.9972
-    # near the poles due to flattening f=1/298.257). We use 0.9972 as
-    # a conservative threshold and also check a generous margin up to
-    # |gamma| < 1.0 for grazing central eclipses.
-    _GAMMA_CENTRAL_STRICT = 0.9972
-    _GAMMA_CENTRAL_GENEROUS = 1.0
+    # Hybrid detection: the umbra/antumbra cone tip is very close to
+    # Earth's surface, so the eclipse transitions between total and
+    # annular along its path (|l2| small enough for a sign change).
+    is_hybrid = abs(l2) < 0.002  # ~13 km, empirical threshold
 
-    if abs(gamma) <= _GAMMA_CENTRAL_GENEROUS:
-        # Shadow axis intersects Earth (at least for spherical model).
-        # Determine eclipse type based on umbral limit (l2):
-        # l2 < 0: umbra (total eclipse)
-        # l2 > 0: antumbra (annular eclipse)
-        # l2 very close to 0: hybrid (annular-total)
-        #
-        # Hybrid eclipse: the umbra/antumbra cone tip is very close to
-        # Earth's surface, causing the eclipse to transition between
-        # total and annular along its path. Detection based on |l2|
-        # being small enough that the sign could change along the path.
-        is_hybrid = abs(l2) < 0.002  # ~13 km, empirical threshold
-
+    if abs(gamma) <= 1.0:
+        # Central: the shadow axis intersects Earth.
+        # l2 < 0: umbra (total); l2 > 0: antumbra (annular).
         if is_hybrid:
             eclipse_type = ECL_ANNULAR_TOTAL | ECL_CENTRAL
         elif l2 < 0:
             eclipse_type = ECL_TOTAL | ECL_CENTRAL
         else:
             eclipse_type = ECL_ANNULAR | ECL_CENTRAL
-
-    # Mark shallow grazing eclipses
-    if eclipse_type & ECL_PARTIAL and _is_shallow_eclipse(magnitude):
-        eclipse_type |= ECL_GRAZING
+    elif abs(gamma) <= 1.0 + abs(l2) and abs(l2) > 0:
+        # Noncentral total/annular (~1% of eclipses): the umbra/antumbra
+        # touches Earth but the shadow axis misses it. The reference
+        # classifies these as TOTAL|NONCENTRAL / ANNULAR|NONCENTRAL.
+        if is_hybrid:
+            eclipse_type = ECL_ANNULAR_TOTAL | ECL_NONCENTRAL
+        elif l2 < 0:
+            eclipse_type = ECL_TOTAL | ECL_NONCENTRAL
+        else:
+            eclipse_type = ECL_ANNULAR | ECL_NONCENTRAL
 
     return eclipse_type, magnitude, gamma, moon_sun_ratio
 
@@ -4841,7 +4832,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow penumbral eclipse
     if penumbral_mag > 0 and penumbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow penumbral eclipse - mark as grazing
-        eclipse_type = ECL_PENUMBRAL | ECL_GRAZING
+        # Shallow grazing penumbral: the reference reports plain PENUMBRAL
+        eclipse_type = ECL_PENUMBRAL
         penumbral_mag = max(0.0, penumbral_mag)
         return eclipse_type, 0.0, penumbral_mag, gamma, penumbra_radius, umbra_radius
 
@@ -4854,7 +4846,8 @@ def _calculate_lunar_eclipse_type_and_magnitude(
     # Edge case: shallow umbral (partial) eclipse
     if umbral_mag > 0 and umbral_mag < SHALLOW_ECLIPSE_MAG_THRESHOLD:
         # Very shallow partial umbral eclipse - mark as grazing
-        eclipse_type = ECL_PARTIAL | ECL_GRAZING
+        # Shallow grazing partial: the reference reports plain PARTIAL
+        eclipse_type = ECL_PARTIAL
         umbral_mag = max(0.0, min(1.0, umbral_mag))
         penumbral_mag = max(0.0, penumbral_mag)
         return (
@@ -6858,8 +6851,6 @@ def lun_occult_when_glob(
             else:
                 ecl_type = ECL_PARTIAL
 
-            if is_grazing:
-                ecl_type |= ECL_GRAZING
 
             tret = (
                 jd_max,
@@ -15662,9 +15653,6 @@ def planet_occult_when_glob(
                 else:
                     ecl_type = ECL_PARTIAL
 
-                # Add grazing flag if applicable
-                if is_grazing:
-                    ecl_type |= ECL_GRAZING
 
                 tret = (
                     jd_max,  # [0] Time of maximum
