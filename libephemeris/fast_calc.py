@@ -1996,7 +1996,15 @@ def _fast_calc_core(
                     _, dpsi_sid, _, _ = _frame_data(jd_tt)
                     nutation_deg = math.degrees(dpsi_sid)
                     aya = mean_aya + nutation_deg
-                except (ValueError, Exception):
+                except (KeyError, ValueError) as _nut_exc:
+                    from .logging_config import get_logger
+
+                    # Mean-only ayanamsha is a ~9-17" silent precision loss;
+                    # never hide it, and never eat programming errors.
+                    get_logger().warning(
+                        "sidereal: nutation unavailable (%s); using mean ayanamsha",
+                        _nut_exc,
+                    )
                     aya = mean_aya
 
             lon = (lon - aya) % 360.0

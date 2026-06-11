@@ -44,6 +44,7 @@ import math
 from dataclasses import dataclass
 from typing import Tuple, Optional, NamedTuple
 from .logging_config import get_logger
+from .exceptions import EphemerisRangeError
 from .constants import (
     CHIRON,
     PHOLUS,
@@ -2662,7 +2663,7 @@ def calc_minor_body_heliocentric(
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
-        except (ImportError, ValueError, KeyError):
+        except (ImportError, ValueError, KeyError, EphemerisRangeError):
             # Fall through to Keplerian calculation
             pass
 
@@ -3533,7 +3534,7 @@ def calc_asteroid_by_number(
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
-        except (ImportError, ValueError):
+        except (ImportError, ValueError, EphemerisRangeError):
             # Fall through to Keplerian calculation
             pass
 

@@ -55,8 +55,10 @@ from skyfield.framelib import ecliptic_frame
 from dataclasses import dataclass
 import erfa
 
+from .exceptions import EphemerisRangeError
+
 if TYPE_CHECKING:
-    from .exceptions import EphemerisRangeError
+    pass
 
 # Combined exception tuple for catching both jplephem and Skyfield range errors
 _RANGE_ERRORS = (OutOfRangeError, SkyfieldRangeError)
@@ -774,6 +776,11 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
     except (OSError, ValueError, KeyError, RuntimeError, TypeError) as e:
         logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
+        return None
+    except EphemerisRangeError as e:
+        # The freshly downloaded kernel does not cover the requested epoch;
+        # fall back to the Keplerian path like any other SPK miss.
+        logger.warning("Auto SPK coverage miss for body %d: %s", ipl, e)
         return None
 
 
@@ -2289,7 +2296,12 @@ def _calc_body(
             pass
         else:
             # Fallback: try the legacy calc_spk_body_position (non-type21 SPK)
-            spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+            try:
+                spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+            except EphemerisRangeError:
+                # Outside the registered kernel's coverage — continue to
+                # the Keplerian path (documented out-of-coverage behavior).
+                spk_result = None
             if spk_result is not None:
                 get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
                 _record(ipl, "SPK")
@@ -2490,7 +2502,16 @@ def _calc_body(
         # In Skyfield, the SSB is the origin (center=0), so we don't need an observer
         observer = None
         icrf_center = 0  # SSB
-    elif (iflag & FLG_TOPOCTR) and observer_topo:
+    elif iflag & FLG_TOPOCTR:
+        if observer_topo is None:
+            from .exceptions import Error
+
+            # Matching the reference API: topocentric positions without a
+            # prior set_topo() are an error, not a silent geocentric result.
+            raise Error(
+                "FLG_TOPOCTR requires a geographic position: call "
+                "set_topo(lon, lat, alt) first"
+            )
         earth = planets["earth"]
         observer = earth + observer_topo
         icrf_center = observer_topo

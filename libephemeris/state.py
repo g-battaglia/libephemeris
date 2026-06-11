@@ -808,7 +808,7 @@ def set_precision_tier(tier: str) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -1264,7 +1264,7 @@ def set_ephe_path(path: Optional[str]) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -1312,7 +1312,7 @@ def set_ephemeris_file(filename: str) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -1660,7 +1660,7 @@ def _close_inner() -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             # SpiceKernel may not have close() in all versions,
             # or may already be closed
             pass
@@ -1669,7 +1669,7 @@ def _close_inner() -> None:
     if _PLANET_CENTERS is not None:
         try:
             _PLANET_CENTERS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
 
     # Clear computation caches for hot path optimization
@@ -1720,7 +1720,7 @@ def _close_inner() -> None:
     for kernel in _SPK_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _SPK_KERNELS = {}
     _SPK_BODY_MAP = {}
@@ -1729,7 +1729,7 @@ def _close_inner() -> None:
     for kernel in _SPK_TYPE21_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _SPK_TYPE21_KERNELS = {}
 

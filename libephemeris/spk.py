@@ -1091,7 +1091,7 @@ def _calc_type21_position(
         for _ in range(3):
             try:
                 pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-            except (OSError, ValueError, KeyError, IndexError) as e:
+            except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
                 get_logger().debug("SPK type 21 computation failed: %s", e)
                 return None
 
@@ -1110,7 +1110,7 @@ def _calc_type21_position(
         # No light-time correction
         try:
             pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-        except (OSError, ValueError, KeyError, IndexError) as e:
+        except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
             get_logger().debug("SPK type 21 computation failed: %s", e)
             return None
 
@@ -1378,7 +1378,9 @@ def calc_spk_body_position(
     if coverage is not None:
         start_jd, end_jd = coverage
         if t.tt < start_jd or t.tt > end_jd:
-            raise ValueError(
+            from .exceptions import EphemerisRangeError
+
+            raise EphemerisRangeError(
                 f"JD {t.tt:.1f} outside SPK coverage [{start_jd:.1f}, {end_jd:.1f}] "
                 f"for body {ipl}"
             )

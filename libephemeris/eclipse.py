@@ -121,6 +121,20 @@ def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
     return impl(*args, reader=None, **kwargs)
 
 
+def _reraise_if_leb_range_error(exc: BaseException) -> None:
+    """Re-raise ``exc`` when it signals LEB out-of-range coverage.
+
+    Defensive ``except`` blocks inside eclipse implementations must not
+    swallow LEB coverage errors: doing so converts an out-of-range probe
+    into fabricated zeros/sentinels and prevents
+    ``_call_with_leb_skyfield_fallback`` from retrying on the Skyfield
+    path. Call this first in any broad except that would otherwise
+    degrade gracefully.
+    """
+    if _is_leb_out_of_range(exc):
+        raise exc
+
+
 # Constants for eclipse calculations
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
@@ -3002,7 +3016,8 @@ def sol_eclipse_where(
                 sun_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, SUN, gp)
                 moon_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, MOON, gp)
                 return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 return 999.0
 
     else:
@@ -3039,7 +3054,8 @@ def sol_eclipse_where(
                 sun_app = observer_at.at(t).observe(sun).apparent()
                 moon_app = observer_at.at(t).observe(moon).apparent()
                 return sun_app.separation_from(moon_app).degrees
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 return 999.0  # Return large value on error
 
     # Function to calculate Sun-Moon separation at a given location
@@ -3225,7 +3241,8 @@ def sol_eclipse_where(
         if is_total_shadow:
             path_width_km = -path_width_km
 
-    except (KeyError, ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+        _reraise_if_leb_range_error(_exc)
         # If calculation fails, return zeros (10-element geopos, 20-element attr)
         return (
             0,
@@ -3613,7 +3630,8 @@ def _sol_eclipse_how_impl(
             jd_tt = tjdut + deltat(tjdut)
             sun_topo = _topo_ecliptic(reader, jd_tt, tjdut, SUN, _gp)
             moon_topo = _topo_ecliptic(reader, jd_tt, tjdut, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0, (
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -3671,7 +3689,8 @@ def _sol_eclipse_how_impl(
         try:
             sun_app = observer_at.at(t).observe(sun).apparent()
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # If calculation fails, return zeros (20 elements per reference API spec)
             return 0, (
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -4368,7 +4387,8 @@ def _sol_eclipse_how_details_impl(
 
         # Position angle at C1
         result["position_angle_c1"] = _calc_position_angle(jd_c1)
-    except (KeyError, ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+        _reraise_if_leb_range_error(_exc)
         pass
 
     # Fourth contact (separation increasing from sum of radii)
@@ -4388,7 +4408,8 @@ def _sol_eclipse_how_details_impl(
 
         # Position angle at C4
         result["position_angle_c4"] = _calc_position_angle(jd_c4)
-    except (KeyError, ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+        _reraise_if_leb_range_error(_exc)
         pass
 
     # Second and third contacts (for central eclipses only)
@@ -4411,7 +4432,8 @@ def _sol_eclipse_how_details_impl(
 
             # Position angle at C2
             result["position_angle_c2"] = _calc_position_angle(jd_c2)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             pass
 
         # Third contact
@@ -4431,7 +4453,8 @@ def _sol_eclipse_how_details_impl(
 
             # Position angle at C3
             result["position_angle_c3"] = _calc_position_angle(jd_c3)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             pass
 
     # Calculate durations
@@ -5688,7 +5711,8 @@ def _lun_eclipse_how_pythonic(
         try:
             jd_tt = jd + deltat(jd)
             moon_topo = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0, tuple([0.0] * 20)
 
         moon_az_val, moon_alt_true, moon_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, moon_topo[:3])
@@ -5720,7 +5744,8 @@ def _lun_eclipse_how_pythonic(
         # Get Moon apparent position from observer
         try:
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # If calculation fails, return zeros (20 elements)
             return 0, tuple([0.0] * 20)
 
@@ -5925,7 +5950,8 @@ def _lun_eclipse_how_impl(
         try:
             jd_tt = tjdut + deltat(tjdut)
             moon_topo = _topo_ecliptic(reader, jd_tt, tjdut, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0, tuple([0.0] * 20)
 
         moon_az_val, moon_alt_true, moon_alt_app = azalt(tjdut, ECL2HOR, _gp, 0, 0, moon_topo[:3])
@@ -5969,7 +5995,8 @@ def _lun_eclipse_how_impl(
         # Get Moon apparent position from observer (topocentric)
         try:
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # If calculation fails, return zeros (20 elements)
             return 0, tuple([0.0] * 20)
 
@@ -7769,7 +7796,8 @@ def _lun_occult_where_pythonic(
                 else:
                     tgt_pos = _topo_ecliptic(_reader, jd_tt, jd, planet, _gp, FLG_SPEED)
                 return _ang_sep_ow(moon_pos[0], moon_pos[1], tgt_pos[0], tgt_pos[1])
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 return 999.0
     else:
         ts = _ts_ow
@@ -7801,7 +7829,8 @@ def _lun_occult_where_pythonic(
                 moon_app = observer_at.at(t).observe(moon_body).apparent()
                 target_app = _get_target_for_observer(observer_at, t)
                 return moon_app.separation_from(target_app).degrees
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 return 999.0
 
     # Gradient descent to find minimum separation (occultation center)
@@ -7950,7 +7979,8 @@ def _lun_occult_where_pythonic(
         else:
             diameter_ratio = 999.0  # Moon much larger than star
 
-    except (KeyError, ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+        _reraise_if_leb_range_error(_exc)
         # If calculation fails, use defaults
         moon_azimuth = 0.0
         moon_altitude = 0.0
@@ -9126,7 +9156,8 @@ def heliacal_ut(
         try:
             pheno = pheno_ut(jd, body, flags)
             return pheno[2]  # Elongation
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # Fallback: calculate elongation manually
             t = ts.ut1_jd(jd)
             sun_app = earth.at(t).observe(sun).apparent()
@@ -9138,7 +9169,8 @@ def heliacal_ut(
         try:
             pheno = pheno_ut(jd, body, flags)
             return pheno[4]  # Visual magnitude
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0  # Default to bright magnitude
 
     def _calculate_limiting_magnitude(sun_alt: float, body_alt: float) -> float:
@@ -9660,7 +9692,8 @@ def heliacal_pheno_ut(
         elongation = pheno[2]  # Elongation
         magnitude = pheno[4]  # Visual magnitude
         phase_angle = pheno[1]  # Phase angle
-    except (KeyError, ValueError, ArithmeticError, IndexError):
+    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+        _reraise_if_leb_range_error(_exc)
         # Calculate elongation manually
         sun_geo = earth.at(t).observe(sun).apparent()
         elongation = body_geo.separation_from(sun_geo).degrees
@@ -9776,7 +9809,8 @@ def heliacal_pheno_ut(
             # L ≈ pi * D / 2 where D is diameter
             moon_diameter = 0.5  # Approximately 0.5 degrees
             l_moon = math.pi * moon_diameter / 2
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             pass
 
     # Yallop q-test (for lunar crescent visibility)
@@ -10062,7 +10096,8 @@ def vis_limit_mag(
             try:
                 star_mag_val, _star_name_mag = fixstar2_mag(objname)
                 obj_mag = star_mag_val
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 obj_mag = 2.0  # Default magnitude if not found
 
             # Convert ecliptic to equatorial then to horizontal
@@ -10105,7 +10140,8 @@ def vis_limit_mag(
             try:
                 pheno_result = pheno_ut(jd, body_id, flags)
                 obj_mag = pheno_result[4]  # Visual magnitude
-            except (KeyError, ValueError, ArithmeticError, IndexError):
+            except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+                _reraise_if_leb_range_error(_exc)
                 obj_mag = 0.0  # Default bright
         else:
             raise ValueError(f"illegal planet number {body_id}.")
@@ -10207,7 +10243,8 @@ def vis_limit_mag(
             moon_pheno = pheno_ut(jd_ut, MOON, flags & 0xFF)
             phase_angle = moon_pheno[0]  # Phase angle in degrees
             illumination = (1 + math.cos(math.radians(phase_angle))) / 2.0
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             illumination = 0.5  # Assume half moon
 
         # Moon brightness increases with altitude and illumination
@@ -13460,7 +13497,8 @@ def _calc_eclipse_path_width_impl(
             jd_tt = jd + deltat(jd)
             sun_topo = _topo_ecliptic(reader, jd_tt, jd, SUN, _gp)
             moon_topo = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0
 
         sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
@@ -13489,14 +13527,16 @@ def _calc_eclipse_path_width_impl(
         try:
             observer = wgs84.latlon(calc_lat, calc_lon, 0.0)
             observer_at = earth + observer
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0
 
         # Get Sun and Moon apparent positions from the observer
         try:
             sun_app = observer_at.at(t).observe(sun).apparent()
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0
 
         # Get Sun altitude
@@ -14481,7 +14521,8 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
             jd_tt = jd + deltat(jd)
             sun_topo = _topo_ecliptic(reader, jd_tt, jd, SUN, _gp)
             moon_topo = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0
 
         sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
@@ -14519,7 +14560,8 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
         try:
             sun_app = observer_at.at(t).observe(sun).apparent()
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # If calculation fails, return 0 magnitude
             return 0.0
 
@@ -14710,7 +14752,8 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
             jd_tt = jd + deltat(jd)
             sun_topo = _topo_ecliptic(reader, jd_tt, jd, SUN, _gp)
             moon_topo = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             return 0.0
 
         sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
@@ -14748,7 +14791,8 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         try:
             sun_app = observer_at.at(t).observe(sun).apparent()
             moon_app = observer_at.at(t).observe(moon).apparent()
-        except (KeyError, ValueError, ArithmeticError, IndexError):
+        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
+            _reraise_if_leb_range_error(_exc)
             # If calculation fails, return 0 obscuration
             return 0.0
 

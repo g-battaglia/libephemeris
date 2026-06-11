@@ -671,7 +671,7 @@ class EphemerisContext:
             if _SHARED_PLANETS is not None:
                 try:
                     _SHARED_PLANETS.close()
-                except (AttributeError, Exception):
+                except (AttributeError, OSError, ValueError):
                     # SpiceKernel may not have close() in all versions,
                     # or may already be closed
                     pass

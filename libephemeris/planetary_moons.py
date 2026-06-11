@@ -333,7 +333,7 @@ def unregister_moon_spk(spk_file: str) -> None:
     if spk_file in _MOON_SPK_KERNELS:
         try:
             _MOON_SPK_KERNELS[spk_file].close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
         del _MOON_SPK_KERNELS[spk_file]
 
@@ -591,7 +591,7 @@ def close_moon_kernels() -> None:
     for kernel in _MOON_SPK_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
 
     _MOON_SPK_KERNELS = {}
