@@ -90,6 +90,7 @@ from .constants import (
     VULKANUS,
     POSEIDON,
     ISIS,
+    AST_OFFSET,
     NIBIRU,
     HARRINGTON,
     NEPTUNE_LEVERRIER,
@@ -721,6 +722,19 @@ def get_planet_name(planet: int) -> str:
     """
     if planet in _PLANET_NAMES:
         return _PLANET_NAMES[planet]
+    if planet > AST_OFFSET:
+        # Numbered minor planets: the reference resolves the built-in
+        # set by asteroid number and returns an empty string for the
+        # rest (names normally come from the asteroid ephemeris files).
+        _BUILTIN_AST_NAMES = {
+            1: "Ceres",
+            2: "Pallas",
+            3: "Juno",
+            4: "Vesta",
+            2060: "Chiron",
+            5145: "Pholus",
+        }
+        return _BUILTIN_AST_NAMES.get(planet - AST_OFFSET, "")
     return f"Unknown ({planet})"
 
 

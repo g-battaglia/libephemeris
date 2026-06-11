@@ -1350,10 +1350,11 @@ class OrbitalElements:
         Returns:
             Mean motion in degrees per day.
         """
-        # n = 360 / (a^1.5 * 365.25) for heliocentric orbits
-        # For geocentric orbits, this would need Earth's GM, but we use
-        # an approximate formula.
-        return 360.0 / (self.semi_axis**1.5 * 365.25)
+        # Gaussian mean motion for heliocentric orbits:
+        # n = k * 180/pi / a^1.5 = 0.9856076686 / a^1.5 deg/day.
+        # (Geocentric bodies encode their motion in the mean-anomaly
+        # polynomial instead.)
+        return 0.9856076686 / self.semi_axis**1.5
 
 
 # Standard epoch Julian Day values
@@ -2078,6 +2079,20 @@ def calc_orbital_position(
     pos_prev = _calc_orbital_position_raw(elem, jd_tt - dt_step)
     pos_next = _calc_orbital_position_raw(elem, jd_tt + dt_step)
 
+    # Elements referred to a fixed equinox are precessed to J2000 (the
+    # frame this function documents); equinox-of-date elements (JDATE)
+    # stay in their of-date frame. The same rotation applies to the
+    # speed samples so the rates stay frame-consistent.
+    tequ = elem.equinox_jd
+    if tequ is not None and abs(tequ - 2451545.0) > 1e-6:
+        from .astrometry import _precess_ecliptic
+
+        longitude, latitude = _precess_ecliptic(longitude, latitude, tequ, 2451545.0)
+        p_lon, p_lat = _precess_ecliptic(pos_prev[0], pos_prev[1], tequ, 2451545.0)
+        n_lon, n_lat = _precess_ecliptic(pos_next[0], pos_next[1], tequ, 2451545.0)
+        pos_prev = (p_lon, p_lat, pos_prev[2])
+        pos_next = (n_lon, n_lat, pos_next[2])
+
     dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
     if dlon > 180.0 / (2.0 * dt_step):
@@ -2357,26 +2372,13 @@ def calc_uranian_longitude(ipl: int, jd_tt: float) -> float:
         >>> lon = calc_uranian_longitude(CUPIDO, 2451545.0)  # J2000.0
         >>> print(f"Cupido longitude: {lon:.4f}")
     """
-    if ipl not in URANIAN_ELEMENTS:
+    if ipl not in URANIAN_KEPLERIAN_ELEMENTS:
         raise ValueError(f"Body ID {ipl} is not a valid Uranian planet")
 
-    elements = URANIAN_ELEMENTS[ipl]
-
-    # Calculate T = Julian centuries from J2000.0
-    T = (jd_tt - 2451545.0) / 36525.0
-
-    # Mean longitude
-    longitude = elements.L0 + elements.n * T
-
-    # Add periodic oscillation if amplitude is non-zero
-    if elements.amplitude != 0.0:
-        arg = elements.phase + elements.phase_rate * T
-        longitude += elements.amplitude * math.sin(math.radians(arg))
-
-    # Normalize to 0-360 degrees
-    longitude = longitude % 360.0
-
-    return longitude
+    # Delegate to the verified Keplerian element set; the legacy
+    # mean-longitude oscillation table (URANIAN_ELEMENTS) carries
+    # contradictory values and is no longer consulted.
+    return calc_uranian_planet(ipl, jd_tt)[0]
 
 
 def calc_uranian_position(
@@ -2410,49 +2412,12 @@ def calc_uranian_position(
         >>> pos = calc_uranian_position(KRONOS, 2451545.0)
         >>> print(f"Kronos at {pos[0]:.4f} deg, dist {pos[2]:.2f} AU")
     """
-    if ipl not in URANIAN_ELEMENTS:
+    if ipl not in URANIAN_KEPLERIAN_ELEMENTS:
         raise ValueError(f"Body ID {ipl} is not a valid Uranian planet")
 
-    elements = URANIAN_ELEMENTS[ipl]
-
-    # Calculate longitude
-    longitude = calc_uranian_longitude(ipl, jd_tt)
-
-    # Latitude is assumed to be 0 (on ecliptic)
-    latitude = 0.0
-
-    # Estimate distance from mean motion using Kepler's 3rd law
-    # n (deg/century) -> n (deg/day) = n / 36525
-    # n (rad/day) = n (deg/day) * pi / 180
-    # For circular orbit: n = sqrt(GM / a^3), where GM = k^2 (Gaussian constant)
-    # k = 0.01720209895 AU^(3/2) / day
-    # n = k / a^(3/2)  => a = (k / n)^(2/3)
-    n_deg_per_day = elements.n / 36525.0
-    n_rad_per_day = math.radians(n_deg_per_day)
-    k = 0.01720209895  # Gaussian gravitational constant
-
-    if n_rad_per_day > 0:
-        distance = (k / n_rad_per_day) ** (2.0 / 3.0)
-    else:
-        distance = 100.0  # Default large distance
-
-    # Calculate velocity (central difference numerical differentiation)
-    dt = 1.0 / 86400.0  # 1 second in days
-    lon_prev = calc_uranian_longitude(ipl, jd_tt - dt)
-    lon_next = calc_uranian_longitude(ipl, jd_tt + dt)
-
-    # Handle wrap-around
-    dlon = (lon_next - lon_prev) / (2.0 * dt)
-    if dlon > 180.0 / (2.0 * dt):
-        dlon -= 360.0 / (2.0 * dt)
-    elif dlon < -180.0 / (2.0 * dt):
-        dlon += 360.0 / (2.0 * dt)
-
-    # Latitude and distance are constant
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the verified Keplerian element set (see
+    # calc_uranian_longitude).
+    return calc_uranian_planet(ipl, jd_tt)
 
 
 def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
