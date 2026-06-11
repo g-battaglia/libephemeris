@@ -11245,6 +11245,12 @@ def get_inex_number(
             best_match_residual = residual
             best_match_series = ref_inex_test
 
+    # No residual sanity gate is applied here: the reference table is
+    # far too sparse (a handful of anchor series) for grid residuals to
+    # discriminate eclipse dates from arbitrary ones - valid members of
+    # a series sit hundreds of days from the nearest anchor's grid. The
+    # result is therefore only meaningful when the caller already knows
+    # jd_eclipse is an eclipse maximum.
     return best_match_series
 
 
