@@ -1443,13 +1443,12 @@ def _heliacal_pheno_ut_leb(
     tav_act = body_alt_deg - sun_alt_deg
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference
-    daz_act = body_az_deg - sun_az
+    # Azimuth difference, signed (reference convention: Sun minus object)
+    daz_act = sun_az - body_az_deg
     while daz_act > 180:
         daz_act -= 360
     while daz_act < -180:
         daz_act += 360
-    daz_act = abs(daz_act)
 
     # Elongation and magnitude
     if is_star:
@@ -1503,45 +1502,41 @@ def _heliacal_pheno_ut_leb(
         else:
             parallax = 0.0
 
-    # Rise/set estimates (same simplified logic as Skyfield path)
-    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
-    rise_set_correction = -0.833
-    lat_rad = math.radians(lat)
+    # Rise/set of the disc centers and the visibility window via the
+    # shared reference-scheme helper (sentinel 99999999.0 for instants
+    # that do not exist).
+    _star_name_p = ""
+    if is_star:
+        from .fixed_stars import STAR_CATALOG as _SC
 
-    if body_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
-                rise_o = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
-                rise_o = jd + time_to_horizon / 24.0
-        else:
-            rise_o = jd
-    else:
-        rise_o = jd
-
-    if sun_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd + time_to_horizon / 24.0
-        else:
-            rise_s = jd
-    else:
-        rise_s = jd
-
-    lag = rise_o - rise_s
-
-    if sun_alt_deg < -6 and body_alt_deg > 0:
-        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0
-    else:
-        tvis_vr = 0.0
+        for _entry in _SC:
+            if _entry.id == body:
+                _star_name_p = _entry.name
+                break
+    (
+        rise_o,
+        rise_s,
+        lag,
+        t_first_vr,
+        t_best_vr,
+        t_last_vr,
+        tvis_vr,
+        t_b_yallop,
+    ) = _pheno_rise_window(
+        jd,
+        body,
+        _star_name_p,
+        event_type,
+        (lon, lat, altitude),
+        (
+            pressure,
+            temperature,
+            humidity * 100.0 if humidity <= 1.0 else humidity,
+            0.0,
+        ),
+        (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+        flags,
+    )
 
     if not is_star and phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
@@ -1574,23 +1569,6 @@ def _heliacal_pheno_ut_leb(
         q_yallop = 0.0
         q_crit = 0.0
 
-    sun_rate = 15.0 * math.cos(lat_rad)
-    if sun_rate > 0:
-        if is_morning:
-            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
-            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
-            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
-        else:
-            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
-            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
-            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
-    else:
-        t_first_vr = jd
-        t_best_vr = jd
-        t_last_vr = jd
-
-    t_b_yallop = t_best_vr
-
     dret = [0.0] * 50
     dret[0] = body_alt_deg
     dret[1] = app_alt_deg
@@ -1618,7 +1596,7 @@ def _heliacal_pheno_ut_leb(
     dret[23] = lag
     dret[24] = tvis_vr
     dret[25] = l_moon
-    dret[26] = phase_angle
+    dret[26] = elongation
     dret[27] = illumination
 
     return tuple(dret), flags
@@ -2941,8 +2919,9 @@ def heliacal_ut(
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
     # atmo[3] is meteorological range / ktot, handled internally
 
-    # Convert humidity from percent to 0-1 range for internal use
-    humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
+    # datm[2] is relative humidity in percent (reference convention);
+    # convert to the 0-1 range used internally.
+    humidity = humidity_pct / 100.0
 
     # Parse objname to get body ID
     body_id = _parse_object_name(objname)
@@ -3118,16 +3097,19 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
         return body_id
 
-    # Try to parse as planet number
+    # Try to parse as planet number. Only the int conversion may fall
+    # through to star resolution - the Sun/Moon rejection must escape
+    # (it used to be swallowed by this very except clause).
     try:
         body_id = int(object_name)
+    except ValueError:
+        body_id = None
+    if body_id is not None:
         if body_id == SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
         if body_id == MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
         return body_id
-    except ValueError:
-        pass
 
     # Try to resolve as a fixed star name
     from .fixed_stars import resolve_star_name
@@ -3143,6 +3125,157 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
         "planet IDs (2-9 for Mercury-Pluto), or fixed star names "
         "(Sirius, Regulus, Aldebaran, etc.)."
     )
+
+
+_TJD_INVALID = 99999999.0
+
+_PHENO_BODY_NAMES = {
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+}
+
+
+def _pheno_rise_window(
+    jd: float,
+    body: int,
+    star_name: str,
+    event_type: int,
+    geopos3: tuple,
+    atmo4: tuple,
+    obs6: tuple,
+    flags: int,
+) -> Tuple[float, float, float, float, float, float, float, float]:
+    """Rise/set and visibility-window instants for heliacal_pheno_ut.
+
+    Reference scheme: the Sun's and the object's disc-center rise (event
+    types 1/4) or set (2/3) are searched from four hours before ``jd``;
+    the first/optimum/last visibility instants come from the visibility
+    margin scanned on the night side of the Sun's event, and the
+    sentinel 99999999.0 marks instants that do not exist. Returns
+    (rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop).
+    """
+    from .constants import (
+        BIT_DISC_CENTER,
+        CALC_RISE,
+        CALC_SET,
+        FLG_JPLEPH,
+        FLG_MOSEPH,
+    )
+    from .eclipse import rise_trans
+
+    eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
+    rs = CALC_RISE if event_type in (1, 4) else CALC_SET
+    is_star = bool(star_name)
+
+    rc_s, tr_s = rise_trans(
+        jd - 4.0 / 24.0, SUN, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    )
+    rise_s = tr_s[0] if rc_s == 0 else _TJD_INVALID
+    target = star_name if is_star else body
+    rc_o, tr_o = rise_trans(
+        jd - 4.0 / 24.0, target, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    )
+    norise = rc_o != 0
+    rise_o = tr_o[0] if rc_o == 0 else _TJD_INVALID
+
+    lag = 0.0 if (norise or rc_s != 0) else rise_o - rise_s
+    tb_yallop = _TJD_INVALID
+    if not is_star and body == MOON and not norise and rc_s == 0:
+        tb_yallop = (rise_o * 4.0 + rise_s * 5.0) / 9.0
+
+    t_first = _TJD_INVALID
+    t_best = _TJD_INVALID
+    t_last = _TJD_INVALID
+    tvis = _TJD_INVALID
+
+    # Acronychal event types only carry a visibility window for the
+    # Moon and the inner planets (reference convention).
+    if event_type in (3, 4) and (is_star or body not in (1, 2, 3)):
+        return rise_o, rise_s, lag, t_first, t_best, t_last, 0.0, tb_yallop
+    if rc_s != 0:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+
+    objname = star_name if is_star else _PHENO_BODY_NAMES.get(body)
+    if objname is None:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+
+    _schaefer = create_schaefer_model(
+        pressure=atmo4[0],
+        temperature=atmo4[1],
+        humidity=atmo4[2],
+        met_range=atmo4[3] if atmo4[3] >= 1.0 else 0.0,
+        altitude=geopos3[2],
+        observer_age=obs6[0],
+        snellen=obs6[1],
+    )
+
+    def _margin(t: float) -> float:
+        retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
+        if retval < 0:
+            return -99.0
+        return dret_v[0] - (dret_v[7] + _schaefer.extinction(dret_v[1]))
+
+    win = 4.0 / 24.0
+    if rs == CALC_RISE:
+        lo, hi = rise_s - win, rise_s
+    else:
+        lo, hi = rise_s, rise_s + win
+
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    a = hi - (hi - lo) / phi
+    b = lo + (hi - lo) / phi
+    fa, fb = _margin(a), _margin(b)
+    g_lo, g_hi = lo, hi
+    for _ in range(22):
+        if fa > fb:
+            g_hi, b, fb = b, a, fa
+            a = g_hi - (g_hi - g_lo) / phi
+            fa = _margin(a)
+        else:
+            g_lo, a, fa = a, b, fb
+            b = g_lo + (g_hi - g_lo) / phi
+            fb = _margin(b)
+        if g_hi - g_lo < 3e-5:
+            break
+    t_peak = 0.5 * (g_lo + g_hi)
+    m_peak = _margin(t_peak)
+    if m_peak <= 0.0:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+    t_best = t_peak
+
+    def _cross(t_in: float, t_out: float) -> float:
+        # Object still visible at the scan boundary: the reference's
+        # walk starts/stops there, so the boundary itself bounds the
+        # window (e.g. Venus is already visible right at sunset).
+        if _margin(t_out) > 0.0:
+            return t_out
+        for _ in range(22):
+            mid = 0.5 * (t_in + t_out)
+            if _margin(mid) > 0.0:
+                t_in = mid
+            else:
+                t_out = mid
+            if abs(t_out - t_in) < 3e-5:
+                break
+        return 0.5 * (t_in + t_out)
+
+    t_first = _cross(t_peak, lo)
+    t_last = _cross(t_peak, hi)
+    if not norise:
+        if rs == CALC_RISE and t_first != _TJD_INVALID:
+            t_first = max(t_first, rise_o)
+        elif rs == CALC_SET and t_last != _TJD_INVALID:
+            t_last = min(t_last, rise_o)
+    if t_first != _TJD_INVALID and t_last != _TJD_INVALID:
+        tvis = t_last - t_first
+    return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
 
 
 def _heliacal_pheno_ut_pythonic(
@@ -3404,14 +3537,13 @@ def _heliacal_pheno_ut_pythonic(
     # Geocentric arcus visionis
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference (absolute value, matching reference API convention)
-    daz_act = body_az_deg - sun_az_deg
+    # Azimuth difference, signed (reference convention: Sun minus object)
+    daz_act = sun_az_deg - body_az_deg
     # Normalize to -180 to +180
     while daz_act > 180:
         daz_act -= 360
     while daz_act < -180:
         daz_act += 360
-    daz_act = abs(daz_act)
 
     # Get elongation (longitude difference) from Sun
     # For fixed stars, always calculate manually since pheno_ut doesn't support them
@@ -3461,64 +3593,37 @@ def _heliacal_pheno_ut_pythonic(
         else:
             parallax = 0.0
 
-    # Calculate rise/set times for object and Sun
-    # For morning events, we look for rise times; for evening, set times
-    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
+    # Rise/set of the disc centers and the visibility window, the
+    # reference way (rise_trans searches from 4 hours before jd; the
+    # sentinel 99999999.0 marks instants that do not exist).
+    _star_name = ""
+    if is_star:
+        from .fixed_stars import STAR_CATALOG as _SC
 
-    # Use a simple estimate for rise/set time based on altitude
-    # Rise/set occurs when altitude crosses 0 (corrected for refraction)
-    # Time rate: approximately 1 degree of altitude per 4 minutes (at mid-latitudes)
-    rise_set_correction = -0.833  # Standard refraction + semidiameter for Sun
-
-    # Estimate object rise/set time
-    if body_alt_deg != 0:
-        # Rough estimate: time to rise/set based on altitude rate
-        # Altitude rate ~ 15 cos(lat) per hour at the horizon
-        alt_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-        if alt_rate > 0:
-            if is_morning:
-                # Object rising: how long until it crosses horizon
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd - time_to_horizon / 24.0
-            else:
-                # Object setting
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd + time_to_horizon / 24.0
-        else:
-            rise_o = jd
-    else:
-        rise_o = jd
-
-    # Estimate Sun rise/set time
-    if sun_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd + time_to_horizon / 24.0
-        else:
-            rise_s = jd
-    else:
-        rise_s = jd
-
-    # Lag time (object rise - Sun rise)
-    lag = rise_o - rise_s
-
-    # Visibility duration estimate (simplified)
-    # Based on how long the object is above horizon while Sun is below
-    if sun_alt_deg < -6 and body_alt_deg > 0:
-        # Object visible during civil twilight or darker
-        # Estimate visibility window
-        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0  # days
-    else:
-        tvis_vr = 0.0
+        for _entry in _SC:
+            if _entry.id == body:
+                _star_name = _entry.name
+                break
+    _geopos3 = (lon, lat, altitude)
+    _atmo4 = (
+        pressure,
+        temperature,
+        humidity * 100.0 if humidity <= 1.0 else humidity,
+        0.0,
+    )
+    _obs6 = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+    (
+        rise_o,
+        rise_s,
+        lag,
+        t_first_vr,
+        t_best_vr,
+        t_last_vr,
+        tvis_vr,
+        t_b_yallop,
+    ) = _pheno_rise_window(
+        jd, body, _star_name, event_type, _geopos3, _atmo4, _obs6, flags
+    )
 
     # Illumination percentage for all bodies
     # For planets: (1 + cos(phase_angle)) / 2 * 100
@@ -3567,29 +3672,6 @@ def _heliacal_pheno_ut_pythonic(
         q_yallop = 0.0
         q_crit = 0.0
 
-    # First, best, and last visibility times (VR = visibility rule)
-    # Simplified: based on Sun altitude thresholds
-    # First visibility: Sun at about -10
-    # Best visibility: Sun at about -8
-    # Last visibility: Sun at about -6
-    sun_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-    if sun_rate > 0:
-        if is_morning:
-            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
-            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
-            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
-        else:
-            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
-            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
-            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
-    else:
-        t_first_vr = jd
-        t_best_vr = jd
-        t_last_vr = jd
-
-    # Best time according to Yallop (for Moon)
-    t_b_yallop = t_best_vr  # Use same as best VR for simplicity
-
     # Fill in the result array
     dret[0] = body_alt_deg  # AltO - topocentric altitude (unrefracted)
     dret[1] = app_alt_deg  # AppAltO - apparent altitude (refracted)
@@ -3617,7 +3699,7 @@ def _heliacal_pheno_ut_pythonic(
     dret[23] = lag  # Lag - time difference
     dret[24] = tvis_vr  # TvisVR - visibility duration
     dret[25] = l_moon  # LMoon - crescent length
-    dret[26] = phase_angle  # CVAact (using phase angle)
+    dret[26] = elongation  # elong - elongation from the Sun
     dret[27] = illumination  # Illum - illumination percentage
     # dret[28] onwards are reserved, already 0.0
 
@@ -3662,8 +3744,8 @@ def heliacal_pheno_ut(
     temperature = atmo[1] if len(atmo) > 1 else 15.0
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
 
-    # Convert humidity from percent to 0-1 range
-    humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
+    # datm[2] is relative humidity in percent (reference convention)
+    humidity = humidity_pct / 100.0
 
     # Parse objname to body ID (Moon is allowed for pheno calculations)
     body_id = _parse_object_name(objname, allow_moon=True)

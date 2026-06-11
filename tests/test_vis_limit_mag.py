@@ -28,10 +28,15 @@ from libephemeris import (
 class TestVisLimitMagBasic:
     """Basic tests for vis_limit_mag function."""
 
-    def test_venus_night_visibility(self):
-        """Test Venus visibility at night."""
-        # August 15, 2024 at 22:00 UT (nighttime in Europe)
-        jd = julday(2024, 8, 15, 22.0)
+    def test_venus_evening_visibility(self):
+        """Venus above the horizon in evening twilight gives real data.
+
+        (The old epoch here had Venus below the horizon, where the
+        reference returns the -2/-100 sentinel - see the dedicated
+        below-horizon test.)
+        """
+        # January 10, 2025 at 17:30 UT: Venus high in the evening sky
+        jd = julday(2025, 1, 10, 17.5)
         # Rome, Italy
         geopos = (12.4964, 41.9028, 0)
         # Standard atmosphere
