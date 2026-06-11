@@ -2967,18 +2967,97 @@ def heliacal_ut(
     jd3 = 0.0  # End of visibility
 
     if jd_event > 0:
-        jd1 = jd_event  # Start visibility
+        jd1 = jd_event
 
-        # Calculate optimum and end visibility if details requested
         if not (flags & HELFLAG_NO_DETAILS):
-            # For detailed calculation, we estimate optimum and end times
-            # based on typical visibility window durations
-            # This is an approximation; full implementation would require
-            # more complex calculations
-            jd2 = jd_event  # Optimum (same as start for now)
-            jd3 = jd_event  # End (same as start for now)
+            # The reference refines three instants around the event: the
+            # optimum (maximum margin between the limiting magnitude and
+            # the body's extincted magnitude) and the two crossings where
+            # that margin vanishes (start and end of visibility).
+            jd1, jd2, jd3 = _heliacal_visibility_window(
+                jd_event, geopos, atmo, observer, objname, flags
+            )
 
     return (jd1, jd2, jd3)
+
+
+def _heliacal_visibility_window(
+    jd_event: float,
+    geopos: tuple,
+    atmo: tuple,
+    observer: tuple,
+    objname: str,
+    flags: int,
+) -> Tuple[float, float, float]:
+    """(start, optimum, end) of a heliacal visibility window.
+
+    The visibility margin is the limiting visual magnitude minus the
+    body's apparent magnitude with extinction; the body is visible
+    where the margin is positive. The optimum maximizes the margin, the
+    window limits are its zero crossings on either side. When a
+    crossing cannot be bracketed (e.g. the object stays visible into
+    darkness), the event time itself is reported for that limit.
+    """
+    from .extinction import calc_airmass
+
+    pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
+    schaefer = create_schaefer_model(
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity_pct if humidity_pct > 1.0 else humidity_pct * 100.0,
+        met_range=met_range if met_range >= 1.0 else 0.0,
+        altitude=geopos[2] if len(geopos) > 2 else 0.0,
+        observer_age=observer[0] if len(observer) > 0 else 36.0,
+        snellen=observer[1] if len(observer) > 1 else 1.0,
+    )
+
+    def _margin(jd: float) -> float:
+        retval, dret = vis_limit_mag(jd, geopos, atmo, observer, objname, flags)
+        if retval < 0:
+            return -99.0
+        return dret[0] - (dret[7] + schaefer.extinction(dret[1]))
+
+    # Optimum: maximum margin within ~3 hours of the event.
+    win = 0.12
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    lo, hi = jd_event - win, jd_event + win
+    a = hi - (hi - lo) / phi
+    b = lo + (hi - lo) / phi
+    fa, fb = _margin(a), _margin(b)
+    for _ in range(25):
+        if fa > fb:
+            hi, b, fb = b, a, fa
+            a = hi - (hi - lo) / phi
+            fa = _margin(a)
+        else:
+            lo, a, fa = a, b, fb
+            b = lo + (hi - lo) / phi
+            fb = _margin(b)
+        if hi - lo < 2e-5:
+            break
+    jd_opt = 0.5 * (lo + hi)
+
+    def _crossing(t_in: float, t_out: float) -> float:
+        f_in = _margin(t_in)
+        f_out = _margin(t_out)
+        if f_in <= 0.0 or f_out > 0.0:
+            return jd_event
+        for _ in range(25):
+            mid = 0.5 * (t_in + t_out)
+            if _margin(mid) > 0.0:
+                t_in = mid
+            else:
+                t_out = mid
+            if abs(t_out - t_in) < 2e-5:
+                break
+        return 0.5 * (t_in + t_out)
+
+    jd_start_vis = _crossing(jd_opt, jd_opt - win)
+    jd_end_vis = _crossing(jd_opt, jd_opt + win)
+    return jd_start_vis, jd_opt, jd_end_vis
 
 
 def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
