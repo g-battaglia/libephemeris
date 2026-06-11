@@ -1129,13 +1129,16 @@ def init_all(
                 continue
 
             try:
+                # naif_id deliberately omitted: Horizons-generated kernels
+                # may use 20000000+N target IDs while SPK_BODY_NAME_MAP holds
+                # the classic 2000000+N; registration auto-detects the ID
+                # from the downloaded file.
                 download_spk_from_horizons(
                     body_id=horizons_id,
                     jd_start=jd_start,
                     jd_end=jd_end,
                     output_path=output_path,
                     ipl=ipl,
-                    naif_id=naif_id,
                 )
                 body_success += 1
                 result["spk_success"] += 1

@@ -38,6 +38,34 @@ from typing import Dict, Optional, Union
 
 from .logging_config import get_logger
 from .download import _is_valid_bsp
+from .exceptions import Error
+
+
+def _detect_naif_id_from_file(
+    spk_path: str, preferred: Optional[int] = None
+) -> Optional[int]:
+    """Read the target NAIF ID from a downloaded SPK file.
+
+    Horizons-generated small-body kernels may number their targets
+    20000000+N while the classic convention is 2000000+N; the file itself
+    is the source of truth.  Returns ``preferred`` when it is present in
+    the file, the single small-body target when the file has exactly one,
+    otherwise None.
+    """
+    from . import spk
+
+    try:
+        targets = spk._get_spk_targets(spk_path)
+    except (OSError, ValueError, KeyError, ImportError):
+        return None
+    if not targets:
+        return None
+    if preferred is not None and preferred in targets:
+        return preferred
+    small_bodies = [t for t in targets if t > 1000000]
+    if len(small_bodies) == 1:
+        return small_bodies[0]
+    return None
 
 
 # =============================================================================
@@ -325,8 +353,14 @@ def _download_spk_astroquery(
             overwrite=True,
         )
 
-        logger.info("SPK download complete: %s", os.path.basename(result_path))
-        return result_path
+        # download_spk names the file with its own convention; callers rely
+        # on the file living at exactly output_path (cache lookups,
+        # registration), so move it there.
+        if os.path.abspath(result_path) != os.path.abspath(output_path):
+            os.replace(result_path, output_path)
+
+        logger.info("SPK download complete: %s", os.path.basename(output_path))
+        return output_path
     except (OSError, ValueError, KeyError, ImportError) as e:
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
@@ -525,7 +559,9 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
 
     if force or not os.path.exists(cache_path):
         with _AUTO_SPK_LOCK:
-            if not os.path.exists(cache_path):
+            # Re-check under the lock; honor force even if another thread
+            # (or a previous run) left a file here.
+            if force or not os.path.exists(cache_path):
                 _download_spk_astroquery(
                     body_id=config.body_id,
                     start=config.start,
@@ -534,8 +570,13 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
                 )
         config.spk_path = cache_path
 
-    # Deduce NAIF ID if not provided
+    # Resolve the NAIF ID: explicit > detected from the file > deduced.
+    # Horizons-generated kernels may use 20000000+N target IDs while the
+    # classic convention is 2000000+N — reading the file is authoritative.
     naif_id = config.naif_id
+    detected = _detect_naif_id_from_file(cache_path, naif_id)
+    if detected is not None:
+        naif_id = detected
     if naif_id is None:
         naif_id = spk._deduce_naif_id(config.body_id)
         if naif_id is None:
@@ -543,7 +584,7 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
                 f"Cannot deduce NAIF ID for '{config.body_id}'. "
                 "Please provide naif_id explicitly in enable_auto_spk()."
             )
-        config.naif_id = naif_id
+    config.naif_id = naif_id
 
     # Register the SPK body if not already registered
     from . import state
@@ -573,8 +614,9 @@ def try_auto_download(ipl: int) -> Optional[str]:
 
     try:
         return _ensure_spk_downloaded(config)
-    except (OSError, ValueError, KeyError, ImportError):
+    except (OSError, ValueError, KeyError, ImportError, Error):
         # Log error but don't raise - fall back to Keplerian
+        # (Error covers SPKNotFoundError raised by registration)
         return None
 
 
@@ -697,7 +739,9 @@ def list_cached_spk(
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = DEFAULT_AUTO_SPK_DIR
-        dirs_to_check = [default_cache, resolved_dir]
+        # Dedupe: in the default configuration both entries resolve to the
+        # same directory, which would double-count sizes and listings.
+        dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -851,7 +895,9 @@ def get_cache_size(cache_dir: Optional[str] = None) -> float:
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = DEFAULT_AUTO_SPK_DIR
-        dirs_to_check = [default_cache, resolved_dir]
+        # Dedupe: in the default configuration both entries resolve to the
+        # same directory, which would double-count sizes and listings.
+        dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -1006,28 +1052,15 @@ def enable_common_bodies(
         VESTA,
         ERIS,
         SEDNA,
-        NAIF_CHIRON,
-        NAIF_PHOLUS,
-        NAIF_CERES,
-        NAIF_PALLAS,
-        NAIF_JUNO,
-        NAIF_VESTA,
-        NAIF_ERIS,
-        NAIF_SEDNA,
+        SPK_BODY_NAME_MAP,
     )
 
-    common_bodies = [
-        (CHIRON, "2060", NAIF_CHIRON),
-        (PHOLUS, "5145", NAIF_PHOLUS),
-        (CERES, "1", NAIF_CERES),
-        (PALLAS, "2", NAIF_PALLAS),
-        (JUNO, "3", NAIF_JUNO),
-        (VESTA, "4", NAIF_VESTA),
-        (ERIS, "136199", NAIF_ERIS),
-        (SEDNA, "90377", NAIF_SEDNA),
-    ]
-
-    for ipl, body_id, naif_id in common_bodies:
+    # Use the canonical Horizons command strings from SPK_BODY_NAME_MAP:
+    # bare numbers like "1".."4" collide with planet-barycenter indices on
+    # Horizons ("SPK creation is not available for pre-computed objects"),
+    # so Ceres..Vesta need the "Name;" small-body syntax.
+    for ipl in (CHIRON, PHOLUS, CERES, PALLAS, JUNO, VESTA, ERIS, SEDNA):
+        body_id, naif_id = SPK_BODY_NAME_MAP[ipl]
         enable_auto_spk(
             ipl=ipl,
             body_id=body_id,
@@ -1449,7 +1482,13 @@ def _register_spk_after_download(
     """
     from . import spk
 
-    # Deduce NAIF ID if not provided
+    # The file's own target IDs are authoritative (Horizons kernels may use
+    # 20000000+N where the classic convention is 2000000+N).
+    detected = _detect_naif_id_from_file(spk_path, naif_id)
+    if detected is not None:
+        naif_id = detected
+
+    # Deduce NAIF ID if still unknown
     if naif_id is None:
         naif_id = spk._deduce_naif_id(str(body_id))
         if naif_id is None:
