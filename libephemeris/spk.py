@@ -1402,84 +1402,67 @@ def calc_spk_body_position(
     else:
         observer = planets["earth"]
 
-    # Calculate position
-    # Target position relative to SSB
-    target_pos = target.at(t)
+    # Apparent geocentric pipeline, mirroring the type-21 path:
+    # light-time iteration on the target (unless FLG_TRUEPOS) and
+    # annual aberration (unless FLG_NOABERR); heliocentric output stays
+    # geometric like the rest of the library's heliocentric paths.
+    from .constants import FLG_NOABERR, FLG_TRUEPOS
+    from .astrometry import apply_aberration_to_position
 
-    # Observer position relative to SSB
-    observer_pos = observer.at(t)
+    C_AU_DAY = 173.144632674240
+    apply_light_time = not (iflag & FLG_TRUEPOS) and not is_heliocentric
+    apply_aberr = not (iflag & FLG_NOABERR) and not is_heliocentric
+    ts = get_timescale()
 
-    # Relative position (target as seen from observer)
-    # We need to compute this manually since SPK targets may not support observe()
-    target_xyz = target_pos.position.au
-    observer_xyz = observer_pos.position.au
+    def _rel_at(t_obs):
+        """Light-time corrected target-minus-observer vector (AU)."""
+        obs_at = observer.at(t_obs)
+        obs_xyz = obs_at.position.au
+        t_emit = t_obs
+        rel = None
+        for _ in range(3):
+            tgt_xyz = target.at(t_emit).position.au
+            rel = [tgt_xyz[i] - obs_xyz[i] for i in range(3)]
+            if not apply_light_time:
+                break
+            dist_au = math.sqrt(rel[0] ** 2 + rel[1] ** 2 + rel[2] ** 2)
+            t_emit = ts.tt_jd(t_obs.tt - dist_au / C_AU_DAY)
+        if apply_aberr:
+            obs_vel = obs_at.velocity.au_per_d
+            rel = list(
+                apply_aberration_to_position(
+                    (rel[0], rel[1], rel[2]),
+                    (obs_vel[0], obs_vel[1], obs_vel[2]),
+                )
+            )
+        return rel
 
-    rel_xyz = [target_xyz[i] - observer_xyz[i] for i in range(3)]
-
-    # Convert to ecliptic coordinates
-    # Use Skyfield's ecliptic frame
     from skyfield.positionlib import ICRF
 
-    rel_pos = ICRF(rel_xyz, t=t, center=399)
+    def _ecl_at(t_obs):
+        rel = _rel_at(t_obs)
+        rel_pos = ICRF(rel, t=t_obs, center=399)
+        ecl = rel_pos.frame_latlon(ecliptic_frame)
+        return (
+            ecl[1].degrees % 360.0,
+            ecl[0].degrees,
+            ecl[2].au,
+        )
 
-    # Get ecliptic lat/lon
-    ecl_pos = rel_pos.frame_latlon(ecliptic_frame)
-    lat = ecl_pos[0].degrees
-    lon = ecl_pos[1].degrees
-    dist = ecl_pos[2].au
-
-    # Normalize longitude to 0-360
-    lon = lon % 360.0
+    lon, lat, dist = _ecl_at(t)
 
     # Calculate speeds if requested
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
     if iflag & FLG_SPEED:
-        # Central difference numerical differentiation (1 second timestep)
-        ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
+        lon_prev, lat_prev, dist_prev = _ecl_at(ts.tt_jd(t.tt - dt))
+        lon_next, lat_next, dist_next = _ecl_at(ts.tt_jd(t.tt + dt))
 
-        t_prev = ts.tt_jd(t.tt - dt)
-        t_next = ts.tt_jd(t.tt + dt)
-
-        # Position at t - dt
-        target_pos_prev = target.at(t_prev)
-        observer_pos_prev = observer.at(t_prev)
-
-        target_xyz_prev = target_pos_prev.position.au
-        observer_xyz_prev = observer_pos_prev.position.au
-
-        rel_xyz_prev = [target_xyz_prev[i] - observer_xyz_prev[i] for i in range(3)]
-
-        rel_pos_prev = ICRF(rel_xyz_prev, t=t_prev, center=399)
-        ecl_pos_prev = rel_pos_prev.frame_latlon(ecliptic_frame)
-
-        lat_prev = ecl_pos_prev[0].degrees
-        lon_prev = ecl_pos_prev[1].degrees % 360.0
-        dist_prev = ecl_pos_prev[2].au
-
-        # Position at t + dt
-        target_pos_next = target.at(t_next)
-        observer_pos_next = observer.at(t_next)
-
-        target_xyz_next = target_pos_next.position.au
-        observer_xyz_next = observer_pos_next.position.au
-
-        rel_xyz_next = [target_xyz_next[i] - observer_xyz_next[i] for i in range(3)]
-
-        rel_pos_next = ICRF(rel_xyz_next, t=t_next, center=399)
-        ecl_pos_next = rel_pos_next.frame_latlon(ecliptic_frame)
-
-        lat_next = ecl_pos_next[0].degrees
-        lon_next = ecl_pos_next[1].degrees % 360.0
-        dist_next = ecl_pos_next[2].au
-
-        # Compute rates using central difference (per day)
         speed_lon = (lon_next - lon_prev) / (2.0 * dt)
         speed_lat = (lat_next - lat_prev) / (2.0 * dt)
         speed_dist = (dist_next - dist_prev) / (2.0 * dt)
 
-        # Handle 360 wrap
         if speed_lon > 180.0 / (2.0 * dt):
             speed_lon -= 360.0 / (2.0 * dt)
         if speed_lon < -180.0 / (2.0 * dt):
