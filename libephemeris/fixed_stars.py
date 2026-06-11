@@ -4083,10 +4083,9 @@ def calc_fixed_star_position(
             if "outside range" not in str(_leb_err).lower():
                 raise  # Re-raise unexpected ValueError
             from .logging_config import get_logger
+
             get_logger().debug("LEB star fallback: %s", _leb_err)
-    return _calc_star_position_skyfield(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame
-    )
+    return _calc_star_position_skyfield(star_id, jd_tt, noaberr, nogdefl, j2000_frame)
 
 
 def calc_fixed_star_velocity(
@@ -4162,6 +4161,116 @@ def calc_fixed_star_velocity(
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
 
+def _se_star_key(name: str) -> str:
+    """Reference search key for a traditional star name.
+
+    The reference removes every whitespace character and lowercases the
+    traditional-name part; the Bayer/Flamsteed part after a comma keeps
+    its case.
+    """
+    s = "".join(ch for ch in name if not ch.isspace())
+    head, sep, tail = s.partition(",")
+    return head.lower() + sep + tail
+
+
+_SE_SORTED_CATALOG: "list | None" = None
+
+
+def _se_sorted_catalog():
+    """Catalog entries sorted by their reference search key.
+
+    Sequential star numbers ("1", "2", ...) index this order, mirroring
+    the reference's sorted in-memory star list (its v2 behavior; the
+    sequence is specific to the catalog shipped with this library).
+    """
+    global _SE_SORTED_CATALOG
+    if _SE_SORTED_CATALOG is None:
+        _SE_SORTED_CATALOG = sorted(STAR_CATALOG, key=lambda e: _se_star_key(e.name))
+    return _SE_SORTED_CATALOG
+
+
+def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
+    """Resolve a star with the reference's exact search semantics.
+
+    Mirrors the reference resolution rules:
+    - leading comma: the rest is a Bayer/Flamsteed nomenclature key,
+      matched exactly (case preserved): ",alTau" -> Aldebaran;
+    - "name,nomenclature": the traditional-name part is ignored and the
+      nomenclature key decides;
+    - leading digit: 1-based sequential number in the sorted catalog;
+    - trailing '%' on a traditional name: prefix wildcard (a '%'
+      anywhere else is an error);
+    - otherwise: exact traditional-name match (whitespace removed,
+      case-insensitive).
+
+    No fuzzy matching, Bayer-word parsing or prefix guessing happens
+    here - those remain available in the library's own search helpers
+    (resolve_star_name, search helpers), not in the reference-named
+    functions.
+
+    Returns:
+        (star_id, error_message, "Name,nomenclature"); on error the id
+        is -1 and the canonical name is None.
+    """
+    sstar = _se_star_key(star_name)
+    if not sstar:
+        return -1, "star name empty", None
+
+    def _found(entry) -> tuple[int, None, str]:
+        return entry.id, None, f"{entry.name},{entry.nomenclature}"
+
+    # ",nomenclature" or "name,nomenclature": nomenclature key search.
+    if "," in sstar:
+        key = sstar[sstar.index(",") + 1 :]
+        if not key:
+            return -1, f"could not find star name {sstar}", None
+        for entry in STAR_CATALOG:
+            if "".join(entry.nomenclature.split()) == key:
+                return _found(entry)
+        return -1, f"could not find star name ,{key}", None
+
+    # Sequential star number.
+    if sstar[0].isdigit():
+        digits = ""
+        for ch in sstar:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        star_nr = int(digits)
+        ordered = _se_sorted_catalog()
+        if star_nr < 1 or star_nr > len(ordered):
+            return (
+                -1,
+                f"sequential fixed star number {star_nr} is not available",
+                None,
+            )
+        return _found(ordered[star_nr - 1])
+
+    # Trailing '%' wildcard on the traditional name.
+    if "%" in sstar:
+        if not sstar.endswith("%") or sstar.count("%") != 1:
+            return -1, f"invalid search string {sstar}", None
+        prefix = sstar[:-1]
+        for entry in _se_sorted_catalog():
+            if _se_star_key(entry.name).startswith(prefix):
+                return _found(entry)
+        return -1, f"star search string {sstar} did not match", None
+
+    # Exact traditional-name match. The alias table plays the role of
+    # the reference catalog's additional name lines per star, so exact
+    # alias keys resolve too (still no fuzzy or prefix matching).
+    for entry in STAR_CATALOG:
+        if _se_star_key(entry.name) == sstar:
+            return _found(entry)
+    for alias, star_id in STAR_ALIASES.items():
+        if _se_star_key(alias).lower() == sstar:
+            for entry in STAR_CATALOG:
+                if entry.id == star_id:
+                    return _found(entry)
+    return -1, f"could not find star name {sstar}", None
+
+
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
     """
     Resolve a star name to its ID with reference API-compatible name resolution.
@@ -4180,12 +4289,7 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
         Tuple of (star_id, error_message, canonical_name).
         If error, star_id is -1 and canonical_name is None.
     """
-    star_id = resolve_star_name(star_name)
-    if star_id is not None:
-        canonical_name = get_canonical_star_name(star_id)
-        return star_id, None, canonical_name
-
-    return -1, f"could not find star name {star_name.lower()}", None
+    return _resolve_star_se(star_name)
 
 
 def _preprocess_flags(iflag: int) -> int:
@@ -4534,9 +4638,7 @@ def batch_fixstars_ut(
                 speed_dist = 0.0
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            result = _apply_fixstar_flags(
-                result, jd_tt, flags, j2000_native=use_j2000
-            )
+            result = _apply_fixstar_flags(result, jd_tt, flags, j2000_native=use_j2000)
             results[index] = (result, canonical_name, flags)
         except Error:
             if skip_errors:
