@@ -270,10 +270,11 @@ def nutation_angles(jd_tt: float) -> Tuple[float, float]:
 # PRECESSION
 # =============================================================================
 
-# Equatorial precession angles (Lieske 1977)
-ZETA_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 1.39656, -0.000139)
-Z_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 1.39656, -0.000139)
-THETA_A_COEFFS: Tuple[float, ...] = (0.0, 2004.3109, -0.85330, -0.000217)
+# Equatorial precession angles from J2000 (Lieske 1977), polynomial in
+# Julian centuries TT since J2000: c0 + c1*t + c2*t^2 + c3*t^3 (arcsec)
+ZETA_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 0.30188, 0.017998)
+Z_A_COEFFS: Tuple[float, ...] = (0.0, 2306.2181, 1.09468, 0.018203)
+THETA_A_COEFFS: Tuple[float, ...] = (0.0, 2004.3109, -0.42665, -0.041833)
 
 
 def _precession_matrix_j2000_to_date(jd_tt: float) -> np.ndarray:
@@ -390,9 +391,22 @@ def _precess_ecliptic(
     t2 = _jd_to_julian_centuries(to_jd)
     dt = t2 - t1
 
-    zeta = (2306.2181 + 1.39656 * t1) * dt + 1.09468 * dt**2 + 0.018203 * dt**3
-    z = (2306.2181 + 1.39656 * t1) * dt + 0.30188 * dt**2 + 0.017998 * dt**3
-    theta = (2004.3109 - 0.85330 * t1) * dt - 0.42665 * dt**2 - 0.041833 * dt**3
+    # Lieske et al. (1977) two-epoch precession angles (Meeus, eq. 21.2)
+    zeta = (
+        (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
+        + (0.30188 - 0.000344 * t1) * dt**2
+        + 0.017998 * dt**3
+    )
+    z = (
+        (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
+        + (1.09468 + 0.000066 * t1) * dt**2
+        + 0.018203 * dt**3
+    )
+    theta = (
+        (2004.3109 - 0.85330 * t1 - 0.000217 * t1**2) * dt
+        - (0.42665 + 0.000217 * t1) * dt**2
+        - 0.041833 * dt**3
+    )
 
     zeta_rad = zeta * ARCSEC_TO_RAD
     z_rad = z * ARCSEC_TO_RAD
