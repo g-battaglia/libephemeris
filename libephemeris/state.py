@@ -506,6 +506,20 @@ def get_leb_reader() -> Optional["LEBReader"]:
         return None
 
     if _LEB_READER is None:
+        with _INIT_LOCK:
+            return _get_leb_reader_locked(mode)
+    return _LEB_READER
+
+
+def _get_leb_reader_locked(mode):
+    """Lazy-create the LEB reader (must hold _INIT_LOCK).
+
+    Serialized so concurrent first calls cannot create two readers (and
+    leak an mmap), and so a concurrent set_leb_file(None) cannot resurrect
+    a stale reader mid-creation.
+    """
+    global _LEB_READER
+    if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
 
         # TOML config fallback
@@ -594,9 +608,11 @@ def _get_or_create_horizons_client():
     """Create or return the singleton HorizonsClient."""
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
     if _HORIZONS_CLIENT is None:
-        from .horizons_backend import HorizonsClient
+        with _INIT_LOCK:
+            if _HORIZONS_CLIENT is None:
+                from .horizons_backend import HorizonsClient
 
-        _HORIZONS_CLIENT = HorizonsClient()
+                _HORIZONS_CLIENT = HorizonsClient()
         if not _HORIZONS_WARNED:
             logger = get_logger()
             logger.info(
@@ -992,7 +1008,17 @@ def get_planet_centers() -> Optional[SpiceKernel]:
 
     current_tier = get_precision_tier()
 
-    # Reload if tier changed or not loaded
+    # Reload if tier changed or not loaded (serialized: concurrent first
+    # calls must not create two kernels and leak file handles)
+    if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
+        with _INIT_LOCK:
+            return _get_planet_centers_locked(current_tier)
+    return _PLANET_CENTERS
+
+
+def _get_planet_centers_locked(current_tier):
+    """Lazy-load planet centers kernel (must hold _INIT_LOCK)."""
+    global _PLANET_CENTERS, _PLANET_CENTERS_TIER
     if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
         _PLANET_CENTERS = None
         _PLANET_CENTERS_TIER = None

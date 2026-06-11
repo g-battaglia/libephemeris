@@ -55,6 +55,8 @@ jplephem : https://pypi.org/project/jplephem/
 SPICE Toolkit : http://naif.jpl.nasa.gov/naif/toolkit.html
 """
 
+import threading
+
 from numpy import array, zeros, reshape
 from jplephem.daf import DAF
 from jplephem.names import target_names
@@ -94,6 +96,12 @@ class SPKType21(object):
         # initialize for compute_type21
         self.mda_record_exist = False
         self.current_segment_exist = False
+
+        # libephemeris addition: the evaluation work arrays (G/FC/WC/W/KQ,
+        # REFPOS/REFVEL, mda_record, current_segment) are instance state
+        # mutated by spke21()/compute_type21(); kernels are cached and
+        # shared across calc threads, so evaluation must be serialized.
+        self._compute_lock = threading.Lock()
         
     @classmethod
     def open(cls, path):
@@ -132,17 +140,18 @@ class SPKType21(object):
         """
         eval_sec = (jd1 - T0)
         eval_sec = (eval_sec + jd2) * S_PER_DAY
-        
-        if self.mda_record_exist:
-            if eval_sec >= self.mda_lb and eval_sec < self.mda_ub:
-                result = self.spke21(eval_sec, self.mda_record)
-                return result[0:3], result[3:]
-        
-        self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(eval_sec, target, center)
-        self.mda_record_exists = True
-        
-        result = self.spke21(eval_sec, self.mda_record)
-        return result[0:3], result[3:]
+
+        with self._compute_lock:
+            if self.mda_record_exist:
+                if eval_sec >= self.mda_lb and eval_sec < self.mda_ub:
+                    result = self.spke21(eval_sec, self.mda_record)
+                    return result[0:3], result[3:]
+
+            self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(eval_sec, target, center)
+            self.mda_record_exists = True
+
+            result = self.spke21(eval_sec, self.mda_record)
+            return result[0:3], result[3:]
                 
     def get_MDA_record(self, eval_sec, target, center):
         """Return a EMDA record for defined epoch.

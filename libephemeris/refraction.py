@@ -291,8 +291,8 @@ def _dn_dr_at_height(
 # Cache
 # ---------------------------------------------------------------------------
 
-_refr_cache_key: tuple = ()
-_refr_cache_func: object = None  # Callable or None
+# Single-slot profile cache: (key, profile) stored atomically as one tuple
+_refr_cache_entry: object = None
 
 
 class _AtmosphereProfile:
@@ -343,14 +343,19 @@ class _AtmosphereProfile:
 def _get_profile(
     obs_alt: float, obs_P: float, obs_T_K: float, lapse_rate: float
 ) -> _AtmosphereProfile:
-    """Return a cached atmosphere profile."""
-    global _refr_cache_key, _refr_cache_func
+    """Return a cached atmosphere profile.
+
+    The single-slot cache stores (key, profile) as one tuple so a
+    concurrent reader can never pair the new key with the previous
+    profile (the old code assigned the key before the profile).
+    """
+    global _refr_cache_entry
     key = (obs_alt, obs_P, obs_T_K, lapse_rate)
-    if key == _refr_cache_key and _refr_cache_func is not None:
-        return _refr_cache_func  # type: ignore[return-value]
+    entry = _refr_cache_entry
+    if entry is not None and entry[0] == key:
+        return entry[1]
     prof = _AtmosphereProfile(obs_alt, obs_P, obs_T_K, lapse_rate)
-    _refr_cache_key = key
-    _refr_cache_func = prof
+    _refr_cache_entry = (key, prof)
     return prof
 
 

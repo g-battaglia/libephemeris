@@ -132,7 +132,12 @@ class EphemerisContext:
         """
         Get shared Skyfield timescale object.
 
-        Thread-safe lazy initialization. All contexts share the same timescale.
+        Thread-safe lazy initialization. All contexts share the same
+        timescale — and crucially the SAME one as the module-level API:
+        state.get_timescale() builds an enhanced timescale with merged
+        historical Delta-T (1657-1973). A plain load.timescale() here
+        diverged from module calc_ut by up to ~0.7 s of Delta-T (~0.4"
+        of Moon longitude) for pre-1973 dates.
 
         Returns:
             Timescale: Skyfield timescale for time conversions (UTC, TT, etc.)
@@ -141,8 +146,9 @@ class EphemerisContext:
         if _SHARED_TS is None:
             with _SHARED_LOCK:
                 if _SHARED_TS is None:  # Double-checked locking
-                    load = self.get_loader()
-                    _SHARED_TS = load.timescale()
+                    from .state import get_timescale as _state_get_timescale
+
+                    _SHARED_TS = _state_get_timescale()
         return _SHARED_TS
 
     def get_planets(self) -> SpiceKernel:
@@ -486,6 +492,13 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
+                _ctx_topo = None
+                if self.topo is not None:
+                    _ctx_topo = (
+                        float(self.topo.longitude.degrees),
+                        float(self.topo.latitude.degrees),
+                        float(self.topo.elevation.m),
+                    )
                 result = fast_calc.fast_calc_ut(
                     reader,
                     tjd_ut,
@@ -494,6 +507,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
 
@@ -555,6 +569,13 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
+                _ctx_topo_tt = None
+                if self.topo is not None:
+                    _ctx_topo_tt = (
+                        float(self.topo.longitude.degrees),
+                        float(self.topo.latitude.degrees),
+                        float(self.topo.elevation.m),
+                    )
                 result = fast_calc.fast_calc_tt(
                     reader,
                     tjd,
@@ -563,6 +584,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo=_ctx_topo_tt,
                 )
                 from .logging_config import get_logger
 
