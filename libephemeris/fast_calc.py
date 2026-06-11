@@ -1223,11 +1223,10 @@ def _pipeline_icrs(
     # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
     #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
     #    Skipped for helio/bary/truepos/nogdefl and for the Moon (negligible at
-    #    ~0.0026 AU, deflection < 0.000001").
-    if not (
-        iflag
-        & (FLG_NOABERR | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)
-    ):
+    #    ~0.0026 AU, deflection < 0.000001"). NOABERR deliberately does NOT
+    #    skip deflection: the reference API disables only aberration with it
+    #    (FLG_ASTROMETRIC = NOABERR|NOGDEFL).
+    if not (iflag & (FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)):
         if ipl != MOON and lt > 0.0:
             geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
 

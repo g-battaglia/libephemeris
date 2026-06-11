@@ -2578,8 +2578,15 @@ def _calc_body(
             # Cache observer.at(t) to avoid recomputing Earth's position
             # for every planet at the same JD
             obs_at_t = get_cached_observer_at(observer, t)
-            if iflag & FLG_NOABERR:
-                pos = obs_at_t.observe(target)  # Astrometric
+            if (iflag & FLG_NOABERR) and (iflag & FLG_NOGDEFL):
+                # Astrometric (the reference FLG_ASTROMETRIC combination)
+                pos = obs_at_t.observe(target)
+            elif iflag & FLG_NOABERR:
+                # Reference semantics: NOABERR disables only aberration;
+                # gravitational light deflection still applies (that is
+                # why FLG_ASTROMETRIC is defined as NOABERR|NOGDEFL).
+                astrometric = obs_at_t.observe(target)
+                pos = _apply_deflection_only(astrometric, t, icrf_center, planets)
             elif iflag & FLG_NOGDEFL:
                 # Aberration without gravitational deflection:
                 # Pass empty deflectors tuple to skip Sun/Jupiter/Saturn
@@ -4141,6 +4148,62 @@ def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> flo
     if flags & FLG_NONUT:
         return _calc_ayanamsa(tjd_ut, sid_mode)
     return _get_true_ayanamsa(tjd_ut)
+
+
+class _SkyfieldDeflectorSource:
+    """Adapter exposing the Skyfield kernel via LEBReader's eval_body API.
+
+    Lets the Skyfield path reuse fast_calc._apply_gravitational_deflection
+    (the shared PPN formula) for the NOABERR-only flag combination, where
+    deflection must be applied without aberration.
+    """
+
+    _NAMES = {0: "sun", 5: "jupiter barycenter", 6: "saturn barycenter"}
+
+    def __init__(self, planets_kernel):
+        self._planets = planets_kernel
+
+    def eval_body(self, body_id: int, jd_tt: float):
+        name = self._NAMES[body_id]  # KeyError -> deflector skipped upstream
+        ts = get_timescale()
+        t = ts.tt_jd(jd_tt)
+        at = self._planets[name].at(t)
+        p = at.position.au
+        v = at.velocity.au_per_d
+        return (
+            (float(p[0]), float(p[1]), float(p[2])),
+            (float(v[0]), float(v[1]), float(v[2])),
+        )
+
+
+def _apply_deflection_only(astrometric, t, icrf_center, planets_kernel):
+    """Apply gravitational deflection to an astrometric position (no aberration).
+
+    Skyfield has no built-in deflection-without-aberration mode, so the
+    geocentric astrometric vector is deflected with the shared PPN routine
+    and re-wrapped as an ICRF position for the downstream frame transforms.
+    """
+    from skyfield.positionlib import ICRF
+
+    from .fast_calc import _apply_gravitational_deflection
+
+    geo = astrometric.position.au
+    geo_t = (float(geo[0]), float(geo[1]), float(geo[2]))
+    obs = astrometric.center_barycentric
+    obs_pos = obs.position.au
+    obs_t = (float(obs_pos[0]), float(obs_pos[1]), float(obs_pos[2]))
+    lt = float(astrometric.light_time)
+
+    source = _SkyfieldDeflectorSource(planets_kernel)
+    deflected = _apply_gravitational_deflection(
+        geo_t, obs_t, t.tt, lt, source  # type: ignore[arg-type]
+    )
+    return ICRF(
+        (deflected[0], deflected[1], deflected[2]),
+        astrometric.velocity.au_per_d,
+        t=t,
+        center=icrf_center,
+    )
 
 
 # Position tuple type for nod_aps results
