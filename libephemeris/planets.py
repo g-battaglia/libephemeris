@@ -846,6 +846,14 @@ def calc_ut(
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
 
+    # The reference API echoes the ephemeris bit in the returned flags
+    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
+    # Swiss-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    from .constants import FLG_JPLEPH
+
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+
     # FLG_SPEED3: 3-position numerical differentiation for speed.
     # libephemeris already uses this method as its only speed computation,
     # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
@@ -1016,6 +1024,14 @@ def calc(
 
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
+
+    # The reference API echoes the ephemeris bit in the returned flags
+    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
+    # Swiss-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    from .constants import FLG_JPLEPH
+
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
 
     # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
     if flags & FLG_SPEED3:
@@ -1406,17 +1422,17 @@ def _calc_body_pctr(
         elif dp1 < -9000:
             dp1 += 360.0 / (2.0 * dt)
 
-    # Apply sidereal offset if requested (ecliptic only)
-    # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
-    # as is standard practice. get_ayanamsa_ut() returns mean ayanamsha.
+    # Apply sidereal offset if requested (ecliptic only).
+    # Routed through _get_ayanamsa_for_flags so FLG_NONUT/FLG_J2000 select
+    # the proper ayanamsha variant, consistent with _calc_body.
     if is_sidereal and not is_equatorial:
-        ayanamsa = _get_true_ayanamsa(t.ut1)
+        ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
         if iflag & FLG_SPEED:
-            ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt)
-            ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt)
+            ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
+            ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
             da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
             dp1 -= da
 
@@ -2596,13 +2612,26 @@ def _calc_body(
             # Get initial geometric position
             p, v = get_vector(t)
 
-            # Iterative light-time correction (2-3 iterations is enough)
+            # Light-time iteration: retard only the target; the observer
+            # (Sun or SSB) stays at the observation time. Retarding both
+            # shifts the result by the observer's barycentric motion over
+            # the light time (up to ~10 mas for the outer planets) and
+            # diverges from the LEB pipeline.
+            if observer is not None:
+                _obs_at = observer.at(t)
+                _obs_pos_lt = _obs_at.position.au
+                _obs_vel_lt = _obs_at.velocity.au_per_d
+            else:
+                _obs_pos_lt = np.zeros(3)
+                _obs_vel_lt = np.zeros(3)
+
             for _ in range(3):
                 dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
                 light_time = dist / C_AU_PER_DAY
                 ts_lt = get_timescale()
-                t_retarded = ts_lt.tdb_jd(t.tdb - light_time)
-                p, v = get_vector(t_retarded)
+                _tgt_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time))
+                p = _tgt_ret.position.au - _obs_pos_lt
+                v = _tgt_ret.velocity.au_per_d - _obs_vel_lt
 
             from skyfield.positionlib import ICRF
 
@@ -2656,52 +2685,10 @@ def _calc_body(
             p1 = ra.hours * 15.0
             p2 = dec.degrees
             p3 = dist.au
-
-            # Velocities?
-            # Skyfield doesn't give RA/Dec rates directly.
-            # We can use numerical differentiation if speed is requested.
-            if iflag & FLG_SPEED:
-                # Calculate velocity using central difference for J2000
-                dt = 1.0 / 86400.0
-                ts_inner = get_timescale()  # Fix: get ts locally
-
-                # Helper to get J2000 RA/Dec at t
-                def get_j2000_coord(t_):
-                    from skyfield.positionlib import ICRF
-
-                    if (
-                        iflag & FLG_TRUEPOS
-                        or (iflag & FLG_BARYCTR)
-                        or (iflag & FLG_HELCTR)
-                    ):
-                        p_, v_ = get_vector(t_)
-                        pos_ = ICRF(
-                            p_,
-                            v_,
-                            t=t_,
-                            center=icrf_center,
-                        )
-                    else:
-                        obs_at_t_ = get_cached_observer_at(observer, t_)
-                        if iflag & FLG_NOABERR:
-                            pos_ = obs_at_t_.observe(target)
-                        elif iflag & FLG_NOGDEFL:
-                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
-                        else:
-                            pos_ = obs_at_t_.observe(target).apparent()
-                    ra_, dec_, dist_ = pos_.radec()
-                    return ra_.hours * 15.0, dec_.degrees, dist_.au
-
-                # Central difference: get t-dt and t+dt
-                p1_prev, p2_prev, p3_prev = get_j2000_coord(ts_inner.tt_jd(t.tt - dt))
-                p1_next, p2_next, p3_next = get_j2000_coord(ts_inner.tt_jd(t.tt + dt))
-                dp1 = (p1_next - p1_prev) / (2.0 * dt)
-                dp2 = (p2_next - p2_prev) / (2.0 * dt)
-                dp3 = (p3_next - p3_prev) / (2.0 * dt)
-                if dp1 > 9000:
-                    dp1 -= 360 / (2.0 * dt)
-                if dp1 < -9000:
-                    dp1 += 360 / (2.0 * dt)
+            # Speeds are computed once in the generic central-difference
+            # block below (section 4); an in-branch duplicate previously
+            # ran two extra full pipeline evaluations whose results were
+            # unconditionally discarded.
         else:
             # Equator of Date (true or mean depending on NONUT/SIDEREAL flags)
             # Use the already-computed pos (with light-time correction) for the
@@ -2755,68 +2742,10 @@ def _calc_body(
                 dec_, ra_, dist_ = pos.frame_latlon(true_equator_and_equinox_of_date)
                 p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
 
-            if iflag & FLG_SPEED:
-                # Central difference numerical differentiation for speeds
-                # 1 second timestep provides good balance
-                dt = 1.0 / 86400.0  # 1 second in days
-
-                # Helper to get coord at time t_ (for speed neighbors only).
-                # Uses fresh observer.at() without cache to avoid Skyfield
-                # Time reify descriptor state corruption between calls.
-                def get_coord(t_):
-                    from skyfield.positionlib import ICRF
-
-                    if (
-                        iflag & FLG_TRUEPOS
-                        or (iflag & FLG_BARYCTR)
-                        or (iflag & FLG_HELCTR)
-                    ):
-                        p_, v_ = get_vector(t_)
-                        pos_ = ICRF(
-                            p_,
-                            v_,
-                            t=t_,
-                            center=icrf_center,
-                        )
-                    else:
-                        obs_at_t_ = observer.at(t_)
-                        if iflag & FLG_NOABERR:
-                            pos_ = obs_at_t_.observe(target)
-                        elif iflag & FLG_NOGDEFL:
-                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
-                        else:
-                            pos_ = obs_at_t_.observe(target).apparent()
-
-                    if _use_mean_equator:
-                        from skyfield.framelib import mean_equator_and_equinox_of_date
-
-                        dec_, ra_, dist_ = pos_.frame_latlon(
-                            mean_equator_and_equinox_of_date
-                        )
-                        return ra_.degrees, dec_.degrees, dist_.au
-                    else:
-                        from skyfield.framelib import true_equator_and_equinox_of_date
-
-                        dec_, ra_, dist_ = pos_.frame_latlon(
-                            true_equator_and_equinox_of_date
-                        )
-                    return ra_.degrees, dec_.degrees, dist_.au
-
-                ts = get_timescale()
-                # Central difference: create fresh Time objects to avoid
-                # Skyfield reify descriptor state leakage between calls
-                t_prev = ts.tt_jd(float(t.tt - dt))
-                t_next = ts.tt_jd(float(t.tt + dt))
-                p1_prev, p2_prev, p3_prev = get_coord(t_prev)
-                p1_next, p2_next, p3_next = get_coord(t_next)
-                dp1 = (p1_next - p1_prev) / (2.0 * dt)
-                dp2 = (p2_next - p2_prev) / (2.0 * dt)
-                dp3 = (p3_next - p3_prev) / (2.0 * dt)
-                # Handle 360 wrap for RA
-                if dp1 > 9000:
-                    dp1 -= 360 / (2.0 * dt)
-                if dp1 < -9000:
-                    dp1 += 360 / (2.0 * dt)
+            # Speeds are computed once in the generic central-difference
+            # block below (section 4); the previous in-branch duplicate
+            # ran two extra full pipeline evaluations whose results were
+            # unconditionally discarded before that block.
 
     else:
         # Ecliptic (Long/Lat)
@@ -4804,8 +4733,10 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # For Moon, use geocentric orbit (around Earth)
     if ipl == MOON:
         center = planets["earth"]
-        # GM_Earth in AU^3/day^2 (from solar mass ratio)
-        GM = 0.01720209895**2 / 332946.0
+        # Two-body mu for the Moon's geocentric osculating orbit must use
+        # GM(Earth+Moon): Sun/(Earth+Moon) mass ratio = 328900.5596
+        # (Earth alone, 332946, biases the semi-major axis ~+1.2%).
+        GM = 0.01720209895**2 / 328900.5596
     else:
         center = planets["sun"]
         # GM_sun in AU^3/day^2
