@@ -12894,6 +12894,8 @@ def planet_occult_when_glob(
     # Main search loop
     jd = jd_start
     step = 1.0  # Check every day initially
+    # direction < 0 searches backward in time (reference convention).
+    sign = -1.0 if direction < 0 else 1.0
 
     for iteration in range(MAX_ITERATIONS):
         try:
@@ -12904,6 +12906,21 @@ def planet_occult_when_glob(
                 # Exceeded ephemeris range - stop searching
                 break
             raise
+
+        # Mutual planetary occultations subtend arcseconds and last
+        # minutes: a sampled is_occ hit can fall between steps. Any
+        # close approach is therefore refined to its true minimum
+        # before the occultation test.
+        if not is_occ and sep < 0.2:
+            jd_min_c = _find_minimum_separation(jd - 0.5, jd + 0.5)
+            is_occ_c, _sep_c, _o_r, _t_r = _check_occultation(jd_min_c)
+            if is_occ_c:
+                is_occ = True
+                jd = jd_min_c
+            elif (jd_min_c - jd) * sign > 0.0:
+                # Past this conjunction: jump beyond it.
+                jd = jd_min_c + sign * 0.5
+                continue
 
         if is_occ:
             # Found an occultation! Refine timing
@@ -12954,7 +12971,7 @@ def planet_occult_when_glob(
         else:
             step = 1.0
 
-        jd += step
+        jd += sign * step
 
         if jd > jd_start + MAX_SEARCH_YEARS * 365.25:
             break
