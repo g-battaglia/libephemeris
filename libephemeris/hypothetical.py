@@ -47,7 +47,15 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Tuple, Dict, Any, List, Optional, Union
-from .constants import FICT_OFFSET
+from .constants import (
+    FICT_OFFSET,
+    HARRINGTON,
+    NEPTUNE_ADAMS,
+    NEPTUNE_LEVERRIER,
+    NIBIRU,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
+)
 
 
 # =============================================================================
@@ -71,9 +79,7 @@ TRANSPLUTO: int = ISIS  # Alias
 NIBIRU: int = FICT_OFFSET + 9  # 49 - Sitchin's hypothetical planet
 HARRINGTON: int = FICT_OFFSET + 10  # 50 - Harrington's Planet X
 NEPTUNE_LEVERRIER: int = FICT_OFFSET + 11  # 51 - Leverrier's Neptune position
-PLANET_X_LEVERRIER: int = (
-    NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X"
-)
+PLANET_X_LEVERRIER: int = NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X"
 NEPTUNE_ADAMS: int = FICT_OFFSET + 12  # 52 - Adams' Neptune position
 PLANET_X_ADAMS: int = (
     NEPTUNE_ADAMS  # Alias - Adams' calculated "Planet X" (independently derived)
@@ -2199,6 +2205,134 @@ def get_hypothetical_name(ipl: int) -> str:
     return HYPOTHETICAL_NAMES.get(ipl, f"Unknown ({ipl})")
 
 
+# Orbital elements of the classical hypothetical/predicted planets the
+# reference exposes as bodies 49-54. The values are historical data from
+# the published predictions (collected, like every fictitious-body
+# element set, in the standard orbital-elements file format):
+# - Nibiru: elements as circulated in the astrological community for
+#   Z. Sitchin's popular "12th planet" lore.
+# - Harrington: R.S. Harrington's Planet X search orbit (AJ 96, 1476,
+#   1988).
+# - Leverrier / Adams: the 1846 theoretical orbits of Neptune by
+#   U. Le Verrier (CRAS 23) and J.C. Adams.
+# - Lowell: P. Lowell, "Memoir on a Trans-Neptunian Planet" (1915).
+# - Pickering: W.H. Pickering's Planet P prediction (1928).
+FICTITIOUS_ORBITAL_ELEMENTS = {
+    NIBIRU: OrbitalElements(
+        name="Nibiru",
+        epoch_jd=1856113.380954,
+        equinox_jd=1856113.380954,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(0.0),
+        semi_axis=234.8921,
+        eccentricity=TPolynomial(0.981092),
+        arg_perihelion=TPolynomial(103.966),
+        asc_node=TPolynomial(-44.567),
+        inclination=TPolynomial(158.708),
+    ),
+    HARRINGTON: OrbitalElements(
+        name="Harrington",
+        epoch_jd=2374696.5,
+        equinox_jd=2451545.0,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(0.0),
+        semi_axis=101.2,
+        eccentricity=TPolynomial(0.411),
+        arg_perihelion=TPolynomial(208.5),
+        asc_node=TPolynomial(275.4),
+        inclination=TPolynomial(32.4),
+    ),
+    NEPTUNE_LEVERRIER: OrbitalElements(
+        name="Leverrier",
+        epoch_jd=2395662.5,
+        equinox_jd=2395662.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(34.05),
+        semi_axis=36.15,
+        eccentricity=TPolynomial(0.10761),
+        arg_perihelion=TPolynomial(284.75),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    NEPTUNE_ADAMS: OrbitalElements(
+        name="Adams",
+        epoch_jd=2395662.5,
+        equinox_jd=2395662.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(24.28),
+        semi_axis=37.25,
+        eccentricity=TPolynomial(0.12062),
+        arg_perihelion=TPolynomial(299.11),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    PLUTO_LOWELL: OrbitalElements(
+        name="Lowell",
+        epoch_jd=2425977.5,
+        equinox_jd=2425977.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(281.0),
+        semi_axis=43.0,
+        eccentricity=TPolynomial(0.202),
+        arg_perihelion=TPolynomial(204.9),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    PLUTO_PICKERING: OrbitalElements(
+        name="Pickering",
+        epoch_jd=2425977.5,
+        equinox_jd=2425977.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(48.95),
+        semi_axis=55.1,
+        eccentricity=TPolynomial(0.31),
+        arg_perihelion=TPolynomial(280.1),
+        asc_node=TPolynomial(100.0),
+        inclination=TPolynomial(15.0),
+    ),
+}
+
+
+def calc_fictitious_position(
+    ipl: int, jd_tt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """Heliocentric position of a classical predicted planet (49-54).
+
+    Full Keplerian propagation of the published prediction orbits with
+    equinox precession; see FICTITIOUS_ORBITAL_ELEMENTS for the sources.
+
+    Returns (lon, lat, dist, dlon, dlat, ddist), J2000 ecliptic.
+    """
+    elem = FICTITIOUS_ORBITAL_ELEMENTS.get(ipl)
+    if elem is None:
+        from .exceptions import UnknownBodyError
+
+        raise UnknownBodyError(message=f"no fictitious elements for body {ipl}")
+
+    # Propagate through _keplerian_to_ecliptic_j2000: it applies the
+    # element-equinox precession to J2000 correctly and uses the
+    # Gaussian mean motion (calc_orbital_position does neither).
+    from types import SimpleNamespace
+
+    ad = SimpleNamespace(
+        epoch=elem.epoch_jd,
+        M0=elem.mean_anomaly.evaluate(0.0),
+        n=0.9856076686 / elem.semi_axis**1.5,
+        e=elem.eccentricity.evaluate(0.0),
+        a=elem.semi_axis,
+        omega=elem.arg_perihelion.evaluate(0.0),
+        Omega=elem.asc_node.evaluate(0.0),
+        i=elem.inclination.evaluate(0.0),
+        equinox_jd=elem.equinox_jd,
+    )
+    lon, lat, dist = _keplerian_to_ecliptic_j2000(ad, jd_tt)
+    h = 0.5
+    lon_p, lat_p, dist_p = _keplerian_to_ecliptic_j2000(ad, jd_tt - h)
+    lon_n, lat_n, dist_n = _keplerian_to_ecliptic_j2000(ad, jd_tt + h)
+    dlon = ((lon_n - lon_p + 180.0) % 360.0) - 180.0
+    return (lon, lat, dist, dlon, lat_n - lat_p, dist_n - dist_p)
+
+
 def calc_uranian_longitude(ipl: int, jd_tt: float) -> float:
     """
     Calculate the ecliptic longitude of a Uranian (Hamburg School) planet.
@@ -3284,115 +3418,31 @@ def calc_white_moon_position(
     jd_tt: float,
     use_true_lilith: bool = False,
 ) -> Tuple[float, float, float, float, float, float]:
-    """
-    Calculate the position of the White Moon (Selena).
+    """Position of the White Moon (Selena).
 
-    The White Moon (also called Selena) is a symbolic astrological point defined
-    as the lunar perigee - the point 180 degrees opposite to Black Moon Lilith
-    (the lunar apogee). It represents the closest approach of the Moon to Earth,
-    symbolically associated with positive lunar qualities.
+    Uses the published circular geocentric orbit (the standard
+    orbital-elements convention for this body): mean longitude
+    242.2205555 + 5143.5418158*T degrees (T in Julian centuries from
+    J2000, equinox of date), radius 0.05280098949 AU, zero eccentricity
+    and inclination. The longitude advances 0.140822 degrees/day
+    (a 7-year cycle).
 
-    Definition:
-        White Moon Selena = Mean Lilith + 180° (default, matching reference API)
-        This uses the mean lunar apogee, which ignores short-period oscillations.
-
-    True Lilith-based Definition:
-        White Moon Selena = True Lilith + 180° (optional via use_true_lilith=True)
-        This uses the osculating (true) lunar apogee, which includes perturbations.
-        The true apogee oscillates ±5-10° from the mean position.
-
-    Astronomical Background:
-        - Black Moon Lilith (lunar apogee) = point where Moon is farthest from Earth
-        - White Moon Selena (lunar perigee) = point where Moon is closest to Earth
-        - Mean apogee progresses at ~40.69°/year (apsidal precession period ~8.85 years)
+    The ``use_true_lilith`` parameter is kept for backward compatibility
+    and is ignored: the reference defines Selena by these elements, not
+    as the anti-apogee.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
-        use_true_lilith: If True, calculate based on True (osculating) Lilith
-                         instead of Mean Lilith. Default is False to match
-                         the reference API convention.
+        use_true_lilith: Ignored (kept for API compatibility).
 
     Returns:
-        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
-            - longitude: Ecliptic longitude in degrees (0-360)
-            - latitude: Ecliptic latitude in degrees (0 for mean-based, varies for true)
-            - distance: Distance (0 for symbolic point, or apogee distance for true)
-            - dlon: Daily longitude change in degrees/day
-            - dlat: Daily latitude change in degrees/day
-            - ddist: Daily distance change in AU/day
-
-    Note:
-        This is a symbolic calculation. The White Moon is not a physical body,
-        but rather a calculated point representing the lunar perigee direction.
-
-    Example:
-        >>> from libephemeris.hypothetical import calc_white_moon_position
-        >>> pos = calc_white_moon_position(2451545.0)  # J2000.0, mean-based
-        >>> print(f"White Moon at {pos[0]:.4f} deg")
-        >>> pos_true = calc_white_moon_position(2451545.0, use_true_lilith=True)
-        >>> print(f"White Moon (true) at {pos_true[0]:.4f} deg")
-
-    References:
-        - Reference documentation on fictitious objects
-        - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist) -
+        geocentric ecliptic of date, distance in AU.
     """
-    # Import lunar module to get Lilith position
-    from . import lunar
-
-    if use_true_lilith:
-        # Use True (osculating) Lilith - includes perturbations
-        lilith_lon, lilith_lat, lilith_dist = lunar.calc_true_lilith(jd_tt)
-
-        # White Moon is opposite to Black Moon
-        longitude = (lilith_lon + 180.0) % 360.0
-
-        # For true-based calculation, latitude is opposite (symmetric point)
-        # Note: True Lilith has non-zero latitude due to inclination of apsidal line
-        latitude = -lilith_lat  # Opposite point has opposite latitude
-
-        # Distance is same as Lilith (apogee distance = perigee distance conceptually,
-        # but for a symbolic point we use 0)
-        distance = 0.0  # Symbolic point, no meaningful distance
-
-        # Calculate velocity via numerical differentiation
-        dt = 1.0 / 86400.0  # 1 second step
-        lilith_next_lon, lilith_next_lat, _ = lunar.calc_true_lilith(jd_tt + dt)
-
-        lilith_dlon = (lilith_next_lon - lilith_lon) / dt
-        # Handle wrap-around
-        if lilith_dlon > 180.0 / dt:
-            lilith_dlon -= 360.0 / dt
-        elif lilith_dlon < -180.0 / dt:
-            lilith_dlon += 360.0 / dt
-
-        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
-        dlat = -(lilith_next_lat - lilith_lat) / dt  # Opposite latitude change
-        ddist = 0.0
-    else:
-        # Use Mean Lilith - default, standard approach
-        lilith_lon = lunar.calc_mean_lilith(jd_tt)
-
-        # White Moon is opposite to Black Moon
-        longitude = (lilith_lon + 180.0) % 360.0
-
-        # Latitude, distance, and velocities are simplified for mean calculation
-        latitude = 0.0
-        distance = 0.0  # Symbolic point, no meaningful distance
-
-        # Calculate velocity via numerical differentiation
-        dt = 1.0 / 86400.0  # 1 second step
-        lilith_next = lunar.calc_mean_lilith(jd_tt + dt)
-        lilith_dlon = (lilith_next - lilith_lon) / dt
-        if lilith_dlon > 180.0 / dt:
-            lilith_dlon -= 360.0 / dt
-        elif lilith_dlon < -180.0 / dt:
-            lilith_dlon += 360.0 / dt
-
-        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
-        dlat = 0.0
-        ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    t_cent = (jd_tt - 2451545.0) / 36525.0
+    lon = (242.2205555 + 5143.5418158 * t_cent) % 360.0
+    dlon = 5143.5418158 / 36525.0
+    return (lon, 0.0, 0.05280098949, dlon, 0.0, 0.0)
 
 
 def calc_waldemath_position(
@@ -3834,6 +3884,9 @@ def calc_hypothetical_position(
     # (Witte/Sieggruen elements refined by Neely 1988)
     if ipl in URANIAN_KEPLERIAN_ELEMENTS:
         return calc_uranian_planet(ipl, jd_tt)
+
+    if ipl in FICTITIOUS_ORBITAL_ELEMENTS:
+        return calc_fictitious_position(ipl, jd_tt)
 
     # Transpluto / Isis
     if ipl == ISIS:

@@ -90,6 +90,12 @@ from .constants import (
     VULKANUS,
     POSEIDON,
     ISIS,
+    NIBIRU,
+    HARRINGTON,
+    NEPTUNE_LEVERRIER,
+    NEPTUNE_ADAMS,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
     CHIRON,
     PHOLUS,
     CERES,
@@ -174,7 +180,13 @@ _PLANET_NAMES = {
     INTP_APOG: "intp. Apogee",
     INTP_PERG: "intp. Perigee",
     EARTH: "Earth",
-    ISIS: "Transpluto",
+    ISIS: "Isis-Transpluto",
+    NIBIRU: "Nibiru",
+    HARRINGTON: "Harrington",
+    NEPTUNE_LEVERRIER: "Leverrier",
+    NEPTUNE_ADAMS: "Adams",
+    PLUTO_LOWELL: "Lowell",
+    PLUTO_PICKERING: "Pickering",
     CUPIDO: "Cupido",
     HADES: "Hades",
     ZEUS: "Zeus",
@@ -2219,29 +2231,46 @@ def _calc_body(
     # White Moon and Waldemath are geocentric constructions; Vulcan and
     # Proserpina are heliocentric orbits and must be converted to
     # geocentric (with light-time retardation) like any orbiting body.
-    if ipl in (WHITE_MOON, VULCAN, PROSERPINA, WALDEMATH):
+    _FICT_HELIO_IDS = (
+        NIBIRU,
+        HARRINGTON,
+        NEPTUNE_LEVERRIER,
+        NEPTUNE_ADAMS,
+        PLUTO_LOWELL,
+        PLUTO_PICKERING,
+    )
+    if ipl in (WHITE_MOON, VULCAN, PROSERPINA, WALDEMATH) or ipl in _FICT_HELIO_IDS:
         from . import hypothetical
 
         jd_tt = t.tt
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
-        if ipl in (VULCAN, PROSERPINA):
+        if ipl in (VULCAN, PROSERPINA) or ipl in _FICT_HELIO_IDS:
             from skyfield.framelib import ecliptic_J2000_frame
             from .astrometry import _precess_ecliptic
 
             _C_AU_DAY = 173.144632674240
-            _calc_helio = (
-                hypothetical.calc_vulcan
-                if ipl == VULCAN
-                else hypothetical.calc_proserpina
-            )
+            if ipl == VULCAN:
+                _calc_helio = hypothetical.calc_vulcan
+            elif ipl == PROSERPINA:
+                _calc_helio = hypothetical.calc_proserpina
+            else:
+
+                def _calc_helio(jd, _ipl=ipl):
+                    return hypothetical.calc_fictitious_position(_ipl, jd)
 
             def _helio_xyz_j2000(jd: float) -> Tuple[float, float, float]:
                 """Heliocentric J2000-ecliptic cartesian position (AU)."""
                 h = _calc_helio(jd)
-                # The element propagation yields mean ecliptic of date;
-                # rotate to J2000 so the Earth subtraction is frame-consistent.
-                lon_j, lat_j = _precess_ecliptic(h[0], h[1], jd, 2451545.0)
+                if ipl in (VULCAN, PROSERPINA):
+                    # These element sets use the equinox of date; rotate
+                    # to J2000 so the Earth subtraction is
+                    # frame-consistent.
+                    lon_j, lat_j = _precess_ecliptic(h[0], h[1], jd, 2451545.0)
+                else:
+                    # The predicted-planet propagation already returns
+                    # J2000 ecliptic coordinates.
+                    lon_j, lat_j = h[0], h[1]
                 lon_r = math.radians(lon_j)
                 lat_r = math.radians(lat_j)
                 cl = math.cos(lat_r)
@@ -2363,7 +2392,10 @@ def _calc_body(
             # (e.g. due to third-party library incompatibility) — allow
             # Keplerian fallback rather than blocking the calculation entirely.
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED and not _auto_download_attempted:
+                if (
+                    ipl not in SPK_AUTO_DOWNLOAD_BLOCKED
+                    and not _auto_download_attempted
+                ):
                     horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
                     body_name = spk._get_body_name(ipl) or str(ipl)
                     raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
@@ -2460,9 +2492,7 @@ def _calc_body(
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            raise ValueError(
-                "Angles require observer location. Call set_topo() first."
-            )
+            raise ValueError("Angles require observer location. Call set_topo() first.")
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -4158,7 +4188,11 @@ def _apply_deflection_only(astrometric, t, icrf_center, planets_kernel):
 
     source = _SkyfieldDeflectorSource(planets_kernel)
     deflected = _apply_gravitational_deflection(
-        geo_t, obs_t, t.tt, lt, source  # type: ignore[arg-type]
+        geo_t,
+        obs_t,
+        t.tt,
+        lt,
+        source,  # type: ignore[arg-type]
     )
     return ICRF(
         (deflected[0], deflected[1], deflected[2]),
@@ -4614,9 +4648,7 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
-def get_orbital_elements(
-    tjdet: float, planet: int, flags: int
-) -> Tuple[float, ...]:
+def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
 
@@ -4668,9 +4700,7 @@ def get_orbital_elements(
     return _calc_orbital_elements(t, planet, flags)
 
 
-def get_orbital_elements_ut(
-    tjd_ut: float, ipl: int, iflag: int
-) -> Tuple[float, ...]:
+def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for Universal Time.
 
@@ -5455,8 +5485,18 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     base_flags = FLG_SPEED | (iflag & FLG_TRUEPOS)
 
     # Unsupported bodies (nodes, apogees, etc.) — match _calc_pheno() behavior
-    _PHENO_SUPPORTED = {SUN, MOON, MERCURY, VENUS, MARS,
-                        JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
+    _PHENO_SUPPORTED = {
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+    }
     if ipl not in _PHENO_SUPPORTED:
         return (0.0,) * 20
 
@@ -5513,7 +5553,11 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         body_xyz, _ = _leb_calc(tjd_ut, ipl, _xyz_flags)
         sun_xyz, _ = _leb_calc(tjd_ut, SUN, _xyz_flags)
         # body→Sun and body→Earth vectors
-        bs = (sun_xyz[0] - body_xyz[0], sun_xyz[1] - body_xyz[1], sun_xyz[2] - body_xyz[2])
+        bs = (
+            sun_xyz[0] - body_xyz[0],
+            sun_xyz[1] - body_xyz[1],
+            sun_xyz[2] - body_xyz[2],
+        )
         be = (-body_xyz[0], -body_xyz[1], -body_xyz[2])
         dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
         mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
@@ -5577,9 +5621,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
 
 
-def pheno_ut(
-    tjdut: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
 
@@ -5634,9 +5676,7 @@ def pheno_ut(
     return _calc_pheno(t, planet, flags)
 
 
-def pheno(
-    tjdet: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 
