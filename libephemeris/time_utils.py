@@ -457,17 +457,31 @@ def utc_to_jd(
     """
     # Validate leap second: second=60 is only valid at 23:59:60 on dates
     # where a leap second was actually inserted (end of June 30 or Dec 31).
+    # Raises the project Error (reference API raises its Error class too).
     if second >= 60.0:
+        from .exceptions import Error
+
         if hour != 23 or minute != 59:
-            raise ValueError(
+            raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
             )
         if not _is_leap_second_date(year, month, day):
-            raise ValueError(
+            raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
             )
+
+    # Before 1972 UTC (with leap seconds) did not exist; the reference API
+    # treats the input as UT1 directly: jd_ut1 is the literal calendar JD
+    # and jd_et = jd_ut1 + Delta T. (Routing through Skyfield's ts.utc()
+    # would clamp TAI-UTC to 10 s, drifting up to tens of minutes in
+    # antiquity — verified +24 s at 1800, -27 min at year 1000.)
+    if year < 1972:
+        decimal_hour = hour + minute / 60.0 + second / 3600.0
+        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
+        jd_et = jd_ut1 + deltat(jd_ut1)
+        return float(jd_et), float(jd_ut1)
 
     ts = get_timescale()
 
@@ -489,6 +503,18 @@ def utc_to_jd(
 
     # Explicit float cast to satisfy type checker (Skyfield uses lazy reify decorator)
     return float(t.tt), float(t.ut1)
+
+
+def _jd_to_calendar_tuple(
+    jd: float, calendar: int
+) -> tuple[int, int, int, int, int, float]:
+    """Split a Julian Day into (y, m, d, hh, mm, ss.s) calendar components."""
+    y, m, d, decimal_hour = revjul(jd, calendar)
+    hh = int(decimal_hour)
+    minute_frac = (decimal_hour - hh) * 60.0
+    mm = int(minute_frac)
+    ss = (minute_frac - mm) * 60.0
+    return y, m, d, hh, mm, ss
 
 
 def jdet_to_utc(
@@ -528,6 +554,13 @@ def jdet_to_utc(
         >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
         2000-01-01 11:58:55.82
     """
+    # Pre-1972 there is no UTC: the reference API returns the UT1 calendar
+    # date directly (jd_ut1 = jd_et - Delta T, fixed-point refined).
+    jd_ut1_est = jd_et - deltat(jd_et)
+    jd_ut1_est = jd_et - deltat(jd_ut1_est)
+    if revjul(jd_ut1_est, GREG_CAL)[0] < 1972:
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
+
     ts = get_timescale()
 
     # Create a Skyfield Time object from TT Julian Day
@@ -599,6 +632,10 @@ def jdut1_to_utc(
         2020-06-15 14:30:00.00
     """
     ts = get_timescale()
+
+    # Pre-1972 there is no UTC: return the UT1 calendar date directly.
+    if revjul(jd_ut1, GREG_CAL)[0] < 1972:
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day
     t = ts.ut1_jd(jd_ut1)
@@ -1341,42 +1378,43 @@ def utc_time_zone(
         >>> utc_time_zone(2024, 1, 15, 12, 0, 0.0, -5)
         (2024, 1, 15, 17, 0, 0.0)
     """
-    # Convert local time to decimal hours
-    decimal_hour = hour + minute / 60.0 + second / 3600.0
+    # Component-wise arithmetic (no decimal-hour round trip): the seconds
+    # value passes through bit-exact — including a leap-second input
+    # (second >= 60), which the reference API preserves — and no
+    # millisecond rounding is applied.
+    offset_min_f = timezone_offset * 60.0
+    offset_min = round(offset_min_f)
+    # Sub-minute offset residue (rare, e.g. historical LMT zones)
+    offset_sec = (offset_min_f - offset_min) * 60.0
 
-    # Convert to Julian Day
-    jd = julday(year, month, day, decimal_hour, GREG_CAL)
+    out_second = second - offset_sec
+    minute_carry = 0
+    # Keep a leap second (60 <= s < 61) untouched by normalization
+    if out_second >= 61.0 or (out_second >= 60.0 and second < 60.0):
+        out_second -= 60.0
+        minute_carry += 1
+    elif out_second < 0.0:
+        out_second += 60.0
+        minute_carry -= 1
 
-    # Subtract timezone offset to get UTC (convert hours to days)
-    jd_local = jd - timezone_offset / 24.0
+    total_min = hour * 60 + minute - offset_min + minute_carry
+    day_shift, total_min = divmod(total_min, 1440)
 
-    # Convert back to calendar date
-    local_year, local_month, local_day, local_decimal_hour = revjul(
-        jd_local, GREG_CAL
+    local_hour = total_min // 60
+    local_minute = total_min % 60
+
+    if day_shift == 0:
+        local_year, local_month, local_day = year, month, day
+    else:
+        # Date arithmetic via JD at noon (immune to time-of-day rounding)
+        jd_noon = julday(year, month, day, 12.0, GREG_CAL) + day_shift
+        local_year, local_month, local_day, _ = revjul(jd_noon, GREG_CAL)
+
+    return (
+        local_year,
+        local_month,
+        local_day,
+        int(local_hour),
+        int(local_minute),
+        float(out_second),
     )
-
-    # Extract time components from decimal hour with rounding to avoid
-    # floating-point precision issues (e.g., 11.4999999 -> 11.5)
-    # Round to millisecond precision (3 decimal places in seconds)
-    # This is sufficient for timezone conversions and avoids floating-point errors
-    total_seconds = local_decimal_hour * 3600.0
-    total_seconds = round(total_seconds, 3)
-
-    local_hour = int(total_seconds // 3600)
-    remaining = total_seconds - local_hour * 3600
-    local_minute = int(remaining // 60)
-    local_second = remaining - local_minute * 60
-
-    # Handle edge case where rounding pushes us to 60 seconds
-    if local_second >= 60.0:
-        local_second -= 60.0
-        local_minute += 1
-    if local_minute >= 60:
-        local_minute -= 60
-        local_hour += 1
-    if local_hour >= 24:
-        local_hour -= 24
-        # Day already handled by revjul, this shouldn't happen
-        # but included for safety
-
-    return local_year, local_month, local_day, local_hour, local_minute, local_second

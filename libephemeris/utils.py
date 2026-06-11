@@ -304,21 +304,21 @@ def azalt(
     if azimuth < 0:
         azimuth += 360.0
 
-    # pressure=0 means "no refraction" (pyswisseph convention).
-    # Only apply refraction when pressure is explicitly positive.
+    # Reference API convention for azalt(): pressure 0 does NOT disable
+    # refraction here (that is refrac()'s convention) — it means "estimate
+    # the pressure from the observer's altitude" using the standard
+    # atmosphere, then apply refraction.
+    if pressure <= 0:
+        pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.0) ** 5.255
 
     # Calculate atmospheric refraction via ICAO ray-tracing
-    if pressure > 0 and alt_true > -2.0:
-        alt_apparent, _ = refrac_extended(
-            alt_true,
-            altitude,
-            pressure,
-            temperature,
-            flag=TRUE_TO_APP,
-        )
-    else:
-        # No refraction correction
-        alt_apparent = alt_true
+    alt_apparent, _ = refrac_extended(
+        alt_true,
+        altitude,
+        pressure,
+        temperature,
+        flag=TRUE_TO_APP,
+    )
 
     return (azimuth, alt_true, alt_apparent)
 
@@ -420,15 +420,18 @@ def azalt_rev(
     cos_lat = math.cos(lat_rad)
     sin_lat = math.sin(lat_rad)
 
-    if abs(cos_dec) < 1e-10 or abs(sin_lat) < 1e-10:
-        # At poles or object at celestial pole, hour angle is undefined
-        # Use 0 as default
+    if abs(cos_dec) < 1e-10 or abs(cos_lat) < 1e-10:
+        # Object at a celestial pole, or observer at a geographic pole:
+        # the hour angle is genuinely undefined there.
         ha = 0.0
     else:
         sin_H = math.sin(az_rad) * math.cos(alt_rad) / cos_dec
-        cos_H = (math.cos(az_rad) * math.cos(alt_rad) + sin_dec * cos_lat) / (
-            cos_dec * sin_lat
-        )
+        # cos(H) from the altitude identity
+        #   sin(alt) = sin(lat)·sin(dec) + cos(lat)·cos(dec)·cos(H)
+        # which avoids the sin(lat) division of the azimuth identity —
+        # geographic latitude 0 (a perfectly normal input) is no longer a
+        # degenerate case returning RA = LST for every azimuth/altitude.
+        cos_H = (math.sin(alt_rad) - sin_lat * sin_dec) / (cos_dec * cos_lat)
 
         ha_rad = math.atan2(sin_H, cos_H)
         ha = math.degrees(ha_rad)
@@ -736,7 +739,13 @@ def degnorm(x: float) -> float:
         >>> degnorm(720)
         0.0
     """
-    return x % 360.0
+    result = x % 360.0
+    # Python's modulo can return exactly 360.0 for tiny negative inputs
+    # (e.g. (-1e-17) % 360.0 == 360.0); snap that artifact to 0.0 to keep
+    # the documented [0, 360) contract (legitimate near-360 values pass).
+    if result >= 360.0:
+        return 0.0
+    return result
 
 
 TWO_PI = 2.0 * math.pi
@@ -770,7 +779,12 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
-    return x % TWO_PI
+    result = x % TWO_PI
+    # Same snap as degnorm: keep the [0, 2*pi) contract for tiny negative
+    # inputs whose modulo lands exactly on the upper bound.
+    if result >= TWO_PI:
+        return 0.0
+    return result
 
 
 def difdeg2n(p1: float, p2: float) -> float:
@@ -1009,7 +1023,7 @@ def csroundsec(cs: int) -> int:
     Notes:
         - 1 centisecond = 1/100 arcsecond
         - Uses truncation-toward-zero integer division with +50 offset
-        - Special handling at degree boundaries (30° for positive, 90° for negative)
+        - Round-down at every 30° multiple in both signs (reference behavior)
 
     Examples:
         >>> csroundsec(150)  # 1.50 arcseconds -> 2 arcseconds = 200 cs
@@ -1042,10 +1056,11 @@ def csroundsec(cs: int) -> int:
     if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
         return result - 100
 
-    # Boundary correction for negative values at quadrant boundaries
-    # (90° = 32,400,000 cs). Same principle: prevent rounding across -90°/-180° etc.
+    # Boundary correction for negative values: the reference API applies
+    # the same 30°-multiple round-down on the negative side (verified:
+    # csroundsec(-10800149) = -10800100, and likewise at -60°, -90°, ...).
     if cs < 0:
-        if result != 0 and result % 32400000 == 0 and cs <= result - 100:
+        if result != 0 and result % 10800000 == 0 and cs <= result - 100:
             return result - 100
         # Negative values in (-100, 0) round to 0; values <= -100 round to -100
         # when the standard formula yields 0 (truncation toward zero artifact)

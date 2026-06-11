@@ -27,6 +27,7 @@ References:
 
 from __future__ import annotations
 
+import math
 import os
 import ssl
 import threading
@@ -993,30 +994,32 @@ def get_ut1_utc(mjd: float) -> Optional[float]:
     """
     _ensure_data_loaded()
 
-    if not _IERS_DATA:
+    # Snapshot: clear_iers_cache() rebinds the global under the lock, so a
+    # local binding makes the reads race-free.
+    data = _IERS_DATA
+    if not data:
         return None
 
-    # Look for exact match first
-    mjd_int = round(mjd)
-    if mjd_int in _IERS_DATA:
-        return _IERS_DATA[mjd_int].ut1_utc
-
-    # Try nearby dates for interpolation
-    mjd_floor = int(mjd)
+    # Interpolate between the bracketing daily entries. (The previous
+    # nearest-midnight lookup short-circuited before interpolation could
+    # ever run, turning DUT1 into a step function with ~ms-level error.)
+    mjd_floor = math.floor(mjd)
     mjd_ceil = mjd_floor + 1
+    frac = mjd - mjd_floor
 
-    if mjd_floor in _IERS_DATA and mjd_ceil in _IERS_DATA:
-        # Linear interpolation
-        ut1_utc_floor = _IERS_DATA[mjd_floor].ut1_utc
-        ut1_utc_ceil = _IERS_DATA[mjd_ceil].ut1_utc
-        frac = mjd - mjd_floor
+    if frac == 0.0 and mjd_floor in data:
+        return data[mjd_floor].ut1_utc
+
+    if mjd_floor in data and mjd_ceil in data:
+        ut1_utc_floor = data[mjd_floor].ut1_utc
+        ut1_utc_ceil = data[mjd_ceil].ut1_utc
         return ut1_utc_floor + frac * (ut1_utc_ceil - ut1_utc_floor)
 
-    # Try finding closest available date
-    if mjd_floor in _IERS_DATA:
-        return _IERS_DATA[mjd_floor].ut1_utc
-    if mjd_ceil in _IERS_DATA:
-        return _IERS_DATA[mjd_ceil].ut1_utc
+    # Edge of table: closest available date
+    if mjd_floor in data:
+        return data[mjd_floor].ut1_utc
+    if mjd_ceil in data:
+        return data[mjd_ceil].ut1_utc
 
     return None
 
@@ -1192,6 +1195,9 @@ def is_iers_data_available(jd: float) -> bool:
     Returns:
         True if IERS data is available for this date
     """
+    # Load on demand like every other getter — otherwise this returns
+    # False until some sibling function happens to load the table first.
+    _ensure_data_loaded()
     mjd = _jd_to_mjd(jd)
     mjd_int = round(mjd)
     return mjd_int in _IERS_DATA

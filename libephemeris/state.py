@@ -1361,8 +1361,13 @@ def set_tid_acc(acc: float) -> None:
     Set the tidal acceleration used in Delta T calculations.
 
     The tidal acceleration of the Moon affects the long-term extrapolation
-    of Delta T (TT - UT1), which is important for historical astronomical
-    calculations. Different JPL ephemeris files assume different values.
+    of Delta T (TT - UT1) in the reference implementation. Different JPL
+    ephemeris files assume different values.
+
+    NOTE: in libephemeris the stored value is informational only — Delta T
+    comes from the userdef override, IERS data, or the Skyfield/enhanced
+    timescale, none of which consult this setting. get_tid_acc() returns
+    whatever was set here, for reference-API compatibility.
 
     Args:
         acc: Tidal acceleration in arcsec/century^2.
