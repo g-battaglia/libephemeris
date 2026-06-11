@@ -1038,7 +1038,7 @@ def _heliacal_ut_leb(
     def _get_elongation(jd: float) -> float:
         if not is_star:
             try:
-                pheno = pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
                 return pheno[2]
             except (ValueError, TypeError, ArithmeticError):
                 pass
@@ -1058,7 +1058,7 @@ def _heliacal_ut_leb(
         if is_star:
             return star_magnitude
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             return pheno[4]
         except (ValueError, TypeError, ArithmeticError):
             return 0.0
@@ -1462,7 +1462,7 @@ def _heliacal_pheno_ut_leb(
         phase_angle = 0.0
     else:
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             elongation = pheno[2]
             magnitude = pheno[4]
             phase_angle = pheno[0]
@@ -1547,7 +1547,7 @@ def _heliacal_pheno_ut_leb(
     l_moon = 0.0
     if body == MOON:
         try:
-            moon_pheno = pheno_ut(jd, MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             phase_angle_deg = moon_pheno[0]
             illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
             if phase_angle_deg > 0:
@@ -1740,7 +1740,7 @@ def _vis_limit_mag_leb(
     if is_star_flag:
         try:
             star_result, _star_name_out, _retflag = fixstar2_ut(
-                objname, tjdut, flags & 0xFF
+                objname, tjdut, _heliacal_eph_flags(flags)
             )
             star_lon = star_result[0]
             star_lat = star_result[1]
@@ -1782,7 +1782,7 @@ def _vis_limit_mag_leb(
             obj_az = az
 
             try:
-                pheno_result = pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, _heliacal_eph_flags(flags))
                 obj_mag = pheno_result[4]
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0
@@ -1818,7 +1818,7 @@ def _vis_limit_mag_leb(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
+        moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 
@@ -2124,7 +2124,7 @@ def _heliacal_ut_pythonic(
         """Get the elongation of body from Sun in degrees."""
         if not is_star:
             try:
-                pheno = pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
                 return pheno[2]  # Elongation
             except (ValueError, TypeError, ArithmeticError):
                 pass
@@ -2144,7 +2144,7 @@ def _heliacal_ut_pythonic(
             # For fixed stars, return the catalog magnitude
             return star_magnitude
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             return pheno[4]  # Visual magnitude
         except (ValueError, TypeError, ArithmeticError):
             return 0.0  # Default to bright magnitude
@@ -3129,6 +3129,19 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
 _TJD_INVALID = 99999999.0
 
+
+def _heliacal_eph_flags(flags: int) -> int:
+    """Reduce a heliacal flags word to its ephemeris-selection bits.
+
+    HELFLAG_* values share bit positions with FLG_* calculation flags
+    (e.g. HELFLAG_VISLIM_DARK == FLG_XYZ), so heliacal flags must never
+    reach calc/pheno/fixstar calls unmasked.
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    return flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
+
+
 _PHENO_BODY_NAMES = {
     1: "Moon",
     2: "Mercury",
@@ -3555,7 +3568,7 @@ def _heliacal_pheno_ut_pythonic(
         phase_angle = 0.0  # Stars don't have phase angle
     else:
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
             phase_angle = pheno[0]  # Phase angle (index 0, not 1)
@@ -3639,7 +3652,7 @@ def _heliacal_pheno_ut_pythonic(
     if body == MOON:
         # Calculate Moon phase and crescent geometry
         try:
-            moon_pheno = pheno_ut(jd, MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             phase_angle_deg = moon_pheno[0]  # [0] = phase angle in degrees
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
@@ -3989,7 +4002,7 @@ def vis_limit_mag(
         # Fixed star calculation
         try:
             star_result, _star_name_out, _retflag = fixstar2_ut(
-                objname, tjdut, flags & 0xFF
+                objname, tjdut, _heliacal_eph_flags(flags)
             )
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
@@ -4051,7 +4064,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result = pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, _heliacal_eph_flags(flags))
                 obj_mag = pheno_result[4]  # Visual magnitude
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0  # Default bright
@@ -4092,7 +4105,7 @@ def vis_limit_mag(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
+        moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
         phase_angle = moon_pheno[0]
         moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
 
