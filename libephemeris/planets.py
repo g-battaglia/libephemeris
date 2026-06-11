@@ -2160,15 +2160,83 @@ def _calc_body(
         return _to_native_floats(result), iflag
 
     # Handle White Moon (Selena), Vulcan, Proserpina, Waldemath — fictitious bodies (IDs 55-58)
-    # These are geocentric symbolic points computed in hypothetical.py.
-    # White Moon = Mean Lilith + 180° (ecliptic of date), same coordinate system as Mean Apogee.
+    # White Moon and Waldemath are geocentric constructions; Vulcan and
+    # Proserpina are heliocentric orbits and must be converted to
+    # geocentric (with light-time retardation) like any orbiting body.
     if ipl in (WHITE_MOON, VULCAN, PROSERPINA, WALDEMATH):
         from . import hypothetical
 
         jd_tt = t.tt
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
-        pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+        if ipl in (VULCAN, PROSERPINA):
+            from skyfield.framelib import ecliptic_J2000_frame
+            from .astrometry import _precess_ecliptic
+
+            _C_AU_DAY = 173.144632674240
+            _calc_helio = (
+                hypothetical.calc_vulcan
+                if ipl == VULCAN
+                else hypothetical.calc_proserpina
+            )
+
+            def _helio_xyz_j2000(jd: float) -> Tuple[float, float, float]:
+                """Heliocentric J2000-ecliptic cartesian position (AU)."""
+                h = _calc_helio(jd)
+                # The element propagation yields mean ecliptic of date;
+                # rotate to J2000 so the Earth subtraction is frame-consistent.
+                lon_j, lat_j = _precess_ecliptic(h[0], h[1], jd, 2451545.0)
+                lon_r = math.radians(lon_j)
+                lat_r = math.radians(lat_j)
+                cl = math.cos(lat_r)
+                return (
+                    h[2] * cl * math.cos(lon_r),
+                    h[2] * cl * math.sin(lon_r),
+                    h[2] * math.sin(lat_r),
+                )
+
+            def _geo_of_date(jd: float) -> Tuple[float, float, float]:
+                """Geocentric mean-ecliptic-of-date spherical position."""
+                ts_i = get_timescale()
+                t_i = ts_i.tt_jd(jd)
+                earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+                exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+                ex, ey, ez = float(exyz[0]), float(exyz[1]), float(exyz[2])
+
+                # Light-time iteration: target retarded, observer fixed
+                lt = 0.0
+                xg = yg = zg = 0.0
+                for _ in range(3):
+                    bx, by, bz = _helio_xyz_j2000(jd - lt)
+                    xg, yg, zg = bx - ex, by - ey, bz - ez
+                    lt = math.sqrt(xg * xg + yg * yg + zg * zg) / _C_AU_DAY
+
+                rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+                lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+                sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+                lat_g = math.degrees(math.asin(sin_lat))
+                # Back to mean ecliptic of date
+                lon_g, lat_g = _precess_ecliptic(lon_g, lat_g, 2451545.0, jd)
+                return lon_g, lat_g, rg
+
+            if iflag & FLG_HELCTR:
+                pos = _calc_helio(jd_tt)
+            else:
+                g_lon, g_lat, g_dist = _geo_of_date(jd_tt)
+                dt_v = 0.1
+                prev = _geo_of_date(jd_tt - dt_v)
+                nxt = _geo_of_date(jd_tt + dt_v)
+                g_dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+                if g_dlon > 180.0 / (2.0 * dt_v):
+                    g_dlon -= 360.0 / (2.0 * dt_v)
+                elif g_dlon < -180.0 / (2.0 * dt_v):
+                    g_dlon += 360.0 / (2.0 * dt_v)
+                g_dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+                g_ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+                pos = (g_lon, g_lat, g_dist, g_dlon, g_dlat, g_ddist)
+        else:
+            pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+
         lon, lat, dist = pos[0], pos[1], pos[2]
         dlon, dlat, ddist = pos[3], pos[4], pos[5]
 

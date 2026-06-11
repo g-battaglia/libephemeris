@@ -908,17 +908,19 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ),
     PROSERPINA: HypotheticalElements(
         name="Proserpina",
-        epoch=2451545.0,  # J2000.0
-        a=81.0,  # Semi-major axis in AU (trans-Plutonian)
-        e=0.0,  # Circular orbit (simplest astrological model)
+        # Published elements by Valentin Abramov (Tartu, Estonia), the set
+        # in standard astrological use for the hypothetical trans-Plutonian
+        # Proserpina: epoch J1900, equinox of date, circular orbit.
+        epoch=2415020.0,  # J1900.0
+        a=79.225630,  # Semi-major axis in AU (Abramov)
+        e=0.0,  # Circular orbit
         i=0.0,  # On ecliptic plane
         omega=0.0,  # Irrelevant for circular orbit
-        Omega=0.0,  # Assumed zero ascending node
-        M0=0.0,  # Mean anomaly at J2000.0 (arbitrary starting point)
-        # Mean motion: n = 360 / (a^1.5 * 365.25) deg/day
-        # Period = 81^1.5 = 729.3 years
-        # n = 360 / (729.3 * 365.25) = 0.001352 deg/day
-        n=360.0 / (81.0**1.5 * 365.25),  # ~0.001352 deg/day
+        Omega=0.0,  # Zero ascending node
+        M0=170.73,  # Mean anomaly at J1900 (Abramov)
+        # Mean motion from the Gaussian gravitational constant
+        # (k = 0.01720209895 rad/day => 0.9856076686 deg/day at 1 AU)
+        n=0.9856076686 / (79.225630**1.5),  # deg/day
     ),
 }
 
