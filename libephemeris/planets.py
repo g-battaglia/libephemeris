@@ -4077,10 +4077,10 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     """
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
-    ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode)
-    # Return FLG_SWIEPH as retflag (matching pyswisseph behaviour),
-    # not the raw input ``flags``.
-    return (FLG_SWIEPH, float(ayanamsa))
+    ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode, flags)
+    # retflag echoes the input flags with FLG_SWIEPH added (reference
+    # behaviour: 0 -> 2, FLG_NONUT -> 66).
+    return (flags | FLG_SWIEPH, float(ayanamsa))
 
 
 def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
@@ -4113,19 +4113,24 @@ def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     tjd_tt = t_ut.tt  # Convert UT1 to TT
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
-    ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode)
-    # Return FLG_SWIEPH as retflag (matching pyswisseph behaviour),
-    # not the raw input ``flags``.
-    return (FLG_SWIEPH, float(ayanamsa))
+    ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode, flags)
+    # retflag echoes the input flags with FLG_SWIEPH added (reference
+    # behaviour: 0 -> 2, FLG_NONUT -> 66).
+    return (flags | FLG_SWIEPH, float(ayanamsa))
 
 
-def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
+def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> float:
     """
     Internal function to calculate the ayanamsa value for a given TT and sid_mode.
+
+    The _ex variants of the reference API return the *true* ayanamsha
+    (mean + nutation in longitude) unless FLG_NONUT is set — that is the
+    distinction from the plain get_ayanamsa, which returns the mean value.
 
     Args:
         tjd_tt: Julian Day in Terrestrial Time (TT)
         sid_mode: Sidereal mode constant
+        flags: Calculation flags; FLG_NONUT selects the mean ayanamsha.
 
     Returns:
         Ayanamsa value in degrees
@@ -4133,7 +4138,9 @@ def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
     ts = get_timescale()
     t_obj = ts.tt_jd(tjd_tt)
     tjd_ut = t_obj.ut1
-    return _calc_ayanamsa(tjd_ut, sid_mode)
+    if flags & FLG_NONUT:
+        return _calc_ayanamsa(tjd_ut, sid_mode)
+    return _get_true_ayanamsa(tjd_ut)
 
 
 # Position tuple type for nod_aps results

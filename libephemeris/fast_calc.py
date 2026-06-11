@@ -923,7 +923,8 @@ def _calc_ayanamsa_from_leb(
         T_power *= T
 
     # Get reference offset for active sidereal mode
-    mode = sid_mode if sid_mode is not None else 1  # Default Lahiri
+    # Default Fagan/Bradley (0), matching the reference API
+    mode = sid_mode if sid_mode is not None else 0
 
     if mode in _STAR_BASED_MODES:
         raise KeyError(f"Star-based sidereal mode {mode} requires Skyfield")

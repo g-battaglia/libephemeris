@@ -1138,7 +1138,8 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
 
     Note:
         Affects all position calculations when FLG_SIDEREAL is set.
-        Default is Lahiri (SIDM_LAHIRI) if never set.
+        Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY) if never set,
+        matching the reference API.
     """
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
     with _STATE_LOCK:
@@ -1166,10 +1167,11 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
         int or tuple: Sidereal mode ID, or full configuration tuple
 
     Note:
-        Returns SIDM_LAHIRI (1) by default if never set.
+        Returns SIDM_FAGAN_BRADLEY (0) by default if never set, matching
+        the reference API's default when set_sid_mode() was never called.
     """
     with _STATE_LOCK:
-        mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
+        mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 0
         if full:
             return mode, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
         return mode

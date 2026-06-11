@@ -342,11 +342,23 @@ class TestAyanamshaExUt:
     @pytest.mark.unit
     @pytest.mark.parametrize("mode,name", ALL_MODES)
     def test_ayanamsa_ex_ut_matches_ayanamsa_ut(self, mode: int, name: str):
-        """Extended function should match simple function."""
+        """The ex variant returns the TRUE ayanamsha (mean + nutation).
+
+        Reference API semantics (verified against pyswisseph): the plain
+        function returns the mean ayanamsha; the _ex variant adds nutation
+        in longitude unless FLG_NONUT is set.
+        """
         swe.set_sid_mode(mode)
         jd = 2451545.0
         ayan_simple = swe.get_ayanamsa_ut(jd)
         _, ayan_ex = swe.get_ayanamsa_ex_ut(jd, 0)
-        assert abs(ayan_simple - ayan_ex) < 1e-10, (
-            f"{name}: simple {ayan_simple} vs ex {ayan_ex}"
+        # The difference is the nutation in longitude (|dpsi| <= ~17.5");
+        # wrap-aware because ayanamshas near 0 deg can wrap to ~360.
+        delta = abs(ayan_simple - ayan_ex) % 360.0
+        delta = min(delta, 360.0 - delta)
+        assert delta < 0.006, f"{name}: simple {ayan_simple} vs ex {ayan_ex}"
+        # With FLG_NONUT the ex variant returns the mean value exactly
+        _, ayan_ex_nonut = swe.get_ayanamsa_ex_ut(jd, swe.FLG_NONUT)
+        assert abs(ayan_simple - ayan_ex_nonut) < 1e-10, (
+            f"{name}: simple {ayan_simple} vs ex(NONUT) {ayan_ex_nonut}"
         )
