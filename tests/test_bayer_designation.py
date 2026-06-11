@@ -311,8 +311,13 @@ class TestResolveStar2WithBayer:
         assert entry.nomenclature == "epVir"
 
     def test_resolve2_star_not_in_catalog(self):
-        """Bayer designation for star not in catalog should return error."""
-        entry, err = _resolve_star2("Gamma Virginis")  # Porrima - not in catalog
+        """Bayer designation for a star not in the catalog returns an error.
+
+        (Porrima/Gamma Virginis joined the catalog with the 1447-star
+        expansion, so a constellation/letter pair with no star at all is
+        used instead.)
+        """
+        entry, err = _resolve_star2("Omega Crucis")  # no such Bayer star
         assert entry is None
         assert "could not find" in err.lower()
 
@@ -363,7 +368,7 @@ class TestSweFixstar2WithBayer:
         """fixstar2_ut should raise error for star not in catalog."""
         jd = 2451545.0
         with pytest.raises(Error):
-            fixstar2_ut("Gamma Virginis", jd, 0)
+            fixstar2_ut("NoSuchStarXYZ", jd, 0)
 
 
 @pytest.mark.unit
