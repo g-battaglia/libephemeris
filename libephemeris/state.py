@@ -543,8 +543,10 @@ def get_leb_reader() -> Optional["LEBReader"]:
                 return None
         elif mode == "leb":
             raise RuntimeError(
-                "LIBEPHEMERIS_MODE=leb but no .leb file configured. "
-                "Use set_leb_file() or set LIBEPHEMERIS_LEB env var."
+                "Calculation mode is 'leb' but no .leb file configured. "
+                "Use set_leb_file() or set LIBEPHEMERIS_LEB env var. "
+                f"(mode source: explicit={_CALC_MODE!r}, "
+                f"env={os.environ.get(_CALC_MODE_ENV_VAR)!r})"
             )
     return _LEB_READER
 

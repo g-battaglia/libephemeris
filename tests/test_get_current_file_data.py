@@ -30,6 +30,10 @@ def reset_state(monkeypatch):
     # Disable LEB auto-discovery and reader
     from libephemeris import state
 
+    # Also clear any explicit calc-mode override: close() preserves it by
+    # design (issue #30), so an earlier test's set_calc_mode("leb") would
+    # otherwise survive into this Skyfield-only module.
+    monkeypatch.setattr(state, "_CALC_MODE", None)
     monkeypatch.setattr(state, "_LEB_FILE", None)
     monkeypatch.setattr(state, "_LEB_READER", None)
     monkeypatch.setattr(state, "_discover_leb_file", lambda: None)

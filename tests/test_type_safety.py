@@ -51,11 +51,12 @@ class TestGetSidMode:
 
     def test_get_sid_mode_returns_int_when_not_set(self):
         """get_sid_mode() should return int even when mode is not set."""
-        # After close(), _SIDEREAL_MODE is None but get_sid_mode() should default to 1
+        # After close(), _SIDEREAL_MODE is None; the default mirrors the
+        # reference API: SIDM_FAGAN_BRADLEY (0)
         close()
         mode = get_sid_mode()
         assert isinstance(mode, int)
-        assert mode == 1  # Default to SIDM_LAHIRI
+        assert mode == 0  # Default to SIDM_FAGAN_BRADLEY
 
     def test_get_sid_mode_returns_int_when_set(self):
         """get_sid_mode() should return int when mode is explicitly set."""
@@ -81,9 +82,9 @@ class TestGetSidMode:
         result = get_sid_mode(full=True)
         assert isinstance(result, tuple)
         mode, t0, ayan_t0 = result
-        # Mode should be an int (default 1), not None
+        # Mode should be an int (default 0 = Fagan/Bradley), not None
         assert isinstance(mode, int)
-        assert mode == 1
+        assert mode == 0
 
 
 class TestHousesReturnTypes:

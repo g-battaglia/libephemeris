@@ -5769,8 +5769,8 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ETA PEG": 112158,
     "ETA PERSEI": 13268,
     "ETA PER": 13268,
-    "ETA PISCIUM": 5742,  # (consistent with STAR_CATALOG)
-    "ETA PSC": 5742,
+    "ETA PISCIUM": 7097,  # (consistent with STAR_CATALOG)
+    "ETA PSC": 7097,
     "ETA SAGITTARII": 89642,
     "ETA SGR": 89642,
     "ETA SCORPII": 84143,

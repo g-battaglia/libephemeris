@@ -5407,15 +5407,31 @@ def _gauquelin_sector_pythonic(
     gast = float(t.gast)  # in hours
     armc_deg = (gast * 15.0 + lon) % 360.0
 
-    # Get body position - planet (int) or star (str)
-    if isinstance(planet, str):
-        pos, _star_name, retflag = fixstar_ut(planet, jd, flags | FLG_SPEED)
-        planet_lon = float(pos[0])
-        planet_lat = float(pos[1])
-    else:
-        pos, retflag = calc_ut(jd, planet, flags | FLG_SPEED)
-        planet_lon = pos[0]
-        planet_lat = pos[1]
+    # Get body position - planet (int) or star (str).
+    # The reference API computes the body topocentrically from the geopos
+    # argument (default flags include FLG_TOPOCTR): set the observer for
+    # the sub-call and restore the caller's topo afterwards.
+    from . import state as _state
+    from .state import get_topo, set_topo
+
+    saved_topo = get_topo()
+    try:
+        if flags & FLG_TOPOCTR:
+            set_topo(lon, lat, altitude)
+        if isinstance(planet, str):
+            pos, _star_name, retflag = fixstar_ut(planet, jd, flags | FLG_SPEED)
+            planet_lon = float(pos[0])
+            planet_lat = float(pos[1])
+        else:
+            pos, retflag = calc_ut(jd, planet, flags | FLG_SPEED)
+            planet_lon = pos[0]
+            planet_lat = pos[1]
+    finally:
+        if flags & FLG_TOPOCTR:
+            # Restore the exact previous observer object (or None) so the
+            # caller's topo state and observer-cache identity are untouched.
+            with _state._STATE_LOCK:
+                _state._TOPO = saved_topo
 
     # For method 1 (without latitude), ignore ecliptic latitude
     if method == 1:

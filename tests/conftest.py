@@ -68,6 +68,14 @@ def disable_auto_spk_download_for_tests():
     ephem.set_auto_spk_download(original if original else None)
 
 
+# NOTE on calc-mode isolation: since issue #30, close() preserves an
+# explicitly set calculation mode (process-level configuration). The
+# reset_ephemeris_state fixture below restores _CALC_MODE per test; test
+# modules that must run without LEB (regardless of earlier explicit
+# set_calc_mode calls in the worker) should monkeypatch
+# state._CALC_MODE to None themselves rather than relying on close().
+
+
 # ============================================================================
 # TEST DATA FIXTURES
 # ============================================================================
