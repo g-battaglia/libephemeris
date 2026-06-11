@@ -90,6 +90,7 @@ from .state import get_timescale
 from .planets import get_ayanamsa_ut, calc_ut
 from .cache import get_true_obliquity, get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
+from .utils import difdeg2n
 
 
 def _init_cardinal_cusps(asc: float, mc: float) -> list:
@@ -469,12 +470,12 @@ def _ra_to_ecliptic_longitude(
     Returns:
         Ecliptic longitude in degrees [0, 360)
     """
-    VERY_SMALL = 1e-10
+    _NEAR_ZERO = 1e-10
 
     # Polar degenerate cases
-    if abs(90.0 - pole_height_deg) < VERY_SMALL:
+    if abs(90.0 - pole_height_deg) < _NEAR_ZERO:
         return 180.0
-    if abs(90.0 + pole_height_deg) < VERY_SMALL:
+    if abs(90.0 + pole_height_deg) < _NEAR_ZERO:
         return 0.0
 
     ra_rad = math.radians(ra_deg % 360.0)
@@ -492,9 +493,9 @@ def _ra_to_ecliptic_longitude(
 
     # Snap cardinal points to exact values (avoid floating-point drift)
     for cardinal in (90.0, 180.0, 270.0):
-        if abs(longitude - cardinal) < VERY_SMALL:
+        if abs(longitude - cardinal) < _NEAR_ZERO:
             return cardinal
-    if abs(longitude - 360.0) < VERY_SMALL or abs(longitude) < VERY_SMALL:
+    if abs(longitude - 360.0) < _NEAR_ZERO or abs(longitude) < _NEAR_ZERO:
         return 0.0
 
     return longitude
@@ -2402,26 +2403,45 @@ def _houses_savard_a(
     armc: float, lat: float, eps: float, asc: float, mc: float
 ) -> List[float]:
     """
-    Savard-A house system (John Savard's "Albategnius" houses).
+    Savard-A house system (code 'J', John Savard's "Albategnius" houses).
 
-    Similar to Campanus but divides the prime vertical based on latitude
-    circles at 1/3 and 2/3 of geographic latitude, instead of Campanus's
-    fixed 30°/60° segments.
+    Like Campanus, the intermediate cusps are the ecliptic crossings of
+    position circles through the North and South points of the horizon
+    ("house circles").  Campanus anchors those circles at fixed 30°/60°
+    arcs along the prime vertical; Savard-A instead anchors them where the
+    prime vertical crosses the declination parallels at one third and two
+    thirds of the geographic latitude.
 
-    Algorithm (from Swiss Ephemeris swehouse.c):
-        1. Compute prime vertical division points:
-           xs2 = arcsin(sin(lat/3) / sin(lat))
-           xs1 = arcsin(sin(2·lat/3) / sin(lat))
-        2. Equatorial offsets:
-           xh1 = arctan(tan(xs1) / cos(lat))
-           xh2 = arctan(tan(xs2) / cos(lat))
-        3. Pole heights:
-           fh1 = arcsin(sin(lat) · cos(xs1))
-           fh2 = arcsin(sin(lat) · cos(xs2))
-        4. Project using Asc1(ARMC+90 ± offset, pole_height, sin(ε), cos(ε))
+    Derivation from spherical trigonometry
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    A point of the prime vertical (PV) at arc *x* from the East point has
+    declination δ with
+
+        sin δ = sin φ · sin x
+
+    (right spherical triangle East-point / equator / PV).  Requiring
+    δ = k·φ/3 therefore puts the anchor points at the PV arcs
+
+        x_k = arcsin( sin(k·φ/3) / sin φ ),   k = 1, 2
+
+    with the equator limits x_k → arcsin(k/3) as φ → 0.
+
+    A house circle anchored at PV arc *x* is handled exactly like a
+    Campanus circle (see _houses_campanus): its anchor's hour-angle offset
+    from the East point and its pole height follow from the same right
+    triangle,
+
+        H_x = arctan( tan x / cos φ )          (hour-angle offset)
+        p_x = arcsin( sin φ · cos x )          (pole height)
+
+    and the cusp is the ecliptic crossing computed by _calc_ascendant at
+    RA = ARMC + 90° ∓ H_x with pole height p_x (east side −, west side +).
+
+    Ref: Smart, "Textbook on Spherical Astronomy", Ch. 3 (right spherical
+    triangles, pole/great-circle geometry).
 
     Args:
-        armc: Sidereal time at Greenwich (RAMC) in degrees
+        armc: Right Ascension of the Midheaven (RAMC) in degrees
         lat: Geographic latitude in degrees
         eps: True obliquity of ecliptic in degrees
         asc: Ascendant longitude in degrees
@@ -2432,41 +2452,53 @@ def _houses_savard_a(
     """
     cusps = _init_cardinal_cusps(asc, mc)
 
-    VERY_SMALL = 1e-10
+    _NEAR_ZERO = 1e-10
     sin_lat = math.sin(math.radians(lat))
     cos_lat = math.cos(math.radians(lat))
 
-    # Calculate prime vertical division points based on latitude
-    if abs(lat) < VERY_SMALL:
-        # Degenerate case: near equator, use limit values
-        # lim(sin(lat/3)/sin(lat)) as lat->0 = 1/3
-        # lim(sin(2*lat/3)/sin(lat)) as lat->0 = 2/3
-        xs2 = math.degrees(math.asin(1.0 / 3.0))
-        xs1 = math.degrees(math.asin(2.0 / 3.0))
+    # PV arcs of the anchor points: declination φ/3 (inner -> cusps 12/2)
+    # and 2φ/3 (outer -> cusps 11/3).
+    if abs(lat) < _NEAR_ZERO:
+        # Equator limit: sin(kφ/3)/sin(φ) -> k/3 as φ -> 0
+        pv_arc_inner = math.degrees(math.asin(1.0 / 3.0))
+        pv_arc_outer = math.degrees(math.asin(2.0 / 3.0))
     else:
-        xs2 = math.degrees(math.asin(math.sin(math.radians(lat / 3.0)) / sin_lat))
-        xs1 = math.degrees(math.asin(math.sin(math.radians(2.0 * lat / 3.0)) / sin_lat))
+        pv_arc_inner = math.degrees(
+            math.asin(math.sin(math.radians(lat / 3.0)) / sin_lat)
+        )
+        pv_arc_outer = math.degrees(
+            math.asin(math.sin(math.radians(2.0 * lat / 3.0)) / sin_lat)
+        )
 
-    # Equatorial offsets
-    if abs(cos_lat) < VERY_SMALL:
-        # Near pole
+    # Hour-angle offsets of the anchor points from the East point
+    if abs(cos_lat) < _NEAR_ZERO:
+        # Observer at a pole: the prime vertical degenerates onto the
+        # meridian, so both offsets collapse to it.
         if lat > 0:
-            xh1 = xh2 = 90.0
+            ha_outer = ha_inner = 90.0
         else:
-            xh1 = xh2 = 270.0
+            ha_outer = ha_inner = 270.0
     else:
-        xh1 = math.degrees(math.atan(math.tan(math.radians(xs1)) / cos_lat))
-        xh2 = math.degrees(math.atan(math.tan(math.radians(xs2)) / cos_lat))
+        ha_outer = math.degrees(
+            math.atan(math.tan(math.radians(pv_arc_outer)) / cos_lat)
+        )
+        ha_inner = math.degrees(
+            math.atan(math.tan(math.radians(pv_arc_inner)) / cos_lat)
+        )
 
-    # Pole heights
-    fh1 = math.degrees(math.asin(sin_lat * math.cos(math.radians(xs1))))
-    fh2 = math.degrees(math.asin(sin_lat * math.cos(math.radians(xs2))))
+    # Pole heights of the two house circles
+    pole_outer = math.degrees(
+        math.asin(sin_lat * math.cos(math.radians(pv_arc_outer)))
+    )
+    pole_inner = math.degrees(
+        math.asin(sin_lat * math.cos(math.radians(pv_arc_inner)))
+    )
 
-    # Project onto ecliptic using Asc1 equivalent (_calc_ascendant)
-    cusps[11] = _calc_ascendant(armc + 90.0 - xh1, eps, lat, fh1)
-    cusps[12] = _calc_ascendant(armc + 90.0 - xh2, eps, lat, fh2)
-    cusps[2] = _calc_ascendant(armc + 90.0 + xh2, eps, lat, fh2)
-    cusps[3] = _calc_ascendant(armc + 90.0 + xh1, eps, lat, fh1)
+    # Ecliptic crossings: east side (cusps 11/12), west side (cusps 2/3)
+    cusps[11] = _calc_ascendant(armc + 90.0 - ha_outer, eps, lat, pole_outer)
+    cusps[12] = _calc_ascendant(armc + 90.0 - ha_inner, eps, lat, pole_inner)
+    cusps[2] = _calc_ascendant(armc + 90.0 + ha_inner, eps, lat, pole_inner)
+    cusps[3] = _calc_ascendant(armc + 90.0 + ha_outer, eps, lat, pole_outer)
 
     _set_opposite_cusps(cusps)
 
@@ -3553,32 +3585,34 @@ def _houses_krusinski(
     """
     cusps = [0.0] * 13
 
-    # Within polar circle, swap AC/DC if AC is on wrong side
-    acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-    if acmc_diff < 0:
+    # Within the polar circle the ecliptic can intersect the horizon
+    # "backwards", leaving the computed Ascendant west of the MC; swap to the
+    # opposite point so the Asc-Zenith circle is anchored at the eastern
+    # horizon intersection.
+    if difdeg2n(asc, mc) < 0:
         asc = (asc + 180.0) % 360.0
 
-    # --- Forward transform: ecliptic -> house circle ---
-    # Start with ecliptic coords of the ascendant
-    x = [asc, 0.0, 1.0]  # lon, lat, radius
+    # --- Forward transform: locate the Ascendant in the house-circle frame ---
+    # Spherical triple [longitude, latitude, radius] of the Ascendant
+    asc_vec = [asc, 0.0, 1.0]
 
     # Ecliptic -> equatorial (rotate by obliquity)
-    x = _rotate_spherical_x_axis(x, -eps)
+    asc_vec = _rotate_spherical_x_axis(asc_vec, -eps)
 
     # Equatorial -> hour angle frame (subtract local sidereal time offset)
-    x[0] = (x[0] - (armc - 90.0)) % 360.0
+    asc_vec[0] = (asc_vec[0] - (armc - 90.0)) % 360.0
 
     # Hour angle -> horizontal (rotate by co-latitude)
-    x = _rotate_spherical_x_axis(x, -(90.0 - lat))
+    asc_vec = _rotate_spherical_x_axis(asc_vec, -(90.0 - lat))
 
     # Save horizon longitude of Asc to restore during inverse transform
-    kr_horizon_lon = x[0]
+    asc_horizon_lon = asc_vec[0]
 
     # Zero the horizon longitude (align Asc with reference meridian)
-    x[0] = 0.0
+    asc_vec[0] = 0.0
 
     # Horizontal -> house circle (rotate to Asc-Zenith great circle plane)
-    x = _rotate_spherical_x_axis(x, -90.0)
+    asc_vec = _rotate_spherical_x_axis(asc_vec, -90.0)
 
     # --- Inverse transform: house circle -> ecliptic ---
     # Divide the great circle into 12 equal arcs of 30 deg each
@@ -3586,23 +3620,23 @@ def _houses_krusinski(
     cos_obliquity = math.cos(math.radians(eps))
 
     for i in range(6):
-        # Set division point on the house circle (0, 30, 60, 90, 120, 150 deg)
-        x_cusp = [30.0 * i, 0.0, 1.0]
+        # Division point on the house circle (0, 30, 60, 90, 120, 150 deg)
+        point = [30.0 * i, 0.0, 1.0]
 
         # House circle -> horizontal (reverse the final forward rotation)
-        x_cusp = _rotate_spherical_x_axis(x_cusp, 90.0)
+        point = _rotate_spherical_x_axis(point, 90.0)
 
         # Restore horizon longitude
-        x_cusp[0] = (x_cusp[0] + kr_horizon_lon) % 360.0
+        point[0] = (point[0] + asc_horizon_lon) % 360.0
 
         # Horizontal -> equatorial (rotate by co-latitude, reverse direction)
-        x_cusp = _rotate_spherical_x_axis(x_cusp, 90.0 - lat)
+        point = _rotate_spherical_x_axis(point, 90.0 - lat)
 
         # Restore RA from hour angle frame
-        x_cusp[0] = (x_cusp[0] + (armc - 90.0)) % 360.0
+        point[0] = (point[0] + (armc - 90.0)) % 360.0
 
         # Equatorial -> ecliptic (RA to ecliptic longitude, zero pole height)
-        lon = _ra_to_ecliptic_longitude(x_cusp[0], 0.0, sin_obliquity, cos_obliquity)
+        lon = _ra_to_ecliptic_longitude(point[0], 0.0, sin_obliquity, cos_obliquity)
 
         cusps[i + 1] = lon
         cusps[i + 7] = (lon + 180.0) % 360.0
@@ -3908,6 +3942,12 @@ def _houses_sunshine_makransky(
     uses prime-vertical / meridian decomposition with explicit handling
     of meridian distance > 90° (which occurs at high latitudes in winter).
 
+    The implementation follows the book's published computational
+    procedure step by step, using the standard primary-directions
+    quantities: MD (meridian distance), ZD (zenith distance), AD
+    (ascensional difference), the pole height of a house circle, and the
+    book's intermediate arcs and quadrant case tables.
+
     Falls back to Porphyry if the Sun is circumpolar (within polar circle).
 
     Args:
@@ -3921,7 +3961,7 @@ def _houses_sunshine_makransky(
     Returns:
         List of 13 house cusp longitudes (index 0 unused)
     """
-    NEAR_ZERO = 1e-10
+    _NEAR_ZERO = 1e-10
 
     # MC-below-horizon check (same as Treindl variant)
     acmc = asc - mc
@@ -3949,19 +3989,21 @@ def _houses_sunshine_makransky(
     else:
         ascensional_diff = math.degrees(math.asin(ad_arg))
 
-    nsa = 90.0 - ascensional_diff
-    dsa = 90.0 + ascensional_diff
+    night_semi_arc = 90.0 - ascensional_diff
+    day_semi_arc = 90.0 + ascensional_diff
 
-    # Semi-arc offsets (same as Treindl)
-    xh = [0.0] * 13
-    xh[2] = -2.0 * nsa / 3.0
-    xh[3] = -1.0 * nsa / 3.0
-    xh[5] = 1.0 * nsa / 3.0
-    xh[6] = 2.0 * nsa / 3.0
-    xh[8] = -2.0 * dsa / 3.0
-    xh[9] = -1.0 * dsa / 3.0
-    xh[11] = 1.0 * dsa / 3.0
-    xh[12] = 2.0 * dsa / 3.0
+    # Equal trisection of the Sun's semi-arcs: each intermediate cusp sits
+    # at a third of the night arc (houses 2/3/5/6) or of the day arc
+    # (houses 8/9/11/12) away from the relevant meridian.
+    arc_offset = [0.0] * 13
+    arc_offset[2] = -2.0 * night_semi_arc / 3.0
+    arc_offset[3] = -1.0 * night_semi_arc / 3.0
+    arc_offset[5] = 1.0 * night_semi_arc / 3.0
+    arc_offset[6] = 2.0 * night_semi_arc / 3.0
+    arc_offset[8] = -2.0 * day_semi_arc / 3.0
+    arc_offset[9] = -1.0 * day_semi_arc / 3.0
+    arc_offset[11] = 1.0 * day_semi_arc / 3.0
+    arc_offset[12] = 2.0 * day_semi_arc / 3.0
 
     sin_lat = math.sin(math.radians(lat))
     cos_lat = math.cos(math.radians(lat))
@@ -3971,129 +4013,159 @@ def _houses_sunshine_makransky(
 
     south = lat < 0
 
-    for ih in range(1, 13):
-        if (ih - 1) % 3 == 0:
+    for house in range(1, 13):
+        if (house - 1) % 3 == 0:
             continue  # skip cardinal cusps 1, 4, 7, 10
 
-        md = abs(xh[ih])
+        merid_dist = abs(arc_offset[house])
 
-        # RA of the house point on the equator
-        if ih <= 6:
-            rah = (armc + 180.0 + xh[ih]) % 360.0
+        # RA of the house point on the equator (night houses count from the
+        # lower meridian, day houses from the upper)
+        if house <= 6:
+            ra_house = (armc + 180.0 + arc_offset[house]) % 360.0
         else:
-            rah = (armc + xh[ih]) % 360.0
+            ra_house = (armc + arc_offset[house]) % 360.0
 
         if south:
-            rah = (180.0 + rah) % 360.0
+            ra_house = (180.0 + ra_house) % 360.0
 
-        # Compute zenith distance (zd) via Makransky's three-triangle method
-        if abs(md - 90.0) < NEAR_ZERO:
-            # Special case: md == 90 (house point is on the east/west point)
-            zd = 90.0 - math.degrees(math.atan(sin_lat * tan_dec))
+        # Zenith distance of the house point, built from the book's three
+        # successive right spherical triangles (Primary Directions, 1988).
+        if abs(merid_dist - 90.0) < _NEAR_ZERO:
+            # Degenerate case: MD = 90°, the house point stands on the
+            # east/west point and the triangles collapse.
+            zenith_dist = 90.0 - math.degrees(math.atan(sin_lat * tan_dec))
         else:
-            if md < 90.0:
-                # Triangle 1: CP-Zenith-NP: side (90-lat), angle md at NP
-                a = math.degrees(math.atan(cos_lat * math.tan(math.radians(md))))
+            # Triangle 1 — from the meridian along the equator: the arc
+            # between the zenith's meridian and the house point's vertical.
+            if merid_dist < 90.0:
+                zd_equator = math.degrees(
+                    math.atan(cos_lat * math.tan(math.radians(merid_dist)))
+                )
             else:
-                # md > 90: Triangle 1 reflected: MP-east point-CP
-                a = math.degrees(math.atan(math.tan(math.radians(md - 90.0)) / cos_lat))
+                # MD > 90°: the same triangle read from the opposite
+                # (east-point) side.
+                zd_equator = math.degrees(
+                    math.atan(math.tan(math.radians(merid_dist - 90.0)) / cos_lat)
+                )
 
-            # Triangle 2: CP-MP-east point
-            b = math.degrees(math.atan(tan_lat * math.cos(math.radians(md))))
+            # Triangle 2 — the meridian arc between the equator and the
+            # foot of the house point's vertical.
+            merid_arc = math.degrees(math.atan(tan_lat * math.cos(math.radians(merid_dist))))
 
-            # c = distance from house point to CP along meridian
-            if ih <= 6:
-                c = b + sun_dec
+            # Meridian arc from the house point's declination parallel:
+            # night houses add the Sun's declination, day houses subtract.
+            if house <= 6:
+                merid_arc_dec = merid_arc + sun_dec
             else:
-                c = b - sun_dec
+                merid_arc_dec = merid_arc - sun_dec
 
-            # Triangle 3: HP-CP-XP
-            f = math.degrees(
+            # Triangle 3 — correction carrying the declination offset back
+            # onto the vertical of the house point.
+            zd_correction = math.degrees(
                 math.atan(
-                    sin_lat * math.sin(math.radians(md)) * math.tan(math.radians(c))
+                    sin_lat
+                    * math.sin(math.radians(merid_dist))
+                    * math.tan(math.radians(merid_arc_dec))
                 )
             )
 
-            zd = a + f
+            zenith_dist = zd_equator + zd_correction
 
-        # Pole height of the house circle
-        pole = math.degrees(math.asin(math.sin(math.radians(zd)) * sin_lat))
+        # Pole height of the house circle through the house point
+        pole_height = math.degrees(
+            math.asin(math.sin(math.radians(zenith_dist)) * sin_lat)
+        )
 
-        # q: correction from declination and pole
-        q_arg = tan_dec * math.tan(math.radians(pole))
-        q_arg = max(-1.0, min(1.0, q_arg))
-        q = math.degrees(math.asin(q_arg))
+        # Ascensional difference of the house circle's pole: the RA shift
+        # between the house point and the circle's equator crossing.
+        ad_arg = tan_dec * math.tan(math.radians(pole_height))
+        ad_arg = max(-1.0, min(1.0, ad_arg))
+        ad_pole = math.degrees(math.asin(ad_arg))
 
-        # w: adjusted RA
-        if ih <= 3 or ih >= 11:
-            w = (rah - q) % 360.0
+        # RA of the house circle's equator crossing (eastern houses shift
+        # against the pole's AD, western houses with it)
+        if house <= 3 or house >= 11:
+            ra_crossing = (ra_house - ad_pole) % 360.0
         else:
-            w = (rah + q) % 360.0
+            ra_crossing = (ra_house + ad_pole) % 360.0
 
-        # Project w and pole onto ecliptic
-        if abs(w - 90.0) < NEAR_ZERO:
-            r = math.degrees(math.atan(sin_ecl * math.tan(math.radians(pole))))
-            if ih <= 3 or ih >= 11:
-                cu = 90.0 + r
-            else:
-                cu = 90.0 - r
-        elif abs(w - 270.0) < NEAR_ZERO:
-            r = math.degrees(math.atan(sin_ecl * math.tan(math.radians(pole))))
-            if ih <= 3 or ih >= 11:
-                cu = 270.0 - r
-            else:
-                cu = 270.0 + r
-        else:
-            m = math.degrees(
-                math.atan(abs(math.tan(math.radians(pole)) / math.cos(math.radians(w))))
+        # Project (ra_crossing, pole_height) onto the ecliptic, resolving
+        # quadrants with the book's case tables.
+        if abs(ra_crossing - 90.0) < _NEAR_ZERO:
+            ecl_arc = math.degrees(
+                math.atan(sin_ecl * math.tan(math.radians(pole_height)))
             )
-            if ih <= 3 or ih >= 11:
-                if 90.0 < w < 270.0:
-                    z = m - eps
-                else:
-                    z = m + eps
+            if house <= 3 or house >= 11:
+                cusp_lon = 90.0 + ecl_arc
             else:
-                if 90.0 < w < 270.0:
-                    z = m + eps
+                cusp_lon = 90.0 - ecl_arc
+        elif abs(ra_crossing - 270.0) < _NEAR_ZERO:
+            ecl_arc = math.degrees(
+                math.atan(sin_ecl * math.tan(math.radians(pole_height)))
+            )
+            if house <= 3 or house >= 11:
+                cusp_lon = 270.0 - ecl_arc
+            else:
+                cusp_lon = 270.0 + ecl_arc
+        else:
+            # Inclination of the house circle's meridian plane at the equator
+            pole_merid_angle = math.degrees(
+                math.atan(
+                    abs(
+                        math.tan(math.radians(pole_height))
+                        / math.cos(math.radians(ra_crossing))
+                    )
+                )
+            )
+            # Tilt it into the ecliptic frame (sign per quadrant and house side)
+            if house <= 3 or house >= 11:
+                if 90.0 < ra_crossing < 270.0:
+                    ecl_angle = pole_merid_angle - eps
                 else:
-                    z = m - eps
+                    ecl_angle = pole_merid_angle + eps
+            else:
+                if 90.0 < ra_crossing < 270.0:
+                    ecl_angle = pole_merid_angle + eps
+                else:
+                    ecl_angle = pole_merid_angle - eps
 
-            if abs(z - 90.0) < NEAR_ZERO:
-                cu = 90.0 if w < 180.0 else 270.0
+            if abs(ecl_angle - 90.0) < _NEAR_ZERO:
+                cusp_lon = 90.0 if ra_crossing < 180.0 else 270.0
             else:
-                r = math.degrees(
+                ecl_arc = math.degrees(
                     math.atan(
                         abs(
-                            math.cos(math.radians(m))
-                            * math.tan(math.radians(w))
-                            / math.cos(math.radians(z))
+                            math.cos(math.radians(pole_merid_angle))
+                            * math.tan(math.radians(ra_crossing))
+                            / math.cos(math.radians(ecl_angle))
                         )
                     )
                 )
-                if w < 90.0:
-                    cu = r
-                elif 90.0 < w < 180.0:
-                    cu = 180.0 - r
-                elif 180.0 < w < 270.0:
-                    cu = 180.0 + r
+                if ra_crossing < 90.0:
+                    cusp_lon = ecl_arc
+                elif 90.0 < ra_crossing < 180.0:
+                    cusp_lon = 180.0 - ecl_arc
+                elif 180.0 < ra_crossing < 270.0:
+                    cusp_lon = 180.0 + ecl_arc
                 else:
-                    cu = 360.0 - r
+                    cusp_lon = 360.0 - ecl_arc
 
-                # z > 90 correction (Makransky p. 146)
-                if z > 90.0:
-                    if w < 90.0:
-                        cu = 180.0 - r
-                    elif 90.0 < w < 180.0:
-                        cu = r
-                    elif 180.0 < w < 270.0:
-                        cu = 360.0 - r
+                # Reflected case table for ecl_angle > 90° (Makransky p. 146)
+                if ecl_angle > 90.0:
+                    if ra_crossing < 90.0:
+                        cusp_lon = 180.0 - ecl_arc
+                    elif 90.0 < ra_crossing < 180.0:
+                        cusp_lon = ecl_arc
+                    elif 180.0 < ra_crossing < 270.0:
+                        cusp_lon = 360.0 - ecl_arc
                     else:
-                        cu = 180.0 + r
+                        cusp_lon = 180.0 + ecl_arc
 
             if south:
-                cu = (cu + 180.0) % 360.0
+                cusp_lon = (cusp_lon + 180.0) % 360.0
 
-        cusps[ih] = cu % 360.0
+        cusps[house] = cusp_lon % 360.0
 
     return cusps
 
@@ -4137,7 +4209,7 @@ def _houses_horizontal(
         List of 13 house cusp longitudes (index 0 unused, 1-12 are cusps)
     """
     cusps = [0.0] * 13
-    VERY_SMALL = 1e-10
+    _NEAR_ZERO = 1e-10
 
     # Co-latitude: complement of geographic latitude
     if lat > 0:
@@ -4146,8 +4218,8 @@ def _houses_horizontal(
         co_lat = -90.0 - lat
 
     # Clamp to avoid singularity at the equator (|co_lat| = 90 deg)
-    if abs(abs(co_lat) - 90.0) < VERY_SMALL:
-        co_lat = (90.0 - VERY_SMALL) if co_lat > 0 else (-90.0 + VERY_SMALL)
+    if abs(abs(co_lat) - 90.0) < _NEAR_ZERO:
+        co_lat = (90.0 - _NEAR_ZERO) if co_lat > 0 else (-90.0 + _NEAR_ZERO)
 
     # ARMC rotated by 180 deg (base reference for house calculations)
     armc_base = (armc + 180.0) % 360.0
@@ -4252,93 +4324,118 @@ def _houses_natural_gradient(
     return cusps
 
 
-def _apc_sector(n: int, ph: float, e: float, az: float) -> float:
+def _apc_cusp(house: int, lat_rad: float, eps_rad: float, armc_rad: float) -> float:
     """
-    Calculate one sector of the APC (Ascendant-Parallel Circle) house system.
+    Ecliptic longitude of one APC (Ascendant-Parallel Circle) house cusp.
 
-    The APC system divides the parallel of declination passing through the
-    Ascendant into equal arcs above and below the horizon. Position circles
-    through the North and South points of the horizon pass through each
-    division point; their intersections with the ecliptic define the cusps.
+    The APC system divides the declination parallel through the Ascendant
+    into equal arcs: the diurnal part (Asc over the meridian to Dsc) and the
+    nocturnal part each into six. Position circles through the North and
+    South points of the horizon pass through each division point; their
+    intersections with the ecliptic define the cusps.
 
-    Algorithm derived from the geometric definition by L. Knegt
-    (WvA/Ram school, Netherlands).
+    System definition published by L. Knegt (WvA/Ram school, Netherlands),
+    'Handleiding voor het berekenen van huizentabellen'.
 
-    Mathematical derivation (standard spherical trigonometry):
-        1. Compute the ascensional difference (kv) of the Ascendant:
-           kv = arctan(tan(phi) * tan(eps) * cos(ARMC)
-                       / (1 + tan(phi) * tan(eps) * sin(ARMC)))
+    Derivation from spherical trigonometry
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Let φ be the geographic latitude, ε the obliquity, θ the ARMC.
 
-        2. Derive the declination of the Ascendant:
-           delta_Asc = arctan(sin(kv) / tan(phi))
+    *Ascensional difference of the Ascendant.*  The Ascendant's declination
+    δ_A and its ascensional difference K (the hour-angle offset between its
+    rising point and the east point) satisfy the classical relations
+    sin K = tan φ · tan δ_A and the rising condition RA_A = θ + 90° − K.
+    Substituting the Ascendant's position on the ecliptic and eliminating
+    RA_A yields the closed form
 
-        3. Divide the parallel circle into equal arcs:
-           Below horizon (houses 1-7): a = kv + ARMC + pi/2 + k*(pi/2 - kv)/3
-           Above horizon (houses 8-12): a = kv + ARMC + pi/2 + k*(pi/2 + kv)/3
+        K   = arctan( tan φ · tan ε · cos θ / (1 + tan φ · tan ε · sin θ) )
+        δ_A = arctan( sin K / tan φ )
 
-        4. Project each division point onto the ecliptic via:
-           lambda = atan2(tan(delta_Asc)*tan(phi)*sin(ARMC) + sin(a),
-                          cos(eps)*(tan(delta_Asc)*tan(phi)*cos(ARMC) + cos(a))
-                          + sin(eps)*tan(phi)*sin(ARMC - a))
+    (for φ → 0 the parallel through the Ascendant approaches the equator's
+    pole distance, handled as a limit below).
+
+    *Division points.*  On the declination parallel the Ascendant sits at
+    hour angle −(90° + K) (east horizon). Walking the parallel by equal
+    sixths of the nocturnal arc (90° − K each, houses 1-7 eastward below
+    the horizon) or of the diurnal arc (90° + K each, houses 8-12) puts
+    division point k at right ascension
+
+        a_k = θ + 90° + K + k · (90° ∓ K) / 3.
+
+    *Projection.*  The position circle through the horizon North/South
+    points and the division point (a_k, δ_A) crosses the ecliptic at
+
+        λ = atan2( tan δ_A · tan φ · sin θ + sin a_k,
+                   cos ε · (tan δ_A · tan φ · cos θ + cos a_k)
+                     + sin ε · tan φ · sin(θ − a_k) ).
 
     Args:
-        n: House number (1-12)
-        ph: Geographic latitude in radians
-        e: Obliquity of ecliptic in radians
-        az: ARMC in radians
+        house: House number (1-12)
+        lat_rad: Geographic latitude in radians
+        eps_rad: Obliquity of the ecliptic in radians
+        armc_rad: ARMC in radians
 
     Returns:
-        Ecliptic longitude of house cusp in degrees
+        Ecliptic longitude of the house cusp in degrees
     """
-    VERY_SMALL = 1e-10
-    PI = math.pi
+    _NEAR_ZERO = 1e-10
 
-    # Calculate asc_diff (ascensional difference of ascendant) and asc_declination (declination of ascendant)
-    if abs(math.degrees(ph)) > 90 - VERY_SMALL:
+    # Ascensional difference and declination of the Ascendant
+    if abs(math.degrees(lat_rad)) > 90 - _NEAR_ZERO:
         asc_diff = 0.0
         asc_declination = 0.0
     else:
         asc_diff = math.atan(
-            math.tan(ph)
-            * math.tan(e)
-            * math.cos(az)
-            / (1 + math.tan(ph) * math.tan(e) * math.sin(az))
+            math.tan(lat_rad)
+            * math.tan(eps_rad)
+            * math.cos(armc_rad)
+            / (1 + math.tan(lat_rad) * math.tan(eps_rad) * math.sin(armc_rad))
         )
 
-        if abs(math.degrees(ph)) < VERY_SMALL:
-            asc_declination = math.radians(90.0 - VERY_SMALL)
-            if ph < 0:
+        if abs(math.degrees(lat_rad)) < _NEAR_ZERO:
+            # Equator limit: the parallel through the Ascendant degenerates;
+            # use a near-pole declination with the Ascendant's sign.
+            asc_declination = math.radians(90.0 - _NEAR_ZERO)
+            if lat_rad < 0:
                 asc_declination = -asc_declination
         else:
-            asc_declination = math.atan(math.sin(asc_diff) / math.tan(ph))
+            asc_declination = math.atan(math.sin(asc_diff) / math.tan(lat_rad))
 
-    # Determine which arc to use (below or above horizon)
-    if n < 8:
-        is_below_hor = True  # Houses 1-7
-        k = n - 1
+    # Step index along the parallel: houses 1-7 walk the nocturnal arc
+    # eastward from the Ascendant, houses 8-12 the diurnal arc.
+    if house < 8:
+        below_horizon = True
+        step = house - 1
     else:
-        is_below_hor = False  # Houses 8-12
-        k = n - 13
+        below_horizon = False
+        step = house - 13
 
-    # Calculate right ascension of house cusp on APC circle
-    if is_below_hor:
-        a = asc_diff + az + PI / 2 + k * (PI / 2 - asc_diff) / 3
+    # Right ascension of the division point on the Ascendant's parallel
+    half_pi = math.pi / 2
+    if below_horizon:
+        ra_division = (
+            asc_diff + armc_rad + half_pi + step * (half_pi - asc_diff) / 3
+        )
     else:
-        a = asc_diff + az + PI / 2 + k * (PI / 2 + asc_diff) / 3
+        ra_division = (
+            asc_diff + armc_rad + half_pi + step * (half_pi + asc_diff) / 3
+        )
 
-    a = a % (2 * PI)
+    ra_division = ra_division % (2 * math.pi)
 
-    # Calculate ecliptic longitude
+    # Ecliptic crossing of the position circle through the division point
     longitude = math.atan2(
-        math.tan(asc_declination) * math.tan(ph) * math.sin(az) + math.sin(a),
-        math.cos(e)
-        * (math.tan(asc_declination) * math.tan(ph) * math.cos(az) + math.cos(a))
-        + math.sin(e) * math.tan(ph) * math.sin(az - a),
+        math.tan(asc_declination) * math.tan(lat_rad) * math.sin(armc_rad)
+        + math.sin(ra_division),
+        math.cos(eps_rad)
+        * (
+            math.tan(asc_declination) * math.tan(lat_rad) * math.cos(armc_rad)
+            + math.cos(ra_division)
+        )
+        + math.sin(eps_rad) * math.tan(lat_rad) * math.sin(armc_rad - ra_division),
     )
 
-    longitude = math.degrees(longitude) % 360.0
-
-    return longitude
+    return math.degrees(longitude) % 360.0
 
 
 def _houses_apc(
@@ -4370,23 +4467,23 @@ def _houses_apc(
     """
     cusps = [0.0] * 13
 
-    # Convert to radians for apc_sector
-    ph_rad = math.radians(lat)
-    e_rad = math.radians(eps)
-    az_rad = math.radians(armc)
+    # Per-cusp computation works in radians
+    lat_rad = math.radians(lat)
+    eps_rad = math.radians(eps)
+    armc_rad = math.radians(armc)
 
     # Calculate all 12 house cusps
     for i in range(1, 13):
-        cusps[i] = _apc_sector(i, ph_rad, e_rad, az_rad)
+        cusps[i] = _apc_cusp(i, lat_rad, eps_rad, armc_rad)
 
-    # MC from apc_sector near latitude 90 is not accurate, use calculated MC
+    # The per-cusp formula is ill-conditioned for the MC near |lat| = 90;
+    # the directly computed MC is exact, so always substitute it.
     cusps[10] = mc
     cusps[4] = (mc + 180.0) % 360.0
 
     # Within polar circle, handle horizon crossing
     if abs(lat) >= 90.0 - eps:
-        acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-        if acmc_diff < 0:
+        if difdeg2n(asc, mc) < 0:
             # Flip all cusps by 180° (clockwise direction)
             asc = (asc + 180.0) % 360.0
             mc = (mc + 180.0) % 360.0
@@ -4486,7 +4583,7 @@ def _house_pos_pythonic(
         >>> house = int(pos)  # House number (e.g., 10)
         >>> position = pos - house  # Position within house (e.g., 0.5 = halfway)
     """
-    VERY_SMALL = 1e-10
+    _NEAR_ZERO = 1e-10
     # Tiny offset (~0.28 microdeg) to avoid bodies landing exactly on a cusp boundary
     CUSP_BOUNDARY_OFFSET = 1.0 / 3600000.0
 
@@ -4561,134 +4658,151 @@ def _house_pos_pythonic(
         sin_dec = 1.0
     if sin_dec < -1.0:
         sin_dec = -1.0
-    de = math.degrees(math.asin(sin_dec))
+    dec = math.degrees(math.asin(sin_dec))
 
-    # Meridian distance from ARMC
-    mdd = (ra - armc) % 360.0
-    if mdd >= 180:
-        mdd -= 360.0
-    mdn = (mdd + 180.0) % 360.0
-    if mdn >= 180:
-        mdn -= 360.0
+    # Signed meridian distances of the body, in (-180, 180]:
+    #   md_upper — RA distance from the upper meridian (culmination, RA = ARMC)
+    #   md_lower — RA distance from the lower meridian (anti-culmination)
+    md_upper = (ra - armc) % 360.0
+    if md_upper >= 180:
+        md_upper -= 360.0
+    md_lower = (md_upper + 180.0) % 360.0
+    if md_lower >= 180:
+        md_lower -= 360.0
 
     # Handle different house systems
     if hsys_char == "P" or hsys_char == "G":
-        # Placidus / Gauquelin house position
-        # The Placidus position is the fraction of the semi-arc traversed,
-        # mapped to a 360-degree circle. This is the standard definition of
-        # Placidus (Holden, 'The Elements of House Division', 1977).
+        # Placidus / Gauquelin house position.
+        # The Placidus position of a body is the fraction of its own
+        # semi-arc already traversed, mapped onto a 360° house circle
+        # (Holden, 'The Elements of House Division', 1977):
         #
-        # For a body above the horizon:
-        #   position = (meridian_distance / semi_diurnal_arc + 3) * 90 deg
-        # For a body below the horizon:
-        #   position = (meridian_distance / semi_nocturnal_arc + 1) * 90 deg
+        #   above horizon: position = (md_upper / day_semi_arc + 3) * 90°
+        #   below horizon: position = (md_lower / night_semi_arc + 1) * 90°
 
-        # Check circumpolar condition
-        if 90.0 - abs(de) <= abs(geolat):
-            # Circumpolar case: when a body never rises/sets, substitute
-            # lower/upper culmination for rise/set to define pseudo-semi-arcs
-            if de * geolat < 0:
-                xp0 = (90.0 + mdn / 2.0) % 360.0
+        if 90.0 - abs(dec) <= abs(geolat):
+            # Circumpolar body: it never rises or sets, so no semi-arcs
+            # exist.  A never-rising body is placed in the nocturnal half
+            # by its half-weighted distance from lower culmination; a
+            # never-setting body in the diurnal half from upper culmination.
+            if dec * geolat < 0:
+                pos_deg = (90.0 + md_lower / 2.0) % 360.0
             else:
-                xp0 = (270.0 + mdd / 2.0) % 360.0
+                pos_deg = (270.0 + md_upper / 2.0) % 360.0
         else:
-            # Normal case
-            sinad = math.tan(math.radians(de)) * math.tan(math.radians(geolat))
-            if abs(sinad) > 1.0:
-                sinad = 1.0 if sinad > 0 else -1.0
-            ad = math.degrees(math.asin(sinad))
-            a = sinad + math.cos(math.radians(mdd))
-            is_above_hor = a >= 0
+            # Ascensional difference of the body: sin(AD) = tan δ · tan φ
+            sin_ad = math.tan(math.radians(dec)) * math.tan(math.radians(geolat))
+            if abs(sin_ad) > 1.0:
+                sin_ad = 1.0 if sin_ad > 0 else -1.0
+            asc_diff = math.degrees(math.asin(sin_ad))
 
-            sad = 90.0 + ad  # Semi-diurnal arc
-            san = 90.0 - ad  # Semi-nocturnal arc
+            # Above-horizon test.  The altitude h of the body satisfies
+            #   sin h = sin φ sin δ + cos φ cos δ cos H;
+            # dividing by cos φ cos δ (> 0) gives the equivalent sign test
+            #   tan φ tan δ + cos H  =  sin(AD) + cos H  >=  0.
+            horizon_test = sin_ad + math.cos(math.radians(md_upper))
+            above_horizon = horizon_test >= 0
 
-            if is_above_hor:
-                xp0 = (mdd / sad + 3.0) * 90.0
+            day_semi_arc = 90.0 + asc_diff
+            night_semi_arc = 90.0 - asc_diff
+
+            if above_horizon:
+                pos_deg = (md_upper / day_semi_arc + 3.0) * 90.0
             else:
-                xp0 = (mdn / san + 1.0) * 90.0
+                pos_deg = (md_lower / night_semi_arc + 1.0) * 90.0
 
             # Add small offset for cusp precision
-            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
 
         if hsys_char == "G":
-            # Gauquelin sectors are clockwise
-            xp0 = 360.0 - xp0
-            hpos = xp0 / 10.0 + 1.0
+            # Gauquelin sectors run clockwise
+            pos_deg = 360.0 - pos_deg
+            hpos = pos_deg / 10.0 + 1.0
         else:
-            hpos = xp0 / 30.0 + 1.0
+            hpos = pos_deg / 30.0 + 1.0
 
         return hpos
 
     elif hsys_char == "R":
-        # Regiomontanus - uses declination
-        if abs(mdd) < VERY_SMALL:
-            xp0 = 270.0
-        elif 180.0 - abs(mdd) < VERY_SMALL:
-            xp0 = 90.0
+        # Regiomontanus house position.
+        # Regiomontanus divides the celestial equator into equal arcs by
+        # position circles through the North and South points of the
+        # horizon; a body's position is the equator point cut by its own
+        # position circle.  Intersecting the plane of the circle through
+        # the horizon N/S points and the body (meridian distance M,
+        # declination δ) with the equator gives the closed form
+        #
+        #   tan x = -(tan φ tan δ + cos M) / sin M
+        #
+        # measured so that x = 270° on the upper meridian (M = 0) and
+        # x = 90° on the lower (|M| = 180°) — those two degenerate cases
+        # are handled directly.
+        if abs(md_upper) < _NEAR_ZERO:
+            pos_deg = 270.0
+        elif 180.0 - abs(md_upper) < _NEAR_ZERO:
+            pos_deg = 90.0
         else:
-            if 90.0 - abs(geolat) < VERY_SMALL:
-                geolat = 90.0 - VERY_SMALL if geolat > 0 else -90.0 + VERY_SMALL
-            if 90.0 - abs(de) < VERY_SMALL:
-                de = 90.0 - VERY_SMALL if de > 0 else -90.0 + VERY_SMALL
+            if 90.0 - abs(geolat) < _NEAR_ZERO:
+                geolat = 90.0 - _NEAR_ZERO if geolat > 0 else -90.0 + _NEAR_ZERO
+            if 90.0 - abs(dec) < _NEAR_ZERO:
+                dec = 90.0 - _NEAR_ZERO if dec > 0 else -90.0 + _NEAR_ZERO
 
-            a = math.tan(math.radians(geolat)) * math.tan(math.radians(de)) + math.cos(
-                math.radians(mdd)
+            pole_term = math.tan(math.radians(geolat)) * math.tan(
+                math.radians(dec)
+            ) + math.cos(math.radians(md_upper))
+            pos_deg = math.degrees(
+                math.atan(-pole_term / math.sin(math.radians(md_upper)))
             )
-            xp0 = math.degrees(math.atan(-a / math.sin(math.radians(mdd))))
-            if mdd < 0:
-                xp0 += 180.0
-            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+            if md_upper < 0:
+                pos_deg += 180.0
+            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
 
-        hpos = xp0 / 30.0 + 1.0
+        hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "C":
-        # Campanus house position
-        # The Campanus system divides the prime vertical into 12 equal 30 deg arcs.
-        # To find a body's house position, we transform its equatorial coordinates
-        # to the prime vertical frame via a standard x-axis rotation matrix.
+        # Campanus house position.
+        # The Campanus system divides the prime vertical into 12 equal
+        # 30° arcs.  A body's position follows from rotating its
+        # equatorial coordinates into the frame whose fundamental plane
+        # is the prime vertical (pole = horizon North point):
         #
-        # Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13
-        # (standard spherical coordinate rotation).
+        # 1. Express the body as (meridian distance - 90°, declination),
+        #    i.e. longitude measured from the east point of the equator.
+        # 2. Rotate about the shared x-axis (the east point) by -latitude,
+        #    which carries the equator onto the prime vertical.
+        # 3. The longitude in the rotated frame is the Campanus position.
         #
-        # Steps:
-        # 1. Express body position as (hour_angle - 90 deg, declination)
-        # 2. Apply x-axis rotation by -latitude to project onto prime vertical
-        # 3. The resulting longitude gives the Campanus position
+        # Reference: Meeus, 'Astronomical Algorithms' 2nd ed., Ch. 13;
+        # Montenbruck & Pfleger, par. 1.3 (x-axis rotation matrix).
 
-        xeq0 = mdd - 90.0
-        xeq1 = de
+        ha_east = md_upper - 90.0
 
-        # Standard x-axis rotation matrix (Montenbruck & Pfleger, par. 1.3):
-        #   x' = x
-        #   y' = y * cos(theta) + z * sin(theta)
-        #   z' = -y * sin(theta) + z * cos(theta)
-        xeq0_rad = math.radians(xeq0)
-        xeq1_rad = math.radians(xeq1)
+        ha_east_rad = math.radians(ha_east)
+        dec_rad = math.radians(dec)
         rot_angle = math.radians(-geolat)
 
-        cos_eps = math.cos(rot_angle)
-        sin_eps = math.sin(rot_angle)
-        cos_xeq0 = math.cos(xeq0_rad)
-        sin_xeq0 = math.sin(xeq0_rad)
-        cos_xeq1 = math.cos(xeq1_rad)
-        sin_xeq1 = math.sin(xeq1_rad)
+        cos_rot = math.cos(rot_angle)
+        sin_rot = math.sin(rot_angle)
+        cos_ha = math.cos(ha_east_rad)
+        sin_ha = math.sin(ha_east_rad)
+        cos_dec = math.cos(dec_rad)
+        sin_dec_b = math.sin(dec_rad)
 
         # Convert to Cartesian
-        x0 = cos_xeq1 * cos_xeq0
-        x1 = cos_xeq1 * sin_xeq0
-        x2 = sin_xeq1
+        vec_x = cos_dec * cos_ha
+        vec_y = cos_dec * sin_ha
+        vec_z = sin_dec_b
 
-        # Rotation around x-axis
-        x2_0 = x0
-        x2_1 = x1 * cos_eps + x2 * sin_eps
-        x2_2 = -x1 * sin_eps + x2 * cos_eps
+        # Rotation around x-axis:
+        #   x' = x;  y' = y cos θ + z sin θ;  z' = -y sin θ + z cos θ
+        rot_x = vec_x
+        rot_y = vec_y * cos_rot + vec_z * sin_rot
 
         # Convert back to spherical (longitude only needed)
-        xp0 = math.degrees(math.atan2(x2_1, x2_0))
-        xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = xp0 / 30.0 + 1.0
+        pos_deg = math.degrees(math.atan2(rot_y, rot_x))
+        pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
+        hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char in ["E", "A", "W", "V", "D", "N"]:
@@ -4697,23 +4811,23 @@ def _house_pos_pythonic(
         mc = _armc_to_mc(armc, eps)
 
         if hsys_char == "D":
-            xp0 = (lon - mc - 90.0) % 360.0
+            pos_deg = (lon - mc - 90.0) % 360.0
         elif hsys_char == "V":
-            xp0 = (lon - asc + 15.0) % 360.0
+            pos_deg = (lon - asc + 15.0) % 360.0
         elif hsys_char == "W":
-            xp0 = (lon - asc + (asc % 30.0)) % 360.0
+            pos_deg = (lon - asc + (asc % 30.0)) % 360.0
         elif hsys_char == "N":
-            xp0 = lon
+            pos_deg = lon
         else:
-            xp0 = (lon - asc) % 360.0
+            pos_deg = (lon - asc) % 360.0
 
-        xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = xp0 / 30.0 + 1.0
+        pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
+        hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "X":
         # Meridian (axial rotation)
-        hpos = ((mdd - 90.0) % 360.0) / 30.0 + 1.0
+        hpos = ((md_upper - 90.0) % 360.0) / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "M":
@@ -4723,7 +4837,7 @@ def _house_pos_pythonic(
         # atan2(sin(λ), cos(λ)·cos(ε)) gives the RA-equivalent in [-180, 180],
         # then % 360 maps to [0, 360).
         a = lon
-        if abs(a - 90.0) > VERY_SMALL and abs(a - 270.0) > VERY_SMALL:
+        if abs(a - 90.0) > _NEAR_ZERO and abs(a - 270.0) > _NEAR_ZERO:
             hpos_deg = (
                 math.degrees(
                     math.atan2(
@@ -4733,87 +4847,101 @@ def _house_pos_pythonic(
                 % 360.0
             )
         else:
-            hpos_deg = 90.0 if abs(a - 90.0) <= VERY_SMALL else 270.0
+            hpos_deg = 90.0 if abs(a - 90.0) <= _NEAR_ZERO else 270.0
         hpos_deg = (hpos_deg - armc - 90.0) % 360.0
         hpos = hpos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "K":
-        # Koch (Birthplace/GOH) house position
-        # Uses the MC's semi-arc as the reference arc, combined with the
-        # body's ascensional difference (AD) and the MC's AD.
+        # Koch (Birthplace / GOH) house position.
+        # The Koch system defines every house circle by the *birthplace
+        # horizon*: each cusp rises after the MC by an equal share of the
+        # MC degree's own semi-arc.  A body's position is therefore the
+        # share of the MC's semi-arc that has elapsed between the body's
+        # rising (its meridian distance corrected by its own ascensional
+        # difference) and the MC's rising (corrected by the MC's AD):
         #
-        # Formula:
-        #   adp = arcsin(tan(lat) * tan(dec))        -- body's AD
-        #   admc = arcsin(tan(eps) * tan(lat) * sin(armc))  -- MC's AD
-        #   samc = 90 + admc                         -- MC's semi-arc
+        #   ad_body      = arcsin(tan φ · tan δ_body)
+        #   ad_mc        = arcsin(tan ε · tan φ · sin ARMC)
+        #                  (δ_MC from sin δ = sin ε · sin λ_MC, folded into
+        #                   one expression via the MC's RA = ARMC)
+        #   mc_semi_arc  = 90° + ad_mc
         #
-        #   East (mdd >= 0):  dfac = (mdd - adp + admc) / samc
-        #                     xp0 = (dfac - 1) * 90
-        #   West (mdd < 0):   dfac = (mdd + 180 + adp + admc) / samc
-        #                     xp0 = (dfac + 1) * 90
+        #   east  (md_upper >= 0): fraction = (md_upper - ad_body + ad_mc)
+        #                                       / mc_semi_arc
+        #                          position = (fraction - 1) · 90°
+        #   west  (md_upper <  0): fraction = (md_upper + 180 + ad_body
+        #                                       + ad_mc) / mc_semi_arc
+        #                          position = (fraction + 1) · 90°
+        #
+        # Bodies whose fraction falls outside [0, 2] never cross the
+        # birthplace horizon inside this quadrant pair — the Koch position
+        # is undefined and 0.0 is returned (matching the reference API).
 
         tan_eps = math.tan(math.radians(eps))
 
-        # Circumpolar checks for body
-        is_invalid = False
-        is_circumpolar = False
+        invalid = False
 
-        if 90.0 - geolat < de or -90.0 - geolat > de:
-            adp = 90.0
-            is_circumpolar = True
-        elif geolat - 90.0 > de or geolat + 90.0 < de:
-            adp = -90.0
-            is_circumpolar = True
+        # Body's ascensional difference, saturated at ±90° for declinations
+        # that never rise / never set at this latitude.
+        if 90.0 - geolat < dec or -90.0 - geolat > dec:
+            ad_body = 90.0
+        elif geolat - 90.0 > dec or geolat + 90.0 < dec:
+            ad_body = -90.0
         else:
-            adp_arg = math.tan(math.radians(geolat)) * math.tan(math.radians(de))
-            adp_arg = max(-1.0, min(1.0, adp_arg))
-            adp = math.degrees(math.asin(adp_arg))
+            ad_arg = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
+            ad_arg = max(-1.0, min(1.0, ad_arg))
+            ad_body = math.degrees(math.asin(ad_arg))
 
         # MC's ascensional difference
-        admc_arg = (
+        ad_mc_arg = (
             tan_eps * math.tan(math.radians(geolat)) * math.sin(math.radians(armc))
         )
-        if abs(admc_arg) > 1.0:
-            admc_arg = 1.0 if admc_arg > 0 else -1.0
-            is_circumpolar = True
-        admc = math.degrees(math.asin(admc_arg))
+        if abs(ad_mc_arg) > 1.0:
+            ad_mc_arg = 1.0 if ad_mc_arg > 0 else -1.0
+        ad_mc = math.degrees(math.asin(ad_mc_arg))
 
         # MC's semi-arc
-        samc = 90.0 + admc
-        if samc == 0.0:
-            is_invalid = True
+        mc_semi_arc = 90.0 + ad_mc
+        if mc_semi_arc == 0.0:
+            invalid = True
 
-        xp0 = 0.0
-        if not is_invalid and abs(samc) > 0:
+        pos_deg = 0.0
+        if not invalid and abs(mc_semi_arc) > 0:
             # Small tolerance for floating-point boundary checks.
-            # When a body is exactly on the MC or IC, dfac can be
+            # When a body is exactly on the MC or IC, the fraction can be
             # -1e-17 instead of 0.0 due to IEEE 754 rounding.
-            _KOCH_DFAC_TOL = 1e-6
-            if mdd >= 0:  # east
-                dfac = (mdd - adp + admc) / samc
-                if dfac > 2.0 + _KOCH_DFAC_TOL or dfac < -_KOCH_DFAC_TOL:
-                    is_invalid = True
+            _KOCH_FRACTION_TOL = 1e-6
+            if md_upper >= 0:  # east
+                arc_fraction = (md_upper - ad_body + ad_mc) / mc_semi_arc
+                if (
+                    arc_fraction > 2.0 + _KOCH_FRACTION_TOL
+                    or arc_fraction < -_KOCH_FRACTION_TOL
+                ):
+                    invalid = True
                 else:
-                    dfac = max(0.0, min(2.0, dfac))
-                    xp0 = (dfac - 1.0) * 90.0
+                    arc_fraction = max(0.0, min(2.0, arc_fraction))
+                    pos_deg = (arc_fraction - 1.0) * 90.0
             else:  # west
-                mdn_val = mdd + 180.0
-                dfac = (mdn_val + adp + admc) / samc
-                if dfac > 2.0 + _KOCH_DFAC_TOL or dfac < -_KOCH_DFAC_TOL:
-                    is_invalid = True
+                md_from_lower = md_upper + 180.0
+                arc_fraction = (md_from_lower + ad_body + ad_mc) / mc_semi_arc
+                if (
+                    arc_fraction > 2.0 + _KOCH_FRACTION_TOL
+                    or arc_fraction < -_KOCH_FRACTION_TOL
+                ):
+                    invalid = True
                 else:
-                    dfac = max(0.0, min(2.0, dfac))
-                    xp0 = (dfac + 1.0) * 90.0
+                    arc_fraction = max(0.0, min(2.0, arc_fraction))
+                    pos_deg = (arc_fraction + 1.0) * 90.0
 
-        if is_invalid:
-            # Koch position failed in circumpolar area — return 0.0
-            # matching pyswisseph behavior
+        if invalid:
+            # Koch position undefined in the circumpolar area — return 0.0
+            # matching the reference API behavior
             return 0.0
         else:
-            xp0 = xp0 % 360.0
-            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
-            hpos = xp0 / 30.0 + 1.0
+            pos_deg = pos_deg % 360.0
+            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
+            hpos = pos_deg / 30.0 + 1.0
             return hpos
 
     elif hsys_char == "T":
@@ -4822,26 +4950,26 @@ def _house_pos_pythonic(
         # method as Placidus — the difference between the systems is only
         # in how cusps are computed (different pole heights per house),
         # not in how a body is placed within those cusps.
-        if 90.0 - abs(de) <= abs(geolat):
-            if de * geolat < 0:
-                xp0 = (90.0 + mdn / 2.0) % 360.0
+        if 90.0 - abs(dec) <= abs(geolat):
+            if dec * geolat < 0:
+                pos_deg = (90.0 + md_lower / 2.0) % 360.0
             else:
-                xp0 = (270.0 + mdd / 2.0) % 360.0
+                pos_deg = (270.0 + md_upper / 2.0) % 360.0
         else:
-            sinad = math.tan(math.radians(de)) * math.tan(math.radians(geolat))
-            if abs(sinad) > 1.0:
-                sinad = 1.0 if sinad > 0 else -1.0
-            ad = math.degrees(math.asin(sinad))
-            a = sinad + math.cos(math.radians(mdd))
-            is_above_hor = a >= 0
-            sad = 90.0 + ad
-            san = 90.0 - ad
-            if is_above_hor:
-                xp0 = (mdd / sad + 3.0) * 90.0
+            sin_ad = math.tan(math.radians(dec)) * math.tan(math.radians(geolat))
+            if abs(sin_ad) > 1.0:
+                sin_ad = 1.0 if sin_ad > 0 else -1.0
+            asc_diff = math.degrees(math.asin(sin_ad))
+            horizon_test = sin_ad + math.cos(math.radians(md_upper))
+            above_horizon = horizon_test >= 0
+            day_semi_arc = 90.0 + asc_diff
+            night_semi_arc = 90.0 - asc_diff
+            if above_horizon:
+                pos_deg = (md_upper / day_semi_arc + 3.0) * 90.0
             else:
-                xp0 = (mdn / san + 1.0) * 90.0
-            xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = xp0 / 30.0 + 1.0
+                pos_deg = (md_lower / night_semi_arc + 1.0) * 90.0
+            pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
+        hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "B":

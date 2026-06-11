@@ -3,8 +3,21 @@
 ## Independent Implementation
 
 LibEphemeris is an **independent implementation** of an astronomical ephemeris
-library for Python. It does not contain, and has never shipped in any release,
-code derived from the Swiss Ephemeris (SE) source code by Astrodienst AG.
+library for Python. Its computations are independently implemented and are not
+derived from the Swiss Ephemeris (SE) source code by Astrodienst AG.
+
+In June 2026 an internal provenance review found that a small cluster of
+house-system routines in `houses.py` (Savard-A, Krusinski, APC, the
+Sunshine/Makransky variant, and parts of `house_pos`) carried
+implementation expression that followed the structure and identifiers of
+SE's `swehouse.c` more closely than this project's independence standard
+allows. Those routines were rewritten in place: identifiers, comments and
+docstrings were re-derived from the published system definitions (Savard;
+Krusinski 1995 / Pisa 1997 / Goelzer 1995; Knegt; Makransky 1988; Holden
+1977; Koch), while the underlying mathematics — which is not protectable
+subject matter — was preserved and verified bit-identical over a ~91,000
+case grid against the pre-rewrite outputs. The full sweep record lives in
+`docs/methodology/provenance-sweep-2026-06.md`.
 
 All astronomical computations are based on:
 
