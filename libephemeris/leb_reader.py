@@ -191,7 +191,13 @@ class LEBReader:
 
         try:
             self._parse()
-        except (OSError, ValueError, KeyError):
+        except (struct.error, IndexError, KeyError) as exc:
+            # Truncated/corrupted files surface as struct/index/key errors
+            # deep in the unpackers; normalize to ValueError so callers
+            # (validation, Skyfield fallback) see one failure type.
+            self.close()
+            raise ValueError(f"Corrupted LEB file {path!r}: {exc}") from exc
+        except (OSError, ValueError):
             # Clean up mmap and file handle on parse failure
             self.close()
             raise
@@ -361,6 +367,14 @@ class LEBReader:
                 f"for body {body_id}"
             )
 
+        # Corrupted-header guard: a zero interval or empty segment table
+        # would otherwise surface as ZeroDivisionError / garbage reads.
+        if body.interval_days <= 0.0 or body.segment_count <= 0:
+            raise ValueError(
+                f"Corrupted LEB body entry {body_id}: interval_days="
+                f"{body.interval_days}, segment_count={body.segment_count}"
+            )
+
         # O(1) segment lookup
         seg_idx = int((jd - body.jd_start) / body.interval_days)
         seg_idx = max(0, min(seg_idx, body.segment_count - 1))
@@ -411,8 +425,14 @@ class LEBReader:
         return result  # type: ignore[return-value]
 
     def has_nutation(self) -> bool:
-        """Return True if this LEB file contains nutation data."""
-        return self._nutation is not None
+        """Return True if this LEB file contains usable nutation data.
+
+        A nutation section written with ``--skip-aux`` carries a header with
+        ``segment_count == 0`` and no coefficients; treating it as present
+        would make eval_nutation read the adjacent section's bytes as
+        coefficients, silently corrupting every position.
+        """
+        return self._nutation is not None and self._nutation.segment_count > 0
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles at a given Julian Day.
@@ -426,10 +446,13 @@ class LEBReader:
         Raises:
             ValueError: If nutation data is not available or JD out of range.
         """
-        if self._nutation is None:
+        if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
 
         nut = self._nutation
+
+        if nut.interval_days <= 0.0:
+            raise ValueError("Corrupted LEB nutation header: zero interval")
 
         if jd_tt < nut.jd_start or jd_tt > nut.jd_end:
             raise ValueError(
@@ -465,7 +488,8 @@ class LEBReader:
     def delta_t(self, jd: float) -> float:
         """Get Delta-T (TT - UT1) at a given Julian Day.
 
-        Uses cubic interpolation on the sparse table.
+        Uses linear interpolation on the sparse table (sufficient for the
+        30-day sample spacing).
 
         Args:
             jd: Julian Day (UT or TT -- the difference is negligible for lookup).

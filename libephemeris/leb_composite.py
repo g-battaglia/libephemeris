@@ -58,8 +58,8 @@ class CompositeLEBReader:
         for reader in readers:
             if (
                 self._nutation_reader is None
-                and hasattr(reader, "_nutation")
-                and reader._nutation is not None
+                and hasattr(reader, "has_nutation")
+                and reader.has_nutation()
             ):
                 self._nutation_reader = reader
             if (
@@ -138,14 +138,24 @@ class CompositeLEBReader:
 
         readers = [open_leb(path)]
 
-        if len(parts) >= 2:
-            prefix = parts[0]  # e.g., "base"
-            # Find companion files with same prefix (both extensions)
+        # Companions exist only for the group-file naming scheme
+        # ({tier}_{group}.leb2).  A merged file (e.g. "ephemeris_base.leb")
+        # is complete on its own — a bare first-token prefix match would
+        # pull in other tiers ("ephemeris_medium.leb", ...) and stale
+        # partials, silently mixing tiers in one composite.
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+
+        if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
+            prefix = "_".join(parts[:-1])  # e.g., "base"
             companions = sorted(
                 glob.glob(os.path.join(directory, f"{prefix}_*.leb"))
                 + glob.glob(os.path.join(directory, f"{prefix}_*.leb2"))
             )
             for companion_path in companions:
+                cname = os.path.basename(companion_path).rsplit(".", 1)[0]
+                cparts = cname.split("_")
+                if cparts[:-1] != parts[:-1] or cparts[-1] not in _GROUP_SUFFIXES:
+                    continue
                 if os.path.abspath(companion_path) != os.path.abspath(path):
                     try:
                         readers.append(open_leb(companion_path))
@@ -225,6 +235,12 @@ class CompositeLEBReader:
                 pass
         self._readers.clear()
         self._body_map.clear()
+        # Drop aux-reader references too: they point at now-closed readers,
+        # and a post-close delta_t()/eval_nutation() should fail with the
+        # clean "no data" ValueError rather than a struct/TypeError.
+        self._nutation_reader = None
+        self._delta_t_reader = None
+        self._star_reader = None
 
     def __enter__(self) -> "CompositeLEBReader":
         return self

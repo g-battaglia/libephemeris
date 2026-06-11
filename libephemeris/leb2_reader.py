@@ -90,7 +90,12 @@ class LEB2Reader:
 
         try:
             self._parse()
-        except (OSError, ValueError, KeyError):
+        except (struct.error, IndexError, KeyError) as exc:
+            # Normalize truncated/corrupted-file failures to ValueError so
+            # validation and the Skyfield fallback see one failure type.
+            self.close()
+            raise ValueError(f"Corrupted LEB2 file {path!r}: {exc}") from exc
+        except (OSError, ValueError):
             self.close()
             raise
 
@@ -106,6 +111,16 @@ class LEB2Reader:
                 f"(supported: {LEB2_VERSION_V1}, {LEB2_VERSION})"
             )
         self._chunked = self._header.version >= LEB2_VERSION
+
+        # The header flags carry the compression algorithm ID; feeding a
+        # COMPRESSION_NONE (or unknown-scheme) file to the zstd pipeline
+        # would fail confusingly deep in decompression.
+        from .leb_format import COMPRESSION_ZSTD_TRUNC_SHUFFLE
+
+        if self._header.flags != COMPRESSION_ZSTD_TRUNC_SHUFFLE:
+            raise ValueError(
+                f"Unsupported LEB2 compression scheme: {self._header.flags}"
+            )
 
         # Parse section directory
         self._sections: Dict[int, SectionEntry] = {}
@@ -194,6 +209,15 @@ class LEB2Reader:
         body = self._bodies[body_id]
         chunk = self._chunk_index[body_id][chunk_idx]
 
+        # The stored uncompressed size is fully derivable; validating it
+        # caps the decompression allocation for corrupted/crafted files.
+        expected = chunk.segment_count * (body.degree + 1) * body.components * 8
+        if chunk.uncompressed_size != expected:
+            raise ValueError(
+                f"Corrupted LEB2 chunk (body {body_id}, chunk {chunk_idx}): "
+                f"uncompressed_size {chunk.uncompressed_size} != expected {expected}"
+            )
+
         compressed = self._mm[
             chunk.blob_offset: chunk.blob_offset + chunk.compressed_size
         ]
@@ -214,6 +238,12 @@ class LEB2Reader:
     def _decompress_body(self, body_id: int) -> None:
         """Decompress a body's full coefficients (v1 legacy)."""
         entry = self._bodies[body_id]
+        expected = entry.segment_count * (entry.degree + 1) * entry.components * 8
+        if entry.uncompressed_size != expected:
+            raise ValueError(
+                f"Corrupted LEB2 body entry {body_id}: uncompressed_size "
+                f"{entry.uncompressed_size} != expected {expected}"
+            )
         compressed = self._mm[
             entry.data_offset: entry.data_offset + entry.compressed_size
         ]
@@ -300,17 +330,55 @@ class LEB2Reader:
                 f"for body {body_id}"
             )
 
+        # Corrupted-header guard (zero interval / empty segment table)
+        if body.interval_days <= 0.0 or body.segment_count <= 0:
+            raise ValueError(
+                f"Corrupted LEB2 body entry {body_id}: interval_days="
+                f"{body.interval_days}, segment_count={body.segment_count}"
+            )
+
         # Global segment index
         seg_idx = int((jd - body.jd_start) / body.interval_days)
         seg_idx = max(0, min(seg_idx, body.segment_count - 1))
 
         # Get coefficients — chunked (v2) or monolithic (v1)
         if self._chunked:
+            chunks = self._chunk_index[body_id]
+            if not chunks:
+                raise ValueError(
+                    f"Corrupted LEB2 file: empty chunk index for body {body_id}"
+                )
             chunk_idx = self._find_chunk(body_id, jd)
+            chunk = chunks[chunk_idx]
+            # The jd binary search compares against stored (write-time
+            # rounded) chunk boundaries; in the half-ulp window where they
+            # disagree with the segment arithmetic, trust the segment
+            # index — clamping would silently evaluate the neighbouring
+            # segment's polynomial.
+            if not (
+                chunk.segment_start
+                <= seg_idx
+                < chunk.segment_start + chunk.segment_count
+            ):
+                for step in (-1, 1):
+                    alt = chunk_idx + step
+                    if 0 <= alt < len(chunks):
+                        cand = chunks[alt]
+                        if (
+                            cand.segment_start
+                            <= seg_idx
+                            < cand.segment_start + cand.segment_count
+                        ):
+                            chunk_idx, chunk = alt, cand
+                            break
+                else:
+                    raise ValueError(
+                        f"Corrupted LEB2 chunk index for body {body_id}: "
+                        f"segment {seg_idx} not covered by any chunk near "
+                        f"jd {jd}"
+                    )
             chunk_data = self._decompress_chunk(body_id, chunk_idx)
-            chunk = self._chunk_index[body_id][chunk_idx]
             local_seg = seg_idx - chunk.segment_start
-            local_seg = max(0, min(local_seg, chunk.segment_count - 1))
             deg1 = body.degree + 1
             n_coeffs = body.components * deg1
             byte_offset = local_seg * n_coeffs * 8
@@ -358,15 +426,22 @@ class LEB2Reader:
         return result  # type: ignore[return-value]
 
     def has_nutation(self) -> bool:
-        """Return True if this LEB file contains nutation data."""
-        return self._nutation is not None
+        """Return True if this LEB file contains usable nutation data.
+
+        An empty (--skip-aux) nutation section has segment_count == 0;
+        treating it as present would read the adjacent section's bytes as
+        coefficients.
+        """
+        return self._nutation is not None and self._nutation.segment_count > 0
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles. Same as LEBReader.eval_nutation()."""
-        if self._nutation is None:
+        if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
 
         nut = self._nutation
+        if nut.interval_days <= 0.0:
+            raise ValueError("Corrupted LEB2 nutation header: zero interval")
         if jd_tt < nut.jd_start or jd_tt > nut.jd_end:
             raise ValueError(
                 f"JD {jd_tt} outside nutation range [{nut.jd_start}, {nut.jd_end}]"

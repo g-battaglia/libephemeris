@@ -2840,12 +2840,17 @@ def merge_leb_files(
                 break
 
     # -------------------------------------------------------------------------
-    # 3. Collect nutation from first file that has it
+    # 3. Collect nutation from first file that has REAL nutation data.
+    # A --skip-aux partial writes an empty nutation section (header with
+    # segment_count == 0); taking that one would poison the merged file.
     # -------------------------------------------------------------------------
     nutation_blob: Optional[bytes] = None
     for info in input_data:
         if SECTION_NUTATION in info["sections"]:
             sec = info["sections"][SECTION_NUTATION]
+            nut_header = read_nutation_header(info["data"], sec.offset)
+            if nut_header.segment_count <= 0:
+                continue
             nutation_blob = info["data"][sec.offset : sec.offset + sec.size]
             break
 
