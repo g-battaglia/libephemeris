@@ -163,20 +163,30 @@ class TestSweLunOccultWhenLoc:
         # up to ~1.5 degrees (Moon radius + parallax margin)
         assert 0.0 <= attr[7] < 2.0
 
-    def test_raises_error_for_no_target(self):
-        """Test that function raises error if no target specified."""
-        jd_start = julday(2024, 1, 1, 0)
-        geopos = [10.0, 45.0, 0.0]
+    def test_body_zero_is_the_sun(self):
+        """Body 0 is the Sun: the search finds a solar eclipse.
 
-        with pytest.raises(ValueError):
-            lun_occult_when_loc(jd_start, 0, geopos, FLG_SWIEPH)
+        The reference treats ipl=0 (Sun) as a legitimate occultation
+        target - an occultation of the Sun by the Moon is a solar
+        eclipse (verified against pyswisseph 2.10.03).
+        """
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = [-96.797, 32.7767, 0.0]  # Dallas, 2024-04-08 path
+
+        retflags, tret, attr = lun_occult_when_loc(
+            jd_start, 0, geopos, FLG_SWIEPH
+        )
+        assert retflags != 0
+        assert tret[0] > jd_start
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
-        with pytest.raises(ValueError):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
             lun_occult_when_loc(jd_start, "UnknownStar123", geopos, FLG_SWIEPH)
 
     def test_raises_error_for_invalid_geopos(self):

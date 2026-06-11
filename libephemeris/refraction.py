@@ -55,6 +55,32 @@ References
 - Auer, L.H. & Standish, E.M. (2000), AJ, 119, 2472
 - Smart, W.M. (1977) "Textbook on Spherical Astronomy", Ch. VI
 - Bomford, G. (1980) "Geodesy", 4th ed., Clarendon Press, §2.17-2.20
+
+Deviation from the reference implementation
+-------------------------------------------
+The reference (Swiss Ephemeris compatible) library computes refraction
+from empirical curve fits: Sinclair's formula (quoted in Bennett 1982)
+inside swe_azalt/swe_refrac_extended and the Saemundsson/Bennett pair in
+swe_refrac. This module deliberately keeps the ray-traced model instead
+(owner decision, 2026-06): it is physically grounded and at least as
+accurate against rigorous benchmarks. Measured envelope of the
+difference vs. the reference's fits at p=1013.25 hPa, T=10 C:
+
+- above ~15 deg altitude:           < 0.1 arcsec
+- 5 .. 15 deg:                      < 1 arcsec
+- 0 .. 5 deg (incl. horizon):       up to ~15 arcsec
+- below the horizon dip:            up to ~0.18 deg (the fits are
+                                    extrapolations there; neither model
+                                    is observationally constrained)
+
+Consequences: apparent altitudes from utils.azalt/refrac/refrac_extended
+can differ from the reference by the envelope above, which can flip
+near-horizon visibility bits (eclipse/occultation *_VISIBLE flags)
+within a few seconds of an event's horizon crossing. Rise/set times are
+NOT affected: eclipse.rise_trans and everything built on it use the
+reference's own Sinclair model (see eclipse._rise_true_to_apparent) so
+that rise/set, twilight and eclipse timing agree with the reference to
+fractions of a second.
 """
 
 from __future__ import annotations

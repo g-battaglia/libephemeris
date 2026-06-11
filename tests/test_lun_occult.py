@@ -116,17 +116,21 @@ class TestLunOccultWhenGlob:
         assert (retflags & ECL_TOTAL) or (retflags & ECL_PARTIAL)
 
     def test_raises_error_for_no_target(self):
-        """Test that function raises error if no target specified."""
+        """An empty star name cannot be resolved and raises Error."""
+        from libephemeris.exceptions import Error
+
         jd_start = julday(2024, 1, 1, 0)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(Error):
             lun_occult_when_glob(jd_start, "", FLG_SWIEPH, 0)
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd_start = julday(2017, 1, 1, 0)
 
-        with pytest.raises(ValueError):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
             lun_occult_when_glob(jd_start, "UnknownStar123", FLG_SWIEPH, 0)
 
     def test_swe_alias(self):
@@ -187,21 +191,26 @@ class TestLunOccultEdgeCases:
         # Start from a date with no immediate occultation
         jd_start = julday(2020, 1, 1, 0)
 
-        # The function should either find an occultation or raise RuntimeError
-        # after exhausting the search limit
+        # The function should either find an occultation or raise Error
+        # after exhausting the search limit (reference parity: search
+        # exhaustion raises swisseph.Error)
+        from libephemeris.exceptions import Error
+
         try:
             retflags, tret = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
             # If found, verify it's after start date
             assert tret[0] > jd_start
-        except RuntimeError as e:
-            # Expected if no occultation in 20 years
-            assert "No lunar occultation" in str(e)
+        except Error as e:
+            # Expected if no occultation in the search window
+            assert "occultation" in str(e)
 
     def test_raises_error_for_invalid_planet(self):
         """Test that invalid planet ID raises appropriate error."""
         jd_start = julday(2020, 1, 1, 0)
 
-        with pytest.raises(ValueError):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
             lun_occult_when_glob(jd_start, 999, FLG_SWIEPH, 0)  # Invalid planet ID
 
 
@@ -225,11 +234,14 @@ class TestLunOccultResolveStarId:
         retflags, tret = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
         assert tret[0] > jd_start
 
-    def test_invalid_star_raises_value_error_with_message(self):
-        """Test that invalid stars raise ValueError with descriptive message."""
+    def test_invalid_star_raises_error_with_message(self):
+        """Invalid stars raise Error with a descriptive message (pyswisseph
+        raises swisseph.Error for unresolvable star names)."""
+        from libephemeris.exceptions import Error
+
         jd_start = julday(2017, 1, 1, 0)
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(Error) as exc_info:
             lun_occult_when_glob(jd_start, "InvalidStarXYZ123", FLG_SWIEPH, 0)
 
         # Error message should mention the star name

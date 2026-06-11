@@ -71,7 +71,11 @@ class TestLunOccultWhere:
 
         assert ocl_type == 0
 
-        assert all(g == 0.0 for g in geopos)
+        # The reference still reports the closest-approach point in
+        # geopos[0..1]; only geopos[2..9] stay zero.
+        assert -180.0 <= geopos[0] <= 180.0
+        assert -90.0 <= geopos[1] <= 90.0
+        assert all(g == 0.0 for g in geopos[2:])
 
     def test_occultation_type_flags(self):
         """Test that occultation type flags are set correctly."""
@@ -121,25 +125,34 @@ class TestLunOccultWhere:
         ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
-            assert 0.0 <= attr[0] <= 1.0
-            assert attr[1] >= 0.0
-            assert 0.0 <= attr[2] <= 1.0
-            assert 0.0 <= attr[3] <= 1000.0
+            # Star occultations: magnitude 1 (point source fully
+            # covered), diameter ratio 0, core "shadow" = minus the
+            # lunar diameter at the center point (reference layout,
+            # verified against pyswisseph 2.10.03).
+            assert attr[0] == 1.0
+            assert attr[1] == 0.0
+            assert attr[2] == 1.0
+            assert -3500.0 < attr[3] < 0.0
             assert 0.0 <= attr[4] < 360.0 or -180.0 <= attr[4] <= 180.0
             assert -90.0 <= attr[5] <= 90.0
 
-    def test_raises_error_for_no_target(self):
-        """Test that function raises error if no target specified."""
-        jd = julday(2024, 1, 1, 0)
+    def test_body_zero_is_the_sun(self):
+        """Body 0 is the Sun: occultation of the Sun = solar eclipse.
 
-        with pytest.raises(ValueError):
-            lun_occult_where(jd, 0, FLG_SWIEPH)
+        Verified against pyswisseph 2.10.03 (retflag 5 with the shadow
+        center over Mexico for the 2024-04-08 totality instant).
+        """
+        retflags, geopos, attr = lun_occult_where(2460409.26, 0, FLG_SWIEPH)
+        assert retflags != 0
+        assert -180.0 <= geopos[0] <= 180.0
 
     def test_raises_error_for_unknown_star(self):
         """Test that function raises error for unknown star name."""
         jd = julday(2017, 6, 28, 10)
 
-        with pytest.raises(ValueError):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
             lun_occult_where(jd, "UnknownStar123", FLG_SWIEPH)
 
     def test_swe_alias(self):
@@ -327,7 +340,9 @@ class TestLunOccultWherePlanetOccultations:
         """Test that invalid planet ID raises an error."""
         jd = julday(2024, 1, 1, 0)
 
-        with pytest.raises(ValueError):
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
             lun_occult_where(jd, 999, FLG_SWIEPH)
 
     def test_mars_occultation_structure(self):
@@ -381,7 +396,9 @@ class TestLunOccultWhereAttributes:
         ocl_type, geopos, attr = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         if ocl_type != 0:
-            assert attr[1] > 100
+            # Stars are point sources: the lunar/body diameter ratio is
+            # reported as 0 by the reference.
+            assert attr[1] == 0.0
 
     def test_apparent_altitude_different_from_true(self):
         """Test that apparent altitude includes refraction correction."""
