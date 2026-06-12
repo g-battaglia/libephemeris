@@ -2005,21 +2005,56 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
     Returns:
         The OrbitalElements instance closest in time to jd_tt
     """
-    # Start with the original single-epoch elements as the default best
-    best = MINOR_BODY_ELEMENTS[body_id]
-    best_dt = abs(jd_tt - best.epoch)
-
-    if body_id not in MINOR_BODY_ELEMENTS_MULTI:
-        return best
-
-    # Scan multi-epoch entries for the nearest one
-    for elem in MINOR_BODY_ELEMENTS_MULTI[body_id]:
-        dt = abs(jd_tt - elem.epoch)
-        if dt < best_dt:
-            best = elem
-            best_dt = dt
-
+    best, second, _w = _get_epoch_elements_blend(body_id, jd_tt)
     return best
+
+
+# Half-width of the cross-fade window centered on the midpoint between
+# adjacent element epochs.  Inside the window, positions from the two
+# bracketing element sets are blended linearly so the switch between
+# epochs (each propagated up to ~5 years two-body) does not step.
+_EPOCH_BLEND_HALF_DAYS: float = 182.625  # half a Julian year
+
+
+def _get_epoch_elements_blend(
+    body_id: int, jd_tt: float
+) -> tuple[OrbitalElements, Optional[OrbitalElements], float]:
+    """Nearest element epoch plus a cross-fade partner near midpoints.
+
+    Returns (primary, secondary, weight): ``primary`` is the nearest
+    epoch's elements.  Within ±_EPOCH_BLEND_HALF_DAYS of the midpoint
+    between two adjacent epochs, ``secondary`` is the other bracketing
+    epoch and ``weight`` (0..0.5] is the secondary's linear blend
+    fraction; otherwise ``secondary`` is None and ``weight`` is 0.0.
+    """
+    base = MINOR_BODY_ELEMENTS[body_id]
+    entries = MINOR_BODY_ELEMENTS_MULTI.get(body_id)
+    if not entries:
+        return base, None, 0.0
+
+    # Multi-epoch entries are generated in ascending epoch order; the
+    # single-epoch base participates as a fallback only when it is
+    # nearer than every table entry (e.g. outside the table range).
+    nearest = min(entries, key=lambda e: abs(jd_tt - e.epoch))
+    if abs(jd_tt - base.epoch) < abs(jd_tt - nearest.epoch):
+        return base, None, 0.0
+
+    idx = entries.index(nearest)
+    if jd_tt >= nearest.epoch and idx + 1 < len(entries):
+        other = entries[idx + 1]
+    elif jd_tt < nearest.epoch and idx > 0:
+        other = entries[idx - 1]
+    else:
+        return nearest, None, 0.0
+
+    midpoint = (nearest.epoch + other.epoch) / 2.0
+    dist = abs(jd_tt - midpoint)
+    if dist >= _EPOCH_BLEND_HALF_DAYS:
+        return nearest, None, 0.0
+
+    # weight ramps 0.5 at the midpoint -> 0 at the window edge
+    weight = 0.5 * (1.0 - dist / _EPOCH_BLEND_HALF_DAYS)
+    return nearest, other, weight
 
 
 def solve_kepler_equation_elliptic(M: float, e: float, tol: float = 1e-8) -> float:
@@ -2664,9 +2699,19 @@ def calc_minor_body_heliocentric(
 
     # Fall back to Keplerian calculation
     # Use multi-epoch elements if available for better accuracy
-    # Pass body_id to enable resonant libration correction for plutinos
-    elements = _get_closest_epoch_elements(body_id, jd_tt)
+    # Pass body_id to enable resonant libration correction for plutinos.
+    # Near the midpoint between adjacent element epochs the two
+    # propagations are cross-faded in Cartesian space so the nearest-
+    # epoch switch does not step the position.
+    elements, blend_elements, blend_w = _get_epoch_elements_blend(body_id, jd_tt)
     x, y, z = calc_minor_body_position(elements, jd_tt, body_id=body_id)
+    if blend_elements is not None and blend_w > 0.0:
+        xb, yb, zb = calc_minor_body_position(
+            blend_elements, jd_tt, body_id=body_id
+        )
+        x = x * (1.0 - blend_w) + xb * blend_w
+        y = y * (1.0 - blend_w) + yb * blend_w
+        z = z * (1.0 - blend_w) + zb * blend_w
 
     # Convert Cartesian to spherical coordinates
     r = math.sqrt(x**2 + y**2 + z**2)

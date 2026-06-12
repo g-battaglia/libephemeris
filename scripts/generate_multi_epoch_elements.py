@@ -683,8 +683,10 @@ Examples:
 # Epoch range: {args.start}–{args.end}, spacing: {args.spacing} years
 # Source: JPL SPK type 21 state vectors → osculating Keplerian elements
 #
-# Each body has elements at {args.spacing}-year intervals for cubic Hermite
-# interpolation in _get_closest_epoch_elements().
+# Each body has elements at {args.spacing}-year intervals; the consumer
+# (_get_epoch_elements_blend) picks the nearest epoch and cross-fades
+# positions near epoch midpoints (Hermite interpolation of osculating
+# elements was tested and rejected for overshoot).
 #
 # Bodies with SPK data: {success_count}/{len(all_bodies)}
 # Bodies without SPK: {skip_count}/{len(all_bodies)}
