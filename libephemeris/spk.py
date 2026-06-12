@@ -966,7 +966,7 @@ class _SpkType21Target:
         return f"<SpkType21Target NAIF={self._naif_id}>"
 
 
-def get_spk_type21_target(ipl: int):
+def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     """Get a Skyfield-compatible VectorFunction target for a type 21 asteroid.
 
     Returns a _SpkType21Target that can be used with Skyfield's observe/apparent
@@ -974,6 +974,12 @@ def get_spk_type21_target(ipl: int):
 
     Args:
         ipl: libephemeris body ID (e.g., CHIRON=15, CERES=17)
+        jd_tt: Optional epoch (JD TT).  When given and outside the
+            kernel's coverage, returns None so the caller falls through
+            to the legacy path, which raises EphemerisRangeError and
+            lands on the documented Keplerian out-of-coverage fallback —
+            the same flow as type 2/3 kernels.  (A small margin covers
+            the light-time retardation at the coverage edges.)
 
     Returns:
         _SpkType21Target or None
@@ -989,6 +995,14 @@ def get_spk_type21_target(ipl: int):
     spk_type = _detect_spk_type(spk_file)
     if spk_type != 21:
         return None
+
+    if jd_tt is not None:
+        coverage = get_spk_coverage(spk_file)
+        if coverage is not None:
+            start_jd, end_jd = coverage
+            margin = 0.05  # days; light-time at observe() edges
+            if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
+                return None
 
     kernel = _load_type21_kernel(spk_file)
     if kernel is None:
@@ -1360,6 +1374,19 @@ def calc_spk_body_position(
 
     # Handle type 21 (JPL Horizons asteroids/comets)
     if spk_type == 21:
+        # Out-of-coverage epochs raise EphemerisRangeError exactly like
+        # the type 2/3 branch below; None stays reserved for genuine
+        # computation failures (unreadable/corrupt kernel data).
+        coverage = get_spk_coverage(spk_file)
+        if coverage is not None:
+            start_jd, end_jd = coverage
+            if t.tt < start_jd or t.tt > end_jd:
+                from .exceptions import EphemerisRangeError
+
+                raise EphemerisRangeError(
+                    f"JD {t.tt:.1f} outside SPK coverage "
+                    f"[{start_jd:.1f}, {end_jd:.1f}] for body {ipl}"
+                )
         kernel = _load_type21_kernel(spk_file)
         if kernel is not None:
             result = _calc_type21_position(kernel, naif_id, t, iflag)

@@ -2429,7 +2429,7 @@ def _calc_body(
         from .logging_config import get_logger
 
         # First check if already registered
-        _spk_type21_target = spk.get_spk_type21_target(ipl)
+        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
 
         _auto_download_attempted = False
         if _spk_type21_target is None:
@@ -2442,7 +2442,7 @@ def _calc_body(
                 except (OSError, ValueError, KeyError, RuntimeError, TypeError):
                     pass
                 # Re-check after download
-                _spk_type21_target = spk.get_spk_type21_target(ipl)
+                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
 
         if _spk_type21_target is not None:
             # Route through the planet pipeline below (observe/apparent)
