@@ -2673,6 +2673,16 @@ def calc_minor_body_heliocentric(
     lon = math.degrees(math.atan2(y, x)) % 360.0
     lat = math.degrees(math.asin(z / r))
 
+    # Frame contract: the orbital-element tables are referenced to the
+    # J2000 ecliptic (fit from JPL VECTORS), so calc_minor_body_position
+    # returns J2000 ecliptic coordinates.  Precess to the ecliptic of
+    # date so this fallback agrees with the SPK branch above (measured
+    # bias before this correction: ~1290" at 2026, i.e. 26 yr of
+    # general precession).
+    from .astrometry import _precess_ecliptic
+
+    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
     return lon, lat, r
 
 
@@ -3553,12 +3563,20 @@ def calc_asteroid_by_number(
             "Check if the asteroid number is valid."
         )
 
-    # Calculate position using Keplerian mechanics with perturbations
+    # Calculate position using Keplerian mechanics with perturbations.
+    # Frame contract: calc_minor_body_position returns coordinates in the
+    # frame the elements are referenced to.  SBDB osculating elements are
+    # J2000 ecliptic, so precess to the ecliptic of date below — matching
+    # the SPK branch above and calc_minor_body_heliocentric.
     x, y, z = calc_minor_body_position(elements, jd_tt)
 
     # Convert Cartesian to spherical coordinates
     r = math.sqrt(x**2 + y**2 + z**2)
     lon = math.degrees(math.atan2(y, x)) % 360.0
     lat = math.degrees(math.asin(z / r))
+
+    from .astrometry import _precess_ecliptic
+
+    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
     return lon, lat, r

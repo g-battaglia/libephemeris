@@ -744,6 +744,29 @@ def get_planet_name(planet: int) -> str:
     return f"Unknown ({planet})"
 
 
+# pyswisseph treats calc_ut(jd, AST_OFFSET + 1, flags) identically to
+# calc_ut(jd, CERES, flags); same for the other built-in asteroids.
+_AST_NUMBER_REMAP = {
+    1: CERES,  # 17
+    2: PALLAS,  # 18
+    3: JUNO,  # 19
+    4: VESTA,  # 20
+    2060: CHIRON,  # 15
+    5145: PHOLUS,  # 16
+}
+
+
+def _remap_ast_offset(ipl: int) -> int:
+    """Map AST_OFFSET + N to the dedicated body id for built-in asteroids.
+
+    Must run before the LEB/Horizons dispatch so e.g. AST_OFFSET + 1 is
+    served from the same backend as CERES; other ids pass through.
+    """
+    if ipl > AST_OFFSET:
+        return _AST_NUMBER_REMAP.get(ipl - AST_OFFSET, ipl)
+    return ipl
+
+
 def _try_auto_spk_download(t, ipl: int, iflag: int):
     """
     Try to automatically download and use SPK for a minor body.
@@ -771,15 +794,17 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
     logger = get_logger()
 
-    # Check if this body is in the SPK download map
-    if ipl not in SPK_BODY_NAME_MAP:
-        return None
-
     # Skip bodies where JPL blocks SPK generation
     if ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
         return None
 
-    horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
+    if ipl in SPK_BODY_NAME_MAP:
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
+    elif AST_OFFSET < ipl < FIXSTAR_OFFSET:
+        # Arbitrary numbered asteroid: Horizons small-body record syntax
+        horizons_id = f"{ipl - AST_OFFSET};"
+    else:
+        return None
 
     try:
         # Use the date range from the current precision tier so the downloaded
@@ -892,6 +917,10 @@ def calc_ut(
     # where SPEED takes priority if both are set).
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+
+    # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
+    # dispatch so both id forms are served by the same backend.
+    planet = _remap_ast_offset(planet)
 
     # --- South nodes: derive from north node via the same dispatch path ---
     # South node = north node + 180° longitude, negated latitude.
@@ -1068,6 +1097,9 @@ def calc(
     # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+
+    # Built-in asteroids by AST_OFFSET number (see calc_ut)
+    planet = _remap_ast_offset(planet)
 
     # --- South nodes: derive from the north node via the same dispatch
     # path (see calc_ut for the backend-consistency rationale) ---
@@ -1639,7 +1671,30 @@ def _keplerian_position_at(
     from . import minor_bodies
     from .state import get_timescale
 
-    lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
+    if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
+        lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(
+            ipl, jd_tt
+        )
+    else:
+        # Arbitrary numbered asteroid: Keplerian elements fetched from
+        # JPL SBDB (cached after the first call).  No element source at
+        # all means the body is genuinely unknown.
+        from .exceptions import UnknownBodyError
+
+        try:
+            lon_hel, lat_hel, r_hel = minor_bodies.calc_asteroid_by_number(
+                ipl - AST_OFFSET, jd_tt, use_spk=False
+            )
+        except (ValueError, ConnectionError, OSError) as e:
+            raise UnknownBodyError(
+                message=(
+                    f"Asteroid {ipl - AST_OFFSET} (body ID {ipl}): no SPK "
+                    f"registered and JPL SBDB lookup failed ({e}). Register "
+                    f"an SPK file or enable auto-download, or check the "
+                    f"asteroid number."
+                ),
+                body_id=ipl,
+            ) from e
 
     if iflag & FLG_HELCTR:
         return lon_hel, lat_hel, r_hel
@@ -1816,21 +1871,9 @@ def _calc_body(
     if ipl == SUN and (iflag & FLG_HELCTR):
         return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
-    # Remap AST_OFFSET + N to dedicated body IDs for special asteroids.
-    # pyswisseph treats calc_ut(jd, 10001, flags) identically to calc_ut(jd, 17, flags)
-    # (both compute Ceres). We mirror this behavior.
-    if ipl >= AST_OFFSET:
-        _ast_num = ipl - AST_OFFSET
-        _AST_REMAP = {
-            1: CERES,  # 17
-            2: PALLAS,  # 18
-            3: JUNO,  # 19
-            4: VESTA,  # 20
-            2060: CHIRON,  # 15
-            5145: PHOLUS,  # 16
-        }
-        if _ast_num in _AST_REMAP:
-            ipl = _AST_REMAP[_ast_num]
+    # Remap AST_OFFSET + N to dedicated body IDs for built-in asteroids
+    # (idempotent safety net; calc/calc_ut already remap pre-dispatch).
+    ipl = _remap_ast_offset(ipl)
 
     # Handle planetary moons (Galilean moons, Titan, etc.)
     if planetary_moons.is_planetary_moon(ipl):
@@ -2372,8 +2415,13 @@ def _calc_body(
     # through the Skyfield observe/apparent pipeline (same as planets).
     # This avoids the ~0.3" systematic error from the legacy ecliptic J2000
     # + manual precession/nutation approach in _calc_type21_position.
+    # Arbitrary numbered asteroids (AST_OFFSET + N, below the fixed-star
+    # range) take the same pipeline: registered SPK -> auto-SPK ->
+    # Keplerian elements (curated table or JPL SBDB) -> UnknownBodyError.
     _spk_type21_target = None
-    if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
+    if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (
+        AST_OFFSET < ipl < FIXSTAR_OFFSET
+    ):
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
@@ -2430,10 +2478,14 @@ def _calc_body(
             jd_tt = t.tt
 
             # Try ASSIST N-body integration fallback if available
+            # (only for bodies with curated elements; arbitrary SBDB
+            # asteroids have no initial conditions for the integrator)
             try:
                 from .rebound_integration import check_assist_data_available
 
-                if check_assist_data_available():
+                if ipl in minor_bodies.MINOR_BODY_ELEMENTS and (
+                    check_assist_data_available()
+                ):
                     lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
 
                     speed_lon = 0.0
