@@ -767,6 +767,20 @@ def _remap_ast_offset(ipl: int) -> int:
     return ipl
 
 
+def _nutation_rate_deg_per_day(jd_tt: float, dt: float = 0.5) -> float:
+    """Central-difference rate of nutation in longitude (deg/day).
+
+    The lunar node/apse bodies are output on the true ecliptic of date,
+    so their reference-compatible speeds include d(dpsi)/dt (about
+    2e-6 deg/day at J2000); under FLG_NONUT the rate is excluded.
+    """
+    from .cache import get_cached_nutation
+
+    dpsi_prev, _ = get_cached_nutation(jd_tt - dt)
+    dpsi_next, _ = get_cached_nutation(jd_tt + dt)
+    return math.degrees(dpsi_next - dpsi_prev) / (2.0 * dt)
+
+
 def _try_auto_spk_download(t, ipl: int, iflag: int):
     """
     Try to automatically download and use SPK for a minor body.
@@ -1922,6 +1936,10 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
+                # True-ecliptic output: the speed includes the nutation
+                # rate, exactly like the position includes dpsi.
+                if not (iflag & FLG_NONUT) and not _sid_eq:
+                    dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -1941,9 +1959,9 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic terms from ELP2000-82B theory.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & FLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -1963,6 +1981,11 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
+                    # The raw true-node curve contains nutation; under
+                    # NONUT (mean-ecliptic output) remove its rate, the
+                    # same way dpsi was removed from the position.
+                    if (iflag & FLG_NONUT) or _sid_eq:
+                        dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
                     ValueError,
@@ -2020,9 +2043,9 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon + math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic correction terms.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat = 0.0, 0.0
             if iflag & FLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -2036,6 +2059,10 @@ def _calc_body(
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
+                # True-ecliptic output: include the nutation rate, like
+                # the position includes dpsi.
+                if not (iflag & FLG_NONUT) and not _sid_eq:
+                    dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -2055,12 +2082,15 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic terms from orbital mechanics.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & FLG_SPEED:
-                dt = 0.5  # 0.5 days for perturbation-corrected velocity
+                # 0.05 d (~1.2 h): converged derivative of the osculating
+                # curve; a 0.5 d window low-passes its fast oscillations
+                # and was ~2x further from the reference speeds.
+                dt = 0.05
                 try:
                     lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
                     lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
@@ -2073,6 +2103,10 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
+                    # The raw osculating curve contains nutation; under
+                    # NONUT (mean-ecliptic output) remove its rate.
+                    if (iflag & FLG_NONUT) or _sid_eq:
+                        dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
                     ValueError,
@@ -2105,10 +2139,21 @@ def _calc_body(
             lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
         else:  # INTP_PERG
             lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
+        # The interpolated apse curves are calibrated against the true
+        # ecliptic of date (nutation included).  Under NONUT — or under
+        # SIDEREAL+EQUATORIAL, where the reference outputs the mean
+        # ecliptic converted with mean obliquity — subtract dpsi, the
+        # same convention as TRUE_NODE/OSCU_APOG.
+        _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
+        if (iflag & FLG_NONUT) or _sid_eq:
+            from .cache import get_cached_nutation
+
+            dpsi_rad, _ = get_cached_nutation(jd_tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
         # Calculate velocity via central difference numerical differentiation
-        # Using ±0.5 days to capture perturbation effects that a 1-second
-        # step would miss, ensuring velocity reflects the actual rate of
-        # change including all periodic terms.
+        # The ±0.5-day step low-passes oscillations shorter than about
+        # a day (a tiny step would track them exactly); the reference
+        # smooths these speeds comparably.
         dlon, dlat, ddist = 0.0, 0.0, 0.0
         if iflag & FLG_SPEED:
             dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -2135,6 +2180,10 @@ def _calc_body(
             dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
+            # The interpolated curves are true-ecliptic; under NONUT
+            # (mean-ecliptic output) remove the nutation rate.
+            if (iflag & FLG_NONUT) or _sid_eq:
+                dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
         # Apply sidereal correction if requested (not for equatorial output).
         # FLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
         # pyswisseph silently ignores J2000 for these bodies when sidereal is

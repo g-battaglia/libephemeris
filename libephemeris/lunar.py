@@ -204,6 +204,17 @@ def _jd_to_year(jd_tt: float) -> float:
     return (jd_tt - 2451545.0) / 365.25 + 2000.0
 
 
+# Linear taper window applied to correction-table edge values outside the
+# table range.  Stepping straight to 0.0 at the boundary used to produce
+# discontinuities up to the edge-correction magnitude (hundreds of arcsec
+# around 1549/2651 CE) and speed spikes from central differences that
+# straddled the boundary; holding the edge value forever would instead
+# extrapolate a fit beyond its data.  The taper keeps positions continuous
+# and decays the correction to zero within a year of the table edge.
+_APSE_EDGE_TAPER_YEARS: float = 1.0
+_APSE_EDGE_TAPER_DAYS: float = 365.25
+
+
 def _interpolate_perigee_correction(jd_tt: float) -> float:
     """
     Interpolate perigee perturbation correction from precomputed table.
@@ -216,27 +227,32 @@ def _interpolate_perigee_correction(jd_tt: float) -> float:
         jd_tt: Julian Day in TT
 
     Returns:
-        Interpolated correction in degrees, or 0.0 if outside table range
+        Interpolated correction in degrees.  Outside the table range the
+        edge value is linearly tapered to 0.0 over one year (no step).
     """
     if not _PERIGEE_CORRECTIONS_AVAILABLE or not PERIGEE_PERTURBATION_CORRECTIONS:
         return 0.0
 
     year = _jd_to_year(jd_tt)
 
-    if year < PERIGEE_CORRECTION_START_YEAR or year > PERIGEE_CORRECTION_END_YEAR:
-        return 0.0
+    if year < PERIGEE_CORRECTION_START_YEAR:
+        weight = 1.0 - (PERIGEE_CORRECTION_START_YEAR - year) / _APSE_EDGE_TAPER_YEARS
+        if weight <= 0.0:
+            return 0.0
+        return float(PERIGEE_PERTURBATION_CORRECTIONS[0]) * weight
+    if year > PERIGEE_CORRECTION_END_YEAR:
+        weight = 1.0 - (year - PERIGEE_CORRECTION_END_YEAR) / _APSE_EDGE_TAPER_YEARS
+        if weight <= 0.0:
+            return 0.0
+        return float(PERIGEE_PERTURBATION_CORRECTIONS[-1]) * weight
 
     idx_float = (year - PERIGEE_CORRECTION_START_YEAR) / PERIGEE_CORRECTION_STEP_YEARS
     idx_low = int(idx_float)
 
     if idx_low < 0:
-        return 0.0
+        return float(PERIGEE_PERTURBATION_CORRECTIONS[0])
     if idx_low >= len(PERIGEE_PERTURBATION_CORRECTIONS) - 1:
-        return (
-            float(PERIGEE_PERTURBATION_CORRECTIONS[-1])
-            if PERIGEE_PERTURBATION_CORRECTIONS
-            else 0.0
-        )
+        return float(PERIGEE_PERTURBATION_CORRECTIONS[-1])
 
     frac = idx_float - idx_low
     return float(PERIGEE_PERTURBATION_CORRECTIONS[idx_low]) + frac * (
@@ -262,14 +278,28 @@ def _interpolate_apse_correction(
         n: Number of entries in the table
 
     Returns:
-        Interpolated correction in arcseconds, or 0.0 if outside table range
+        Interpolated correction in arcseconds.  Outside the table range
+        the edge value is linearly tapered to 0.0 over one year — a hard
+        0.0 step here used to jump positions by the edge correction
+        (up to a few hundred arcsec at the 1549/2651 CE table limits).
     """
     if not corrections or n == 0:
         return 0.0
 
     idx_float = (jd_tt - jd_start) / step_days
-    if idx_float < 0 or idx_float >= n - 1:
-        return 0.0
+
+    if idx_float < 0:
+        dist_days = -idx_float * step_days
+        weight = 1.0 - dist_days / _APSE_EDGE_TAPER_DAYS
+        if weight <= 0.0:
+            return 0.0
+        return float(corrections[0]) * weight
+    if idx_float >= n - 1:
+        dist_days = (idx_float - (n - 1)) * step_days
+        weight = 1.0 - dist_days / _APSE_EDGE_TAPER_DAYS
+        if weight <= 0.0:
+            return 0.0
+        return float(corrections[n - 1]) * weight
 
     idx_low = int(idx_float)
     frac = idx_float - idx_low
@@ -2581,6 +2611,10 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     - With correction table (1549-2651): RMS ~6", Max ~40" vs Swiss Ephemeris
     - Outside correction table range: RMS ~171" (~0.048°)
     - Smooth, continuous curve without the artifacts of osculating elements
+    - Frame contract: the output is the true ecliptic of date everywhere.
+      Outside the correction-table range only the precision drops (the
+      edge correction tapers to zero within a year); the frame does not
+      change, and FLG_NONUT keeps subtracting dpsi as usual.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT).
@@ -2943,6 +2977,10 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
 
     - With correction table (1549-2651): RMS ~11", Max ~100" vs Swiss Ephemeris
     - Outside correction table range: RMS ~386" (~0.107°)
+    - Frame contract: the output is the true ecliptic of date everywhere.
+      Outside the correction-table range only the precision drops (the
+      edge correction tapers to zero within a year); the frame does not
+      change, and FLG_NONUT keeps subtracting dpsi as usual.
     - Smooth, continuous curve
 
     Suitable for astrological applications, supermoon timing, and tidal predictions.
