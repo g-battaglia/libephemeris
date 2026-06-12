@@ -43,6 +43,8 @@ WHEEL_REQUIRED = (
     "libephemeris/data/leb2/base_core.leb2",
     "libephemeris/vendor/spktype21.py",
     "libephemeris/moon_theories/galilean.py",
+    "libephemeris/moon_theories/tass17.py",
+    "libephemeris/moon_theories/tass17_data.py",
 )
 
 

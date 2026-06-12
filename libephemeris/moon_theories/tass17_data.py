@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
-# Copyright (c) 2025-2026 Giacomo Battaglia
+# SPDX-License-Identifier: MIT
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """
 TASS 1.7 Periodic Terms Data
 
@@ -7,6 +7,13 @@ Auto-generated from Stellarium tass17.c by Johannes Gajdosik (MIT License).
 Original theory: Vienne & Duriez (1995), IMCCE.
 
 This file contains ~1500 periodic terms for Saturn's 8 major satellites.
+
+Reference:
+- Vienne, A. & Duriez, L. (1995) "TASS1.6", A&A 297, 588-605
+- Original Fortran: ftp://ftp.imcce.fr/pub/ephem/satel/tass17/
+- Stellarium implementation: Johannes Gajdosik (MIT license)
+
+License: MIT (Stellarium implementation by Johannes Gajdosik)
 """
 
 from typing import List, Tuple

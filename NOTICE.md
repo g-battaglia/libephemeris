@@ -93,9 +93,10 @@ The git history of this repository reflects this progression transparently.
 
 ## Vendored and Adapted Components
 
-Three modules shipped in the package are vendored or adapted third-party
-code and keep their upstream licenses (MIT for `vendor/spktype21.py` and
-`moon_theories/tass17.py`; LGPL-3.0 for `moon_theories/galilean.py`,
+Four files shipped in the package are vendored or adapted third-party
+code and keep their upstream licenses (MIT for `vendor/spktype21.py`,
+`moon_theories/tass17.py`, and the generated periodic-term tables in
+`moon_theories/tass17_data.py`; LGPL-3.0 for `moon_theories/galilean.py`,
 adapted from PyMeeus, with a clean-room replacement planned). Full
 inventory and license texts: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

@@ -11,7 +11,7 @@ process — see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
 | Component | Path | Upstream | License |
 |---|---|---|---|
 | spktype21 0.1.0 | `libephemeris/vendor/spktype21.py` | Shushi Uetsuki (whiskie14142) | MIT |
-| TASS 1.7 port | `libephemeris/moon_theories/tass17.py` | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
+| TASS 1.7 port | `libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py` (generated periodic-term tables) | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
 | Galilean E5 theory | `libephemeris/moon_theories/galilean.py` | Adapted from PyMeeus (M. Lutz, S. Scholz, V. Serra, S. Veigl) | LGPL-3.0 |
 
 Each of these files carries its own `SPDX-License-Identifier` header and
