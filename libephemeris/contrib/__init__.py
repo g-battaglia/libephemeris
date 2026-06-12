@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """libephemeris.contrib — extended astrology helpers.
 
 Zodiac and nakshatra constants, Vedic planet IDs, classical aspect

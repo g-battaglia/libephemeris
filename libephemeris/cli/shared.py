@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Shared CLI utilities for both production (libephemeris) and dev (leph) CLIs.
 
 Contains tier metadata, download helpers, and common CLI patterns reused

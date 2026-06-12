@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Diagnostic commands: tier positions, data download verification.
 
 Replaces 4 poe tasks: diag:base, diag:medium, diag:extended, diag:download.

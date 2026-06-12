@@ -91,10 +91,54 @@ replaced with independently sourced alternatives before any stable release:
 
 The git history of this repository reflects this progression transparently.
 
+## Vendored and Adapted Components
+
+Three modules shipped in the package are vendored or adapted third-party
+code and keep their upstream licenses (MIT for `vendor/spktype21.py` and
+`moon_theories/tass17.py`; LGPL-3.0 for `moon_theories/galilean.py`,
+adapted from PyMeeus, with a clean-room replacement planned). Full
+inventory and license texts: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Calibration Data Disclosure
+
+Two generated data sets are calibrated against pyswisseph used strictly as
+a **black-box oracle**: the residual tables in
+`libephemeris/lunar_apse_corrections.py` (interpolated lunar apogee and
+perigee, bodies INTP_APOG / INTP_PERG) and the trigonometric perturbation
+coefficients in `lunar.py` produced by the `leph calibrate` workflow
+(regenerable via `scripts/generate_lunar_apse_corrections.py`). These
+tables contain numeric program *output* — computed positions of the lunar
+apsides — not Swiss Ephemeris source expression; the fitting pipeline and
+all runtime code are original. The INTP_* bodies are constructs defined by
+the reference API, so 1:1 behavioral parity requires fitting to reference
+output. This is disclosed for transparency and is part of the legal review
+checklist for the commercial edition (see
+[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)).
+
+## AI-Assisted Development
+
+Parts of this codebase were developed with AI assistance (Anthropic
+Claude), always under the direction and review of the project author, with
+behavior verified against published references and the black-box oracle
+harness. Under Anthropic's commercial terms, rights in such output belong
+to the customer; copyright in the work is held by Giacomo Battaglia.
+
+## Trademarks
+
+"Swiss Ephemeris" is a product name of Astrodienst AG. References to it in
+this repository are nominative only: they describe interface compatibility
+and black-box verification targets. LibEphemeris is not affiliated with,
+or endorsed by, Astrodienst AG.
+
 ## License
 
-LibEphemeris is distributed under the **GNU Affero General Public License v3**
-(AGPL-3.0-only). See the [LICENSE](LICENSE) file for the full text.
+LibEphemeris is **dual-licensed**: under the **GNU Affero General Public
+License v3** (AGPL-3.0-only — see the [LICENSE](LICENSE) file) or,
+alternatively, under a commercial license available from the copyright
+holder (see [LICENSING.md](LICENSING.md) and
+[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)). Owned source files carry
+the SPDX expression `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`;
+vendored/adapted modules keep their own identifiers.
 
 This project has no license dependency on, and no license obligation toward,
 the Swiss Ephemeris or Astrodienst AG.

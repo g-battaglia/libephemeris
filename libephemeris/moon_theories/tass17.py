@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """
 TASS 1.7 - Theorie Analytique des Satellites de Saturne.
 

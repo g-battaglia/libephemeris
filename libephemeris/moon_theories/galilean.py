@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-only
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """
 Galilean satellite ephemeris based on the E5 theory of Lieske.
 

@@ -177,4 +177,15 @@ Learn more at [kerykeion.net](https://kerykeion.net).
 
 ## License
 
-AGPL-3.0. See [LICENSE](LICENSE).
+Dual-licensed:
+
+- **[AGPL-3.0-only](LICENSE)** — free for any use that complies with the
+  AGPL (including network/SaaS source-disclosure obligations). PyPI
+  releases carry this license.
+- **Commercial license** — for closed-source products and services; see
+  [LICENSING.md](LICENSING.md).
+
+LibEphemeris is an independent, API-compatible implementation; it contains
+no Swiss Ephemeris code ([NOTICE.md](NOTICE.md),
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). "Swiss Ephemeris" is a
+product of Astrodienst AG.

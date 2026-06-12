@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Exception classes for libephemeris.
 
 This module provides a comprehensive exception hierarchy for ephemeris calculations.

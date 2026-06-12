@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """TOML configuration file loader for libephemeris.
 
 Loads configuration from ``libephemeris-config.toml`` files,

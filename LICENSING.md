@@ -1,0 +1,64 @@
+# Licensing
+
+LibEphemeris is **dual-licensed**: every release of the same codebase is
+offered under two alternative grants, and you choose the one you use it
+under.
+
+## 1. Open source — AGPL-3.0-only
+
+The default license is the [GNU Affero General Public License v3](LICENSE)
+(AGPL-3.0-only). It is free for any use — including commercial use — as
+long as you comply with its terms, most notably: if you distribute the
+software or make a modified version available to users over a network,
+you must make the corresponding source code available under the AGPL.
+
+The packages published on PyPI are AGPL-3.0-only.
+
+## 2. Commercial license
+
+Organizations that cannot or do not want to comply with the AGPL (for
+example: embedding LibEphemeris in a closed-source product, or running a
+SaaS without source disclosure) can obtain a commercial license from the
+copyright holder instead.
+
+- Outline: [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) (draft, pending
+  legal review)
+- Contact: Giacomo Battaglia — <giacomo@libephemeris.dev>
+
+## How the dual license works
+
+- Giacomo Battaglia is the copyright holder of LibEphemeris (provenance:
+  [NOTICE.md](NOTICE.md)).
+- Each owned source file carries the SPDX expression
+  `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the recipient may
+  elect either grant.
+- **Exceptions**: three vendored/adapted modules keep their upstream
+  licenses (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Two are
+  MIT; `libephemeris/moon_theories/galilean.py` is LGPL-3.0 and remains
+  LGPL-3.0 under either grant (a clean-room replacement is planned).
+- Versions up to and including the 2.x series were published under
+  AGPL-3.0-only; those grants remain valid for those published versions.
+
+## Contributions
+
+External contributions are accepted only with a contributor agreement that
+licenses the contribution to the maintainer for distribution under **both**
+grants (AGPL-3.0-only and the commercial license). Opening a pull request
+constitutes agreement unless stated otherwise; a formal CLA flow will be
+added before external contributions are merged.
+
+## Relationship to Swiss Ephemeris
+
+LibEphemeris is an **independent implementation** with an API that is
+signature-compatible with pyswisseph; it does not contain Swiss Ephemeris
+code and has no license relationship with Astrodienst AG (details and
+provenance record: [NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product
+of Astrodienst AG; the name is used here nominatively only.
+pyswisseph appears solely in the `dev` extra as a black-box test oracle
+and is never a runtime dependency.
+
+---
+
+*This document describes the project's licensing model; it is not legal
+advice. The commercial license terms require review by legal counsel
+before any sale.*

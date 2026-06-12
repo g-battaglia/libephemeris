@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Test commands: unit tests, comparison tests, lunar, LEB, LEB2, Horizons, coverage.
 
 Replaces 48 poe test tasks with clearly named hierarchical commands.

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: MIT
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """A supporting module for jplephem to handle data type 21 (Version 0.1.0)
 
 VENDORED by libephemeris from spktype21==0.1.0 (PyPI).
