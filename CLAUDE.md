@@ -177,7 +177,7 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 
 1. `leph calibrate perigee` (or `leph calibrate perigee-quick` for quick 2-min run)
 2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. `leph generate lunar-corrections` (regenerates `lunar_corrections.py`)
+3. `leph generate apse-corrections` (regenerates `lunar_apse_corrections.py`, the live residual table)
 4. `leph test lunar perigee`
 
 See `docs/methodology/interpolated-perigee.md` for the full methodology.

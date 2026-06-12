@@ -38,7 +38,7 @@ def _python(args: list[str], use_dotenv: bool = True) -> None:
     "Full workflow:\n\n"
     "  1. leph calibrate perigee              # Fit coefficients (~30 min)\n"
     "  2. Paste output into lunar.py           # _calc_elp2000_perigee_perturbations()\n"
-    "  3. leph generate lunar-corrections      # Regenerate correction tables\n"
+    "  3. leph generate apse-corrections       # Regenerate residual tables\n"
     "  4. leph test lunar perigee              # Verify accuracy",
 )
 def calibrate_group() -> None:
@@ -57,7 +57,7 @@ def perigee() -> None:
     Workflow:
       1. leph calibrate perigee
       2. Paste coefficients into _calc_elp2000_perigee_perturbations() in lunar.py
-      3. leph generate lunar-corrections
+      3. leph generate apse-corrections
       4. leph test lunar perigee
     """
     _python(

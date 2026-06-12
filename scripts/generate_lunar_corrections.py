@@ -2,6 +2,13 @@
 """
 Generate precomputed correction tables for mean lunar elements.
 
+RETIRED: the tables this script writes (lunar_corrections.py) are not
+consumed by any runtime path — see CLEAN.md.  The live interpolated-apse
+residual tables are produced by scripts/generate_lunar_apse_corrections.py
+('leph generate apse-corrections').  Kept for reference; the smoothing
+approach below also aliases short-period perturbations into the "mean"
+(full perturbations rather than residuals), which is why it was retired.
+
 This script computes correction tables that convert analytical mean elements
 (JPL DE440 polynomial fits) to geometrically-derived mean elements from JPL ephemeris.
 
