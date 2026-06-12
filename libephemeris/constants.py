@@ -951,11 +951,19 @@ DAYS_PER_JULIAN_CENTURY: float = 36525.0
 # =============================================================================
 # PLANETARY MOON IDENTIFIERS
 # =============================================================================
-# Body IDs for planetary satellites (moons) following reference API 2.10+ convention
-# These require satellite SPK files (jup365.bsp, sat441.bsp, etc.) to be registered
-# using register_moon_spk() before calculation.
+# Canonical body IDs for planetary satellites follow the reference API 2.10+
+# convention: ipl = PLMOON_OFFSET + NAIF satellite id, e.g. Io = 9501,
+# Titan = 9606, Charon = 9901.  Any NAIF satellite id (401-998) is accepted
+# this way; 9n99 addresses the planet's center of body (e.g. 9599 Jupiter).
+# Satellite SPK files (jup365.bsp, sat441.bsp, ...) must be registered with
+# register_moon_spk() before calculation.
+#
+# The MOON_* constants below use a legacy private numbering
+# (MOON_OFFSET + small index, e.g. Io = 9001) that predates the canonical
+# scheme.  They are kept as deprecated aliases; new code should use
+# PLMOON_OFFSET + NAIF id.
 
-MOON_OFFSET: int = 9000  # Base offset for planetary moon IDs
+MOON_OFFSET: int = 9000  # Base offset for legacy moon IDs (deprecated)
 
 # Jupiter's Galilean Moons (discovered by Galileo Galilei in 1610)
 MOON_IO: int = MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
@@ -1069,6 +1077,30 @@ FICT_OFFSET_1: int = 39
 MAX_STNAME: int = 256
 NALL_NAT_POINTS: int = 38
 PLMOON_OFFSET: int = 9000
+
+# Canonical planetary-moon ids (PLMOON_OFFSET + NAIF satellite id).
+# These match the ipl numbers the reference API uses for its sepm* files.
+PLMOON_IO: int = PLMOON_OFFSET + NAIF_IO  # 9501
+PLMOON_EUROPA: int = PLMOON_OFFSET + NAIF_EUROPA  # 9502
+PLMOON_GANYMEDE: int = PLMOON_OFFSET + NAIF_GANYMEDE  # 9503
+PLMOON_CALLISTO: int = PLMOON_OFFSET + NAIF_CALLISTO  # 9504
+PLMOON_MIMAS: int = PLMOON_OFFSET + NAIF_MIMAS  # 9601
+PLMOON_ENCELADUS: int = PLMOON_OFFSET + NAIF_ENCELADUS  # 9602
+PLMOON_TETHYS: int = PLMOON_OFFSET + NAIF_TETHYS  # 9603
+PLMOON_DIONE: int = PLMOON_OFFSET + NAIF_DIONE  # 9604
+PLMOON_RHEA: int = PLMOON_OFFSET + NAIF_RHEA  # 9605
+PLMOON_TITAN: int = PLMOON_OFFSET + NAIF_TITAN  # 9606
+PLMOON_HYPERION: int = PLMOON_OFFSET + NAIF_HYPERION  # 9607
+PLMOON_IAPETUS: int = PLMOON_OFFSET + NAIF_IAPETUS  # 9608
+PLMOON_MIRANDA: int = PLMOON_OFFSET + NAIF_MIRANDA  # 9705
+PLMOON_ARIEL: int = PLMOON_OFFSET + NAIF_ARIEL  # 9701
+PLMOON_UMBRIEL: int = PLMOON_OFFSET + NAIF_UMBRIEL  # 9702
+PLMOON_TITANIA: int = PLMOON_OFFSET + NAIF_TITANIA  # 9703
+PLMOON_OBERON: int = PLMOON_OFFSET + NAIF_OBERON  # 9704
+PLMOON_TRITON: int = PLMOON_OFFSET + NAIF_TRITON  # 9801
+PLMOON_PHOBOS: int = PLMOON_OFFSET + NAIF_PHOBOS  # 9401
+PLMOON_DEIMOS: int = PLMOON_OFFSET + NAIF_DEIMOS  # 9402
+PLMOON_CHARON: int = PLMOON_OFFSET + NAIF_CHARON  # 9901
 
 # Additional calculation flags
 FLG_CENTER_BODY: int = 1048576

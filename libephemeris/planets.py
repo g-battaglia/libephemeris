@@ -735,6 +735,12 @@ def get_planet_name(planet: int) -> str:
             5145: "Pholus",
         }
         return _BUILTIN_AST_NAMES.get(planet - AST_OFFSET, "")
+    from . import planetary_moons
+
+    if planetary_moons.is_planetary_moon(planet):
+        name = planetary_moons.get_moon_name(planet)
+        if not name.startswith("Unknown"):
+            return name
     return f"Unknown ({planet})"
 
 
@@ -1832,8 +1838,15 @@ def _calc_body(
         if result is not None:
             result = _maybe_equatorial_convert(result, t.tt, iflag)
             return result, iflag
-        # If moon not registered, return zeros (body not available)
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        # No registered satellite SPK covers this moon.  The reference
+        # API raises here too ("SwissEph file 'sepm....se1' not found").
+        from .exceptions import Error
+
+        raise Error(
+            f"no satellite SPK registered for "
+            f"{planetary_moons.get_moon_name(ipl)} (body {ipl}); "
+            f"call register_moon_spk() with e.g. jup365.bsp/sat441.bsp"
+        )
 
     # Handle lunar nodes (Mean/True North/South)
     if ipl in [MEAN_NODE, TRUE_NODE]:
