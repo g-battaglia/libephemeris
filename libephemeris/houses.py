@@ -696,7 +696,12 @@ def houses(
 
     # Vertex uses armc_deg (Original)
     # Hemisphere check relative to TRUE ARMC (West of True ARMC)
-    vertex = _calc_vertex(armc_deg, eps, lat, armc_deg)
+    # The horizontal system computes its equator-degenerate angles on
+    # the negative-latitude side (reference behavior — its vertex and
+    # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
+    # lat -> 0+ limits).
+    _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
+    vertex = _calc_vertex(armc_deg, eps, _vtx_lat, armc_deg)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -727,9 +732,13 @@ def houses(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Returns 180.0 as fallback in this case.
+    # The one-sided limits are 180 (lat -> 0+) and 0 (lat -> 0-).
+    # The reference outputs 180.0 at exactly lat 0 for every system
+    # except the horizontal system 'H', whose internal latitude
+    # handling lands on the negative-side limit 0.0 (verified per
+    # system against pyswisseph at armc 0/90/180/270).
     if abs(lat) < 1e-10:
-        co_asc = 180.0
+        co_asc = 0.0 if hsys_char == "H" else 180.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
@@ -1256,7 +1265,12 @@ def houses_armc(
 
     # Vertex uses armc_deg (Original)
     # Hemisphere check relative to TRUE ARMC (West of True ARMC)
-    vertex = _calc_vertex(armc_deg, eps, lat, armc_deg)
+    # The horizontal system computes its equator-degenerate angles on
+    # the negative-latitude side (reference behavior — its vertex and
+    # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
+    # lat -> 0+ limits).
+    _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
+    vertex = _calc_vertex(armc_deg, eps, _vtx_lat, armc_deg)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -1281,9 +1295,13 @@ def houses_armc(
     # If lat >= 0: coasc2 = Asc(ARMC + 90°, 90° - lat)
     # If lat < 0:  coasc2 = Asc(ARMC + 90°, -90° - lat)
     # At equator (lat=0), coasc2_lat becomes 90° which is undefined.
-    # Returns 180.0 as fallback in this case.
+    # The one-sided limits are 180 (lat -> 0+) and 0 (lat -> 0-).
+    # The reference outputs 180.0 at exactly lat 0 for every system
+    # except the horizontal system 'H', whose internal latitude
+    # handling lands on the negative-side limit 0.0 (verified per
+    # system against pyswisseph at armc 0/90/180/270).
     if abs(lat) < 1e-10:
-        co_asc = 180.0
+        co_asc = 0.0 if hsys_char == "H" else 180.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
@@ -1386,10 +1404,11 @@ def houses_armc(
     elif hsys_char == "D":  # Equal from MC
         cusps = _houses_equal_mc(asc, mc)
     elif hsys_char == "I":  # Sunshine (Treindl)
-        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, 0.0)
+        # ascmc9 carries the Sun's declination (reference convention)
+        cusps = _houses_sunshine(armc_active, lat, eps, asc, mc, ascmc9)
         ascmc[1] = cusps[10]
     elif hsys_char == "i":  # Sunshine (Makransky)
-        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, 0.0)
+        cusps = _houses_sunshine_makransky(armc_active, lat, eps, asc, mc, ascmc9)
         ascmc[1] = cusps[10]
     elif hsys_char == "J":  # Savard-A
         cusps = _houses_savard_a(armc_active, calc_lat, eps, asc, mc)
@@ -1883,11 +1902,20 @@ def _houses_placidus(
 
             # Calculate semi-arc (or part of it)
             # tan(lat) * tan(dec)
-            # Check bounds
+            # Within one float-noise step of the polar circle the
+            # candidate RA can sweep ecliptic degrees whose declination
+            # makes |tan(lat)*tan(dec)| exceed 1 mid-iteration even
+            # though the converged cusp itself is well-defined.  Clamp
+            # the ascensional-difference argument (AD saturates at
+            # +/-90 deg) and keep iterating — the latitude pre-check
+            # has already raised for genuinely polar latitudes.
+            # Bailing out here sent these cases to the fallback cusps,
+            # up to 20 deg away from the reference at lat +/-66.55.
             prod = math.tan(rad_lat) * tan_dec
-            if abs(prod) > 1.0:
-                # Circumpolar / fail
-                return None
+            if prod > 1.0:
+                prod = 1.0
+            elif prod < -1.0:
+                prod = -1.0
 
             # AD (Ascensional Difference) = asin(prod)
             # SA (Semi-Arc) = 90 + AD (if decl north and lat north)
@@ -2137,14 +2165,83 @@ def _houses_placidus(
 
         return lon % 360.0
 
-    # Calculate cusps
+    def _ad_deg_at(ra_deg: float) -> float:
+        """Clamped ascensional difference (deg) of the ecliptic point at RA."""
+        tan_dec = math.sin(math.radians(ra_deg)) * math.tan(rad_eps)
+        prod = math.tan(rad_lat) * tan_dec
+        if prod > 1.0:
+            prod = 1.0
+        elif prod < -1.0:
+            prod = -1.0
+        return math.degrees(math.asin(prod))
+
+    def bisect_placidus(offset_deg: float, is_below_horizon: bool):
+        """Solve the Placidus hour-angle condition by bisection.
+
+        The fixed-point iteration above oscillates within float-noise of
+        the polar circle (lat +/-66.55 at eps 23.4393), where the
+        reference still converges.  The cusp condition is a continuous
+        root problem with a guaranteed sign change on its bracket, so
+        bisection always lands it:
+
+          house 11: x = (90 + AD(armc + x)) / 3          on x in [0, 60]
+          house 12: x = 2 (90 + AD(armc + x)) / 3        on x in [0, 120]
+          house 2:  x = 2 (90 - AD(armc + 180 - x)) / 3  on x in [0, 120]
+          house 3:  x = (90 - AD(armc + 180 - x)) / 3    on x in [0, 60]
+
+        (x is the hour-angle fraction from the relevant meridian; AD is
+        clamped so the bracket endpoints always satisfy g(lo) <= 0 and
+        g(hi) >= 0.)
+        """
+        if offset_deg == 30:
+            frac, hi, from_ic = 1.0 / 3.0, 60.0, False
+        elif offset_deg == 60:
+            frac, hi, from_ic = 2.0 / 3.0, 120.0, False
+        elif offset_deg == 120:
+            frac, hi, from_ic = 2.0 / 3.0, 120.0, True
+        else:  # 150
+            frac, hi, from_ic = 1.0 / 3.0, 60.0, True
+
+        def g(x: float) -> float:
+            if from_ic:
+                ad = _ad_deg_at(armc + 180.0 - x)
+                return x - frac * (90.0 - ad)
+            ad = _ad_deg_at(armc + x)
+            return x - frac * (90.0 + ad)
+
+        lo_x, hi_x = 0.0, hi
+        g_lo = g(lo_x)
+        if g_lo > 0.0:
+            return None  # bracket failed (cannot happen with clamped AD)
+        for _ in range(80):
+            mid = 0.5 * (lo_x + hi_x)
+            if g(mid) <= 0.0:
+                lo_x = mid
+            else:
+                hi_x = mid
+        x = 0.5 * (lo_x + hi_x)
+        ra = (armc + 180.0 - x) % 360.0 if from_ic else (armc + x) % 360.0
+        y = math.sin(math.radians(ra))
+        xx = math.cos(math.radians(ra)) * math.cos(rad_eps)
+        return math.degrees(math.atan2(y, xx)) % 360.0
+
+    # Calculate cusps: fast fixed point first, bisection where it fails
     c11 = iterate_placidus(30, False)
     c12 = iterate_placidus(60, False)
     c2 = iterate_placidus(120, True)
     c3 = iterate_placidus(150, True)
+    if c11 is None:
+        c11 = bisect_placidus(30, False)
+    if c12 is None:
+        c12 = bisect_placidus(60, False)
+    if c2 is None:
+        c2 = bisect_placidus(120, True)
+    if c3 is None:
+        c3 = bisect_placidus(150, True)
 
     if c11 is None or c12 is None or c2 is None or c3 is None:
-        # Fallback to Porphyry or Equal if Placidus fails (high latitude)
+        # Safety net only: the bisection bracket is mathematically
+        # guaranteed with clamped AD.
         return _houses_porphyry(asc, mc)
 
     cusps[11] = c11
@@ -2566,8 +2663,11 @@ def _houses_whole_sign(asc: float) -> List[float]:
         List of 13 house cusp longitudes
     """
     cusps = [0.0] * 13
-    # Start of sign containing Asc
-    start = math.floor(asc / 30.0) * 30.0
+    # Start of sign containing Asc.  The 1e-9 deg nudge resolves the
+    # boundary case: at cardinal ARMC the ascendant lands within one
+    # float ULP of an exact sign cusp (e.g. 180 - 1.4e-13 at ARMC 90,
+    # lat -66) and the reference assigns the NEW sign there.
+    start = math.floor((asc + 1e-9) / 30.0) * 30.0
     for i in range(1, 13):
         cusps[i] = (start + (i - 1) * 30.0) % 360.0
     return cusps
@@ -3947,7 +4047,7 @@ def _houses_sunshine_makransky(
     (ascensional difference), the pole height of a house circle, and the
     book's intermediate arcs and quadrant case tables.
 
-    Falls back to Porphyry if the Sun is circumpolar (within polar circle).
+    Raises PolarCircleError if the Sun is circumpolar (reference parity).
 
     Args:
         armc: Right Ascension of the Midheaven (RAMC) in degrees
@@ -3978,15 +4078,22 @@ def _houses_sunshine_makransky(
     cusps[4] = (mc + 180.0) % 360.0
     cusps[7] = (asc + 180.0) % 360.0
 
-    # Ascensional difference
+    # Ascensional difference.  When |tan(dec)*tan(lat)| >= 1 the Sun is
+    # circumpolar (never rises or never sets), the diurnal semi-arcs do
+    # not exist, and the reference raises rather than substituting a
+    # different house system (verified: pyswisseph errors for 'i' at
+    # exactly |lat|+|dec| >= 90, e.g. 66.56/23.44, 80/11.47).
     ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
-    if ad_arg >= 1.0:
-        # Sun circumpolar — fall back to Porphyry
-        return _houses_porphyry(asc, mc)
-    elif ad_arg <= -1.0:
-        return _houses_porphyry(asc, mc)
-    else:
-        ascensional_diff = math.degrees(math.asin(ad_arg))
+    if abs(ad_arg) >= 1.0:
+        raise PolarCircleError(
+            message=(
+                f"Sunshine houses undefined: the Sun (declination "
+                f"{sun_dec:.4f}) is circumpolar at latitude {lat:.4f}"
+            ),
+            latitude=lat,
+            house_system="i",
+        )
+    ascensional_diff = math.degrees(math.asin(ad_arg))
 
     night_semi_arc = 90.0 - ascensional_diff
     day_semi_arc = 90.0 + ascensional_diff
@@ -4591,8 +4698,9 @@ def _house_pos_pythonic(
     hsys_char: str
     hsys_int: int
 
-    # Detect which calling convention is used
-    if isinstance(hsys_or_objcoord, tuple):
+    # Detect which calling convention is used.  objcoord may be any
+    # sequence (the reference accepts lists as well as tuples).
+    if isinstance(hsys_or_objcoord, (tuple, list)):
         # 5-arg reference API form: (armc, lat, obliquity, objcoord, hsys)
         objcoord = hsys_or_objcoord
         lon = objcoord[0]
@@ -4621,8 +4729,14 @@ def _house_pos_pythonic(
             # int case
             hsys_char = chr(hsys_or_objcoord)
             hsys_int = hsys_or_objcoord
-        # lon comes from lon_or_hsys (float), default to 0.0
-        lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
+        # lon comes from lon_or_hsys: a float, or an objcoord sequence
+        # in the hsys-first calling order
+        if isinstance(lon_or_hsys, (tuple, list)):
+            lon = float(lon_or_hsys[0])
+            if len(lon_or_hsys) > 1:
+                lat_body = float(lon_or_hsys[1])
+        else:
+            lon = float(lon_or_hsys) if lon_or_hsys is not None else 0.0
 
     # Normalize inputs
     lon = lon % 360.0
@@ -4724,6 +4838,7 @@ def _house_pos_pythonic(
 
     elif hsys_char == "R":
         # Regiomontanus house position.
+        #
         # Regiomontanus divides the celestial equator into equal arcs by
         # position circles through the North and South points of the
         # horizon; a body's position is the equator point cut by its own
@@ -4736,10 +4851,19 @@ def _house_pos_pythonic(
         # measured so that x = 270° on the upper meridian (M = 0) and
         # x = 90° on the lower (|M| = 180°) — those two degenerate cases
         # are handled directly.
+        # Degenerate meridian cases: the equator intersection is 270
+        # (house 10 side) or 90 (house 4 side) according to whether the
+        # meridian point is above or below the horizon — at polar
+        # latitudes the upper-meridian point can be below it (altitude
+        # 90 - |lat - dec| < 0 ⟺ tan(lat) tan(dec) < -1) and the limit
+        # of the closed form lands on the opposite branch (verified:
+        # pyswisseph puts the MC degree in house 4 at armc 90,
+        # lat -80).
+        _tt = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
         if abs(md_upper) < _NEAR_ZERO:
-            pos_deg = 270.0
+            pos_deg = 270.0 if _tt > -1.0 else 90.0
         elif 180.0 - abs(md_upper) < _NEAR_ZERO:
-            pos_deg = 90.0
+            pos_deg = 90.0 if _tt < 1.0 else 270.0
         else:
             if 90.0 - abs(geolat) < _NEAR_ZERO:
                 geolat = 90.0 - _NEAR_ZERO if geolat > 0 else -90.0 + _NEAR_ZERO
@@ -4891,6 +5015,12 @@ def _house_pos_pythonic(
             ad_arg = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
             ad_arg = max(-1.0, min(1.0, ad_arg))
             ad_body = math.degrees(math.asin(ad_arg))
+            if abs(ad_body) < 1e-12:
+                # An ascensional difference of ~1e-15 deg is float noise
+                # from a declination that is physically zero (body on
+                # the equinoctial points); its sign must not decide the
+                # validity boundary below.
+                ad_body = 0.0
 
         # MC's ascensional difference
         ad_mc_arg = (
@@ -4899,6 +5029,10 @@ def _house_pos_pythonic(
         if abs(ad_mc_arg) > 1.0:
             ad_mc_arg = 1.0 if ad_mc_arg > 0 else -1.0
         ad_mc = math.degrees(math.asin(ad_mc_arg))
+        if abs(ad_mc) < 1e-12:
+            # Same noise floor as ad_body: sin(180 deg) = 1.2e-16 makes
+            # the MC's AD ~1e-15 deg at cardinal ARMC; physically zero.
+            ad_mc = 0.0
 
         # MC's semi-arc
         mc_semi_arc = 90.0 + ad_mc
@@ -4910,27 +5044,24 @@ def _house_pos_pythonic(
             # Small tolerance for floating-point boundary checks.
             # When a body is exactly on the MC or IC, the fraction can be
             # -1e-17 instead of 0.0 due to IEEE 754 rounding.
-            _KOCH_FRACTION_TOL = 1e-6
+            # Both boundaries are strict, matching the reference: a
+            # fraction of exactly 0.0 (body on the meridian with zero
+            # AD) is valid, but -1e-17 from a cancelling md/AD pair or
+            # a fraction at/above 2 is classified undefined.  Bodies
+            # exactly on the validity edge are decided by the same
+            # comparisons the reference applies.
             if md_upper >= 0:  # east
                 arc_fraction = (md_upper - ad_body + ad_mc) / mc_semi_arc
-                if (
-                    arc_fraction > 2.0 + _KOCH_FRACTION_TOL
-                    or arc_fraction < -_KOCH_FRACTION_TOL
-                ):
+                if arc_fraction >= 2.0 or arc_fraction < 0.0:
                     invalid = True
                 else:
-                    arc_fraction = max(0.0, min(2.0, arc_fraction))
                     pos_deg = (arc_fraction - 1.0) * 90.0
             else:  # west
                 md_from_lower = md_upper + 180.0
                 arc_fraction = (md_from_lower + ad_body + ad_mc) / mc_semi_arc
-                if (
-                    arc_fraction > 2.0 + _KOCH_FRACTION_TOL
-                    or arc_fraction < -_KOCH_FRACTION_TOL
-                ):
+                if arc_fraction >= 2.0 or arc_fraction < 0.0:
                     invalid = True
                 else:
-                    arc_fraction = max(0.0, min(2.0, arc_fraction))
                     pos_deg = (arc_fraction + 1.0) * 90.0
 
         if invalid:
@@ -5016,8 +5147,15 @@ def _house_pos_pythonic(
         diff_to_body = (lon - cusp_start + 360.0) % 360.0
         house_size = (cusp_end - cusp_start + 360.0) % 360.0
 
-        if house_size < 0.0001:
-            house_size = 30.0
+        if house_size < 1e-9:
+            # Zero-width house (coincident cusps happen at extreme
+            # latitudes, e.g. Pullen SD at lat 89 collapses houses 2-3).
+            # A body can only be "in" it when it sits exactly on the
+            # cusp; treating the empty house as 30 deg wide used to
+            # swallow a whole sign of sky into it.
+            if diff_to_body < 1e-9:
+                return float(i + 1)
+            continue
 
         if diff_to_body < house_size:
             house_num = i + 1
