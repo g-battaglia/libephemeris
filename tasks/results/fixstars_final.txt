@@ -1,0 +1,14 @@
+J2000: n=167 median=0.0095" p90=0.0107" <=0.1": 165/167
+1950: n=167 median=0.0056" p90=0.0069" <=0.1": 165/167
+2050: n=167 median=0.0062" p90=0.0069" <=0.1": 165/167
+resolve 'Regulus': SE=Regulus,alLeo LE=Regulus,alLeo OK
+resolve 'regulus': SE=Regulus,alLeo LE=Regulus,alLeo OK
+resolve ',alTau': SE=Aldebaran,alTau LE=Aldebaran,alTau OK
+resolve 'Foo,alTau': SE=Aldebaran,alTau LE=Aldebaran,alTau OK
+resolve 'alde%': SE=Aldebaran,alTau LE=Aldebaran,alTau OK
+resolve 'Sirius': SE=Sirius,alCMa LE=Sirius,alCMa OK
+resolve 'bad%bad': errors SE=True LE=True OK
+resolve 'NoSuchStarXYZ': errors SE=True LE=True OK
+retflag echo (0): SE=2 LE=2 OK
+TOPOCTR: dlon SE=-0.1701" LE=-0.1701" retflag SE=32770 LE=32770 OK
+FAILURES: 0

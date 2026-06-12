@@ -1,0 +1,27 @@
+  A: match=3032 diff=0 info_diff=420 raise_ok=0 raise_mismatch=0
+  B: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  C: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  D: match=2682 diff=0 info_diff=770 raise_ok=0 raise_mismatch=0
+  E: match=3032 diff=0 info_diff=420 raise_ok=0 raise_mismatch=0
+  F: match=648 diff=0 info_diff=2804 raise_ok=0 raise_mismatch=0
+  G: match=3284 diff=0 info_diff=0 raise_ok=168 raise_mismatch=0
+  H: match=569 diff=0 info_diff=2883 raise_ok=0 raise_mismatch=0
+  I: match=1362 diff=0 info_diff=2834 raise_ok=0 raise_mismatch=0
+  J: match=666 diff=0 info_diff=2786 raise_ok=0 raise_mismatch=0
+  K: match=3258 diff=0 info_diff=26 raise_ok=168 raise_mismatch=0
+  L: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  M: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  N: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  O: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  P: match=3284 diff=0 info_diff=0 raise_ok=168 raise_mismatch=0
+  Q: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  R: match=3412 diff=0 info_diff=40 raise_ok=0 raise_mismatch=0
+  S: match=2682 diff=0 info_diff=770 raise_ok=0 raise_mismatch=0
+  T: match=965 diff=0 info_diff=2487 raise_ok=0 raise_mismatch=0
+  U: match=716 diff=0 info_diff=2736 raise_ok=0 raise_mismatch=0
+  V: match=3032 diff=0 info_diff=420 raise_ok=0 raise_mismatch=0
+  W: match=3032 diff=0 info_diff=420 raise_ok=0 raise_mismatch=0
+  X: match=3452 diff=0 info_diff=0 raise_ok=0 raise_mismatch=0
+  Y: match=616 diff=0 info_diff=2836 raise_ok=0 raise_mismatch=0
+  i: match=1074 diff=0 info_diff=2834 raise_ok=288 raise_mismatch=0
+compare: 0 gated mismatches vs pyswisseph
