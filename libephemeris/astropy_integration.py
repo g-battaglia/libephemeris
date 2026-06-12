@@ -127,7 +127,12 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
     from .state import get_timescale
     from .time_utils import deltat
 
-    # Skyfield calculations
+    # Scale caveat: the input jd_utc is handed to Skyfield as UT1 and to
+    # astropy as both UTC and UT1.  |UT1 - UTC| is kept below 0.9 s by
+    # leap seconds, so the comparison values below carry an inherent
+    # uncertainty of up to ~0.9 s (delta_t_difference_ms reflects the
+    # two libraries' delta-T tables *plus* this scale conflation).  For
+    # exact work convert the input explicitly before comparing.
     ts = get_timescale()
     t_sf = ts.ut1_jd(jd_utc)
     skyfield_delta_t = float(t_sf.delta_t)  # seconds
@@ -136,8 +141,7 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
     # Astropy calculations
     t_ap = Time(jd_utc, format="jd", scale="utc")
 
-    # Delta T from astropy (TT - UT1)
-    # Note: astropy uses UT1, we approximate with UTC for comparison
+    # Delta T from astropy (TT - UT1), treating the input as UT1
     t_ut1 = Time(jd_utc, format="jd", scale="ut1")
     astropy_delta_t = (t_ap.tt.jd - t_ut1.jd) * 86400.0  # seconds
 
@@ -318,7 +322,7 @@ def compare_coordinate_transforms(
         BarycentricMeanEcliptic,
     )
     import astropy.units as u
-    from skyfield.api import Star, Topos
+    from skyfield.api import Star, wgs84
     from .state import get_planets, get_timescale
 
     # Skyfield calculation
@@ -329,7 +333,7 @@ def compare_coordinate_transforms(
 
     # Create star and observer
     star = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-    observer = earth + Topos(latitude_degrees=lat_deg, longitude_degrees=lon_deg)
+    observer = earth + wgs84.latlon(lat_deg, lon_deg)
 
     # Calculate alt/az with Skyfield
     apparent = observer.at(t_sf).observe(star).apparent()

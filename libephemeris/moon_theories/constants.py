@@ -162,8 +162,9 @@ def get_cob_offset(
         t: Skyfield Time object
 
     Returns:
-        Tuple (dx, dy, dz) offset in AU, in ICRF/J2000 frame.
-        Add this to the barycenter position to get the planet center.
+        Tuple (dx, dy, dz) offset in AU, in the equatorial ICRF/J2000
+        frame (the frame Skyfield SSB vectors use).  Add this to the
+        barycenter position to get the planet center.
 
     Notes:
         - For Jupiter: uses Galilean moon positions (E5/Meeus theory)
@@ -172,6 +173,11 @@ def get_cob_offset(
         - For Neptune: uses Triton Keplerian elements
         - For Pluto: uses Charon 2-body solution
         - For other planets: returns (0, 0, 0)
+
+        The moon theories output the J2000 ecliptic frame (the Uranus
+        theory outputs equatorial ICRF directly), so this function
+        applies the fixed ecliptic -> equatorial rotation before
+        returning.
     """
     # Get Julian Date from Skyfield Time
     jd = t.tt
@@ -180,18 +186,36 @@ def get_cob_offset(
     name_lower = planet_name.lower().replace(" barycenter", "").strip()
 
     if name_lower == "jupiter":
-        return _jupiter_cob_offset(jd)
+        return _ecliptic_to_equatorial_j2000(_jupiter_cob_offset(jd))
     elif name_lower == "saturn":
-        return _saturn_cob_offset(jd)
+        return _ecliptic_to_equatorial_j2000(_saturn_cob_offset(jd))
     elif name_lower == "uranus":
-        return _uranus_cob_offset(jd)
+        return _uranus_cob_offset(jd)  # already equatorial ICRF
     elif name_lower == "neptune":
-        return _neptune_cob_offset(jd)
+        return _ecliptic_to_equatorial_j2000(_neptune_cob_offset(jd))
     elif name_lower in ("pluto", "pluto barycenter"):
-        return _pluto_cob_offset(jd)
+        return _ecliptic_to_equatorial_j2000(_pluto_cob_offset(jd))
     else:
         # No correction needed for other planets
         return (0.0, 0.0, 0.0)
+
+
+# Mean obliquity at J2000.0: 84381.406 arcsec (IAU 2006)
+_EPS_J2000_RAD: float = math.radians(84381.406 / 3600.0)
+_COS_EPS: float = math.cos(_EPS_J2000_RAD)
+_SIN_EPS: float = math.sin(_EPS_J2000_RAD)
+
+
+def _ecliptic_to_equatorial_j2000(
+    xyz: Tuple[float, float, float],
+) -> Tuple[float, float, float]:
+    """Rotate a J2000-ecliptic vector to the equatorial ICRF frame."""
+    x, y, z = xyz
+    return (
+        x,
+        y * _COS_EPS - z * _SIN_EPS,
+        y * _SIN_EPS + z * _COS_EPS,
+    )
 
 
 def _jupiter_cob_offset(jd: float) -> Tuple[float, float, float]:

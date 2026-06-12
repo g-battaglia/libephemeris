@@ -408,13 +408,17 @@ def galilean_moon_positions(
     R4 = A4 * (1.0 + sum_r4)
 
     # ==========================================================================
-    # PRECESSION CORRECTION
+    # PRECESSION CORRECTION (B1950 -> J2000, fixed)
     # ==========================================================================
 
-    # Time in centuries since B1950.0
-    T0 = (jd - 2433282.423) / 36525.0
+    # The E5 longitudes are referenced to the mean equinox of B1950.
+    # Precess by the constant arc B1950 -> J2000 so the output frame is
+    # the J2000 ecliptic (the COB consumer then applies one fixed
+    # rotation to equatorial ICRF).  Precessing to the equinox of date
+    # here would silently mix frames at the consumer.
+    T0 = (2451545.0 - 2433282.423) / 36525.0
 
-    # Precession in longitude from epoch B1950.0 (degrees)
+    # Precession in longitude from epoch B1950.0 to J2000.0 (degrees)
     P = 1.3966626 * T0 + 0.0003088 * T0 * T0
 
     # Corrected longitudes
@@ -447,14 +451,13 @@ def galilean_moon_positions(
     # TRANSFORM TO J2000 ECLIPTIC FRAME
     # ==========================================================================
 
-    # Jupiter's pole orientation at epoch
-    # Ascending node of Jupiter's orbit (approximate)
-    JC = (jd - 2451545.0) / 36525.0
-    OMEGA_J = _radians(100.464407 + 1.0209774 * JC)
-    i_J = _radians(1.303267 - 0.0054965 * JC)  # Inclination of Jupiter's orbit
+    # Jupiter's orbit orientation, held at J2000 to match the J2000
+    # equinox the longitudes were precessed to above.
+    OMEGA_J = _radians(100.464407)  # Ascending node of Jupiter's orbit
+    i_J = _radians(1.303267)  # Inclination of Jupiter's orbit
 
-    # Inclination of Jupiter's equator to orbit
-    Inc = _radians(3.120262 + 0.0006 * (jd - 2415020.5) / 36525.0)
+    # Inclination of Jupiter's equator to orbit (at J2000)
+    Inc = _radians(3.120262 + 0.0006 * (2451545.0 - 2415020.5) / 36525.0)
 
     psi_rad = _radians(psi_corr)
 

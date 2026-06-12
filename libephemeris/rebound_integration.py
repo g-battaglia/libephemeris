@@ -346,8 +346,9 @@ def _download_single_file(
             actual_mb = dest.stat().st_size / (1024 * 1024)
             print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
 
-    except (ImportError, RuntimeError, ValueError):
-        # Clean up temp file on error
+    except (ImportError, RuntimeError, ValueError, OSError):
+        # Clean up temp file on error.  OSError also covers the
+        # urllib.error.URLError network failures raised mid-download.
         try:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -450,6 +451,30 @@ def download_assist_data(
     reset_assist_data_cache()
 
     return data_dir
+
+
+# Mean obliquity at J2000.0 — the same 23.4392911 deg constant spk.py
+# uses for its ICRS <-> ecliptic J2000 rotations, so states converted
+# here live in the identical ecliptic frame as the SPK/Keplerian paths.
+_EPS_J2000_RAD: float = math.radians(23.4392911)
+
+
+def _ecliptic_j2000_to_icrs(
+    x: float, y: float, z: float
+) -> Tuple[float, float, float]:
+    """Rotate a vector from ecliptic J2000 to equatorial ICRS."""
+    ce = math.cos(_EPS_J2000_RAD)
+    se = math.sin(_EPS_J2000_RAD)
+    return (x, y * ce - z * se, y * se + z * ce)
+
+
+def _icrs_to_ecliptic_j2000(
+    x: float, y: float, z: float
+) -> Tuple[float, float, float]:
+    """Rotate a vector from equatorial ICRS to ecliptic J2000."""
+    ce = math.cos(_EPS_J2000_RAD)
+    se = math.sin(_EPS_J2000_RAD)
+    return (x, y * ce + z * se, -y * se + z * ce)
 
 
 @dataclass
@@ -878,24 +903,33 @@ def propagate_orbit_assist(
     # Attach ASSIST extras
     extras = assist.Extras(sim, ephem)
 
-    # Configure non-gravitational forces if requested
-    if include_non_gravitational:
-        # Set Marsden model parameters
-        # A1: radial, A2: transverse, A3: normal components
-        extras.particle_params = {
-            "A1": A1,
-            "A2": A2,
-            "A3": A3,
-        }
-
-    # Convert orbital elements to heliocentric Cartesian state.
-    # ASSIST manages the Sun internally, so we must supply Cartesian
-    # coordinates — orbital-element keywords require a massive primary
-    # which does not exist in the ASSIST simulation.
+    # Convert orbital elements to heliocentric ecliptic-J2000 Cartesian
+    # state.  ASSIST integrates in the *equatorial ICRF frame with the
+    # solar-system barycenter at the origin* (time = TDB days relative
+    # to ephem.jd_ref), so rotate ecliptic -> equatorial and shift the
+    # origin by the Sun's barycentric state from ASSIST's own ephemeris.
     cart = _elements_to_cartesian(elements, jd_start)
 
-    # Add test particle with Cartesian state
-    sim.add(m=0.0, **cart)
+    sun0 = ephem.get_particle("sun", jd_start - ephem.jd_ref)
+    x0, y0, z0 = _ecliptic_j2000_to_icrs(cart["x"], cart["y"], cart["z"])
+    vx0, vy0, vz0 = _ecliptic_j2000_to_icrs(cart["vx"], cart["vy"], cart["vz"])
+
+    # Add test particle with barycentric equatorial state
+    sim.add(
+        m=0.0,
+        x=x0 + sun0.x,
+        y=y0 + sun0.y,
+        z=z0 + sun0.z,
+        vx=vx0 + sun0.vx,
+        vy=vy0 + sun0.vy,
+        vz=vz0 + sun0.vz,
+    )
+
+    # Configure non-gravitational forces if requested.  ASSIST's API
+    # takes a flat array of 3 Marsden parameters (A1 radial, A2
+    # transverse, A3 normal) per particle, after the particle exists.
+    if include_non_gravitational:
+        extras.particle_params = [A1, A2, A3]
 
     # Set initial time (JD - reference JD)
     sim.t = jd_start - ephem.jd_ref
@@ -906,16 +940,22 @@ def propagate_orbit_assist(
     # Integrate
     sim.integrate(t_end)
 
-    # Get particle state
+    # Get particle state (barycentric equatorial ICRF) and convert back
+    # to the heliocentric ecliptic J2000 frame PropagationResult uses.
     p = sim.particles[0]
+    sun1 = ephem.get_particle("sun", t_end)
+    xh, yh, zh = _icrs_to_ecliptic_j2000(p.x - sun1.x, p.y - sun1.y, p.z - sun1.z)
+    vxh, vyh, vzh = _icrs_to_ecliptic_j2000(
+        p.vx - sun1.vx, p.vy - sun1.vy, p.vz - sun1.vz
+    )
 
     return PropagationResult(
-        x=p.x,
-        y=p.y,
-        z=p.z,
-        vx=p.vx,
-        vy=p.vy,
-        vz=p.vz,
+        x=xh,
+        y=yh,
+        z=zh,
+        vx=vxh,
+        vy=vyh,
+        vz=vzh,
         jd_tt=jd_end,
     )
 
