@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Repo-local launcher for the leph dev CLI.
+
+The dev CLI is not shipped in wheels (repo-relative tooling); from a
+source checkout run ./leph, `python -m libephemeris.dev_cli`, or
+`poe leph -- <args>`.
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from libephemeris.dev_cli import main
+
+if __name__ == "__main__":
+    main()

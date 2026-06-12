@@ -13,11 +13,23 @@ Requires: astropy (dev dependency)
 from __future__ import annotations
 
 import math
-import os
 
 import pytest
 
-os.environ["LIBEPHEMERIS_MODE"] = "skyfield"
+
+@pytest.fixture(scope="module", autouse=True)
+def _force_skyfield_mode():
+    """Pin skyfield mode for this module without poisoning the process env.
+
+    The old module-level os.environ assignment leaked into every test
+    that ran after this module in the same worker.
+    """
+    import libephemeris as le
+
+    le.set_calc_mode("skyfield")
+    yield
+    le.set_calc_mode(None)
+
 
 try:
     import astropy.constants as const

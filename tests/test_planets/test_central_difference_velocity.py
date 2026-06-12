@@ -11,7 +11,8 @@ approximately 100x better numerical precision for the same timestep.
 
 import os
 import pytest
-import swisseph as swe
+
+swe = pytest.importorskip("swisseph")
 
 from libephemeris import calc_ut, calc, calc_pctr
 from libephemeris.constants import (

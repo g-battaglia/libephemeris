@@ -6,7 +6,8 @@ to match pyswisseph within 0.0001° (0.36 arcseconds).
 """
 
 import pytest
-import swisseph as swe
+
+swe = pytest.importorskip("swisseph")
 import libephemeris as ephem
 
 

@@ -48,7 +48,7 @@ def disable_strict_precision_for_tests():
     ephem.set_strict_precision(False)
     yield
     # Restore original state
-    ephem.set_strict_precision(original if original else None)
+    ephem.set_strict_precision(original)
 
 
 # ============================================================================
@@ -65,7 +65,7 @@ def disable_auto_spk_download_for_tests():
     original = ephem.get_auto_spk_download()
     ephem.set_auto_spk_download(False)
     yield
-    ephem.set_auto_spk_download(original if original else None)
+    ephem.set_auto_spk_download(original)
 
 
 # NOTE on calc-mode isolation: since issue #30, close() preserves an

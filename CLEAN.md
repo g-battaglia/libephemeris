@@ -61,3 +61,84 @@ that followed (WS1-WS8). Grows as further dead code is identified.
 - `_check_astroquery_available`: the module talks to JPL Horizons via
   urllib only (the docstrings that claimed astroquery were fixed in
   WS2); nothing calls this probe.
+
+## From the 2026-06-10 review inventory (verified 2026-06-12)
+
+Entries from the review's dead-code section, re-verified at logging
+time.  Items the fix workstreams made live again are noted as such.
+
+### libephemeris/lunar.py (additional)
+
+- `_interpolate_perigee_correction` (lunar.py:223): no callers (its
+  table is covered in the lunar_corrections.py entry above).
+- `_sample_osculating_apogee_with_fallback`, `_unwrap_longitudes`,
+  `_cubic_spline_interpolate`, `_sample_osculating_perigee_with_fallback`,
+  `_solve_linear_system`, `compare_true_lilith_methods`: helpers of the
+  retired two-step interpolated-apse architecture; no live callers.
+
+### libephemeris/true_node_terms.py
+
+- The whole 99-term table has no summation consumer (the live true
+  node is geometric); it is exercised only by documentation tests.
+
+### libephemeris/eclipse.py
+
+- `_validate_contact_time` (~line 340), duplicate `_get_sun_moon_data`
+  (second copy), shadowed inner `_find_previous_new_moon`,
+  `_GAMMA_CENTRAL_STRICT`, `is_total`/`is_annular` helpers,
+  `MAX_ITERATIONS` (occult section), `_check_occultation`,
+  `_calculate_contact_times`: superseded by the WS5 shared geometry
+  cores.  NOTE: `_find_previous_full_moon` was in the review inventory
+  but is LIVE again since WS2 wired the backwards lunar-eclipse search
+  through it (eclipse.py:4709).
+- The heliacal trio formerly at eclipse.py 8966-10261 is shadowed by
+  heliacal.py's exports (which own the live implementations).
+- Several `x = x` self-assignment no-ops flagged by the review remain
+  in place (eclipse.py, heliacal.py, fixed_stars.py).
+
+### libephemeris/schaefer.py
+
+- Entire module imported nowhere (heliacal.py carries its own
+  SchaeferModel); its twilight model is discontinuous.
+
+### libephemeris/planets.py
+
+- `_calc_nod_aps_osculating`, `_calc_star_based_ayanamsha`: no callers.
+
+### libephemeris/erfa_nutation.py
+
+- Consumed only by its own test and the dev CLI.
+
+### libephemeris/astrometry.py
+
+- The no-erfa fallback precession tuples (~274-311) are unreachable —
+  pyerfa is a hard dependency — and carry wrong constants.
+
+### libephemeris/iers_data.py
+
+- Unreachable interpolation branch (~1008-1013).
+
+### scripts/generate_leb2.py
+
+- `_year_to_jd` (broken, no callers) and the unused v1 `write_leb2`.
+
+### libephemeris/constants.py
+
+- `_NALL_NAT_POINTS_INTERNAL` (line 144): unused and contradicts
+  `NALL_NAT_POINTS`.
+
+### libephemeris/_config_toml.py
+
+- The tomli import fallback is dead under requires-python >= 3.12
+  (tomllib is stdlib).
+
+### libephemeris/houses.py (additional)
+
+- `iterate_placidus` still carries ~130 lines of abandoned derivation
+  notes ("Wait, ...", "No, ...") around lines 1896-2030; they are
+  comments, not code, but are logged here as cleanup candidates.
+
+### tests/
+
+- `tests/test_pre_commit_config.py`: permanently skipped; validates a
+  config file that does not exist in the repo.

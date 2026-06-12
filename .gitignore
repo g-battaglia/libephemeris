@@ -1,8 +1,8 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
-build/
-dist/
+/build/
+/dist/
 wheels/
 *.egg-info
 
@@ -63,3 +63,6 @@ data/reference/
 # Manual build output (EPUB/PDF)
 docs/build/
 /.opencode
+
+# JS tooling
+node_modules/

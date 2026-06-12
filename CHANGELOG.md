@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - Unreleased
+
+The 2026-06 full-project review fix series (workstreams WS0-WS9; WS10
+pending).  Most fixes are internal corrections; the items below
+DELIBERATELY change observable behavior to match the Swiss Ephemeris
+reference or to correct measured errors.
+
+### Behavior changes
+
+- Default sidereal ayanamsha is Fagan/Bradley (reference parity);
+  Lahiri remains available via `set_sid_mode(SIDM_LAHIRI)`.
+- Eclipse functions return the reference's exact retflag bits and
+  zero-filled cells: the invented `ECL_GRAZING` bit and local
+  `ANNULAR_TOTAL` classifications are gone, when_loc reports geometric
+  contact times with visibility only in the `*_VISIBLE` bits, and
+  fabricated fallback contact times are now 0.0.
+- `sol_eclipse_where`/`lun_occult_where` fill `geopos[2..9]` and the
+  no-eclipse cells the way the reference does.
+- Besselian elements are built on the true equator of date with NASA
+  sign conventions (x east-positive, l2 negative for total).
+- Search/not-found conditions raise `libephemeris.Error` (reference
+  parity) instead of `RuntimeError`; LEB out-of-range and ephemeris
+  range failures raise `EphemerisRangeError`; `FLG_TOPOCTR` without
+  `set_topo()` raises instead of silently returning geocentric.
+- Fixed-star functions return "Name,nomenclature", use strict
+  reference name-resolution semantics (comma = exact nomenclature key,
+  '%' wildcard, sequential digits), and honor `FLG_TOPOCTR`; the star
+  catalog is rebuilt from public sources (1447 stars).
+- Planetary moons: canonical ids are PLMOON_OFFSET + NAIF (Io 9501);
+  unregistered moons raise like the reference; geocentric positions
+  are apparent (light-time + aberration).
+- Any numbered asteroid works via AST_OFFSET + N (SPK -> SBDB
+  Keplerian fallback); unknown bodies raise `UnknownBodyError`.
+- The Keplerian minor-body fallback outputs the ecliptic of date
+  (previously J2000, ~1290" bias at 2026).
+- Interpolated apogee/perigee honor `FLG_NONUT`; node/apse speeds
+  include the nutation rate in true-ecliptic output; the apse residual
+  tables were regenerated (node residuals at the rounding floor).
+- `utc_to_jd`/`jdet_to_utc`/`jdut1_to_utc` treat pre-1972 input as UT1
+  per their documented semantics.
+- `.env` loading only exports `LIBEPHEMERIS_*` keys.
+- `libephemeris download all` asks for confirmation (use `--yes` to
+  skip); `--quiet` no longer suppresses error output.
+- The `leph` dev CLI and `libephemeris.dev_cli` are no longer shipped
+  in wheels (repo tooling; use `./leph` or
+  `python -m libephemeris.dev_cli` from a checkout).
+
+See REVIEW-2026-06-10.md and the WS1-WS9 commit series for the full
+fix inventory (houses provenance rewrite, eclipse/rise/heliacal
+geometry cores, error-policy sweep, COB/ASSIST frame fixes, lint
+debt).
+
 ## [2.0.2] - 2026-06-03
 
 ### Fixed
@@ -17,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   occultation within 20 years" even where events exist. The clamp now uses
   the kernel's true upper bound (max end_jd). `base`/`medium` single-segment
   DE440 kernels were unaffected.
+
+## [2.0.1] - 2026-05-18
+
+### Fixed
+
+- `is_day_chart`: inverted 2D ecliptic day/night logic (issue #1) —
+  charts near the horizon classified day as night and vice versa.
 
 ## [2.0.0] - 2026-05-14
 

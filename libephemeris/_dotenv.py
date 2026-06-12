@@ -146,6 +146,12 @@ def load_dotenv(
 
         key, value = parsed
 
+        # Only the library's own namespace: a project .env regularly
+        # holds unrelated secrets (API keys, DB urls) that must not be
+        # exported into the process just because libephemeris imported.
+        if not key.startswith("LIBEPHEMERIS_"):
+            continue
+
         if override or key not in os.environ:
             os.environ[key] = value
 

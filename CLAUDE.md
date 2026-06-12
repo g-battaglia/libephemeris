@@ -9,6 +9,11 @@ VERY IMPORTANT:
 
 Uses `uv` for dependencies and `poe` (poethepoet) for task running.
 
+The `leph` dev CLI is repo tooling and is not shipped in wheels: from a
+source checkout use `./leph`, `python -m libephemeris.dev_cli`, or
+`poe leph -- <args>` (an installed editable venv may still expose a
+`leph` script).
+
 ```bash
 uv pip install -e ".[dev]"        # Install with dev dependencies
 poe lint                          # Ruff linter with auto-fix
@@ -79,7 +84,7 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 
 ## Binary Ephemeris Mode (LEB)
 
-Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags (`FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_NONUT`).
+Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags — notably `FLG_TOPOCTR` (raises/falls back per body class), `FLG_XYZ`, `FLG_RADIANS`; `FLG_NONUT` is handled on the LEB path for most bodies.
 
 ```python
 from libephemeris import set_leb_file

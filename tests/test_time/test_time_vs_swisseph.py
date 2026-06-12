@@ -10,7 +10,8 @@ from __future__ import annotations
 
 
 import pytest
-import swisseph as swe_ref
+
+swe_ref = pytest.importorskip("swisseph")
 
 import libephemeris as swe
 from libephemeris.constants import GREG_CAL

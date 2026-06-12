@@ -1,6 +1,6 @@
 [project]
 name = "libephemeris"
-version = "2.0.2"
+version = "2.1.0"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -101,7 +101,9 @@ Changelog = "https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md"
 
 [project.scripts]
 libephemeris = "libephemeris.cli:main"
-leph = "libephemeris.dev_cli:main"
+# leph (the dev CLI) is repo tooling with repo-relative paths and is
+# deliberately NOT shipped in the wheel.  From a source checkout use
+# ./leph, `python -m libephemeris.dev_cli`, or `poe leph -- <args>`.
 
 
 
@@ -110,11 +112,13 @@ requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
+# libephemeris.dev_cli (the leph dev CLI) is intentionally excluded:
+# it is repo tooling with repo-relative paths (tests/, scripts/, data/)
+# that only works from a source checkout.
 packages = [
     "libephemeris",
     "libephemeris.cli",
     "libephemeris.contrib",
-    "libephemeris.dev_cli",
     "libephemeris.moon_theories",
     "libephemeris.vendor",
 ]
@@ -137,6 +141,9 @@ libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]
 # ---------------------------------------------------------------------------
 
 [tool.poe.tasks]
+
+# Dev CLI launcher (leph is not a wheel entry point; see project.scripts)
+leph = {cmd = "python -m libephemeris.dev_cli", help = "Run the leph dev CLI (poe leph -- <args>)"}
 
 # --- Setup ---
 "setup:reference" = {cmd = "python scripts/download_reference_data.py", help = "Download reference data for comparison tests (~3.4 MB)"}

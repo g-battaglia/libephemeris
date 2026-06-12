@@ -157,7 +157,18 @@ def load_config(
     try:
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError:
+        _CONFIG_LOADED = True
+        return False
+    except tomllib.TOMLDecodeError as e:
+        # A malformed config silently ignored looks like "my settings
+        # don't apply" — say what is wrong and where.
+        import warnings
+
+        warnings.warn(
+            f"Ignoring malformed libephemeris config {config_path}: {e}",
+            stacklevel=2,
+        )
         _CONFIG_LOADED = True
         return False
 

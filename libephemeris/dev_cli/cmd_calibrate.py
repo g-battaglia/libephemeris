@@ -12,21 +12,19 @@ import click
 
 
 def _python(args: list[str], use_dotenv: bool = True) -> None:
-    """Run a python script, optionally loading .env."""
+    """Run a python script, optionally loading .env.
+
+    Uses the shared _dotenv loader (same parsing and the same
+    LIBEPHEMERIS_*-only filter as the package import path) instead of a
+    third ad-hoc .env parser.
+    """
     import os
 
-    run_env = dict(os.environ)
     if use_dotenv:
-        # Load .env file if it exists (same behavior as poe's envfile = ".env")
-        env_path = os.path.join(os.getcwd(), ".env")
-        if os.path.exists(env_path):
-            with open(env_path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        key, _, value = line.partition("=")
-                        run_env[key.strip()] = value.strip().strip("\"'")
-    sys.exit(subprocess.call([sys.executable, *args], env=run_env))
+        from .._dotenv import load_dotenv
+
+        load_dotenv(os.path.join(os.getcwd(), ".env"))
+    sys.exit(subprocess.call([sys.executable, *args], env=dict(os.environ)))
 
 
 @click.group(
