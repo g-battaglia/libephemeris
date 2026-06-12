@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Thread-safe ephemeris context for libephemeris.
 
@@ -676,6 +678,9 @@ class EphemerisContext:
               resources (ephemeris files, timescale, loader)
             - After calling close(), the next calculation on any context
               will automatically reload resources as needed
+            - The timescale cache is reset at the state level too, so the
+              reload picks up fresh time data (IERS table, leap seconds)
+              instead of the previously cached singleton
             - Instance-specific state (topo, sidereal_mode, angles_cache)
               is NOT affected - only shared resources are reset
 
@@ -704,3 +709,14 @@ class EphemerisContext:
             _SHARED_TS = None
             _SHARED_EPHE_PATH = None
             _SHARED_EPHE_FILE = "de440.bsp"
+
+            # _SHARED_TS caches the singleton built by state.get_timescale();
+            # clearing the reference alone would re-cache the same live
+            # object on the next call. Reset the state-level cache too so
+            # time data (IERS table, leap seconds) is actually rebuilt.
+            # Lock order _SHARED_LOCK -> state._INIT_LOCK matches
+            # get_timescale() above; state never takes locks in the
+            # reverse order.
+            from .state import _reset_timescale
+
+            _reset_timescale()

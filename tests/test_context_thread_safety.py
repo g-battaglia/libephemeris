@@ -183,8 +183,10 @@ class TestContextResourceSharing:
         """Module-level API uses shared timescale."""
         from libephemeris import state
 
-        # Pre-load
-        ephem.calc_ut(2451545.0, SUN, 0)
+        # Explicitly load the timescale (calc_ut may use the LEB fast
+        # path, which never touches state._TS; an earlier test may have
+        # reset it via EphemerisContext.close()).
+        state.get_timescale()
 
         # Verify timescale is loaded
         assert state._TS is not None

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Global state management for libephemeris.
 
@@ -418,7 +420,13 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
     try:
         reader.warm(jd_start, jd_end)
         logger = get_logger()
-        logger.debug("mmap preload: warmed JD range %s-%s (%d-%d)", jd_start, jd_end, start_year, end_year)
+        logger.debug(
+            "mmap preload: warmed JD range %s-%s (%d-%d)",
+            jd_start,
+            jd_end,
+            start_year,
+            end_year,
+        )
     except (AttributeError, OSError, ValueError) as exc:
         logger = get_logger()
         logger.warning("mmap preload failed: %s", exc)
@@ -738,6 +746,19 @@ def get_timescale() -> Timescale:
                     load = get_loader()
                     _TS = load.timescale()
     return _TS
+
+
+def _reset_timescale() -> None:
+    """Drop the cached shared timescale so the next access rebuilds it.
+
+    Used by EphemerisContext.close() to honor its documented resource
+    reset: get_timescale() caches the singleton in _TS, so clearing only
+    the context-level reference would hand the same stale object back on
+    the next call (stale IERS/leap-second data after a config change).
+    """
+    global _TS
+    with _INIT_LOCK:
+        _TS = None
 
 
 # =============================================================================
@@ -1630,8 +1651,9 @@ def close() -> None:
         - After calling close(), the next ephemeris calculation will
           automatically reload the ephemeris files as needed
         - Process-level configuration is preserved: the calculation mode
-          set via set_calc_mode() and the strict-precision setting survive
-          close() (they are re-resolved from env/TOML only if never set
+          set via set_calc_mode(), the .leb file path set via
+          set_leb_file() and the strict-precision setting survive close()
+          (they are re-resolved from env/TOML only if never set
           explicitly). Per-session state (topo, sidereal mode, user
           Delta-T, open files, caches) is cleared.
         - This is useful for:
@@ -1686,12 +1708,14 @@ def _close_inner() -> None:
             _LEB_READER.close()
         except (AttributeError, OSError):
             pass
-    _LEB_FILE = None
     _LEB_READER = None
-    # _CALC_MODE is deliberately preserved: the calculation mode chosen via
-    # set_calc_mode() is process-level configuration, not per-session state.
-    # Resetting it silently re-enabled the auto fallback chain (network
-    # downloads, backend switches) after every close() — see issue #30.
+    # _CALC_MODE and _LEB_FILE are deliberately preserved: the calculation
+    # mode chosen via set_calc_mode() and the .leb path chosen via
+    # set_leb_file() are process-level configuration, not per-session state.
+    # Resetting the mode silently re-enabled the auto fallback chain (network
+    # downloads, backend switches) after every close() — see issue #30 —
+    # and clearing the path made mode "leb" raise (or silently switch to an
+    # auto-discovered file) on the first calculation after close().
 
     # Clear fast_calc's cached reference to the closed LEB reader. Without
     # this, helpers like _frame_data() would still dispatch through a stale
