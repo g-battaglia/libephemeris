@@ -19,11 +19,9 @@ Target: ~5000+ checks, <30 seconds.
 
 from __future__ import annotations
 
-import math
 import random
 import sys
 import time
-import traceback
 
 # ---------------------------------------------------------------------------
 # Libraries

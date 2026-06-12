@@ -13,7 +13,6 @@ The tests verify:
 """
 
 import pytest
-import math
 
 from libephemeris.astropy_integration import (
     check_astropy_available,

@@ -159,8 +159,14 @@ def fetch_iau_names(verbose: bool) -> dict[int, str]:
         # in the 2022+ layout. Fall back to a regex.
         import re
 
-        m = re.match(
-            r"^(?P<name>.{1,18}?)\s{1,}\S.*?\s(?P<hip>\d{1,6}|_)\s+(?P<hd>\d{1,6}|_)\s+"
+        # The name occupies the first fixed-width field (18 columns) —
+        # a non-greedy regex here used to truncate multi-word names
+        # ("Polaris Australis" -> "Polaris", "Yed Prior" -> "Yed").
+        name = line[:18].strip()
+        if not name:
+            continue
+        m = re.search(
+            r"\s(?P<hip>\d{1,6}|_)\s+(?P<hd>\d{1,6}|_)\s+"
             r"(?P<ra>[\d.]+)\s+(?P<dec>[-+]?[\d.]+)\s",
             line,
         )
@@ -168,9 +174,6 @@ def fetch_iau_names(verbose: bool) -> dict[int, str]:
             continue
         hip_s = m.group("hip")
         if hip_s == "_":
-            continue
-        name = m.group("name").strip()
-        if not name:
             continue
         try:
             names[int(hip_s)] = name

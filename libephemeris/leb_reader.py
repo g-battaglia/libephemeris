@@ -10,7 +10,6 @@ single-point performance (~1.5us per Clenshaw evaluation).
 
 from __future__ import annotations
 
-import math
 import mmap
 import os
 import struct
@@ -34,7 +33,6 @@ from .leb_format import (
     MAGIC,
     NUTATION_HEADER_SIZE,
     SECTION_BODY_INDEX,
-    SECTION_CHEBYSHEV,
     SECTION_DELTA_T,
     SECTION_DIR_SIZE,
     SECTION_NUTATION,
@@ -42,7 +40,6 @@ from .leb_format import (
     STAR_ENTRY_SIZE,
     VERSION,
     BodyEntry,
-    FileHeader,
     NutationHeader,
     SectionEntry,
     StarEntry,
@@ -51,7 +48,6 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
-    segment_byte_size,
     _madvise_ranges,
     _madvise_dontneed,
 )

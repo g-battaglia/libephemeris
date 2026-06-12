@@ -45,7 +45,7 @@ could supplement (not replace) the existing Skyfield-based calculations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 
 def check_astropy_available() -> bool:
@@ -62,7 +62,7 @@ def check_astropy_available() -> bool:
     """
     try:
         import astropy.time
-        import astropy.coordinates
+        import astropy.coordinates  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -125,7 +125,6 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
 
     from astropy.time import Time
     from .state import get_timescale
-    from .time_utils import deltat
 
     # Scale caveat: the input jd_utc is handed to Skyfield as UT1 and to
     # astropy as both UTC and UT1.  |UT1 - UTC| is kept below 0.9 s by
@@ -318,7 +317,6 @@ def compare_coordinate_transforms(
         SkyCoord,
         EarthLocation,
         AltAz,
-        Galactic,
         BarycentricMeanEcliptic,
     )
     import astropy.units as u

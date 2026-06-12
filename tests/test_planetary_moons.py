@@ -15,7 +15,6 @@ are skipped by default. Set LIBEPHEMERIS_TEST_MOON_SPK=1 to run them.
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
 
 import libephemeris as eph
 from libephemeris import planetary_moons, state

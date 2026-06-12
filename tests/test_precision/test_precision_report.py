@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 import json
 import pytest
-import math
 
 # Add compare_scripts to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts"))

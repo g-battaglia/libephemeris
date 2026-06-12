@@ -23,8 +23,6 @@ from libephemeris import (
     MARS,
     JUPITER,
     SATURN,
-    SUN,
-    MOON,
     HELIACAL_RISING,
     HELIACAL_SETTING,
     EVENING_FIRST,

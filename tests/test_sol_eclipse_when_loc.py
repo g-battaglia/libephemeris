@@ -21,11 +21,8 @@ from libephemeris import (
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_PARTIAL,
-    ECL_ANNULAR,
     ECL_VISIBLE,
     ECL_MAX_VISIBLE,
-    ECL_1ST_VISIBLE,
-    ECL_4TH_VISIBLE,
 )
 
 

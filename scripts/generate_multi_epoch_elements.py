@@ -133,8 +133,6 @@ def _state_to_keplerian(
         KeplerianElements or None if conversion fails (e.g. degenerate orbit)
     """
     # Position and velocity vectors
-    r_vec = (x, y, z)
-    v_vec = (vx, vy, vz)
 
     r = math.sqrt(x**2 + y**2 + z**2)
     v = math.sqrt(vx**2 + vy**2 + vz**2)
@@ -315,7 +313,7 @@ def _get_spk_state_vector(
             return x_ecl, y_ecl, z_ecl, vx_ecl, vy_ecl, vz_ecl
         finally:
             kernel.close()
-    except Exception as exc:
+    except Exception:
         # SPK may not cover this epoch
         return None
 
@@ -556,7 +554,7 @@ Examples:
     try:
         from libephemeris.constants import SPK_BODY_NAME_MAP
         from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS
-        from libephemeris.spk import _get_body_name
+        from libephemeris.spk import _get_body_name  # noqa: F401 (availability probe)
     except ImportError as e:
         print(f"Error importing libephemeris: {e}", file=sys.stderr)
         return 1

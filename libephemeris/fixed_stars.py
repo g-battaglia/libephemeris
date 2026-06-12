@@ -185,11 +185,9 @@ from .constants import (
     FLG_MOSEPH,
     FLG_XYZ,
     FLG_RADIANS,
-    FLG_ICRS,
     FLG_TRUEPOS,
     FLG_TOPOCTR,
     J2000,
-    J1991_25,
     DAYS_PER_JULIAN_YEAR,
 )
 from .utils import cotrans_sp
@@ -373,7 +371,7 @@ def propagate_proper_motion(
 # Bayer/Flamsteed cross index (IV/27A), XHIP radial velocities
 # (V/137D) and IAU WGSN proper names. Internal IDs of the library's
 # original curated stars are preserved by the generator.
-from .star_catalog_gen import STAR_ROWS as _STAR_ROWS
+from .star_catalog_gen import STAR_ROWS as _STAR_ROWS  # noqa: E402
 
 STAR_CATALOG: List[StarCatalogEntry] = [
     StarCatalogEntry(
@@ -1072,7 +1070,10 @@ STAR_ALIASES: dict[str, int] = {
     "ALPHA CEN": RIGIL_KENT,
     "α CEN": RIGIL_KENT,
     "ALCEN": RIGIL_KENT,
-    "TOLIMAN": RIGIL_KENT,
+    # Toliman is the IAU name of alpha Cen B (catalog id 1000846); the
+    # exact catalog name takes precedence, so this legacy alias only
+    # documents the historical usage.
+    "TOLIMAN": 1000846,
     "RIGIL KENT": RIGIL_KENT,
     "FOOT OF CENTAUR": RIGIL_KENT,
     "BUNGULA": RIGIL_KENT,
@@ -2004,13 +2005,16 @@ def resolve_star_name(name: str) -> int | None:
     if "," in normalized:
         normalized = normalized.split(",")[0].strip()
 
-    # 1. Try exact match in STAR_ALIASES
-    if normalized in STAR_ALIASES:
-        return STAR_ALIASES[normalized]
-
-    # 2. Try exact match against canonical star names
+    # 1. Try exact match against canonical star names — a star's own
+    # catalog name outranks a legacy alias pointing elsewhere (e.g.
+    # 'Suhail' is the IAU name of lambda Velorum but also a historical
+    # alias of Canopus).
     if normalized in _STAR_NAME_TO_ID:
         return _STAR_NAME_TO_ID[normalized]
+
+    # 2. Try exact match in STAR_ALIASES
+    if normalized in STAR_ALIASES:
+        return STAR_ALIASES[normalized]
 
     # 3. Try exact match against nomenclature (e.g., "ALLEO", "BEPER")
     for entry in STAR_CATALOG:
@@ -3734,57 +3738,57 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "SADALSUUD": 106278,  # Beta Aquarii
     "SADR": 100453,  # Gamma Cygni
     "SAIPH": 27366,  # Kappa Orionis
-    "SALM": 98066,  # Tau Pegasi
+    "SALM": 115250,  # Tau Pegasi
     "SARGAS": 86228,  # Theta Scorpii
-    "SARIN": 79992,  # Delta Herculis
+    "SARIN": 84379,  # Delta Herculis
     "SCHEAT": 113881,  # Beta Pegasi
     "SCHEDAR": 3179,  # Alpha Cassiopeiae
     "SECUNDA HYADUM": 20455,  # Delta1 Tauri
-    "SEGIN": 4427,  # Epsilon Cassiopeiae
+    "SEGIN": 8886,  # Epsilon Cassiopeiae
     "SEGINUS": 71075,  # Gamma Bootis
     "SHAULA": 85927,  # Lambda Scorpii
     "SHAMA": 69701,  # HD 99109
     "SHERATAN": 8903,  # Beta Arietis
     "SIKA": 50782,  # HD 99491
     "SIRIUS": 32349,  # Alpha Canis Majoris
-    "SITULA": 110672,  # Kappa Aquarii
+    "SITULA": 111710,  # Kappa Aquarii
     "SKAT": 113136,  # Delta Aquarii
     "SPICA": 65474,  # Alpha Virginis
     "STRIBOR": 91085,  # HD 171028
     "SUBRA": 47508,  # Omicron Leonis
     "SUHAIL": 44816,  # Lambda Velorum
     "SULAFAT": 93194,  # Gamma Lyrae
-    "SYRMA": 71957,  # Iota Virginis
+    "SYRMA": 69701,  # Iota Virginis
     # T
     "TABIT": 22449,  # Pi3 Orionis
-    "TAIYANGSHOU": 54539,  # Chi Ursae Majoris
-    "TAIYI": 53759,  # 8 Draconis
+    "TAIYANGSHOU": 57399,  # Chi Ursae Majoris
+    "TAIYI": 63076,  # 8 Draconis
     "TALITHA": 44127,  # Iota Ursae Majoris
-    "TANIA AUSTRALIS": 51250,  # Mu Ursae Majoris
-    "TANIA BOREALIS": 50801,  # Lambda Ursae Majoris
-    "TARAZED": 95501,  # Gamma Aquilae
+    "TANIA AUSTRALIS": 50801,  # Mu Ursae Majoris
+    "TANIA BOREALIS": 50372,  # Lambda Ursae Majoris
+    "TARAZED": 97278,  # Gamma Aquilae
     "TAYGETA": 17531,  # 19 Tauri (Pleiades)
     "TEBERDA": 94256,  # HD 178813
-    "TEGMINE": 43103,  # Zeta1 Cancri
+    "TEGMINE": 40167,  # Zeta1 Cancri
     "TEJAT": 30343,  # Mu Geminorum (HIP 30343, corrected from erroneous 32362)
     "THUBAN": 68756,  # Alpha Draconis
-    "TIAKI": 23015,  # Beta Gruis
-    "TIANGUAN": 25930,  # Zeta Tauri
-    "TIANYI": 52403,  # 7 Draconis
-    "TITAWIN": 9683,  # Upsilon Andromedae
+    "TIAKI": 112122,  # Beta Gruis
+    "TIANGUAN": 26451,  # Zeta Tauri
+    "TIANYI": 62423,  # 7 Draconis
+    "TITAWIN": 7513,  # Upsilon Andromedae (HIP 7513; 9683 was a typo)
     "TOLIMAN": 71681,  # Alpha Centauri B
-    "TONATIUH": 43177,  # HD 104985
-    "TORCULAR": 6193,  # Omicron Piscium
-    "TUREIS": 42913,  # Rho Puppis
+    "TONATIUH": 58952,  # HD 104985
+    "TORCULAR": 8198,  # Omicron Piscium
+    "TUREIS": 39757,  # Rho Puppis
     "TYL": 91919,  # Epsilon Draconis
     # U
-    "UKDAH": 52863,  # Iota Hydrae
+    "UKDAH": 47431,  # Iota Hydrae
     "UNUKALHAI": 77070,  # Alpha Serpentis
     "UNURGUNITE": 34444,  # Sigma Canis Majoris
     "URUK": 116076,  # HD 231701
     # V
     "VEGA": 91262,  # Alpha Lyrae
-    "VERITATE": 74793,  # 14 Andromedae
+    "VERITATE": 116076,  # 14 Andromedae
     "VINDEMIATRIX": 63608,  # Epsilon Virginis
     "WASAT": 35550,  # Delta Geminorum
     "WAZN": 27628,  # Beta Columbae
@@ -3792,18 +3796,18 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     # X
     "XAMIDIMURA": 82514,  # Mu1 Scorpii
     # Y
-    "YED POSTERIOR": 86284,  # Epsilon Ophiuchi
-    "YED PRIOR": 83000,  # Delta Ophiuchi
+    "YED POSTERIOR": 79882,  # Epsilon Ophiuchi
+    "YED PRIOR": 79593,  # Delta Ophiuchi
     "YILDUN": 85822,  # Delta Ursae Minoris
     # Z
     "ZANIAH": 60129,  # Eta Virginis
     "ZAURAK": 18543,  # Gamma Eridani
     "ZAVIJAVA": 57757,  # Beta Virginis
-    "ZHANG": 49641,  # Upsilon1 Hydrae
-    "ZIBAL": 20535,  # Zeta Eridani
+    "ZHANG": 48356,  # Upsilon1 Hydrae
+    "ZIBAL": 15197,  # Zeta Eridani
     "ZOSMA": 54872,  # Delta Leonis
     "ZUBENELGENUBI": 72622,  # Alpha2 Librae
-    "ZUBENELHAKRABI": 76470,  # Gamma Librae
+    "ZUBENELHAKRABI": 76333,  # Gamma Librae
     "ZUBENESCHAMALI": 74785,  # Beta Librae
     # =========================================================================
     # BAYER DESIGNATIONS (Greek letter + constellation)

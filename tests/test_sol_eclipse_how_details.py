@@ -10,23 +10,17 @@ Reference eclipse: April 8, 2024 total solar eclipse
 - NYC: Partial eclipse with ~90% obscuration
 """
 
-import math
 import pytest
 
 pytestmark = pytest.mark.slow
 
 from libephemeris import (
     julday,
-    revjul,
     sol_eclipse_how_details,
     _sol_eclipse_how_details_pythonic,
     sol_eclipse_how,
     sol_eclipse_when_loc,
     FLG_SWIEPH,
-    ECL_TOTAL,
-    ECL_PARTIAL,
-    ECL_ANNULAR,
-    ECL_VISIBLE,
 )
 
 

@@ -7,7 +7,6 @@ actual implementation.
 """
 
 import math
-import pytest
 
 from libephemeris import lunar
 from libephemeris.lunar import (

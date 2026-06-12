@@ -13,7 +13,6 @@ import libephemeris as swe
 from libephemeris.state import set_calc_mode, get_calc_mode
 from libephemeris.constants import (
     SUN,
-    MOON,
     MARS,
     FLG_SPEED,
     FLG_SIDEREAL,

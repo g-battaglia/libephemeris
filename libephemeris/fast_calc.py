@@ -45,7 +45,6 @@ from .constants import (
     FLG_XYZ,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
-    _MOON_MEAN_ECC,
 )
 from .leb_format import (
     COORD_ECLIPTIC,
@@ -639,8 +638,8 @@ def _fw2m(
     ce = math.cos(eps)
 
     # BA = R1(phib) x R3(gamb)
-    ba10 = -sg * cp
-    ba11 = cg * cp
+    -sg * cp
+    cg * cp
     ba20 = sg * sp
     ba21 = -cg * sp
 

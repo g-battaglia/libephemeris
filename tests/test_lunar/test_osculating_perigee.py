@@ -15,7 +15,6 @@ These tests verify:
 4. Consistency of interpolated perigee results
 """
 
-import math
 import pytest
 from libephemeris import lunar
 

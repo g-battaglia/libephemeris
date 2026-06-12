@@ -25,7 +25,6 @@ class TestErrorMessageFormat:
 
         pyswisseph uses format: "illegal planet number {n}."
         """
-        import libephemeris as ephem
 
         # These should fail silently (return zeros) rather than raise
         # because invalid planets in _calc_body just return zeros

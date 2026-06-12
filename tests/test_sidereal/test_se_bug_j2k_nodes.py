@@ -22,7 +22,6 @@ See docs/reference/se-bug-sidereal-j2000-nodes.md for full analysis.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

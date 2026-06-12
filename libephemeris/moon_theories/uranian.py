@@ -238,7 +238,6 @@ def _moon_position_kepler(
     # Position in orbital plane (perifocal frame)
     x_peri = r * math.cos(nu)
     y_peri = r * math.sin(nu)
-    z_peri = 0.0
 
     # Rotation matrices
     cos_omega = math.cos(omega)

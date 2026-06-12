@@ -8,7 +8,6 @@ the FLG_EQUATORIAL flag produces results consistent with cotrans.
 
 from __future__ import annotations
 
-import math
 import random
 
 import pytest
@@ -23,7 +22,6 @@ from libephemeris.constants import (
     MERCURY,
     VENUS,
     FLG_EQUATORIAL,
-    FLG_SPEED,
 )
 
 

@@ -26,7 +26,6 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     MEAN_NODE,
-    MEAN_APOG,
     ECL_NUT,
     FLG_SWIEPH,
     FLG_SPEED,
@@ -38,7 +37,6 @@ from libephemeris.constants import (
 from libephemeris.utils import (
     ECL2HOR,
     EQU2HOR,
-    HOR2EQU,
     TRUE_TO_APP,
     APP_TO_TRUE,
 )

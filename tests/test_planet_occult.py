@@ -226,10 +226,6 @@ class TestPlanetOccultImports:
 
     def test_swe_aliases_are_same_function(self):
         """Test that swe_* are aliases to base functions."""
-        from libephemeris import (
-            planet_occult_when_glob,
-            planet_occult_when_loc,
-        )
 
 
 

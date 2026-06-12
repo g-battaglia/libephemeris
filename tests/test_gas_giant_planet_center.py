@@ -17,8 +17,6 @@ References:
 - JPL DE440 documentation on planet center positions
 """
 
-import pytest
-import libephemeris as ephem
 from libephemeris import (
     calc_ut,
     calc,
@@ -36,7 +34,6 @@ from libephemeris.planets import (
     get_planet_target,
     _PLANET_CENTER_NAIF_IDS,
     _CobCorrectedTarget,
-    _SpkCenterTarget,
 )
 from libephemeris.state import get_planets
 

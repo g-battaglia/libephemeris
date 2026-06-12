@@ -5,7 +5,6 @@ This tests the function that returns information about the currently loaded
 ephemeris file: file path, date range, and ephemeris type.
 """
 
-import os
 import pytest
 from libephemeris import (
     get_current_file_data,

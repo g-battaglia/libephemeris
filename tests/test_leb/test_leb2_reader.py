@@ -9,28 +9,7 @@ import pytest
 
 from libephemeris.leb_compression import compress_body, compute_mantissa_bits
 from libephemeris.leb_format import (
-    BODY_ENTRY_SIZE,
-    COMPRESSED_BODY_ENTRY_SIZE,
-    COMPRESSION_ZSTD_TRUNC_SHUFFLE,
-    HEADER_SIZE,
-    LEB2_MAGIC,
-    LEB2_VERSION,
-    SECTION_BODY_INDEX,
-    SECTION_COMPRESSED_CHEBYSHEV,
-    SECTION_DELTA_T,
-    SECTION_DIR_SIZE,
-    SECTION_NUTATION,
-    SECTION_STARS,
-    CompressedBodyEntry,
-    FileHeader,
-    SectionEntry,
-    read_body_entry,
-    read_header,
-    read_section_dir,
     segment_byte_size,
-    write_compressed_body_entry,
-    write_header,
-    write_section_dir,
 )
 from libephemeris.leb_reader import LEBReader, open_leb
 

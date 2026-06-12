@@ -10,7 +10,6 @@ These tests verify that:
 
 import math
 import time
-import pytest
 from libephemeris.cache import (
     get_cached_nutation,
     get_nutation_degrees,

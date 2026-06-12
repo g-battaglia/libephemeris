@@ -34,8 +34,6 @@ from __future__ import annotations
 import math
 from typing import Sequence, Tuple, Union
 
-import numpy as np
-from skyfield.errors import EphemerisRangeError
 from .constants import (
     SUN,
     MOON,
@@ -66,7 +64,6 @@ from .constants import (
     ECL_ALLTYPES_SOLAR,
     ECL_ALLTYPES_LUNAR,
     ECL_PENUMBRAL,
-    ECL_GRAZING,
     ECL_VISIBLE,
     ECL_MAX_VISIBLE,
     ECL_1ST_VISIBLE,
@@ -1529,7 +1526,7 @@ def _calculate_eclipse_phases_besselian(
     Returns:
         Tuple of 10 floats with phase times (JD UT), matching reference API format
     """
-    is_central = bool(eclipse_type & ECL_CENTRAL)
+    bool(eclipse_type & ECL_CENTRAL)
     is_total = bool(eclipse_type & ECL_TOTAL)
     is_annular = bool(eclipse_type & ECL_ANNULAR)
 
@@ -1678,7 +1675,7 @@ def _calculate_eclipse_type_and_magnitude(
     l2 = _calc_umbra_limit(jd)
 
     gamma_limit_partial = 1.0 + l1
-    gamma_limit_central = max(0.0, 1.0 - abs(l2))
+    max(0.0, 1.0 - abs(l2))
 
     # Angular separation between Sun and Moon centers (degrees)
     def _angular_separation(
@@ -1962,7 +1959,7 @@ def _calc_local_eclipse_max_time(
     if reader is not None:
         from .fast_calc import _topo_ecliptic
         from .time_utils import deltat
-        from .utils import azalt, ECL2HOR, angular_separation
+        from .utils import angular_separation
 
         # geopos for topo/azalt: (lon, lat, alt)
         geopos = (lon, lat, altitude)
@@ -2247,8 +2244,8 @@ def _sol_eclipse_when_glob_pythonic(
             # Check if we had a backward result that might be closer
             if search_direction == "bidirectional" and backward_result is not None:
                 # Compare distances from jd_start
-                backward_jd_max = backward_result[1][0]
-                forward_jd_max = result[1][0]
+                backward_result[1][0]
+                result[1][0]
 
                 # If backward eclipse max is closer to jd_start (but before it),
                 # and forward is far away, still prefer forward since it's >= jd_start
@@ -2966,7 +2963,6 @@ def _sol_eclipse_when_loc_impl(
         - Reference API: sol_eclipse_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    from typing import Sequence
 
     # Validate geopos
     if len(geopos) < 3:
@@ -3051,9 +3047,9 @@ def _sol_eclipse_when_loc_impl(
     if backwards:
         # Find the most recent global eclipse before tjdut
         # We need to search backward in time
-        search_direction = -1
+        pass
     else:
-        search_direction = 1
+        pass
 
     for _ in range(MAX_ECLIPSES):
         # Find next/previous global eclipse
@@ -3894,7 +3890,7 @@ def _sol_eclipse_how_details_impl(
     result["sun_angular_radius"] = sun_r
     result["moon_angular_radius"] = moon_r
 
-    sum_radii = sun_r + moon_r
+    sun_r + moon_r
     diff_radii = abs(sun_r - moon_r)
 
     # Find local maximum for this observer
@@ -4717,7 +4713,7 @@ def _lun_eclipse_when_pythonic(
         # Get Moon position at Full Moon
         moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
         moon_lon = moon_pos[0]
-        moon_lat = moon_pos[1]
+        moon_pos[1]
 
         # Check if close enough to ecliptic for eclipse
         # Lunar eclipse possible if Moon is near a node
@@ -5107,9 +5103,9 @@ def _lun_eclipse_how_pythonic(
 
     # Calculate apparent diameters
     # Moon semi-diameter: 932.56 arcsec at mean distance 0.002569 AU
-    moon_diameter = 2 * (932.56 / 3600.0) * (0.002569 / moon_dist_au)
-    umbra_diameter = 2 * umbra_radius
-    penumbra_diameter = 2 * penumbra_radius
+    2 * (932.56 / 3600.0) * (0.002569 / moon_dist_au)
+    2 * umbra_radius
+    2 * penumbra_radius
 
     # Determine eclipse type flags
     eclipse_type = 0
@@ -5882,7 +5878,6 @@ def lun_occult_when_loc(
         - Reference API: lun_occult_when_loc()
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
     """
-    from typing import Sequence
 
     # Validate geopos
     if len(geopos) < 3:
@@ -6521,7 +6516,6 @@ def _rise_trans_true_hor_impl(
     if _use_leb_rt:
         try:
             from . import fast_calc as _fc_rt
-            from .time_utils import deltat as _sd_rt
 
             if not is_fixed_star:
                 _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
@@ -8046,7 +8040,7 @@ def vis_limit_mag(
 EARTH_RADIUS_KM = 6378.137
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # noqa: E402 (section-local import)
 
 
 @dataclass
@@ -11489,7 +11483,7 @@ def calc_eclipse_northern_limit(
 
             # Convert d (declination of shadow axis) and mu (hour angle) to radians
             d_rad = math.radians(d)
-            mu_rad = math.radians(mu)
+            math.radians(mu)
 
             # The perpendicular distance from Earth center to shadow axis is gamma
             # The y-coordinate points north in the fundamental plane
@@ -11682,7 +11676,7 @@ def calc_eclipse_southern_limit(
 
             # Convert d (declination of shadow axis) and mu (hour angle) to radians
             d_rad = math.radians(d)
-            mu_rad = math.radians(mu)
+            math.radians(mu)
 
             # The perpendicular distance from Earth center to shadow axis is gamma
             # The y-coordinate points north in the fundamental plane
@@ -12691,21 +12685,12 @@ def planet_occult_when_glob(
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
         - Herald, D. & Sinnott, R. "Planetary Occultations"
     """
-    from .state import get_planets, get_timescale
     from .fixed_stars import FIXED_STARS, _resolve_star_id
     from .constants import (
-        MERCURY,
-        VENUS,
-        MARS,
-        JUPITER,
-        SATURN,
-        URANUS,
-        NEPTUNE,
-        PLUTO,
         SUN,
         MOON,
     )
-    from .planets import _PLANET_MAP, get_planet_target
+    from .planets import _PLANET_MAP
 
     if occulted_planet == 0 and not starname:
         raise ValueError(
@@ -12944,8 +12929,7 @@ def planet_occult_when_glob(
                 # Determine occultation type
                 # Grazing threshold: when the target passes within the outer 10%
                 # of the occulting planet's disc
-                grazing_threshold = 0.9 * occ_r
-                is_grazing = min_sep > grazing_threshold
+                0.9 * occ_r
 
                 if min_sep < abs(occ_r - target_r):
                     ecl_type = ECL_TOTAL
@@ -13101,14 +13085,6 @@ def _planet_occult_when_loc_impl(
     from skyfield.api import wgs84
 
     from .constants import (
-        MERCURY,
-        VENUS,
-        MARS,
-        JUPITER,
-        SATURN,
-        URANUS,
-        NEPTUNE,
-        PLUTO,
         SUN,
         MOON,
     )

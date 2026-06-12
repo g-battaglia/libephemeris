@@ -16,11 +16,7 @@ import libephemeris as ephem
 from libephemeris.constants import FLG_SPEED
 
 from tests.test_leb.compare.conftest import (
-    ICRS_PLANETS,
-    ECLIPTIC_BODIES,
-    HYPOTHETICAL_BODIES,
     CompareHelper,
-    leb_file_path,
     lon_error_arcsec,
 )
 

@@ -61,10 +61,10 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple, List, Callable
+from typing import TYPE_CHECKING, Optional, Tuple, List
 
 if TYPE_CHECKING:
     from .minor_bodies import OrbitalElements
@@ -295,7 +295,6 @@ def _download_single_file(
         quiet: Suppress all non-error output.
     """
     import hashlib
-    import ssl
     import tempfile
     import urllib.request
 
@@ -528,7 +527,7 @@ def check_rebound_available() -> bool:
         bool: True if REBOUND can be imported, False otherwise.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -542,7 +541,7 @@ def check_assist_available() -> bool:
         bool: True if ASSIST can be imported, False otherwise.
     """
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -600,7 +599,7 @@ def get_rebound_version() -> Optional[str]:
         str: Version string if installed, None otherwise.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
 
         return rebound.__version__
     except ImportError:
@@ -614,7 +613,7 @@ def get_assist_version() -> Optional[str]:
         str: Version string if installed, None otherwise.
     """
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
 
         return assist.__version__
     except ImportError:
@@ -678,7 +677,7 @@ def _elements_to_cartesian(
         dict with keys ``x, y, z, vx, vy, vz`` suitable for
         ``rebound.Simulation.add(m=0, ...)``.
     """
-    import rebound
+    import rebound  # noqa: F401 (availability probe)
 
     # Gaussian gravitational constant squared -> G*M_sun in AU^3/day^2
     k_squared = 0.00029591220828559
@@ -737,7 +736,7 @@ def propagate_orbit_rebound(
         >>> print(f"Ceres at {result.ecliptic_lon:.4f} deg, {result.distance:.4f} AU")
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "REBOUND is required for n-body orbit propagation. "
@@ -854,14 +853,14 @@ def propagate_orbit_assist(
         download instructions.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "REBOUND is required for ASSIST. Install with: pip install rebound"
         )
 
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "ASSIST is required for ephemeris-quality integration. "
@@ -997,8 +996,8 @@ def propagate_trajectory(
 
     if use_assist and check_assist_available():
         try:
-            import rebound
-            import assist
+            import rebound  # noqa: F401 (availability probe)
+            import assist  # noqa: F401 (availability probe)
 
             # Configure ephemeris
             if ephem_config is None:
@@ -1014,7 +1013,7 @@ def propagate_trajectory(
                     ephem = assist.Ephem(ephem_config.planets_file)
 
                 sim = rebound.Simulation()
-                extras = assist.Extras(sim, ephem)
+                assist.Extras(sim, ephem)
 
                 cart = _elements_to_cartesian(elements, jd_start)
                 sim.add(m=0.0, **cart)
@@ -1042,7 +1041,7 @@ def propagate_trajectory(
             "Install with: pip install rebound"
         )
 
-    import rebound
+    import rebound  # noqa: F401 (availability probe)
 
     k_squared = 0.00029591220828559
     sim = rebound.Simulation()

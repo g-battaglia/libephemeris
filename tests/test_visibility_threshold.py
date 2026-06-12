@@ -18,7 +18,6 @@ References:
     - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
 """
 
-import pytest
 
 from libephemeris import (
     # Visibility threshold functions
@@ -87,7 +86,6 @@ class TestContrastThreshold:
         # For dark skies, the threshold is higher because limiting magnitude is closer to sky brightness.
         # What matters is that dark-adapted vision has BETTER limiting magnitude.
         # We test this indirectly through calc_limiting_magnitude_for_sky.
-        from libephemeris import calc_limiting_magnitude_for_sky
 
         # The key test is that dark adaptation allows seeing fainter objects
         # This is properly tested in TestLimitingMagnitudeForSky
@@ -397,16 +395,12 @@ class TestImportability:
     def test_all_functions_importable(self):
         """All visibility functions should be importable from libephemeris."""
         from libephemeris import (
-            VisibilityResult,
             calc_eye_adaptation_state,
             calc_contrast_threshold,
             calc_visibility_threshold,
             is_object_visible,
             calc_limiting_magnitude_for_sky,
-            OBSERVER_SKILL_INEXPERIENCED,
             OBSERVER_SKILL_AVERAGE,
-            OBSERVER_SKILL_EXPERIENCED,
-            OBSERVER_SKILL_EXPERT,
             EXPERIENCE_FACTORS,
         )
 

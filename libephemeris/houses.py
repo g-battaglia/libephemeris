@@ -88,8 +88,8 @@ from .constants import (
 )
 from .state import get_timescale
 from .planets import get_ayanamsa_ut, calc_ut
-from .cache import get_true_obliquity, get_cached_nutation
-from .exceptions import Error, PolarCircleError, validate_coordinates
+from .cache import get_true_obliquity
+from .exceptions import PolarCircleError, validate_coordinates
 from .utils import difdeg2n
 
 
@@ -1879,7 +1879,7 @@ def _houses_placidus(
 
             sin_ra = math.sin(math.radians(ra))
             tan_dec = sin_ra * math.tan(rad_eps)
-            dec = math.atan(tan_dec)
+            math.atan(tan_dec)
 
             # Calculate semi-arc (or part of it)
             # tan(lat) * tan(dec)
@@ -1904,15 +1904,14 @@ def _houses_placidus(
             # It implies the trisection.
             # Factor f.
 
-            f = 1.0
             if offset_deg == 30 or offset_deg == 210:
-                f = 1.0 / 3.0
+                pass
             if offset_deg == 60 or offset_deg == 240:
-                f = 2.0 / 3.0
+                pass
             if offset_deg == 120 or offset_deg == 300:
-                f = 2.0 / 3.0  # From IC?
+                pass  # From IC?
             if offset_deg == 150 or offset_deg == 330:
-                f = 1.0 / 3.0
+                pass
 
             # If below horizon (houses 2, 3), semi-arc is nocturnal.
             # SA_noct = 180 - SA_diurnal = 90 - AD.
@@ -2924,7 +2923,7 @@ def _houses_alcabitius(
 
     cusps = _init_cardinal_cusps(asc, mc)
 
-    rad_lat = math.radians(lat)
+    math.radians(lat)
     rad_eps = math.radians(eps)
 
     # RA of Ascendant

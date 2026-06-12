@@ -7,7 +7,6 @@ and that houses_ex handles sidereal correction correctly.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

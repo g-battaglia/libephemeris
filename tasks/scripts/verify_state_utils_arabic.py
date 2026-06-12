@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 import sys
 import time
-import traceback
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -1567,7 +1566,7 @@ for mode in range(43, 47):
             isinstance(name, str),
             f"name={name!r}",
         )
-    except Exception as e:
+    except Exception:
         # May not exist, that's fine
         check(f"get_ayanamsa_name({mode}) handled", True)
 

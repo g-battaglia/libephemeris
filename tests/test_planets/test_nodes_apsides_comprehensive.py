@@ -7,13 +7,11 @@ for the Moon and planets, and that values are physically plausible.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SUN,
     MOON,
     MERCURY,
     VENUS,
@@ -23,7 +21,6 @@ from libephemeris.constants import (
     NODBIT_MEAN,
     NODBIT_OSCU,
     NODBIT_OSCU_BAR,
-    FLG_SPEED,
 )
 
 

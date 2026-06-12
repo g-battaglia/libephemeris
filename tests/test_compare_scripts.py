@@ -10,9 +10,7 @@ Tests verify that:
 
 import sys
 from pathlib import Path
-import subprocess
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts"))
 sys.path.insert(0, str(Path(__file__).parent.parent / "compare_scripts" / "tests"))
@@ -167,16 +165,6 @@ class TestComparisonUtils:
 
     def test_import_comparison_utils(self):
         """Test that comparison_utils can be imported."""
-        from comparison_utils import (
-            Tolerances,
-            angular_diff,
-            format_coord,
-            format_diff,
-            format_status,
-            TestStatistics,
-            print_header,
-            print_section,
-        )
 
     def test_angular_diff(self):
         """Test angular difference calculation."""

@@ -31,7 +31,6 @@ References:
 - JPL: Explanatory Supplement to the Astronomical Almanac
 """
 
-import math
 import pytest
 import libephemeris as ephem
 from libephemeris.state import get_timescale

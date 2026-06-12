@@ -28,7 +28,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional
 
 import certifi
 
@@ -1569,7 +1569,6 @@ def _download_planet_centers_for_tier(
     Raises:
         Exception: If download fails
     """
-    import urllib.request
 
     logger = get_logger()
     filename = f"planet_centers_{tier_name}.bsp"

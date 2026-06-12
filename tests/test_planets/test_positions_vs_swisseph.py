@@ -10,7 +10,6 @@ derivative approximation.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 import swisseph as swe_ref

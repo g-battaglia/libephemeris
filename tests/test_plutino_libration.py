@@ -10,7 +10,6 @@ Tests verify:
 """
 
 import math
-import pytest
 from libephemeris.constants import (
     IXION,
     ORCUS,

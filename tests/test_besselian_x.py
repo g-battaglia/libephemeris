@@ -12,7 +12,6 @@ Reference data sources:
 - Meeus "Astronomical Algorithms" Chapter 54
 """
 
-import pytest
 import math
 from libephemeris import julday, calc_besselian_x, FLG_SWIEPH
 

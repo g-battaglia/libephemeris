@@ -700,9 +700,12 @@ def config() -> None:
     iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
     iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
     click.echo(f"  Location: {data_dir}/iers_cache/")
-    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0)")
+    _cur = f"  [current: {iers_auto}]" if iers_auto else ""
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0){_cur}")
+    _cur = f"  [current: {iers_dt}]" if iers_dt else ""
     click.echo(
         f"  Env var:  {_e('LIBEPHEMERIS_IERS_DELTA_T')}  (1/0, use observed Delta T)"
+        f"{_cur}"
     )
     click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
     click.echo()

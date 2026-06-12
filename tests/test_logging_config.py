@@ -16,7 +16,6 @@ import os
 import sys
 from unittest.mock import patch
 
-import pytest
 
 
 class TestGetLogger:
@@ -24,7 +23,7 @@ class TestGetLogger:
 
     def test_get_logger_returns_logger(self):
         """get_logger should return a logging.Logger instance."""
-        from libephemeris.logging_config import get_logger, _logger_configured
+        from libephemeris.logging_config import get_logger
 
         # Reset the logger configured flag for testing
         import libephemeris.logging_config as lc

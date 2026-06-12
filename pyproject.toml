@@ -189,14 +189,9 @@ coverage = {cmd = "leph test coverage run", help = "Tests with coverage reports 
 "leb2:verify:medium" = {cmd = "leph leb2 verify medium", help = "Verify medium tier LEB2 vs LEB1 (<0.003\")"}
 "leb2:verify:extended" = {cmd = "leph leb2 verify extended", help = "Verify extended tier LEB2 vs LEB1 (<0.003\")"}
 
-[tool.pytest.ini_options]
-markers = [
-    "leb_compare: LEB vs Skyfield comparison tests (medium tier)",
-    "leb_compare_base: LEB vs Skyfield comparison tests (base tier)",
-    "leb_compare_extended: LEB vs Skyfield comparison tests (extended tier)",
-    "leb_compare_crosstier: Cross-tier consistency tests",
-    "slow: Slow tests excluded from default runs",
-]
+# pytest configuration lives in pytest.ini (single source of truth);
+# a [tool.pytest.ini_options] section here would be silently ignored
+# because pytest.ini takes precedence.
 
 [tool.mypy]
 python_version = "3.12"
@@ -218,12 +213,36 @@ extend-exclude = '''
 '''
 
 [tool.ruff.lint]
-# Ignore star imports (F403, F405) - the library uses star imports for constants
-# Ignore unused imports in __init__.py (F401) - re-exports for public API
-# Ignore module level imports not at top of file (E402) - intentional for __init__.py
-ignore = ["F403", "F405", "F401", "E402"]
-# Also ignore unused local variables (F841) for now - complex astronomical calculations
-extend-ignore = ["F841"]
+# No global ignores: the former blanket F401/F403/F405/E402/F841 list hid
+# real unused imports and variables everywhere.  Files that legitimately
+# star-import or re-export get targeted exemptions below.
+
+[tool.ruff.lint.per-file-ignores]
+# Public API surface: re-exports (F401), star imports (F403/F405) and
+# deliberate late imports after __version__ bootstrapping (E402).
+"libephemeris/__init__.py" = ["F401", "F403", "F405", "E402"]
+# Star-imports the constants module by design (late, after the typed
+# explicit imports — E402 is the documented layout there).
+"libephemeris/planets.py" = ["F403", "F405", "E402"]
+# Test modules conventionally star-import the package/constants; unused
+# locals in tests (ignored tuple components etc.) are accepted noise;
+# E402 covers the pytest.importorskip()-before-import pattern.
+"tests/*" = ["F403", "F405", "F841", "E402"]
+# conftest files re-import fixtures from sibling conftests to register
+# them — those imports look unused but are load-bearing for pytest.
+"tests/**/conftest.py" = ["F401", "F403", "F405"]
+# Re-exports the legacy MOON_*/NAIF_* ids for backward compatibility.
+"libephemeris/planetary_moons.py" = ["F401"]
+# Test bootstrap star-imports the package to expose every symbol.
+"tests/conftest.py" = ["F403", "F405"]
+# Star-imports the constants module by design.
+"libephemeris/houses.py" = ["F403", "F405"]
+# Vendored third-party code (spktype21): kept byte-compatible upstream.
+"libephemeris/vendor/*" = ["E731", "E741"]
+# Standalone scripts insert the repo root on sys.path before importing.
+"scripts/*" = ["E402"]
+"compare_scripts/*" = ["E402"]
+"tasks/*" = ["E402"]
 
 [tool.coverage.run]
 source = ["libephemeris"]

@@ -13,7 +13,6 @@ import os
 import pytest
 
 from libephemeris.leb_reader import open_leb
-from libephemeris.constants import SUN, MOON
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LEB1_BASE = os.path.join(PROJECT_ROOT, "data", "leb", "ephemeris_base.leb")

@@ -20,7 +20,12 @@ def _assert_batch_matches_loop(stars: tuple[str, ...], flags: int) -> None:
         loop_result = swe.fixstar_ut(star, JD, flags)
         assert batch_result[1] == loop_result[1]
         assert batch_result[2] == loop_result[2]
-        assert batch_result[0] == pytest.approx(loop_result[0], abs=1e-9)
+        # rel=1e-12 because star distances reach ~1e7 AU, where 1 ULP
+        # is ~2e-9 — an absolute 1e-9 tolerance demanded bit-identical
+        # floats and broke on cache-dependent operation ordering.
+        assert batch_result[0] == pytest.approx(
+            loop_result[0], rel=1e-12, abs=1e-9
+        )
 
 
 def test_list_fixed_stars_returns_catalog_entries() -> None:
@@ -82,7 +87,7 @@ def test_batch_fixstars_ut_single_star() -> None:
     batch = swe.batch_fixstars_ut(("Regulus",), JD, 0)
     single = swe.fixstar_ut("Regulus", JD, 0)
     assert len(batch) == 1
-    assert batch[0][0] == pytest.approx(single[0], abs=1e-9)
+    assert batch[0][0] == pytest.approx(single[0], rel=1e-12, abs=1e-9)
     assert batch[0][1] == single[1]
 
 

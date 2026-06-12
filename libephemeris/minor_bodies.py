@@ -2393,7 +2393,7 @@ def _calc_short_period_correction(
 
         # Second-order eccentricity correction: modulate with e
         # This adds the e·cos(2M - M_J) term from Brouwer eq. 15.22
-        cos_diff = math.cos(lambda_body - lambda_p)
+        math.cos(lambda_body - lambda_p)
         delta_lambda += (
             -amplitude
             * e
@@ -3085,7 +3085,7 @@ def clear_asteroid_name_cache() -> int:
 # - Centaur Chiron (2060) - frequently used in astrology
 # Format: body_id -> (asteroid_number, horizons_id, naif_id, body_name)
 
-from .constants import (
+from .constants import (  # noqa: E402 (section-local import)
     CERES,
     PALLAS,
     JUNO,

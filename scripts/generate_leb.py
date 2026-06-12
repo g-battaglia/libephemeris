@@ -1153,9 +1153,7 @@ def generate_ecliptic_bodies_vectorized(
 
 def _init_skyfield():
     """Initialize Skyfield resources (called once per process)."""
-    import libephemeris as ephem
     from libephemeris.state import get_planets, get_timescale
-    from libephemeris.planets import get_planet_target
 
     planets = get_planets()
     ts = get_timescale()
@@ -1738,7 +1736,6 @@ def generate_body_ecliptic(
         calc_interpolated_apogee,
         calc_interpolated_perigee,
     )
-    from libephemeris.time_utils import deltat
 
     # Map body_id to evaluation function
     eval_funcs = {
@@ -2732,7 +2729,6 @@ def merge_leb_files(
         read_header,
         read_nutation_header,
         read_section_dir,
-        read_star_entry,
     )
 
     if not inputs:

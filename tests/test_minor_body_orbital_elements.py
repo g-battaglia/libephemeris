@@ -8,7 +8,6 @@ Tests verify:
 - Mean motion (n) is consistent with semi-major axis (a) via Kepler's 3rd law
 """
 
-import math
 import pytest
 from libephemeris.constants import (
     CHIRON,
@@ -49,7 +48,7 @@ from libephemeris.constants import (
     BENNU,
     RYUGU,
 )
-from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
+from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS
 
 
 # Expected epoch for all bodies (JD 2461000.5 TDB = 2025-Sep-19)

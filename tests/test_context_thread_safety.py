@@ -1227,7 +1227,6 @@ class TestEphemerisContextClose:
         Multiple threads calling close() and doing calculations concurrently
         should not cause crashes or data corruption.
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
         num_threads = 12
@@ -1276,7 +1275,6 @@ class TestEphemerisContextClose:
         This is the critical test for detecting race conditions between
         close() and calculation operations.
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
         num_calc_threads = 10
@@ -1389,7 +1387,6 @@ class TestEphemerisContextClose:
 
         Verify that sidereal mode settings work correctly after close().
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
 
@@ -1432,7 +1429,6 @@ class TestEphemerisContextClose:
 
         Verify that house calculations work correctly after close().
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
 

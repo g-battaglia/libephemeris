@@ -13,9 +13,6 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
     FLG_SWIEPH,
 )
 

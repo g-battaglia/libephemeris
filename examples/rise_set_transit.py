@@ -23,7 +23,6 @@ from libephemeris.constants import (
     # Planet IDs
     SUN,
     MOON,
-    MERCURY,
     VENUS,
     MARS,
     JUPITER,
@@ -32,15 +31,11 @@ from libephemeris.constants import (
     CALC_RISE,
     CALC_SET,
     CALC_MTRANSIT,
-    CALC_ITRANSIT,
-    # Calculation modifiers
     BIT_DISC_CENTER,
     BIT_NO_REFRACTION,
     BIT_CIVIL_TWILIGHT,
     BIT_NAUTIC_TWILIGHT,
     BIT_ASTRO_TWILIGHT,
-    # Flags
-    FLG_SWIEPH,
 )
 
 

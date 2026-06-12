@@ -9,7 +9,6 @@ These tests verify:
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
 
 import libephemeris as eph
 from libephemeris import state, spk_auto

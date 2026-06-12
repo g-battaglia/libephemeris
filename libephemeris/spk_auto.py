@@ -370,7 +370,7 @@ def _download_spk_astroquery(
 def _check_astroquery_available() -> bool:
     """Check if astroquery is available."""
     try:
-        from astroquery.jplhorizons import Horizons
+        from astroquery.jplhorizons import Horizons  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -1096,7 +1096,7 @@ def _jd_to_iso_date(jd: float) -> str:
     # Algorithm from Meeus, Astronomical Algorithms
     jd = jd + 0.5
     z = int(jd)
-    f = jd - z
+    jd - z
 
     if z < 2299161:
         a = z

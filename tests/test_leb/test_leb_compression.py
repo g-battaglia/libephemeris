@@ -1,10 +1,8 @@
 """Tests for LEB2 compression primitives."""
 
 import numpy as np
-import pytest
 
 from libephemeris.leb_compression import (
-    apply_truncation,
     compress_body,
     compute_mantissa_bits,
     decompress_body,

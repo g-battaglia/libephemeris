@@ -7,7 +7,6 @@ bodies, locations, and edge cases including polar regions.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -17,9 +16,7 @@ from libephemeris.constants import (
     MOON,
     MARS,
     JUPITER,
-    SATURN,
     VENUS,
-    MERCURY,
     CALC_RISE,
     CALC_SET,
     CALC_MTRANSIT,

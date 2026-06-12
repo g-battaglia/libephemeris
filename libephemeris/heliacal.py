@@ -262,7 +262,7 @@ class SchaeferModel:
         # Rozenberg (1966) formula for better horizon accuracy
         alt_rad = math.radians(max(altitude_deg, -5.0))
         sin_alt = math.sin(alt_rad)
-        cos_alt = math.cos(alt_rad)
+        math.cos(alt_rad)
 
         # Rozenberg formula
         if altitude_deg > 0:
@@ -616,7 +616,6 @@ class SchaeferModel:
         Returns:
             Required arcus visionis in degrees
         """
-        C = SchaeferConstants
 
         # Base arcus visionis depends on magnitude
         # Brighter objects need less arcus visionis
@@ -1666,9 +1665,6 @@ def _vis_limit_mag_leb(
         HELFLAG_VISLIM_DARK,
         HELFLAG_VISLIM_NOMOON,
         HELFLAG_BELOW_HORIZON,
-        HELFLAG_PHOTOPIC,
-        HELFLAG_SCOTOPIC,
-        HELFLAG_MIXED,
     )
 
     if not objname:
@@ -2977,7 +2973,6 @@ def _heliacal_visibility_window(
     crossing cannot be bracketed (e.g. the object stays visible into
     darkness), the event time itself is reported for that limit.
     """
-    from .extinction import calc_airmass
 
     pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
     temperature = atmo[1] if len(atmo) > 1 else 15.0
@@ -3916,9 +3911,6 @@ def vis_limit_mag(
         HELFLAG_VISLIM_DARK,
         HELFLAG_VISLIM_NOMOON,
         HELFLAG_BELOW_HORIZON,
-        HELFLAG_PHOTOPIC,
-        HELFLAG_SCOTOPIC,
-        HELFLAG_MIXED,
     )
     from skyfield.api import wgs84
 

@@ -330,14 +330,14 @@ for hsys_char in HOUSE_SYSTEMS:
             ref_ok = True
             try:
                 ref_cusps, ref_ascmc = swe_ref.houses(jd, lat, lon, hsys_char.encode())
-            except Exception as e:
+            except Exception:
                 ref_ok = False
 
             # Call libephemeris: uses ord()
             lib_ok = True
             try:
                 lib_cusps, lib_ascmc = lib.houses(jd, lat, lon, ord(hsys_char))
-            except Exception as e:
+            except Exception:
                 lib_ok = False
 
             # If either raised, skip (polar circle issues etc.)

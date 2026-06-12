@@ -369,7 +369,7 @@ def compute_mean_apse_analytical(jd_tt: float) -> float:
     cos_incl = math.cos(incl_rad)
     sin_incl = math.sin(incl_rad)
     y_new = y * cos_incl - z * sin_incl
-    z_new = y * sin_incl + z * cos_incl
+    y * sin_incl + z * cos_incl
 
     lon_from_node_proj = math.atan2(y_new, x)
 

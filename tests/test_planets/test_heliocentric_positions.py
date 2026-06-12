@@ -17,7 +17,6 @@ import pytest
 import libephemeris as swe
 from libephemeris.constants import (
     SUN,
-    MOON,
     MERCURY,
     VENUS,
     MARS,
@@ -27,10 +26,6 @@ from libephemeris.constants import (
     NEPTUNE,
     PLUTO,
     EARTH,
-    CHIRON,
-    MEAN_NODE,
-    TRUE_NODE,
-    MEAN_APOG,
     FLG_HELCTR,
     FLG_SPEED,
     FLG_EQUATORIAL,

@@ -7,7 +7,6 @@ and find_station_ut return valid results.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

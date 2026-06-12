@@ -8,13 +8,12 @@ minor algorithm differences (e.g. Delta T polynomial fits).
 
 from __future__ import annotations
 
-import math
 
 import pytest
 import swisseph as swe_ref
 
 import libephemeris as swe
-from libephemeris.constants import GREG_CAL, JUL_CAL
+from libephemeris.constants import GREG_CAL
 
 
 # ---------------------------------------------------------------------------

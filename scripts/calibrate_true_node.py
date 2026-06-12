@@ -13,7 +13,6 @@ Usage:
     python scripts/calibrate_true_node.py
 """
 
-import sys
 import random
 import numpy as np
 from typing import Tuple, List

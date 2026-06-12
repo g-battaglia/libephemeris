@@ -8,8 +8,6 @@ Tests the pyswisseph-compatible star name resolution system including:
 """
 
 import pytest
-import libephemeris as ephem
-from libephemeris.exceptions import Error
 from libephemeris.fixed_stars import (
     STAR_ALIASES,
     STAR_CATALOG,
@@ -27,7 +25,6 @@ from libephemeris.constants import (
     ANTARES,
     VEGA,
     POLARIS,
-    FOMALHAUT,
     BETELGEUSE,
     RIGEL,
     PROCYON,
@@ -116,7 +113,14 @@ class TestResolveStarName:
         """Test comma-prefix partial matching (pyswisseph convention)."""
         # ,alg should find Algol
         result = resolve_star_name(",alg")
-        assert result == ALGOL, f"Expected Algol, got {result}"
+        # The expanded catalog resolves the prefix 'alg' to Algenib
+        # (first match); the 108-star era found Algol.
+        from libephemeris.fixed_stars import STAR_CATALOG
+
+        names = {e.id: e.name for e in STAR_CATALOG}
+        assert names[result].lower().startswith("alg"), (
+            f"Expected an 'alg…' star, got {names.get(result, result)}"
+        )
 
         # ,reg should find Regulus
         result = resolve_star_name(",reg")
@@ -132,7 +136,11 @@ class TestResolveStarName:
 
     def test_comma_prefix_with_whitespace(self):
         """Test comma-prefix with trailing whitespace."""
-        assert resolve_star_name(", alg") == ALGOL
+        result = resolve_star_name(", alg")
+        from libephemeris.fixed_stars import STAR_CATALOG
+
+        names = {e.id: e.name for e in STAR_CATALOG}
+        assert names[result].lower().startswith("alg")
         assert resolve_star_name(",  reg  ") == REGULUS
 
     def test_comma_prefix_empty_returns_none(self):
@@ -187,16 +195,16 @@ class TestSweFixstarUtWithAliases:
     def test_exact_name_works(self, standard_jd):
         """Test fixstar_ut with exact canonical names."""
         pos, name, retflag = fixstar_ut("Regulus", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
         assert 149 < pos[0] < 151  # Regulus longitude
 
     def test_returns_canonical_name(self, standard_jd):
         """Test that fixstar_ut returns canonical star name."""
         pos, name, retflag = fixstar_ut("Alpha Leo", standard_jd, 0)
-        assert name == "Regulus", f"Expected 'Regulus', got '{name}'"
+        assert name == "Regulus,alLeo", f"Expected 'Regulus,alLeo', got '{name}'"
 
         pos, name, retflag = fixstar_ut("Dog Star", standard_jd, 0)
-        assert name == "Sirius", f"Expected 'Sirius', got '{name}'"
+        assert name == "Sirius,alCMa", f"Expected 'Sirius,alCMa', got '{name}'"
 
     def test_case_insensitive(self, standard_jd):
         """Test case-insensitive star name lookup."""
@@ -204,22 +212,27 @@ class TestSweFixstarUtWithAliases:
         pos2, name2, _ = fixstar_ut("sirius", standard_jd, 0)
         pos3, name3, _ = fixstar_ut("Sirius", standard_jd, 0)
 
-        assert name1 == name2 == name3 == "Sirius"
+        assert name1 == name2 == name3 == "Sirius,alCMa"
         assert abs(pos1[0] - pos2[0]) < 0.0001
         assert abs(pos1[0] - pos3[0]) < 0.0001
 
     def test_comma_prefix_search(self, standard_jd):
-        """Test comma-prefix partial search."""
-        pos, name, retflag = fixstar_ut(",alg", standard_jd, 0)
-        assert name == "Algol", f"Expected 'Algol', got '{name}'"
+        """Partial nomenclature after comma errors (reference parity).
+
+        Verified: swe.fixstar2_ut(',alg') raises 'could not find star'.
+        """
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
+            fixstar_ut(",alg", standard_jd, 0)
 
     def test_bayer_designation(self, standard_jd):
         """Test Bayer designation lookup."""
         pos, name, _ = fixstar_ut("Alpha Leo", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
 
         pos, name, _ = fixstar_ut("Alpha CMa", standard_jd, 0)
-        assert name == "Sirius"
+        assert name == "Sirius,alCMa"
 
     def test_identical_results_for_aliases(self, standard_jd):
         """Test that all aliases for a star return identical positions."""
@@ -240,14 +253,14 @@ class TestSweFixstarUtWithAliases:
     def test_backward_compatibility_regulus(self, standard_jd):
         """Test backward compatibility - Regulus still works."""
         pos, name, retflag = fixstar_ut("Regulus", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
         assert 149 < pos[0] < 151
         assert -1 < pos[1] < 2
 
     def test_backward_compatibility_spica(self, standard_jd):
         """Test backward compatibility - Spica still works."""
         pos, name, retflag = fixstar_ut("Spica", standard_jd, 0)
-        assert name == "Spica"
+        assert name == "Spica,alVir"
         assert 203 < pos[0] < 205
         assert -3 < pos[1] < -1
 
@@ -264,17 +277,19 @@ class TestSweFixstarWithAliases:
     def test_exact_name_works(self, standard_jd):
         """Test fixstar with exact canonical names."""
         pos, name, retflag = fixstar("Regulus", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
 
     def test_alias_works(self, standard_jd):
         """Test fixstar with aliases."""
         pos, name, retflag = fixstar("Alpha Leo", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
 
-    def test_comma_prefix_works(self, standard_jd):
-        """Test fixstar with comma-prefix search."""
-        pos, name, retflag = fixstar(",sir", standard_jd, 0)
-        assert name == "Sirius"
+    def test_comma_prefix_errors(self, standard_jd):
+        """Partial nomenclature after comma errors (reference parity)."""
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
+            fixstar(",sir", standard_jd, 0)
 
 
 @pytest.mark.unit
@@ -285,8 +300,13 @@ class TestAllStarsHaveAliases:
         """Test that all stars in catalog can be resolved by name."""
         for entry in STAR_CATALOG:
             result = resolve_star_name(entry.name)
-            assert result == entry.id, (
-                f"Star '{entry.name}' should resolve to {entry.id}, got {result}"
+            # Some names legitimately label several catalog entries
+            # (e.g. the th01Ori Trapezium components): accept any
+            # entry carrying the same name.
+            same_name_ids = {e.id for e in STAR_CATALOG if e.name == entry.name}
+            assert result in same_name_ids, (
+                f"Star '{entry.name}' should resolve to one of "
+                f"{sorted(same_name_ids)}, got {result}"
             )
 
     def test_bayer_designations_work(self):
@@ -341,17 +361,21 @@ class TestPyswissephCompatibility:
         """J2000.0 epoch as Julian Day."""
         return 2451545.0
 
-    def test_comma_prefix_finds_algol(self, standard_jd):
-        """Test that ,alg finds Algol (pyswisseph behavior)."""
-        pos, name, retflag = fixstar_ut(",alg", standard_jd, 0)
-        assert name == "Algol"
-        # Algol is around 26 Taurus = 56 degrees
+    def test_comma_prefix_errors_like_pyswisseph(self, standard_jd):
+        """',alg' errors exactly like pyswisseph (exact-key semantics);
+        the exact nomenclature ',bePer' finds Algol."""
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error):
+            fixstar_ut(",alg", standard_jd, 0)
+        pos, name, retflag = fixstar_ut(",bePer", standard_jd, 0)
+        assert name == "Algol,bePer"
         assert 55 < pos[0] < 57
 
     def test_alpha_leo_finds_regulus(self, standard_jd):
         """Test that Alpha Leo finds Regulus (pyswisseph behavior)."""
         pos, name, retflag = fixstar_ut("Alpha Leo", standard_jd, 0)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
 
     def test_sirius_case_variations_identical(self, standard_jd):
         """Test SIRIUS and sirius return identical results."""
@@ -360,7 +384,7 @@ class TestPyswissephCompatibility:
         pos_mixed, name_mixed, _ = fixstar_ut("Sirius", standard_jd, 0)
 
         # All should return Sirius as canonical name
-        assert name_upper == name_lower == name_mixed == "Sirius"
+        assert name_upper == name_lower == name_mixed == "Sirius,alCMa"
 
         # All should return identical positions
         assert abs(pos_upper[0] - pos_lower[0]) < 0.0001
@@ -369,7 +393,7 @@ class TestPyswissephCompatibility:
     def test_alpha_cma_finds_sirius(self, standard_jd):
         """Test that Alpha CMa finds Sirius (pyswisseph behavior)."""
         pos, name, retflag = fixstar_ut("Alpha CMa", standard_jd, 0)
-        assert name == "Sirius"
+        assert name == "Sirius,alCMa"
 
 
 @pytest.mark.unit
@@ -396,7 +420,7 @@ class TestReturnTypeStructure:
 
         # name should be a string (canonical star name)
         assert isinstance(name, str)
-        assert name == "Regulus"
+        assert name == "Regulus,alLeo"
 
         # retflag should be an int
         assert isinstance(retflag, int)
@@ -413,5 +437,5 @@ class TestReturnTypeStructure:
         assert isinstance(pos, tuple)
         assert len(pos) == 6
         assert isinstance(name, str)
-        assert name == "Spica"
+        assert name == "Spica,alVir"
         assert isinstance(retflag, int)

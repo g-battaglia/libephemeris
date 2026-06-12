@@ -20,7 +20,7 @@ import concurrent.futures
 import random
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import pytest
 
@@ -100,7 +100,6 @@ class TestLockCorrectness:
         interleave their context swaps. If the lock is working correctly,
         each thread should see consistent state throughout its calculation.
         """
-        from libephemeris import state
 
         jd = 2451545.0
         num_iterations = 100
@@ -997,7 +996,6 @@ class TestSharedResourceThreadSafety:
         """
         Verify multiple threads can safely initialize the shared loader.
         """
-        from libephemeris import context
 
         # Reset shared resources
         EphemerisContext.close()

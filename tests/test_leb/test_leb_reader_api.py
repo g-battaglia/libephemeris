@@ -21,13 +21,6 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
-    MEAN_NODE,
-    TRUE_NODE,
-    MEAN_APOG,
-    CHIRON,
 )
 
 

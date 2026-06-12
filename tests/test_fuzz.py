@@ -15,12 +15,7 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.exceptions import (
-    CalculationError,
-    CoordinateError,
-    EphemerisRangeError,
     Error,
-    InvalidBodyError,
-    UnknownBodyError,
 )
 
 warnings.filterwarnings("ignore")

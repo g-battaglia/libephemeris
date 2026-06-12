@@ -13,7 +13,6 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    SUN,
     MOON,
     MERCURY,
     VENUS,
@@ -24,7 +23,6 @@ from libephemeris.constants import (
     NEPTUNE,
     PLUTO,
     FLG_HELCTR,
-    FLG_SPEED,
 )
 
 

@@ -7,13 +7,11 @@ with various stars, dates, and flag combinations.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    FLG_SPEED,
     FLG_EQUATORIAL,
     FLG_SIDEREAL,
     SIDM_LAHIRI,

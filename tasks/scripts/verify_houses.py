@@ -11,7 +11,6 @@ Sections:
 Target: ~10000+ checks, <30 seconds.
 """
 
-import math
 import os
 import sys
 import time
@@ -124,7 +123,7 @@ for hsys_char in HOUSE_SYSTEMS:
                 ref_result = swe_ref.houses(jd, lat, lon, hsys_bytes)
                 ref_cusps = ref_result[0]
                 ref_ascmc = ref_result[1]
-            except Exception as e:
+            except Exception:
                 ref_ok = False
 
             # If both fail, that is acceptable (polar issues etc.) -- count as pass
@@ -212,7 +211,7 @@ for hsys_char in SID_SYSTEMS:
                 lib_cusps = lib_result[0]
                 lib_ascmc = lib_result[1]
                 lib.set_sid_mode(0)  # reset
-            except Exception as e:
+            except Exception:
                 lib_ok = False
                 lib.set_sid_mode(0)
 
@@ -225,7 +224,7 @@ for hsys_char in SID_SYSTEMS:
                 ref_cusps = ref_result[0]
                 ref_ascmc = ref_result[1]
                 swe_ref.set_sid_mode(0)
-            except Exception as e:
+            except Exception:
                 ref_ok = False
                 swe_ref.set_sid_mode(0)
 
@@ -307,7 +306,7 @@ for hsys_char in ARMC_SYSTEMS:
                 lib_result = lib.houses_armc(armc, ARMC_LAT, eps, hsys_int)
                 lib_cusps = lib_result[0]
                 lib_ascmc = lib_result[1]
-            except Exception as e:
+            except Exception:
                 lib_ok = False
 
             # --- pyswisseph ---
@@ -315,7 +314,7 @@ for hsys_char in ARMC_SYSTEMS:
                 ref_result = swe_ref.houses_armc(armc, ARMC_LAT, eps, hsys_bytes)
                 ref_cusps = ref_result[0]
                 ref_ascmc = ref_result[1]
-            except Exception as e:
+            except Exception:
                 ref_ok = False
 
             if not lib_ok and not ref_ok:
@@ -411,7 +410,7 @@ for jd in JDS_5:
                 lib_pos = float(
                     lib.house_pos(armc, HPOS_LAT, eps, (planet_lon, 0.0), hsys_char)
                 )
-            except Exception as e:
+            except Exception:
                 lib_ok = False
 
             # --- pyswisseph: house_pos(armc, lat, eps, (lon, lat_body), hsys_bytes) ---
@@ -421,7 +420,7 @@ for jd in JDS_5:
                         armc, HPOS_LAT, eps, (planet_lon, 0.0), hsys_bytes
                     )
                 )
-            except Exception as e:
+            except Exception:
                 ref_ok = False
 
             if not lib_ok and not ref_ok:
@@ -481,7 +480,7 @@ for jd in JDS_10:
         lib_pos = None
         try:
             lib_pos = float(lib.house_pos(armc, GQ_LAT, eps, (planet_lon, 0.0), "G"))
-        except Exception as e:
+        except Exception:
             lib_ok = False
 
         # Check: result should be in [1, 37) for Gauquelin
@@ -505,7 +504,7 @@ for jd in JDS_10:
             ref_pos = float(
                 swe_ref.house_pos(armc, GQ_LAT, eps, (planet_lon, 0.0), b"G")
             )
-        except Exception as e:
+        except Exception:
             ref_ok = False
 
         if lib_ok and ref_ok:

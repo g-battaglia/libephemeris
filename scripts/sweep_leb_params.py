@@ -33,8 +33,6 @@ from libephemeris import set_calc_mode, calc
 from libephemeris.constants import FLG_SPEED, FLG_HELCTR
 from libephemeris.leb_format import (
     BODY_PARAMS,
-    COORD_ECLIPTIC,
-    COORD_HELIO_ECL,
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
 )
@@ -376,7 +374,7 @@ def main() -> None:
 
         # Print results for this body
         for r in results:
-            marker = "PASS" if r["pass"] else "FAIL"
+            "PASS" if r["pass"] else "FAIL"
             icon = "+" if r["pass"] else "X"
             is_current = (
                 r["interval"] == BODY_PARAMS[body_id][0]

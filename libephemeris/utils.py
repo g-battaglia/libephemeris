@@ -370,7 +370,7 @@ def azalt_rev(
     # Extract geopos components
     lon = geopos[0]
     lat = geopos[1]
-    altitude = geopos[2]
+    geopos[2]
 
     from .time_utils import _sidtime_internal
     from .state import get_timescale

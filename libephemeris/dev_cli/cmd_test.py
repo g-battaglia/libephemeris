@@ -33,7 +33,9 @@ def _pytest(args: list[str], env: dict[str, str] | None = None) -> None:
     run_env: dict[str, str] | None = None
     if env:
         run_env = {**os.environ, **env}
-    sys.exit(subprocess.call(["pytest", *args], env=run_env))
+    # sys.executable -m pytest: always the venv's pytest, not whatever
+    # 'pytest' resolves to on PATH
+    sys.exit(subprocess.call([sys.executable, "-m", "pytest", *args], env=run_env))
 
 
 def _python(args: list[str], env: dict[str, str] | None = None) -> None:
@@ -92,7 +94,6 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "tests/test_ephemeris_config.py",
     "tests/test_extinction.py",
     "tests/test_logging_config.py",
-    "tests/test_packaging.py",
     "tests/test_dotenv.py",
     "tests/test_type_safety.py",
     "tests/test_golden_regression.py",
@@ -132,11 +133,11 @@ def skyfield_group() -> None:
     short_help="Run all tests (unit + compare) sequentially, no @slow.",
 )
 def skyfield_all() -> None:
-    """Run all tests (unit + compare) sequentially, excluding @slow markers.
+    """Run all unit tests sequentially, excluding @slow markers.
 
-    Runs ~5890 tests from tests/ and compare_scripts/tests/ directories.
-    Compare tests only run if pyswisseph is installed. Sequential execution
-    means slower but easier to debug failures. Takes ~5 min.
+    Runs the tests/ tree (pytest.ini testpaths) — compare_scripts/tests/
+    is NOT collected here; use the 'compare' commands for those.
+    Sequential execution means slower but easier to debug failures.
     """
     _pytest(["-m", "not slow"])
 
@@ -789,7 +790,8 @@ def vs_skyfield_all() -> None:
             "tests/test_leb/compare/",
             "-v",
             "-m",
-            "leb_compare or leb_compare_base or leb_compare_extended or leb_compare_crosstier",
+            "leb_compare or leb_compare_base or leb_compare_medium "
+            "or leb_compare_extended or leb_compare_crosstier",
         ]
     )
 

@@ -5,7 +5,6 @@ and houses_ex2 speed accuracy vs numerical differentiation.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -16,7 +15,6 @@ from libephemeris.constants import (
     SIDM_FAGAN_BRADLEY,
     SIDM_RAMAN,
 )
-from libephemeris.exceptions import PolarCircleError
 
 
 @pytest.fixture(autouse=True)

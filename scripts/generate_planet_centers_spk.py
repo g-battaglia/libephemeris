@@ -270,7 +270,6 @@ def download_source_files(
     Returns:
         Dictionary mapping planet name to list of local file paths.
     """
-    import urllib.request
 
     sources = TIER_SOURCES[tier]
     local_files: Dict[str, List[str]] = {}

@@ -8,10 +8,9 @@ orbit propagation, both with and without the optional REBOUND/ASSIST packages.
 import math
 import os
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from libephemeris.minor_bodies import (
-    OrbitalElements,
     MINOR_BODY_ELEMENTS,
     calc_minor_body_position,
 )

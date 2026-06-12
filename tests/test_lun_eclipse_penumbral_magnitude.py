@@ -8,7 +8,6 @@ Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 """
 
-import pytest
 from libephemeris import (
     julday,
     lun_eclipse_when,

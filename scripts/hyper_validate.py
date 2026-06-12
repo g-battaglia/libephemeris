@@ -1605,7 +1605,7 @@ def run_section_r():
             try:
                 # First get ecliptic position
                 calc = swe.calc_ut(jd, body)
-                ep_calc = ephem.calc_ut(jd, body)
+                ephem.calc_ut(jd, body)
                 ecl_pos = calc[0][:3]
 
                 swe_r = swe.azalt(jd, 0, (lon, lat, alt), 1013.25, 15.0, ecl_pos)

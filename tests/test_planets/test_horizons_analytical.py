@@ -6,12 +6,10 @@ These tests verify the offline analytical paths in the Horizons backend
 
 from __future__ import annotations
 
-import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
     SUN,
-    MOON,
     MEAN_NODE,
     MEAN_APOG,
     FLG_SWIEPH,

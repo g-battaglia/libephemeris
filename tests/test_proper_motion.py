@@ -15,7 +15,6 @@ Tests verify:
 - Consistency with catalog data
 """
 
-import pytest
 import math
 
 from libephemeris.fixed_stars import propagate_proper_motion

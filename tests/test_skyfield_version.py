@@ -9,7 +9,6 @@ Skyfield 1.54 improvements (January 2026):
 """
 
 import numpy as np
-import pytest
 import skyfield
 
 

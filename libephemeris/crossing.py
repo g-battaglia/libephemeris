@@ -1839,7 +1839,7 @@ def find_station_ut(
         return pos[3]
 
     # Get current motion direction
-    current_speed = get_speed(jd_ut)
+    get_speed(jd_ut)
 
     jd_search_start = jd_ut
     max_attempts = 4  # Allow searching up to 2 full synodic periods

@@ -14,26 +14,17 @@ import pytest
 import libephemeris as swe
 from libephemeris.constants import (
     SUN,
-    MOON,
-    MERCURY,
-    VENUS,
     EARTH,
     MARS,
     JUPITER,
     SATURN,
     URANUS,
     NEPTUNE,
-    PLUTO,
-    CHIRON,
     MEAN_NODE,
-    TRUE_NODE,
     NODBIT_MEAN,
     NODBIT_OSCU,
     NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
-    FLG_SWIEPH,
-    FLG_SPEED,
-    FLG_HELCTR,
 )
 
 

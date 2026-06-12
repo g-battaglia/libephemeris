@@ -21,23 +21,12 @@ from libephemeris.constants import (
     BETELGEUSE,
     FOMALHAUT,
     ALDEBARAN,
-    ALGOL,
     ARCTURUS,
-    ANTARES,
     RIGEL,
     VEGA,
-    POLARIS,
-    PROCYON,
-    CAPELLA,
-    DENEB,
-    ALTAIR,
     SIRIUS,
     SPICA_STAR,
     REGULUS,
-    CANOPUS,
-    ACHERNAR,
-    CASTOR,
-    POLLUX,
 )
 
 

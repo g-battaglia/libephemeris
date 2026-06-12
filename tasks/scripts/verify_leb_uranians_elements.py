@@ -21,7 +21,6 @@ Tolerances:
 
 from __future__ import annotations
 
-import math
 import os
 import sys
 import time
@@ -683,7 +682,7 @@ def run_section_18() -> None:
 
     SECONDS_PER_DAY = 86400.0
     TIME_TOL_SEC = 60.0  # 60 seconds tolerance
-    TIME_TOL_JD = TIME_TOL_SEC / SECONDS_PER_DAY
+    _TIME_TOL_JD = TIME_TOL_SEC / SECONDS_PER_DAY
 
     # --- 18a: Equinoxes (Vernal equinox, Sun crossing 0 deg) ---
     # 2000-2025, one per year = 26 checks

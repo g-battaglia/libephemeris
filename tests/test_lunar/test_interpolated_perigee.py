@@ -24,7 +24,6 @@ These tests verify:
 6. Proper smoothing of oscillations
 """
 
-import math
 import pytest
 import libephemeris as swe
 

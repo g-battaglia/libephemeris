@@ -44,7 +44,6 @@ References:
 from __future__ import annotations
 
 import math
-import warnings
 from typing import Tuple, TYPE_CHECKING
 
 from .tracing import _record
@@ -1588,7 +1587,7 @@ def _calc_nutation_obliquity(
     t = ts.ut1_jd(jd)
 
     # Calculate Julian centuries from J2000.0
-    T = (jd - 2451545.0) / 36525.0
+    (jd - 2451545.0) / 36525.0
 
     # Mean obliquity of the ecliptic (IAU 2006 via pyerfa)
     mean_obliquity = math.degrees(erfa.obl06(2451545.0, t.tt - 2451545.0))
@@ -1763,7 +1762,7 @@ def _assist_position_at(
         FileNotFoundError: If ephemeris data files not found.
     """
     from . import minor_bodies
-    from .rebound_integration import propagate_orbit_assist, AssistEphemConfig
+    from .rebound_integration import propagate_orbit_assist
     from .state import get_timescale
 
     elements = minor_bodies.MINOR_BODY_ELEMENTS[ipl]
@@ -3725,7 +3724,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
 
         # Convert from radians to degrees
-        dpsi_deg = math.degrees(dpsi_rad)
+        math.degrees(dpsi_rad)
         deps_deg = math.degrees(deps_rad)
 
         eps_true = eps0 + deps_deg
@@ -4930,7 +4929,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Radial velocity
     r_dot_v = x * vx + y * vy + z * vz
-    v_r = r_dot_v / r_mag
+    r_dot_v / r_mag
 
     # Specific angular momentum vector h = r x v
     hx = y * vz - z * vy

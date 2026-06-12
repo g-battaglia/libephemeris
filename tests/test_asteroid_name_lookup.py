@@ -15,8 +15,6 @@ import json
 from libephemeris.minor_bodies import (
     get_asteroid_number,
     clear_asteroid_name_cache,
-    _build_local_name_cache,
-    _ASTEROID_NAME_CACHE,
 )
 
 

@@ -18,7 +18,6 @@ from libephemeris.constants import (
     MOON,
     MARS,
     FLG_SIDEREAL,
-    FLG_SPEED,
 )
 
 

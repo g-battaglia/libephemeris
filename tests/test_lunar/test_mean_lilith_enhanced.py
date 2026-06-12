@@ -9,7 +9,6 @@ Expected improvement: reduce error from ~270 arcsec to <100 arcsec compared
 to JPL DE440 reference across the 1800-2200 range.
 """
 
-import math
 import pytest
 import warnings
 

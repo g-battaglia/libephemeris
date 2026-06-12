@@ -16,7 +16,6 @@ from libephemeris import (
     julday,
     sol_eclipse_obscuration_at_loc,
     _sol_eclipse_obscuration_at_loc_pythonic,
-    sol_eclipse_magnitude_at_loc,
     _sol_eclipse_magnitude_at_loc_pythonic,
     sol_eclipse_how,
     FLG_SWIEPH,

@@ -7,7 +7,6 @@ at different geographic locations and dates.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -15,11 +14,9 @@ import libephemeris as swe
 from libephemeris.constants import (
     SUN,
     MOON,
-    MERCURY,
     VENUS,
     MARS,
     JUPITER,
-    SATURN,
     CALC_RISE,
     CALC_SET,
     CALC_MTRANSIT,

@@ -12,7 +12,7 @@ References:
 """
 
 import math
-from typing import Tuple, Optional
+from typing import Tuple
 
 # =============================================================================
 # GRAVITATIONAL PARAMETERS (GM) in km³/s²

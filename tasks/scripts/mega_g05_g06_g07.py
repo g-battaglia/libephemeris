@@ -28,7 +28,6 @@ import os
 import math
 import random
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -91,7 +90,7 @@ def safe(func, *args, **kwargs):
     """Call func and return result, or None on exception."""
     try:
         return func(*args, **kwargs)
-    except Exception as e:
+    except Exception:
         return None
 
 

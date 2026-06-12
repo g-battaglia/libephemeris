@@ -8,20 +8,17 @@ Validation tests use the 2024-Apr-08 total solar eclipse as reference:
 Reference data from NASA Eclipse website and pyswisseph comparison.
 """
 
-import math
 import pytest
 
 pytestmark = pytest.mark.slow
 
 from libephemeris import (
     julday,
-    revjul,
     sol_eclipse_where,
     sol_eclipse_how,
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_PARTIAL,
-    ECL_ANNULAR,
     ECL_CENTRAL,
     ECL_VISIBLE,
 )

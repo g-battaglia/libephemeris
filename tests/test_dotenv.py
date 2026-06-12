@@ -7,7 +7,6 @@ import textwrap
 from pathlib import Path
 from unittest import mock
 
-import pytest
 
 from libephemeris._dotenv import _parse_line, _find_env_file, load_dotenv
 

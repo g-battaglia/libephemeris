@@ -23,14 +23,10 @@ from libephemeris.constants import (
     URANUS,
     NEPTUNE,
     PLUTO,
-    CHIRON,
-    MEAN_NODE,
     NODBIT_MEAN,
     NODBIT_OSCU,
     NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
-    FLG_SWIEPH,
-    FLG_SPEED,
 )
 
 

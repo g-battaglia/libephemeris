@@ -10,7 +10,6 @@ import math
 import random
 import sys
 import time
-import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -1050,7 +1049,7 @@ set_section("G17.03 LEB reader API")
 
 if leb_available:
     try:
-        from libephemeris.leb_reader import LEBReader, open_leb
+        from libephemeris.leb_reader import open_leb
 
         reader = open_leb(LEB_FILE)
         check(reader is not None, "open_leb returns non-None reader")
@@ -1087,7 +1086,7 @@ if leb_available:
 
         # Test CompositeLEBReader if available
         try:
-            from libephemeris.leb_composite import CompositeLEBReader
+            from libephemeris.leb_composite import CompositeLEBReader  # noqa: F401 (availability probe)
 
             check(True, "CompositeLEBReader importable")
         except ImportError:

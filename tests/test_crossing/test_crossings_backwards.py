@@ -13,7 +13,6 @@ from libephemeris.constants import (
     SUN,
     MOON,
     FLG_SWIEPH,
-    FLG_SPEED,
 )
 
 JD_J2000 = 2451545.0

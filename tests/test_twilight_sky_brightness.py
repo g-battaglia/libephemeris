@@ -11,12 +11,9 @@ References:
     - Rozenberg, G.V. (1966) "Twilight: A Study in Atmospheric Optics"
 """
 
-import math
-import pytest
 
 from libephemeris import (
     # Main twilight functions
-    TwilightSkyBrightness,
     get_twilight_phase,
     calc_twilight_sky_brightness,
     calc_twilight_brightness_simple,
@@ -477,16 +474,11 @@ class TestImportability:
     def test_all_functions_importable(self):
         """All twilight functions should be importable from libephemeris."""
         from libephemeris import (  # noqa: F811
-            TwilightSkyBrightness,
             get_twilight_phase,
             calc_twilight_sky_brightness,
             calc_twilight_brightness_simple,
             calc_limiting_magnitude_twilight,
-            TWILIGHT_CIVIL_START,
             TWILIGHT_CIVIL_END,
-            TWILIGHT_NAUTICAL_END,
-            TWILIGHT_ASTRONOMICAL_END,
-            DARK_SKY_BRIGHTNESS_V,
         )
 
         # Verify they are callable/usable

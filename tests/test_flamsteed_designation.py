@@ -16,7 +16,6 @@ from libephemeris.fixed_stars import (
     _resolve_star2,
     fixstar2_ut,
     fixstar2,
-    CONSTELLATION_ABBREV,
 )
 from libephemeris.constants import (
     REGULUS,
@@ -33,13 +32,6 @@ from libephemeris.constants import (
     POLLUX,
     ALCYONE,
     ASTEROPE,
-    CELAENO,
-    ELECTRA,
-    MAIA,
-    MEROPE,
-    TAYGETA,
-    ATLAS,
-    PLEIONE,
 )
 
 

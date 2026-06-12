@@ -44,18 +44,12 @@ from __future__ import annotations
 import erfa
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, Any, List, Optional, Union
-from .constants import (
-    FICT_OFFSET,
-    HARRINGTON,
-    NEPTUNE_ADAMS,
-    NEPTUNE_LEVERRIER,
-    NIBIRU,
-    PLUTO_LOWELL,
-    PLUTO_PICKERING,
-)
+from typing import Tuple, Dict, List, Optional, Union
+# NIBIRU..PLUTO_PICKERING are deliberately (re)defined below with their
+# documentation and aliases; constants.py carries the same values.
+from .constants import FICT_OFFSET
 
 
 # =============================================================================

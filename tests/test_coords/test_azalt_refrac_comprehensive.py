@@ -12,7 +12,6 @@ from libephemeris.constants import (
     JUPITER,
     SATURN,
     FLG_SWIEPH,
-    FLG_SPEED,
     FLG_EQUATORIAL,
 )
 from libephemeris.utils import (

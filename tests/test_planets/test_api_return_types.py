@@ -27,11 +27,7 @@ from libephemeris.constants import (
     INTP_PERG,
     CHIRON,
     FLG_SPEED,
-    FLG_HELCTR,
-    FLG_EQUATORIAL,
-    FLG_SIDEREAL,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
     GREG_CAL,
 )
 

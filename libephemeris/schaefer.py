@@ -24,7 +24,7 @@ Constants:
 from __future__ import annotations
 
 import math
-from typing import Tuple, Optional
+from typing import Tuple
 
 # =============================================================================
 # PHYSICAL CONSTANTS

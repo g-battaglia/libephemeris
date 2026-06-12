@@ -59,7 +59,6 @@ from libephemeris.constants import (
     VESTA,
 )
 from libephemeris.minor_bodies import (
-    MINOR_BODY_ELEMENTS,
     _get_closest_epoch_elements,
     calc_minor_body_position,
 )

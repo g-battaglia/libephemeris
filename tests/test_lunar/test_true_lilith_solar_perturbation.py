@@ -21,8 +21,6 @@ References:
 - Chapront-Touze, M. & Chapront, J. "Lunar Tables and Programs" (1991)
 """
 
-import math
-import pytest
 from libephemeris.lunar import calc_true_lilith, calc_mean_lilith
 
 

@@ -7,7 +7,6 @@ consistency between the two functions, and known values.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

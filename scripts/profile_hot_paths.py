@@ -41,7 +41,6 @@ from libephemeris.constants import (
     TRUE_NODE,
     MEAN_APOG,
     FLG_SPEED,
-    FLG_SIDEREAL,
 )
 
 

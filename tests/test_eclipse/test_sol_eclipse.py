@@ -1271,7 +1271,6 @@ class TestSolEclipseMaxTime:
 
     def test_swe_alias_exists(self):
         """sol_eclipse_max_time should be an alias."""
-        from libephemeris import sol_eclipse_max_time
 
 
     def test_known_eclipse_april_2024_precision(self):

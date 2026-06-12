@@ -22,7 +22,6 @@ from libephemeris.constants import (
     MOON,
     MARS,
     JUPITER,
-    FLG_SPEED,
     FLG_EQUATORIAL,
 )
 

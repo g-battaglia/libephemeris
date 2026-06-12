@@ -216,7 +216,16 @@ class TestCentaurusStarsNameResolution:
         assert resolve_star_name("Rigil Kentaurus") == RIGIL_KENT
         assert resolve_star_name("Alpha Centauri") == RIGIL_KENT
         assert resolve_star_name("Alpha Cen") == RIGIL_KENT
-        assert resolve_star_name("Toliman") == RIGIL_KENT
+
+    def test_resolve_toliman_is_alpha_cen_b(self):
+        """Toliman is the IAU name of alpha Cen B (HIP 71681), a
+        separate catalog entry from Rigil Kentaurus (alpha Cen A)."""
+        from libephemeris.fixed_stars import STAR_CATALOG
+
+        toliman_id = resolve_star_name("Toliman")
+        entry = next(e for e in STAR_CATALOG if e.id == toliman_id)
+        assert entry.hip_number == 71681
+        assert toliman_id != RIGIL_KENT
 
     def test_resolve_hadar(self):
         """Test Hadar name resolution."""

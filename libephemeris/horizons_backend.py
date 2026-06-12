@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 logger = logging.getLogger("libephemeris")
 
@@ -366,19 +366,13 @@ def horizons_calc_ut(
         KeyError: Body not supported by Horizons.
     """
     from .constants import (
-        FLG_EQUATORIAL,
         FLG_HELCTR,
         FLG_BARYCTR,
-        FLG_J2000,
         FLG_NOABERR,
         FLG_NOGDEFL,
-        FLG_SIDEREAL,
         FLG_SPEED,
         FLG_TOPOCTR,
         FLG_TRUEPOS,
-        FLG_XYZ,
-        FLG_RADIANS,
-        FLG_ICRS,
         FLG_NONUT,
     )
 
@@ -726,7 +720,7 @@ def _calc_analytical(
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate analytical body (Mean Node, Mean Apogee)."""
     from .time_utils import deltat
-    from .constants import FLG_SPEED, FLG_SIDEREAL
+    from .constants import FLG_SIDEREAL
 
     jd_tt = jd_ut + deltat(jd_ut)
 

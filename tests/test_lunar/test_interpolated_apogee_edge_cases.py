@@ -10,8 +10,6 @@ Edge cases tested:
    the valid ephemeris range.
 """
 
-import math
-import pytest
 from libephemeris import lunar
 
 

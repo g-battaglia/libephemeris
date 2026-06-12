@@ -18,10 +18,7 @@ import time
 import libephemeris
 from libephemeris.constants import (
     CALC_RISE,
-    CALC_SET,
-    MOON,
     SUN,
-    FLG_SPEED,
 )
 from libephemeris.time_utils import julday
 

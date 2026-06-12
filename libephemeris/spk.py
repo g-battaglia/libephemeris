@@ -43,7 +43,6 @@ import math
 import os
 import re
 import ssl
-import sys
 import tempfile
 import time
 import urllib.error
@@ -56,10 +55,10 @@ import numpy as np
 
 from skyfield.framelib import ecliptic_frame
 
-from .download import SimpleProgressBar, _is_valid_bsp
+from .download import _is_valid_bsp
 from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
-from .state import get_loader, get_timescale
+from .state import get_timescale
 
 # Vendored spktype21 for SPK type 21 support (upstream unmaintained since 2018).
 # Includes numpy 2.x compatibility fix (.item() on map_array results).
@@ -1076,7 +1075,7 @@ def _calc_type21_position(
     planets = state.get_planets()
     sun = planets["sun"]
     earth = planets["earth"]
-    ts = state.get_timescale()
+    state.get_timescale()
 
     # Earth heliocentric position in ICRS
     earth_ssb = earth.at(t).position.au

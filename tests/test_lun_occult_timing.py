@@ -21,11 +21,7 @@ from libephemeris import (
     revjul,
     lun_occult_when_glob,
     lun_occult_when_loc,
-    ECL_TOTAL,
-    ECL_PARTIAL,
     VENUS,
-    MARS,
-    JUPITER,
     FLG_SWIEPH,
 )
 

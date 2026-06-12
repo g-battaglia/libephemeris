@@ -25,7 +25,6 @@ from libephemeris.constants import (
     OSCU_APOG,
     INTP_APOG,
     INTP_PERG,
-    CHIRON,
     FLG_SPEED,
     FLG_SIDEREAL,
     FLG_EQUATORIAL,

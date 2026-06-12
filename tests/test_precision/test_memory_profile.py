@@ -13,7 +13,6 @@ Uses Python's tracemalloc for memory tracking.
 import gc
 import tracemalloc
 from dataclasses import dataclass
-from typing import Optional
 
 import pytest
 
