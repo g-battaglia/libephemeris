@@ -52,7 +52,25 @@ reference or to correct measured errors.
   in wheels (repo tooling; use `./leph` or
   `python -m libephemeris.dev_cli` from a checkout).
 
-See REVIEW-2026-06-10.md and the WS1-WS9 commit series for the full
+- Houses: the clean-room harness (26 systems x 130-point grid,
+  houses_armc + house_pos vs pyswisseph) reports zero gated
+  mismatches.  Sunshine 'i' honors the Sun-declination parameter and
+  raises for a circumpolar Sun; sidereal cusps use the mean-equinox
+  ayanamsha like the reference (13.9" shift); sidereal Aries-house
+  cusps stay at 0/30/...; Placidus converges through the polar-circle
+  hairline by bisection; Regiomontanus/Koch house positions handle
+  polar and meridian-degenerate bodies like the reference; unknown
+  house codes raise inside the polar circle; houses_ex2 cusp speeds
+  follow the reference's structure for N/U/O (true derivatives are
+  kept for P/K, which match the reference's own cusp motion better
+  than its reported approximation).
+- Crossings: a search started exactly at a crossing returns that
+  instant (the dead-band skip of a full cycle is gone, matching
+  swe.solcross); cross_ut finds an imminent retrograde crossing
+  instead of jumping past it; Brent step guards use a time epsilon
+  instead of degree tolerances.
+
+See REVIEW-2026-06-10.md and the WS1-WS10 commit series for the full
 fix inventory (houses provenance rewrite, eclipse/rise/heliacal
 geometry cores, error-policy sweep, COB/ASSIST frame fixes, lint
 debt).

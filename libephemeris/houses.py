@@ -87,7 +87,7 @@ from .constants import (
     FLG_TOPOCTR,
 )
 from .state import get_timescale
-from .planets import get_ayanamsa_ut, calc_ut
+from .planets import calc_ut
 from .cache import get_true_obliquity
 from .exceptions import PolarCircleError, validate_coordinates
 from .utils import difdeg2n
@@ -329,6 +329,20 @@ def _validate_cusps(cusps: list | tuple) -> tuple[bool, str | None]:
             return False, f"House cusp {i + 1} out of range [0, 360): {cusp}"
 
     return True, None
+
+
+_KNOWN_HSYS_CODES = set("ABCDEFGHIJKLMNOPQRSTUVWXYi")
+
+
+def _polar_raise_applies(hsys_char: str) -> bool:
+    """Systems that raise inside the polar circle.
+
+    Placidus, Koch and Gauquelin are undefined there; an UNKNOWN house
+    code falls through the dispatch to the Placidus default and must
+    raise the same way (the reference errors for e.g. hsys 'Z' at
+    lat 80 instead of quietly computing a fallback).
+    """
+    return hsys_char in ("P", "K", "G") or hsys_char not in _KNOWN_HSYS_CODES
 
 
 def _raise_polar_circle_error(
@@ -777,7 +791,7 @@ def houses(
     # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Raise detailed PolarCircleError with useful information
-    if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
+    if _polar_raise_applies(hsys_char) and _is_polar_circle(lat, eps):
         _raise_polar_circle_error(lat, eps, hsys_char, "houses")
 
     # Calculate Sun's declination for Sunshine houses ('I' or 'i')
@@ -1337,7 +1351,7 @@ def houses_armc(
     # Check for polar circle condition for Placidus/Koch/Gauquelin
     # These systems cannot be calculated when abs(lat) + eps > 90°
     # Raise detailed PolarCircleError with useful information
-    if hsys_char in ["P", "K", "G"] and _is_polar_circle(lat, eps):
+    if _polar_raise_applies(hsys_char) and _is_polar_circle(lat, eps):
         _raise_polar_circle_error(lat, eps, hsys_char, "houses_armc")
 
     cusps = [0.0] * 13
@@ -1538,9 +1552,38 @@ def houses_armc_ex2(
         cs[6] = v_asc  # cusp 7  = DESC
         cs[9] = v_mc  # cusp 10 = MC
         cusps_speed = tuple(cs)
-    # Other systems (Placidus, Koch, Porphyry, etc.): use numerical
-    # differentiation directly. Note: Koch and Placidus use a smaller
-    # step size (1 second vs 1 minute) to reduce truncation error.
+    elif hsys in (ord("N"), ord("U")):
+        # Aries houses ('N') have fixed cusps and Krusinski ('U') has
+        # no analytic speed model in the reference: pyswisseph returns
+        # the ASC rate on cusps 1/7, the MC rate on 4/10, and zeros on
+        # the intermediate cusps for both systems.  Mirror that.
+        v_asc = ascmc_speed[0]
+        v_mc = ascmc_speed[1]
+        cs = [0.0] * len(cusps)
+        cs[0] = v_asc
+        cs[3] = v_mc
+        cs[6] = v_asc
+        cs[9] = v_mc
+        cusps_speed = tuple(cs)
+    elif hsys == ord("O"):
+        # Porphyry: the reference derives cusp speeds from the angle
+        # rates as v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
+        # cusps 1-4 and k = 4,5 for cusps 5-6 (continuing the
+        # progression across the IC rather than re-interpolating
+        # toward the descendant; verified against pyswisseph).
+        v_asc = ascmc_speed[0]
+        v_mc = ascmc_speed[1]
+        step = (v_asc - v_mc) / 3.0
+        ks = [3, 2, 1, 0, 4, 5]
+        cs = [v_mc + ks[i % 6] * step for i in range(len(cusps))]
+        cusps_speed = tuple(cs)
+    # Other systems (Placidus, Koch, Campanus, Regiomontanus, ...):
+    # numerical differentiation of the actual cusp functions.  Note:
+    # these are the TRUE derivatives — they match a centered difference
+    # of the reference's own cusps to ~0.001 deg/day, while the
+    # reference's reported speeds for Placidus/Koch come from an
+    # internal analytic approximation that deviates from its own cusp
+    # motion by up to ~1%.  We keep the exact values.
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
@@ -1580,7 +1623,15 @@ def houses_ex(
     cusps, ascmc = houses(tjdut, lat, lon, hsys, flags)
 
     if flags & FLG_SIDEREAL:
-        ayanamsa = get_ayanamsa_ut(tjdut)
+        # The reference converts house cusps with the MEAN-equinox
+        # ayanamsha (no nutation term — the houses are geometric
+        # ARMC-frame quantities): swe.houses_ex cusps differ from
+        # tropical by get_ayanamsa_ex(jd, 0), 13.9" away from the
+        # plain (true) get_ayanamsa at J2000.  Verified against
+        # pyswisseph for P/E at Fagan-Bradley and Lahiri.
+        from .planets import get_ayanamsa_ex_ut
+
+        ayanamsa = get_ayanamsa_ex_ut(tjdut, 0)[1]
 
         # Compute sidereal angles
         # All ecliptic longitudes in ascmc get ayanamsa correction EXCEPT
@@ -1651,6 +1702,12 @@ def houses_ex(
                 else sunshine_cusps[i]
                 for i in range(1, 13)
             )
+        elif hsys_char == "N":
+            # Aries houses: the wheel is anchored at 0 deg of the
+            # zodiac in use — in the sidereal zodiac the cusps stay at
+            # 0, 30, ... (the reference does not shift them by the
+            # ayanamsha).
+            cusps = tuple(float(i * 30) for i in range(12))
         else:
             # For other systems, just subtract ayanamsa from tropical cusps
             cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])

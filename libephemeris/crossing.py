@@ -115,6 +115,13 @@ def _is_near_station(speed: float) -> bool:
     return abs(speed) < STATION_SPEED_THRESHOLD
 
 
+# Minimal bracket width (days) below which Brent switches to bisection.
+# This is the step-size guard of Brent's method and is a TIME quantity
+# (~1 ms); the function tolerances (degrees or deg/day) must not be
+# compared against day intervals.
+_BRENT_TIME_EPS_DAYS = 1e-8
+
+
 def _brent_find_crossing(
     get_position_func: Callable[[float], Tuple[float, float]],
     x2cross: float,
@@ -202,8 +209,8 @@ def _brent_find_crossing(
         )
         cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
         cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
-        cond4 = mflag and abs(jd_b - c) < tolerance
-        cond5 = not mflag and abs(c - d) < tolerance
+        cond4 = mflag and abs(jd_b - c) < _BRENT_TIME_EPS_DAYS
+        cond5 = not mflag and abs(c - d) < _BRENT_TIME_EPS_DAYS
 
         if cond1 or cond2 or cond3 or cond4 or cond5:
             # Bisection
@@ -369,12 +376,12 @@ def solcross_ut(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        # If already very close, look for next complete crossing
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -489,12 +496,12 @@ def solcross(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        # If already very close, look for next complete crossing
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -596,11 +603,12 @@ def mooncross_ut(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -716,11 +724,12 @@ def mooncross(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -1031,8 +1040,40 @@ def cross_ut(
     else:
         effective_speed = speed if abs(speed) > 0.001 else speed_default
 
-    if abs(diff) < 1e-5:
-        diff = 360.0  # Already at target, look for next crossing
+    # No dead-band skip: (x2cross - lon) % 360 maps a just-passed
+    # target to ~360 already, and a body exactly at the target crosses
+    # NOW (same convention as solcross/mooncross).
+
+    # A retrograde planet can reach a target lying just BEHIND it while
+    # still retrograde — long before the prograde-speed guess below.
+    # Scan forward for the first wrapped sign change and refine, so the
+    # chronologically first crossing is returned.
+    if speed < 0:
+        diff_back = (lon_start - x2cross) % 360.0
+        if diff_back < 25.0:  # max retrograde arc is ~20 deg (Mars)
+            def _delta(jd_time: float) -> float:
+                lon_t = calc_ut(jd_time, planet, flags)[0][0]
+                return (lon_t - x2cross + 180.0) % 360.0 - 180.0
+
+            d_prev = _delta(tjdut)
+            step = 0.5
+            t_prev = tjdut
+            t_scan = tjdut + step
+            while t_scan <= tjdut + 200.0:
+                d_cur = _delta(t_scan)
+                if d_prev == 0.0:
+                    return float(t_prev)
+                if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
+                    lo, hi = t_prev, t_scan
+                    for _ in range(60):
+                        mid = 0.5 * (lo + hi)
+                        if _delta(lo) * _delta(mid) <= 0:
+                            hi = mid
+                        else:
+                            lo = mid
+                    return float(0.5 * (lo + hi))
+                t_prev, d_prev = t_scan, d_cur
+                t_scan += step
 
     dt_guess = diff / effective_speed
     jd_guess = tjdut + dt_guess
@@ -1688,8 +1729,8 @@ def _brent_find_station(
         )
         cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
         cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
-        cond4 = mflag and abs(jd_b - c) < tolerance * 86400
-        cond5 = not mflag and abs(c - d) < tolerance * 86400
+        cond4 = mflag and abs(jd_b - c) < _BRENT_TIME_EPS_DAYS
+        cond5 = not mflag and abs(c - d) < _BRENT_TIME_EPS_DAYS
 
         if cond1 or cond2 or cond3 or cond4 or cond5:
             s = (jd_a + jd_b) / 2
