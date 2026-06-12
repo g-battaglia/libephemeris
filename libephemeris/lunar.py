@@ -7,29 +7,26 @@ This module computes:
 - Mean Lilith: Average lunar apogee (Black Moon Lilith)
 - True Lilith: Instantaneous osculating lunar apogee
 
-True Node Calculation Method
-============================
+True Node Calculation Method (live)
+===================================
 
-The True Lunar Node is the instantaneous (osculating) ascending node of the
-Moon's orbit, computed using a rigorous orbital mechanics approach combined
-with high-precision perturbation theory.
+The True Lunar Node is the instantaneous (osculating) ascending node of
+the Moon's orbit.  calc_true_lunar_node computes it purely geometrically:
 
-**Two-Step Calculation Process:**
+- Obtains the Moon's geocentric position r and velocity v from the JPL
+  DE ephemeris, directly in Skyfield's true-ecliptic-of-date frame
+  (IAU 2006 precession + IAU 2000A nutation applied by Skyfield)
+- Computes the angular momentum vector h = r x v
+- Reads the ascending node longitude from atan2(h_x, -h_y)
+- Derives the node distance from the osculating conic (p, e, omega)
 
-1. **Geometric Osculating Node** (calc_true_lunar_node):
-   - Obtains Moon's geocentric position (r) and velocity (v) from JPL DE ephemeris
-   - Computes angular momentum vector h = r x v (perpendicular to orbital plane)
-   - Transforms h from ICRS equatorial to J2000 ecliptic coordinates
-   - Derives ascending node longitude from: node = atan2(h_x, -h_y)
-   - Applies IAU 2006 precession from J2000 to ecliptic of date
-   - Applies IAU 2000A nutation (1365 terms) for true ecliptic of date
-
-2. **ELP2000-82B Perturbation Series** (_calc_elp2000_node_perturbations):
-   - Implements 120+ perturbation terms from the ELP2000-82B lunar theory
-   - Includes extended high-order terms (5D, 6D, 7D) for historical dates
-   - Higher-order secular corrections (T³, T⁴, T⁵) for pre-1800 accuracy
-   - Corrects for gravitational influences not fully captured in the
-     osculating elements approach
+No perturbation series is applied on top: the DE state vectors already
+contain every perturbation.  The ELP2000-style node series
+(_calc_elp2000_node_perturbations) is NOT part of this pipeline — it
+belongs to a retired two-step architecture (kept for reference; see
+CLEAN.md).  The apogee/perigee functions, by contrast, DO use their
+ELP-style series (_calc_elp2000_apogee/perigee_perturbations) on top of
+the mean-element polynomials.
 
 **Perturbation Terms Included:**
 
@@ -190,6 +187,14 @@ except ImportError:
     PERIGEE_CT_COUNT = 0
     PERIGEE_CORRECTIONS = ()
 
+
+# Earth-Moon system gravitational parameter in AU^3/day^2, from the
+# IAU 2015 Resolution B3 nominal values (GM_Earth = 398600.435436 km^3/s^2,
+# Earth/Moon mass ratio 81.3005691).  Matches the DE440 system value to
+# 2e-8 relative.  Single source for all osculating-element math below.
+GM_EARTH_MOON_AU3_DAY2: float = (
+    (398600.435436 * (1.0 + 1.0 / 81.3005691)) / (149597870.7**3) * (86400.0**2)
+)
 
 # Validity range constants for Meeus polynomial approximations
 # The polynomials are optimized for dates near J2000.0 (year 2000)
@@ -1875,8 +1880,9 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
                 - longitude: Ecliptic longitude of ascending node in degrees [0, 360),
                             referenced to true ecliptic of date (includes nutation)
                 - latitude: Always 0.0 (the node lies on the ecliptic by definition)
-                - distance: Angular momentum magnitude scaled by 1000 (proxy for
-                           orbital characteristics, not physical distance)
+                - distance: Geocentric distance of the osculating orbit at the
+                           ascending node in AU, from the conic r = p/(1 + e cos nu)
+                           evaluated at the node (p, e, omega from r, v)
 
     Precision and Accuracy
     ======================
@@ -1970,8 +1976,7 @@ def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
     # Uses the vis-viva relation to derive semi-latus rectum p = h²/GM,
     # eccentricity from e_vec = (v×h)/GM - r̂, and argument of perigee ω.
     # Distance at ascending node: r = p / (1 + e·cos(2π - ω))
-    # GM uses Earth+Moon system value from DE440 (AU³/day²).
-    _GM_EARTH_MOON = 8.9970116e-10  # AU³/day² (DE440 Earth-Moon system)
+    _GM_EARTH_MOON = GM_EARTH_MOON_AU3_DAY2
 
     r_x, r_y, r_z = float(r[0]), float(r[1]), float(r[2])
     v_x, v_y, v_z = float(v[0]), float(v[1]), float(v[2])
@@ -2179,16 +2184,8 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     h_y = r[2] * v[0] - r[0] * v[2]
     h_z = r[0] * v[1] - r[1] * v[0]
 
-    # Gravitational parameter for Earth-Moon system in AU³/day²
-    # μ = G(M_Earth + M_Moon) for the two-body problem.
-    # IAU 2015 Resolution B3 values:
-    #   GM_Earth = 398600.435436 km³/s²
-    #   Earth/Moon mass ratio = 81.3005691
-    gm_earth = 398600.435436  # km³/s²
-    earth_moon_mass_ratio = 81.3005691  # IAU 2015
-    gm_moon = gm_earth / earth_moon_mass_ratio  # ~4902.800 km³/s²
-    gm_earth_moon = gm_earth + gm_moon  # ~403503.235 km³/s²
-    mu = gm_earth_moon / (149597870.7**3) * (86400**2)  # AU³/day²
+    # Earth-Moon system gravitational parameter (shared module constant)
+    mu = GM_EARTH_MOON_AU3_DAY2
 
     # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
     vxh_x = v[1] * h_z - v[2] * h_y
@@ -2322,16 +2319,8 @@ def calc_osculating_perigee(jd_tt: float) -> Tuple[float, float, float]:
     h_y = r[2] * v[0] - r[0] * v[2]
     h_z = r[0] * v[1] - r[1] * v[0]
 
-    # Gravitational parameter for Earth-Moon system in AU³/day²
-    # μ = G(M_Earth + M_Moon) for the two-body problem.
-    # IAU 2015 Resolution B3 values:
-    #   GM_Earth = 398600.435436 km³/s²
-    #   Earth/Moon mass ratio = 81.3005691
-    gm_earth = 398600.435436  # km³/s²
-    earth_moon_mass_ratio = 81.3005691  # IAU 2015
-    gm_moon = gm_earth / earth_moon_mass_ratio  # ~4902.800 km³/s²
-    gm_earth_moon = gm_earth + gm_moon  # ~403503.235 km³/s²
-    mu = gm_earth_moon / (149597870.7**3) * (86400**2)  # AU³/day²
+    # Earth-Moon system gravitational parameter (shared module constant)
+    mu = GM_EARTH_MOON_AU3_DAY2
 
     # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
     vxh_x = v[1] * h_z - v[2] * h_y

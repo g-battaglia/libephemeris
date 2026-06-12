@@ -43,22 +43,14 @@ class TestGMEarthConstant:
     """Tests for the GM_Earth constant value used in lunar.py."""
 
     def test_gm_earth_value_in_source_code(self):
-        """Verify that lunar.py uses the IAU 2015 GM_Earth value."""
+        """Verify that lunar.py builds its GM from the IAU 2015 GM_Earth value."""
         lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
         content = lunar_py.read_text()
 
-        # Find the gm_earth constant definition
-        pattern = r"gm_earth\s*=\s*(\d+\.?\d*)\s*#\s*km"
-        match = re.search(pattern, content)
-
-        assert match is not None, "Could not find gm_earth constant in lunar.py"
-
-        gm_value = float(match.group(1))
-
-        # Verify it matches IAU 2015 value within a small tolerance
-        assert abs(gm_value - GM_EARTH_IAU2015_KM3_S2) < 0.001, (
-            f"gm_earth value {gm_value} does not match IAU 2015 value "
-            f"{GM_EARTH_IAU2015_KM3_S2} km^3/s^2"
+        # The shared constant embeds the IAU 2015 GM_Earth figure verbatim
+        assert "398600.435436" in content, (
+            "lunar.py should derive GM_EARTH_MOON_AU3_DAY2 from the IAU 2015 "
+            "GM_Earth value 398600.435436 km^3/s^2"
         )
 
     def test_earth_moon_mass_ratio_in_source_code(self):
@@ -66,40 +58,29 @@ class TestGMEarthConstant:
         lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
         content = lunar_py.read_text()
 
-        # Find the mass ratio constant
-        pattern = r"earth_moon_mass_ratio\s*=\s*(\d+\.?\d*)"
-        match = re.search(pattern, content)
-
-        assert match is not None, (
-            "Could not find earth_moon_mass_ratio constant in lunar.py"
-        )
-
-        ratio_value = float(match.group(1))
-
-        # Verify it matches IAU 2015 value within tolerance
-        assert abs(ratio_value - EARTH_MOON_MASS_RATIO_IAU2015) < 0.0001, (
-            f"earth_moon_mass_ratio {ratio_value} does not match IAU 2015 value "
-            f"{EARTH_MOON_MASS_RATIO_IAU2015}"
+        assert "81.3005691" in content, (
+            "lunar.py should derive GM_EARTH_MOON_AU3_DAY2 from the IAU 2015 "
+            "Earth/Moon mass ratio 81.3005691"
         )
 
     def test_uses_combined_earth_moon_mu(self):
-        """Verify that calc_true_lilith uses combined Earth-Moon gravitational parameter."""
+        """The shared constant equals the combined Earth-Moon mu in AU^3/day^2."""
+        from libephemeris.lunar import GM_EARTH_MOON_AU3_DAY2
+
+        expected = (
+            GM_EARTH_MOON_IAU2015_KM3_S2 / (AU_KM**3) * (SECONDS_PER_DAY**2)
+        )
+        assert math.isclose(GM_EARTH_MOON_AU3_DAY2, expected, rel_tol=1e-12), (
+            f"GM_EARTH_MOON_AU3_DAY2 = {GM_EARTH_MOON_AU3_DAY2} does not equal "
+            f"the combined IAU 2015 Earth-Moon mu {expected} AU^3/day^2"
+        )
+        # And the osculating-element code consumes the shared constant
         lunar_py = Path(__file__).parent.parent.parent / "libephemeris" / "lunar.py"
         content = lunar_py.read_text()
-
-        # Check that gm_earth_moon is calculated and used for mu
-        assert "gm_earth_moon" in content, (
-            "lunar.py should calculate gm_earth_moon (combined Earth-Moon GM)"
-        )
-        assert "gm_moon" in content, (
-            "lunar.py should calculate gm_moon from Earth/Moon mass ratio"
-        )
-        # Verify mu uses the combined value, not just GM_Earth
-        pattern = r"mu\s*=\s*gm_earth_moon"
-        match = re.search(pattern, content)
-        assert match is not None, (
-            "mu should be set from gm_earth_moon (combined Earth-Moon GM), "
-            "not just GM_Earth"
+        pattern = r"mu\s*=\s*GM_EARTH_MOON_AU3_DAY2"
+        assert re.search(pattern, content), (
+            "osculating-element mu should come from the shared "
+            "GM_EARTH_MOON_AU3_DAY2 constant"
         )
 
     def test_gm_value_documented_in_docstring(self):

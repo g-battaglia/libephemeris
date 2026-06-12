@@ -1,0 +1,49 @@
+# CLEAN.md — Dead-code inventory
+
+Code identified as unused by any live calculation path. Per project
+policy these entries are **logged here and left in place** — they are
+not deleted. Each entry records where the code lives, why it is dead,
+and what replaced it, so a future cleanup (or revival) has full context.
+
+Sourced from the 2026-06-10 full-project review and the fix workstreams
+that followed (WS1-WS8). Grows as further dead code is identified.
+
+## libephemeris/lunar.py
+
+- `_calc_elp2000_node_perturbations` (ELP2000-style true-node series,
+  ~120 terms): not called by the live `calc_true_lunar_node`, which is
+  purely geometric (h = r x v from DE state vectors in the true ecliptic
+  frame; every perturbation is already inside the JPL ephemeris). The
+  series belongs to the retired two-step architecture. The
+  apogee/perigee counterparts (`_calc_elp2000_apogee_perturbations`,
+  `_calc_elp2000_perigee_perturbations`) are NOT dead — they are live in
+  the interpolated-apse pipeline.
+
+## libephemeris/hypothetical.py
+
+- `UranianElements` dataclass and the `URANIAN_ELEMENTS` table
+  (mean-longitude oscillation model): the public
+  `calc_uranian_longitude`/`calc_uranian_position` were re-pointed at
+  `URANIAN_KEPLERIAN_ELEMENTS` (the set verified against the reference)
+  in WS7b. The table's values contradicted the Keplerian set and the
+  reference output; one comment at `hypothetical.py:2379` still
+  references it for historical context.
+- The eight per-body `*KeplerianElements` dataclasses and their
+  `CUPIDO_KEPLERIAN_ELEMENTS` ... `POSEIDON_KEPLERIAN_ELEMENTS`
+  constants (hypothetical.py:313-666): superseded by the consolidated
+  `URANIAN_KEPLERIAN_ELEMENTS` dict, which is what the live dispatch
+  uses. Several of the per-body blocks carry element values that
+  contradict both the consolidated dict and the reference.
+
+## libephemeris/houses.py
+
+- `is_circumpolar` vestigial flag in the house-position prelude:
+  computed but never read. Removed in the WS1 provenance rewrite of the
+  P/G/K/R/C branches (commit 9b2ea79) — removal was explicitly called
+  for by the owner-approved fix plan; logged here for the record.
+
+## libephemeris/spk_auto.py
+
+- `_check_astroquery_available`: the module talks to JPL Horizons via
+  urllib only (the docstrings that claimed astroquery were fixed in
+  WS2); nothing calls this probe.
