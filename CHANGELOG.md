@@ -70,6 +70,19 @@ reference or to correct measured errors.
   instead of jumping past it; Brent step guards use a time epsilon
   instead of degree tolerances.
 
+### Behavior changes (cont.)
+
+- Planet X Lowell/Pickering: `calc_planet_x_lowell` and
+  `calc_planet_x_pickering` now return the same position as
+  `calc_hypothetical_position` / the main `calc()` API for these bodies.
+  Previously the dedicated functions used a separate element set
+  (Lowell i=10°, Pickering a=51.9 AU) and skipped the equinox→J2000
+  precession, so they disagreed with the dispatcher (which uses the
+  published Hoyt 1980 elements from `data/fictitious_orbits.csv`) by up to
+  ~158°. They now delegate to that canonical path. The legacy
+  `LOWELL_PLANET_X_ELEMENTS` / `PICKERING_PLANET_X_ELEMENTS` constants are
+  retained but no longer drive the calculation (see CLEAN.md).
+
 ### Licensing / provenance
 
 - The Galilean satellite module (`moon_theories/galilean.py`) was rewritten

@@ -143,6 +143,22 @@ time.  Items the fix workstreams made live again are noted as such.
 - `tests/test_pre_commit_config.py`: permanently skipped; validates a
   config file that does not exist in the repo.
 
+### libephemeris/hypothetical.py (Planet X Lowell/Pickering legacy paths)
+
+- `_calc_planet_x_lowell_raw`, `_calc_planet_x_pickering_raw`: no callers.
+  `calc_planet_x_lowell`/`calc_planet_x_pickering` now delegate to
+  `calc_fictitious_position` (the canonical Hoyt 1980 / `fictitious_orbits.csv`
+  path the dispatcher and `calc()` use), so the dedicated raw Keplerian
+  helpers are no longer reached.
+- `LOWELL_PLANET_X_ELEMENTS`, `PICKERING_PLANET_X_ELEMENTS` and their
+  `LowellPlanetXElements`/`PickeringPlanetXElements` dataclasses: no longer
+  consulted at runtime (the canonical elements live in
+  `FICTITIOUS_ORBITAL_ELEMENTS` / the CSV). Retained as public constants
+  (`PICKERING_PLANET_X_ELEMENTS` is exported) and validated by their unit
+  tests; their values (Lowell i=10, Pickering a=51.9) differ from the
+  canonical CSV set, which is why they were retired from the calc — see the
+  WS-8 Planet X consistency fix.
+
 ### scripts/build_star_catalog.py (superseded v1 star-catalog builder)
 
 - Superseded by `scripts/build_star_catalog_v2.py`, which generates the

@@ -3563,67 +3563,12 @@ def calc_planet_x_lowell(
         >>> pos = calc_planet_x_lowell(2451545.0)  # J2000.0
         >>> print(f"Planet X Lowell at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = LOWELL_PLANET_X_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to ecliptic frame
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    # Convert to spherical coordinates
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    # Calculate velocity via central difference numerical differentiation
-    dt_step = 1.0  # 1 day step for daily velocity
-    pos_prev = _calc_planet_x_lowell_raw(jd_tt - dt_step)
-    pos_next = _calc_planet_x_lowell_raw(jd_tt + dt_step)
-
-    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around
-    if dlon > 180.0 / (2.0 * dt_step):
-        dlon -= 360.0 / (2.0 * dt_step)
-    elif dlon < -180.0 / (2.0 * dt_step):
-        dlon += 360.0 / (2.0 * dt_step)
-
-    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
-    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the canonical published-element path (Hoyt 1980, via
+    # data/fictitious_orbits.csv) that calc_hypothetical_position and the
+    # public calc() API already use for this body, so every route agrees.
+    # The legacy LOWELL_PLANET_X_ELEMENTS set and _calc_planet_x_lowell_raw
+    # are no longer consulted at runtime (see CLEAN.md).
+    return calc_fictitious_position(PLUTO_LOWELL, jd_tt)
 
 
 def _calc_planet_x_lowell_raw(jd_tt: float) -> Tuple[float, float, float]:
@@ -3712,67 +3657,13 @@ def calc_planet_x_pickering(
         >>> pos = calc_planet_x_pickering(2451545.0)  # J2000.0
         >>> print(f"Planet X Pickering at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = PICKERING_PLANET_X_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to ecliptic frame
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    # Convert to spherical coordinates
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    # Calculate velocity via central difference numerical differentiation
-    dt_step = 1.0  # 1 day step for daily velocity
-    pos_prev = _calc_planet_x_pickering_raw(jd_tt - dt_step)
-    pos_next = _calc_planet_x_pickering_raw(jd_tt + dt_step)
-
-    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around
-    if dlon > 180.0 / (2.0 * dt_step):
-        dlon -= 360.0 / (2.0 * dt_step)
-    elif dlon < -180.0 / (2.0 * dt_step):
-        dlon += 360.0 / (2.0 * dt_step)
-
-    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
-    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the canonical published-element path (Hoyt 1980, via
+    # data/fictitious_orbits.csv) that calc_hypothetical_position and the
+    # public calc() API already use for this body, so every route agrees.
+    # The legacy PICKERING_PLANET_X_ELEMENTS set and
+    # _calc_planet_x_pickering_raw are no longer consulted at runtime
+    # (see CLEAN.md).
+    return calc_fictitious_position(PLUTO_PICKERING, jd_tt)
 
 
 def _calc_planet_x_pickering_raw(jd_tt: float) -> Tuple[float, float, float]:

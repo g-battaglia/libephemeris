@@ -242,18 +242,27 @@ class TestUranianLongitudeCalculations:
     J2000 = 2451545.0
 
     def test_calc_uranian_longitude_at_j2000(self):
-        """Test longitude at J2000.0 epoch."""
-        # At J2000, T=0, so longitude should be close to L0
-        for body_id, elements in URANIAN_ELEMENTS.items():
+        """Longitude at J2000 matches the published Keplerian model.
+
+        The live calc uses URANIAN_KEPLERIAN_ELEMENTS (Witte/Lefeldt 1928,
+        refined by Neely 1988), not the retired URANIAN_ELEMENTS.L0 mean-
+        longitude fit. Compare against the mean longitude derived from those
+        elements; the true longitude differs only by the (tiny) equation of
+        centre and the J1900->J2000 equinox precession.
+        """
+        from libephemeris.hypothetical import URANIAN_KEPLERIAN_ELEMENTS
+
+        for body_id, ke in URANIAN_KEPLERIAN_ELEMENTS.items():
             lon = calc_uranian_longitude(body_id, self.J2000)
-            # Should be close to L0 (within amplitude for oscillation)
-            expected = elements.L0 % 360.0
-            # Allow for oscillation amplitude
-            diff = abs(lon - expected)
+            mean_lon = (
+                ke.M0 + ke.n * (self.J2000 - ke.epoch) + ke.omega + ke.Omega
+            ) % 360.0
+            diff = abs(lon - mean_lon)
             if diff > 180:
                 diff = 360 - diff
             assert diff < 5.0, (
-                f"{elements.name}: longitude {lon} too far from L0 {expected}"
+                f"{ke.name}: longitude {lon:.3f} too far from published mean "
+                f"longitude {mean_lon:.3f}"
             )
 
     def test_calc_uranian_longitude_range(self):
@@ -308,12 +317,21 @@ class TestUranianPositionCalculations:
         assert isinstance(dlat, float)
         assert isinstance(ddist, float)
 
-    def test_calc_uranian_position_latitude_zero(self):
-        """Test that Uranian planets have zero latitude (on ecliptic)."""
-        for body_id in URANIAN_ELEMENTS:
+    def test_calc_uranian_position_latitude_bounded(self):
+        """Uranian latitude is bounded by the body's orbital inclination.
+
+        The published Neely elements give several Uranian planets a small
+        inclination (e.g. Cupido 1.08 deg), so latitude is not identically
+        zero; it must stay within the inclination (plus a small allowance
+        for the J1900->J2000 equinox precession, which tilts even an i=0
+        orbit by ~0.01 deg).
+        """
+        from libephemeris.hypothetical import URANIAN_KEPLERIAN_ELEMENTS
+
+        for body_id, ke in URANIAN_KEPLERIAN_ELEMENTS.items():
             pos = calc_uranian_position(body_id, self.J2000)
-            assert pos[1] == 0.0, (
-                f"{URANIAN_ELEMENTS[body_id].name} should have zero latitude"
+            assert abs(pos[1]) <= ke.i + 0.1, (
+                f"{ke.name} latitude {pos[1]} exceeds inclination {ke.i}"
             )
 
     def test_calc_uranian_position_distance_reasonable(self):
@@ -392,20 +410,17 @@ class TestWhiteMoonCalculations:
         assert isinstance(pos, tuple)
         assert len(pos) == 6
 
-    def test_calc_white_moon_opposite_to_lilith(self):
-        """Test that White Moon is 180 degrees from Black Moon Lilith."""
-        from libephemeris import lunar
+    def test_calc_white_moon_longitude_published_formula(self):
+        """White Moon longitude follows the published Selena element set.
 
-        lilith_lon = lunar.calc_mean_lilith(self.J2000)
-        white_moon_pos = calc_white_moon_position(self.J2000)
-        white_moon_lon = white_moon_pos[0]
-
-        # Should be 180 degrees apart
-        diff = abs(white_moon_lon - lilith_lon)
-        if diff > 180:
-            diff = 360 - diff
-        assert abs(diff - 180.0) < 0.1, (
-            f"White Moon should be 180 deg from Lilith, got {diff}"
+        Selena is defined by its published circular geocentric orbit
+        (lon = 242.2205555 + 5143.5418158*T deg, T in Julian centuries from
+        J2000), not as the point opposite Black Moon Lilith. At J2000 (T=0)
+        the longitude is the constant term.
+        """
+        pos = calc_white_moon_position(self.J2000)
+        assert abs(pos[0] - 242.2205555) < 1e-6, (
+            f"White Moon longitude at J2000 should be 242.2205555, got {pos[0]}"
         )
 
     def test_calc_white_moon_longitude_range(self):
@@ -418,10 +433,12 @@ class TestWhiteMoonCalculations:
         pos = calc_white_moon_position(self.J2000, use_true_lilith=False)
         assert pos[1] == 0.0, "Mean-based White Moon should have zero latitude"
 
-    def test_calc_white_moon_distance_zero(self):
-        """Test that White Moon distance is zero (symbolic point)."""
+    def test_calc_white_moon_distance(self):
+        """White Moon distance is the published Selena radius (~0.0528 AU)."""
         pos = calc_white_moon_position(self.J2000)
-        assert pos[2] == 0.0, "White Moon is a symbolic point with no distance"
+        assert abs(pos[2] - 0.05280098949) < 1e-9, (
+            f"White Moon distance should be 0.05280098949 AU, got {pos[2]}"
+        )
 
     def test_calc_white_moon_velocity_positive(self):
         """Test that White Moon has positive (prograde) velocity."""
@@ -438,8 +455,8 @@ class TestWhiteMoonCalculations:
         pos1 = calc_white_moon_position(self.J2000)
         pos2 = calc_white_moon_position(self.J2000 + 365.25)  # 1 year later
 
-        # Mean apogee moves ~40.69 deg/year
-        expected_motion = 40.69
+        # Selena's published mean longitude advances 5143.5418158 deg/century
+        expected_motion = 5143.5418158 / 100.0  # ~51.44 deg/year
 
         # Calculate actual motion (handle wrap-around)
         actual_motion = pos2[0] - pos1[0]
@@ -452,35 +469,20 @@ class TestWhiteMoonCalculations:
             f"Annual motion should be ~{expected_motion:.2f} deg, got {actual_motion:.2f}"
         )
 
-    def test_calc_white_moon_true_lilith_opposite(self):
-        """Test that White Moon (true) is 180 degrees from True Lilith."""
-        from libephemeris import lunar
+    def test_calc_white_moon_true_flag_ignored(self):
+        """use_true_lilith is accepted for compatibility but ignored.
 
-        true_lilith_lon, true_lilith_lat, _ = lunar.calc_true_lilith(self.J2000)
-        white_moon_pos = calc_white_moon_position(self.J2000, use_true_lilith=True)
-        white_moon_lon = white_moon_pos[0]
+        Selena is defined by its published elements, so the true-Lilith
+        variant returns the same position as the default.
+        """
+        pos_default = calc_white_moon_position(self.J2000)
+        pos_true = calc_white_moon_position(self.J2000, use_true_lilith=True)
+        assert pos_default == pos_true
 
-        # Should be 180 degrees apart
-        diff = abs(white_moon_lon - true_lilith_lon)
-        if diff > 180:
-            diff = 360 - diff
-        assert abs(diff - 180.0) < 0.1, (
-            f"White Moon (true) should be 180 deg from True Lilith, got {diff}"
-        )
-
-    def test_calc_white_moon_true_has_latitude(self):
-        """Test that White Moon (true-based) can have non-zero latitude."""
-        from libephemeris import lunar
-
-        # True Lilith has latitude due to inclination
-        _, true_lilith_lat, _ = lunar.calc_true_lilith(self.J2000)
-        white_moon_pos = calc_white_moon_position(self.J2000, use_true_lilith=True)
-
-        # White Moon latitude should be opposite to True Lilith latitude
-        assert abs(white_moon_pos[1] + true_lilith_lat) < 0.01, (
-            f"White Moon latitude should be opposite to True Lilith: "
-            f"got {white_moon_pos[1]}, expected {-true_lilith_lat}"
-        )
+    def test_calc_white_moon_latitude_zero(self):
+        """White Moon latitude is zero (published orbit has zero inclination)."""
+        pos = calc_white_moon_position(self.J2000, use_true_lilith=True)
+        assert pos[1] == 0.0, f"White Moon latitude should be 0, got {pos[1]}"
 
     def test_calc_white_moon_mean_vs_true_differ(self):
         """Test that mean-based and true-based White Moon can differ."""
@@ -3195,10 +3197,11 @@ class TestProserpina:
     bodies documented in Swiss Ephemeris seorbel.txt, Proserpina is not part of
     the standard Swiss Ephemeris fictitious bodies.
 
-    The implementation uses a simple circular orbit model with:
-        - Semi-major axis: 81.0 AU (beyond Neptune and Pluto)
+    The implementation uses a simple circular orbit model with the
+    published Abramov elements:
+        - Semi-major axis: 79.22563 AU (beyond Neptune and Pluto)
         - Eccentricity: 0.0 (circular orbit)
-        - Orbital period: ~729 years (derived from Kepler's 3rd law)
+        - Orbital period: ~705 years (derived from Kepler's 3rd law)
     """
 
     # Test epochs
@@ -3221,17 +3224,17 @@ class TestProserpina:
         assert pos[1] == 0.0, "Proserpina should be on ecliptic (lat=0)"
 
     def test_calc_proserpina_distance(self):
-        """Test that Proserpina distance is at 81 AU."""
+        """Proserpina distance equals its published semi-major axis (circular)."""
         pos = calc_proserpina(self.J2000)
-        assert abs(pos[2] - 81.0) < 0.001, (
-            f"Proserpina distance should be 81.0 AU, got {pos[2]:.4f}"
+        assert abs(pos[2] - 79.225630) < 0.001, (
+            f"Proserpina distance should be 79.22563 AU, got {pos[2]:.4f}"
         )
 
     def test_calc_proserpina_slow_motion(self):
         """Test that Proserpina has very slow daily motion (~0.00135 deg/day)."""
         pos = calc_proserpina(self.J2000)
-        # Expected motion: n = 360 / (81^1.5 * 365.25) = ~0.00135 deg/day
-        expected_n = 360.0 / (81.0**1.5 * 365.25)
+        # Gaussian mean motion: n = 0.9856076686 / a^1.5, a = 79.22563 AU
+        expected_n = 0.9856076686 / (79.225630**1.5)
         assert abs(pos[3] - expected_n) < 0.0001, (
             f"Proserpina daily motion should be ~{expected_n:.6f} deg/day, got {pos[3]:.6f}"
         )
@@ -3254,15 +3257,14 @@ class TestProserpina:
         assert pos[5] == 0.0, "Distance velocity should be 0 for circular orbit"
 
     def test_calc_proserpina_orbital_period(self):
-        """Test that Proserpina has approximately 729 year orbital period."""
-        # From Kepler's 3rd law: Period = a^1.5 years = 81^1.5 = 729.3 years
+        """Proserpina period ~705 years (Kepler's 3rd law, a=79.22563 AU)."""
+        # Period = a^1.5 years = 79.22563^1.5 = ~705 years
         elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
         period_days = 360.0 / elements.n
         period_years = period_days / 365.25
 
-        # Verify period is approximately 729 years
-        assert 720.0 < period_years < 740.0, (
-            f"Proserpina period should be ~729 years, got {period_years:.1f}"
+        assert 700.0 < period_years < 712.0, (
+            f"Proserpina period should be ~705 years, got {period_years:.1f}"
         )
 
     def test_calc_proserpina_progression(self):
@@ -3312,7 +3314,9 @@ class TestProserpina:
         assert PROSERPINA in HYPOTHETICAL_ELEMENTS
         elements = HYPOTHETICAL_ELEMENTS[PROSERPINA]
         assert elements.name == "Proserpina"
-        assert abs(elements.a - 81.0) < 0.001, "Semi-major axis should be 81 AU"
+        assert abs(elements.a - 79.225630) < 0.001, (
+            "Semi-major axis should be the published 79.22563 AU (Abramov)"
+        )
         assert elements.e == 0.0, "Eccentricity should be 0 (circular orbit)"
         assert elements.i == 0.0, "Inclination should be 0 (on ecliptic)"
 
@@ -3325,7 +3329,7 @@ class TestProserpina:
         transpluto_pos = calc_transpluto(self.J2000)
 
         # Both are trans-Plutonian but have different orbits
-        # Proserpina: circular, 81 AU
+        # Proserpina: circular, 79.22563 AU
         # Transpluto: eccentric (e=0.3), 77.775 AU semi-major axis
         assert proserpina_pos[2] != transpluto_pos[2], (
             "Proserpina and Transpluto should have different distances"
@@ -3534,11 +3538,15 @@ class TestPlanetXPickering:
             assert -16.0 <= pos[1] <= 16.0, f"Latitude {pos[1]} out of range"
 
     def test_calc_planet_x_pickering_distance_range(self):
-        """Test that distance is within expected range for e=0.31, a=51.9 AU."""
-        # Perihelion = a * (1 - e) = 51.9 * (1 - 0.31) = 35.8 AU
-        # Aphelion = a * (1 + e) = 51.9 * (1 + 0.31) = 68.0 AU
-        perihelion = 51.9 * (1.0 - 0.31)
-        aphelion = 51.9 * (1.0 + 0.31)
+        """Test that distance is within expected range for e=0.31, a=55.1 AU.
+
+        calc_planet_x_pickering now delegates to the canonical published
+        elements (Hoyt 1980 via data/fictitious_orbits.csv: a=55.1, e=0.31),
+        not the legacy PICKERING_PLANET_X_ELEMENTS (a=51.9).
+        """
+        # Perihelion = a * (1 - e) = 55.1 * 0.69; Aphelion = a * (1 + e)
+        perihelion = 55.1 * (1.0 - 0.31)
+        aphelion = 55.1 * (1.0 + 0.31)
 
         test_dates = [self.J2000, self.J2000 + 36525, self.J2000 + 73050]
         for jd in test_dates:
