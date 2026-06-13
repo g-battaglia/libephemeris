@@ -137,7 +137,9 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
         # Altitude in degrees for polynomial term
         h = altitude_deg
         denominator = sin_h + 0.50572 * ((h + 6.07995) ** (-1.6364))
-        if denominator <= 0:
+        if denominator <= 0:  # pragma: no cover - unreachable: a non-positive
+            # denominator requires a negative power base, which raises before
+            # this guard can return; kept as a defensive floor.
             return 40.0
         return min(1.0 / denominator, 40.0)
 

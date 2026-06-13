@@ -543,7 +543,9 @@ def segment_byte_size(degree: int, components: int) -> int:
 
 try:
     _PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
-except (AttributeError, OSError, ValueError):
+except (AttributeError, OSError, ValueError):  # pragma: no cover - POSIX
+    # sysconf is always present on the supported platforms (macOS/Linux);
+    # the 4096 fallback is a defensive default for exotic environments.
     _PAGE_SIZE = 4096
 _PAGE_MASK = ~(_PAGE_SIZE - 1)
 

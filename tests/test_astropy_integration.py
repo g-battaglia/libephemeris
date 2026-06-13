@@ -505,3 +505,29 @@ class TestDocumentationValidation:
         assert isinstance(jd, float)
         # Should be close to J2000.0
         assert abs(jd - 2451545.0) < 0.01
+
+
+class TestAstropyAvailabilityBranches:
+    """Cover the import-guard / format branches."""
+
+    def test_check_returns_false_when_import_fails(self, monkeypatch):
+        import sys
+
+        from libephemeris import astropy_integration as ai
+
+        monkeypatch.setitem(sys.modules, "astropy.coordinates", None)
+        assert ai.check_astropy_available() is False
+
+    def test_require_astropy_raises_when_unavailable(self, monkeypatch):
+        from libephemeris import astropy_integration as ai
+
+        monkeypatch.setattr(ai, "check_astropy_available", lambda: False)
+        with pytest.raises(ImportError):
+            ai._require_astropy()
+
+    def test_parse_time_string_with_explicit_format(self):
+        from libephemeris.astropy_integration import parse_time_string
+
+        jd = parse_time_string("2000-01-01T12:00:00.000", format="isot")
+        assert isinstance(jd, float)
+        assert abs(jd - 2451545.0) < 0.01

@@ -38,7 +38,7 @@ from typing import Any, Dict, Optional, Union
 # TOML parser: stdlib on 3.11+, tomli package on 3.9/3.10
 if sys.version_info >= (3, 11):
     import tomllib
-else:
+else:  # pragma: no cover - Python <3.11 tomli shim; project requires 3.12+
     try:
         import tomli as tomllib  # type: ignore[no-redef]
     except ImportError:

@@ -268,6 +268,17 @@ branch = true
 parallel = true
 omit = [
     "libephemeris/__pycache__/*",
+    # Out of scope for the 100% target: dev tooling, interactive wizard, vendored code.
+    "libephemeris/dev_cli/*",          # dev tooling (leph CLI), not shipped behavior
+    "libephemeris/cli/*",              # interactive init wizard
+    "libephemeris/vendor/*",           # vendored third-party (spktype21)
+    # Generated data tables (pure coefficients, no logic to exercise).
+    "libephemeris/lunar_apse_corrections.py",
+    "libephemeris/multi_epoch_data.py",
+    "libephemeris/lunar_corrections.py",
+    "libephemeris/true_node_terms.py",
+    "libephemeris/star_catalog_gen.py",
+    "libephemeris/moon_theories/tass17_data.py",
 ]
 
 [tool.coverage.paths]

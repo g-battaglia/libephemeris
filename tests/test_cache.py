@@ -256,3 +256,85 @@ class TestCachePerformance:
         assert avg_warm < 0.005, (
             f"House calculations too slow: {avg_warm * 1000:.2f}ms avg"
         )
+
+
+class _FakeTime:
+    def __init__(self, tt: float) -> None:
+        self.tt = tt
+
+
+class _FakeObserver:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.calls = 0
+
+    def at(self, _t):
+        self.calls += 1
+        return f"pos-{self.name}"
+
+
+class TestObserverAtCache:
+    """Cover get_cached_observer_at branches."""
+
+    def test_id_collision_recomputes(self):
+        # A stale entry stored under the same (id, tt) key but pointing at a
+        # *different* observer object must not be returned: the function must
+        # detect the identity mismatch and recompute (208 -> 210 branch).
+        from libephemeris import cache
+
+        cache.clear_observer_cache()
+        obs = _FakeObserver("a")
+        t = _FakeTime(2451545.0)
+        key = (id(obs), float(t.tt))
+        cache._observer_at_cache[key] = (object(), "stale")
+
+        result = cache.get_cached_observer_at(obs, t)
+
+        assert result == "pos-a"
+        assert obs.calls == 1
+        cache.clear_observer_cache()
+
+    def test_cache_hit_returns_same_object(self):
+        from libephemeris import cache
+
+        cache.clear_observer_cache()
+        obs = _FakeObserver("b")
+        t = _FakeTime(2451600.0)
+        first = cache.get_cached_observer_at(obs, t)
+        second = cache.get_cached_observer_at(obs, t)
+        assert first is second
+        assert obs.calls == 1  # second call served from cache
+        cache.clear_observer_cache()
+
+    def test_cache_eviction_when_full(self):
+        from libephemeris import cache
+
+        cache.clear_observer_cache()
+        # Fill well beyond the max so a later miss trips the len > max clear().
+        for i in range(cache._OBSERVER_CACHE_MAX + 5):
+            cache.get_cached_observer_at(_FakeObserver(str(i)), _FakeTime(float(i)))
+        # The clear() on overflow keeps the cache bounded.
+        assert len(cache._observer_at_cache) <= cache._OBSERVER_CACHE_MAX + 1
+        cache.clear_observer_cache()
+
+
+class TestClearCachesImportFallback:
+    """Cover the optional-import except arms in clear_caches()."""
+
+    def test_clear_caches_survives_missing_optional_modules(self, monkeypatch):
+        import sys
+
+        import libephemeris
+        from libephemeris import cache
+
+        # `from .fast_calc import ...` imports a submodule, so a None entry in
+        # sys.modules is enough to raise ImportError.
+        monkeypatch.setitem(sys.modules, "libephemeris.fast_calc", None)
+        # `from . import refraction` first checks for an already-bound package
+        # attribute, so we must remove that attribute too (plus the None
+        # sys.modules entry) to force the ImportError path.
+        monkeypatch.setitem(sys.modules, "libephemeris.refraction", None)
+        monkeypatch.delattr(libephemeris, "refraction", raising=False)
+
+        # Must not raise even though both inner imports fail.
+        cache.clear_caches()

@@ -363,3 +363,27 @@ class TestPublicAPI:
         import libephemeris
 
         assert "load_dotenv" in libephemeris.__all__
+
+
+class TestErrorBranches:
+    """Cover the defensive except arms."""
+
+    def test_find_env_file_skips_raising_search_path(self, monkeypatch) -> None:
+        import libephemeris._dotenv as dotenv
+
+        def _boom() -> Path:
+            raise OSError("unreadable home dir")
+
+        monkeypatch.delenv(dotenv._ENV_FILE_VAR, raising=False)
+        monkeypatch.setattr(dotenv, "_SEARCH_PATHS", (_boom,))
+
+        # The raising search path is swallowed; no candidate -> None.
+        assert dotenv._find_env_file() is None
+
+    def test_load_dotenv_returns_false_on_unreadable_file(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        # A file that exists but cannot be decoded as UTF-8 must yield False.
+        bad = tmp_path / "bad.env"
+        bad.write_bytes(b"\xff\xfe\x00invalid")
+        assert load_dotenv(str(bad)) is False
