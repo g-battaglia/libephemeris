@@ -93,12 +93,26 @@ The git history of this repository reflects this progression transparently.
 
 ## Vendored and Adapted Components
 
-Four files shipped in the package are vendored or adapted third-party
-code and keep their upstream licenses (MIT for `vendor/spktype21.py`,
-`moon_theories/tass17.py`, and the generated periodic-term tables in
-`moon_theories/tass17_data.py`; LGPL-3.0 for `moon_theories/galilean.py`,
-adapted from PyMeeus, with a clean-room replacement planned). Full
-inventory and license texts: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Three files shipped in the package are vendored or adapted third-party
+code and keep their upstream licenses, all permissive (MIT):
+`vendor/spktype21.py`, `moon_theories/tass17.py`, and the generated
+periodic-term tables in `moon_theories/tass17_data.py`. The package
+contains no copyleft code. Full inventory and license texts:
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The Galilean satellite module (`moon_theories/galilean.py`) was, through
+v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. In June 2026 it was
+rewritten clean-room from the published theory (Lieske 1998, A&AS 129,
+205; Meeus 1998, *Astronomical Algorithms*, ch. 44) under strict
+information barriers: a functional specification restating the published
+mathematics and the project's frame adaptations was written from the
+theory, and an independent implementation was produced from that
+specification alone — without reference to PyMeeus or the prior module.
+The rewrite reproduces the prior numeric output to floating-point
+re-association level (sub-nanometre per moon component over 1800–2200) and
+is now owned by the project under the dual license. Process and
+independence record:
+[docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md).
 
 ## Calibration Data Disclosure
 

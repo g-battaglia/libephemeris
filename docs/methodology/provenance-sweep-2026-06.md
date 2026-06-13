@@ -6,6 +6,12 @@ fingerprints, performed as part of the June 2026 code review remediation
 implementation *expression* (identifiers, comments, docstrings, code
 structure) must be independently written.
 
+> **Related:** the Galilean satellite module's separate clean-room rewrite
+> (removing the last LGPL/PyMeeus-adapted code) is recorded in
+> [galilean-clean-room-2026-06.md](galilean-clean-room-2026-06.md); its
+> PyMeeus fingerprint class lives in the same `scripts/check_provenance.py`
+> gate (class 3).
+
 ## Method
 
 `grep -rniE` over `libephemeris/` (excluding `__pycache__`) for two

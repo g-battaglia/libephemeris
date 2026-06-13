@@ -32,7 +32,6 @@ EXCEPTIONS: dict[str, str] = {
     "libephemeris/vendor/spktype21.py": "MIT",
     "libephemeris/moon_theories/tass17.py": "MIT",
     "libephemeris/moon_theories/tass17_data.py": "MIT",
-    "libephemeris/moon_theories/galilean.py": "LGPL-3.0-only",
 }
 THIRD_PARTY_NOTE = (
     "# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md"

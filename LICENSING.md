@@ -32,10 +32,13 @@ copyright holder instead.
 - Each owned source file carries the SPDX expression
   `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the recipient may
   elect either grant.
-- **Exceptions**: three vendored/adapted modules keep their upstream
-  licenses (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). Two are
-  MIT; `libephemeris/moon_theories/galilean.py` is LGPL-3.0 and remains
-  LGPL-3.0 under either grant (a clean-room replacement is planned).
+- **Exceptions**: a few vendored/adapted files keep their upstream
+  licenses (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); they are
+  all permissive (MIT). There is no copyleft code in the package: the
+  Galilean satellite module was rewritten clean-room in June 2026 from the
+  published Lieske 1998 / Meeus theory and is now dual-licensed like the
+  rest of the project (see
+  [docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md)).
 - Versions up to and including the 2.x series were published under
   AGPL-3.0-only; those grants remain valid for those published versions.
 

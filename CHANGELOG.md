@@ -70,6 +70,20 @@ reference or to correct measured errors.
   instead of jumping past it; Brent step guards use a time epsilon
   instead of degree tolerances.
 
+### Licensing / provenance
+
+- The Galilean satellite module (`moon_theories/galilean.py`) was rewritten
+  clean-room from the published Lieske 1998 / Meeus ch. 44 theory, removing
+  the last LGPL-3.0 component; it is now dual-licensed like the rest of the
+  project. Output is unchanged to floating-point re-association level
+  (sub-nanometre per moon component over 1800-2200). The package now
+  contains no copyleft code; the only third-party files are permissive
+  (MIT): `vendor/spktype21.py`, `moon_theories/tass17.py`, and
+  `moon_theories/tass17_data.py` (the last relabeled MIT to match its
+  Stellarium-derived data). The provenance CI gate gained a PyMeeus
+  zero-hit class. See
+  `docs/methodology/galilean-clean-room-2026-06.md`.
+
 See REVIEW-2026-06-10.md and the WS1-WS10 commit series for the full
 fix inventory (houses provenance rewrite, eclipse/rise/heliacal
 geometry cores, error-policy sweep, COB/ASSIST frame fixes, lint

@@ -12,27 +12,20 @@ process — see [LICENSING.md](LICENSING.md) and [NOTICE.md](NOTICE.md).
 |---|---|---|---|
 | spktype21 0.1.0 | `libephemeris/vendor/spktype21.py` | Shushi Uetsuki (whiskie14142) | MIT |
 | TASS 1.7 port | `libephemeris/moon_theories/tass17.py`, `libephemeris/moon_theories/tass17_data.py` (generated periodic-term tables) | Johannes Gajdosik's Stellarium implementation of Vienne & Duriez TASS 1.7 | MIT |
-| Galilean E5 theory | `libephemeris/moon_theories/galilean.py` | Adapted from PyMeeus (M. Lutz, S. Scholz, V. Serra, S. Veigl) | LGPL-3.0 |
 
 Each of these files carries its own `SPDX-License-Identifier` header and
 documents its upstream provenance in the module docstring. They are **not**
-covered by the LibEphemeris dual license.
+covered by the LibEphemeris dual license, but they are all permissively
+(MIT) licensed; the package contains no copyleft code.
 
-### LGPL-3.0 component — compliance statement
-
-`libephemeris/moon_theories/galilean.py` is adapted from PyMeeus and remains
-under the GNU Lesser General Public License v3. Compliance notes for any
-distribution of LibEphemeris (including the commercial edition):
-
-- The module is a single self-contained Python file; its complete source is
-  included in every distribution (Python wheels ship source).
-- Users may modify and replace that module; nothing in LibEphemeris's own
-  license restricts doing so.
-- Distributions must make the LGPL-3.0 (and GPL-3.0) license texts
-  available: <https://www.gnu.org/licenses/lgpl-3.0.html>.
-- A clean-room re-implementation from the primary sources (Lieske 1998,
-  "Galilean satellite ephemerides E5", A&AS 129, 205; Meeus 1998,
-  *Astronomical Algorithms*, ch. 44) is planned to retire this exception.
+The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
+was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. It was
+**rewritten clean-room in June 2026** from the published theory (Lieske,
+J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129, 205; Meeus 1998,
+*Astronomical Algorithms*, ch. 44) and is now owned by the project under
+the dual AGPL/commercial license. See
+[docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md)
+for the process and independence record.
 
 ### MIT license text (spktype21, TASS 1.7 port)
 

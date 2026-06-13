@@ -19,10 +19,9 @@
 2. **Scope tiers** — per-product / per-organization; SaaS vs distributed
    software; redistribution to end users.
 3. **Third-party components** — the grant covers only code owned by the
-   Licensor. Vendored components keep their own licenses (see
-   [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); in particular
-   `libephemeris/moon_theories/galilean.py` remains LGPL-3.0 and its
-   notices/source must accompany distributions until replaced.
+   Licensor. Vendored components keep their own (permissive, MIT) licenses
+   (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); their notices
+   must accompany distributions. The package contains no copyleft code.
 4. **Trademarks** — no rights to the "Swiss Ephemeris" name (Astrodienst
    AG) or to the LibEphemeris name beyond accurate attribution.
 5. **Warranty disclaimer and limitation of liability.**
