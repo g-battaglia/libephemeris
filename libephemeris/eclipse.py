@@ -34,7 +34,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union, cast
 
 from .constants import (
     SUN,
@@ -4512,7 +4512,7 @@ def _calculate_lunar_eclipse_phases(
     umbra_radius: float,
     penumbra_radius: float,
     moon_lat_at_max: float,
-) -> Tuple[float, float, float, float, float, float, float, float]:
+) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Calculate times of lunar eclipse phases (contacts).
 
@@ -5373,9 +5373,9 @@ def lun_occult_when_glob(
         if is_star:
             from .fixed_stars import fixstar_ut
 
-            pos, _n, _r = fixstar_ut(body, jd, eph_flags)
+            pos, _n, _r = fixstar_ut(cast(str, body), jd, eph_flags)
             return float(pos[0]), float(pos[1])
-        pos, _ = calc_ut(jd, body, eph_flags)
+        pos, _ = calc_ut(jd, cast(int, body), eph_flags)
         return float(pos[0]), float(pos[1])
 
     def _sep_minus_radii(jd: float) -> float:
@@ -5396,9 +5396,11 @@ def lun_occult_when_glob(
         if is_star:
             from .fixed_stars import fixstar_ut
 
-            bpos, _n, _r = fixstar_ut(body, jd, eph_flags | FLG_EQUATORIAL)
+            bpos, _n, _r = fixstar_ut(
+                cast(str, body), jd, eph_flags | FLG_EQUATORIAL
+            )
         else:
-            bpos, _ = calc_ut(jd, body, eph_flags | FLG_EQUATORIAL)
+            bpos, _ = calc_ut(jd, cast(int, body), eph_flags | FLG_EQUATORIAL)
         mra = calc_ut(jd, MOON, eph_flags | FLG_EQUATORIAL)[0][0]
         d = (bpos[0] - mra) % 360.0
         if d > 180.0:
@@ -5618,9 +5620,9 @@ def _lun_occult_when_loc_pythonic(
         if is_star:
             from .fixed_stars import fixstar_ut
 
-            pos, _n, _r = fixstar_ut(body, jd, eph_flags)
+            pos, _n, _r = fixstar_ut(cast(str, body), jd, eph_flags)
             return float(pos[0]), float(pos[1])
-        pos, _ = calc_ut(jd, body, eph_flags)
+        pos, _ = calc_ut(jd, cast(int, body), eph_flags)
         return float(pos[0]), float(pos[1])
 
     def _radii_sep(jd: float) -> Tuple[float, float, float]:
@@ -6527,7 +6529,7 @@ def _rise_trans_true_hor_impl(
             from . import fast_calc as _fc_rt
 
             if not is_fixed_star:
-                _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
+                _fc_rt.fast_calc_ut(_reader_rt, jd_start, cast(int, body), FLG_SPEED)
         except (KeyError, ValueError):
             _use_leb_rt = False
 
@@ -6538,7 +6540,7 @@ def _rise_trans_true_hor_impl(
         if is_fixed_star:
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
         ts = get_timescale()
@@ -6553,7 +6555,7 @@ def _rise_trans_true_hor_impl(
             from skyfield.api import Star as SkyfieldStar
             from .fixed_stars import FIXED_STARS, _resolve_star_id
 
-            star_id, err, _ = _resolve_star_id(body)
+            star_id, err, _ = _resolve_star_id(cast(str, body))
             if err is not None:
                 raise ValueError(err)
             star_entry = FIXED_STARS[star_id]
@@ -6563,7 +6565,7 @@ def _rise_trans_true_hor_impl(
             target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
             target_name = _PLANET_MAP[planet]
@@ -6634,7 +6636,7 @@ def _rise_trans_true_hor_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                star_pos, _, _ = fixstar_ut(body, jd, FLG_SPEED)
+                star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
                 dist = star_pos[2]
             else:
@@ -6649,7 +6651,9 @@ def _rise_trans_true_hor_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                pos, _, _ = fixstar_ut(body, jd, FLG_EQUATORIAL | FLG_SPEED)
+                pos, _, _ = fixstar_ut(
+                    cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED
+                )
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
@@ -6658,6 +6662,7 @@ def _rise_trans_true_hor_impl(
 
         def _get_body_altaz(jd: float) -> Tuple[float, float, float]:
             t = ts.ut1_jd(jd)
+            assert earth is not None and observer is not None and target is not None
             observer_at = earth + observer
             body_app = observer_at.at(t).observe(target).apparent()
             alt, az, _ = body_app.altaz()
@@ -6665,6 +6670,7 @@ def _rise_trans_true_hor_impl(
 
         def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
             t = ts.ut1_jd(jd)
+            assert earth is not None and target is not None
             body_app = earth.at(t).observe(target).apparent()
             ra, dec, _ = body_app.radec(epoch="date")
             return ra.hours, dec.degrees
@@ -11024,7 +11030,7 @@ def _get_saros_info(
         Tuple of (saros_series_number, saros_member_number) as floats.
     """
     if eclipse_type.lower() == "solar":
-        references = _SOLAR_SAROS_REFERENCES
+        references: Sequence[Tuple[float, int, int]] = _SOLAR_SAROS_REFERENCES
     elif eclipse_type.lower() == "lunar":
         references = _LUNAR_SAROS_REFERENCES
     else:

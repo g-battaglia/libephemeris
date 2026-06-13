@@ -33,6 +33,8 @@ from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
 if TYPE_CHECKING:
+    from .leb_composite import CompositeLEBReader
+    from .leb2_reader import LEB2Reader
     from .leb_reader import LEBReader
 
 
@@ -99,7 +101,7 @@ class EphemerisContext:
 
         # LEB binary ephemeris configuration (per-context)
         self._leb_file: Optional[str] = None
-        self._leb_reader: Optional["LEBReader"] = None
+        self._leb_reader: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = None
 
         # Ephemeris configuration (for this context)
         self._ephe_path = ephe_path
@@ -207,7 +209,7 @@ class EphemerisContext:
         self._leb_file = filepath
         self._leb_reader = None
 
-    def get_leb_reader(self) -> Optional["LEBReader"]:
+    def get_leb_reader(self) -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
         """Get the active LEBReader for this context, if any.
 
         If the .leb file path is invalid or the file is corrupted,

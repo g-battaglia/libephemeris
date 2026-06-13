@@ -46,7 +46,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple, TYPE_CHECKING, cast
 
 from .tracing import _record
 from jplephem.exceptions import OutOfRangeError
@@ -104,7 +104,13 @@ from .constants import (
     PALLAS,
     JUNO,
     VESTA,
+    FIXSTAR_OFFSET,
+    WHITE_MOON,
+    VULCAN,
+    PROSERPINA,
+    WALDEMATH,
     FLG_SPEED,
+    FLG_SWIEPH,
     FLG_HELCTR,
     FLG_TOPOCTR,
     FLG_SIDEREAL,
@@ -125,6 +131,57 @@ from .constants import (
     PARS_SPIRITUS,
     PARS_AMORIS,
     PARS_FIDEI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_BABYL_BRITTON,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_TRUE_MULA,
+    SIDM_TRUE_SHEORAN,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_ARYABHATA_522,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_VALENS_MOON,
+    SIDM_LAHIRI_1940,
+    SIDM_LAHIRI_VP285,
+    SIDM_KRISHNAMURTI_VP291,
+    SIDM_LAHIRI_ICRC,
+    SIDM_USER,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_FOPOINT,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
 )
@@ -1655,7 +1712,10 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
         eps = get_true_obliquity(jd_tt)
 
     # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-    result = cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps)
+    result = cast(
+        Tuple[float, ...],
+        cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps),
+    )
     return (
         result[0],
         result[1],
@@ -4590,8 +4650,8 @@ def _calc_nod_aps(
             peri_dist = 2.0 * 0.002569555 - apog_dist
 
         # Build output: nodes and apsides from lunar theory
-        xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
-        xndsc: PosTuple = (
+        moon_xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
+        moon_xndsc: PosTuple = (
             (node_lon + 180.0) % 360.0,
             -node_lat,
             node_dist,
@@ -4599,10 +4659,10 @@ def _calc_nod_aps(
             0.0,
             0.0,
         )
-        xperi: PosTuple = (peri_lon, peri_lat, peri_dist, 0.0, 0.0, 0.0)
-        xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        moon_xperi: PosTuple = (peri_lon, peri_lat, peri_dist, 0.0, 0.0, 0.0)
+        moon_xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
 
-        return (xnasc, xndsc, xperi, xaphe)
+        return (moon_xnasc, moon_xndsc, moon_xperi, moon_xaphe)
 
     else:
         # Heliocentric ICRS vectors

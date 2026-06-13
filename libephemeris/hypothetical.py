@@ -54,7 +54,7 @@ import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, List, Optional, Union
+from typing import Tuple, Dict, List, Optional, Union, cast
 # NIBIRU..PLUTO_PICKERING are deliberately (re)defined below with their
 # documentation and aliases; constants.py carries the same values.
 from .constants import FICT_OFFSET
@@ -2352,10 +2352,11 @@ def calc_fictitious_position(
         i=elem.inclination.evaluate(0.0),
         equinox_jd=elem.equinox_jd,
     )
-    lon, lat, dist = _keplerian_to_ecliptic_j2000(ad, jd_tt)
+    ad_typed = cast(UranianKeplerianElements, ad)
+    lon, lat, dist = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt)
     h = 0.5
-    lon_p, lat_p, dist_p = _keplerian_to_ecliptic_j2000(ad, jd_tt - h)
-    lon_n, lat_n, dist_n = _keplerian_to_ecliptic_j2000(ad, jd_tt + h)
+    lon_p, lat_p, dist_p = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt - h)
+    lon_n, lat_n, dist_n = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt + h)
     dlon = ((lon_n - lon_p + 180.0) % 360.0) - 180.0
     return (lon, lat, dist, dlon, lat_n - lat_p, dist_n - dist_p)
 

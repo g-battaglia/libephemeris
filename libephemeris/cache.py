@@ -261,8 +261,7 @@ def clear_caches() -> None:
     try:
         from . import refraction as _refraction
 
-        _refraction._refr_cache_key = ()
-        _refraction._refr_cache_func = None
+        _refraction._refr_cache_entry = None
     except ImportError:
         pass
 

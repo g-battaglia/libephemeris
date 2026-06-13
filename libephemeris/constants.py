@@ -136,7 +136,6 @@ WHITE_MOON: int = (
 )  # 56 - White Moon Selena (opposite to Black Moon Lilith)
 
 SELENA: int = WHITE_MOON  # Alias - Selena is another name for White Moon
-SELENA: int = WHITE_MOON  # Reference API-compatible alias
 
 # Proserpina - hypothetical trans-Plutonian planet used by some astrologers
 # This is a hypothetical body not in the standard fictitious bodies set

@@ -201,7 +201,7 @@ coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Te
 "leb2:verify:medium" = {cmd = "python -m libephemeris.dev_cli leb2 verify medium", help = "Verify medium tier LEB2 vs LEB1 (<0.003\")"}
 "leb2:verify:extended" = {cmd = "python -m libephemeris.dev_cli leb2 verify extended", help = "Verify extended tier LEB2 vs LEB1 (<0.003\")"}
 
-# --- Licensing / provenance gates (also run in CI: license-provenance.yml) ---
+# --- Licensing / provenance gates (local poe tasks only; no CI) ---
 "license:check" = {cmd = "python scripts/check_spdx_headers.py --check", help = "Verify SPDX headers on all shipped source files"}
 "provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Swiss Ephemeris / PyMeeus fingerprint sweep over libephemeris/ (zero-hit gate)"}
 "provenance:hypothetical" = {cmd = "python scripts/check_hypothetical_provenance.py", help = "Verify Uranian/Transpluto elements trace to published sources (zero-mismatch gate)"}

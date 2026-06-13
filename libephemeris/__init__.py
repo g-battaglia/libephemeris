@@ -43,6 +43,7 @@ _load_config()
 del _load_config
 
 from .constants import *
+from .constants import FLG_SPEED, GREG_CAL, JUL_CAL
 from .logging_config import (
     get_logger,
     set_log_level,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import erfa
-from typing import Optional, Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union, cast
 
 # Azalt calculation method flags (compatible with the reference API)
 ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -54,7 +54,7 @@ def cotrans_sp(
     """
     if eps is not None:
         # 3-arg form: cotrans_sp(coord_3, speed_3, eps)
-        speed_seq = eps_or_speed
+        speed_seq = cast(Sequence[float], eps_or_speed)
         obliquity = float(eps)
         lon = float(coord[0])
         lat = float(coord[1])
@@ -65,7 +65,7 @@ def cotrans_sp(
         _split_return = True
     else:
         # 2-arg form: cotrans_sp(coord_6, eps)
-        obliquity = float(eps_or_speed)
+        obliquity = float(cast(float, eps_or_speed))
         lon = float(coord[0])
         lat = float(coord[1])
         dist = float(coord[2])

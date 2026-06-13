@@ -1418,6 +1418,7 @@ def _heliacal_pheno_ut_leb(
     if is_star:
         from .fixed_stars import fixstar_ut
 
+        assert star_name is not None
         _eq_pos, _, _ = fixstar_ut(
             star_name, jd, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         )
@@ -1830,6 +1831,7 @@ def _vis_limit_mag_leb(
             _star_ecl, _, _ = _sfut_vlm(objname, tjdut, FLG_SPEED)
             _star_pos = (_star_ecl[0], _star_ecl[1])
         else:
+            assert body_id is not None
             _body_ecl = _leb_ecliptic_pos(reader, tjdut, body_id, geopos_ll)
             _star_pos = (_body_ecl[0], _body_ecl[1])
         moon_ecl = _leb_ecliptic_pos(reader, tjdut, MOON, geopos_ll)
@@ -3102,15 +3104,15 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     # through to star resolution - the Sun/Moon rejection must escape
     # (it used to be swallowed by this very except clause).
     try:
-        body_id = int(object_name)
+        parsed_body_id: int | None = int(object_name)
     except ValueError:
-        body_id = None
-    if body_id is not None:
-        if body_id == SUN:
+        parsed_body_id = None
+    if parsed_body_id is not None:
+        if parsed_body_id == SUN:
             raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == MOON and not allow_moon:
+        if parsed_body_id == MOON and not allow_moon:
             raise ValueError("Moon is not valid for heliacal calculations")
-        return body_id
+        return parsed_body_id
 
     # Try to resolve as a fixed star name
     from .fixed_stars import resolve_star_name

@@ -59,9 +59,10 @@ if TYPE_CHECKING:
     from typing import Union
 
     from .leb2_reader import LEB2Reader
+    from .leb_composite import CompositeLEBReader
     from .leb_reader import LEBReader
 
-    LEBReaderLike = Union[LEBReader, LEB2Reader]
+    LEBReaderLike = Union[LEBReader, LEB2Reader, CompositeLEBReader]
 
 # =============================================================================
 # CONSTANTS
@@ -369,7 +370,7 @@ def _apply_gravitational_deflection(
     earth_bary: Tuple[float, float, float],
     jd_tt: float,
     light_time: float,
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
 ) -> Tuple[float, float, float]:
     """Apply PPN gravitational light deflection by Sun, Jupiter, Saturn.
 
@@ -669,7 +670,7 @@ _LEB_FRAME_CACHE_MAX = 64
 
 
 def _get_leb_frame_data(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
 ) -> Tuple[
     Tuple[Tuple[float, float, float], ...],
@@ -752,7 +753,7 @@ def _reset_active_reader() -> None:
     _active_generation += 1
 
 
-def _set_active_reader(reader: "LEBReader") -> None:
+def _set_active_reader(reader: "LEBReaderLike") -> None:
     """Bind the active reader for this thread\'s frame-data dispatch."""
     _active_local.gen = _active_generation
     _active_local.reader = reader
@@ -904,7 +905,7 @@ _STAR_BASED_MODES = frozenset({17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 4
 
 
 def _calc_ayanamsa_from_leb(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
@@ -985,7 +986,7 @@ def _topocentric_offset(
     geopos: Tuple[float, float, float],
     jd_tt: float,
     jd_ut1: float,
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
 ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
     """Compute observer ICRS position and velocity offset from geocenter.
 
@@ -1042,7 +1043,7 @@ def _topocentric_offset(
 
 
 def _topo_ecliptic(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     jd_ut1: float,
     ipl: int,
@@ -1088,7 +1089,7 @@ def _topo_ecliptic(
 
 
 def _apparent_icrs_cartesian(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     ipl: int,
 ) -> Tuple[float, float, float]:
@@ -1117,7 +1118,7 @@ def _apparent_icrs_cartesian(
 
 
 def _pipeline_icrs(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     ipl: int,
     iflag: int,
@@ -1387,7 +1388,7 @@ def _pipeline_icrs(
 
 
 def _pipeline_ecliptic(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     ipl: int,
     iflag: int,
@@ -1540,7 +1541,7 @@ def _pipeline_ecliptic(
 
 
 def _pipeline_helio(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     ipl: int,
     iflag: int,
@@ -1692,7 +1693,7 @@ def _pipeline_helio(
 
 
 def fast_calc_ut(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     tjd_ut: float,
     ipl: int,
     iflag: int,
@@ -1776,7 +1777,7 @@ def fast_calc_ut(
 
 
 def fast_calc_tt(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     tjd_tt: float,
     ipl: int,
     iflag: int,
@@ -1853,7 +1854,7 @@ def fast_calc_tt(
 
 
 def _fast_calc_core(
-    reader: "LEBReader",
+    reader: "LEBReaderLike",
     jd_tt: float,
     jd_ut: float,
     ipl: int,

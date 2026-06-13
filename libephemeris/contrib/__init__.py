@@ -519,7 +519,7 @@ def raman_houses(jd: float, geolon: float, geolat: float) -> tuple[float, ...]:
     12 cusps as a 12-tuple (house 1 at index 0)."""
     from .. import houses as _houses
 
-    cusps, _ascmc = _houses(jd, geolat, geolon, b"S")
+    cusps, _ascmc = _houses(jd, geolat, geolon, ord("S"))
     return tuple(cusps)
 
 

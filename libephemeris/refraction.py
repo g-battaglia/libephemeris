@@ -320,7 +320,9 @@ def _dn_dr_at_height(
 # ---------------------------------------------------------------------------
 
 # Single-slot profile cache: (key, profile) stored atomically as one tuple
-_refr_cache_entry: object = None
+_refr_cache_entry: tuple[tuple[float, float, float, float], _AtmosphereProfile] | None = (
+    None
+)
 
 
 class _AtmosphereProfile:

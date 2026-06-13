@@ -156,7 +156,7 @@ _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 # SPK kernel state for minor body calculations
 _SPK_KERNELS: dict[str, SpiceKernel] = {}  # Cached SPK kernels {filepath: kernel}
 _SPK_TYPE21_KERNELS: dict[
-    str, object
+    str, "SPKType21"
 ] = {}  # Cached SPK type 21 kernels {filepath: SPKType21}
 _SPK_BODY_MAP: dict[
     int, tuple[str, int]
@@ -182,10 +182,12 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 
 # LEB (binary ephemeris) configuration
 _LEB_FILE: Optional[str] = None  # Path to .leb file
-_LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
+_LEB_READER: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = (
+    None  # Cached LEB reader instance
+)
 
 # Horizons API client
-_HORIZONS_CLIENT: Optional[object] = None
+_HORIZONS_CLIENT: Optional["HorizonsClient"] = None
 _HORIZONS_WARNED: bool = False
 
 # Calculation mode: "auto" (default), "skyfield", "leb", or "horizons"
@@ -194,7 +196,11 @@ _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
 _VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 
 if TYPE_CHECKING:
+    from .horizons_backend import HorizonsClient
+    from .leb2_reader import LEB2Reader
+    from .leb_composite import CompositeLEBReader
     from .leb_reader import LEBReader
+    from .vendor.spktype21 import SPKType21
 
 
 def set_calc_mode(mode: Optional[str]) -> None:
@@ -477,7 +483,7 @@ def release_data_cache() -> None:
                         pass
 
 
-def get_leb_reader() -> Optional["LEBReader"]:
+def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     """Get the active LEBReader, if any.
 
     Respects the calculation mode set via set_calc_mode() or the

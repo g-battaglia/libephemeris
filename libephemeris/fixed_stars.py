@@ -53,7 +53,7 @@ References:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Sequence, Tuple
+from typing import List, Sequence, Tuple, cast
 
 from skyfield.api import Star
 from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
@@ -2692,7 +2692,10 @@ def _apply_fixstar_flags(
             # True equator of date: use true obliquity
             eps = get_true_obliquity(jd_tt)
 
-        result_sp = cotrans_sp((lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps)
+        result_sp = cast(
+            Tuple[float, ...],
+            cotrans_sp((lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps),
+        )
         lon, lat, dist = result_sp[0], result_sp[1], result_sp[2]
         speed_lon, speed_lat, speed_dist = result_sp[3], result_sp[4], result_sp[5]
 
