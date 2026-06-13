@@ -645,9 +645,12 @@ def calc_dip(
         return 0.0
     dip_geometric = math.degrees(math.acos(ratio))
 
-    # Refraction coefficient after Thom (1971); the lapse-rate term keeps
-    # the conventional 0.0065 K/m default consistent with the standard
-    # atmosphere used elsewhere in this module.
+    # Refraction coefficient after Thom (1971). 0.0342 K/m is the
+    # autoconvective lapse rate g/R_specific (≈9.81/287) at which density is
+    # height-independent — the upper bound on the actual lapse rate; the
+    # 0.154 and 0.0238 factors are Thom's empirical normalisation. The
+    # lapse-rate term keeps the conventional 0.0065 K/m default consistent
+    # with the standard atmosphere used elsewhere in this module.
     krefr = (0.0342 + lapse_rate) / (0.154 * 0.0238)
     t_kelvin = 273.16 + attemp
     d = 1.0 - 1.8480 * krefr * atpress / (t_kelvin * t_kelvin)

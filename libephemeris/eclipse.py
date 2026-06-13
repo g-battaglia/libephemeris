@@ -779,6 +779,13 @@ def _sinclair_refraction_deg(
     "The calculation of astronomical refraction in marine navigation",
     Journal of the Institute of Navigation 35 (1982), p. 256, with
     Bennett's pressure/temperature compensation (p. 259).
+
+    The two branches join at h = 17.904104638432°: above it the high-altitude
+    asymptote 0.97/tan(h) (arcmin) applies; at or below it Sinclair's rational
+    fit (34.46 + 4.23h + 0.004h²)/(1 + 0.505h + 0.0845h²) (arcmin) applies.
+    The pressure/temperature factor (atpress-80)/930 / (1 + 8e-5·(r+39)·
+    (attemp-10)) is Bennett's compensation (p. 259), referred to 1010 mbar /
+    10 °C. Result converted arcmin -> deg.
     """
     h = app_alt_deg
     if h > 17.904104638432:
@@ -7383,8 +7390,10 @@ def heliacal_pheno_ut(
     sin_alt = max(-1.0, min(1.0, sin_alt))
     geo_alt_deg = math.degrees(math.asin(sin_alt))
 
-    # Calculate atmospheric refraction
-    # Use simplified formula: R = 1.02 / tan(h + 10.3/(h + 5.11)) in arcminutes
+    # Atmospheric refraction from true altitude, in arcminutes:
+    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
+    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
     if body_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
@@ -13313,7 +13322,9 @@ def _planet_occult_when_loc_impl(
                     ratio = 999.0
                     obscuration = magnitude
 
-                # Refraction correction (simplified)
+                # Refraction from true altitude, arcmin -> deg:
+                # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson (1986),
+                # Sky & Telescope 72, 70; Meeus (1998) ch. 16, eq. 16.4.
                 apparent_alt = (
                     target_alt
                     + (

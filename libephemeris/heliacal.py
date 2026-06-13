@@ -1383,7 +1383,11 @@ def _heliacal_pheno_ut_leb(
         star_name=star_name,
     )
 
-    # Atmospheric refraction (same formula as Skyfield path)
+    # Atmospheric refraction from true altitude, in arcminutes:
+    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
+    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
+    # Below h = -1° the 0.5° fallback approximates horizon refraction.
     if body_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
@@ -3527,15 +3531,17 @@ def _heliacal_pheno_ut_pythonic(
     sin_alt = max(-1.0, min(1.0, sin_alt))
     geo_alt_deg = math.degrees(math.asin(sin_alt))
 
-    # Calculate atmospheric refraction
-    # Use simplified formula: R = 1.02 / tan(h + 10.3/(h + 5.11)) in arcminutes
+    # Atmospheric refraction from true altitude, in arcminutes:
+    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
+    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
     if body_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
         )
         refraction /= 60.0  # Convert arcminutes to degrees
     else:
-        refraction = 0.5  # Near horizon approximation
+        refraction = 0.5  # Near-horizon fallback (below the formula's range)
 
     # Apparent altitude (with refraction)
     app_alt_deg = body_alt_deg + refraction

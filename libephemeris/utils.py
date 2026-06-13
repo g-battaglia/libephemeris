@@ -206,8 +206,10 @@ def azalt(
         - Reference API convention: Azimuth is measured from South, westward.
           This differs from the common convention (from North, eastward).
           To convert: az_from_north = (azimuth + 180) % 360
-        - Refraction is calculated using the Bennett formula, which is accurate
-          to about 0.07 arcmin for altitudes above 15°.
+        - Refraction is ray-traced through the ICAO Standard Atmosphere
+          (see ``libephemeris/refraction.py`` for the model and References);
+          it agrees with the common empirical fits (Bennett 1982,
+          Sæmundsson 1986) within the envelope documented there.
         - When pressure=0, no refraction is applied (apparent_alt = true_alt)
         - For objects below the horizon (negative altitude), refraction is
           extrapolated but becomes less accurate.
@@ -495,11 +497,12 @@ def refrac(
     Notes:
         - At the horizon (0 degrees), refraction is approximately 34 arcminutes
           (0.567 degrees) under standard atmospheric conditions.
-        - The formula used is the Saemund-Bennett formula, which is accurate
-          to about 0.07 arcminutes for altitudes above 15 degrees.
-        - For altitudes below -2 degrees, refraction is extrapolated linearly.
-        - Pressure and temperature adjustments follow the standard formula:
-          correction = (pressure / 1010) * (283 / (273 + temperature))
+        - Refraction is ray-traced through the ICAO Standard Atmosphere (see
+          ``libephemeris/refraction.py`` for the model and References), not
+          an empirical curve fit; it agrees with the Bennett 1982 /
+          Sæmundsson 1986 fits within the envelope documented there.
+        - Pressure and temperature enter through the atmospheric model
+          (refractive index n ∝ P/T), not a separate correction factor.
 
     Examples:
         >>> # True altitude at horizon -> apparent altitude is higher
