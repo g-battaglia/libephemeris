@@ -1,45 +1,45 @@
-# LibEphemeris Commercial License — DRAFT
+# LibEphemeris Commercial License
 
-> **STATUS: DRAFT TEMPLATE — NOT A LICENSE OFFER.**
-> This outline is an engineering placeholder for the commercial grant
-> referenced by the SPDX expression `LicenseRef-LibEphemeris-Commercial`.
-> It must be completed, reviewed and approved by legal counsel before any
-> commercial license is sold. Until then, the only effective public grant
-> is AGPL-3.0-only (see [LICENSE](LICENSE) and [LICENSING.md](LICENSING.md)).
+LibEphemeris is dual-licensed. The default public grant is **AGPL-3.0-only**
+(see [LICENSE](LICENSE) and [LICENSING.md](LICENSING.md)). Organizations that
+cannot or do not want to comply with the AGPL — for example, embedding
+LibEphemeris in a closed-source product, or running a SaaS without source
+disclosure — can instead obtain a commercial license, identified by the SPDX
+expression `LicenseRef-LibEphemeris-Commercial`.
+
+## How to obtain a commercial license
+
+Commercial-licensing terms are arranged **directly with the copyright
+holder**. There is no online purchase or self-serve form — please get in
+touch and we will work out the terms for your use case:
 
 - **Licensor:** Giacomo Battaglia
-- **Contact:** <giacomo@libephemeris.dev>
-- **Identifier:** `LicenseRef-LibEphemeris-Commercial`
+- **Contact:** <kerykeion.astrology@gmail.com>
 
-## Outline to be completed with counsel
+A commercial license typically covers the right to use, modify and
+redistribute LibEphemeris in object or source form as part of your products
+without the AGPL's source-disclosure obligations, scoped to your
+distribution model (per product / per organization, distributed software vs.
+SaaS).
 
-1. **Grant** — non-exclusive, non-transferable right to use, modify and
-   redistribute LibEphemeris in object or source form as part of the
-   licensee's products, without AGPL source-disclosure obligations.
-2. **Scope tiers** — per-product / per-organization; SaaS vs distributed
-   software; redistribution to end users.
-3. **Third-party components** — the grant covers only code owned by the
-   Licensor. Vendored components keep their own (permissive, MIT) licenses
-   (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); their notices
-   must accompany distributions. The package contains no copyleft code.
-4. **Trademarks** — no rights to the "Swiss Ephemeris" name (Astrodienst
-   AG) or to the LibEphemeris name beyond accurate attribution.
-5. **Warranty disclaimer and limitation of liability.**
-6. **Support and updates** — what the fee includes (versions, duration).
-7. **Term and termination** — effect of termination on shipped products.
-8. **Governing law and venue.**
+## What the grant covers
 
-## Counsel review checklist (commercial edition)
+The grant covers only code owned by the Licensor. The vendored components
+listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) keep their own
+licenses; they are all permissive (MIT) and their notices must accompany
+distributions. **The package contains no copyleft code.** No rights are
+granted to the "Swiss Ephemeris" name (Astrodienst AG) or to the
+LibEphemeris name beyond accurate attribution.
 
-- Final license/EULA text for the items above.
-- Independence/provenance dossier: [NOTICE.md](NOTICE.md),
-  `docs/methodology/provenance-sweep-2026-06.md`, verification logs under
-  `tasks/results/`.
-- Calibration-data position (tables fitted to pyswisseph output as a
-  black-box oracle — see "Calibration Data Disclosure" in NOTICE.md).
-- API-compatibility position (*Google LLC v. Oracle America*, 593 U.S. 1
-  (2021); EU Directive 2009/24/EC, interoperability provisions).
-- ESA Hipparcos data attribution terms; EU database right considerations
-  for compiled catalogs.
-- Contributor rights audit (sole-author status; AI-assisted output
-  ownership statement in NOTICE.md).
+## Independence & provenance
+
+The independence/provenance record that backs the commercial offering:
+
+- [NOTICE.md](NOTICE.md) — independent-implementation statement, calibration
+  disclosure, AI-authorship note.
+- `docs/methodology/provenance-sweep-2026-06.md` — Swiss Ephemeris
+  fingerprint remediation; `docs/methodology/galilean-clean-room-2026-06.md`
+  — the Galilean clean-room rewrite that retired the last copyleft module.
+- `docs/methodology/hypothetical-bodies.md` — published-source provenance
+  for the hypothetical-body elements.
+- Verification baselines under `tasks/results/`.

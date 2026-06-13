@@ -12,10 +12,10 @@ license-files = [
     "THIRD_PARTY_NOTICES.md",
 ]
 authors = [
-    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+    { name = "Giacomo Battaglia", email = "kerykeion.astrology@gmail.com" }
 ]
 maintainers = [
-    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+    { name = "Giacomo Battaglia", email = "kerykeion.astrology@gmail.com" }
 ]
 keywords = [
     "astronomy",

@@ -21,9 +21,10 @@ example: embedding LibEphemeris in a closed-source product, or running a
 SaaS without source disclosure) can obtain a commercial license from the
 copyright holder instead.
 
-- Outline: [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) (draft, pending
-  legal review)
-- Contact: Giacomo Battaglia — <giacomo@libephemeris.dev>
+Commercial-licensing terms are arranged directly with the copyright holder
+on request — please get in touch:
+
+- Contact: Giacomo Battaglia — <kerykeion.astrology@gmail.com>
 
 ## How the dual license works
 
@@ -63,5 +64,5 @@ and is never a runtime dependency.
 ---
 
 *This document describes the project's licensing model; it is not legal
-advice. The commercial license terms require review by legal counsel
-before any sale.*
+advice. Commercial-licensing terms are arranged directly with the
+copyright holder — contact <kerykeion.astrology@gmail.com>.*
