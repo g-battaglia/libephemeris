@@ -130,6 +130,17 @@ output. This is disclosed for transparency and is part of the legal review
 checklist for the commercial edition (see
 [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)).
 
+A third, smaller item: the **legacy Uranian display tables** in
+`libephemeris/hypothetical.py` (`URANIAN_ELEMENTS` and the per-body
+`*_KEPLERIAN_ELEMENTS` `L0` / Hades `M0` constants) are historical
+pyswisseph-oracle-calibrated fits. They are **not consulted at runtime** —
+the live Keplerian propagation uses the published Witte/Lefeldt 1928 +
+Neely 1988 elements from `libephemeris/data/fictitious_orbits.csv` — and
+are retained only for module-API stability (tests pin them). The
+code↔CSV↔publication provenance is enforced by
+`scripts/check_hypothetical_provenance.py` (`poe provenance:hypothetical`)
+and documented in `docs/methodology/hypothetical-bodies.md`.
+
 ## AI-Assisted Development
 
 Parts of this codebase were developed with AI assistance (Anthropic

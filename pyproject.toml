@@ -203,7 +203,8 @@ coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Te
 
 # --- Licensing / provenance gates (also run in CI: license-provenance.yml) ---
 "license:check" = {cmd = "python scripts/check_spdx_headers.py --check", help = "Verify SPDX headers on all shipped source files"}
-"provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Swiss Ephemeris fingerprint sweep over libephemeris/ (zero-hit gate)"}
+"provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Swiss Ephemeris / PyMeeus fingerprint sweep over libephemeris/ (zero-hit gate)"}
+"provenance:hypothetical" = {cmd = "python scripts/check_hypothetical_provenance.py", help = "Verify Uranian/Transpluto elements trace to published sources (zero-mismatch gate)"}
 "wheel:audit" = {cmd = "python scripts/check_wheel_contents.py", help = "Build the wheel and verify packaged contents"}
 
 # pytest configuration lives in pytest.ini (single source of truth);

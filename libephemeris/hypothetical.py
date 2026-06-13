@@ -34,11 +34,17 @@ Other Fictitious Bodies:
     - Waldemath Moon: Dr. Waldemath's hypothetical second moon of Earth (body #18)
       Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 
-References:
-    - Reference API documentation
-    - Witte, Alfred: "Regelwerk fuer Planetenbilder" (1932)
-    - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
-    - Landscheidt: "Cosmic Cybernetics" (1973)
+References (orbital-element sources; see data/fictitious_orbits.csv and
+docs/methodology/hypothetical-bodies.md for the per-body source table):
+    - Witte, A. & Lefeldt, H. (1928). "Regelwerk für Planetenbilder."
+      Hamburg: Ludwig Rudolph. (Hamburg-school Uranian planets)
+    - Neely, J. (1988). "The Uranian Planets." NCGR Research Journal,
+      vol. 1. (refined Uranian elements)
+    - Strubell, M. (1952). "Die Sterne" 3/1952, p. 70ff. (Transpluto/Isis)
+    - Abramov, V. (unpublished). (Proserpina)
+    - Hoyt, W.G. (1980). "Planets X and Pluto." Univ. of Arizona Press.
+      (historical Neptune / Pluto predictions)
+    - Harrington, R.S. (1988). "The Location of Planet X." AJ 96(4), 1476.
 """
 
 from __future__ import annotations
@@ -160,13 +166,15 @@ class UranianElements:
     phase_rate: float = 0.0
 
 
-# Uranian planet polynomial parameters for simplified position computation.
-# Source: Witte/Sieggrun, Regelwerk fur Planetenbilder (Hamburg School, 1928).
-# L0 and n values derived from the published ephemeris tables (Witte 1928,
-# refined by Neely 1988). The amplitude/phase/phase_rate terms represent
-# periodic corrections from the Hamburg School tradition to approximate
-# the equation of center and other perturbations for these hypothetical orbits.
-# See scripts/derive_hypothetical_elements.py for independent Keplerian verification.
+# Legacy mean-longitude oscillation table — a historical fit calibrated
+# against pyswisseph output, NOT consulted by any calculation path (the
+# unified Keplerian propagation in URANIAN_KEPLERIAN_ELEMENTS superseded
+# it; see calc_uranian_longitude). Retained only for module-API stability
+# (tests pin its membership/range). The L0 / amplitude / phase / phase_rate
+# values are oracle-calibrated, not attested in Hamburg-school literature;
+# the published elements live in URANIAN_KEPLERIAN_ELEMENTS and
+# data/fictitious_orbits.csv. Disclosed in NOTICE.md ("Calibration Data
+# Disclosure") and enforced by scripts/check_hypothetical_provenance.py.
 URANIAN_ELEMENTS: Dict[int, UranianElements] = {
     CUPIDO: UranianElements(
         name="Cupido",
@@ -320,7 +328,7 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
     i=0.0,  # Assumed on ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=105.301693,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=105.301693,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0037945179,  # Mean motion deg/day (Kepler's 3rd law from a=40.99837 AU)
 )
 
@@ -357,14 +365,16 @@ class HadesKeplerianElements:
     n: float
 
 
-# Hades Keplerian elements
-# Source: Witte/Sieggrun, Regelwerk fur Planetenbilder (Hamburg School, 1928)
-# Epoch J1900.0 (JD 2415020.0); a=50.66744 AU, e=0.00245, i=1.05 deg
+# Hades Keplerian elements — LEGACY display table, not consulted at runtime
+# (the live element set is URANIAN_KEPLERIAN_ELEMENTS[HADES], whose M0 is
+# the published Neely mean anomaly 27.6496 from data/fictitious_orbits.csv).
 #
-# Note: M0 here is mean anomaly (M). The unified URANIAN_KEPLERIAN_ELEMENTS
-# dict uses mean longitude (L = M + omega + Omega) for its M0 field.
-# Both are self-consistent within their respective usage contexts.
-# See scripts/derive_hypothetical_elements.py for the derivation.
+# Note on M0: the published mean anomaly at J1900 is 27.6496 (CSV / live
+# dict). The value 26.850162 below is a RETIRED calibration artifact of an
+# earlier mean-longitude propagation path: its old unified mean longitude
+# 336.363662 minus (omega 148.1796 + Omega 161.3339) = 26.850162. It is
+# kept only so this unused dataclass instance stays stable for the tests
+# that pin it; scripts/check_hypothetical_provenance.py freezes it.
 HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     name="Hades",
     epoch=2415020.0,  # J1900.0
@@ -373,7 +383,7 @@ HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     i=1.0500,  # Inclination in degrees
     omega=148.1796,  # Argument of perihelion in degrees
     Omega=161.3339,  # Longitude of ascending node in degrees
-    M0=26.850162,  # Mean anomaly at epoch in degrees (derived from Witte/Sieggrun 1928)
+    M0=26.850162,  # RETIRED calibration artifact (see note above); unused
     n=0.00278759,  # Mean motion deg/day (Kepler's 3rd law from a=50.66744 AU)
 )
 
@@ -421,7 +431,7 @@ ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=104.289095,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=104.289095,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0022203750,  # Mean motion deg/day (Kepler's 3rd law from a=59.21436 AU)
 )
 
@@ -469,7 +479,7 @@ KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=17.111353,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=17.111353,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0019351856,  # Mean motion deg/day (Kepler's 3rd law from a=64.81690 AU)
 )
 
@@ -517,7 +527,7 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=138.565328,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=138.565328,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0017177599,  # Mean motion deg/day (Kepler's 3rd law from a=70.29949 AU)
 )
 
@@ -565,7 +575,7 @@ ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=350.613913,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=350.613913,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0016016766,  # Mean motion deg/day (Kepler's 3rd law from a=73.62765 AU)
 )
 
@@ -614,7 +624,7 @@ VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=55.397715,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=55.397715,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0015069325,  # Mean motion deg/day (Kepler's 3rd law from a=77.25568 AU)
 )
 
@@ -663,7 +673,7 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=166.140256,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=166.140256,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0013256078,  # Mean motion deg/day (Kepler's 3rd law from a=83.66907 AU)
 )
 
@@ -783,8 +793,14 @@ class UranianKeplerianElements:
 #   6. Precess equatorial from equinox to J2000
 #   7. Rotate equatorial -> ecliptic at J2000 obliquity
 #
-# Orbital elements: Witte/Sieggruen, refined by James Neely
-# M0 values are MEAN ANOMALY at epoch (not mean longitude)
+# Orbital elements (the single source of truth, identical to
+# data/fictitious_orbits.csv — enforced by
+# scripts/check_hypothetical_provenance.py):
+#   Witte, A. & Lefeldt, H. (1928). "Regelwerk für Planetenbilder."
+#     Hamburg: Ludwig Rudolph.
+#   Neely, J. (1988). "The Uranian Planets." NCGR Research Journal, vol. 1
+#     (refined elements).
+# M0 values are MEAN ANOMALY at epoch (not mean longitude).
 #
 # Gaussian gravitational constant: k = 0.01720209895 rad/day
 # -> daily motion = 0.9856076686 deg/day / a^1.5
