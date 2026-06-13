@@ -57,7 +57,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Star catalog building (scripts/build_star_catalog.py)
+# Star catalog building (scripts/build_star_catalog_v2.py)
 stars = [
     "astropy>=5.0.0",
 ]

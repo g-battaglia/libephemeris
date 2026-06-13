@@ -142,3 +142,15 @@ time.  Items the fix workstreams made live again are noted as such.
 
 - `tests/test_pre_commit_config.py`: permanently skipped; validates a
   config file that does not exist in the repo.
+
+### scripts/build_star_catalog.py (superseded v1 star-catalog builder)
+
+- Superseded by `scripts/build_star_catalog_v2.py`, which generates the
+  shipped `libephemeris/star_catalog_gen.py` from van Leeuwen 2007 (CDS
+  I/311). The v1 builder additionally carries the **wrong HIP name
+  mappings** that caused REVIEW-2026-06-10 item C9 (HIP 5742 → "Eta
+  Piscium", 7097 → "Alrescha", 42911 → "Tarf"). Left in place per policy
+  with a SUPERSEDED banner in its docstring; still exercised by
+  `tests/test_build_star_catalog.py`. The corrected entries are pinned by
+  `tests/test_zodiacal_stars.py::TestC9CatalogRegression`. Do not use it to
+  regenerate the catalog.
