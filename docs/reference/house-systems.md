@@ -545,37 +545,39 @@ Fails within polar circle due to undefined diurnal/nocturnal arcs.
 
 ### Algorithm
 
-Uses co-latitude transformation and Campanus-like projection:
-
-1. Transform latitude to co-latitude: `φ' = 90° - φ`
-2. Calculate intermediate azimuths
-3. Apply ascendant formula with modified angles
+The horizon is divided into twelve equal 30° arcs from the East Point.
+Through each division point a vertical circle (great circle through zenith
+and nadir) is drawn; its ecliptic intersection is the house cusp. Derived
+from the geometric definition in R. W. Holden, *The Elements of House
+Division* (1977), ch. 10, with the spherical triangle solved via Smart,
+*Textbook on Spherical Astronomy*, ch. 3.
 
 ### Mathematical Formulas
 
-**Co-latitude:**
+**Co-latitude** (signed complement of geographic latitude):
 ```
-φ' = 90° - φ  (for φ > 0)
-φ' = -90° - φ (for φ < 0)
-```
-
-**Intermediate azimuths:**
-```
-fh1 = arcsin(sin(φ')/2)
-fh2 = arcsin(√3/2 · sin(φ'))
-xh1 = arctan(√3 / cos(φ'))
-xh2 = arctan(1/(√3 · cos(φ')))
+φ' = 90° - φ   (for φ > 0)
+φ' = -90° - φ  (for φ < 0)
 ```
 
-**House cusps (using modified ARMC):**
+**Vertical-circle parameters** at each horizon division angle θ (measured
+from the meridian; θ = k·30°, k = 1..5), from the spherical triangle
+(zenith, celestial pole, division point):
 ```
-θ' = ARMC + 180°
-cusps[11] = Asc(θ' + 90° - xh1, ε, φ, fh1)
-cusps[12] = Asc(θ' + 90° - xh2, ε, φ, fh2)
-cusps[1]  = Asc(θ' + 90°, ε, φ, φ')
-cusps[2]  = Asc(θ' + 90° + xh2, ε, φ, fh2)
-cusps[3]  = Asc(θ' + 90° + xh1, ε, φ, fh1)
+pole_height = arcsin(sin θ · sin φ')
+ra_offset   = atan2(cos θ, sin θ · cos φ')
 ```
+
+**House cusps** (base reference θ₀ = ARMC + 180°; Asc = rising-point
+formula at the given RA and pole height):
+```
+cusp = Asc(θ₀ + 90° + ra_offset, ε, φ, pole_height)
+
+θ = 30° → cusp 3    θ = 60° → cusp 2    θ = 90° → cusp 1 (East Point)
+θ = 120° → cusp 12   θ = 150° → cusp 11
+```
+(At θ = 90°: pole_height = arcsin(sin φ') = φ' and ra_offset = 0, so
+cusp 1 falls on the East Point. The remaining cusps follow by symmetry.)
 
 ---
 

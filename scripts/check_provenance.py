@@ -14,9 +14,14 @@ package:
 Classes 1-2 come from the June 2026 Swiss Ephemeris remediation (WS1);
 class 3 from the June 2026 Galilean clean-room rewrite, which replaced the
 PyMeeus-adapted ``moon_theories/galilean.py`` with an independent
-implementation derived from Lieske 1998 / Meeus ch. 44. All classes must
-produce zero hits over ``libephemeris/**/*.py``; this gate keeps the tree
-that way.
+implementation derived from Lieske 1998 / Meeus ch. 44; class 4 flags any
+copyleft (L/GPL) license declaration that strays into the tree.
+
+The sweep covers ``libephemeris/``, ``scripts/`` and ``docs/`` (``*.py``
+and ``*.md``). A short allowlist exempts the files that legitimately record
+the retired Swiss Ephemeris / PyMeeus history (this script and the
+methodology docs); ``libephemeris/`` is never exempt. All classes must
+produce zero hits; this gate keeps the tree that way.
 
 Usage:
     python scripts/check_provenance.py
@@ -29,7 +34,20 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_ROOT = REPO_ROOT / "libephemeris"
+SCAN_DIRS = ("libephemeris", "scripts", "docs")
+SCAN_SUFFIXES = (".py", ".md")
+
+# Files that legitimately record the retired SE / PyMeeus / LGPL history
+# (the gate itself and the provenance evidence docs). Never includes any
+# libephemeris/ file — shipped code stays strictly zero-hit.
+ALLOWLIST = frozenset(
+    {
+        "scripts/check_provenance.py",
+        "docs/methodology/provenance-sweep-2026-06.md",
+        "docs/methodology/galilean-clean-room-2026-06.md",
+        "docs/methodology/galilean-e5-spec.md",
+    }
+)
 
 SOURCE_FILE_RE = re.compile(
     r"swehouse|swecl\.c|sweph\.c|swemmoon|swemplan|swedate\.c", re.IGNORECASE
@@ -47,19 +65,33 @@ PYMEEUS_RE = re.compile(
     r"|jupiter_system_angles",
     re.IGNORECASE,
 )
+# Copyleft license declarations. Matches LGPL anywhere and standalone
+# GPL-2.0 / GPL-3.0, but NOT AGPL-3.0 (this project's own license) — the
+# negative lookbehind rejects a preceding letter, so the GPL-3.0 inside
+# "AGPL-3.0" and "LGPL-3.0" is not double-flagged.
+COPYLEFT_RE = re.compile(r"\bLGPL\b|(?<![A-Za-z])GPL-[23]\.0")
 CLASSES = (
     ("source-file-ref", SOURCE_FILE_RE),
     ("identifier", IDENTIFIER_RE),
     ("pymeeus", PYMEEUS_RE),
+    ("copyleft", COPYLEFT_RE),
 )
 
 
 def main() -> int:
     hits: list[tuple[Path, int, str, str]] = []
     files = sorted(
-        p for p in PACKAGE_ROOT.rglob("*.py") if "__pycache__" not in p.parts
+        p
+        for d in SCAN_DIRS
+        for p in (REPO_ROOT / d).rglob("*")
+        if p.suffix in SCAN_SUFFIXES and "__pycache__" not in p.parts
     )
+    scanned = 0
     for path in files:
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if rel in ALLOWLIST:
+            continue
+        scanned += 1
         for lineno, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
@@ -70,8 +102,8 @@ def main() -> int:
     for path, lineno, label, line in hits:
         print(f"{path.relative_to(REPO_ROOT)}:{lineno}: [{label}] {line[:100]}")
     print(
-        f"provenance sweep: {len(hits)} hit(s) over {len(files)} files "
-        f"in libephemeris/ (gate: 0)"
+        f"provenance sweep: {len(hits)} hit(s) over {scanned} files "
+        f"in {'/, '.join(SCAN_DIRS)}/ (gate: 0)"
     )
     return 1 if hits else 0
 
