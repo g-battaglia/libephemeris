@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import erfa
-from typing import Optional, Sequence, Tuple, Union, cast
+from typing import Optional, Sequence, Tuple, Union, cast, overload
 
 # Azalt calculation method flags (compatible with the reference API)
 ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -24,6 +24,18 @@ HOR2EQU: int = 1  # Horizontal to equatorial coordinates
 # Refraction calculation flags (compatible with the reference API)
 TRUE_TO_APP: int = 0  # True altitude to apparent altitude
 APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
+
+
+@overload
+def cotrans_sp(
+    coord: "Sequence[float]", eps_or_speed: float
+) -> "Tuple[float, float, float, float, float, float]": ...
+
+
+@overload
+def cotrans_sp(
+    coord: "Sequence[float]", eps_or_speed: "Sequence[float]", eps: float
+) -> "Tuple[Tuple[float, float, float], Tuple[float, float, float]]": ...
 
 
 def cotrans_sp(

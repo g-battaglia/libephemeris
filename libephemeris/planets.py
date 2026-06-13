@@ -46,7 +46,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Tuple, TYPE_CHECKING, cast
+from typing import Tuple, TYPE_CHECKING
 
 from .tracing import _record
 from jplephem.exceptions import OutOfRangeError
@@ -1712,10 +1712,7 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
         eps = get_true_obliquity(jd_tt)
 
     # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
-    result = cast(
-        Tuple[float, ...],
-        cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps),
-    )
+    result = cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps)
     return (
         result[0],
         result[1],
