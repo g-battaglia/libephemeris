@@ -17,6 +17,15 @@ Method:
   3. Fit Delaunay-based trigonometric series via least squares
   4. Store residuals (true_perturbation - trig_fit) as correction tables
   5. At runtime: longitude = mean + trig_series + interpolated_correction
+
+Provenance / calibration disclosure:
+  The stored values are numeric program *output* — computed positions of
+  the interpolated lunar apsides — obtained with pyswisseph used strictly
+  as a black-box oracle. They are not Swiss Ephemeris source expression.
+  The interpolated-apse bodies (INTP_APOG / INTP_PERG) are constructs
+  defined by the reference API, so 1:1 behavioral parity requires fitting
+  to reference output; the analytic series and this fitting pipeline are
+  original. Disclosed in NOTICE.md, section "Calibration Data Disclosure".
 """
 
 from __future__ import annotations

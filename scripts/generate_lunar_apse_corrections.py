@@ -23,6 +23,16 @@ After any recalibration of the trigonometric series
 (``leph calibrate perigee`` -> paste coefficients), regenerate the
 residual tables with this script, then run ``leph test lunar``.
 
+Provenance / calibration disclosure:
+    pyswisseph is used strictly as a black-box oracle. The stored values
+    are numeric program *output* (computed apse positions), not Swiss
+    Ephemeris source expression. INTP_APOG / INTP_PERG are constructs
+    defined by the reference API, so 1:1 behavioral parity requires
+    fitting to reference output; the analytic series and this fitting
+    pipeline are original. See NOTICE.md, "Calibration Data Disclosure".
+    The generated module carries the project dual-license header (the
+    tables are project-owned output data).
+
 Usage:
     python scripts/generate_lunar_apse_corrections.py --verify 2000
         Sample N random grid points, recompute the residuals, and report
@@ -147,7 +157,9 @@ def write_module() -> None:
     (pjd0, pstep, pcount, pvals) = results["perigee"]
     with open(out, "w") as f:
         f.write(
-            f'''"""
+            f'''# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
+"""
 AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 
 Correction tables for interpolated lunar apogee and perigee longitude.
@@ -164,6 +176,15 @@ Method:
   3. Fit Delaunay-based trigonometric series via least squares
   4. Store residuals (true_perturbation - trig_fit) as correction tables
   5. At runtime: longitude = mean + trig_series + interpolated_correction
+
+Provenance / calibration disclosure:
+  The stored values are numeric program *output* — computed positions of
+  the interpolated lunar apsides — obtained with pyswisseph used strictly
+  as a black-box oracle. They are not Swiss Ephemeris source expression.
+  The interpolated-apse bodies (INTP_APOG / INTP_PERG) are constructs
+  defined by the reference API, so 1:1 behavioral parity requires fitting
+  to reference output; the analytic series and this fitting pipeline are
+  original. Disclosed in NOTICE.md, section "Calibration Data Disclosure".
 """
 
 from __future__ import annotations
