@@ -3132,6 +3132,15 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         if entry.nomenclature.upper() == search_upper:
             return entry, None
 
+    # 2b. Try exact alias match. Alternate spellings and traditional names
+    # (e.g. "Betelgeux", "Beetlejuice", "Formalhaut") are explicit aliases,
+    # so they resolve exactly here rather than by a lossy fuzzy guess below.
+    alias_id = STAR_ALIASES.get(search_upper)
+    if alias_id is not None:
+        for entry in STAR_CATALOG:
+            if entry.id == alias_id:
+                return entry, None
+
     # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
     parsed_nomenclature = _parse_bayer_designation(search)
     if parsed_nomenclature:
@@ -3172,24 +3181,13 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
 
-    # 6. Try substring match in name (anywhere in the name)
-    for entry in STAR_CATALOG:
-        if search_upper in entry.name.upper():
-            matches.append(entry)
-
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # 7. Try phonetic fuzzy matching for common misspellings
-    fuzzy_result = _fuzzy_match_star(star_name)
-    if fuzzy_result is not None:
-        for entry in STAR_CATALOG:
-            if entry.id == fuzzy_result:
-                return entry, None
-
+    # No substring-anywhere or phonetic fuzzy fallback here: those tiers
+    # silently returned an unrelated but similarly-spelled star (e.g.
+    # "Chort"->kaRet, "Pushya"->psHya, "Messier 42"->muSer, "Alrai"->Cebalrai)
+    # for any valid name absent from this catalog, diverging from Swiss
+    # Ephemeris (which errors on unknown names). Legitimate alternate
+    # spellings are handled by the exact-alias tier above; an unresolved name
+    # now returns an honest error instead of a wrong star.
     return None, f"could not find star name {star_name.lower()}"
 
 
