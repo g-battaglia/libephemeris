@@ -401,6 +401,27 @@ FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 # Build lookup from canonical name to star ID
 _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
 
+# Build lookup from HIP number to catalog entry.
+_HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
+
+# Curated, individually-validated traditional-name corrections (name -> HIP).
+# Kept separate from the larger STAR_NAME_TO_HIP map because not every entry of
+# that map is vetted for the resolver path (a few carry wrong HIPs, e.g.
+# TYL/UNURGUNITE). HIP is stable across catalog regeneration, unlike the
+# generated row ids. Each entry verified against Swiss Ephemeris + IAU/WGSN:
+#   Alaraph = beta Vir (Zavijava) -- not Spica
+#   Gienah Corvi = gamma Crv (Gienah) -- not delta Crv (Algorab)
+#   Atri = delta UMa (Megrez) -- Hindu Saptarishi name
+#   Nash = gamma-2 Sgr (Alnasl)
+#   Deli = eta Aqr -- Hebrew name (Greek Hydria)
+_NAME_HIP_FIX = {
+    "ALARAPH": 57757,
+    "GIENAH CORVI": 59803,
+    "ATRI": 59774,
+    "NASH": 88635,
+    "DELI": 111497,
+}
+
 
 # =============================================================================
 # BAYER DESIGNATION PARSING
@@ -839,7 +860,8 @@ STAR_ALIASES: dict[str, int] = {
     "67 VIR": SPICA_STAR,
     "α VIR": SPICA_STAR,
     "AZIMECH": SPICA_STAR,
-    "ALARAPH": SPICA_STAR,
+    # NOTE: "Alaraph" is beta Vir (Zavijava), not Spica — resolved via
+    # STAR_NAME_TO_HIP instead (see ALARAPH there).
     "ALVIR": SPICA_STAR,
     "SUNBULA": SPICA_STAR,
     "VIRGIN'S SPIKE": SPICA_STAR,
@@ -1364,7 +1386,8 @@ STAR_ALIASES: dict[str, int] = {
     "δ CRV": ALGORAB,
     "DECRV": ALGORAB,
     "AL-GHIRAB": ALGORAB,
-    "GIENAH CORVI": ALGORAB,
+    # NOTE: "Gienah Corvi" is gamma Crv (Gienah), not delta Crv (Algorab) —
+    # resolved via STAR_NAME_TO_HIP instead (see GIENAH CORVI there).
     # ======== ALPHECCA (Alpha Coronae Borealis) - BEHENIAN ========
     "GEMMA": ALPHECCA,
     "ALPHA CORONAE BOREALIS": ALPHECCA,
@@ -3140,6 +3163,16 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         for entry in STAR_CATALOG:
             if entry.id == alias_id:
                 return entry, None
+
+    # 2c. Curated traditional-name corrections (HIP-keyed, stable across
+    # regen). Resolves names that are not catalog entry names or aliases to the
+    # correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" -> delta UMa
+    # / Megrez), overriding the looser prefix tiers below.
+    fix_hip = _NAME_HIP_FIX.get(search_upper)
+    if fix_hip is not None:
+        fix_entry = _HIP_TO_ENTRY.get(fix_hip)
+        if fix_entry is not None:
+            return fix_entry, None
 
     # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
     parsed_nomenclature = _parse_bayer_designation(search)

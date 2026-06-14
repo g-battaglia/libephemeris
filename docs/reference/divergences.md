@@ -137,6 +137,39 @@ separates the radial velocity component differently.
 Star magnitudes agree within 0.5 mag for all catalog stars. Small differences
 arise from different catalog versions.
 
+### 4.5 Star-name resolution
+
+For a star name absent from this library's catalog, `fixstar2`/`fixstar2_ut`
+return an explicit "could not find star name" error rather than a fuzzy-matched
+unrelated star (older builds could silently return e.g. `kaRet` for "Chort").
+
+A handful of *traditional* names are deliberately resolved to a different star
+than pyswisseph. In each case below libephemeris follows the IAU/WGSN-approved
+assignment (or the dominant naming tradition) and pyswisseph uses an older or
+non-standard star; mainstream named stars all match to <1".
+
+| Name | libephemeris | pyswisseph | Basis |
+|---|---|---|---|
+| Menkar | α Cet | λ Cet | IAU name "Menkar" approved for α Ceti (2016) |
+| Sadalbari | μ Peg | λ Peg | IAU name "Sadalbari" approved for μ Pegasi |
+| Algedi | α² Cap | α¹ Cap | IAU name "Algedi" approved for α² Capricorni |
+| Kurhah | ξ Cep | ζ Cep | IAU/WGSN name "Kurhah" approved for ξ Cephei (2016) |
+| Mirak | β And (Mirach) | ε Boo | "Mirak" is a documented spelling variant of Mirach (β And); ε Boo is Izar |
+
+Genuinely ambiguous traditional names (no single authority — libephemeris keeps
+its existing assignment, pyswisseph differs):
+
+- **Dheneb** — α Cyg (Deneb) here; pyswisseph uses ζ Aql (Deneb el Okab).
+- **Ruc** — δ Cas (Ruchbah) here; pyswisseph uses δ Cyg. "Rucbah" is attested
+  for δ Cas / α Aqr, not δ Cyg.
+- **Girtab** — θ Sco (Sargas) here; "Girtab" is sometimes κ Sco.
+- **Deneb Kaitos** — β Cet (Diphda) here; "Deneb Kaitos Shemali" is η Cet.
+- **Ukdah** — ι Hya here (IAU-CSN); pyswisseph uses τ² Hya.
+
+The clearly-wrong cases (Alaraph → β Vir, Gienah Corvi → γ Crv, Atri → δ UMa,
+Nash → γ² Sgr, Deli → η Aqr) were corrected to match both the reference and the
+naming tradition.
+
 ## 5. Refraction and Horizontal Coordinates
 
 ### 5.1 Atmospheric Refraction (`refrac`)
