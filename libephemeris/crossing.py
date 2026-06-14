@@ -1067,12 +1067,15 @@ def cross_ut(
                     return float(t_prev)
                 if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
                     lo, hi = t_prev, t_scan
+                    f_lo = _delta(lo)
                     for _ in range(60):
                         mid = 0.5 * (lo + hi)
-                        if _delta(lo) * _delta(mid) <= 0:
+                        f_mid = _delta(mid)
+                        if f_lo * f_mid <= 0:
                             hi = mid
                         else:
                             lo = mid
+                            f_lo = f_mid
                     return float(0.5 * (lo + hi))
                 t_prev, d_prev = t_scan, d_cur
                 t_scan += step

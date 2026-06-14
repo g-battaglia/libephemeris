@@ -405,7 +405,9 @@ def _year_to_jd(year: int) -> float:
     return 1 + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045.0
 
 
-def _maybe_warm_reader(reader: "LEBReader") -> None:
+def _maybe_warm_reader(
+    reader: "LEBReader | LEB2Reader | CompositeLEBReader",
+) -> None:
     """Conditionally warm the reader based on TOML ``mmap_preload`` config.
 
     When ``mmap_preload = true`` in the TOML configuration, converts the

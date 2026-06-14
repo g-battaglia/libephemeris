@@ -170,3 +170,35 @@ time.  Items the fix workstreams made live again are noted as such.
   `tests/test_build_star_catalog.py`. The corrected entries are pinned by
   `tests/test_zodiacal_stars.py::TestC9CatalogRegression`. Do not use it to
   regenerate the catalog.
+
+## No-op expression statements (ruff B018 artifacts, 2026-06-13)
+
+Lines where a ruff autofix stripped an unused assignment target, leaving a
+bare expression whose value is computed and discarded (the real value is
+recomputed later or never needed). They have no effect on output. Logged
+here and left in place per policy rather than deleted. These are distinct
+from the deliberately-kept `x = x` self-assignments noted under the
+eclipse/heliacal/fixed_stars review entries.
+
+- `libephemeris/planets.py:1649` — `(jd - 2451545.0) / 36525.0` (Julian
+  centuries computed and discarded; the live path recomputes as needed).
+- `libephemeris/planets.py:3786` — `math.degrees(dpsi_rad)` (only the
+  `deps_deg` conversion on the next line is assigned).
+- `libephemeris/planets.py:4991` — `r_dot_v / r_mag` (radial component,
+  discarded).
+- `libephemeris/utils.py:389` — `geopos[2]` (`azalt_rev` does not use the
+  altitude component, unlike `azalt`).
+- `libephemeris/lunar.py:384` — `y * sin_incl + z * cos_incl` (the
+  z-projection of the node inclination correction; `z` is hardcoded 0.0,
+  so only the `y_new`/`x` terms feed the `atan2`).
+- `libephemeris/fast_calc.py:644-645` — `-sg * cp` / `cg * cp` (two
+  rotation-matrix elements; the live `ba20`/`ba21` use different
+  expressions on the following lines).
+- `libephemeris/minor_bodies.py:2398` — `math.cos(lambda_body - lambda_p)`
+  (a stray cosine before the actual `delta_lambda` update).
+- `libephemeris/spk_auto.py:1101` — `jd - z` (fractional part of the Julian
+  Day, discarded).
+
+Note: `libephemeris/spk.py:1084` (`state.get_timescale()`) looks similar but
+is NOT dead — `get_timescale()` lazily initializes the global timescale, a
+real side effect — so it is left exactly as-is and excluded from this list.

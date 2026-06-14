@@ -13,6 +13,8 @@ References:
 - PLU060: Brozović & Jacobson (2024) - Pluto system
 """
 
+from __future__ import annotations
+
 import math
 from typing import Tuple
 

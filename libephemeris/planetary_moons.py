@@ -590,11 +590,16 @@ def get_moon_coverage(moon_id: int) -> Optional[Tuple[float, float]]:
         >>> start, end = get_moon_coverage(MOON_IO)
         >>> print(f"Io coverage: JD {start:.1f} to {end:.1f}")
     """
-    if moon_id not in _MOON_SPK_BY_BODY:
+    # Resolve the kernel by body id first, then by canonical NAIF target
+    # (matches calc_moon_position so coverage is not None for moons keyed
+    # only under PLMOON_OFFSET + naif_id by the auto-detect path).
+    naif_id = _moon_naif_id(moon_id)
+    if naif_id is None:
         return None
-
-    spk_file = _MOON_SPK_BY_BODY[moon_id]
-    kernel = _MOON_SPK_KERNELS.get(spk_file)
+    spk_file = _MOON_SPK_BY_BODY.get(moon_id) or _MOON_SPK_BY_BODY.get(
+        PLMOON_OFFSET + naif_id
+    )
+    kernel = _MOON_SPK_KERNELS.get(spk_file) if spk_file else None
     if kernel is None:
         return None
 

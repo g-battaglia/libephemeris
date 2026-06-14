@@ -18,7 +18,10 @@ def _python(args: list[str], use_dotenv: bool = True) -> None:
 
     Uses the shared _dotenv loader (same parsing and the same
     LIBEPHEMERIS_*-only filter as the package import path) instead of a
-    third ad-hoc .env parser.
+    third ad-hoc .env parser. Like that loader, an already-set environment
+    variable takes precedence over the ``.env`` value (no override), and the
+    parsed keys are merged into this process's ``os.environ`` before being
+    passed on to the subprocess.
     """
     import os
 

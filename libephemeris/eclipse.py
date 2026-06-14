@@ -708,6 +708,10 @@ def _lun_eclipse_phase_times(
 
     tret = [0.0] * 10
     tret[0] = jd_max
+    # Half-window for each contact search. It must exceed the longest
+    # half-phase duration (penumbral half-duration peaks near ~3 h), or the
+    # contact would fall outside [jd_max - win, jd_max] and _root_bisect
+    # would silently return its 0.0 "unbracketed" sentinel for that contact.
     win = 4.0 / 24.0
     tret[6] = _root_bisect(_f_pen, jd_max - win, jd_max)
     tret[7] = _root_bisect(_f_pen, jd_max, jd_max + win)
