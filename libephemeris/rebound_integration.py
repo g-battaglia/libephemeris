@@ -1017,8 +1017,26 @@ def propagate_trajectory(
                 sim = rebound.Simulation()
                 assist.Extras(sim, ephem)
 
+                # ASSIST integrates in the equatorial ICRF frame with the
+                # solar-system barycenter at the origin (same convention as
+                # propagate_orbit_assist), so rotate ecliptic -> equatorial
+                # and shift the origin by the Sun's barycentric state before
+                # adding the particle, then undo both at each output epoch.
                 cart = _elements_to_cartesian(elements, jd_start)
-                sim.add(m=0.0, **cart)
+                sun0 = ephem.get_particle("sun", jd_start - ephem.jd_ref)
+                x0, y0, z0 = _ecliptic_j2000_to_icrs(cart["x"], cart["y"], cart["z"])
+                vx0, vy0, vz0 = _ecliptic_j2000_to_icrs(
+                    cart["vx"], cart["vy"], cart["vz"]
+                )
+                sim.add(
+                    m=0.0,
+                    x=x0 + sun0.x,
+                    y=y0 + sun0.y,
+                    z=z0 + sun0.z,
+                    vx=vx0 + sun0.vx,
+                    vy=vy0 + sun0.vy,
+                    vz=vz0 + sun0.vz,
+                )
 
                 sim.t = jd_start - ephem.jd_ref
 
@@ -1026,9 +1044,16 @@ def propagate_trajectory(
                     t = jd_start + i * dt
                     sim.integrate(t - ephem.jd_ref)
                     p = sim.particles[0]
+                    sun_t = ephem.get_particle("sun", t - ephem.jd_ref)
+                    xh, yh, zh = _icrs_to_ecliptic_j2000(
+                        p.x - sun_t.x, p.y - sun_t.y, p.z - sun_t.z
+                    )
+                    vxh, vyh, vzh = _icrs_to_ecliptic_j2000(
+                        p.vx - sun_t.vx, p.vy - sun_t.vy, p.vz - sun_t.vz
+                    )
                     results.append(
                         PropagationResult(
-                            x=p.x, y=p.y, z=p.z, vx=p.vx, vy=p.vy, vz=p.vz, jd_tt=t
+                            x=xh, y=yh, z=zh, vx=vxh, vy=vyh, vz=vzh, jd_tt=t
                         )
                     )
 

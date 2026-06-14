@@ -150,7 +150,7 @@ class SPKType21(object):
                     return result[0:3], result[3:]
 
             self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(eval_sec, target, center)
-            self.mda_record_exists = True
+            self.mda_record_exist = True
 
             result = self.spke21(eval_sec, self.mda_record)
             return result[0:3], result[3:]
