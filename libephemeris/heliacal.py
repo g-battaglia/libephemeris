@@ -1222,26 +1222,39 @@ def _heliacal_ut_leb(
         return (jd_low + jd_high) / 2
 
     def _search_heliacal_rising(jd_start_inner: float) -> float:
+        # A heliacal rising is the FIRST morning visibility after the body was
+        # invisible because it was too close to the Sun (i.e. it emerged from a
+        # conjunction gap). Requiring only N consecutive invisible days is not
+        # enough: mid-apparition a bright planet can flicker invisible for a few
+        # days (Moon glare / marginal twilight) and that would be mis-reported
+        # as a rising. So we also require the invisibility streak to have passed
+        # through low solar elongation (a real conjunction gap), which a
+        # mid-apparition dip never does.
+        ELONG_GAP = 10.0  # deg: streak min elongation below this == near conjunction
         max_days = 800
         lookback_jds = [jd_start_inner - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
-        for vis, _ in lookback_vis:
+        min_elong = 999.0
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
                 break
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
                     consecutive_invisible += 1
+                    min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5:
+                    if consecutive_invisible >= 5 and (is_star or min_elong <= ELONG_GAP):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
+                    min_elong = 999.0
         return 0.0
 
     def _search_heliacal_setting(jd_start_inner: float) -> float:
@@ -2617,16 +2630,28 @@ def _heliacal_ut_pythonic(
         return results
 
     def _search_heliacal_rising(jd_start: float) -> float:
-        """Search for heliacal rising using batched Skyfield computation."""
+        """Search for heliacal rising using batched Skyfield computation.
+
+        A heliacal rising is the first morning visibility after the body
+        emerged from a conjunction gap (was too close to the Sun). Requiring
+        only N consecutive invisible days is insufficient: mid-apparition a
+        bright planet can flicker invisible for a few days (Moon glare /
+        marginal twilight), which would be mis-reported as a rising. So the
+        invisibility streak must also have passed through low solar elongation
+        (a real conjunction gap), which a mid-apparition dip never does.
+        """
+        ELONG_GAP = 10.0  # deg
         max_days = 800
 
         # Look back to establish initial visibility state.
         lookback_jds = [jd_start - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
-        for vis, _ in lookback_vis:
+        min_elong = 999.0
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
                 break
 
@@ -2635,13 +2660,17 @@ def _heliacal_ut_pythonic(
             jd_days = [jd_start + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
 
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
                     consecutive_invisible += 1
+                    # use the day JD (always valid); jd_vis is a sentinel when
+                    # there is no twilight visibility window.
+                    min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5:
+                    if consecutive_invisible >= 5 and (is_star or min_elong <= ELONG_GAP):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
+                    min_elong = 999.0
 
         return 0.0
 
