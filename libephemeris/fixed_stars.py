@@ -405,10 +405,10 @@ _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
 _HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
 
 # Curated, individually-validated traditional-name corrections (name -> HIP).
-# Kept separate from the larger STAR_NAME_TO_HIP map because not every entry of
-# that map is vetted for the resolver path (a few carry wrong HIPs, e.g.
-# TYL/UNURGUNITE). HIP is stable across catalog regeneration, unlike the
-# generated row ids. Each entry verified against Swiss Ephemeris + IAU/WGSN:
+# Kept separate from the larger STAR_NAME_TO_HIP map, which is the name->HIP
+# lookup for get_hip_from_star_name (not the fixstar resolver path). HIP is
+# stable across catalog regeneration, unlike the generated row ids. Each entry
+# verified against Swiss Ephemeris + IAU/WGSN:
 #   Alaraph = beta Vir (Zavijava) -- not Spica
 #   Gienah Corvi = gamma Crv (Gienah) -- not delta Crv (Algorab)
 #   Atri = delta UMa (Megrez) -- Hindu Saptarishi name
@@ -3824,11 +3824,11 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "TONATIUH": 58952,  # HD 104985
     "TORCULAR": 8198,  # Omicron Piscium
     "TUREIS": 39757,  # Rho Puppis
-    "TYL": 91919,  # Epsilon Draconis
+    "TYL": 97433,  # Epsilon Draconis (was 91919 = eps-1 Lyrae, wrong)
     # U
     "UKDAH": 47431,  # Iota Hydrae
     "UNUKALHAI": 77070,  # Alpha Serpentis
-    "UNURGUNITE": 34444,  # Sigma Canis Majoris
+    "UNURGUNITE": 33856,  # Sigma Canis Majoris (was 34444 = Wezen/del CMa, wrong)
     "URUK": 116076,  # HD 231701
     # V
     "VEGA": 91262,  # Alpha Lyrae
