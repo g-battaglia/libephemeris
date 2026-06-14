@@ -147,7 +147,7 @@ def _gauss_legendre_nodes(n: int) -> Tuple[list, list]:
         x = math.cos(theta)
 
         dp = 1.0  # will be overwritten in the loop
-        for _ in range(50):
+        for _ in range(50):  # pragma: no branch - Newton iteration always converges in <50 steps
             p0 = 1.0
             p1 = x
             for j in range(2, n + 1):
