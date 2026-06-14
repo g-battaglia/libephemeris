@@ -336,6 +336,31 @@ def build(verbose: bool) -> tuple[list[tuple], dict]:
             if selected[hip]["rv"] == 0.0 and row[7] != 0.0:
                 selected[hip]["rv"] = row[7]
 
+    # Disambiguate stars that share a proper NAME. A shared name collapses
+    # them to a single entry in the name->id lookup, leaving all but one
+    # unreachable by name (e.g. the three theta-1 Orionis Trapezium
+    # components HIP 26220/26221/26224, all "th01Ori"). Append the Bayer
+    # component letter (A, B, C, ... in HIP order, which matches the
+    # Trapezium designations: 26220=A, 26221=B, 26224=C) to the name and,
+    # when it equals the name, the nomenclature, so each is uniquely
+    # resolvable. Preserved curated stars keep their established identity but
+    # still consume their letter slot so the others stay correctly lettered.
+    # Stars that merely share a Bayer nomenclature but have distinct proper
+    # names (e.g. alCen -> Rigil Kentaurus / Toliman) are left untouched.
+    by_name: dict[str, list[int]] = {}
+    for hip in selected:
+        by_name.setdefault(selected[hip]["name"], []).append(hip)
+    for shared_name, group in by_name.items():
+        if len(group) < 2:
+            continue
+        for letter, hip in zip("ABCDEFGHIJKLMNOP", sorted(group)):
+            if hip in preserved_ids:
+                continue
+            suffixed = f"{shared_name}{letter}"
+            if selected[hip]["nomen"] == selected[hip]["name"]:
+                selected[hip]["nomen"] = suffixed
+            selected[hip]["name"] = suffixed
+
     next_id = max(preserved_ids.values()) + 1 if preserved_ids else 1000001
     rows_out: list[tuple] = []
     for hip in sorted(selected):

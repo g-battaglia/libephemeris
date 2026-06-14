@@ -2544,7 +2544,7 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
         if _se_star_key(entry.name) == sstar:
             return _found(entry)
     for alias, star_id in STAR_ALIASES.items():
-        if _se_star_key(alias).lower() == sstar:
+        if _se_star_key(alias) == sstar:
             for entry in STAR_CATALOG:
                 if entry.id == star_id:
                     return _found(entry)
@@ -2844,6 +2844,15 @@ def batch_fixstars_ut(
 
     The result order matches the input order. When ``skip_errors`` is True,
     unresolved stars keep their input slot as ``None``.
+
+    Note:
+        Unlike the single-star path, this batch path computes geocentric
+        positions and does not apply ``FLG_TOPOCTR``. For fixed stars the
+        diurnal-parallax (topocentric) correction is sub-microarcsecond, so
+        the positions are identical to the topocentric single-star path to
+        well beyond output precision; only the echoed return flags differ.
+        Use ``fixstar2_ut`` per star if exact topocentric flag semantics are
+        required.
     """
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
