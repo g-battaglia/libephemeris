@@ -1068,7 +1068,11 @@ def _calc_type21_position(
 
     # Check flags
     is_heliocentric = bool(iflag & FLG_HELCTR)
-    apply_light_time = not (iflag & FLG_TRUEPOS) and not is_heliocentric
+    # Light-time is applied for heliocentric output too (retarded by the
+    # Sun->body light time, see the iteration below); the reference and the
+    # rest of the library retard heliocentric positions. Aberration, however,
+    # is a geocentric-observer effect and is excluded from heliocentric output.
+    apply_light_time = not (iflag & FLG_TRUEPOS)
     apply_aberration = not (iflag & FLG_NOABERR) and not is_heliocentric
     apply_precession = not (iflag & FLG_J2000)
     apply_nutation = not (iflag & FLG_NONUT) and apply_precession
@@ -1114,9 +1118,13 @@ def _calc_type21_position(
             pos_au = np.array(pos_km) / AU_KM
             pos_ecl = np.array(_icrs_to_ecliptic_j2000(*pos_au))
 
-            # Compute geocentric distance
-            pos_geo = pos_ecl - earth_helio_ecl
-            dist_au = float(np.linalg.norm(pos_geo))
+            # Light-time distance: Sun->body for heliocentric output,
+            # Earth->body for geocentric output.
+            if is_heliocentric:
+                dist_au = float(np.linalg.norm(pos_ecl))
+            else:
+                pos_geo = pos_ecl - earth_helio_ecl
+                dist_au = float(np.linalg.norm(pos_geo))
 
             # Light-time in days
             light_time_days = dist_au / C_LIGHT_AU_DAY
@@ -1430,15 +1438,17 @@ def calc_spk_body_position(
     else:
         observer = planets["earth"]
 
-    # Apparent geocentric pipeline, mirroring the type-21 path:
-    # light-time iteration on the target (unless FLG_TRUEPOS) and
-    # annual aberration (unless FLG_NOABERR); heliocentric output stays
-    # geometric like the rest of the library's heliocentric paths.
+    # Apparent pipeline, mirroring the type-21 path: light-time iteration
+    # on the target (unless FLG_TRUEPOS) and, for geocentric output, annual
+    # aberration (unless FLG_NOABERR). Heliocentric output is light-time
+    # corrected too -- here the observer is the Sun, so the iteration below
+    # retards by the Sun->body light time -- but carries no aberration,
+    # matching the reference and the rest of the library's heliocentric paths.
     from .constants import FLG_NOABERR, FLG_TRUEPOS
     from .astrometry import apply_aberration_to_position
 
     C_AU_DAY = 173.144632674240
-    apply_light_time = not (iflag & FLG_TRUEPOS) and not is_heliocentric
+    apply_light_time = not (iflag & FLG_TRUEPOS)
     apply_aberr = not (iflag & FLG_NOABERR) and not is_heliocentric
     ts = get_timescale()
 

@@ -105,6 +105,29 @@ class StateVector:
 # =============================================================================
 
 
+_SSL_CTX = None
+_SSL_CTX_LOCK = threading.Lock()
+
+
+def _get_ssl_context():
+    """Return a shared default SSL context, building it once on first use.
+
+    Parsing the certifi CA bundle (disk read + parse) is non-trivial and the
+    Horizons path issues many sequential fetches per body, so the context is
+    cached at module level rather than rebuilt on every request.
+    """
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        with _SSL_CTX_LOCK:
+            if _SSL_CTX is None:
+                import ssl
+
+                import certifi
+
+                _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+    return _SSL_CTX
+
+
 class HorizonsClient:
     """HTTP client for NASA JPL Horizons API with LRU cache.
 
@@ -230,12 +253,9 @@ class HorizonsClient:
         self, url: str, command: str, max_retries: int = 2
     ) -> StateVector:
         """Fetch URL with exponential backoff retry."""
-        import ssl
         import time
 
-        import certifi
-
-        ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        ssl_ctx = _get_ssl_context()
 
         last_err = None
         for attempt in range(max_retries + 1):
@@ -559,7 +579,7 @@ def horizons_calc_ut(
             geo2,
             earth_sv2.pos,
             jd_tt2,
-            lt if not (iflag & FLG_TRUEPOS) else 0.0,
+            lt2,
             batch,
             client,
         )
