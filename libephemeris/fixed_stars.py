@@ -2738,6 +2738,12 @@ def _apply_fixstar_flags(
         lon = (lon - ayanamsa) % 360.0
 
     # ---- 4. Output format conversion ----
+    # Cast to native Python floats (upstream Skyfield/numpy ops can leak
+    # numpy.float64) before any output path, so every fixstar* return is native.
+    lon, lat, dist = float(lon), float(lat), float(dist)
+    speed_lon = float(speed_lon)
+    speed_lat = float(speed_lat)
+    speed_dist = float(speed_dist)
     result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
     if iflag & FLG_XYZ:
