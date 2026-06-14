@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FORBIDDEN = (
     re.compile(r"(^|/)tests?/"),
     re.compile(r"(^|/)compare_scripts/"),
-    re.compile(r"libephemeris/dev_cli/"),
+    re.compile(r"libephemeris/dev_cli(/|\.py)"),
     re.compile(r"\.se1$", re.IGNORECASE),
     re.compile(r"sefstars", re.IGNORECASE),
     re.compile(r"seorbel", re.IGNORECASE),

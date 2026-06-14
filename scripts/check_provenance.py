@@ -50,7 +50,9 @@ ALLOWLIST = frozenset(
 )
 
 SOURCE_FILE_RE = re.compile(
-    r"swehouse|swecl\.c|sweph\.c|swemmoon|swemplan|swedate\.c", re.IGNORECASE
+    r"swehouse|swecl\.c|sweph\.c|swephlib|swejpl|swehel"
+    r"|swemmoon|swemplan|swedate\.c",
+    re.IGNORECASE,
 )
 IDENTIFIER_RE = re.compile(
     r"\bswed\b|\bdgsect\b|\bxs1\b|\bxh1\b|\bfh1\b|\bmdd\b|\bmdn\b|\badp\b"
@@ -65,11 +67,19 @@ PYMEEUS_RE = re.compile(
     r"|jupiter_system_angles",
     re.IGNORECASE,
 )
-# Copyleft license declarations. Matches LGPL anywhere and standalone
-# GPL-2.0 / GPL-3.0, but NOT AGPL-3.0 (this project's own license) — the
-# negative lookbehind rejects a preceding letter, so the GPL-3.0 inside
-# "AGPL-3.0" and "LGPL-3.0" is not double-flagged.
-COPYLEFT_RE = re.compile(r"\bLGPL\b|(?<![A-Za-z])GPL-[23]\.0")
+# Copyleft license declarations (case-insensitive). Matches L/GPL token
+# forms (LGPL, GPL, GPLv2/v3, GPL-2.0/3.0, LGPL-3.0) and the spelled-out
+# "GNU/Lesser General Public License", but NOT AGPL-3.0 (this project's own
+# license): the leading word boundary means the GPL inside "AGPL" is not at
+# a token start, and "GNU Affero General Public" breaks the GNU...general
+# adjacency. Word boundaries also avoid false hits on substrings such as the
+# "gPl" inside "PickeringPlanet".
+COPYLEFT_RE = re.compile(
+    r"\bL?GPL(?:[-\s]?v?[23](?:\.0)?)?\b"
+    r"|\blesser\s+general\s+public\b"
+    r"|\bGNU\s+general\s+public\b",
+    re.IGNORECASE,
+)
 CLASSES = (
     ("source-file-ref", SOURCE_FILE_RE),
     ("identifier", IDENTIFIER_RE),

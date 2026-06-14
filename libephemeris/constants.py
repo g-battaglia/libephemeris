@@ -869,6 +869,7 @@ HELFLAG_SEARCH_1_PERIOD: int = 1 << 11  # 2048 - Search one synodic period only
 HELFLAG_VISLIM_DARK: int = 1 << 12  # 4096 - Assume Sun at nadir (dark sky)
 HELFLAG_VISLIM_NOMOON: int = 1 << 13  # 8192 - Exclude Moon's contribution
 HELFLAG_VISLIM_PHOTOPIC: int = 1 << 14  # 16384 - Force photopic vision mode
+HELFLAG_VISLIM_SCOTOPIC: int = 1 << 15  # 32768 - Force scotopic vision mode
 HELFLAG_AV: int = 1 << 16  # 65536 - Arcus visionis method (VR)
 HELFLAG_AVKIND_VR: int = 1 << 16  # 65536 - Alias for HELFLAG_AV
 HELFLAG_AVKIND_PTO: int = 1 << 17  # 131072 - Ptolemy method

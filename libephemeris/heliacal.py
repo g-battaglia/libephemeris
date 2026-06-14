@@ -42,6 +42,8 @@ from .constants import (
     FIXSTAR_OFFSET,
     FLG_SPEED,
     FLG_SWIEPH,
+    HELFLAG_VISLIM_PHOTOPIC,
+    HELFLAG_VISLIM_SCOTOPIC,
 )
 
 # Inner planets (orbit inside Earth's orbit)
@@ -1635,9 +1637,9 @@ def _vislim_scotopic_flag(
     )
     bsk_nl = 54.0 * (10.0 ** (reduction_mag / 2.5))
     is_scotopic = bsk_nl < 1645.0
-    if flags & HELFLAG_VISLIM_PHOTOPIC_OVERRIDE:
+    if flags & HELFLAG_VISLIM_PHOTOPIC:
         is_scotopic = False
-    if flags & HELFLAG_VISLIM_SCOTOPIC_OVERRIDE:
+    if flags & HELFLAG_VISLIM_SCOTOPIC:
         is_scotopic = True
     flag = HELFLAG_SCOTOPIC if is_scotopic else HELFLAG_PHOTOPIC
     bnight = 1479.0
@@ -1645,12 +1647,6 @@ def _vislim_scotopic_flag(
     if bnight * bnight_factor > bsk_nl > bnight / bnight_factor:
         flag |= 2
     return flag
-
-
-# Reference flag values for forcing the vision regime (SE names:
-# SE_HELFLAG_VISLIM_PHOTOPIC / SE_HELFLAG_VISLIM_SCOTOPIC).
-HELFLAG_VISLIM_PHOTOPIC_OVERRIDE = 1 << 14
-HELFLAG_VISLIM_SCOTOPIC_OVERRIDE = 1 << 15
 
 
 def _vis_limit_mag_leb(
