@@ -198,6 +198,9 @@ eclipse/heliacal/fixed_stars review entries.
   (a stray cosine before the actual `delta_lambda` update).
 - `libephemeris/spk_auto.py:1101` — `jd - z` (fractional part of the Julian
   Day, discarded).
+- `libephemeris/heliacal.py:269` — `math.cos(alt_rad)` in
+  `SchaeferModel.airmass()` (the Rozenberg formula uses only `sin_alt`; the
+  cosine is computed and discarded). Found in audit round v10.
 
 Note: `libephemeris/spk.py:1084` (`state.get_timescale()`) looks similar but
 is NOT dead — `get_timescale()` lazily initializes the global timescale, a
