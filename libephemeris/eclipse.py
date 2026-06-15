@@ -10728,9 +10728,17 @@ def _calc_eclipse_path_width_impl(
           the Sun is lower in the sky
 
     Precision:
-        Accurate to approximately ±1 km for typical eclipses when the Sun is
-        more than 10° above the horizon. Less accurate near sunrise/sunset
-        due to grazing geometry.
+        This is a simplified geometric model: the umbral/antumbral cone radius
+        (Besselian l2) projected onto the surface through 1/sin(Sun altitude)
+        with curvature and observer-elevation corrections. It measures the
+        shadow ellipse in the local vertical plane rather than strictly
+        perpendicular to the shadow's ground track, so near greatest eclipse
+        (Sun high) it runs a few percent wider than the published path widths
+        in the canon of solar eclipses -- e.g. ~124 km vs ~115 km on
+        2017-08-21 and ~207 km vs ~198 km on 2024-04-08 (about 5-8% high). The
+        central-line position, northern/southern limits and central duration
+        are accurate (greatest-eclipse position to ~0.02 deg). The discrepancy
+        grows toward sunrise/sunset where the grazing geometry dominates.
 
     Example:
         >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic, ECL_TOTAL
