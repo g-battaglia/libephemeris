@@ -1046,39 +1046,57 @@ def cross_ut(
     # target to ~360 already, and a body exactly at the target crosses
     # NOW (same convention as solcross/mooncross).
 
-    # A retrograde planet can reach a target lying just BEHIND it while
-    # still retrograde — long before the prograde-speed guess below.
-    # Scan forward for the first wrapped sign change and refine, so the
-    # chronologically first crossing is returned.
-    if speed < 0:
-        diff_back = (lon_start - x2cross) % 360.0
-        if diff_back < 25.0:  # max retrograde arc is ~20 deg (Mars)
-            def _delta(jd_time: float) -> float:
-                lon_t = calc_ut(jd_time, planet, flags)[0][0]
-                return (lon_t - x2cross + 180.0) % 360.0 - 180.0
+    # Newton-Raphson assumes near-monotonic prograde motion and mishandles
+    # crossings near a retrograde loop, in several ways that all return the wrong
+    # crossing:
+    #   * target just BEHIND now, reached via an imminent retrograde dip (even
+    #     while still prograde, approaching a station) -> NR projects a full orbit
+    #     ahead and returns a crossing months-to-decades too late;
+    #   * currently RETROGRADE with a target it last passed in the recent past ->
+    #     NR can step backward and converge to a PAST crossing (before tjdut),
+    #     violating the forward-only contract;
+    #   * near a station, the step diff/speed explodes and the search diverges.
+    # In all of these the chronologically first crossing lies within ~one synodic
+    # period, so scan forward from tjdut for the first wrapped sign change and
+    # refine. The scan is forward-only by construction and early-exits on the
+    # first crossing, so it is cheap whenever one exists soon. The fast common
+    # case (prograde, target ahead, away from a station) skips it and uses NR.
+    _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0,
+                  7: 6.0, 8: 5.0, 9: 4.0}
+    _SYNODIC = {2: 116.0, 3: 584.0, 4: 780.0, 5: 399.0, 6: 378.0,
+                7: 370.0, 8: 367.0, 9: 367.0}
+    diff_back = (lon_start - x2cross) % 360.0
+    if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(
+        planet, 22.0
+    ):
+        scan_window = _SYNODIC.get(planet, 800.0) * 1.2
 
-            d_prev = _delta(tjdut)
-            step = 0.5
-            t_prev = tjdut
-            t_scan = tjdut + step
-            while t_scan <= tjdut + 200.0:
-                d_cur = _delta(t_scan)
-                if d_prev == 0.0:
-                    return float(t_prev)
-                if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
-                    lo, hi = t_prev, t_scan
-                    f_lo = _delta(lo)
-                    for _ in range(60):
-                        mid = 0.5 * (lo + hi)
-                        f_mid = _delta(mid)
-                        if f_lo * f_mid <= 0:
-                            hi = mid
-                        else:
-                            lo = mid
-                            f_lo = f_mid
-                    return float(0.5 * (lo + hi))
-                t_prev, d_prev = t_scan, d_cur
-                t_scan += step
+        def _delta(jd_time: float) -> float:
+            lon_t = calc_ut(jd_time, planet, flags)[0][0]
+            return (lon_t - x2cross + 180.0) % 360.0 - 180.0
+
+        d_prev = _delta(tjdut)
+        step = 0.5
+        t_prev = tjdut
+        t_scan = tjdut + step
+        while t_scan <= tjdut + scan_window:
+            d_cur = _delta(t_scan)
+            if d_prev == 0.0:
+                return float(t_prev)
+            if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
+                lo, hi = t_prev, t_scan
+                f_lo = _delta(lo)
+                for _ in range(60):
+                    mid = 0.5 * (lo + hi)
+                    f_mid = _delta(mid)
+                    if f_lo * f_mid <= 0:
+                        hi = mid
+                    else:
+                        lo = mid
+                        f_lo = f_mid
+                return float(0.5 * (lo + hi))
+            t_prev, d_prev = t_scan, d_cur
+            t_scan += step
 
     dt_guess = diff / effective_speed
     jd_guess = tjdut + dt_guess
@@ -1216,7 +1234,25 @@ def cross_ut(
         else:
             max_range = 800  # Mars and others
         if abs(jd - tjdut) > max_range:  # Use tjdut not jd_guess
-            raise Error("Planet crossing search diverged")
+            # Newton-Raphson wandered off — typically a near-station overshoot,
+            # where the step diff/speed explodes as speed -> 0 close to a
+            # retrograde turning point. A crossing usually still exists near
+            # tjdut, so fall back to a dense forward bracket scan + Brent before
+            # giving up (strict improvement: only reached when NR would raise).
+            num_samples = min(4000, max(int(max_range / 0.5), 200))
+            try:
+                jd_a, jd_b = _find_bracket_for_crossing(
+                    get_position,
+                    x2cross,
+                    tjdut,
+                    tjdut + max_range,
+                    num_samples=num_samples,
+                )
+                return _brent_find_crossing(
+                    get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, 100
+                )
+            except (Error, RuntimeError):
+                raise Error("Planet crossing search diverged")
 
     raise Error("Maximum iterations reached in planet crossing calculation")
 
