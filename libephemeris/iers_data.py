@@ -524,7 +524,7 @@ def _parse_finals_data(filepath: str) -> dict[float, IERSDataPoint]:
                 # Check if this is observed (I) or predicted (P)
                 # The flag is at column 58 (1-indexed), so 57 in Python
                 is_prediction = False
-                if len(line) > 57:
+                if len(line) > 57:  # pragma: no branch - earlier len<68 guard makes this always true
                     flag = line[57]
                     is_prediction = flag.upper() == "P"
 

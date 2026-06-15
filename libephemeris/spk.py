@@ -527,7 +527,7 @@ def download_spk(
                 ) from e
 
     # Should not reach here, but just in case
-    raise ConnectionError(f"Download failed: {last_error}")
+    raise ConnectionError(f"Download failed: {last_error}")  # pragma: no cover - retry loop always returns or raises
 
 
 # =============================================================================

@@ -776,7 +776,7 @@ def _calc_analytical(
         lon2, lat2 = calc_mean_lilith_with_latitude(jd_tt + dt)
         dlon = ((lon2 - lon + 180) % 360 - 180) / dt
         dlat = (lat2 - lat) / dt
-    else:
+    else:  # pragma: no cover - only bodies 10/12 reach here (others raise KeyError above)
         dlon = 0.0
 
     # Sidereal
