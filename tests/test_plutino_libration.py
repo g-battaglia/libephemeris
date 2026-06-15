@@ -139,6 +139,35 @@ class TestResonantArgument:
         )
         assert 0 <= phi < 360
 
+    def test_resonant_argument_is_frame_invariant(self):
+        """phi must use the longitude of perihelion (Omega + omega), not omega.
+
+        A proper resonant argument is invariant under a rotation of the
+        reference longitude origin. Rotating the node Omega by +delta while
+        rotating the argument of perihelion omega by -delta leaves both the
+        mean longitude (Omega + omega + M) and the longitude of perihelion
+        (Omega + omega) unchanged, so phi must not change. Were phi to use the
+        argument of perihelion omega directly (rather than Omega + omega), it
+        would shift by delta -- which is exactly the defect this guards against.
+        """
+        import dataclasses
+
+        elements = MINOR_BODY_ELEMENTS[IXION]
+        jd = elements.epoch
+        phi0 = calc_resonant_argument_plutino(
+            elements, jd, elements.omega, elements.M0
+        )
+        delta = 37.0
+        rotated = dataclasses.replace(elements, Omega=elements.Omega + delta)
+        phi1 = calc_resonant_argument_plutino(
+            rotated, jd, elements.omega - delta, elements.M0
+        )
+        diff = (phi1 - phi0 + 180.0) % 360.0 - 180.0
+        assert abs(diff) < 1e-9, (
+            f"resonant argument not frame-invariant: shifted by {diff} deg "
+            "(it must use the longitude of perihelion Omega + omega, not omega)"
+        )
+
 
 class TestLibrationCorrection:
     """Test libration correction calculation."""

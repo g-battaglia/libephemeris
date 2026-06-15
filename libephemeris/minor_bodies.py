@@ -718,16 +718,20 @@ def calc_resonant_argument_plutino(
     Calculate the resonant argument φ for a plutino (2:3 resonance).
 
     For the 2:3 mean motion resonance with Neptune:
-        φ = 3λ_TNO - 2λ_Neptune - ω_TNO
+        φ = 3λ_TNO - 2λ_Neptune - ϖ_TNO
 
     where:
         λ_TNO = Ω + ω + M (mean longitude of the TNO)
         λ_Neptune = mean longitude of Neptune
-        ω_TNO = argument of perihelion of the TNO
+        ϖ_TNO = Ω + ω (longitude of perihelion of the TNO)
 
-    This argument librates (oscillates) around a center value rather than
-    circulating through 360°, which is the defining characteristic of
-    bodies captured in resonance.
+    The longitude of perihelion ϖ (a true longitude measured from the reference
+    direction) is used rather than the argument of perihelion ω (measured from
+    the node). This makes φ a proper resonant angle: the integer coefficients of
+    the longitude-like terms sum to zero (3 - 2 - 1 = 0), so φ is invariant under
+    a rotation of the reference longitude origin. φ librates (oscillates) around
+    180° rather than circulating through 360°, the defining characteristic of
+    bodies captured in the resonance.
 
     Args:
         elements: Orbital elements of the plutino
@@ -738,14 +742,18 @@ def calc_resonant_argument_plutino(
     Returns:
         float: The resonant argument φ in degrees
     """
-    # Calculate mean longitude of the TNO: λ = Ω + ω + M
+    # Mean longitude of the TNO: λ = Ω + ω + M
     lambda_tno = (elements.Omega + omega_pert + M_pert) % 360.0
+
+    # Longitude of perihelion: ϖ = Ω + ω (a true longitude, unlike the
+    # argument of perihelion ω which is measured from the node).
+    varpi_tno = (elements.Omega + omega_pert) % 360.0
 
     # Get Neptune's mean longitude at this time
     lambda_neptune = calc_neptune_mean_longitude(jd_tt)
 
-    # Resonant argument for 2:3 resonance: φ = 3λ_body - 2λ_Neptune - ω_body
-    phi = (3.0 * lambda_tno - 2.0 * lambda_neptune - omega_pert) % 360.0
+    # Resonant argument for the 2:3 resonance: φ = 3λ_body - 2λ_Neptune - ϖ_body
+    phi = (3.0 * lambda_tno - 2.0 * lambda_neptune - varpi_tno) % 360.0
 
     return phi
 
