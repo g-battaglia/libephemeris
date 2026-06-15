@@ -45,6 +45,20 @@ use different interpolation and integration methods.
 **Future dates (>2050):** Up to 2" position divergence due to delta-T model
 extrapolation differences.
 
+**Extreme / BCE dates (the modern-ephemeris fidelity advantage).** Validated at
+the *same* TT (so Delta-T cancels) against an exact JPL **DE441** oracle
+(jplephem) from ~3000 BCE to +5000 CE. libephemeris (extended LEB tier, fit to
+DE441) tracks the exact ephemeris to **< 0.01"** across the whole range for the
+Sun, Moon, and inner planets (< 0.09" for the giants, the residual being the
+center-vs-barycenter choice). pyswisseph diverges increasingly toward the past —
+its geocentric apparent positions vs the same DE441 truth grow to ~11" (Moon, 1000
+CE) → ~157" (1000 BCE) → **~550" (~0.15°, Moon, 3000 BCE)**; planets stay smaller
+(a few arcsec to ~1'). This is the consequence of the two engines using different
+underlying ephemerides (libephemeris: JPL DE441, 2020; pyswisseph: DE431, 2013,
+plus its own lunar secular model): DE441 is JPL's latest long-range integration,
+and libephemeris reproduces it faithfully over the full -13000 … +17000 span. For
+historical/archaeo-astronomy work libephemeris is the more accurate choice.
+
 ### 1.2 Interpolated Apogee/Perigee (bodies 21, 22)
 
 IntpApog and IntpPerg use semi-analytical ELP2000-82B perturbation theory.
@@ -210,6 +224,16 @@ This is because osculating orbital elements are derived differently from the
 two ephemeris engines. The divergence is largest for:
 - Outer planets (different integration methods)
 - Bodies with high eccentricity (osculating elements more sensitive)
+
+**Lunar True Node / True Lilith (verdict: libephemeris is exact).** Adjudicated
+against an independent osculating computation built from the DE441 Moon−Earth
+state vector (`Ω = atan2(h_x,−h_y)`, h = r×v; True Lilith = −eccentricity-vector
+direction). Over 1975–2022 libephemeris reproduces this exact osculating truth to
+**0.000"** (True Node) and **0.000"** (True Lilith), while pyswisseph differs by
+~0.13–0.25" (True Lilith) — i.e. libephemeris's osculating lunar apparatus is
+numerically exact and the residual is pyswisseph's convention, not a libephemeris
+error. (The ~±30° month-scale libration of True Lilith is the real, physical
+swing of the instantaneous osculating apse, not noise.)
 
 ## 8. Phenomena (`pheno_ut`)
 
