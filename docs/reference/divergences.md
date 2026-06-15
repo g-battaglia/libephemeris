@@ -184,6 +184,21 @@ The clearly-wrong cases (Alaraph → β Vir, Gienah Corvi → γ Crv, Atri → �
 Nash → γ² Sgr, Deli → η Aqr) were corrected to match both the reference and the
 naming tradition.
 
+### 4.6 Flamsteed designations: `fixstar` vs `fixstar2`
+
+For **Flamsteed-style designations** (e.g. `29Psc`, `2Cet`, `7Cet` — a number
+plus a 3-letter constellation), the legacy `fixstar`/`fixstar_ut` and the modern
+`fixstar2`/`fixstar2_ut` can resolve the *same name to a different star* (~289 of
+the catalog's ~1450 entries, by tens of degrees). This is the inherently fragile
+Flamsteed lookup: pyswisseph's own `swe_fixstar` and `swe_fixstar2` likewise
+disagree, and resolve these names differently again from libephemeris. **`fixstar2`
+is the reliable path** — it matches the requested Flamsteed star correctly (e.g.
+`29Psc` → 29 Piscium), where the legacy `fixstar` and both pyswisseph variants
+may pick an unrelated row. **Proper names and Bayer designations** (Sirius,
+Aldebaran, Regulus, … and all mainstream named stars) resolve **identically** in
+`fixstar` and `fixstar2` (0.0"). Recommendation: prefer `fixstar2` for
+Flamsteed-designation lookups.
+
 ## 5. Refraction and Horizontal Coordinates
 
 ### 5.1 Atmospheric Refraction (`refrac`)
