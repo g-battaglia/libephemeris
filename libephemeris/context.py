@@ -126,7 +126,7 @@ class EphemerisContext:
         global _SHARED_LOADER
         if _SHARED_LOADER is None:
             with _SHARED_LOCK:
-                if _SHARED_LOADER is None:  # Double-checked locking
+                if _SHARED_LOADER is None:  # pragma: no branch - double-checked locking; the race arc only triggers under concurrent first-init
                     from .state import _get_data_dir
 
                     _SHARED_LOADER = Loader(_get_data_dir())

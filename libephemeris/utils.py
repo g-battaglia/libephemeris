@@ -317,7 +317,7 @@ def azalt(
 
     # Normalize azimuth to 0-360 range
     azimuth = azimuth % 360.0
-    if azimuth < 0:
+    if azimuth < 0:  # pragma: no cover - modulo by positive 360.0 is always >= 0
         azimuth += 360.0
 
     # Reference API convention for azalt(): pressure 0 does NOT disable
