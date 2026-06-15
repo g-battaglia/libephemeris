@@ -478,6 +478,56 @@ def _icrs_to_ecliptic_j2000(
     return (x, y * ce + z * se, -y * se + z * ce)
 
 
+# ASSIST integrates the test particle in the gravity of the Sun, the planets and
+# the major-asteroid perturbers baked into the small-body ephemeris (sb441-n16:
+# Ceres, Pallas, Juno, Vesta, Hygiea, Iris, ...). When the body being propagated
+# *is* one of those perturbers, ASSIST adds that perturber's own (near-singular)
+# acceleration onto the coincident test particle, which wrecks the integration
+# (the orbit goes retrograde / diverges). ASSIST's Python API can only toggle the
+# whole ASTEROIDS force, so when a self-coincidence is detected we drop it for
+# that single integration. The omitted effect — the *other* major asteroids on
+# the target — is < ~0.01" over a year, far below the catastrophic self term.
+_ASSIST_SELF_AU: float = 1e-4  # ~15000 km: far below inter-asteroid separations,
+#                                far above the ~0 self-coincidence of a perturber.
+
+
+def _assist_disable_self_perturber(extras, ephem, x, y, z, t_rel) -> Optional[str]:
+    """If the test particle at barycentric ICRF (x, y, z) AU coincides with an
+    ASSIST asteroid perturber at time ``t_rel`` (= jd_tt - ephem.jd_ref), remove
+    the ASTEROIDS force from ``extras`` to avoid a self-interaction singularity.
+
+    Returns the matched perturber name, or None if there is no coincidence.
+    """
+    try:
+        from assist.ephem import ASSIST_BODY_IDS
+    except Exception:  # noqa: BLE001 (older/newer assist without the table)
+        return None
+    hit = None
+    for bid, name in ASSIST_BODY_IDS.items():
+        if bid < 11:  # 0-10 are Sun..Pluto (real bodies, never the "self" case)
+            continue
+        try:
+            a = ephem.get_particle(name, t_rel)
+        except Exception:  # noqa: BLE001
+            continue
+        if (x - a.x) ** 2 + (y - a.y) ** 2 + (z - a.z) ** 2 < _ASSIST_SELF_AU ** 2:
+            hit = name
+            break
+    if hit is not None and "ASTEROIDS" in extras.forces:
+        import warnings
+
+        extras.forces = [f for f in extras.forces if f != "ASTEROIDS"]
+        warnings.warn(
+            f"propagate: the body being propagated coincides with the ASSIST "
+            f"asteroid perturber '{hit}', so the ASTEROIDS force was disabled for "
+            f"this integration to avoid a self-interaction singularity (the "
+            f"perturbations from the other major asteroids, < ~0.01\", are "
+            f"omitted).",
+            stacklevel=3,
+        )
+    return hit
+
+
 @dataclass
 class PropagationResult:
     """Result of orbit propagation.
@@ -926,6 +976,13 @@ def propagate_orbit_assist(
         vz=vz0 + sun0.vz,
     )
 
+    # Avoid the self-interaction singularity when the propagated body is itself
+    # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/Juno/...).
+    _assist_disable_self_perturber(
+        extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+        jd_start - ephem.jd_ref,
+    )
+
     # Configure non-gravitational forces if requested.  ASSIST's API
     # takes a flat array of 3 Marsden parameters (A1 radial, A2
     # transverse, A3 normal) per particle, after the particle exists.
@@ -1015,7 +1072,7 @@ def propagate_trajectory(
                     ephem = assist.Ephem(ephem_config.planets_file)
 
                 sim = rebound.Simulation()
-                assist.Extras(sim, ephem)
+                extras = assist.Extras(sim, ephem)
 
                 # ASSIST integrates in the equatorial ICRF frame with the
                 # solar-system barycenter at the origin (same convention as
@@ -1036,6 +1093,13 @@ def propagate_trajectory(
                     vx=vx0 + sun0.vx,
                     vy=vy0 + sun0.vy,
                     vz=vz0 + sun0.vz,
+                )
+
+                # Avoid the self-interaction singularity when the body is itself
+                # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/...).
+                _assist_disable_self_perturber(
+                    extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+                    jd_start - ephem.jd_ref,
                 )
 
                 sim.t = jd_start - ephem.jd_ref

@@ -661,6 +661,61 @@ class TestAssistEndToEnd:
         assert sep > 1e-6
 
     @requires_assist_data
+    def test_assist_perturber_self_interaction_prograde(self):
+        """Regression: propagating a body that is itself an ASSIST asteroid
+        perturber (Ceres/Vesta/...) must NOT self-interact into a retrograde /
+        diverged orbit. Previously the ASTEROIDS force added the coincident
+        perturber's near-singular acceleration, flipping the orbit by ~160deg/yr.
+        """
+        import warnings
+
+        for ipl in (CERES, VESTA):
+            elements = MINOR_BODY_ELEMENTS[ipl]
+            jd_start = elements.epoch
+            jd_end = jd_start + 365.25
+
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                result = propagate_orbit_assist(elements, jd_start, jd_end)
+
+            # Prograde guard: specific angular momentum z-component must be > 0
+            # (ecliptic-J2000); the bug produced h_z < 0.
+            h_z = result.x * result.vy - result.y * result.vx
+            assert h_z > 0, f"{ipl}: retrograde h_z={h_z:.3e} (self-interaction)"
+
+            # ASSIST must stay close to the 2-body REBOUND direction (the bug put
+            # them ~160deg apart). Both track the real orbit; ASSIST only adds the
+            # small planetary perturbation, so the angle is < ~2deg over a year.
+            reb = propagate_orbit_rebound(elements, jd_start, jd_end)
+            dot = result.x * reb.x + result.y * reb.y + result.z * reb.z
+            na = math.sqrt(result.x**2 + result.y**2 + result.z**2)
+            nb = math.sqrt(reb.x**2 + reb.y**2 + reb.z**2)
+            ang = math.degrees(math.acos(max(-1.0, min(1.0, dot / (na * nb)))))
+            assert ang < 2.0, f"{ipl}: ASSIST vs REBOUND diverge by {ang:.1f}deg"
+
+            # The self-coincidence must be detected and reported.
+            assert any("self-interaction" in str(w.message) for w in caught), (
+                f"{ipl}: expected a self-perturber warning"
+            )
+
+    @requires_assist_data
+    def test_assist_non_perturber_keeps_asteroid_force(self):
+        """A body that is NOT one of ASSIST's asteroid perturbers (Chiron) must
+        propagate with the full force model and emit no self-interaction warning.
+        """
+        import warnings
+
+        elements = MINOR_BODY_ELEMENTS[CHIRON]
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = propagate_orbit_assist(
+                elements, elements.epoch, elements.epoch + 365.25
+            )
+        h_z = result.x * result.vy - result.y * result.vx
+        assert h_z > 0  # prograde
+        assert not any("self-interaction" in str(w.message) for w in caught)
+
+    @requires_assist_data
     def test_assist_backward_integration(self):
         """Backward ASSIST integration should work."""
         elements = MINOR_BODY_ELEMENTS[CERES]
