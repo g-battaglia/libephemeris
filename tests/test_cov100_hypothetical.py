@@ -638,3 +638,20 @@ class TestUranianLongitudeSpeed:
             assert dlon == pytest.approx(
                 _unwrapped_central_dlon(CUPIDO, jd), abs=1e-9
             )
+
+    def test_calc_heliocentric_speed_sane_across_crossing(self):
+        # The public calc() heliocentric path forwards this speed, so it must
+        # also be the mean motion (not a ~180 deg/day wrap artefact) across the
+        # 0/360 crossing. Heliocentric Uranian positions are analytic, so this
+        # works regardless of the loaded ephemeris range.
+        import libephemeris as L
+
+        prev_mode = L.get_calc_mode()
+        try:
+            L.set_calc_mode("skyfield")
+            flags = L.FLG_SPEED | L.FLG_HELCTR | L.FLG_J2000
+            for jd in (2386562.0, 2386563.0, 2386564.0):
+                res, _rf = L.calc(jd, CUPIDO, flags)
+                assert abs(res[3]) < 0.01, f"jd {jd}: helio dlon {res[3]}"
+        finally:
+            L.set_calc_mode(prev_mode)

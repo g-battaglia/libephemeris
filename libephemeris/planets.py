@@ -2309,10 +2309,13 @@ def _calc_body(
         prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
         nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
         dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        if dlon > 180.0:
-            dlon -= 360.0
-        elif dlon < -180.0:
-            dlon += 360.0
+        # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360), so a
+        # crossing is a ~360 deg jump in the raw difference; after dividing by
+        # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
+        if dlon > 180.0 / (2.0 * dt_v):
+            dlon -= 360.0 / (2.0 * dt_v)
+        elif dlon < -180.0 / (2.0 * dt_v):
+            dlon += 360.0 / (2.0 * dt_v)
         dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
@@ -2384,10 +2387,12 @@ def _calc_body(
         prev = _get_transpluto_geo_j2000(jd_tt - dt_v)
         nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
         dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        if dlon > 180.0:
-            dlon -= 360.0
-        elif dlon < -180.0:
-            dlon += 360.0
+        # Unwrap a 0/360 boundary crossing (see the Uranian path above): the
+        # threshold and correction must carry the 1/(2*dt_v) factor.
+        if dlon > 180.0 / (2.0 * dt_v):
+            dlon -= 360.0 / (2.0 * dt_v)
+        elif dlon < -180.0 / (2.0 * dt_v):
+            dlon += 360.0 / (2.0 * dt_v)
         dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
