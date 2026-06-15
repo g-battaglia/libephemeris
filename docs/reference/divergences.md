@@ -271,9 +271,19 @@ with nutation differently in the two engines.
 
 ### 10.2 Ayanamsha Values
 
-Standard modes (Lahiri, Fagan-Bradley, Raman): <0.1" divergence.
-Exotic/experimental modes: up to ~40" divergence for modes that depend on
-specific reference star positions or galactic frame definitions.
+Standard modes (Lahiri, Fagan-Bradley, Raman, Krishnamurti, and the other
+fixed-epoch table systems): **exact** agreement (0.00" at J2000 and across
+±100y — the J2000 zero-points and IAU 2006 precession rate are identical).
+
+Exotic/experimental modes diverge, and the divergence **grows with distance
+from J2000**: ~0" at J2000 for the star-anchored "True" modes (True Citra,
+True Revati, True Pushya) rising to ~40" at ±100y, and up to ~145" for the
+galactic/calculated modes (galactic-equator, Aryabhata-class) at the extremes.
+These modes are computed dynamically from specific reference-star or
+galactic-frame positions, so they inherit the small fixed-star proper-motion /
+galactic-frame-definition differences between the two engines (see §4). This is
+a definitional difference in those niche modes, not an error in the ayanamsha
+machinery: every fixed-epoch mode is exact.
 
 ## 11. Crossing Functions
 
