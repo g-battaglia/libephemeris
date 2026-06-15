@@ -21,7 +21,9 @@ import pytest
 import libephemeris as L
 from libephemeris.constants import (
     MARS,
+    JUPITER,
     SATURN,
+    URANUS,
     FLG_SWIEPH,
 )
 
@@ -67,6 +69,22 @@ def test_cross_ut_is_forward_only():
         truth = _first_crossing(MARS, start, target)
         assert truth is not None
         assert abs(jd - truth) < 2.0, f"di={di}: {jd-start:.1f} vs {truth-start:.1f}"
+
+
+def test_cross_ut_far_behind_prograde_is_forward():
+    """A target far behind a prograde planet (beyond retrograde reach) is first
+    crossed a WHOLE ORBIT ahead, not in the past. Bug #4 (v7 fuzz): Newton
+    converged to / oscillated around the past crossing and returned a negative
+    time (or raised); the forward bracket fallback must return the future one.
+    Jupiter ~+11 yr, Uranus ~+72 yr ahead.
+    """
+    for body, start, off in ((JUPITER, 2447651.3, -20.6), (URANUS, 2447883.3, -48.8)):
+        base = _lon(body, start)
+        target = (base + off) % 360.0
+        jd = L.cross_ut(body, target, start, FLG_SWIEPH)
+        assert jd >= start - 1e-6, f"body {body} went backward: {jd - start:.0f} d"
+        d = abs(((_lon(body, jd) - target + 180.0) % 360.0) - 180.0)
+        assert d < 0.01, f"body {body}: wrong crossing longitude {d:.4f} deg"
 
 
 def test_cross_ut_behind_target_not_decades_late():

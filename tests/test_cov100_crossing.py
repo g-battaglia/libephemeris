@@ -875,16 +875,21 @@ class TestCrossUt:
             if n == 2:
                 return ([20.0, 0.0, 1.0, -0.5], None)  # negative -> fallback
             if n == 3:
+                return ([10.0, 0.0, 1.0, 1.0], None)  # large +step -> jd back forward
+            if n == 4:
                 return ([59.9, 0.0, 1.0, 0.0005], None)  # tiny speed -> 1198
-            return ([60.0, 0.0, 1.0, 1.0], None)  # converge
+            return ([60.0, 0.0, 1.0, 1.0], None)  # converge (jd >= tjdut)
 
         def raise_bracket(*a, **k):
             raise Error("no bracket")
 
         _patch_calc_ut(monkeypatch, fake)
         monkeypatch.setattr(cr, "_find_bracket_for_crossing", raise_bracket)
+        # The negative-speed step pushes jd before tjdut, the next positive step
+        # brings it back forward, so convergence is forward-only (>= tjdut).
         result = cross_ut(MARS, 60.0, J2000)
         assert isinstance(result, float)
+        assert result >= J2000 - 1e-6
 
     def test_divergence(self, monkeypatch):
         # Direct planet (Mars, speed_default 0.5) whose NR step keeps pushing

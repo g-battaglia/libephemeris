@@ -300,6 +300,45 @@ def _find_bracket_for_crossing(
     )
 
 
+def _forward_first_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    tjdut: float,
+    max_range: float,
+    tolerance: float,
+) -> float:
+    """First crossing at or after ``tjdut`` via a forward bracket scan + Brent.
+
+    Forward-only by construction (scans only [tjdut, tjdut+max_range] and returns
+    the first sign change). The sample step scales with ``max_range`` so the scan
+    stays cheap even for slow outer planets whose first crossing of a target lying
+    behind them can be a full orbit (years–centuries) ahead. Raises ``Error`` if
+    no crossing lies within ``max_range``.
+    """
+    num_samples = min(4000, max(int(max_range / 0.5), 200))
+    jd_a, jd_b = _find_bracket_for_crossing(
+        get_position_func, x2cross, tjdut, tjdut + max_range, num_samples=num_samples
+    )
+    return _brent_find_crossing(
+        get_position_func, x2cross, jd_a, jd_b, tolerance, 100
+    )
+
+
+def _cross_max_range(planet: int, speed_default: float) -> float:
+    """Forward search horizon (days) for a planet's longitude crossing, sized to
+    cover at least one orbital period so a target lying behind a slow planet is
+    still found ahead."""
+    if abs(speed_default) < 0.01:
+        return 100000.0  # very slow (Pluto ~248 yr period)
+    if abs(speed_default) < 0.05:
+        return 40000.0   # Saturn/Uranus/Neptune
+    if abs(speed_default) < 0.1:
+        return 5000.0    # Jupiter (~12 yr)
+    if planet in (2, 3):
+        return 500.0     # Mercury, Venus
+    return 800.0         # Mars and others
+
+
 def solcross_ut(
     x2cross: float,
     tjdut: float,
@@ -1152,6 +1191,7 @@ def cross_ut(
     # Newton-Raphson iteration
     jd = jd_guess
     station_fallback_triggered = False
+    max_range = _cross_max_range(planet, speed_default)
 
     for iteration in range(max_iter):
         try:
@@ -1169,7 +1209,18 @@ def cross_ut(
 
         # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
-            return jd
+            if jd >= tjdut - 1e-6:
+                return jd
+            # Newton converged to a PAST crossing — the wrapped step diff/speed
+            # walked backward (e.g. a target far behind a prograde planet, whose
+            # first forward crossing is a whole orbit ahead). Forward-only is a
+            # hard contract: return the first crossing at or after tjdut instead.
+            try:
+                return _forward_first_crossing(
+                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                )
+            except (Error, RuntimeError):
+                raise Error("Planet crossing search diverged")
 
         # Detect if we've encountered a station or retrograde during iteration.
         # Retrograde (speed < 0) causes NR to step backward in time, which
@@ -1217,44 +1268,28 @@ def cross_ut(
 
         jd += diff / speed
 
-        # Safety: longer range for slower planets, also account for retrograde
-        # Outer planets can take years to cross a given longitude due to
-        # retrograde periods and long orbital periods. Jupiter's orbital
-        # period is ~12 years (~4333 days), Saturn ~29 years, etc.
-        if abs(speed_default) < 0.01:
-            max_range = 100000  # Very slow planets (Pluto ~248yr period)
-        elif abs(speed_default) < 0.05:
-            max_range = (
-                40000  # Slow outer planets (Saturn ~29yr, Uranus ~84yr, Neptune ~165yr)
-            )
-        elif abs(speed_default) < 0.1:
-            max_range = 5000  # Jupiter (~12yr orbital period)
-        elif planet in (2, 3):  # Mercury, Venus
-            max_range = 500  # Fast inner planets with multiple crossings/year
-        else:
-            max_range = 800  # Mars and others
-        if abs(jd - tjdut) > max_range:  # Use tjdut not jd_guess
-            # Newton-Raphson wandered off — typically a near-station overshoot,
-            # where the step diff/speed explodes as speed -> 0 close to a
-            # retrograde turning point. A crossing usually still exists near
-            # tjdut, so fall back to a dense forward bracket scan + Brent before
-            # giving up (strict improvement: only reached when NR would raise).
-            num_samples = min(4000, max(int(max_range / 0.5), 200))
+        # Safety: if Newton wandered beyond one orbital period from tjdut
+        # (typically a near-station overshoot where diff/speed explodes as
+        # speed -> 0), fall back to a forward bracket scan + Brent — a crossing
+        # exists at or after tjdut within max_range. Forward-only by construction.
+        if abs(jd - tjdut) > max_range:
             try:
-                jd_a, jd_b = _find_bracket_for_crossing(
-                    get_position,
-                    x2cross,
-                    tjdut,
-                    tjdut + max_range,
-                    num_samples=num_samples,
-                )
-                return _brent_find_crossing(
-                    get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, 100
+                return _forward_first_crossing(
+                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
                 )
             except (Error, RuntimeError):
                 raise Error("Planet crossing search diverged")
 
-    raise Error("Maximum iterations reached in planet crossing calculation")
+    # Newton-Raphson exhausted its iterations without converging — e.g. a far
+    # crossing of a very slow planet that NR keeps oscillating around within
+    # max_range (so neither the divergence nor the backward guard fired). The
+    # forward bracket scan is the robust catch-all.
+    try:
+        return _forward_first_crossing(
+            get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+        )
+    except (Error, RuntimeError):
+        raise Error("Maximum iterations reached in planet crossing calculation")
 
 
 def helio_cross_ut(
