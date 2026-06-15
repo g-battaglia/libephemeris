@@ -2629,10 +2629,13 @@ def _calc_body(
             except (ImportError, RuntimeError, ValueError, FileNotFoundError):
                 pass
 
-            # Keplerian as last resort — reduced precision, warn the user
+            # Keplerian as last resort — reduced precision, warn the user.
+            # Measured vs JPL: the unperturbed two-body fit drifts to ~1-2 deg
+            # outside the SPK window (it omits planetary perturbations), not
+            # arcminutes — state that honestly so callers don't trust it.
             get_logger().warning(
                 "body=%d jd=%.1f source=Keplerian (fallback). "
-                "Precision is limited (arcminute-level). "
+                "Precision is degraded (~1-2 degrees; unperturbed two-body). "
                 "Install SPK kernels or enable auto-download for higher accuracy.",
                 ipl,
                 jd_tt,
