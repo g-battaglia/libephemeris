@@ -336,8 +336,20 @@ through its SPK pipeline.
 ## 13. Heliacal Events
 
 `heliacal_ut` is computationally expensive (>90s per call for some
-configurations). Timing divergence: up to ~2 days for heliacal rising/setting
-events, due to different atmospheric extinction and visibility models.
+configurations). Timing divergence: up to ~2–3 days for heliacal rising/setting
+events (measured: Venus rising ≈2 d, setting ≈3 d vs pyswisseph), due to
+different atmospheric extinction and visibility (arcus-visionis) models. There is
+no independent oracle for these events at sub-day precision, so this is recorded
+as a model divergence, not adjudicated.
+
+## 13.1 Fictitious / Uranian bodies (Hamburg School, 40–48)
+
+The Uranian planets (Cupido…Poseidon) and Transpluto are propagated from their
+published Hamburg-School Keplerian elements. libephemeris vs pyswisseph differ by
+up to **~33"** (Cupido; most < 25"), reflecting different element handling — there
+is no independent astronomical reference for these fictitious bodies, so neither
+is "truth". (The CLAUDE.md "~0.000000\"" figure for Uranians is the LEB-vs-Skyfield
+*internal* agreement, not a lib-vs-pyswisseph or lib-vs-reference accuracy.)
 
 ## 14. Constants and API
 
