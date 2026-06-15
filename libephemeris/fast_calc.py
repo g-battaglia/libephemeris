@@ -1408,12 +1408,14 @@ def _pipeline_ecliptic(
         # LEB stores 0 for dist; pyswisseph returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
     elif ipl == TRUE_NODE:
-        # LEB stores h_mag proxy for dist. The full osculating orbit
-        # calculation (calc_true_lunar_node) would be more precise but
-        # requires Skyfield/DE kernel, defeating the purpose of LEB mode.
-        # The LEB distance value is sufficient — True Node distance is
-        # not used in astrological calculations.
-        pass  # keep dist from LEB
+        # KNOWN LIMITATION (see divergences.md 7): the LEB-stored value is an
+        # h_mag proxy (~0.0015 AU), NOT the osculating node radius pyswisseph and
+        # the Skyfield backend return (~0.0024 AU). Recomputing it standalone
+        # would require reconstructing the geocentric-ecliptic Moon state inside
+        # this pipeline; the longitude/latitude (the used quantities) are correct,
+        # so the distance proxy is left as-is and documented. Use the Skyfield
+        # backend if the True Node distance / FLG_XYZ is needed.
+        pass  # keep dist proxy from LEB (lon/lat correct; distance documented)
     elif ipl == MEAN_APOG:
         # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
         # Override with 3-harmonic model fitted to pyswisseph output:

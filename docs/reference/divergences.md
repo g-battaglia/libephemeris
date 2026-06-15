@@ -250,6 +250,18 @@ numerically exact and the residual is pyswisseph's convention, not a libephemeri
 error. (The ~±30° month-scale libration of True Lilith is the real, physical
 swing of the instantaneous osculating apse, not noise.)
 
+**True Node *distance* in LEB mode (backend limitation).** The True Node's
+*longitude and latitude* are correct in every mode (LEB agrees with the
+Skyfield/default backend and pyswisseph to 0.000"). Its **distance** (and hence
+`FLG_XYZ` output) is correct only on the **Skyfield/default** backend, which
+derives it from the osculating conic of the Moon's DE state and matches pyswisseph
+exactly. The **LEB backend** returns a stored proxy (~0.0015 AU vs the correct
+~0.0024 AU) rather than recomputing the osculating node radius, because doing so
+standalone would require reconstructing the geocentric-ecliptic Moon state inside
+the LEB pipeline. Use the default/Skyfield mode if you need the True Node distance;
+the angular position is reliable everywhere. (Mean Node and Oscu Apogee distances
+agree across backends.)
+
 ## 8. Phenomena (`pheno_ut`)
 
 ### 8.1 Phase Angle
