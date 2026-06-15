@@ -2312,6 +2312,9 @@ def _calc_body(
         # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360), so a
         # crossing is a ~360 deg jump in the raw difference; after dividing by
         # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
+        # Valid only because these bodies are slow (<<90 deg/day at dt_v=1): a
+        # real speed above 180/(2*dt_v) cannot occur, so it can only be a wrap.
+        # Do NOT reuse this for fast bodies -- it would misread real motion.
         if dlon > 180.0 / (2.0 * dt_v):
             dlon -= 360.0 / (2.0 * dt_v)
         elif dlon < -180.0 / (2.0 * dt_v):
@@ -2388,7 +2391,8 @@ def _calc_body(
         nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
         dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
         # Unwrap a 0/360 boundary crossing (see the Uranian path above): the
-        # threshold and correction must carry the 1/(2*dt_v) factor.
+        # threshold and correction must carry the 1/(2*dt_v) factor. Valid only
+        # for slow bodies (<<90 deg/day at dt_v=1); do NOT reuse for fast ones.
         if dlon > 180.0 / (2.0 * dt_v):
             dlon -= 360.0 / (2.0 * dt_v)
         elif dlon < -180.0 / (2.0 * dt_v):

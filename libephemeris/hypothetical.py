@@ -2989,6 +2989,9 @@ def calc_uranian_planet(
     # [0, 360), so a boundary crossing shows up as a ~360 deg jump in the raw
     # difference; after dividing by 2*dt_step the artefact is ~360/(2*dt_step),
     # so the detection threshold and correction must carry the same factor.
+    # Valid only because these bodies are slow (<<90 deg/day at dt_step=1): a
+    # real speed above 180/(2*dt_step) cannot occur, so it can only be a wrap.
+    # Do NOT reuse this for fast bodies -- it would misread real motion.
     if dlon > 180.0 / (2.0 * dt_step):
         dlon -= 360.0 / (2.0 * dt_step)
     elif dlon < -180.0 / (2.0 * dt_step):

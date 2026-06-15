@@ -1615,6 +1615,9 @@ def _pipeline_helio(
         # Unwrap a 0/360 boundary crossing: the longitudes are in [0, 360), so a
         # crossing is a ~360 deg jump in the raw difference; after dividing by
         # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
+        # Valid only because these bodies are slow (<<90 deg/day at dt_v=1): a
+        # real speed above 180/(2*dt_v) cannot occur, so it can only be a wrap.
+        # Do NOT reuse this for fast bodies -- it would misread real motion.
         if dlon > 180.0 / (2.0 * dt_v):
             dlon -= 360.0 / (2.0 * dt_v)
         elif dlon < -180.0 / (2.0 * dt_v):
