@@ -5,12 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] - Unreleased
+## [3.0.0a1] - 2026-06-15
 
-The 2026-06 full-project review fix series (workstreams WS0-WS9; WS10
-pending).  Most fixes are internal corrections; the items below
-DELIBERATELY change observable behavior to match the Swiss Ephemeris
-reference or to correct measured errors.
+First **v3 alpha**.  v3 introduces **dual licensing** — `AGPL-3.0-only OR
+LicenseRef-LibEphemeris-Commercial` — on a clean-room provenance footing, and
+ships the 2026-06 full-project review fix series (workstreams WS0-WS12) plus
+the audit-round-v10 correctness fixes.  Most fixes are internal corrections;
+the items below DELIBERATELY change observable behavior to match the Swiss
+Ephemeris reference or to correct measured errors.
+
+> **Alpha.** Published for early integration and feedback.  The public API is
+> the stable v2 canonical surface; the major-version bump is driven by the
+> licensing change and the deliberate behavior changes listed below.  The
+> commercial-license terms are still under counsel review (see `LICENSING.md`).
 
 ### Behavior changes
 
@@ -85,6 +92,14 @@ reference or to correct measured errors.
 
 ### Licensing / provenance
 
+- **Dual licensing.** LibEphemeris is now offered under
+  `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the same codebase is
+  available under the AGPL (PyPI wheels stay AGPL-3.0-only) or, for
+  closed-source / SaaS use without source disclosure, under a commercial
+  license from the copyright holder.  Owned source files carry the SPDX
+  expression and are gated by `scripts/check_spdx_headers.py`; vendored files
+  keep their permissive (MIT) upstream licenses.  See `LICENSING.md`,
+  `COMMERCIAL-LICENSE.md`, `THIRD_PARTY_NOTICES.md`, and `NOTICE.md`.
 - The Galilean satellite module (`moon_theories/galilean.py`) was rewritten
   clean-room from the published Lieske 1998 / Meeus ch. 44 theory, removing
   the last LGPL-3.0 component; it is now dual-licensed like the rest of the
@@ -97,7 +112,27 @@ reference or to correct measured errors.
   zero-hit class. See
   `docs/methodology/galilean-clean-room-2026-06.md`.
 
-See REVIEW-2026-06-10.md and the WS1-WS10 commit series for the full
+### Eclipse correctness (audit round v10)
+
+- Solar-eclipse obscuration is a true fraction in `[0, 1]`: a total eclipse
+  clamps to `1.0` (the `(R_moon/R_sun)²` area ratio belongs to the magnitude,
+  not the obscuration), and a no-eclipse instant reports `0.0` from every
+  entry point — it previously leaked a `1.0` fallback through
+  `sol_eclipse_where` / `lun_occult_where`.
+- The lunar-eclipse magnitude and contact helpers, and
+  `_lun_eclipse_how_pythonic`, now route through the single canonical shadow
+  model; they previously used a second model that disagreed by up to ~0.011
+  in magnitude and tens-to-hundreds of seconds in contact times.
+- Solar-eclipse path width is characterized against NASA's Five Millennium
+  Canon (documented agreement band, regression-guarded).
+
+### Other corrections
+
+- The plutino resonant libration argument uses the longitude of perihelion.
+- The longitude-speed wrap-around correction is applied consistently across
+  `planets`, `fast_calc`, and the Uranian bodies (`hypothetical`).
+
+See REVIEW-2026-06-10.md and the WS0-WS12 commit series for the full
 fix inventory (houses provenance rewrite, eclipse/rise/heliacal
 geometry cores, error-policy sweep, COB/ASSIST frame fixes, lint
 debt).
