@@ -202,3 +202,31 @@ eclipse/heliacal/fixed_stars review entries.
 Note: `libephemeris/spk.py:1084` (`state.get_timescale()`) looks similar but
 is NOT dead — `get_timescale()` lazily initializes the global timescale, a
 real side effect — so it is left exactly as-is and excluded from this list.
+
+## Orphaned lunar-eclipse contact-search chain (audit v10, 2026-06-15)
+
+The standalone lunar-eclipse contact functions
+(`calc_lunar_eclipse_penumbral_first_contact_p1` / `..._fourth_contact_p4`,
+`calc_lunar_eclipse_umbral_{first,second,third,fourth}_contact_u{1,2,3,4}` in
+`libephemeris/eclipse.py`) now delegate to the canonical `_lun_how_core`
+shadow model via `_lun_contact_via_core` → `_lun_eclipse_phase_times`, so they
+return exactly the `lun_eclipse_when` phase times (and reproduce the
+independent Earth-shadow geometry / NASA Five Millennium Canon contact times to
+<0.5 s). The earlier per-contact search chain they used implemented a divergent
+shadow model (1/85 atmospheric enlargement + small-angle separation) that
+drifted from the canonical phase times by tens to hundreds of seconds
+(U1/U4 up to ~260 s, P1/P4 up to ~310 s). It is now unreferenced. Left in place
+per policy (logged, not deleted):
+
+- `_calc_lunar_eclipse_penumbral_separation` (eclipse.py:9495)
+- `_find_lunar_penumbral_contact_time` (eclipse.py:9567)
+- `_calc_lunar_eclipse_umbral_outer_separation` (eclipse.py:9786)
+- `_calc_lunar_eclipse_umbral_inner_separation` (eclipse.py:9857)
+- `_find_lunar_umbral_outer_contact_time` (eclipse.py:9927)
+- `_find_lunar_umbral_inner_contact_time` (eclipse.py:10003)
+
+The private `_calculate_lunar_eclipse_type_and_magnitude` (eclipse.py:4250) is
+NOT dead — it still backs `lun_eclipse_gamma`, whose gamma matches the
+independent shadow geometry to ~0.0002 Earth-radii — but its umbral/penumbral
+*magnitude* outputs are no longer used (the convenience magnitude functions now
+delegate to `_lun_how_core`).

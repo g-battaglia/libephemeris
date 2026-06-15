@@ -1,0 +1,92 @@
+"""Regression: lunar-eclipse magnitude convenience functions must agree with
+the canonical lun_eclipse_how() shadow model and with NASA's published values.
+
+Background (audit round v10): lun_eclipse_umbral_magnitude() and
+lun_eclipse_penumbral_magnitude() used to route through a *second* shadow model
+(_calculate_lunar_eclipse_type_and_magnitude, with a 1/85 atmospheric
+enlargement and a small-angle approximation) that disagreed with the canonical
+lun_eclipse_how() / lun_eclipse_when() path (AA-1998 1/50 enlargement +
+empirical deflators) by up to ~0.011 in magnitude. The canonical path
+reproduces the umbral/penumbral magnitudes published in NASA's Five Millennium
+Canon of Lunar Eclipses to ~0.001, so the convenience functions were the less
+accurate of the two. They now delegate to the same core, so:
+
+  (1) lun_eclipse_umbral_magnitude(jd)   == lun_eclipse_how(jd, geo)[1][0]   (exact)
+  (2) lun_eclipse_penumbral_magnitude(jd)== max(0, lun_eclipse_how(jd,geo)[1][1]) (exact)
+  (3) the umbral magnitude reproduces NASA's catalog to <0.003.
+
+These are independent-reference checks (NASA values + cross-API identity), not
+type/range guards. Reference: https://eclipse.gsfc.nasa.gov/lunar.html
+"""
+
+import pytest
+
+from libephemeris import (
+    FLG_SWIEPH,
+    julday,
+    lun_eclipse_how,
+    lun_eclipse_penumbral_magnitude,
+    lun_eclipse_umbral_magnitude,
+    lun_eclipse_when,
+)
+
+pytestmark = pytest.mark.slow
+
+_GEO = (0.0, 0.0, 0.0)  # lunar-eclipse magnitude is observer-independent
+
+# NASA Five Millennium Canon of Lunar Eclipses: umbral magnitude at greatest
+# eclipse. (year, month, umbral_magnitude, kind)
+_NASA_UMBRAL = [
+    (2018, 7, 1.6087, "total"),    # longest total eclipse of the 21st century
+    (2019, 1, 1.1956, "total"),
+    (2021, 5, 1.0095, "total"),
+    (2022, 5, 1.4141, "total"),
+    (2022, 11, 1.3589, "total"),
+    (2021, 11, 0.9742, "partial"),  # deep partial
+    (2023, 10, 0.1227, "partial"),  # shallow partial
+]
+
+
+def _find_max(year: int, month: int) -> float:
+    """JD(UT) of the greatest lunar eclipse on or after the 1st of the month."""
+    jd0 = julday(year, month, 1, 0.0)
+    _rf, tret = lun_eclipse_when(jd0, FLG_SWIEPH, 0, False)
+    return tret[0]
+
+
+@pytest.mark.parametrize("year,month,_nasa,_kind", _NASA_UMBRAL)
+def test_umbral_magnitude_matches_how_exactly(year, month, _nasa, _kind):
+    """The convenience umbral magnitude is identical to lun_eclipse_how attr[0]."""
+    jd_max = _find_max(year, month)
+    conv = lun_eclipse_umbral_magnitude(jd_max, FLG_SWIEPH)
+    _rc, attr = lun_eclipse_how(jd_max, _GEO, FLG_SWIEPH)
+    assert conv == pytest.approx(attr[0], abs=1e-12), (
+        f"{year}-{month}: umbral_magnitude {conv} != lun_eclipse_how[0] {attr[0]}"
+    )
+
+
+@pytest.mark.parametrize("year,month,_nasa,_kind", _NASA_UMBRAL)
+def test_penumbral_magnitude_matches_how_exactly(year, month, _nasa, _kind):
+    """The convenience penumbral magnitude is identical to lun_eclipse_how attr[1]."""
+    jd_max = _find_max(year, month)
+    conv = lun_eclipse_penumbral_magnitude(jd_max, FLG_SWIEPH)
+    _rc, attr = lun_eclipse_how(jd_max, _GEO, FLG_SWIEPH)
+    assert conv == pytest.approx(max(0.0, attr[1]), abs=1e-12), (
+        f"{year}-{month}: penumbral_magnitude {conv} != "
+        f"max(0, lun_eclipse_how[1] {attr[1]})"
+    )
+
+
+@pytest.mark.parametrize("year,month,nasa,kind", _NASA_UMBRAL)
+def test_umbral_magnitude_matches_nasa(year, month, nasa, kind):
+    """The umbral magnitude reproduces NASA's catalog value to <0.003."""
+    jd_max = _find_max(year, month)
+    mag = lun_eclipse_umbral_magnitude(jd_max, FLG_SWIEPH)
+    assert mag == pytest.approx(nasa, abs=0.003), (
+        f"{year}-{month} ({kind}): umbral magnitude {mag} vs NASA {nasa}"
+    )
+    # Classification must be on the correct side of the total/partial boundary.
+    if kind == "total":
+        assert mag >= 1.0
+    else:
+        assert 0.0 < mag < 1.0

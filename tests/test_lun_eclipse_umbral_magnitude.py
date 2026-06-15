@@ -168,9 +168,10 @@ class TestUmbralMagnitudeConsistency:
         )  # Location doesn't affect lunar eclipse magnitude
         umbral_mag_from_how = attr[0]
 
-        # They should be equal or very close
-        assert abs(umbral_mag_direct - umbral_mag_from_how) < 0.01, (
-            f"Magnitudes should match: direct={umbral_mag_direct}, "
+        # They must be identical: lun_eclipse_umbral_magnitude delegates to the
+        # same shadow core (_lun_how_core) as lun_eclipse_how (audit v10).
+        assert umbral_mag_direct == pytest.approx(umbral_mag_from_how, abs=1e-12), (
+            f"Magnitudes should match exactly: direct={umbral_mag_direct}, "
             f"from_how={umbral_mag_from_how}"
         )
 

@@ -724,6 +724,25 @@ def _lun_eclipse_phase_times(
     return tuple(tret)
 
 
+def _lun_contact_via_core(jd_max: float, tret_idx: int, flags: int) -> float:
+    """Lunar-eclipse contact time at ``tret`` index ``tret_idx``.
+
+    Computed from the canonical ``_lun_how_core`` shadow model via
+    ``_lun_eclipse_phase_times`` -- the same path ``lun_eclipse_when`` uses,
+    which reproduces the independent Earth-shadow geometry (and the contact
+    times published in NASA's Five Millennium Canon of Lunar Eclipses) to
+    <0.5 s. Routing the standalone ``calc_lunar_eclipse_*_contact_*`` helpers
+    through here keeps them consistent with ``lun_eclipse_when`` instead of the
+    earlier, divergent 1/85-enlargement + small-angle separation model (which
+    drifted by tens to hundreds of seconds). Returns 0.0 when the requested
+    phase does not occur (e.g. an umbral contact for a penumbral-only eclipse).
+    """
+    retc, _attr, _dc = _lun_how_core(jd_max, flags)
+    if not retc:
+        return 0.0
+    return _lun_eclipse_phase_times(jd_max, retc, flags)[tret_idx]
+
+
 def _golden_min(fn, t_lo: float, t_hi: float) -> float:
     """Golden-section minimum of ``fn`` on [t_lo, t_hi] to ~1e-7 day."""
     phi = (1.0 + math.sqrt(5.0)) / 2.0
@@ -9689,14 +9708,8 @@ def calc_lunar_eclipse_penumbral_first_contact_p1(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate P1 (penumbral first contact)
-    # Search backward from maximum with a range of ~4.8 hours
-    # (penumbral contact typically occurs 2-3 hours before maximum)
-    t_p1 = _find_lunar_penumbral_contact_time(
-        jd_max, search_before=True, search_range=0.20
-    )
-
-    return t_p1
+    # P1 = penumbral begin = tret[6] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 6, flags)
 
 
 def calc_lunar_eclipse_penumbral_fourth_contact_p4(
@@ -9766,14 +9779,8 @@ def calc_lunar_eclipse_penumbral_fourth_contact_p4(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate P4 (penumbral fourth contact)
-    # Search forward from maximum with a range of ~4.8 hours
-    # (penumbral contact typically occurs 2-3 hours after maximum)
-    t_p4 = _find_lunar_penumbral_contact_time(
-        jd_max, search_before=False, search_range=0.20
-    )
-
-    return t_p4
+    # P4 = penumbral end = tret[7] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 7, flags)
 
 
 def _calc_lunar_eclipse_umbral_outer_separation(jd: float) -> float:
@@ -10150,14 +10157,8 @@ def calc_lunar_eclipse_umbral_first_contact_u1(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate U1 (umbral first contact)
-    # Search backward from maximum with a range of ~3.6 hours
-    # (umbral contact typically occurs 1-2 hours before maximum)
-    t_u1 = _find_lunar_umbral_outer_contact_time(
-        jd_max, search_before=True, search_range=0.15
-    )
-
-    return t_u1
+    # U1 = umbral (partial) begin = tret[2] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 2, flags)
 
 
 def calc_lunar_eclipse_umbral_second_contact_u2(
@@ -10228,13 +10229,8 @@ def calc_lunar_eclipse_umbral_second_contact_u2(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate U2 (totality begins)
-    # Search backward from maximum with a range of ~2.4 hours
-    t_u2 = _find_lunar_umbral_inner_contact_time(
-        jd_max, search_before=True, search_range=0.10
-    )
-
-    return t_u2
+    # U2 = totality begins = tret[4] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 4, flags)
 
 
 def calc_lunar_eclipse_umbral_third_contact_u3(
@@ -10305,13 +10301,8 @@ def calc_lunar_eclipse_umbral_third_contact_u3(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate U3 (totality ends)
-    # Search forward from maximum with a range of ~2.4 hours
-    t_u3 = _find_lunar_umbral_inner_contact_time(
-        jd_max, search_before=False, search_range=0.10
-    )
-
-    return t_u3
+    # U3 = totality ends = tret[5] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 5, flags)
 
 
 def calc_lunar_eclipse_umbral_fourth_contact_u4(
@@ -10383,13 +10374,8 @@ def calc_lunar_eclipse_umbral_fourth_contact_u4(
         - Espenak & Meeus "Five Millennium Canon of Lunar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate U4 (umbral fourth contact)
-    # Search forward from maximum with a range of ~3.6 hours
-    t_u4 = _find_lunar_umbral_outer_contact_time(
-        jd_max, search_before=False, search_range=0.15
-    )
-
-    return t_u4
+    # U4 = umbral (partial) end = tret[3] from the canonical shadow model.
+    return _lun_contact_via_core(jd_max, 3, flags)
 
 
 def calc_solar_eclipse_duration(
@@ -12336,18 +12322,17 @@ def _lun_eclipse_umbral_magnitude_pythonic(
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Reference documentation
     """
-    # Use the existing calculation function
-    (
-        ecl_type_flags,
-        umbral_mag,
-        penumbral_mag,
-        gamma,
-        penumbra_radius,
-        umbra_radius,
-    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
-
-    # Return the umbral magnitude, clamped to non-negative
-    return max(0.0, umbral_mag)
+    # Delegate to the same shadow core (_lun_how_core) that backs
+    # lun_eclipse_how()/lun_eclipse_when(), so this convenience function
+    # returns the identical umbral magnitude (attr[0]). That core reproduces
+    # the umbral magnitudes published in NASA's Five Millennium Canon of Lunar
+    # Eclipses to ~0.001. The older private helper
+    # _calculate_lunar_eclipse_type_and_magnitude() uses a different
+    # atmospheric-enlargement convention (1/85 vs the AA-1998 1/50 + empirical
+    # deflators) and a small-angle approximation; it disagreed with
+    # lun_eclipse_how() by up to ~0.011 in magnitude.
+    _retc, attr, _dcore = _lun_how_core(jd, flags)
+    return max(0.0, attr[0])
 
 
 def lun_eclipse_umbral_magnitude(
@@ -12454,18 +12439,14 @@ def _lun_eclipse_penumbral_magnitude_pythonic(
         - Meeus "Astronomical Algorithms" Ch. 54 (Eclipses)
         - Reference documentation
     """
-    # Use the existing calculation function
-    (
-        ecl_type_flags,
-        umbral_mag,
-        penumbral_mag,
-        gamma,
-        penumbra_radius,
-        umbra_radius,
-    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
-
-    # Return the penumbral magnitude, clamped to non-negative
-    return max(0.0, penumbral_mag)
+    # Delegate to the same shadow core (_lun_how_core) that backs
+    # lun_eclipse_how()/lun_eclipse_when() so the penumbral magnitude (attr[1])
+    # stays consistent with the canonical model and NASA's canon. See the
+    # umbral variant for the rationale behind retiring
+    # _calculate_lunar_eclipse_type_and_magnitude() from this path (divergent
+    # 1/85 enlargement + small-angle approximation).
+    _retc, attr, _dcore = _lun_how_core(jd, flags)
+    return max(0.0, attr[1])
 
 
 def lun_eclipse_penumbral_magnitude(
