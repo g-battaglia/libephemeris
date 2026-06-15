@@ -5066,6 +5066,11 @@ def _lun_eclipse_how_pythonic(
     References:
         - Reference API: lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
+
+    Note:
+        Type and umbral/penumbral magnitudes come from the canonical
+        _lun_how_core shadow model, so they match lun_eclipse_how(); only the
+        topocentric azimuth/altitude (attr[4..6]) are computed locally here.
     """
     # reader is provided by the caller (None forces Skyfield path)
 
@@ -5088,7 +5093,6 @@ def _lun_eclipse_how_pythonic(
         )
         moon_altitude = moon_alt_true
         moon_azimuth = moon_az_val
-        moon_dist_au = moon_topo[2]
     else:
         from skyfield.api import wgs84
 
@@ -5125,29 +5129,18 @@ def _lun_eclipse_how_pythonic(
         # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
         moon_azimuth = (moon_az.degrees + 180.0) % 360.0
 
-        # Get Moon's distance for angular size calculation
-        moon_dist_au = moon_app.distance().au
+    # Eclipse circumstances from the canonical selenocentric shadow model
+    # (_lun_how_core) -- the same core that backs lun_eclipse_how()/
+    # lun_eclipse_when(), so the type and magnitudes returned here stay
+    # consistent with it (audit v10). The earlier path used
+    # _calculate_lunar_eclipse_type_and_magnitude(), whose divergent 1/85
+    # atmospheric enlargement + small-angle approximation disagreed with the
+    # canonical model by up to ~0.011 in magnitude.
+    retc_core, attr_core, _dcore = _lun_how_core(jd, flags)
+    umbral_mag = attr_core[0]
+    penumbral_mag = attr_core[1]
 
-    # Calculate eclipse geometry using the same calculations as _lun_eclipse_when_pythonic
-    (
-        ecl_type_flags,
-        umbral_mag,
-        penumbral_mag,
-        gamma,
-        penumbra_radius,
-        umbra_radius,
-    ) = _calculate_lunar_eclipse_type_and_magnitude(jd)
-
-    # Calculate apparent diameters
-    # Moon semi-diameter: 932.56 arcsec at mean distance 0.002569 AU
-    2 * (932.56 / 3600.0) * (0.002569 / moon_dist_au)
-    2 * umbra_radius
-    2 * penumbra_radius
-
-    # Determine eclipse type flags
-    eclipse_type = 0
-
-    if penumbral_mag <= 0 and umbral_mag <= 0:
+    if retc_core == 0:
         # No eclipse - Moon too far from Earth's shadow
         return 0, (
             0.0,  # [0] umbral magnitude
@@ -5172,8 +5165,8 @@ def _lun_eclipse_how_pythonic(
             0.0,  # [11-19] Reserved
         )
 
-    # There is an eclipse - set type flags
-    eclipse_type = ecl_type_flags
+    # There is an eclipse - start from the canonical type flag
+    eclipse_type = retc_core
 
     # Check if Moon is above horizon
     if moon_altitude > -1.0:  # Allow for refraction near horizon
@@ -5189,7 +5182,7 @@ def _lun_eclipse_how_pythonic(
         moon_azimuth,  # [4] Azimuth of Moon
         moon_altitude,  # [5] True altitude of Moon
         moon_altitude,  # [6] Apparent altitude (approx)
-        0.0,  # [7] Distance from opposition (degrees)
+        attr_core[7],  # [7] Distance from opposition (degrees)
         max(0.0, umbral_mag),  # [8] Eclipse magnitude (equals [0])
         *_get_saros_info(jd, "lunar"),  # [9] Saros, [10] member
         0.0,  # [11] Reserved
@@ -12308,8 +12301,9 @@ def _lun_eclipse_umbral_magnitude_pythonic(
         events, use _lun_eclipse_when_pythonic() first.
 
         For penumbral-only eclipses, this function returns 0.0 since the
-        Moon has not entered the umbra. Use _lun_eclipse_how_pythonic() to get the
-        penumbral magnitude in such cases.
+        Moon has not entered the umbra. Use lun_eclipse_penumbral_magnitude()
+        to get the penumbral magnitude in such cases; both draw on the same
+        canonical _lun_how_core shadow model, so they stay consistent.
 
     Algorithm:
         1. Calculate Moon's ecliptic position
