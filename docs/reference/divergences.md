@@ -223,6 +223,19 @@ Eclipse timing (`tret[0]` maximum): typically <10s divergence.
 Eclipse geography (`geopos`): typically <1° divergence.
 Eclipse type flags may occasionally differ for borderline cases.
 
+**Obscuration of a total eclipse (deliberate divergence).** Obscuration is the
+fraction of the Sun's *area* covered by the Moon, so it is physically bounded by
+1.0 (a total eclipse covers 100% of the Sun). libephemeris returns exactly
+**1.0** for total eclipses (`sol_eclipse_how` `attr[2]`,
+`sol_eclipse_obscuration_at_loc`, and `sol_eclipse_how_details`
+`max_obscuration`). pyswisseph instead reports the lunar/solar disc *area ratio*
+`(R_moon/R_sun)² ≈ 1.05–1.12 > 1` for total eclipses, which is not a fraction.
+This is an intentional choice for physical correctness; the "how much larger the
+Moon appears than the Sun" information remains available in the eclipse
+*magnitude* (`attr[0]`/`attr[8]`). Annular eclipses are identical to pyswisseph
+(`(R_moon/R_sun)² < 1`, the ring-residual area fraction) and partial eclipses
+use the standard two-disc lens overlap; both agree to ~1e-3.
+
 ### 6.2 Lunar Eclipses
 
 Similar to solar eclipses. Timing agrees within ~10s for most events.

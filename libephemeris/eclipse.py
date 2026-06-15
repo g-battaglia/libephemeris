@@ -494,7 +494,14 @@ def _sol_how_core(
     attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
     if retc == 0 or rsun <= 0.0:
         attr[2] = 1.0
-    elif retc in (ECL_TOTAL, ECL_ANNULAR):
+    elif retc == ECL_TOTAL:
+        # The (larger) Moon fully covers the Sun: the obscured fraction of the
+        # solar disc is 100%. (The Moon/Sun area ratio (rmoon/rsun)**2 exceeds
+        # 1 here and is the eclipse magnitude's domain, not the obscuration.)
+        attr[2] = 1.0
+    elif retc == ECL_ANNULAR:
+        # A ring of Sun remains around the smaller Moon: the obscured fraction
+        # is the ratio of the lunar to the solar disc area.
         attr[2] = (rmoon / rsun) ** 2
     else:
         # Standard two-disc overlap (lens) area as a fraction of the
@@ -963,24 +970,20 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
         d: Center-to-center separation in degrees
 
     Returns:
-        Obscuration as a fraction. For total eclipses where Moon is larger
-        than Sun, this can exceed 1.0 (matching reference API behavior where
-        obscuration = (r_moon/r_sun)^2 represents the disc area ratio).
+        Obscuration as a fraction in [0, 1]: 1.0 for a total eclipse (the Sun
+        is fully covered), (r_moon/r_sun)^2 for an annular eclipse (a ring of
+        Sun remains), and the two-disc lens-overlap fraction for a partial
+        eclipse.
     """
     # Handle edge case: no overlap
     if d >= r_sun + r_moon:
         return 0.0
 
-    # Handle edge case: one disk entirely within the other
-    if d <= abs(r_sun - r_moon):
-        # Both total and annular: obscuration = disc area ratio
-        # For total eclipses (r_moon >= r_sun), this is >= 1.0
-        # For annular eclipses (r_moon < r_sun), this is < 1.0
-        return (r_moon / r_sun) ** 2
-
-    # Handle edge case: zero or near-zero separation
-    if d < MINIMUM_SEPARATION_FOR_LENS:
-        return (r_moon / r_sun) ** 2
+    # Edge case: one disc lies entirely within the other (or is concentric).
+    if d <= abs(r_sun - r_moon) or d < MINIMUM_SEPARATION_FOR_LENS:
+        # Total (Moon >= Sun): the Sun is fully covered -> 1.0.
+        # Annular (Moon < Sun): a ring remains -> disc area ratio < 1.0.
+        return 1.0 if r_moon >= r_sun else (r_moon / r_sun) ** 2
 
     # Calculate lens-shaped intersection area
     # d1 is distance from Sun center to intersection chord
@@ -3953,9 +3956,11 @@ def _sol_eclipse_how_details_impl(
     if d >= sun_r_max + moon_r_max:
         max_obscuration = 0.0
     elif d <= abs(sun_r_max - moon_r_max):
-        # Both total and annular: obscuration = disc area ratio
-        # For total eclipses (moon >= sun), this is >= 1.0
-        max_obscuration = (moon_r_max / sun_r_max) ** 2
+        # Total (Moon >= Sun): the Sun is fully covered -> 1.0.
+        # Annular (Moon < Sun): a ring of Sun remains -> disc area ratio < 1.0.
+        max_obscuration = (
+            1.0 if moon_r_max >= sun_r_max else (moon_r_max / sun_r_max) ** 2
+        )
     else:
         d1 = (d * d + sun_r_max * sun_r_max - moon_r_max * moon_r_max) / (2 * d)
         d2 = d - d1
@@ -12161,9 +12166,12 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         # No overlap - no eclipse
         return 0.0
     elif d <= abs(r_sun - r_moon):
-        # One disk entirely within the other
-        # Both total and annular: obscuration = disc area ratio
-        # For total eclipses (r_moon >= r_sun), this is >= 1.0
+        # One disc lies entirely within the other.
+        if r_moon >= r_sun:
+            # Total: the (larger) Moon fully covers the Sun -> 100% obscured.
+            return 1.0
+        # Annular: a ring of Sun remains around the smaller Moon, so the
+        # obscured fraction is the ratio of the lunar to the solar disc area.
         return (r_moon / r_sun) ** 2
     else:
         # Partial overlap - use lens formula for intersection of two circles
