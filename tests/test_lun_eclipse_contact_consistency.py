@@ -25,6 +25,8 @@ Millennium Canon contact times, the erfa/JPL shadow-geometry oracle) lives in
 the local validation sweeps.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from libephemeris import (

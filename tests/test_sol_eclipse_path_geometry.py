@@ -13,6 +13,8 @@ in NASA's Five Millennium Canon of Solar Eclipses
     band so the agreement level is documented and gross regressions are caught.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from libephemeris import (

@@ -20,6 +20,8 @@ Checks (independent of any external implementation):
   * partial: 0 < obscuration < 1.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from libephemeris import (

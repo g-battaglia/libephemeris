@@ -19,6 +19,8 @@ These are independent-reference checks (NASA values + cross-API identity), not
 type/range guards. Reference: https://eclipse.gsfc.nasa.gov/lunar.html
 """
 
+from __future__ import annotations
+
 import pytest
 
 from libephemeris import (
