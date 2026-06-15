@@ -592,3 +592,49 @@ class TestHypotheticalDispatch:
         # 69 = FICT_OFFSET + 29: inside the hypothetical range but unmapped.
         out = calc_hypothetical_position(69, J2000)
         assert out == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def _unwrapped_central_dlon(body_id, jd, h=1.0):
+    """Independent truth: central finite-difference of the UNWRAPPED longitude.
+
+    calc_uranian_planet returns the longitude normalised to [0, 360), so a
+    correct daily speed is the central difference of the longitude after
+    unwrapping the 0/360 jump.
+    """
+    p0 = calc_uranian_planet(body_id, jd - h)[0]
+    p1 = calc_uranian_planet(body_id, jd + h)[0]
+    d = (p1 - p0 + 180.0) % 360.0 - 180.0
+    return d / (2.0 * h)
+
+
+class TestUranianLongitudeSpeed:
+    """Longitude speed of calc_uranian_planet across the 0/360 boundary.
+
+    Regression for the wrap-around defect (audit round 11): the central
+    difference was wrapped with a +/-180 threshold *after* dividing by
+    2*dt_step, so a boundary crossing (raw jump ~360 -> halved to ~180) was not
+    corrected and the reported speed jumped to ~-180 deg/day instead of the
+    body's mean motion.
+    """
+
+    def test_speed_matches_unwrapped_finite_difference(self):
+        from libephemeris.hypothetical import URANIAN_KEPLERIAN_ELEMENTS
+
+        for body_id in URANIAN_KEPLERIAN_ELEMENTS:
+            for jd in (J2000, J2000 - 36525.0, J2000 + 36525.0):
+                reported = calc_uranian_planet(body_id, jd)[3]
+                expected = _unwrapped_central_dlon(body_id, jd)
+                assert reported == pytest.approx(expected, abs=1e-9), (
+                    f"body {body_id} jd {jd}: dlon {reported} != {expected}"
+                )
+
+    def test_speed_is_mean_motion_across_0_360_crossing(self):
+        # CUPIDO crosses the 0/360 boundary near JD 2386563.5; its longitude
+        # speed there is the mean motion (~0.0038 deg/day), not the ~180 deg/day
+        # artefact the old threshold produced. |dlon| must stay tiny.
+        for jd in (2386562.0, 2386563.0, 2386564.0, 2386565.0):
+            dlon = calc_uranian_planet(CUPIDO, jd)[3]
+            assert abs(dlon) < 0.01, f"jd {jd}: dlon {dlon} (wrap artefact)"
+            assert dlon == pytest.approx(
+                _unwrapped_central_dlon(CUPIDO, jd), abs=1e-9
+            )

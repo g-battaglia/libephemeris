@@ -2985,11 +2985,14 @@ def calc_uranian_planet(
     pos_next = _keplerian_to_ecliptic_j2000(elements, jd_tt + dt_step)
 
     dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around at 0/360 boundary
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    # Handle wrap-around at the 0/360 boundary. The positions are normalised to
+    # [0, 360), so a boundary crossing shows up as a ~360 deg jump in the raw
+    # difference; after dividing by 2*dt_step the artefact is ~360/(2*dt_step),
+    # so the detection threshold and correction must carry the same factor.
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
     dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
     ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
