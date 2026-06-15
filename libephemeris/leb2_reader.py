@@ -487,7 +487,7 @@ class LEB2Reader:
         idx = max(0, min(idx, n - 2))
 
         span = jds[idx + 1] - jds[idx]
-        if span == 0.0:
+        if span == 0.0:  # pragma: no cover - sorted Delta-T table has no duplicate adjacent JDs
             return vals[idx]
         t = (jd - jds[idx]) / span
         return vals[idx] + t * (vals[idx + 1] - vals[idx])

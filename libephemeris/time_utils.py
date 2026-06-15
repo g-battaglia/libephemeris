@@ -914,7 +914,7 @@ def _sidtime_internal(
 
     # Normalize to 0-24 hours range
     last = last % 24.0
-    if last < 0:
+    if last < 0:  # pragma: no cover - modulo by positive 24.0 is always >= 0
         last += 24.0
 
     return last

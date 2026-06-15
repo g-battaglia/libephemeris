@@ -68,7 +68,7 @@ def _jd_to_julian_centuries(jd_tt: float) -> float:
 def _normalize_angle(angle: float) -> float:
     """Normalize angle to [0, 360) degrees."""
     angle = angle % 360.0
-    if angle < 0:
+    if angle < 0:  # pragma: no cover - modulo by positive 360.0 is always >= 0
         angle += 360.0
     return angle
 
