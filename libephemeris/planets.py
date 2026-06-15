@@ -2615,6 +2615,14 @@ def _calc_body(
                         if speed_lon < -180.0 / (2.0 * dt):
                             speed_lon += 360.0 / (2.0 * dt)
 
+                    # Sidereal offset (ecliptic only) — like every other body
+                    # branch; without this the ASSIST fallback silently returned
+                    # a tropical longitude for FLG_SIDEREAL requests.
+                    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+                        lon, speed_lon = _apply_sidereal_correction(
+                            lon, speed_lon, t.ut1, iflag
+                        )
+
                     get_logger().debug(
                         "body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt
                     )
@@ -2662,6 +2670,13 @@ def _calc_body(
                     speed_lon -= 360.0 / (2.0 * dt)
                 if speed_lon < -180.0 / (2.0 * dt):
                     speed_lon += 360.0 / (2.0 * dt)
+
+            # Sidereal offset (ecliptic only) — the Keplerian fallback likewise
+            # dropped FLG_SIDEREAL, returning tropical for sidereal requests.
+            if is_sidereal and not (iflag & FLG_EQUATORIAL):
+                lon, speed_lon = _apply_sidereal_correction(
+                    lon, speed_lon, t.ut1, iflag
+                )
 
             return _to_native_floats(
                 _maybe_equatorial_convert(
