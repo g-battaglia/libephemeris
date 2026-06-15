@@ -519,6 +519,8 @@ class TestSweSolEclipseWhereLimits:
         assert retflag == 0
         assert geopos[0] != 0.0 or geopos[1] != 0.0
         assert attr[0] < 0.0
+        # No eclipse -> nothing of the Sun is obscured (not the 1.0 fallback).
+        assert attr[2] == 0.0
 
 
 @pytest.mark.skip(reason="pyswisseph installed doesn't have eclipse functions")

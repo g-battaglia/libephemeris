@@ -492,7 +492,12 @@ def _sol_how_core(
     attr = [0.0] * 20
     attr[1] = rmoon / rsun if rsun > 0.0 else 0.0
     attr[0] = (rsun + rmoon - dctr) / (2.0 * rsun) if rsun > 0.0 else 1.0
-    if retc == 0 or rsun <= 0.0:
+    if retc == 0:
+        # No eclipse at this place and time: nothing of the Sun is obscured.
+        # (sol_eclipse_how() zeroes attr on retflag==0, but sol_eclipse_where()
+        # and lun_occult_where() return this attr directly, so set 0.0 here.)
+        attr[2] = 0.0
+    elif rsun <= 0.0:
         attr[2] = 1.0
     elif retc == ECL_TOTAL:
         # The (larger) Moon fully covers the Sun: the obscured fraction of the

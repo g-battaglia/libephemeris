@@ -236,6 +236,12 @@ Moon appears than the Sun" information remains available in the eclipse
 (`(R_moon/R_sun)² < 1`, the ring-residual area fraction) and partial eclipses
 use the standard two-disc lens overlap; both agree to ~1e-3.
 
+At a no-eclipse instant the obscuration is **0.0** from every entry point —
+`sol_eclipse_how` (which zeroes its attr when `retflag == 0`) and now
+`sol_eclipse_where` / `lun_occult_where` (which return the closest-approach attr
+directly). This is the physically correct fraction; earlier builds leaked a
+`1.0` fallback through the `where` path.
+
 ### 6.2 Lunar Eclipses
 
 Similar to solar eclipses. Timing agrees within ~10s for most events.
