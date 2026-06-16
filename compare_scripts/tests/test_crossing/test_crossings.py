@@ -1539,11 +1539,14 @@ class TestStationDetectionAndBrentsFallback:
     def test_find_bracket_raises_if_no_crossing(self):
         """Test that bracket finding raises error if no crossing found."""
         from libephemeris.crossing import _find_bracket_for_crossing
+        from libephemeris.exceptions import Error
 
         def constant_position(jd):
             return 10.0, 0.0  # Always at 10°
 
-        with pytest.raises(RuntimeError, match="No crossing found"):
+        # The library raises its canonical Error (mirroring swisseph.Error, which
+        # is likewise a direct Exception subclass, not a RuntimeError).
+        with pytest.raises(Error, match="No crossing found"):
             _find_bracket_for_crossing(
                 constant_position, x2cross=50.0, jd_start=0.0, jd_end=10.0
             )

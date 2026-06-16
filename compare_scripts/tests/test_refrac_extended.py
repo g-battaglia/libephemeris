@@ -238,17 +238,21 @@ class TestRefracExtendedEdgeCases:
         assert dip < -2.0  # Should be significant dip
 
     def test_zero_lapse_rate(self):
-        """Test with zero lapse rate (isothermal atmosphere)."""
+        """Test with zero lapse rate (isothermal atmosphere) against pyswisseph.
+
+        A zero lapse rate is NOT "no atmosphere": an isothermal column still has
+        a density gradient and therefore still refracts the horizon, so the dip
+        is NOT the pure geometric dip. The 1:1 check is vs swe, which returns the
+        same refraction-included dip (agreement ~0.001 arcmin).
+        """
         _, (_, _, _, dip) = ephem.refrac_extended(
             0.0, 1000.0, 1013.25, 15.0, 0.0, ephem.TRUE_TO_APP
         )
+        _, (_, _, _, dip_swe) = swe.refrac_extended(
+            0.0, 1000.0, 1013.25, 15.0, 0.0, swe.TRUE_TO_APP
+        )
         assert isinstance(dip, float)
-        # With zero lapse rate, should get pure geometric dip
-        # Check against geometric formula
-        EARTH_RADIUS = 6371000.0
-        ratio = EARTH_RADIUS / (EARTH_RADIUS + 1000.0)
-        geometric_dip = -math.degrees(math.acos(ratio))
-        assert abs(dip - geometric_dip) < 0.001
+        assert abs(dip - dip_swe) < 0.001, f"dip lib={dip}, swe={dip_swe}"
 
     def test_default_parameters(self):
         """Test that default parameters work correctly."""

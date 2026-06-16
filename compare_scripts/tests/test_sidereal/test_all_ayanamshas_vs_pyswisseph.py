@@ -472,17 +472,25 @@ class TestAyanamshaExFunctions:
         ids=[m[2] for m in ALL_AYANAMSHA_MODES[:10]],
     )
     def test_get_ayanamsa_ex_matches_standard(self, mode_id, sid_mode, name):
-        """
-        Verify get_ayanamsa_ex returns consistent ayanamsha values.
+        """get_ayanamsa_ex_ut must match pyswisseph's get_ayanamsa_ex_ut 1:1.
+
+        It does NOT match the plain get_ayanamsa_ut: the ex form returns the
+        mean ayanamsha while the plain form returns the true (nutation-applied)
+        ayanamsha, so the two differ by the nutation in longitude (~0.004°) --
+        in pyswisseph exactly as in libephemeris. The meaningful check is
+        therefore ex-vs-Swiss-ex, not ex-vs-standard.
         """
         jd = JD_J2000
+        tolerance = get_tolerance(sid_mode)
 
         ephem.set_sid_mode(sid_mode)
-        ayan_standard = ephem.get_ayanamsa_ut(jd)
+        swe.set_sid_mode(sid_mode)
 
-        retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, 0)
+        _retflag, ayan_ex = ephem.get_ayanamsa_ex_ut(jd, 0)
+        _retflag_swe, ayan_ex_swe = swe.get_ayanamsa_ex_ut(jd, 0)
 
-        # Ayanamsha should match
-        assert abs(ayan_ex - ayan_standard) < 0.0001, (
-            f"Mode {name}: ex={ayan_ex:.6f} != standard={ayan_standard:.6f}"
+        diff = angle_diff(ayan_ex, ayan_ex_swe)
+        assert diff < tolerance, (
+            f"Mode {mode_id} ({name}): ex={ayan_ex:.6f} vs "
+            f"pyswisseph ex={ayan_ex_swe:.6f}, diff={diff:.6f} >= {tolerance}"
         )

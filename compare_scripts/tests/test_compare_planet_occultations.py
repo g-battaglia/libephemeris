@@ -372,7 +372,7 @@ class TestVenusRegulus:
                 "Occultation should be within 150 years"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No Venus-Regulus occultation found within search limit")
             raise
@@ -412,7 +412,7 @@ class TestVenusRegulus:
                 f"RA2={regulus_ra:.3f}, Dec2={regulus_dec:.3f})"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No Venus-Regulus occultation found within search limit")
             raise
@@ -446,7 +446,7 @@ class TestMarsStarOccultation:
                 f"Mars-{star_name} occultation should be in the future"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip(
                     f"No Mars-{star_name} occultation found within search limit"
@@ -479,7 +479,7 @@ class TestMarsStarOccultation:
                 f"got {separation:.4f}°"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip(
                     f"No Mars-{star_name} occultation found within search limit"
@@ -518,7 +518,7 @@ class TestPlanetOccultWhenLoc:
                 f"Occultation at {loc_name} should be in the future"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip(f"No Venus-Regulus occultation visible from {loc_name}")
             raise
@@ -543,7 +543,7 @@ class TestPlanetOccultWhenLoc:
                 f"True altitude {true_alt:.1f}° at {loc_name} should indicate visibility"
             )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip(f"No Venus-Regulus occultation visible from {loc_name}")
             raise
@@ -583,7 +583,7 @@ class TestMutualPlanetaryOccultation:
             jd_max = tret[0]
             assert jd_max > jd_2000, "Occultation should be after start date"
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No Venus-Jupiter occultation found (expected - very rare)")
             raise
@@ -600,7 +600,7 @@ class TestMutualPlanetaryOccultation:
             assert isinstance(retflags, int)
             assert len(tret) == 10
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No Venus-Mars occultation found (expected - very rare)")
             raise
@@ -636,7 +636,7 @@ class TestOccultationTimingValidation:
                     f"Max ({jd_max}) should be before end ({jd_end})"
                 )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No occultation found for timing validation")
             raise
@@ -661,7 +661,7 @@ class TestOccultationTimingValidation:
                     f"Duration {duration_minutes:.1f} minutes should be reasonable"
                 )
 
-        except RuntimeError as e:
+        except (RuntimeError, pyephem.Error) as e:
             if "No planetary occultation" in str(e):
                 pytest.skip("No occultation found for duration validation")
             raise

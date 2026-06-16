@@ -73,17 +73,24 @@ class TestAzaltNoRefraction:
     """Tests for azalt without atmospheric refraction."""
 
     def test_no_refraction_when_pressure_zero(self):
-        """Test that true and apparent altitude are equal when pressure is 0."""
+        """At pressure=0 azalt's apparent altitude matches pyswisseph's.
+
+        pressure=0 is NOT "no refraction" for azalt: like swe.azalt, the
+        pressure is estimated from the observer altitude (standard atmosphere)
+        and refraction IS applied, so true != apparent. The 1:1 check is
+        therefore lib apparent vs swe apparent (they agree within ~1.5").
+        """
         jd = ephem.julday(2024, 6, 15, 12.0)
         geopos = (12.5, 41.9, 0)
         coord = (90.0, 30.0, 1.0)
 
-        az, alt_true, alt_app = ephem.azalt(
+        _az, _alt_true, alt_app = ephem.azalt(
             jd, ephem.EQU2HOR, geopos, 0.0, 15, coord
         )
+        _az_s, _alt_true_s, alt_app_swe = swe.azalt(jd, 1, geopos, 0.0, 15, coord)
 
-        assert abs(alt_true - alt_app) < 1e-10, (
-            "True and apparent altitude should be equal when pressure is 0"
+        assert abs(alt_app - alt_app_swe) < 0.01, (
+            f"apparent altitude at pressure=0: lib={alt_app}, swe={alt_app_swe}"
         )
 
 
@@ -254,20 +261,30 @@ class TestAzaltNoRefractionVsSwisseph:
         ],
     )
     def test_no_refraction_matches_swisseph(self, coord):
-        """Test that no-refraction results match pyswisseph."""
+        """azalt at pressure=0 matches pyswisseph (true AND apparent altitude).
+
+        pressure=0 estimates the pressure from the observer altitude (standard
+        atmosphere) in both libraries, so refraction IS applied above the
+        horizon and true != apparent. Below the horizon both clamp apparent to
+        true. Either way our apparent altitude tracks pyswisseph's.
+        """
         jd = ephem.julday(2024, 3, 20, 12.0)  # Equinox
         geopos = (0.0, 45.0, 0)  # lon, lat, alt
-        pressure = 0.0  # No refraction
+        pressure = 0.0  # estimate from observer altitude (not "no refraction")
         temp = 10.0
 
         result_lib = ephem.azalt(jd, ephem.EQU2HOR, geopos, pressure, temp, coord)
         result_swe = swe.azalt(jd, 1, geopos, pressure, temp, coord)
 
-        # Without refraction in our library, true and apparent should be equal
-        assert abs(result_lib[1] - result_lib[2]) < 1e-6
-
-        # Note: pyswisseph may still apply some refraction even with pressure=0
-        # so we only compare true altitude with our implementation
+        # True altitude is geometric: must match closely.
+        assert abs(result_lib[1] - result_swe[1]) < 0.01, (
+            f"True altitude mismatch: lib={result_lib[1]}, swe={result_swe[1]}"
+        )
+        # Apparent altitude (with the standard-atmosphere refraction) must
+        # likewise track pyswisseph within a couple of arcseconds.
+        assert abs(result_lib[2] - result_swe[2]) < 0.01, (
+            f"Apparent altitude mismatch: lib={result_lib[2]}, swe={result_swe[2]}"
+        )
 
         # Compare with pyswisseph true altitude
         az_diff = abs(result_lib[0] - result_swe[0])

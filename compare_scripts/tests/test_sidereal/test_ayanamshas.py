@@ -228,25 +228,37 @@ class TestAyanamsaEx:
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ayanamsa_matches_standard(self):
-        """Ayanamsa from get_ayanamsa_ex should match get_ayanamsa."""
+        """get_ayanamsa_ex must match pyswisseph's get_ayanamsa_ex.
+
+        It does NOT equal the plain get_ayanamsa: ex is the mean ayanamsha and
+        the plain form is the true (nutation-applied) one, differing by the
+        nutation in longitude (~0.004°) -- in pyswisseph just the same. So the
+        right check is ex-vs-Swiss-ex.
+        """
         jd = 2451545.0
         ephem.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        aya_standard = ephem.get_ayanamsa(jd)
         _retflag, aya_ex = ephem.get_ayanamsa_ex(jd, 0)
+        _retflag_swe, aya_ex_swe = swe.get_ayanamsa_ex(jd, 0)
 
-        assert abs(aya_ex - aya_standard) < 0.0001
+        assert abs(aya_ex - aya_ex_swe) < 0.005
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_ut_ayanamsa_matches_standard(self):
-        """Ayanamsa from get_ayanamsa_ex_ut should match get_ayanamsa_ut."""
+        """get_ayanamsa_ex_ut must match pyswisseph's get_ayanamsa_ex_ut.
+
+        Like the TT variant, the ex (mean) form differs from the plain
+        get_ayanamsa_ut (true) by the nutation in longitude, in pyswisseph too.
+        """
         jd = 2451545.0
         ephem.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-        aya_standard = ephem.get_ayanamsa_ut(jd)
         _retflag, aya_ex = ephem.get_ayanamsa_ex_ut(jd, 0)
+        _retflag_swe, aya_ex_swe = swe.get_ayanamsa_ex_ut(jd, 0)
 
-        assert abs(aya_ex - aya_standard) < 0.0001
+        assert abs(aya_ex - aya_ex_swe) < 0.005
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_retflag(self):
@@ -282,18 +294,17 @@ class TestAyanamsaEx:
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_uses_global_sid_mode(self):
-        """get_ayanamsa_ex should use the global set_sid_mode."""
+        """get_ayanamsa_ex should use the global set_sid_mode (vs pyswisseph)."""
         jd = 2451545.0
 
-        # Set global mode to Lahiri
+        # Set global mode to Lahiri in both libraries
         ephem.set_sid_mode(SIDM_LAHIRI)
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
         _retflag, aya_ex = ephem.get_ayanamsa_ex(jd, 0)
+        _retflag_swe, aya_ex_swe = swe.get_ayanamsa_ex(jd, 0)
 
-        # Compare with standard function
-        aya_lahiri = ephem.get_ayanamsa(jd)
-
-        # Should match Lahiri
-        assert abs(aya_ex - aya_lahiri) < 0.0001
+        # The global Lahiri mode must drive the ex value to match pyswisseph's.
+        assert abs(aya_ex - aya_ex_swe) < 0.005
 
     @pytest.mark.unit
     def test_get_ayanamsa_ex_with_flags(self):

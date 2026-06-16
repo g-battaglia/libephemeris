@@ -213,8 +213,9 @@ class TestPyswissephMoonSupport:
 class TestLibephemerisWithoutSpk:
     """Test libephemeris planetary moon behavior without SPK files loaded.
 
-    When no satellite SPK files are registered, libephemeris should return
-    zeros for planetary moon positions (different from pyswisseph's Sun fallback).
+    When no satellite SPK files are registered, libephemeris raises Error
+    (honest failure, reference-API parity) rather than pyswisseph's silent
+    Sun-position fallback or the older silent-zeros behavior.
     """
 
     def setup_method(self):
@@ -228,36 +229,30 @@ class TestLibephemerisWithoutSpk:
 
     @pytest.mark.comparison
     @pytest.mark.parametrize("moon_id,moon_name,naif_id", GALILEAN_MOONS)
-    def test_unregistered_moon_returns_zeros(self, moon_id, moon_name, naif_id):
-        """Verify libephemeris returns zeros for unregistered moons.
-
-        This is different from pyswisseph which returns Sun position.
+    def test_unregistered_moon_raises_error(self, moon_id, moon_name, naif_id):
+        """Unregistered planetary moons raise Error (honest failure, like the
+        reference API), directing the caller to register_moon_spk() instead of
+        returning silent zeros. Changed deliberately in WS7f for parity.
         """
         jd = 2451545.0
-        pos, _ = eph.calc_ut(jd, moon_id, FLG_SPEED)
-
-        assert pos[0] == 0.0, f"{moon_name} longitude should be 0.0 when unregistered"
-        assert pos[1] == 0.0, f"{moon_name} latitude should be 0.0 when unregistered"
-        assert pos[2] == 0.0, f"{moon_name} distance should be 0.0 when unregistered"
+        with pytest.raises(eph.Error, match="SPK"):
+            eph.calc_ut(jd, moon_id, FLG_SPEED)
 
     @pytest.mark.comparison
     def test_difference_from_pyswisseph_documented(self):
-        """Document key difference: libephemeris returns zeros, pyswisseph returns Sun.
-
-        This is an important behavioral difference between the libraries when
-        satellite SPK files are not loaded.
+        """Document the behavioral difference when no satellite SPK is loaded:
+        libephemeris raises Error (honest failure, reference-API parity) while
+        pyswisseph silently returns the Sun position.
         """
         jd = 2451545.0
 
-        # libephemeris returns zeros
-        lib_pos, _ = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
+        # libephemeris raises rather than returning a misleading position.
+        with pytest.raises(eph.Error):
+            eph.calc_ut(jd, MOON_IO, FLG_SPEED)
 
         # pyswisseph returns Sun position
         swe_pos, _ = swe.calc_ut(jd, MOON_IO, swe.FLG_SWIEPH)
         sun_pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH)
-
-        # Verify behavioral difference
-        assert lib_pos[0] == 0.0, "libephemeris should return 0 for unregistered moon"
         assert abs(swe_pos[0] - sun_pos[0]) < 1.0, (
             "pyswisseph should return Sun position for unregistered moon"
         )
@@ -636,11 +631,12 @@ class TestEdgeCases:
     @pytest.mark.comparison
     def test_invalid_moon_id(self):
         """Test behavior with invalid moon IDs."""
-        # ID not in moon range
-        assert planetary_moons.is_planetary_moon(9999) is False
+        # ID not in moon range. (9999 now resolves under the canonical
+        # PLMOON_OFFSET+NAIF scheme, so use a clearly out-of-range id.)
+        assert planetary_moons.is_planetary_moon(99999) is False
 
         # Unknown moon ID
-        name = planetary_moons.get_moon_name(9999)
+        name = planetary_moons.get_moon_name(99999)
         assert "Unknown" in name
 
     @pytest.mark.comparison

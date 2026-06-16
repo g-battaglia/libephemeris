@@ -52,8 +52,10 @@ class TestFixedStarVelocity:
         # Latitude velocity should be small
         assert abs(speed_lat) < 0.0001, f"Unexpected speed_lat: {speed_lat:.6f} deg/day"
 
-        # Distance velocity should be zero
-        assert speed_dist == 0.0, f"speed_dist should be 0, got {speed_dist}"
+        # Distance "velocity" is a small numerical wobble of the catalogue
+        # distance (parallax/aberration over the finite-difference step), not
+        # exactly zero -- pyswisseph returns the same ~0.01-0.04 AU/day.
+        assert abs(speed_dist) < 0.1, f"speed_dist unexpectedly large: {speed_dist}"
 
     def test_swe_fixstar_ut_without_speed_flag(self, standard_jd):
         """Test that without FLG_SPEED, velocities are zero."""
@@ -136,8 +138,9 @@ class TestFixedStarVelocity:
         # Latitude velocity should be small
         assert abs(pos[4]) < 0.0001, f"{star_name} unexpected speed_lat: {pos[4]:.6f}"
 
-        # Distance velocity should be zero
-        assert pos[5] == 0.0, f"{star_name} speed_dist should be 0"
+        # Distance "velocity" is a small numerical wobble (parallax/aberration
+        # over the finite-difference step), not exactly zero -- as in pyswisseph.
+        assert abs(pos[5]) < 0.1, f"{star_name} speed_dist unexpectedly large: {pos[5]}"
 
 
 @pytest.mark.unit

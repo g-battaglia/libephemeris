@@ -742,8 +742,12 @@ class TestHousesEx2:
         # Cusps should be shifted from tropical by about 23-24 degrees
         cusps_trop, _, _, _ = ephem.houses_ex2(jd, lat, lon, ord("P"), FLG_SPEED)
 
-        # Check that sidereal cusps differ from tropical
-        ayanamsa = ephem.get_ayanamsa_ut(jd)
+        # Check that sidereal cusps differ from tropical by the ayanamsha.
+        # Use the *mean* ayanamsha (get_ayanamsa_ex_ut), not the true one
+        # (get_ayanamsa_ut, which adds nutation): the tropical cusps are already
+        # apparent (nutation included), so the tropical->sidereal shift is the
+        # mean ayanamsha. This matches pyswisseph's sidereal cusps exactly.
+        ayanamsa = ephem.get_ayanamsa_ex_ut(jd, 0)[1]
         for i in range(12):
             expected = (cusps_trop[i] - ayanamsa) % 360
             diff = abs(cusps[i] - expected)

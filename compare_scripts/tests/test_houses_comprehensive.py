@@ -761,6 +761,11 @@ class TestAscmcSameAcrossSystems:
                 continue
 
             for i in range(8):
+                # Skip ascmc points that are mathematically undefined at the
+                # equator for this system (e.g. H's Vertex/CoAsc_Munkasey),
+                # as the other equator tests already do.
+                if abs(lat) < 0.1 and i in SKIP_ASCMC_AT_EQUATOR.get(hsys, set()):
+                    continue
                 diff = angular_diff(ref_ascmc[i], ascmc[i])
                 assert diff < 0.001, (
                     f"ascmc[{i}] ({ASCMC_LABELS[i]}) differs between P and {hsys} "
