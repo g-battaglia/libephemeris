@@ -54,6 +54,11 @@ from .leb_format import (
     COORD_ICRS_BARY,
     COORD_ICRS_BARY_SYSTEM,
 )
+from .precession_vondrak import (
+    vondrak_mean_obliquity_deg,
+    vondrak_pn_matrix,
+    vondrak_precession_matrix,
+)
 
 if TYPE_CHECKING:
     from typing import Union
@@ -475,11 +480,14 @@ def _get_skyfield_frame_data(
     float,
     float,
 ]:
-    """Get precession-nutation matrix and nutation angles from Skyfield.
+    """Get precession-nutation matrix and nutation angles for the Skyfield path.
 
-    Uses Skyfield's IAU 2000A nutation model, matching the reference pipeline
-    in planets.py.  This ensures LEB-vs-Skyfield comparison tests measure only
-    Chebyshev fitting error, not nutation model mismatch.
+    The nutation angles still come from Skyfield's own IAU 2006/2000A model (so
+    the modern nutation, and the LEB-vs-Skyfield comparison tests, are
+    unchanged), but the precession and of-date mean obliquity now come from the
+    Vondrák 2011 long-term model via ``vondrak_pn_matrix`` -- the same single
+    source the LEB path uses, so the two backends cannot diverge at remote
+    epochs. (Previously this read Skyfield's ``t.M`` IAU 2006 BPN matrix.)
 
     Args:
         jd_tt: Julian Day in TT.
@@ -487,61 +495,41 @@ def _get_skyfield_frame_data(
     Returns:
         (pn_mat, dpsi, deps, eps_true_rad) where:
         - pn_mat: 3x3 ICRS→true-equatorial-of-date rotation as nested tuples
-        - dpsi: nutation in longitude (radians, IAU 2000A)
-        - deps: nutation in obliquity (radians, IAU 2000A)
+        - dpsi: nutation in longitude (radians, IAU 2006/2000A)
+        - deps: nutation in obliquity (radians, IAU 2006/2000A)
         - eps_true_rad: true obliquity (radians)
     """
     from .cache import get_cached_time_tt
 
     t = get_cached_time_tt(jd_tt)
 
-    # PNM matrix: ICRS -> true equatorial of date (N × P × B)
-    M = t.M
-    pn_mat = (
-        (float(M[0][0]), float(M[0][1]), float(M[0][2])),
-        (float(M[1][0]), float(M[1][1]), float(M[1][2])),
-        (float(M[2][0]), float(M[2][1]), float(M[2][2])),
-    )
-
-    # Nutation angles (IAU 2000A, matching Skyfield's own computation)
+    # Nutation angles from Skyfield's own computation (unchanged).
     dpsi, deps = t._nutation_angles_radians
-    eps_true_rad = float(t._mean_obliquity_radians + deps)
+    dpsi = float(dpsi)
+    deps = float(deps)
 
-    return pn_mat, float(dpsi), float(deps), eps_true_rad
+    # Vondrák 2011 long-term precession (via erfa) + Skyfield's nutation,
+    # built into the ICRS->true-equator-of-date matrix.
+    pn_mat, eps_true_rad = vondrak_pn_matrix(jd_tt, dpsi, deps)
+
+    return pn_mat, dpsi, deps, eps_true_rad
 
 
 @lru_cache(maxsize=64)
 def _get_precession_matrix(
     jd_tt: float,
 ) -> Tuple[Tuple[float, float, float], ...]:
-    """Get mean-equator-of-date rotation matrix from Skyfield.
+    """Get the ICRS->mean-equator-of-date rotation matrix (no nutation).
 
-    Returns the ICRS→mean-equatorial-of-date rotation matrix used for
-    sidereal+equatorial output, where pyswisseph uses the mean equator.
+    Used for sidereal+equatorial output, where pyswisseph uses the mean equator.
+    Now sourced from the Vondrák 2011 long-term precession (via erfa, ICRS frame
+    bias included) -- the same single source as the LEB path -- so both backends
+    agree and remain valid at remote epochs. (Previously this used Skyfield's
+    ``mean_equator_and_equinox_of_date`` IAU 2006 frame.)
 
-    Uses Skyfield's ``mean_equator_and_equinox_of_date`` frame, which is the
-    dynamical mean equator (precession-only, no nutation, no ICRS frame bias).
-    This matches the Skyfield reference path in ``planets.py`` line 2436-2440
-    and produces results consistent with pyswisseph's SID+EQ output.
-
-    Note: ``t.P`` was previously used here but it includes the ICRS frame bias
-    (~17 mas), causing up to 0.015″ excess error vs the Skyfield reference path.
-
-    IMPORTANT: We must NOT call ``mean_equator_and_equinox_of_date.rotation_at(t)``
-    because it internally accesses ``t.P``.  Skyfield's ``P = reify(precession_matrix)``
-    descriptor uses ``update_wrapper``, so ``P.__name__`` = ``'precession_matrix'``.
-    When the reify ``__get__`` fires, it stores the numpy result under
-    ``t.__dict__['precession_matrix']``, shadowing the *method* of the same name.
-    Subsequent ``t.M`` computation calls ``self.precession_matrix()`` expecting a
-    callable method but finds the numpy array instead → TypeError.  Since we use
-    ``get_cached_time_tt()`` (LRU-cached Time objects), this corruption persists
-    across callers and causes Pipeline B bodies (TrueNode, OscuApog, etc.) to fail
-    when they later access ``t.M`` via ``ecliptic_frame.rotation_at(t)``.
-
-    The fix: call ``t.precession_matrix()`` directly (the method, not the ``P``
-    reify descriptor) and combine with ``ICRS_to_J2000`` manually.  This is
-    mathematically identical to ``mxm(t.P, ICRS_to_J2000)`` but avoids the
-    reify descriptor corruption.
+    The ``@lru_cache`` is retained so ``cache.clear_caches()`` can call
+    ``_get_precession_matrix.cache_clear()`` (the underlying Vondrák matrix is
+    state-independent, but the cache-clearing contract must hold).
 
     Args:
         jd_tt: Julian Day in TT.
@@ -549,20 +537,7 @@ def _get_precession_matrix(
     Returns:
         3x3 rotation matrix as nested tuples.
     """
-    from .cache import get_cached_time_tt
-    from skyfield.framelib import ICRS_to_J2000
-    from skyfield.functions import mxm
-
-    t = get_cached_time_tt(jd_tt)
-
-    # Equivalent to mean_equator_and_equinox_of_date.rotation_at(t) which does
-    # mxm(t.P, ICRS_to_J2000), but avoids accessing t.P (reify descriptor).
-    R = mxm(t.precession_matrix(), ICRS_to_J2000)
-    return (
-        (float(R[0][0]), float(R[0][1]), float(R[0][2])),
-        (float(R[1][0]), float(R[1][1]), float(R[1][2])),
-        (float(R[2][0]), float(R[2][1]), float(R[2][2])),
-    )
+    return vondrak_precession_matrix(jd_tt)
 
 
 # =============================================================================
@@ -680,9 +655,11 @@ def _get_leb_frame_data(
 ]:
     """Get precession-nutation matrix and nutation angles from LEB data.
 
-    Pure-Python replacement for _get_skyfield_frame_data() that uses
-    LEB-stored nutation Chebyshev coefficients and IAU 2006 precession
-    polynomials. No Skyfield or erfa calls.
+    Skyfield-free replacement for _get_skyfield_frame_data(): the nutation comes
+    from the LEB-stored Chebyshev coefficients, and the precession from the
+    Vondrák 2011 long-term model via ``vondrak_pn_matrix`` (see
+    ``precession_vondrak.py`` for the erfa/Vondrák provenance). Long-term-valid,
+    unlike the IAU 2006 polynomials previously used here.
 
     Args:
         reader: LEBReader or LEB2Reader with nutation data.
@@ -702,14 +679,9 @@ def _get_leb_frame_data(
     # Nutation from LEB Chebyshev (~1.5 µs)
     dpsi, deps = reader.eval_nutation(jd_tt)
 
-    # Precession angles from IAU 2006 polynomials (~1 µs)
-    gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
-
-    # True obliquity
-    eps_true_rad = epsa + deps
-
-    # Build bias-precession-nutation matrix
-    pn_mat = _fw2m(gamb, phib, psib + dpsi, eps_true_rad)
+    # Vondrák 2011 long-term precession (via erfa) combined with the LEB
+    # nutation above into the ICRS->true-equator-of-date matrix.
+    pn_mat, eps_true_rad = vondrak_pn_matrix(jd_tt, dpsi, deps)
 
     result = (pn_mat, dpsi, deps, eps_true_rad)
 
@@ -724,13 +696,12 @@ def _get_leb_frame_data(
 def _get_leb_precession_matrix(
     jd_tt: float,
 ) -> Tuple[Tuple[float, float, float], ...]:
-    """Get mean-equator-of-date precession matrix (pure Python).
+    """Get the ICRS->mean-equator-of-date precession matrix (no nutation).
 
-    Equivalent to _get_precession_matrix() but without Skyfield.
-    Uses IAU 2006 Fukushima-Williams angles with zero nutation.
+    Skyfield-free; uses the Vondrák 2011 long-term precession (via erfa,
+    frame bias included) -- the same source as _get_precession_matrix().
     """
-    gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
-    return _fw2m(gamb, phib, psib, epsa)
+    return vondrak_precession_matrix(jd_tt)
 
 
 # Thread-local reference to the active reader for frame data dispatch.
@@ -1348,7 +1319,7 @@ def _pipeline_icrs(
         # FLG_NONUT: mean ecliptic (P matrix only, no nutation)
         if _want_nonut:
             _rot_mat = _prec_matrix(jd_tt)
-            eps_rad = math.radians(_mean_obliquity_iau2006(jd_tt))
+            eps_rad = math.radians(vondrak_mean_obliquity_deg(jd_tt))
         else:
             _rot_mat, _, _, eps_rad = _frame_data(jd_tt)
 
@@ -1494,10 +1465,10 @@ def _pipeline_ecliptic(
         # Equatorial of date: rotate ecliptic-of-date → equatorial-of-date.
         # Sidereal/NONUT modes use mean obliquity (no nutation).
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
-            eps = _mean_obliquity_iau2006(jd_tt)
+            eps = vondrak_mean_obliquity_deg(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
-            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps_mean = vondrak_mean_obliquity_deg(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
         # Velocity via finite difference on original ecliptic coords
@@ -1637,10 +1608,10 @@ def _pipeline_helio(
         # so it uses true obliquity of date on J2000 ecliptic coords.
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
-            eps = _mean_obliquity_iau2006(jd_tt)
+            eps = vondrak_mean_obliquity_deg(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
-            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps_mean = vondrak_mean_obliquity_deg(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
         dt_step = 0.001
@@ -1663,10 +1634,10 @@ def _pipeline_helio(
         # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
         lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
-            eps = _mean_obliquity_iau2006(jd_tt)
+            eps = vondrak_mean_obliquity_deg(jd_tt)
         else:
             _, _, deps, _ = _frame_data(jd_tt)
-            eps_mean = _mean_obliquity_iau2006(jd_tt)
+            eps_mean = vondrak_mean_obliquity_deg(jd_tt)
             eps = eps_mean + math.degrees(deps)
 
         dt_step = 0.001

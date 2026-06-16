@@ -233,3 +233,39 @@ NOT dead — it still backs `lun_eclipse_gamma`, whose gamma matches the
 independent shadow geometry to ~0.0002 Earth-radii — but its umbral/penumbral
 *magnitude* outputs are no longer used (the convenience magnitude functions now
 delegate to `_lun_how_core`).
+
+## libephemeris/fast_calc.py
+
+Dead since the Vondrák 2011 long-term precession migration (2026-06-16). The
+apparent-place reduction now sources precession and the of-date mean obliquity
+from `libephemeris/precession_vondrak.py` (Vondrák via erfa), so the pure-Python
+IAU 2006 helpers below have no live caller. They are kept as a self-contained,
+erfa-validated IAU 2006 reference (each matched `erfa.pfw06`/`erfa.obl06` to
+<1e-12 before being retired):
+
+- `_iau2006_precession_angles` (IAU 2006 Fukushima-Williams precession angles)
+  — replaced by `erfa.ltp`/`ltpb` via `vondrak_precession_matrix`.
+- `_fw2m` (Fukushima-Williams angles -> BPN matrix) — the nutation matrix is now
+  built by `erfa.numat` inside `vondrak_pn_matrix`. (Its two B018 no-op lines,
+  already noted in earlier reviews, are moot now that the whole function is dead.)
+- `_mean_obliquity_iau2006` and its `_OBLIQUITY_COEFFS` table — replaced by
+  `vondrak_mean_obliquity_deg` (angle between the Vondrák equator and ecliptic
+  poles), which stays valid at remote epochs where the IAU 2006 polynomial
+  diverges.
+
+The IAU 2006 / Lieske 1977 fallbacks in `astrometry.py`
+(`_precession_matrix_j2000_to_date`, `_precess_ecliptic`) are NOT dead: they
+still run when pyerfa is unavailable.
+
+`astrometry._nutation_matrix` and `astrometry._precession_nutation_matrix` were
+deliberately left on IAU 2006 (the erfa branch returns `erfa.pnm06a`/`obl06`/
+`nut00b`) and were NOT migrated to Vondrák in the 2026-06-16 change. They have
+**no production caller** — the apparent-place reduction never calls them; the
+only callers are `tests/test_cov100_astrometry.py`, which pin them numerically
+against `erfa.pnm06a`. They are kept as a standalone IAU 2006 precession-nutation
+reference. This is a deliberate, documented latent inconsistency: the module's
+standalone precession helpers (`_precession_matrix_j2000_to_date`,
+`_precess_ecliptic`) are Vondrák, while these combined precession-nutation
+helpers are IAU 2006. A future production caller that needs long-term-valid
+precession+nutation must use `vondrak_pn_matrix` (the single source used by every
+real reduction path), not these helpers.

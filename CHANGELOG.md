@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Long-term precession (Vondrák 2011).** The apparent-place reduction now uses
+  the Vondrák, Capitaine & Wallace (2011) long-term precession model (A&A 534,
+  A22), valid ±200,000 years, instead of the IAU 2006 precession polynomial which
+  is only valid for a few centuries around J2000. At extreme dates this matches
+  Swiss Ephemeris's precession (Swiss uses the same model since v1.78) — the Sun's
+  longitude error at year -3000 drops from ~36" to ~6" (the residual being the
+  DE441-vs-DE431 ephemeris difference, which Vondrák does not affect). Modern
+  results are unchanged to sub-milliarcsecond (Vondrák ≡ IAU 2006 near J2000), so
+  the golden regression baseline was regenerated. The of-date mean obliquity is
+  likewise taken from the Vondrák poles (long-term valid). Implemented via PyERFA's
+  reference `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA, clean-room — no GPL
+  source consulted); see `libephemeris/precession_vondrak.py` and
+  `docs/methodology/pyerfa-integration.md`. Touches the LEB fast path, the Skyfield
+  reference path, and the ecliptic-body / SPK / fixed-star paths uniformly.
+
 ## [3.0.0a1] - 2026-06-15
 
 First **v3 alpha**.  v3 introduces **dual licensing** — `AGPL-3.0-only OR

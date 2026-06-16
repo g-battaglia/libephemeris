@@ -56,6 +56,12 @@ from skyfield.framelib import ecliptic_frame
 from dataclasses import dataclass
 import erfa
 
+from .precession_vondrak import (
+    vondrak_mean_obliquity_rad,
+    vondrak_pn_matrix,
+    vondrak_precession_matrix,
+)
+
 from .exceptions import EphemerisRangeError
 
 if TYPE_CHECKING:
@@ -1345,7 +1351,6 @@ def _calc_body_pctr(
     Returns:
         Tuple of (position_tuple, flags)
     """
-    from skyfield.framelib import ecliptic_frame
     from skyfield.positionlib import ICRF
 
     planets = get_planets()
@@ -1448,32 +1453,36 @@ def _calc_body_pctr(
         if iflag & FLG_J2000:
             ra, dec, dist = pos.radec()
         elif is_icrs:
-            # ICRS equatorial of date: skip frame bias (B matrix).
+            # ICRS equatorial of date (no frame bias): Vondrák 2011 precession
+            # + Skyfield nutation -- the same single source as the LEB fast path.
             import numpy as np
 
-            from skyfield.framelib import ICRS_to_J2000
-
-            xyz_icrs = np.array(pos.position.au)
-            # True equator: N × P (no B)
-            M_no_bias = t.M @ ICRS_to_J2000.T
-            xyz_eq = M_no_bias @ xyz_icrs
+            dpsi, deps = t._nutation_angles_radians
+            pn, _eps_true = vondrak_pn_matrix(
+                t.tt, float(dpsi), float(deps), frame_bias=False
+            )
+            xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist_val))
+            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
             p3 = dist_val
         else:
-            # True equator of date - use manual rotation to avoid Skyfield
-            # Time reify descriptor corruption
+            # True equator of date: Vondrák 2011 precession + Skyfield nutation
+            # (ICRS -> true equator of date), matching the LEB fast path.
             import numpy as np
 
-            # t.M is the precession-nutation matrix (ICRS -> true equator of date)
-            xyz_icrs = np.array(pos.position.au)
-            xyz_eq = t.M @ xyz_icrs
+            dpsi, deps = t._nutation_angles_radians
+            pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist_val)) if dist_val > 0 else 0.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+                if dist_val > 0
+                else 0.0
+            )
             p3 = dist_val
         if iflag & FLG_J2000:
             p1 = ra.degrees
@@ -1495,36 +1504,50 @@ def _calc_body_pctr(
 
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             lon = math.degrees(math.atan2(ye, xe)) % 360.0
-            lat = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+            lat = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
 
             p1, p2, p3 = lon, lat, dist
         elif is_icrs:
-            # ICRS ecliptic of date: skip frame bias (B matrix).
+            # ICRS ecliptic of date (no frame bias): Vondrák 2011 precession +
+            # Skyfield nutation, then rotate equator -> ecliptic by eps_true.
             import numpy as np
 
-            from skyfield.framelib import ICRS_to_J2000
-
-            R_ecl = ecliptic_frame.rotation_at(t)
-            R_icrs = R_ecl @ ICRS_to_J2000.T
-            xyz_icrs = np.array(pos.position.au)
-            xyz_ecl = R_icrs @ xyz_icrs
-            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            dpsi, deps = t._nutation_angles_radians
+            pn, eps_true = vondrak_pn_matrix(
+                t.tt, float(dpsi), float(deps), frame_bias=False
+            )
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps_true), math.sin(eps_true)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist))
+            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
             p3 = dist
         else:
-            # Ecliptic of date - use manual rotation to avoid Skyfield
-            # Time reify descriptor corruption
+            # Ecliptic of date: Vondrák 2011 precession + Skyfield nutation, then
+            # rotate equator -> ecliptic by eps_true. Matches the LEB fast path.
             import numpy as np
 
-            R_ecl = ecliptic_frame.rotation_at(t)
-            xyz_icrs = np.array(pos.position.au)
-            xyz_ecl = R_ecl @ xyz_icrs
-            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            dpsi, deps = t._nutation_angles_radians
+            pn, eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps_true), math.sin(eps_true)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
             p3 = dist
 
     # Calculate speed using central difference numerical differentiation if requested
@@ -1744,9 +1767,7 @@ def _keplerian_position_at(
     from .state import get_timescale
 
     if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
-        lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(
-            ipl, jd_tt
-        )
+        lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
     else:
         # Arbitrary numbered asteroid: Keplerian elements fetched from
         # JPL SBDB (cached after the first call).  No element source at
@@ -2535,9 +2556,7 @@ def _calc_body(
     # range) take the same pipeline: registered SPK -> auto-SPK ->
     # Keplerian elements (curated table or JPL SBDB) -> UnknownBodyError.
     _spk_type21_target = None
-    if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (
-        AST_OFFSET < ipl < FIXSTAR_OFFSET
-    ):
+    if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
@@ -2942,48 +2961,48 @@ def _calc_body(
             _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
             if is_icrs:
-                # ICRS equatorial of date: skip frame bias (B matrix).
-                # t.M = N × P × B; for ICRS we want N × P = t.M × B^T.
-                # t.P is precession-only (J2000 dyn → mean of date).
+                # ICRS equator of date (no frame bias): Vondrák 2011 precession,
+                # with nutation unless the mean equator is requested.
                 import numpy as np
-
-                from skyfield.framelib import ICRS_to_J2000
 
                 xyz_icrs = np.array(pos.position.au)
                 if _use_mean_equator:
-                    # Mean equator: P only (no B, no N)
-                    xyz_eq = t.precession_matrix() @ xyz_icrs
+                    pn = vondrak_precession_matrix(t.tt, frame_bias=False)
                 else:
-                    # True equator: N × P (no B)
-                    M_no_bias = t.M @ ICRS_to_J2000.T
-                    xyz_eq = M_no_bias @ xyz_icrs
+                    dpsi, deps = t._nutation_angles_radians
+                    pn, _eps_true = vondrak_pn_matrix(
+                        t.tt, float(dpsi), float(deps), frame_bias=False
+                    )
+                xyz_eq = np.array(pn) @ xyz_icrs
                 xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
                 dist = math.sqrt(xe * xe + ye * ye + ze * ze)
                 p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
+                p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
                 p3 = dist
             elif _use_mean_equator:
-                # Compute mean equatorial coords directly to avoid Skyfield's
-                # mean_equator_and_equinox_of_date frame which accesses t.P
-                # (the reify descriptor corrupts t.precession_matrix).
+                # Mean equator of date (with frame bias): Vondrák precession.
                 import numpy as np
 
-                P = t.precession_matrix()
-                from skyfield.framelib import ICRS_to_J2000
-
-                R = P @ ICRS_to_J2000
-                xyz_icrs = np.array(pos.position.au)
-                xyz_eq = R @ xyz_icrs
+                pn = vondrak_precession_matrix(t.tt)
+                xyz_eq = np.array(pn) @ np.array(pos.position.au)
                 xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
                 dist = math.sqrt(xe * xe + ye * ye + ze * ze)
                 p1 = math.degrees(math.atan2(ye, xe)) % 360.0
                 p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
                 p3 = dist
             else:
-                from skyfield.framelib import true_equator_and_equinox_of_date
+                # True equator of date (with frame bias): Vondrák precession +
+                # Skyfield nutation, matching the LEB fast path.
+                import numpy as np
 
-                dec_, ra_, dist_ = pos.frame_latlon(true_equator_and_equinox_of_date)
-                p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+                xyz_eq = np.array(pn) @ np.array(pos.position.au)
+                xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                p3 = dist
 
             # Speeds are computed once in the generic central-difference
             # block below (section 4); the previous in-branch duplicate
@@ -3013,75 +3032,42 @@ def _calc_body(
             # Convert to spherical
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             lon = math.degrees(math.atan2(ye, xe)) % 360.0
-            lat = math.degrees(math.asin(ze / dist))
+            lat = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
 
             p1, p2, p3 = lon, lat, dist
 
         else:
-            # Ecliptic of Date (true or mean depending on NONUT flag)
+            # Ecliptic of date: reduce ICRS -> equator of date with Vondrák 2011
+            # precession (the same single source as the LEB fast path), then
+            # rotate equator -> ecliptic about the equinox by the obliquity. The
+            # mean variant (FLG_NONUT) drops nutation; the frame bias is dropped
+            # for FLG_ICRS.
+            import numpy as np
+
             if iflag & FLG_NONUT:
-                # Mean ecliptic of date: precession only, no nutation
-                # Full chain: mean_ecliptic = rot_x(-ε) @ P @ B  (B = ICRS_to_J2000)
-                # ICRS mode: mean_ecliptic = rot_x(-ε) @ P       (skip frame bias)
-                from skyfield.framelib import ICRS_to_J2000
-                from skyfield.functions import mxm, rot_x
-
-                mean_obliquity = t._mean_obliquity_radians
-                if is_icrs:
-                    mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.precession_matrix())
-                else:
-                    mean_ecl_matrix = mxm(
-                        rot_x(-mean_obliquity),
-                        mxm(t.precession_matrix(), ICRS_to_J2000),
-                    )
-                # Transform ICRS position to mean ecliptic
-                import numpy as np
-
-                xyz_icrs = np.array(pos.position.au)
-                xyz_ecl = mean_ecl_matrix @ xyz_icrs
-                xe, ye, ze = xyz_ecl
-                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
-                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
-                p3 = dist
+                # Mean ecliptic of date (precession only, no nutation).
+                eps = vondrak_mean_obliquity_rad(t.tt)
+                pn = vondrak_precession_matrix(t.tt, frame_bias=not is_icrs)
             elif is_icrs:
-                # ICRS ecliptic of date: skip frame bias (B matrix).
-                # ecliptic_frame.rotation_at(t) = rot_x(-ε_true) @ t.M
-                # where t.M = N @ P @ B.  For ICRS: rot_x(-ε_true) @ N @ P
-                # = ecliptic_frame.rotation_at(t) @ B^T
-                import numpy as np
-
-                from skyfield.framelib import ICRS_to_J2000
-
-                R_ecl = ecliptic_frame.rotation_at(t)
-                R_icrs = R_ecl @ ICRS_to_J2000.T
-                xyz_icrs = np.array(pos.position.au)
-                xyz_ecl = R_icrs @ xyz_icrs
-                xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
-                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
-                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
-                p3 = dist
+                # ICRS ecliptic of date (no frame bias).
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
             else:
-                try:
-                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-                except TypeError:
-                    # Skyfield Time reify corruption: recompute with fresh Time
-                    from .cache import clear_observer_cache
+                # True ecliptic of date.
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
 
-                    clear_observer_cache()
-                    t_fresh = get_timescale().tt_jd(float(t.tt))
-                    obs_fresh = observer.at(t_fresh)
-                    if iflag & FLG_NOABERR:
-                        pos = obs_fresh.observe(target)
-                    elif iflag & FLG_NOGDEFL:
-                        pos = obs_fresh.observe(target).apparent(deflectors=())
-                    else:
-                        pos = obs_fresh.observe(target).apparent()
-                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-                p1 = lon_.degrees
-                p2 = lat_.degrees
-                p3 = dist_.au
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps), math.sin(eps)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+            p3 = dist
 
     # 4. Speed (Central Difference Numerical Differentiation if requested)
     # Using central differences: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)

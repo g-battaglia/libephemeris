@@ -18,7 +18,7 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 ## Features
 
 - **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
-- **IAU 2006/2000A standards** - precession, nutation, and obliquity via the official ERFA library
+- **IAU + Vondrák 2011 standards** - long-term precession (Vondrák 2011, valid ±200,000 years), nutation and obliquity (IAU 2006/2000A) via the official ERFA library
 - **Validated high precision** - planetary differences typically measured in fractions of an arcsecond, house cusps < 0.02", benchmarked across 4,400+ comparison rounds ([full report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md))
 - **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
 - **25 house systems, 43 ayanamsha modes** - independently verified against pyswisseph
@@ -36,7 +36,7 @@ Swiss Ephemeris is the industry standard for planetary calculations. But its Pyt
 LibEphemeris provides the **same API** with a modern foundation:
 
 - **NASA JPL ephemerides** instead of semi-analytical theory - DE440/DE441 are the latest planetary ephemerides from the Jet Propulsion Laboratory, the same data used for spacecraft navigation.
-- **IAU 2006/2000A standards** - precession and nutation computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
+- **IAU + Vondrák 2011 standards** - long-term precession (Vondrák, Capitaine & Wallace 2011, valid ±200,000 years instead of the IAU 2006 polynomial's few centuries), nutation and obliquity (IAU 2006/2000A), all computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
 - **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune corrected from system barycenters to actual body centers using JPL satellite ephemerides. Most libraries skip this.
 - **Independently verified** - every function cross-validated against pyswisseph, JPL Horizons, and astropy/ERFA. [Precision report with full methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md).
 - **Pure Python** - readable source, standard debugging, no build toolchain. Runs on any platform, any CI, any serverless environment.

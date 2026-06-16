@@ -2172,9 +2172,7 @@ def _calc_star_position_leb(
         _apply_aberration,
         _apply_gravitational_deflection,
         _cartesian_to_spherical,
-        _fw2m,
         _get_leb_frame_data,
-        _iau2006_precession_angles,
         _mat3_vec3,
         _rotate_equatorial_to_ecliptic,
         _rotate_icrs_to_ecliptic_j2000,
@@ -2258,12 +2256,16 @@ def _calc_star_position_leb(
         try:
             pn_mat, _dpsi, _deps, eps_true_rad = _get_leb_frame_data(reader, jd_tt)
         except (KeyError, ValueError, AttributeError):
+            # Reader without nutation data: nutation from erfa, precession from
+            # the Vondrák 2011 long-term model (same source as _get_leb_frame_data).
             import erfa
 
+            from .precession_vondrak import vondrak_pn_matrix
+
             dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
-            gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
-            eps_true_rad = epsa + deps_rad
-            pn_mat = _fw2m(gamb, phib, psib + dpsi_rad, eps_true_rad)
+            pn_mat, eps_true_rad = vondrak_pn_matrix(
+                jd_tt, float(dpsi_rad), float(deps_rad)
+            )
         geo_eq = _mat3_vec3(pn_mat, geo)
         ecl = _rotate_equatorial_to_ecliptic(
             geo_eq[0], geo_eq[1], geo_eq[2], eps_true_rad

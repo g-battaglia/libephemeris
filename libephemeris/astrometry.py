@@ -25,6 +25,14 @@ from typing import Tuple, Any
 
 import numpy as np
 
+# NOTE: the ``precession_vondrak`` import is deliberately deferred to inside
+# ``_mean_obliquity`` (not hoisted to module scope). This module keeps an
+# import-time-erfa-optional contract -- the pyerfa import below is guarded, and
+# ``test_cov100_astrometry`` execs this file as a standalone module (no package
+# parent) to verify that guard. A top-level relative import would break that
+# standalone load. ``precession_vondrak`` requires erfa, so importing it lazily
+# preserves both the contract and the module's standalone-loadability.
+
 # =============================================================================
 # CONSTANTS
 # =============================================================================
@@ -104,17 +112,23 @@ except ImportError:
 # =============================================================================
 
 
-def _mean_obliquity(jd_tt: float) -> float:
-    """Mean obliquity of the ecliptic (IAU 2006) in degrees."""
-    if _HAS_ERFA and _erfa is not None:
-        eps0 = _erfa.obl06(J2000, jd_tt - J2000)
-        return float(eps0) * RAD_TO_DEG
+def _julian_epoch(jd_tt: float) -> float:
+    """Julian epoch (e.g. 2000.0 at J2000.0) for the ERFA long-term routines."""
+    return 2000.0 + (jd_tt - J2000) / 365.25
 
-    t = _jd_to_julian_centuries(jd_tt)
-    epsilon = 0.0
-    for i, coeff in enumerate(OBLIQUITY_COEFFS):
-        epsilon += coeff * (t**i)
-    return epsilon * ARCSEC_TO_RAD * RAD_TO_DEG
+
+def _mean_obliquity(jd_tt: float) -> float:
+    """Of-date mean obliquity of the ecliptic in degrees, Vondrák 2011.
+
+    Long-term-valid (angle between the Vondrák equator and ecliptic poles via
+    erfa, see ``precession_vondrak``), replacing the IAU 2006 obliquity
+    polynomial that diverges at remote epochs.
+    """
+    # Deferred import: keeps this module loadable without erfa at import time
+    # (see the module-scope NOTE and test_cov100_astrometry).
+    from .precession_vondrak import vondrak_mean_obliquity_deg
+
+    return vondrak_mean_obliquity_deg(jd_tt)
 
 
 # =============================================================================
@@ -280,9 +294,14 @@ THETA_A_COEFFS: Tuple[float, ...] = (0.0, 2004.3109, -0.42665, -0.041833)
 
 
 def _precession_matrix_j2000_to_date(jd_tt: float) -> np.ndarray:
-    """Precession rotation matrix from J2000 to date."""
+    """Precession rotation matrix from J2000 to date (Vondrák 2011 via erfa).
+
+    Uses the long-term ``erfa.ltp`` (J2000 mean equator/equinox -> date), valid
+    over ±200,000 years. The IAU 2006 / Lieske polynomial path below is a
+    fallback only when pyerfa is unavailable.
+    """
     if _HAS_ERFA and _erfa is not None:
-        return np.array(_erfa.pmat06(J2000, jd_tt - J2000))
+        return np.array(_erfa.ltp(_julian_epoch(jd_tt)))
 
     t = _jd_to_julian_centuries(jd_tt)
 
@@ -389,51 +408,43 @@ def _precess_ecliptic(
     y1 = cos_lat * sin_lon * cos_eps1 - sin_lat * sin_eps1
     z1 = cos_lat * sin_lon * sin_eps1 + sin_lat * cos_eps1
 
-    t1 = _jd_to_julian_centuries(from_jd)
-    t2 = _jd_to_julian_centuries(to_jd)
-    dt = t2 - t1
+    # Equatorial precession from_jd -> to_jd via Vondrák 2011 (long-term valid):
+    # erfa.ltp(to) @ erfa.ltp(from)^T composes the two J2000-referred matrices.
+    # The Lieske (1977) two-epoch polynomial is a fallback when pyerfa is absent.
+    if _HAS_ERFA and _erfa is not None:
+        prec = _erfa.ltp(_julian_epoch(to_jd)) @ _erfa.ltp(_julian_epoch(from_jd)).T
+    else:
+        t1 = _jd_to_julian_centuries(from_jd)
+        dt = _jd_to_julian_centuries(to_jd) - t1
+        zeta = (
+            (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
+            + (0.30188 - 0.000344 * t1) * dt**2
+            + 0.017998 * dt**3
+        ) * ARCSEC_TO_RAD
+        z = (
+            (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
+            + (1.09468 + 0.000066 * t1) * dt**2
+            + 0.018203 * dt**3
+        ) * ARCSEC_TO_RAD
+        theta = (
+            (2004.3109 - 0.85330 * t1 - 0.000217 * t1**2) * dt
+            - (0.42665 + 0.000217 * t1) * dt**2
+            - 0.041833 * dt**3
+        ) * ARCSEC_TO_RAD
+        cz, sz = math.cos(zeta), math.sin(zeta)
+        cZ, sZ = math.cos(z), math.sin(z)
+        ct, st = math.cos(theta), math.sin(theta)
+        prec = np.array(
+            [
+                [cz * ct * cZ - sz * sZ, -sz * ct * cZ - cz * sZ, -st * cZ],
+                [cz * ct * sZ + sz * cZ, -sz * ct * sZ + cz * cZ, -st * sZ],
+                [cz * st, -sz * st, ct],
+            ]
+        )
 
-    # Lieske et al. (1977) two-epoch precession angles (Meeus, eq. 21.2)
-    zeta = (
-        (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
-        + (0.30188 - 0.000344 * t1) * dt**2
-        + 0.017998 * dt**3
-    )
-    z = (
-        (2306.2181 + 1.39656 * t1 - 0.000139 * t1**2) * dt
-        + (1.09468 + 0.000066 * t1) * dt**2
-        + 0.018203 * dt**3
-    )
-    theta = (
-        (2004.3109 - 0.85330 * t1 - 0.000217 * t1**2) * dt
-        - (0.42665 + 0.000217 * t1) * dt**2
-        - 0.041833 * dt**3
-    )
-
-    zeta_rad = zeta * ARCSEC_TO_RAD
-    z_rad = z * ARCSEC_TO_RAD
-    theta_rad = theta * ARCSEC_TO_RAD
-
-    cos_zeta = math.cos(zeta_rad)
-    sin_zeta = math.sin(zeta_rad)
-    cos_z = math.cos(z_rad)
-    sin_z = math.sin(z_rad)
-    cos_theta = math.cos(theta_rad)
-    sin_theta = math.sin(theta_rad)
-
-    r11 = cos_zeta * cos_theta * cos_z - sin_zeta * sin_z
-    r12 = -sin_zeta * cos_theta * cos_z - cos_zeta * sin_z
-    r13 = -sin_theta * cos_z
-    r21 = cos_zeta * cos_theta * sin_z + sin_zeta * cos_z
-    r22 = -sin_zeta * cos_theta * sin_z + cos_zeta * cos_z
-    r23 = -sin_theta * sin_z
-    r31 = cos_zeta * sin_theta
-    r32 = -sin_zeta * sin_theta
-    r33 = cos_theta
-
-    x2 = r11 * x1 + r12 * y1 + r13 * z1
-    y2 = r21 * x1 + r22 * y1 + r23 * z1
-    z2 = r31 * x1 + r32 * y1 + r33 * z1
+    x2 = prec[0, 0] * x1 + prec[0, 1] * y1 + prec[0, 2] * z1
+    y2 = prec[1, 0] * x1 + prec[1, 1] * y1 + prec[1, 2] * z1
+    z2 = prec[2, 0] * x1 + prec[2, 1] * y1 + prec[2, 2] * z1
 
     cos_eps2 = math.cos(eps2)
     sin_eps2 = math.sin(eps2)

@@ -67,6 +67,39 @@ from libephemeris.erfa_nutation import get_erfa_pnm06a_matrix
 matrix = get_erfa_pnm06a_matrix(jd_tt)
 ```
 
+### Long-Term Precession (Vondrák 2011)
+
+The IAU 2006 precession is a polynomial only valid for a few centuries around
+J2000; at remote epochs it diverges rapidly (for example the Sun's ecliptic
+longitude is ~36" off at year -3000). For its apparent-place reduction
+LibEphemeris therefore uses the **long-term precession model of Vondrák,
+Capitaine & Wallace (2011)**, "New precession expressions, valid for long time
+intervals" (A&A 534, A22), which is fitted to a numerical integration and stays
+accurate over ±200,000 years while agreeing with IAU 2006 to sub-milliarcsecond
+precision near J2000. This is the same model Swiss Ephemeris has used since v1.78,
+so the two libraries' precession now agree at extreme epochs.
+
+The model is obtained directly from PyERFA's reference Vondrák routines — no
+coefficients are transcribed by hand and no GPL source is consulted:
+
+```python
+import erfa
+epj = 2000.0 + (jd_tt - 2451545.0) / 365.25
+P = erfa.ltpb(epj)      # ICRS -> mean equator/equinox of date (frame bias included)
+pecl = erfa.ltpecl(epj) # ecliptic pole (for the of-date mean obliquity)
+pequ = erfa.ltpequ(epj) # equator pole
+```
+
+`libephemeris/precession_vondrak.py` wraps these into the matrix builders used by
+every reduction path (the LEB fast path, the Skyfield reference path, and the
+ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is taken as
+the angle between the Vondrák equator and ecliptic poles (long-term valid),
+replacing the IAU 2006 obliquity polynomial which also diverges at remote epochs.
+Nutation remains IAU 2006/2000A and is layered on top of the Vondrák precession.
+
+The remaining model floor versus Swiss Ephemeris at deep-BCE dates is the
+underlying ephemeris (DE441 here vs Swiss's DE431), which Vondrák does not affect.
+
 ### Cached Nutation
 
 For performance-critical applications, a cached variant avoids redundant calculations for the same Julian date via an LRU cache:
