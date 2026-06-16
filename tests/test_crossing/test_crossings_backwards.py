@@ -71,6 +71,13 @@ class TestSolcrossBackwards:
         for _ in range(3):
             jd = swe.solcross_ut(55.0, jd)
             forward_marks.append(jd)
+            # Epsilon-forward past this crossing so the next search advances:
+            # like pyswisseph, solcross_ut from an exact crossing returns that
+            # same crossing (see test_solcross_forward_idempotent above).
+            jd += 1.0 / 86400.0
+        # Navigate backward from the last mark exactly: the backward at-crossing
+        # guard steps a full cycle to the previous crossing.
+        jd = forward_marks[-1]
         for expected in reversed(forward_marks[:-1]):
             jd = swe.solcross_ut(55.0, jd, backwards=True)
             assert abs(jd - expected) * 86400 < 0.1
