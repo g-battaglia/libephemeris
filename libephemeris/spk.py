@@ -527,7 +527,9 @@ def download_spk(
                 ) from e
 
     # Should not reach here, but just in case
-    raise ConnectionError(f"Download failed: {last_error}")  # pragma: no cover - retry loop always returns or raises
+    raise ConnectionError(
+        f"Download failed: {last_error}"
+    )  # pragma: no cover - retry loop always returns or raises
 
 
 # =============================================================================
@@ -1091,14 +1093,21 @@ def _calc_type21_position(
     # Convert Earth to ecliptic J2000
     earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
 
-    # Earth velocity (needed for aberration)
+    # Earth velocity. Two frames are needed:
+    #  - heliocentric (Earth-Sun): forms the body's geocentric velocity below,
+    #    cancelling the Sun term carried by the heliocentric SPK vectors.
+    #  - barycentric (SSB): the correct frame for stellar aberration (IAU;
+    #    matches the planets.py apparent-place pipeline).
     if apply_aberration or (iflag & FLG_SPEED):
-        earth_vel_icrs = np.array(earth.at(t).velocity.au_per_d) - np.array(
+        earth_vel_bary_icrs = np.array(earth.at(t).velocity.au_per_d)
+        earth_vel_helio_icrs = earth_vel_bary_icrs - np.array(
             sun.at(t).velocity.au_per_d
         )
-        earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_icrs))
+        earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_helio_icrs))
+        earth_vel_bary_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_bary_icrs))
     else:
         earth_vel_ecl = np.array([0.0, 0.0, 0.0])
+        earth_vel_bary_ecl = np.array([0.0, 0.0, 0.0])
 
     # =========================================================================
     # Step 1: Get heliocentric position from SPK, with light-time iteration
@@ -1169,12 +1178,14 @@ def _calc_type21_position(
     # Step 3: Apply aberration (if requested)
     # =========================================================================
     if apply_aberration:
-        # apply_aberration_to_position expects tuples
+        # apply_aberration_to_position expects tuples. Aberration uses the
+        # observer's barycentric (SSB) velocity, per the IAU apparent-place
+        # convention shared with planets.py.
         pos_tuple = (float(pos_final[0]), float(pos_final[1]), float(pos_final[2]))
         vel_tuple = (
-            float(earth_vel_ecl[0]),
-            float(earth_vel_ecl[1]),
-            float(earth_vel_ecl[2]),
+            float(earth_vel_bary_ecl[0]),
+            float(earth_vel_bary_ecl[1]),
+            float(earth_vel_bary_ecl[2]),
         )
         pos_aberrated = apply_aberration_to_position(pos_tuple, vel_tuple)
         pos_final = np.array(pos_aberrated)

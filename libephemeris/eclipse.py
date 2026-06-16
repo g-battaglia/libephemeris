@@ -5422,9 +5422,7 @@ def lun_occult_when_glob(
         if is_star:
             from .fixed_stars import fixstar_ut
 
-            bpos, _n, _r = fixstar_ut(
-                cast(str, body), jd, eph_flags | FLG_EQUATORIAL
-            )
+            bpos, _n, _r = fixstar_ut(cast(str, body), jd, eph_flags | FLG_EQUATORIAL)
         else:
             bpos, _ = calc_ut(jd, cast(int, body), eph_flags | FLG_EQUATORIAL)
         mra = calc_ut(jd, MOON, eph_flags | FLG_EQUATORIAL)[0][0]
@@ -6677,9 +6675,7 @@ def _rise_trans_true_hor_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                pos, _, _ = fixstar_ut(
-                    cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED
-                )
+                pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
@@ -11933,7 +11929,7 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
     # Clamp to valid range (can exceed 1.0 for total eclipse)
     magnitude = max(0.0, min(magnitude, 1.0 + moon_diameter / sun_diameter))
 
-    return magnitude
+    return float(magnitude)
 
 
 def sol_eclipse_magnitude_at_loc(
@@ -12205,7 +12201,7 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         else:
             obscuration = 0.0
 
-    return max(0.0, obscuration)
+    return float(max(0.0, obscuration))
 
 
 def sol_eclipse_obscuration_at_loc(

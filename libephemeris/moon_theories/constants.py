@@ -233,7 +233,7 @@ def _jupiter_cob_offset(jd: float) -> Tuple[float, float, float]:
     """
     from .galilean import galilean_moon_positions
 
-    # Get moon positions relative to Jupiter in km (ICRF)
+    # Get moon positions relative to Jupiter in km (J2000 ecliptic)
     io_xyz, europa_xyz, ganymede_xyz, callisto_xyz = galilean_moon_positions(jd)
 
     # Weighted sum: barycenter offset from Jupiter center

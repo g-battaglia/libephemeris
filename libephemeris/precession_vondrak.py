@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Long-term precession (Vondrák 2011) for apparent-place reduction.
 
 This module is the single source of the precession matrix and of-date mean

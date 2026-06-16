@@ -5,7 +5,7 @@ Fixed star position calculations for libephemeris.
 
 Computes ecliptic positions for bright fixed stars with:
 - Proper motion correction (rigorous space motion approach)
-- IAU 2006 precession from J2000 to date
+- Long-term precession (Vondrák 2011) from J2000 to date
 - IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
 - Equatorial to ecliptic coordinate transformation
 
@@ -2717,9 +2717,7 @@ def _apply_fixstar_flags(
             # True equator of date: use true obliquity
             eps = get_true_obliquity(jd_tt)
 
-        result_sp = cotrans_sp(
-            (lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps
-        )
+        result_sp = cotrans_sp((lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps)
         lon, lat, dist = result_sp[0], result_sp[1], result_sp[2]
         speed_lon, speed_lat, speed_dist = result_sp[3], result_sp[4], result_sp[5]
 
@@ -2878,12 +2876,10 @@ def batch_fixstars_ut(
 
     Note:
         Unlike the single-star path, this batch path computes geocentric
-        positions and does not apply ``FLG_TOPOCTR``. For fixed stars the
-        diurnal-parallax (topocentric) correction is sub-microarcsecond, so
-        the positions are identical to the topocentric single-star path to
-        well beyond output precision; only the echoed return flags differ.
-        Use ``fixstar2_ut`` per star if exact topocentric flag semantics are
-        required.
+        positions and does not apply ``FLG_TOPOCTR``. A fixed star's diurnal
+        *parallax* is sub-microarcsecond, but the diurnal *aberration* that
+        ``FLG_TOPOCTR`` adds is ~0.2"; the batch positions omit it. Use
+        ``fixstar2_ut`` per star when topocentric output is required.
     """
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
@@ -3274,6 +3270,7 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     entry, error = _resolve_star2(star)
@@ -3289,22 +3286,23 @@ def fixstar2_ut(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, flags)
+        return (result, star_name_out, ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -3352,6 +3350,7 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     entry, error = _resolve_star2(star)
@@ -3362,22 +3361,23 @@ def fixstar2(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, flags)
+        return (result, star_name_out, ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:

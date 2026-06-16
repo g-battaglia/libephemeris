@@ -275,3 +275,27 @@ standalone precession helpers (`_precession_matrix_j2000_to_date`,
 helpers are IAU 2006. A future production caller that needs long-term-valid
 precession+nutation must use `vondrak_pn_matrix` (the single source used by every
 real reduction path), not these helpers.
+
+## Bare-expression no-ops (2026-06-16 review follow-up)
+
+Residual bare-expression statements left by earlier refactors: the assignment
+LHS was dropped but the RHS kept, so each computes a value that is immediately
+discarded — no side effect, no behavioral impact. Logged per policy and left in
+place (ruff B018 is not enabled, so lint stays green).
+
+- `planets.py:1752` — `(jd - 2451545.0) / 36525.0`: the Julian-centuries `T`
+  binding was removed when the of-date obliquity moved to Vondrák
+  (`vondrak_mean_obliquity_deg`); the bare division remains.
+- `minor_bodies.py:2406` — `math.cos(lambda_body - lambda_p)`: the `cos_diff`
+  binding was dropped; the live second-order term uses
+  `sin(2*M_body - lambda_p)`, so this was always-dead scaffolding, not a
+  dropped term.
+- `lunar.py:384` — `y * sin_incl + z * cos_incl`: the `z_new` binding was
+  dropped; only `atan2(y_new, x)` is used downstream (and `z == 0.0` here).
+- `spk_auto.py:1101` — `jd - z`: the fractional-day `f` binding was dropped;
+  the Meeus ISO-date algorithm only needs the integer part `z`.
+- `fixed_stars.py:3013` — `batch_fixstars_ut = batch_fixstars_ut`: a no-op
+  self-assignment (a former alias that lost its distinct LHS).
+
+The sixth instance (`fast_calc.py:619-620`) lives inside `_fw2m`, already logged
+above as dead.

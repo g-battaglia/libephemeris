@@ -521,7 +521,9 @@ def apply_aberration_to_position(
 
     Args:
         position: Geocentric position (x, y, z) in AU.
-        earth_velocity: Earth heliocentric velocity (vx, vy, vz) in AU/day.
+        earth_velocity: Observer barycentric (SSB) velocity (vx, vy, vz) in
+            AU/day — the IAU apparent-place convention used across the library
+            (see the planets.py pipeline). The parameter name is historical.
 
     Returns:
         Apparent (aberrated) position (x, y, z) in AU.

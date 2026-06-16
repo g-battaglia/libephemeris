@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0a3] - 2026-06-16
+
+### Fixed
+
+- **`fixstar2` / `fixstar2_ut` parity with the reference.** The flexible-lookup
+  star functions now honor `FLG_TOPOCTR` (applying the ~0.18" diurnal-aberration
+  topocentric shift) and return the reference-style return flag (e.g. `2`, with
+  `FLG_SWIEPH` added when no ephemeris bit is given), mirroring the legacy
+  `fixstar` / `fixstar_ut`. Previously the docs-recommended `fixstar2*` path
+  silently ignored `FLG_TOPOCTR` and echoed the preprocessed input flags.
+  Positions match pyswisseph to <0.001"; return flags now match exactly.
+- **Native floats from the eclipse `*_at_loc` helpers.**
+  `sol_eclipse_magnitude_at_loc` and `sol_eclipse_obscuration_at_loc` now return
+  a native Python `float` on the Skyfield backend (they could leak
+  `numpy.float64`); the LEB backend was already correct.
+
+### Changed
+
+- **SPK type-21 aberration frame.** The vendored type-21 asteroid path now uses
+  the observer's barycentric (SSB) velocity for stellar aberration, matching the
+  IAU apparent-place convention used by the main planet pipeline (was the
+  heliocentric Earth velocity; effect ~0.009").
+
+### Added
+
+- SPDX license header on `precession_vondrak.py`, completing dual-licensing
+  header coverage (the `check_spdx_headers` gate is green again).
+
+### Docs
+
+- Corrected stale documentation: the fixed-star precession model (Vondrák 2011,
+  not IAU 2006), the Galilean moon-position frame (J2000 ecliptic, not ICRF), the
+  `batch_fixstars_ut` topocentric note, and the crossing-solver exception type in
+  the LEB testing guide (`Error`, not `RuntimeError`).
+
 ## [3.0.0a2] - 2026-06-16
 
 ### Changed
