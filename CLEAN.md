@@ -253,9 +253,15 @@ erfa-validated IAU 2006 reference (each matched `erfa.pfw06`/`erfa.obl06` to
   poles), which stays valid at remote epochs where the IAU 2006 polynomial
   diverges.
 
-The IAU 2006 / Lieske 1977 fallbacks in `astrometry.py`
-(`_precession_matrix_j2000_to_date`, `_precess_ecliptic`) are NOT dead: they
-still run when pyerfa is unavailable.
+The IAU 2006 / Lieske 1977 + numpy fallbacks in `astrometry.py`
+(`_precession_matrix_j2000_to_date`, `_precess_ecliptic`, `_nutation_matrix`,
+`_mean_obliquity`) are **reference/test-only**, NOT runtime fallbacks. pyerfa is
+a required runtime dependency (declared in `pyproject.toml`, and imported at
+module top level by `cache.py`/`planets.py`/`fast_calc.py`), so a real install
+always takes the erfa path. The `else`/`_HAS_ERFA == False` branches exist only
+to keep the module internally symmetric and to be exercised by the no-erfa unit
+tests (`tests/test_cov100_astrometry.py`, which monkeypatch the erfa flag off).
+They are kept (not deleted) so that symmetry and that test coverage remain.
 
 `astrometry._nutation_matrix` and `astrometry._precession_nutation_matrix` were
 deliberately left on IAU 2006 (the erfa branch returns `erfa.pnm06a`/`obl06`/

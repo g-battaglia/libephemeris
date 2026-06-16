@@ -118,17 +118,27 @@ def _julian_epoch(jd_tt: float) -> float:
 
 
 def _mean_obliquity(jd_tt: float) -> float:
-    """Of-date mean obliquity of the ecliptic in degrees, Vondrák 2011.
+    """Of-date mean obliquity of the ecliptic in degrees.
 
-    Long-term-valid (angle between the Vondrák equator and ecliptic poles via
-    erfa, see ``precession_vondrak``), replacing the IAU 2006 obliquity
-    polynomial that diverges at remote epochs.
+    With erfa available (the normal runtime path — pyerfa is a required
+    dependency) this is the Vondrák 2011 long-term obliquity (the angle between
+    the Vondrák equator and ecliptic poles), long-term valid and consistent with
+    the precession used everywhere else. The ``_HAS_ERFA`` guard keeps this
+    function symmetric with the other reductions in this module: when erfa is
+    monkeypatched off (the no-erfa unit tests) it falls back to the IAU 2006
+    obliquity polynomial rather than crashing on the erfa-backed Vondrák path.
     """
-    # Deferred import: keeps this module loadable without erfa at import time
-    # (see the module-scope NOTE and test_cov100_astrometry).
-    from .precession_vondrak import vondrak_mean_obliquity_deg
+    if _HAS_ERFA and _erfa is not None:
+        # Deferred import: keeps this module loadable without erfa at import time
+        # (see the module-scope NOTE and test_cov100_astrometry).
+        from .precession_vondrak import vondrak_mean_obliquity_deg
 
-    return vondrak_mean_obliquity_deg(jd_tt)
+        return vondrak_mean_obliquity_deg(jd_tt)
+
+    # No-erfa fallback: IAU 2006 obliquity polynomial (valid near J2000).
+    t = _jd_to_julian_centuries(jd_tt)
+    eps_arcsec = sum(c * (t**i) for i, c in enumerate(OBLIQUITY_COEFFS))
+    return eps_arcsec / 3600.0
 
 
 # =============================================================================

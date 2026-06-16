@@ -209,4 +209,4 @@ def vondrak_pn_matrix(
         (float(pn[1][0]), float(pn[1][1]), float(pn[1][2])),
         (float(pn[2][0]), float(pn[2][1]), float(pn[2][2])),
     )
-    return pn_mat, eps_mean_rad + deps
+    return pn_mat, float(eps_mean_rad + deps)

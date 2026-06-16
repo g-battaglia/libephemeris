@@ -98,11 +98,17 @@ def test_pn_matrix_orientation_and_layering(jd: float) -> None:
 
 @pytest.mark.parametrize("year", [1800, 1900, 2000, 2100, 2200])
 def test_modern_obliquity_matches_iau2006(year: int) -> None:
-    """Near J2000 Vondrák agrees with the IAU 2006 obliquity to < 1 mas."""
+    """Near J2000 Vondrák agrees with the IAU 2006 obliquity to a few mas.
+
+    Measured: ~0.001 mas at J2000, growing to ~1.7 mas at the 1800/2200 ends of
+    this range (Vondrák is a long-term fit, IAU 2006 a few-century polynomial).
+    The bound is 3 mas = 0.003" — a meaningful guard (the previous 1.0" was 1000x
+    too loose), with margin over the measured 1.7 mas worst case.
+    """
     jd = _J2000 + (year - 2000) * 365.25
     iau2006 = erfa.obl06(_J2000, jd - _J2000)
     diff_arcsec = abs(vondrak_mean_obliquity_rad(jd) - iau2006) * 206264.806
-    assert diff_arcsec < 1.0
+    assert diff_arcsec < 0.003
 
 
 @pytest.mark.parametrize("year", [1800, 1900, 2000, 2100, 2200])

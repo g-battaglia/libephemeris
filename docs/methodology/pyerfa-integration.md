@@ -193,27 +193,26 @@ The precision improvement is most significant for:
 
 ## Installation
 
-PyERFA is an optional dependency. Install it with:
+PyERFA is a **required runtime dependency** (declared in `pyproject.toml`) and is
+installed automatically with LibEphemeris:
 
 ```bash
-pip install pyerfa
+pip install libephemeris
 ```
 
-Or with LibEphemeris extras:
+The precession/nutation/obliquity reductions are built directly on PyERFA, so it
+is always present at runtime. The pure-Python analytical helpers that remain in
+`astrometry.py` (Lieske precession, the IAU 2006 obliquity polynomial, the
+numpy nutation series) are **reference/test-only**: they are exercised by the
+no-erfa unit tests (which monkeypatch the erfa flag off) but are not a runtime
+fallback, since a real install always has PyERFA.
 
-```bash
-pip install libephemeris[precision]
-```
-
-To verify PyERFA is available:
+To confirm PyERFA is available:
 
 ```python
 from libephemeris.erfa_nutation import has_erfa
-if has_erfa():
-    print("PyERFA is available for high-precision calculations")
+assert has_erfa()  # always true in a normal install
 ```
-
-When PyERFA is not installed, LibEphemeris falls back seamlessly to its built-in approximations.
 
 ## References
 

@@ -3525,26 +3525,29 @@ def _get_star_position_ecliptic(
     """
     Calculate ecliptic longitude of a fixed star at given date.
 
-    Uses the full Skyfield astrometric pipeline which includes:
+    Uses the Skyfield astrometric pipeline for the apparent ICRS direction:
       - Proper motion propagation (rigorous space motion with radial velocity)
-      - IAU 2006 precession with GCRS->J2000 frame bias
-      - IAU 2000A nutation (1365 terms, ~0.1 mas)
-      - Annual aberration (~20.5" correction)
+      - Annual aberration (~20.5" correction) + light deflection
 
-    The result is the apparent ecliptic longitude on the true ecliptic of date.
+    then rotates that apparent ICRS vector to the **Vondrák 2011 ecliptic of
+    date** (the same frame `_calc_body` uses), rather than Skyfield's IAU 2006
+    `ecliptic_frame`. This keeps the star-based ayanamsha modes (True Citra /
+    Revati / Galactic) on the library's precession+obliquity model so they stay
+    consistent with the planet longitudes — and with Swiss Ephemeris — at remote
+    epochs. Nutation is IAU 2006/2000A (via `erfa.nut06a`).
 
     Args:
         star: Star catalog data (J2000.0 ICRS coordinates, proper motion, parallax, radial velocity)
         tjd_tt: Julian Day in Terrestrial Time (TT)
-        eps_true: True obliquity of ecliptic at date (unused, kept for API compatibility;
-                  Skyfield's ecliptic_frame handles the obliquity internally)
+        eps_true: True obliquity of date in degrees (Vondrák mean + nutation),
+                  used for the equator-of-date -> ecliptic-of-date rotation.
 
     Returns:
         Ecliptic longitude of date in degrees (0-360)
 
     References:
         - Skyfield: Brandon Rhodes, skyfield.readthedocs.io
-        - IAU 2006 precession: Capitaine et al. A&A 412, 567-586 (2003)
+        - Vondrák, Capitaine & Wallace, A&A 534, A22 (2011) — long-term precession
         - IAU 2000A nutation: Mathews, Herring & Buffett, JGR 107 (2002)
     """
     # Convert StarData to Skyfield Star object
@@ -3568,11 +3571,20 @@ def _get_star_position_ecliptic(
 
     # earth.at(t).observe(star) applies proper motion + light-time
     # .apparent() applies aberration + deflection
-    # .frame_latlon(ecliptic_frame) transforms to true ecliptic of date
     pos = earth.at(t).observe(star_obj).apparent()
-    lat, lon, dist = pos.frame_latlon(ecliptic_frame)
 
-    return lon.degrees
+    # Rotate the apparent ICRS direction to the Vondrák ecliptic of date (same
+    # reduction as _calc_body), not Skyfield's IAU 2006 ecliptic_frame.
+    import numpy as np
+
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
+    pn, _eps = vondrak_pn_matrix(tjd_tt, float(dpsi_rad), float(deps_rad))
+    xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+    eps_rad = math.radians(eps_true)
+    ce, se = math.cos(eps_rad), math.sin(eps_rad)
+    xe = float(xq)
+    ye = float(yq) * ce + float(zq) * se
+    return math.degrees(math.atan2(ye, xe)) % 360.0
 
 
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
