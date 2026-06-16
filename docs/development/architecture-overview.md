@@ -98,8 +98,11 @@ kernels via **jplephem**). The library provides:
 
 ### 2.1 Current Performance Profile
 
-The library is **pure Python** with zero native extensions. No Cython, mypyc,
-C extensions, or compiled code exists anywhere in the project.
+The library's own code is **pure Python** — no Cython, mypyc, or compiled
+extensions in the package source, so its hot paths run as interpreted Python.
+(Its scientific dependencies — NumPy, pyerfa — are compiled, but the ephemeris
+algorithms themselves are not, which is the relevant factor for the per-op cost
+below.)
 
 #### Cost per Operation
 

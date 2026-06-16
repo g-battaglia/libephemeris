@@ -10,7 +10,7 @@ Features
 --------
 
 - **pyswisseph Compatible**: Drop-in replacement for pyswisseph
-- **Pure Python**: No C extensions required
+- **Readable Python**: the ephemeris algorithms are plain, inspectable Python (on the standard NumPy/Skyfield/pyerfa stack)
 - **High Precision**: Uses NASA JPL DE440/DE441 ephemeris via Skyfield
 - **Four Calculation Modes**: auto, skyfield, leb, horizons
 - **25 House Systems**: Including Placidus, Koch, Whole Sign, and more (26 codes with A/E alias)

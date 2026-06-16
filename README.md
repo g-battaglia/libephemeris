@@ -11,7 +11,7 @@
 
 A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards.
 
-**Drop-in replacement for PySwissEph** - pure Python, no C extensions, easier deployment.
+**Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
 
 ---
 
@@ -25,13 +25,13 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 - **Physical planet centers** - outer planets corrected from barycenters using JPL satellite ephemerides
 - **Thread-safe contexts when you need them** - SwissEph-compatible globals for drop-in migration, `EphemerisContext` for concurrent workloads
 - **15,000+ years of coverage** - `base`, `medium`, and `extended` precision tiers from modern use to -13200 / +17191 CE
-- **Pure Python 3.12+** - no C extensions, clean installs across CI, containers, and serverless
+- **Readable Python 3.12+** - the ephemeris algorithms are plain, inspectable Python; clean installs across CI, containers, and serverless from prebuilt scientific wheels
 
 ---
 
 ## Why LibEphemeris
 
-Swiss Ephemeris is the industry standard for planetary calculations. But its Python binding (pyswisseph) is a C extension - hard to build, hard to debug, tied to a single computation model.
+Swiss Ephemeris is the industry standard for planetary calculations. But its Python binding (pyswisseph) wraps a large opaque C library - hard to build from source, hard to inspect or debug, tied to a single computation model.
 
 LibEphemeris provides the **same API** with a modern foundation:
 
@@ -39,7 +39,7 @@ LibEphemeris provides the **same API** with a modern foundation:
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák, Capitaine & Wallace 2011, valid ±200,000 years instead of the IAU 2006 polynomial's few centuries), nutation (IAU 2006/2000A), all computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
 - **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune corrected from system barycenters to actual body centers using JPL satellite ephemerides. Most libraries skip this.
 - **Independently verified** - every function cross-validated against pyswisseph, JPL Horizons, and astropy/ERFA. [Precision report with full methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md).
-- **Pure Python** - readable source, standard debugging, no build toolchain. Runs on any platform, any CI, any serverless environment.
+- **Readable Python algorithms** - plain, inspectable source and standard debugging instead of an opaque C library. Installs from prebuilt wheels (NumPy/Skyfield/pyerfa) across any platform, CI, or serverless environment.
 
 **Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md).
 
