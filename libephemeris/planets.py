@@ -57,6 +57,7 @@ from dataclasses import dataclass
 import erfa
 
 from .precession_vondrak import (
+    vondrak_mean_obliquity_deg,
     vondrak_mean_obliquity_rad,
     vondrak_pn_matrix,
     vondrak_precession_matrix,
@@ -1148,7 +1149,11 @@ def calc(
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
     if planet == ECL_NUT:
-        mean_obliquity = math.degrees(erfa.obl06(2451545.0, tjdet - 2451545.0))
+        # Of-date mean obliquity from the Vondrák 2011 long-term model (angle
+        # between the of-date equator and ecliptic poles), consistent with the
+        # precession used everywhere else and long-term valid. Nutation stays
+        # IAU 2006/2000A. See _calc_nutation_obliquity for the rationale.
+        mean_obliquity = vondrak_mean_obliquity_deg(tjdet)
         dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjdet - 2451545.0)
         delta_psi = math.degrees(dpsi_rad)
         delta_eps = math.degrees(deps_rad)
@@ -1465,7 +1470,11 @@ def _calc_body_pctr(
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+                if dist_val > 0
+                else 0.0
+            )
             p3 = dist_val
         else:
             # True equator of date: Vondrák 2011 precession + Skyfield nutation
@@ -1527,7 +1536,11 @@ def _calc_body_pctr(
             ze = -float(yq) * se + float(zq) * ce
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
             p3 = dist
         else:
             # Ecliptic of date: Vondrák 2011 precession + Skyfield nutation, then
@@ -1650,8 +1663,15 @@ def _calc_nutation_obliquity(
     """
     Calculate nutation and obliquity data for ECL_NUT (-1).
 
-    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a)
-    and IAU 2006 mean obliquity via erfa.obl06() for maximum precision.
+    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a) and the
+    Vondrák 2011 long-term mean obliquity (the angle between the of-date equator
+    and ecliptic poles). The Vondrák obliquity is the self-consistent companion
+    to the Vondrák precession used throughout the reduction and stays rigorous at
+    remote epochs, where the IAU 2006 obliquity polynomial is an out-of-range
+    extrapolation. This differs from Swiss Ephemeris's reported obliquity by up
+    to ~6" only at deep-BCE dates (a deliberate, documented scientific
+    improvement); the effect is confined to ecliptic latitude -- ecliptic
+    longitude is unaffected by the obliquity choice.
 
     Args:
         jd: Julian Day in UT
@@ -1671,8 +1691,8 @@ def _calc_nutation_obliquity(
     # Calculate Julian centuries from J2000.0
     (jd - 2451545.0) / 36525.0
 
-    # Mean obliquity of the ecliptic (IAU 2006 via pyerfa)
-    mean_obliquity = math.degrees(erfa.obl06(2451545.0, t.tt - 2451545.0))
+    # Mean obliquity of the ecliptic (Vondrák 2011 long-term, via pyerfa poles)
+    mean_obliquity = vondrak_mean_obliquity_deg(t.tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
     dpsi_rad, deps_rad = erfa.nut06a(2451545.0, t.tt - 2451545.0)
@@ -3788,8 +3808,10 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         SIDM_J2000,
         SIDM_VALENS_MOON,
     ]:
-        # Calculate Obliquity of Date (eps_true) using IAU 2006 obliquity via pyerfa
-        eps0 = math.degrees(erfa.obl06(2451545.0, tjd_tt - 2451545.0))
+        # Of-date mean obliquity from the Vondrák 2011 long-term model (via the
+        # pyerfa equator/ecliptic poles), consistent with the precession used
+        # everywhere else and long-term valid; nutation stays IAU 2006/2000A.
+        eps0 = vondrak_mean_obliquity_deg(tjd_tt)
 
         # Use IAU 2006/2000A nutation model via pyerfa for maximum precision
         # Provides ~0.01-0.05 mas accuracy, consistent with all other code paths
@@ -4528,8 +4550,6 @@ def _calc_nod_aps(
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
         Each element is a PosTuple: (longitude, latitude, distance, dlon, dlat, ddist)
     """
-    from .cache import get_true_obliquity
-
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     # Unsupported bodies
@@ -4571,12 +4591,13 @@ def _calc_nod_aps(
     planets = get_planets()
     jd_tt = t.tt
 
-    # --- ICRS → ecliptic of date rotation ---
-    # Step 1: precession-nutation matrix (ICRS → true equator of date)
-    pnm = erfa.pnm06a(_J2000_JD, jd_tt - _J2000_JD)
-    # Step 2: true obliquity for equator-of-date → ecliptic-of-date
-    eps_deg = get_true_obliquity(jd_tt)
-    eps_rad = math.radians(eps_deg)
+    # --- ICRS → ecliptic of date rotation (Vondrák 2011, matching calc()) ---
+    # Step 1: precession-nutation matrix (ICRS → true equator of date) from the
+    # same Vondrák long-term precession used by the main reduction; nutation
+    # stays IAU 2006/2000A. Step 2: the matching true obliquity (Vondrák mean +
+    # Δε) returned by the same builder rotates equator-of-date → ecliptic-of-date.
+    dpsi_n, deps_n = erfa.nut06a(_J2000_JD, jd_tt - _J2000_JD)
+    pnm, eps_rad = vondrak_pn_matrix(jd_tt, float(dpsi_n), float(deps_n))
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
 

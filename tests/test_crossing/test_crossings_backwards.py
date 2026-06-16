@@ -32,7 +32,9 @@ class TestSolcrossBackwards:
         """Previous Sun crossing must be within the past year."""
         jd = swe.solcross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
-        assert JD_J2000 - jd < 370, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        assert JD_J2000 - jd < 370, (
+            f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        )
         sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
         err = abs(sun[0] - degree)
         if err > 180:
@@ -73,7 +75,7 @@ class TestSolcrossBackwards:
             forward_marks.append(jd)
             # Epsilon-forward past this crossing so the next search advances:
             # like pyswisseph, solcross_ut from an exact crossing returns that
-            # same crossing (see test_solcross_forward_idempotent above).
+            # same crossing (see test_solcross_forward_back_symmetric above).
             jd += 1.0 / 86400.0
         # Navigate backward from the last mark exactly: the backward at-crossing
         # guard steps a full cycle to the previous crossing.
@@ -92,7 +94,9 @@ class TestMooncrossBackwards:
         """Previous Moon crossing must be within the past sidereal month."""
         jd = swe.mooncross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
-        assert JD_J2000 - jd < 30, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        assert JD_J2000 - jd < 30, (
+            f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        )
         moon, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH)
         err = abs(moon[0] - degree)
         if err > 180:

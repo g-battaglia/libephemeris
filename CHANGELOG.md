@@ -18,11 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   DE441-vs-DE431 ephemeris difference, which Vondrák does not affect). Modern
   results are unchanged to sub-milliarcsecond (Vondrák ≡ IAU 2006 near J2000), so
   the golden regression baseline was regenerated. The of-date mean obliquity is
-  likewise taken from the Vondrák poles (long-term valid). Implemented via PyERFA's
-  reference `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA, clean-room — no GPL
-  source consulted); see `libephemeris/precession_vondrak.py` and
-  `docs/methodology/pyerfa-integration.md`. Touches the LEB fast path, the Skyfield
-  reference path, and the ecliptic-body / SPK / fixed-star paths uniformly.
+  likewise taken from the Vondrák poles (long-term valid) **everywhere** —
+  including the `ECL_NUT` pseudo-body, the galactic-frame sidereal modes, and the
+  node/apside (`nod_aps`) reduction — so the whole library shares one consistent
+  precession+obliquity model. This is the rigorous of-date obliquity (the true
+  equator/ecliptic pole angle) and is a **deliberate, documented scientific
+  improvement** over the IAU 2006 obliquity polynomial's out-of-range
+  extrapolation; it differs from Swiss's reported obliquity by ≤ ~6″ only at
+  deep-BCE dates, an effect confined to ecliptic latitude (longitude is unaffected
+  by the obliquity choice) and below the planetary ephemeris floor there. See the
+  measured table in `docs/methodology/pyerfa-integration.md` and
+  `scripts/validate_vondrak_vs_swiss.py`. Implemented via PyERFA's reference
+  `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA, clean-room — no GPL source
+  consulted); see `libephemeris/precession_vondrak.py`. Touches the LEB fast path,
+  the Skyfield reference path, and the ecliptic-body / SPK / fixed-star paths
+  uniformly.
 
 ## [3.0.0a1] - 2026-06-15
 

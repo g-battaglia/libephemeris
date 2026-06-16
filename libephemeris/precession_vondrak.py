@@ -73,6 +73,12 @@ def _julian_epoch(jd_tt: float) -> float:
     """Convert a Julian Date (TT) to a Julian epoch (e.g. 2000.0 at J2000.0).
 
     ERFA's long-term precession routines are parameterised by the Julian epoch.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The Julian epoch (Julian years) corresponding to ``jd_tt``.
     """
     return 2000.0 + (jd_tt - _J2000) / 365.25
 
@@ -86,6 +92,14 @@ def _precession_matrix(jd_tt: float, frame_bias: bool) -> Matrix3:
     frame bias (``erfa.ltpb``). With it false, the bias is omitted (``erfa.ltp``,
     J2000 mean equator -> date), matching the library's FLG_ICRS convention of
     treating ICRS as the J2000 mean frame.
+
+    Args:
+        jd_tt: Julian Date in TT.
+        frame_bias: Include the ICRS frame bias (``erfa.ltpb``) when true; omit
+            it (``erfa.ltp``) when false.
+
+    Returns:
+        The 3x3 precession rotation matrix as nested tuples of floats.
     """
     epj = _julian_epoch(jd_tt)
     p = erfa.ltpb(epj) if frame_bias else erfa.ltp(epj)
@@ -98,7 +112,14 @@ def _precession_matrix(jd_tt: float, frame_bias: bool) -> Matrix3:
 
 @lru_cache(maxsize=1024)
 def _mean_obliquity_rad(jd_tt: float) -> float:
-    """Of-date mean obliquity (radians) = angle between equator and ecliptic poles."""
+    """Of-date mean obliquity (radians) = angle between equator and ecliptic poles.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The of-date mean obliquity in radians (Vondrák 2011, long-term valid).
+    """
     epj = _julian_epoch(jd_tt)
     ecl = erfa.ltpecl(epj)
     equ = erfa.ltpequ(epj)
@@ -110,12 +131,25 @@ def vondrak_mean_obliquity_rad(jd_tt: float) -> float:
     """Of-date mean obliquity of the ecliptic (radians), Vondrák 2011.
 
     Long-term-valid replacement for the IAU 2006 obliquity polynomial.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The of-date mean obliquity in radians.
     """
     return _mean_obliquity_rad(jd_tt)
 
 
 def vondrak_mean_obliquity_deg(jd_tt: float) -> float:
-    """Of-date mean obliquity of the ecliptic (degrees), Vondrák 2011."""
+    """Of-date mean obliquity of the ecliptic (degrees), Vondrák 2011.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The of-date mean obliquity in degrees.
+    """
     return math.degrees(_mean_obliquity_rad(jd_tt))
 
 
@@ -126,6 +160,13 @@ def vondrak_precession_matrix(jd_tt: float, frame_bias: bool = True) -> Matrix3:
     ``frame_bias`` (default) the ICRS frame bias is included, matching the
     previous Fukushima-Williams matrix which carried the bias in its ``gamb``
     angle.
+
+    Args:
+        jd_tt: Julian Date in TT.
+        frame_bias: Include the ICRS frame bias when true (default).
+
+    Returns:
+        The 3x3 precession rotation matrix as nested tuples of floats.
     """
     return _precession_matrix(jd_tt, frame_bias)
 

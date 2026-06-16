@@ -16,13 +16,28 @@ import numpy as np
 import pytest
 
 from libephemeris.precession_vondrak import (
-    _julian_epoch,
     vondrak_mean_obliquity_rad,
     vondrak_pn_matrix,
     vondrak_precession_matrix,
 )
 
 _J2000 = 2451545.0
+
+
+def _julian_epoch_ref(jd_tt: float) -> float:
+    """Independent Julian-epoch reference for the oracle.
+
+    Computed locally (not imported from the module under test) so a bug in the
+    production ``_julian_epoch`` cannot hide behind a shared conversion.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The Julian epoch corresponding to ``jd_tt``.
+    """
+    return 2000.0 + (jd_tt - _J2000) / 365.25
+
 
 # A grid spanning the modern era through deep-BCE and far-future epochs.
 _JD_GRID = [
@@ -36,6 +51,15 @@ _DEPS = math.radians(0.0026)
 
 
 def _max_abs(a: np.ndarray, b: np.ndarray) -> float:
+    """Return the maximum absolute element-wise difference between two arrays.
+
+    Args:
+        a: First array.
+        b: Second array (same shape as ``a``).
+
+    Returns:
+        The largest ``|a - b|`` element as a native float.
+    """
     return float(np.max(np.abs(a - b)))
 
 
@@ -43,24 +67,25 @@ def _max_abs(a: np.ndarray, b: np.ndarray) -> float:
 def test_precession_matrix_matches_erfa_ltpb(jd: float) -> None:
     """The precession-only matrix is exactly ERFA's long-term Vondrák matrix."""
     got = np.asarray(vondrak_precession_matrix(jd))
-    expected = np.asarray(erfa.ltpb(_julian_epoch(jd)))
+    expected = np.asarray(erfa.ltpb(_julian_epoch_ref(jd)))
     assert _max_abs(got, expected) < 1e-12
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)
 def test_obliquity_is_pole_angle(jd: float) -> None:
     """Of-date mean obliquity is the angle between the equator and ecliptic poles."""
-    epj = _julian_epoch(jd)
+    epj = _julian_epoch_ref(jd)
     ecl = erfa.ltpecl(epj)
     equ = erfa.ltpequ(epj)
-    expected = math.acos(float(np.dot(equ, ecl)))
+    # Clamp to acos's domain: FP drift can push the dot marginally past ±1.
+    expected = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
     assert abs(vondrak_mean_obliquity_rad(jd) - expected) < 1e-12
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)
 def test_pn_matrix_orientation_and_layering(jd: float) -> None:
     """pn = N(eps_mean, dpsi, deps) @ ltpb, with eps_true = eps_mean + deps."""
-    epj = _julian_epoch(jd)
+    epj = _julian_epoch_ref(jd)
     eps_mean = vondrak_mean_obliquity_rad(jd)
     expected = np.asarray(erfa.numat(eps_mean, _DPSI, _DEPS)) @ np.asarray(
         erfa.ltpb(epj)

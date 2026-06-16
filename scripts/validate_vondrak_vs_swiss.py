@@ -33,14 +33,15 @@ import sys
 
 import numpy as np
 
-import libephemeris as ephem
-
 try:
     import erfa
     import swisseph as swe
 except ImportError as exc:  # pragma: no cover - dev tooling
     print(f"Missing dependency for validation: {exc}")
     sys.exit(1)
+
+import libephemeris as ephem
+from libephemeris.precession_vondrak import vondrak_mean_obliquity_deg
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LEB_DIR = os.path.join(_REPO, "data", "leb")
@@ -86,11 +87,29 @@ def _swiss_tt(jd_tt: float, body: int) -> tuple[float, float, int]:
 
 
 def _leb_ut(jd_ut: float, body: int) -> float:
+    """libephemeris apparent ecliptic longitude (deg), UT input.
+
+    Args:
+        jd_ut: Julian Date in UT.
+        body: Body identifier.
+
+    Returns:
+        Geocentric apparent ecliptic longitude in degrees.
+    """
     pos, _ = ephem.calc_ut(jd_ut, body, 0)
     return pos[0]
 
 
 def _swiss_ut(jd_ut: float, body: int) -> float:
+    """Swiss apparent ecliptic longitude (deg), UT input.
+
+    Args:
+        jd_ut: Julian Date in UT.
+        body: Body identifier.
+
+    Returns:
+        Geocentric apparent ecliptic longitude in degrees.
+    """
     pos, _ = swe.calc_ut(jd_ut, body, swe.FLG_SWIEPH)
     return pos[0]
 
@@ -107,6 +126,14 @@ def _precession_divergence_arcsec(jd_tt: float) -> float:
 
 
 def _setup_leb(tier: str) -> bool:
+    """Point libephemeris at a tier's LEB file and enable LEB mode.
+
+    Args:
+        tier: Precision tier ("base", "medium", "extended").
+
+    Returns:
+        True if the LEB file exists and was selected, False otherwise.
+    """
     path = os.path.join(_LEB_DIR, f"ephemeris_{tier}.leb")
     if not os.path.exists(path):
         print(f"  [skip] LEB {tier} file not found: {path}")
@@ -205,6 +232,59 @@ def longterm_sweep() -> int:
     return 0
 
 
+def obliquity_sweep() -> int:
+    """Document the of-date mean obliquity choice versus Swiss Ephemeris.
+
+    LibEphemeris uses the Vondrák 2011 long-term mean obliquity (the true angle
+    between the of-date equator and ecliptic poles), the self-consistent
+    companion to the Vondrák precession. This is rigorous at remote epochs where
+    the IAU 2006 obliquity polynomial is an out-of-range extrapolation. Swiss
+    Ephemeris reports a slightly different obliquity at deep-BCE dates; the
+    discrepancy (<=~6") is confined to ecliptic LATITUDE -- longitude is
+    invariant to the obliquity choice (verified in the long-term sweep above).
+    This sweep makes that deliberate, documented deviation reproducible.
+    """
+    print()
+    print("=" * 78)
+    print("OF-DATE MEAN OBLIQUITY  (Vondrák 2011 vs IAU 2006 vs Swiss)")
+    print('Longitude is unaffected by this choice; only latitude shifts (<=~6").')
+    print("=" * 78)
+    swe.set_ephe_path(_SWISS_DIR)
+    from libephemeris.constants import ECL_NUT
+
+    print(
+        f"{'Year':>6} {'Swiss obl°':>13} {'Vondrák Δ"':>12} {'IAU2006 Δ"':>12} "
+        f"{'Sun latΔ" (lib-Sw)':>18}"
+    )
+    print("-" * 64)
+    if not _setup_leb("extended"):
+        return 0
+    for yr in (-3000, -2000, -1000, 0, 2000, 3000):
+        jd = swe.julday(yr, 1, 1, 12.0)
+        en, _ = swe.calc(jd, ECL_NUT, swe.FLG_SWIEPH)
+        sw_obl = en[1]
+        von = vondrak_mean_obliquity_deg(jd)
+        iau = math.degrees(erfa.obl06(_J2000, jd - _J2000))
+        l_sun, _, _ = _swiss_tt(jd, 0)  # swiss sun for lat
+        sp, _ = swe.calc(jd, 0, swe.FLG_SWIEPH)
+        lp, _ = ephem.calc(jd, 0, 0)
+        sun_lat_delta = (lp[1] - sp[1]) * 3600.0
+        print(
+            f"{yr:>6} {sw_obl:>13.7f} {(von - sw_obl) * 3600:>12.3f} "
+            f"{(iau - sw_obl) * 3600:>12.3f} {sun_lat_delta:>18.3f}"
+        )
+    print("-" * 64)
+    print(
+        "Vondrák is the rigorous of-date obliquity (true equator/ecliptic pole\n"
+        "angle, valid ±200,000 yr); IAU 2006 is a few-century polynomial that\n"
+        "extrapolates out of range at these epochs. Swiss sits between the two and\n"
+        "matches neither; libephemeris keeps the physically-consistent Vondrák\n"
+        "value as a deliberate, documented scientific improvement. The effect is\n"
+        "latitude-only and below the deep-BCE ephemeris floor on the planets."
+    )
+    return 0
+
+
 def main() -> int:
     saved_mode = ephem.state._CALC_MODE
     saved_leb = ephem.state._LEB_FILE
@@ -212,8 +292,12 @@ def main() -> int:
     try:
         modern_sweep()
         longterm_sweep()
+        obliquity_sweep()
     finally:
-        ephem.state._LEB_FILE = saved_leb
+        # Restore via public setters so the cached LEB reader is rebuilt to
+        # match the restored path (direct _LEB_FILE assignment would leave the
+        # sweep reader stale for any later caller).
+        ephem.set_leb_file(saved_leb)
         ephem.set_calc_mode(saved_mode)
         if saved_tier is not None:
             ephem.set_precision_tier(saved_tier)
