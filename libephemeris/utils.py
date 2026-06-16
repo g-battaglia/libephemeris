@@ -336,6 +336,13 @@ def azalt(
         flag=TRUE_TO_APP,
     )
 
+    # Reference API convention (and refrac()'s): if refraction cannot lift the
+    # object above the horizon, report the true altitude — no refraction is
+    # applied below the horizon. refrac_extended() omits this clamp, so apply it
+    # here to keep azalt's apparent altitude 1:1 with swe.azalt below 0°.
+    if alt_apparent < 0.0:
+        alt_apparent = alt_true
+
     return (azimuth, alt_true, alt_apparent)
 
 

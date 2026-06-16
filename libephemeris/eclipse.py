@@ -12702,7 +12702,7 @@ def planet_occult_when_glob(
         - Meeus "Astronomical Algorithms" Ch. 9 (Angular Separation)
         - Herald, D. & Sinnott, R. "Planetary Occultations"
     """
-    from .fixed_stars import FIXED_STARS, _resolve_star_id
+    from .fixed_stars import _resolve_star_id, fixstar_ut
     from .constants import (
         SUN,
         MOON,
@@ -12760,22 +12760,20 @@ def planet_occult_when_glob(
     def _get_target_position(jd: float) -> Tuple[float, float, float]:
         """Get target (occulted) body's geocentric RA, Dec, and angular radius."""
         if occulted_planet == 0:
-            # Fixed star
-            star_id, err, _ = _resolve_star_id(starname)
+            # Validate the star name first so an unknown star raises ValueError
+            # (the documented contract), not the lower-level fixstar_ut Error.
+            _star_id, err, _ = _resolve_star_id(starname)
             if err is not None:
                 raise ValueError(err)
-
-            star = FIXED_STARS[star_id]
-
-            # Time from J2000.0
-            t_years = (jd - 2451545.0) / 365.25
-
-            # Apply proper motion
-            ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
-            dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
-
-            # Stars have negligible angular radius
-            return ra_deg, dec_deg, 0.0001  # ~0.4 arcsec for point source
+            # Fixed star: use the apparent equatorial position of date
+            # (precession + nutation + aberration + proper motion), the same
+            # frame as the occulting planet's calc_ut(FLG_EQUATORIAL) RA/Dec.
+            # A bare J2000 + proper-motion position omits precession, leaving the
+            # star up to ~0.6° (precession to 2044) out of the planet's frame, so
+            # the disc never overlaps and no occultation is ever detected.
+            star_xx, _, _ = fixstar_ut(starname, jd, FLG_EQUATORIAL)
+            # Stars have negligible angular radius (~0.4 arcsec point source).
+            return float(star_xx[0]), float(star_xx[1]), 0.0001
         else:
             # Planet
             ra, dec, dist, angular_radius = _get_planet_position(jd, occulted_planet)

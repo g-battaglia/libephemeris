@@ -1229,18 +1229,27 @@ def _heliacal_ut_leb(
         # days (Moon glare / marginal twilight) and that would be mis-reported
         # as a rising. So we also require the invisibility streak to have passed
         # through low solar elongation (a real conjunction gap), which a
-        # mid-apparition dip never does.
+        # mid-apparition dip never does. There is one more legitimate case the
+        # elongation test alone misses: when the conjunction happened *before*
+        # the search window (the body starts the search already past conjunction
+        # but still invisible, e.g. Mars at 17 deg and climbing). Then the streak
+        # never dips below ELONG_GAP inside the window, yet the first visibility
+        # is still a true heliacal rising. We accept it whenever the body has not
+        # been visible at all since the start of the search (seen_visible False),
+        # which a mid-apparition flicker -- visible before the dip -- never is.
         ELONG_GAP = 10.0  # deg: streak min elongation below this == near conjunction
         max_days = 800
         lookback_jds = [jd_start_inner - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
         min_elong = 999.0
+        seen_visible = False
         for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
                 min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
+                seen_visible = True
                 break
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
@@ -1251,10 +1260,13 @@ def _heliacal_ut_leb(
                     consecutive_invisible += 1
                     min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5 and (is_star or min_elong <= ELONG_GAP):
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                    ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
                     min_elong = 999.0
+                    seen_visible = True
         return 0.0
 
     def _search_heliacal_setting(jd_start_inner: float) -> float:
@@ -2639,6 +2651,15 @@ def _heliacal_ut_pythonic(
         marginal twilight), which would be mis-reported as a rising. So the
         invisibility streak must also have passed through low solar elongation
         (a real conjunction gap), which a mid-apparition dip never does.
+
+        One legitimate case the elongation test alone misses: when the
+        conjunction happened *before* the search window, the body starts the
+        search already past conjunction but still invisible (e.g. Mars at 17 deg
+        and climbing), so the streak never dips below ELONG_GAP inside the
+        window even though the first visibility is a true rising. Accept it when
+        the body has not been visible at all since the search start
+        (seen_visible False) -- a mid-apparition flicker, visible before the
+        dip, never satisfies that.
         """
         ELONG_GAP = 10.0  # deg
         max_days = 800
@@ -2648,11 +2669,13 @@ def _heliacal_ut_pythonic(
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
         min_elong = 999.0
+        seen_visible = False
         for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
                 min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
+                seen_visible = True
                 break
 
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
@@ -2667,10 +2690,13 @@ def _heliacal_ut_pythonic(
                     # there is no twilight visibility window.
                     min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5 and (is_star or min_elong <= ELONG_GAP):
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                    ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
                     min_elong = 999.0
+                    seen_visible = True
 
         return 0.0
 

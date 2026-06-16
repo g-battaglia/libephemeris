@@ -2682,7 +2682,7 @@ def _calc_body(
 
             # Sidereal offset (ecliptic only) — the Keplerian fallback likewise
             # dropped FLG_SIDEREAL, returning tropical for sidereal requests.
-            if is_sidereal and not (iflag & FLG_EQUATORIAL):
+            if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
                 lon, speed_lon = _apply_sidereal_correction(
                     lon, speed_lon, t.ut1, iflag
                 )
