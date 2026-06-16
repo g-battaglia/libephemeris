@@ -1442,6 +1442,40 @@ def _calc_body_pctr(
             p = tgt_ret.position.au - obs_pos
             v = tgt_ret.velocity.au_per_d - obs_vel
 
+        # Gravitational light deflection by Sun/Jupiter/Saturn, applied before
+        # aberration (Skyfield .apparent() order) so calc_pctr matches calc()
+        # and pyswisseph. Without it, inner planets near the Sun were off by up
+        # to ~0.2". Skipped under FLG_NOGDEFL.
+        if not (iflag & FLG_NOGDEFL):
+            from .fast_calc import _apply_gravitational_deflection
+
+            p = np.array(
+                _apply_gravitational_deflection(
+                    (float(p[0]), float(p[1]), float(p[2])),
+                    (float(obs_pos[0]), float(obs_pos[1]), float(obs_pos[2])),
+                    float(t_fresh.tt),
+                    light_time,
+                    _SkyfieldDeflectorSource(planets),
+                )
+            )
+
+        # Stellar aberration about the OBSERVER's (center's) barycentric
+        # velocity -- the same relativistic correction Skyfield's .apparent()
+        # applies in calc(). Without it, calc_pctr(X, Earth) was missing the
+        # full annual aberration and diverged from the geocentric apparent
+        # calc(X) (and from pyswisseph) by up to ~20.5". Skipped under
+        # FLG_NOABERR; FLG_TRUEPOS already skips light-time + this block.
+        if not (iflag & FLG_NOABERR):
+            from .fast_calc import _apply_aberration
+
+            p = np.array(
+                _apply_aberration(
+                    (float(p[0]), float(p[1]), float(p[2])),
+                    (float(obs_vel[0]), float(obs_vel[1]), float(obs_vel[2])),
+                    light_time,
+                )
+            )
+
     # Create position object for coordinate conversion
     pos = ICRF(p, v, t=t_fresh, center=399)
 
@@ -1449,6 +1483,9 @@ def _calc_body_pctr(
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
     is_icrs = bool(iflag & FLG_ICRS)
     is_sidereal = bool(iflag & FLG_SIDEREAL)
+    # Mean equator of date when nutation is suppressed (FLG_NONUT) or the
+    # sidereal+equatorial frame is requested -- mirrors _calc_body.
+    _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
     p1, p2, p3 = 0.0, 0.0, 0.0
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
@@ -1458,14 +1495,17 @@ def _calc_body_pctr(
         if iflag & FLG_J2000:
             ra, dec, dist = pos.radec()
         elif is_icrs:
-            # ICRS equatorial of date (no frame bias): Vondrák 2011 precession
-            # + Skyfield nutation -- the same single source as the LEB fast path.
+            # ICRS equator of date (no frame bias): Vondrák 2011 precession,
+            # with Skyfield nutation unless the mean equator is requested.
             import numpy as np
 
-            dpsi, deps = t._nutation_angles_radians
-            pn, _eps_true = vondrak_pn_matrix(
-                t.tt, float(dpsi), float(deps), frame_bias=False
-            )
+            if _use_mean_equator:
+                pn = vondrak_precession_matrix(t.tt, frame_bias=False)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
             xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
@@ -1477,12 +1517,16 @@ def _calc_body_pctr(
             )
             p3 = dist_val
         else:
-            # True equator of date: Vondrák 2011 precession + Skyfield nutation
-            # (ICRS -> true equator of date), matching the LEB fast path.
+            # Equator of date (with frame bias): Vondrák 2011 precession, with
+            # Skyfield nutation unless the mean equator is requested. Matches the
+            # LEB fast path.
             import numpy as np
 
-            dpsi, deps = t._nutation_angles_radians
-            pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            if _use_mean_equator:
+                pn = vondrak_precession_matrix(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
             xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
@@ -1521,14 +1565,19 @@ def _calc_body_pctr(
 
             p1, p2, p3 = lon, lat, dist
         elif is_icrs:
-            # ICRS ecliptic of date (no frame bias): Vondrák 2011 precession +
-            # Skyfield nutation, then rotate equator -> ecliptic by eps_true.
+            # ICRS ecliptic of date (no frame bias): Vondrák 2011 precession,
+            # with Skyfield nutation unless FLG_NONUT requests the mean ecliptic,
+            # then rotate equator -> ecliptic by eps_true.
             import numpy as np
 
-            dpsi, deps = t._nutation_angles_radians
-            pn, eps_true = vondrak_pn_matrix(
-                t.tt, float(dpsi), float(deps), frame_bias=False
-            )
+            if iflag & FLG_NONUT:
+                pn = vondrak_precession_matrix(t.tt, frame_bias=False)
+                eps_true = vondrak_mean_obliquity_rad(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps_true = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
             xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
             ce, se = math.cos(eps_true), math.sin(eps_true)
             xe = float(xq)
@@ -1543,12 +1592,17 @@ def _calc_body_pctr(
             )
             p3 = dist
         else:
-            # Ecliptic of date: Vondrák 2011 precession + Skyfield nutation, then
-            # rotate equator -> ecliptic by eps_true. Matches the LEB fast path.
+            # Ecliptic of date: Vondrák 2011 precession, with Skyfield nutation
+            # unless FLG_NONUT requests the mean ecliptic, then rotate equator ->
+            # ecliptic by eps_true. Matches the LEB fast path.
             import numpy as np
 
-            dpsi, deps = t._nutation_angles_radians
-            pn, eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            if iflag & FLG_NONUT:
+                pn = vondrak_precession_matrix(t.tt)
+                eps_true = vondrak_mean_obliquity_rad(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
             xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
             ce, se = math.cos(eps_true), math.sin(eps_true)
             xe = float(xq)
@@ -1572,7 +1626,13 @@ def _calc_body_pctr(
         t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
-        # Get positions at t - dt and t + dt using the same method (without speed or sidereal)
+        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
+        # the difference). pyswisseph computes the sidereal+equatorial SPEED in
+        # the tropical (true-equator) frame -- the same as the plain equatorial
+        # speed -- even though the sidereal POSITION uses the mean equator.
+        # (Verified vs pyswisseph: the Moon's SID|EQ RA speed matches the
+        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
+        # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
         result_prev, _ = _calc_body_pctr(
             t_prev, ipl, iplctr, flags_no_speed_no_sidereal
@@ -3110,9 +3170,13 @@ def _calc_body(
         t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
-        # CRITICAL: Remove SIDEREAL flag from recursive call to ensure both positions
-        # are in the same frame (tropical) before calculating velocity.
-        # We'll apply sidereal conversion to the velocity afterwards.
+        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
+        # the difference). pyswisseph computes the sidereal+equatorial SPEED in
+        # the tropical (true-equator) frame -- the same as the plain equatorial
+        # speed -- even though the sidereal POSITION uses the mean equator.
+        # (Verified vs pyswisseph: the Moon's SID|EQ RA speed matches the
+        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
+        # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
         try:
             result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
@@ -4604,12 +4668,17 @@ def _calc_nod_aps(
     jd_tt = t.tt
 
     # --- ICRS → ecliptic of date rotation (Vondrák 2011, matching calc()) ---
-    # Step 1: precession-nutation matrix (ICRS → true equator of date) from the
-    # same Vondrák long-term precession used by the main reduction; nutation
-    # stays IAU 2006/2000A. Step 2: the matching true obliquity (Vondrák mean +
-    # Δε) returned by the same builder rotates equator-of-date → ecliptic-of-date.
-    dpsi_n, deps_n = erfa.nut06a(_J2000_JD, jd_tt - _J2000_JD)
-    pnm, eps_rad = vondrak_pn_matrix(jd_tt, float(dpsi_n), float(deps_n))
+    # Step 1: precession(-nutation) matrix (ICRS → equator of date) from the same
+    # Vondrák long-term precession used by the main reduction. Under FLG_NONUT
+    # the mean equator/obliquity are used (no nutation); otherwise nutation stays
+    # IAU 2006/2000A. Step 2: the matching obliquity rotates equator-of-date →
+    # ecliptic-of-date.
+    if iflag & FLG_NONUT:
+        pnm = vondrak_precession_matrix(jd_tt)
+        eps_rad = vondrak_mean_obliquity_rad(jd_tt)
+    else:
+        dpsi_n, deps_n = erfa.nut06a(_J2000_JD, jd_tt - _J2000_JD)
+        pnm, eps_rad = vondrak_pn_matrix(jd_tt, float(dpsi_n), float(deps_n))
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
 
