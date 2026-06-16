@@ -79,7 +79,7 @@ class TestLunEclipseHow:
 
         # No umbral immersion; the penumbral measure stays as the
         # (negative) distance-from-penumbra value, the reference
-        # convention (verified against pyswisseph 2.10.03).
+        # convention (verified against the reference ephemeris 2.10.03).
         assert attr[0] == 0.0
         assert attr[1] < 0.0
         # Eclipse type should be 0
@@ -189,10 +189,10 @@ class TestLunEclipseHow:
 
 
 class TestSweLunEclipseHow:
-    """Test suite for lun_eclipse_how with pyswisseph-compatible signature."""
+    """Test suite for lun_eclipse_how with the reference-API-compatible signature."""
 
-    def test_pyswisseph_signature(self):
-        """Test the pyswisseph-compatible signature with geopos parameter."""
+    def test_reference_signature(self):
+        """Test the reference-API-compatible signature with geopos parameter."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
         # geopos = [longitude, latitude, altitude]
         rome_geopos = [12.4964, 41.9028, 0]
@@ -217,7 +217,7 @@ class TestSweLunEclipseHow:
         ecl_type, attr = lun_eclipse_how(jd_eclipse, la_geopos, FLG_SWIEPH)
 
         # Totality in progress and Moon above the horizon: the retflag
-        # carries the phase (pyswisseph 2.10.03 returns ECL_TOTAL here;
+        # carries the phase (the reference ephemeris 2.10.03 returns ECL_TOTAL here;
         # no visibility bits are set by this function).
         assert ecl_type & ECL_TOTAL
 
@@ -307,7 +307,7 @@ class TestSweLunEclipseHow:
         assert abs(attr[8] - attr[0]) < 1e-10
 
     def test_geopos_longitude_first(self):
-        """Test that geopos uses longitude-first order (pyswisseph convention)."""
+        """Test that geopos uses longitude-first order (reference ephemeris convention)."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         # Rome: lon=12.4964, lat=41.9028
@@ -483,7 +483,7 @@ class TestLunEclipseHowEdgeCases:
 class TestValidationRequirements:
     """Tests for ECLIPSE-005 validation requirements.
 
-    These tests verify the implementation matches pyswisseph output
+    These tests verify the implementation matches the reference ephemeris output
     within the specified tolerances for the 2022-Nov-08 total lunar eclipse.
 
     Reference: Nov 8, 2022 total lunar eclipse

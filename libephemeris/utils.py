@@ -47,7 +47,7 @@ def cotrans_sp(
     Transform coordinates and velocities between ecliptic and equatorial systems.
 
     Supports two calling conventions:
-      1. PySwissEph-compatible: cotrans_sp(coord_6, eps) -> flat 6-tuple
+      1. Reference-API-compatible: cotrans_sp(coord_6, eps) -> flat 6-tuple
       2. Split form: cotrans_sp(coord_3, speed_3, eps) -> (coord_3, speed_3)
 
     The direction of transformation depends on the sign of obliquity:
@@ -86,7 +86,7 @@ def cotrans_sp(
         dist_speed = float(coord[5])
         _split_return = False
     # Convert to radians
-    # Negate obliquity to match the pyswisseph API convention
+    # Negate obliquity to match the reference API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
     eps_rad = math.radians(-obliquity)
@@ -700,7 +700,7 @@ def cotrans(
     dist = coord[2]
 
     # Convert to radians
-    # Negate obliquity to match the pyswisseph API convention
+    # Negate obliquity to match the reference API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
     eps_rad = math.radians(-eps)
@@ -1221,7 +1221,7 @@ def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
             minutes = 0
             degrees += 1
 
-    # Format matching pyswisseph: "{deg}{char}{min:02d}" or
+    # Format matching the reference ephemeris: "{deg}{char}{min:02d}" or
     # "{deg}{char}{min:02d}'{sec:02d}"
     if seconds == 0:
         return f"{degrees}{direction}{minutes:02d}"
@@ -1264,7 +1264,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
         >>> cs2timestr(-360000)  # -1 hour
         '-1:00:00'
     """
-    # Accept bytes separator (pyswisseph uses b':')
+    # Accept bytes separator (the reference ephemeris uses b':')
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
@@ -1300,7 +1300,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
 
     # Format the string matching reference API format
     # Format: "%02d<sep>%02d<sep>%02d"
-    # Hours are mod 24 to match pyswisseph behavior
+    # Hours are mod 24 to match the reference behavior
     hours = hours % 24
     if suppresszero:
         if seconds == 0:
@@ -1345,7 +1345,7 @@ def deg_midp(x1: float, x2: float) -> float:
     diff = x2 - x1
 
     # When both arcs are equally long (diff exactly ±180) we follow the
-    # pyswisseph convention: always take the positive (clockwise) half,
+    # the reference convention: always take the positive (clockwise) half,
     # i.e. treat -180 the same as +180.
     if diff > 180.0:
         diff -= 360.0
@@ -1393,7 +1393,7 @@ def rad_midp(x: float, y: float) -> float:
     diff = y - x
 
     # When both arcs are equally long (diff exactly ±π) we follow the
-    # pyswisseph convention: always take the positive (clockwise) half.
+    # the reference convention: always take the positive (clockwise) half.
     if diff > math.pi:
         diff -= TWO_PI
     elif diff < -math.pi:
@@ -1416,7 +1416,7 @@ def d2l(d: float) -> int:
     "round half away from zero" semantics (also known as commercial rounding).
     This is standard practice in astronomical computation software.
 
-    Compatible with the pyswisseph swe.d2l() API.
+    Compatible with the reference swe.d2l() API.
 
     Args:
         d: A floating-point number to convert.
@@ -1429,7 +1429,7 @@ def d2l(d: float) -> int:
         - This differs from Python's built-in round() function, which uses
           "round half to even" (banker's rounding) for Python 3.
         - Used internally for coordinate conversions and also exposed
-          publicly for consistency with the pyswisseph API.
+          publicly for consistency with the reference API.
 
     Examples:
         >>> d2l(1.4)

@@ -76,7 +76,6 @@ dev = [
     "black>=25.1.0",
     "mypy>=1.0.0",
     "poethepoet>=0.37.0,<0.38.0",
-    "pyswisseph>=2.10.3.2",  # Comparison/validation tests only — not a runtime dependency
     "pytest>=8.0.0,<9.0.0",
     "pytest-xdist>=3.5.0",
     "ruff>=0.14.6",
@@ -140,18 +139,14 @@ libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]
 #
 # Naming convention:
 #   test:<backend>:<variant>         — unit tests via <backend>
-#   test:compare:<backend>:<variant> — libephemeris vs pyswisseph via <backend>
 #
-# Test matrix: every backend gets core / fast / full / compare / compare:full.
+# Test matrix: every backend gets core / fast / full.
 # ---------------------------------------------------------------------------
 
 [tool.poe.tasks]
 
 # Dev CLI launcher (leph is not a wheel entry point; see project.scripts)
 leph = {cmd = "python -m libephemeris.dev_cli", help = "Run the leph dev CLI (poe leph -- <args>)"}
-
-# --- Setup ---
-"setup:reference" = {cmd = "python scripts/download_reference_data.py", help = "Download reference data for comparison tests (~3.4 MB)"}
 
 # --- Code quality ---
 lint = {cmd = "python -m libephemeris.dev_cli code lint", help = "Lint all Python files (ruff, auto-fix)"}
@@ -172,15 +167,6 @@ typecheck = {cmd = "python -m libephemeris.dev_cli code typecheck", help = "Type
 "test:horizons:core" = {cmd = "python -m libephemeris.dev_cli test horizons precision-quick", help = "Horizons quick precision check, 50 dates (~15s)"}
 "test:horizons:fast" = {cmd = "python -m libephemeris.dev_cli test horizons precision", help = "Horizons precision 13 bodies, 200 dates (~45s)"}
 "test:horizons:full" = {cmd = "python -m libephemeris.dev_cli test horizons vs-leb", help = "Horizons cross-validate against LEB2 (15 bodies, 100 dates)"}
-
-# --- Compare: libephemeris vs pyswisseph ---
-"test:compare:skyfield" = {cmd = "python -m libephemeris.dev_cli test compare skyfield-fast", help = "Compare vs pyswisseph via Skyfield (parallel, no @slow)"}
-"test:compare:skyfield:full" = {cmd = "python -m libephemeris.dev_cli test compare skyfield-full", help = "Compare vs pyswisseph via Skyfield (ALL tests)"}
-"test:compare:leb" = {cmd = "python -m libephemeris.dev_cli test compare leb-backend", help = "Compare vs pyswisseph via LEB backend (no @slow)"}
-"test:compare:leb:full" = {cmd = "python -m libephemeris.dev_cli test compare leb-backend-full", help = "Compare vs pyswisseph via LEB backend (ALL tests)"}
-"test:compare:horizons" = {cmd = "python -m libephemeris.dev_cli test compare horizons-backend", help = "Compare vs pyswisseph via Horizons API (no @slow)"}
-"test:compare:horizons:full" = {cmd = "python -m libephemeris.dev_cli test compare horizons-backend-full", help = "Compare vs pyswisseph via Horizons API (ALL tests)"}
-"test:houses" = {cmd = "python -m libephemeris.dev_cli test compare houses", help = "Compare all 25 house systems (26 codes) vs pyswisseph with precision report"}
 
 # --- Coverage ---
 coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Tests with coverage reports (no @slow)"}
@@ -217,18 +203,10 @@ warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
 
-[tool.ruff]
-exclude = ["compare_scripts"]
-
 [tool.black]
 line-length = 88
 target-version = ["py312"]
 include = '\.pyi?$'
-extend-exclude = '''
-/(
-  compare_scripts
-)/
-'''
 
 [tool.ruff.lint]
 # No global ignores: the former blanket F401/F403/F405/E402/F841 list hid
@@ -259,8 +237,6 @@ extend-exclude = '''
 "libephemeris/vendor/*" = ["E731", "E741"]
 # Standalone scripts insert the repo root on sys.path before importing.
 "scripts/*" = ["E402"]
-"compare_scripts/*" = ["E402"]
-"tasks/*" = ["E402"]
 
 [tool.coverage.run]
 source = ["libephemeris"]

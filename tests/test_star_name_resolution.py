@@ -1,7 +1,7 @@
 """
 Unit tests for star name resolution with aliases and wildcards.
 
-Tests the pyswisseph-compatible star name resolution system including:
+Tests the reference-API-compatible star name resolution system including:
 - STAR_ALIASES dictionary with alternative names
 - resolve_star_name function with prefix/fuzzy matching
 - fixstar_ut with canonical star name return
@@ -110,7 +110,7 @@ class TestResolveStarName:
         assert resolve_star_name("Alpha CMa") == SIRIUS
 
     def test_comma_prefix_partial_match(self):
-        """Test comma-prefix partial matching (pyswisseph convention)."""
+        """Test comma-prefix partial matching (reference ephemeris convention)."""
         # ,alg should find Algol
         result = resolve_star_name(",alg")
         # The expanded catalog resolves the prefix 'alg' to Algenib
@@ -149,7 +149,7 @@ class TestResolveStarName:
         assert resolve_star_name(",  ") is None
 
     def test_trailing_comma_format(self):
-        """Test pyswisseph format with trailing comma (star_name,nomenclature)."""
+        """Test reference ephemeris format with trailing comma (star_name,nomenclature)."""
         assert resolve_star_name("Regulus,alLeo") == REGULUS
         assert resolve_star_name("Spica,alVir") == SPICA_STAR
 
@@ -353,16 +353,16 @@ class TestAllStarsHaveAliases:
 
 
 @pytest.mark.integration
-class TestPyswissephCompatibility:
-    """Integration tests comparing against pyswisseph behavior."""
+class TestReferenceCompatibility:
+    """Integration tests comparing against the reference ephemeris behavior."""
 
     @pytest.fixture
     def standard_jd(self):
         """J2000.0 epoch as Julian Day."""
         return 2451545.0
 
-    def test_comma_prefix_errors_like_pyswisseph(self, standard_jd):
-        """',alg' errors exactly like pyswisseph (exact-key semantics);
+    def test_comma_prefix_errors_like_reference(self, standard_jd):
+        """',alg' errors exactly like the reference ephemeris (exact-key semantics);
         the exact nomenclature ',bePer' finds Algol."""
         from libephemeris.exceptions import Error
 
@@ -373,7 +373,7 @@ class TestPyswissephCompatibility:
         assert 55 < pos[0] < 57
 
     def test_alpha_leo_finds_regulus(self, standard_jd):
-        """Test that Alpha Leo finds Regulus (pyswisseph behavior)."""
+        """Test that Alpha Leo finds Regulus (reference ephemeris behavior)."""
         pos, name, retflag = fixstar_ut("Alpha Leo", standard_jd, 0)
         assert name == "Regulus,alLeo"
 
@@ -391,7 +391,7 @@ class TestPyswissephCompatibility:
         assert abs(pos_upper[0] - pos_mixed[0]) < 0.0001
 
     def test_alpha_cma_finds_sirius(self, standard_jd):
-        """Test that Alpha CMa finds Sirius (pyswisseph behavior)."""
+        """Test that Alpha CMa finds Sirius (reference ephemeris behavior)."""
         pos, name, retflag = fixstar_ut("Alpha CMa", standard_jd, 0)
         assert name == "Sirius,alCMa"
 

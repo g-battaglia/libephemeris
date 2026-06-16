@@ -1815,7 +1815,7 @@ def _vis_limit_mag_leb(
 
     if obj_alt < 0:
         # Reference convention: retval -2 with dret[0] = -100 marks an
-        # object below the local horizon (verified vs pyswisseph).
+        # object below the local horizon (verified vs the reference ephemeris).
         dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 
@@ -2995,7 +2995,7 @@ def heliacal_ut(
         flags=flags,
     )
 
-    # Build the result as 3 floats matching pyswisseph API
+    # Build the result as 3 floats matching the reference API
     jd1 = 0.0  # Start of visibility
     jd2 = 0.0  # Optimum visibility
     jd3 = 0.0  # End of visibility
@@ -3788,7 +3788,7 @@ def heliacal_pheno_ut(
     Provides data relevant for the calculation of heliacal risings and settings.
 
     This is the reference-compatible wrapper around _heliacal_pheno_ut_pythonic(). It
-    accepts the same parameter layout as pyswisseph's heliacal_pheno_ut
+    accepts the same parameter layout as the reference ephemeris's heliacal_pheno_ut
     and returns a flat 50-element tuple.
 
     Args:
@@ -4128,7 +4128,7 @@ def vis_limit_mag(
     if obj_alt < 0:
         # Match reference API: return all zeros in data when below horizon
         # Reference convention: retval -2 with dret[0] = -100 marks an
-        # object below the local horizon (verified vs pyswisseph).
+        # object below the local horizon (verified vs the reference ephemeris).
         dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 

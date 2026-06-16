@@ -286,7 +286,7 @@ class TestConsistencyWithSweEclipseHow:
 
 
 class TestSweApiConvention:
-    """Test that swe_ version follows pyswisseph API conventions."""
+    """Test that swe_ version follows the reference ephemeris API conventions."""
 
     def test_geopos_lon_lat_order(self):
         """Test that geopos uses [lon, lat, alt] order."""

@@ -13,7 +13,7 @@ This module maintains the library's singleton state including:
 - SPK kernel registry for minor body calculations
 
 All state is stored in module-level globals to provide a stateful module-level API
-compatible with pyswisseph's threading model (thread-unsafe by design).
+compatible with the reference ephemeris's threading model (thread-unsafe by design).
 """
 
 from __future__ import annotations

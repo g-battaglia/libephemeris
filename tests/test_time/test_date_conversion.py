@@ -2,13 +2,13 @@
 Tests for date_conversion / date_conversion function.
 
 After Phase 2, `date_conversion` is an alias for `date_conversion` and
-returns ``(valid, jd, (year, month, day, hour))`` matching pyswisseph.
+returns ``(valid, jd, (year, month, day, hour))`` matching the reference ephemeris.
 
 The old calendar-conversion helper is available as
 ``libephemeris.time_utils.date_conversion`` (renamed import in __init__).
 
 Tests cover:
-- pyswisseph-compatible return format
+- reference-API-compatible return format
 - Validation of dates
 - Calendar parameter handling
 - The old calendar-conversion helper (via _date_conversion_calendars)
@@ -20,7 +20,7 @@ from libephemeris.time_utils import date_conversion as calendar_convert
 
 
 class TestSWEDateConversion:
-    """Test date_conversion / date_conversion pyswisseph-compatible API."""
+    """Test date_conversion / date_conversion reference-API-compatible API."""
 
     @pytest.mark.unit
     def test_returns_valid_jd_tuple(self):
@@ -56,7 +56,7 @@ class TestSWEDateConversion:
 
     @pytest.mark.unit
     def test_bytes_calendar(self):
-        """Calendar parameter should accept bytes (pyswisseph style)."""
+        """Calendar parameter should accept bytes (reference ephemeris style)."""
         valid, jd, _ = ephem.date_conversion(2000, 1, 1, 12.0, b"g")
         assert valid is True
         assert isinstance(jd, float)

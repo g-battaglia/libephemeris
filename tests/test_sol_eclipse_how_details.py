@@ -327,7 +327,7 @@ class TestSolEclipseHowDetailsLegacy:
             tjd_ut, 32.7767, -96.797, 0, FLG_SWIEPH
         )
 
-        # pyswisseph style: geopos = [lon, lat, alt]
+        # reference-API style: geopos = [lon, lat, alt]
         result_swe = sol_eclipse_how_details(
             tjd_ut, [-96.797, 32.7767, 0], FLG_SWIEPH
         )

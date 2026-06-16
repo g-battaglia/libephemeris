@@ -521,7 +521,7 @@ def _get_precession_matrix(
 ) -> Tuple[Tuple[float, float, float], ...]:
     """Get the ICRS->mean-equator-of-date rotation matrix (no nutation).
 
-    Used for sidereal+equatorial output, where pyswisseph uses the mean equator.
+    Used for sidereal+equatorial output, where the reference ephemeris uses the mean equator.
     Now sourced from the Vondrák 2011 long-term precession (via erfa, ICRS frame
     bias included) -- the same single source as the LEB path -- so both backends
     agree and remain valid at remote epochs. (Previously this used Skyfield's
@@ -787,7 +787,7 @@ def _cotrans(lon: float, lat: float, eps: float) -> Tuple[float, float]:
     Returns:
         (transformed_lon, transformed_lat) in degrees.
     """
-    eps_rad = math.radians(-eps)  # Negate to match pyswisseph convention
+    eps_rad = math.radians(-eps)  # Negate to match the reference convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
 
@@ -1374,13 +1374,13 @@ def _pipeline_ecliptic(
     # Override distance/latitude for lunar analytical bodies.
     # LEB stores pre-computed Chebyshev coefficients that may use older
     # models.  These overrides compute values analytically at runtime
-    # for better match with pyswisseph.
+    # for better match with the reference ephemeris.
     if ipl == MEAN_NODE:
-        # LEB stores 0 for dist; pyswisseph returns mean distance constant.
+        # LEB stores 0 for dist; the reference ephemeris returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
     elif ipl == TRUE_NODE:
         # KNOWN LIMITATION (see divergences.md 7): the LEB-stored value is an
-        # h_mag proxy (~0.0015 AU), NOT the osculating node radius pyswisseph and
+        # h_mag proxy (~0.0015 AU), NOT the osculating node radius the reference ephemeris and
         # the Skyfield backend return (~0.0024 AU). Recomputing it standalone
         # would require reconstructing the geocentric-ecliptic Moon state inside
         # this pipeline; the longitude/latitude (the used quantities) are correct,
@@ -1389,10 +1389,10 @@ def _pipeline_ecliptic(
         pass  # keep dist proxy from LEB (lon/lat correct; distance documented)
     elif ipl == MEAN_APOG:
         # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
-        # Override with 3-harmonic model fitted to pyswisseph output:
+        # Override with 3-harmonic model fitted to the reference ephemeris output:
         #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
         # where ω = (apogee_lon - node_lon).
-        # Max residual vs pyswisseph: ~1.3", RMS: ~0.7".
+        # Max residual vs the reference ephemeris: ~1.3", RMS: ~0.7".
         from .lunar import calc_mean_lunar_node
 
         node_lon = calc_mean_lunar_node(jd_tt)
@@ -1403,7 +1403,7 @@ def _pipeline_ecliptic(
         dist = _MOON_MEAN_APOG_DIST_AU
 
     # Nutation in longitude (dpsi) handling.
-    # When SIDEREAL+EQUATORIAL: pyswisseph outputs mean ecliptic (no nutation)
+    # When SIDEREAL+EQUATORIAL: the reference ephemeris outputs mean ecliptic (no nutation)
     # Nutation handling for ecliptic-direct bodies.
     # Mean bodies are stored without nutation; true bodies include it.
     # FLG_NONUT: output on mean ecliptic (no nutation).
@@ -1429,7 +1429,7 @@ def _pipeline_ecliptic(
     # Input coords are always ecliptic of date.
     #
     # FLG_J2000 is honored for ALL bodies, including TrueNode, OscuApog,
-    # IntpApog, and IntpPerg.  pyswisseph silently ignores J2000 for these
+    # IntpApog, and IntpPerg.  the reference ephemeris silently ignores J2000 for these
     # four bodies when FLG_SIDEREAL is set — this is a behavioral bug
     # (ayanamsha and J2000 ecliptic precession are geometrically distinct
     # and composable operations).  LibEphemeris intentionally fixes this.
@@ -1606,7 +1606,7 @@ def _pipeline_helio(
     if is_equatorial and is_j2000:
         # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
         # so it uses true obliquity of date on J2000 ecliptic coords.
-        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
+        # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris.
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = vondrak_mean_obliquity_deg(jd_tt)
         else:
@@ -1631,7 +1631,7 @@ def _pipeline_helio(
 
     elif is_equatorial:
         # Equatorial of date: precess J2000 → date, then ecliptic → equatorial.
-        # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph.
+        # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris.
         lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = vondrak_mean_obliquity_deg(jd_tt)
@@ -1934,7 +1934,7 @@ def _fast_calc_core(
         #   ecl_date → precess_to_J2000 → −aya  (wrong — non-commutative)
         #
         # This applies to ALL Pipeline B bodies uniformly: MeanNode, MeanApog,
-        # TrueNode, OscuApog, IntpApog, IntpPerg.  pyswisseph only does this
+        # TrueNode, OscuApog, IntpApog, IntpPerg.  the reference ephemeris only does this
         # for mean bodies (silently ignoring J2000 for the others when sidereal
         # is set) — LibEphemeris intentionally corrects this behavioral bug.
         # See docs/reference/se-bug-sidereal-j2000-nodes.md
@@ -1963,7 +1963,7 @@ def _fast_calc_core(
 
     # Sidereal correction
     #
-    # When EQUATORIAL is set, pyswisseph does NOT subtract ayanamsha from RA
+    # When EQUATORIAL is set, the reference ephemeris does NOT subtract ayanamsha from RA
     # for any body type:
     #   - Pipeline A (ICRS): already outputs equatorial coordinates using the
     #     mean equator (P matrix) when sidereal is set.
@@ -1987,7 +1987,7 @@ def _fast_calc_core(
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
             #
-            # This applies uniformly to ALL bodies.  pyswisseph uses true
+            # This applies uniformly to ALL bodies.  the reference ephemeris uses true
             # ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even when
             # FLG_J2000 is set (because it skips J2000 precession for them).
             # LibEphemeris intentionally fixes this: when J2000 is requested,

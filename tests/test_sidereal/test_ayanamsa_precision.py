@@ -2,7 +2,7 @@
 Tests for improved ayanamsa precision using IAU 2006 precession model.
 
 This test verifies that the precession rate used in ayanamsa calculations
-matches pyswisseph closely (using IAU 2006 precession model with
+matches the reference ephemeris closely (using IAU 2006 precession model with
 quadratic term: 5028.796273"/century linear + 1.105608"/century² quadratic).
 
 The expected precision is <0.01" (arcseconds) at all epochs from 1900-2100.
@@ -19,14 +19,14 @@ from libephemeris.constants import (
 
 
 class TestAyanamsaPrecession:
-    """Test that ayanamsa precession rate matches pyswisseph."""
+    """Test that ayanamsa precession rate matches the reference ephemeris."""
 
     # Test epochs (Julian Day)
     JD_J1900 = 2415020.0  # 1900-01-01 12:00 TT
     JD_J2000 = 2451545.0  # 2000-01-01 12:00 TT
     JD_J2100 = 2488070.0  # 2100-01-01 12:00 TT
 
-    # pyswisseph reference values (computed with pyswisseph)
+    # Reference ephemeris values (computed with the reference ephemeris)
     # Format: (JD, sid_mode, expected_ayanamsa)
     REFERENCE_VALUES = [
         # Lahiri
@@ -37,11 +37,11 @@ class TestAyanamsaPrecession:
         (JD_J1900, SIDM_FAGAN_BRADLEY, 23.34371910),
         (JD_J2000, SIDM_FAGAN_BRADLEY, 24.74029999),
         (JD_J2100, SIDM_FAGAN_BRADLEY, 26.13749505),
-        # Raman - actual Swiss Eph values
+        # Raman - actual reference ephemeris values
         (JD_J1900, SIDM_RAMAN, 21.01421001),
         (JD_J2000, SIDM_RAMAN, 22.41079104),
         (JD_J2100, SIDM_RAMAN, 23.80798618),
-        # Krishnamurti - actual Swiss Eph values
+        # Krishnamurti - actual reference ephemeris values
         (JD_J1900, SIDM_KRISHNAMURTI, 22.36365901),
         (JD_J2000, SIDM_KRISHNAMURTI, 23.76024004),
         (JD_J2100, SIDM_KRISHNAMURTI, 25.15743518),
@@ -49,9 +49,9 @@ class TestAyanamsaPrecession:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("jd,sid_mode,expected", REFERENCE_VALUES)
-    def test_ayanamsa_matches_swisseph(self, jd, sid_mode, expected):
+    def test_ayanamsa_matches_reference(self, jd, sid_mode, expected):
         """
-        Ayanamsa should match pyswisseph within 0.01 arcseconds.
+        Ayanamsa should match the reference ephemeris within 0.01 arcseconds.
 
         This tests the IAU 2006 precession model implementation with both
         linear rate (5028.796273"/century) and quadratic term (1.105608"/century²).

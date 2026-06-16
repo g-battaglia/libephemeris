@@ -874,7 +874,7 @@ def _calc_planet_angular_radius(planet_id: int, dist_au: float) -> float:
     """Compute angular radius of a planet in degrees from its geocentric distance.
 
     Uses the exact geometric formula: angular_radius = arcsin(physical_radius / distance),
-    matching the Swiss Ephemeris approach of computing angular sizes dynamically from
+    matching the reference ephemeris approach of computing angular sizes dynamically from
     physical radii and actual distance rather than using static lookup tables.
 
     Args:
@@ -2308,9 +2308,9 @@ def sol_eclipse_when_glob(
     ecltype: int = 0,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
-    """Find the next (or previous) global solar eclipse (pyswisseph-compatible).
+    """Find the next (or previous) global solar eclipse (reference-API-compatible).
 
-    Wrapper around _sol_eclipse_when_glob_pythonic() matching pyswisseph signature.
+    Wrapper around _sol_eclipse_when_glob_pythonic() matching the reference signature.
 
     Args:
         tjdut: Julian Day (UT) to start search from.
@@ -2319,7 +2319,7 @@ def sol_eclipse_when_glob(
         backwards: If True, search backward in time.
 
     Returns:
-        Tuple of (retflag, tret) matching pyswisseph.
+        Tuple of (retflag, tret) matching the reference ephemeris.
     """
     direction = "backward" if backwards else "forward"
     return _sol_eclipse_when_glob_pythonic(
@@ -4549,7 +4549,7 @@ def _calculate_lunar_eclipse_phases(
     """
     Calculate times of lunar eclipse phases (contacts).
 
-    Phase indices (pyswisseph-compatible 10-element format):
+    Phase indices (reference-API-compatible 10-element format):
         [0]: Time of maximum eclipse
         [1]: Reserved (0)
         [2]: Time of partial eclipse beginning (Moon enters umbra)
@@ -4804,9 +4804,9 @@ def lun_eclipse_when(
     ecltype: int = 0,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...]]:
-    """Find the next (or previous) lunar eclipse globally (pyswisseph-compatible).
+    """Find the next (or previous) lunar eclipse globally (reference-API-compatible).
 
-    Wrapper around _lun_eclipse_when_pythonic() matching pyswisseph signature.
+    Wrapper around _lun_eclipse_when_pythonic() matching the reference signature.
 
     Args:
         tjdut: Julian Day (UT) to start search from.
@@ -4815,7 +4815,7 @@ def lun_eclipse_when(
         backwards: If True, search backward in time.
 
     Returns:
-        Tuple of (retflag, tret) matching pyswisseph.
+        Tuple of (retflag, tret) matching the reference ephemeris.
     """
     return _lun_eclipse_when_pythonic(
         tjdut, flags=flags, eclipse_type=ecltype, backwards=backwards
@@ -4969,9 +4969,9 @@ def lun_eclipse_when_loc(
     flags: int = FLG_SWIEPH,
     backwards: bool = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
-    """Find the next lunar eclipse visible from a geographic position (pyswisseph-compatible).
+    """Find the next lunar eclipse visible from a geographic position (reference-API-compatible).
 
-    Wrapper around _lun_eclipse_when_loc_pythonic() matching pyswisseph signature.
+    Wrapper around _lun_eclipse_when_loc_pythonic() matching the reference signature.
 
     Args:
         tjdut: Julian Day (UT) to start search from.
@@ -4980,7 +4980,7 @@ def lun_eclipse_when_loc(
         backwards: If True, search backward in time.
 
     Returns:
-        Tuple of (retflag, tret, attr) matching pyswisseph.
+        Tuple of (retflag, tret, attr) matching the reference ephemeris.
     """
     if len(geopos) < 3:
         raise ValueError("geopos must have at least 3 elements: [lon, lat, alt]")
@@ -5178,7 +5178,7 @@ def _lun_eclipse_how_pythonic(
         eclipse_type |= ECL_VISIBLE
         eclipse_type |= ECL_MAX_VISIBLE
 
-    # Prepare attributes tuple (20 elements matching pyswisseph layout)
+    # Prepare attributes tuple (20 elements matching the reference layout)
     attr = (
         max(0.0, umbral_mag),  # [0] Umbral magnitude
         max(0.0, penumbral_mag),  # [1] Penumbral magnitude
@@ -5824,7 +5824,7 @@ def _lun_occult_when_loc_pythonic(
         rc_where, _wlon, _wlat, dcore = _eclipse_where_core(jd_max, flags, body)
         retflag |= rc_where & ECL_NONCENTRAL
         attr_list[3] = dcore[0]
-        # pyswisseph caps the diameter fraction and the obscuration at 1
+        # the reference ephemeris caps the diameter fraction and the obscuration at 1
         # for occultations (its lun_occult_when_loc wrapper applies the
         # 'fixes seen in perl extension'); mirror that for 1:1 parity.
         attr_list[0] = min(attr_list[0], 1.0)
@@ -6002,9 +6002,9 @@ def lun_occult_where(
     body: "int | str" = 0,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
-    """Calculate where on Earth a lunar occultation is visible (pyswisseph-compatible).
+    """Calculate where on Earth a lunar occultation is visible (reference-API-compatible).
 
-    Wrapper around _lun_occult_where_pythonic() matching pyswisseph's signature.
+    Wrapper around _lun_occult_where_pythonic() matching the reference signature.
 
     Args:
         tjdut: Julian Day (UT) of the moment to calculate.
@@ -6012,7 +6012,7 @@ def lun_occult_where(
         flags: Calculation flags (default FLG_SWIEPH).
 
     Returns:
-        Tuple of (retflag, geopos, attr) matching pyswisseph.
+        Tuple of (retflag, geopos, attr) matching the reference ephemeris.
     """
     return _call_with_leb_skyfield_fallback(
         _lun_occult_where_internal,
@@ -6144,7 +6144,7 @@ def _rise_trans_impl(
 def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
     """Build a 10-element tret tuple for rise_trans return value.
 
-    pyswisseph returns a 10-element tuple where only index 0 is meaningful
+    The reference ephemeris returns a 10-element tuple where only index 0 is meaningful
     (the Julian Day of the event). Remaining elements are always 0.0.
     """
     return (jd_event, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -7247,7 +7247,7 @@ def heliacal_ut(
         return 0.0, -1  # Not found
 
 
-# Note: heliacal_ut is defined in heliacal.py with the pyswisseph-compatible
+# Note: heliacal_ut is defined in heliacal.py with the reference-API-compatible
 # API signature (returns 3-tuple). The internal heliacal_ut here returns
 # (jd_event, retflag) and is used by heliacal_ut internally.
 

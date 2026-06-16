@@ -233,8 +233,9 @@ class TestMoonPositionUnregistered:
     def test_calc_ut_unregistered_moon_raises(self):
         """calc_ut raises Error for an unregistered moon (reference parity).
 
-        The reference API raises ("SwissEph file 'sepm9501.se1' not found")
-        when the satellite ephemeris is unavailable; silent zeros would be
+        The reference API raises (reporting that the satellite ephemeris file
+        'sepm9501.se1' is not found) when the satellite ephemeris is
+        unavailable; silent zeros would be
         indistinguishable from a real position.
         """
         jd = 2451545.0  # J2000.0

@@ -487,7 +487,7 @@ def _to_native_floats(values: tuple) -> PositionResult:
     - Type checking in downstream code
 
     This function ensures all values are native Python floats for
-    compatibility with the pyswisseph API contract.
+    compatibility with the reference API contract.
 
     Args:
         values: Tuple of 6 values (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -809,7 +809,7 @@ def get_planet_name(planet: int) -> str:
     return f"Unknown ({planet})"
 
 
-# pyswisseph treats calc_ut(jd, AST_OFFSET + 1, flags) identically to
+# The reference ephemeris treats calc_ut(jd, AST_OFFSET + 1, flags) identically to
 # calc_ut(jd, CERES, flags); same for the other built-in asteroids.
 _AST_NUMBER_REMAP = {
     1: CERES,  # 17
@@ -1444,7 +1444,7 @@ def _calc_body_pctr(
 
         # Gravitational light deflection by Sun/Jupiter/Saturn, applied before
         # aberration (Skyfield .apparent() order) so calc_pctr matches calc()
-        # and pyswisseph. Without it, inner planets near the Sun were off by up
+        # and the reference ephemeris. Without it, inner planets near the Sun were off by up
         # to ~0.2". Skipped under FLG_NOGDEFL.
         if not (iflag & FLG_NOGDEFL):
             from .fast_calc import _apply_gravitational_deflection
@@ -1463,7 +1463,7 @@ def _calc_body_pctr(
         # velocity -- the same relativistic correction Skyfield's .apparent()
         # applies in calc(). Without it, calc_pctr(X, Earth) was missing the
         # full annual aberration and diverged from the geocentric apparent
-        # calc(X) (and from pyswisseph) by up to ~20.5". Skipped under
+        # calc(X) (and from the reference ephemeris) by up to ~20.5". Skipped under
         # FLG_NOABERR; FLG_TRUEPOS already skips light-time + this block.
         if not (iflag & FLG_NOABERR):
             from .fast_calc import _apply_aberration
@@ -1627,10 +1627,10 @@ def _calc_body_pctr(
         t_next = ts_inner.tt_jd(t.tt + dt)
 
         # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
-        # the difference). pyswisseph computes the sidereal+equatorial SPEED in
+        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
         # the tropical (true-equator) frame -- the same as the plain equatorial
         # speed -- even though the sidereal POSITION uses the mean equator.
-        # (Verified vs pyswisseph: the Moon's SID|EQ RA speed matches the
+        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
         # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
         # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
@@ -1728,7 +1728,7 @@ def _calc_nutation_obliquity(
     and ecliptic poles). The Vondrák obliquity is the self-consistent companion
     to the Vondrák precession used throughout the reduction and stays rigorous at
     remote epochs, where the IAU 2006 obliquity polynomial is an out-of-range
-    extrapolation. This differs from Swiss Ephemeris's reported obliquity by up
+    extrapolation. This differs from the reference ephemeris's reported obliquity by up
     to ~6" only at deep-BCE dates (a deliberate, documented scientific
     improvement); the effect is confined to ecliptic latitude -- ecliptic
     longitude is unaffected by the obliquity choice.
@@ -1802,7 +1802,7 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     from .utils import cotrans_sp
 
     # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date.
-    # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph
+    # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris
     # which converts to equatorial using the precession-only frame.
     if iflag & FLG_J2000:
         eps = 23.4392911  # Mean obliquity at J2000.0
@@ -2055,7 +2055,7 @@ def _calc_body(
             result = _maybe_equatorial_convert(result, t.tt, iflag)
             return result, iflag
         # No registered satellite SPK covers this moon.  The reference
-        # API raises here too ("SwissEph file 'sepm....se1' not found").
+        # API raises here too (a missing-ephemeris-file error).
         from .exceptions import Error
 
         raise Error(
@@ -2071,9 +2071,9 @@ def _calc_body(
         if ipl == MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
             # The Meeus polynomial returns mean ecliptic of date.
-            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if not (iflag & FLG_NONUT) and not _sid_eq:
@@ -2109,7 +2109,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # TrueNode includes nutation effects in its perturbation terms.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if (iflag & FLG_NONUT) or _sid_eq:
@@ -2161,7 +2161,7 @@ def _calc_body(
                     )
             # Apply sidereal correction if requested (not for equatorial output).
             # FLG_J2000 is honored for TrueNode, same as MeanNode.
-            # pyswisseph silently ignores J2000 for TrueNode when sidereal is
+            # the reference ephemeris silently ignores J2000 for TrueNode when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -2191,9 +2191,9 @@ def _calc_body(
         if ipl == MEAN_APOG:
             lon, lat = lunar.calc_mean_lilith_with_latitude(jd_tt)
             # The analytical formula returns mean ecliptic of date.
-            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if not (iflag & FLG_NONUT) and not _sid_eq:
@@ -2232,7 +2232,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # OscuApog includes nutation effects in its orbital computation.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if (iflag & FLG_NONUT) or _sid_eq:
@@ -2281,7 +2281,7 @@ def _calc_body(
                     )
             # Apply sidereal correction if requested (not for equatorial output).
             # FLG_J2000 is honored for OscuApog, same as MeanApog.
-            # pyswisseph silently ignores J2000 for OscuApog when sidereal is
+            # the reference ephemeris silently ignores J2000 for OscuApog when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
             # See docs/reference/se-bug-sidereal-j2000-nodes.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -2345,7 +2345,7 @@ def _calc_body(
                 dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
         # Apply sidereal correction if requested (not for equatorial output).
         # FLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
-        # pyswisseph silently ignores J2000 for these bodies when sidereal is
+        # the reference ephemeris silently ignores J2000 for these bodies when sidereal is
         # set — LibEphemeris intentionally fixes this behavioral bug.
         # See docs/reference/se-bug-sidereal-j2000-nodes.md
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -3036,7 +3036,7 @@ def _calc_body(
             # Use the already-computed pos (with light-time correction) for the
             # main position. This is critical for HELCTR/BARYCTR where pos
             # includes iterative light-time correction applied in section 3.
-            # When SIDEREAL+EQUATORIAL, pyswisseph uses mean equator (no nutation),
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris uses mean equator (no nutation),
             # same as NONUT behavior.
             _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
@@ -3171,10 +3171,10 @@ def _calc_body(
         t_next = ts_inner.tt_jd(t.tt + dt)
 
         # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
-        # the difference). pyswisseph computes the sidereal+equatorial SPEED in
+        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
         # the tropical (true-equator) frame -- the same as the plain equatorial
         # speed -- even though the sidereal POSITION uses the mean equator.
-        # (Verified vs pyswisseph: the Moon's SID|EQ RA speed matches the
+        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
         # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
         # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
@@ -3210,7 +3210,7 @@ def _calc_body(
 
     # 5. Sidereal Mode
     # Sidereal correction is applied to ecliptic longitude only.
-    # Pyswisseph ignores sidereal flag when outputting equatorial coords.
+    # The reference ephemeris ignores sidereal flag when outputting equatorial coords.
     # Use NONUT-aware ayanamsha when FLG_NONUT is set.
     if is_sidereal and not is_equatorial:
         ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
@@ -3597,7 +3597,7 @@ def _get_star_position_ecliptic(
     date** (the same frame `_calc_body` uses), rather than Skyfield's IAU 2006
     `ecliptic_frame`. This keeps the star-based ayanamsha modes (True Citra /
     Revati / Galactic) on the library's precession+obliquity model so they stay
-    consistent with the planet longitudes — and with Swiss Ephemeris — at remote
+    consistent with the planet longitudes — and with the reference ephemeris — at remote
     epochs. Nutation is IAU 2006/2000A (via `erfa.nut06a`).
 
     Args:
@@ -4338,7 +4338,7 @@ def get_ayanamsa(tjdet: float) -> float:
         Properly converts TT to UT1 using Skyfield's timescale with Delta T correction.
         Delta T (TT - UT) varies from ~32s (year 2000) to minutes (historical times).
         While ayanamsa changes slowly (~50"/century), correct conversion ensures
-        consistency with the pyswisseph API contract.
+        consistency with the reference API contract.
     """
     ts = get_timescale()
     t_tt = ts.tt_jd(tjdet)
@@ -4351,7 +4351,7 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     Calculate ayanamsa with extended flags for Ephemeris Time.
 
     Uses the sidereal mode set via set_sid_mode(). Returns the ayanamsa
-    value along with the return flags, matching pyswisseph signature.
+    value along with the return flags, matching the reference signature.
 
     Args:
         tjdet: Julian Day in Ephemeris Time (TT/ET)
@@ -4587,7 +4587,7 @@ class HeliocentricNodApsWarning(UserWarning):
 
     .. deprecated::
         This warning is no longer emitted since libephemeris now uses geocentric
-        osculating elements for nod_aps calculations, matching pyswisseph's
+        osculating elements for nod_aps calculations, matching the reference ephemeris's
         approach. Kept for backward compatibility.
     """
 
@@ -4611,7 +4611,7 @@ def _calc_nod_aps(
     descending node, perihelion, and aphelion on the instantaneous orbit, then
     converts these positions to geocentric ecliptic coordinates of date.
 
-    This approach matches pyswisseph's geocentric interpretation: the returned
+    This approach matches the reference ephemeris's geocentric interpretation: the returned
     longitudes represent where the node/apse appears in the ecliptic as seen
     from Earth.
 
@@ -4717,7 +4717,7 @@ def _calc_nod_aps(
     # elements from geocentric state vectors.
     # NODBIT_MEAN → MEAN_NODE + MEAN_APOG
     # NODBIT_OSCU → TRUE_NODE + OSCU_APOG
-    # This matches pyswisseph behavior.
+    # This matches the reference behavior.
     if ipl == MOON:
         jd_ut = t.ut1
         # Strip output-format bits (FLG_RADIANS / FLG_XYZ) and FLG_SPEED:
@@ -4875,7 +4875,7 @@ def _calc_nod_aps(
         anti-perihelion direction. In the perifocal frame this is the
         point (-2ae, 0, 0).
 
-        This matches the pyswisseph convention which returns the second
+        This matches the reference convention which returns the second
         focal point in the aphelion/apogee slot of nod_aps results.
         """
         # Distance from primary focus to second focus = 2 * a * e
@@ -4953,7 +4953,7 @@ def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, 
     """
     Calculate Keplerian orbital elements for a celestial body.
 
-    Reference API compatible function matching pyswisseph signature.
+    Reference API compatible function matching the reference signature.
 
     This function computes the osculating (instantaneous) orbital elements
     for a planet at a given time. The elements describe the elliptical orbit
@@ -5279,7 +5279,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     L_deg = math.degrees(L)
     varpi_deg = math.degrees(varpi)
 
-    # Build the 17-element tuple matching pyswisseph index layout
+    # Build the 17-element tuple matching the reference index layout
     elements = (
         a,  # [0] Semi-major axis (AU)
         e,  # [1] Eccentricity
@@ -5300,7 +5300,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         Q,  # [16] Aphelion distance (AU)
     )
 
-    # Pad to 50 elements for pyswisseph compatibility
+    # Pad to 50 elements for reference-API compatibility
     elements_50 = elements + tuple([0.0] * (50 - len(elements)))
     return elements_50
 
@@ -5311,7 +5311,7 @@ def orbit_max_min_true_distance(
     """
     Calculate the maximum, minimum, and current true geocentric distances.
 
-    Reference API compatible function matching pyswisseph
+    Reference API compatible function matching the reference
     ``orbit_max_min_true_distance``.
 
     This function computes the maximum and minimum true distances from Earth
@@ -5332,7 +5332,7 @@ def orbit_max_min_true_distance(
 
     Returns:
         Tuple of (max_distance, min_distance, true_distance) in AU.
-        Order matches pyswisseph: (max, min, true).
+        Order matches the reference ephemeris: (max, min, true).
 
     Example:
         >>> from libephemeris import orbit_max_min_true_distance, MARS
@@ -5641,7 +5641,7 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
         diameter_deg = 2 * radius_km / distance_km * RAD_TO_DEG
                      = 2 * radius_km / (distance_au * AU_KM) * (180 / pi)
 
-    Returns degrees for pyswisseph API compatibility (pheno_ut attr[3]).
+    Returns degrees for reference-API compatibility (pheno_ut attr[3]).
 
     Args:
         radius_km: Physical radius of the body in kilometers
@@ -5654,7 +5654,7 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
         return 0.0
     distance_km = distance_au * _AU_KM
     # Angular diameter = 2 * arctan(radius/distance) ≈ 2 * radius/distance (small angle)
-    # Convert from radians to degrees (not arcseconds) for pyswisseph compatibility
+    # Convert from radians to degrees (not arcseconds) for reference-API compatibility
     return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC / 3600.0
 
 
@@ -5762,7 +5762,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags.
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph).
+        Tuple of 20 floats (matching the reference ephemeris).
 
     Raises:
         KeyError: If the body is not available in the LEB reader.
@@ -5935,7 +5935,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
         flags: Calculation flags (FLG_TRUEPOS, FLG_HELCTR, etc.)
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph):
+        Tuple of 20 floats (matching the reference ephemeris):
             - [0]: Phase angle (Earth-planet-Sun) in degrees
             - [1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
             - [2]: Elongation of planet from Sun in degrees
@@ -5989,7 +5989,7 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
         flags: Calculation flags
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph):
+        Tuple of 20 floats (matching the reference ephemeris):
             - [0]: Phase angle, [1]: Phase, [2]: Elongation,
             - [3]: Diameter, [4]: Magnitude, [5-19]: Reserved (0.0)
 
@@ -6036,7 +6036,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags
 
     Returns:
-        Tuple of 20 floats (bare tuple, matching pyswisseph).
+        Tuple of 20 floats (bare tuple, matching the reference ephemeris).
     """
 
     from .cache import get_cached_observer_at
@@ -6321,7 +6321,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         tjd,
     )
 
-    # Return tuple with at least 20 elements (pyswisseph API compatibility)
+    # Return tuple with at least 20 elements (reference-API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
     return attr
 
@@ -6341,7 +6341,7 @@ def _calc_planet_magnitude(
     Calculate visual magnitude of a planet.
 
     Uses Mallama 2018 formulas for Mercury, Venus, Mars, Jupiter, Saturn
-    for pyswisseph API compatibility. These formulas are from:
+    for reference-API compatibility. These formulas are from:
     A. Mallama, J. Hilton, "Computing Apparent Planetary Magnitudes for
     The Astronomical Almanac" (2018).
 

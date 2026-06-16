@@ -254,25 +254,25 @@ class TestStarAliasesAlternateSpellings:
 
 
 @pytest.mark.integration
-class TestPyswissephCompatibility:
-    """Integration tests for pyswisseph API compatibility with fuzzy matching."""
+class TestReferenceCompatibility:
+    """Integration tests for reference ephemeris API compatibility with fuzzy matching."""
 
     @pytest.fixture
     def standard_jd(self):
         """J2000.0 epoch as Julian Day."""
         return 2451545.0
 
-    def test_pyswisseph_betelgeuse_variant_behavior(self, standard_jd):
-        """Test that alternate spellings work like pyswisseph."""
-        # In pyswisseph, fixstar can find stars by various names
+    def test_reference_betelgeuse_variant_behavior(self, standard_jd):
+        """Test that alternate spellings work like the reference ephemeris."""
+        # In the reference ephemeris, fixstar can find stars by various names
         # Our implementation should be compatible
         pos, name, retflag = fixstar_ut("Betelgeux", standard_jd, 0)
         assert name == "Betelgeuse,alOri", f"Expected 'Betelgeuse,alOri', got '{name}'"
         # Betelgeuse is in Gemini/Orion, around 87-89 degrees
         assert 80 < pos[0] < 95, f"Betelgeuse longitude {pos[0]} out of expected range"
 
-    def test_pyswisseph_fomalhaut_variant_behavior(self, standard_jd):
-        """Test that Fomalhaut alternate spellings work like pyswisseph."""
+    def test_reference_fomalhaut_variant_behavior(self, standard_jd):
+        """Test that Fomalhaut alternate spellings work like the reference ephemeris."""
         pos, name, retflag = fixstar_ut("Formalhaut", standard_jd, 0)
         assert name == "Fomalhaut,alPsA", f"Expected 'Fomalhaut,alPsA', got '{name}'"
         # Fomalhaut is around 3-4 degrees Pisces (333-334 degrees ecliptic)

@@ -408,7 +408,7 @@ _HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
 # Kept separate from the larger STAR_NAME_TO_HIP map, which is the name->HIP
 # lookup for get_hip_from_star_name (not the fixstar resolver path). HIP is
 # stable across catalog regeneration, unlike the generated row ids. Each entry
-# verified against Swiss Ephemeris + IAU/WGSN:
+# verified against the reference ephemeris + IAU/WGSN:
 #   Alaraph = beta Vir (Zavijava) -- not Spica
 #   Gienah Corvi = gamma Crv (Gienah) -- not delta Crv (Algorab)
 #   Atri = delta UMa (Megrez) -- Hindu Saptarishi name
@@ -4522,7 +4522,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
-    Compatible with pyswisseph: returns (magnitude, star_name) on success,
+    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
@@ -4548,7 +4548,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
 
-    # Build "Name,Nomenclature" format matching pyswisseph
+    # Build "Name,Nomenclature" format matching the reference ephemeris
     for entry in STAR_CATALOG:
         if entry.id == star_id:
             star_name_out = _format_star_name(entry)
@@ -4571,7 +4571,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
 
-    Compatible with pyswisseph: returns (magnitude, star_name) on success,
+    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:

@@ -7,7 +7,7 @@ visible from a specific geographic location.
 Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 
-Times tuple layout (10 elements, pyswisseph-compatible):
+Times tuple layout (10 elements, reference-API compatible):
     [0]: Time of maximum eclipse
     [1]: Reserved
     [2]: Time of partial eclipse beginning (Moon enters umbra)
@@ -19,7 +19,7 @@ Times tuple layout (10 elements, pyswisseph-compatible):
     [8]: Time of moonrise (if Moon rises during eclipse)
     [9]: Time of moonset (if Moon sets during eclipse)
 
-Attr tuple layout (20 elements, pyswisseph-compatible):
+Attr tuple layout (20 elements, reference-API compatible):
     [0]: Umbral magnitude
     [1]: Penumbral magnitude
     [2]: Reserved
@@ -82,7 +82,7 @@ class TestLunEclipseWhenLoc:
         # All elements should be floats
         assert all(isinstance(t, float) for t in times)
 
-        # Should return 20-element attr tuple (pyswisseph layout)
+        # Should return 20-element attr tuple (reference-API layout)
         assert len(attr) == 20
 
         # Eclipse type should be int
@@ -103,10 +103,10 @@ class TestLunEclipseWhenLoc:
         # Penumbral magnitude should be positive
         assert attr[1] >= 0
 
-        # Azimuth should be 0-360 (pyswisseph index [4])
+        # Azimuth should be 0-360 (reference-API index [4])
         assert 0 <= attr[4] <= 360
 
-        # Altitude could be any value but should be reasonable (pyswisseph index [5])
+        # Altitude could be any value but should be reasonable (reference-API index [5])
         assert -90 <= attr[5] <= 90
 
     def test_phase_times_ordering(self):
@@ -192,7 +192,7 @@ class TestLunEclipseWhenLoc:
             jd_start, (paris_lon, paris_lat, 0.0)
         )
 
-        moon_alt = attr[5]  # True altitude (pyswisseph index)
+        moon_alt = attr[5]  # True altitude (reference-API index)
 
         # For a visible eclipse, Moon should be above horizon at some point
         # The altitude at maximum might be below horizon if eclipse is partially visible
@@ -380,7 +380,7 @@ class TestLunEclipseWhenLocEdgeCases:
             jd_start, (moscow_lon, moscow_lat, 0.0)
         )
 
-        # times[8] is moonrise, times[9] is moonset (pyswisseph layout)
+        # times[8] is moonrise, times[9] is moonset (reference-API layout)
         # These may be 0 if Moon doesn't rise/set during eclipse
         assert isinstance(times[8], float)
         assert isinstance(times[9], float)

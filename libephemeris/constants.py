@@ -919,7 +919,7 @@ TIDAL_DE430: float = -25.82  # DE430
 TIDAL_DE431: float = -25.80  # DE431
 TIDAL_DE440: float = -25.936  # DE440 (current default)
 TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-TIDAL_DEFAULT: float = -25.8  # Default value (matches pyswisseph)
+TIDAL_DEFAULT: float = -25.8  # Default value (matches the reference ephemeris)
 TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
 # reference API-compatible aliases (without SE_ prefix)
@@ -1040,17 +1040,17 @@ NAIF_DEIMOS: int = 402
 NAIF_CHARON: int = 901
 
 # =============================================================================
-# BARE ALIASES FOR SE_* CONSTANTS (pyswisseph compatibility)
+# BARE ALIASES FOR SE_* CONSTANTS (reference-API compatibility)
 # =============================================================================
 # These provide the same constants without the SE_ prefix, matching the names
-# that pyswisseph exposes as module-level attributes (e.g. swe.ECL_NUT,
+# that the reference ephemeris exposes as module-level attributes (e.g. swe.ECL_NUT,
 # swe.MEAN_NODE, swe.CHIRON, etc.).
 
 # Special values
 
-# ADDITIONAL PYSWISSEPH-COMPATIBLE CONSTANTS
+# ADDITIONAL REFERENCE-API-COMPATIBLE CONSTANTS
 # =============================================================================
-# These constants match pyswisseph module-level attributes that were not
+# These constants match the reference ephemeris module-level attributes that were not
 # previously exported. Added for full API compatibility.
 
 # House cusps and special points
@@ -1227,8 +1227,8 @@ FNAME_DE431: str = "de431.eph"
 # The upstream reference distribution exports this single value under
 # the SE_-prefixed name, so we mirror it for 1:1 parity. This is the
 # one intentional exception to the "no SE_/SEFLG_/swe_ prefix" rule
-# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of
-# tests/test_api_compat/test_api_surface.py.
+# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of the
+# API-surface parity test, which lives in the separate validation repo.
 SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"

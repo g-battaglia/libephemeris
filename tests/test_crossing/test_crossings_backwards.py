@@ -52,7 +52,7 @@ class TestSolcrossBackwards:
         """next then back yields the previous crossing; fwd from there = next.
 
         A forward search started exactly AT a crossing returns that
-        same instant (pyswisseph-verified: swe.solcross_ut from its own
+        same instant (reference-ephemeris-verified: swe.solcross_ut from its own
         returned crossing gives dt = 0.000000000); navigation steps
         forward by adding a small epsilon past the found crossing.
         """
@@ -74,7 +74,7 @@ class TestSolcrossBackwards:
             jd = swe.solcross_ut(55.0, jd)
             forward_marks.append(jd)
             # Epsilon-forward past this crossing so the next search advances:
-            # like pyswisseph, solcross_ut from an exact crossing returns that
+            # like the reference ephemeris, solcross_ut from an exact crossing returns that
             # same crossing (see test_solcross_forward_back_symmetric above).
             jd += 1.0 / 86400.0
         # Navigate backward from the last mark exactly: the backward at-crossing

@@ -8,7 +8,7 @@ Lunar occultations occur when the Moon passes in front of a planet or star.
 This function adds location-specific visibility checking to ensure the
 occultation is observable from the given coordinates.
 
-The function matches the pyswisseph lun_occult_when_loc() API:
+The function matches the reference ephemeris lun_occult_when_loc() API:
     lun_occult_when_loc(tjdut, body, geopos, flags, backwards)
     -> (retflags, tret, attr)
 """
@@ -31,7 +31,7 @@ from libephemeris import (
 
 
 class TestSweLunOccultWhenLoc:
-    """Test suite for lun_occult_when_loc function (pyswisseph API)."""
+    """Test suite for lun_occult_when_loc function (reference ephemeris API)."""
 
     def test_finds_star_occultation_regulus_from_location(self):
         """Test finding a lunar occultation of Regulus visible from a location.
@@ -43,7 +43,7 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2017, 1, 1, 0)
 
         # Search from a location in Europe (central location for good visibility)
-        # geopos = [lon, lat, alt] - pyswisseph convention
+        # geopos = [lon, lat, alt] - reference ephemeris convention
         geopos = [10.0, 45.0, 0.0]  # Northern Italy (lon=10°E, lat=45°N)
 
         retflags, tret, attr = lun_occult_when_loc(
@@ -56,7 +56,7 @@ class TestSweLunOccultWhenLoc:
         assert tret[0] > 0  # Should have valid maximum time
 
     def test_returns_correct_tuple_structure(self):
-        """Test that return values have correct structure (pyswisseph compatible)."""
+        """Test that return values have correct structure (reference-API compatible)."""
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
 
@@ -71,7 +71,7 @@ class TestSweLunOccultWhenLoc:
         assert len(tret) == 10
         assert all(isinstance(t, float) for t in tret)
 
-        # attr should be 20-element tuple (pyswisseph compatible)
+        # attr should be 20-element tuple (reference-API compatible)
         assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
@@ -139,7 +139,7 @@ class TestSweLunOccultWhenLoc:
     def test_moon_attributes_returned(self):
         """Test that occultation attributes are returned.
 
-        Uses pyswisseph compatible format.
+        Uses reference-API compatible format.
         """
         jd_start = julday(2017, 1, 1, 0)
         geopos = [10.0, 45.0, 0.0]
@@ -168,7 +168,7 @@ class TestSweLunOccultWhenLoc:
 
         The reference treats ipl=0 (Sun) as a legitimate occultation
         target - an occultation of the Sun by the Moon is a solar
-        eclipse (verified against pyswisseph 2.10.03).
+        eclipse (verified against the reference ephemeris 2.10.03).
         """
         jd_start = julday(2024, 1, 1, 0)
         geopos = [-96.797, 32.7767, 0.0]  # Dallas, 2024-04-08 path
@@ -226,7 +226,7 @@ class TestSweLunOccultLocDifferentLocations:
         """Test that the same occultation may be found but with different attributes."""
         jd_start = julday(2017, 1, 1, 0)
 
-        # Two different locations (pyswisseph geopos = [lon, lat, alt])
+        # Two different locations (reference ephemeris geopos = [lon, lat, alt])
         geopos1 = [-0.1, 51.5, 0.0]  # London
         geopos2 = [139.7, 35.7, 0.0]  # Tokyo
 

@@ -5,7 +5,7 @@ Validation tests use the 2024-Apr-08 total solar eclipse as reference:
 - Maximum totality approximately JD 2460409.26 (~18:18 UTC)
 - Central line near Nazas, Durango, Mexico (~25.2N, ~104.1W)
 
-Reference data from NASA Eclipse website and pyswisseph comparison.
+Reference data from NASA Eclipse website and the reference ephemeris comparison.
 """
 
 import pytest
@@ -25,7 +25,7 @@ from libephemeris import (
 
 
 class TestSweSolEclipseWhereSignature:
-    """Test that sol_eclipse_where function signature matches pyswisseph."""
+    """Test that sol_eclipse_where function signature matches the reference ephemeris."""
 
     def test_function_exists(self):
         """Test that sol_eclipse_where function exists."""
@@ -40,11 +40,11 @@ class TestSweSolEclipseWhereSignature:
 
         retflag, geopos, attr = sol_eclipse_where(tjd_ut, FLG_SWIEPH)
 
-        # geopos should be 10-element tuple per pyswisseph documentation
+        # geopos should be 10-element tuple per reference ephemeris documentation
         assert len(geopos) == 10
         assert all(isinstance(g, float) for g in geopos)
 
-        # attr should be 20-element tuple per pyswisseph documentation
+        # attr should be 20-element tuple per reference ephemeris documentation
         assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
@@ -167,7 +167,7 @@ class TestSweSolEclipseWhereApril2024:
 
 
 class TestSweSolEclipseHowSignature:
-    """Test that sol_eclipse_how function signature matches pyswisseph."""
+    """Test that sol_eclipse_how function signature matches the reference ephemeris."""
 
     def test_function_exists(self):
         """Test that sol_eclipse_how function exists."""
@@ -458,9 +458,9 @@ class TestSweSolEclipseHowEdgeCases:
         assert isinstance(retflag, int)
 
 
-# Note: pyswisseph comparison tests are skipped because the installed version
-# doesn't have eclipse functions. These would be useful for validation if
-# a newer pyswisseph version with eclipse support is installed.
+# Note: reference ephemeris comparison tests are skipped because the installed
+# version doesn't have eclipse functions. These would be useful for validation
+# if a newer reference ephemeris version with eclipse support is installed.
 
 
 class TestSweSolEclipseWhereLimits:
@@ -468,7 +468,7 @@ class TestSweSolEclipseWhereLimits:
 
     The reference API fills only geopos[0..1] (longitude/latitude of the
     shadow-center / maximum-eclipse point); geopos[2..9] are returned as
-    zeros (verified live against pyswisseph 2.10.03 for the 2024-04-08
+    zeros (verified live against the reference ephemeris 2.10.03 for the 2024-04-08
     total eclipse and the 2021-06-10 annular eclipse).
     """
 
@@ -488,7 +488,7 @@ class TestSweSolEclipseWhereLimits:
         assert -180.0 <= geopos[0] <= 180.0
         assert -90.0 <= geopos[1] <= 90.0
         # Mid-totality of the 2024-04-08 eclipse runs through Mexico
-        # (pyswisseph: lon -104.99, lat +24.43).
+        # (reference ephemeris: lon -104.99, lat +24.43).
         assert abs(geopos[0] - (-104.99)) < 0.5
         assert abs(geopos[1] - 24.43) < 0.5
 
@@ -502,7 +502,7 @@ class TestSweSolEclipseWhereLimits:
     def test_core_shadow_width_negative_for_total(self):
         """attr[3] is the core-shadow diameter, negative when umbral.
 
-        pyswisseph 2.10.03 returns -189.37 km at this instant.
+        The reference ephemeris 2.10.03 returns -189.37 km at this instant.
         """
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
         assert retflag & ECL_TOTAL
@@ -513,7 +513,7 @@ class TestSweSolEclipseWhereLimits:
         """A no-eclipse instant gives retflag 0 but still fills geopos/attr.
 
         The reference returns the closest-approach point and a negative
-        magnitude measure (pyswisseph: attr[0] = -6.78 at 2459375.5).
+        magnitude measure (reference ephemeris: attr[0] = -6.78 at 2459375.5).
         """
         retflag, geopos, attr = sol_eclipse_where(2459375.5, FLG_SWIEPH)
         assert retflag == 0
@@ -523,14 +523,14 @@ class TestSweSolEclipseWhereLimits:
         assert attr[2] == 0.0
 
 
-@pytest.mark.skip(reason="pyswisseph installed doesn't have eclipse functions")
-class TestComparisonWithPyswisseph:
-    """Compare results with pyswisseph for validation."""
+@pytest.mark.skip(reason="reference ephemeris installed doesn't have eclipse functions")
+class TestComparisonWithReference:
+    """Compare results with the reference ephemeris for validation."""
 
-    def test_eclipse_where_matches_pyswisseph(self):
-        """Test that sol_eclipse_where matches pyswisseph within tolerance."""
+    def test_eclipse_where_matches_reference(self):
+        """Test that sol_eclipse_where matches the reference ephemeris within tolerance."""
         pass
 
-    def test_eclipse_how_obscuration_matches_pyswisseph(self):
-        """Test that sol_eclipse_how obscuration matches pyswisseph within 1%."""
+    def test_eclipse_how_obscuration_matches_reference(self):
+        """Test that sol_eclipse_how obscuration matches the reference ephemeris within 1%."""
         pass

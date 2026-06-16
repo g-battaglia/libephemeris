@@ -172,7 +172,7 @@ class TestGetPlanetName:
     @pytest.mark.unit
     def test_unknown_asteroid_returns_empty(self):
         """Unknown AST_OFFSET ids return '' (reference parity)."""
-        # swe.get_planet_name(99999) == '' in pyswisseph (asteroid 89999,
+        # swe.get_planet_name(99999) == '' in the reference ephemeris (asteroid 89999,
         # no name without its ephemeris file)
         assert swe.get_planet_name(99999) == ""
 

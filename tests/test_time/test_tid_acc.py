@@ -68,7 +68,7 @@ class TestTidAccBasicFunctionality:
 
     @pytest.mark.unit
     def test_set_tid_acc_zero_stores_zero(self):
-        """set_tid_acc with 0.0 should store 0.0 (pyswisseph compat)."""
+        """set_tid_acc with 0.0 should store 0.0 (reference-API compat)."""
         ephem.set_tid_acc(ephem.TIDAL_DE421)
         ephem.set_tid_acc(0.0)
         assert ephem.get_tid_acc() == 0.0
@@ -117,12 +117,12 @@ class TestTidAccConstants:
 
     @pytest.mark.unit
     def test_tidal_automatic_is_999999(self):
-        """TIDAL_AUTOMATIC should be 999999 (pyswisseph compat)."""
+        """TIDAL_AUTOMATIC should be 999999 (reference-API compat)."""
         assert ephem.TIDAL_AUTOMATIC == 999999
 
     @pytest.mark.unit
     def test_tidal_default_is_minus_25_8(self):
-        """TIDAL_DEFAULT should be -25.8 (pyswisseph compat)."""
+        """TIDAL_DEFAULT should be -25.8 (reference-API compat)."""
         assert ephem.TIDAL_DEFAULT == -25.8
 
 

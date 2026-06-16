@@ -2,9 +2,7 @@
 pytest configuration and shared fixtures for LibEphemeris tests.
 
 This module provides test infrastructure for libephemeris standalone tests
-(no pyswisseph/swisseph dependency required).
-
-For comparison tests against pyswisseph, see compare_scripts/tests/conftest.py
+(no external reference-ephemeris dependency required).
 """
 
 import logging
@@ -756,7 +754,4 @@ def pytest_configure(config):
         "markers", "network: marks tests that require network access"
     )
     config.addinivalue_line("markers", "precision: mark test as high-precision")
-    config.addinivalue_line(
-        "markers", "comparison: mark test as comparison with pyswisseph"
-    )
     config.addinivalue_line("markers", "edge_case: mark test as edge case")

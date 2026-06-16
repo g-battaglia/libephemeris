@@ -182,9 +182,14 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 
 ## Lunar Calibration Workflow
 
-1. `leph calibrate perigee` (or `leph calibrate perigee-quick` for quick 2-min run)
+The calibration/generation tooling (which fits coefficients against the reference
+ephemeris as a black-box oracle) now lives in the **separate `validation/` repo**,
+not in this library. Workflow:
+
+1. From `validation/`: run the perigee calibration (`validation/calibrate/calibrate_perigee_perturbations.py`)
 2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. `leph generate apse-corrections` (regenerates `lunar_apse_corrections.py`, the live residual table)
-4. `leph test lunar perigee`
+3. From `validation/`: regenerate the residual table (`validation/calibrate/generate_lunar_apse_corrections.py --write`),
+   which rewrites `lunar_apse_corrections.py` (the live residual table) in this repo
+4. `leph test lunar perigee` (the reference-free perigee tests in this repo)
 
 See `docs/methodology/interpolated-perigee.md` for the full methodology.

@@ -4,8 +4,8 @@ This test suite validates that libephemeris uses correct astronomical constants
 and formulas by cross-checking against astropy (professional astronomy standard)
 and IAU 2015 official values.
 
-These tests are NOT comparisons against Swiss Ephemeris -- they verify that
-libephemeris is astronomically correct regardless of what SE does.
+These tests are NOT comparisons against the reference ephemeris -- they verify that
+libephemeris is astronomically correct regardless of what the reference does.
 
 Requires: astropy (dev dependency)
 """
@@ -60,8 +60,8 @@ pytestmark = pytest.mark.skipif(not HAS_ASTROPY, reason="astropy not installed")
 # IAU 2015 Body Radii (Resolution B3)
 # ============================================================================
 
-# Body radii used by libephemeris (matching pyswisseph/Swiss Ephemeris conventions).
-# These may differ slightly from IAU 2015 nominal values — pyswisseph uses
+# Body radii used by libephemeris (matching the reference ephemeris conventions).
+# These may differ slightly from IAU 2015 nominal values — the reference ephemeris uses
 # NASA fact sheet / mean volumetric radius values in some cases.
 IAU_EQUATORIAL_RADII_KM = {
     SUN: 696000.0,  # NASA fact sheet (IAU 2015 nominal: 695700.0)
@@ -117,7 +117,7 @@ class TestAstropySolarConstants:
     def test_solar_radius_matches_astropy(self):
         """Our solar radius should be close to astropy's IAU 2015 nominal value.
 
-        Note: We use 696000.0 km (NASA fact sheet, matching pyswisseph) while
+        Note: We use 696000.0 km (NASA fact sheet, matching the reference ephemeris) while
         astropy uses the IAU 2015 nominal value of 695700.0 km. The ~300 km
         difference is a known convention difference.
         """
@@ -256,11 +256,11 @@ class TestIlluminatedFraction:
             assert 0.0 <= phase <= 1.0, f"Body {body_id}: phase {phase} not in [0, 1]"
 
     def test_sun_fully_illuminated(self):
-        """Sun illuminated fraction is 0.0 in pyswisseph (phase angle = 0, special case)."""
+        """Sun illuminated fraction is 0.0 in the reference ephemeris (phase angle = 0, special case)."""
         jd = 2451545.0
         result = ephem.pheno_ut(jd, SUN, 256)
         phase = float(result[1])
-        # pyswisseph returns phase=0.0 for Sun (not 1.0) — it's a special case
+        # the reference ephemeris returns phase=0.0 for Sun (not 1.0) — it's a special case
         assert abs(phase) < 0.001, f"Sun phase {phase} != 0.0"
 
     def test_phase_consistent_with_phase_angle(self):

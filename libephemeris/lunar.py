@@ -2090,13 +2090,13 @@ def calc_mean_lilith_with_latitude(jd_tt: float) -> Tuple[float, float]:
     omega_deg = (apogee_lon - node_lon) % 360.0
     omega_rad = math.radians(omega_deg)
 
-    # Latitude from 3-harmonic model fitted to pyswisseph output.
+    # Latitude from 3-harmonic model fitted to the reference ephemeris output.
     # The primary term is i·sin(ω) where i ≈ 5.149° is the effective
     # mean inclination. The sin(3ω) term captures the 3rd-harmonic
     # perturbation from solar gravity on the lunar orbital plane.
     # Coefficients derived by least-squares fit over 10 years of data.
-    #   Max residual vs pyswisseph: ~1.3"
-    #   RMS residual vs pyswisseph: ~0.7"
+    #   Max residual vs the reference ephemeris: ~1.3"
+    #   RMS residual vs the reference ephemeris: ~0.7"
     apogee_lat = 5.1490449082 * math.sin(omega_rad) + 0.0034412113 * math.sin(
         3.0 * omega_rad
     )
@@ -2599,7 +2599,7 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     Expected Precision
     ==================
 
-    - With correction table (1549-2651): RMS ~6", Max ~40" vs Swiss Ephemeris
+    - With correction table (1549-2651): RMS ~6", Max ~40" vs the reference ephemeris
     - Outside correction table range: RMS ~171" (~0.048°)
     - Smooth, continuous curve without the artifacts of osculating elements
     - Frame contract: the output is the true ecliptic of date everywhere.
@@ -2966,7 +2966,7 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     Expected Precision
     ==================
 
-    - With correction table (1549-2651): RMS ~11", Max ~100" vs Swiss Ephemeris
+    - With correction table (1549-2651): RMS ~11", Max ~100" vs the reference ephemeris
     - Outside correction table range: RMS ~386" (~0.107°)
     - Frame contract: the output is the true ecliptic of date everywhere.
       Outside the correction-table range only the precision drops (the

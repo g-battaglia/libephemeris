@@ -90,7 +90,7 @@ class TestRadMidpOppositeAngles:
     def test_rad_midp_pi_0(self):
         """Test midpoint between pi and 0.
 
-        When both arcs are equally long (π), pyswisseph chooses the
+        When both arcs are equally long (π), the reference ephemeris chooses the
         positive (clockwise) arc, yielding 3π/2 not π/2.
         """
         result = ephem.rad_midp(math.pi, 0)

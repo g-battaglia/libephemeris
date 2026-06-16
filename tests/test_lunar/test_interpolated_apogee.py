@@ -75,7 +75,7 @@ class TestInterpolatedApogeeBasic:
         Note: Apogee and perigee are NOT exactly opposite — they can differ by
         up to ~28° at certain lunar phases (Chapront-Touzé & Chapront 1988;
         Meeus, Astronomical Algorithms ch. 47).
-        At J2000.0, even pyswisseph itself shows a deviation of about 12.7°.
+        At J2000.0, even the reference ephemeris itself shows a deviation of about 12.7°.
         """
         jd_ut = 2451545.0
 

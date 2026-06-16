@@ -46,7 +46,7 @@ class TestLunOccultWhenGlob:
         # Start from Jan 1, 2017
         jd_start = julday(2017, 1, 1, 0)
 
-        # pyswisseph signature: lun_occult_when_glob(tjdut, body, flags, ecltype, backwards)
+        # reference ephemeris signature: lun_occult_when_glob(tjdut, body, flags, ecltype, backwards)
         # Returns: (retflags, tret)
         retflags, tret = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
 
@@ -61,12 +61,12 @@ class TestLunOccultWhenGlob:
         assert 1 <= month <= 12  # Any month in 2017 is valid
 
     def test_returns_correct_tuple_structure(self):
-        """Test that return values have correct structure per pyswisseph spec."""
+        """Test that return values have correct structure per the reference ephemeris spec."""
         jd_start = julday(2017, 1, 1, 0)
 
         retflags, tret = lun_occult_when_glob(jd_start, "Regulus", FLG_SWIEPH, 0)
 
-        # Should return 10-element tuple per pyswisseph specification
+        # Should return 10-element tuple per the reference ephemeris specification
         assert len(tret) == 10
         # All elements should be floats
         assert all(isinstance(t, float) for t in tret)
@@ -76,7 +76,7 @@ class TestLunOccultWhenGlob:
     def test_contact_times_ordering(self):
         """Test that contact times are in correct chronological order.
 
-        pyswisseph tret indices:
+        Reference ephemeris tret indices:
         [0]: time of maximum occultation
         [2]: time of occultation begin
         [3]: time of occultation end
@@ -193,7 +193,7 @@ class TestLunOccultEdgeCases:
 
         # The function should either find an occultation or raise Error
         # after exhausting the search limit (reference parity: search
-        # exhaustion raises swisseph.Error)
+        # exhaustion raises the reference ephemeris's Error)
         from libephemeris.exceptions import Error
 
         try:
@@ -235,8 +235,8 @@ class TestLunOccultResolveStarId:
         assert tret[0] > jd_start
 
     def test_invalid_star_raises_error_with_message(self):
-        """Invalid stars raise Error with a descriptive message (pyswisseph
-        raises swisseph.Error for unresolvable star names)."""
+        """Invalid stars raise Error with a descriptive message (the reference
+        ephemeris raises its Error for unresolvable star names)."""
         from libephemeris.exceptions import Error
 
         jd_start = julday(2017, 1, 1, 0)
@@ -248,13 +248,13 @@ class TestLunOccultResolveStarId:
         assert "invalidstarxyz123" in str(exc_info.value).lower()
 
 
-class TestLunOccultPyswissephCompatibility:
-    """Tests verifying pyswisseph API compatibility."""
+class TestLunOccultReferenceCompatibility:
+    """Tests verifying the reference ephemeris API compatibility."""
 
-    def test_signature_matches_pyswisseph(self):
-        """Test that the function signature matches pyswisseph.
+    def test_signature_matches_reference(self):
+        """Test that the function signature matches the reference ephemeris.
 
-        pyswisseph signature:
+        Reference ephemeris signature:
         lun_occult_when_glob(tjdut, body, flags=FLG_SWIEPH, ecltype=0, backwards=False)
 
         body: int for planet ID or str for star name
@@ -267,10 +267,10 @@ class TestLunOccultPyswissephCompatibility:
         assert isinstance(retflags, int)
         assert len(tret) == 10
 
-    def test_tret_indices_match_pyswisseph_documentation(self):
-        """Test that tret array indices match pyswisseph documentation.
+    def test_tret_indices_match_reference_documentation(self):
+        """Test that tret array indices match the reference ephemeris documentation.
 
-        pyswisseph tret indices:
+        Reference ephemeris tret indices:
         [0]: time of maximum occultation
         [1]: time when occultation takes place at local apparent noon
         [2]: time of occultation begin

@@ -141,7 +141,7 @@ class TestGammaValues:
         """Test that gamma values vary across eclipses.
 
         Note: For lunar eclipses, gamma represents the distance of the Moon
-        from the axis of Earth's shadow (in Earth radii). In pyswisseph's
+        from the axis of Earth's shadow (in Earth radii). In the reference ephemeris's
         convention (attr[7] from lun_eclipse_how), gamma is always >= 0
         (it's the absolute distance, not signed). We verify that gamma
         varies across eclipses (not always the same value).
@@ -219,7 +219,7 @@ class TestGammaConsistency:
         For lunar eclipses, gamma represents the absolute distance of the
         Moon's center from the axis of Earth's shadow, measured in Earth
         equatorial radii. Unlike solar eclipse gamma which can be signed,
-        lunar eclipse gamma (as returned by pyswisseph attr[7]) is always
+        lunar eclipse gamma (as returned by the reference ephemeris attr[7]) is always
         non-negative — it is the magnitude of the displacement, not a
         signed north/south indicator.
         """

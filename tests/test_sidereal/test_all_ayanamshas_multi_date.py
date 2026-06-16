@@ -8,7 +8,7 @@ comparing calculated values against reference values at multiple epochs:
 - 2050-01-01 12:00 TT (future)
 - 2100-01-01 12:00 TT (far future)
 
-Reference values are derived from pyswisseph to ensure accuracy.
+Reference values are derived from the reference ephemeris to ensure accuracy.
 """
 
 import pytest
@@ -378,7 +378,7 @@ class TestAyanamshaExAtMultipleDates:
         """
         get_ayanamsa_ex_ut returns the TRUE ayanamsha (mean + nutation),
         while the standard function returns the mean value — the reference
-        API semantics (verified against pyswisseph). With FLG_NONUT the ex
+        API semantics (verified against the reference ephemeris). With FLG_NONUT the ex
         variant returns the mean value again.
         """
         ephem.set_sid_mode(sid_mode)

@@ -10,10 +10,10 @@ surfaced and fixed, in BOTH the LEB and Skyfield backends:
    split now mirrors ``_calc_body``).
 
 2. ``nod_aps`` honors FLG_NONUT without changing the (nutation-invariant) node
-   longitude, matching pyswisseph.
+   longitude, matching the reference ephemeris.
 
 (The sidereal+equatorial *speed* was investigated in the same audit and left
-unchanged: pyswisseph computes that speed in the tropical/true-equator frame --
+unchanged: the reference ephemeris computes that speed in the tropical/true-equator frame --
 the same as the plain equatorial speed -- even though the sidereal position uses
 the mean equator. libephemeris already matched that, so there is nothing new to
 guard there.)
@@ -80,7 +80,7 @@ def test_nod_aps_nonut_node_invariant(compare: CompareHelper, body: int, bname: 
     """nod_aps honors FLG_NONUT and the node longitude stays nutation-invariant.
 
     The osculating node longitude does not carry nutation (verified vs
-    pyswisseph), so NONUT must run cleanly and leave the node unchanged.
+    the reference ephemeris), so NONUT must run cleanly and leave the node unchanged.
     """
     jds = [ephem.julday(y, 1, 1, 12.0) for y in (1900, 2000, 2100)]
     for mode_name, run in (("skyfield", compare.skyfield), ("leb", compare.leb)):

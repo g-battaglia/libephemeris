@@ -294,7 +294,7 @@ class TestExtSiderealJ2000:
         """True bodies SID+J2K: LEB vs Skyfield (SE bug fix applied).
 
         LibEphemeris intentionally honors FLG_J2000 for TrueNode/OscuApog
-        (pyswisseph silently ignores it — this is a behavioral bug).
+        (the reference ephemeris silently ignores it — this is a behavioral bug).
         Both LEB and Skyfield paths must produce consistent results.
         See docs/reference/se-bug-sidereal-j2000-nodes.md
         """

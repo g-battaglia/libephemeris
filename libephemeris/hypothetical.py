@@ -136,7 +136,7 @@ WALDEMATH: int = WALDEMATH
 # B = oscillation frequency (degrees per century)
 #
 # Note: Different sources give slightly different parameters. These values
-# are from the Hamburg School tradition for pyswisseph compatibility.
+# are from the Hamburg School tradition for reference-API compatibility.
 
 
 @dataclass
@@ -167,7 +167,7 @@ class UranianElements:
 
 
 # Legacy mean-longitude oscillation table — a historical fit calibrated
-# against pyswisseph output, NOT consulted by any calculation path (the
+# against the reference ephemeris output, NOT consulted by any calculation path (the
 # unified Keplerian propagation in URANIAN_KEPLERIAN_ELEMENTS superseded
 # it; see calc_uranian_longitude). Retained only for module-API stability
 # (tests pin its membership/range). The L0 / amplitude / phase / phase_rate
@@ -911,7 +911,7 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
 # Transpluto (Isis) elements
 # Source: Strubell, "Die Sterne" 3/1952, p. 70ff
 # Original elements: epoch JD 2368547.66, equinox JD 2431456.5, a=77.775 AU, e=0.3
-# Elements below are derived at J2000 epoch for pyswisseph compatibility.
+# Elements below are derived at J2000 epoch for reference-API compatibility.
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ISIS: HypotheticalElements(
         name="Transpluto/Isis",

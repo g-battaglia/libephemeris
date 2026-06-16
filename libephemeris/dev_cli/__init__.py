@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import click
 
-from .cmd_calibrate import calibrate_group
 from .cmd_code import code_group
 from .cmd_completion import completion_group
 from .cmd_diag import diag_group
@@ -45,14 +44,13 @@ Quick start:
 
 \b
 Subgroups at a glance:
-  test        8 test suites: skyfield, leb-backend, compare, lunar,
+  test        7 test suites: skyfield, leb-backend, lunar,
               leb-format, leb2-format, horizons, coverage
   code        Ruff linter/formatter, mypy type checker
   leb / leb2  Generate, verify, and compress LEB binary ephemeris files
   download    Fetch DE/SPK/IERS data, ASSIST files, and generation source kernels
   status      Show current data/configuration status for the local setup
   generate    Planet-center SPKs, lunar corrections, Keplerian elements
-  calibrate   Fit lunar perigee perturbation coefficients vs JPL DE441
   diag        Print body positions per tier, verify data integrity
   release     Upload LEB files to GitHub Releases
   manual      Build user manuals (EPUB/PDF, Italian/English)
@@ -80,7 +78,6 @@ cli.add_command(leb2_group)
 cli.add_command(download_group)
 cli.add_command(diag_group)
 cli.add_command(generate_group)
-cli.add_command(calibrate_group)
 cli.add_command(release_group)
 cli.add_command(manual_group)
 cli.add_command(completion_group)

@@ -51,7 +51,7 @@ Expected Accuracy by System:
 - Complex (Campanus, Regiomontanus, Topocentric): ~0.01°
 - Horizontal: ~0.01° (with convergence fallback to Porphyry)
 
-Comparison with pyswisseph:
+Comparison with the reference ephemeris:
 - Typical agreement: 0.001-0.1° depending on system and location
 - Test suite validates against 130+ reference cases with tolerances 0.1-1.0°
 
@@ -420,7 +420,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
 
     At the equator (lat=0), the formula has a 1/tan(lat) singularity. We clamp
     latitude to a tiny positive value so the formula evaluates to the correct
-    limiting value, matching Swiss Ephemeris behavior.
+    limiting value, matching the reference behavior.
 
     Args:
         armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
@@ -437,7 +437,7 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
 
     # At equator (lat=0), the Vertex formula has a 1/tan(lat) singularity.
     # Clamp to a tiny positive latitude so the formula evaluates to the
-    # correct limiting value (matches Swiss Ephemeris behavior).
+    # correct limiting value (matches the reference behavior).
     if abs(lat) < 1e-10:
         lat = 1e-10
 
@@ -752,7 +752,7 @@ def houses(
     # The reference outputs 180.0 at exactly lat 0 for every system
     # except the horizontal system 'H', whose internal latitude
     # handling lands on the negative-side limit 0.0 (verified per
-    # system against pyswisseph at armc 0/90/180/270).
+    # system against the reference ephemeris at armc 0/90/180/270).
     if abs(lat) < 1e-10:
         co_asc = 0.0 if hsys_char == "H" else 180.0
     else:
@@ -1315,7 +1315,7 @@ def houses_armc(
     # The reference outputs 180.0 at exactly lat 0 for every system
     # except the horizontal system 'H', whose internal latitude
     # handling lands on the negative-side limit 0.0 (verified per
-    # system against pyswisseph at armc 0/90/180/270).
+    # system against the reference ephemeris at armc 0/90/180/270).
     if abs(lat) < 1e-10:
         co_asc = 0.0 if hsys_char == "H" else 180.0
     else:
@@ -1453,7 +1453,7 @@ def houses_armc_ex2(
     houses_ex2(). It calculates house cusps directly from the ARMC value and
     also returns the velocities (derivatives) of house cusps and angles.
 
-    Velocities are always calculated, matching pyswisseph behavior.
+    Velocities are always calculated, matching the reference behavior.
     The ``ascmc9`` parameter is accepted for API compatibility (used by the
     Sunshine house system) but is otherwise unused.
 
@@ -1489,7 +1489,7 @@ def houses_armc_ex2(
     # Calculate positions at current ARMC
     cusps, ascmc = houses_armc(armc, lat, eps, hsys)
 
-    # Always calculate velocities (matching pyswisseph behavior).
+    # Always calculate velocities (matching the reference behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
     # scale by the sidereal rotation rate to obtain deg/day.
     #
@@ -1545,7 +1545,7 @@ def houses_armc_ex2(
         # Whole Sign: cusps are at fixed sign boundaries (0°, 30°, …).
         # Most cusps have zero speed (they jump discontinuously).
         # Cusps 1,7 (ASC/DESC) get ASC speed; cusps 4,10 (IC/MC) get
-        # MC speed — matching pyswisseph behaviour.
+        # MC speed — matching the reference behavior.
         v_asc = ascmc_speed[0]
         v_mc = ascmc_speed[1]
         cs = [0.0] * len(cusps)
@@ -1556,7 +1556,7 @@ def houses_armc_ex2(
         cusps_speed = tuple(cs)
     elif hsys in (ord("N"), ord("U")):
         # Aries houses ('N') have fixed cusps and Krusinski ('U') has
-        # no analytic speed model in the reference: pyswisseph returns
+        # no analytic speed model in the reference: the reference ephemeris returns
         # the ASC rate on cusps 1/7, the MC rate on 4/10, and zeros on
         # the intermediate cusps for both systems.  Mirror that.
         v_asc = ascmc_speed[0]
@@ -1572,7 +1572,7 @@ def houses_armc_ex2(
         # rates as v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
         # cusps 1-4 and k = 4,5 for cusps 5-6 (continuing the
         # progression across the IC rather than re-interpolating
-        # toward the descendant; verified against pyswisseph).
+        # toward the descendant; verified against the reference ephemeris).
         v_asc = ascmc_speed[0]
         v_mc = ascmc_speed[1]
         step = (v_asc - v_mc) / 3.0
@@ -1630,7 +1630,7 @@ def houses_ex(
         # ARMC-frame quantities): swe.houses_ex cusps differ from
         # tropical by get_ayanamsa_ex(jd, 0), 13.9" away from the
         # plain (true) get_ayanamsa at J2000.  Verified against
-        # pyswisseph for P/E at Fagan-Bradley and Lahiri.
+        # the reference ephemeris for P/E at Fagan-Bradley and Lahiri.
         from .planets import get_ayanamsa_ex_ut
 
         ayanamsa = get_ayanamsa_ex_ut(tjdut, 0)[1]
@@ -1759,11 +1759,11 @@ def houses_ex2(
     # Calculate positions at current time
     cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, flags)
 
-    # Always calculate velocities (matching pyswisseph behavior).
+    # Always calculate velocities (matching the reference behavior).
     # Delegate speed computation to the ARMC-based path.
     # This varies ARMC (with fixed obliquity) and scales by the
     # sidereal rotation rate, matching the internal approach used by
-    # pyswisseph's houses_ex2.  Direct JD-based finite differences
+    # the reference ephemeris's houses_ex2.  Direct JD-based finite differences
     # mix ARMC, obliquity, and nutation changes, producing systematic
     # ~0.003 deg/day offsets on angular cusps.
     #
@@ -4140,7 +4140,7 @@ def _houses_sunshine_makransky(
     # Ascensional difference.  When |tan(dec)*tan(lat)| >= 1 the Sun is
     # circumpolar (never rises or never sets), the diurnal semi-arcs do
     # not exist, and the reference raises rather than substituting a
-    # different house system (verified: pyswisseph errors for 'i' at
+    # different house system (verified: the reference ephemeris errors for 'i' at
     # exactly |lat|+|dec| >= 90, e.g. 66.56/23.44, 80/11.47).
     ad_arg = math.tan(math.radians(sun_dec)) * math.tan(math.radians(lat))
     if abs(ad_arg) >= 1.0:
@@ -4916,7 +4916,7 @@ def _house_pos_pythonic(
         # latitudes the upper-meridian point can be below it (altitude
         # 90 - |lat - dec| < 0 ⟺ tan(lat) tan(dec) < -1) and the limit
         # of the closed form lands on the opposite branch (verified:
-        # pyswisseph puts the MC degree in house 4 at armc 90,
+        # the reference ephemeris puts the MC degree in house 4 at armc 90,
         # lat -80).
         _tt = math.tan(math.radians(geolat)) * math.tan(math.radians(dec))
         if abs(md_upper) < _NEAR_ZERO:
@@ -5552,7 +5552,7 @@ def _gauquelin_sector_pythonic(
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
         flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
             Note: The gauquelin_sector() wrapper defaults to
-            FLG_SWIEPH | FLG_TOPOCTR (32770) per pyswisseph.
+            FLG_SWIEPH | FLG_TOPOCTR (32770) per the reference ephemeris.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude
@@ -5672,7 +5672,7 @@ def gauquelin_sector(
         temperature: Atmospheric temperature in degrees Celsius (default 15.0)
         flags: Calculation flags (FLG_SWIEPH, FLG_TOPOCTR, etc.)
             Note: The gauquelin_sector() wrapper defaults to
-            FLG_SWIEPH | FLG_TOPOCTR (32770) per pyswisseph.
+            FLG_SWIEPH | FLG_TOPOCTR (32770) per the reference ephemeris.
         method: Calculation method:
             - 0: with latitude
             - 1: without latitude

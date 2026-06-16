@@ -11,7 +11,7 @@ verifying that multiple threads can perform calculations concurrently with:
 Each test uses 10+ threads to stress test the library's thread-safety mechanisms.
 
 Note: Since the module-level API uses global state which is not thread-safe by design
-(matching pyswisseph behavior), these tests verify that the state management
+(matching the reference ephemeris behavior), these tests verify that the state management
 doesn't crash under concurrent access and that EphemerisContext provides proper
 isolation for thread-safe concurrent calculations.
 """
@@ -238,7 +238,7 @@ class TestConcurrentModuleLevelAPI:
     Stress tests for concurrent access to module-level API.
 
     Note: The module-level API is NOT thread-safe by design (matching
-    pyswisseph behavior). These tests verify the API doesn't crash
+    the reference ephemeris behavior). These tests verify the API doesn't crash
     under concurrent access, though results may not be deterministic
     when different threads modify global state.
     """

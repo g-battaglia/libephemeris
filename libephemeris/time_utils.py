@@ -8,7 +8,7 @@ Implements standard astronomical time functions for conversions between:
 - Gregorian and Julian calendar systems
 - UT1 (Universal Time) and TT (Terrestrial Time)
 
-Functions provide pyswisseph-compatible API signatures.
+Functions provide reference-API-compatible signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
@@ -54,7 +54,7 @@ def julday(
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
     if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"swisseph.julday: invalid calendar ({cal})")
+        raise ValueError(f"julday: invalid calendar ({cal})")
 
     if month <= 2:
         year -= 1
@@ -101,7 +101,7 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
         unless Julian calendar explicitly requested.
     """
     if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"swisseph.revjul: invalid calendar ({cal})")
+        raise ValueError(f"revjul: invalid calendar ({cal})")
 
     jd = jd + 0.5
     z = _floor(jd)
@@ -341,7 +341,7 @@ def date_conversion(
         >>> date_conversion(1582, 10, 5, 12.0, 'g')
         (1582, 10, 15, 12.0)
     """
-    # Accept bytes calendar (pyswisseph uses b'g'/b'j')
+    # Accept bytes calendar (the reference ephemeris uses b'g'/b'j')
     if isinstance(calendar, bytes):
         calendar = calendar.decode("ascii")
     calendar = calendar.lower()
@@ -1348,7 +1348,7 @@ def utc_time_zone(
     to obtain the equivalent UTC date/time. Handles all date boundary
     crossings (day, month, year) correctly.
 
-    This matches the pyswisseph convention: the offset is **subtracted**
+    This matches the reference convention: the offset is **subtracted**
     from the input time.
 
     Args:

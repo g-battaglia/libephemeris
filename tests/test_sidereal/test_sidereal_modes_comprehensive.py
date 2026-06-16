@@ -343,7 +343,7 @@ class TestAyanamshaExUt:
     def test_ayanamsa_ex_ut_matches_ayanamsa_ut(self, mode: int, name: str):
         """The ex variant returns the TRUE ayanamsha (mean + nutation).
 
-        Reference API semantics (verified against pyswisseph): the plain
+        Reference API semantics (verified against the reference ephemeris): the plain
         function returns the mean ayanamsha; the _ex variant adds nutation
         in longitude unless FLG_NONUT is set.
         """

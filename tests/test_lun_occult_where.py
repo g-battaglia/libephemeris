@@ -128,7 +128,7 @@ class TestLunOccultWhere:
             # Star occultations: magnitude 1 (point source fully
             # covered), diameter ratio 0, core "shadow" = minus the
             # lunar diameter at the center point (reference layout,
-            # verified against pyswisseph 2.10.03).
+            # verified against the reference ephemeris 2.10.03).
             assert attr[0] == 1.0
             assert attr[1] == 0.0
             assert attr[2] == 1.0
@@ -139,7 +139,7 @@ class TestLunOccultWhere:
     def test_body_zero_is_the_sun(self):
         """Body 0 is the Sun: occultation of the Sun = solar eclipse.
 
-        Verified against pyswisseph 2.10.03 (retflag 5 with the shadow
+        Verified against the reference ephemeris 2.10.03 (retflag 5 with the shadow
         center over Mexico for the 2024-04-08 totality instant).
         """
         retflags, geopos, attr = lun_occult_where(2460409.26, 0, FLG_SWIEPH)
@@ -282,13 +282,13 @@ class TestLunOccultWhereIntegration:
         assert result2 == result3
 
 
-class TestLunOccultWherePySwissephAPI:
-    """Tests for pyswisseph-compatible API (body can be int or str)."""
+class TestLunOccultWhereReferenceAPI:
+    """Tests for reference-API-compatible API (body can be int or str)."""
 
     def test_star_name_as_body_parameter(self):
         """Test that star name can be passed directly as body parameter.
 
-        This matches pyswisseph's API: swe.lun_occult_where(jd, "Regulus", flags)
+        This matches the reference ephemeris's API: swe.lun_occult_where(jd, "Regulus", flags)
         """
         jd_start = julday(2017, 1, 1, 0)
         retflags, times = lun_occult_when_glob(

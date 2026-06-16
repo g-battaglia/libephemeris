@@ -2,7 +2,7 @@
 API compatibility and return type tests.
 
 Verifies that all public API functions return the expected types
-and formats, ensuring compatibility with pyswisseph.
+and formats, ensuring compatibility with the reference ephemeris.
 """
 
 from __future__ import annotations

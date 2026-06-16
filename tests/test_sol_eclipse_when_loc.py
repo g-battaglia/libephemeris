@@ -1,13 +1,13 @@
 """
 Tests for sol_eclipse_when_loc function in libephemeris.
 
-Tests the solar eclipse local visibility calculations with exact pyswisseph signature.
+Tests the solar eclipse local visibility calculations with the exact reference ephemeris signature.
 
 Validation tests use the 2024-Apr-08 total solar eclipse as reference:
 - Dallas, Texas: Total eclipse with maximum around 18:42 UTC
 - New York City: Partial eclipse with ~90% obscuration
 
-Reference data from NASA Eclipse website and pyswisseph comparison.
+Reference data from NASA Eclipse website and the reference ephemeris comparison.
 """
 
 import pytest
@@ -27,7 +27,7 @@ from libephemeris import (
 
 
 class TestSweSwolEclipseWhenLocSignature:
-    """Test that function signature matches pyswisseph."""
+    """Test that function signature matches the reference ephemeris."""
 
     def test_function_exists(self):
         """Test that sol_eclipse_when_loc function exists."""

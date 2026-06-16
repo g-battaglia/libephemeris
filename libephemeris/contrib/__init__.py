@@ -892,8 +892,8 @@ def _not_implemented(name: str) -> _Any:
             f"libephemeris.contrib.{name}() is not implemented. "
             "This function requires the optional SQLite atlas/timezone "
             "databases shipped with the upstream reference distribution. "
-            "If you need it, install pyswisseph and call "
-            f"swisseph.contrib.{name}() directly."
+            "If you need it, install the upstream reference Python binding "
+            f"and call its contrib.{name}() directly."
         )
 
     _stub.__name__ = name
