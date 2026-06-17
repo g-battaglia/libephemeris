@@ -43,6 +43,16 @@ LibEphemeris provides the **same API** with a modern foundation:
 
 **Switching from pyswisseph?** Your existing code works with minimal changes. [Migration guide](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md).
 
+### Where LibEphemeris is measurably *more* accurate
+
+Matching the industry standard is the baseline; in two places the modern foundation does demonstrably better, verified against an independent physical criterion (not against any other engine):
+
+- **House cusps over deep time.** House cusps are driven by sidereal time and obliquity, i.e. by precession. Engines that take sidereal time from an IAU 1976/2006 polynomial are only correct for a few centuries and drift by **degrees** at historical or far-future dates. LibEphemeris derives the cusps from the long-term Vondrák 2011 model (valid ±200,000 years) via a stable geometric construction, so cusps stay correct across the whole ±13,000-year ephemeris range — and, because houses and bodies share one obliquity and one ΔT, a chart is internally self-consistent at any epoch. Identical to the reference in the modern era; correct where the reference's own model diverges.
+
+- **House cusp speeds (daily motion).** A cusp's speed is its true time derivative dλ/dt. LibEphemeris computes it as the genuine derivative of the full house solution, so the reported speed integrates to the cusp's actual motion. For the iteratively-solved systems (Placidus, Koch) a common analytic speed approximation mis-states the intermediate cusps by tens to hundreds of °/day near the polar circle; here LibEphemeris matches the real motion to **< 0.005 °/day**.
+
+Full methodology: [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md).
+
 ---
 
 ## Quick Start
@@ -80,7 +90,8 @@ Every number independently measured against pyswisseph across 4,400+ comparison 
 |----------|---------|-----|-------|
 | Sun-Pluto | 0.04-0.26" | 1.17" | Pluto max 0.75"; Neptune is the widest observed planetary delta |
 | Moon | 0.70" | 3.32" | Different underlying lunar models |
-| House cusps | < 0.01" | 0.02" | All 25 systems |
+| House cusps | < 0.01" | 0.02" | All 25 systems (modern); long-term model holds to ±13,000 yr |
+| House cusp speeds | < 0.005°/day | — | True dλ/dt; more accurate than analytic approximations on Placidus/Koch |
 | Fixed stars | < 0.1" | 0.51" | 116 Hipparcos catalog stars |
 | Solar eclipses | - | < 6s | Timing accuracy |
 | Lunar eclipses | - | < 8s | Timing accuracy |
@@ -139,6 +150,7 @@ libephemeris download extended     # -13200 to +17191 CE, full range
 - [Getting Started](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md) - installation, ephemeris tiers, first calculations
 - [Migration from PySwissEph](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
 - [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md) - full methodology, comparison tables, verification process
+- [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md) - why houses and cusp speeds stay correct over ±13,000 years
 - [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples
 - [House Systems](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/house-systems.md) - all 25 systems, verified against pyswisseph
 - [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - 43 sidereal modes

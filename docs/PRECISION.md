@@ -29,6 +29,25 @@ All planets sub-arcsecond. Moon ~3" max reflects different lunar models (JPL DE4
 | Latitude speed | < 0.004°/day |
 | Distance speed | < 0.0001 AU/day |
 
+### House cusp speeds (`houses_ex2`)
+
+The cusp/angle speeds are the genuine time derivative dλ/dt of each cusp,
+computed from the full house solution, so the reported speed integrates to the
+cusp's real motion. Validated against an independent high-accuracy derivative
+(no other engine in the loop):
+
+| System group | Reported speed vs true dλ/dt |
+|--------------|------------------------------|
+| Angles (Asc/MC) + closed-form (Regiomontanus, Campanus, Equal, Meridian) | < 0.005°/day |
+| Iterative (Placidus, Koch) | < 0.005°/day |
+
+For the iterative systems this is **more accurate than an analytic speed
+approximation**: such an approximation deviates from the cusp's own motion by a
+fraction of a °/day at mid-latitude and by tens to hundreds of °/day near the
+polar circle (e.g. Koch at 60° latitude). Sign-locked systems (Whole-Sign,
+Aries, Krusinski) report the guiding-point (Asc/MC) rate on the angle cusps, the
+astrologically meaningful daily motion of the chart frame.
+
 ## Lunar Points
 
 | Point | Max Diff | Independent Verification |
@@ -44,6 +63,27 @@ All planets sub-arcsecond. Moon ~3" max reflects different lunar models (JPL DE4
 
 < 0.02" for all 24 supported house systems, tested at 11 global locations.
 Iterative systems (Placidus, Koch) use 10⁻⁷° convergence threshold.
+
+**Long-term range (where LibEphemeris is more accurate).** House cusps are
+driven by sidereal time (ARMC) and obliquity — both functions of precession.
+LibEphemeris derives them from the long-term Vondrák 2011 model (valid ±200,000
+years) through a geometric construction that stays stable everywhere, rather than
+an IAU 1976/2006 sidereal-time polynomial that diverges by **degrees** outside a
+few centuries. Verified across the full ephemeris range (−13200…+17191 CE):
+
+| Quantity | Criterion | Result |
+|----------|-----------|--------|
+| Mean obliquity | vs reference, full range | < 0.001" |
+| Sidereal time (ARMC) | vs reference, matched ΔT, full range | < 0.05" |
+| Cusps, all systems | vs reference, matched ΔT, full range | < 0.05" |
+| Cusps, modern era (1860–2040) | vs reference, own ΔT | < 0.05" |
+
+At remote epochs a *whole-chart* comparison against another engine differs by the
+ΔT-model choice (amplified through the Sun's mean longitude, ~3548"/day), which is
+physical and shared by both house cusps and planetary positions — not a cusp
+error. With the same ΔT the cusp model reproduces the reference exactly across the
+whole range. See
+[sidereal-time-longterm.md](methodology/sidereal-time-longterm.md).
 
 ## Fixed Stars
 
