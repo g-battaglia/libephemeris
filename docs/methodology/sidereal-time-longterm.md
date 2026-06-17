@@ -122,18 +122,60 @@ model to **< 0.05″ across the entire supported range** (and the mean obliquity
 independent reproduction of the published physics; only the (physical,
 unavoidable) ΔT choice remains.
 
+## House cusp speeds (daily motion)
+
+`houses_ex2` also returns the **speed** (daily motion) of each cusp and angle.
+A cusp longitude λ is a function of time through the sidereal time, the obliquity
+and (via the ecliptic frame) nutation, so its true speed is the **total time
+derivative** dλ/dt. We compute it directly as a centered finite difference of the
+full house solution in time,
+
+    dλ/dt ≈ [ λ(jd + dt) − λ(jd − dt) ] / (2·dt),   dt = 2 seconds,
+
+evaluated on `houses()` itself, so every time-dependent term is captured. The
+2-second step is the measured optimum: the result is stable to ~10⁻³ °/day from
+dt ≈ 30 s down to ≈ 1 s, while larger steps feel the cusp's curvature and much
+smaller ones are dominated by floating-point noise.
+
+This matters most for the **iteratively-solved** systems (Placidus, Koch). Their
+intermediate cusps are defined by a transcendental (semidiurnal-arc) condition;
+the genuine time derivative of that solution is what the finite difference above
+returns, and integrating it reproduces the cusp's actual motion. An *analytic*
+speed approximation of those systems can drift from the cusp's own motion — by a
+fraction of a °/day at mid-latitude and by tens to hundreds of °/day near the
+polar circle, where the iteration is most sensitive. The closed-form systems
+(Regiomontanus, Campanus, Equal, Meridian) and the angles Asc/MC have no
+iteration and are unaffected.
+
+For **sign-locked** systems — Whole-Sign, Aries, Krusinski — the cusps sit at
+fixed sign boundaries and jump discontinuously, so their instantaneous derivative
+is meaningless. There we report the speed of the point that drives the wheel: the
+Ascendant rate on cusps 1/7 and the MC rate on 4/10 (zero on the intermediates) —
+the astrologically meaningful daily motion of the chart frame.
+
+`houses_armc_ex2` is the one exception to the time-derivative method: it receives
+only an ARMC (no Julian Day), so it differentiates with respect to ARMC and scales
+by the sidereal rate — the most accurate speed obtainable from that input (the
+missing obliquity-rate term is ~0.01 °/day). Callers that have the time should use
+`houses_ex2`, which captures every term.
+
 ## Validation
 
 The model is exhaustively validated in the separate `validation/` repository:
 
 * `validation/compare_scripts/rounds/houses/lt*.py` (run with
-  `sh run.sh houses`) — 25 scripts covering, across −13200…+17191: mean-obliquity
+  `sh run.sh houses`) — covering, across −13200…+17191: mean-obliquity
   model-purity (< 0.001″), sidereal-time model-purity at matched ΔT (< 0.05″),
   every house system at many latitudes (matched-ΔT cusps < 0.05″), vertex /
-  auxiliary points, cusp speeds, high latitudes, a dense modern no-regression
-  sweep, sidereal (ayanamsha) cusps, internal consistency, DE441 edges,
-  round-trips, `house_pos`, and a massive systems×latitudes×epochs grid.
+  auxiliary points, high latitudes, a dense modern no-regression sweep, sidereal
+  (ayanamsha) cusps, internal consistency, DE441 edges, round-trips, `house_pos`,
+  a massive systems×latitudes×epochs grid, and the **cusp speeds** under the
+  ground-truth criterion (the reported speed must reproduce the real cusp motion)
+  plus agreement with the reference on the angles and closed-form systems.
 * `validation/compare_scripts/rounds/positions/lt*.py` (run with
   `sh run.sh positions`) — confirms the shared obliquity leaves modern positions
-  unchanged and bounds the (smooth, expected) of-date obliquity shift at remote
-  epochs.
+  unchanged, bounds the (smooth, expected) of-date obliquity shift at remote
+  epochs, and validates the full −8000…+8000 range with the DE441 extended tier
+  both against the reference (with a date-scaled envelope for the ΔT and
+  ephemeris-version differences) and against an **independent DE441 oracle**
+  (jplephem + erfa) that shares the ephemeris but not the code path.

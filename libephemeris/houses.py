@@ -1596,13 +1596,14 @@ def houses_armc_ex2(
         ks = [3, 2, 1, 0, 4, 5]
         cs = [v_mc + ks[i % 6] * step for i in range(len(cusps))]
         cusps_speed = tuple(cs)
-    # Other systems (Placidus, Koch, Campanus, Regiomontanus, ...):
-    # numerical differentiation of the actual cusp functions.  Note:
-    # these are the TRUE derivatives — they match a centered difference
-    # of the reference's own cusps to ~0.001 deg/day, while the
-    # reference's reported speeds for Placidus/Koch come from an
-    # internal analytic approximation that deviates from its own cusp
-    # motion by up to ~1%.  We keep the exact values.
+    # Other systems (Placidus, Koch, Campanus, Regiomontanus, ...): the cusp
+    # speeds above are the genuine derivative of the cusp functions with respect
+    # to ARMC, scaled by the sidereal rate. This is the most accurate speed
+    # obtainable from an ARMC input alone: with only the ARMC (and no Julian
+    # Day) the small obliquity-rate term dε/dt — worth ~0.01 deg/day — cannot be
+    # included. Callers that have the time should prefer houses_ex2(), which
+    # finite-differences the full house solution in time and so captures every
+    # time-dependent term exactly.
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
@@ -1773,20 +1774,58 @@ def houses_ex2(
     # Calculate positions at current time
     cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, flags)
 
-    # Always calculate velocities (matching the reference behavior).
-    # Delegate speed computation to the ARMC-based path.
-    # This varies ARMC (with fixed obliquity) and scales by the
-    # sidereal rotation rate, matching the internal approach used by
-    # the reference ephemeris's houses_ex2.  Direct JD-based finite differences
-    # mix ARMC, obliquity, and nutation changes, producing systematic
-    # ~0.003 deg/day offsets on angular cusps.
+    # Velocities (daily motion). A cusp longitude is a function of time through
+    # the sidereal time (ARMC), the obliquity of the ecliptic and (via the
+    # ecliptic frame) nutation. The true daily motion is therefore the TOTAL
+    # time derivative dλ/dt, which we obtain by a centered finite difference of
+    # the full house solution in time:
     #
-    # We extract ARMC from the ascmc tuple returned by houses_ex (index 2 = ARMC)
-    # and the true obliquity from the same long-term model used by houses().
-    armc_val = ascmc[2]  # ARMC stored by houses
-    _, eps = _house_armc_obliquity(tjdut)
+    #     dλ/dt ≈ [ λ(jd + dt) − λ(jd − dt) ] / (2·dt)
+    #
+    # evaluated on houses() itself, so every time-dependent term (ARMC rate,
+    # dε/dt, nutation) is captured automatically. A step of dt = 2 seconds is the
+    # measured optimum: the result is stable to ~1e-3 deg/day from dt≈30 s down
+    # to dt≈1 s, while dt≳4 s starts to feel the cusp's curvature and dt≲0.5 s is
+    # dominated by floating-point noise.
+    #
+    # This is the genuine derivative of the reported cusps for every system,
+    # including the iteratively-solved ones (Placidus, Koch): integrating it
+    # reproduces the cusp motion, which an analytic speed approximation of those
+    # systems does not.
+    _DT_DAYS = 2.0 / 86400.0
+    cusps_minus, ascmc_minus = houses(tjdut - _DT_DAYS, lat, lon, hsys, flags)
+    cusps_plus, ascmc_plus = houses(tjdut + _DT_DAYS, lat, lon, hsys, flags)
 
-    _, _, cusps_speed, ascmc_speed = houses_armc_ex2(armc_val, lat, eps, hsys)
+    def _rate(after: float, before: float) -> float:
+        d = after - before
+        if d > 180.0:
+            d -= 360.0
+        elif d < -180.0:
+            d += 360.0
+        return d / (2.0 * _DT_DAYS)
+
+    cusps_speed = tuple(_rate(cusps_plus[i], cusps_minus[i]) for i in range(len(cusps)))
+    ascmc_speed = tuple(
+        _rate(ascmc_plus[i], ascmc_minus[i]) for i in range(len(ascmc))
+    )
+
+    # Sign-locked / non-analytic systems are the only ones whose cusps are NOT
+    # smooth functions of time: Whole Sign ('W') and Aries ('N') cusps sit at
+    # fixed sign boundaries and Krusinski ('U') has no smooth speed model, so
+    # their instantaneous derivative is ~0 except at the discontinuous sign
+    # jumps. For these we report the speed of the point that drives the wheel —
+    # the Ascendant rate on cusps 1/7, the MC rate on 4/10, zero on the
+    # intermediates — i.e. the astrologically meaningful daily motion of the
+    # chart frame. Every other system (including Porphyry) keeps the true
+    # time-derivative computed above, which by construction integrates to the
+    # cusp's actual motion.
+    if hsys in (ord("W"), ord("N"), ord("U")):
+        cs = [0.0] * len(cusps)
+        cs[0] = ascmc_speed[0]  # cusp 1  = Asc
+        cs[3] = ascmc_speed[1]  # cusp 4  = IC  -> MC rate
+        cs[6] = ascmc_speed[0]  # cusp 7  = Desc
+        cs[9] = ascmc_speed[1]  # cusp 10 = MC
+        cusps_speed = tuple(cs)
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
