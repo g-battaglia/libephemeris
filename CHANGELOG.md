@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0a4] - 2026-06-17
+
+### Changed
+
+- **House cusps use a long-term sidereal-time and obliquity model
+  (Vondrák 2011).** The house path previously took its sidereal time (ARMC) from
+  an IAU-2006 CIO sidereal time, a polynomial valid only a few centuries that
+  diverges by degrees at remote epochs (house cusps were off by up to ~3° at
+  ±8000 years). Cusps are now derived from the long-term Vondrák 2011 model
+  (valid ±200,000 years) via a stable geometric construction
+  (`libephemeris/sidereal_longterm.py`), so they stay correct across the whole
+  supported date range. Modern results are unchanged (sub-milliarcsecond near
+  J2000); only remote epochs change, where they become correct. The of-date mean
+  obliquity is now a single shared realization used by both the house cusps and
+  the position pipeline, so a chart's angles and bodies sit in one
+  self-consistent precession/obliquity frame.
+- **House cusp speeds are the true time derivative.** `houses_ex2` now reports
+  each cusp/angle speed as the genuine dλ/dt of the full house solution (centered
+  time difference, 2 s step), so the reported speed integrates to the cusp's
+  actual motion. For the iteratively-solved systems (Placidus, Koch) this is
+  markedly more accurate than an analytic speed approximation near the polar
+  circle. Sign-locked systems (Whole Sign, Aries, Krusinski) report the
+  guiding-point (Asc/MC) rate; `houses_armc_ex2` is unchanged (ARMC-only input).
+
+### Docs
+
+- New `docs/methodology/sidereal-time-longterm.md` and expanded README /
+  `docs/PRECISION.md` sections documenting the long-term house accuracy and the
+  true cusp-speed method, including where LibEphemeris is measurably more
+  accurate than analytic/short-range approaches.
+
 ## [3.0.0a3] - 2026-06-16
 
 ### Fixed
