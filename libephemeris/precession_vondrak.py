@@ -11,8 +11,8 @@ Why Vondrák 2011
 ----------------
 The IAU 2006 precession (Capitaine et al. 2003) is a polynomial only valid for
 a few centuries around J2000.0; it diverges rapidly at remote epochs (e.g. ~36"
-for the Sun's longitude at year -3000). Swiss Ephemeris and modern long-term
-work instead use the model of
+for the Sun's longitude at year -3000). Long-term ephemeris work instead uses
+the model of
 
     Vondrák, J., Capitaine, N. & Wallace, P. (2011),
     "New precession expressions, valid for long time intervals",
@@ -20,35 +20,34 @@ work instead use the model of
 
 which is fitted to a numerical integration and stays accurate over ±200,000
 years while agreeing with IAU 2006 to sub-milliarcsecond precision near J2000.
-Adopting it makes ancient/future positions scientifically correct and matches
-Swiss Ephemeris's precession (Swiss uses the same model since v1.78).
+Adopting it makes ancient/future positions scientifically correct.
 
 How it is implemented (provenance / clean-room)
 -----------------------------------------------
-The Vondrák 2011 model is obtained **from pyerfa/ERFA**, not transcribed by hand
-and not derived from any GPL source:
+The Vondrák 2011 precession matrix is obtained **from pyerfa/ERFA**, not
+transcribed by hand and not derived from any third-party application source:
 
     * ``erfa.ltpb``   -> long-term precession matrix, ICRS frame bias included
                         (ICRS -> mean equator and equinox of date).
-    * ``erfa.ltpecl`` -> ecliptic pole unit vector (for the of-date obliquity).
-    * ``erfa.ltpequ`` -> equator pole unit vector.
+    * ``erfa.ltp``    -> same without the ICRS frame bias.
     * ``erfa.numat``  -> the standard nutation rotation matrix.
 
 ERFA is the IAU SOFA-derived library distributed under a permissive BSD-3-Clause
 licence (pyerfa); it is already a hard dependency of libephemeris (we use
 ``erfa.pmat06``/``nut06a``/``obl06`` elsewhere). Using ERFA's reference Vondrák
-routines gives bit-for-bit agreement with the published model — and therefore
-with Swiss Ephemeris's precession — without copying Swiss Ephemeris's GPL C code.
+routines gives bit-for-bit agreement with the published model.
 
 The nutation angles (``dpsi``, ``deps``) are NOT computed here: callers pass in
 their own (LEB Chebyshev nutation on the fast path, IAU 2006/2000A on the
 reference path) so that the well-tuned modern nutation is preserved unchanged.
 Only the precession and the of-date *mean* obliquity become Vondrák-based.
 
-The of-date mean obliquity is taken as the angle between the Vondrák equator
-pole and ecliptic pole (``arccos(equ · ecl)``) rather than the IAU 2006
-obliquity polynomial, which also diverges at remote epochs. This is the term
-that closes the Sun's ~36" longitude gap at year -3000.
+The of-date mean obliquity is delegated to
+:mod:`libephemeris.sidereal_longterm`, which evaluates the Vondrák 2011 obliquity
+series directly. This is a single shared realization used by both the position
+pipeline and the house cusps, and it replaces the IAU 2006 obliquity polynomial
+(which diverges at remote epochs) — the term that closes the Sun's ~36"
+longitude gap at year -3000.
 """
 
 from __future__ import annotations
@@ -112,21 +111,23 @@ def _precession_matrix(jd_tt: float, frame_bias: bool) -> Matrix3:
     )
 
 
-@lru_cache(maxsize=1024)
 def _mean_obliquity_rad(jd_tt: float) -> float:
-    """Of-date mean obliquity (radians) = angle between equator and ecliptic poles.
+    """Of-date mean obliquity (radians), Vondrák 2011 (long-term valid).
+
+    Delegates to :func:`libephemeris.sidereal_longterm.mean_obliquity_rad`, which
+    evaluates the Vondrák 2011 obliquity series directly. This is the single
+    of-date mean-obliquity realization shared by the position pipeline and the
+    house cusps, so one chart's bodies and angles sit in a consistent frame.
 
     Args:
         jd_tt: Julian Date in TT.
 
     Returns:
-        The of-date mean obliquity in radians (Vondrák 2011, long-term valid).
+        The of-date mean obliquity in radians.
     """
-    epj = _julian_epoch(jd_tt)
-    ecl = erfa.ltpecl(epj)
-    equ = erfa.ltpequ(epj)
-    cos_eps = float(equ[0] * ecl[0] + equ[1] * ecl[1] + equ[2] * ecl[2])
-    return math.acos(max(-1.0, min(1.0, cos_eps)))
+    from . import sidereal_longterm
+
+    return sidereal_longterm.mean_obliquity_rad(jd_tt)
 
 
 def vondrak_mean_obliquity_rad(jd_tt: float) -> float:

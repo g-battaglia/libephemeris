@@ -72,14 +72,44 @@ def test_precession_matrix_matches_erfa_ltpb(jd: float) -> None:
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)
-def test_obliquity_is_pole_angle(jd: float) -> None:
-    """Of-date mean obliquity is the angle between the equator and ecliptic poles."""
+def test_obliquity_matches_pole_angle_modern(jd: float) -> None:
+    """Of-date mean obliquity agrees with the ERFA pole-angle in the modern era.
+
+    The of-date mean obliquity now comes from the Vondrák 2011 obliquity series
+    directly (``sidereal_longterm``), the canonical realization of the published
+    model and the single source shared with the house cusps. It agrees with the
+    ERFA equator/ecliptic pole-angle form to sub-milliarcsecond near J2000.0;
+    the two Vondrák realizations only diverge at remote epochs (a bounded,
+    expected difference checked in ``test_obliquity_pole_angle_divergence``).
+    """
+    yr = 2000.0 + (jd - _J2000) / 365.25
+    if not (1800.0 <= yr <= 2200.0):
+        pytest.skip("modern-era assertion only")
     epj = _julian_epoch_ref(jd)
     ecl = erfa.ltpecl(epj)
     equ = erfa.ltpequ(epj)
-    # Clamp to acos's domain: FP drift can push the dot marginally past ±1.
     expected = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
-    assert abs(vondrak_mean_obliquity_rad(jd) - expected) < 1e-12
+    # sub-milliarcsecond (< 0.001") agreement in the modern era
+    assert abs(vondrak_mean_obliquity_rad(jd) - expected) < math.radians(0.001 / 3600.0)
+
+
+@pytest.mark.parametrize("jd", _JD_GRID)
+def test_obliquity_pole_angle_divergence(jd: float) -> None:
+    """The two Vondrák obliquity realizations diverge only by a bounded amount.
+
+    The direct series (production) and the ERFA pole-angle form are both Vondrák
+    2011 but differ at remote epochs by a smooth, bounded amount (≈0 modern,
+    a few arcsec per millennium at the extremes). This pins that the production
+    obliquity stays the canonical series without an unbounded drift.
+    """
+    epj = _julian_epoch_ref(jd)
+    ecl = erfa.ltpecl(epj)
+    equ = erfa.ltpequ(epj)
+    pole_angle = math.acos(max(-1.0, min(1.0, float(np.dot(equ, ecl)))))
+    cy = abs(jd - _J2000) / 36525.0
+    # bounded divergence: ~0 modern, growing slowly with |centuries from J2000|
+    bound = math.radians((0.001 + 0.5 * cy) / 3600.0)
+    assert abs(vondrak_mean_obliquity_rad(jd) - pole_angle) < bound
 
 
 @pytest.mark.parametrize("jd", _JD_GRID)

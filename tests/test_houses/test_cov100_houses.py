@@ -144,14 +144,10 @@ def test_houses_mc_quadrant_branches():
 
 def test_houses_asc_snaps_to_zero():
     """An Ascendant landing on 360 deg is snapped to 0.0 (line 711)."""
-    from libephemeris.state import get_timescale
-
-    ts = get_timescale()
-    t = ts.ut1_jd(JD)
-    gast = float(t.gast)
-    # Choose a longitude that drives ARMC to exactly 270 deg, where the
-    # Equatorial-Ascendant formula yields asc == 360 and is snapped to 0.
-    lon = 270.0 - (gast * 15.0)
+    # houses() derives ARMC from the long-term sidereal-time model, so drive
+    # ARMC to exactly 270 deg using that same baseline: ARMC = armc0(JD) + lon.
+    armc0, _eps = H._house_armc_obliquity(JD)
+    lon = 270.0 - armc0
     while lon > 180.0:
         lon -= 360.0
     while lon < -180.0:

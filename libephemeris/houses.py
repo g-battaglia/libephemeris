@@ -88,11 +88,39 @@ from .constants import (
     FLG_SWIEPH,
     FLG_TOPOCTR,
 )
-from .state import get_timescale
 from .planets import calc_ut
-from .cache import get_true_obliquity
+from .cache import get_cached_nutation
 from .exceptions import PolarCircleError, validate_coordinates
 from .utils import difdeg2n
+from . import sidereal_longterm as _sidlt
+from .time_utils import deltat as _deltat
+
+
+def _house_armc_obliquity(tjdut: float) -> tuple[float, float]:
+    """Sidereal time at longitude 0 (= ARMC) and true obliquity, for houses.
+
+    Both quantities come from the long-term model in :mod:`sidereal_longterm`
+    (Vondrák 2011 precession/obliquity + the geometric sidereal-time method),
+    so house cusps stay correct over the full supported date range instead of
+    diverging at remote epochs the way an IAU-2006 sidereal-time polynomial
+    would. The of-date mean obliquity is the same realization used by the
+    position pipeline, keeping cusps and bodies in one self-consistent frame.
+
+    Args:
+        tjdut: Julian Day in UT1.
+
+    Returns:
+        (armc0_deg, eps_true_deg): apparent sidereal time at longitude 0 and
+        the true obliquity of the ecliptic, both in degrees.
+    """
+    jd_tt = tjdut + _deltat(tjdut)
+    dpsi_rad, deps_rad = get_cached_nutation(jd_tt)
+    eps_mean = _sidlt.mean_obliquity_deg(jd_tt)
+    eps_true = eps_mean + math.degrees(deps_rad)
+    armc0 = _sidlt.apparent_sidereal_time_deg(
+        tjdut, 0.0, dpsi_deg=math.degrees(dpsi_rad), eps_true_deg=eps_true
+    )
+    return armc0, eps_true
 
 
 def _init_cardinal_cusps(asc: float, mc: float) -> list:
@@ -586,24 +614,13 @@ def houses(
     # Validate latitude and longitude ranges
     validate_coordinates(lat, lon, "houses")
 
-    # 1. Calculate Sidereal Time (ARMC)
-    # ARMC = GMST + lon
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
-
-    # Use Skyfield's GAST (Greenwich Apparent Sidereal Time) for house calculations
-    # GAST includes nutation in right ascension, which is critical for accurate house cusps.
-    # Unlike GMST (mean sidereal time), GAST accounts for the true position of the
-    # equinox affected by nutation, providing ~0.015 arcsec precision in final cusps.
-    # Skyfield GAST precision: ~0.001 seconds of time = ~0.015 arcsec in RA
-    # Reference: Skyfield documentation, IAU SOFA standards (iau2000b nutation model)
-    gast = float(t.gast)  # in hours (convert numpy.float64 to Python float)
-    armc_deg = (gast * 15.0 + lon) % 360.0
-
-    # True Obliquity of Ecliptic - uses cached nutation calculation
-    # This is a hot path optimization: obliquity calculation with nutation
-    # is expensive (~0.03ms) and called frequently. Caching provides ~50x speedup.
-    eps = get_true_obliquity(t.tt)
+    # 1. Sidereal time (ARMC) and true obliquity from the long-term model.
+    # ARMC = apparent sidereal time at longitude 0 + lon. Both the sidereal time
+    # and the obliquity use the Vondrák 2011 long-term realization (see
+    # sidereal_longterm), so cusps remain correct across the whole supported date
+    # range rather than diverging at remote epochs.
+    armc0_deg, eps = _house_armc_obliquity(tjdut)
+    armc_deg = (armc0_deg + lon) % 360.0
 
     # 2. Calculate Ascendant and MC
     # MC is intersection of Meridian and Ecliptic.
@@ -1625,12 +1642,11 @@ def houses_ex(
     cusps, ascmc = houses(tjdut, lat, lon, hsys, flags)
 
     if flags & FLG_SIDEREAL:
-        # The reference converts house cusps with the MEAN-equinox
-        # ayanamsha (no nutation term — the houses are geometric
-        # ARMC-frame quantities): swe.houses_ex cusps differ from
-        # tropical by get_ayanamsa_ex(jd, 0), 13.9" away from the
-        # plain (true) get_ayanamsa at J2000.  Verified against
-        # the reference ephemeris for P/E at Fagan-Bradley and Lahiri.
+        # Sidereal house cusps use the MEAN-equinox ayanamsha (no nutation
+        # term — houses are geometric ARMC-frame quantities): cusps differ
+        # from tropical by get_ayanamsa_ex(jd, 0), which is 13.9" away from
+        # the plain (true) get_ayanamsa at J2000. Verified against the
+        # reference ephemeris for P/E at Fagan-Bradley and Lahiri.
         from .planets import get_ayanamsa_ex_ut
 
         ayanamsa = get_ayanamsa_ex_ut(tjdut, 0)[1]
@@ -1682,9 +1698,7 @@ def houses_ex(
                 sun_dec = sun_pos[1]
             except (IndexError, TypeError, ValueError):
                 sun_dec = 0.0
-            ts = get_timescale()
-            t = ts.ut1_jd(tjdut)
-            eps = get_true_obliquity(t.tt)
+            _, eps = _house_armc_obliquity(tjdut)
             armc = ascmc[2]
             if hsys_char == "I":
                 sunshine_cusps = _houses_sunshine(
@@ -1767,13 +1781,10 @@ def houses_ex2(
     # mix ARMC, obliquity, and nutation changes, producing systematic
     # ~0.003 deg/day offsets on angular cusps.
     #
-    # We extract ARMC and true obliquity from the ascmc tuple returned
-    # by houses_ex (index 2 = ARMC) and compute obliquity via the
-    # same cached path used by houses().
+    # We extract ARMC from the ascmc tuple returned by houses_ex (index 2 = ARMC)
+    # and the true obliquity from the same long-term model used by houses().
     armc_val = ascmc[2]  # ARMC stored by houses
-    ts = get_timescale()
-    t = ts.ut1_jd(tjdut)
-    eps = get_true_obliquity(t.tt)
+    _, eps = _house_armc_obliquity(tjdut)
 
     _, _, cusps_speed, ascmc_speed = houses_armc_ex2(armc_val, lat, eps, hsys)
 
@@ -5591,17 +5602,10 @@ def _gauquelin_sector_pythonic(
     # This computes Gauquelin sectors from house position
     from .planets import calc_ut
     from .fixed_stars import fixstar_ut
-    from .cache import get_true_obliquity
 
-    ts = get_timescale()
-    t = ts.ut1_jd(jd)
-
-    # Calculate obliquity of ecliptic
-    eps = get_true_obliquity(t.tt)
-
-    # Calculate ARMC (sidereal time at location)
-    gast = float(t.gast)  # in hours
-    armc_deg = (gast * 15.0 + lon) % 360.0
+    # ARMC (sidereal time at location) and true obliquity from the long-term model.
+    armc0_deg, eps = _house_armc_obliquity(jd)
+    armc_deg = (armc0_deg + lon) % 360.0
 
     # Get body position - planet (int) or star (str).
     # The reference API computes the body topocentrically from the geopos
