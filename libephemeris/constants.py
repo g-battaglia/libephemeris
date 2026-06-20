@@ -767,6 +767,9 @@ _MOON_MEAN_DIST_AU: float = _MOON_MEAN_DIST_KM / AUNIT  # ~0.002569555 AU
 _MOON_MEAN_APOG_DIST_AU: float = (
     _MOON_MEAN_DIST_KM * (1.0 + _MOON_MEAN_ECC) / AUNIT
 )  # ~0.002710625 AU
+_MOON_MEAN_PERIG_DIST_AU: float = (
+    _MOON_MEAN_DIST_KM * (1.0 - _MOON_MEAN_ECC) / AUNIT
+)  # ~0.002428485 AU (a(1-e), the perigee counterpart of the apogee distance)
 
 # =============================================================================
 # ECLIPSE TYPES AND FLAGS

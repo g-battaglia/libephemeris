@@ -117,6 +117,7 @@ from .constants import (
     PARS_FIDEI,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
+    _MOON_MEAN_PERIG_DIST_AU,
 )
 
 # Import all sidereal mode constants (SIDM_*)
@@ -2217,7 +2218,10 @@ def _calc_body(
             # (e.g. due to third-party library incompatibility) — allow
             # Keplerian fallback rather than blocking the calculation entirely.
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED and not _auto_download_attempted:
+                if (
+                    ipl not in SPK_AUTO_DOWNLOAD_BLOCKED
+                    and not _auto_download_attempted
+                ):
                     horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
                     body_name = spk._get_body_name(ipl) or str(ipl)
                     raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
@@ -2314,9 +2318,7 @@ def _calc_body(
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            raise ValueError(
-                "Angles require observer location. Call set_topo() first."
-            )
+            raise ValueError("Angles require observer location. Call set_topo() first.")
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -4244,7 +4246,10 @@ def _calc_nod_aps(
         apog_lat = apog_pos[1]
         apog_dist = apog_pos[2]
 
-        # Perigee is 180° from apogee
+        # Perigee is the opposite apsis: 180° from apogee in longitude, with the
+        # latitude sign flipped, and at the mean *perigee* distance a(1-e) rather
+        # than the apogee distance a(1+e). (Velocities are 0.0 here, matching
+        # pyswisseph's mean apsis output.)
         peri_lon = (apog_lon + 180.0) % 360.0
 
         # Build output: nodes and apsides from lunar theory
@@ -4257,7 +4262,14 @@ def _calc_nod_aps(
             0.0,
             0.0,
         )
-        xperi: PosTuple = (peri_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        xperi: PosTuple = (
+            peri_lon,
+            -apog_lat,
+            _MOON_MEAN_PERIG_DIST_AU,
+            0.0,
+            0.0,
+            0.0,
+        )
         xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
 
         return (xnasc, xndsc, xperi, xaphe)
@@ -4425,9 +4437,7 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
-def get_orbital_elements(
-    tjdet: float, planet: int, flags: int
-) -> Tuple[float, ...]:
+def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
 
@@ -4479,9 +4489,7 @@ def get_orbital_elements(
     return _calc_orbital_elements(t, planet, flags)
 
 
-def get_orbital_elements_ut(
-    tjd_ut: float, ipl: int, iflag: int
-) -> Tuple[float, ...]:
+def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for Universal Time.
 
@@ -5264,8 +5272,18 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     base_flags = FLG_SPEED | (iflag & FLG_TRUEPOS)
 
     # Unsupported bodies (nodes, apogees, etc.) — match _calc_pheno() behavior
-    _PHENO_SUPPORTED = {SUN, MOON, MERCURY, VENUS, MARS,
-                        JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
+    _PHENO_SUPPORTED = {
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+    }
     if ipl not in _PHENO_SUPPORTED:
         return (0.0,) * 20
 
@@ -5322,7 +5340,11 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         body_xyz, _ = _leb_calc(tjd_ut, ipl, _xyz_flags)
         sun_xyz, _ = _leb_calc(tjd_ut, SUN, _xyz_flags)
         # body→Sun and body→Earth vectors
-        bs = (sun_xyz[0] - body_xyz[0], sun_xyz[1] - body_xyz[1], sun_xyz[2] - body_xyz[2])
+        bs = (
+            sun_xyz[0] - body_xyz[0],
+            sun_xyz[1] - body_xyz[1],
+            sun_xyz[2] - body_xyz[2],
+        )
         be = (-body_xyz[0], -body_xyz[1], -body_xyz[2])
         dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
         mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
@@ -5386,9 +5408,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
 
 
-def pheno_ut(
-    tjdut: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
 
@@ -5443,9 +5463,7 @@ def pheno_ut(
     return _calc_pheno(t, planet, flags)
 
 
-def pheno(
-    tjdet: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 
@@ -5520,7 +5538,6 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Special case: Sun
     if ipl == SUN:
-        # Sun is always "full" from Earth's perspective
         # Get Sun distance
         earth = planets["earth"]
         sun = planets["sun"]
@@ -5528,7 +5545,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
-        phase = 0.0  # Phase (illuminated fraction) is inapplicable for the Sun
+        # pyswisseph returns phase angle 0.0 AND phase (illuminated fraction)
+        # 0.0 for the Sun; keep 0.0 for 1:1 compatibility (not 1.0).
+        phase = 0.0
         elongation = 0.0
 
         # Apparent diameter of Sun based on physical radius
