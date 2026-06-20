@@ -228,11 +228,6 @@ class TestGlobalStateIsolation:
                 f"Fagan result {i} inconsistent: {pos[0]} vs {fagan_lon}"
             )
 
-    @pytest.mark.xfail(
-        reason="Known: _CONTEXT_SWAP_LOCK does not fully isolate topocentric state "
-        "in _calc_body_with_context — requires architectural fix (context-only mode)",
-        strict=False,
-    )
     def test_topo_isolation(self) -> None:
         """Different threads with different topocentric positions get different results."""
         jd = J2000
@@ -286,6 +281,40 @@ class TestGlobalStateIsolation:
             assert abs(pos[0] - rome_lon) < 1e-10, f"Rome result {i} inconsistent"
         for i, pos in enumerate(results_tokyo):
             assert abs(pos[0] - tokyo_lon) < 1e-10, f"Tokyo result {i} inconsistent"
+
+    def test_leb_path_uses_context_observer_not_global(self, monkeypatch) -> None:
+        """The LEB fast path must use the context's observer, not global state.
+
+        Regression test for topocentric thread-safety: previously the LEB
+        fast path read the global set_topo() observer, so concurrent contexts
+        with different observers shared one (wrong) location. The context must
+        now pass its own observer explicitly into fast_calc_ut.
+        """
+        from libephemeris import fast_calc, state
+
+        # Pretend a global LEB reader exists so the LEB fast path is taken.
+        sentinel_reader = object()
+        monkeypatch.setattr(state, "get_leb_reader", lambda: sentinel_reader)
+
+        captured: dict = {}
+
+        def fake_fast_calc_ut(reader, tjd_ut, ipl, iflag, **kwargs):
+            captured["topo_geopos"] = kwargs.get("topo_geopos")
+            return ((0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag)
+
+        monkeypatch.setattr(fast_calc, "fast_calc_ut", fake_fast_calc_ut)
+
+        ctx = EphemerisContext()
+        ctx.set_topo(12.5, 41.9, 50.0)  # Rome
+        ctx.calc_ut(J2000, swe.MOON, swe.FLG_TOPOCTR | swe.FLG_SPEED)
+
+        assert captured["topo_geopos"] is not None, (
+            "context did not pass an observer into the LEB fast path"
+        )
+        lon, lat, elev = captured["topo_geopos"]
+        assert lon == pytest.approx(12.5)
+        assert lat == pytest.approx(41.9)
+        assert elev == pytest.approx(50.0)
 
     def test_sid_mode_switching_stress(self) -> None:
         """Multiple threads rapidly switching sidereal modes."""

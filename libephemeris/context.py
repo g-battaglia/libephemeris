@@ -258,6 +258,21 @@ class EphemerisContext:
         """
         return self.topo
 
+    def _topo_geopos(self) -> Optional[Tuple[float, float, float]]:
+        """Return this context's observer as (lon_deg, lat_deg, elevation_m).
+
+        Used to pass the observer explicitly into the LEB fast path so that
+        FLG_TOPOCTR calculations are thread-safe and do not read global state.
+        Returns None when no observer is set on this context.
+        """
+        if self.topo is None:
+            return None
+        return (
+            float(self.topo.longitude.degrees),
+            float(self.topo.latitude.degrees),
+            float(self.topo.elevation.m),
+        )
+
     def set_sid_mode(self, mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
         """
         Set the sidereal mode (ayanamsha system) for calculations.
@@ -485,7 +500,8 @@ class EphemerisContext:
             try:
                 from . import fast_calc
 
-                # Pass sidereal params explicitly (thread-safe, no global swap)
+                # Pass sidereal params and observer explicitly (thread-safe,
+                # no global state swap).
                 result = fast_calc.fast_calc_ut(
                     reader,
                     tjd_ut,
@@ -494,6 +510,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo_geopos=self._topo_geopos(),
                 )
                 from .logging_config import get_logger
 
@@ -554,7 +571,8 @@ class EphemerisContext:
             try:
                 from . import fast_calc
 
-                # Pass sidereal params explicitly (thread-safe, no global swap)
+                # Pass sidereal params and observer explicitly (thread-safe,
+                # no global state swap).
                 result = fast_calc.fast_calc_tt(
                     reader,
                     tjd,
@@ -563,6 +581,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo_geopos=self._topo_geopos(),
                 )
                 from .logging_config import get_logger
 

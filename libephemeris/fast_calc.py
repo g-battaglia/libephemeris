@@ -1682,6 +1682,7 @@ def fast_calc_ut(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    topo_geopos: Optional[Tuple[float, float, float]] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Fast equivalent of calc_ut() using precomputed .leb data.
 
@@ -1693,6 +1694,10 @@ def fast_calc_ut(
         sid_mode: Sidereal mode override (for thread-safe context calls).
         sid_t0: Sidereal reference epoch override.
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
+        topo_geopos: Observer (lon_deg, lat_deg, elevation_m) for FLG_TOPOCTR.
+            When provided (e.g. from an EphemerisContext), it is used directly
+            so the result is thread-safe and independent of global state. When
+            None, the global set_topo() observer is used (legacy global API).
 
     Returns:
         Same as calc_ut(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
@@ -1708,9 +1713,10 @@ def fast_calc_ut(
     # Strip FLG_MOSEPH (always ignored)
     iflag = iflag & ~FLG_MOSEPH
 
-    # FLG_TOPOCTR: resolve observer position from global state
+    # FLG_TOPOCTR: resolve observer position. Prefer the explicit topo_geopos
+    # (thread-safe, context-supplied); otherwise fall back to global state.
     topo_offset = None
-    if iflag & FLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR and topo_geopos is None:
         from .state import get_topo
 
         topo = get_topo()
@@ -1761,6 +1767,7 @@ def fast_calc_tt(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
+    topo_geopos: Optional[Tuple[float, float, float]] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Fast equivalent of calc() using precomputed .leb data.
 
@@ -1772,6 +1779,10 @@ def fast_calc_tt(
         sid_mode: Sidereal mode override (for thread-safe context calls).
         sid_t0: Sidereal reference epoch override.
         sid_ayan_t0: Sidereal ayanamsha-at-epoch override.
+        topo_geopos: Observer (lon_deg, lat_deg, elevation_m) for FLG_TOPOCTR.
+            When provided (e.g. from an EphemerisContext) it is used directly,
+            making the call thread-safe; when None, the global set_topo()
+            observer is used (legacy global API).
 
     Returns:
         Same as calc(): ((lon, lat, dist, dlon, dlat, ddist), iflag)
@@ -1786,7 +1797,7 @@ def fast_calc_tt(
     iflag = iflag & ~FLG_MOSEPH
 
     topo_offset = None
-    if iflag & FLG_TOPOCTR:
+    if iflag & FLG_TOPOCTR and topo_geopos is None:
         from .state import get_topo
 
         topo = get_topo()
