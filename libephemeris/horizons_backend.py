@@ -643,8 +643,8 @@ def _to_ecliptic_output(
         pass
     elif iflag & FLG_J2000:
         # J2000 ecliptic
-        pos = _rotate_icrs_to_ecliptic_j2000(pos)
-        vel = _rotate_icrs_to_ecliptic_j2000(vel)
+        pos = _rotate_icrs_to_ecliptic_j2000(*pos)
+        vel = _rotate_icrs_to_ecliptic_j2000(*vel)
     elif iflag & FLG_EQUATORIAL:
         # True equatorial of date — apply precession-nutation matrix
         pn_mat, dpsi, deps, eps_true = _get_skyfield_frame_data(jd_tt)
@@ -657,12 +657,12 @@ def _to_ecliptic_output(
         pos = _mat3_vec3(pn_mat, pos)
         vel = _mat3_vec3(pn_mat, vel)
         # Equatorial -> ecliptic
-        pos = _rotate_equatorial_to_ecliptic(pos, eps_true)
-        vel = _rotate_equatorial_to_ecliptic(vel, eps_true)
+        pos = _rotate_equatorial_to_ecliptic(*pos, eps_true)
+        vel = _rotate_equatorial_to_ecliptic(*vel, eps_true)
 
     # Convert to spherical
-    lon, lat, dist = _cartesian_to_spherical(pos)
-    dlon, dlat, ddist = _cartesian_velocity_to_spherical(pos, vel)
+    lon, lat, dist = _cartesian_to_spherical(*pos)
+    dlon, dlat, ddist = _cartesian_velocity_to_spherical(*pos, *vel)
 
     # Sidereal correction
     if iflag & FLG_SIDEREAL:
