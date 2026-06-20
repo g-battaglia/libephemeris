@@ -1102,7 +1102,11 @@ def utc_to_tai_jd(
         >>> jd_tai = utc_to_tai_jd(2020, 1, 1, 0, 0, 0.0)
         >>> print(f"JD(TAI): {jd_tai:.6f}")
     """
-    # First get the JD in UTC (using UT1 as approximation since UTC ≈ UT1)
+    # Convert the UTC calendar instant to its conventional Julian Day, counting
+    # a uniform 86400 SI seconds per day (no UT1 / DUT1 involved here — this is a
+    # pure calendar-to-JD conversion). TAI is then this instant plus the
+    # cumulative leap-second offset (TAI - UTC). This is the inverse of
+    # tai_jd_to_utc() and round-trips exactly.
     decimal_hour = hour + minute / 60.0 + second / 3600.0
     jd_utc = julday(year, month, day, decimal_hour, calendar)
 
