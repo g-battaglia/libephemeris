@@ -86,9 +86,7 @@ def _is_leb_out_of_range(exc: BaseException) -> bool:
     nutation coverage produce messages containing "outside range" or
     "outside nutation range".
     """
-    return isinstance(exc, (KeyError, ValueError)) and (
-        "outside" in str(exc).lower()
-    )
+    return isinstance(exc, (KeyError, ValueError)) and ("outside" in str(exc).lower())
 
 
 def _call_with_leb_skyfield_fallback(impl, *args, **kwargs):
@@ -832,17 +830,21 @@ def _calculate_eclipse_phases_besselian(
     calculating exact contact times based on when the penumbral and umbral
     shadow boundaries cross Earth's limb.
 
-    Phase indices (matching reference API tret array):
+    Phase indices (matching reference API tret array for the *global*
+    sol_eclipse_when_glob layout, which is what this function returns):
         [0]: Time of maximum eclipse (tret[0])
-        [1]: Time of first contact - eclipse begins (tret[1])
-        [2]: Time of second contact - total/annular begins, if central (tret[2])
-        [3]: Time of third contact - total/annular ends, if central (tret[3])
-        [4]: Time of fourth contact - eclipse ends (tret[4])
-        [5]: Time of sunrise on central line (tret[5])
-        [6]: Time of sunset on central line (tret[6])
-        [7]: Time when annular-total eclipse starts (tret[7])
-        [8]: Time when annular-total eclipse ends (tret[8])
-        [9]: Reserved (tret[9])
+        [1]: Time of eclipse at local apparent noon (tret[1])
+        [2]: Time of eclipse begin - first contact (tret[2])
+        [3]: Time of eclipse end - fourth contact (tret[3])
+        [4]: Time of totality/annularity begin - second contact (tret[4])
+        [5]: Time of totality/annularity end - third contact (tret[5])
+        [6]: Time of center line begin (tret[6])
+        [7]: Time of center line end (tret[7])
+        [8]: Time when annular-total eclipse becomes total (tret[8])
+        [9]: Time when annular-total eclipse becomes annular again (tret[9])
+
+    Note: this differs from the local (sol_eclipse_when_loc) layout, where
+    [1]=first contact, [2]=second contact, [3]=third, [4]=fourth.
 
     Args:
         jd_max: Julian Day of eclipse maximum (refined using Besselian elements)
@@ -1060,17 +1062,21 @@ def _calculate_eclipse_phases(
 
     Uses Besselian elements for high-precision timing (< 10 seconds).
 
-    Phase indices (matching reference API tret array):
+    Phase indices (matching reference API tret array for the *global*
+    sol_eclipse_when_glob layout, which is what this function returns):
         [0]: Time of maximum eclipse (tret[0])
-        [1]: Time of first contact - eclipse begins (tret[1])
-        [2]: Time of second contact - total/annular begins, if central (tret[2])
-        [3]: Time of third contact - total/annular ends, if central (tret[3])
-        [4]: Time of fourth contact - eclipse ends (tret[4])
-        [5]: Time of sunrise on central line (tret[5])
-        [6]: Time of sunset on central line (tret[6])
-        [7]: Time when annular-total eclipse starts (tret[7])
-        [8]: Time when annular-total eclipse ends (tret[8])
-        [9]: Reserved (tret[9])
+        [1]: Time of eclipse at local apparent noon (tret[1])
+        [2]: Time of eclipse begin - first contact (tret[2])
+        [3]: Time of eclipse end - fourth contact (tret[3])
+        [4]: Time of totality/annularity begin - second contact (tret[4])
+        [5]: Time of totality/annularity end - third contact (tret[5])
+        [6]: Time of center line begin (tret[6])
+        [7]: Time of center line end (tret[7])
+        [8]: Time when annular-total eclipse becomes total (tret[8])
+        [9]: Time when annular-total eclipse becomes annular again (tret[9])
+
+    Note: this differs from the local (sol_eclipse_when_loc) layout, where
+    [1]=first contact, [2]=second contact, [3]=third, [4]=fourth.
 
     Args:
         jd_max: Julian Day of maximum eclipse
@@ -1583,7 +1589,10 @@ def _calculate_local_eclipse_phases(
     """
     return _call_with_leb_skyfield_fallback(
         _calculate_local_eclipse_phases_impl,
-        jd_max_global, lat, lon, altitude,
+        jd_max_global,
+        lat,
+        lon,
+        altitude,
     )
 
 
@@ -1626,8 +1635,14 @@ def _calculate_local_eclipse_phases_impl(
         try:
             from .fast_calc import _topo_ecliptic
             from .time_utils import deltat
-            _topo_ecliptic(reader, jd_max_global + deltat(jd_max_global),
-                           jd_max_global, SUN, (lon, lat, altitude))
+
+            _topo_ecliptic(
+                reader,
+                jd_max_global + deltat(jd_max_global),
+                jd_max_global,
+                SUN,
+                (lon, lat, altitude),
+            )
         except (KeyError, ValueError):
             reader = None
 
@@ -1648,7 +1663,9 @@ def _calculate_local_eclipse_phases_impl(
             """Get Sun altitude and azimuth at given JD from observer location."""
             jd_tt = jd + deltat(jd)
             sun_pos = _topo_ecliptic(reader, jd_tt, jd, SUN, geopos)
-            sun_az, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, geopos, 0, 0, sun_pos[:3])
+            sun_az, sun_alt_true, sun_alt_app = azalt(
+                jd, ECL2HOR, geopos, 0, 0, sun_pos[:3]
+            )
             # azalt returns SE convention azimuth (S=0)
             return sun_alt_true, sun_az
 
@@ -2051,6 +2068,7 @@ def _sol_eclipse_when_loc_pythonic(
             from .constants import FLG_TOPOCTR as _TOPOCTR_LOC
             from .state import get_topo as _gt_loc
             import libephemeris as _le_loc
+
             _saved_topo_loc = _gt_loc()
             _le_loc.set_topo(lon, lat, altitude)
             try:
@@ -2058,8 +2076,13 @@ def _sol_eclipse_when_loc_pythonic(
                 moon_pos, _ = calc_ut(jd_local_max, MOON, FLG_SPEED | _TOPOCTR_LOC)
             finally:
                 from libephemeris import state as _st_loc
+
                 if _saved_topo_loc is not None:
-                    _le_loc.set_topo(_saved_topo_loc.longitude.degrees, _saved_topo_loc.latitude.degrees, _saved_topo_loc.elevation.m)
+                    _le_loc.set_topo(
+                        _saved_topo_loc.longitude.degrees,
+                        _saved_topo_loc.latitude.degrees,
+                        _saved_topo_loc.elevation.m,
+                    )
                 else:
                     _st_loc._TOPO = None
             sun_dist_au = sun_pos[2]
@@ -2146,7 +2169,11 @@ def sol_eclipse_when_loc(
     full API contract.
     """
     return _call_with_leb_skyfield_fallback(
-        _sol_eclipse_when_loc_impl, tjdut, geopos, flags, backwards,
+        _sol_eclipse_when_loc_impl,
+        tjdut,
+        geopos,
+        flags,
+        backwards,
     )
 
 
@@ -2259,7 +2286,9 @@ def _sol_eclipse_when_loc_impl(
             sun_pos = _topo_ecliptic(reader, jd_tt, jd, SUN, _geopos)
             moon_pos = _topo_ecliptic(reader, jd_tt, jd, MOON, _geopos)
             sep = angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
-            sun_az, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _geopos, 0, 0, sun_pos[:3])
+            sun_az, sun_alt_true, sun_alt_app = azalt(
+                jd, ECL2HOR, _geopos, 0, 0, sun_pos[:3]
+            )
             return (
                 sep,
                 sun_alt_true,
@@ -2274,7 +2303,9 @@ def _sol_eclipse_when_loc_impl(
             """Get Sun altitude, azimuth, and apparent altitude at given JD."""
             jd_tt = jd + deltat(jd)
             sun_pos = _topo_ecliptic(reader, jd_tt, jd, SUN, _geopos)
-            sun_az, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _geopos, 0, 0, sun_pos[:3])
+            sun_az, sun_alt_true, sun_alt_app = azalt(
+                jd, ECL2HOR, _geopos, 0, 0, sun_pos[:3]
+            )
             # Calculate apparent altitude with refraction
             true_alt = sun_alt_true
             if true_alt > -1.0:
@@ -2989,7 +3020,9 @@ def sol_eclipse_where(
         jd_tt = tjdut + deltat(tjdut)
         # Approximate GMST from JD (same approach as Skyfield)
         T = (jd_tt - 2451545.0) / 36525.0
-        gmst_hours = (280.46061837 + 360.98564736629 * (tjdut - 2451545.0) + 0.000387933 * T * T) / 15.0
+        gmst_hours = (
+            280.46061837 + 360.98564736629 * (tjdut - 2451545.0) + 0.000387933 * T * T
+        ) / 15.0
         init_lon = moon_ra_deg - gmst_hours * 15.0
         init_lon = ((init_lon + 180) % 360) - 180
         init_lat = moon_dec_deg
@@ -3001,7 +3034,9 @@ def sol_eclipse_where(
                 jd_tt_loc = tjdut + deltat(tjdut)
                 sun_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, SUN, gp)
                 moon_pos = _topo_ecliptic(reader, jd_tt_loc, tjdut, MOON, gp)
-                return angular_separation(sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1])
+                return angular_separation(
+                    sun_pos[0], sun_pos[1], moon_pos[0], moon_pos[1]
+                )
             except (KeyError, ValueError, ArithmeticError, IndexError):
                 return 999.0
 
@@ -3096,7 +3131,9 @@ def sol_eclipse_where(
             moon_topo = _topo_ecliptic(reader, _jd_tt, tjdut, MOON, _gp)
 
             # Get Sun altitude and azimuth at central line
-            sun_az_val, sun_alt_true, sun_alt_app_val = azalt(tjdut, ECL2HOR, _gp, 0, 0, sun_topo[:3])
+            sun_az_val, sun_alt_true, sun_alt_app_val = azalt(
+                tjdut, ECL2HOR, _gp, 0, 0, sun_topo[:3]
+            )
             sun_altitude = sun_alt_true
             sun_azimuth = sun_az_val
 
@@ -3112,7 +3149,9 @@ def sol_eclipse_where(
             else:
                 apparent_alt = sun_altitude
 
-            separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+            separation = angular_separation(
+                sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1]
+            )
             local_sun_dist = sun_topo[2]
             local_moon_dist = moon_topo[2]
         else:
@@ -3518,7 +3557,10 @@ def sol_eclipse_how(
     full API contract.
     """
     return _call_with_leb_skyfield_fallback(
-        _sol_eclipse_how_impl, tjdut, geopos, flags,
+        _sol_eclipse_how_impl,
+        tjdut,
+        geopos,
+        flags,
     )
 
 
@@ -3615,11 +3657,31 @@ def _sol_eclipse_how_impl(
             moon_topo = _topo_ecliptic(reader, jd_tt, tjdut, MOON, _gp)
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0, (
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
             )
 
-        sun_az_val, sun_alt_true, sun_alt_app = azalt(tjdut, ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(
+            tjdut, ECL2HOR, _gp, 0, 0, sun_topo[:3]
+        )
         sun_altitude = sun_alt_true
         sun_azimuth = sun_az_val
 
@@ -3638,11 +3700,31 @@ def _sol_eclipse_how_impl(
         # If Sun is below horizon, no visible eclipse
         if sun_altitude < -1.0:
             return 0, (
-                0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt,
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                sun_azimuth,
+                sun_altitude,
+                apparent_alt,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
             )
 
-        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        separation = angular_separation(
+            sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1]
+        )
         sun_dist_au = sun_topo[2]
         moon_dist_au = moon_topo[2]
     else:
@@ -3674,8 +3756,26 @@ def _sol_eclipse_how_impl(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             # If calculation fails, return zeros (20 elements per reference API spec)
             return 0, (
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
             )
 
         # Get Sun altitude and azimuth
@@ -3701,8 +3801,26 @@ def _sol_eclipse_how_impl(
         # If Sun is below horizon, no visible eclipse (20 elements per reference API spec)
         if sun_altitude < -1.0:  # Allow for refraction near horizon
             return 0, (
-                0.0, 0.0, 0.0, 0.0, sun_azimuth, sun_altitude, apparent_alt,
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                sun_azimuth,
+                sun_altitude,
+                apparent_alt,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
             )
 
         # Calculate angular separation between Sun and Moon
@@ -3891,7 +4009,10 @@ def sol_eclipse_how_details(
     full API contract.
     """
     return _call_with_leb_skyfield_fallback(
-        _sol_eclipse_how_details_impl, tjd_ut, geopos, ifl,
+        _sol_eclipse_how_details_impl,
+        tjd_ut,
+        geopos,
+        ifl,
     )
 
 
@@ -4022,7 +4143,9 @@ def _sol_eclipse_how_details_impl(
             """Get Sun altitude and azimuth at given JD."""
             jd_tt = jd + deltat(jd)
             sun_pos = _topo_ecliptic(reader, jd_tt, jd, SUN, _gp)
-            sun_az, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_pos[:3])
+            sun_az, sun_alt_true, sun_alt_app = azalt(
+                jd, ECL2HOR, _gp, 0, 0, sun_pos[:3]
+            )
             return sun_alt_true, sun_az
 
         def _get_angular_sizes(jd: float) -> tuple:
@@ -4040,6 +4163,7 @@ def _sol_eclipse_how_details_impl(
             from .constants import FLG_TOPOCTR as _TP_PA
             from .state import get_topo as _gt_pa
             import libephemeris as _le_pa
+
             _saved_topo_pa = _gt_pa()
             _le_pa.set_topo(_gp[0], _gp[1], _gp[2])
             try:
@@ -4048,8 +4172,13 @@ def _sol_eclipse_how_details_impl(
                 moon_eq, _ = calc_ut(jd, MOON, _pa_flags)
             finally:
                 from libephemeris import state as _st_pa
+
                 if _saved_topo_pa is not None:
-                    _le_pa.set_topo(_saved_topo_pa.longitude.degrees, _saved_topo_pa.latitude.degrees, _saved_topo_pa.elevation.m)
+                    _le_pa.set_topo(
+                        _saved_topo_pa.longitude.degrees,
+                        _saved_topo_pa.latitude.degrees,
+                        _saved_topo_pa.elevation.m,
+                    )
                 else:
                     _st_pa._TOPO = None
             sun_ra_rad = math.radians(sun_eq[0])
@@ -5163,9 +5292,7 @@ def lun_eclipse_when(
             is not yet supported by the underlying implementation).
     """
     if backwards:
-        raise NotImplementedError(
-            "backward lunar eclipse search is not implemented"
-        )
+        raise NotImplementedError("backward lunar eclipse search is not implemented")
     return _lun_eclipse_when_pythonic(tjdut, flags=flags, eclipse_type=ecltype)
 
 
@@ -5273,14 +5400,18 @@ def _lun_eclipse_when_loc_pythonic(
             """Get Moon geometric altitude and azimuth at given JD."""
             jd_tt = jd + deltat(jd)
             moon_pos = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-            moon_az, moon_alt_true, moon_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, moon_pos[:3])
+            moon_az, moon_alt_true, moon_alt_app = azalt(
+                jd, ECL2HOR, _gp, 0, 0, moon_pos[:3]
+            )
             return moon_alt_true, moon_az
 
         def _get_moon_apparent_alt(jd: float) -> float:
             """Get Moon apparent altitude with atmospheric refraction."""
             jd_tt = jd + deltat(jd)
             moon_pos = _topo_ecliptic(reader, jd_tt, jd, MOON, _gp)
-            moon_az, moon_alt_true, moon_alt_app = azalt(jd, ECL2HOR, _gp, 1013.25, 10.0, moon_pos[:3])
+            moon_az, moon_alt_true, moon_alt_app = azalt(
+                jd, ECL2HOR, _gp, 1013.25, 10.0, moon_pos[:3]
+            )
             return moon_alt_app
     else:
         from .state import get_planets, get_timescale
@@ -5589,7 +5720,12 @@ def lun_eclipse_when_loc(
     altitude = float(geopos[2])
 
     return _call_with_leb_skyfield_fallback(
-        _lun_eclipse_when_loc_pythonic, tjdut, lat, lon, altitude, flags,
+        _lun_eclipse_when_loc_pythonic,
+        tjdut,
+        lat,
+        lon,
+        altitude,
+        flags,
     )
 
 
@@ -5680,7 +5816,9 @@ def _lun_eclipse_how_pythonic(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0, tuple([0.0] * 20)
 
-        moon_az_val, moon_alt_true, moon_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, moon_topo[:3])
+        moon_az_val, moon_alt_true, moon_alt_app = azalt(
+            jd, ECL2HOR, _gp, 0, 0, moon_topo[:3]
+        )
         moon_altitude = moon_alt_true
         moon_azimuth = moon_az_val
         moon_dist_au = moon_topo[2]
@@ -5812,7 +5950,10 @@ def lun_eclipse_how(
     full API contract.
     """
     return _call_with_leb_skyfield_fallback(
-        _lun_eclipse_how_impl, tjdut, geopos, flags,
+        _lun_eclipse_how_impl,
+        tjdut,
+        geopos,
+        flags,
     )
 
 
@@ -5917,7 +6058,9 @@ def _lun_eclipse_how_impl(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0, tuple([0.0] * 20)
 
-        moon_az_val, moon_alt_true, moon_alt_app = azalt(tjdut, ECL2HOR, _gp, 0, 0, moon_topo[:3])
+        moon_az_val, moon_alt_true, moon_alt_app = azalt(
+            tjdut, ECL2HOR, _gp, 0, 0, moon_topo[:3]
+        )
         moon_altitude = moon_alt_true
         moon_azimuth = moon_az_val
         moon_dist_au = moon_topo[2]
@@ -6241,9 +6384,11 @@ def lun_occult_when_glob(
             return ra.hours * 15.0, dec.degrees, dist.au, moon_angular_radius
 
     if reader is not None:
+
         def _get_target_position(jd: float) -> Tuple[float, float, float]:
             if planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 pos, _, _ = fixstar_ut(star_name, jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0], pos[1], 0.0001
             else:
@@ -6253,6 +6398,7 @@ def lun_occult_when_glob(
                 angular_radius = _calc_planet_angular_radius(planet, target_eq[2])
                 return target_eq[0], target_eq[1], angular_radius
     else:
+
         def _get_target_position(jd: float) -> Tuple[float, float, float]:
             if planet == 0:
                 from .fixed_stars import FIXED_STARS
@@ -6582,6 +6728,7 @@ def lun_occult_when_glob(
     if reader is not None:
         # Batch scan requires Skyfield; load only if not already loaded
         from .state import get_planets as _gp_batch
+
         eph = _gp_batch()
         ts = get_timescale()
         earth = eph["earth"]
@@ -6940,6 +7087,7 @@ def _lun_occult_when_loc_pythonic(
             jd_tt = jd + deltat(jd)
             if planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 star_pos, _, _ = fixstar_ut(star_name, jd, FLG_SPEED)
                 az, alt_true, _alt_app = azalt(jd, ECL2HOR, geopos, 0, 0, star_pos[:3])
                 return alt_true, az
@@ -6973,11 +7121,10 @@ def _lun_occult_when_loc_pythonic(
             which can be up to ~1 degree and significantly affects timing.
             """
             jd_tt = jd_check + deltat(jd_check)
-            moon_ecl = _topo_ecliptic(
-                reader, jd_tt, jd_check, MOON, geopos, FLG_SPEED
-            )
+            moon_ecl = _topo_ecliptic(reader, jd_tt, jd_check, MOON, geopos, FLG_SPEED)
             if planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 star_pos, _, _ = fixstar_ut(star_name, jd_check, FLG_SPEED)
                 target_lon, target_lat = star_pos[0], star_pos[1]
             else:
@@ -6985,9 +7132,7 @@ def _lun_occult_when_loc_pythonic(
                     reader, jd_tt, jd_check, planet, geopos, FLG_SPEED
                 )
                 target_lon, target_lat = target_ecl[0], target_ecl[1]
-            return angular_separation(
-                moon_ecl[0], moon_ecl[1], target_lon, target_lat
-            )
+            return angular_separation(moon_ecl[0], moon_ecl[1], target_lon, target_lat)
     else:
         eph = get_planets()
         ts = get_timescale()
@@ -7014,6 +7159,7 @@ def _lun_occult_when_loc_pythonic(
                 ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
                 dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
                 from skyfield.api import Star
+
                 star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
                 star_app = observer_at.at(t).observe(star_obj).apparent()
                 alt, az, _ = star_app.altaz()
@@ -7523,7 +7669,14 @@ def lun_occult_when_loc(
     # Call the internal implementation with LEB→Skyfield fallback
     ecl_type, times, attr = _call_with_leb_skyfield_fallback(
         _lun_occult_when_loc_pythonic,
-        tjdut, planet, star_name, lat, lon, altitude, flags, backwards,
+        tjdut,
+        planet,
+        star_name,
+        lat,
+        lon,
+        altitude,
+        flags,
+        backwards,
     )
 
     # Return in reference API order: (retflags, tret, attr)
@@ -7655,6 +7808,7 @@ def _lun_occult_where_pythonic(
         def _get_target_position(jd_calc: float) -> Tuple[float, float, float]:
             if planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 pos, _, _ = fixstar_ut(star_name, jd_calc, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0], pos[1], 0.0001
             else:
@@ -7752,6 +7906,7 @@ def _lun_occult_where_pythonic(
                 moon_pos = _topo_ecliptic(_reader, jd_tt, jd, MOON, _gp, FLG_SPEED)
                 if planet == 0:
                     from .fixed_stars import fixstar_ut
+
                     tgt_pos, _, _ = fixstar_ut(star_name, jd, FLG_SPEED)
                 else:
                     tgt_pos = _topo_ecliptic(_reader, jd_tt, jd, planet, _gp, FLG_SPEED)
@@ -7774,6 +7929,7 @@ def _lun_occult_where_pythonic(
                 ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
                 dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
                 from skyfield.api import Star
+
                 star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
                 return observer_at.at(time_obj).observe(star_obj).apparent()
             else:
@@ -7882,11 +8038,14 @@ def _lun_occult_where_pythonic(
             _gp_c = (central_lon, central_lat, 0.0)
             _jd_tt_c = jd + deltat(jd)
             _moon_c = _topo_ecliptic(_reader, _jd_tt_c, jd, MOON, _gp_c, FLG_SPEED)
-            _moon_az_c, moon_altitude, apparent_alt = azalt(jd, ECL2HOR, _gp_c, 1013.25, 15.0, _moon_c[:3])
+            _moon_az_c, moon_altitude, apparent_alt = azalt(
+                jd, ECL2HOR, _gp_c, 1013.25, 15.0, _moon_c[:3]
+            )
             moon_azimuth = _moon_az_c
 
             if planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 _tgt_c, _, _ = fixstar_ut(star_name, jd, FLG_SPEED)
             else:
                 _tgt_c = _topo_ecliptic(_reader, _jd_tt_c, jd, planet, _gp_c, FLG_SPEED)
@@ -8023,7 +8182,10 @@ def lun_occult_where(
         Tuple of (retflag, geopos, attr) matching pyswisseph.
     """
     return _call_with_leb_skyfield_fallback(
-        _lun_occult_where_internal, tjdut, body, flags,
+        _lun_occult_where_internal,
+        tjdut,
+        body,
+        flags,
     )
 
 
@@ -8047,7 +8209,14 @@ def rise_trans(
     for partial/custom LEB files. See the impl docstring for the full API.
     """
     return _call_with_leb_skyfield_fallback(
-        _rise_trans_impl, tjdut, body, rsmi, geopos, atpress, attemp, flags,
+        _rise_trans_impl,
+        tjdut,
+        body,
+        rsmi,
+        geopos,
+        atpress,
+        attemp,
+        flags,
     )
 
 
@@ -8181,6 +8350,7 @@ def _rise_trans_impl(
         try:
             from . import fast_calc as _fc_rt
             from .time_utils import deltat as _sd_rt
+
             if not is_fixed_star:
                 _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
         except (KeyError, ValueError):
@@ -8289,22 +8459,27 @@ def _rise_trans_impl(
             jd_tt = jd + deltat(jd)
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
+
                 star_pos, _, _ = fixstar_ut(body, jd, FLG_SPEED)
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
             else:
-                pos = _topo_ecliptic(_reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED)
+                pos = _topo_ecliptic(
+                    _reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED
+                )
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, pos[:3])
             return alt_true, az
 
         def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
+
                 pos, _, _ = fixstar_ut(body, jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
                 return eq[0] / 15.0, eq[1]
     else:
+
         def _get_semi_diameter(jd: float, body: int) -> float:
             if body == SUN:
                 t = ts.ut1_jd(jd)
@@ -8348,16 +8523,38 @@ def _rise_trans_impl(
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
         if _use_leb_rt:
             return _calculate_transit_leb(
-                jd_start, lon, event_type, _get_body_ra_dec, CALC_ITRANSIT,
+                jd_start,
+                lon,
+                event_type,
+                _get_body_ra_dec,
+                CALC_ITRANSIT,
             )
         return _calculate_transit(
-            jd_start, lat, lon, event_type, ts, earth, target, observer,
+            jd_start,
+            lat,
+            lon,
+            event_type,
+            ts,
+            earth,
+            target,
+            observer,
             CALC_ITRANSIT,
         )
 
     return _calculate_rise_set(
-        jd_start, lat, lon, event_type, target_altitude, ts, earth, target,
-        observer, _get_body_altaz, _get_body_ra_dec, CALC_RISE, CALC_SET,
+        jd_start,
+        lat,
+        lon,
+        event_type,
+        target_altitude,
+        ts,
+        earth,
+        target,
+        observer,
+        _get_body_altaz,
+        _get_body_ra_dec,
+        CALC_RISE,
+        CALC_SET,
         rsmi,
     )
 
@@ -8658,7 +8855,14 @@ def rise_trans_true_hor(
     """
     return _call_with_leb_skyfield_fallback(
         _rise_trans_true_hor_impl,
-        tjdut, body, rsmi, geopos, atpress, attemp, horhgt, flags,
+        tjdut,
+        body,
+        rsmi,
+        geopos,
+        atpress,
+        attemp,
+        horhgt,
+        flags,
     )
 
 
@@ -8796,6 +9000,7 @@ def _rise_trans_true_hor_impl(
         try:
             from . import fast_calc as _fc_rt
             from .time_utils import deltat as _sd_rt
+
             if not is_fixed_star:
                 _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
         except (KeyError, ValueError):
@@ -8908,22 +9113,27 @@ def _rise_trans_true_hor_impl(
             jd_tt = jd + deltat(jd)
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
+
                 star_pos, _, _ = fixstar_ut(body, jd, FLG_SPEED)
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
             else:
-                pos = _topo_ecliptic(_reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED)
+                pos = _topo_ecliptic(
+                    _reader_rt, jd_tt, jd, planet, geopos_leb, FLG_SPEED
+                )
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, pos[:3])
             return alt_true, az
 
         def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
+
                 pos, _, _ = fixstar_ut(body, jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
                 return eq[0] / 15.0, eq[1]
     else:
+
         def _get_body_altaz(jd: float) -> Tuple[float, float]:
             t = ts.ut1_jd(jd)
             observer_at = earth + observer
@@ -8940,16 +9150,38 @@ def _rise_trans_true_hor_impl(
     if event_type in (CALC_MTRANSIT, CALC_ITRANSIT):
         if _use_leb_rt:
             return _calculate_transit_leb(
-                jd_start, lon, event_type, _get_body_ra_dec, CALC_ITRANSIT,
+                jd_start,
+                lon,
+                event_type,
+                _get_body_ra_dec,
+                CALC_ITRANSIT,
             )
         return _calculate_transit(
-            jd_start, lat, lon, event_type, ts, earth, target, observer,
+            jd_start,
+            lat,
+            lon,
+            event_type,
+            ts,
+            earth,
+            target,
+            observer,
             CALC_ITRANSIT,
         )
 
     return _calculate_rise_set(
-        jd_start, lat, lon, event_type, target_altitude, ts, earth, target,
-        observer, _get_body_altaz, _get_body_ra_dec, CALC_RISE, CALC_SET,
+        jd_start,
+        lat,
+        lon,
+        event_type,
+        target_altitude,
+        ts,
+        earth,
+        target,
+        observer,
+        _get_body_altaz,
+        _get_body_ra_dec,
+        CALC_RISE,
+        CALC_SET,
         rsmi,
     )
 
@@ -10036,9 +10268,7 @@ def vis_limit_mag(
     if is_fixed_star:
         # Fixed star calculation
         try:
-            star_result, star_name_out, retflag = fixstar2_ut(
-                objname, jd, flags & 0xFF
-            )
+            star_result, star_name_out, retflag = fixstar2_ut(objname, jd, flags & 0xFF)
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
             # We need to convert ecliptic to horizontal
@@ -13314,7 +13544,11 @@ def calc_eclipse_path_width(
     full API contract.
     """
     return _call_with_leb_skyfield_fallback(
-        _calc_eclipse_path_width_impl, jd, lat, lon, flags,
+        _calc_eclipse_path_width_impl,
+        jd,
+        lat,
+        lon,
+        flags,
     )
 
 
@@ -13450,7 +13684,9 @@ def _calc_eclipse_path_width_impl(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0.0
 
-        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(
+            jd, ECL2HOR, _gp, 0, 0, sun_topo[:3]
+        )
         sun_altitude = sun_alt_true
 
         if sun_altitude <= 0:
@@ -14471,13 +14707,17 @@ def _sol_eclipse_magnitude_at_loc_pythonic(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0.0
 
-        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(
+            jd, ECL2HOR, _gp, 0, 0, sun_topo[:3]
+        )
         sun_altitude = sun_alt_true
 
         if sun_altitude < -1.0:
             return 0.0
 
-        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        separation = angular_separation(
+            sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1]
+        )
         sun_dist_au = sun_topo[2]
         moon_dist_au = moon_topo[2]
     else:
@@ -14603,7 +14843,11 @@ def sol_eclipse_magnitude_at_loc(
 
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_magnitude_at_loc_pythonic,
-        tjd_ut, lat, lon, altitude, ifl,
+        tjd_ut,
+        lat,
+        lon,
+        altitude,
+        ifl,
     )
 
 
@@ -14700,13 +14944,17 @@ def _sol_eclipse_obscuration_at_loc_pythonic(
         except (KeyError, ValueError, ArithmeticError, IndexError):
             return 0.0
 
-        sun_az_val, sun_alt_true, sun_alt_app = azalt(jd, ECL2HOR, _gp, 0, 0, sun_topo[:3])
+        sun_az_val, sun_alt_true, sun_alt_app = azalt(
+            jd, ECL2HOR, _gp, 0, 0, sun_topo[:3]
+        )
         sun_altitude = sun_alt_true
 
         if sun_altitude < -1.0:
             return 0.0
 
-        separation = angular_separation(sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1])
+        separation = angular_separation(
+            sun_topo[0], sun_topo[1], moon_topo[0], moon_topo[1]
+        )
         sun_dist_au = sun_topo[2]
         moon_dist_au = moon_topo[2]
     else:
@@ -14866,7 +15114,11 @@ def sol_eclipse_obscuration_at_loc(
 
     return _call_with_leb_skyfield_fallback(
         _sol_eclipse_obscuration_at_loc_pythonic,
-        tjd_ut, lat, lon, altitude, ifl,
+        tjd_ut,
+        lat,
+        lon,
+        altitude,
+        ifl,
     )
 
 
@@ -15327,7 +15579,9 @@ def planet_occult_when_glob(
 
     # Validate occulting planet - can't be Sun or Moon (use other functions for those)
     if occulting_planet == SUN:
-        raise ValueError("Sun cannot be an occulting body - use _sol_eclipse_when_glob_pythonic")
+        raise ValueError(
+            "Sun cannot be an occulting body - use _sol_eclipse_when_glob_pythonic"
+        )
     if occulting_planet == MOON:
         raise ValueError("Moon cannot be an occulting body - use lun_occult_when_glob")
     if occulting_planet not in _PLANET_MAP:
@@ -15614,8 +15868,14 @@ def planet_occult_when_loc(
     """
     return _call_with_leb_skyfield_fallback(
         _planet_occult_when_loc_impl,
-        jd_start, occulting_planet, occulted_planet, star_name,
-        lat, lon, altitude, flags,
+        jd_start,
+        occulting_planet,
+        occulted_planet,
+        star_name,
+        lat,
+        lon,
+        altitude,
+        flags,
     )
 
 
@@ -15715,9 +15975,13 @@ def _planet_occult_when_loc_impl(
 
     # Validate planets
     if occulting_planet == SUN:
-        raise ValueError("Sun cannot be an occulting body - use _sol_eclipse_when_loc_pythonic")
+        raise ValueError(
+            "Sun cannot be an occulting body - use _sol_eclipse_when_loc_pythonic"
+        )
     if occulting_planet == MOON:
-        raise ValueError("Moon cannot be an occulting body - use _lun_occult_when_loc_pythonic")
+        raise ValueError(
+            "Moon cannot be an occulting body - use _lun_occult_when_loc_pythonic"
+        )
     if occulting_planet not in _PLANET_MAP:
         raise ValueError(f"Invalid occulting planet ID: {occulting_planet}")
 
@@ -15749,10 +16013,13 @@ def _planet_occult_when_loc_impl(
             jd_tt = jd + deltat(jd)
             if occulted_planet == 0:
                 from .fixed_stars import fixstar_ut
+
                 star_pos, _, _ = fixstar_ut(star_name, jd, FLG_SPEED)
                 az, alt_true, _alt_app = azalt(jd, ECL2HOR, geopos, 0, 0, star_pos[:3])
             else:
-                pos = _topo_ecliptic(_reader, jd_tt, jd, occulted_planet, geopos, FLG_SPEED)
+                pos = _topo_ecliptic(
+                    _reader, jd_tt, jd, occulted_planet, geopos, FLG_SPEED
+                )
                 az, alt_true, _alt_app = azalt(jd, ECL2HOR, geopos, 0, 0, pos[:3])
             return alt_true, az
     else:
@@ -15764,6 +16031,7 @@ def _planet_occult_when_loc_impl(
 
         def _get_body_altitude(jd: float, planet_id: int) -> Tuple[float, float]:
             from .planets import get_planet_target
+
             target_name = _PLANET_MAP[planet_id]
             target = get_planet_target(eph, target_name)
             t = ts.ut1_jd(jd)
@@ -15773,6 +16041,7 @@ def _planet_occult_when_loc_impl(
 
         def _get_target_altitude(jd: float) -> Tuple[float, float]:
             from .planets import get_planet_target
+
             t = ts.ut1_jd(jd)
             if occulted_planet == 0:
                 star_id, err, _ = _resolve_star_id(star_name)
@@ -15783,6 +16052,7 @@ def _planet_occult_when_loc_impl(
                 ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
                 dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
                 from skyfield.api import Star
+
                 star_obj = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
                 target_app = observer_at.at(t).observe(star_obj).apparent()
             else:
@@ -15844,15 +16114,34 @@ def _planet_occult_when_loc_impl(
 
                     _jd_tt_occ = jd_max + _sd_occ(jd_max)
                     _gp_occ = (lon, lat, altitude)
-                    occ_pos = _tp_occ(_reader, _jd_tt_occ, jd_max, occulting_planet, _gp_occ, FLG_SPEED)
+                    occ_pos = _tp_occ(
+                        _reader,
+                        _jd_tt_occ,
+                        jd_max,
+                        occulting_planet,
+                        _gp_occ,
+                        FLG_SPEED,
+                    )
                     if occulted_planet == 0:
                         from .fixed_stars import fixstar_ut
+
                         tgt_pos, _, _ = fixstar_ut(star_name, jd_max, FLG_SPEED)
                         target_radius = 0.0001
                     else:
-                        tgt_pos = _tp_occ(_reader, _jd_tt_occ, jd_max, occulted_planet, _gp_occ, FLG_SPEED)
-                        target_radius = _calc_planet_angular_radius(occulted_planet, tgt_pos[2])
-                    separation = _ang_sep_occ(occ_pos[0], occ_pos[1], tgt_pos[0], tgt_pos[1])
+                        tgt_pos = _tp_occ(
+                            _reader,
+                            _jd_tt_occ,
+                            jd_max,
+                            occulted_planet,
+                            _gp_occ,
+                            FLG_SPEED,
+                        )
+                        target_radius = _calc_planet_angular_radius(
+                            occulted_planet, tgt_pos[2]
+                        )
+                    separation = _ang_sep_occ(
+                        occ_pos[0], occ_pos[1], tgt_pos[0], tgt_pos[1]
+                    )
                     occ_dist = occ_pos[2]
                     occ_radius = _calc_planet_angular_radius(occulting_planet, occ_dist)
                 else:
@@ -15869,9 +16158,12 @@ def _planet_occult_when_loc_impl(
                         ra_deg = star.ra_j2000 + (star.pm_ra * t_years) / 3600.0
                         dec_deg = star.dec_j2000 + (star.pm_dec * t_years) / 3600.0
                         from skyfield.api import Star
+
                         target_body = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
                     else:
-                        target_body = get_planet_target(eph, _PLANET_MAP[occulted_planet])
+                        target_body = get_planet_target(
+                            eph, _PLANET_MAP[occulted_planet]
+                        )
                     target_app = observer_at.at(t).observe(target_body).apparent()
                     separation = occ_app.separation_from(target_app).degrees
                     occ_dist = occ_app.distance().au

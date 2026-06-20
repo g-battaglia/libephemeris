@@ -1408,4 +1408,34 @@ __all__ = [
     "WALDEMATH",
     "WHITE_MOON",
     "ZEUS",
+    # Public API imported above but previously omitted from __all__
+    # Calculation mode and LEB file selection
+    "set_calc_mode",
+    "get_calc_mode",
+    "set_leb_file",
+    "get_leb_reader",
+    "reset_session",
+    # Houses with polar-circle fallback
+    "houses_with_fallback",
+    "houses_armc_with_fallback",
+    # Extreme/polar latitude helpers
+    "get_polar_latitude_threshold",
+    "get_extreme_latitude_info",
+    "EXTREME_LATITUDE_THRESHOLD",
+    # Eclipses / occultations
+    "lun_eclipse_gamma",
+    "planet_occult_when_glob",
+    "planet_occult_when_loc",
+    "calc_eclipse_northern_limit",
+    "calc_eclipse_southern_limit",
+    # Besselian elements
+    "BesselianElements",
+    "interpolate_besselian_elements",
+    # Nutation model
+    "get_nutation_model",
+    "NutationFallbackWarning",
+    # Hypothetical bodies
+    "calc_proserpina",
+    # Logging
+    "LIBEPHEMERIS_LOG_LEVEL_ENV",
 ]
