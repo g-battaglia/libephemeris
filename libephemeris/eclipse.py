@@ -32,7 +32,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Sequence, Tuple, Union
+from typing import Sequence, Tuple, Union, cast
 
 import numpy as np
 from skyfield.errors import EphemerisRangeError
@@ -5011,7 +5011,7 @@ def _calculate_lunar_eclipse_phases(
     umbra_radius: float,
     penumbra_radius: float,
     moon_lat_at_max: float,
-) -> Tuple[float, float, float, float, float, float, float, float]:
+) -> Tuple[float, float, float, float, float, float, float, float, float, float]:
     """
     Calculate times of lunar eclipse phases (contacts).
 
@@ -8352,7 +8352,7 @@ def _rise_trans_impl(
             from .time_utils import deltat as _sd_rt
 
             if not is_fixed_star:
-                _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
+                _fc_rt.fast_calc_ut(_reader_rt, jd_start, cast(int, body), FLG_SPEED)
         except (KeyError, ValueError):
             _use_leb_rt = False
 
@@ -8363,7 +8363,7 @@ def _rise_trans_impl(
         if is_fixed_star:
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
         ts = get_timescale()
@@ -8378,7 +8378,7 @@ def _rise_trans_impl(
             from skyfield.api import Star as SkyfieldStar
             from .fixed_stars import FIXED_STARS, _resolve_star_id
 
-            star_id, err, _ = _resolve_star_id(body)
+            star_id, err, _ = _resolve_star_id(cast(str, body))
             if err is not None:
                 raise ValueError(err)
             star_entry = FIXED_STARS[star_id]
@@ -8388,7 +8388,7 @@ def _rise_trans_impl(
             target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
             target_name = _PLANET_MAP[planet]
@@ -8460,7 +8460,7 @@ def _rise_trans_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                star_pos, _, _ = fixstar_ut(body, jd, FLG_SPEED)
+                star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
             else:
                 pos = _topo_ecliptic(
@@ -8473,7 +8473,7 @@ def _rise_trans_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                pos, _, _ = fixstar_ut(body, jd, FLG_EQUATORIAL | FLG_SPEED)
+                pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
@@ -8481,6 +8481,7 @@ def _rise_trans_impl(
     else:
 
         def _get_semi_diameter(jd: float, body: int) -> float:
+            assert earth is not None  # set in the Skyfield branch
             if body == SUN:
                 t = ts.ut1_jd(jd)
                 sun_pos = earth.at(t).observe(eph["sun"])
@@ -8494,6 +8495,7 @@ def _rise_trans_impl(
             return 0.0
 
         def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            assert earth is not None and observer is not None  # Skyfield branch
             t = ts.ut1_jd(jd)
             observer_at = earth + observer
             body_app = observer_at.at(t).observe(target).apparent()
@@ -8501,6 +8503,7 @@ def _rise_trans_impl(
             return alt.degrees, (az.degrees + 180.0) % 360.0
 
         def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            assert earth is not None  # set in the Skyfield branch
             t = ts.ut1_jd(jd)
             body_app = earth.at(t).observe(target).apparent()
             ra, dec, _ = body_app.radec(epoch="date")
@@ -9002,7 +9005,7 @@ def _rise_trans_true_hor_impl(
             from .time_utils import deltat as _sd_rt
 
             if not is_fixed_star:
-                _fc_rt.fast_calc_ut(_reader_rt, jd_start, body, FLG_SPEED)
+                _fc_rt.fast_calc_ut(_reader_rt, jd_start, cast(int, body), FLG_SPEED)
         except (KeyError, ValueError):
             _use_leb_rt = False
 
@@ -9013,7 +9016,7 @@ def _rise_trans_true_hor_impl(
         if is_fixed_star:
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
         ts = get_timescale()
@@ -9028,7 +9031,7 @@ def _rise_trans_true_hor_impl(
             from skyfield.api import Star as SkyfieldStar
             from .fixed_stars import FIXED_STARS, _resolve_star_id
 
-            star_id, err, _ = _resolve_star_id(body)
+            star_id, err, _ = _resolve_star_id(cast(str, body))
             if err is not None:
                 raise ValueError(err)
             star_entry = FIXED_STARS[star_id]
@@ -9038,7 +9041,7 @@ def _rise_trans_true_hor_impl(
             target = SkyfieldStar(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
             planet = -1
         else:
-            planet = body
+            planet = cast(int, body)
             if planet not in _PLANET_MAP:
                 raise ValueError("illegal planet number %d." % planet)
             target_name = _PLANET_MAP[planet]
@@ -9114,7 +9117,7 @@ def _rise_trans_true_hor_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                star_pos, _, _ = fixstar_ut(body, jd, FLG_SPEED)
+                star_pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_SPEED)
                 az, alt_true, _ = azalt(jd, ECL2HOR, geopos_leb, 0, 0, star_pos[:3])
             else:
                 pos = _topo_ecliptic(
@@ -9127,7 +9130,7 @@ def _rise_trans_true_hor_impl(
             if is_fixed_star:
                 from .fixed_stars import fixstar_ut
 
-                pos, _, _ = fixstar_ut(body, jd, FLG_EQUATORIAL | FLG_SPEED)
+                pos, _, _ = fixstar_ut(cast(str, body), jd, FLG_EQUATORIAL | FLG_SPEED)
                 return pos[0] / 15.0, pos[1]
             else:
                 eq, _ = calc_ut(jd, planet, FLG_EQUATORIAL | FLG_SPEED)
@@ -9135,6 +9138,7 @@ def _rise_trans_true_hor_impl(
     else:
 
         def _get_body_altaz(jd: float) -> Tuple[float, float]:
+            assert earth is not None and observer is not None  # Skyfield branch
             t = ts.ut1_jd(jd)
             observer_at = earth + observer
             body_app = observer_at.at(t).observe(target).apparent()
@@ -9142,6 +9146,7 @@ def _rise_trans_true_hor_impl(
             return alt.degrees, (az.degrees + 180.0) % 360.0
 
         def _get_body_ra_dec(jd: float) -> Tuple[float, float]:
+            assert earth is not None  # set in the Skyfield branch
             t = ts.ut1_jd(jd)
             body_app = earth.at(t).observe(target).apparent()
             ra, dec, _ = body_app.radec(epoch="date")
@@ -13894,6 +13899,7 @@ def _get_saros_info(
     Returns:
         Tuple of (saros_series_number, saros_member_number) as floats.
     """
+    references: Tuple[Tuple[float, int, int], ...]
     if eclipse_type.lower() == "solar":
         references = _SOLAR_SAROS_REFERENCES
     elif eclipse_type.lower() == "lunar":

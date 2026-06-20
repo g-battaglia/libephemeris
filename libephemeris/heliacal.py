@@ -902,7 +902,11 @@ def _leb_body_altaz(
         ecl_lon, ecl_lat, ecl_dist = topo[0], topo[1], topo[2]
 
     az, alt_true, alt_app = azalt(
-        jd_ut, ECL2HOR, geopos_lonlat, atpress, attemp,
+        jd_ut,
+        ECL2HOR,
+        geopos_lonlat,
+        atpress,
+        attemp,
         (ecl_lon, ecl_lat, ecl_dist),
     )
     # Convert SE convention (S=0, westward) to Skyfield convention (N=0, eastward)
@@ -968,8 +972,10 @@ def _heliacal_ut_leb(
 
     # --- validation (same as Skyfield path) ---
     if event_type not in (
-        HELIACAL_RISING, HELIACAL_SETTING,
-        EVENING_FIRST, MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
             f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
@@ -1010,11 +1016,22 @@ def _heliacal_ut_leb(
     def _get_altitudes(jd: float):
         """Return (sun_alt, body_alt, body_az)."""
         _, sun_alt, _ = _leb_body_altaz(
-            reader, jd, SUN, geopos, pressure, temperature,
+            reader,
+            jd,
+            SUN,
+            geopos,
+            pressure,
+            temperature,
         )
         az, body_alt, _ = _leb_body_altaz(
-            reader, jd, body, geopos, pressure, temperature,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            pressure,
+            temperature,
+            is_star=is_star,
+            star_name=star_name,
         )
         return sun_alt, body_alt, az
 
@@ -1028,8 +1045,12 @@ def _heliacal_ut_leb(
         # Manual elongation from ecliptic coords
         sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
         body_ecl = _leb_ecliptic_pos(
-            reader, jd, body, geopos,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
         )
         return angular_separation(sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1])
 
@@ -1052,24 +1073,40 @@ def _heliacal_ut_leb(
     def _get_moon_data(jd: float):
         """Return (moon_alt, phase, moon_body_sep)."""
         _, moon_alt, _ = _leb_body_altaz(
-            reader, jd, MOON, geopos, pressure, temperature,
+            reader,
+            jd,
+            MOON,
+            geopos,
+            pressure,
+            temperature,
         )
         # Moon phase from geocentric elongation (matching Skyfield path)
         from .planets import calc_ut as _scu_md
+
         _sun_geo, _ = _scu_md(jd, SUN, FLG_SPEED)
         _moon_geo, _ = _scu_md(jd, MOON, FLG_SPEED)
         elong_moon = angular_separation(
-            _sun_geo[0], _sun_geo[1], _moon_geo[0], _moon_geo[1],
+            _sun_geo[0],
+            _sun_geo[1],
+            _moon_geo[0],
+            _moon_geo[1],
         )
         phase = (1.0 - math.cos(math.radians(elong_moon))) / 2.0
         moon_ecl = _leb_ecliptic_pos(reader, jd, MOON, geopos)
 
         body_ecl = _leb_ecliptic_pos(
-            reader, jd, body, geopos,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
         )
         moon_body_sep = angular_separation(
-            moon_ecl[0], moon_ecl[1], body_ecl[0], body_ecl[1],
+            moon_ecl[0],
+            moon_ecl[1],
+            body_ecl[0],
+            body_ecl[1],
         )
         return moon_alt, phase, moon_body_sep
 
@@ -1083,8 +1120,12 @@ def _heliacal_ut_leb(
         body_mag = _get_body_magnitude(jd)
         moon_alt, moon_phase, moon_body_sep = _get_moon_data(jd)
         visible = schaefer.is_visible(
-            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
-            elongation=elongation, moon_alt=moon_alt, moon_phase=moon_phase,
+            body_alt=body_alt,
+            body_mag=body_mag,
+            sun_alt=sun_alt,
+            elongation=elongation,
+            moon_alt=moon_alt,
+            moon_phase=moon_phase,
             moon_obj_angle=moon_body_sep,
         )
         return visible, sun_alt, body_alt, elongation
@@ -1096,9 +1137,14 @@ def _heliacal_ut_leb(
             return False
         body_mag = _get_body_magnitude(jd)
         return schaefer.is_visible(
-            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
-            elongation=elongation, moon_alt=-90.0, moon_phase=0.0,
-            moon_obj_angle=180.0, margin=margin,
+            body_alt=body_alt,
+            body_mag=body_mag,
+            sun_alt=sun_alt,
+            elongation=elongation,
+            moon_alt=-90.0,
+            moon_phase=0.0,
+            moon_obj_angle=180.0,
+            margin=margin,
         )
 
     def _find_twilight_center(jd_day: float, morning: bool) -> float:
@@ -1291,8 +1337,10 @@ def _heliacal_pheno_ut_leb(
     from .utils import angular_separation
 
     if event_type not in (
-        HELIACAL_RISING, HELIACAL_SETTING,
-        EVENING_FIRST, MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
             f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
@@ -1314,13 +1362,24 @@ def _heliacal_pheno_ut_leb(
     # --- positions via LEB ---
     # Sun
     sun_az, sun_alt_deg, _ = _leb_body_altaz(
-        reader, jd, SUN, geopos, pressure, temperature,
+        reader,
+        jd,
+        SUN,
+        geopos,
+        pressure,
+        temperature,
     )
 
     # Body
     body_az_deg, body_alt_deg, _body_app_alt = _leb_body_altaz(
-        reader, jd, body, geopos, pressure, temperature,
-        is_star=is_star, star_name=star_name,
+        reader,
+        jd,
+        body,
+        geopos,
+        pressure,
+        temperature,
+        is_star=is_star,
+        star_name=star_name,
     )
 
     # Atmospheric refraction (same formula as Skyfield path)
@@ -1335,8 +1394,12 @@ def _heliacal_pheno_ut_leb(
 
     # Get ecliptic positions for parallax and elongation calculations
     body_ecl = _leb_ecliptic_pos(
-        reader, jd, body, geopos,
-        is_star=is_star, star_name=star_name,
+        reader,
+        jd,
+        body,
+        geopos,
+        is_star=is_star,
+        star_name=star_name,
     )
     sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
 
@@ -1349,15 +1412,16 @@ def _heliacal_pheno_ut_leb(
 
     if is_star:
         from .fixed_stars import fixstar_ut
+
+        assert star_name is not None  # set whenever is_star is True
         _eq_pos, _, _ = fixstar_ut(
             star_name, jd, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
         from .planets import calc_ut as _scu_hp
-        _eq_pos, _ = _scu_hp(
-            jd, body, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
-        )
+
+        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED)
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
 
     # Use GAST to match the Skyfield path's t.gast + J2000 RA
@@ -1371,8 +1435,9 @@ def _heliacal_pheno_ut_leb(
     _ha_rad = math.radians(_ha_deg)
     _dec_rad = math.radians(_body_dec_deg)
     _lat_rad = math.radians(geopos[1])
-    _sin_alt = (math.sin(_lat_rad) * math.sin(_dec_rad)
-                + math.cos(_lat_rad) * math.cos(_dec_rad) * math.cos(_ha_rad))
+    _sin_alt = math.sin(_lat_rad) * math.sin(_dec_rad) + math.cos(_lat_rad) * math.cos(
+        _dec_rad
+    ) * math.cos(_ha_rad)
     geo_alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, _sin_alt))))
 
     # Arcus visionis
@@ -1390,7 +1455,10 @@ def _heliacal_pheno_ut_leb(
     # Elongation and magnitude
     if is_star:
         elongation = angular_separation(
-            sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+            sun_ecl[0],
+            sun_ecl[1],
+            body_ecl[0],
+            body_ecl[1],
         )
         magnitude = star_magnitude
         phase_angle = 0.0
@@ -1402,7 +1470,10 @@ def _heliacal_pheno_ut_leb(
             phase_angle = pheno[0]
         except (ValueError, TypeError, ArithmeticError):
             elongation = angular_separation(
-                sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+                sun_ecl[0],
+                sun_ecl[1],
+                body_ecl[0],
+                body_ecl[1],
             )
             magnitude = 0.0
             phase_angle = 0.0
@@ -1425,6 +1496,7 @@ def _heliacal_pheno_ut_leb(
         earth_radius_au = 6371.0 / 149597870.7
         # Use geocentric distance (not topocentric) for parallax, matching Skyfield
         from .planets import calc_ut as _scu_par
+
         _geo_pos, _ = _scu_par(jd, body, FLG_SPEED)
         dist_au = _geo_pos[2]
         if dist_au > 0:
@@ -1596,12 +1668,22 @@ def _vis_limit_mag_leb(
 
     # Sun position
     sun_az, sun_alt, _ = _leb_body_altaz(
-        reader, tjdut, SUN, geopos_ll, pressure, temperature,
+        reader,
+        tjdut,
+        SUN,
+        geopos_ll,
+        pressure,
+        temperature,
     )
 
     # Moon position
     moon_az, moon_alt, _ = _leb_body_altaz(
-        reader, tjdut, MOON, geopos_ll, pressure, temperature,
+        reader,
+        tjdut,
+        MOON,
+        geopos_ll,
+        pressure,
+        temperature,
     )
 
     # Determine object
@@ -1613,10 +1695,16 @@ def _vis_limit_mag_leb(
     except ValueError:
         name_upper = objname.upper().strip()
         planet_names = {
-            "SUN": SUN, "MOON": MOON,
-            "MERCURY": 2, "VENUS": 3, "MARS": 4,
-            "JUPITER": 5, "SATURN": 6, "URANUS": 7,
-            "NEPTUNE": 8, "PLUTO": 9,
+            "SUN": SUN,
+            "MOON": MOON,
+            "MERCURY": 2,
+            "VENUS": 3,
+            "MARS": 4,
+            "JUPITER": 5,
+            "SATURN": 6,
+            "URANUS": 7,
+            "NEPTUNE": 8,
+            "PLUTO": 9,
         }
         if name_upper in planet_names:
             body_id = planet_names[name_upper]
@@ -1642,7 +1730,11 @@ def _vis_limit_mag_leb(
                 obj_mag = 2.0
 
             hor_result = azalt(
-                tjdut, ECL2HOR, geopos_ll, pressure, temperature,
+                tjdut,
+                ECL2HOR,
+                geopos_ll,
+                pressure,
+                temperature,
                 (star_lon, star_lat, 1.0),
             )
             obj_az = hor_result[0]
@@ -1657,7 +1749,12 @@ def _vis_limit_mag_leb(
 
         if body_id in _PLANET_MAP:
             az, alt_true, _ = _leb_body_altaz(
-                reader, tjdut, body_id, geopos_ll, pressure, temperature,
+                reader,
+                tjdut,
+                body_id,
+                geopos_ll,
+                pressure,
+                temperature,
             )
             obj_alt = alt_true
             obj_az = az
@@ -1703,18 +1800,26 @@ def _vis_limit_mag_leb(
 
         if is_star_flag:
             from .fixed_stars import fixstar_ut as _sfut_vlm
+
             _star_ecl, _, _ = _sfut_vlm(objname, tjdut, FLG_SPEED)
             _star_pos = (_star_ecl[0], _star_ecl[1])
         else:
+            assert body_id is not None  # set whenever is_star_flag is False
             _body_ecl = _leb_ecliptic_pos(reader, tjdut, body_id, geopos_ll)
             _star_pos = (_body_ecl[0], _body_ecl[1])
         moon_ecl = _leb_ecliptic_pos(reader, tjdut, MOON, geopos_ll)
         sun_ecl = _leb_ecliptic_pos(reader, tjdut, SUN, geopos_ll)
         moon_obj_angle = angular_separation(
-            _star_pos[0], _star_pos[1], moon_ecl[0], moon_ecl[1],
+            _star_pos[0],
+            _star_pos[1],
+            moon_ecl[0],
+            moon_ecl[1],
         )
         sun_obj_angle = angular_separation(
-            _star_pos[0], _star_pos[1], sun_ecl[0], sun_ecl[1],
+            _star_pos[0],
+            _star_pos[1],
+            sun_ecl[0],
+            sun_ecl[1],
         )
     except (ValueError, TypeError, AttributeError):
         pass
@@ -1738,9 +1843,16 @@ def _vis_limit_mag_leb(
         vision_type = HELFLAG_SCOTOPIC
 
     dret = (
-        limiting_mag, obj_alt, obj_az,
-        sun_alt, sun_az, moon_alt, moon_az,
-        apparent_obj_mag, 0.0, 0.0,
+        limiting_mag,
+        obj_alt,
+        obj_az,
+        sun_alt,
+        sun_az,
+        moon_alt,
+        moon_az,
+        apparent_obj_mag,
+        0.0,
+        0.0,
     )
     return float(vision_type), dret
 
@@ -1835,8 +1947,17 @@ def _heliacal_ut_pythonic(
     if _leb_rdr is not None:
         try:
             return _heliacal_ut_leb(
-                _leb_rdr, jd_start, lat, lon, altitude,
-                pressure, temperature, humidity, body, event_type, flags,
+                _leb_rdr,
+                jd_start,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                humidity,
+                body,
+                event_type,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -1844,6 +1965,7 @@ def _heliacal_ut_pythonic(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
@@ -2986,8 +3108,17 @@ def _heliacal_pheno_ut_pythonic(
     if _leb_rdr is not None:
         try:
             return _heliacal_pheno_ut_leb(
-                _leb_rdr, jd, lat, lon, altitude,
-                pressure, temperature, humidity, body, event_type, flags,
+                _leb_rdr,
+                jd,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                humidity,
+                body,
+                event_type,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -2995,6 +3126,7 @@ def _heliacal_pheno_ut_pythonic(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
@@ -3536,7 +3668,13 @@ def vis_limit_mag(
     if _leb_rdr is not None:
         try:
             return _vis_limit_mag_leb(
-                _leb_rdr, tjdut, geopos, atmo, observer, objname, flags,
+                _leb_rdr,
+                tjdut,
+                geopos,
+                atmo,
+                observer,
+                objname,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -3544,6 +3682,7 @@ def vis_limit_mag(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 

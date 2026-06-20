@@ -4429,10 +4429,12 @@ def _calc_nod_aps(
     geo_aphe = _to_geo_lonlat(pos_aphe)
 
     # Build output tuples (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-    xnasc: PosTuple = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)
-    xndsc: PosTuple = (geo_dsc[0], geo_dsc[1], geo_dsc[2], 0.0, 0.0, 0.0)
-    xperi: PosTuple = (geo_peri[0], geo_peri[1], geo_peri[2], 0.0, 0.0, 0.0)
-    xaphe: PosTuple = (geo_aphe[0], geo_aphe[1], geo_aphe[2], 0.0, 0.0, 0.0)
+    # (annotations omitted: these names are already typed as PosTuple in the
+    # mean-element branch above.)
+    xnasc = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)
+    xndsc = (geo_dsc[0], geo_dsc[1], geo_dsc[2], 0.0, 0.0, 0.0)
+    xperi = (geo_peri[0], geo_peri[1], geo_peri[2], 0.0, 0.0, 0.0)
+    xaphe = (geo_aphe[0], geo_aphe[1], geo_aphe[2], 0.0, 0.0, 0.0)
 
     return (xnasc, xndsc, xperi, xaphe)
 

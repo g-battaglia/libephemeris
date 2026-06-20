@@ -985,7 +985,9 @@ def _topocentric_offset(
     xyz_itrf_m = erfa.gd2gc(1, lon_rad, lat_rad, alt_m)  # 1 = WGS84
 
     # Celestial-to-terrestrial matrix (polar motion xp=yp=0)
-    c2t = erfa.c2t06a(2451545.0, jd_tt - 2451545.0, 2451545.0, jd_ut1 - 2451545.0, 0.0, 0.0)
+    c2t = erfa.c2t06a(
+        2451545.0, jd_tt - 2451545.0, 2451545.0, jd_ut1 - 2451545.0, 0.0, 0.0
+    )
 
     # Terrestrial → celestial (transpose)
     t2c_0 = (float(c2t[0][0]), float(c2t[1][0]), float(c2t[2][0]))
@@ -1010,9 +1012,15 @@ def _topocentric_offset(
     vz_itrf = 0.0
 
     vel_au_day = (
-        (t2c_0[0] * vx_itrf + t2c_0[1] * vy_itrf + t2c_0[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
-        (t2c_1[0] * vx_itrf + t2c_1[1] * vy_itrf + t2c_1[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
-        (t2c_2[0] * vx_itrf + t2c_2[1] * vy_itrf + t2c_2[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
+        (t2c_0[0] * vx_itrf + t2c_0[1] * vy_itrf + t2c_0[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
+        (t2c_1[0] * vx_itrf + t2c_1[1] * vy_itrf + t2c_1[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
+        (t2c_2[0] * vx_itrf + t2c_2[1] * vy_itrf + t2c_2[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
     )
 
     return pos_au, vel_au_day
@@ -1100,7 +1108,9 @@ def _pipeline_icrs(
     iflag: int,
     want_velocity: bool = False,
     is_system_bary: bool = False,
-    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    topo_offset: Optional[
+        Tuple[Tuple[float, float, float], Tuple[float, float, float]]
+    ] = None,
     want_xyz: bool = False,
 ) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
@@ -1224,8 +1234,7 @@ def _pipeline_icrs(
     #    Skipped for helio/bary/truepos/nogdefl and for the Moon (negligible at
     #    ~0.0026 AU, deflection < 0.000001").
     if not (
-        iflag
-        & (FLG_NOABERR | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)
+        iflag & (FLG_NOABERR | FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)
     ):
         if ipl != MOON and lt > 0.0:
             geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
@@ -1260,8 +1269,12 @@ def _pipeline_icrs(
                 dlon, dlat, ddist = geo_vel[0], geo_vel[1], geo_vel[2]
             else:
                 dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo[0], geo[1], geo[2],
-                    geo_vel[0], geo_vel[1], geo_vel[2],
+                    geo[0],
+                    geo[1],
+                    geo[2],
+                    geo_vel[0],
+                    geo_vel[1],
+                    geo_vel[2],
                 )
 
     elif (iflag & FLG_EQUATORIAL) and _is_sidereal:
@@ -1279,8 +1292,12 @@ def _pipeline_icrs(
                 dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
             else:
                 dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo_eq[0], geo_eq[1], geo_eq[2],
-                    vel_eq[0], vel_eq[1], vel_eq[2],
+                    geo_eq[0],
+                    geo_eq[1],
+                    geo_eq[2],
+                    vel_eq[0],
+                    vel_eq[1],
+                    vel_eq[2],
                 )
 
     elif iflag & FLG_EQUATORIAL:
@@ -1302,8 +1319,12 @@ def _pipeline_icrs(
                 dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
             else:
                 dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo_eq[0], geo_eq[1], geo_eq[2],
-                    vel_eq[0], vel_eq[1], vel_eq[2],
+                    geo_eq[0],
+                    geo_eq[1],
+                    geo_eq[2],
+                    vel_eq[0],
+                    vel_eq[1],
+                    vel_eq[2],
                 )
 
     elif iflag & FLG_J2000:
@@ -1313,15 +1334,17 @@ def _pipeline_icrs(
         else:
             lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
         if want_velocity:
-            vel_ecl = _rotate_icrs_to_ecliptic_j2000(
-                geo_vel[0], geo_vel[1], geo_vel[2]
-            )
+            vel_ecl = _rotate_icrs_to_ecliptic_j2000(geo_vel[0], geo_vel[1], geo_vel[2])
             if _want_xyz:
                 dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
             else:
                 dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    ecl[0], ecl[1], ecl[2],
-                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
+                    ecl[0],
+                    ecl[1],
+                    ecl[2],
+                    vel_ecl[0],
+                    vel_ecl[1],
+                    vel_ecl[2],
                 )
 
     else:
@@ -1335,15 +1358,11 @@ def _pipeline_icrs(
 
         geo_eq = _mat3_vec3(_rot_mat, geo)
 
-        ecl = _rotate_equatorial_to_ecliptic(
-            geo_eq[0], geo_eq[1], geo_eq[2], eps_rad
-        )
+        ecl = _rotate_equatorial_to_ecliptic(geo_eq[0], geo_eq[1], geo_eq[2], eps_rad)
         if _want_xyz:
             lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
         else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(
-                ecl[0], ecl[1], ecl[2]
-            )
+            lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
         if want_velocity:
             vel_eq = _mat3_vec3(_rot_mat, geo_vel)
@@ -1354,8 +1373,12 @@ def _pipeline_icrs(
                 dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
             else:
                 dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    ecl[0], ecl[1], ecl[2],
-                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
+                    ecl[0],
+                    ecl[1],
+                    ecl[2],
+                    vel_ecl[0],
+                    vel_ecl[1],
+                    vel_ecl[2],
                 )
 
     if want_velocity:
@@ -1743,7 +1766,8 @@ def fast_calc_ut(
     jd_tt = tjd_ut + delta_t
 
     if iflag & FLG_TOPOCTR:
-        topo_offset = _topocentric_offset(topo_geopos, jd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
+        assert topo_geopos is not None  # set above or supplied by caller
+        topo_offset = _topocentric_offset(topo_geopos, jd_tt, tjd_ut, reader)
 
     return _fast_calc_core(
         reader,
@@ -1819,7 +1843,8 @@ def fast_calc_tt(
     tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
 
     if iflag & FLG_TOPOCTR:
-        topo_offset = _topocentric_offset(topo_geopos, tjd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
+        assert topo_geopos is not None  # set above or supplied by caller
+        topo_offset = _topocentric_offset(topo_geopos, tjd_tt, tjd_ut, reader)
 
     return _fast_calc_core(
         reader,
@@ -1844,7 +1869,9 @@ def _fast_calc_core(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
-    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    topo_offset: Optional[
+        Tuple[Tuple[float, float, float], Tuple[float, float, float]]
+    ] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Core fast calculation logic shared by fast_calc_ut and fast_calc_tt.
 
@@ -1895,12 +1922,20 @@ def _fast_calc_core(
         _pipeline_a = not _xyz_sid
         if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
-                reader, jd_tt, ipl, _pipe_iflag, want_velocity=True,
+                reader,
+                jd_tt,
+                ipl,
+                _pipe_iflag,
+                want_velocity=True,
                 topo_offset=topo_offset,
             )
         else:
             lon, lat, dist = _pipeline_icrs(
-                reader, jd_tt, ipl, _pipe_iflag, topo_offset=topo_offset,
+                reader,
+                jd_tt,
+                ipl,
+                _pipe_iflag,
+                topo_offset=topo_offset,
             )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
@@ -2059,12 +2094,16 @@ def _fast_calc_core(
             _dlon_r = math.radians(dlon)
             _dlat_r = math.radians(dlat)
             _sin_lat = math.sin(_lat_r)
-            vx = (-dist * _cos_lat * math.sin(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.cos(_lon_r) * _dlat_r
-                  + _cos_lat * math.cos(_lon_r) * ddist)
-            vy = (dist * _cos_lat * math.cos(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.sin(_lon_r) * _dlat_r
-                  + _cos_lat * math.sin(_lon_r) * ddist)
+            vx = (
+                -dist * _cos_lat * math.sin(_lon_r) * _dlon_r
+                - dist * _sin_lat * math.cos(_lon_r) * _dlat_r
+                + _cos_lat * math.cos(_lon_r) * ddist
+            )
+            vy = (
+                dist * _cos_lat * math.cos(_lon_r) * _dlon_r
+                - dist * _sin_lat * math.sin(_lon_r) * _dlat_r
+                + _cos_lat * math.sin(_lon_r) * ddist
+            )
             vz = dist * _cos_lat * _dlat_r + _sin_lat * ddist
         else:
             vx = vy = vz = 0.0

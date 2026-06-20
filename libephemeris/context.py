@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 import threading
-from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
+from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, cast, overload
 
 from .tracing import _record
 from skyfield.api import Loader, Topos
@@ -213,7 +213,7 @@ class EphemerisContext:
             try:
                 from .leb_reader import open_leb
 
-                self._leb_reader = open_leb(self._leb_file)
+                self._leb_reader = cast("LEBReader", open_leb(self._leb_file))
             except (FileNotFoundError, ValueError, OSError) as e:
                 from .logging_config import get_logger
 

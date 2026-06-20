@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .leb_format import StarEntry
 
@@ -36,7 +36,7 @@ class CompositeLEBReader:
             raise ValueError("CompositeLEBReader requires at least one reader")
 
         self._readers = readers
-        self._body_map: Dict[int, object] = {}  # body_id -> reader
+        self._body_map: Dict[int, Any] = {}  # body_id -> reader (duck-typed)
 
         # Build body -> reader dispatch map
         for reader in readers:
@@ -45,7 +45,7 @@ class CompositeLEBReader:
                     self._body_map[body_id] = reader
 
         # Expose _bodies for fast_calc.py compatibility (accesses reader._bodies[ipl])
-        self._bodies = {}
+        self._bodies: Dict[int, Any] = {}
         for reader in readers:
             for body_id, entry in reader._bodies.items():
                 if body_id not in self._bodies:

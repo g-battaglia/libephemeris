@@ -19,7 +19,18 @@ from __future__ import annotations
 import os
 import threading
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    cast,
+    overload,
+)
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
@@ -154,8 +165,8 @@ _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 # SPK kernel state for minor body calculations
 _SPK_KERNELS: dict[str, SpiceKernel] = {}  # Cached SPK kernels {filepath: kernel}
 _SPK_TYPE21_KERNELS: dict[
-    str, object
-] = {}  # Cached SPK type 21 kernels {filepath: SPKType21}
+    str, Any
+] = {}  # Cached SPK type 21 kernels {filepath: SPKType21 (vendored, untyped)}
 _SPK_BODY_MAP: dict[
     int, tuple[str, int]
 ] = {}  # Body mappings {ipl: (spk_file, naif_id)}
@@ -180,10 +191,10 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 
 # LEB (binary ephemeris) configuration
 _LEB_FILE: Optional[str] = None  # Path to .leb file
-_LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
+_LEB_READER: Optional["LEBReader"] = None  # Cached LEB reader instance
 
 # Horizons API client
-_HORIZONS_CLIENT: Optional[object] = None
+_HORIZONS_CLIENT: Optional["HorizonsClient"] = None
 _HORIZONS_WARNED: bool = False
 
 # Calculation mode: "auto" (default), "skyfield", "leb", or "horizons"
@@ -193,6 +204,7 @@ _VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 
 if TYPE_CHECKING:
     from .leb_reader import LEBReader
+    from .horizons_backend import HorizonsClient
 
 
 def set_calc_mode(mode: Optional[str]) -> None:
@@ -418,7 +430,13 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
     try:
         reader.warm(jd_start, jd_end)
         logger = get_logger()
-        logger.debug("mmap preload: warmed JD range %s-%s (%d-%d)", jd_start, jd_end, start_year, end_year)
+        logger.debug(
+            "mmap preload: warmed JD range %s-%s (%d-%d)",
+            jd_start,
+            jd_end,
+            start_year,
+            end_year,
+        )
     except (AttributeError, OSError, ValueError) as exc:
         logger = get_logger()
         logger.warning("mmap preload failed: %s", exc)
@@ -527,11 +545,13 @@ def get_leb_reader() -> Optional["LEBReader"]:
                 if "_" in basename:
                     from .leb_composite import CompositeLEBReader
 
-                    _LEB_READER = CompositeLEBReader.from_file_with_companions(path)
+                    _LEB_READER = cast(
+                        "LEBReader", CompositeLEBReader.from_file_with_companions(path)
+                    )
                 else:
                     from .leb_reader import open_leb
 
-                    _LEB_READER = open_leb(path)
+                    _LEB_READER = cast("LEBReader", open_leb(path))
                 _maybe_warm_reader(_LEB_READER)
             except (FileNotFoundError, ValueError, OSError) as e:
                 if mode == "leb":
