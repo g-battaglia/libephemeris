@@ -98,9 +98,7 @@ PLANET_X_LEVERRIER: int = (
 # Planet X Adams - Adams' calculated "Planet X" (independently derived, similar to Leverrier's)
 # John Couch Adams independently predicted Neptune's position around the same time as Leverrier.
 # This uses Adams' orbital elements prediction (FICT_OFFSET + 12 = 52).
-PLANET_X_ADAMS: int = (
-    FICT_OFFSET + 12
-)  # 52 - Adams' Planet X (Neptune prediction)
+PLANET_X_ADAMS: int = FICT_OFFSET + 12  # 52 - Adams' Planet X (Neptune prediction)
 
 # Planet X Lowell - Percival Lowell's predicted "Planet X" that led to Pluto's discovery
 # Lowell predicted a trans-Neptunian planet based on perceived perturbations in Uranus's orbit.
@@ -108,9 +106,7 @@ PLANET_X_ADAMS: int = (
 # though Pluto was too small to be Lowell's predicted Planet X.
 # This uses Lowell's orbital elements prediction (FICT_OFFSET + 13 = 53).
 # Orbital elements (1915 prediction): a=43.0 AU, e=0.202, i=10°
-PLANET_X_LOWELL: int = (
-    FICT_OFFSET + 13
-)  # 53 - Lowell's Planet X (Pluto prediction)
+PLANET_X_LOWELL: int = FICT_OFFSET + 13  # 53 - Lowell's Planet X (Pluto prediction)
 
 # Planet X Pickering - William H. Pickering's predicted "Planet O" (1919)
 # Pickering proposed several trans-Neptunian planets (Planet O, P, Q, R, S, T, U).
@@ -122,9 +118,7 @@ PLANET_X_LOWELL: int = (
 # Like Lowell's Planet X, these predictions were based on supposed perturbations in outer
 # planet orbits, which later proved to be observational errors.
 # This uses Pickering's orbital elements prediction (FICT_OFFSET + 14 = 54).
-PLANET_X_PICKERING: int = (
-    FICT_OFFSET + 14
-)  # 54 - Pickering's Planet O/X prediction
+PLANET_X_PICKERING: int = FICT_OFFSET + 14  # 54 - Pickering's Planet O/X prediction
 
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # Calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
@@ -133,8 +127,7 @@ WHITE_MOON: int = (
     FICT_OFFSET + 16
 )  # 56 - White Moon Selena (opposite to Black Moon Lilith)
 
-SELENA: int = WHITE_MOON  # Alias - Selena is another name for White Moon
-SELENA: int = WHITE_MOON  # Reference API-compatible alias
+SELENA: int = WHITE_MOON  # Reference API-compatible alias (Selena = White Moon)
 
 # Proserpina - hypothetical trans-Plutonian planet used by some astrologers
 # This is a hypothetical body not in the standard fictitious bodies set
@@ -154,16 +147,12 @@ QUAOAR: int = 50000 + AST_OFFSET  # Classical KBO
 NESSUS: int = 7066 + AST_OFFSET  # Centaur, astrologically important
 ASBOLUS: int = 8405 + AST_OFFSET  # Centaur, astrologically significant
 CHARIKLO: int = 10199 + AST_OFFSET  # Centaur, largest known, has ring system
-GONGGONG: int = (
-    225088 + AST_OFFSET
-)  # TNO, dwarf planet candidate (formerly 2007 OR10)
+GONGGONG: int = 225088 + AST_OFFSET  # TNO, dwarf planet candidate (formerly 2007 OR10)
 APOPHIS: int = 99942 + AST_OFFSET  # Near-Earth asteroid, close approach 2029
 HYGIEA: int = 10 + AST_OFFSET  # Fourth largest asteroid, dwarf planet candidate
 INTERAMNIA: int = 704 + AST_OFFSET  # Fifth largest asteroid, main belt
 DAVIDA: int = 511 + AST_OFFSET  # Seventh largest asteroid, main belt
-EUROPA_AST: int = (
-    52 + AST_OFFSET
-)  # 52 Europa (main belt asteroid, not Jupiter's moon)
+EUROPA_AST: int = 52 + AST_OFFSET  # 52 Europa (main belt asteroid, not Jupiter's moon)
 SYLVIA: int = (
     87 + AST_OFFSET
 )  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
@@ -333,6 +322,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     RYUGU: ("162173", NAIF_RYUGU),  # 162173 Ryugu (Apollo asteroid)
 }
 
+
 def get_horizons_id(ipl: int) -> str | None:
     """
     Get the JPL Horizons target identifier for a libephemeris body ID.
@@ -352,6 +342,7 @@ def get_horizons_id(ipl: int) -> str | None:
     if ipl in SPK_BODY_NAME_MAP:
         return SPK_BODY_NAME_MAP[ipl][0]
     return None
+
 
 def get_naif_id_from_ipl(ipl: int) -> int | None:
     """
@@ -373,6 +364,7 @@ def get_naif_id_from_ipl(ipl: int) -> int | None:
         return SPK_BODY_NAME_MAP[ipl][1]
     return None
 
+
 def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
     """
     Get both Horizons ID and NAIF ID for a libephemeris body.
@@ -390,6 +382,7 @@ def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
         ('136199', 2136199)
     """
     return SPK_BODY_NAME_MAP.get(ipl)
+
 
 # =============================================================================
 # SPK AUTO-DOWNLOAD BLOCKED BODIES
@@ -412,6 +405,7 @@ SPK_AUTO_DOWNLOAD_BLOCKED: dict[int, str] = {
     ),
 }
 
+
 def is_spk_auto_download_blocked(ipl: int) -> bool:
     """Return True if JPL Horizons blocks SPK generation for this body.
 
@@ -426,6 +420,7 @@ def is_spk_auto_download_blocked(ipl: int) -> bool:
         True if auto-download is blocked for this body.
     """
     return ipl in SPK_AUTO_DOWNLOAD_BLOCKED
+
 
 # =============================================================================
 # REQUIRED SPK BODIES FOR HIGH-PRECISION CALCULATIONS
@@ -546,9 +541,7 @@ PHECDA: int = FIXSTAR_OFFSET + 70  # Gamma Ursae Majoris - bowl star
 MEGREZ: int = FIXSTAR_OFFSET + 71  # Delta Ursae Majoris - bowl-handle junction
 
 # Crux (Southern Cross) - completing the constellation
-DELTA_CRUCIS: int = (
-    FIXSTAR_OFFSET + 72
-)  # Delta Crucis - fourth star of Southern Cross
+DELTA_CRUCIS: int = FIXSTAR_OFFSET + 72  # Delta Crucis - fourth star of Southern Cross
 
 # Centaurus - completing the bright stars of the constellation
 MENKENT: int = FIXSTAR_OFFSET + 73  # Theta Centauri
@@ -874,10 +867,7 @@ HELFLAG_AVKIND_PTO: int = 1 << 17  # 131072 - Ptolemy method
 HELFLAG_AVKIND_MIN7: int = 1 << 18  # 262144 - Babylonian method (min 7°)
 HELFLAG_AVKIND_MIN9: int = 1 << 19  # 524288 - Babylonian method (min 9°)
 HELFLAG_AVKIND: int = (  # 983040 - Mask for all AV kind bits
-    HELFLAG_AVKIND_VR
-    | HELFLAG_AVKIND_PTO
-    | HELFLAG_AVKIND_MIN7
-    | HELFLAG_AVKIND_MIN9
+    HELFLAG_AVKIND_VR | HELFLAG_AVKIND_PTO | HELFLAG_AVKIND_MIN7 | HELFLAG_AVKIND_MIN9
 )
 
 # reference API-compatible aliases (without SE_ prefix)
@@ -1216,8 +1206,583 @@ TJD_INVALID: float = 99999999.0
 # =============================================================================
 # __all__ — explicit public API (excludes 'annotations' and private names)
 # =============================================================================
+# NOTE: explicit list (mypy cannot resolve a dynamic dir()-based __all__).
+# Regenerate after adding/removing constants with:
+#   uv run python -c "import libephemeris.constants as c; print(sorted(n for n in dir(c) if not n.startswith('_') and n!='annotations'))"
 __all__ = [
-    _name
-    for _name in sorted(dir())
-    if not _name.startswith("_") and _name != "annotations"
+    "ACHERNAR",
+    "ACRONYCHAL_RISING",
+    "ACRONYCHAL_SETTING",
+    "ACRUX",
+    "ACUBENS",
+    "ADHARA",
+    "ADMETOS",
+    "AIN",
+    "ALBIREO",
+    "ALCOR",
+    "ALCYONE",
+    "ALDEBARAN",
+    "ALGEDI",
+    "ALGENIB",
+    "ALGIEBA",
+    "ALGOL",
+    "ALGORAB",
+    "ALHENA",
+    "ALIOTH",
+    "ALKAID",
+    "ALMACH",
+    "ALNILAM",
+    "ALNITAK",
+    "ALPHARD",
+    "ALPHECCA",
+    "ALPHERATZ",
+    "ALRESCHA",
+    "ALTAIR",
+    "AMOR",
+    "ANGLE_OFFSET",
+    "ANTARES",
+    "ANTIVERTEX",
+    "APOLLON",
+    "APOPHIS",
+    "ARABIC_OFFSET",
+    "ARCTURUS",
+    "ARMC",
+    "ASBOLUS",
+    "ASC",
+    "ASCELLA",
+    "ASCENDANT",
+    "ASELLUS_AUSTRALIS",
+    "ASELLUS_BOREALIS",
+    "ASTEROPE",
+    "ASTNAMFILE",
+    "AST_OFFSET",
+    "ATLAS",
+    "AUNIT",
+    "AUNIT_TO_KM",
+    "AUNIT_TO_LIGHTYEAR",
+    "AUNIT_TO_PARSEC",
+    "B1950",
+    "BELLATRIX",
+    "BENNU",
+    "BETELGEUSE",
+    "BIT_ASTRO_TWILIGHT",
+    "BIT_CIVIL_TWILIGHT",
+    "BIT_DISC_BOTTOM",
+    "BIT_DISC_CENTER",
+    "BIT_FIXED_DISC_SIZE",
+    "BIT_FORCE_SLOW_METHOD",
+    "BIT_HINDU_RISING",
+    "BIT_NAUTIC_TWILIGHT",
+    "BIT_NO_REFRACTION",
+    "CALC_ITRANSIT",
+    "CALC_MTRANSIT",
+    "CALC_RISE",
+    "CALC_SET",
+    "CANOPUS",
+    "CAPELLA",
+    "CASTOR",
+    "CELAENO",
+    "CERES",
+    "CHARIKLO",
+    "CHIRON",
+    "COASC1",
+    "COASC2",
+    "COMET_OFFSET",
+    "COSMICAL_SETTING",
+    "CUPIDO",
+    "DABIH",
+    "DAVIDA",
+    "DAYS_PER_JULIAN_CENTURY",
+    "DAYS_PER_JULIAN_YEAR",
+    "DELTAT_AUTOMATIC",
+    "DELTA_CRUCIS",
+    "DENEB",
+    "DENEBOLA",
+    "DENEB_ALGEDI",
+    "DESCENDANT",
+    "DE_NUMBER",
+    "DIPHDA",
+    "DSCHUBBA",
+    "DUBHE",
+    "EARTH",
+    "ECL_1ST_VISIBLE",
+    "ECL_2ND_VISIBLE",
+    "ECL_3RD_VISIBLE",
+    "ECL_4TH_VISIBLE",
+    "ECL_ALLTYPES_LUNAR",
+    "ECL_ALLTYPES_SOLAR",
+    "ECL_ANNULAR",
+    "ECL_ANNULAR_TOTAL",
+    "ECL_CENTRAL",
+    "ECL_GRAZING",
+    "ECL_HYBRID",
+    "ECL_MAX_VISIBLE",
+    "ECL_NONCENTRAL",
+    "ECL_NUT",
+    "ECL_OCC_BEG_DAYLIGHT",
+    "ECL_OCC_END_DAYLIGHT",
+    "ECL_ONE_TRY",
+    "ECL_PARTBEG_VISIBLE",
+    "ECL_PARTEND_VISIBLE",
+    "ECL_PARTIAL",
+    "ECL_PENUMBBEG_VISIBLE",
+    "ECL_PENUMBEND_VISIBLE",
+    "ECL_PENUMBRAL",
+    "ECL_TOTAL",
+    "ECL_TOTBEG_VISIBLE",
+    "ECL_TOTEND_VISIBLE",
+    "ECL_VISIBLE",
+    "ELECTRA",
+    "ELNATH",
+    "EPHE_PATH",
+    "EPSILON_CENTAURI",
+    "EQUASC",
+    "ERIS",
+    "EROS",
+    "ETAMIN",
+    "ETA_CENTAURI",
+    "ETA_PISCIUM",
+    "EUROPA_AST",
+    "EVENING_FIRST",
+    "EVENING_LAST",
+    "FICTFILE",
+    "FICT_MAX",
+    "FICT_OFFSET",
+    "FICT_OFFSET_1",
+    "FIXSTAR",
+    "FIXSTAR_OFFSET",
+    "FLG_ASTROMETRIC",
+    "FLG_BARYCTR",
+    "FLG_CENTER_BODY",
+    "FLG_DEFAULTEPH",
+    "FLG_DPSIDEPS_1980",
+    "FLG_EQUATORIAL",
+    "FLG_HELCTR",
+    "FLG_ICRS",
+    "FLG_J2000",
+    "FLG_JPLEPH",
+    "FLG_JPLHOR",
+    "FLG_JPLHOR_APPROX",
+    "FLG_MOSEPH",
+    "FLG_NOABERR",
+    "FLG_NOGDEFL",
+    "FLG_NONUT",
+    "FLG_ORBEL_AA",
+    "FLG_RADIANS",
+    "FLG_SIDEREAL",
+    "FLG_SPEED",
+    "FLG_SPEED3",
+    "FLG_SWIEPH",
+    "FLG_TEST_PLMOON",
+    "FLG_TOPOCTR",
+    "FLG_TROPICAL",
+    "FLG_TRUEPOS",
+    "FLG_XYZ",
+    "FNAME_DE200",
+    "FNAME_DE403",
+    "FNAME_DE404",
+    "FNAME_DE405",
+    "FNAME_DE406",
+    "FNAME_DE431",
+    "FNAME_DFT",
+    "FNAME_DFT2",
+    "FOMALHAUT",
+    "GACRUX",
+    "GONGGONG",
+    "GRAFFIAS",
+    "GREG_CAL",
+    "HADAR",
+    "HADES",
+    "HAMAL",
+    "HARRINGTON",
+    "HAUMEA",
+    "HELFLAG_AV",
+    "HELFLAG_AVKIND",
+    "HELFLAG_AVKIND_MIN7",
+    "HELFLAG_AVKIND_MIN9",
+    "HELFLAG_AVKIND_PTO",
+    "HELFLAG_AVKIND_VR",
+    "HELFLAG_BELOW_HORIZON",
+    "HELFLAG_HIGH_PRECISION",
+    "HELFLAG_LONG_SEARCH",
+    "HELFLAG_MIXED",
+    "HELFLAG_NO_DETAILS",
+    "HELFLAG_OPTICAL_PARAMS",
+    "HELFLAG_PHOTOPIC",
+    "HELFLAG_SCOTOPIC",
+    "HELFLAG_SEARCH_1_PERIOD",
+    "HELFLAG_VISLIM_DARK",
+    "HELFLAG_VISLIM_NOMOON",
+    "HELFLAG_VISLIM_PHOTOPIC",
+    "HELIACAL_RISING",
+    "HELIACAL_SETTING",
+    "HIDALGO",
+    "HYGIEA",
+    "IC",
+    "ICARUS",
+    "INTERAMNIA",
+    "INTP_APOG",
+    "INTP_PERG",
+    "ISIS",
+    "ITOKAWA",
+    "IXION",
+    "J1900",
+    "J1991_25",
+    "J2000",
+    "JUL_CAL",
+    "JUNO",
+    "JUPITER",
+    "KAUS_AUSTRALIS",
+    "KAUS_BOREALIS",
+    "KAUS_MEDIA",
+    "KOCHAB",
+    "KRONOS",
+    "LESATH",
+    "LILITH_AST",
+    "MAIA",
+    "MAKEMAKE",
+    "MARKAB",
+    "MARS",
+    "MAX_STNAME",
+    "MC",
+    "MEAN_APOG",
+    "MEAN_NODE",
+    "MEGREZ",
+    "MEISSA",
+    "MENKAR",
+    "MENKENT",
+    "MERAK",
+    "MERCURY",
+    "MEROPE",
+    "MESARTHIM",
+    "MIMOSA",
+    "MINTAKA",
+    "MIRA",
+    "MIRACH",
+    "MIXEDOPIC_FLAG",
+    "MIZAR",
+    "MODEL_BIAS",
+    "MODEL_DELTAT",
+    "MODEL_JPLHORA_MODE",
+    "MODEL_JPLHOR_MODE",
+    "MODEL_NUT",
+    "MODEL_PREC_LONGTERM",
+    "MODEL_PREC_SHORTTERM",
+    "MODEL_SIDT",
+    "MOD_BIAS_DEFAULT",
+    "MOD_BIAS_IAU2000",
+    "MOD_BIAS_IAU2006",
+    "MOD_BIAS_NONE",
+    "MOD_DELTAT_DEFAULT",
+    "MOD_DELTAT_ESPENAK_MEEUS_2006",
+    "MOD_DELTAT_STEPHENSON_1997",
+    "MOD_DELTAT_STEPHENSON_ETC_2016",
+    "MOD_DELTAT_STEPHENSON_MORRISON_1984",
+    "MOD_DELTAT_STEPHENSON_MORRISON_2004",
+    "MOD_JPLHORA_1",
+    "MOD_JPLHORA_2",
+    "MOD_JPLHORA_3",
+    "MOD_JPLHORA_DEFAULT",
+    "MOD_JPLHOR_DEFAULT",
+    "MOD_JPLHOR_LONG_AGREEMENT",
+    "MOD_NBIAS",
+    "MOD_NDELTAT",
+    "MOD_NJPLHOR",
+    "MOD_NJPLHORA",
+    "MOD_NNUT",
+    "MOD_NPREC",
+    "MOD_NUT_DEFAULT",
+    "MOD_NUT_IAU_1980",
+    "MOD_NUT_IAU_2000A",
+    "MOD_NUT_IAU_2000B",
+    "MOD_NUT_IAU_CORR_1987",
+    "MOD_NUT_WOOLARD",
+    "MOD_PREC_BRETAGNON_2003",
+    "MOD_PREC_DEFAULT",
+    "MOD_PREC_DEFAULT_SHORT",
+    "MOD_PREC_IAU_1976",
+    "MOD_PREC_IAU_2000",
+    "MOD_PREC_IAU_2006",
+    "MOD_PREC_LASKAR_1986",
+    "MOD_PREC_NEWCOMB",
+    "MOD_PREC_OWEN_1990",
+    "MOD_PREC_SIMON_1994",
+    "MOD_PREC_VONDRAK_2011",
+    "MOD_PREC_WILLIAMS_1994",
+    "MOD_PREC_WILL_EPS_LASK",
+    "MOON",
+    "MOON_ARIEL",
+    "MOON_CALLISTO",
+    "MOON_CHARON",
+    "MOON_DEIMOS",
+    "MOON_DIONE",
+    "MOON_ENCELADUS",
+    "MOON_EUROPA",
+    "MOON_GANYMEDE",
+    "MOON_HYPERION",
+    "MOON_IAPETUS",
+    "MOON_IO",
+    "MOON_MIMAS",
+    "MOON_MIRANDA",
+    "MOON_OBERON",
+    "MOON_OFFSET",
+    "MOON_PHOBOS",
+    "MOON_RHEA",
+    "MOON_TETHYS",
+    "MOON_TITAN",
+    "MOON_TITANIA",
+    "MOON_TRITON",
+    "MOON_UMBRIEL",
+    "MORNING_FIRST",
+    "MORNING_LAST",
+    "MUHLIFAIN",
+    "NAIF_AMOR",
+    "NAIF_APOPHIS",
+    "NAIF_ARIEL",
+    "NAIF_ASBOLUS",
+    "NAIF_ASTEROID_OFFSET",
+    "NAIF_BENNU",
+    "NAIF_CALLISTO",
+    "NAIF_CERES",
+    "NAIF_CHARIKLO",
+    "NAIF_CHARON",
+    "NAIF_CHIRON",
+    "NAIF_DAVIDA",
+    "NAIF_DEIMOS",
+    "NAIF_DIONE",
+    "NAIF_ENCELADUS",
+    "NAIF_ERIS",
+    "NAIF_EROS",
+    "NAIF_EUROPA",
+    "NAIF_EUROPA_AST",
+    "NAIF_GANYMEDE",
+    "NAIF_GONGGONG",
+    "NAIF_HAUMEA",
+    "NAIF_HIDALGO",
+    "NAIF_HYGIEA",
+    "NAIF_HYPERION",
+    "NAIF_IAPETUS",
+    "NAIF_ICARUS",
+    "NAIF_INTERAMNIA",
+    "NAIF_IO",
+    "NAIF_ITOKAWA",
+    "NAIF_IXION",
+    "NAIF_JUNO",
+    "NAIF_LILITH_AST",
+    "NAIF_MAKEMAKE",
+    "NAIF_MIMAS",
+    "NAIF_MIRANDA",
+    "NAIF_NESSUS",
+    "NAIF_OBERON",
+    "NAIF_ORCUS",
+    "NAIF_PALLAS",
+    "NAIF_PANDORA_AST",
+    "NAIF_PHOBOS",
+    "NAIF_PHOLUS",
+    "NAIF_PSYCHE",
+    "NAIF_QUAOAR",
+    "NAIF_RHEA",
+    "NAIF_RYUGU",
+    "NAIF_SAPPHO",
+    "NAIF_SEDNA",
+    "NAIF_SYLVIA",
+    "NAIF_TETHYS",
+    "NAIF_TITAN",
+    "NAIF_TITANIA",
+    "NAIF_TORO",
+    "NAIF_TOUTATIS",
+    "NAIF_TRITON",
+    "NAIF_UMBRIEL",
+    "NAIF_VESTA",
+    "NALL_NAT_POINTS",
+    "NASCMC",
+    "NASHIRA",
+    "NEPTUNE",
+    "NEPTUNE_ADAMS",
+    "NEPTUNE_LEVERRIER",
+    "NESSUS",
+    "NFICT_ELEM",
+    "NIBIRU",
+    "NODBIT_FOPOINT",
+    "NODBIT_MEAN",
+    "NODBIT_OSCU",
+    "NODBIT_OSCU_BAR",
+    "NPLANETS",
+    "NSE_MODELS",
+    "NSIDM_PREDEF",
+    "NUNKI",
+    "ORCUS",
+    "OSCU_APOG",
+    "PALLAS",
+    "PANDORA_AST",
+    "PARS_AMORIS",
+    "PARS_FIDEI",
+    "PARS_FORTUNAE",
+    "PARS_SPIRITUS",
+    "PHECDA",
+    "PHOLUS",
+    "PHOTOPIC_FLAG",
+    "PLANET_X_ADAMS",
+    "PLANET_X_LEVERRIER",
+    "PLANET_X_LOWELL",
+    "PLANET_X_PICKERING",
+    "PLEIONE",
+    "PLMOON_OFFSET",
+    "PLUTO",
+    "PLUTO_LOWELL",
+    "PLUTO_PICKERING",
+    "POLARIS",
+    "POLASC",
+    "POLLUX",
+    "POSEIDON",
+    "PRIMA_HYADUM",
+    "PROCYON",
+    "PROPUS",
+    "PROSERPINA",
+    "PSYCHE",
+    "QUAOAR",
+    "RASALGETHI",
+    "RASALHAGUE",
+    "REGULUS",
+    "REQUIRED_SPK_BODIES",
+    "RIGEL",
+    "RIGIL_KENT",
+    "RYUGU",
+    "SADALMELIK",
+    "SADALSUUD",
+    "SAIPH",
+    "SAPPHO",
+    "SARGAS",
+    "SATURN",
+    "SCHEAT",
+    "SCOTOPIC_FLAG",
+    "SECUNDA_HYADUM",
+    "SEDNA",
+    "SELENA",
+    "SE_FNAME_DE431",
+    "SHAULA",
+    "SHERATAN",
+    "SIDBITS",
+    "SIDBIT_ECL_DATE",
+    "SIDBIT_ECL_T0",
+    "SIDBIT_NO_PREC_OFFSET",
+    "SIDBIT_PREC_ORIG",
+    "SIDBIT_SSY_PLANE",
+    "SIDBIT_USER_UT",
+    "SIDM_ALDEBARAN_15TAU",
+    "SIDM_ARYABHATA",
+    "SIDM_ARYABHATA_522",
+    "SIDM_ARYABHATA_MSUN",
+    "SIDM_B1950",
+    "SIDM_BABYL_BRITTON",
+    "SIDM_BABYL_ETPSC",
+    "SIDM_BABYL_HUBER",
+    "SIDM_BABYL_KUGLER1",
+    "SIDM_BABYL_KUGLER2",
+    "SIDM_BABYL_KUGLER3",
+    "SIDM_DELUCE",
+    "SIDM_DJWHAL_KHUL",
+    "SIDM_FAGAN_BRADLEY",
+    "SIDM_GALALIGN_MARDYKS",
+    "SIDM_GALCENT_0SAG",
+    "SIDM_GALCENT_COCHRANE",
+    "SIDM_GALCENT_MULA_WILHELM",
+    "SIDM_GALCENT_RGILBRAND",
+    "SIDM_GALEQU_FIORENZA",
+    "SIDM_GALEQU_IAU1958",
+    "SIDM_GALEQU_MULA",
+    "SIDM_GALEQU_TRUE",
+    "SIDM_HIPPARCHOS",
+    "SIDM_J1900",
+    "SIDM_J2000",
+    "SIDM_JN_BHASIN",
+    "SIDM_KRISHNAMURTI",
+    "SIDM_KRISHNAMURTI_VP291",
+    "SIDM_LAHIRI",
+    "SIDM_LAHIRI_1940",
+    "SIDM_LAHIRI_ICRC",
+    "SIDM_LAHIRI_VP285",
+    "SIDM_RAMAN",
+    "SIDM_SASSANIAN",
+    "SIDM_SS_CITRA",
+    "SIDM_SS_REVATI",
+    "SIDM_SURYASIDDHANTA",
+    "SIDM_SURYASIDDHANTA_MSUN",
+    "SIDM_TRUE_CITRA",
+    "SIDM_TRUE_MULA",
+    "SIDM_TRUE_PUSHYA",
+    "SIDM_TRUE_REVATI",
+    "SIDM_TRUE_SHEORAN",
+    "SIDM_USER",
+    "SIDM_USHASHASHI",
+    "SIDM_VALENS_MOON",
+    "SIDM_YUKTESHWAR",
+    "SIMULATE_VICTORVB",
+    "SIRIUS",
+    "SKAT",
+    "SPICA_STAR",
+    "SPK_AUTO_DOWNLOAD_BLOCKED",
+    "SPK_BODY_NAME_MAP",
+    "SPLIT_DEG_KEEP_DEG",
+    "SPLIT_DEG_KEEP_SIGN",
+    "SPLIT_DEG_NAKSHATRA",
+    "SPLIT_DEG_ROUND_DEG",
+    "SPLIT_DEG_ROUND_MIN",
+    "SPLIT_DEG_ROUND_SEC",
+    "SPLIT_DEG_ZODIACAL",
+    "STARFILE",
+    "STARFILE_OLD",
+    "SUN",
+    "SYLVIA",
+    "TARF",
+    "TAYGETA",
+    "TEJAT",
+    "THETA_TAURI",
+    "THUBAN",
+    "TIDAL_26",
+    "TIDAL_AUTOMATIC",
+    "TIDAL_DE200",
+    "TIDAL_DE403",
+    "TIDAL_DE404",
+    "TIDAL_DE405",
+    "TIDAL_DE406",
+    "TIDAL_DE421",
+    "TIDAL_DE422",
+    "TIDAL_DE430",
+    "TIDAL_DE431",
+    "TIDAL_DE440",
+    "TIDAL_DE441",
+    "TIDAL_DEFAULT",
+    "TIDAL_JPLEPH",
+    "TIDAL_MOSEPH",
+    "TIDAL_STEPHENSON_2016",
+    "TIDAL_SWIEPH",
+    "TJD_INVALID",
+    "TORO",
+    "TOUTATIS",
+    "TRANSPLUTO",
+    "TRUE_NODE",
+    "UNUKALHAI",
+    "URANUS",
+    "VARUNA",
+    "VEGA",
+    "VENUS",
+    "VERTEX",
+    "VESTA",
+    "VINDEMIATRIX",
+    "VULCAN",
+    "VULKANUS",
+    "WALDEMATH",
+    "WASAT",
+    "WEZEN",
+    "WHITE_MOON",
+    "ZETA_CENTAURI",
+    "ZEUS",
+    "ZOSMA",
+    "ZUBENELGENUBI",
+    "ZUBENESCHAMALI",
+    "get_horizons_id",
+    "get_naif_id_from_ipl",
+    "get_spk_body_info_from_map",
+    "is_spk_auto_download_blocked",
 ]
