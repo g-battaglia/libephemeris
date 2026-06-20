@@ -1044,8 +1044,17 @@ def cross_ut(
         pos_result, _ = calc_ut(jd_time, planet, flags | FLG_SPEED)
         return pos_result[0], pos_result[3]
 
+    # Slow outer planets (Jupiter and beyond) spend long stretches in retrograde
+    # motion, where geocentric speed oscillates and even changes sign. Pure
+    # Newton-Raphson can then overshoot wildly (stepping decades past the true
+    # crossing, sometimes beyond the ephemeris range) instead of converging on
+    # the *first* forward crossing. For these bodies, bracket the first crossing
+    # by forward sampling and refine with Brent's method, which only needs a
+    # sign change and is immune to the retrograde overshoot.
+    is_slow_planet = speed_default < 0.1
+
     # Check if we're near a retrograde station - use Brent's method for robustness
-    if _is_near_station(speed):
+    if is_slow_planet or _is_near_station(speed):
         # Near station: Newton-Raphson may fail due to division by near-zero speed
         # Use Brent's method which only requires bracketing, not derivatives
         try:
