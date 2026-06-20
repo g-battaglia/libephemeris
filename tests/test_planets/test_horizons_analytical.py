@@ -163,3 +163,46 @@ class TestHorizonsUnsupportedFallback:
 
         with pytest.raises(KeyError):
             horizons_calc_ut(None, JD_J2000, 0, FLG_TOPOCTR)
+
+
+@pytest.mark.unit
+class TestHorizonsFetchBatchErrorHandling:
+    """fetch_batch must not silently drop failed fetches (degraded precision)."""
+
+    def test_failed_fetch_is_dropped_but_logged(self):
+        """A failed deflector fetch is omitted from results but logged as a warning."""
+        import io
+        import logging
+        from libephemeris.horizons_backend import HorizonsClient, StateVector
+
+        client = HorizonsClient()
+
+        def fake_fetch(cmd, jd, center="@0", time_type="TDB"):
+            if cmd == "5":  # Jupiter -> simulate transient network failure
+                raise OSError("simulated network error")
+            return StateVector(x=1.0, y=2.0, z=3.0, vx=0.0, vy=0.0, vz=0.0)
+
+        client.fetch_state_vector = fake_fetch  # type: ignore[method-assign]
+
+        # The "libephemeris" logger may have propagate disabled, so attach a
+        # handler directly rather than relying on caplog (root propagation).
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        lg = logging.getLogger("libephemeris")
+        prev_level = lg.level
+        lg.addHandler(handler)
+        lg.setLevel(logging.WARNING)
+        try:
+            reqs = [("10", JD_J2000, "@0"), ("5", JD_J2000, "@0")]
+            res = client.fetch_batch(reqs)
+        finally:
+            lg.removeHandler(handler)
+            lg.setLevel(prev_level)
+
+        # Successful fetch retained, failed one dropped (no exception raised)
+        assert ("10", JD_J2000, "@0") in res
+        assert ("5", JD_J2000, "@0") not in res
+        # ...but the drop is visible, not silent
+        logout = stream.getvalue()
+        assert "Horizons fetch failed" in logout
+        assert "command=5" in logout

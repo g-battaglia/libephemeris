@@ -215,8 +215,19 @@ class HorizonsClient:
                 key = futures[fut]
                 try:
                     results[key] = fut.result()
-                except (OSError, ValueError, KeyError):
-                    pass  # skip failed fetches
+                except (OSError, ValueError, KeyError) as exc:
+                    # Do not raise: a failed deflector (Sun/Jupiter/Saturn) must
+                    # not abort the whole calculation. But do not fail silently
+                    # either — a dropped fetch degrades precision (e.g. missing
+                    # gravitational deflection), so make it visible in the log.
+                    cmd, jd, center = key
+                    logger.warning(
+                        "Horizons fetch failed for command=%s jd=%s center=%s: %s",
+                        cmd,
+                        jd,
+                        center,
+                        exc,
+                    )
 
         return results
 
@@ -237,13 +248,16 @@ class HorizonsClient:
                     data = json.loads(resp.read().decode("utf-8"))
 
                 if "error" in data:
+                    # Permanent API error (e.g. body not found). Signalled as
+                    # KeyError per this method's documented contract; not retried.
                     raise KeyError(f"Horizons API error for {command}: {data['error']}")
 
                 return self._parse_response(data, command)
 
             except KeyError:
-                raise  # don't retry API errors (body not found etc.)
-            except (OSError, ValueError, KeyError) as e:
+                raise  # permanent (body not found / API error): do not retry
+            except (OSError, ValueError) as e:
+                # Transient: network errors and malformed/partial responses.
                 last_err = e
                 if attempt < max_retries:
                     time.sleep(0.5 * (2**attempt))
@@ -538,6 +552,14 @@ def _apply_deflection_horizons(
     for defl_cmd, gm in deflectors:
         key = (defl_cmd, jd_tt, "@0")
         if key not in batch:
+            # The Sun ("10") dominates gravitational deflection (~1.8" near the
+            # limb); skipping it silently would degrade precision invisibly.
+            if defl_cmd == "10":
+                logger.warning(
+                    "Horizons: Sun deflector unavailable at jd=%s; "
+                    "gravitational deflection is degraded for this position.",
+                    jd_tt,
+                )
             continue
 
         defl_sv = batch[key]
