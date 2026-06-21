@@ -527,8 +527,10 @@ def horizons_calc_ut(
     else:
         lt = 0.0
 
-    # Gravitational deflection
-    if not (iflag & FLG_NOGDEFL):
+    # Gravitational deflection (suppressed for true geometric positions, matching
+    # fast_calc and Swiss Ephemeris app_pos_etc_plan, which gate deflection on
+    # both NOGDEFL and TRUEPOS — like the light-time and aberration steps).
+    if not (iflag & FLG_NOGDEFL) and not (iflag & FLG_TRUEPOS):
         geo = _apply_deflection_horizons(geo, earth_sv.pos, jd_tt, lt, batch, client)
 
     # Aberration (relativistic when light-time is known, matching fast_calc)
@@ -573,7 +575,7 @@ def horizons_calc_ut(
         dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
         lt2 = dist2 / c_au_day
 
-    if not (iflag & FLG_NOGDEFL):
+    if not (iflag & FLG_NOGDEFL) and not (iflag & FLG_TRUEPOS):
         # Use same deflector positions (good enough for dt=1s)
         geo2 = _apply_deflection_horizons(
             geo2,
@@ -679,6 +681,7 @@ def _to_ecliptic_output(
         _rotate_icrs_to_ecliptic_j2000,
         _get_skyfield_frame_data,
         _mat3_vec3,
+        _prec_matrix,
     )
     import math
 
@@ -697,6 +700,13 @@ def _to_ecliptic_output(
             # J2000 ecliptic
             pos = _rotate_icrs_to_ecliptic_j2000(*pos)
             vel = _rotate_icrs_to_ecliptic_j2000(*vel)
+    elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
+        # Sidereal + equatorial: mean equator of date (precession only, no
+        # nutation) and NO ayanamsa, mirroring the Skyfield/LEB path in
+        # fast_calc (the ayanamsa is applied to ecliptic longitude only).
+        p_mat = _prec_matrix(jd_tt)
+        pos = _mat3_vec3(p_mat, pos)
+        vel = _mat3_vec3(p_mat, vel)
     elif iflag & FLG_EQUATORIAL:
         # True equatorial of date — apply precession-nutation matrix
         pn_mat, dpsi, deps, eps_true = _get_skyfield_frame_data(jd_tt)
@@ -716,8 +726,10 @@ def _to_ecliptic_output(
     lon, lat, dist = _cartesian_to_spherical(*pos)
     dlon, dlat, ddist = _cartesian_velocity_to_spherical(*pos, *vel)
 
-    # Sidereal correction
-    if iflag & FLG_SIDEREAL:
+    # Sidereal correction (ecliptic longitude only; equatorial sidereal output
+    # uses the mean-equator-of-date frame handled above, with no ayanamsa — the
+    # same rule as planets._calc_body_pctr and fast_calc).
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import get_ayanamsa_ut
 
         ayan = get_ayanamsa_ut(jd_ut)
