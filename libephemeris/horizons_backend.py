@@ -483,15 +483,23 @@ def horizons_calc_ut(
                 sv = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
         return _to_ecliptic_output(sv.pos, sv.vel, jd_tt, jd_ut, iflag)
 
+    # Deflection is skipped for true geometric positions and when explicitly
+    # disabled; only prefetch the deflectors when it will actually run.
+    apply_deflection = not (iflag & FLG_NOGDEFL) and not (iflag & FLG_TRUEPOS)
+
     # Geocentric apparent — full pipeline
-    # Prefetch: target + Earth + deflectors (Sun, Jupiter, Saturn)
+    # Prefetch: target + Earth (always); deflectors (Sun, Jupiter, Saturn) only
+    # when deflection will run.
     prefetch_cmds = [
         (command, jd_tt, "@0"),  # target barycentric
         ("399", jd_tt, "@0"),  # Earth barycentric
-        ("10", jd_tt, "@0"),  # Sun barycentric (deflector)
-        ("5", jd_tt, "@0"),  # Jupiter barycenter (deflector)
-        ("6", jd_tt, "@0"),  # Saturn barycenter (deflector)
     ]
+    if apply_deflection:
+        prefetch_cmds += [
+            ("10", jd_tt, "@0"),  # Sun barycentric (deflector)
+            ("5", jd_tt, "@0"),  # Jupiter barycenter (deflector)
+            ("6", jd_tt, "@0"),  # Saturn barycenter (deflector)
+        ]
     batch = client.fetch_batch(prefetch_cmds)
 
     target_sv = batch.get((command, jd_tt, "@0"))
@@ -530,7 +538,7 @@ def horizons_calc_ut(
     # Gravitational deflection (suppressed for true geometric positions, matching
     # fast_calc and Swiss Ephemeris app_pos_etc_plan, which gate deflection on
     # both NOGDEFL and TRUEPOS — like the light-time and aberration steps).
-    if not (iflag & FLG_NOGDEFL) and not (iflag & FLG_TRUEPOS):
+    if apply_deflection:
         geo = _apply_deflection_horizons(geo, earth_sv.pos, jd_tt, lt, batch, client)
 
     # Aberration (relativistic when light-time is known, matching fast_calc)
@@ -575,7 +583,7 @@ def horizons_calc_ut(
         dist2 = math.sqrt(geo2[0] ** 2 + geo2[1] ** 2 + geo2[2] ** 2)
         lt2 = dist2 / c_au_day
 
-    if not (iflag & FLG_NOGDEFL) and not (iflag & FLG_TRUEPOS):
+    if apply_deflection:
         # Use same deflector positions (good enough for dt=1s)
         geo2 = _apply_deflection_horizons(
             geo2,
