@@ -1003,7 +1003,11 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
         coverage = get_spk_coverage(spk_file)
         if coverage is not None:
             start_jd, end_jd = coverage
-            margin = 0.05  # days; light-time at observe() edges
+            # Margin must exceed the worst-case one-way light-time so the
+            # Skyfield observe() retardation never steps outside the kernel
+            # (Chiron near aphelion ~0.11 d); below it observe() would raise
+            # instead of falling through to the documented Keplerian path.
+            margin = 0.2  # days
             if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
                 return None
 
