@@ -1471,8 +1471,10 @@ def houses_armc_ex2(
     also returns the velocities (derivatives) of house cusps and angles.
 
     Velocities are always calculated, matching the reference behavior.
-    The ``ascmc9`` parameter is accepted for API compatibility (used by the
-    Sunshine house system) but is otherwise unused.
+    The ``ascmc9`` parameter carries the Sun's declination for the Sunshine
+    house system ('I'/'i') and is forwarded to the underlying cusp solution
+    (matching the reference, whose houses_armc_ex2 also uses it); it is
+    ignored by every other house system.
 
     Velocities are calculated using centered finite differences, with ARMC
     shifted by ±1 second (Koch/Placidus) or ±1 minute (other systems).
@@ -1503,8 +1505,10 @@ def houses_armc_ex2(
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
     """
-    # Calculate positions at current ARMC
-    cusps, ascmc = houses_armc(armc, lat, eps, hsys)
+    # Calculate positions at current ARMC. ascmc9 (the Sun's declination) is
+    # forwarded so the Sunshine system ('I'/'i') gets it; houses_armc ignores
+    # it for every other system.
+    cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
     # Always calculate velocities (matching the reference behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
@@ -1526,8 +1530,8 @@ def houses_armc_ex2(
         d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
 
     # Calculate positions at ARMC ± d_armc
-    cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys)
-    cusps_after, ascmc_after = houses_armc(armc + d_armc, lat, eps, hsys)
+    cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys, ascmc9)
+    cusps_after, ascmc_after = houses_armc(armc + d_armc, lat, eps, hsys, ascmc9)
 
     def angular_diff_local(pos2: float, pos1: float) -> float:
         """Calculate angular difference handling 360° wraparound."""
