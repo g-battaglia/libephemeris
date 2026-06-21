@@ -30,10 +30,10 @@ The refractive index of air is computed from:
 
     n(P, T) = 1 + 8.060e-5 * P / T
 
-where P is in mbar and T in Kelvin.  The coefficient 7.934e-5 is derived
+where P is in mbar and T in Kelvin.  The coefficient 8.060e-5 is derived
 from the Barrell & Sears (1939) group-refractive-index for the visible
 band, adjusted to include the average effect of atmospheric humidity
-on astronomical refraction (~1% above the dry-air value).
+on astronomical refraction (~2% above the dry-air value).
 
 The total refraction is computed by evaluating the integral:
 
@@ -41,7 +41,7 @@ The total refraction is computed by evaluating the integral:
             (dn/dr) / (n * sqrt(n^2 * r^2 / C^2 - 1))  dr
 
 where C = n_obs * r_obs * sin(z_obs) is the Bouguer (Snell) invariant.
-This integral is evaluated using Gauss-Legendre quadrature with 200
+This integral is evaluated using Gauss-Legendre quadrature with 120
 points, giving machine-precision convergence even at the horizon.
 
 For the APP_TO_TRUE direction the function inverts the
@@ -126,7 +126,7 @@ _T0: float = 288.15  # Standard temperature [K]
 
 
 # ---------------------------------------------------------------------------
-# Gauss-Legendre quadrature nodes and weights (200-point)
+# Gauss-Legendre quadrature nodes and weights (120-point)
 # ---------------------------------------------------------------------------
 # Precomputed once at import time.  numpy is used ONLY here for the
 # roots/weights computation; the runtime integration loop is pure Python.
