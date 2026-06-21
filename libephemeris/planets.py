@@ -583,6 +583,47 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     return result
 
 
+def _south_node_from_north(
+    north_result: tuple[float, float, float, float, float, float], flags: int
+) -> tuple[float, float, float, float, float, float]:
+    """Derive the descending ("south") lunar node from the ascending node.
+
+    The south node is the antipode of the north node on the celestial sphere,
+    so it is obtained from the already-formatted north result.  The transform
+    depends on the output representation:
+
+    * ``FLG_XYZ`` (Cartesian): negate the position and velocity vectors.
+    * ``FLG_RADIANS`` (spherical radians): longitude + pi (mod 2*pi), with the
+      latitude and latitude-speed negated.
+    * default (spherical degrees): longitude + 180 (mod 360), with the
+      latitude and latitude-speed negated.
+
+    The previous code always did ``(north[0] + 180.0) % 360.0``; under
+    ``FLG_XYZ`` that added 180 to a Cartesian x-component, and under
+    ``FLG_RADIANS`` it added 180 to a radian longitude, both producing garbage.
+    """
+    if flags & FLG_XYZ:
+        # Cartesian: the antipode is the negated position (and velocity) vector.
+        return (
+            -north_result[0],
+            -north_result[1],
+            -north_result[2],
+            -north_result[3],
+            -north_result[4],
+            -north_result[5],
+        )
+    half_turn = math.pi if (flags & FLG_RADIANS) else 180.0
+    full_turn = 2.0 * math.pi if (flags & FLG_RADIANS) else 360.0
+    return (
+        (north_result[0] + half_turn) % full_turn,
+        -north_result[1],
+        north_result[2],
+        north_result[3],
+        -north_result[4],
+        north_result[5],
+    )
+
+
 def _body_uses_jpl_ephemeris(ipl: int) -> bool:
     """Check if a body uses the JPL ephemeris for calculations.
 
@@ -1014,15 +1055,7 @@ def calc_ut(
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
         north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        south_lon = (north_result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -north_result[1],
-            north_result[2],
-            north_result[3],
-            -north_result[4],
-            north_result[5],
-        ), retflag
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1190,15 +1223,7 @@ def calc(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_result, retflag = calc(tjdet, abs(planet), flags)
-        south_lon = (north_result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -north_result[1],
-            north_result[2],
-            north_result[3],
-            -north_result[4],
-            north_result[5],
-        ), retflag
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
