@@ -508,6 +508,11 @@ def _sol_how_core(
         # A ring of Sun remains around the smaller Moon: the obscured fraction
         # is the ratio of the lunar to the solar disc area.
         attr[2] = (rmoon / rsun) ** 2
+    elif dctr <= 0.0:
+        # Exactly concentric discs in the partial branch are reachable only at
+        # the annular/total boundary (rsun == rmoon); the overlap is the whole
+        # smaller disc. Guards the lens-area 1/dctr singularity below.
+        attr[2] = min(1.0, (rmoon / rsun) ** 2)
     else:
         # Standard two-disc overlap (lens) area as a fraction of the
         # solar disc.
@@ -3591,7 +3596,7 @@ def _sol_eclipse_how_details_impl(
             'ratio': float - Ratio of lunar diameter to solar diameter
             'shadow_width_km': float - Core shadow width in km (0 for partial)
 
-            Position angles (degrees from North, clockwise):
+            Position angles (degrees from North through East, counterclockwise):
             'position_angle_c1': float - Position angle at first contact
             'position_angle_c2': float - Position angle at second contact (or 0)
             'position_angle_c3': float - Position angle at third contact (or 0)
