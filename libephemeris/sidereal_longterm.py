@@ -107,9 +107,13 @@ _LIGHT_TIME_DAYS = 1.495978707e11 / 299792458.0 / 86400.0
 _LTERM_T0 = 2396758.5  # 1 Jan 1850
 _LTERM_T1 = 2469807.5  # 1 Jan 2050
 # Continuity offsets (degrees) that join the long-term branch onto the modern
-# polynomial branch smoothly at the two boundaries.
-_LTERM_OFS0 = 0.000378172  # at/below T0
-_LTERM_OFS1 = 0.001385646  # at/above T1
+# polynomial branch smoothly at the two boundaries. Each equals
+# (_mean_sidereal_longterm_deg - _gmst_iau2006_deg) evaluated at that boundary,
+# so the piecewise GMST is continuous there; regenerate with that one-liner if
+# the dT model changes. (The previous _LTERM_OFS1 over-corrected, leaving a
+# ~2.04" jump at 2050; _LTERM_OFS0 was already correct to ~0.013".)
+_LTERM_OFS0 = 0.000374585174938602  # at/below T0 (1 Jan 1850)
+_LTERM_OFS1 = 0.000819257385870742  # at/above T1 (1 Jan 2050)
 
 # --------------------------------------------------------------------------
 # Vondrák 2011 (A&A 534, A22; corrigendum A&A 541, C1) coefficient series.
