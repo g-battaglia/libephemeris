@@ -2194,37 +2194,51 @@ def _calc_star_position_leb(
     # 1. Earth position and velocity from LEB (ICRS barycentric)
     earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
 
-    # 2. Propagate proper motion from J2000 to observation date
-    ra_date, dec_date = propagate_proper_motion(
-        star_data.ra_j2000,
-        star_data.dec_j2000,
-        star_data.pm_ra,
-        star_data.pm_dec,
-        J2000,
-        jd_tt,
+    # 2. Star ICRS position via rigorous 3D space motion.
+    #    Mirrors Skyfield's Star._compute_vectors (the reference used by
+    #    _calc_star_position_from_observer): build the J2000 position and
+    #    space-velocity vectors from (ra, dec, parallax, proper motion, radial
+    #    velocity), then propagate them linearly in 3D.  A first-order
+    #    propagation in RA/Dec diverges from this reference by up to ~0.27" for
+    #    the highest proper-motion stars (e.g. eps Ind, Rigil Kentaurus) already
+    #    within the base tier, growing to arcminutes/degrees at millennial
+    #    epochs; the 3D form tracks the Skyfield reference to the LEB pipeline
+    #    floor (<0.005" across the full catalogue).
+    _ASEC2RAD = math.pi / 180.0 / 3600.0
+    _C_M_PER_S = 299792458.0
+    _AU_KM = 149597870.7
+    # Reference default parallax 0.1249 mas for stars without a measured value
+    # (the same value Skyfield receives in the reference path).
+    px_mas = star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249
+    ra_rad = math.radians(star_data.ra_j2000)
+    dec_rad = math.radians(star_data.dec_j2000)
+    cra = math.cos(ra_rad)
+    sra = math.sin(ra_rad)
+    cdc = math.cos(dec_rad)
+    sdc = math.sin(dec_rad)
+    dist_internal = 1.0 / math.sin(px_mas * 1.0e-3 * _ASEC2RAD)  # AU
+    pos0 = (
+        dist_internal * cdc * cra,
+        dist_internal * cdc * sra,
+        dist_internal * sdc,
     )
-
-    # 3. RA/Dec → ICRS Cartesian
-    if star_data.parallax_mas > 0.0:
-        dist_internal = 206265000.0 / star_data.parallax_mas
-    else:
-        # Reference default parallax 0.0001249 arcsec for stars without
-        # a measured value.
-        dist_internal = 206265000.0 / 0.1249
-
-    # Apply radial velocity correction to distance (matching Skyfield Star behavior)
-    if star_data.radial_km_per_s != 0.0 and dist_internal < 1e11:
-        dt_years = (jd_tt - J2000) / DAYS_PER_JULIAN_YEAR
-        au_per_year = star_data.radial_km_per_s * 365.25 * 86400.0 / 149597870.7
-        dist_internal += au_per_year * dt_years
-
-    ra_rad = math.radians(ra_date)
-    dec_rad = math.radians(dec_date)
-    cos_dec = math.cos(dec_rad)
+    # Doppler factor: accounts for the changing light-travel time to the star.
+    k = 1.0 / (1.0 - star_data.radial_km_per_s / _C_M_PER_S * 1000.0)
+    # Proper motion (mas/yr; pm_ra already includes cos(dec)) and radial
+    # velocity as orthogonal AU/day components.
+    pmr = (star_data.pm_ra * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    pmd = (star_data.pm_dec * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    rvl = star_data.radial_km_per_s * 86400.0 / _AU_KM * k
+    vel = (
+        -pmr * sra - pmd * sdc * cra + rvl * cdc * cra,
+        pmr * cra - pmd * sdc * sra + rvl * cdc * sra,
+        pmd * cdc + rvl * sdc,
+    )
+    dt_days = jd_tt - J2000
     star_icrs = (
-        dist_internal * cos_dec * math.cos(ra_rad),
-        dist_internal * cos_dec * math.sin(ra_rad),
-        dist_internal * math.sin(dec_rad),
+        pos0[0] + vel[0] * dt_days,
+        pos0[1] + vel[1] * dt_days,
+        pos0[2] + vel[2] * dt_days,
     )
 
     # 4. Geocentric vector
