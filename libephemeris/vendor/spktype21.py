@@ -97,6 +97,13 @@ class SPKType21(object):
         
         # initialize for compute_type21
         self.mda_record_exist = False
+        # Body the cached mda_record belongs to. The mda_lb/mda_ub window is
+        # NOT body-specific, so the cache must also key on (target, center);
+        # otherwise a hit for a different body in the same time window would
+        # return the wrong body's state (multiple type-21 targets can share
+        # one .bsp/instance).
+        self.mda_target = None
+        self.mda_center = None
         self.current_segment_exist = False
 
         # libephemeris addition: the evaluation work arrays (G/FC/WC/W/KQ,
@@ -145,11 +152,15 @@ class SPKType21(object):
 
         with self._compute_lock:
             if self.mda_record_exist:
-                if eval_sec >= self.mda_lb and eval_sec < self.mda_ub:
+                if (eval_sec >= self.mda_lb and eval_sec < self.mda_ub
+                        and target == self.mda_target
+                        and center == self.mda_center):
                     result = self.spke21(eval_sec, self.mda_record)
                     return result[0:3], result[3:]
 
             self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(eval_sec, target, center)
+            self.mda_target = target
+            self.mda_center = center
             self.mda_record_exist = True
 
             result = self.spke21(eval_sec, self.mda_record)
