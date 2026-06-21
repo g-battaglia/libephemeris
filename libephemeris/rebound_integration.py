@@ -986,8 +986,12 @@ def propagate_orbit_assist(
     # Configure non-gravitational forces if requested.  ASSIST's API
     # takes a flat array of 3 Marsden parameters (A1 radial, A2
     # transverse, A3 normal) per particle, after the particle exists.
+    # The setter requires a numpy float64 array (it calls value.ctypes on
+    # it); a plain Python list raises AttributeError.
     if include_non_gravitational:
-        extras.particle_params = [A1, A2, A3]
+        import numpy as np
+
+        extras.particle_params = np.array([A1, A2, A3], dtype=np.float64)
 
     # Set initial time (JD - reference JD)
     sim.t = jd_start - ephem.jd_ref
