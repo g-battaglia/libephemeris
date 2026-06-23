@@ -2073,15 +2073,16 @@ def _fast_calc_core(
             # Skip it for Pipeline-A FLG_J2000 output: the longitude is on the
             # FIXED J2000 ecliptic, which does not precess, so subtracting the
             # rate would leave the speed off by the full general-precession rate
-            # (~0.137"/day) versus pyswisseph. The deferred-J2000 ecliptic-direct
-            # bodies (nodes/apogees) DO keep the subtraction here because dlon is
-            # rebuilt from the re-precessed positions in the _deferred_sid_j2k
-            # block below; for them _pipe_flags ran without FLG_J2000, so this is
-            # genuine ecliptic-of-date speed that the rebuild then re-precesses.
+            # (~0.137"/day) versus the reference ephemeris. The deferred-J2000
+            # ecliptic-direct bodies (nodes/apogees) DO keep the subtraction
+            # here because dlon is rebuilt from the re-precessed positions in
+            # the _deferred_sid_j2k block below; for them _pipe_flags ran without
+            # FLG_J2000, so this is genuine ecliptic-of-date speed that the
+            # rebuild then re-precesses.
             #
             # Only when FLG_SPEED was requested: without it dlon was already
-            # zeroed above, and pyswisseph returns exactly 0.0 in the speed
-            # slots — subtracting the precession rate would corrupt that 0.0
+            # zeroed above, and the reference ephemeris returns exactly 0.0 in
+            # the speed slots — subtracting the precession rate would corrupt 0.0
             # into ~-0.137"/day (the _deferred rebuild below would then carry
             # the spurious value through). Gating here keeps both paths at 0.0.
             if (iflag & FLG_SPEED) and (
