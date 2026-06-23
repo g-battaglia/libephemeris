@@ -740,9 +740,19 @@ def _to_ecliptic_output(
     # uses the mean-equator-of-date frame handled above, with no ayanamsa — the
     # same rule as planets._calc_body_pctr and fast_calc).
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
-        from .planets import get_ayanamsa_ut
+        from .planets import _get_ayanamsa_for_flags
 
-        ayan = get_ayanamsa_ut(jd_ut)
+        # The longitude is on the TRUE ecliptic of date (the default branch
+        # above applies the precession-nutation matrix), so it already carries
+        # the nutation-in-longitude term Δψ. Subtract the TRUE ayanamsa
+        # (mean + Δψ), exactly as fast_calc (lines 1996-2003) and
+        # planets._apply_sidereal_correction do. Using the mean ayanamsa here
+        # (the old get_ayanamsa_ut call) left a spurious ~9-17" offset versus
+        # the LEB/Skyfield backend for the same request. _get_ayanamsa_for_flags
+        # correctly returns the mean ayanamsa for FLG_NONUT/FLG_J2000 (where the
+        # position carries no nutation), so the J2000 ecliptic branch above
+        # stays correct.
+        ayan = _get_ayanamsa_for_flags(jd_ut, iflag)
         lon = (lon - ayan) % 360.0
 
         # Sidereal speed correction: subtract the precession rate from the
