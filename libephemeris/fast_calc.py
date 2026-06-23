@@ -2065,28 +2065,23 @@ def _fast_calc_core(
 
             lon = (lon - aya) % 360.0
 
-            # Sidereal speed correction: subtract the precession rate from dlon
-            # for ecliptic-OF-DATE output (the ayanamsha drifts ~50"/yr).
-            # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
-            # Convert: deg/day = (arcsec/century) / 3600 / 36525
+            # Sidereal speed correction (ayanamsa drift): the ayanamsha drifts
+            # ~50"/yr, so its time-derivative (~the general-precession rate) is
+            # removed from dlon for sidereal SPEED output. _PREC_COEFFS are
+            # arcsec/century: dP/dT = c0 + 2*c1*T + ...; convert to deg/day with
+            # / 3600 / 36525.
             #
-            # Skip it for Pipeline-A FLG_J2000 output: the longitude is on the
-            # FIXED J2000 ecliptic, which does not precess, so subtracting the
-            # rate would leave the speed off by the full general-precession rate
-            # (~0.137"/day) versus the reference ephemeris. The deferred-J2000
-            # ecliptic-direct bodies (nodes/apogees) DO keep the subtraction
-            # here because dlon is rebuilt from the re-precessed positions in
-            # the _deferred_sid_j2k block below; for them _pipe_flags ran without
-            # FLG_J2000, so this is genuine ecliptic-of-date speed that the
-            # rebuild then re-precesses.
-            #
-            # Only when FLG_SPEED was requested: without it dlon was already
-            # zeroed above, and the reference ephemeris returns exactly 0.0 in
-            # the speed slots — subtracting the precession rate would corrupt 0.0
-            # into ~-0.137"/day (the _deferred rebuild below would then carry
-            # the spurious value through). Gating here keeps both paths at 0.0.
+            # Fires for every sidereal SPEED request — including FLG_J2000, where
+            # the drift is still present (the ayanamsa offset is constant in the
+            # J2000 frame, but the of-date longitude this dlon was built from
+            # still carries it). It is the FLG_SPEED-absent case that must be
+            # excluded: dlon was zeroed above and must stay 0.0.
+            # The deferred ecliptic-direct bodies (nodes/apogees) keep this
+            # of-date drift; their _deferred_sid_j2k rebuild below re-precesses
+            # the POSITION (not the rate) to J2000. Pipeline-A bodies get the
+            # J2000 frame term applied separately, just after this block.
             if (iflag & FLG_SPEED) and (
-                _deferred_sid_j2k or not (iflag & FLG_J2000)
+                _deferred_sid_j2k or not (iflag & FLG_J2000) or _pipeline_a
             ):
                 T = (jd_tt - J2000) / 36525.0
                 prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
@@ -2096,6 +2091,29 @@ def _fast_calc_core(
         except KeyError:
             # Star-based sidereal mode, fall back
             raise
+
+    # J2000 longitude-speed frame conversion (Pipeline A, spherical output only).
+    # _pipeline_icrs rotates the velocity into the J2000 ecliptic with a fixed
+    # (instantaneous) matrix, which omits the time-derivative of that rotation —
+    # the of-date→J2000 equinox motion. That motion removes the general-
+    # precession rate from the longitude speed, so apply the subtraction here.
+    # It runs for BOTH tropical and sidereal J2000 ecliptic output (for sidereal
+    # it is the second ~p term, on top of the ayanamsa drift above). Excluded:
+    # the deferred ecliptic-direct bodies (handled by the rebuild below;
+    # _pipeline_a is False for them), equatorial output (its own frame), and XYZ
+    # output (dlon then holds a Cartesian velocity component, not a longitude
+    # rate — Pipeline-A XYZ returns the vectors straight from _pipeline_icrs).
+    if (
+        _pipeline_a
+        and (iflag & FLG_SPEED)
+        and (iflag & FLG_J2000)
+        and not (iflag & FLG_EQUATORIAL)
+        and not (iflag & FLG_XYZ)
+    ):
+        T = (jd_tt - J2000) / 36525.0
+        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
+        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
+        dlon -= prec_rate_deg_day
 
     # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
     # The pipeline was run without FLG_J2000 so ayanamsha could be

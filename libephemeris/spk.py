@@ -999,21 +999,42 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     if spk_type != 21:
         return None
 
+    kernel = _load_type21_kernel(spk_file)
+    if kernel is None:
+        return None
+
     if jd_tt is not None:
         coverage = get_spk_coverage(spk_file)
         if coverage is not None:
             start_jd, end_jd = coverage
-            # Margin must exceed the worst-case one-way light-time so the
-            # Skyfield observe() retardation never steps outside the kernel
-            # (Chiron near aphelion ~0.11 d); below it observe() would raise
-            # instead of falling through to the documented Keplerian path.
-            margin = 0.2  # days
+            # Outside the raw coverage: caller falls through to the direct /
+            # Keplerian out-of-coverage path.
+            if jd_tt <= start_jd or jd_tt >= end_jd:
+                return None
+            # Coverage-edge margin: Skyfield's observe() retards the target by
+            # the one-way light-time, so jd_tt must sit at least that far inside
+            # the kernel or observe() raises instead of falling through to the
+            # documented Keplerian path. Size it from the body's actual
+            # heliocentric distance — a fixed margin sized for Chiron (~0.11 d
+            # near aphelion) is far too small for distant TNOs (Eris/Sedna reach
+            # ~0.5 d). Floor at 0.2 d for the inner small bodies.
+            _AU_KM = 149597870.7
+            _C_AU_DAY = 173.1446326846693
+            try:
+                pos_km, _ = kernel.compute_type21(10, naif_id, float(jd_tt))
+                helio_au = (
+                    math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2)
+                    / _AU_KM
+                )
+            except (ValueError, IndexError, KeyError):
+                # Probe failed near the edge: assume a distant body (~175 AU,
+                # ~1 d light-time) so the margin is conservative, not too small.
+                helio_au = 175.0
+            # Earth's orbit adds at most ~1 AU to the geocentric distance; a
+            # 1.2 safety factor absorbs the light-time iteration and slop.
+            margin = max(0.2, (helio_au + 1.0) / _C_AU_DAY * 1.2)
             if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
                 return None
-
-    kernel = _load_type21_kernel(spk_file)
-    if kernel is None:
-        return None
 
     # Get the Sun target from the main ephemeris
     planets = state.get_planets()

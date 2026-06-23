@@ -106,14 +106,11 @@ _LIGHT_TIME_DAYS = 1.495978707e11 / 299792458.0 / 86400.0
 # Modern window where the IAU 2006 GMST polynomial branch is used directly.
 _LTERM_T0 = 2396758.5  # 1 Jan 1850
 _LTERM_T1 = 2469807.5  # 1 Jan 2050
-# Continuity offsets (degrees) that join the long-term branch onto the modern
-# polynomial branch smoothly at the two boundaries. Each equals
-# (_mean_sidereal_longterm_deg - _gmst_iau2006_deg) evaluated at that boundary,
-# so the piecewise GMST is continuous there; regenerate with that one-liner if
-# the dT model changes. (The previous _LTERM_OFS1 over-corrected, leaving a
-# ~2.04" jump at 2050; _LTERM_OFS0 was already correct to ~0.013".)
-_LTERM_OFS0 = 0.000374585174938602  # at/below T0 (1 Jan 1850)
-_LTERM_OFS1 = 0.000819257385870742  # at/above T1 (1 Jan 2050)
+# Continuity offsets that join the long-term branch onto the modern polynomial
+# branch at the two boundaries are computed at runtime from the live ΔT model
+# (see _lterm_offset below), not hardcoded — so they never go stale when the ΔT
+# model changes (set_delta_t_userdef / IERS). They are only evaluated on the
+# rare long-term branch (dates outside 1850–2050).
 
 # --------------------------------------------------------------------------
 # Vondrák 2011 (A&A 534, A22; corrigendum A&A 541, C1) coefficient series.
@@ -384,6 +381,23 @@ def _mean_sidereal_longterm_deg(jd_ut1: float) -> float:
     return (lon + dhour) % 360.0
 
 
+def _lterm_offset(boundary_jd: float) -> float:
+    """Continuity offset (deg) joining the long-term branch to the modern one.
+
+    Equals (long-term branch − modern branch) evaluated at ``boundary_jd``, so
+    the piecewise GMST is continuous there. Computed from the live ΔT model
+    rather than hardcoded, so it can never drift out of sync when the ΔT model
+    changes. Only called on the long-term branch (rare), so the extra cost is
+    negligible. The result is reduced to (−180, 180] to absorb any 0/360 wrap
+    between the two branches.
+    """
+    jd_tt = boundary_jd + _deltat_days(boundary_jd)
+    diff = _mean_sidereal_longterm_deg(boundary_jd) - (
+        _gmst_iau2006_deg(boundary_jd, jd_tt) % 360.0
+    )
+    return (diff + 180.0) % 360.0 - 180.0
+
+
 def mean_sidereal_time_deg(jd_ut1: float) -> float:
     """Greenwich Mean Sidereal Time at ``jd_ut1`` in degrees [0, 360).
 
@@ -396,9 +410,9 @@ def mean_sidereal_time_deg(jd_ut1: float) -> float:
         return _gmst_iau2006_deg(jd_ut1, jd_tt) % 360.0
     g = _mean_sidereal_longterm_deg(jd_ut1)
     if jd_ut1 <= _LTERM_T0:
-        g -= _LTERM_OFS0
+        g -= _lterm_offset(_LTERM_T0)
     else:
-        g -= _LTERM_OFS1
+        g -= _lterm_offset(_LTERM_T1)
     return g % 360.0
 
 

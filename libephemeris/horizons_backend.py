@@ -749,6 +749,12 @@ def _to_ecliptic_output(
     # Sidereal correction (ecliptic longitude only; equatorial sidereal output
     # uses the mean-equator-of-date frame handled above, with no ayanamsa — the
     # same rule as planets._calc_body_pctr and fast_calc).
+    #
+    # Only Pipeline-A-like bodies (planets/asteroids/helio/bary state vectors)
+    # reach _to_ecliptic_output; the deferred ecliptic-direct bodies
+    # (nodes/apogees) are handled by _calc_analytical and never arrive here, so
+    # the simple J2000 handling below — without fast_calc's _deferred_sid_j2k
+    # rebuild — is correct for every body that does.
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import _get_ayanamsa_for_flags
 
@@ -765,32 +771,38 @@ def _to_ecliptic_output(
         ayan = _get_ayanamsa_for_flags(jd_ut, iflag)
         lon = (lon - ayan) % 360.0
 
-        # Sidereal speed correction: subtract the precession rate from the
-        # longitude speed for ecliptic-OF-DATE output, mirroring fast_calc (the
-        # ayanamsa drifts ~50"/yr, so its time-derivative must be removed from
-        # dlon). Done here so BOTH the spherical return below and the XYZ rebuild
-        # use the sidereal rate; otherwise the velocity would carry the tropical
-        # rate and diverge from the LEB/Skyfield backend for the same request.
-        #
-        # Skip it for FLG_J2000: the longitude was rotated into the FIXED J2000
-        # ecliptic above, which does not precess, so subtracting the precession
-        # rate would leave the speed off by the full general-precession rate
-        # (~0.137"/day) versus the reference ephemeris. (Horizons never reaches
-        # this path for the deferred-J2000 ecliptic-direct bodies — nodes/apogees
-        # are intercepted upstream — so this simple guard matches fast_calc,
-        # where those bodies keep the subtraction via the _deferred_sid_j2k
-        # rebuild.)
-        #
-        # Also skip when FLG_SPEED was not requested: dlon is then 0.0 (vel was
-        # passed as the zero vector) and the reference ephemeris returns exactly
-        # 0.0 in the speed slots — subtracting the rate would corrupt that 0.0
-        # into ~-0.137"/day, matching the fast_calc gate above.
-        if (iflag & FLG_SPEED) and not (iflag & FLG_J2000):
+        # Sidereal speed correction (ayanamsa drift): the ayanamsa drifts
+        # ~50"/yr, so its time-derivative is removed from the longitude speed for
+        # sidereal SPEED output (mirroring fast_calc). Done here so BOTH the
+        # spherical return below and the XYZ rebuild use the sidereal rate.
+        # Fires for every sidereal SPEED request, including FLG_J2000 — the J2000
+        # frame term is applied separately just below. Skipped only when
+        # FLG_SPEED is absent (dlon is then 0.0 and must stay 0.0).
+        if iflag & FLG_SPEED:
             # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
             T = (jd_tt - J2000) / 36525.0
             prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
             prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
             dlon -= prec_rate_deg_day
+
+    # J2000 longitude-speed frame conversion (spherical output only). The
+    # velocity was rotated into the J2000 ecliptic with a fixed matrix
+    # (_rotate_icrs_to_ecliptic_j2000), which omits the of-date→J2000 equinox
+    # motion; that motion removes the general-precession rate from the longitude
+    # speed, so apply it here. Runs for BOTH tropical and sidereal J2000 ecliptic
+    # SPEED output (mirroring fast_calc's Pipeline-A frame term). Equatorial
+    # output (own frame) and XYZ output (the Cartesian velocity is already in the
+    # J2000 frame) are excluded.
+    if (
+        (iflag & FLG_SPEED)
+        and (iflag & FLG_J2000)
+        and not (iflag & FLG_EQUATORIAL)
+        and not (iflag & FLG_XYZ)
+    ):
+        T = (jd_tt - J2000) / 36525.0
+        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
+        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
+        dlon -= prec_rate_deg_day
 
     # XYZ output
     if iflag & FLG_XYZ:
