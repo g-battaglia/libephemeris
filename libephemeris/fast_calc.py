@@ -2078,7 +2078,15 @@ def _fast_calc_core(
             # rebuilt from the re-precessed positions in the _deferred_sid_j2k
             # block below; for them _pipe_flags ran without FLG_J2000, so this is
             # genuine ecliptic-of-date speed that the rebuild then re-precesses.
-            if _deferred_sid_j2k or not (iflag & FLG_J2000):
+            #
+            # Only when FLG_SPEED was requested: without it dlon was already
+            # zeroed above, and pyswisseph returns exactly 0.0 in the speed
+            # slots — subtracting the precession rate would corrupt that 0.0
+            # into ~-0.137"/day (the _deferred rebuild below would then carry
+            # the spurious value through). Gating here keeps both paths at 0.0.
+            if (iflag & FLG_SPEED) and (
+                _deferred_sid_j2k or not (iflag & FLG_J2000)
+            ):
                 T = (jd_tt - J2000) / 36525.0
                 prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
                 prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)

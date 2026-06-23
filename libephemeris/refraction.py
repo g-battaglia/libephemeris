@@ -42,7 +42,9 @@ The total refraction is computed by evaluating the integral:
 
 where C = n_obs * r_obs * sin(z_obs) is the Bouguer (Snell) invariant.
 This integral is evaluated using Gauss-Legendre quadrature with 120
-points, giving machine-precision convergence even at the horizon.
+points, giving sub-arcsecond convergence; the near-singular integrand
+as z -> 90 deg limits accuracy at the horizon to ~0.2 arcsec (far below
+this module's documented deviation envelope from the reference fits).
 
 For the APP_TO_TRUE direction the function inverts the
 TRUE_TO_APP computation numerically via Newton-Raphson iteration

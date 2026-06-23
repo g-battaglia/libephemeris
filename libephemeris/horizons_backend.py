@@ -678,6 +678,7 @@ def _to_ecliptic_output(
         FLG_EQUATORIAL,
         FLG_J2000,
         FLG_SIDEREAL,
+        FLG_SPEED,
         FLG_XYZ,
         FLG_RADIANS,
         FLG_ICRS,
@@ -770,7 +771,12 @@ def _to_ecliptic_output(
         # the deferred-J2000 ecliptic-direct bodies — nodes/apogees are
         # intercepted upstream — so this simple guard matches fast_calc, where
         # those bodies keep the subtraction via the _deferred_sid_j2k rebuild.)
-        if not (iflag & FLG_J2000):
+        #
+        # Also skip when FLG_SPEED was not requested: dlon is then 0.0 (vel was
+        # passed as the zero vector) and pyswisseph returns exactly 0.0 in the
+        # speed slots — subtracting the rate would corrupt that 0.0 into
+        # ~-0.137"/day, matching the fast_calc gate above.
+        if (iflag & FLG_SPEED) and not (iflag & FLG_J2000):
             # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
             T = (jd_tt - J2000) / 36525.0
             prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T

@@ -2244,15 +2244,18 @@ def _calc_star_position_leb(
     # 4. Geocentric vector
     geo = _vec3_sub(star_icrs, earth_pos)
 
-    # 5. Light-time (zero for stars without parallax — infinite direction)
+    # 5. Light-time. dist_internal above is always finite (zero-parallax stars
+    # use the clamped 0.1249 mas default), so the geocentric distance is finite
+    # too — compute light-time from it for every star, matching the Skyfield
+    # reference path, which feeds the same clamped default into observe() and
+    # always retards. (Gating on the raw parallax instead would leave the one
+    # zero-parallax catalog star on the lt=0 / first-order-aberration branch
+    # while the reference used the relativistic, light-retarded one.)
     # Note: for finite-distance stars, proper motion is not re-evaluated
     # at the retarded epoch (jd_tt - lt).  The error is < 0.001" for all
     # catalog stars because lt is at most ~few years and pm is < 10"/yr.
-    if star_data.parallax_mas > 0.0:
-        geo_dist = _vec3_dist(geo)
-        lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
-    else:
-        lt = 0.0
+    geo_dist = _vec3_dist(geo)
+    lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
 
     # 6. Gravitational deflection (skip if noaberr or nogdefl)
     if not noaberr and not nogdefl:
