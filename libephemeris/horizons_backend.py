@@ -690,6 +690,8 @@ def _to_ecliptic_output(
         _get_skyfield_frame_data,
         _mat3_vec3,
         _prec_matrix,
+        _PREC_COEFFS,
+        J2000,
     )
     import math
 
@@ -742,6 +744,18 @@ def _to_ecliptic_output(
 
         ayan = get_ayanamsa_ut(jd_ut)
         lon = (lon - ayan) % 360.0
+
+        # Sidereal speed correction: subtract the precession rate from the
+        # longitude speed, mirroring fast_calc (the ayanamsa drifts ~50"/yr, so
+        # its time-derivative must be removed from dlon). Done here so BOTH the
+        # spherical return below and the XYZ rebuild use the sidereal rate;
+        # otherwise the velocity would carry the tropical rate and diverge from
+        # the LEB/Skyfield backend for the same request.
+        # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
+        T = (jd_tt - J2000) / 36525.0
+        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
+        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
+        dlon -= prec_rate_deg_day
 
     # XYZ output
     if iflag & FLG_XYZ:
