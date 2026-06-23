@@ -483,6 +483,18 @@ class EphemerisContext:
             >>> pos, retflag = ctx.calc_ut(2451545.0, MARS, FLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
+        # South nodes: derive from the north node via this same context path,
+        # mirroring the module-level calc_ut(). Without this, the negative IDs
+        # fall through to _calc_body's inline antipode, which is not
+        # representation-aware under FLG_XYZ / FLG_RADIANS.
+        from .constants import MEAN_NODE, TRUE_NODE
+
+        if ipl in (-MEAN_NODE, -TRUE_NODE):
+            from .planets import _south_node_from_north
+
+            north_result, retflag = self.calc_ut(tjd_ut, abs(ipl), iflag)
+            return _south_node_from_north(north_result, iflag), retflag
+
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
         if reader is None:
@@ -561,6 +573,16 @@ class EphemerisContext:
             TT differs from UT by Delta T (~32s for year 2000).
             For most astrological applications, use calc_ut() instead.
         """
+        # South nodes: derive from the north node via this same context path,
+        # mirroring the module-level calc().
+        from .constants import MEAN_NODE, TRUE_NODE
+
+        if ipl in (-MEAN_NODE, -TRUE_NODE):
+            from .planets import _south_node_from_north
+
+            north_result, retflag = self.calc(tjd, abs(ipl), iflag)
+            return _south_node_from_north(north_result, iflag), retflag
+
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
         if reader is None:

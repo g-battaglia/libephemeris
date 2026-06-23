@@ -2195,20 +2195,6 @@ def _calc_body(
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
 
-    # South nodes are 180° from north nodes
-    if ipl in [-MEAN_NODE, -TRUE_NODE]:
-        north_ipl = abs(ipl)
-        result, flags = _calc_body(t, north_ipl, iflag)
-        south_lon = (result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -result[1],
-            result[2],
-            result[3],
-            -result[4],
-            result[5],
-        ), flags
-
     # Handle Lilith (Mean/Osculating Apogee)
     if ipl in [MEAN_APOG, OSCU_APOG]:
         jd_tt = t.tt
