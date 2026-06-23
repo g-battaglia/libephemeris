@@ -27,6 +27,7 @@ import os
 import threading
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
+from .constants import MEAN_NODE, TRUE_NODE
 from .tracing import _record
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
@@ -488,8 +489,6 @@ class EphemerisContext:
         # intercepted here because no downstream path derives it (_calc_body has
         # no antipode branch), and the antipode is representation-dependent
         # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
-        from .constants import MEAN_NODE, TRUE_NODE
-
         if ipl in (-MEAN_NODE, -TRUE_NODE):
             from .planets import _south_node_from_north
 
@@ -576,8 +575,6 @@ class EphemerisContext:
         """
         # South nodes: derive from the north node via this same context path,
         # mirroring the module-level calc().
-        from .constants import MEAN_NODE, TRUE_NODE
-
         if ipl in (-MEAN_NODE, -TRUE_NODE):
             from .planets import _south_node_from_north
 

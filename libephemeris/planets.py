@@ -2025,7 +2025,11 @@ def _calc_body(
 
     Supported body types:
         - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE440 ephemeris
-        - Lunar nodes (Mean/True North/South) via lunar.py
+        - Lunar nodes (Mean/True NORTH) via lunar.py. The south nodes
+          (negative ids) are NOT handled here: the public entry points
+          (calc/calc_ut and EphemerisContext) intercept them and derive the
+          antipode via planets._south_node_from_north, so _calc_body only ever
+          receives the positive (north) node id.
         - Lilith/Lunar apogee (Mean/Osculating) via lunar.py
         - Minor bodies (asteroids, TNOs) via minor_bodies.py with rigorous geocentric conversion
         - Fixed stars (Regulus, Spica) via fixed_stars.py

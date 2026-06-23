@@ -178,6 +178,57 @@ def _cartesian_velocity_to_spherical(
     return (dlon_deg, dlat_deg, ddist)
 
 
+def _spherical_to_cartesian_with_velocity(
+    lon: float,
+    lat: float,
+    dist: float,
+    dlon: float,
+    dlat: float,
+    ddist: float,
+) -> Tuple[float, float, float, float, float, float]:
+    """Convert spherical position+velocity to Cartesian (the inverse Jacobian).
+
+    Shared by the FLG_XYZ post-processing in both the LEB/Skyfield path
+    (``fast_calc``) and the Horizons backend so the two stay identical.
+
+    Args:
+        lon, lat: Longitude/latitude in DEGREES.
+        dist: Radial distance in AU.
+        dlon, dlat: Longitude/latitude speed in DEGREES/day.
+        ddist: Radial speed in AU/day.
+
+    Returns:
+        (x, y, z, vx, vy, vz) — position in AU, velocity in AU/day.  The
+        velocity is exactly zero when all input rates are zero.
+    """
+    lon_r = math.radians(lon)
+    lat_r = math.radians(lat)
+    cos_lat = math.cos(lat_r)
+    sin_lat = math.sin(lat_r)
+    cos_lon = math.cos(lon_r)
+    sin_lon = math.sin(lon_r)
+    x = dist * cos_lat * cos_lon
+    y = dist * cos_lat * sin_lon
+    z = dist * sin_lat
+    if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
+        dlon_r = math.radians(dlon)
+        dlat_r = math.radians(dlat)
+        vx = (
+            -dist * cos_lat * sin_lon * dlon_r
+            - dist * sin_lat * cos_lon * dlat_r
+            + cos_lat * cos_lon * ddist
+        )
+        vy = (
+            dist * cos_lat * cos_lon * dlon_r
+            - dist * sin_lat * sin_lon * dlat_r
+            + cos_lat * sin_lon * ddist
+        )
+        vz = dist * cos_lat * dlat_r + sin_lat * ddist
+    else:
+        vx = vy = vz = 0.0
+    return (x, y, z, vx, vy, vz)
+
+
 def _rotate_equatorial_to_ecliptic(
     x: float, y: float, z: float, eps_rad: float
 ) -> Tuple[float, float, float]:
@@ -2014,13 +2065,24 @@ def _fast_calc_core(
 
             lon = (lon - aya) % 360.0
 
-            # Sidereal speed correction: subtract precession rate from dlon
+            # Sidereal speed correction: subtract the precession rate from dlon
+            # for ecliptic-OF-DATE output (the ayanamsha drifts ~50"/yr).
             # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
             # Convert: deg/day = (arcsec/century) / 3600 / 36525
-            T = (jd_tt - J2000) / 36525.0
-            prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
-            prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-            dlon -= prec_rate_deg_day
+            #
+            # Skip it for Pipeline-A FLG_J2000 output: the longitude is on the
+            # FIXED J2000 ecliptic, which does not precess, so subtracting the
+            # rate would leave the speed off by the full general-precession rate
+            # (~0.137"/day) versus pyswisseph. The deferred-J2000 ecliptic-direct
+            # bodies (nodes/apogees) DO keep the subtraction here because dlon is
+            # rebuilt from the re-precessed positions in the _deferred_sid_j2k
+            # block below; for them _pipe_flags ran without FLG_J2000, so this is
+            # genuine ecliptic-of-date speed that the rebuild then re-precesses.
+            if _deferred_sid_j2k or not (iflag & FLG_J2000):
+                T = (jd_tt - J2000) / 36525.0
+                prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
+                prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
+                dlon -= prec_rate_deg_day
 
         except KeyError:
             # Star-based sidereal mode, fall back
@@ -2051,26 +2113,9 @@ def _fast_calc_core(
     # FLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
     # Pipeline A handles XYZ internally via _pipeline_icrs; skip here.
     if (iflag & FLG_XYZ) and not _pipeline_a:
-        _lon_r = math.radians(lon)
-        _lat_r = math.radians(lat)
-        _cos_lat = math.cos(_lat_r)
-        x = dist * _cos_lat * math.cos(_lon_r)
-        y = dist * _cos_lat * math.sin(_lon_r)
-        z = dist * math.sin(_lat_r)
-        if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
-            _dlon_r = math.radians(dlon)
-            _dlat_r = math.radians(dlat)
-            _sin_lat = math.sin(_lat_r)
-            vx = (-dist * _cos_lat * math.sin(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.cos(_lon_r) * _dlat_r
-                  + _cos_lat * math.cos(_lon_r) * ddist)
-            vy = (dist * _cos_lat * math.cos(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.sin(_lon_r) * _dlat_r
-                  + _cos_lat * math.sin(_lon_r) * ddist)
-            vz = dist * _cos_lat * _dlat_r + _sin_lat * ddist
-        else:
-            vx = vy = vz = 0.0
-        return (x, y, z, vx, vy, vz), iflag
+        return _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, dlon, dlat, ddist
+        ), iflag
 
     # FLG_RADIANS: convert angular output from degrees to radians
     # Skip when XYZ is active — values are Cartesian AU, not angles

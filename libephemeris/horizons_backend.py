@@ -690,6 +690,7 @@ def _to_ecliptic_output(
         _get_skyfield_frame_data,
         _mat3_vec3,
         _prec_matrix,
+        _spherical_to_cartesian_with_velocity,
         _PREC_COEFFS,
         J2000,
     )
@@ -756,52 +757,41 @@ def _to_ecliptic_output(
         lon = (lon - ayan) % 360.0
 
         # Sidereal speed correction: subtract the precession rate from the
-        # longitude speed, mirroring fast_calc (the ayanamsa drifts ~50"/yr, so
-        # its time-derivative must be removed from dlon). Done here so BOTH the
-        # spherical return below and the XYZ rebuild use the sidereal rate;
-        # otherwise the velocity would carry the tropical rate and diverge from
-        # the LEB/Skyfield backend for the same request.
-        # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
-        T = (jd_tt - J2000) / 36525.0
-        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
-        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-        dlon -= prec_rate_deg_day
+        # longitude speed for ecliptic-OF-DATE output, mirroring fast_calc (the
+        # ayanamsa drifts ~50"/yr, so its time-derivative must be removed from
+        # dlon). Done here so BOTH the spherical return below and the XYZ rebuild
+        # use the sidereal rate; otherwise the velocity would carry the tropical
+        # rate and diverge from the LEB/Skyfield backend for the same request.
+        #
+        # Skip it for FLG_J2000: the longitude was rotated into the FIXED J2000
+        # ecliptic above, which does not precess, so subtracting the precession
+        # rate would leave the speed off by the full general-precession rate
+        # (~0.137"/day) versus pyswisseph. (Horizons never reaches this path for
+        # the deferred-J2000 ecliptic-direct bodies — nodes/apogees are
+        # intercepted upstream — so this simple guard matches fast_calc, where
+        # those bodies keep the subtraction via the _deferred_sid_j2k rebuild.)
+        if not (iflag & FLG_J2000):
+            # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
+            T = (jd_tt - J2000) / 36525.0
+            prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
+            prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
+            dlon -= prec_rate_deg_day
 
     # XYZ output
     if iflag & FLG_XYZ:
         if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
             # Sidereal ecliptic Cartesian: rebuild the vectors from the
             # ayanamsa-shifted longitude, mirroring fast_calc's XYZ+SIDEREAL
-            # post-processing. The bare pos/vel were rotated to ecliptic-of-date
-            # but NOT by the ayanamsa, so returning them as-is would yield
-            # tropical Cartesian output while the LEB/Skyfield backends return
-            # sidereal (ayanamsa-rotated) Cartesian for the same request.
-            lon_r = math.radians(lon)
-            lat_r = math.radians(lat)
-            cos_lat = math.cos(lat_r)
-            sin_lat = math.sin(lat_r)
-            cos_lon = math.cos(lon_r)
-            sin_lon = math.sin(lon_r)
-            x = dist * cos_lat * cos_lon
-            y = dist * cos_lat * sin_lon
-            z = dist * sin_lat
-            if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
-                dlon_r = math.radians(dlon)
-                dlat_r = math.radians(dlat)
-                vx = (
-                    -dist * cos_lat * sin_lon * dlon_r
-                    - dist * sin_lat * cos_lon * dlat_r
-                    + cos_lat * cos_lon * ddist
-                )
-                vy = (
-                    dist * cos_lat * cos_lon * dlon_r
-                    - dist * sin_lat * sin_lon * dlat_r
-                    + cos_lat * sin_lon * ddist
-                )
-                vz = dist * cos_lat * dlat_r + sin_lat * ddist
-            else:
-                vx = vy = vz = 0.0
-            return ((x, y, z, vx, vy, vz), iflag)
+            # post-processing (shared helper). The bare pos/vel were rotated to
+            # ecliptic-of-date but NOT by the ayanamsa, so returning them as-is
+            # would yield tropical Cartesian output while the LEB/Skyfield
+            # backends return sidereal (ayanamsa-rotated) Cartesian.
+            return (
+                _spherical_to_cartesian_with_velocity(
+                    lon, lat, dist, dlon, dlat, ddist
+                ),
+                iflag,
+            )
         return (pos + vel, iflag)  # type: ignore
 
     # Radians

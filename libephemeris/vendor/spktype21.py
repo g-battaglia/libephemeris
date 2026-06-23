@@ -96,14 +96,14 @@ class SPKType21(object):
         self.W = zeros(MAXTRM + 2)
         
         # initialize for compute_type21
-        self.mda_record_exist = False
-        # Body the cached mda_record belongs to. The mda_lb/mda_ub window is
-        # NOT body-specific, so the cache must also key on (target, center);
-        # otherwise a hit for a different body in the same time window would
-        # return the wrong body's state (multiple type-21 targets can share
-        # one .bsp/instance).
-        self.mda_target = None
-        self.mda_center = None
+        # Per-body cache of the last MDA record: (target, center) -> (record,
+        # lb, ub). The mda_lb/mda_ub window is NOT body-specific, so a single
+        # slot keyed only on time would return the wrong body's state when
+        # multiple type-21 targets share one .bsp/instance. Keying on
+        # (target, center) also avoids cache thrashing when callers interleave
+        # several bodies in the same time window. The key space is tiny (a
+        # handful of small-body targets), so no eviction is needed.
+        self._mda_cache = {}
         self.current_segment_exist = False
 
         # libephemeris addition: the evaluation work arrays (G/FC/WC/W/KQ,
@@ -151,21 +151,20 @@ class SPKType21(object):
         eval_sec = (eval_sec + jd2) * S_PER_DAY
 
         with self._compute_lock:
-            if self.mda_record_exist:
-                if (eval_sec >= self.mda_lb and eval_sec < self.mda_ub
-                        and target == self.mda_target
-                        and center == self.mda_center):
-                    result = self.spke21(eval_sec, self.mda_record)
+            key = (target, center)
+            cached = self._mda_cache.get(key)
+            if cached is not None:
+                mda_record, mda_lb, mda_ub = cached
+                if mda_lb <= eval_sec < mda_ub:
+                    result = self.spke21(eval_sec, mda_record)
                     return result[0:3], result[3:]
 
-            self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(
+            mda_record, mda_lb, mda_ub = self.get_MDA_record(
                 eval_sec, target, center
             )
-            self.mda_target = target
-            self.mda_center = center
-            self.mda_record_exist = True
+            self._mda_cache[key] = (mda_record, mda_lb, mda_ub)
 
-            result = self.spke21(eval_sec, self.mda_record)
+            result = self.spke21(eval_sec, mda_record)
             return result[0:3], result[3:]
                 
     def get_MDA_record(self, eval_sec, target, center):

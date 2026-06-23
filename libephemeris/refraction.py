@@ -128,8 +128,9 @@ _T0: float = 288.15  # Standard temperature [K]
 # ---------------------------------------------------------------------------
 # Gauss-Legendre quadrature nodes and weights (120-point)
 # ---------------------------------------------------------------------------
-# Precomputed once at import time.  numpy is used ONLY here for the
-# roots/weights computation; the runtime integration loop is pure Python.
+# Precomputed once at import time.  The nodes/weights are computed in pure
+# Python (Legendre recurrence + Newton-Raphson, no numpy); the runtime
+# integration loop is likewise pure Python.
 
 
 def _gauss_legendre_nodes(n: int) -> Tuple[list, list]:
