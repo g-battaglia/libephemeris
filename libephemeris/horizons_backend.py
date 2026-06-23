@@ -745,6 +745,39 @@ def _to_ecliptic_output(
 
     # XYZ output
     if iflag & FLG_XYZ:
+        if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+            # Sidereal ecliptic Cartesian: rebuild the vectors from the
+            # ayanamsa-shifted longitude, mirroring fast_calc's XYZ+SIDEREAL
+            # post-processing. The bare pos/vel were rotated to ecliptic-of-date
+            # but NOT by the ayanamsa, so returning them as-is would yield
+            # tropical Cartesian output while the LEB/Skyfield backends return
+            # sidereal (ayanamsa-rotated) Cartesian for the same request.
+            lon_r = math.radians(lon)
+            lat_r = math.radians(lat)
+            cos_lat = math.cos(lat_r)
+            sin_lat = math.sin(lat_r)
+            cos_lon = math.cos(lon_r)
+            sin_lon = math.sin(lon_r)
+            x = dist * cos_lat * cos_lon
+            y = dist * cos_lat * sin_lon
+            z = dist * sin_lat
+            if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
+                dlon_r = math.radians(dlon)
+                dlat_r = math.radians(dlat)
+                vx = (
+                    -dist * cos_lat * sin_lon * dlon_r
+                    - dist * sin_lat * cos_lon * dlat_r
+                    + cos_lat * cos_lon * ddist
+                )
+                vy = (
+                    dist * cos_lat * cos_lon * dlon_r
+                    - dist * sin_lat * sin_lon * dlat_r
+                    + cos_lat * sin_lon * ddist
+                )
+                vz = dist * cos_lat * dlat_r + sin_lat * ddist
+            else:
+                vx = vy = vz = 0.0
+            return ((x, y, z, vx, vy, vz), iflag)
         return (pos + vel, iflag)  # type: ignore
 
     # Radians

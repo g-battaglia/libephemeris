@@ -484,9 +484,10 @@ class EphemerisContext:
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
         # South nodes: derive from the north node via this same context path,
-        # mirroring the module-level calc_ut(). Without this, the negative IDs
-        # fall through to _calc_body's inline antipode, which is not
-        # representation-aware under FLG_XYZ / FLG_RADIANS.
+        # mirroring the module-level calc_ut(). The descending node must be
+        # intercepted here because no downstream path derives it (_calc_body has
+        # no antipode branch), and the antipode is representation-dependent
+        # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         from .constants import MEAN_NODE, TRUE_NODE
 
         if ipl in (-MEAN_NODE, -TRUE_NODE):
