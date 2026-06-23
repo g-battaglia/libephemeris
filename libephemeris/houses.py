@@ -1054,6 +1054,7 @@ def houses_armc_with_fallback(
     hsys: int,
     fallback_hsys: int = ord("O"),
     validate_cusps: bool = True,
+    ascmc9: float = 0.0,
 ) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
     """
     Calculate house cusps from ARMC with automatic fallback for polar latitudes.
@@ -1070,6 +1071,9 @@ def houses_armc_with_fallback(
                        Default: ord('O') (Porphyry).
         validate_cusps: If True (default), validate cusp values for numerical sanity
                         and fall back if invalid cusps are detected.
+        ascmc9: The Sun's declination, used only by the Sunshine house system
+                ('I'/'i') and forwarded to the underlying cusp solution; it is
+                ignored by every other house system.
 
     Returns:
         Tuple containing:
@@ -1116,14 +1120,16 @@ def houses_armc_with_fallback(
     is_extreme = _is_extreme_latitude(lat)
 
     try:
-        cusps, ascmc = houses_armc(armc, lat, eps, hsys)
+        # ascmc9 (the Sun's declination) is forwarded so the Sunshine system
+        # ('I'/'i') gets it; houses_armc ignores it for every other system.
+        cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
         # Validate cusps if requested
         if validate_cusps:
             is_valid, validation_error = _validate_cusps(cusps)
             if not is_valid:
                 # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
+                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
                 warning = (
                     f"{primary_name} house system produced invalid cusps at latitude "
                     f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
@@ -1144,7 +1150,7 @@ def houses_armc_with_fallback(
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
-        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
+        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
