@@ -426,19 +426,29 @@ class TestCalcAllArabicParts:
         # Day Spirit: 100 + 100 - 200 = 0
         assert parts["Pars_Spiritus"] == pytest.approx(0.0)
 
-    def test_missing_keys_default_to_zero(self):
-        """Test that missing keys default to 0.0."""
-        positions = {"Asc": 90.0}  # Only ASC provided
+    def test_missing_required_keys_raise(self):
+        """Missing required positions fail fast instead of defaulting to 0.0."""
+        # Only ASC provided -> Sun/Moon/Mercury/Venus missing.
+        with pytest.raises(KeyError, match="missing required position"):
+            calc_all_arabic_parts({"Asc": 90.0})
 
-        parts = calc_all_arabic_parts(positions)
+        # A single missing key (Venus) is still an error.
+        with pytest.raises(KeyError, match="Venus"):
+            calc_all_arabic_parts(
+                {"Asc": 0.0, "Sun": 90.0, "Moon": 180.0, "Mercury": 45.0}
+            )
 
-        # With all other values as 0, Sun=0 is in upper hemisphere relative to
-        # ASC=90 (sun_rel = -90 % 360 = 270), so this is a day chart.
-        # Since Sun=Moon=0, day/night formulas are symmetric:
-        # Day Fortune:   ASC + Moon - Sun = 90 + 0 - 0 = 90
-        # Day Spirit:    ASC + Sun - Moon = 90 + 0 - 0 = 90
-        assert parts["Pars_Fortunae"] == pytest.approx(90.0)
-        assert parts["Pars_Spiritus"] == pytest.approx(90.0)
+    def test_sun_lat_remains_optional(self):
+        """Sun_lat is the only optional key: a complete dict without it works."""
+        positions = {
+            "Asc": 0.0,
+            "Sun": 90.0,
+            "Moon": 180.0,
+            "Mercury": 45.0,
+            "Venus": 135.0,
+        }
+        parts = calc_all_arabic_parts(positions)  # no Sun_lat -> must not raise
+        assert "Pars_Fortunae" in parts
 
     def test_all_parts_returned(self):
         """Verify all four standard parts are returned."""

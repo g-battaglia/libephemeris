@@ -1,5 +1,6 @@
 """Tests for LEB2Reader and CompositeLEBReader."""
 
+import glob
 import os
 import struct
 import tempfile
@@ -25,6 +26,19 @@ requires_leb1 = pytest.mark.skipif(
 requires_leb2 = pytest.mark.skipif(
     not os.path.isdir(LEB2_DIR), reason="LEB2 files not available"
 )
+
+
+@pytest.fixture(scope="module")
+def single_tier_dir(tmp_path_factory):
+    """One tier's LEB2 group files only (medium); from_directory now rejects
+    the mixed-tier data/leb2 directory, so symlink a single complete tier."""
+    src = sorted(glob.glob(os.path.join(LEB2_DIR, "medium_*.leb2")))
+    if not src:
+        pytest.skip("medium_*.leb2 files not found")
+    d = tmp_path_factory.mktemp("leb2_single_tier")
+    for s in src:
+        os.symlink(os.path.abspath(s), os.path.join(d, os.path.basename(s)))
+    return str(d)
 
 
 def _create_mini_leb2(body_ids=(0,)):
@@ -177,18 +191,25 @@ requires_leb2_companions = pytest.mark.skipif(
 
 @requires_leb2
 class TestCompositeLEBReader:
-    def test_from_directory(self):
+    def test_from_directory(self, single_tier_dir):
         from libephemeris.leb_composite import CompositeLEBReader
 
-        reader = CompositeLEBReader.from_directory(LEB2_DIR)
+        reader = CompositeLEBReader.from_directory(single_tier_dir)
         assert reader.has_body(0)  # Sun (core always present)
         reader.close()
 
-    @requires_leb2_companions
-    def test_from_directory_all_groups(self):
+    def test_from_directory_mixed_tiers_raises(self):
+        """data/leb2 mixes base/medium/extended; merging them is rejected."""
         from libephemeris.leb_composite import CompositeLEBReader
 
-        reader = CompositeLEBReader.from_directory(LEB2_DIR)
+        with pytest.raises(ValueError, match="mixed tiers"):
+            CompositeLEBReader.from_directory(LEB2_DIR)
+
+    @requires_leb2_companions
+    def test_from_directory_all_groups(self, single_tier_dir):
+        from libephemeris.leb_composite import CompositeLEBReader
+
+        reader = CompositeLEBReader.from_directory(single_tier_dir)
         assert reader.has_body(15)  # Chiron (asteroids)
         assert reader.has_body(13)  # OscuApog (apogee)
         assert reader.has_body(40)  # Cupido (uranians)
@@ -216,10 +237,10 @@ class TestCompositeLEBReader:
         reader.close()
 
     @requires_leb2_companions
-    def test_eval_body_cross_files(self):
+    def test_eval_body_cross_files(self, single_tier_dir):
         from libephemeris.leb_composite import CompositeLEBReader
 
-        reader = CompositeLEBReader.from_directory(LEB2_DIR)
+        reader = CompositeLEBReader.from_directory(single_tier_dir)
         jd = 2451545.0
 
         # Bodies from different files
@@ -235,10 +256,10 @@ class TestCompositeLEBReader:
 
         reader.close()
 
-    def test_missing_body_raises(self):
+    def test_missing_body_raises(self, single_tier_dir):
         from libephemeris.leb_composite import CompositeLEBReader
 
-        reader = CompositeLEBReader.from_directory(LEB2_DIR)
+        reader = CompositeLEBReader.from_directory(single_tier_dir)
         with pytest.raises(KeyError):
             reader.eval_body(999, 2451545.0)
         reader.close()

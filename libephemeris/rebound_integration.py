@@ -1111,6 +1111,10 @@ def propagate_trajectory(
 
                 # Avoid the self-interaction singularity when the body is itself
                 # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/...).
+                # Evaluated once before the loop on purpose: the match is by the
+                # identity of the propagated body versus the fixed ASSIST
+                # perturber set, which does not change along the trajectory, so a
+                # per-step re-check would be redundant.
                 _assist_disable_self_perturber(
                     extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
                     jd_start - ephem.jd_ref,

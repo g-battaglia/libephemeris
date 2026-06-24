@@ -2289,9 +2289,12 @@ def _calc_star_position_leb(
         )
         lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
-
+    # Zero-parallax stars keep the finite distance from the clamped 0.1249 mas
+    # default (~1.65e9 AU) computed above — the same value the Skyfield backend
+    # and the reference ephemeris return for them (verified: the reference
+    # gives 1.650118e9 AU for a zero-parallax star). The previous override to
+    # 100000.0 AU diverged from both backends and from this path's own
+    # light-time, which was already computed from the finite distance.
     return lon, lat, dist
 
 

@@ -1417,8 +1417,13 @@ def calc_spk_body_position(
         ValueError: If JD is outside SPK coverage
     """
     from . import state
-    from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
-    from .planets import _get_true_ayanamsa
+    from .constants import (
+        FLG_HELCTR,
+        FLG_SPEED,
+        FLG_SIDEREAL,
+        FLG_NONUT,
+        FLG_J2000,
+    )
 
     # Check if body is registered
     if ipl not in state._SPK_BODY_MAP:
@@ -1554,21 +1559,30 @@ def calc_spk_body_position(
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
-    if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude (this type 2/3 path always produces a
-        # true ecliptic-of-date longitude), consistent with the planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+    # FLG_NONUT / FLG_J2000: frame_latlon(ecliptic_frame) above produces a TRUE
+    # ecliptic-of-date longitude (with nutation in longitude Δψ). The mean
+    # ecliptic (NONUT) and the J2000 frame carry no nutation, so strip Δψ here.
+    # For J2000 the downstream _maybe_equatorial_convert precesses of-date→J2000
+    # but does not remove nutation, so it must be removed first — matching the
+    # type-21 path and the reference, whose J2000 ecliptic output is mean.
+    if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
+        from .cache import get_cached_nutation
 
-        # Correct the longitude speed for the ayanamsha drift rate (~50"/yr);
-        # speed_lon was built from tropical samples, so the of-date ayanamsa
-        # motion must be removed for sidereal SPEED output.
+        dpsi_rad, _ = get_cached_nutation(t.tt)
+        lon = (lon - math.degrees(dpsi_rad)) % 360.0
         if iflag & FLG_SPEED:
-            dt_aya = 1.0 / 86400.0
-            ayan_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
-            ayan_next = _get_true_ayanamsa(t.ut1 + dt_aya)
-            speed_lon -= (ayan_next - ayan_prev) / (2.0 * dt_aya)
+            from .planets import _nutation_rate_deg_per_day
+
+            speed_lon -= _nutation_rate_deg_per_day(t.tt)
+
+    # Apply sidereal correction if requested. Routed through the canonical
+    # flag-aware helper so the ayanamsa variant matches the longitude frame set
+    # above: TRUE ayanamsa (mean + Δψ) cancels Δψ on a true-of-date longitude,
+    # while NONUT/J2000 (Δψ already stripped) get the MEAN ayanamsa. The helper
+    # also removes the ~50"/yr ayanamsha drift from speed_lon under FLG_SPEED.
+    if iflag & FLG_SIDEREAL:
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from .leb_format import StarEntry
 
@@ -100,6 +100,35 @@ class CompositeLEBReader:
         )
         if not leb_files:
             raise FileNotFoundError(f"No .leb/.leb2 files found in {directory}")
+
+        # Tier guard: refuse to silently merge files from different tiers
+        # (e.g. base_core.leb2 + medium_core.leb2) — they share body ids but
+        # cover different date ranges with different fits, so a first-wins merge
+        # would corrupt positions. Mirrors the tier check in
+        # from_file_with_companions. Filenames encode the tier either as
+        # {tier}_{group} (group-file scheme) or as a bare known-tier token
+        # (e.g. ephemeris_base.leb); files with no recognizable tier are not
+        # constrained.
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+        _KNOWN_TIERS = {"base", "medium", "extended"}
+
+        def _file_tier(path: str) -> Optional[str]:
+            parts = os.path.basename(path).rsplit(".", 1)[0].split("_")
+            if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
+                prefix = "_".join(parts[:-1])
+                return prefix if prefix in _KNOWN_TIERS else None
+            for token in parts:
+                if token in _KNOWN_TIERS:
+                    return token
+            return None
+
+        tiers = {t for t in (_file_tier(p) for p in leb_files) if t is not None}
+        if len(tiers) > 1:
+            raise ValueError(
+                "Refusing to build a composite from mixed tiers in "
+                f"{directory}: {sorted(tiers)}. All files must share one tier "
+                "(base/medium/extended)."
+            )
 
         readers = []
         for path in leb_files:

@@ -47,8 +47,10 @@ from .constants import (
     FLG_EQUATORIAL,
     FLG_HELCTR,
     FLG_NOABERR,
+    FLG_NONUT,
     FLG_SIDEREAL,
     FLG_SPEED,
+    FLG_TOPOCTR,
     FLG_TRUEPOS,
     # Legacy moon ids (deprecated aliases) and NAIF ids: constants.py is
     # the single source of truth; re-exported here for backward compat.
@@ -485,11 +487,29 @@ def calc_moon_position(
     # Determine observer
     is_heliocentric = bool(iflag & FLG_HELCTR)
     is_barycentric = bool(iflag & FLG_BARYCTR)
+    is_topocentric = (
+        bool(iflag & FLG_TOPOCTR) and not is_heliocentric and not is_barycentric
+    )
 
     if is_barycentric:
         observer = None  # solar-system barycenter: zero position/velocity
     elif is_heliocentric:
         observer = planets["sun"]
+    elif is_topocentric:
+        # Topocentric: observer = geocenter + site, mirroring the planet path
+        # (planets._calc_body). Without a prior set_topo() this is an error, not
+        # a silent geocentric result — matching the reference API.
+        from .state import get_topo
+
+        topo = get_topo()
+        if topo is None:
+            from .exceptions import Error
+
+            raise Error(
+                "FLG_TOPOCTR requires a geographic position: call "
+                "set_topo(lon, lat, alt) first"
+            )
+        observer = planets["earth"] + topo
     else:
         observer = planets["earth"]
 
@@ -549,11 +569,19 @@ def calc_moon_position(
         rel = _rel_at(t_obs)
         rel_pos = ICRF(rel, t=t_obs, center=399)
         ecl = rel_pos.frame_latlon(ecliptic_frame)
-        return (
-            float(ecl[1].degrees) % 360.0,
-            float(ecl[0].degrees),
-            float(ecl[2].au),
-        )
+        lon = float(ecl[1].degrees) % 360.0
+        lat = float(ecl[0].degrees)
+        dist = float(ecl[2].au)
+        # FLG_NONUT: ecliptic_frame is the TRUE ecliptic of date (includes
+        # nutation in longitude Δψ); strip it for the mean ecliptic. Done per
+        # sample so the central-difference speed below inherits the correction
+        # automatically (no separate nutation-rate term needed).
+        if iflag & FLG_NONUT:
+            from .cache import get_cached_nutation
+
+            dpsi_rad, _ = get_cached_nutation(t_obs.tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
+        return (lon, lat, dist)
 
     lon, lat, dist = _ecl_at(t)
 

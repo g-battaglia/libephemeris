@@ -8,6 +8,7 @@ and context manager protocol.
 
 from __future__ import annotations
 
+import glob
 import math
 import os
 
@@ -61,6 +62,23 @@ SKIP_NO_LEB2_CORE = pytest.mark.skipif(
 JD_J2000 = 2451545.0  # 2000-01-01 12:00 TT
 
 
+@pytest.fixture(scope="module")
+def single_tier_dir(tmp_path_factory):
+    """A directory holding exactly one tier's LEB2 group files.
+
+    ``data/leb2`` mixes tiers (base/medium/extended), which ``from_directory``
+    now rejects. The medium set is the only complete single tier present
+    (medium_core/asteroids/apogee/uranians), so symlink those into a temp dir.
+    """
+    src = sorted(glob.glob(os.path.join(LEB2_DIR, "medium_*.leb2")))
+    if not src:
+        pytest.skip("medium_*.leb2 files not found")
+    d = tmp_path_factory.mktemp("leb2_single_tier")
+    for s in src:
+        os.symlink(s, os.path.join(d, os.path.basename(s)))
+    return str(d)
+
+
 # ============================================================================
 # from_directory
 # ============================================================================
@@ -71,19 +89,27 @@ class TestFromDirectory:
     """Test CompositeLEBReader.from_directory."""
 
     @pytest.mark.unit
-    def test_from_directory_opens_all_files(self):
+    def test_from_directory_opens_all_files(self, single_tier_dir):
         """from_directory discovers and opens all .leb files in a directory."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
-            # Should have opened at least the 4 base files
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
+            # Should have opened all the medium group files
             assert reader is not None
             # Core bodies must be present
             assert reader.has_body(SUN)
             assert reader.has_body(MOON)
 
     @pytest.mark.unit
-    def test_from_directory_has_core_bodies(self):
+    def test_from_directory_mixed_tiers_raises(self):
+        """from_directory refuses to merge files from different tiers."""
+        # data/leb2 holds base_*, medium_*, and extended_* files together;
+        # merging them first-wins would silently corrupt positions.
+        with pytest.raises(ValueError, match="mixed tiers"):
+            CompositeLEBReader.from_directory(LEB2_DIR)
+
+    @pytest.mark.unit
+    def test_from_directory_has_core_bodies(self, single_tier_dir):
         """Core planets are accessible from composite reader."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             for body in [
                 SUN,
                 MOON,
@@ -99,27 +125,23 @@ class TestFromDirectory:
                 assert reader.has_body(body), f"Missing core body {body}"
 
     @pytest.mark.unit
-    def test_from_directory_has_asteroid_bodies(self):
+    def test_from_directory_has_asteroid_bodies(self, single_tier_dir):
         """Asteroid bodies are accessible when asteroids group is present."""
-        if not os.path.exists(LEB2_BASE_ASTEROIDS):
-            pytest.skip("base_asteroids.leb2 not found")
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             for body in [CHIRON, CERES, PALLAS, JUNO, VESTA]:
                 assert reader.has_body(body), f"Missing asteroid body {body}"
 
     @pytest.mark.unit
-    def test_from_directory_has_apogee_bodies(self):
+    def test_from_directory_has_apogee_bodies(self, single_tier_dir):
         """Apogee bodies are accessible when apogee group is present."""
-        if not os.path.exists(LEB2_BASE_APOGEE):
-            pytest.skip("base_apogee.leb2 not found")
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             for body in [OSCU_APOG, INTP_APOG, INTP_PERG]:
                 assert reader.has_body(body), f"Missing apogee body {body}"
 
     @pytest.mark.unit
-    def test_from_directory_eval_body_returns_valid(self):
+    def test_from_directory_eval_body_returns_valid(self, single_tier_dir):
         """eval_body returns valid position/velocity tuples."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             pos, vel = reader.eval_body(SUN, JD_J2000)
             assert len(pos) == 3
             assert len(vel) == 3
@@ -149,21 +171,20 @@ class TestFromDirectory:
             CompositeLEBReader.from_directory(str(tmp_path))
 
     @pytest.mark.unit
-    def test_from_directory_jd_range_is_widest(self):
+    def test_from_directory_jd_range_is_widest(self, single_tier_dir):
         """jd_range is the widest range across all component readers."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             jd_start, jd_end = reader.jd_range
             assert jd_start < JD_J2000 < jd_end
-            # Base tier covers 1849-2150, so range should be at least 100 years
+            # Medium tier covers ~1550-2650, so range is well over 100 years
             assert (jd_end - jd_start) > 365.25 * 100
 
-    @SKIP_NO_LEB2_CORE
     @pytest.mark.unit
-    def test_from_directory_path_property(self):
+    def test_from_directory_path_property(self, single_tier_dir):
         """path property returns first reader's path."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             assert reader.path is not None
-            assert reader.path.endswith(".leb")
+            assert reader.path.endswith(".leb2")
 
 
 # ============================================================================
@@ -268,9 +289,9 @@ class TestBodyDispatch:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", CORE_BODIES)
-    def test_core_body_eval(self, body):
+    def test_core_body_eval(self, body, single_tier_dir):
         """Each core body can be evaluated at J2000."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             if not reader.has_body(body):
                 pytest.skip(f"Body {body} not in composite reader")
             pos, vel = reader.eval_body(body, JD_J2000)
@@ -282,11 +303,9 @@ class TestBodyDispatch:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", ASTEROID_BODIES)
-    def test_asteroid_body_eval(self, body):
+    def test_asteroid_body_eval(self, body, single_tier_dir):
         """Each asteroid body can be evaluated at J2000."""
-        if not os.path.exists(LEB2_BASE_ASTEROIDS):
-            pytest.skip("base_asteroids.leb2 not found")
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             if not reader.has_body(body):
                 pytest.skip(f"Body {body} not in composite reader")
             pos, vel = reader.eval_body(body, JD_J2000)
@@ -297,11 +316,9 @@ class TestBodyDispatch:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body", APOGEE_BODIES)
-    def test_apogee_body_eval(self, body):
+    def test_apogee_body_eval(self, body, single_tier_dir):
         """Each apogee body can be evaluated at J2000."""
-        if not os.path.exists(LEB2_BASE_APOGEE):
-            pytest.skip("base_apogee.leb2 not found")
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             if not reader.has_body(body):
                 pytest.skip(f"Body {body} not in composite reader")
             pos, vel = reader.eval_body(body, JD_J2000)
@@ -310,9 +327,9 @@ class TestBodyDispatch:
 
     @pytest.mark.unit
     @pytest.mark.parametrize("jd", TEST_DATES)
-    def test_sun_across_dates(self, jd):
+    def test_sun_across_dates(self, jd, single_tier_dir):
         """Sun position varies sensibly across dates."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             pos, vel = reader.eval_body(SUN, jd)
             # eval_body returns raw cartesian AU coords, not ecliptic degrees
             for v in pos + vel:
@@ -346,9 +363,9 @@ class TestAuxiliaryData:
     """Test nutation, delta_t, and other auxiliary data from composite."""
 
     @pytest.mark.unit
-    def test_eval_nutation(self):
+    def test_eval_nutation(self, single_tier_dir):
         """eval_nutation returns (dpsi, deps) in radians."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             try:
                 dpsi, deps = reader.eval_nutation(JD_J2000)
                 # Nutation values are small angles in radians
@@ -358,9 +375,9 @@ class TestAuxiliaryData:
                 pytest.skip("No nutation reader in composite")
 
     @pytest.mark.unit
-    def test_delta_t(self):
+    def test_delta_t(self, single_tier_dir):
         """delta_t returns reasonable values."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             try:
                 dt = reader.delta_t(JD_J2000)
                 # At J2000, delta-T is about 63.8 seconds = 0.000738 days
@@ -369,9 +386,9 @@ class TestAuxiliaryData:
                 pytest.skip("No delta_t reader in composite")
 
     @pytest.mark.unit
-    def test_has_body_false_for_unknown(self):
+    def test_has_body_false_for_unknown(self, single_tier_dir):
         """has_body returns False for nonexistent body IDs."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             assert not reader.has_body(99999)
             assert not reader.has_body(-1)
 
@@ -386,17 +403,17 @@ class TestContextManager:
     """Test context manager and close behavior."""
 
     @pytest.mark.unit
-    def test_context_manager_protocol(self):
+    def test_context_manager_protocol(self, single_tier_dir):
         """Composite reader supports with-statement."""
-        with CompositeLEBReader.from_directory(LEB2_DIR) as reader:
+        with CompositeLEBReader.from_directory(single_tier_dir) as reader:
             assert reader.has_body(SUN)
         # After exit, reader should be closed
         # Accessing may or may not raise -- just verify no crash on exit
 
     @pytest.mark.unit
-    def test_explicit_close(self):
+    def test_explicit_close(self, single_tier_dir):
         """Explicit close() doesn't crash."""
-        reader = CompositeLEBReader.from_directory(LEB2_DIR)
+        reader = CompositeLEBReader.from_directory(single_tier_dir)
         reader.eval_body(SUN, JD_J2000)
         reader.close()
 

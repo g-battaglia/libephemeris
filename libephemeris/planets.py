@@ -1938,22 +1938,80 @@ def _assist_position_at(
     t = ts.tt_jd(jd_tt)
     sun = planets_dict["sun"]
     earth = planets_dict["earth"]
-    earth_helio = sun.at(t).observe(earth)
-    earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
 
-    lon_rad = math.radians(lon_hel)
-    lat_rad = math.radians(lat_hel)
-    x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
-    y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
-    z_hel_ecl = r_hel * math.sin(lat_rad)
+    # The ASSIST result is heliocentric ecliptic J2000 (rebound_integration
+    # rotates ICRS->ecliptic with the fixed J2000 obliquity), with position AND
+    # velocity available. Build the geocentric apparent place exactly like the
+    # SPK type-21 path: everything in ecliptic J2000, geometric heliocentric
+    # Earth, light-time retardation, then stellar aberration, then precession to
+    # of-date + nutation. The previous code differenced an of-date Earth
+    # (Skyfield ecliptic_frame) from the J2000 asteroid (a ~12 arcmin frame-mix)
+    # and applied neither light-time nor aberration (~25 arcsec more).
+    from .rebound_integration import _icrs_to_ecliptic_j2000
+    from .astrometry import (
+        C_LIGHT_AU_DAY,
+        apply_aberration_to_position,
+        precess_from_j2000,
+    )
+    from .cache import get_cached_nutation
 
-    x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
-    y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
-    z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+    ast_pos = [result.x, result.y, result.z]  # heliocentric ecliptic J2000, AU
+    ast_vel = [result.vx, result.vy, result.vz]  # AU/day
 
-    r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
-    lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
-    lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+    earth_helio_icrs = earth.at(t).position.au - sun.at(t).position.au
+    earth_helio_ecl = _icrs_to_ecliptic_j2000(
+        float(earth_helio_icrs[0]),
+        float(earth_helio_icrs[1]),
+        float(earth_helio_icrs[2]),
+    )
+
+    apply_light_time = not (iflag & FLG_TRUEPOS)
+    apply_aberration = not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR)
+
+    # Geocentric vector with light-time retardation. The asteroid's heliocentric
+    # velocity is effectively constant over the ~minutes-to-hours light time, so
+    # a first-order retardation (pos - vel*lt) matches re-integrating to
+    # jd_tt - lt without the extra N-body cost. Two iterations converge.
+    geo = [ast_pos[i] - earth_helio_ecl[i] for i in range(3)]
+    if apply_light_time:
+        for _ in range(2):
+            lt = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2) / C_LIGHT_AU_DAY
+            geo = [
+                (ast_pos[i] - ast_vel[i] * lt) - earth_helio_ecl[i]
+                for i in range(3)
+            ]
+
+    if apply_aberration:
+        # Aberration uses Earth's barycentric velocity in ecliptic J2000, per the
+        # IAU apparent-place convention shared with the SPK/planets pipeline.
+        earth_vel_bary_ecl = _icrs_to_ecliptic_j2000(
+            *(float(v) for v in earth.at(t).velocity.au_per_d)
+        )
+        geo = list(
+            apply_aberration_to_position(
+                (geo[0], geo[1], geo[2]),
+                (
+                    earth_vel_bary_ecl[0],
+                    earth_vel_bary_ecl[1],
+                    earth_vel_bary_ecl[2],
+                ),
+            )
+        )
+
+    r_geo = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
+    lon_j2000 = math.degrees(math.atan2(geo[1], geo[0])) % 360.0
+    lat_j2000 = math.degrees(math.asin(geo[2] / r_geo)) if r_geo > 0 else 0.0
+
+    # The geocentric vector is in the J2000 ecliptic; precess to the ecliptic of
+    # date and add nutation in longitude (Δψ) so the return matches the of-date
+    # true-ecliptic contract every other body branch follows (the caller then
+    # applies the J2000 / equatorial framing via _maybe_equatorial_convert).
+    # Δψ is omitted for NONUT (mean ecliptic) and for J2000 — there the caller
+    # precesses back to J2000, whose ecliptic carries no nutation.
+    lon, lat = precess_from_j2000(lon_j2000, lat_j2000, jd_tt)
+    if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000):
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
 
