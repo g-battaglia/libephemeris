@@ -700,8 +700,7 @@ def _to_ecliptic_output(
         _mat3_vec3,
         _prec_matrix,
         _spherical_to_cartesian_with_velocity,
-        _PREC_COEFFS,
-        J2000,
+        _general_precession_rate_deg_day,
     )
     import math
 
@@ -779,11 +778,7 @@ def _to_ecliptic_output(
         # frame term is applied separately just below. Skipped only when
         # FLG_SPEED is absent (dlon is then 0.0 and must stay 0.0).
         if iflag & FLG_SPEED:
-            # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
-            T = (jd_tt - J2000) / 36525.0
-            prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
-            prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-            dlon -= prec_rate_deg_day
+            dlon -= _general_precession_rate_deg_day(jd_tt)
 
     # J2000 longitude-speed frame conversion (spherical output only). The
     # velocity was rotated into the J2000 ecliptic with a fixed matrix
@@ -799,10 +794,7 @@ def _to_ecliptic_output(
         and not (iflag & FLG_EQUATORIAL)
         and not (iflag & FLG_XYZ)
     ):
-        T = (jd_tt - J2000) / 36525.0
-        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
-        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-        dlon -= prec_rate_deg_day
+        dlon -= _general_precession_rate_deg_day(jd_tt)
 
     # XYZ output
     if iflag & FLG_XYZ:

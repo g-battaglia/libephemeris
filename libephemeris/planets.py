@@ -530,43 +530,15 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     lon, lat, dist, dlon, dlat, ddist = result
 
     if iflag & FLG_XYZ:
-        # Convert spherical (degrees) to Cartesian (AU)
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so this path
+        # stays identical to the LEB/Skyfield, Horizons, and fixed-star XYZ
+        # post-processing. Cast to native floats (inputs may be numpy.float64).
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        # Convert velocity from (deg/day, deg/day, AU/day) to Cartesian AU/day
-        # Using the Jacobian of the spherical-to-Cartesian transformation
-        dlon_rad = math.radians(dlon)  # rad/day
-        dlat_rad = math.radians(dlat)  # rad/day
-
-        vx = (
-            ddist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        x, y, z, vx, vy, vz = _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, dlon, dlat, ddist
         )
-        vy = (
-            ddist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = ddist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (
-            float(x),
-            float(y),
-            float(z),
-            float(vx),
-            float(vy),
-            float(vz),
-        )
+        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         # Convert angular values from degrees to radians

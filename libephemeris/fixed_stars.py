@@ -2764,33 +2764,14 @@ def _apply_fixstar_flags(
     result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
     if iflag & FLG_XYZ:
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so star XYZ
+        # output stays identical to the planet/Horizons XYZ post-processing.
+        # Inputs are already native floats (cast above), so the result is too.
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        dlon_rad = math.radians(speed_lon)
-        dlat_rad = math.radians(speed_lat)
-
-        vx = (
-            speed_dist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        return _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, speed_lon, speed_lat, speed_dist
         )
-        vy = (
-            speed_dist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = speed_dist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         return (

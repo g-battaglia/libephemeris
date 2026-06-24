@@ -887,6 +887,25 @@ def _precess_ecliptic(
 # IAU 2006 general precession polynomial (arcsec/century)
 _PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
 
+
+def _general_precession_rate_deg_day(jd_tt: float) -> float:
+    """General-precession rate dP/dT at ``jd_tt``, in degrees/day.
+
+    The longitude-speed corrections (ayanamsa drift for sidereal SPEED output
+    and the of-date→J2000 equinox-motion frame term) both subtract this rate
+    from ``dlon``. ``_PREC_COEFFS`` are arcsec/century, so dP/dT =
+    c0 + 2*c1*T + ... (only the first two terms matter at the required
+    precision); convert to deg/day with / 3600 / 36525.
+
+    Shared by both subtraction sites in ``_fast_calc_core`` and by the matching
+    sites in ``horizons_backend._to_ecliptic_output`` so the LEB/Skyfield and
+    Horizons backends stay identical.
+    """
+    T = (jd_tt - J2000) / 36525.0
+    prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
+    return prec_rate_arcsec_cy / (3600.0 * 36525.0)
+
+
 # Ayanamsha J2000 offsets for formula-based sidereal modes (degrees).
 # Star-based / galactic modes have (0.0) placeholders and require Skyfield.
 # These values mirror the ayanamsha_data dict in planets._calc_ayanamsa().
@@ -2083,10 +2102,7 @@ def _fast_calc_core(
             if (iflag & FLG_SPEED) and (
                 _deferred_sid_j2k or not (iflag & FLG_J2000) or _pipeline_a
             ):
-                T = (jd_tt - J2000) / 36525.0
-                prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
-                prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-                dlon -= prec_rate_deg_day
+                dlon -= _general_precession_rate_deg_day(jd_tt)
 
         except KeyError:
             # Star-based sidereal mode, fall back
@@ -2110,10 +2126,7 @@ def _fast_calc_core(
         and not (iflag & FLG_EQUATORIAL)
         and not (iflag & FLG_XYZ)
     ):
-        T = (jd_tt - J2000) / 36525.0
-        prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
-        prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-        dlon -= prec_rate_deg_day
+        dlon -= _general_precession_rate_deg_day(jd_tt)
 
     # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
     # The pipeline was run without FLG_J2000 so ayanamsha could be
