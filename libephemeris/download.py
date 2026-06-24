@@ -389,6 +389,9 @@ def download_file(
             chunk_size = 64 * 1024  # 64KB chunks
 
             with os.fdopen(temp_fd, "wb") as f:
+                # Ownership of the fd has transferred to f, which closes it on
+                # exit; mark it so the except clause below does not also close.
+                temp_fd = -1
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
@@ -416,6 +419,13 @@ def download_file(
         return True
 
     except (OSError, ValueError, KeyError, RuntimeError):
+        # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
+        # raised first); otherwise it leaks until the process exits.
+        if temp_fd != -1:
+            try:
+                os.close(temp_fd)
+            except OSError:
+                pass
         # Clean up temp file on error
         if os.path.exists(temp_path):
             os.unlink(temp_path)

@@ -891,7 +891,7 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
         >>> get_spk_date_range_for_tier()
         ('1900-01-01', '2100-01-01')
         >>> get_spk_date_range_for_tier("extended")
-        ('1550-01-01', '2650-01-01')
+        ('1600-01-01', '2500-01-01')
     """
     if tier_name is not None:
         if tier_name not in TIERS:

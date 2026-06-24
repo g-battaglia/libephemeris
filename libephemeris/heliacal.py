@@ -1843,8 +1843,11 @@ def _vis_limit_mag_leb(
     sun_obj_angle = 180.0
     try:
         moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         if is_star_flag:
             from .fixed_stars import fixstar_ut as _sfut_vlm
@@ -4159,8 +4162,11 @@ def vis_limit_mag(
     sun_obj_angle = 180.0
     try:
         moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         # Calculate angular separation between object and Moon
         if is_fixed_star:

@@ -245,6 +245,11 @@ def parse_time_string(time_string: str, format: str | None = None) -> float:
         - MJD: Modified Julian Day
         - GPS: GPS seconds
 
+    Note:
+        Auto-detection (format=None) only recognizes the string-based date
+        formats (ISO, FITS). The numeric formats (unix, mjd, gps) are NOT
+        auto-detected and require an explicit ``format=`` argument.
+
     Example:
         >>> from libephemeris.astropy_integration import parse_time_string
         >>> jd = parse_time_string("2000-01-01T12:00:00")

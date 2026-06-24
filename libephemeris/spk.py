@@ -1089,7 +1089,6 @@ def _calc_type21_position(
         precess_from_j2000,
         apply_aberration_to_position,
     )
-    from .planets import _get_true_ayanamsa
 
     jd_tdb = t.tdb  # Use TDB for SPK calculations
     jd_tt = t.tt  # TT for precession/nutation
@@ -1179,7 +1178,10 @@ def _calc_type21_position(
     # Final position computation at light-time corrected epoch
     try:
         pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-    except (OSError, ValueError, KeyError, IndexError) as e:
+    except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
+        # RuntimeError included to match the two loop-body handlers above and
+        # the documented graceful fall-through (compute_type21/spke21 raise
+        # RuntimeError on segment/"Invalid data" errors).
         get_logger().debug("SPK type 21 computation failed: %s", e)
         return None
 
@@ -1277,10 +1279,15 @@ def _calc_type21_position(
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
     if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        # Flag-aware ayanamsa (true for of-date, mean for NONUT/J2000) and the
+        # ayanamsha-rate speed correction, via the canonical helper. The
+        # type-21 longitude already honors FLG_J2000/FLG_NONUT (precession /
+        # nutation applied above), so the flag-aware ayanamsa matches it; the
+        # helper also subtracts the ~50"/yr drift from speed_lon under
+        # FLG_SPEED (previously left at the tropical value).
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, r, speed_lon, speed_lat, speed_dist)
 
@@ -1550,8 +1557,18 @@ def calc_spk_body_position(
     # Apply sidereal correction if requested
     if iflag & FLG_SIDEREAL:
         # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
+        # from the ecliptic longitude (this type 2/3 path always produces a
+        # true ecliptic-of-date longitude), consistent with the planets.py path.
         ayanamsa = _get_true_ayanamsa(t.ut1)
         lon = (lon - ayanamsa) % 360.0
+
+        # Correct the longitude speed for the ayanamsha drift rate (~50"/yr);
+        # speed_lon was built from tropical samples, so the of-date ayanamsa
+        # motion must be removed for sidereal SPEED output.
+        if iflag & FLG_SPEED:
+            dt_aya = 1.0 / 86400.0
+            ayan_prev = _get_true_ayanamsa(t.ut1 - dt_aya)
+            ayan_next = _get_true_ayanamsa(t.ut1 + dt_aya)
+            speed_lon -= (ayan_next - ayan_prev) / (2.0 * dt_aya)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)

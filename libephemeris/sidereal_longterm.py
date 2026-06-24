@@ -369,7 +369,10 @@ def _mean_sidereal_longterm_deg(jd_ut1: float) -> float:
     # Ecliptic-of-J2000 unit direction, then to the J2000 equator.
     rad = dlon * _DEG
     vec = (math.cos(rad), math.sin(rad), 0.0)
-    eps_j2000 = mean_obliquity_rad(_J2000 + _deltat_days(_J2000))
+    # _J2000 (2451545.0) is already the J2000.0 TT epoch and mean_obliquity_rad
+    # takes TT, so it is passed directly — adding ΔT would double-count the
+    # UT→TT offset (the eps_date term below correctly uses jd_tt as-is).
+    eps_j2000 = mean_obliquity_rad(_J2000)
     vec = _rot_x(vec, -eps_j2000)
     # Precess to the mean equator of date, then back to the ecliptic of date.
     vec = _precess_j2000_to_date(vec, jd_tt)

@@ -309,8 +309,9 @@ def _dn_dr_at_height(
 ) -> float:
     """Derivative dn/dr at altitude *h* via central difference.
 
-    Uses a 2-metre step for numerical differentiation, which is small
-    enough for accuracy but large enough to avoid cancellation errors.
+    Uses a ±1 m central-difference step (2 m total span) for numerical
+    differentiation, which is small enough for accuracy but large enough
+    to avoid cancellation errors.
     """
     delta = 1.0  # metres
     n_plus = _n_at_height(h + delta, obs_alt, obs_P, obs_T_K, lapse_rate)

@@ -44,6 +44,7 @@ from skyfield.positionlib import ICRF
 
 from .constants import (
     FLG_BARYCTR,
+    FLG_EQUATORIAL,
     FLG_HELCTR,
     FLG_NOABERR,
     FLG_SIDEREAL,
@@ -316,13 +317,20 @@ def unregister_moon_spk(spk_file: str) -> None:
     for moon_id in moons_to_remove:
         del _MOON_SPK_BY_BODY[moon_id]
 
-    # Remove kernel from cache
-    if spk_file in _MOON_SPK_KERNELS:
+    # Remove kernel(s) from cache, matching by exact path or basename (the same
+    # tolerant matching used for body removal above). register_moon_spk caches
+    # under the resolved absolute path, so an exact-key lookup on a bare
+    # basename would leave the kernel handle open and leaked.
+    base = os.path.basename(spk_file)
+    kernel_keys = [
+        k for k in _MOON_SPK_KERNELS if k == spk_file or k.endswith(base)
+    ]
+    for k in kernel_keys:
         try:
-            _MOON_SPK_KERNELS[spk_file].close()
+            _MOON_SPK_KERNELS[k].close()
         except (AttributeError, OSError, ValueError):
             pass
-        del _MOON_SPK_KERNELS[spk_file]
+        del _MOON_SPK_KERNELS[k]
 
 
 def list_registered_moons() -> dict[int, str]:
@@ -497,7 +505,10 @@ def calc_moon_position(
         not (iflag & FLG_TRUEPOS) and not is_heliocentric and not is_barycentric
     )
     apply_aberr = (
-        not (iflag & FLG_NOABERR) and not is_heliocentric and not is_barycentric
+        not (iflag & FLG_TRUEPOS)
+        and not (iflag & FLG_NOABERR)
+        and not is_heliocentric
+        and not is_barycentric
     )
     ts = get_timescale()
 
@@ -567,10 +578,22 @@ def calc_moon_position(
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
-    if iflag & FLG_SIDEREAL:
+    # Apply sidereal correction if requested (ecliptic longitude only; for
+    # equatorial sidereal output the mean-equator-of-date frame carries the
+    # sidereal framing and no ayanamsa is subtracted — the same rule as
+    # planets._calc_body_pctr, gated on not-equatorial).
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         ayanamsa = get_ayanamsa_ut(t.ut1)
         lon = (lon - ayanamsa) % 360.0
+
+        # Correct the longitude speed for the ayanamsha drift rate (~50"/yr),
+        # mirroring planets.py: speed_lon was built from tropical samples, so
+        # the of-date ayanamsa motion must be removed for sidereal SPEED output.
+        if iflag & FLG_SPEED:
+            dt = 1.0 / 86400.0
+            ayanamsa_prev = get_ayanamsa_ut(t.ut1 - dt)
+            ayanamsa_next = get_ayanamsa_ut(t.ut1 + dt)
+            speed_lon -= (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 

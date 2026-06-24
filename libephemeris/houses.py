@@ -668,10 +668,13 @@ def houses(
         mc += 360.0
 
     if 90.0 < armc_active <= 270.0:
-        if mc < 90.0 or mc > 270.0:
+        # Boundary uses <= to match the canonical houses_armc() quadrant
+        # correction (keeps MC in (90, 270] when ARMC is in (90, 270]); at the
+        # exact cardinal armc==270 the < form put MC 180 deg from houses_armc).
+        if mc <= 90.0 or mc > 270.0:
             mc += 180.0
     elif armc_active > 270.0:
-        if mc < 270.0:
+        if mc <= 270.0:
             mc += 180.0
     elif armc_active <= 90.0:
         if mc > 90.0:
@@ -1751,10 +1754,9 @@ def houses_ex2(
     This function is an extended version of houses_ex() that also returns
     the velocities (derivatives) of house cusps and angles.
 
-    Velocities are only calculated when the FLG_SPEED flag is set in the flags
-    parameter. When FLG_SPEED is not set, zero velocities are returned for
-    efficiency. This is useful for progressed chart applications where the rate
-    of change of house cusps is needed.
+    Velocities are always calculated, matching the reference behavior (like
+    houses_armc_ex2). This is useful for progressed chart applications where
+    the rate of change of house cusps is needed.
 
     Velocities are computed via the ARMC-based derivative path
     (houses_armc_ex2), which varies ARMC with fixed obliquity and
@@ -1765,15 +1767,16 @@ def houses_ex2(
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask. Use FLG_SPEED to compute velocities.
-               FLG_SIDEREAL can also be used for sidereal calculations.
+        flags: Calculation flags bitmask. FLG_SIDEREAL can be used for
+               sidereal calculations. Velocities are always computed
+               regardless of FLG_SPEED.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, etc.)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if FLG_SPEED not set)
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if FLG_SPEED not set)
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
 
     Example:
         >>> cusps, ascmc, cusps_speed, ascmc_speed = houses_ex2(
@@ -5292,10 +5295,11 @@ def _armc_to_mc(armc: float, eps: float) -> float:
     if mc < 0:
         mc += 360.0
     if 90.0 < armc <= 270.0:
-        if mc < 90.0 or mc > 270.0:
+        # Match the canonical houses_armc() quadrant correction (<= boundary).
+        if mc <= 90.0 or mc > 270.0:
             mc += 180.0
     elif armc > 270.0:
-        if mc < 270.0:
+        if mc <= 270.0:
             mc += 180.0
     elif armc <= 90.0:
         if mc > 90.0:

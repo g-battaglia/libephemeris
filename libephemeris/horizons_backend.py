@@ -826,58 +826,92 @@ def _to_ecliptic_output(
 def _calc_analytical(
     jd_ut: float, body_id: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
-    """Calculate analytical body (Mean Node, Mean Apogee)."""
+    """Calculate analytical body (Mean Node, Mean Apogee/Lilith).
+
+    Mirrors the canonical Mean Node / Mean Apogee branches of
+    ``planets._calc_body`` so the Horizons backend produces identical results
+    to the LEB/Skyfield path for every flag combination. The previous version
+    returned a bare mean-ecliptic-of-date spherical 6-tuple and ignored
+    FLG_J2000 / FLG_EQUATORIAL / FLG_XYZ / FLG_RADIANS, omitted the nutation-in-
+    longitude term Δψ that the of-date output carries (a ~17" tropical error),
+    and left the sidereal longitude speed uncorrected for the ayanamsha drift.
+    All of this is pure analytical math (no DE440 / HTTP), so it stays valid in
+    Horizons mode.
+    """
+    import math
+
     from .time_utils import deltat
-    from .constants import FLG_SIDEREAL
+    from .constants import FLG_SIDEREAL, FLG_NONUT, FLG_EQUATORIAL, FLG_SPEED
+    from .constants import _MOON_MEAN_DIST_AU, _MOON_MEAN_APOG_DIST_AU
+    from .planets import (
+        _apply_output_flags,
+        _apply_sidereal_correction,
+        _maybe_equatorial_convert,
+        _nutation_rate_deg_per_day,
+    )
+    from .cache import get_cached_nutation
 
     jd_tt = jd_ut + deltat(jd_ut)
+    is_sidereal = bool(iflag & FLG_SIDEREAL)
+    # SIDEREAL+EQUATORIAL output is on the mean ecliptic (no nutation), so Δψ is
+    # neither added to the position nor its rate to the speed.
+    _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
+    add_nutation = not (iflag & FLG_NONUT) and not _sid_eq
 
     if body_id == 10:  # Mean Node
         from .lunar import calc_mean_lunar_node
 
         lon = calc_mean_lunar_node(jd_tt)
         lat = 0.0
-        dist = 0.002569  # mean lunar distance in AU (approximate)
+        dist = _MOON_MEAN_DIST_AU
     elif body_id == 12:  # Mean Apogee (Lilith)
         from .lunar import calc_mean_lilith_with_latitude
 
         lon, lat = calc_mean_lilith_with_latitude(jd_tt)
-        dist = 0.002710  # mean apogee distance
+        dist = _MOON_MEAN_APOG_DIST_AU
     else:
         raise KeyError(f"Body {body_id} not analytical")
 
-    # Speed via finite difference
-    dt = 1.0 / 86400.0  # 1 second
-    dlat = 0.0
-    if body_id == 10:
-        from .lunar import calc_mean_lunar_node
+    # The analytical formulae return the MEAN ecliptic of date; the reference
+    # outputs the TRUE ecliptic, so add Δψ to the longitude unless suppressed.
+    if add_nutation:
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
-        lon2 = calc_mean_lunar_node(jd_tt + dt)
-        dlon = (lon2 - lon) / dt
-        if abs(dlon) > 180 / dt:
-            dlon = ((lon2 - lon + 180) % 360 - 180) / dt
-    elif body_id == 12:
-        from .lunar import calc_mean_lilith_with_latitude
+    # Speed via ±0.5-day central difference (matching the canonical path).
+    dlon, dlat = 0.0, 0.0
+    if iflag & FLG_SPEED:
+        dt = 0.5
+        if body_id == 10:
+            lon_prev = calc_mean_lunar_node(jd_tt - dt)
+            lon_next = calc_mean_lunar_node(jd_tt + dt)
+        else:
+            lon_prev, lat_prev = calc_mean_lilith_with_latitude(jd_tt - dt)
+            lon_next, lat_next = calc_mean_lilith_with_latitude(jd_tt + dt)
+            dlat = (lat_next - lat_prev) / (2.0 * dt)
+        lon_diff = lon_next - lon_prev
+        if lon_diff > 180:
+            lon_diff -= 360.0
+        elif lon_diff < -180:
+            lon_diff += 360.0
+        dlon = lon_diff / (2.0 * dt)
+        # True-ecliptic output: the speed carries the nutation rate, exactly
+        # as the position carries Δψ.
+        if add_nutation:
+            dlon += _nutation_rate_deg_per_day(jd_tt, dt)
 
-        lon2, lat2 = calc_mean_lilith_with_latitude(jd_tt + dt)
-        dlon = ((lon2 - lon + 180) % 360 - 180) / dt
-        dlat = (lat2 - lat) / dt
-    else:  # pragma: no cover - only bodies 10/12 reach here (others raise KeyError above)
-        dlon = 0.0
+    # Sidereal correction (flag-aware ayanamsa + ayanamsha-rate speed term),
+    # ecliptic longitude only — equatorial sidereal output uses the mean-equator
+    # frame in _maybe_equatorial_convert with no ayanamsa.
+    if is_sidereal and not (iflag & FLG_EQUATORIAL):
+        lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag)
 
-    # Sidereal: calc_mean_lunar_node / calc_mean_lilith_with_latitude return a
-    # MEAN ecliptic-of-date longitude (no nutation), so the MEAN ayanamsa is the
-    # correct one to subtract here. This matches the LEB/Skyfield Mean Node /
-    # Lilith path, which instead adds Δψ to the longitude and subtracts the
-    # TRUE ayanamsa (mean + Δψ) — algebraically the same final value, since the
-    # Δψ terms cancel.
-    if iflag & FLG_SIDEREAL:
-        from .planets import get_ayanamsa_ut
-
-        ayan = get_ayanamsa_ut(jd_ut)
-        lon = (lon - ayan) % 360.0
-
-    return ((lon, lat, dist, dlon, dlat, 0.0), iflag)
+    result = (lon, lat, dist, dlon, dlat, 0.0)
+    # FLG_J2000 (precession) and FLG_EQUATORIAL conversion, then the output
+    # representation flags (FLG_XYZ / FLG_RADIANS).
+    result = _maybe_equatorial_convert(result, jd_tt, iflag)
+    result = _apply_output_flags(result, iflag)
+    return (result, iflag)
 
 
 def _calc_uranian(

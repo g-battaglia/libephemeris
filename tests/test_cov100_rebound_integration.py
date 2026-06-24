@@ -895,7 +895,14 @@ class TestPropagateOrbitAssist:
                 A2=2e-10,
                 A3=3e-10,
             )
-        assert captured["instance"].particle_params == [1e-10, 2e-10, 3e-10]
+        # particle_params is now a numpy float64 array (the ASSIST setter calls
+        # value.ctypes, which a plain list lacks), so compare element-wise.
+        import numpy as np
+
+        params = captured["instance"].particle_params
+        assert isinstance(params, np.ndarray)
+        assert params.dtype == np.float64
+        np.testing.assert_array_equal(params, [1e-10, 2e-10, 3e-10])
 
     def test_assist_default_config(
         self, fake_rebound, fake_assist, ceres, tmp_path

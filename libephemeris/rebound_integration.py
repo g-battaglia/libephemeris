@@ -903,6 +903,11 @@ def propagate_orbit_assist(
     Note:
         Requires ~1 GB of ephemeris data files. See module docstring for
         download instructions.
+
+        jd_start/jd_end are TT Julian Dates and are passed to ASSIST, which
+        expects TDB. TT is used directly as an approximation of TDB; the
+        TT-TDB difference is <= ~1.7 ms and is negligible for these
+        integrations.
     """
     try:
         import rebound  # noqa: F401 (availability probe)
@@ -1046,6 +1051,11 @@ def propagate_trajectory(
 
     Returns:
         List[PropagationResult]: Positions and velocities at each time
+
+    Note:
+        When use_assist=True, jd_start/jd_end (TT) are passed to ASSIST,
+        which expects TDB. TT is used directly as an approximation of TDB;
+        the TT-TDB difference is <= ~1.7 ms and is negligible here.
 
     Example:
         >>> trajectory = propagate_trajectory(elements, jd_start, jd_end, num_points=365)

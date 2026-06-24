@@ -3481,11 +3481,11 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
     cycles of death and rebirth, and the shadow self.
 
     Orbital elements used (traditional astrological):
-        - Epoch: J2000.0 (JD 2451545.0)
-        - Semi-major axis: 81.0 AU (beyond Neptune and Pluto)
+        - Epoch: J1900.0 (JD 2415020.0)
+        - Semi-major axis: 79.225630 AU (beyond Neptune and Pluto)
         - Eccentricity: 0.0 (circular orbit)
         - Inclination: 0.0 degrees (on ecliptic)
-        - Orbital period: ~729 years (derived from Kepler's 3rd law)
+        - Orbital period: ~705 years (derived from Kepler's 3rd law)
 
     Note: Different astrologers may use different orbital elements for Proserpina.
     This implementation uses a simple circular orbit model.
@@ -3497,7 +3497,7 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
             - longitude: Heliocentric ecliptic longitude in degrees (0-360)
             - latitude: Ecliptic latitude in degrees (0 for circular orbit on ecliptic)
-            - distance: Distance from Sun in AU (81.0 AU, constant for circular orbit)
+            - distance: Distance from Sun in AU (79.225630 AU, constant for circular orbit)
             - dlon: Daily longitude change in degrees/day
             - dlat: Daily latitude change in degrees/day (0)
             - ddist: Daily distance change in AU/day (0 for circular orbit)

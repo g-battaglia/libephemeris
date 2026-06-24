@@ -2754,6 +2754,17 @@ def _apply_fixstar_flags(
         ayanamsa = get_ayanamsa_ut(tjd_ut)
         lon = (lon - ayanamsa) % 360.0
 
+        # Correct the first-coordinate speed for the ayanamsha drift rate
+        # (~50"/yr), mirroring the planet path (planets.py): the speed was
+        # built on the tropical frame, so the of-date ayanamsa motion must be
+        # removed for sidereal SPEED output. Without this, a star's sidereal
+        # speed_lon is returned identical to its tropical value.
+        if iflag & FLG_SPEED:
+            dt_day = 0.5
+            ayan_prev = get_ayanamsa_ut(tjd_ut - dt_day)
+            ayan_next = get_ayanamsa_ut(tjd_ut + dt_day)
+            speed_lon -= (ayan_next - ayan_prev) / (2.0 * dt_day)
+
     # ---- 4. Output format conversion ----
     # Cast to native Python floats (upstream Skyfield/numpy ops can leak
     # numpy.float64) before any output path, so every fixstar* return is native.

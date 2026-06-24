@@ -732,7 +732,7 @@ def time_equ(jd: float) -> float:
         >>> eot = time_equ(jd)
         >>> eot_minutes = eot * 1440
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
-        Equation of Time: -3.05 minutes
+        Equation of Time: -3.29 minutes
     """
     # The equation of time is derived from the relationship:
     #   E = GAST - RA_sun + 12h - UT
@@ -989,8 +989,7 @@ def sidtime(
 
     Note:
         - When obliquity/nutation are None, uses IAU 2000B nutation model
-        - GMST is computed using the IAU 1982 formula from Meeus
-          "Astronomical Algorithms" Chapter 12
+        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
         - Result is normalized to the range 0-24 hours
         - For Greenwich sidereal time, use longitude=0.0
 
@@ -1043,8 +1042,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
 
     Note:
         - This function is equivalent to calling _sidtime_internal(jd, 0.0, obliquity, nutation)
-        - GMST is computed using the IAU 1982 formula from Meeus
-          "Astronomical Algorithms" Chapter 12
+        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
         - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
         - Result is normalized to the range 0-24 hours
 
