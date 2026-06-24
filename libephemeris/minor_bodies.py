@@ -1420,7 +1420,8 @@ def apply_secular_perturbations(
             - Omega_pert: Perturbed longitude of ascending node (degrees)
             - M_pert: Perturbed mean anomaly at target time (degrees)
             - n_pert: Perturbed mean motion (degrees/day)
-            - e_pert: Perturbed eccentricity (dimensionless, 0 < e < 1)
+            - e_pert: Perturbed eccentricity (dimensionless, 0 <= e <= 0.999;
+              capped below the parabolic limit, but no positive floor)
             - i_pert: Perturbed inclination (degrees)
 
     See Also:

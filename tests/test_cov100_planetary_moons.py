@@ -480,6 +480,12 @@ def test_calc_position_sidereal(monkeypatch):
     ts = state.get_timescale()
     t = ts.tt_jd(2451545.0)
     _setup_simple_io(monkeypatch, position=_ecl_vector(123.0))
+    # The sidereal path now routes through the canonical flag-aware helper
+    # (_apply_sidereal_correction -> _get_ayanamsa_for_flags), matching the
+    # planet path, instead of subtracting the mean get_ayanamsa_ut directly.
+    monkeypatch.setattr(
+        planets_mod, "_get_ayanamsa_for_flags", lambda jd, iflag: 30.0
+    )
 
     tropical = pm.calc_moon_position(t, MOON_IO, FLG_TRUEPOS | FLG_NOABERR)
     sidereal = pm.calc_moon_position(

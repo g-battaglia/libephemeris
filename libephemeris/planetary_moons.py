@@ -453,8 +453,6 @@ def calc_moon_position(
     Raises:
         EphemerisRangeError: If JD is outside the SPK kernel's coverage
     """
-    from .planets import get_ayanamsa_ut
-
     naif_id = _moon_naif_id(moon_id)
     if naif_id is None:
         return None
@@ -611,17 +609,16 @@ def calc_moon_position(
     # sidereal framing and no ayanamsa is subtracted — the same rule as
     # planets._calc_body_pctr, gated on not-equatorial).
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
-        ayanamsa = get_ayanamsa_ut(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        # Route through the canonical flag-aware helper so the ayanamsa variant
+        # matches the longitude frame: when FLG_NONUT stripped Δψ above (mean
+        # ecliptic) the helper subtracts the MEAN ayanamsa, while an of-date
+        # (true) longitude gets the TRUE ayanamsa — subtracting get_ayanamsa_ut
+        # (always true) from a NONUT mean longitude left a spurious ~9-17"
+        # offset versus the planet path. The helper also removes the ~50"/yr
+        # ayanamsha drift from speed_lon under FLG_SPEED.
+        from .planets import _apply_sidereal_correction
 
-        # Correct the longitude speed for the ayanamsha drift rate (~50"/yr),
-        # mirroring planets.py: speed_lon was built from tropical samples, so
-        # the of-date ayanamsa motion must be removed for sidereal SPEED output.
-        if iflag & FLG_SPEED:
-            dt = 1.0 / 86400.0
-            ayanamsa_prev = get_ayanamsa_ut(t.ut1 - dt)
-            ayanamsa_next = get_ayanamsa_ut(t.ut1 + dt)
-            speed_lon -= (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
