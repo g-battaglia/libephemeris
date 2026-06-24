@@ -920,4 +920,18 @@ def _calc_uranian(
 
         lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag)
 
-    return ((lon, lat, dist, dlon, dlat, ddist), iflag)
+    # Equatorial conversion and output-representation flags, mirroring the
+    # canonical heliocentric Uranian path (planets._calc_body lines ~2446-2451,
+    # ~2472-2476). The bare return above produced ecliptic spherical DEGREES for
+    # every request, so FLG_EQUATORIAL / FLG_XYZ / FLG_RADIANS were silently
+    # ignored — a tens-of-degrees / wrong-representation divergence from the
+    # LEB/Skyfield backend. _maybe_equatorial_convert is masked with ~FLG_J2000
+    # because the J2000 framing was already handled by the precession gate above
+    # (the canonical path masks it for the same reason). Both helpers are pure
+    # analytical math (obliquity/nutation via erfa), so no DE440/HTTP is needed.
+    from .planets import _apply_output_flags, _maybe_equatorial_convert
+
+    result = (lon, lat, dist, dlon, dlat, ddist)
+    result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+    result = _apply_output_flags(result, iflag)
+    return (result, iflag)

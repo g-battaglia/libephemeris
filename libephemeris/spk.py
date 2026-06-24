@@ -1026,9 +1026,14 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
                     math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2)
                     / _AU_KM
                 )
-            except (ValueError, IndexError, KeyError):
+            except Exception:
                 # Probe failed near the edge: assume a distant body (~175 AU,
                 # ~1 d light-time) so the margin is conservative, not too small.
+                # Catch broadly — the probe is best-effort and the underlying
+                # compute_type21/get_MDA_record/spke21 also raise RuntimeError
+                # (e.g. "Invalid data" / segment errors); a probe failure must
+                # never escape this margin sizing and break the documented
+                # graceful fall-through to the Keplerian out-of-coverage path.
                 helio_au = 175.0
             # Earth's orbit adds at most ~1 AU to the geocentric distance; a
             # 1.2 safety factor absorbs the light-time iteration and slop.
