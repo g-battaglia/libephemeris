@@ -2007,9 +2007,13 @@ def _assist_position_at(
     # true-ecliptic contract every other body branch follows (the caller then
     # applies the J2000 / equatorial framing via _maybe_equatorial_convert).
     # Δψ is omitted for NONUT (mean ecliptic) and for J2000 — there the caller
-    # precesses back to J2000, whose ecliptic carries no nutation.
+    # precesses back to J2000, whose ecliptic carries no nutation. It is also
+    # omitted for SIDEREAL+EQUATORIAL: _maybe_equatorial_convert rotates that
+    # case with the MEAN obliquity, so the longitude must be the mean ecliptic
+    # too (mirrors the node/Lilith _sid_eq rule), else ~Δψ leaks into RA/Dec.
     lon, lat = precess_from_j2000(lon_j2000, lat_j2000, jd_tt)
-    if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000):
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000) and not _sid_eq:
         dpsi_rad, _ = get_cached_nutation(jd_tt)
         lon = (lon + math.degrees(dpsi_rad)) % 360.0
 

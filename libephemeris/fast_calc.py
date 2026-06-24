@@ -2031,6 +2031,21 @@ def _fast_calc_core(
     else:
         raise ValueError(f"Unknown coord_type {body.coord_type}")
 
+    # ICRS (Pipeline-A) bodies requested as XYZ+SIDEREAL are forced through the
+    # spherical path (FLG_XYZ stripped via _pipe_iflag) so the sidereal longitude
+    # subtraction can run; the Cartesian conversion then happens at the end. At
+    # that point dlon is still a spherical longitude rate exactly like the
+    # Pipeline-A spherical path, so the J2000 / ayanamsa-drift speed gates below
+    # must treat them identically — _pipeline_a was set False only to route the
+    # XYZ conversion. Without this, the XYZ sidereal-J2000 velocity omits the two
+    # precession-rate terms the equivalent spherical output applies, leaving the
+    # XYZ and spherical results (which must be exact coordinate transforms of one
+    # another) inconsistent by ~2x the general-precession rate in dlon.
+    _xyz_sid_pipea = _xyz_sid and body.coord_type in (
+        COORD_ICRS_BARY,
+        COORD_ICRS_BARY_SYSTEM,
+    )
+
     # Sidereal correction
     #
     # When EQUATORIAL is set, the reference ephemeris does NOT subtract ayanamsha from RA
@@ -2100,7 +2115,10 @@ def _fast_calc_core(
             # the POSITION (not the rate) to J2000. Pipeline-A bodies get the
             # J2000 frame term applied separately, just after this block.
             if (iflag & FLG_SPEED) and (
-                _deferred_sid_j2k or not (iflag & FLG_J2000) or _pipeline_a
+                _deferred_sid_j2k
+                or not (iflag & FLG_J2000)
+                or _pipeline_a
+                or _xyz_sid_pipea
             ):
                 dlon -= _general_precession_rate_deg_day(jd_tt)
 
@@ -2119,12 +2137,15 @@ def _fast_calc_core(
     # _pipeline_a is False for them), equatorial output (its own frame), and XYZ
     # output (dlon then holds a Cartesian velocity component, not a longitude
     # rate — Pipeline-A XYZ returns the vectors straight from _pipeline_icrs).
+    # The `not XYZ` guard keeps Pipeline-A tropical-XYZ (Cartesian straight from
+    # _pipeline_icrs) out; _xyz_sid_pipea adds back the XYZ+SIDEREAL case, whose
+    # dlon is still a spherical longitude rate here (Cartesian conversion is
+    # deferred to the FLG_XYZ post-processing below).
     if (
-        _pipeline_a
-        and (iflag & FLG_SPEED)
+        (iflag & FLG_SPEED)
         and (iflag & FLG_J2000)
         and not (iflag & FLG_EQUATORIAL)
-        and not (iflag & FLG_XYZ)
+        and ((_pipeline_a and not (iflag & FLG_XYZ)) or _xyz_sid_pipea)
     ):
         dlon -= _general_precession_rate_deg_day(jd_tt)
 

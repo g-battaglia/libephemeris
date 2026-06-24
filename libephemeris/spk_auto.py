@@ -588,10 +588,14 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
             )
     config.naif_id = naif_id
 
-    # Register the SPK body if not already registered
+    # Register the SPK body, or re-register if it now resolves to a different
+    # file. A forced re-download with a wider date range produces a new cache
+    # path (the filename hashes the range), so a presence-only check would leave
+    # the stale narrower kernel registered and calc_ut would keep using it.
     from . import state
 
-    if config.ipl not in state._SPK_BODY_MAP:
+    existing = state._SPK_BODY_MAP.get(config.ipl)
+    if existing is None or existing[0] != cache_path:
         spk.register_spk_body(config.ipl, cache_path, naif_id)
 
     return cache_path
@@ -1145,8 +1149,15 @@ def _iso_to_jd(date_str: str) -> float:
         >>> _iso_to_jd("1550-01-01")
         2287184.5
     """
-    parts = date_str.split("-")
+    # A BCE date from _jd_to_iso_date renders the year with a leading '-'
+    # (e.g. "-1975-11-07"); strip it before splitting so the year sign is not
+    # mistaken for a field separator (which would make int("") raise).
+    neg_year = date_str.startswith("-")
+    core = date_str[1:] if neg_year else date_str
+    parts = core.split("-")
     year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+    if neg_year:
+        year = -year
 
     # Algorithm from Meeus, Astronomical Algorithms
     if month <= 2:

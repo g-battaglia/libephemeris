@@ -493,8 +493,10 @@ def calc_extinction_magnitude(
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
     """
-    # Objects below horizon have essentially infinite extinction
-    if altitude_deg < 0:
+    # Objects at or below the horizon have essentially infinite extinction.
+    # Use <= 0 (not < 0) to match calc_simple_extinction and avoid an ~88-mag
+    # discontinuity between altitude 0.0 (airmass capped at 40) and -0.0.
+    if altitude_deg <= 0:
         return 99.0
 
     # Calculate airmass

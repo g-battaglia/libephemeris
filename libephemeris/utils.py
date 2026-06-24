@@ -1269,12 +1269,12 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
-    # Handle sign
-    if cs < 0:
-        sign = -1
-        cs = -cs
-    else:
-        sign = 1
+    # Wrap the whole magnitude into one day [0, 24h) before extracting fields.
+    # Applying the sign to the hours field alone left sub-hour negatives (e.g.
+    # -6000 cs = -1 min) indistinguishable from their positive counterpart and
+    # broke the documented wrap ("-360000 cs -> 23:00:00"). Python's modulo maps
+    # negatives into the positive range, so -6000 -> 23:59:00 as intended.
+    cs = cs % (24 * 360000)
 
     # Extract hours, minutes, and seconds
     # 1 hour = 60 * 60 * 100 = 360000 centiseconds
@@ -1295,13 +1295,9 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
             minutes = 0
             hours += 1
 
-    # Apply sign to hours
-    if sign < 0:
-        hours = -hours
-
     # Format the string matching reference API format
     # Format: "%02d<sep>%02d<sep>%02d"
-    # Hours are mod 24 to match the reference behavior
+    # A rounding carry can push 23:59:59.5x up to 24:00:00; wrap back to 00.
     hours = hours % 24
     if suppresszero:
         if seconds == 0:

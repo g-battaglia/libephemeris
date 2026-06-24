@@ -526,6 +526,11 @@ def test_get_visibility_conditions_keys_and_values() -> None:
     }
     assert set(conditions) == expected_keys
     assert isinstance(conditions["is_visible"], bool)
+    # limiting_magnitude is an intrinsic-magnitude threshold (extinction folded
+    # in by calc_limiting_magnitude), so the margin and visibility are taken
+    # against the object's intrinsic magnitude — not the already-extincted
+    # apparent magnitude (which would double-count extinction).
     assert conditions["magnitude_margin"] == pytest.approx(
-        conditions["limiting_magnitude"] - conditions["apparent_magnitude"]
+        conditions["limiting_magnitude"] - 1.0
     )
+    assert conditions["is_visible"] == (1.0 <= conditions["limiting_magnitude"])

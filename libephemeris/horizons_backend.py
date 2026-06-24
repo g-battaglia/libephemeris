@@ -780,19 +780,24 @@ def _to_ecliptic_output(
         if iflag & FLG_SPEED:
             dlon -= _general_precession_rate_deg_day(jd_tt)
 
-    # J2000 longitude-speed frame conversion (spherical output only). The
-    # velocity was rotated into the J2000 ecliptic with a fixed matrix
-    # (_rotate_icrs_to_ecliptic_j2000), which omits the of-date→J2000 equinox
-    # motion; that motion removes the general-precession rate from the longitude
-    # speed, so apply it here. Runs for BOTH tropical and sidereal J2000 ecliptic
-    # SPEED output (mirroring fast_calc's Pipeline-A frame term). Equatorial
-    # output (own frame) and XYZ output (the Cartesian velocity is already in the
-    # J2000 frame) are excluded.
+    # J2000 longitude-speed frame conversion. The velocity was rotated into the
+    # J2000 ecliptic with a fixed matrix (_rotate_icrs_to_ecliptic_j2000), which
+    # omits the of-date→J2000 equinox motion; that motion removes the general-
+    # precession rate from the longitude speed, so apply it here. Runs for BOTH
+    # tropical and sidereal J2000 ecliptic SPEED output (mirroring fast_calc's
+    # Pipeline-A frame term). Equatorial output (own frame) is excluded.
+    #
+    # XYZ: tropical XYZ returns the raw Cartesian vel below (pos+vel), so dlon is
+    # unused and the term is moot; but the XYZ+SIDEREAL branch REBUILDS the
+    # Cartesian vectors from dlon (a still-spherical longitude rate), so the term
+    # must apply there too — otherwise the XYZ sidereal-J2000 velocity is missing
+    # the frame term its spherical counterpart applies (and disagrees with the
+    # LEB/Skyfield backend). So exclude XYZ only when NOT sidereal.
     if (
         (iflag & FLG_SPEED)
         and (iflag & FLG_J2000)
         and not (iflag & FLG_EQUATORIAL)
-        and not (iflag & FLG_XYZ)
+        and (not (iflag & FLG_XYZ) or (iflag & FLG_SIDEREAL))
     ):
         dlon -= _general_precession_rate_deg_day(jd_tt)
 

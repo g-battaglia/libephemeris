@@ -310,23 +310,27 @@ def unregister_moon_spk(spk_file: str) -> None:
     Example:
         >>> unregister_moon_spk("jup365.bsp")
     """
+    # Match by exact path or by whole-basename equality. Anchoring on the full
+    # basename (rather than str.endswith) avoids two failure modes: an empty
+    # basename — os.path.basename("foo.bsp/") == "" — would make endswith("")
+    # true for every key and unregister ALL kernels, and a bare suffix like
+    # "jup365.bsp" would wrongly match "/alt/xjup365.bsp".
+    base = os.path.basename(spk_file)
+
+    def _matches(path: str) -> bool:
+        return path == spk_file or (base != "" and os.path.basename(path) == base)
+
     # Remove body registrations for this file
     moons_to_remove = [
-        moon_id
-        for moon_id, path in _MOON_SPK_BY_BODY.items()
-        if path == spk_file or path.endswith(os.path.basename(spk_file))
+        moon_id for moon_id, path in _MOON_SPK_BY_BODY.items() if _matches(path)
     ]
     for moon_id in moons_to_remove:
         del _MOON_SPK_BY_BODY[moon_id]
 
-    # Remove kernel(s) from cache, matching by exact path or basename (the same
-    # tolerant matching used for body removal above). register_moon_spk caches
-    # under the resolved absolute path, so an exact-key lookup on a bare
-    # basename would leave the kernel handle open and leaked.
-    base = os.path.basename(spk_file)
-    kernel_keys = [
-        k for k in _MOON_SPK_KERNELS if k == spk_file or k.endswith(base)
-    ]
+    # Remove kernel(s) from cache. register_moon_spk caches under the resolved
+    # absolute path, so an exact-key lookup on a bare basename would leave the
+    # kernel handle open and leaked; the basename match closes it.
+    kernel_keys = [k for k in _MOON_SPK_KERNELS if _matches(k)]
     for k in kernel_keys:
         try:
             _MOON_SPK_KERNELS[k].close()
@@ -574,7 +578,14 @@ def calc_moon_position(
         # nutation in longitude Δψ); strip it for the mean ecliptic. Done per
         # sample so the central-difference speed below inherits the correction
         # automatically (no separate nutation-rate term needed).
-        if iflag & FLG_NONUT:
+        #
+        # FLG_SIDEREAL|FLG_EQUATORIAL: the downstream _maybe_equatorial_convert
+        # rotates with the MEAN obliquity for sidereal output, so the longitude
+        # must also be the mean ecliptic (Δψ stripped) — otherwise the mismatch
+        # leaks ~Δψ·cos(ε) (~15-17") into RA/Dec. Mirror the node/Lilith _sid_eq
+        # rule in planets._calc_body_pctr.
+        _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+        if (iflag & FLG_NONUT) or _sid_eq:
             from .cache import get_cached_nutation
 
             dpsi_rad, _ = get_cached_nutation(t_obs.tt)

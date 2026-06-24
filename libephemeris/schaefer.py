@@ -168,7 +168,14 @@ def calc_aerosol_extinction(
 
     Args:
         humidity_fraction: Relative humidity (0.0-1.0)
-        met_range_km: Meteorological visibility range in km (0 = compute from humidity)
+        met_range_km: Dual-use parameter:
+            - ``0`` → compute the coefficient from ``humidity_fraction``;
+            - ``>= 1.0`` → interpreted as the meteorological visibility range in
+              km (Koschmieder: ``k = 3.912 / V - 0.106``);
+            - ``0 < value < 1.0`` → interpreted DIRECTLY as the aerosol
+              coefficient in mag/airmass, NOT as a sub-km visibility range. To
+              model dense fog (sub-km visibility) pass the resulting coefficient
+              explicitly rather than the range.
         altitude_m: Observer altitude in meters
 
     Returns:
@@ -726,12 +733,16 @@ def is_object_visible(
         snellen_ratio,
     )
 
-    # Calculate apparent magnitude with extinction
+    # Apparent (observed) magnitude after full-path extinction — informational.
     airmass = calc_airmass(object_altitude_deg)
     apparent_mag = object_magnitude + k_total * airmass
 
-    # Check visibility
-    is_visible = apparent_mag <= limiting_mag
+    # Visibility: calc_limiting_magnitude already folds the altitude-dependent
+    # extinction into the limit (it returns the faintest INTRINSIC magnitude
+    # visible at this altitude), so compare the object's intrinsic magnitude
+    # directly. Comparing apparent_mag here too would double-count extinction —
+    # penalising the object by k*(2*airmass-1) instead of the correct k*airmass.
+    is_visible = object_magnitude <= limiting_mag
 
     # Additional check: minimum elongation from Sun
     # Bright objects can be seen closer to Sun than faint ones
@@ -905,8 +916,11 @@ def get_visibility_conditions(
         "sky_brightness_mag_arcsec2": sky_mag,
         "limiting_magnitude": limiting_mag,
         "apparent_magnitude": apparent_mag,
-        "magnitude_margin": limiting_mag - apparent_mag,
-        "is_visible": apparent_mag <= limiting_mag,
+        # limiting_mag is an INTRINSIC-magnitude threshold (extinction already
+        # folded in by calc_limiting_magnitude), so compare the object's
+        # intrinsic magnitude — comparing apparent_mag would double-count it.
+        "magnitude_margin": limiting_mag - object_magnitude,
+        "is_visible": object_magnitude <= limiting_mag,
         "arcus_visionis": get_arcus_visionis(object_magnitude),
         "optimal_sun_altitude": get_optimal_sun_altitude(object_magnitude, True),
     }
