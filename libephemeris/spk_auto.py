@@ -588,10 +588,15 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
             )
     config.naif_id = naif_id
 
-    # Register the SPK body if not already registered
+    # Register the SPK body, or re-register if it now resolves to a different
+    # (path, NAIF id). A forced re-download with a wider date range produces a
+    # new cache path (the filename hashes the range), and _detect_naif_id_from_file
+    # may correct naif_id for the same path; a presence- or path-only check would
+    # leave the stale registration in place and calc_ut would keep using it.
     from . import state
 
-    if config.ipl not in state._SPK_BODY_MAP:
+    existing = state._SPK_BODY_MAP.get(config.ipl)
+    if existing is None or existing != (cache_path, naif_id):
         spk.register_spk_body(config.ipl, cache_path, naif_id)
 
     return cache_path
@@ -1095,16 +1100,18 @@ def _jd_to_iso_date(jd: float) -> str:
         str: ISO date string (YYYY-MM-DD)
     """
     # Julian Day to calendar date conversion
-    # Algorithm from Meeus, Astronomical Algorithms
+    # Algorithm from Meeus, Astronomical Algorithms.
+    # Use the proleptic Gregorian calendar for ALL dates so this is the exact
+    # inverse of _iso_to_jd (which always applies the Gregorian correction
+    # b = 2 - a + a//4). A z < 2299161 Julian branch would drift these two
+    # apart by ~10 days for pre-1582 dates (e.g. medium/extended tier starts),
+    # corrupting the SPK request window and cache filenames.
     jd = jd + 0.5
     z = int(jd)
     jd - z
 
-    if z < 2299161:
-        a = z
-    else:
-        alpha = int((z - 1867216.25) / 36524.25)
-        a = z + 1 + alpha - int(alpha / 4)
+    alpha = int((z - 1867216.25) / 36524.25)
+    a = z + 1 + alpha - int(alpha / 4)
 
     b = a + 1524
     c = int((b - 122.1) / 365.25)
@@ -1143,10 +1150,17 @@ def _iso_to_jd(date_str: str) -> float:
         >>> _iso_to_jd("2000-01-01")
         2451544.5
         >>> _iso_to_jd("1550-01-01")
-        2287184.5
+        2287185.5
     """
-    parts = date_str.split("-")
+    # A BCE date from _jd_to_iso_date renders the year with a leading '-'
+    # (e.g. "-1975-11-07"); strip it before splitting so the year sign is not
+    # mistaken for a field separator (which would make int("") raise).
+    neg_year = date_str.startswith("-")
+    core = date_str[1:] if neg_year else date_str
+    parts = core.split("-")
     year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+    if neg_year:
+        year = -year
 
     # Algorithm from Meeus, Astronomical Algorithms
     if month <= 2:
@@ -1234,8 +1248,15 @@ def _find_covering_spk(
                 file_jd_end = float(parts[-1])
 
                 # Check if this file covers our requested range
-                # We compare truncated integer values since filenames use truncated JDs
-                # Add 1 to file_jd_end to account for the truncation (covers the full day)
+                # Filenames store int()-truncated JDs, so file_jd_end is the
+                # floor of the kernel's true end (true_end >= file_jd_end) and
+                # file_jd_start is the floor of its true start. We compare on the
+                # truncated request bounds; the kernels are generated with a
+                # light-time margin past the nominal range (see the type-21
+                # coverage-margin widening), so the up-to-one-day truncation gap
+                # at the end is absorbed by that margin, and any genuine
+                # out-of-coverage read is still caught by _is_valid_bsp / the
+                # eval-time range check.
                 if file_jd_start <= int(jd_start) and file_jd_end >= int(jd_end):
                     filepath = os.path.join(cache_dir, filename)
                     if _is_valid_bsp(filepath):

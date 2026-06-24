@@ -2194,51 +2194,68 @@ def _calc_star_position_leb(
     # 1. Earth position and velocity from LEB (ICRS barycentric)
     earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
 
-    # 2. Propagate proper motion from J2000 to observation date
-    ra_date, dec_date = propagate_proper_motion(
-        star_data.ra_j2000,
-        star_data.dec_j2000,
-        star_data.pm_ra,
-        star_data.pm_dec,
-        J2000,
-        jd_tt,
+    # 2. Star ICRS position via rigorous 3D space motion.
+    #    Mirrors Skyfield's Star._compute_vectors (the reference used by
+    #    _calc_star_position_from_observer): build the J2000 position and
+    #    space-velocity vectors from (ra, dec, parallax, proper motion, radial
+    #    velocity), then propagate them linearly in 3D.  A first-order
+    #    propagation in RA/Dec diverges from this reference by up to ~0.27" for
+    #    the highest proper-motion stars (e.g. eps Ind, Rigil Kentaurus) already
+    #    within the base tier, growing to arcminutes/degrees at millennial
+    #    epochs; the 3D form tracks the Skyfield reference to the LEB pipeline
+    #    floor (<0.005" across the full catalogue).
+    _ASEC2RAD = math.pi / 180.0 / 3600.0
+    _C_M_PER_S = 299792458.0
+    _AU_KM = 149597870.7
+    # Reference default parallax 0.1249 mas for stars without a measured value
+    # (the same value Skyfield receives in the reference path).
+    px_mas = star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249
+    ra_rad = math.radians(star_data.ra_j2000)
+    dec_rad = math.radians(star_data.dec_j2000)
+    cra = math.cos(ra_rad)
+    sra = math.sin(ra_rad)
+    cdc = math.cos(dec_rad)
+    sdc = math.sin(dec_rad)
+    dist_internal = 1.0 / math.sin(px_mas * 1.0e-3 * _ASEC2RAD)  # AU
+    pos0 = (
+        dist_internal * cdc * cra,
+        dist_internal * cdc * sra,
+        dist_internal * sdc,
     )
-
-    # 3. RA/Dec → ICRS Cartesian
-    if star_data.parallax_mas > 0.0:
-        dist_internal = 206265000.0 / star_data.parallax_mas
-    else:
-        # Reference default parallax 0.0001249 arcsec for stars without
-        # a measured value.
-        dist_internal = 206265000.0 / 0.1249
-
-    # Apply radial velocity correction to distance (matching Skyfield Star behavior)
-    if star_data.radial_km_per_s != 0.0 and dist_internal < 1e11:
-        dt_years = (jd_tt - J2000) / DAYS_PER_JULIAN_YEAR
-        au_per_year = star_data.radial_km_per_s * 365.25 * 86400.0 / 149597870.7
-        dist_internal += au_per_year * dt_years
-
-    ra_rad = math.radians(ra_date)
-    dec_rad = math.radians(dec_date)
-    cos_dec = math.cos(dec_rad)
+    # Doppler factor: accounts for the changing light-travel time to the star.
+    k = 1.0 / (1.0 - star_data.radial_km_per_s / _C_M_PER_S * 1000.0)
+    # Proper motion (mas/yr; pm_ra already includes cos(dec)) and radial
+    # velocity as orthogonal AU/day components.
+    pmr = (star_data.pm_ra * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    pmd = (star_data.pm_dec * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    rvl = star_data.radial_km_per_s * 86400.0 / _AU_KM * k
+    vel = (
+        -pmr * sra - pmd * sdc * cra + rvl * cdc * cra,
+        pmr * cra - pmd * sdc * sra + rvl * cdc * sra,
+        pmd * cdc + rvl * sdc,
+    )
+    dt_days = jd_tt - J2000
     star_icrs = (
-        dist_internal * cos_dec * math.cos(ra_rad),
-        dist_internal * cos_dec * math.sin(ra_rad),
-        dist_internal * math.sin(dec_rad),
+        pos0[0] + vel[0] * dt_days,
+        pos0[1] + vel[1] * dt_days,
+        pos0[2] + vel[2] * dt_days,
     )
 
     # 4. Geocentric vector
     geo = _vec3_sub(star_icrs, earth_pos)
 
-    # 5. Light-time (zero for stars without parallax — infinite direction)
+    # 5. Light-time. dist_internal above is always finite (zero-parallax stars
+    # use the clamped 0.1249 mas default), so the geocentric distance is finite
+    # too — compute light-time from it for every star, matching the Skyfield
+    # reference path, which feeds the same clamped default into observe() and
+    # always retards. (Gating on the raw parallax instead would leave the one
+    # zero-parallax catalog star on the lt=0 / first-order-aberration branch
+    # while the reference used the relativistic, light-retarded one.)
     # Note: for finite-distance stars, proper motion is not re-evaluated
     # at the retarded epoch (jd_tt - lt).  The error is < 0.001" for all
     # catalog stars because lt is at most ~few years and pm is < 10"/yr.
-    if star_data.parallax_mas > 0.0:
-        geo_dist = _vec3_dist(geo)
-        lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
-    else:
-        lt = 0.0
+    geo_dist = _vec3_dist(geo)
+    lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
 
     # 6. Gravitational deflection (skip if noaberr or nogdefl)
     if not noaberr and not nogdefl:
@@ -2272,9 +2289,12 @@ def _calc_star_position_leb(
         )
         lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
-
+    # Zero-parallax stars keep the finite distance from the clamped 0.1249 mas
+    # default (~1.65e9 AU) computed above — the same value the Skyfield backend
+    # and the reference ephemeris return for them (verified: the reference
+    # gives 1.650118e9 AU for a zero-parallax star). The previous override to
+    # 100000.0 AU diverged from both backends and from this path's own
+    # light-time, which was already computed from the finite distance.
     return lon, lat, dist
 
 
@@ -2708,8 +2728,12 @@ def _apply_fixstar_flags(
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
         if iflag & FLG_J2000:
-            # J2000 obliquity for J2000 equatorial frame
-            eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
+            # J2000 obliquity for J2000 equatorial frame.
+            # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
+            # Kept to match the planet J2000-equatorial path (planets.py) so
+            # star and planet declinations share one J2000 frame; the strict
+            # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
+            eps = 23.4392911
         elif iflag & FLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
             eps = get_mean_obliquity(jd_tt)
@@ -2737,6 +2761,25 @@ def _apply_fixstar_flags(
         ayanamsa = get_ayanamsa_ut(tjd_ut)
         lon = (lon - ayanamsa) % 360.0
 
+        # Correct the first-coordinate speed for the ayanamsha drift rate
+        # (~50"/yr), mirroring the planet path (planets.py): the speed was
+        # built on the tropical frame, so the of-date ayanamsa motion must be
+        # removed for sidereal SPEED output. Without this, a star's sidereal
+        # speed_lon is returned identical to its tropical value.
+        if iflag & FLG_SPEED:
+            dt_day = 0.5
+            ayan_prev = get_ayanamsa_ut(tjd_ut - dt_day)
+            ayan_next = get_ayanamsa_ut(tjd_ut + dt_day)
+            # get_ayanamsa_ut returns a normalised [0, 360) angle, so wrap the
+            # finite-difference delta to the shortest arc before dividing; an
+            # unwrapped 0/360 crossing would inject a spurious ~360 deg/day jump.
+            ayan_delta = ayan_next - ayan_prev
+            if ayan_delta > 180.0:
+                ayan_delta -= 360.0
+            elif ayan_delta < -180.0:
+                ayan_delta += 360.0
+            speed_lon -= ayan_delta / (2.0 * dt_day)
+
     # ---- 4. Output format conversion ----
     # Cast to native Python floats (upstream Skyfield/numpy ops can leak
     # numpy.float64) before any output path, so every fixstar* return is native.
@@ -2747,33 +2790,14 @@ def _apply_fixstar_flags(
     result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
     if iflag & FLG_XYZ:
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so star XYZ
+        # output stays identical to the planet/Horizons XYZ post-processing.
+        # Inputs are already native floats (cast above), so the result is too.
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        dlon_rad = math.radians(speed_lon)
-        dlat_rad = math.radians(speed_lat)
-
-        vx = (
-            speed_dist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        return _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, speed_lon, speed_lat, speed_dist
         )
-        vy = (
-            speed_dist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = speed_dist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         return (
@@ -2875,12 +2899,29 @@ def batch_fixstars_ut(
     unresolved stars keep their input slot as ``None``.
 
     Note:
-        Unlike the single-star path, this batch path computes geocentric
-        positions and does not apply ``FLG_TOPOCTR``. A fixed star's diurnal
-        *parallax* is sub-microarcsecond, but the diurnal *aberration* that
-        ``FLG_TOPOCTR`` adds is ~0.2"; the batch positions omit it. Use
-        ``fixstar2_ut`` per star when topocentric output is required.
+        The fast geocentric batch path does not support ``FLG_TOPOCTR``. When
+        that flag is set the function transparently delegates to the
+        topocentric single-star path (``fixstar2_ut``) per star, so batch and
+        single-star output agree (the diurnal *aberration* that ``FLG_TOPOCTR``
+        adds is ~0.2"); only the per-star fast path is bypassed.
     """
+    # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
+    # below; rather than silently return geocentric positions that disagree
+    # with fixstar2_ut, delegate per star to the topocentric single-star path.
+    if flags & FLG_TOPOCTR:
+        topo_results: list[
+            Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+        ] = []
+        for star_name in stars:
+            try:
+                topo_results.append(fixstar2_ut(star_name, tjdut, flags))
+            except Error:
+                if skip_errors:
+                    topo_results.append(None)
+                    continue
+                raise
+        return tuple(topo_results)
+
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 

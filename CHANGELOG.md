@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0a5] - 2026-06-24
+
+Correctness, lint, and documentation fixes from an external code review. Each
+finding was verified against the current code; only the valid ones were applied.
+
+### Fixed
+
+- **Heliacal Moon brightness used a wrong phase-angle conversion.** The sky-
+  brightness model mapped the Moon's illuminated fraction to a phase angle with
+  a linear formula `(1 - f) * 180°`, which over-brightened gibbous phases. It now
+  uses the correct geometric relation `acos(2f - 1)`, so heliacal visibility under
+  moonlight is computed accurately.
+- **Sidereal house cusp speeds mixed frames.** `houses_ex2` sampled the cusp/angle
+  velocities on the tropical path while returning sidereal positions; under
+  `FLG_SIDEREAL` the speeds are now sampled on the same sidereal-aware path, so
+  positions and speeds are frame-consistent.
+- **Horizons backend flag handling.** Analytical bodies (Mean Node, Mean Apogee)
+  are now dispatched before the `FLG_NONUT` rejection, so their nutation-free
+  output is honored instead of falling back; Uranian-body speed components are
+  zeroed when `FLG_SPEED` is not requested, matching the other code paths.
+- **Fixed-star sidereal speed wrap.** The ayanamsa finite-difference used in the
+  sidereal speed correction is now wrapped to the shortest arc, removing a
+  spurious ~360°/day jump when the ayanamsa crosses 0°/360°.
+- **SPK auto-download re-registration.** A body is re-registered when its resolved
+  `(file, NAIF id)` changes — not only when the path changes — so a corrected
+  target id or an in-place re-download is picked up.
+- **Aerosol extinction double-scaling.** A directly supplied aerosol coefficient
+  (`0 < value < 1`) is returned as the final value at the observer, no longer
+  scaled again by altitude (coefficients derived from visibility/humidity still
+  scale). This matches the documented behavior.
+- Native Python floats are returned from the shared spherical-to-cartesian
+  velocity helper even when callers pass numpy scalars.
+
+### Changed
+
+- The IERS ΔT lookup now logs its fallback to Skyfield at debug level instead of
+  swallowing the error silently.
+
+### Docs
+
+- Corrected docstrings: extinction at/below the horizon returns `99.0`; the
+  `set_sid_mode` default is Fagan/Bradley; the `houses_ex2` velocity path is
+  described as a centered finite difference; added Google-style `Args`/`Returns`
+  to `_matches`, `_lterm_offset`, and `_parse_leap_seconds_iers`.
+- Lint cleanups: ambiguous Unicode glyphs in comments/docstrings replaced with
+  ASCII; intentional broad exception handlers annotated explicitly.
+
 ## [3.0.0a4] - 2026-06-17
 
 ### Changed

@@ -903,6 +903,11 @@ def propagate_orbit_assist(
     Note:
         Requires ~1 GB of ephemeris data files. See module docstring for
         download instructions.
+
+        jd_start/jd_end are TT Julian Dates and are passed to ASSIST, which
+        expects TDB. TT is used directly as an approximation of TDB; the
+        TT-TDB difference is <= ~1.7 ms and is negligible for these
+        integrations.
     """
     try:
         import rebound  # noqa: F401 (availability probe)
@@ -986,8 +991,12 @@ def propagate_orbit_assist(
     # Configure non-gravitational forces if requested.  ASSIST's API
     # takes a flat array of 3 Marsden parameters (A1 radial, A2
     # transverse, A3 normal) per particle, after the particle exists.
+    # The setter requires a numpy float64 array (it calls value.ctypes on
+    # it); a plain Python list raises AttributeError.
     if include_non_gravitational:
-        extras.particle_params = [A1, A2, A3]
+        import numpy as np
+
+        extras.particle_params = np.array([A1, A2, A3], dtype=np.float64)
 
     # Set initial time (JD - reference JD)
     sim.t = jd_start - ephem.jd_ref
@@ -1043,6 +1052,11 @@ def propagate_trajectory(
     Returns:
         List[PropagationResult]: Positions and velocities at each time
 
+    Note:
+        When use_assist=True, jd_start/jd_end (TT) are passed to ASSIST,
+        which expects TDB. TT is used directly as an approximation of TDB;
+        the TT-TDB difference is <= ~1.7 ms and is negligible here.
+
     Example:
         >>> trajectory = propagate_trajectory(elements, jd_start, jd_end, num_points=365)
         >>> for point in trajectory:
@@ -1097,6 +1111,10 @@ def propagate_trajectory(
 
                 # Avoid the self-interaction singularity when the body is itself
                 # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/...).
+                # Evaluated once before the loop on purpose: the match is by the
+                # identity of the propagated body versus the fixed ASSIST
+                # perturber set, which does not change along the trajectory, so a
+                # per-step re-check would be redundant.
                 _assist_disable_self_perturber(
                     extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
                     jd_start - ephem.jd_ref,

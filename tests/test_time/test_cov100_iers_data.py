@@ -473,6 +473,26 @@ class TestParseLeapSeconds:
         assert entries[1].year == 2017
         assert entries[1].tai_utc == pytest.approx(37.0)
 
+    def test_parse_real_leap_second_dat(self, tmp_path):
+        """The real IERS Leap_Second.dat (numeric, '#'-commented) must parse.
+
+        Regression: this format was misrouted to the IETF parser and silently
+        discarded, so downloaded IERS updates never took effect.
+        """
+        content = (
+            "#  MJD        Date        TAI-UTC (s)\n"
+            "#           day month year\n"
+            "   41317.0    1  1 1972      10\n"
+            "   57754.0    1  1 2017      37\n"
+        )
+        fp = tmp_path / "Leap_Second.dat"
+        fp.write_text(content)
+        entries = iers_data._parse_leap_seconds(str(fp))
+        assert len(entries) == 2
+        assert entries[0].mjd == pytest.approx(41317.0)
+        assert entries[-1].year == 2017
+        assert entries[-1].tai_utc == pytest.approx(37.0)
+
     def test_parse_iers_unknown_month_skipped(self, tmp_path):
         """An unrecognised month name is skipped (month==0 -> continue)."""
         content = "2017 Smarch 1 TAI-UTC= 37s\n2015 July 1 TAI-UTC= 36s\n"

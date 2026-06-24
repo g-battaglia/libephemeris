@@ -1420,7 +1420,8 @@ def apply_secular_perturbations(
             - Omega_pert: Perturbed longitude of ascending node (degrees)
             - M_pert: Perturbed mean anomaly at target time (degrees)
             - n_pert: Perturbed mean motion (degrees/day)
-            - e_pert: Perturbed eccentricity (dimensionless, 0 < e < 1)
+            - e_pert: Perturbed eccentricity (dimensionless, 0 <= e <= 0.999;
+              capped below the parabolic limit, but no positive floor)
             - i_pert: Perturbed inclination (degrees)
 
     See Also:
@@ -1474,8 +1475,11 @@ def apply_secular_perturbations(
     k_t = k_forced + e_free * math.cos(g * dt + beta)
 
     e_pert = math.sqrt(h_t * h_t + k_t * k_t)
-    # Clamp to physical range [0.001, 0.999] to prevent numerical issues
-    e_pert = max(0.001, min(e_pert, 0.999))
+    # Clamp to the physical range [0.0, 0.999]: cap below 1 (parabolic) but do
+    # NOT impose a positive floor — a genuinely near-circular orbit must keep
+    # its small eccentricity. The downstream anomaly solver uses the (h, k)
+    # vectors and handles e == 0 fine, so no positive floor is needed.
+    e_pert = max(0.0, min(e_pert, 0.999))
 
     # Inclination vector evolution
     i0_rad = math.radians(elements.i)

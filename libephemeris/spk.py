@@ -999,17 +999,47 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     if spk_type != 21:
         return None
 
+    kernel = _load_type21_kernel(spk_file)
+    if kernel is None:
+        return None
+
     if jd_tt is not None:
         coverage = get_spk_coverage(spk_file)
         if coverage is not None:
             start_jd, end_jd = coverage
-            margin = 0.05  # days; light-time at observe() edges
+            # Outside the raw coverage: caller falls through to the direct /
+            # Keplerian out-of-coverage path.
+            if jd_tt <= start_jd or jd_tt >= end_jd:
+                return None
+            # Coverage-edge margin: Skyfield's observe() retards the target by
+            # the one-way light-time, so jd_tt must sit at least that far inside
+            # the kernel or observe() raises instead of falling through to the
+            # documented Keplerian path. Size it from the body's actual
+            # heliocentric distance — a fixed margin sized for Chiron (~0.11 d
+            # near aphelion) is far too small for distant TNOs (Eris/Sedna reach
+            # ~0.5 d). Floor at 0.2 d for the inner small bodies.
+            _AU_KM = 149597870.7
+            _C_AU_DAY = 173.1446326846693
+            try:
+                pos_km, _ = kernel.compute_type21(10, naif_id, float(jd_tt))
+                helio_au = (
+                    math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2)
+                    / _AU_KM
+                )
+            except Exception:  # noqa: BLE001  # intentional best-effort probe
+                # Probe failed near the edge: assume a distant body (~175 AU,
+                # ~1 d light-time) so the margin is conservative, not too small.
+                # Catch broadly — the probe is best-effort and the underlying
+                # compute_type21/get_MDA_record/spke21 also raise RuntimeError
+                # (e.g. "Invalid data" / segment errors); a probe failure must
+                # never escape this margin sizing and break the documented
+                # graceful fall-through to the Keplerian out-of-coverage path.
+                helio_au = 175.0
+            # Earth's orbit adds at most ~1 AU to the geocentric distance; a
+            # 1.2 safety factor absorbs the light-time iteration and slop.
+            margin = max(0.2, (helio_au + 1.0) / _C_AU_DAY * 1.2)
             if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
                 return None
-
-    kernel = _load_type21_kernel(spk_file)
-    if kernel is None:
-        return None
 
     # Get the Sun target from the main ephemeris
     planets = state.get_planets()
@@ -1059,7 +1089,6 @@ def _calc_type21_position(
         precess_from_j2000,
         apply_aberration_to_position,
     )
-    from .planets import _get_true_ayanamsa
 
     jd_tdb = t.tdb  # Use TDB for SPK calculations
     jd_tt = t.tt  # TT for precession/nutation
@@ -1149,7 +1178,10 @@ def _calc_type21_position(
     # Final position computation at light-time corrected epoch
     try:
         pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-    except (OSError, ValueError, KeyError, IndexError) as e:
+    except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
+        # RuntimeError included to match the two loop-body handlers above and
+        # the documented graceful fall-through (compute_type21/spke21 raise
+        # RuntimeError on segment/"Invalid data" errors).
         get_logger().debug("SPK type 21 computation failed: %s", e)
         return None
 
@@ -1231,7 +1263,7 @@ def _calc_type21_position(
             speed_lon = math.degrees((x * vy - y * vx) / xy_sq)
             xy = math.sqrt(xy_sq)
             speed_lat = (
-                math.degrees((z * (x * vx + y * vy) / xy - xy * vz) / (r * r))
+                math.degrees((xy * vz - z * (x * vx + y * vy) / xy) / (r * r))
                 if r > 0
                 else 0.0
             )
@@ -1247,10 +1279,15 @@ def _calc_type21_position(
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
     if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        # Flag-aware ayanamsa (true for of-date, mean for NONUT/J2000) and the
+        # ayanamsha-rate speed correction, via the canonical helper. The
+        # type-21 longitude already honors FLG_J2000/FLG_NONUT (precession /
+        # nutation applied above), so the flag-aware ayanamsa matches it; the
+        # helper also subtracts the ~50"/yr drift from speed_lon under
+        # FLG_SPEED (previously left at the tropical value).
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, r, speed_lon, speed_lat, speed_dist)
 
@@ -1380,8 +1417,13 @@ def calc_spk_body_position(
         ValueError: If JD is outside SPK coverage
     """
     from . import state
-    from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
-    from .planets import _get_true_ayanamsa
+    from .constants import (
+        FLG_HELCTR,
+        FLG_SPEED,
+        FLG_SIDEREAL,
+        FLG_NONUT,
+        FLG_J2000,
+    )
 
     # Check if body is registered
     if ipl not in state._SPK_BODY_MAP:
@@ -1517,11 +1559,30 @@ def calc_spk_body_position(
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
+    # FLG_NONUT / FLG_J2000: frame_latlon(ecliptic_frame) above produces a TRUE
+    # ecliptic-of-date longitude (with nutation in longitude Δψ). The mean
+    # ecliptic (NONUT) and the J2000 frame carry no nutation, so strip Δψ here.
+    # For J2000 the downstream _maybe_equatorial_convert precesses of-date→J2000
+    # but does not remove nutation, so it must be removed first — matching the
+    # type-21 path and the reference, whose J2000 ecliptic output is mean.
+    if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
+        from .cache import get_cached_nutation
+
+        dpsi_rad, _ = get_cached_nutation(t.tt)
+        lon = (lon - math.degrees(dpsi_rad)) % 360.0
+        if iflag & FLG_SPEED:
+            from .planets import _nutation_rate_deg_per_day
+
+            speed_lon -= _nutation_rate_deg_per_day(t.tt)
+
+    # Apply sidereal correction if requested. Routed through the canonical
+    # flag-aware helper so the ayanamsa variant matches the longitude frame set
+    # above: TRUE ayanamsa (mean + Δψ) cancels Δψ on a true-of-date longitude,
+    # while NONUT/J2000 (Δψ already stripped) get the MEAN ayanamsa. The helper
+    # also removes the ~50"/yr ayanamsha drift from speed_lon under FLG_SPEED.
     if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)

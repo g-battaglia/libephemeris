@@ -668,10 +668,13 @@ def houses(
         mc += 360.0
 
     if 90.0 < armc_active <= 270.0:
-        if mc < 90.0 or mc > 270.0:
+        # Boundary uses <= to match the canonical houses_armc() quadrant
+        # correction (keeps MC in (90, 270] when ARMC is in (90, 270]); at the
+        # exact cardinal armc==270 the < form put MC 180 deg from houses_armc).
+        if mc <= 90.0 or mc > 270.0:
             mc += 180.0
     elif armc_active > 270.0:
-        if mc < 270.0:
+        if mc <= 270.0:
             mc += 180.0
     elif armc_active <= 90.0:
         if mc > 90.0:
@@ -1054,6 +1057,7 @@ def houses_armc_with_fallback(
     hsys: int,
     fallback_hsys: int = ord("O"),
     validate_cusps: bool = True,
+    ascmc9: float = 0.0,
 ) -> tuple[tuple[float, ...], tuple[float, ...], bool, str | None]:
     """
     Calculate house cusps from ARMC with automatic fallback for polar latitudes.
@@ -1070,6 +1074,9 @@ def houses_armc_with_fallback(
                        Default: ord('O') (Porphyry).
         validate_cusps: If True (default), validate cusp values for numerical sanity
                         and fall back if invalid cusps are detected.
+        ascmc9: The Sun's declination, used only by the Sunshine house system
+                ('I'/'i') and forwarded to the underlying cusp solution; it is
+                ignored by every other house system.
 
     Returns:
         Tuple containing:
@@ -1116,14 +1123,16 @@ def houses_armc_with_fallback(
     is_extreme = _is_extreme_latitude(lat)
 
     try:
-        cusps, ascmc = houses_armc(armc, lat, eps, hsys)
+        # ascmc9 (the Sun's declination) is forwarded so the Sunshine system
+        # ('I'/'i') gets it; houses_armc ignores it for every other system.
+        cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
         # Validate cusps if requested
         if validate_cusps:
             is_valid, validation_error = _validate_cusps(cusps)
             if not is_valid:
                 # Invalid cusps detected - fall back to stable system
-                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
+                cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
                 warning = (
                     f"{primary_name} house system produced invalid cusps at latitude "
                     f"{abs(lat):.2f}° ({validation_error}). Using {fallback_name} as fallback."
@@ -1144,7 +1153,7 @@ def houses_armc_with_fallback(
         return cusps, ascmc, False, None
     except PolarCircleError as e:
         # Use fallback house system
-        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys)
+        cusps, ascmc = houses_armc(armc, lat, eps, fallback_hsys, ascmc9)
 
         warning = (
             f"{primary_name} house system unavailable at latitude {abs(lat):.2f}° "
@@ -1471,8 +1480,10 @@ def houses_armc_ex2(
     also returns the velocities (derivatives) of house cusps and angles.
 
     Velocities are always calculated, matching the reference behavior.
-    The ``ascmc9`` parameter is accepted for API compatibility (used by the
-    Sunshine house system) but is otherwise unused.
+    The ``ascmc9`` parameter carries the Sun's declination for the Sunshine
+    house system ('I'/'i') and is forwarded to the underlying cusp solution
+    (matching the reference, whose houses_armc_ex2 also uses it); it is
+    ignored by every other house system.
 
     Velocities are calculated using centered finite differences, with ARMC
     shifted by ±1 second (Koch/Placidus) or ±1 minute (other systems).
@@ -1503,8 +1514,10 @@ def houses_armc_ex2(
         ... )
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (same as ASC)
     """
-    # Calculate positions at current ARMC
-    cusps, ascmc = houses_armc(armc, lat, eps, hsys)
+    # Calculate positions at current ARMC. ascmc9 (the Sun's declination) is
+    # forwarded so the Sunshine system ('I'/'i') gets it; houses_armc ignores
+    # it for every other system.
+    cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
     # Always calculate velocities (matching the reference behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
@@ -1526,8 +1539,8 @@ def houses_armc_ex2(
         d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
 
     # Calculate positions at ARMC ± d_armc
-    cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys)
-    cusps_after, ascmc_after = houses_armc(armc + d_armc, lat, eps, hsys)
+    cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys, ascmc9)
+    cusps_after, ascmc_after = houses_armc(armc + d_armc, lat, eps, hsys, ascmc9)
 
     def angular_diff_local(pos2: float, pos1: float) -> float:
         """Calculate angular difference handling 360° wraparound."""
@@ -1741,29 +1754,30 @@ def houses_ex2(
     This function is an extended version of houses_ex() that also returns
     the velocities (derivatives) of house cusps and angles.
 
-    Velocities are only calculated when the FLG_SPEED flag is set in the flags
-    parameter. When FLG_SPEED is not set, zero velocities are returned for
-    efficiency. This is useful for progressed chart applications where the rate
-    of change of house cusps is needed.
+    Velocities are always calculated, matching the reference behavior (like
+    houses_armc_ex2). This is useful for progressed chart applications where
+    the rate of change of house cusps is needed.
 
-    Velocities are computed via the ARMC-based derivative path
-    (houses_armc_ex2), which varies ARMC with fixed obliquity and
-    scales by the sidereal rotation rate (~360.986°/day).
+    Velocities are computed via centered finite differences of houses_ex(),
+    so the reported rates include the same flag-dependent frame corrections
+    (e.g. the FLG_SIDEREAL ayanamsa) and time-dependent terms (ARMC rate,
+    obliquity drift, nutation) as the returned cusp and angle positions.
 
     Args:
         tjdut: Julian Day in Universal Time (UT1)
         lat: Geographic latitude in degrees
         lon: Geographic longitude in degrees
         hsys: House system identifier (int or bytes)
-        flags: Calculation flags bitmask. Use FLG_SPEED to compute velocities.
-               FLG_SIDEREAL can also be used for sidereal calculations.
+        flags: Calculation flags bitmask. FLG_SIDEREAL can be used for
+               sidereal calculations. Velocities are always computed
+               regardless of FLG_SPEED.
 
     Returns:
         Tuple containing:
             - cusps: Tuple of 12 house cusp longitudes in degrees
             - ascmc: Tuple of 8 angles (Asc, MC, etc.)
-            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day (0.0 if FLG_SPEED not set)
-            - ascmc_speed: Tuple of 8 angle velocities in degrees/day (0.0 if FLG_SPEED not set)
+            - cusps_speed: Tuple of 12 house cusp velocities in degrees/day
+            - ascmc_speed: Tuple of 8 angle velocities in degrees/day
 
     Example:
         >>> cusps, ascmc, cusps_speed, ascmc_speed = houses_ex2(
@@ -1782,8 +1796,9 @@ def houses_ex2(
     #
     #     dλ/dt ≈ [ λ(jd + dt) − λ(jd − dt) ] / (2·dt)
     #
-    # evaluated on houses() itself, so every time-dependent term (ARMC rate,
-    # dε/dt, nutation) is captured automatically. A step of dt = 2 seconds is the
+    # evaluated on houses_ex() itself, so every time-dependent term (ARMC rate,
+    # dε/dt, nutation) — and the FLG_SIDEREAL ayanamsa, which houses() does not
+    # apply — is captured automatically. A step of dt = 2 seconds is the
     # measured optimum: the result is stable to ~1e-3 deg/day from dt≈30 s down
     # to dt≈1 s, while dt≳4 s starts to feel the cusp's curvature and dt≲0.5 s is
     # dominated by floating-point noise.
@@ -1793,8 +1808,8 @@ def houses_ex2(
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
     _DT_DAYS = 2.0 / 86400.0
-    cusps_minus, ascmc_minus = houses(tjdut - _DT_DAYS, lat, lon, hsys, flags)
-    cusps_plus, ascmc_plus = houses(tjdut + _DT_DAYS, lat, lon, hsys, flags)
+    cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, flags)
+    cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, flags)
 
     def _rate(after: float, before: float) -> float:
         d = after - before
@@ -5282,10 +5297,11 @@ def _armc_to_mc(armc: float, eps: float) -> float:
     if mc < 0:
         mc += 360.0
     if 90.0 < armc <= 270.0:
-        if mc < 90.0 or mc > 270.0:
+        # Match the canonical houses_armc() quadrant correction (<= boundary).
+        if mc <= 90.0 or mc > 270.0:
             mc += 180.0
     elif armc > 270.0:
-        if mc < 270.0:
+        if mc <= 270.0:
             mc += 180.0
     elif armc <= 90.0:
         if mc > 90.0:

@@ -891,7 +891,7 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
         >>> get_spk_date_range_for_tier()
         ('1900-01-01', '2100-01-01')
         >>> get_spk_date_range_for_tier("extended")
-        ('1550-01-01', '2650-01-01')
+        ('1600-01-01', '2500-01-01')
     """
     if tier_name is not None:
         if tier_name not in TIERS:
@@ -995,6 +995,11 @@ def get_planets() -> SpiceKernel:
                                 _EPHEMERIS_FILE,
                             )
                             _PLANETS = load(fb_path)
+                            # Reflect the kernel actually loaded so
+                            # get_current_file_data() reports the matching DE
+                            # number and date range instead of the requested
+                            # tier file we did not load.
+                            _EPHEMERIS_FILE = fb
                             loaded = True
                             break
                     if not loaded:
@@ -1004,6 +1009,7 @@ def get_planets() -> SpiceKernel:
                             "internal calculations..."
                         )
                         _PLANETS = load("de440s.bsp")
+                        _EPHEMERIS_FILE = "de440s.bsp"
                 else:
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)

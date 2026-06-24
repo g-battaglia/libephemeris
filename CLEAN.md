@@ -299,3 +299,71 @@ place (ruff B018 is not enabled, so lint stays green).
 
 The sixth instance (`fast_calc.py:619-620`) lives inside `_fw2m`, already logged
 above as dead.
+
+### Additional bare-expression no-ops (2026-06-24 full-code review)
+
+Two more were left by the `2a937ec` "consolidate duplicated XYZ + precession-rate
+helpers" refactor — the assignment LHS was dropped, the RHS kept:
+
+- `planets.py:5093` — `r_dot_v / r_mag`: the radial-velocity `v_r` binding was
+  dropped. `_calc_orbital_elements` does not use a radial-velocity scalar
+  downstream (it builds the elements from the `r`/`v` vectors directly), so the
+  bare division is inert.
+- `planets.py:3884` — `math.degrees(dpsi_rad)`: the `dpsi_deg` binding was
+  dropped in the star-based `_calc_ayanamsa` branch. `eps_true` there is built
+  from `deps_deg` only, so the discarded nutation-in-longitude conversion is
+  dead.
+
+## 2026-06-24 full-code review — structural dead code
+
+Logged per policy and left in place.
+
+- `constants.py:145` — `_NALL_NAT_POINTS_INTERNAL = NPLANETS + NFICT_ELEM +
+  AST_OFFSET + COMET_OFFSET`: computed but never referenced anywhere in the
+  codebase (grep finds only the definition). A vestige of an internal point
+  count that no live path consumes.
+- `cache.py:207` — observer-cache eviction `if len(_observer_at_cache) >
+  _OBSERVER_CACHE_MAX: clear()` fires only once the dict already holds
+  `_OBSERVER_CACHE_MAX + 1` entries (so the cache transiently holds 33 with a
+  cap of 32). Behaviorally harmless (it still bounds the cache), just an
+  off-by-one relative to the named cap; not changed to avoid perturbing the
+  validated cache behavior.
+- `crossing.py:1971` — `get_speed(jd_ut)`: a bare call whose return value is
+  discarded (the comment says "Get current motion direction" but nothing
+  consumes it). It performs a real `calc_ut` ephemeris evaluation with no
+  effect — dead, but left in place per policy (removal would change timing
+  only, not results).
+- `crossing.py` backward initial-guess branches (e.g. the `diff = (x2cross -
+  lon_start) % 360.0` blocks around lines 413-418 / 534-538): `diff` is always
+  in `[0, 360)`, so one arm of the subsequent `if diff > 1e-5 … elif …` wrap
+  adjustment is unreachable. Redundant but harmless; the live arm produces the
+  correct guess.
+- `leb_compression.py:74` — `if rel >= 1.0: bits.append(1)`: reachable only at
+  the exact equality `mx == target_precision` (the earlier guard uses `<`, not
+  `<=`), a measure-zero case; effectively dead for real coefficient data.
+- `download.py:267` — `SimpleProgressBar._render` computes `filled = int(width *
+  current / total)` without clamping `current` to `total`; if more bytes arrive
+  than the advertised Content-Length, `filled` exceeds `width` and the `"-" *
+  (width - filled)` segment goes negative (empty). Cosmetic display only (the
+  bar is not used for any calculation); left as-is.
+
+## 2026-06-24 full-code review — known limitations (not changed)
+
+Real but low-risk edges left in place; a behavioral change would touch
+delicate validated paths for a negligible practical gain.
+
+- `context.py:__init__` — constructing an `EphemerisContext` with a custom
+  `ephe_path`/`ephe_file` mutates the module globals `_SHARED_EPHE_PATH`/
+  `_SHARED_EPHE_FILE`, which select the single process-wide shared kernel. This
+  is by design (all contexts share one loaded JPL kernel to save memory), but it
+  means contexts are NOT independent in their kernel selection: the first context
+  to trigger the load wins, and a later context requesting a different file is
+  silently served the already-loaded one. Now documented explicitly in the
+  constructor docstring rather than refactored (a true per-context kernel would
+  defeat the shared-memory design).
+- `crossing.py` backward heliocentric search (`helio_cross_ut` ~line 1462,
+  `helio_cross` ~line 1632) — when the target longitude lies within
+  `NR_TOLERANCE` of the body's current longitude, the negative initial `dt_guess`
+  is ~0, so Newton-Raphson can converge on a crossing at/after `tjdut` instead of
+  the strictly-previous one (returns `jd >= tjdut`). Degenerate "already there"
+  case only; left unchanged to avoid perturbing the validated crossing solver.

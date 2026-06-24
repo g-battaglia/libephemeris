@@ -428,13 +428,16 @@ class SchaeferModel:
         if moon_alt <= 0:
             return 0.0
 
-        # Convert phase fraction to phase angle (degrees).
-        # phase=0 → α=180° (new), phase=1 → α=0° (full)
-        alpha = (1.0 - moon_phase) * 180.0
+        # Convert illuminated fraction to the geometric phase angle (degrees).
+        # f = (1 + cos(alpha)) / 2  =>  alpha = acos(2*f - 1):
+        #   f=0 -> alpha=180 (new), f=1 -> alpha=0 (full), f=0.5 -> alpha=90.
+        # The previous linear map (1 - f) * 180 over-brightened gibbous phases.
+        phase_fraction = min(1.0, max(0.0, moon_phase))
+        alpha = math.degrees(math.acos(2.0 * phase_fraction - 1.0))
 
         # Moon visual magnitude as function of phase angle
         # (Allen 1976, Krisciunas & Schaefer 1991 Eq. 9).
-        # V_moon = -12.73 + 0.026|α| + 4e-9 * α^4
+        # V_moon = -12.73 + 0.026|alpha| + 4e-9 * alpha^4
         abs_alpha = abs(alpha)
         moon_mag = -12.73 + 0.026 * abs_alpha + 4.0e-9 * abs_alpha**4
 
@@ -452,16 +455,20 @@ class SchaeferModel:
         # Airmass at object position
         X_obj = self.airmass(obj_alt)
 
-        # Sky brightness from Moon (K&S 1991 Eq. 15/20):
-        # B_moon = f(ρ) * I * 10^(-0.4*k*X_obj) * (1 - 10^(-0.4*k*X_obj))
+        # Sky brightness from Moon (K&S 1991 Eq. 20):
+        # B_moon = f(rho) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
         #
-        # The term (1 - 10^(-0.4*k*X_obj)) represents the fraction of
-        # atmosphere along the line of sight available for scattering.
-        extinction_factor = 10.0 ** (-0.4 * self.k_total * X_obj)
-        scatter_depth = 1.0 - extinction_factor
+        # I_ground already carries the moonlight extinction along the Moon's
+        # airmass (X_moon). The remaining factor (1 - 10^(-0.4*k*X_obj)) is the
+        # fraction of atmosphere along the OBJECT's line of sight available for
+        # scattering. There is no second object-path extinction multiplier; an
+        # extra 10^(-0.4*k*X_obj) here would apply object-path extinction twice
+        # and systematically under-estimate moonlit sky brightness at low
+        # object altitude.
+        scatter_depth = 1.0 - 10.0 ** (-0.4 * self.k_total * X_obj)
 
         # B_moon in nanoLamberts
-        B_moon = f_rho * I_ground * extinction_factor * scatter_depth
+        B_moon = f_rho * I_ground * scatter_depth
 
         # Convert B_moon to magnitude reduction.
         # Dark sky brightness B_dark ≈ 145 nL (airglow) + 100 nL (zodiacal)
@@ -1843,8 +1850,11 @@ def _vis_limit_mag_leb(
     sun_obj_angle = 180.0
     try:
         moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         if is_star_flag:
             from .fixed_stars import fixstar_ut as _sfut_vlm
@@ -4159,8 +4169,11 @@ def vis_limit_mag(
     sun_obj_angle = 180.0
     try:
         moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         # Calculate angular separation between object and Moon
         if is_fixed_star:

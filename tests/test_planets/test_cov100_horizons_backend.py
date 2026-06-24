@@ -648,9 +648,11 @@ class TestCalcAnalytical:
             _calc_analytical(JD, 99, FLG_SWIEPH)
 
     def test_mean_node_wrap_branch(self):
-        # Force the speed wrap branch (abs(dlon) > 180/dt) by patching the
-        # node function to jump across 0/360 between the two epochs.
-        seq = iter([359.9, 0.1])
+        # Force the speed wrap branch by patching the node function so the
+        # ±0.5-day central-difference samples straddle the 0/360 boundary.
+        # _calc_analytical now calls calc_mean_lunar_node three times:
+        # position (jd_tt), then jd_tt-dt and jd_tt+dt for the speed.
+        seq = iter([0.0, 359.9, 0.1])
         with mock.patch.object(
             hb, "_calc_analytical", wraps=hb._calc_analytical
         ):
@@ -660,8 +662,11 @@ class TestCalcAnalytical:
                 lunar, "calc_mean_lunar_node", side_effect=lambda jd: next(seq)
             ):
                 (data, fl) = _calc_analytical(JD, 10, FLG_SWIEPH | FLG_SPEED)
-        # Wrapped speed stays small (degrees/sec scaled), not a huge jump.
+        # Wrapped speed stays small, not a huge ~360 deg/day jump: the samples
+        # 359.9 -> 0.1 must wrap to +0.2 deg over the day, so speed_lon ~ 0.2.
+        # Without the wrap the raw diff (-359.8) would blow this bound.
         assert len(data) == 6
+        assert abs(data[3]) < 1.0
 
 
 class TestCalcUranian:

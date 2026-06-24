@@ -530,43 +530,15 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     lon, lat, dist, dlon, dlat, ddist = result
 
     if iflag & FLG_XYZ:
-        # Convert spherical (degrees) to Cartesian (AU)
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so this path
+        # stays identical to the LEB/Skyfield, Horizons, and fixed-star XYZ
+        # post-processing. Cast to native floats (inputs may be numpy.float64).
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        # Convert velocity from (deg/day, deg/day, AU/day) to Cartesian AU/day
-        # Using the Jacobian of the spherical-to-Cartesian transformation
-        dlon_rad = math.radians(dlon)  # rad/day
-        dlat_rad = math.radians(dlat)  # rad/day
-
-        vx = (
-            ddist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        x, y, z, vx, vy, vz = _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, dlon, dlat, ddist
         )
-        vy = (
-            ddist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = ddist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (
-            float(x),
-            float(y),
-            float(z),
-            float(vx),
-            float(vy),
-            float(vz),
-        )
+        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         # Convert angular values from degrees to radians
@@ -581,6 +553,47 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
         )
 
     return result
+
+
+def _south_node_from_north(
+    north_result: tuple[float, float, float, float, float, float], flags: int
+) -> tuple[float, float, float, float, float, float]:
+    """Derive the descending ("south") lunar node from the ascending node.
+
+    The south node is the antipode of the north node on the celestial sphere,
+    so it is obtained from the already-formatted north result.  The transform
+    depends on the output representation:
+
+    * ``FLG_XYZ`` (Cartesian): negate the position and velocity vectors.
+    * ``FLG_RADIANS`` (spherical radians): longitude + pi (mod 2*pi), with the
+      latitude and latitude-speed negated.
+    * default (spherical degrees): longitude + 180 (mod 360), with the
+      latitude and latitude-speed negated.
+
+    The previous code always did ``(north[0] + 180.0) % 360.0``; under
+    ``FLG_XYZ`` that added 180 to a Cartesian x-component, and under
+    ``FLG_RADIANS`` it added 180 to a radian longitude, both producing garbage.
+    """
+    if flags & FLG_XYZ:
+        # Cartesian: the antipode is the negated position (and velocity) vector.
+        return (
+            -north_result[0],
+            -north_result[1],
+            -north_result[2],
+            -north_result[3],
+            -north_result[4],
+            -north_result[5],
+        )
+    half_turn = math.pi if (flags & FLG_RADIANS) else 180.0
+    full_turn = 2.0 * math.pi if (flags & FLG_RADIANS) else 360.0
+    return (
+        (north_result[0] + half_turn) % full_turn,
+        -north_result[1],
+        north_result[2],
+        north_result[3],
+        -north_result[4],
+        north_result[5],
+    )
 
 
 def _body_uses_jpl_ephemeris(ipl: int) -> bool:
@@ -1014,15 +1027,7 @@ def calc_ut(
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
         north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        south_lon = (north_result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -north_result[1],
-            north_result[2],
-            north_result[3],
-            -north_result[4],
-            north_result[5],
-        ), retflag
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1190,15 +1195,7 @@ def calc(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_result, retflag = calc(tjdet, abs(planet), flags)
-        south_lon = (north_result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -north_result[1],
-            north_result[2],
-            north_result[3],
-            -north_result[4],
-            north_result[5],
-        ), retflag
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1941,22 +1938,84 @@ def _assist_position_at(
     t = ts.tt_jd(jd_tt)
     sun = planets_dict["sun"]
     earth = planets_dict["earth"]
-    earth_helio = sun.at(t).observe(earth)
-    earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
 
-    lon_rad = math.radians(lon_hel)
-    lat_rad = math.radians(lat_hel)
-    x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
-    y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
-    z_hel_ecl = r_hel * math.sin(lat_rad)
+    # The ASSIST result is heliocentric ecliptic J2000 (rebound_integration
+    # rotates ICRS->ecliptic with the fixed J2000 obliquity), with position AND
+    # velocity available. Build the geocentric apparent place exactly like the
+    # SPK type-21 path: everything in ecliptic J2000, geometric heliocentric
+    # Earth, light-time retardation, then stellar aberration, then precession to
+    # of-date + nutation. The previous code differenced an of-date Earth
+    # (Skyfield ecliptic_frame) from the J2000 asteroid (a ~12 arcmin frame-mix)
+    # and applied neither light-time nor aberration (~25 arcsec more).
+    from .rebound_integration import _icrs_to_ecliptic_j2000
+    from .astrometry import (
+        C_LIGHT_AU_DAY,
+        apply_aberration_to_position,
+        precess_from_j2000,
+    )
+    from .cache import get_cached_nutation
 
-    x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
-    y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
-    z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+    ast_pos = [result.x, result.y, result.z]  # heliocentric ecliptic J2000, AU
+    ast_vel = [result.vx, result.vy, result.vz]  # AU/day
 
-    r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
-    lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
-    lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+    earth_helio_icrs = earth.at(t).position.au - sun.at(t).position.au
+    earth_helio_ecl = _icrs_to_ecliptic_j2000(
+        float(earth_helio_icrs[0]),
+        float(earth_helio_icrs[1]),
+        float(earth_helio_icrs[2]),
+    )
+
+    apply_light_time = not (iflag & FLG_TRUEPOS)
+    apply_aberration = not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR)
+
+    # Geocentric vector with light-time retardation. The asteroid's heliocentric
+    # velocity is effectively constant over the ~minutes-to-hours light time, so
+    # a first-order retardation (pos - vel*lt) matches re-integrating to
+    # jd_tt - lt without the extra N-body cost. Two iterations converge.
+    geo = [ast_pos[i] - earth_helio_ecl[i] for i in range(3)]
+    if apply_light_time:
+        for _ in range(2):
+            lt = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2) / C_LIGHT_AU_DAY
+            geo = [
+                (ast_pos[i] - ast_vel[i] * lt) - earth_helio_ecl[i]
+                for i in range(3)
+            ]
+
+    if apply_aberration:
+        # Aberration uses Earth's barycentric velocity in ecliptic J2000, per the
+        # IAU apparent-place convention shared with the SPK/planets pipeline.
+        earth_vel_bary_ecl = _icrs_to_ecliptic_j2000(
+            *(float(v) for v in earth.at(t).velocity.au_per_d)
+        )
+        geo = list(
+            apply_aberration_to_position(
+                (geo[0], geo[1], geo[2]),
+                (
+                    earth_vel_bary_ecl[0],
+                    earth_vel_bary_ecl[1],
+                    earth_vel_bary_ecl[2],
+                ),
+            )
+        )
+
+    r_geo = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
+    lon_j2000 = math.degrees(math.atan2(geo[1], geo[0])) % 360.0
+    lat_j2000 = math.degrees(math.asin(geo[2] / r_geo)) if r_geo > 0 else 0.0
+
+    # The geocentric vector is in the J2000 ecliptic; precess to the ecliptic of
+    # date and add nutation in longitude (Δψ) so the return matches the of-date
+    # true-ecliptic contract every other body branch follows (the caller then
+    # applies the J2000 / equatorial framing via _maybe_equatorial_convert).
+    # Δψ is omitted for NONUT (mean ecliptic) and for J2000 — there the caller
+    # precesses back to J2000, whose ecliptic carries no nutation. It is also
+    # omitted for SIDEREAL+EQUATORIAL: _maybe_equatorial_convert rotates that
+    # case with the MEAN obliquity, so the longitude must be the mean ecliptic
+    # too (mirrors the node/Lilith _sid_eq rule), else ~Δψ leaks into RA/Dec.
+    lon, lat = precess_from_j2000(lon_j2000, lat_j2000, jd_tt)
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000) and not _sid_eq:
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
 
@@ -2000,7 +2059,11 @@ def _calc_body(
 
     Supported body types:
         - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE440 ephemeris
-        - Lunar nodes (Mean/True North/South) via lunar.py
+        - Lunar nodes (Mean/True NORTH) via lunar.py. The south nodes
+          (negative ids) are NOT handled here: the public entry points
+          (calc/calc_ut and EphemerisContext) intercept them and derive the
+          antipode via planets._south_node_from_north, so _calc_body only ever
+          receives the positive (north) node id.
         - Lilith/Lunar apogee (Mean/Osculating) via lunar.py
         - Minor bodies (asteroids, TNOs) via minor_bodies.py with rigorous geocentric conversion
         - Fixed stars (Regulus, Spica) via fixed_stars.py
@@ -2169,20 +2232,6 @@ def _calc_body(
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
-
-    # South nodes are 180° from north nodes
-    if ipl in [-MEAN_NODE, -TRUE_NODE]:
-        north_ipl = abs(ipl)
-        result, flags = _calc_body(t, north_ipl, iflag)
-        south_lon = (result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -result[1],
-            result[2],
-            result[3],
-            -result[4],
-            result[5],
-        ), flags
 
     # Handle Lilith (Mean/Osculating Apogee)
     if ipl in [MEAN_APOG, OSCU_APOG]:
@@ -2593,6 +2642,19 @@ def _calc_body(
 
             if iflag & FLG_HELCTR:
                 pos = _calc_helio(jd_tt)
+                if ipl in _FICT_HELIO_IDS:
+                    # calc_fictitious_position returns J2000 ecliptic for the
+                    # predicted planets; precess to the mean ecliptic of date so
+                    # the shared "mean ecliptic of date (+ nutation)" treatment
+                    # below is frame-consistent. Without this, a J2000 longitude
+                    # would get Δψ added (and be reported) without ever being
+                    # precessed to of-date. VULCAN/PROSERPINA already use the
+                    # equinox of date and need no rotation.
+                    from .fast_calc import _general_precession_rate_deg_day
+
+                    h_lon, h_lat = _precess_ecliptic(pos[0], pos[1], 2451545.0, jd_tt)
+                    h_dlon = pos[3] + _general_precession_rate_deg_day(jd_tt)
+                    pos = (h_lon, h_lat, pos[2], h_dlon, pos[4], pos[5])
             else:
                 g_lon, g_lat, g_dist = _geo_of_date(jd_tt)
                 dt_v = 0.1

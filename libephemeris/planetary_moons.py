@@ -44,10 +44,14 @@ from skyfield.positionlib import ICRF
 
 from .constants import (
     FLG_BARYCTR,
+    FLG_EQUATORIAL,
     FLG_HELCTR,
+    FLG_J2000,
     FLG_NOABERR,
+    FLG_NONUT,
     FLG_SIDEREAL,
     FLG_SPEED,
+    FLG_TOPOCTR,
     FLG_TRUEPOS,
     # Legacy moon ids (deprecated aliases) and NAIF ids: constants.py is
     # the single source of truth; re-exported here for backward compat.
@@ -307,22 +311,41 @@ def unregister_moon_spk(spk_file: str) -> None:
     Example:
         >>> unregister_moon_spk("jup365.bsp")
     """
+    # Match by exact path or by whole-basename equality. Anchoring on the full
+    # basename (rather than str.endswith) avoids two failure modes: an empty
+    # basename — os.path.basename("foo.bsp/") == "" — would make endswith("")
+    # true for every key and unregister ALL kernels, and a bare suffix like
+    # "jup365.bsp" would wrongly match "/alt/xjup365.bsp".
+    base = os.path.basename(spk_file)
+
+    def _matches(path: str) -> bool:
+        """Return whether a registered SPK path matches the requested file.
+
+        Args:
+            path: Registered SPK path to compare against ``spk_file``.
+
+        Returns:
+            True if ``path`` equals ``spk_file`` or shares its basename.
+        """
+        return path == spk_file or (base != "" and os.path.basename(path) == base)
+
     # Remove body registrations for this file
     moons_to_remove = [
-        moon_id
-        for moon_id, path in _MOON_SPK_BY_BODY.items()
-        if path == spk_file or path.endswith(os.path.basename(spk_file))
+        moon_id for moon_id, path in _MOON_SPK_BY_BODY.items() if _matches(path)
     ]
     for moon_id in moons_to_remove:
         del _MOON_SPK_BY_BODY[moon_id]
 
-    # Remove kernel from cache
-    if spk_file in _MOON_SPK_KERNELS:
+    # Remove kernel(s) from cache. register_moon_spk caches under the resolved
+    # absolute path, so an exact-key lookup on a bare basename would leave the
+    # kernel handle open and leaked; the basename match closes it.
+    kernel_keys = [k for k in _MOON_SPK_KERNELS if _matches(k)]
+    for k in kernel_keys:
         try:
-            _MOON_SPK_KERNELS[spk_file].close()
+            _MOON_SPK_KERNELS[k].close()
         except (AttributeError, OSError, ValueError):
             pass
-        del _MOON_SPK_KERNELS[spk_file]
+        del _MOON_SPK_KERNELS[k]
 
 
 def list_registered_moons() -> dict[int, str]:
@@ -443,8 +466,6 @@ def calc_moon_position(
     Raises:
         EphemerisRangeError: If JD is outside the SPK kernel's coverage
     """
-    from .planets import get_ayanamsa_ut
-
     naif_id = _moon_naif_id(moon_id)
     if naif_id is None:
         return None
@@ -477,11 +498,29 @@ def calc_moon_position(
     # Determine observer
     is_heliocentric = bool(iflag & FLG_HELCTR)
     is_barycentric = bool(iflag & FLG_BARYCTR)
+    is_topocentric = (
+        bool(iflag & FLG_TOPOCTR) and not is_heliocentric and not is_barycentric
+    )
 
     if is_barycentric:
         observer = None  # solar-system barycenter: zero position/velocity
     elif is_heliocentric:
         observer = planets["sun"]
+    elif is_topocentric:
+        # Topocentric: observer = geocenter + site, mirroring the planet path
+        # (planets._calc_body). Without a prior set_topo() this is an error, not
+        # a silent geocentric result — matching the reference API.
+        from .state import get_topo
+
+        topo = get_topo()
+        if topo is None:
+            from .exceptions import Error
+
+            raise Error(
+                "FLG_TOPOCTR requires a geographic position: call "
+                "set_topo(lon, lat, alt) first"
+            )
+        observer = planets["earth"] + topo
     else:
         observer = planets["earth"]
 
@@ -497,7 +536,10 @@ def calc_moon_position(
         not (iflag & FLG_TRUEPOS) and not is_heliocentric and not is_barycentric
     )
     apply_aberr = (
-        not (iflag & FLG_NOABERR) and not is_heliocentric and not is_barycentric
+        not (iflag & FLG_TRUEPOS)
+        and not (iflag & FLG_NOABERR)
+        and not is_heliocentric
+        and not is_barycentric
     )
     ts = get_timescale()
 
@@ -538,11 +580,32 @@ def calc_moon_position(
         rel = _rel_at(t_obs)
         rel_pos = ICRF(rel, t=t_obs, center=399)
         ecl = rel_pos.frame_latlon(ecliptic_frame)
-        return (
-            float(ecl[1].degrees) % 360.0,
-            float(ecl[0].degrees),
-            float(ecl[2].au),
-        )
+        lon = float(ecl[1].degrees) % 360.0
+        lat = float(ecl[0].degrees)
+        dist = float(ecl[2].au)
+        # FLG_NONUT: ecliptic_frame is the TRUE ecliptic of date (includes
+        # nutation in longitude Δψ); strip it for the mean ecliptic. Done per
+        # sample so the central-difference speed below inherits the correction
+        # automatically (no separate nutation-rate term needed).
+        #
+        # FLG_SIDEREAL|FLG_EQUATORIAL: the downstream _maybe_equatorial_convert
+        # rotates with the MEAN obliquity for sidereal output, so the longitude
+        # must also be the mean ecliptic (Δψ stripped) — otherwise the mismatch
+        # leaks ~Δψ·cos(ε) (~15-17") into RA/Dec. Mirror the node/Lilith _sid_eq
+        # rule in planets._calc_body_pctr.
+        #
+        # FLG_J2000: the J2000 ecliptic carries no nutation. _maybe_equatorial_convert
+        # precesses this longitude to J2000 with a precession-only matrix that never
+        # removes Δψ, so the of-date Δψ must be stripped here (mirroring the planet/
+        # SPK path, which omits nutation for J2000) — otherwise moons land ~Δψ (up to
+        # ~17") off the nutation-free J2000 frame used by every other J2000 body.
+        _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+        if (iflag & FLG_NONUT) or _sid_eq or (iflag & FLG_J2000):
+            from .cache import get_cached_nutation
+
+            dpsi_rad, _ = get_cached_nutation(t_obs.tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
+        return (lon, lat, dist)
 
     lon, lat, dist = _ecl_at(t)
 
@@ -567,10 +630,21 @@ def calc_moon_position(
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
-    if iflag & FLG_SIDEREAL:
-        ayanamsa = get_ayanamsa_ut(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+    # Apply sidereal correction if requested (ecliptic longitude only; for
+    # equatorial sidereal output the mean-equator-of-date frame carries the
+    # sidereal framing and no ayanamsa is subtracted — the same rule as
+    # planets._calc_body_pctr, gated on not-equatorial).
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+        # Route through the canonical flag-aware helper so the ayanamsa variant
+        # matches the longitude frame: when FLG_NONUT stripped Δψ above (mean
+        # ecliptic) the helper subtracts the MEAN ayanamsa, while an of-date
+        # (true) longitude gets the TRUE ayanamsa — subtracting get_ayanamsa_ut
+        # (always true) from a NONUT mean longitude left a spurious ~9-17"
+        # offset versus the planet path. The helper also removes the ~50"/yr
+        # ayanamsha drift from speed_lon under FLG_SPEED.
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 

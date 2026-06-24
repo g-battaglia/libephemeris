@@ -54,10 +54,21 @@ def test_calc_aerosol_extinction_from_humidity() -> None:
 
 
 def test_calc_aerosol_extinction_altitude_reduces() -> None:
-    """Higher altitude reduces aerosol extinction."""
-    low = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=0.0)
-    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=1500.0)
+    """Higher altitude reduces aerosol extinction (visibility-derived branch)."""
+    # Use a meteorological range (>= 1.0 km) so the coefficient is derived and
+    # therefore altitude-scaled; a direct coefficient (0 < value < 1.0) is
+    # returned as-is (see test below).
+    low = schaefer.calc_aerosol_extinction(0.5, met_range_km=10.0, altitude_m=0.0)
+    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=10.0, altitude_m=1500.0)
     assert high < low
+
+
+def test_calc_aerosol_extinction_direct_coeff_not_altitude_scaled() -> None:
+    """A direct aerosol coefficient (0 < value < 1.0) is returned unscaled."""
+    sea = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=0.0)
+    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=1500.0)
+    assert sea == 0.3
+    assert high == 0.3
 
 
 def test_calc_ozone_extinction() -> None:
@@ -526,6 +537,11 @@ def test_get_visibility_conditions_keys_and_values() -> None:
     }
     assert set(conditions) == expected_keys
     assert isinstance(conditions["is_visible"], bool)
+    # limiting_magnitude is an intrinsic-magnitude threshold (extinction folded
+    # in by calc_limiting_magnitude), so the margin and visibility are taken
+    # against the object's intrinsic magnitude — not the already-extincted
+    # apparent magnitude (which would double-count extinction).
     assert conditions["magnitude_margin"] == pytest.approx(
-        conditions["limiting_magnitude"] - conditions["apparent_magnitude"]
+        conditions["limiting_magnitude"] - 1.0
     )
+    assert conditions["is_visible"] == (1.0 <= conditions["limiting_magnitude"])

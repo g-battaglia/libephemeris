@@ -178,6 +178,59 @@ def _cartesian_velocity_to_spherical(
     return (dlon_deg, dlat_deg, ddist)
 
 
+def _spherical_to_cartesian_with_velocity(
+    lon: float,
+    lat: float,
+    dist: float,
+    dlon: float,
+    dlat: float,
+    ddist: float,
+) -> Tuple[float, float, float, float, float, float]:
+    """Convert spherical position+velocity to Cartesian (the inverse Jacobian).
+
+    Shared by the FLG_XYZ post-processing in both the LEB/Skyfield path
+    (``fast_calc``) and the Horizons backend so the two stay identical.
+
+    Args:
+        lon, lat: Longitude/latitude in DEGREES.
+        dist: Radial distance in AU.
+        dlon, dlat: Longitude/latitude speed in DEGREES/day.
+        ddist: Radial speed in AU/day.
+
+    Returns:
+        (x, y, z, vx, vy, vz) — position in AU, velocity in AU/day.  The
+        velocity is exactly zero when all input rates are zero.
+    """
+    lon_r = math.radians(lon)
+    lat_r = math.radians(lat)
+    cos_lat = math.cos(lat_r)
+    sin_lat = math.sin(lat_r)
+    cos_lon = math.cos(lon_r)
+    sin_lon = math.sin(lon_r)
+    x = dist * cos_lat * cos_lon
+    y = dist * cos_lat * sin_lon
+    z = dist * sin_lat
+    if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
+        dlon_r = math.radians(dlon)
+        dlat_r = math.radians(dlat)
+        vx = (
+            -dist * cos_lat * sin_lon * dlon_r
+            - dist * sin_lat * cos_lon * dlat_r
+            + cos_lat * cos_lon * ddist
+        )
+        vy = (
+            dist * cos_lat * cos_lon * dlon_r
+            - dist * sin_lat * sin_lon * dlat_r
+            + cos_lat * sin_lon * ddist
+        )
+        vz = dist * cos_lat * dlat_r + sin_lat * ddist
+    else:
+        vx = vy = vz = 0.0
+    # Cast to native floats: callers may pass numpy scalars (e.g. star vectors),
+    # and several return this helper directly, so honour the native-float contract.
+    return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
+
+
 def _rotate_equatorial_to_ecliptic(
     x: float, y: float, z: float, eps_rad: float
 ) -> Tuple[float, float, float]:
@@ -835,6 +888,25 @@ def _precess_ecliptic(
 
 # IAU 2006 general precession polynomial (arcsec/century)
 _PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
+
+
+def _general_precession_rate_deg_day(jd_tt: float) -> float:
+    """General-precession rate dP/dT at ``jd_tt``, in degrees/day.
+
+    The longitude-speed corrections (ayanamsa drift for sidereal SPEED output
+    and the of-date→J2000 equinox-motion frame term) both subtract this rate
+    from ``dlon``. ``_PREC_COEFFS`` are arcsec/century, so dP/dT =
+    c0 + 2*c1*T + ... (only the first two terms matter at the required
+    precision); convert to deg/day with / 3600 / 36525.
+
+    Shared by both subtraction sites in ``_fast_calc_core`` and by the matching
+    sites in ``horizons_backend._to_ecliptic_output`` so the LEB/Skyfield and
+    Horizons backends stay identical.
+    """
+    T = (jd_tt - J2000) / 36525.0
+    prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2.0 * _PREC_COEFFS[1] * T
+    return prec_rate_arcsec_cy / (3600.0 * 36525.0)
+
 
 # Ayanamsha J2000 offsets for formula-based sidereal modes (degrees).
 # Star-based / galactic modes have (0.0) placeholders and require Skyfield.
@@ -1961,6 +2033,21 @@ def _fast_calc_core(
     else:
         raise ValueError(f"Unknown coord_type {body.coord_type}")
 
+    # ICRS (Pipeline-A) bodies requested as XYZ+SIDEREAL are forced through the
+    # spherical path (FLG_XYZ stripped via _pipe_iflag) so the sidereal longitude
+    # subtraction can run; the Cartesian conversion then happens at the end. At
+    # that point dlon is still a spherical longitude rate exactly like the
+    # Pipeline-A spherical path, so the J2000 / ayanamsa-drift speed gates below
+    # must treat them identically — _pipeline_a was set False only to route the
+    # XYZ conversion. Without this, the XYZ sidereal-J2000 velocity omits the two
+    # precession-rate terms the equivalent spherical output applies, leaving the
+    # XYZ and spherical results (which must be exact coordinate transforms of one
+    # another) inconsistent by ~2x the general-precession rate in dlon.
+    _xyz_sid_pipea = _xyz_sid and body.coord_type in (
+        COORD_ICRS_BARY,
+        COORD_ICRS_BARY_SYSTEM,
+    )
+
     # Sidereal correction
     #
     # When EQUATORIAL is set, the reference ephemeris does NOT subtract ayanamsha from RA
@@ -2014,17 +2101,55 @@ def _fast_calc_core(
 
             lon = (lon - aya) % 360.0
 
-            # Sidereal speed correction: subtract precession rate from dlon
-            # _PREC_COEFFS are arcsec/century: dP/dT = c0 + 2*c1*T + ...
-            # Convert: deg/day = (arcsec/century) / 3600 / 36525
-            T = (jd_tt - J2000) / 36525.0
-            prec_rate_arcsec_cy = _PREC_COEFFS[0] + 2 * _PREC_COEFFS[1] * T
-            prec_rate_deg_day = prec_rate_arcsec_cy / (3600.0 * 36525.0)
-            dlon -= prec_rate_deg_day
+            # Sidereal speed correction (ayanamsa drift): the ayanamsha drifts
+            # ~50"/yr, so its time-derivative (~the general-precession rate) is
+            # removed from dlon for sidereal SPEED output. _PREC_COEFFS are
+            # arcsec/century: dP/dT = c0 + 2*c1*T + ...; convert to deg/day with
+            # / 3600 / 36525.
+            #
+            # Fires for every sidereal SPEED request — including FLG_J2000, where
+            # the drift is still present (the ayanamsa offset is constant in the
+            # J2000 frame, but the of-date longitude this dlon was built from
+            # still carries it). It is the FLG_SPEED-absent case that must be
+            # excluded: dlon was zeroed above and must stay 0.0.
+            # The deferred ecliptic-direct bodies (nodes/apogees) keep this
+            # of-date drift; their _deferred_sid_j2k rebuild below re-precesses
+            # the POSITION (not the rate) to J2000. Pipeline-A bodies get the
+            # J2000 frame term applied separately, just after this block.
+            if (iflag & FLG_SPEED) and (
+                _deferred_sid_j2k
+                or not (iflag & FLG_J2000)
+                or _pipeline_a
+                or _xyz_sid_pipea
+            ):
+                dlon -= _general_precession_rate_deg_day(jd_tt)
 
         except KeyError:
             # Star-based sidereal mode, fall back
             raise
+
+    # J2000 longitude-speed frame conversion (Pipeline A, spherical output only).
+    # _pipeline_icrs rotates the velocity into the J2000 ecliptic with a fixed
+    # (instantaneous) matrix, which omits the time-derivative of that rotation —
+    # the of-date→J2000 equinox motion. That motion removes the general-
+    # precession rate from the longitude speed, so apply the subtraction here.
+    # It runs for BOTH tropical and sidereal J2000 ecliptic output (for sidereal
+    # it is the second ~p term, on top of the ayanamsa drift above). Excluded:
+    # the deferred ecliptic-direct bodies (handled by the rebuild below;
+    # _pipeline_a is False for them), equatorial output (its own frame), and XYZ
+    # output (dlon then holds a Cartesian velocity component, not a longitude
+    # rate — Pipeline-A XYZ returns the vectors straight from _pipeline_icrs).
+    # The `not XYZ` guard keeps Pipeline-A tropical-XYZ (Cartesian straight from
+    # _pipeline_icrs) out; _xyz_sid_pipea adds back the XYZ+SIDEREAL case, whose
+    # dlon is still a spherical longitude rate here (Cartesian conversion is
+    # deferred to the FLG_XYZ post-processing below).
+    if (
+        (iflag & FLG_SPEED)
+        and (iflag & FLG_J2000)
+        and not (iflag & FLG_EQUATORIAL)
+        and ((_pipeline_a and not (iflag & FLG_XYZ)) or _xyz_sid_pipea)
+    ):
+        dlon -= _general_precession_rate_deg_day(jd_tt)
 
     # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
     # The pipeline was run without FLG_J2000 so ayanamsha could be
@@ -2051,26 +2176,9 @@ def _fast_calc_core(
     # FLG_XYZ post-processing for Pipeline B/C (spherical → Cartesian)
     # Pipeline A handles XYZ internally via _pipeline_icrs; skip here.
     if (iflag & FLG_XYZ) and not _pipeline_a:
-        _lon_r = math.radians(lon)
-        _lat_r = math.radians(lat)
-        _cos_lat = math.cos(_lat_r)
-        x = dist * _cos_lat * math.cos(_lon_r)
-        y = dist * _cos_lat * math.sin(_lon_r)
-        z = dist * math.sin(_lat_r)
-        if dlon != 0.0 or dlat != 0.0 or ddist != 0.0:
-            _dlon_r = math.radians(dlon)
-            _dlat_r = math.radians(dlat)
-            _sin_lat = math.sin(_lat_r)
-            vx = (-dist * _cos_lat * math.sin(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.cos(_lon_r) * _dlat_r
-                  + _cos_lat * math.cos(_lon_r) * ddist)
-            vy = (dist * _cos_lat * math.cos(_lon_r) * _dlon_r
-                  - dist * _sin_lat * math.sin(_lon_r) * _dlat_r
-                  + _cos_lat * math.sin(_lon_r) * ddist)
-            vz = dist * _cos_lat * _dlat_r + _sin_lat * ddist
-        else:
-            vx = vy = vz = 0.0
-        return (x, y, z, vx, vy, vz), iflag
+        return _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, dlon, dlat, ddist
+        ), iflag
 
     # FLG_RADIANS: convert angular output from degrees to radians
     # Skip when XYZ is active — values are Cartesian AU, not angles

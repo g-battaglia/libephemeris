@@ -1244,36 +1244,37 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
 
     Returns:
         Formatted string representing the time in hours, minutes, seconds.
-        Format: "HH:MM:SS" (e.g., "12:34:56")
+        Format: "HH:MM:SS" with zero-padded fields (e.g., "12:34:56")
 
     Notes:
         - 1 centisecond = 1/100 second
         - 1 second = 100 centiseconds
         - 1 minute = 6000 centiseconds
         - 1 hour = 360000 centiseconds
-        - Negative values produce negative hour strings (e.g., "-1:00:00")
+        - Hours are zero-padded and wrap modulo 24, so negative values map
+          into the 0-23 range (e.g., -360000 cs -> "23:00:00")
         - Seconds are rounded to whole numbers (centiseconds are rounded)
 
     Examples:
         >>> cs2timestr(0)
-        ' 0:00:00'
+        '00:00:00'
         >>> cs2timestr(360000)  # 1 hour
-        ' 1:00:00'
+        '01:00:00'
         >>> cs2timestr(4526050)  # 12:34:21 (with rounding from .50)
         '12:34:21'
-        >>> cs2timestr(-360000)  # -1 hour
-        '-1:00:00'
+        >>> cs2timestr(-360000)  # -1 hour wraps mod 24
+        '23:00:00'
     """
     # Accept bytes separator (the reference ephemeris uses b':')
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
-    # Handle sign
-    if cs < 0:
-        sign = -1
-        cs = -cs
-    else:
-        sign = 1
+    # Wrap the whole magnitude into one day [0, 24h) before extracting fields.
+    # Applying the sign to the hours field alone left sub-hour negatives (e.g.
+    # -6000 cs = -1 min) indistinguishable from their positive counterpart and
+    # broke the documented wrap ("-360000 cs -> 23:00:00"). Python's modulo maps
+    # negatives into the positive range, so -6000 -> 23:59:00 as intended.
+    cs = cs % (24 * 360000)
 
     # Extract hours, minutes, and seconds
     # 1 hour = 60 * 60 * 100 = 360000 centiseconds
@@ -1294,13 +1295,9 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
             minutes = 0
             hours += 1
 
-    # Apply sign to hours
-    if sign < 0:
-        hours = -hours
-
     # Format the string matching reference API format
     # Format: "%02d<sep>%02d<sep>%02d"
-    # Hours are mod 24 to match the reference behavior
+    # A rounding carry can push 23:59:59.5x up to 24:00:00; wrap back to 00.
     hours = hours % 24
     if suppresszero:
         if seconds == 0:

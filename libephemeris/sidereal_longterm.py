@@ -56,16 +56,16 @@ that entirely by a **geometric** construction valid everywhere:
 1. take the mean longitude of the Earth from the published secular expression of
    Simon, J.L. et al. (1994), "Numerical expressions for precession formulae and
    mean elements for the Moon and the planets", A&A 282, 663;
-2. correct it for Sun–Earth light-time;
+2. correct it for Sun-Earth light-time;
 3. form the corresponding unit direction on the ecliptic of J2000.0, rotate it to
    the J2000.0 equator, **precess it to the date with the Vondrák matrix**, and
    read off its ecliptic longitude of date;
-4. add the equation of the equinoxes (nutation in longitude × cos ε) and the UT1
+4. add the equation of the equinoxes (nutation in longitude x cos eps) and the UT1
    hour angle.
 
 Because step 3 transforms a *physical direction* through the long-term precession
 matrix (instead of summing a divergent RA polynomial), the result is stable over
-the whole supported range. For the modern window 1850–2050 the well-established
+the whole supported range. For the modern window 1850-2050 the well-established
 IAU 2006 GMST polynomial is used directly (it is most precise there), with tiny
 continuity offsets so the two branches join smoothly.
 
@@ -99,17 +99,18 @@ _DEG = math.pi / 180.0
 # Obliquity of the ecliptic at J2000.0 (IAU 2006): 84381.406".
 _EPS0 = 84381.406 * _AS2R
 
-# Sun–Earth light-time, in days: AU / c. AU = 1.495978707e11 m (IAU 2012),
+# Sun-Earth light-time, in days: AU / c. AU = 1.495978707e11 m (IAU 2012),
 # c = 299792458 m/s, 86400 s/day  ->  ~0.0057755183 day.
 _LIGHT_TIME_DAYS = 1.495978707e11 / 299792458.0 / 86400.0
 
 # Modern window where the IAU 2006 GMST polynomial branch is used directly.
 _LTERM_T0 = 2396758.5  # 1 Jan 1850
 _LTERM_T1 = 2469807.5  # 1 Jan 2050
-# Continuity offsets (degrees) that join the long-term branch onto the modern
-# polynomial branch smoothly at the two boundaries.
-_LTERM_OFS0 = 0.000378172  # at/below T0
-_LTERM_OFS1 = 0.001385646  # at/above T1
+# Continuity offsets that join the long-term branch onto the modern polynomial
+# branch at the two boundaries are computed at runtime from the live ΔT model
+# (see _lterm_offset below), not hardcoded — so they never go stale when the ΔT
+# model changes (set_delta_t_userdef / IERS). They are only evaluated on the
+# rare long-term branch (dates outside 1850-2050).
 
 # --------------------------------------------------------------------------
 # Vondrák 2011 (A&A 534, A22; corrigendum A&A 541, C1) coefficient series.
@@ -363,12 +364,15 @@ def _mean_sidereal_longterm_deg(jd_ut1: float) -> float:
     t3 = t * t2
     # Simon et al. 1994 mean longitude of the Earth (degrees).
     dlon = 100.46645683 + (1295977422.83429 * t - 2.04411 * t2 - 0.00523 * t3) / 3600.0
-    # Sun–Earth light-time correction.
+    # Sun-Earth light-time correction.
     dlon = (dlon - _LIGHT_TIME_DAYS * 360.0 / 365.2425) % 360.0
     # Ecliptic-of-J2000 unit direction, then to the J2000 equator.
     rad = dlon * _DEG
     vec = (math.cos(rad), math.sin(rad), 0.0)
-    eps_j2000 = mean_obliquity_rad(_J2000 + _deltat_days(_J2000))
+    # _J2000 (2451545.0) is already the J2000.0 TT epoch and mean_obliquity_rad
+    # takes TT, so it is passed directly — adding ΔT would double-count the
+    # UT→TT offset (the eps_date term below correctly uses jd_tt as-is).
+    eps_j2000 = mean_obliquity_rad(_J2000)
     vec = _rot_x(vec, -eps_j2000)
     # Precess to the mean equator of date, then back to the ecliptic of date.
     vec = _precess_j2000_to_date(vec, jd_tt)
@@ -380,10 +384,34 @@ def _mean_sidereal_longterm_deg(jd_ut1: float) -> float:
     return (lon + dhour) % 360.0
 
 
+def _lterm_offset(boundary_jd: float) -> float:
+    """Continuity offset (deg) joining the long-term branch to the modern one.
+
+    Equals (long-term branch - modern branch) evaluated at ``boundary_jd``, so
+    the piecewise GMST is continuous there. Computed from the live delta-T model
+    rather than hardcoded, so it can never drift out of sync when the delta-T
+    model changes. Only called on the long-term branch (rare), so the extra cost
+    is negligible.
+
+    Args:
+        boundary_jd: Julian Day (UT1) of the branch boundary (1 Jan 1850 or
+            1 Jan 2050).
+
+    Returns:
+        Continuity offset in degrees, reduced to (-180, 180] to absorb any
+        0/360 wrap between the two branches.
+    """
+    jd_tt = boundary_jd + _deltat_days(boundary_jd)
+    diff = _mean_sidereal_longterm_deg(boundary_jd) - (
+        _gmst_iau2006_deg(boundary_jd, jd_tt) % 360.0
+    )
+    return (diff + 180.0) % 360.0 - 180.0
+
+
 def mean_sidereal_time_deg(jd_ut1: float) -> float:
     """Greenwich Mean Sidereal Time at ``jd_ut1`` in degrees [0, 360).
 
-    Piecewise: the IAU 2006 polynomial in 1850–2050 (most precise there), the
+    Piecewise: the IAU 2006 polynomial in 1850-2050 (most precise there), the
     long-term geometric method outside it (correct over the whole supported
     range), joined with small continuity offsets.
     """
@@ -392,9 +420,9 @@ def mean_sidereal_time_deg(jd_ut1: float) -> float:
         return _gmst_iau2006_deg(jd_ut1, jd_tt) % 360.0
     g = _mean_sidereal_longterm_deg(jd_ut1)
     if jd_ut1 <= _LTERM_T0:
-        g -= _LTERM_OFS0
+        g -= _lterm_offset(_LTERM_T0)
     else:
-        g -= _LTERM_OFS1
+        g -= _lterm_offset(_LTERM_T1)
     return g % 360.0
 
 

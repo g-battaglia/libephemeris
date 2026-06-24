@@ -30,10 +30,10 @@ The refractive index of air is computed from:
 
     n(P, T) = 1 + 8.060e-5 * P / T
 
-where P is in mbar and T in Kelvin.  The coefficient 7.934e-5 is derived
+where P is in mbar and T in Kelvin.  The coefficient 8.060e-5 is derived
 from the Barrell & Sears (1939) group-refractive-index for the visible
 band, adjusted to include the average effect of atmospheric humidity
-on astronomical refraction (~1% above the dry-air value).
+on astronomical refraction (~2% above the dry-air value).
 
 The total refraction is computed by evaluating the integral:
 
@@ -41,8 +41,10 @@ The total refraction is computed by evaluating the integral:
             (dn/dr) / (n * sqrt(n^2 * r^2 / C^2 - 1))  dr
 
 where C = n_obs * r_obs * sin(z_obs) is the Bouguer (Snell) invariant.
-This integral is evaluated using Gauss-Legendre quadrature with 200
-points, giving machine-precision convergence even at the horizon.
+This integral is evaluated using Gauss-Legendre quadrature with 120
+points, giving sub-arcsecond convergence; the near-singular integrand
+as z -> 90 deg limits accuracy at the horizon to ~0.2 arcsec (far below
+this module's documented deviation envelope from the reference fits).
 
 For the APP_TO_TRUE direction the function inverts the
 TRUE_TO_APP computation numerically via Newton-Raphson iteration
@@ -126,10 +128,11 @@ _T0: float = 288.15  # Standard temperature [K]
 
 
 # ---------------------------------------------------------------------------
-# Gauss-Legendre quadrature nodes and weights (200-point)
+# Gauss-Legendre quadrature nodes and weights (120-point)
 # ---------------------------------------------------------------------------
-# Precomputed once at import time.  numpy is used ONLY here for the
-# roots/weights computation; the runtime integration loop is pure Python.
+# Precomputed once at import time.  The nodes/weights are computed in pure
+# Python (Legendre recurrence + Newton-Raphson, no numpy); the runtime
+# integration loop is likewise pure Python.
 
 
 def _gauss_legendre_nodes(n: int) -> Tuple[list, list]:
@@ -306,8 +309,9 @@ def _dn_dr_at_height(
 ) -> float:
     """Derivative dn/dr at altitude *h* via central difference.
 
-    Uses a 2-metre step for numerical differentiation, which is small
-    enough for accuracy but large enough to avoid cancellation errors.
+    Uses a ±1 m central-difference step (2 m total span) for numerical
+    differentiation, which is small enough for accuracy but large enough
+    to avoid cancellation errors.
     """
     delta = 1.0  # metres
     n_plus = _n_at_height(h + delta, obs_alt, obs_P, obs_T_K, lapse_rate)

@@ -161,7 +161,9 @@ def get_erfa_nutation_cached(
         ts = get_timescale()
         t = ts.tt_jd(jd_tt)
         dpsi_rad, deps_rad = iau2000a_radians(t)
-        return dpsi_rad, deps_rad
+        # Skyfield returns numpy.float64; coerce to native floats to match
+        # the erfa paths and the library-wide "always return float" invariant.
+        return float(dpsi_rad), float(deps_rad)
 
     if model == "nut00a":
         result = get_erfa_nutation_nut00a(jd_tt)

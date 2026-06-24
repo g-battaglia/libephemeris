@@ -451,21 +451,25 @@ class TestEnsureSpkDownloaded:
         assert result == cache_path
         mock_dl.assert_not_called()
 
-    def test_already_registered_skips_register(self, tmp_path):
-        """Already registered ipl skips register_spk_body (branch 594)."""
+    def test_register_skipped_for_same_path_rereg_for_different(self, tmp_path):
+        """register_spk_body is skipped only when the SAME path is already
+        registered; a different already-registered path is re-registered
+        (branch 594) so a force re-download to a new path takes effect."""
         from libephemeris import state
 
         config = spk_auto.AutoSpkConfig(
             ipl=CHIRON, body_id="2060", naif_id=NAIF_CHIRON,
             cache_dir=str(tmp_path),
         )
+        resolved = config.get_cache_path()
 
         def fake_download(**kwargs):
             with open(kwargs["output_path"], "wb") as f:
                 f.write(b"x")
 
-        state._SPK_BODY_MAP[CHIRON] = ("dummy", NAIF_CHIRON)
         try:
+            # (a) Same path already registered -> register is skipped.
+            state._SPK_BODY_MAP[CHIRON] = (resolved, NAIF_CHIRON)
             with patch.object(
                 spk_auto, "_download_spk_astroquery", side_effect=fake_download
             ), patch(
@@ -473,6 +477,16 @@ class TestEnsureSpkDownloaded:
             ), patch("libephemeris.spk.register_spk_body") as mock_reg:
                 spk_auto._ensure_spk_downloaded(config)
             mock_reg.assert_not_called()
+
+            # (b) A different (stale) path registered -> re-register.
+            state._SPK_BODY_MAP[CHIRON] = ("stale_old.bsp", NAIF_CHIRON)
+            with patch.object(
+                spk_auto, "_download_spk_astroquery", side_effect=fake_download
+            ), patch(
+                "libephemeris.spk._get_spk_targets", return_value=[NAIF_CHIRON]
+            ), patch("libephemeris.spk.register_spk_body") as mock_reg:
+                spk_auto._ensure_spk_downloaded(config)
+            mock_reg.assert_called_once()
         finally:
             state._SPK_BODY_MAP.clear()
 

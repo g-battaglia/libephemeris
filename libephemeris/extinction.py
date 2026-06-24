@@ -469,7 +469,7 @@ def calc_extinction_magnitude(
     Returns:
         Total extinction in magnitudes. This value should be added
         to the object's catalog magnitude to get apparent magnitude.
-        Returns a large value (99.0) for objects below the horizon.
+        Returns a large value (99.0) for objects at or below the horizon.
 
     Algorithm:
         extinction = k * X
@@ -487,14 +487,16 @@ def calc_extinction_magnitude(
         >>> calc_extinction_magnitude(5.0)   # Near horizon
         3.2...   # Significant extinction
         >>> calc_extinction_magnitude(0.0)   # Horizon
-        11.2...  # Very high extinction
+        99.0  # At or below the horizon: treated as essentially infinite
 
     References:
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
     """
-    # Objects below horizon have essentially infinite extinction
-    if altitude_deg < 0:
+    # Objects at or below the horizon have essentially infinite extinction.
+    # Use <= 0 (not < 0) to match calc_simple_extinction and avoid an ~88-mag
+    # discontinuity between altitude 0.0 (airmass capped at 40) and -0.0.
+    if altitude_deg <= 0:
         return 99.0
 
     # Calculate airmass
