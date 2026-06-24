@@ -190,8 +190,10 @@ def calc_aerosol_extinction(
         # Simplified: k_aerosol = 3.912 / V - 0.106 (for visual wavelengths)
         k_aerosol = max(0.0, 3.912 / met_range_km - 0.106)
     elif 0 < met_range_km < 1.0:
-        # Direct aerosol coefficient given
-        k_aerosol = met_range_km
+        # Direct aerosol coefficient given at the observer site: it is already
+        # the final mag/airmass value, so return it without altitude scaling
+        # (which applies only to coefficients derived from visibility/humidity).
+        return met_range_km
     else:
         # Estimate from humidity
         # Higher humidity leads to more aerosol scattering

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import glob
 import os
+from contextlib import suppress
 from typing import Any, Dict, List, Optional, Tuple
 
 from .leb_format import StarEntry
@@ -146,10 +147,8 @@ class CompositeLEBReader:
         tiers = {t for t in (_file_tier(p) for p in opened_paths) if t is not None}
         if len(tiers) > 1:
             for reader in readers:
-                try:
+                with suppress(OSError, ValueError, KeyError, AttributeError):
                     reader.close()
-                except Exception:
-                    pass
             raise ValueError(
                 "Refusing to build a composite from mixed tiers in "
                 f"{directory}: {sorted(tiers)}. All files must share one tier "

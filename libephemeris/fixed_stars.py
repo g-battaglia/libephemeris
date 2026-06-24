@@ -2770,7 +2770,15 @@ def _apply_fixstar_flags(
             dt_day = 0.5
             ayan_prev = get_ayanamsa_ut(tjd_ut - dt_day)
             ayan_next = get_ayanamsa_ut(tjd_ut + dt_day)
-            speed_lon -= (ayan_next - ayan_prev) / (2.0 * dt_day)
+            # get_ayanamsa_ut returns a normalised [0, 360) angle, so wrap the
+            # finite-difference delta to the shortest arc before dividing; an
+            # unwrapped 0/360 crossing would inject a spurious ~360 deg/day jump.
+            ayan_delta = ayan_next - ayan_prev
+            if ayan_delta > 180.0:
+                ayan_delta -= 360.0
+            elif ayan_delta < -180.0:
+                ayan_delta += 360.0
+            speed_lon -= ayan_delta / (2.0 * dt_day)
 
     # ---- 4. Output format conversion ----
     # Cast to native Python floats (upstream Skyfield/numpy ops can leak

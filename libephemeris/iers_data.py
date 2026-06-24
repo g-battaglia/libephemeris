@@ -612,6 +612,12 @@ def _parse_leap_seconds(filepath: str) -> list[LeapSecondEntry]:
 def _parse_leap_seconds_iers(lines: list[str]) -> list[LeapSecondEntry]:
     """Parse the IERS leap-seconds file (Leap_Second.dat).
 
+    Args:
+        lines: Lines read from an IERS leap-second data file.
+
+    Returns:
+        Parsed leap-second entries (one per recognised data row).
+
     The primary IERS source uses all-numeric columns::
 
         #  MJD        Date        TAI-UTC (s)

@@ -1026,7 +1026,7 @@ def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
                     math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2)
                     / _AU_KM
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001  # intentional best-effort probe
                 # Probe failed near the edge: assume a distant body (~175 AU,
                 # ~1 d light-time) so the margin is conservative, not too small.
                 # Catch broadly — the probe is best-effort and the underlying

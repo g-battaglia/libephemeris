@@ -589,13 +589,14 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
     config.naif_id = naif_id
 
     # Register the SPK body, or re-register if it now resolves to a different
-    # file. A forced re-download with a wider date range produces a new cache
-    # path (the filename hashes the range), so a presence-only check would leave
-    # the stale narrower kernel registered and calc_ut would keep using it.
+    # (path, NAIF id). A forced re-download with a wider date range produces a
+    # new cache path (the filename hashes the range), and _detect_naif_id_from_file
+    # may correct naif_id for the same path; a presence- or path-only check would
+    # leave the stale registration in place and calc_ut would keep using it.
     from . import state
 
     existing = state._SPK_BODY_MAP.get(config.ipl)
-    if existing is None or existing[0] != cache_path:
+    if existing is None or existing != (cache_path, naif_id):
         spk.register_spk_body(config.ipl, cache_path, naif_id)
 
     return cache_path

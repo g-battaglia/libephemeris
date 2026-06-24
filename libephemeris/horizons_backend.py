@@ -401,14 +401,16 @@ def horizons_calc_ut(
     # Unsupported flags → fallback to Skyfield
     if iflag & FLG_TOPOCTR:
         raise KeyError("FLG_TOPOCTR not supported by Horizons backend")
-    if iflag & FLG_NONUT:
-        # The of-date frames below always include nutation; defer to Skyfield
-        # (same policy as the LEB backend).
-        raise KeyError("FLG_NONUT not supported by Horizons backend")
-
-    # Analytical bodies — no HTTP needed
+    # Analytical bodies — no HTTP needed. _calc_analytical is FLG_NONUT-aware
+    # (it conditionally omits Δψ), so it must be dispatched BEFORE the generic
+    # FLG_NONUT rejection below, otherwise that handling is unreachable.
     if body_id in _ANALYTICAL_BODIES:
         return _calc_analytical(jd_ut, body_id, iflag)
+
+    if iflag & FLG_NONUT:
+        # The state-vector frames below always include nutation; defer to
+        # Skyfield (same policy as the LEB backend).
+        raise KeyError("FLG_NONUT not supported by Horizons backend")
 
     # Uranian hypotheticals — analytical, heliocentric only
     if body_id in _URANIAN_BODIES:
@@ -924,7 +926,7 @@ def _calc_uranian(
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate Uranian hypothetical body (heliocentric only)."""
     from .time_utils import deltat
-    from .constants import FLG_SIDEREAL, FLG_J2000, FLG_EQUATORIAL
+    from .constants import FLG_SIDEREAL, FLG_J2000, FLG_EQUATORIAL, FLG_SPEED
 
     jd_tt = jd_ut + deltat(jd_ut)
 
@@ -934,6 +936,13 @@ def _calc_uranian(
         lon, lat, dist, dlon, dlat, ddist = calc_transpluto(jd_tt)
     else:
         lon, lat, dist, dlon, dlat, ddist = calc_uranian_planet(body_id, jd_tt)
+
+    # Zero the speed slots when FLG_SPEED is absent so callers never receive
+    # unrequested velocity data — mirroring the state-vector and analytical
+    # paths. (The sidereal speed correction below is itself gated on FLG_SPEED,
+    # so it leaves these zeros untouched.)
+    if not (iflag & FLG_SPEED):
+        dlon = dlat = ddist = 0.0
 
     # calc_uranian_planet / calc_transpluto return a J2000-frame ecliptic
     # longitude. Precess it to the ecliptic OF DATE unless FLG_J2000 is set,

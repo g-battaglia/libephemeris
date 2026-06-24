@@ -226,7 +226,9 @@ def _spherical_to_cartesian_with_velocity(
         vz = dist * cos_lat * dlat_r + sin_lat * ddist
     else:
         vx = vy = vz = 0.0
-    return (x, y, z, vx, vy, vz)
+    # Cast to native floats: callers may pass numpy scalars (e.g. star vectors),
+    # and several return this helper directly, so honour the native-float contract.
+    return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
 
 def _rotate_equatorial_to_ecliptic(

@@ -428,13 +428,16 @@ class SchaeferModel:
         if moon_alt <= 0:
             return 0.0
 
-        # Convert phase fraction to phase angle (degrees).
-        # phase=0 → α=180° (new), phase=1 → α=0° (full)
-        alpha = (1.0 - moon_phase) * 180.0
+        # Convert illuminated fraction to the geometric phase angle (degrees).
+        # f = (1 + cos(alpha)) / 2  =>  alpha = acos(2*f - 1):
+        #   f=0 -> alpha=180 (new), f=1 -> alpha=0 (full), f=0.5 -> alpha=90.
+        # The previous linear map (1 - f) * 180 over-brightened gibbous phases.
+        phase_fraction = min(1.0, max(0.0, moon_phase))
+        alpha = math.degrees(math.acos(2.0 * phase_fraction - 1.0))
 
         # Moon visual magnitude as function of phase angle
         # (Allen 1976, Krisciunas & Schaefer 1991 Eq. 9).
-        # V_moon = -12.73 + 0.026|α| + 4e-9 * α^4
+        # V_moon = -12.73 + 0.026|alpha| + 4e-9 * alpha^4
         abs_alpha = abs(alpha)
         moon_mag = -12.73 + 0.026 * abs_alpha + 4.0e-9 * abs_alpha**4
 
@@ -453,7 +456,7 @@ class SchaeferModel:
         X_obj = self.airmass(obj_alt)
 
         # Sky brightness from Moon (K&S 1991 Eq. 20):
-        # B_moon = f(ρ) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
+        # B_moon = f(rho) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
         #
         # I_ground already carries the moonlight extinction along the Moon's
         # airmass (X_moon). The remaining factor (1 - 10^(-0.4*k*X_obj)) is the

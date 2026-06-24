@@ -319,6 +319,14 @@ def unregister_moon_spk(spk_file: str) -> None:
     base = os.path.basename(spk_file)
 
     def _matches(path: str) -> bool:
+        """Return whether a registered SPK path matches the requested file.
+
+        Args:
+            path: Registered SPK path to compare against ``spk_file``.
+
+        Returns:
+            True if ``path`` equals ``spk_file`` or shares its basename.
+        """
         return path == spk_file or (base != "" and os.path.basename(path) == base)
 
     # Remove body registrations for this file

@@ -209,12 +209,17 @@ def deltat(tjdut: float) -> float:
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
-        except Exception:
+        except Exception as exc:
             # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
             # feeds every downstream position calculation, so a robust fallback
             # must not let an unexpected exception type (OSError, KeyError, ...)
-            # escape and crash the whole pipeline.
-            pass
+            # escape and crash the whole pipeline. Log at debug so the silent
+            # fallback is still observable when diagnosing Delta T discrepancies.
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
+            )
 
     t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)
@@ -297,12 +302,17 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
-        except Exception:
+        except Exception as exc:
             # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
             # feeds every downstream position calculation, so a robust fallback
             # must not let an unexpected exception type (OSError, KeyError, ...)
-            # escape and crash the whole pipeline.
-            pass
+            # escape and crash the whole pipeline. Log at debug so the silent
+            # fallback is still observable when diagnosing Delta T discrepancies.
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
+            )
 
     t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)

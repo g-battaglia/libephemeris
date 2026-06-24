@@ -662,8 +662,11 @@ class TestCalcAnalytical:
                 lunar, "calc_mean_lunar_node", side_effect=lambda jd: next(seq)
             ):
                 (data, fl) = _calc_analytical(JD, 10, FLG_SWIEPH | FLG_SPEED)
-        # Wrapped speed stays small (degrees/sec scaled), not a huge jump.
+        # Wrapped speed stays small, not a huge ~360 deg/day jump: the samples
+        # 359.9 -> 0.1 must wrap to +0.2 deg over the day, so speed_lon ~ 0.2.
+        # Without the wrap the raw diff (-359.8) would blow this bound.
         assert len(data) == 6
+        assert abs(data[3]) < 1.0
 
 
 class TestCalcUranian:

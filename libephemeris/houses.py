@@ -1795,8 +1795,9 @@ def houses_ex2(
     #
     #     dλ/dt ≈ [ λ(jd + dt) − λ(jd − dt) ] / (2·dt)
     #
-    # evaluated on houses() itself, so every time-dependent term (ARMC rate,
-    # dε/dt, nutation) is captured automatically. A step of dt = 2 seconds is the
+    # evaluated on houses_ex() itself, so every time-dependent term (ARMC rate,
+    # dε/dt, nutation) — and the FLG_SIDEREAL ayanamsa, which houses() does not
+    # apply — is captured automatically. A step of dt = 2 seconds is the
     # measured optimum: the result is stable to ~1e-3 deg/day from dt≈30 s down
     # to dt≈1 s, while dt≳4 s starts to feel the cusp's curvature and dt≲0.5 s is
     # dominated by floating-point noise.
@@ -1806,8 +1807,8 @@ def houses_ex2(
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
     _DT_DAYS = 2.0 / 86400.0
-    cusps_minus, ascmc_minus = houses(tjdut - _DT_DAYS, lat, lon, hsys, flags)
-    cusps_plus, ascmc_plus = houses(tjdut + _DT_DAYS, lat, lon, hsys, flags)
+    cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, flags)
+    cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, flags)
 
     def _rate(after: float, before: float) -> float:
         d = after - before

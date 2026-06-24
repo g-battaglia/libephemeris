@@ -295,7 +295,7 @@ class EphemerisContext:
 
         Note:
             Affects all position calculations when FLG_SIDEREAL is set.
-            Default is Lahiri (SIDM_LAHIRI = 1) if never set.
+            Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0) if never set.
         """
         self.sidereal_mode = mode
         self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0

@@ -54,10 +54,21 @@ def test_calc_aerosol_extinction_from_humidity() -> None:
 
 
 def test_calc_aerosol_extinction_altitude_reduces() -> None:
-    """Higher altitude reduces aerosol extinction."""
-    low = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=0.0)
-    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=1500.0)
+    """Higher altitude reduces aerosol extinction (visibility-derived branch)."""
+    # Use a meteorological range (>= 1.0 km) so the coefficient is derived and
+    # therefore altitude-scaled; a direct coefficient (0 < value < 1.0) is
+    # returned as-is (see test below).
+    low = schaefer.calc_aerosol_extinction(0.5, met_range_km=10.0, altitude_m=0.0)
+    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=10.0, altitude_m=1500.0)
     assert high < low
+
+
+def test_calc_aerosol_extinction_direct_coeff_not_altitude_scaled() -> None:
+    """A direct aerosol coefficient (0 < value < 1.0) is returned unscaled."""
+    sea = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=0.0)
+    high = schaefer.calc_aerosol_extinction(0.5, met_range_km=0.3, altitude_m=1500.0)
+    assert sea == 0.3
+    assert high == 0.3
 
 
 def test_calc_ozone_extinction() -> None:
