@@ -1758,9 +1758,10 @@ def houses_ex2(
     houses_armc_ex2). This is useful for progressed chart applications where
     the rate of change of house cusps is needed.
 
-    Velocities are computed via the ARMC-based derivative path
-    (houses_armc_ex2), which varies ARMC with fixed obliquity and
-    scales by the sidereal rotation rate (~360.986°/day).
+    Velocities are computed via centered finite differences of houses_ex(),
+    so the reported rates include the same flag-dependent frame corrections
+    (e.g. the FLG_SIDEREAL ayanamsa) and time-dependent terms (ARMC rate,
+    obliquity drift, nutation) as the returned cusp and angle positions.
 
     Args:
         tjdut: Julian Day in Universal Time (UT1)
