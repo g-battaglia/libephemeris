@@ -27,7 +27,12 @@ from .constants import (
     FLG_SWIEPH,
 )
 from .cache import get_cached_time_ut1
-from .state import get_delta_t_userdef, get_iers_delta_t_enabled, get_timescale
+from .state import (
+    get_delta_t_model,
+    get_delta_t_userdef,
+    get_iers_delta_t_enabled,
+    get_timescale,
+)
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
@@ -139,6 +144,105 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     return year, month, day, hour
 
 
+def _deltat_espenak_meeus(year: float) -> float:
+    """Delta T in **seconds** via the Espenak & Meeus (2006) polynomial set.
+
+    This is the classic model used by NASA's eclipse predictions, valid for
+    roughly -1999 to +3000 (with a parabolic tail outside). ``year`` is a
+    decimal Gregorian year (``year + (month-0.5)/12``).
+
+    Reference: Espenak, F. & Meeus, J. (2006), "Five Millennium Canon of Solar
+    Eclipses: -1999 to +3000"; NASA GSFC polynomial expressions for Delta T.
+    """
+    y = year
+    if y < -500:
+        u = (y - 1820) / 100.0
+        return -20 + 32 * u * u
+    if y < 500:
+        u = y / 100.0
+        return (
+            10583.6
+            - 1014.41 * u
+            + 33.78311 * u**2
+            - 5.952053 * u**3
+            - 0.1798452 * u**4
+            + 0.022174192 * u**5
+            + 0.0090316521 * u**6
+        )
+    if y < 1600:
+        u = (y - 1000) / 100.0
+        return (
+            1574.2
+            - 556.01 * u
+            + 71.23472 * u**2
+            + 0.319781 * u**3
+            - 0.8503463 * u**4
+            - 0.005050998 * u**5
+            + 0.0083572073 * u**6
+        )
+    if y < 1700:
+        t = y - 1600
+        return 120 - 0.9808 * t - 0.01532 * t**2 + t**3 / 7129.0
+    if y < 1800:
+        t = y - 1700
+        return (
+            8.83 + 0.1603 * t - 0.0059285 * t**2 + 0.00013336 * t**3 - t**4 / 1174000.0
+        )
+    if y < 1860:
+        t = y - 1800
+        return (
+            13.72
+            - 0.332447 * t
+            + 0.0068612 * t**2
+            + 0.0041116 * t**3
+            - 0.00037436 * t**4
+            + 0.0000121272 * t**5
+            - 0.0000001699 * t**6
+            + 0.000000000875 * t**7
+        )
+    if y < 1900:
+        t = y - 1860
+        return (
+            7.62
+            + 0.5737 * t
+            - 0.251754 * t**2
+            + 0.01680668 * t**3
+            - 0.0004473624 * t**4
+            + t**5 / 233174.0
+        )
+    if y < 1920:
+        t = y - 1900
+        return (
+            -2.79 + 1.494119 * t - 0.0598939 * t**2 + 0.0061966 * t**3 - 0.000197 * t**4
+        )
+    if y < 1941:
+        t = y - 1920
+        return 21.20 + 0.84493 * t - 0.076100 * t**2 + 0.0020936 * t**3
+    if y < 1961:
+        t = y - 1950
+        return 29.07 + 0.407 * t - t**2 / 233.0 + t**3 / 2547.0
+    if y < 1986:
+        t = y - 1975
+        return 45.45 + 1.067 * t - t**2 / 260.0 - t**3 / 718.0
+    if y < 2005:
+        t = y - 2000
+        return (
+            63.86
+            + 0.3345 * t
+            - 0.060374 * t**2
+            + 0.0017275 * t**3
+            + 0.000651814 * t**4
+            + 0.00002373599 * t**5
+        )
+    if y < 2050:
+        t = y - 2000
+        return 62.92 + 0.32217 * t + 0.005589 * t**2
+    if y < 2150:
+        return -20 + 32 * ((y - 1820) / 100.0) ** 2 - 0.5628 * (2150 - y)
+    u = (y - 1820) / 100.0
+    return -20 + 32 * u * u
+
+
 def deltat(tjdut: float) -> float:
     """
     Calculate Delta T (TT - UT1) for a given Julian Day.
@@ -164,9 +268,15 @@ def deltat(tjdut: float) -> float:
             from IERS is used. This provides the highest precision for
             recent dates (typically 1973-present).
 
-        **Priority 3: Skyfield's Delta T model (default)**
-            Uses Skyfield's implementation of the Stephenson, Morrison, and
-            Hohenkerk (2016) model:
+        **Priority 3: Selected Delta T model**
+            Uses the model chosen via ``set_delta_t_model()`` (or the
+            ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / ``deltat_model``
+            TOML key). The default is ``smh2016`` — Skyfield's implementation of
+            the Stephenson, Morrison, and Hohenkerk (2016) model; selecting
+            ``espenak_meeus`` instead uses the classic NASA Espenak & Meeus
+            (2006) polynomial set.
+
+            The default ``smh2016`` model resolves as follows:
 
             **For historical dates (720 BC - ~2016):**
                 Uses cubic spline interpolation from Table S15 published in
@@ -181,6 +291,18 @@ def deltat(tjdut: float) -> float:
             **For modern/recent dates:**
                 Uses observed IERS (International Earth Rotation Service) data,
                 smoothly blended with the historical model.
+
+        **Scope of the userdef / IERS / model overrides**
+            These three priorities set the ΔT returned by ``deltat()`` /
+            ``deltat_ex()`` and hence the TT used by every calculation that
+            converts UT to TT through them: eclipses, heliacal events, long-term
+            sidereal time, and the LEB / fast / Horizons position backends. The
+            Skyfield position backend instead obtains TT from Skyfield's own
+            internal ΔT model (SMH-2016 + IERS), so its planetary positions are
+            unaffected by ``set_delta_t_userdef()``, the IERS toggle, or
+            ``set_delta_t_model()``. Selecting a model therefore changes
+            positions in the default (LEB) backend but not in ``"skyfield"``
+            mode — a pre-existing property of all three ΔT overrides.
 
         Typical values:
             - Year 1000: ~1500 seconds
@@ -221,6 +343,16 @@ def deltat(tjdut: float) -> float:
                 "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
             )
 
+    # Selected Delta T model (after userdef / IERS). Default is Skyfield's
+    # SMH-2016; ``espenak_meeus`` uses the classic NASA polynomials. (Exact
+    # parity with the reference ephemeris, when needed for validation, is
+    # injected externally via set_delta_t_userdef() — libephemeris never imports
+    # any third-party ephemeris library, to stay license-independent.)
+    if get_delta_t_model() == "espenak_meeus":
+        year, month, _day, _hour = revjul(tjdut)
+        decimal_year = year + (month - 0.5) / 12.0
+        return _deltat_espenak_meeus(decimal_year) / 86400.0
+
     t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)
     return delta_t_seconds / 86400.0
@@ -255,9 +387,11 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
             from IERS is used. This provides the highest precision for
             recent dates (typically 1973-present).
 
-        **Priority 3: Skyfield's Delta T model (default)**
-            Uses Skyfield's implementation of the Stephenson, Morrison, and
-            Hohenkerk (2016) model.
+        **Priority 3: Selected Delta T model**
+            Uses the configured Delta T model. The default is Skyfield's
+            implementation of the Stephenson, Morrison, and Hohenkerk (2016)
+            model; ``espenak_meeus`` selects the Espenak & Meeus polynomial
+            model.
 
         Since libephemeris uses Skyfield which internally uses JPL data,
         FLG_SWIEPH and FLG_JPLEPH produce identical results.
@@ -280,45 +414,14 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
         "Measurement of the Earth's rotation: 720 BC to AD 2015."
         Proceedings of the Royal Society A, 472: 20160404.
     """
-    # Check for user-defined Delta T first
-    userdef_dt = get_delta_t_userdef()
-    if userdef_dt is not None:
-        return userdef_dt
-
     # Check for valid ephemeris flags
     ephe_selection = flag & (FLG_JPLEPH | FLG_SWIEPH)
 
-    # All ephemeris modes use the same Skyfield Delta T model
-    # FLG_SWIEPH and FLG_JPLEPH both use Skyfield/JPL internally
-    # FLG_MOSEPH is accepted for compatibility but ignored
+    # All ephemeris modes use the same selected Delta T model.
+    # FLG_MOSEPH is accepted for compatibility but ignored.
     _ = ephe_selection  # Explicitly unused: all modes use same Delta T
 
-    # Check for IERS Delta T if enabled
-    if get_iers_delta_t_enabled():
-        try:
-            from . import iers_data
-
-            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
-            if delta_t_seconds is not None:
-                # IERS returns seconds, convert to days
-                return delta_t_seconds / 86400.0
-        except Exception as exc:  # noqa: BLE001  # robust fallback, any error
-            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
-            # feeds every downstream position calculation, so a robust fallback
-            # must not let an unexpected exception type (OSError, KeyError, ...)
-            # escape and crash the whole pipeline. Log at debug so the silent
-            # fallback is still observable when diagnosing Delta T discrepancies.
-            from .logging_config import get_logger
-
-            get_logger().debug(
-                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
-            )
-
-    t = get_cached_time_ut1(tjdut)
-    delta_t_seconds = float(t.delta_t)
-    delta_t = delta_t_seconds / 86400.0
-
-    return delta_t
+    return deltat(tjdut)
 
 
 def date_conversion(

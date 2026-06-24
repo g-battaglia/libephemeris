@@ -122,6 +122,56 @@ model to **< 0.05″ across the entire supported range** (and the mean obliquity
 independent reproduction of the published physics; only the (physical,
 unavoidable) ΔT choice remains.
 
+## Comparison against Swiss Ephemeris (matched ΔT)
+
+It is important to separate two different measurements:
+
+* **Model purity** — libephemeris vs its *own published-physics target* (Vondrák
+  2011 + Simon 1994 + IAU-2006 GMST): **< 0.05″** across the whole range, as
+  above. The implementation is faithful.
+* **Difference vs Swiss Ephemeris** — a comparison against a *different engine*
+  that, outside its modern window, uses a **different** long-term sidereal-time
+  realization (an IAU-2006-style precession-in-RA continuation). This is naturally
+  larger at remote epochs and is a *model* difference, not an implementation
+  error.
+
+Measured against pyswisseph, **with the same ΔT forced on both sides** (so ΔT is
+removed from the comparison), the Ascendant residual is:
+
+| epoch | ASC vs Swiss | dominant component |
+|---|---|---|
+| 1850–2050 | **~0.002″** | identical IAU-2006 GMST branch |
+| 2100 | +0.9″ | long-term sidereal-time model gap |
+| 2200 | −1.3″ | (sign change near 2150) |
+| 2300 | −5.6″ | grows secularly with \|epoch − 2050\| |
+
+The residual is **entirely** in ARMC; obliquity and nutation match Swiss to
+< 0.002″ at every epoch from −3000 to +3000 (sub-milliarcsec on true ε, mean ε,
+Δψ, Δε), so they contribute nothing. The MC residual tracks ARMC 1:1; the ASC is
+that ARMC residual times the latitude Jacobian ∂Asc/∂ARMC (which *damps* the error
+at high northern latitude, ≈ 0.56 at 65°N, and slightly amplifies it in the
+south, ≈ 1.38 at 34°S — there is no polar blow-up).
+
+**The ~1.9″ step seen at 2050 is a Swiss-side discontinuity, not ours.** A sub-day
+kink test at JD 2469807.5 (2050-01-01 00:00) shows libephemeris's ARMC increments
+smoothly across the boundary (constant ~1299.548″ per 0.001 d), while pyswisseph
+has a single anomalous increment short by ~1.908″ exactly at that instant — an
+internal Swiss precession/sidereal-time model boundary. libephemeris's own two
+branches join to **0.000000″** there (the continuity offset pins the long-term
+branch to the IAU-2006 value at the boundary). So at 2050 **libephemeris is the
+more self-consistent engine.**
+
+**Verdict.** This is a benign, expected model difference. Inside 1850–2050 (where
+essentially all real charts live) agreement is ~0.002″; the remote-epoch
+divergence is the intentional Vondrák-2011 long-term design, physically preferable
+to the IAU-2006 RA polynomial Swiss continues to extrapolate (which itself
+diverges by degrees at ±8000 yr). No code change is warranted to "match" Swiss
+there; doing so would make libephemeris *less* physically correct at remote
+epochs. (A minor, purely cosmetic option would be a C1-continuous blend at the
+1850/2050 branch joins instead of the current constant continuity offset, to
+reduce the 2050–2150 residual against Swiss; it does not affect far-epoch behavior
+and is not required.)
+
 ## House cusp speeds (daily motion)
 
 `houses_ex2` also returns the **speed** (daily motion) of each cusp and angle.

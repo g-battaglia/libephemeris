@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0a6] - 2026-06-24
+
+### Added
+
+- **Delta T model selector.** `set_delta_t_model()` / `get_delta_t_model()` and the
+  `LIBEPHEMERIS_DELTAT_MODEL` environment variable (and `deltat_model` TOML key)
+  select the ΔT model used after the user-defined / IERS-observed priorities:
+  `smh2016` (default, Stephenson-Morrison-Hohenkerk 2016 via Skyfield) or
+  `espenak_meeus` (a self-contained, clean-room implementation of the classic NASA
+  Espenak & Meeus 2006 polynomials). Both are clean-room; **libephemeris never
+  imports pyswisseph.** See `docs/methodology/delta-t.md`.
+
+### Documentation
+
+- **New `docs/methodology/delta-t.md`** — comprehensive ΔT documentation: the
+  piecewise (multi-era) model, proof it is not a single diverging formula, the new
+  model selector, the clean-room/licensing constraint, the validation method
+  (Swiss ΔT injected externally via `set_delta_t_userdef`, with the
+  `swe.set_delta_t_userdef(-1.0)` pollution caveat), and the vs-Swiss comparison.
+- **Corrected `docs/reference/swisseph-comparison.md`** — modern Swiss Ephemeris
+  (≥ SE 2.06) uses Stephenson-Morrison-Hohenkerk 2016, **not** Espenak & Meeus
+  2006 (verified empirically); the libraries differ only in the deep-past/future
+  ΔT *extrapolation*. Added: at matched ΔT, positions agree to < 0.1″ (Moon
+  ~0.001″) to year 2300; and a new section on house cusps / Ascendant at remote
+  epochs.
+- **`docs/methodology/sidereal-time-longterm.md`** — added a "Comparison against
+  Swiss Ephemeris (matched ΔT)" section: the Ascendant residual outside 1850–2050
+  is purely the long-term sidereal-time (ARMC) model difference (obliquity/nutation
+  match to < 0.002″); the ~1.9″ step at 2050 is a **Swiss-side** discontinuity
+  (libephemeris is self-continuous there); verdict benign-model-difference.
+
 ## [3.0.0a5] - 2026-06-24
 
 Correctness, lint, and documentation fixes from an external code review. Each

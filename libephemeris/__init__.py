@@ -184,6 +184,9 @@ from .state import (
     # IERS Delta T configuration
     set_iers_delta_t_enabled,
     get_iers_delta_t_enabled,
+    # Delta T model selection
+    set_delta_t_model,
+    get_delta_t_model,
     # Strict precision mode
     set_strict_precision,
     get_strict_precision,
@@ -636,7 +639,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.0.0a5"
+__version__ = "3.0.0a6"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "AGPL-3.0"
@@ -992,6 +995,9 @@ __all__ = [
     # IERS Delta T configuration
     "set_iers_delta_t_enabled",
     "get_iers_delta_t_enabled",
+    # Delta T model selection
+    "set_delta_t_model",
+    "get_delta_t_model",
     # Strict precision mode
     "set_strict_precision",
     "get_strict_precision",

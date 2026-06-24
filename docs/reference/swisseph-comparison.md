@@ -9,7 +9,7 @@ LibEphemeris aims for 1:1 API compatibility with Swiss Ephemeris. The two librar
 | Ephemeris | NASA JPL DE440/DE441 (2021) | JPL DE431 (2013), in proprietary format |
 | Lunar model | DE440 numerical integration | Analytical (ELP/MPP02) + DE431 |
 | Nutation | IAU 2006/2000A via pyerfa | IAU 2006/2000A (internal) |
-| Delta T | IERS observed + Stephenson et al. 2016 | Espenak & Meeus 2006 |
+| Delta T | IERS observed + Stephenson-Morrison-Hohenkerk 2016 | IERS observed + Stephenson-Morrison-Hohenkerk 2016 (≥ SE 2.06); differs only in the deep-past / future *extrapolation* |
 | Velocities | Central difference (numerical) | Chebyshev derivative (analytical) |
 | Planet centers | Automatic COB correction (SPK + analytical) | Barycenter by default |
 | Implementation | Pure Python + Skyfield + pyerfa | C (with Python wrapper) |
@@ -139,20 +139,47 @@ For dates near the present (1900--2100), the two models agree to within a few ar
 
 **Why:** Delta T represents the difference between uniform atomic time (TT) and the irregular rotation of the Earth (UT1). The Earth's rotation is unpredictable — it slows down due to lunar tides, speeds up due to post-glacial rebound, and fluctuates on decadal timescales for reasons not fully understood.
 
-The two libraries use different models to estimate ΔT:
+Both libraries actually use the **same family** of ΔT model — Stephenson,
+Morrison & Hohenkerk (2016) for the pre-1955 era and IERS observed values for the
+modern era. (A common misconception, repeated in older versions of this document,
+is that Swiss Ephemeris uses Espenak & Meeus 2006; it did up to SE 1.77, but
+since **SE 2.06/2.08 (2017–2018) Swiss switched to SMH-2016**, exactly like
+libephemeris. Verified empirically: `swe.deltat` at 2100 = 93.2 s, which matches
+libephemeris's 95.9 s and is nowhere near the Espenak-Meeus value of 202.8 s.)
 
-| Period | LibEphemeris | pyswisseph |
+| Period | LibEphemeris | pyswisseph 2.10 |
 |--------|-------------|------------|
-| Historical (before ~1600) | Stephenson, Morrison & Hohenkerk (2016): cubic spline from eclipse observations | Espenak & Meeus (2006): polynomial fits |
-| Modern (1973--present) | IERS observed values (when enabled) | Tabulated values |
-| Future (2050+) | Parabolic extrapolation | Different parabolic extrapolation |
+| Modern (1962–present) | IERS observed | IERS / Astronomical Almanac observed — **identical** (ΔT(2000)=63.83 s on both) |
+| 1620–1955 (telescopic) | Skyfield ΔT table / SMH-2016 | tabulated values | within ~7 s (observational scatter) |
+| −720 → 1620 | Stephenson-Morrison-Hohenkerk 2016 | Stephenson-Morrison-Hohenkerk 2016 | close (same family) |
+| Deep past / future | SMH-2016 long-term (integrated length-of-day) | a *different* long-term extrapolation | the only place they diverge meaningfully |
 
-For the modern era (1900--2020), where direct measurements exist, the two models agree to within ~1 second. The 232-second maximum occurs for dates around 500 CE or beyond 2500 CE, where:
+So the divergence is **not** a "different model"; it is the unavoidable difference
+between two *extrapolations of an unknowable quantity* (future Earth rotation, or
+deep-past rotation beyond the eclipse record). Where ΔT is constrained by data the
+two agree to ≤ ~1 s.
 
-- **Historical dates**: The only data sources are ancient eclipse records (Babylonian, Chinese, Arabic). The Stephenson et al. (2016) model re-analyzed these records with improved methodology, producing different ΔT values than the older Espenak & Meeus (2006) model.
-- **Future dates**: Nobody knows how the Earth's rotation will change. Both models extrapolate using different parabolic formulas, and the divergence grows quadratically with time.
+**The difference is purely ΔT, not the ephemeris.** Forcing the *same* ΔT into
+both engines collapses the position difference to the ephemeris-model floor:
 
-**Practical impact:** ΔT affects the mapping from calendar time to astronomical time. A 232-second difference means that the two libraries place the same calendar date at slightly different points on the astronomical timeline. For planetary positions, this translates to at most a few arcseconds of positional difference (the Moon moves ~0.5"/second, so 232 seconds ≈ 116" of lunar motion — consistent with the Moon precision figures above). For the Sun and planets, the effect is much smaller.
+| date | Moon Δ (native ΔT) | Moon Δ (**same ΔT**) | worst planet (same ΔT) |
+|---|---|---|---|
+| 2100 | 1.6″ | **0.000″** | 0.04″ |
+| 2200 | 29.3″ | **0.000″** | 0.08″ |
+| 2300 | 87.0″ | **0.000″** | 0.06″ |
+
+At a common ΔT, libephemeris and Swiss positions agree to **< 0.1″** (Moon to
+~0.001″) even at year 2300 — proving the engines themselves are equivalent and the
+far-epoch divergence is entirely the ΔT *extrapolation choice*. libephemeris keeps
+the modern SMH-2016 model by default (at least as good as Swiss everywhere,
+strictly more current for the deep past). A second, clean-room **Espenak-Meeus
+2006** model is selectable via `LIBEPHEMERIS_DELTAT_MODEL` — see
+[../methodology/delta-t.md](../methodology/delta-t.md).
+
+**Practical impact:** for any real chart (natal/transit/progression, and even
+ancient astrology back to ~1000 BCE) the ΔT difference is far below the
+arcminute working precision of astrology. It only matters for far-future or
+deep-past research dates, where ΔT is genuinely uncertain for everyone.
 
 ### 2.4. House cusp speeds — numerical vs analytical derivatives
 
@@ -194,6 +221,43 @@ eph.set_auto_spk_download(True)  # Automatic download from JPL Horizons
 With SPK kernels, all minor body calculations achieve sub-arcsecond precision matching JPL Horizons exactly. The Keplerian fallback exists only for cases where SPK data is unavailable.
 
 **Note:** The JPL DE440/DE441 ephemerides used by libephemeris cover only the major planets (Mercury--Pluto) and the Moon. Asteroid positions require separate data sources regardless of the ephemeris generation.
+
+### 2.6. House cusps / Ascendant at remote epochs — long-term sidereal-time model
+
+**What:** Inside the modern range the house cusps (ASC/MC/ARMC) match Swiss to
+**~0.002″** (see the §1 table, < 0.02″). Outside ≈ **1850–2050**, *even with the
+same ΔT forced on both sides*, the cusps diverge from Swiss by a secular,
+sign-changing amount: ASC residual ≈ +1.5″ (2050), +0.9″ (2100), −1.3″ (2200),
+−5.6″ (2300), growing to ~0.1–1° at ±3000–5000 yr.
+
+**Why:** The entire residual is in the **apparent sidereal time (ARMC)** — true
+and mean obliquity, and nutation (Δψ, Δε), agree with Swiss to **< 0.002″ at every
+epoch** (sub-milliarcsec), so the Vondrák-2011 obliquity + ERFA nutation are
+effectively identical to Swiss. The ARMC difference is a *model* difference:
+libephemeris uses the IAU-2006 GMST polynomial inside 1850–2050 (same as Swiss →
+~0.002″) and a **geometric Vondrák-2011 long-term sidereal time** outside it,
+whereas Swiss continues an IAU-2006-style precession-in-RA realization that itself
+diverges at remote epochs. libephemeris's long-term construction is the more
+physically correct of the two (see
+[../methodology/sidereal-time-longterm.md](../methodology/sidereal-time-longterm.md)).
+
+**The ~1.9″ jump at 2050 is a Swiss-side discontinuity, not libephemeris's.** A
+sub-day kink test at JD 2469807.5 (2050-01-01) shows libephemeris's ARMC
+increments perfectly smoothly across the boundary, while **Swiss** has a one-time
+anomalous increment (short by ~1.908″) exactly at that instant — an internal Swiss
+model boundary. libephemeris is verified self-continuous there (internal
+branch gap 0.000000″), i.e. it is the *more* self-consistent engine at 2050. The
+apparent non-monotonicity (|2050| > |2100|) is simply two points on the same
+descending arc toward a sign change near 2150.
+
+**Latitude** modulates (does **not** monotonically amplify) the ASC residual via
+the geometric Jacobian ∂Asc/∂ARMC (≈ 1.06 at the equator, 0.78 at lat 42°N, 0.56
+at 65°N, 1.38 at 34°S) — no polar blow-up; high-northern sites are *damped*.
+
+**Verdict:** benign model difference, not a bug. Negligible (~0.002″) where all
+real charts live (1850–2050); at remote epochs the divergence is the intentional,
+documented Vondrák-2011 long-term design, which is more correct than the diverging
+IAU-2006 polynomial Swiss keeps using.
 
 ---
 

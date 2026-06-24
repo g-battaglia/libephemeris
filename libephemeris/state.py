@@ -2234,6 +2234,105 @@ def get_iers_delta_t_enabled() -> bool:
 
 
 # =============================================================================
+# DELTA T MODEL SELECTION
+# =============================================================================
+
+# Selects which Delta T model is used (after the user-defined and IERS-observed
+# priorities):
+#   - ``smh2016`` (default): Skyfield's Stephenson-Morrison-Hohenkerk (2016)
+#     model — the modern scientific standard, used by libephemeris natively.
+#   - ``espenak_meeus``: the classic Espenak & Meeus (2006) NASA polynomial set.
+# Both are clean-room implementations; libephemeris NEVER imports any third-party
+# ephemeris library, to stay license-independent. Exact parity with the reference
+# ephemeris (for validation only) is injected externally via set_delta_t_userdef()
+# in the validation harness.
+# The models only differ outside the IERS-observed range (chiefly ancient and
+# far-future dates); within the well-observed range they agree closely.
+#
+# Scope (shared by set_delta_t_userdef() and the IERS toggle, not specific to the
+# model selector): these overrides set the ΔT returned by deltat()/deltat_ex() and
+# therefore the TT used by every path that converts UT to TT through them — the
+# LEB / fast / Horizons position backends, eclipses, heliacal events and long-term
+# sidereal time. The Skyfield position backend instead derives TT from Skyfield's
+# own internal ΔT model (SMH-2016 + IERS), so its planetary positions are NOT
+# affected. Selecting a model therefore changes positions in the default (LEB)
+# backend but not in "skyfield" mode.
+_DELTA_T_MODEL_ENV_VAR = "LIBEPHEMERIS_DELTAT_MODEL"
+_VALID_DELTA_T_MODELS = ("smh2016", "espenak_meeus")
+_DEFAULT_DELTA_T_MODEL = "smh2016"
+_DELTA_T_MODEL: Optional[str] = None  # programmatic override
+
+
+def set_delta_t_model(model: Optional[str]) -> None:
+    """
+    Select the Delta T model used outside the user-defined / IERS-observed range.
+
+    Args:
+        model: ``"smh2016"`` (Stephenson-Morrison-Hohenkerk 2016, the default,
+            via Skyfield), ``"espenak_meeus"`` (Espenak & Meeus 2006 polynomials,
+            compatible with the reference ephemeris), or ``None`` to defer to the
+            ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / TOML config.
+
+    Raises:
+        ValueError: if ``model`` is not a recognised model name.
+
+    Environment Variable:
+        LIBEPHEMERIS_DELTAT_MODEL: ``smh2016`` or ``espenak_meeus``.
+
+    Note:
+        The selected model (like ``set_delta_t_userdef()`` and the IERS toggle)
+        governs the ΔT returned by ``deltat()`` / ``deltat_ex()``, and hence the
+        positions of the LEB / fast / Horizons backends, eclipses, heliacal
+        events and long-term sidereal time. The Skyfield backend obtains TT from
+        Skyfield's own internal ΔT model, so its planetary positions are
+        unaffected — selecting a model changes positions in the default (LEB)
+        backend but not in ``"skyfield"`` mode.
+    """
+    global _DELTA_T_MODEL
+    if model is None:
+        _DELTA_T_MODEL = None
+        return
+    normalized = model.lower().strip()
+    if normalized not in _VALID_DELTA_T_MODELS:
+        raise ValueError(
+            f"Unknown delta_t model {model!r}; valid models: "
+            f"{', '.join(_VALID_DELTA_T_MODELS)}"
+        )
+    _DELTA_T_MODEL = normalized
+
+
+def get_delta_t_model() -> str:
+    """
+    Return the active Delta T model name (``"smh2016"`` or ``"espenak_meeus"``).
+
+    Resolution order: explicit ``set_delta_t_model()`` value, then the
+    ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable, then the TOML config,
+    then the default (``"smh2016"``).
+    """
+    if _DELTA_T_MODEL is not None:
+        return _DELTA_T_MODEL
+
+    # Read the env var fresh (cheap dict lookup) so runtime changes are honoured;
+    # only normalise/validate it when it is actually set, to keep the common
+    # default path (this runs per deltat() call) free of needless string work.
+    env_raw = os.environ.get(_DELTA_T_MODEL_ENV_VAR)
+    if env_raw:
+        env_value = env_raw.lower().strip()
+        if env_value in _VALID_DELTA_T_MODELS:
+            return env_value
+
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("deltat_model")
+    if toml_value is not None:
+        toml_value = toml_value.lower().strip()
+        if toml_value in _VALID_DELTA_T_MODELS:
+            return toml_value
+
+    return _DEFAULT_DELTA_T_MODEL
+
+
+# =============================================================================
 # STRICT PRECISION MODE
 # =============================================================================
 

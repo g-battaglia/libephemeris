@@ -14,6 +14,7 @@ precision = "extended"
 mode = "leb"
 auto_spk = true
 strict_precision = false
+deltat_model = "espenak_meeus"
 mmap_preload_start = 2451545
 log_level = "DEBUG"
 unknown_key = "ignored"
@@ -79,6 +80,7 @@ class TestLoadConfig:
         # Valid keys with correct types are kept...
         assert cfg.get_str("precision") == "extended"
         assert cfg.get_str("mode") == "leb"
+        assert cfg.get_str("deltat_model") == "espenak_meeus"
         assert cfg.get_bool("auto_spk") is True
         assert cfg.get_bool("strict_precision") is False
         assert cfg.get_int("mmap_preload_start") == 2451545

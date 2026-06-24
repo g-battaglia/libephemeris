@@ -81,6 +81,24 @@ All coefficients are transcribed from the cited peer-reviewed papers (Vondrák
 (Capitaine, Wallace & Chapront 2003, A&A 412, 567). No third-party source code
 is used. The series and the geometric construction are standard published
 astronomy.
+
+Comparison vs the reference ephemeris (matched ΔT)
+--------------------------------------------------
+Inside 1850-2050 the ARMC matches the reference ephemeris to ~0.002" (identical
+IAU-2006 GMST branch). Outside that window the two engines use *different*
+long-term sidereal-time realizations, so house cusps (ASC/MC) diverge by a
+secular, sign-changing amount even at equal ΔT (ASC ≈ +1.5" at 2050, +0.9" at
+2100, -1.3" at 2200, -5.6" at 2300, ~0.1-1° at ±3000-5000 yr). This is a benign
+*model* difference: obliquity and nutation match the reference to < 0.002" at
+every epoch, so the residual is entirely the long-term ARMC model, and
+libephemeris's geometric Vondrák construction is the more physically correct of
+the two (the reference continues an IAU-2006-style precession-in-RA polynomial
+that itself diverges at remote epochs). NB: the ~1.9" step seen near 2050 is a
+discontinuity on the reference side (its sidereal time has a one-time ~1.908"
+jump exactly at JD 2469807.5); libephemeris's two branches join to 0.000000"
+there, i.e. it is self-continuous. See
+``docs/methodology/sidereal-time-longterm.md`` and
+``docs/reference/swisseph-comparison.md`` for the full analysis.
 """
 
 from __future__ import annotations
