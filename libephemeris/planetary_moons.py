@@ -46,6 +46,7 @@ from .constants import (
     FLG_BARYCTR,
     FLG_EQUATORIAL,
     FLG_HELCTR,
+    FLG_J2000,
     FLG_NOABERR,
     FLG_NONUT,
     FLG_SIDEREAL,
@@ -584,8 +585,14 @@ def calc_moon_position(
         # must also be the mean ecliptic (Δψ stripped) — otherwise the mismatch
         # leaks ~Δψ·cos(ε) (~15-17") into RA/Dec. Mirror the node/Lilith _sid_eq
         # rule in planets._calc_body_pctr.
+        #
+        # FLG_J2000: the J2000 ecliptic carries no nutation. _maybe_equatorial_convert
+        # precesses this longitude to J2000 with a precession-only matrix that never
+        # removes Δψ, so the of-date Δψ must be stripped here (mirroring the planet/
+        # SPK path, which omits nutation for J2000) — otherwise moons land ~Δψ (up to
+        # ~17") off the nutation-free J2000 frame used by every other J2000 body.
         _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
-        if (iflag & FLG_NONUT) or _sid_eq:
+        if (iflag & FLG_NONUT) or _sid_eq or (iflag & FLG_J2000):
             from .cache import get_cached_nutation
 
             dpsi_rad, _ = get_cached_nutation(t_obs.tt)

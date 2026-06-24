@@ -2728,8 +2728,12 @@ def _apply_fixstar_flags(
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
         if iflag & FLG_J2000:
-            # J2000 obliquity for J2000 equatorial frame
-            eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
+            # J2000 obliquity for J2000 equatorial frame.
+            # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
+            # Kept to match the planet J2000-equatorial path (planets.py) so
+            # star and planet declinations share one J2000 frame; the strict
+            # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
+            eps = 23.4392911
         elif iflag & FLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
             eps = get_mean_obliquity(jd_tt)
@@ -2887,12 +2891,29 @@ def batch_fixstars_ut(
     unresolved stars keep their input slot as ``None``.
 
     Note:
-        Unlike the single-star path, this batch path computes geocentric
-        positions and does not apply ``FLG_TOPOCTR``. A fixed star's diurnal
-        *parallax* is sub-microarcsecond, but the diurnal *aberration* that
-        ``FLG_TOPOCTR`` adds is ~0.2"; the batch positions omit it. Use
-        ``fixstar2_ut`` per star when topocentric output is required.
+        The fast geocentric batch path does not support ``FLG_TOPOCTR``. When
+        that flag is set the function transparently delegates to the
+        topocentric single-star path (``fixstar2_ut``) per star, so batch and
+        single-star output agree (the diurnal *aberration* that ``FLG_TOPOCTR``
+        adds is ~0.2"); only the per-star fast path is bypassed.
     """
+    # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
+    # below; rather than silently return geocentric positions that disagree
+    # with fixstar2_ut, delegate per star to the topocentric single-star path.
+    if flags & FLG_TOPOCTR:
+        topo_results: list[
+            Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+        ] = []
+        for star_name in stars:
+            try:
+                topo_results.append(fixstar2_ut(star_name, tjdut, flags))
+            except Error:
+                if skip_errors:
+                    topo_results.append(None)
+                    continue
+                raise
+        return tuple(topo_results)
+
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 

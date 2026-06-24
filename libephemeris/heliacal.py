@@ -452,16 +452,20 @@ class SchaeferModel:
         # Airmass at object position
         X_obj = self.airmass(obj_alt)
 
-        # Sky brightness from Moon (K&S 1991 Eq. 15/20):
-        # B_moon = f(ρ) * I * 10^(-0.4*k*X_obj) * (1 - 10^(-0.4*k*X_obj))
+        # Sky brightness from Moon (K&S 1991 Eq. 20):
+        # B_moon = f(ρ) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
         #
-        # The term (1 - 10^(-0.4*k*X_obj)) represents the fraction of
-        # atmosphere along the line of sight available for scattering.
-        extinction_factor = 10.0 ** (-0.4 * self.k_total * X_obj)
-        scatter_depth = 1.0 - extinction_factor
+        # I_ground already carries the moonlight extinction along the Moon's
+        # airmass (X_moon). The remaining factor (1 - 10^(-0.4*k*X_obj)) is the
+        # fraction of atmosphere along the OBJECT's line of sight available for
+        # scattering. There is no second object-path extinction multiplier; an
+        # extra 10^(-0.4*k*X_obj) here would apply object-path extinction twice
+        # and systematically under-estimate moonlit sky brightness at low
+        # object altitude.
+        scatter_depth = 1.0 - 10.0 ** (-0.4 * self.k_total * X_obj)
 
         # B_moon in nanoLamberts
-        B_moon = f_rho * I_ground * extinction_factor * scatter_depth
+        B_moon = f_rho * I_ground * scatter_depth
 
         # Convert B_moon to magnitude reduction.
         # Dark sky brightness B_dark ≈ 145 nL (airglow) + 100 nL (zodiacal)

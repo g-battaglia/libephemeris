@@ -1540,6 +1540,18 @@ def download_leb2_for_tier(
                 expected_sha256=file_info.get("sha256"),
                 show_progress=show_progress and not quiet,
             )
+            # Validate the downloaded file (download_file only checks the hash
+            # when one is present; a DATA_FILES entry without a sha256 would
+            # otherwise let a truncated/corrupt file through). Mirror
+            # download_leb_for_tier / _download_planet_centers_for_tier.
+            if not _is_valid_leb(str(dest_path)):
+                try:
+                    dest_path.unlink()
+                except OSError:
+                    pass
+                if not quiet:
+                    print(f"  [FAIL] {filename}: downloaded file is corrupt")
+                continue
             downloaded.append(dest_path)
             if not quiet:
                 print(f"  [OK] {filename}")

@@ -209,8 +209,11 @@ def deltat(tjdut: float) -> float:
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
-        except (ValueError, ArithmeticError):
-            # Fall back to Skyfield if IERS data fails
+        except Exception:
+            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
+            # feeds every downstream position calculation, so a robust fallback
+            # must not let an unexpected exception type (OSError, KeyError, ...)
+            # escape and crash the whole pipeline.
             pass
 
     t = get_cached_time_ut1(tjdut)
@@ -294,8 +297,11 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
-        except (ValueError, ArithmeticError):
-            # Fall back to Skyfield if IERS data fails
+        except Exception:
+            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
+            # feeds every downstream position calculation, so a robust fallback
+            # must not let an unexpected exception type (OSError, KeyError, ...)
+            # escape and crash the whole pipeline.
             pass
 
     t = get_cached_time_ut1(tjdut)

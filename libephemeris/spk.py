@@ -1263,7 +1263,7 @@ def _calc_type21_position(
             speed_lon = math.degrees((x * vy - y * vx) / xy_sq)
             xy = math.sqrt(xy_sq)
             speed_lat = (
-                math.degrees((z * (x * vx + y * vy) / xy - xy * vz) / (r * r))
+                math.degrees((xy * vz - z * (x * vx + y * vy) / xy) / (r * r))
                 if r > 0
                 else 0.0
             )

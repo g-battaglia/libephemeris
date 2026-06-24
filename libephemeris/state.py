@@ -995,6 +995,11 @@ def get_planets() -> SpiceKernel:
                                 _EPHEMERIS_FILE,
                             )
                             _PLANETS = load(fb_path)
+                            # Reflect the kernel actually loaded so
+                            # get_current_file_data() reports the matching DE
+                            # number and date range instead of the requested
+                            # tier file we did not load.
+                            _EPHEMERIS_FILE = fb
                             loaded = True
                             break
                     if not loaded:
@@ -1004,6 +1009,7 @@ def get_planets() -> SpiceKernel:
                             "internal calculations..."
                         )
                         _PLANETS = load("de440s.bsp")
+                        _EPHEMERIS_FILE = "de440s.bsp"
                 else:
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)

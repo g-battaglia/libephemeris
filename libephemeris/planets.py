@@ -2642,6 +2642,19 @@ def _calc_body(
 
             if iflag & FLG_HELCTR:
                 pos = _calc_helio(jd_tt)
+                if ipl in _FICT_HELIO_IDS:
+                    # calc_fictitious_position returns J2000 ecliptic for the
+                    # predicted planets; precess to the mean ecliptic of date so
+                    # the shared "mean ecliptic of date (+ nutation)" treatment
+                    # below is frame-consistent. Without this, a J2000 longitude
+                    # would get Δψ added (and be reported) without ever being
+                    # precessed to of-date. VULCAN/PROSERPINA already use the
+                    # equinox of date and need no rotation.
+                    from .fast_calc import _general_precession_rate_deg_day
+
+                    h_lon, h_lat = _precess_ecliptic(pos[0], pos[1], 2451545.0, jd_tt)
+                    h_dlon = pos[3] + _general_precession_rate_deg_day(jd_tt)
+                    pos = (h_lon, h_lat, pos[2], h_dlon, pos[4], pos[5])
             else:
                 g_lon, g_lat, g_dist = _geo_of_date(jd_tt)
                 dt_v = 0.1

@@ -62,7 +62,9 @@ class EphemerisContext:
 
     Attributes:
         topo: Observer topocentric location (or None for geocentric)
-        sidereal_mode: Active sidereal mode ID (1 = Lahiri by default)
+        sidereal_mode: Active sidereal mode ID (0 = Fagan/Bradley by default,
+            matching the module-level API's default when set_sid_mode is never
+            called)
         sidereal_t0: Reference epoch for custom ayanamsha (JD)
         sidereal_ayan_t0: Ayanamsha value at reference epoch (degrees)
 
@@ -89,10 +91,23 @@ class EphemerisContext:
                       Supported files: "de440s.bsp" (1849-2150, lightweight),
                       "de440.bsp" (1550-2650, default), "de441.bsp" (-13200 to
                       +17191, extended range).
+
+        Note:
+            ``ephe_path``/``ephe_file`` select the *process-wide* shared kernel,
+            not a per-context one: all contexts deliberately share a single
+            loaded JPL kernel to save memory (see ``get_planets``). The first
+            context whose calculation triggers the load wins — a later context
+            constructed with a different ``ephe_file`` updates the shared
+            selection only if the kernel has not been loaded yet, otherwise the
+            already-loaded kernel is reused and the new ``ephe_file`` is ignored.
+            Calculation state (topo, sidereal mode, SPK map) IS per-context.
         """
         # Instance-specific state (NOT shared between contexts)
         self.topo: Optional[Topos] = None
-        self.sidereal_mode: int = 1  # Default: Lahiri (SIDM_LAHIRI)
+        # Default Fagan/Bradley (0) to match the module-level API: get_sid_mode()
+        # returns 0 when set_sid_mode was never called, so a fresh context and the
+        # module API must agree for an unset FLG_SIDEREAL request.
+        self.sidereal_mode: int = 0  # Default: Fagan/Bradley (SIDM_FAGAN_BRADLEY)
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
         self._angles_cache: dict[str, float] = {}

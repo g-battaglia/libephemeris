@@ -1372,8 +1372,12 @@ def test_download_leb2_for_tier_invalid_cache_redownload(tmp_path, monkeypatch):
     leb_dir = tmp_path / "leb"
     leb_dir.mkdir()
     # core exists but is invalid -> _is_valid_leb False -> download path.
+    # The freshly downloaded file (b"d") must validate so the post-download
+    # corruption guard accepts it; only the pre-existing b"corrupt" is invalid.
     (leb_dir / "base_core.leb2").write_bytes(b"corrupt")
-    monkeypatch.setattr(dl, "_is_valid_leb", lambda p: False)
+    monkeypatch.setattr(
+        dl, "_is_valid_leb", lambda p: Path(p).read_bytes() != b"corrupt"
+    )
     monkeypatch.setattr(
         dl,
         "download_file",

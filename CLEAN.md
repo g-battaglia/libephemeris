@@ -346,3 +346,24 @@ Logged per policy and left in place.
   than the advertised Content-Length, `filled` exceeds `width` and the `"-" *
   (width - filled)` segment goes negative (empty). Cosmetic display only (the
   bar is not used for any calculation); left as-is.
+
+## 2026-06-24 full-code review — known limitations (not changed)
+
+Real but low-risk edges left in place; a behavioral change would touch
+delicate validated paths for a negligible practical gain.
+
+- `context.py:__init__` — constructing an `EphemerisContext` with a custom
+  `ephe_path`/`ephe_file` mutates the module globals `_SHARED_EPHE_PATH`/
+  `_SHARED_EPHE_FILE`, which select the single process-wide shared kernel. This
+  is by design (all contexts share one loaded JPL kernel to save memory), but it
+  means contexts are NOT independent in their kernel selection: the first context
+  to trigger the load wins, and a later context requesting a different file is
+  silently served the already-loaded one. Now documented explicitly in the
+  constructor docstring rather than refactored (a true per-context kernel would
+  defeat the shared-memory design).
+- `crossing.py` backward heliocentric search (`helio_cross_ut` ~line 1462,
+  `helio_cross` ~line 1632) — when the target longitude lies within
+  `NR_TOLERANCE` of the body's current longitude, the negative initial `dt_guess`
+  is ~0, so Newton-Raphson can converge on a crossing at/after `tjdut` instead of
+  the strictly-previous one (returns `jd >= tjdut`). Degenerate "already there"
+  case only; left unchanged to avoid perturbing the validated crossing solver.

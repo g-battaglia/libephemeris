@@ -154,15 +154,26 @@ class SPKType21(object):
             key = (target, center)
             cached = self._mda_cache.get(key)
             if cached is not None:
-                mda_record, mda_lb, mda_ub = cached
+                mda_record, mda_lb, mda_ub, mda_segment = cached
                 if mda_lb <= eval_sec < mda_ub:
+                    # spke21 reads MAXDIM from self.current_segment; restore the
+                    # segment this record came from so a cache hit for one body
+                    # does not inherit a stale MAXDIM from another body whose
+                    # type-21 segments share this same SPKType21 instance.
+                    self.current_segment = mda_segment
+                    self.current_segment_exist = True
                     result = self.spke21(eval_sec, mda_record)
                     return result[0:3], result[3:]
 
             mda_record, mda_lb, mda_ub = self.get_MDA_record(
                 eval_sec, target, center
             )
-            self._mda_cache[key] = (mda_record, mda_lb, mda_ub)
+            self._mda_cache[key] = (
+                mda_record,
+                mda_lb,
+                mda_ub,
+                self.current_segment,
+            )
 
             result = self.spke21(eval_sec, mda_record)
             return result[0:3], result[3:]
