@@ -1,10 +1,9 @@
 # Long-term sidereal time, precession and obliquity
 
 This note explains how libephemeris computes the **sidereal time (ARMC)** and the
-**mean obliquity** that drive house cusps and the apparent-place reduction, why
-the chosen model is the scientifically correct one over long time spans, and why
-it is better than the approach most ephemeris/astrology engines use. The
-implementation is `libephemeris/sidereal_longterm.py`.
+**mean obliquity** that drive house cusps and the apparent-place reduction, and why
+the chosen model stays correct over long time spans. The implementation is
+`libephemeris/sidereal_longterm.py`.
 
 ## What these quantities are
 
@@ -20,19 +19,20 @@ moves the equinox. Sidereal time additionally depends on the Earth's rotation
 (UT1) and therefore on **ΔT = TT − UT1**, the slowly varying, partly
 unpredictable offset between uniform time and clock-from-rotation time.
 
-## The problem with the usual choice
+## Why a long-term model is required
 
 The classical IAU 1976 / IAU 2006 precession is a **polynomial in time** fitted
 near J2000.0. A truncated polynomial is superb for a few centuries but **diverges
-rapidly** outside its fit window. Evaluated at ±8000 years it is wrong by
+rapidly** outside its fit window: evaluated at ±8000 years it is wrong by
 **degrees**, which corrupts every house cusp at historical or far-future epochs.
-Many astrology engines inherit exactly this limitation, because they read
-sidereal time from an IAU-1976/2006 routine and obliquity from the IAU-2006
-polynomial — both designed for the modern era only.
+The same applies to a sidereal time read from an IAU-1976/2006 routine and an
+obliquity read from the IAU-2006 polynomial — both are designed for the modern era
+only.
 
-Concretely, before this work libephemeris derived the house ARMC from a CIO-based
-IAU-2006 sidereal time; the resulting house cusps diverged from a long-term
-reference by up to **~3°** at ±8000 years.
+This is not hypothetical for libephemeris: an earlier implementation derived the
+house ARMC from a CIO-based IAU-2006 sidereal time, and the resulting house cusps
+diverged from a long-term reference by up to **~3°** at ±8000 years. The current
+model removes that error.
 
 ## The model we use
 
@@ -83,16 +83,16 @@ Time scales follow the standard convention: precession and obliquity are
 evaluated at **TT**; the Earth-rotation hour angle uses **UT1**; the TT↔UT1
 difference is the library's own ΔT, so houses and positions share one ΔT.
 
-## Why this is better than the competitors
+## Properties of this model
 
-* **Validity range.** The model is correct to arcsecond level over ±200
-  millennia. Engines built on IAU 1976/2006 sidereal time are correct only for a
-  few centuries and accrue degree-level house errors at deep-historical dates
-  (Babylonian, ancient-Egyptian charts) and far-future dates.
+* **Validity range.** The model is correct to arcsecond level over ±200 millennia,
+  so deep-historical charts (Babylonian, ancient-Egyptian) and far-future charts
+  keep accurate house cusps, where a truncated IAU 1976/2006 sidereal time accrues
+  degree-level errors.
 * **Internal chart consistency.** House cusps and planetary positions use the
-  *same* obliquity realization and the *same* ΔT. An engine that uses one model
-  for positions and another for houses can place a body on the wrong side of a
-  cusp at remote epochs even when each piece is individually "reasonable".
+  *same* obliquity realization and the *same* ΔT. Using one model for positions and
+  another for houses can place a body on the wrong side of a cusp at remote epochs
+  even when each piece is individually "reasonable".
 * **Independence and verifiability.** Every coefficient comes from the cited
   peer-reviewed papers (Vondrák 2011 + corrigendum; Simon 1994) and the IAU 2006
   GMST expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567). Nothing is
@@ -104,73 +104,25 @@ difference is the library's own ΔT, so houses and positions share one ΔT.
 ΔT measures the Earth's rotation, which is **reconstructed** in the deep past
 (from ancient eclipse records) and **unpredictable** in the future. libephemeris
 uses the Stephenson–Morrison–Hohenkerk (2016) model plus observed IERS data,
-applied consistently across the whole library.
+applied consistently across the whole library (see
+[delta-t.md](delta-t.md)).
 
 At remote epochs the *sidereal time* is extremely sensitive to ΔT: the Sun's mean
 longitude moves ~0.9856°/day ≈ 3548″/day, so a ΔT difference of even a fraction
-of a day is amplified into arcminutes of ARMC. Consequently, comparisons against
-another engine at ±8000 years can differ by arcminutes — but that difference is
-**entirely the ΔT-model choice**, not a precession/obliquity error, and it is:
+of a day is amplified into arcminutes of ARMC. Consequently, comparing against any
+engine that uses a different ΔT at ±8000 years can differ by arcminutes — but that
+difference is **entirely the ΔT-model choice**, not a precession/obliquity error,
+and it is:
 
 * **zero** in the era of real use (1700–2300: sub-arcsecond), and
 * negligible even for historical astrology (within a few arcseconds back to
   ~1000 BCE — far below the arcminute working precision of any astrologer).
 
-When the same ΔT is used on both sides, the house cusps reproduce the reference
-model to **< 0.05″ across the entire supported range** (and the mean obliquity to
-< 0.001″) — i.e. the precession/sidereal-time model itself is an exact,
-independent reproduction of the published physics; only the (physical,
+When the same ΔT is used on both sides, the house cusps reproduce the
+published-physics target to **< 0.05″ across the entire supported range** (and the
+mean obliquity to < 0.001″) — i.e. the precession/sidereal-time model itself is an
+exact, independent reproduction of the published physics; only the (physical,
 unavoidable) ΔT choice remains.
-
-## Comparison against Swiss Ephemeris (matched ΔT)
-
-It is important to separate two different measurements:
-
-* **Model purity** — libephemeris vs its *own published-physics target* (Vondrák
-  2011 + Simon 1994 + IAU-2006 GMST): **< 0.05″** across the whole range, as
-  above. The implementation is faithful.
-* **Difference vs Swiss Ephemeris** — a comparison against a *different engine*
-  that, outside its modern window, uses a **different** long-term sidereal-time
-  realization (an IAU-2006-style precession-in-RA continuation). This is naturally
-  larger at remote epochs and is a *model* difference, not an implementation
-  error.
-
-Measured against pyswisseph, **with the same ΔT forced on both sides** (so ΔT is
-removed from the comparison), the Ascendant residual is:
-
-| epoch | ASC vs Swiss | dominant component |
-|---|---|---|
-| 1850–2050 | **~0.002″** | identical IAU-2006 GMST branch |
-| 2100 | +0.9″ | long-term sidereal-time model gap |
-| 2200 | −1.3″ | (sign change near 2150) |
-| 2300 | −5.6″ | grows secularly with \|epoch − 2050\| |
-
-The residual is **entirely** in ARMC; obliquity and nutation match Swiss to
-< 0.002″ at every epoch from −3000 to +3000 (sub-milliarcsec on true ε, mean ε,
-Δψ, Δε), so they contribute nothing. The MC residual tracks ARMC 1:1; the ASC is
-that ARMC residual times the latitude Jacobian ∂Asc/∂ARMC (which *damps* the error
-at high northern latitude, ≈ 0.56 at 65°N, and slightly amplifies it in the
-south, ≈ 1.38 at 34°S — there is no polar blow-up).
-
-**The ~1.9″ step seen at 2050 is a Swiss-side discontinuity, not ours.** A sub-day
-kink test at JD 2469807.5 (2050-01-01 00:00) shows libephemeris's ARMC increments
-smoothly across the boundary (constant ~1299.548″ per 0.001 d), while pyswisseph
-has a single anomalous increment short by ~1.908″ exactly at that instant — an
-internal Swiss precession/sidereal-time model boundary. libephemeris's own two
-branches join to **0.000000″** there (the continuity offset pins the long-term
-branch to the IAU-2006 value at the boundary). So at 2050 **libephemeris is the
-more self-consistent engine.**
-
-**Verdict.** This is a benign, expected model difference. Inside 1850–2050 (where
-essentially all real charts live) agreement is ~0.002″; the remote-epoch
-divergence is the intentional Vondrák-2011 long-term design, physically preferable
-to the IAU-2006 RA polynomial Swiss continues to extrapolate (which itself
-diverges by degrees at ±8000 yr). No code change is warranted to "match" Swiss
-there; doing so would make libephemeris *less* physically correct at remote
-epochs. (A minor, purely cosmetic option would be a C1-continuous blend at the
-1850/2050 branch joins instead of the current constant continuity offset, to
-reduce the 2050–2150 residual against Swiss; it does not affect far-epoch behavior
-and is not required.)
 
 ## House cusp speeds (daily motion)
 
@@ -213,19 +165,22 @@ missing obliquity-rate term is ~0.01 °/day). Callers that have the time should 
 
 The model is exhaustively validated in the separate `validation/` repository:
 
-* `validation/compare_scripts/rounds/houses/lt*.py` (run with
-  `sh run.sh houses`) — covering, across −13200…+17191: mean-obliquity
-  model-purity (< 0.001″), sidereal-time model-purity at matched ΔT (< 0.05″),
-  every house system at many latitudes (matched-ΔT cusps < 0.05″), vertex /
-  auxiliary points, high latitudes, a dense modern no-regression sweep, sidereal
-  (ayanamsha) cusps, internal consistency, DE441 edges, round-trips, `house_pos`,
-  a massive systems×latitudes×epochs grid, and the **cusp speeds** under the
-  ground-truth criterion (the reported speed must reproduce the real cusp motion)
-  plus agreement with the reference on the angles and closed-form systems.
+* `validation/compare_scripts/rounds/houses/lt*.py` (run with `sh run.sh houses`) —
+  covering, across −13200…+17191: mean-obliquity model-purity (< 0.001″),
+  sidereal-time model-purity at matched ΔT (< 0.05″), every house system at many
+  latitudes (matched-ΔT cusps < 0.05″), vertex / auxiliary points, high latitudes,
+  a dense modern no-regression sweep, sidereal (ayanamsha) cusps, internal
+  consistency, DE441 edges, round-trips, `house_pos`, a massive
+  systems×latitudes×epochs grid, and the **cusp speeds** under the ground-truth
+  criterion (the reported speed must reproduce the real cusp motion).
 * `validation/compare_scripts/rounds/positions/lt*.py` (run with
   `sh run.sh positions`) — confirms the shared obliquity leaves modern positions
   unchanged, bounds the (smooth, expected) of-date obliquity shift at remote
   epochs, and validates the full −8000…+8000 range with the DE441 extended tier
-  both against the reference (with a date-scaled envelope for the ΔT and
-  ephemeris-version differences) and against an **independent DE441 oracle**
-  (jplephem + erfa) that shares the ephemeris but not the code path.
+  against an **independent DE441 oracle** (jplephem + erfa) that shares the
+  ephemeris but not the code path.
+
+---
+
+*For how the remote-epoch ARMC residual compares against Swiss Ephemeris at matched
+ΔT, see [Swiss Ephemeris Comparison](../comparison/known-differences.md#26-house-cusps-and-ascendant-at-remote-epochs).*

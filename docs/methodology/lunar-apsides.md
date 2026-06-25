@@ -1,6 +1,6 @@
 # Lunar Apsides: Computational Methodology
 
-LibEphemeris computes the interpolated lunar apsides (perigee and apogee) using a passage-interpolated harmonic fitting method anchored to JPL DE440/DE441 numerical integrations, differing fundamentally from the analytical term-selection approach used by Swiss Ephemeris.
+LibEphemeris computes the interpolated lunar apsides (perigee and apogee) using a passage-interpolated harmonic fitting method anchored to JPL DE440/DE441 numerical integrations, rather than the classic analytical term-selection approach.
 
 ## Background
 
@@ -8,7 +8,7 @@ The lunar apsides — perigee (closest approach) and apogee (farthest point) —
 
 For practical ephemeris use, this oscillation must be smoothed to produce an "interpolated" or "natural" apsidal position that reflects the genuine long-term motion of the apsidal line without the spurious short-period volatility inherent in the two-body approximation.
 
-The choice of smoothing methodology constitutes the most significant computational difference between LibEphemeris and Swiss Ephemeris.
+The choice of smoothing methodology is the single most consequential design decision for the interpolated apsides, and the place where ephemeris engines differ most.
 
 ## Method
 
@@ -26,21 +26,26 @@ The result is a smooth apsidal curve anchored to the physical distance extrema o
 
 ## Precision and Validation
 
-### Measured Discrepancy
+### Smoothing characteristics
 
-The interpolated perigee (`INTP_PERG`) in LibEphemeris differs from Swiss Ephemeris by up to approximately 5 degrees. This is the largest single discrepancy between the two libraries.
+The passage-interpolated perigee follows the full ~25° oscillation amplitude of the
+physical apsidal line; an analytical term-selection method that removes
+mean-anomaly terms yields a smaller ~15° amplitude. For the apogee, where
+perturbation amplitudes are smaller, the two philosophies converge.
 
-The difference arises from two distinct smoothing philosophies applied to the same underlying phenomenon:
+| Property                      | LibEphemeris                            |
+| ----------------------------- | --------------------------------------- |
+| Ground truth                  | JPL DE440/DE441 numerical integration   |
+| Smoothing method              | Physical passage interpolation          |
+| Perigee oscillation amplitude | ~25 deg from mean                       |
+| Apogee oscillation amplitude  | ~5 deg from mean                        |
+| Date range                    | 1550–2650 (DE440) / -13200 to +17191 (DE441) |
 
-| Property                      | Swiss Ephemeris                 | LibEphemeris                            |
-| ----------------------------- | ------------------------------- | --------------------------------------- |
-| Ground truth                  | ELP2000-82B analytical theory   | JPL DE440/DE441 numerical integration   |
-| Smoothing method              | Analytical term selection       | Physical passage interpolation          |
-| Perigee oscillation amplitude | ~15 deg from mean               | ~25 deg from mean                       |
-| Apogee oscillation amplitude  | ~5 deg from mean                | ~5 deg from mean                        |
-| Date range                    | ~-5400 to +5400 CE              | 1550–2650 (DE440) / -13200 to +17191 (DE441) |
-
-The interpolated apogee (`INTP_APOG`) shows a smaller discrepancy (~0.36 degrees maximum), as both approaches produce similar results for the apogee where perturbation amplitudes are smaller.
+Because the two approaches smooth the same phenomenon differently, the interpolated
+perigee (`INTP_PERG`) is where libephemeris differs most from an analytical engine
+(up to ~5°), while the interpolated apogee (`INTP_APOG`) differs by ~0.36° at most.
+These head-to-head figures are catalogued in the
+[Swiss Ephemeris Comparison](../comparison/known-differences.md).
 
 ### Rationale
 
@@ -49,14 +54,6 @@ LibEphemeris adopts JPL numerical integrations as the primary reference for orbi
 The ELP2000-82B theory, while a significant achievement of 20th-century celestial mechanics, is a truncated analytical approximation fitted to an earlier generation of observations. Where the analytical smoothing and the physical passage interpolation disagree, the JPL-grounded approach more closely represents the actual state of the Earth-Moon system.
 
 This choice prioritizes physical accuracy over backward compatibility with the analytical framework.
-
-## Comparison with Swiss Ephemeris
-
-Swiss Ephemeris computes the interpolated apsides using the analytical method developed by S.L. Moshier, based on the ELP2000-82B lunar theory (Chapront-Touzé & Chapront, 1988).
-
-This approach works within the analytical framework of the lunar theory itself: the thousands of trigonometric terms in ELP2000-82B are classified by their physical origin, and terms associated with the mean anomaly (the Moon's monthly orbital cycle) are excluded. The remaining terms define the smoothed apsidal position.
-
-This produces a mathematically coherent result within its theoretical framework. However, the output is constrained by the truncation level and fitting epoch of the analytical theory (1988). The resulting curve can differ from the physical geometry of the Earth-Moon system — as represented by modern numerical integrations — by several degrees.
 
 ## References
 

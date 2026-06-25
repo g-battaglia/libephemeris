@@ -13,8 +13,13 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "libephemeris"
 copyright = "2024-2026, Giacomo Battaglia"
 author = "Giacomo Battaglia"
-release = "1.0.0"
-version = "1.0.0"
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    release = _pkg_version("libephemeris")
+except PackageNotFoundError:  # editable/source checkout without metadata
+    release = "3.0.0a6"
+version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
 extensions = [
@@ -42,12 +47,13 @@ napoleon_preprocess_types = False
 napoleon_type_aliases = None
 napoleon_attr_annotations = True
 
-# Autodoc settings
+# Autodoc settings.
+# The API reference (docs/api_reference.rst) documents class members and methods by
+# hand (curated signatures + examples), so autoclass must NOT also auto-generate them
+# — otherwise every method/field gets a duplicate object description. Keep autodoc to
+# the class/exception docstring only.
 autodoc_default_options = {
-    "members": True,
     "member-order": "bysource",
-    "special-members": "__init__",
-    "undoc-members": True,
     "exclude-members": "__weakref__",
 }
 autodoc_typehints = "description"

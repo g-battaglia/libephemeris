@@ -56,14 +56,30 @@ By default positions are apparent (light-time + aberration corrected).
 | Flag | Effect |
 |------|--------|
 | `FLG_SIDEREAL` | Subtract ayanamsha from ecliptic longitude. Requires prior `set_sid_mode()` call to select ayanamsha (Lahiri, Fagan-Bradley, etc.). |
+| `FLG_TROPICAL` | Tropical zodiac (value `0`); the default complement of `FLG_SIDEREAL`, listed for explicitness. |
 
 ## Compatibility
 
 | Flag | Effect |
 |------|--------|
-| `FLG_MOSEPH` | Accepted for API compatibility, silently ignored. All calculations always use JPL DE440/DE441. |
-| `FLG_SWIEPH` | Same -- accepted and ignored. |
+| `FLG_JPLEPH` | Select the JPL ephemeris -- what libephemeris always uses, so effectively the default. |
+| `FLG_SWIEPH` | Accepted for API compatibility, ignored -- all calculations use JPL DE440/DE441. |
+| `FLG_MOSEPH` | Accepted for API compatibility, ignored. There is no Moshier fallback. |
+| `FLG_DEFAULTEPH` | Default ephemeris selector (value `2`), equivalent to `FLG_SWIEPH`. |
 | `FLG_SPEED3` | Converted to `FLG_SPEED` internally. |
+
+## Advanced / specialized
+
+These exist for pyswisseph API compatibility; most users never need them.
+
+| Flag | Effect |
+|------|--------|
+| `FLG_CENTER_BODY` | Request the planet body center instead of the system barycenter. libephemeris already returns body centers by default (see [Planet Centers](../methodology/planet-centers-spk.md)). |
+| `FLG_ORBEL_AA` | Use the Astronomical Almanac convention for osculating orbital elements (`get_orbital_elements`). |
+| `FLG_JPLHOR` | JPL Horizons-consistent precession/nutation handling (legacy compatibility). |
+| `FLG_JPLHOR_APPROX` | Approximate JPL Horizons mode (legacy compatibility). |
+| `FLG_DPSIDEPS_1980` | IAU 1980 nutation-delta handling where applicable (legacy compatibility; shares its bit value with `FLG_JPLHOR`). |
+| `FLG_TEST_PLMOON` | Internal planetary-moon test selector; not for general use. |
 
 ## Examples
 

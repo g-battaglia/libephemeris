@@ -17,11 +17,10 @@ LibEphemeris computes the interpolated (natural) lunar apogee and perigee by smo
   - [Decision Matrix](#decision-matrix)
 - [API Usage](#api-usage)
 - [Precision and Validation](#precision-and-validation)
-  - [Precision Comparison vs pyswisseph](#precision-comparison-vs-pyswisseph)
+  - [Precision (measured)](#precision-measured)
   - [Smoothness Comparison](#smoothness-comparison)
   - [Apogee-Perigee Relationship](#apogee-perigee-relationship)
   - [Valid Date Range](#valid-date-range)
-- [Comparison with Swiss Ephemeris](#comparison-with-swiss-ephemeris)
 - [References](#references)
 
 ## Background
@@ -221,7 +220,7 @@ This approach achieves a computationally efficient analytical formula grounded i
 - Oscillates approximately ±5 degrees from mean (for apogee)
 - Smooth, continuous motion
 - Represents the genuine apsidal line orientation
-- Available in LibEphemeris and pyswisseph (version 1.70+)
+- Available via the `INTP_APOG` body
 
 ### Interpolated Perigee (INTP_PERG)
 
@@ -244,8 +243,8 @@ This approach achieves a computationally efficient analytical formula grounded i
 | Physical accuracy | Interpolated |
 | Supermoon calculations | Interpolated Perigee |
 | Lunar distance extremes timing | Interpolated |
-| pyswisseph API compatibility (basic) | Mean Lilith |
-| pyswisseph API compatibility (advanced) | Interpolated |
+| Drop-in API compatibility (basic) | Mean Lilith |
+| Drop-in API compatibility (advanced) | Interpolated |
 | Research into orbital mechanics | Osculating |
 
 ## API Usage
@@ -312,7 +311,7 @@ When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 
 ## Precision and Validation
 
-### Precision Comparison vs pyswisseph
+### Precision (measured)
 
 | Variant | Mean Error | Max Error |
 |---------|------------|-----------|
@@ -325,11 +324,11 @@ When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 
 **Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. LibEphemeris computes osculating elements from JPL DE state vectors
-2. pyswisseph uses integrated analytical lunar theory
+2. an analytical lunar theory yields a different osculating apogee
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
 **Note on Interpolated differences:** The remaining differences arise from:
-1. The Moshier method uses ~50 harmonic terms vs. pyswisseph's full analytical lunar theory
+1. The Moshier method uses ~50 harmonic terms vs. a full analytical lunar theory
 2. Perigee coefficient calibration was performed on a finite sample of dates
 3. Apogee and perigee use different methods optimized for their respective perturbation amplitudes
 
@@ -346,20 +345,15 @@ The interpolated apogee is approximately **60 times smoother** than the osculati
 
 ### Apogee-Perigee Relationship
 
-Both pyswisseph and LibEphemeris compute apogee and perigee using **independent** perturbation series. This means they are not constrained to be exactly 180° apart.
+LibEphemeris computes apogee and perigee using **independent** perturbation series, so they are not constrained to be exactly 180° apart.
 
 This is a known property of the interpolated apogee method (Chapront-Touzé & Chapront, 1988; Meeus, *Astronomical Algorithms*, ch. 22):
 
 > "Apogee and perigee are not exactly opposite — they are only roughly opposite when the Sun is in conjunction with one of them or at a 90-degree angle."
 
-The deviation from 180° can be up to **28 degrees** in extreme cases.
-
-| Implementation | Apogee-Perigee Separation |
-|----------------|---------------------------|
-| LibEphemeris   | ~180° ± 15° (physically correct) |
-| pyswisseph     | ~180° ± 28° (varies with lunar/solar geometry) |
-
-This is expected physical behavior, not a limitation.
+The deviation from 180° can be up to **28 degrees** in extreme cases. In
+LibEphemeris the apogee–perigee separation is ~180° ± 15°, varying with the
+lunar/solar geometry. This is expected physical behaviour, not a limitation.
 
 ### Valid Date Range
 
@@ -369,13 +363,11 @@ For practical purposes, the implementation is valid for:
 - DE440 (default): 1550–2650 (full precision)
 - Extended range: 3000 BCE–3000 CE (reduced precision)
 
-## Comparison with Swiss Ephemeris
+---
 
-The interpolated apogee shows a maximum discrepancy of ~0.36° between LibEphemeris and pyswisseph. This is attributable to differences in the harmonic term sets used: LibEphemeris applies the Moshier ~50-term analytical series for the apogee while pyswisseph uses its full internal analytical lunar theory.
-
-The interpolated perigee shows a larger maximum discrepancy of ~2.6°, reflecting the fundamentally different smoothing philosophies described in [interpolated-perigee.md](interpolated-perigee.md).
-
-For True Lilith (osculating apogee), differences of ~5° arise because the osculating apogee concept is inherently model-dependent for strongly perturbed orbits: LibEphemeris derives osculating elements from JPL DE state vectors while pyswisseph uses integrated analytical lunar theory.
+*For the measured head-to-head with Swiss Ephemeris on the interpolated apogee
+(~0.36°), interpolated perigee (~2.6°) and True Lilith (~5°), see the
+[Swiss Ephemeris Comparison](../comparison/known-differences.md).*
 
 ## References
 

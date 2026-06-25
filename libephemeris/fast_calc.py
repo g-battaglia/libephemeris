@@ -1451,7 +1451,7 @@ def _pipeline_ecliptic(
         # LEB stores 0 for dist; the reference ephemeris returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
     elif ipl == TRUE_NODE:
-        # KNOWN LIMITATION (see divergences.md 7): the LEB-stored value is an
+        # KNOWN LIMITATION (see docs/comparison/known-differences.md §7): the LEB-stored value is an
         # h_mag proxy (~0.0015 AU), NOT the osculating node radius the reference ephemeris and
         # the Skyfield backend return (~0.0024 AU). Recomputing it standalone
         # would require reconstructing the geocentric-ecliptic Moon state inside
@@ -1505,7 +1505,7 @@ def _pipeline_ecliptic(
     # four bodies when FLG_SIDEREAL is set — this is a behavioral bug
     # (ayanamsha and J2000 ecliptic precession are geometrically distinct
     # and composable operations).  LibEphemeris intentionally fixes this.
-    # See docs/reference/se-bug-sidereal-j2000-nodes.md
+    # See docs/comparison/intentional-divergences.md
     _effective_j2000 = bool(iflag & FLG_J2000)
 
     if (iflag & FLG_EQUATORIAL) and _effective_j2000:
@@ -2009,7 +2009,7 @@ def _fast_calc_core(
         # TrueNode, OscuApog, IntpApog, IntpPerg.  the reference ephemeris only does this
         # for mean bodies (silently ignoring J2000 for the others when sidereal
         # is set) — LibEphemeris intentionally corrects this behavioral bug.
-        # See docs/reference/se-bug-sidereal-j2000-nodes.md
+        # See docs/comparison/intentional-divergences.md
         _deferred_sid_j2k = (
             bool(iflag & FLG_SIDEREAL)
             and bool(iflag & FLG_J2000)
@@ -2079,7 +2079,7 @@ def _fast_calc_core(
             # FLG_J2000 is set (because it skips J2000 precession for them).
             # LibEphemeris intentionally fixes this: when J2000 is requested,
             # mean ayanamsha is always used, for all bodies.
-            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            # See docs/comparison/intentional-divergences.md
             _eff_mean_aya = bool(iflag & (FLG_J2000 | FLG_NONUT))
             if _eff_mean_aya:
                 aya = mean_aya
@@ -2156,7 +2156,7 @@ def _fast_calc_core(
     # subtracted in ecliptic-of-date first.  Now precess the sidereal-
     # corrected coords to J2000.  This applies to ALL ecliptic-direct
     # bodies uniformly (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog,
-    # IntpPerg).  See docs/reference/se-bug-sidereal-j2000-nodes.md
+    # IntpPerg).  See docs/comparison/intentional-divergences.md
     if _deferred_sid_j2k:
         dt_step = 0.001  # days
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)

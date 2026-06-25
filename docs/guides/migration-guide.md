@@ -19,7 +19,7 @@ This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephem
 
 `libephemeris` is designed as a **drop-in replacement** for `pyswisseph` in most common use cases. It provides:
 
-- Same function names (with both `swe_` prefixed and unprefixed aliases)
+- Same function names — call them on the `libephemeris` module exactly as you called them on `swisseph` (e.g. `swe.calc_ut`)
 - Same flag and body constants (`FLG_*`, `SIDM_*`, `SUN`, `MOON`, etc.)
 - Same return value structures
 - Same behavior for global state management
@@ -68,15 +68,10 @@ from libephemeris.constants import SUN, FLG_SPEED
 
 ### Function Names
 
-Most functions are available with **both** the `swe_` prefix and without:
-
-| pyswisseph | LibEphemeris |
-|------------|--------------|
-| `swe.calc_ut()` | `swe.calc_ut()` or `swe.calc_ut()` |
-| `swe.houses()` | `swe.houses()` or `swe.houses()` |
-| `swe.julday()` | `swe.julday()` or `swe.julday()` |
-| `swe.set_sid_mode()` | `swe.set_sid_mode()` or `swe.set_sid_mode()` |
-| `swe.get_ayanamsa_ut()` | `swe.get_ayanamsa_ut()` or `swe.get_ayanamsa_ut()` |
+Function names are identical to pyswisseph. After `import libephemeris as swe`,
+existing call sites keep working unchanged — `swe.calc_ut(...)`, `swe.houses(...)`,
+`swe.julday(...)`, `swe.set_sid_mode(...)`, `swe.get_ayanamsa_ut(...)`, and so on.
+Functions are exposed **unprefixed**; there is no `swe_`-prefixed alias form.
 
 ### Constant Names
 

@@ -2226,7 +2226,7 @@ def _calc_body(
             # FLG_J2000 is honored for TrueNode, same as MeanNode.
             # the reference ephemeris silently ignores J2000 for TrueNode when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
-            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            # See docs/comparison/intentional-divergences.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
@@ -2332,7 +2332,7 @@ def _calc_body(
             # FLG_J2000 is honored for OscuApog, same as MeanApog.
             # the reference ephemeris silently ignores J2000 for OscuApog when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
-            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            # See docs/comparison/intentional-divergences.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
@@ -2396,7 +2396,7 @@ def _calc_body(
         # FLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
         # the reference ephemeris silently ignores J2000 for these bodies when sidereal is
         # set — LibEphemeris intentionally fixes this behavioral bug.
-        # See docs/reference/se-bug-sidereal-j2000-nodes.md
+        # See docs/comparison/intentional-divergences.md
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
         result = (lon, lat, dist, dlon, dlat, ddist)

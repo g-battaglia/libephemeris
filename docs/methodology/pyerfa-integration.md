@@ -77,8 +77,7 @@ LibEphemeris therefore uses the **long-term precession model of Vondrák,
 Capitaine & Wallace (2011)**, "New precession expressions, valid for long time
 intervals" (A&A 534, A22), which is fitted to a numerical integration and stays
 accurate over ±200,000 years while agreeing with IAU 2006 to sub-milliarcsecond
-precision near J2000. This is the same model Swiss Ephemeris has used since v1.78,
-so the two libraries' precession now agree at extreme epochs.
+precision near J2000.
 
 The model is obtained directly from PyERFA's reference Vondrák routines — no
 coefficients are transcribed by hand and no GPL source is consulted:
@@ -98,41 +97,26 @@ the angle between the Vondrák equator and ecliptic poles (long-term valid),
 replacing the IAU 2006 obliquity polynomial which also diverges at remote epochs.
 Nutation remains IAU 2006/2000A and is layered on top of the Vondrák precession.
 
-The remaining model floor versus Swiss Ephemeris at deep-BCE dates is the
-underlying ephemeris (DE441 here vs Swiss's DE431), which Vondrák does not affect.
+The remaining model floor at deep-BCE dates is the underlying ephemeris generation
+(DE441), which the precession model does not affect.
 
-#### Of-date mean obliquity — a deliberate, documented scientific improvement
+#### Of-date mean obliquity — a long-term-valid choice
 
-The of-date mean obliquity used in every reduction (and reported by the
-`ECL_NUT` pseudo-body) is the **true angle between the of-date equator and
-ecliptic poles** of the Vondrák model (`erfa.ltpequ` · `erfa.ltpecl`). This is
-the self-consistent companion to the Vondrák precession and stays rigorous over
-±200,000 years. The IAU 2006 obliquity polynomial (`erfa.obl06`) it replaces is
-only valid a few centuries from J2000 and is an out-of-range extrapolation at
-remote epochs.
+The of-date mean obliquity used in every reduction (and reported by the `ECL_NUT`
+pseudo-body) is the **true angle between the of-date equator and ecliptic poles**
+of the Vondrák model (`erfa.ltpequ` · `erfa.ltpecl`). This is the self-consistent
+companion to the Vondrák precession and stays rigorous over ±200,000 years,
+replacing the IAU 2006 obliquity polynomial (`erfa.obl06`), which is only valid a
+few centuries from J2000 and is an out-of-range extrapolation at remote epochs.
 
-Swiss Ephemeris reports an obliquity that matches *neither* model exactly at
-deep-BCE dates — it sits between the rigorous Vondrák pole angle and the IAU 2006
-extrapolation. LibEphemeris keeps the physically-consistent Vondrák value rather
-than reproducing Swiss's value bit-for-bit, because it is the more correct
-quantity. This is a **deliberate deviation from Swiss**, and it is bounded and
-benign:
-
-| Year | Swiss obliquity | Vondrák − Swiss | IAU 2006 − Swiss | Sun latitude (lib − Swiss) |
-|------|-----------------|-----------------|------------------|-----------------------------|
-| −3000 | 24.021270° | −6.475″ | +5.718″ | −5.999″ |
-| −1000 | 23.814592° | −1.040″ | +0.285″ | −1.048″ |
-| 0 | 23.695022° | −0.206″ | −0.010″ | −0.208″ |
-| 2000 | 23.439279° | 0.000″ | 0.000″ | 0.000″ |
-| 3000 | 23.309726° | +0.048″ | +0.010″ | −0.008″ |
-
-Crucially, **the obliquity choice does not affect ecliptic longitude** — for a
-body near the ecliptic the longitude is invariant to a small tilt of the frame;
-only the latitude absorbs it. So this deviation is confined to ecliptic latitude
-(≤ ~6″ at −3000, sub-arcsecond within recorded history, identically zero in the
-modern era), and at deep-BCE it is already well below the DE441-vs-Swiss
-ephemeris floor on the planets (e.g. Mars ≈ 600″ at −3000). The numbers above are
-reproduced by `scripts/validate_vondrak_vs_swiss.py`.
+Crucially, **the obliquity choice does not affect ecliptic longitude** — for a body
+near the ecliptic the longitude is invariant to a small tilt of the frame; only the
+latitude absorbs it. So the choice is confined to ecliptic latitude (sub-arcsecond
+within recorded history, identically zero in the modern era, and at deep-BCE still
+well below the ephemeris-generation floor on the planets). How this of-date
+obliquity compares against Swiss Ephemeris at deep-BCE epochs — a small, deliberate,
+bounded deviation — is documented in the
+[Swiss Ephemeris Comparison](../comparison/intentional-divergences.md#3-of-date-mean-obliquity-at-deep-bce-epochs).
 
 ### Cached Nutation
 

@@ -3,7 +3,7 @@
 A full-catalog sweep confirmed every entry returns finite, in-range coordinates,
 and that fixstar (legacy) and fixstar2 (modern) agree exactly for proper/Bayer
 names. They diverge only for fragile Flamsteed designations (documented in
-divergences.md 4.6); these guards lock the parts that must hold.
+docs/comparison/known-differences.md §4, Fixed stars); these guards lock the parts that must hold.
 """
 from __future__ import annotations
 

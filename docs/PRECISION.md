@@ -1,8 +1,9 @@
 # Precision Summary
 
-Compact precision summary for LibEphemeris vs pyswisseph 2.10.03.
-For full details, models, and methodology see [reference/precision.md](reference/precision.md)
-and [reference/swisseph-comparison.md](reference/swisseph-comparison.md).
+Compact summary of LibEphemeris's measured precision. For the models and full
+methodology see [reference/precision.md](reference/precision.md); for the full
+head-to-head with Swiss Ephemeris see the
+[Swiss Ephemeris Comparison](comparison/index.md).
 
 ## Planetary Positions (geocentric ecliptic, 1550–2650 CE)
 
@@ -64,7 +65,7 @@ astrologically meaningful daily motion of the chart frame.
 < 0.02" for all 24 supported house systems, tested at 11 global locations.
 Iterative systems (Placidus, Koch) use 10⁻⁷° convergence threshold.
 
-**Long-term range (where LibEphemeris is more accurate).** House cusps are
+**Long-term range.** House cusps are
 driven by sidereal time (ARMC) and obliquity — both functions of precession.
 LibEphemeris derives them from the long-term Vondrák 2011 model (valid ±200,000
 years) through a geometric construction that stays stable everywhere, rather than
@@ -73,21 +74,21 @@ few centuries. Verified across the full ephemeris range (−13200…+17191 CE):
 
 | Quantity | Criterion | Result |
 |----------|-----------|--------|
-| Mean obliquity | vs reference, full range | < 0.001" |
-| Sidereal time (ARMC) | vs reference, matched ΔT, full range | < 0.05" |
-| Cusps, all systems | vs reference, matched ΔT, full range | < 0.05" |
-| Cusps, modern era (1860–2040) | vs reference, own ΔT | < 0.05" |
+| Mean obliquity | vs published-physics target, full range | < 0.001" |
+| Sidereal time (ARMC) | matched ΔT, full range | < 0.05" |
+| Cusps, all systems | matched ΔT, full range | < 0.05" |
+| Cusps, modern era (1860–2040) | own ΔT | < 0.05" |
 
 At remote epochs a *whole-chart* comparison against another engine differs by the
 ΔT-model choice (amplified through the Sun's mean longitude, ~3548"/day), which is
 physical and shared by both house cusps and planetary positions — not a cusp
-error. With the same ΔT the cusp model reproduces the reference exactly across the
-whole range. See
+error. With the same ΔT the cusp model reproduces the published-physics target
+exactly across the whole range. See
 [sidereal-time-longterm.md](methodology/sidereal-time-longterm.md).
 
 ## Fixed Stars
 
-116 stars from Hipparcos catalog with van Leeuwen 2007 proper motions.
+1,447 stars from the Hipparcos catalog with van Leeuwen 2007 proper motions.
 Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
 98% of 101 comparable stars within 0.5". Two catalog bugs found and fixed
 (Algedi wrong component, Asellus Borealis wrong HIP number).
@@ -106,7 +107,7 @@ Max difference: 0.51" (Rigil Kentaurus — nearest star, parallax not modeled).
 ## Delta T
 
 - Modern (1900–2025): < 1 second
-- Historical (< 1700): up to ~187 seconds (different models: SMH 2016 vs E&M 2006)
+- Historical (< 1700): up to ~187 seconds (different deep-past ΔT reconstructions)
 - Future (> 2050): grows with extrapolation divergence
 
 ## Minor Bodies
@@ -131,4 +132,5 @@ Uranian hypothetical planets: < 1" (Keplerian from published elements).
 
 4400+ comparison rounds across 29 API sections:
 **3947 PASS, 441 KNOWN, 0 FAIL, 12 SKIP**.
-All divergences documented in [divergences.md](divergences.md).
+All divergences documented in the
+[Swiss Ephemeris Comparison](comparison/known-differences.md).

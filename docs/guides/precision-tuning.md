@@ -49,13 +49,13 @@ spk_path = eph.download_spk(
     body="Chiron",
     start="2000-01-01",
     end="2100-01-01",
-    directory="./spk_kernels"
+    path="./spk_kernels"
 )
 
 # Register the SPK for Chiron calculations
 eph.register_spk_body(
     ipl=eph.CHIRON,
-    spk_path=spk_path,
+    spk_file=spk_path,
     naif_id=eph.NAIF_CHIRON  # 2002060
 )
 
@@ -104,7 +104,7 @@ NAIF_SEDNA = 2090377     # Sedna (90377)
 | Function | Description |
 |----------|-------------|
 | `download_spk(body, start, end, ...)` | Download SPK from JPL Horizons |
-| `register_spk_body(ipl, spk_path, naif_id)` | Register SPK for a body |
+| `register_spk_body(ipl, spk_file, naif_id)` | Register SPK for a body |
 | `unregister_spk_body(ipl)` | Remove SPK registration |
 | `download_and_register_spk(...)` | Download and register in one call |
 | `list_spk_bodies()` | List all registered SPK bodies |

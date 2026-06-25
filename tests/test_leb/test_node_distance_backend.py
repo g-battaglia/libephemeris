@@ -3,7 +3,7 @@
 A flag-pair differential (LEB vs Skyfield, FLG_XYZ) surfaced that the True Node's
 distance — and thus its cartesian XYZ — differs between backends: the Skyfield/
 default path computes the osculating node radius (matching the reference ephemeris), while the
-LEB path returns a stored proxy (documented limitation, divergences.md 7). The
+LEB path returns a stored proxy (documented limitation, docs/comparison/known-differences.md §7). The
 node's longitude/latitude are correct everywhere. These guards lock that in:
 the angular position must agree across backends, and the Skyfield-mode distance
 must be the osculating-conic value (clearly different from the LEB proxy).

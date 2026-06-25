@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Documentation made engine-neutral; Swiss Ephemeris comparisons centralized.**
+  The methodology and reference pages now explain libephemeris's own models and the
+  rationale for each on their own merits, with minimal mention of any other engine.
+  All head-to-head comparison material is consolidated into a single new section,
+  `docs/comparison/` (`index`, `precision`, `known-differences`,
+  `intentional-divergences`, `api-compatibility`), which absorbs and replaces the
+  former `docs/reference/swisseph-comparison.md`, `docs/reference/divergences.md`,
+  and `docs/reference/se-bug-sidereal-j2000-nodes.md` (now removed). The Sphinx nav
+  (`docs/index.rst`) gains a "Swiss Ephemeris Comparison" section and now lists the
+  previously-orphaned `methodology/delta-t` and `methodology/sidereal-time-longterm`
+  pages. Reconciled a documentation inconsistency on the of-date mean obliquity at
+  deep-BCE epochs (the Vondrák pole-angle obliquity intentionally differs from Swiss
+  by ≤ ~6″ in latitude at −3000; longitude/ARMC are unaffected). No code or API
+  changes.
+- **Documentation completeness, accuracy & navigation pass.** Audited the whole
+  docs tree for coverage, up-to-dateness and organization, then fixed the findings:
+  the canonical full API reference (`docs/api_reference.rst`) is no longer orphaned —
+  it now has its own toctree caption in `docs/index.rst` and an entry in the docs
+  index, making the complete public API navigable. Corrected stale counts everywhere
+  to match the code: **47 predefined ayanamsha modes** (added the four missing
+  sections: Lahiri 1940 / Lahiri VP285 / Krishnamurti VP291 / Lahiri ICRC),
+  **25 house systems (26 codes)**, **1,447-star fixed-star catalog** (116 of which
+  are SIMBAD-cross-checked), and Sphinx `release`/`version` now read dynamically
+  from package metadata (was pinned to 1.0.0). Documented the **9 calculation flags**
+  missing from the flag reference (`FLG_TROPICAL`, `FLG_JPLEPH`, `FLG_DEFAULTEPH`,
+  `FLG_CENTER_BODY`, `FLG_ORBEL_AA`, `FLG_JPLHOR`, `FLG_JPLHOR_APPROX`,
+  `FLG_DPSIDEPS_1980`, `FLG_TEST_PLMOON`) and added `find_station_ut` /
+  `next_retrograde_ut` to the API reference. Fixed broken examples and signatures
+  (SPK `register_spk_body(ipl, spk_file, naif_id)` / `download_spk(..., path=...)`,
+  `register_moon_spk(spk_file, moons=None)`, `houses()` signature/return, `deltat_ex`
+  return type, `get_ayanamsa_ex_ut` return), removed the false `swe_`-prefixed alias
+  claims from the migration guide (functions are exposed unprefixed), de-orphaned
+  `methodology/hypothetical-bodies`, and aligned the README/docs navigation indices.
+  No code or API changes.
+
 ## [3.0.0a6] - 2026-06-24
 
 ### Added

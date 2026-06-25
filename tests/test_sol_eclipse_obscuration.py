@@ -11,7 +11,7 @@ two-disc lens overlap -- both already correct.
 
 This deliberately diverges from the upstream reference for total eclipses (the
 reference returns ~1.12); the divergence favours physical correctness and is
-documented in docs/reference/divergences.md.
+documented in docs/comparison/known-differences.md.
 
 Checks (independent of any external implementation):
   * total: obscuration == 1.0 from every public entry point (cross-API),

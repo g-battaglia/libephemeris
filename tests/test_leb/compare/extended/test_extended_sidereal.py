@@ -296,7 +296,7 @@ class TestExtSiderealJ2000:
         LibEphemeris intentionally honors FLG_J2000 for TrueNode/OscuApog
         (the reference ephemeris silently ignores it — this is a behavioral bug).
         Both LEB and Skyfield paths must produce consistent results.
-        See docs/reference/se-bug-sidereal-j2000-nodes.md
+        See docs/comparison/intentional-divergences.md
         """
         flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         max_err = 0.0

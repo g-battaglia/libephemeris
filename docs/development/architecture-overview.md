@@ -21,7 +21,7 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 
 | Metric                      | Value                                  |
 |-----------------------------|----------------------------------------|
-| Package version             | 2.0.0                                  |
+| Package version             | 3.0.0a6                                |
 | Python support              | 3.12 - 3.14                            |
 | Library source files        | 70+ `.py` files in `libephemeris/`     |
 | Total library LOC           | ~100,000 lines                         |
@@ -30,8 +30,8 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 | Comparison test files       | ~120 in `compare_scripts/tests/`       |
 | Public API entries (`__all__`)| 500+                                 |
 | Constants defined           | ~300+ (`SUN`, `MOON`, `FLG_*`, `SIDM_*`, etc.) |
-| Exception classes           | 12 (1 base + 4 categories + 7 specific)|
-| Runtime dependencies        | 6                                      |
+| Exception classes           | 14 (1 base + 4 categories + 9 specific)|
+| Runtime dependencies        | 7                                      |
 
 ### Architecture Summary
 
@@ -41,11 +41,11 @@ kernels via **jplephem**). The library provides:
 
 - A Swiss Ephemeris-compatible Python API (1:1 with pyswisseph)
 - 25 astrological house systems (26 codes)
-- 43 sidereal/ayanamsha modes
+- 47 sidereal/ayanamsha modes
 - Solar/lunar eclipse search and contact point calculation
 - Besselian element computation
 - Lunar node and Lilith calculations (4 methods)
-- Fixed star catalog (102 stars)
+- Fixed star catalog (1,447 stars)
 - Hypothetical/Uranian body support (8 Hamburg School + Transpluto)
 - Minor body/asteroid support with auto-SPK download
 - Atmospheric extinction and heliacal visibility models
@@ -224,7 +224,7 @@ engine/
 │   ├── precession.rs       # IAU 2006 polynomial              (~150 lines)
 │   ├── light_time.rs       # 3-iteration light-time           (~60 lines)
 │   ├── aberration.rs       # Annual aberration                (~100 lines)
-│   ├── ayanamsha.rs        # 43 sidereal systems              (~800 lines)
+│   ├── ayanamsha.rs        # 47 sidereal systems              (~800 lines)
 │   ├── houses/             # 25 house systems (26 codes)                 (~2000 lines)
 │   │   ├── mod.rs
 │   │   ├── placidus.rs
@@ -300,7 +300,7 @@ Three tiers of performance:
 |-------|-------|----------------------------------------------------|
 | 1     | 1-3   | `leb.rs` + `chebyshev.rs` + `calc.rs` (core pipeline) |
 | 2     | 3-4   | `coords.rs` + `precession.rs` + `aberration.rs`   |
-| 3     | 4-6   | `houses/` (all 24 systems) + `ayanamsha.rs`        |
+| 3     | 4-6   | `houses/` (all 25 systems) + `ayanamsha.rs`        |
 | 4     | 6-9   | `eclipse.rs` + `crossing.rs`                       |
 | 5     | 9-11  | `lunar.rs` + `stars.rs` + `hypothetical.rs`        |
 | 6     | 11-13 | `pymodule.rs` (PyO3 bindings) + integration         |
@@ -346,7 +346,7 @@ calculation function, as found in the source code analysis:
 | IAU 2006 precession        | `astrometry.py`, `planets.py`         | 5th degree polynomial     |
 | IAU 2006/2000A nutation    | `cache.py` -> `erfa.nut06a()`         | 1365 lunisolar + 687 planetary terms |
 
-### A.3 House Systems Implemented (24)
+### A.3 House Systems Implemented (25)
 
 | Code | Name                    | Method        | Iterative? | Polar safe? |
 |------|-------------------------|---------------|------------|-------------|
@@ -374,7 +374,7 @@ calculation function, as found in the source code analysis:
 | D    | Equal from MC           | Geometric     | No         | Yes         |
 | I/i  | Sunshine (Makransky)    | Sun arc       | No         | Unstable    |
 
-### A.4 Ayanamsha Systems (43)
+### A.4 Ayanamsha Systems (47)
 
 All 43 systems are implemented in `planets.py::_calc_ayanamsa()` (~375 lines).
 They use the IAU 2006 general precession polynomial (5th degree) as the

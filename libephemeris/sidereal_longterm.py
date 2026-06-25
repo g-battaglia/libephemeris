@@ -98,7 +98,7 @@ discontinuity on the reference side (its sidereal time has a one-time ~1.908"
 jump exactly at JD 2469807.5); libephemeris's two branches join to 0.000000"
 there, i.e. it is self-continuous. See
 ``docs/methodology/sidereal-time-longterm.md`` and
-``docs/reference/swisseph-comparison.md`` for the full analysis.
+``docs/comparison/known-differences.md`` for the full analysis.
 """
 
 from __future__ import annotations
