@@ -19,6 +19,7 @@ A high-precision astronomical ephemeris library for Python, powered by NASA JPL 
 
 - **NASA JPL DE440/DE441** - modern planetary ephemerides via Skyfield, with full-range DE441 support for deep-history and far-future work
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák 2011, valid ±200,000 years), nutation (IAU 2006/2000A) via the official ERFA library
+- **Latest-reconstruction Delta T (TT−UT1)** - IERS-observed values for the atomic-clock era and the most recent published reconstruction of Earth's rotation from ancient eclipse records (Stephenson, Morrison & Hohenkerk 2016 with the Morrison et al. 2021 update) for historical dates; one consistent ΔT drives positions *and* house angles on every backend, so a chart stays accurate and self-consistent from antiquity to the far future ([details](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md))
 - **Validated high precision** - planetary differences typically measured in fractions of an arcsecond, house cusps < 0.02", benchmarked across 4,400+ comparison rounds ([full report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md))
 - **Four backends, one API** - Skyfield, LEB (~14x speedup), Horizons API, and adaptive auto mode through the same `calc_ut()` interface
 - **25 house systems, 43 ayanamsha modes** - independently verified against pyswisseph
@@ -37,6 +38,7 @@ LibEphemeris provides the **same API** with a modern foundation:
 
 - **NASA JPL ephemerides** instead of semi-analytical theory - DE440/DE441 are the latest planetary ephemerides from the Jet Propulsion Laboratory, the same data used for spacecraft navigation.
 - **IAU + Vondrák 2011 standards** - long-term precession and of-date mean obliquity (Vondrák, Capitaine & Wallace 2011, valid ±200,000 years instead of the IAU 2006 polynomial's few centuries), nutation (IAU 2006/2000A), all computed via the official ERFA library (the open-source implementation of IAU SOFA), not custom routines.
+- **Up-to-date Earth-rotation timeline (ΔT)** - the TT↔UT1 conversion uses the *latest* published reconstruction of Earth's rotation from historical eclipse records (Stephenson-Morrison-Hohenkerk 2016 with the Morrison et al. 2021 revision), blended with IERS observations - so ancient and historical charts sit on the most current scientific ΔT, the same time argument shared by positions and house angles.
 - **Physical planet centers** - Jupiter, Saturn, Uranus, Neptune corrected from system barycenters to actual body centers using JPL satellite ephemerides. Most libraries skip this.
 - **Independently verified** - every function cross-validated against pyswisseph, JPL Horizons, and astropy/ERFA. [Precision report with full methodology](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md).
 - **Readable Python algorithms** - plain, inspectable source and standard debugging instead of an opaque C library. Installs from prebuilt wheels (NumPy/Skyfield/pyerfa) across any platform, CI, or serverless environment.
@@ -151,6 +153,7 @@ libephemeris download extended     # -13200 to +17191 CE, full range
 - [Migration from PySwissEph](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/migration-guide.md) - API mapping, flag compatibility, known divergences
 - [Precision Report](https://github.com/g-battaglia/libephemeris/blob/main/docs/PRECISION.md) - full methodology, comparison tables, verification process
 - [Long-term sidereal time, precession & cusp speeds](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/sidereal-time-longterm.md) - why houses and cusp speeds stay correct over ±13,000 years
+- [Delta T (ΔT)](https://github.com/g-battaglia/libephemeris/blob/main/docs/methodology/delta-t.md) - the multi-era ΔT model (IERS + Stephenson-Morrison-Hohenkerk 2016 / Morrison 2021), why it is piecewise, and the model selector
 - [Flag Reference](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/flags.md) - all supported flags with examples
 - [House Systems](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/house-systems.md) - all 25 systems, verified against pyswisseph
 - [Ayanamsha Modes](https://github.com/g-battaglia/libephemeris/blob/main/docs/reference/ayanamsha.md) - 43 sidereal modes
