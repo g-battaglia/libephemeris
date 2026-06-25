@@ -62,10 +62,11 @@ References
 
 Deviation from the reference implementation
 -------------------------------------------
-The reference (Swiss Ephemeris compatible) library computes refraction
+The reference ephemeris computes refraction
 from empirical curve fits: Sinclair's formula (quoted in Bennett 1982)
-inside swe_azalt/swe_refrac_extended and the Saemundsson/Bennett pair in
-swe_refrac. This module deliberately keeps the ray-traced model instead
+inside its azimuth/altitude and extended-refraction paths and the
+Saemundsson/Bennett pair in its plain refraction path. This module
+deliberately keeps the ray-traced model instead
 (owner decision, 2026-06): it is physically grounded and at least as
 accurate against rigorous benchmarks. Measured envelope of the
 difference vs. the reference's fits at p=1013.25 hPa, T=10 C:

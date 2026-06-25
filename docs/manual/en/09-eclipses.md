@@ -166,24 +166,24 @@ jd = ephem.julday(2024, 1, 1, 0.0)
 lat, lon = 41.9028, 12.4964  # Rome
 
 # Search for the next solar eclipse visible from Rome
-ecl_type, tempi, attr = ephem.sol_eclipse_when_loc(
-    jd, lat, lon, altitude=0.0
+ecl_type, times, attr = ephem.sol_eclipse_when_loc(
+    jd, (lon, lat, 0.0)
 )
 
-jd_max = tempi[0]
+jd_max = times[0]
 y, m, d, h = ephem.revjul(jd_max)
-ore = int(h)
-minuti = int((h - ore) * 60)
+hour = int(h)
+minute = int((h - hour) * 60)
 
-magnitudine = attr[0]
-oscuramento = attr[2]
-alt_sole = attr[4]
+magnitude = attr[0]
+obscuration = attr[2]
+sun_alt = attr[4]
 
 print(f"Next eclipse visible from Rome:")
-print(f"Date: {d:.0f}/{m:.0f}/{y:.0f} at {ore:02d}:{minuti:02d} UT")
-print(f"Magnitude: {magnitudine:.3f}")
-print(f"Obscuration: {oscuramento:.1%}")
-print(f"Sun altitude at maximum: {alt_sole:.1f}°")
+print(f"Date: {d:.0f}/{m:.0f}/{y:.0f} at {hour:02d}:{minute:02d} UT")
+print(f"Magnitude: {magnitude:.3f}")
+print(f"Obscuration: {obscuration:.1%}")
+print(f"Sun altitude at maximum: {sun_alt:.1f}°")
 ```
 
 ```

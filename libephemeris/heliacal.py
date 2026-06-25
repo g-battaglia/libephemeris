@@ -3782,7 +3782,9 @@ def _heliacal_pheno_ut_pythonic(
     dret[27] = illumination  # Illum - illumination percentage
     # dret[28] onwards are reserved, already 0.0
 
-    return tuple(dret), flags
+    # Coerce to native Python floats: several entries (alt/az from the Skyfield
+    # backend) are numpy.float64, and the public contract returns native floats.
+    return tuple(float(v) for v in dret), flags
 
 
 def heliacal_pheno_ut(
@@ -4221,16 +4223,18 @@ def vis_limit_mag(
     )
 
     # Build result tuple (10 elements; dret[7] is the body's magnitude
-    # without extinction, the reference convention)
+    # without extinction, the reference convention). The alt/az values come
+    # from the Skyfield backend as numpy.float64; coerce to native Python
+    # floats to honor the public native-float contract.
     dret = (
-        limiting_mag,  # 0: Limiting visual magnitude
-        obj_alt,  # 1: Altitude of object
-        obj_az,  # 2: Azimuth of object
-        sun_alt,  # 3: Altitude of Sun
-        sun_az,  # 4: Azimuth of Sun
-        moon_alt,  # 5: Altitude of Moon
-        moon_az,  # 6: Azimuth of Moon
-        obj_mag,  # 7: Magnitude of object
+        float(limiting_mag),  # 0: Limiting visual magnitude
+        float(obj_alt),  # 1: Altitude of object
+        float(obj_az),  # 2: Azimuth of object
+        float(sun_alt),  # 3: Altitude of Sun
+        float(sun_az),  # 4: Azimuth of Sun
+        float(moon_alt),  # 5: Altitude of Moon
+        float(moon_az),  # 6: Azimuth of Moon
+        float(obj_mag),  # 7: Magnitude of object
         0.0,  # 8: Reserved
         0.0,  # 9: Reserved
     )

@@ -15,7 +15,7 @@ sources only:
 - Radial velocities: XHIP (Anderson & Francis 2012), VizieR V/137D.
 - Proper names: IAU WGSN Catalog of Star Names (IAU-CSN).
 
-The Swiss Ephemeris star data file is not a source of this table.
+No third-party proprietary ephemeris star data file is a source of this table.
 
 Row layout:
     (id, name, nomenclature, hip,

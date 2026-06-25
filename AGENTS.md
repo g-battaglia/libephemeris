@@ -26,7 +26,7 @@ pytest tests/test_file.py::test_name -v # Single test
 - `from __future__ import annotations` at top of every module
 - Line length 88, Python 3.12+, double quotes, Ruff formatter
 - Google-style docstrings, `snake_case` functions, `PascalCase` classes, `_underscore` private
-- `swe_` prefix for Swiss Ephemeris-compatible functions
+- Public API uses canonical bare names (no `swe_`/`SE_`/`SEFLG_` prefixes); the only allowed prefixed name is `SE_FNAME_DE431`
 - Always return native Python floats (not numpy types)
 
 ## Architecture

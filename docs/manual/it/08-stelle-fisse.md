@@ -61,7 +61,7 @@ Nella pratica quotidiana non avrai quasi mai bisogno di questa funzione: `fixsta
 
 ## 8.2 Il catalogo stellare
 
-La libreria include un catalogo interno di circa 100 stelle, basato sui dati del satellite **Hipparcos** dell'ESA (1989–1993). Hipparcos ha misurato la posizione, il moto proprio e la magnitudine di oltre 118.000 stelle con una precisione senza precedenti (circa 1 millesimo di secondo d'arco).
+La libreria include un catalogo interno di circa 1.447 stelle, basato sui dati del satellite **Hipparcos** dell'ESA (1989–1993). Hipparcos ha misurato la posizione, il moto proprio e la magnitudine di oltre 118.000 stelle con una precisione senza precedenti (circa 1 millesimo di secondo d'arco).
 
 Il catalogo copre tutte le stelle importanti per l'astrologia e l'astronomia osservativa: le 15 stelle di Agrippa, le quattro stelle "regali" (Aldebaran, Regolo, Antares, Fomalhaut), le stelle più luminose del cielo, e le stelle zodiacali più usate.
 
@@ -368,7 +368,7 @@ In questo capitolo abbiamo imparato a lavorare con le stelle fisse.
 **Concetti chiave:**
 
 - Le stelle "fisse" si muovono: la **precessione** sposta tutte le stelle di ~50"/anno in longitudine eclittica, e il **moto proprio** aggiunge uno spostamento individuale per ogni stella
-- La libreria include un catalogo di ~100 stelle basato sui dati del satellite Hipparcos, con precisione sub-millesimo di secondo d'arco
+- La libreria include un catalogo di ~1.447 stelle basato sui dati del satellite Hipparcos, con precisione sub-millesimo di secondo d'arco
 - In astrologia, le stelle fisse contano quando un pianeta o un angolo è in **congiunzione** (entro ~1°) con una stella importante
 - Le quattro stelle regali (Aldebaran, Regolo, Antares, Fomalhaut) sono considerate le più potenti
 - La **magnitudine** indica la luminosità: numeri più bassi = stella più luminosa (Sirio = −1.46, limite occhio nudo ≈ 6)

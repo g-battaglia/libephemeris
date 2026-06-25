@@ -96,6 +96,28 @@ from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
 
+def _hsys_code(hsys: int | bytes | str) -> int:
+    """Normalize a house-system identifier to its integer character code.
+
+    Accepts the three forms the public house API accepts — an ``int`` code
+    (``ord('P')``), ``bytes`` (``b'P'``, the reference-API default form), or a
+    ``str`` (``'P'``) — and returns the integer character code so that
+    comparisons against ``ord('X')`` literals work regardless of how the caller
+    passed the system.
+
+    Args:
+        hsys: House system identifier as int, bytes, or str.
+
+    Returns:
+        The integer character code of the (first character of the) identifier.
+    """
+    if isinstance(hsys, int):
+        return hsys
+    if isinstance(hsys, bytes):
+        return hsys[0]  # first byte == ord of the first character
+    return ord(hsys[0])
+
+
 def _house_armc_obliquity(tjdut: float) -> tuple[float, float]:
     """Sidereal time at longitude 0 (= ARMC) and true obliquity, for houses.
 
@@ -1519,6 +1541,10 @@ def houses_armc_ex2(
     # it for every other system.
     cusps, ascmc = houses_armc(armc, lat, eps, hsys, ascmc9)
 
+    # Normalize the house code once so the system-specific overrides below fire
+    # whether the caller passed an int, bytes (b'P'), or str ('P').
+    hsys_code = _hsys_code(hsys)
+
     # Always calculate velocities (matching the reference behavior).
     # Compute d(cusp)/d(ARMC) via centered finite differences, then
     # scale by the sidereal rotation rate to obtain deg/day.
@@ -1533,7 +1559,7 @@ def houses_armc_ex2(
     # Koch and Placidus use a 1-second step (nested trig amplifies
     # truncation error at the 1-minute step).
     # All other systems use a 1-minute step.
-    if hsys in (ord("K"), ord("P")):
+    if hsys_code in (ord("K"), ord("P")):
         d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
     else:
         d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
@@ -1571,7 +1597,7 @@ def houses_armc_ex2(
     )
 
     # ── System-specific cusp speed overrides ──────────────────────
-    if hsys == ord("W"):
+    if hsys_code == ord("W"):
         # Whole Sign: cusps are at fixed sign boundaries (0°, 30°, …).
         # Most cusps have zero speed (they jump discontinuously).
         # Cusps 1,7 (ASC/DESC) get ASC speed; cusps 4,10 (IC/MC) get
@@ -1584,7 +1610,7 @@ def houses_armc_ex2(
         cs[6] = v_asc  # cusp 7  = DESC
         cs[9] = v_mc  # cusp 10 = MC
         cusps_speed = tuple(cs)
-    elif hsys in (ord("N"), ord("U")):
+    elif hsys_code in (ord("N"), ord("U")):
         # Aries houses ('N') have fixed cusps and Krusinski ('U') has
         # no analytic speed model in the reference: the reference ephemeris returns
         # the ASC rate on cusps 1/7, the MC rate on 4/10, and zeros on
@@ -1597,7 +1623,7 @@ def houses_armc_ex2(
         cs[6] = v_asc
         cs[9] = v_mc
         cusps_speed = tuple(cs)
-    elif hsys == ord("O"):
+    elif hsys_code == ord("O"):
         # Porphyry: the reference derives cusp speeds from the angle
         # rates as v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
         # cusps 1-4 and k = 4,5 for cusps 5-6 (continuing the
@@ -1834,7 +1860,7 @@ def houses_ex2(
     # chart frame. Every other system (including Porphyry) keeps the true
     # time-derivative computed above, which by construction integrates to the
     # cusp's actual motion.
-    if hsys in (ord("W"), ord("N"), ord("U")):
+    if _hsys_code(hsys) in (ord("W"), ord("N"), ord("U")):
         cs = [0.0] * len(cusps)
         cs[0] = ascmc_speed[0]  # cusp 1  = Asc
         cs[3] = ascmc_speed[1]  # cusp 4  = IC  -> MC rate

@@ -997,7 +997,7 @@ def calc_ut(
 
     # The reference API echoes the ephemeris bit in the returned flags
     # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # Swiss-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
     from .constants import FLG_JPLEPH
 
     if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
@@ -1176,7 +1176,7 @@ def calc(
 
     # The reference API echoes the ephemeris bit in the returned flags
     # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # Swiss-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
     from .constants import FLG_JPLEPH
 
     if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):

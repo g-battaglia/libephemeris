@@ -80,7 +80,7 @@ accurate over ±200,000 years while agreeing with IAU 2006 to sub-milliarcsecond
 precision near J2000.
 
 The model is obtained directly from PyERFA's reference Vondrák routines — no
-coefficients are transcribed by hand and no GPL source is consulted:
+coefficients are transcribed by hand and no copyleft source is consulted:
 
 ```python
 import erfa

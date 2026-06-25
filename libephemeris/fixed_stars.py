@@ -3262,8 +3262,8 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     # No substring-anywhere or phonetic fuzzy fallback here: those tiers
     # silently returned an unrelated but similarly-spelled star (e.g.
     # "Chort"->kaRet, "Pushya"->psHya, "Messier 42"->muSer, "Alrai"->Cebalrai)
-    # for any valid name absent from this catalog, diverging from Swiss
-    # Ephemeris (which errors on unknown names). Legitimate alternate
+    # for any valid name absent from this catalog, diverging from the reference
+    # ephemeris (which errors on unknown names). Legitimate alternate
     # spellings are handled by the exact-alias tier above; an unresolved name
     # now returns an honest error instead of a wrong star.
     return None, f"could not find star name {star_name.lower()}"

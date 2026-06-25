@@ -61,7 +61,7 @@ In daily practice, you will almost never need this function: `fixstar2_ut` does 
 
 ## 8.2 The star catalog
 
-The library includes an internal catalog of about 100 stars, based on data from ESA's **Hipparcos** satellite (1989–1993). Hipparcos measured the position, proper motion, and magnitude of over 118,000 stars with unprecedented precision (about 1 thousandth of an arcsecond).
+The library includes an internal catalog of about 1,447 stars, based on data from ESA's **Hipparcos** satellite (1989–1993). Hipparcos measured the position, proper motion, and magnitude of over 118,000 stars with unprecedented precision (about 1 thousandth of an arcsecond).
 
 The catalog covers all the important stars for astrology and observational astronomy: the 15 Behenian fixed stars, the four "royal" stars (Aldebaran, Regulus, Antares, Fomalhaut), the brightest stars in the sky, and the most used zodiacal stars.
 
@@ -368,7 +368,7 @@ In this chapter, we learned how to work with fixed stars.
 **Key concepts:**
 
 - "Fixed" stars move: **precession** shifts all stars by ~50"/year in ecliptic longitude, and **proper motion** adds an individual displacement for each star
-- The library includes a catalog of ~100 stars based on Hipparcos satellite data, with sub-milliarcsecond precision
+- The library includes a catalog of ~1,447 stars based on Hipparcos satellite data, with sub-milliarcsecond precision
 - In astrology, fixed stars matter when a planet or angle is in **conjunction** (within ~1°) with an important star
 - The four royal stars (Aldebaran, Regulus, Antares, Fomalhaut) are considered the most powerful
 - **Magnitude** indicates brightness: lower numbers = brighter star (Sirius = −1.46, naked eye limit ≈ 6)

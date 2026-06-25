@@ -18,7 +18,7 @@ from importlib.metadata import PackageNotFoundError, version as _pkg_version
 try:
     release = _pkg_version("libephemeris")
 except PackageNotFoundError:  # editable/source checkout without metadata
-    release = "3.0.0a6"
+    release = "3.0.0rc1"
 version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------

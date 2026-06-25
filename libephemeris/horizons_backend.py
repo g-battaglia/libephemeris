@@ -379,7 +379,7 @@ def horizons_calc_ut(
         client: HorizonsClient instance.
         jd_ut: Julian Day UT.
         body_id: SE_* body constant.
-        iflag: Swiss Ephemeris flags.
+        iflag: The reference-ephemeris calculation flags.
 
     Returns:
         ((lon, lat, dist, dlon, dlat, ddist), iflag)
