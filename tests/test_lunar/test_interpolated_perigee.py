@@ -24,7 +24,6 @@ These tests verify:
 6. Proper smoothing of oscillations
 """
 
-import math
 import pytest
 import libephemeris as swe
 
@@ -65,8 +64,8 @@ class TestInterpolatedPerigeeBasic:
         Note: Apogee and perigee are NOT exactly 180° apart at all times — they
         can deviate by up to 28° depending on Sun-Moon geometry (Chapront-Touzé
         & Chapront 1988; Meeus, Astronomical Algorithms ch. 47).
-        At J2000.0, even pyswisseph itself shows a deviation of about 12.7° from
-        exact opposition.
+        At J2000.0, even the reference ephemeris itself shows a deviation of
+        about 12.7° from exact opposition.
         """
         jd_ut = 2451545.0
 
@@ -105,8 +104,8 @@ class TestInterpolatedPerigeeDirectFunction:
 
         Note: Apogee and perigee are NOT exactly 180° apart at all times — they
         can deviate by up to 28° depending on Sun-Moon geometry (Chapront-Touzé
-        & Chapront 1988). At J2000.0, even pyswisseph itself shows a deviation
-        of about 12.7° from exact opposition.
+        & Chapront 1988). At J2000.0, even the reference ephemeris itself shows
+        a deviation of about 12.7° from exact opposition.
         """
         from libephemeris import lunar
 

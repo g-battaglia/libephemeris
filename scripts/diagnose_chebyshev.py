@@ -8,7 +8,6 @@ or the pipeline output.
 
 from __future__ import annotations
 import sys
-import math
 import numpy as np
 from numpy.polynomial.chebyshev import chebfit, chebval
 
@@ -108,7 +107,7 @@ def main():
     print("\nNode-by-node comparison (pipeline vs calc):")
     for i in range(DEGREE + 1):
         lon_err = ang_diff(pipeline_vals[i, 0], swe_vals[i, 0]) * 3600
-        lat_err = abs(pipeline_vals[i, 1] - swe_vals[i, 1]) * 3600
+        abs(pipeline_vals[i, 1] - swe_vals[i, 1]) * 3600
         print(
             f"  node {i:2d}: JD={node_jds[i]:.6f}  "
             f"pipe_lon={pipeline_vals[i, 0]:.10f}  swe_lon={swe_vals[i, 0]:.10f}  "

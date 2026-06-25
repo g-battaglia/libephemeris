@@ -19,9 +19,6 @@ from libephemeris.constants import (
     MERCURY,
     MARS,
     JUPITER,
-    SATURN,
-    MEAN_NODE,
-    TRUE_NODE,
 )
 
 

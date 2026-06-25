@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Global state management for libephemeris.
 
@@ -11,7 +13,7 @@ This module maintains the library's singleton state including:
 - SPK kernel registry for minor body calculations
 
 All state is stored in module-level globals to provide a stateful module-level API
-compatible with pyswisseph's threading model (thread-unsafe by design).
+compatible with the reference ephemeris's threading model (thread-unsafe by design).
 """
 
 from __future__ import annotations
@@ -154,7 +156,7 @@ _LAPSE_RATE: Optional[float] = None  # Atmospheric lapse rate for refraction
 # SPK kernel state for minor body calculations
 _SPK_KERNELS: dict[str, SpiceKernel] = {}  # Cached SPK kernels {filepath: kernel}
 _SPK_TYPE21_KERNELS: dict[
-    str, object
+    str, "SPKType21"
 ] = {}  # Cached SPK type 21 kernels {filepath: SPKType21}
 _SPK_BODY_MAP: dict[
     int, tuple[str, int]
@@ -180,10 +182,12 @@ _IERS_DELTA_T_ENABLED: Optional[bool] = None  # None = check env var
 
 # LEB (binary ephemeris) configuration
 _LEB_FILE: Optional[str] = None  # Path to .leb file
-_LEB_READER: Optional["LEBReader"] = None  # Cached LEBReader instance
+_LEB_READER: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = (
+    None  # Cached LEB reader instance
+)
 
 # Horizons API client
-_HORIZONS_CLIENT: Optional[object] = None
+_HORIZONS_CLIENT: Optional["HorizonsClient"] = None
 _HORIZONS_WARNED: bool = False
 
 # Calculation mode: "auto" (default), "skyfield", "leb", or "horizons"
@@ -192,7 +196,11 @@ _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
 _VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 
 if TYPE_CHECKING:
+    from .horizons_backend import HorizonsClient
+    from .leb2_reader import LEB2Reader
+    from .leb_composite import CompositeLEBReader
     from .leb_reader import LEBReader
+    from .vendor.spktype21 import SPKType21
 
 
 def set_calc_mode(mode: Optional[str]) -> None:
@@ -397,7 +405,9 @@ def _year_to_jd(year: int) -> float:
     return 1 + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045.0
 
 
-def _maybe_warm_reader(reader: "LEBReader") -> None:
+def _maybe_warm_reader(
+    reader: "LEBReader | LEB2Reader | CompositeLEBReader",
+) -> None:
     """Conditionally warm the reader based on TOML ``mmap_preload`` config.
 
     When ``mmap_preload = true`` in the TOML configuration, converts the
@@ -418,7 +428,13 @@ def _maybe_warm_reader(reader: "LEBReader") -> None:
     try:
         reader.warm(jd_start, jd_end)
         logger = get_logger()
-        logger.debug("mmap preload: warmed JD range %s-%s (%d-%d)", jd_start, jd_end, start_year, end_year)
+        logger.debug(
+            "mmap preload: warmed JD range %s-%s (%d-%d)",
+            jd_start,
+            jd_end,
+            start_year,
+            end_year,
+        )
     except (AttributeError, OSError, ValueError) as exc:
         logger = get_logger()
         logger.warning("mmap preload failed: %s", exc)
@@ -469,7 +485,7 @@ def release_data_cache() -> None:
                         pass
 
 
-def get_leb_reader() -> Optional["LEBReader"]:
+def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     """Get the active LEBReader, if any.
 
     Respects the calculation mode set via set_calc_mode() or the
@@ -505,6 +521,20 @@ def get_leb_reader() -> Optional["LEBReader"]:
     if mode == "skyfield":
         return None
 
+    if _LEB_READER is None:
+        with _INIT_LOCK:
+            return _get_leb_reader_locked(mode)
+    return _LEB_READER
+
+
+def _get_leb_reader_locked(mode):
+    """Lazy-create the LEB reader (must hold _INIT_LOCK).
+
+    Serialized so concurrent first calls cannot create two readers (and
+    leak an mmap), and so a concurrent set_leb_file(None) cannot resurrect
+    a stale reader mid-creation.
+    """
+    global _LEB_READER
     if _LEB_READER is None:
         path = _LEB_FILE or os.environ.get("LIBEPHEMERIS_LEB")
 
@@ -543,8 +573,10 @@ def get_leb_reader() -> Optional["LEBReader"]:
                 return None
         elif mode == "leb":
             raise RuntimeError(
-                "LIBEPHEMERIS_MODE=leb but no .leb file configured. "
-                "Use set_leb_file() or set LIBEPHEMERIS_LEB env var."
+                "Calculation mode is 'leb' but no .leb file configured. "
+                "Use set_leb_file() or set LIBEPHEMERIS_LEB env var. "
+                f"(mode source: explicit={_CALC_MODE!r}, "
+                f"env={os.environ.get(_CALC_MODE_ENV_VAR)!r})"
             )
     return _LEB_READER
 
@@ -592,9 +624,11 @@ def _get_or_create_horizons_client():
     """Create or return the singleton HorizonsClient."""
     global _HORIZONS_CLIENT, _HORIZONS_WARNED
     if _HORIZONS_CLIENT is None:
-        from .horizons_backend import HorizonsClient
+        with _INIT_LOCK:
+            if _HORIZONS_CLIENT is None:
+                from .horizons_backend import HorizonsClient
 
-        _HORIZONS_CLIENT = HorizonsClient()
+                _HORIZONS_CLIENT = HorizonsClient()
         if not _HORIZONS_WARNED:
             logger = get_logger()
             logger.info(
@@ -722,6 +756,19 @@ def get_timescale() -> Timescale:
     return _TS
 
 
+def _reset_timescale() -> None:
+    """Drop the cached shared timescale so the next access rebuilds it.
+
+    Used by EphemerisContext.close() to honor its documented resource
+    reset: get_timescale() caches the singleton in _TS, so clearing only
+    the context-level reference would hand the same stale object back on
+    the next call (stale IERS/leap-second data after a config change).
+    """
+    global _TS
+    with _INIT_LOCK:
+        _TS = None
+
+
 # =============================================================================
 # PRECISION TIER ACCESSORS
 # =============================================================================
@@ -808,7 +855,7 @@ def set_precision_tier(tier: str) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -844,7 +891,7 @@ def get_spk_date_range_for_tier(tier_name: Optional[str] = None) -> Tuple[str, s
         >>> get_spk_date_range_for_tier()
         ('1900-01-01', '2100-01-01')
         >>> get_spk_date_range_for_tier("extended")
-        ('1550-01-01', '2650-01-01')
+        ('1600-01-01', '2500-01-01')
     """
     if tier_name is not None:
         if tier_name not in TIERS:
@@ -948,6 +995,11 @@ def get_planets() -> SpiceKernel:
                                 _EPHEMERIS_FILE,
                             )
                             _PLANETS = load(fb_path)
+                            # Reflect the kernel actually loaded so
+                            # get_current_file_data() reports the matching DE
+                            # number and date range instead of the requested
+                            # tier file we did not load.
+                            _EPHEMERIS_FILE = fb
                             loaded = True
                             break
                     if not loaded:
@@ -957,6 +1009,7 @@ def get_planets() -> SpiceKernel:
                             "internal calculations..."
                         )
                         _PLANETS = load("de440s.bsp")
+                        _EPHEMERIS_FILE = "de440s.bsp"
                 else:
                     logger.info("Downloading JPL ephemeris %s...", _EPHEMERIS_FILE)
                     _PLANETS = load(_EPHEMERIS_FILE)
@@ -990,7 +1043,17 @@ def get_planet_centers() -> Optional[SpiceKernel]:
 
     current_tier = get_precision_tier()
 
-    # Reload if tier changed or not loaded
+    # Reload if tier changed or not loaded (serialized: concurrent first
+    # calls must not create two kernels and leak file handles)
+    if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
+        with _INIT_LOCK:
+            return _get_planet_centers_locked(current_tier)
+    return _PLANET_CENTERS
+
+
+def _get_planet_centers_locked(current_tier):
+    """Lazy-load planet centers kernel (must hold _INIT_LOCK)."""
+    global _PLANET_CENTERS, _PLANET_CENTERS_TIER
     if _PLANET_CENTERS is None or _PLANET_CENTERS_TIER != current_tier:
         _PLANET_CENTERS = None
         _PLANET_CENTERS_TIER = None
@@ -1138,7 +1201,8 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
 
     Note:
         Affects all position calculations when FLG_SIDEREAL is set.
-        Default is Lahiri (SIDM_LAHIRI) if never set.
+        Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY) if never set,
+        matching the reference API.
     """
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
     with _STATE_LOCK:
@@ -1166,10 +1230,11 @@ def get_sid_mode(full: bool = False) -> Union[int, tuple[int, float, float]]:
         int or tuple: Sidereal mode ID, or full configuration tuple
 
     Note:
-        Returns SIDM_LAHIRI (1) by default if never set.
+        Returns SIDM_FAGAN_BRADLEY (0) by default if never set, matching
+        the reference API's default when set_sid_mode() was never called.
     """
     with _STATE_LOCK:
-        mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 1
+        mode = _SIDEREAL_MODE if _SIDEREAL_MODE is not None else 0
         if full:
             return mode, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
         return mode
@@ -1218,7 +1283,8 @@ def reset_session() -> None:
     """Reset per-calculation state without closing files or clearing caches.
 
     Resets: topo, sidereal mode, angles cache, observer cache.
-    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches.
+    Keeps alive: LEB reader, Skyfield timescale, SPK kernels, LRU caches,
+    and process-level configuration (calculation mode, strict precision).
 
     Use this between independent calculations that may use different
     topo/sidereal settings. Use close() only for full teardown (e.g.
@@ -1264,7 +1330,7 @@ def set_ephe_path(path: Optional[str]) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -1312,7 +1378,7 @@ def set_ephemeris_file(filename: str) -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _PLANETS = None
     from .cache import clear_caches
@@ -1356,8 +1422,13 @@ def set_tid_acc(acc: float) -> None:
     Set the tidal acceleration used in Delta T calculations.
 
     The tidal acceleration of the Moon affects the long-term extrapolation
-    of Delta T (TT - UT1), which is important for historical astronomical
-    calculations. Different JPL ephemeris files assume different values.
+    of Delta T (TT - UT1) in the reference implementation. Different JPL
+    ephemeris files assume different values.
+
+    NOTE: in libephemeris the stored value is informational only — Delta T
+    comes from the userdef override, IERS data, or the Skyfield/enhanced
+    timescale, none of which consult this setting. get_tid_acc() returns
+    whatever was set here, for reference-API compatibility.
 
     Args:
         acc: Tidal acceleration in arcsec/century^2.
@@ -1585,14 +1656,20 @@ def close() -> None:
     """
     Close all opened ephemeris files and release resources.
 
-    This function closes the SPK kernel file handles and resets all global
-    state to its initial values. Call this when you're done using the library
-    or want to reload ephemeris files with different settings.
+    This function closes the SPK kernel file handles and resets session
+    state to its initial values. Call this when you're done using the
+    library or want to reload ephemeris files with different settings.
 
     Note:
         - This closes the underlying file handles in the JPL ephemeris kernel
         - After calling close(), the next ephemeris calculation will
           automatically reload the ephemeris files as needed
+        - Process-level configuration is preserved: the calculation mode
+          set via set_calc_mode(), the .leb file path set via
+          set_leb_file() and the strict-precision setting survive close()
+          (they are re-resolved from env/TOML only if never set
+          explicitly). Per-session state (topo, sidereal mode, user
+          Delta-T, open files, caches) is cleared.
         - This is useful for:
           - Freeing memory and file handles in long-running applications
           - Switching to a different ephemeris file
@@ -1645,9 +1722,14 @@ def _close_inner() -> None:
             _LEB_READER.close()
         except (AttributeError, OSError):
             pass
-    _LEB_FILE = None
     _LEB_READER = None
-    _CALC_MODE = None
+    # _CALC_MODE and _LEB_FILE are deliberately preserved: the calculation
+    # mode chosen via set_calc_mode() and the .leb path chosen via
+    # set_leb_file() are process-level configuration, not per-session state.
+    # Resetting the mode silently re-enabled the auto fallback chain (network
+    # downloads, backend switches) after every close() — see issue #30 —
+    # and clearing the path made mode "leb" raise (or silently switch to an
+    # auto-discovered file) on the first calculation after close().
 
     # Clear fast_calc's cached reference to the closed LEB reader. Without
     # this, helpers like _frame_data() would still dispatch through a stale
@@ -1660,7 +1742,7 @@ def _close_inner() -> None:
     if _PLANETS is not None:
         try:
             _PLANETS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             # SpiceKernel may not have close() in all versions,
             # or may already be closed
             pass
@@ -1669,7 +1751,7 @@ def _close_inner() -> None:
     if _PLANET_CENTERS is not None:
         try:
             _PLANET_CENTERS.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
 
     # Clear computation caches for hot path optimization
@@ -1720,7 +1802,7 @@ def _close_inner() -> None:
     for kernel in _SPK_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _SPK_KERNELS = {}
     _SPK_BODY_MAP = {}
@@ -1729,7 +1811,7 @@ def _close_inner() -> None:
     for kernel in _SPK_TYPE21_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
     _SPK_TYPE21_KERNELS = {}
 
@@ -2149,6 +2231,105 @@ def get_iers_delta_t_enabled() -> bool:
         return toml_value
 
     return False
+
+
+# =============================================================================
+# DELTA T MODEL SELECTION
+# =============================================================================
+
+# Selects which Delta T model is used (after the user-defined and IERS-observed
+# priorities):
+#   - ``smh2016`` (default): Skyfield's Stephenson-Morrison-Hohenkerk (2016)
+#     model — the modern scientific standard, used by libephemeris natively.
+#   - ``espenak_meeus``: the classic Espenak & Meeus (2006) NASA polynomial set.
+# Both are clean-room implementations; libephemeris NEVER imports any third-party
+# ephemeris library, to stay license-independent. Exact parity with the reference
+# ephemeris (for validation only) is injected externally via set_delta_t_userdef()
+# in the validation harness.
+# The models only differ outside the IERS-observed range (chiefly ancient and
+# far-future dates); within the well-observed range they agree closely.
+#
+# Scope (shared by set_delta_t_userdef() and the IERS toggle, not specific to the
+# model selector): these overrides set the ΔT returned by deltat()/deltat_ex() and
+# therefore the TT used by every path that converts UT to TT through them — the
+# LEB / fast / Horizons position backends, eclipses, heliacal events and long-term
+# sidereal time. The Skyfield position backend instead derives TT from Skyfield's
+# own internal ΔT model (SMH-2016 + IERS), so its planetary positions are NOT
+# affected. Selecting a model therefore changes positions in the default (LEB)
+# backend but not in "skyfield" mode.
+_DELTA_T_MODEL_ENV_VAR = "LIBEPHEMERIS_DELTAT_MODEL"
+_VALID_DELTA_T_MODELS = ("smh2016", "espenak_meeus")
+_DEFAULT_DELTA_T_MODEL = "smh2016"
+_DELTA_T_MODEL: Optional[str] = None  # programmatic override
+
+
+def set_delta_t_model(model: Optional[str]) -> None:
+    """
+    Select the Delta T model used outside the user-defined / IERS-observed range.
+
+    Args:
+        model: ``"smh2016"`` (Stephenson-Morrison-Hohenkerk 2016, the default,
+            via Skyfield), ``"espenak_meeus"`` (Espenak & Meeus 2006 polynomials,
+            compatible with the reference ephemeris), or ``None`` to defer to the
+            ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / TOML config.
+
+    Raises:
+        ValueError: if ``model`` is not a recognised model name.
+
+    Environment Variable:
+        LIBEPHEMERIS_DELTAT_MODEL: ``smh2016`` or ``espenak_meeus``.
+
+    Note:
+        The selected model (like ``set_delta_t_userdef()`` and the IERS toggle)
+        governs the ΔT returned by ``deltat()`` / ``deltat_ex()``, and hence the
+        positions of the LEB / fast / Horizons backends, eclipses, heliacal
+        events and long-term sidereal time. The Skyfield backend obtains TT from
+        Skyfield's own internal ΔT model, so its planetary positions are
+        unaffected — selecting a model changes positions in the default (LEB)
+        backend but not in ``"skyfield"`` mode.
+    """
+    global _DELTA_T_MODEL
+    if model is None:
+        _DELTA_T_MODEL = None
+        return
+    normalized = model.lower().strip()
+    if normalized not in _VALID_DELTA_T_MODELS:
+        raise ValueError(
+            f"Unknown delta_t model {model!r}; valid models: "
+            f"{', '.join(_VALID_DELTA_T_MODELS)}"
+        )
+    _DELTA_T_MODEL = normalized
+
+
+def get_delta_t_model() -> str:
+    """
+    Return the active Delta T model name (``"smh2016"`` or ``"espenak_meeus"``).
+
+    Resolution order: explicit ``set_delta_t_model()`` value, then the
+    ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable, then the TOML config,
+    then the default (``"smh2016"``).
+    """
+    if _DELTA_T_MODEL is not None:
+        return _DELTA_T_MODEL
+
+    # Read the env var fresh (cheap dict lookup) so runtime changes are honoured;
+    # only normalise/validate it when it is actually set, to keep the common
+    # default path (this runs per deltat() call) free of needless string work.
+    env_raw = os.environ.get(_DELTA_T_MODEL_ENV_VAR)
+    if env_raw:
+        env_value = env_raw.lower().strip()
+        if env_value in _VALID_DELTA_T_MODELS:
+            return env_value
+
+    from ._config_toml import get_str as _toml_str
+
+    toml_value = _toml_str("deltat_model")
+    if toml_value is not None:
+        toml_value = toml_value.lower().strip()
+        if toml_value in _VALID_DELTA_T_MODELS:
+            return toml_value
+
+    return _DEFAULT_DELTA_T_MODEL
 
 
 # =============================================================================

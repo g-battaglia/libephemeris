@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 SPK kernel support for high-precision minor body calculations.
 
@@ -43,7 +45,6 @@ import math
 import os
 import re
 import ssl
-import sys
 import tempfile
 import time
 import urllib.error
@@ -56,10 +57,10 @@ import numpy as np
 
 from skyfield.framelib import ecliptic_frame
 
-from .download import SimpleProgressBar, _is_valid_bsp
+from .download import _is_valid_bsp
 from .exceptions import SPKNotFoundError
 from .logging_config import format_file_size, get_logger
-from .state import get_loader, get_timescale
+from .state import get_timescale
 
 # Vendored spktype21 for SPK type 21 support (upstream unmaintained since 2018).
 # Includes numpy 2.x compatibility fix (.item() on map_array results).
@@ -526,7 +527,9 @@ def download_spk(
                 ) from e
 
     # Should not reach here, but just in case
-    raise ConnectionError(f"Download failed: {last_error}")
+    raise ConnectionError(
+        f"Download failed: {last_error}"
+    )  # pragma: no cover - retry loop always returns or raises
 
 
 # =============================================================================
@@ -966,7 +969,7 @@ class _SpkType21Target:
         return f"<SpkType21Target NAIF={self._naif_id}>"
 
 
-def get_spk_type21_target(ipl: int):
+def get_spk_type21_target(ipl: int, jd_tt: Optional[float] = None):
     """Get a Skyfield-compatible VectorFunction target for a type 21 asteroid.
 
     Returns a _SpkType21Target that can be used with Skyfield's observe/apparent
@@ -974,6 +977,12 @@ def get_spk_type21_target(ipl: int):
 
     Args:
         ipl: libephemeris body ID (e.g., CHIRON=15, CERES=17)
+        jd_tt: Optional epoch (JD TT).  When given and outside the
+            kernel's coverage, returns None so the caller falls through
+            to the legacy path, which raises EphemerisRangeError and
+            lands on the documented Keplerian out-of-coverage fallback —
+            the same flow as type 2/3 kernels.  (A small margin covers
+            the light-time retardation at the coverage edges.)
 
     Returns:
         _SpkType21Target or None
@@ -993,6 +1002,44 @@ def get_spk_type21_target(ipl: int):
     kernel = _load_type21_kernel(spk_file)
     if kernel is None:
         return None
+
+    if jd_tt is not None:
+        coverage = get_spk_coverage(spk_file)
+        if coverage is not None:
+            start_jd, end_jd = coverage
+            # Outside the raw coverage: caller falls through to the direct /
+            # Keplerian out-of-coverage path.
+            if jd_tt <= start_jd or jd_tt >= end_jd:
+                return None
+            # Coverage-edge margin: Skyfield's observe() retards the target by
+            # the one-way light-time, so jd_tt must sit at least that far inside
+            # the kernel or observe() raises instead of falling through to the
+            # documented Keplerian path. Size it from the body's actual
+            # heliocentric distance — a fixed margin sized for Chiron (~0.11 d
+            # near aphelion) is far too small for distant TNOs (Eris/Sedna reach
+            # ~0.5 d). Floor at 0.2 d for the inner small bodies.
+            _AU_KM = 149597870.7
+            _C_AU_DAY = 173.1446326846693
+            try:
+                pos_km, _ = kernel.compute_type21(10, naif_id, float(jd_tt))
+                helio_au = (
+                    math.sqrt(pos_km[0] ** 2 + pos_km[1] ** 2 + pos_km[2] ** 2)
+                    / _AU_KM
+                )
+            except Exception:  # noqa: BLE001  # intentional best-effort probe
+                # Probe failed near the edge: assume a distant body (~175 AU,
+                # ~1 d light-time) so the margin is conservative, not too small.
+                # Catch broadly — the probe is best-effort and the underlying
+                # compute_type21/get_MDA_record/spke21 also raise RuntimeError
+                # (e.g. "Invalid data" / segment errors); a probe failure must
+                # never escape this margin sizing and break the documented
+                # graceful fall-through to the Keplerian out-of-coverage path.
+                helio_au = 175.0
+            # Earth's orbit adds at most ~1 AU to the geocentric distance; a
+            # 1.2 safety factor absorbs the light-time iteration and slop.
+            margin = max(0.2, (helio_au + 1.0) / _C_AU_DAY * 1.2)
+            if jd_tt < start_jd + margin or jd_tt > end_jd - margin:
+                return None
 
     # Get the Sun target from the main ephemeris
     planets = state.get_planets()
@@ -1042,7 +1089,6 @@ def _calc_type21_position(
         precess_from_j2000,
         apply_aberration_to_position,
     )
-    from .planets import _get_true_ayanamsa
 
     jd_tdb = t.tdb  # Use TDB for SPK calculations
     jd_tt = t.tt  # TT for precession/nutation
@@ -1053,7 +1099,11 @@ def _calc_type21_position(
 
     # Check flags
     is_heliocentric = bool(iflag & FLG_HELCTR)
-    apply_light_time = not (iflag & FLG_TRUEPOS) and not is_heliocentric
+    # Light-time is applied for heliocentric output too (retarded by the
+    # Sun->body light time, see the iteration below); the reference and the
+    # rest of the library retard heliocentric positions. Aberration, however,
+    # is a geocentric-observer effect and is excluded from heliocentric output.
+    apply_light_time = not (iflag & FLG_TRUEPOS)
     apply_aberration = not (iflag & FLG_NOABERR) and not is_heliocentric
     apply_precession = not (iflag & FLG_J2000)
     apply_nutation = not (iflag & FLG_NONUT) and apply_precession
@@ -1062,7 +1112,7 @@ def _calc_type21_position(
     planets = state.get_planets()
     sun = planets["sun"]
     earth = planets["earth"]
-    ts = state.get_timescale()
+    state.get_timescale()
 
     # Earth heliocentric position in ICRS
     earth_ssb = earth.at(t).position.au
@@ -1072,14 +1122,21 @@ def _calc_type21_position(
     # Convert Earth to ecliptic J2000
     earth_helio_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_helio_icrs))
 
-    # Earth velocity (needed for aberration)
+    # Earth velocity. Two frames are needed:
+    #  - heliocentric (Earth-Sun): forms the body's geocentric velocity below,
+    #    cancelling the Sun term carried by the heliocentric SPK vectors.
+    #  - barycentric (SSB): the correct frame for stellar aberration (IAU;
+    #    matches the planets.py apparent-place pipeline).
     if apply_aberration or (iflag & FLG_SPEED):
-        earth_vel_icrs = np.array(earth.at(t).velocity.au_per_d) - np.array(
+        earth_vel_bary_icrs = np.array(earth.at(t).velocity.au_per_d)
+        earth_vel_helio_icrs = earth_vel_bary_icrs - np.array(
             sun.at(t).velocity.au_per_d
         )
-        earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_icrs))
+        earth_vel_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_helio_icrs))
+        earth_vel_bary_ecl = np.array(_icrs_to_ecliptic_j2000(*earth_vel_bary_icrs))
     else:
         earth_vel_ecl = np.array([0.0, 0.0, 0.0])
+        earth_vel_bary_ecl = np.array([0.0, 0.0, 0.0])
 
     # =========================================================================
     # Step 1: Get heliocentric position from SPK, with light-time iteration
@@ -1091,7 +1148,7 @@ def _calc_type21_position(
         for _ in range(3):
             try:
                 pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-            except (OSError, ValueError, KeyError, IndexError) as e:
+            except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
                 get_logger().debug("SPK type 21 computation failed: %s", e)
                 return None
 
@@ -1099,9 +1156,13 @@ def _calc_type21_position(
             pos_au = np.array(pos_km) / AU_KM
             pos_ecl = np.array(_icrs_to_ecliptic_j2000(*pos_au))
 
-            # Compute geocentric distance
-            pos_geo = pos_ecl - earth_helio_ecl
-            dist_au = float(np.linalg.norm(pos_geo))
+            # Light-time distance: Sun->body for heliocentric output,
+            # Earth->body for geocentric output.
+            if is_heliocentric:
+                dist_au = float(np.linalg.norm(pos_ecl))
+            else:
+                pos_geo = pos_ecl - earth_helio_ecl
+                dist_au = float(np.linalg.norm(pos_geo))
 
             # Light-time in days
             light_time_days = dist_au / C_LIGHT_AU_DAY
@@ -1110,14 +1171,17 @@ def _calc_type21_position(
         # No light-time correction
         try:
             pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-        except (OSError, ValueError, KeyError, IndexError) as e:
+        except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
             get_logger().debug("SPK type 21 computation failed: %s", e)
             return None
 
     # Final position computation at light-time corrected epoch
     try:
         pos_km, vel_km = kernel.compute_type21(10, naif_id, jd_compute)
-    except (OSError, ValueError, KeyError, IndexError) as e:
+    except (OSError, ValueError, KeyError, IndexError, RuntimeError) as e:
+        # RuntimeError included to match the two loop-body handlers above and
+        # the documented graceful fall-through (compute_type21/spke21 raise
+        # RuntimeError on segment/"Invalid data" errors).
         get_logger().debug("SPK type 21 computation failed: %s", e)
         return None
 
@@ -1146,12 +1210,14 @@ def _calc_type21_position(
     # Step 3: Apply aberration (if requested)
     # =========================================================================
     if apply_aberration:
-        # apply_aberration_to_position expects tuples
+        # apply_aberration_to_position expects tuples. Aberration uses the
+        # observer's barycentric (SSB) velocity, per the IAU apparent-place
+        # convention shared with planets.py.
         pos_tuple = (float(pos_final[0]), float(pos_final[1]), float(pos_final[2]))
         vel_tuple = (
-            float(earth_vel_ecl[0]),
-            float(earth_vel_ecl[1]),
-            float(earth_vel_ecl[2]),
+            float(earth_vel_bary_ecl[0]),
+            float(earth_vel_bary_ecl[1]),
+            float(earth_vel_bary_ecl[2]),
         )
         pos_aberrated = apply_aberration_to_position(pos_tuple, vel_tuple)
         pos_final = np.array(pos_aberrated)
@@ -1197,7 +1263,7 @@ def _calc_type21_position(
             speed_lon = math.degrees((x * vy - y * vx) / xy_sq)
             xy = math.sqrt(xy_sq)
             speed_lat = (
-                math.degrees((z * (x * vx + y * vy) / xy - xy * vz) / (r * r))
+                math.degrees((xy * vz - z * (x * vx + y * vy) / xy) / (r * r))
                 if r > 0
                 else 0.0
             )
@@ -1213,10 +1279,15 @@ def _calc_type21_position(
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
     if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        # Flag-aware ayanamsa (true for of-date, mean for NONUT/J2000) and the
+        # ayanamsha-rate speed correction, via the canonical helper. The
+        # type-21 longitude already honors FLG_J2000/FLG_NONUT (precession /
+        # nutation applied above), so the flag-aware ayanamsa matches it; the
+        # helper also subtracts the ~50"/yr drift from speed_lon under
+        # FLG_SPEED (previously left at the tropical value).
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, r, speed_lon, speed_lat, speed_dist)
 
@@ -1346,8 +1417,13 @@ def calc_spk_body_position(
         ValueError: If JD is outside SPK coverage
     """
     from . import state
-    from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
-    from .planets import _get_true_ayanamsa
+    from .constants import (
+        FLG_HELCTR,
+        FLG_SPEED,
+        FLG_SIDEREAL,
+        FLG_NONUT,
+        FLG_J2000,
+    )
 
     # Check if body is registered
     if ipl not in state._SPK_BODY_MAP:
@@ -1360,6 +1436,19 @@ def calc_spk_body_position(
 
     # Handle type 21 (JPL Horizons asteroids/comets)
     if spk_type == 21:
+        # Out-of-coverage epochs raise EphemerisRangeError exactly like
+        # the type 2/3 branch below; None stays reserved for genuine
+        # computation failures (unreadable/corrupt kernel data).
+        coverage = get_spk_coverage(spk_file)
+        if coverage is not None:
+            start_jd, end_jd = coverage
+            if t.tt < start_jd or t.tt > end_jd:
+                from .exceptions import EphemerisRangeError
+
+                raise EphemerisRangeError(
+                    f"JD {t.tt:.1f} outside SPK coverage "
+                    f"[{start_jd:.1f}, {end_jd:.1f}] for body {ipl}"
+                )
         kernel = _load_type21_kernel(spk_file)
         if kernel is not None:
             result = _calc_type21_position(kernel, naif_id, t, iflag)
@@ -1378,7 +1467,9 @@ def calc_spk_body_position(
     if coverage is not None:
         start_jd, end_jd = coverage
         if t.tt < start_jd or t.tt > end_jd:
-            raise ValueError(
+            from .exceptions import EphemerisRangeError
+
+            raise EphemerisRangeError(
                 f"JD {t.tt:.1f} outside SPK coverage [{start_jd:.1f}, {end_jd:.1f}] "
                 f"for body {ipl}"
             )
@@ -1400,94 +1491,98 @@ def calc_spk_body_position(
     else:
         observer = planets["earth"]
 
-    # Calculate position
-    # Target position relative to SSB
-    target_pos = target.at(t)
+    # Apparent pipeline, mirroring the type-21 path: light-time iteration
+    # on the target (unless FLG_TRUEPOS) and, for geocentric output, annual
+    # aberration (unless FLG_NOABERR). Heliocentric output is light-time
+    # corrected too -- here the observer is the Sun, so the iteration below
+    # retards by the Sun->body light time -- but carries no aberration,
+    # matching the reference and the rest of the library's heliocentric paths.
+    from .constants import FLG_NOABERR, FLG_TRUEPOS
+    from .astrometry import apply_aberration_to_position
 
-    # Observer position relative to SSB
-    observer_pos = observer.at(t)
+    C_AU_DAY = 173.144632674240
+    apply_light_time = not (iflag & FLG_TRUEPOS)
+    apply_aberr = not (iflag & FLG_NOABERR) and not is_heliocentric
+    ts = get_timescale()
 
-    # Relative position (target as seen from observer)
-    # We need to compute this manually since SPK targets may not support observe()
-    target_xyz = target_pos.position.au
-    observer_xyz = observer_pos.position.au
+    def _rel_at(t_obs):
+        """Light-time corrected target-minus-observer vector (AU)."""
+        obs_at = observer.at(t_obs)
+        obs_xyz = obs_at.position.au
+        t_emit = t_obs
+        rel = None
+        for _ in range(3):
+            tgt_xyz = target.at(t_emit).position.au
+            rel = [tgt_xyz[i] - obs_xyz[i] for i in range(3)]
+            if not apply_light_time:
+                break
+            dist_au = math.sqrt(rel[0] ** 2 + rel[1] ** 2 + rel[2] ** 2)
+            t_emit = ts.tt_jd(t_obs.tt - dist_au / C_AU_DAY)
+        if apply_aberr:
+            obs_vel = obs_at.velocity.au_per_d
+            rel = list(
+                apply_aberration_to_position(
+                    (rel[0], rel[1], rel[2]),
+                    (obs_vel[0], obs_vel[1], obs_vel[2]),
+                )
+            )
+        return rel
 
-    rel_xyz = [target_xyz[i] - observer_xyz[i] for i in range(3)]
-
-    # Convert to ecliptic coordinates
-    # Use Skyfield's ecliptic frame
     from skyfield.positionlib import ICRF
 
-    rel_pos = ICRF(rel_xyz, t=t, center=399)
+    def _ecl_at(t_obs):
+        rel = _rel_at(t_obs)
+        rel_pos = ICRF(rel, t=t_obs, center=399)
+        ecl = rel_pos.frame_latlon(ecliptic_frame)
+        return (
+            ecl[1].degrees % 360.0,
+            ecl[0].degrees,
+            ecl[2].au,
+        )
 
-    # Get ecliptic lat/lon
-    ecl_pos = rel_pos.frame_latlon(ecliptic_frame)
-    lat = ecl_pos[0].degrees
-    lon = ecl_pos[1].degrees
-    dist = ecl_pos[2].au
-
-    # Normalize longitude to 0-360
-    lon = lon % 360.0
+    lon, lat, dist = _ecl_at(t)
 
     # Calculate speeds if requested
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
     if iflag & FLG_SPEED:
-        # Central difference numerical differentiation (1 second timestep)
-        ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
+        lon_prev, lat_prev, dist_prev = _ecl_at(ts.tt_jd(t.tt - dt))
+        lon_next, lat_next, dist_next = _ecl_at(ts.tt_jd(t.tt + dt))
 
-        t_prev = ts.tt_jd(t.tt - dt)
-        t_next = ts.tt_jd(t.tt + dt)
-
-        # Position at t - dt
-        target_pos_prev = target.at(t_prev)
-        observer_pos_prev = observer.at(t_prev)
-
-        target_xyz_prev = target_pos_prev.position.au
-        observer_xyz_prev = observer_pos_prev.position.au
-
-        rel_xyz_prev = [target_xyz_prev[i] - observer_xyz_prev[i] for i in range(3)]
-
-        rel_pos_prev = ICRF(rel_xyz_prev, t=t_prev, center=399)
-        ecl_pos_prev = rel_pos_prev.frame_latlon(ecliptic_frame)
-
-        lat_prev = ecl_pos_prev[0].degrees
-        lon_prev = ecl_pos_prev[1].degrees % 360.0
-        dist_prev = ecl_pos_prev[2].au
-
-        # Position at t + dt
-        target_pos_next = target.at(t_next)
-        observer_pos_next = observer.at(t_next)
-
-        target_xyz_next = target_pos_next.position.au
-        observer_xyz_next = observer_pos_next.position.au
-
-        rel_xyz_next = [target_xyz_next[i] - observer_xyz_next[i] for i in range(3)]
-
-        rel_pos_next = ICRF(rel_xyz_next, t=t_next, center=399)
-        ecl_pos_next = rel_pos_next.frame_latlon(ecliptic_frame)
-
-        lat_next = ecl_pos_next[0].degrees
-        lon_next = ecl_pos_next[1].degrees % 360.0
-        dist_next = ecl_pos_next[2].au
-
-        # Compute rates using central difference (per day)
         speed_lon = (lon_next - lon_prev) / (2.0 * dt)
         speed_lat = (lat_next - lat_prev) / (2.0 * dt)
         speed_dist = (dist_next - dist_prev) / (2.0 * dt)
 
-        # Handle 360 wrap
         if speed_lon > 180.0 / (2.0 * dt):
             speed_lon -= 360.0 / (2.0 * dt)
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
+    # FLG_NONUT / FLG_J2000: frame_latlon(ecliptic_frame) above produces a TRUE
+    # ecliptic-of-date longitude (with nutation in longitude Δψ). The mean
+    # ecliptic (NONUT) and the J2000 frame carry no nutation, so strip Δψ here.
+    # For J2000 the downstream _maybe_equatorial_convert precesses of-date→J2000
+    # but does not remove nutation, so it must be removed first — matching the
+    # type-21 path and the reference, whose J2000 ecliptic output is mean.
+    if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
+        from .cache import get_cached_nutation
+
+        dpsi_rad, _ = get_cached_nutation(t.tt)
+        lon = (lon - math.degrees(dpsi_rad)) % 360.0
+        if iflag & FLG_SPEED:
+            from .planets import _nutation_rate_deg_per_day
+
+            speed_lon -= _nutation_rate_deg_per_day(t.tt)
+
+    # Apply sidereal correction if requested. Routed through the canonical
+    # flag-aware helper so the ayanamsa variant matches the longitude frame set
+    # above: TRUE ayanamsa (mean + Δψ) cancels Δψ on a true-of-date longitude,
+    # while NONUT/J2000 (Δψ already stripped) get the MEAN ayanamsa. The helper
+    # also removes the ~50"/yr ayanamsha drift from speed_lon under FLG_SPEED.
     if iflag & FLG_SIDEREAL:
-        # Use true ayanamsa (mean + nutation) so that nutation cancels
-        # from the ecliptic longitude, consistent with planets.py path.
-        ayanamsa = _get_true_ayanamsa(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)

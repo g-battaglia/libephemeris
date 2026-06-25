@@ -5,30 +5,27 @@ Validation tests use the 2024-Apr-08 total solar eclipse as reference:
 - Maximum totality approximately JD 2460409.26 (~18:18 UTC)
 - Central line near Nazas, Durango, Mexico (~25.2N, ~104.1W)
 
-Reference data from NASA Eclipse website and pyswisseph comparison.
+Reference data from NASA Eclipse website and the reference ephemeris comparison.
 """
 
-import math
 import pytest
 
 pytestmark = pytest.mark.slow
 
 from libephemeris import (
     julday,
-    revjul,
     sol_eclipse_where,
     sol_eclipse_how,
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_PARTIAL,
-    ECL_ANNULAR,
     ECL_CENTRAL,
     ECL_VISIBLE,
 )
 
 
 class TestSweSolEclipseWhereSignature:
-    """Test that sol_eclipse_where function signature matches pyswisseph."""
+    """Test that sol_eclipse_where function signature matches the reference ephemeris."""
 
     def test_function_exists(self):
         """Test that sol_eclipse_where function exists."""
@@ -43,11 +40,11 @@ class TestSweSolEclipseWhereSignature:
 
         retflag, geopos, attr = sol_eclipse_where(tjd_ut, FLG_SWIEPH)
 
-        # geopos should be 10-element tuple per pyswisseph documentation
+        # geopos should be 10-element tuple per reference ephemeris documentation
         assert len(geopos) == 10
         assert all(isinstance(g, float) for g in geopos)
 
-        # attr should be 20-element tuple per pyswisseph documentation
+        # attr should be 20-element tuple per reference ephemeris documentation
         assert len(attr) == 20
         assert all(isinstance(a, float) for a in attr)
 
@@ -170,7 +167,7 @@ class TestSweSolEclipseWhereApril2024:
 
 
 class TestSweSolEclipseHowSignature:
-    """Test that sol_eclipse_how function signature matches pyswisseph."""
+    """Test that sol_eclipse_how function signature matches the reference ephemeris."""
 
     def test_function_exists(self):
         """Test that sol_eclipse_how function exists."""
@@ -461,159 +458,79 @@ class TestSweSolEclipseHowEdgeCases:
         assert isinstance(retflag, int)
 
 
-# Note: pyswisseph comparison tests are skipped because the installed version
-# doesn't have eclipse functions. These would be useful for validation if
-# a newer pyswisseph version with eclipse support is installed.
+# Note: reference ephemeris comparison tests are skipped because the installed
+# version doesn't have eclipse functions. These would be useful for validation
+# if a newer reference ephemeris version with eclipse support is installed.
 
 
 class TestSweSolEclipseWhereLimits:
-    """Test sol_eclipse_where returns proper umbra and penumbra limits."""
+    """sol_eclipse_where geopos layout follows the reference convention.
+
+    The reference API fills only geopos[0..1] (longitude/latitude of the
+    shadow-center / maximum-eclipse point); geopos[2..9] are returned as
+    zeros (verified live against the reference ephemeris 2.10.03 for the 2024-04-08
+    total eclipse and the 2021-06-10 annular eclipse).
+    """
 
     def setup_method(self):
         """Set up test fixtures for April 8, 2024 total solar eclipse."""
         # JD during maximum totality in Mexico
         self.tjd_ut = 2460409.26
 
-    def test_umbra_limits_are_calculated(self):
-        """Test that umbra limit coordinates are returned for total eclipse."""
+    def test_geopos_has_ten_elements(self):
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
+        assert len(geopos) == 10
 
-        # For a total eclipse, umbra limits should be non-zero
-        if retflag & ECL_TOTAL:
-            umbra_n_lon, umbra_n_lat = geopos[2], geopos[3]
-            umbra_s_lon, umbra_s_lat = geopos[4], geopos[5]
-
-            # At least one of the umbra limits should be non-zero
-            umbra_defined = (
-                umbra_n_lon != 0.0
-                or umbra_n_lat != 0.0
-                or umbra_s_lon != 0.0
-                or umbra_s_lat != 0.0
-            )
-            assert umbra_defined, "Umbra limits should be calculated for total eclipse"
-
-    def test_penumbra_limits_are_calculated(self):
-        """Test that penumbra limit coordinates are returned for eclipse."""
+    def test_center_point_filled(self):
+        """The shadow-center longitude/latitude must be present and valid."""
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
+        assert retflag & ECL_TOTAL
+        assert -180.0 <= geopos[0] <= 180.0
+        assert -90.0 <= geopos[1] <= 90.0
+        # Mid-totality of the 2024-04-08 eclipse runs through Mexico
+        # (reference ephemeris: lon -104.99, lat +24.43).
+        assert abs(geopos[0] - (-104.99)) < 0.5
+        assert abs(geopos[1] - 24.43) < 0.5
 
-        # Penumbra limits should be non-zero during an eclipse
-        if retflag != 0:
-            penumbra_n_lon, penumbra_n_lat = geopos[6], geopos[7]
-            penumbra_s_lon, penumbra_s_lat = geopos[8], geopos[9]
-
-            # At least one of the penumbra limits should be non-zero
-            penumbra_defined = (
-                penumbra_n_lon != 0.0
-                or penumbra_n_lat != 0.0
-                or penumbra_s_lon != 0.0
-                or penumbra_s_lat != 0.0
-            )
-            assert penumbra_defined, (
-                "Penumbra limits should be calculated during an eclipse"
-            )
-
-    def test_northern_limit_north_of_central(self):
-        """Test that northern umbra limit is north of central line."""
+    def test_remaining_geopos_slots_are_zero(self):
+        """geopos[2..9] are zeros in the reference convention."""
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
+        assert retflag != 0
+        for i in range(2, 10):
+            assert geopos[i] == 0.0, f"geopos[{i}] must be 0.0, got {geopos[i]}"
 
-        if retflag & ECL_TOTAL:
-            central_lat = geopos[1]
-            umbra_n_lat = geopos[3]
+    def test_core_shadow_width_negative_for_total(self):
+        """attr[3] is the core-shadow diameter, negative when umbral.
 
-            # Northern limit latitude should be >= central latitude
-            if umbra_n_lat != 0.0:
-                assert umbra_n_lat >= central_lat - 0.1, (
-                    f"Northern umbra limit ({umbra_n_lat:.2f}) should be "
-                    f">= central line ({central_lat:.2f})"
-                )
-
-    def test_southern_limit_south_of_central(self):
-        """Test that southern umbra limit is south of central line."""
+        The reference ephemeris 2.10.03 returns -189.37 km at this instant.
+        """
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
+        assert retflag & ECL_TOTAL
+        assert attr[3] < 0.0
+        assert abs(attr[3] - (-189.37)) < 1.0
 
-        if retflag & ECL_TOTAL:
-            central_lat = geopos[1]
-            umbra_s_lat = geopos[5]
+    def test_no_eclipse_instant_returns_zero_flag_with_data(self):
+        """A no-eclipse instant gives retflag 0 but still fills geopos/attr.
 
-            # Southern limit latitude should be <= central latitude
-            if umbra_s_lat != 0.0:
-                assert umbra_s_lat <= central_lat + 0.1, (
-                    f"Southern umbra limit ({umbra_s_lat:.2f}) should be "
-                    f"<= central line ({central_lat:.2f})"
-                )
-
-    def test_penumbra_wider_than_umbra(self):
-        """Test that penumbra limits are wider than umbra limits."""
-        retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
-
-        if retflag & ECL_TOTAL:
-            umbra_n_lat = geopos[3]
-            umbra_s_lat = geopos[5]
-            penumbra_n_lat = geopos[7]
-            penumbra_s_lat = geopos[9]
-
-            # Only check if all limits are defined
-            if (
-                umbra_n_lat != 0.0
-                and umbra_s_lat != 0.0
-                and penumbra_n_lat != 0.0
-                and penumbra_s_lat != 0.0
-            ):
-                umbra_width = umbra_n_lat - umbra_s_lat
-                penumbra_width = penumbra_n_lat - penumbra_s_lat
-
-                # Penumbra should be wider than umbra
-                assert penumbra_width >= umbra_width, (
-                    f"Penumbra width ({penumbra_width:.2f}) should be >= "
-                    f"umbra width ({umbra_width:.2f})"
-                )
-
-    def test_limits_have_valid_coordinates(self):
-        """Test that limit coordinates are in valid ranges."""
-        retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
-
-        if retflag != 0:
-            for i in range(0, 10, 2):  # Check longitudes
-                lon = geopos[i]
-                if lon != 0.0:
-                    assert -180 <= lon <= 180, f"Longitude {lon} out of range"
-
-            for i in range(1, 10, 2):  # Check latitudes
-                lat = geopos[i]
-                if lat != 0.0:
-                    assert -90 <= lat <= 90, f"Latitude {lat} out of range"
-
-    def test_limits_reasonable_for_apr2024(self):
-        """Test that limits are in reasonable geographic locations for Apr 2024."""
-        retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
-
-        if retflag & ECL_TOTAL:
-            # All points should be in the Americas region for this eclipse
-            # Central line should be near Mexico
-            central_lon, central_lat = geopos[0], geopos[1]
-
-            # Check umbra limits are roughly in North America
-            umbra_n_lat = geopos[3]
-            umbra_s_lat = geopos[5]
-
-            if umbra_n_lat != 0.0 and umbra_s_lat != 0.0:
-                # Latitudes should be between 10°N and 50°N for this eclipse
-                assert 10 < umbra_n_lat < 50, (
-                    f"Northern umbra lat {umbra_n_lat} unexpected for Apr 2024"
-                )
-                assert 10 < umbra_s_lat < 50, (
-                    f"Southern umbra lat {umbra_s_lat} unexpected for Apr 2024"
-                )
+        The reference returns the closest-approach point and a negative
+        magnitude measure (reference ephemeris: attr[0] = -6.78 at 2459375.5).
+        """
+        retflag, geopos, attr = sol_eclipse_where(2459375.5, FLG_SWIEPH)
+        assert retflag == 0
+        assert geopos[0] != 0.0 or geopos[1] != 0.0
+        assert attr[0] < 0.0
+        # No eclipse -> nothing of the Sun is obscured (not the 1.0 fallback).
+        assert attr[2] == 0.0
 
 
-@pytest.mark.skip(reason="pyswisseph installed doesn't have eclipse functions")
-class TestComparisonWithPyswisseph:
-    """Compare results with pyswisseph for validation."""
+@pytest.mark.skip(reason="reference ephemeris installed doesn't have eclipse functions")
+class TestComparisonWithReference:
+    """Compare results with the reference ephemeris for validation."""
 
-    def test_eclipse_where_matches_pyswisseph(self):
-        """Test that sol_eclipse_where matches pyswisseph within tolerance."""
+    def test_eclipse_where_matches_reference(self):
+        """Test that sol_eclipse_where matches the reference ephemeris within tolerance."""
         pass
 
-    def test_eclipse_how_obscuration_matches_pyswisseph(self):
-        """Test that sol_eclipse_how obscuration matches pyswisseph within 1%."""
+    def test_eclipse_how_obscuration_matches_reference(self):
+        """Test that sol_eclipse_how obscuration matches the reference ephemeris within 1%."""
         pass

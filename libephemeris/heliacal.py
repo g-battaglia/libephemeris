@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Heliacal event calculations for libephemeris.
 
@@ -40,6 +42,8 @@ from .constants import (
     FIXSTAR_OFFSET,
     FLG_SPEED,
     FLG_SWIEPH,
+    HELFLAG_VISLIM_PHOTOPIC,
+    HELFLAG_VISLIM_SCOTOPIC,
 )
 
 # Inner planets (orbit inside Earth's orbit)
@@ -262,7 +266,7 @@ class SchaeferModel:
         # Rozenberg (1966) formula for better horizon accuracy
         alt_rad = math.radians(max(altitude_deg, -5.0))
         sin_alt = math.sin(alt_rad)
-        cos_alt = math.cos(alt_rad)
+        math.cos(alt_rad)
 
         # Rozenberg formula
         if altitude_deg > 0:
@@ -424,13 +428,16 @@ class SchaeferModel:
         if moon_alt <= 0:
             return 0.0
 
-        # Convert phase fraction to phase angle (degrees).
-        # phase=0 → α=180° (new), phase=1 → α=0° (full)
-        alpha = (1.0 - moon_phase) * 180.0
+        # Convert illuminated fraction to the geometric phase angle (degrees).
+        # f = (1 + cos(alpha)) / 2  =>  alpha = acos(2*f - 1):
+        #   f=0 -> alpha=180 (new), f=1 -> alpha=0 (full), f=0.5 -> alpha=90.
+        # The previous linear map (1 - f) * 180 over-brightened gibbous phases.
+        phase_fraction = min(1.0, max(0.0, moon_phase))
+        alpha = math.degrees(math.acos(2.0 * phase_fraction - 1.0))
 
         # Moon visual magnitude as function of phase angle
         # (Allen 1976, Krisciunas & Schaefer 1991 Eq. 9).
-        # V_moon = -12.73 + 0.026|α| + 4e-9 * α^4
+        # V_moon = -12.73 + 0.026|alpha| + 4e-9 * alpha^4
         abs_alpha = abs(alpha)
         moon_mag = -12.73 + 0.026 * abs_alpha + 4.0e-9 * abs_alpha**4
 
@@ -448,16 +455,20 @@ class SchaeferModel:
         # Airmass at object position
         X_obj = self.airmass(obj_alt)
 
-        # Sky brightness from Moon (K&S 1991 Eq. 15/20):
-        # B_moon = f(ρ) * I * 10^(-0.4*k*X_obj) * (1 - 10^(-0.4*k*X_obj))
+        # Sky brightness from Moon (K&S 1991 Eq. 20):
+        # B_moon = f(rho) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
         #
-        # The term (1 - 10^(-0.4*k*X_obj)) represents the fraction of
-        # atmosphere along the line of sight available for scattering.
-        extinction_factor = 10.0 ** (-0.4 * self.k_total * X_obj)
-        scatter_depth = 1.0 - extinction_factor
+        # I_ground already carries the moonlight extinction along the Moon's
+        # airmass (X_moon). The remaining factor (1 - 10^(-0.4*k*X_obj)) is the
+        # fraction of atmosphere along the OBJECT's line of sight available for
+        # scattering. There is no second object-path extinction multiplier; an
+        # extra 10^(-0.4*k*X_obj) here would apply object-path extinction twice
+        # and systematically under-estimate moonlit sky brightness at low
+        # object altitude.
+        scatter_depth = 1.0 - 10.0 ** (-0.4 * self.k_total * X_obj)
 
         # B_moon in nanoLamberts
-        B_moon = f_rho * I_ground * extinction_factor * scatter_depth
+        B_moon = f_rho * I_ground * scatter_depth
 
         # Convert B_moon to magnitude reduction.
         # Dark sky brightness B_dark ≈ 145 nL (airglow) + 100 nL (zodiacal)
@@ -616,7 +627,6 @@ class SchaeferModel:
         Returns:
             Required arcus visionis in degrees
         """
-        C = SchaeferConstants
 
         # Base arcus visionis depends on magnitude
         # Brighter objects need less arcus visionis
@@ -902,7 +912,11 @@ def _leb_body_altaz(
         ecl_lon, ecl_lat, ecl_dist = topo[0], topo[1], topo[2]
 
     az, alt_true, alt_app = azalt(
-        jd_ut, ECL2HOR, geopos_lonlat, atpress, attemp,
+        jd_ut,
+        ECL2HOR,
+        geopos_lonlat,
+        atpress,
+        attemp,
         (ecl_lon, ecl_lat, ecl_dist),
     )
     # Convert SE convention (S=0, westward) to Skyfield convention (N=0, eastward)
@@ -968,8 +982,10 @@ def _heliacal_ut_leb(
 
     # --- validation (same as Skyfield path) ---
     if event_type not in (
-        HELIACAL_RISING, HELIACAL_SETTING,
-        EVENING_FIRST, MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
             f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
@@ -1010,26 +1026,41 @@ def _heliacal_ut_leb(
     def _get_altitudes(jd: float):
         """Return (sun_alt, body_alt, body_az)."""
         _, sun_alt, _ = _leb_body_altaz(
-            reader, jd, SUN, geopos, pressure, temperature,
+            reader,
+            jd,
+            SUN,
+            geopos,
+            pressure,
+            temperature,
         )
         az, body_alt, _ = _leb_body_altaz(
-            reader, jd, body, geopos, pressure, temperature,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            pressure,
+            temperature,
+            is_star=is_star,
+            star_name=star_name,
         )
         return sun_alt, body_alt, az
 
     def _get_elongation(jd: float) -> float:
         if not is_star:
             try:
-                pheno = pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
                 return pheno[2]
             except (ValueError, TypeError, ArithmeticError):
                 pass
         # Manual elongation from ecliptic coords
         sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
         body_ecl = _leb_ecliptic_pos(
-            reader, jd, body, geopos,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
         )
         return angular_separation(sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1])
 
@@ -1037,7 +1068,7 @@ def _heliacal_ut_leb(
         if is_star:
             return star_magnitude
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             return pheno[4]
         except (ValueError, TypeError, ArithmeticError):
             return 0.0
@@ -1052,24 +1083,40 @@ def _heliacal_ut_leb(
     def _get_moon_data(jd: float):
         """Return (moon_alt, phase, moon_body_sep)."""
         _, moon_alt, _ = _leb_body_altaz(
-            reader, jd, MOON, geopos, pressure, temperature,
+            reader,
+            jd,
+            MOON,
+            geopos,
+            pressure,
+            temperature,
         )
         # Moon phase from geocentric elongation (matching Skyfield path)
         from .planets import calc_ut as _scu_md
+
         _sun_geo, _ = _scu_md(jd, SUN, FLG_SPEED)
         _moon_geo, _ = _scu_md(jd, MOON, FLG_SPEED)
         elong_moon = angular_separation(
-            _sun_geo[0], _sun_geo[1], _moon_geo[0], _moon_geo[1],
+            _sun_geo[0],
+            _sun_geo[1],
+            _moon_geo[0],
+            _moon_geo[1],
         )
         phase = (1.0 - math.cos(math.radians(elong_moon))) / 2.0
         moon_ecl = _leb_ecliptic_pos(reader, jd, MOON, geopos)
 
         body_ecl = _leb_ecliptic_pos(
-            reader, jd, body, geopos,
-            is_star=is_star, star_name=star_name,
+            reader,
+            jd,
+            body,
+            geopos,
+            is_star=is_star,
+            star_name=star_name,
         )
         moon_body_sep = angular_separation(
-            moon_ecl[0], moon_ecl[1], body_ecl[0], body_ecl[1],
+            moon_ecl[0],
+            moon_ecl[1],
+            body_ecl[0],
+            body_ecl[1],
         )
         return moon_alt, phase, moon_body_sep
 
@@ -1083,8 +1130,12 @@ def _heliacal_ut_leb(
         body_mag = _get_body_magnitude(jd)
         moon_alt, moon_phase, moon_body_sep = _get_moon_data(jd)
         visible = schaefer.is_visible(
-            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
-            elongation=elongation, moon_alt=moon_alt, moon_phase=moon_phase,
+            body_alt=body_alt,
+            body_mag=body_mag,
+            sun_alt=sun_alt,
+            elongation=elongation,
+            moon_alt=moon_alt,
+            moon_phase=moon_phase,
             moon_obj_angle=moon_body_sep,
         )
         return visible, sun_alt, body_alt, elongation
@@ -1096,9 +1147,14 @@ def _heliacal_ut_leb(
             return False
         body_mag = _get_body_magnitude(jd)
         return schaefer.is_visible(
-            body_alt=body_alt, body_mag=body_mag, sun_alt=sun_alt,
-            elongation=elongation, moon_alt=-90.0, moon_phase=0.0,
-            moon_obj_angle=180.0, margin=margin,
+            body_alt=body_alt,
+            body_mag=body_mag,
+            sun_alt=sun_alt,
+            elongation=elongation,
+            moon_alt=-90.0,
+            moon_phase=0.0,
+            moon_obj_angle=180.0,
+            margin=margin,
         )
 
     def _find_twilight_center(jd_day: float, morning: bool) -> float:
@@ -1173,26 +1229,51 @@ def _heliacal_ut_leb(
         return (jd_low + jd_high) / 2
 
     def _search_heliacal_rising(jd_start_inner: float) -> float:
+        # A heliacal rising is the FIRST morning visibility after the body was
+        # invisible because it was too close to the Sun (i.e. it emerged from a
+        # conjunction gap). Requiring only N consecutive invisible days is not
+        # enough: mid-apparition a bright planet can flicker invisible for a few
+        # days (Moon glare / marginal twilight) and that would be mis-reported
+        # as a rising. So we also require the invisibility streak to have passed
+        # through low solar elongation (a real conjunction gap), which a
+        # mid-apparition dip never does. There is one more legitimate case the
+        # elongation test alone misses: when the conjunction happened *before*
+        # the search window (the body starts the search already past conjunction
+        # but still invisible, e.g. Mars at 17 deg and climbing). Then the streak
+        # never dips below ELONG_GAP inside the window, yet the first visibility
+        # is still a true heliacal rising. We accept it whenever the body has not
+        # been visible at all since the start of the search (seen_visible False),
+        # which a mid-apparition flicker -- visible before the dip -- never is.
+        ELONG_GAP = 10.0  # deg: streak min elongation below this == near conjunction
         max_days = 800
         lookback_jds = [jd_start_inner - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
-        for vis, _ in lookback_vis:
+        min_elong = 999.0
+        seen_visible = False
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
+                seen_visible = True
                 break
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
                     consecutive_invisible += 1
+                    min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5:
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                    ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
+                    min_elong = 999.0
+                    seen_visible = True
         return 0.0
 
     def _search_heliacal_setting(jd_start_inner: float) -> float:
@@ -1291,8 +1372,10 @@ def _heliacal_pheno_ut_leb(
     from .utils import angular_separation
 
     if event_type not in (
-        HELIACAL_RISING, HELIACAL_SETTING,
-        EVENING_FIRST, MORNING_LAST,
+        HELIACAL_RISING,
+        HELIACAL_SETTING,
+        EVENING_FIRST,
+        MORNING_LAST,
     ):
         raise ValueError(
             f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
@@ -1314,16 +1397,31 @@ def _heliacal_pheno_ut_leb(
     # --- positions via LEB ---
     # Sun
     sun_az, sun_alt_deg, _ = _leb_body_altaz(
-        reader, jd, SUN, geopos, pressure, temperature,
+        reader,
+        jd,
+        SUN,
+        geopos,
+        pressure,
+        temperature,
     )
 
     # Body
     body_az_deg, body_alt_deg, _body_app_alt = _leb_body_altaz(
-        reader, jd, body, geopos, pressure, temperature,
-        is_star=is_star, star_name=star_name,
+        reader,
+        jd,
+        body,
+        geopos,
+        pressure,
+        temperature,
+        is_star=is_star,
+        star_name=star_name,
     )
 
-    # Atmospheric refraction (same formula as Skyfield path)
+    # Atmospheric refraction from true altitude, in arcminutes:
+    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
+    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
+    # Below h = -1° the 0.5° fallback approximates horizon refraction.
     if body_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
@@ -1335,8 +1433,12 @@ def _heliacal_pheno_ut_leb(
 
     # Get ecliptic positions for parallax and elongation calculations
     body_ecl = _leb_ecliptic_pos(
-        reader, jd, body, geopos,
-        is_star=is_star, star_name=star_name,
+        reader,
+        jd,
+        body,
+        geopos,
+        is_star=is_star,
+        star_name=star_name,
     )
     sun_ecl = _leb_ecliptic_pos(reader, jd, SUN, geopos)
 
@@ -1349,15 +1451,16 @@ def _heliacal_pheno_ut_leb(
 
     if is_star:
         from .fixed_stars import fixstar_ut
+
+        assert star_name is not None
         _eq_pos, _, _ = fixstar_ut(
             star_name, jd, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
         )
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
         from .planets import calc_ut as _scu_hp
-        _eq_pos, _ = _scu_hp(
-            jd, body, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED
-        )
+
+        _eq_pos, _ = _scu_hp(jd, body, FLG_EQUATORIAL | FLG_J2000 | FLG_SPEED)
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
 
     # Use GAST to match the Skyfield path's t.gast + J2000 RA
@@ -1371,38 +1474,44 @@ def _heliacal_pheno_ut_leb(
     _ha_rad = math.radians(_ha_deg)
     _dec_rad = math.radians(_body_dec_deg)
     _lat_rad = math.radians(geopos[1])
-    _sin_alt = (math.sin(_lat_rad) * math.sin(_dec_rad)
-                + math.cos(_lat_rad) * math.cos(_dec_rad) * math.cos(_ha_rad))
+    _sin_alt = math.sin(_lat_rad) * math.sin(_dec_rad) + math.cos(_lat_rad) * math.cos(
+        _dec_rad
+    ) * math.cos(_ha_rad)
     geo_alt_deg = math.degrees(math.asin(max(-1.0, min(1.0, _sin_alt))))
 
     # Arcus visionis
     tav_act = body_alt_deg - sun_alt_deg
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference
-    daz_act = body_az_deg - sun_az
+    # Azimuth difference, signed (reference convention: Sun minus object)
+    daz_act = sun_az - body_az_deg
     while daz_act > 180:
         daz_act -= 360
     while daz_act < -180:
         daz_act += 360
-    daz_act = abs(daz_act)
 
     # Elongation and magnitude
     if is_star:
         elongation = angular_separation(
-            sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+            sun_ecl[0],
+            sun_ecl[1],
+            body_ecl[0],
+            body_ecl[1],
         )
         magnitude = star_magnitude
         phase_angle = 0.0
     else:
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             elongation = pheno[2]
             magnitude = pheno[4]
             phase_angle = pheno[0]
         except (ValueError, TypeError, ArithmeticError):
             elongation = angular_separation(
-                sun_ecl[0], sun_ecl[1], body_ecl[0], body_ecl[1],
+                sun_ecl[0],
+                sun_ecl[1],
+                body_ecl[0],
+                body_ecl[1],
             )
             magnitude = 0.0
             phase_angle = 0.0
@@ -1425,6 +1534,7 @@ def _heliacal_pheno_ut_leb(
         earth_radius_au = 6371.0 / 149597870.7
         # Use geocentric distance (not topocentric) for parallax, matching Skyfield
         from .planets import calc_ut as _scu_par
+
         _geo_pos, _ = _scu_par(jd, body, FLG_SPEED)
         dist_au = _geo_pos[2]
         if dist_au > 0:
@@ -1432,45 +1542,41 @@ def _heliacal_pheno_ut_leb(
         else:
             parallax = 0.0
 
-    # Rise/set estimates (same simplified logic as Skyfield path)
-    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
-    rise_set_correction = -0.833
-    lat_rad = math.radians(lat)
+    # Rise/set of the disc centers and the visibility window via the
+    # shared reference-scheme helper (sentinel 99999999.0 for instants
+    # that do not exist).
+    _star_name_p = ""
+    if is_star:
+        from .fixed_stars import STAR_CATALOG as _SC
 
-    if body_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
-                rise_o = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (body_alt_deg - rise_set_correction) / alt_rate
-                rise_o = jd + time_to_horizon / 24.0
-        else:
-            rise_o = jd
-    else:
-        rise_o = jd
-
-    if sun_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd + time_to_horizon / 24.0
-        else:
-            rise_s = jd
-    else:
-        rise_s = jd
-
-    lag = rise_o - rise_s
-
-    if sun_alt_deg < -6 and body_alt_deg > 0:
-        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0
-    else:
-        tvis_vr = 0.0
+        for _entry in _SC:
+            if _entry.id == body:
+                _star_name_p = _entry.name
+                break
+    (
+        rise_o,
+        rise_s,
+        lag,
+        t_first_vr,
+        t_best_vr,
+        t_last_vr,
+        tvis_vr,
+        t_b_yallop,
+    ) = _pheno_rise_window(
+        jd,
+        body,
+        _star_name_p,
+        event_type,
+        (lon, lat, altitude),
+        (
+            pressure,
+            temperature,
+            humidity * 100.0 if humidity <= 1.0 else humidity,
+            0.0,
+        ),
+        (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+        flags,
+    )
 
     if not is_star and phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
@@ -1481,7 +1587,7 @@ def _heliacal_pheno_ut_leb(
     l_moon = 0.0
     if body == MOON:
         try:
-            moon_pheno = pheno_ut(jd, MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             phase_angle_deg = moon_pheno[0]
             illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
             if phase_angle_deg > 0:
@@ -1502,23 +1608,6 @@ def _heliacal_pheno_ut_leb(
     else:
         q_yallop = 0.0
         q_crit = 0.0
-
-    sun_rate = 15.0 * math.cos(lat_rad)
-    if sun_rate > 0:
-        if is_morning:
-            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
-            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
-            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
-        else:
-            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
-            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
-            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
-    else:
-        t_first_vr = jd
-        t_best_vr = jd
-        t_last_vr = jd
-
-    t_b_yallop = t_best_vr
 
     dret = [0.0] * 50
     dret[0] = body_alt_deg
@@ -1547,10 +1636,49 @@ def _heliacal_pheno_ut_leb(
     dret[23] = lag
     dret[24] = tvis_vr
     dret[25] = l_moon
-    dret[26] = phase_angle
+    dret[26] = elongation
     dret[27] = illumination
 
     return tuple(dret), flags
+
+
+def _vislim_scotopic_flag(
+    schaefer,
+    sun_alt: float,
+    moon_alt: float,
+    moon_phase: float,
+    obj_alt: float,
+    sun_obj_angle: float,
+    moon_obj_angle: float,
+    flags: int,
+) -> int:
+    """Reference-style scotopic/photopic return flag for vis_limit_mag.
+
+    The reference flags scotopic (night) vision when the total sky
+    background at the object falls below 1645 nanolamberts, with an
+    extra +2 bit inside the transition band around 1479 nL. Our sky
+    model works in magnitude-reduction space over the dark-sky
+    background (~54 nL at zenith), so the brightness is converted
+    before applying the same thresholds. HELFLAG_VISLIM_PHOTOPIC and
+    HELFLAG_VISLIM_SCOTOPIC override the measurement.
+    """
+    from .constants import HELFLAG_PHOTOPIC, HELFLAG_SCOTOPIC
+
+    reduction_mag = schaefer.sky_brightness_total(
+        sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
+    )
+    bsk_nl = 54.0 * (10.0 ** (reduction_mag / 2.5))
+    is_scotopic = bsk_nl < 1645.0
+    if flags & HELFLAG_VISLIM_PHOTOPIC:
+        is_scotopic = False
+    if flags & HELFLAG_VISLIM_SCOTOPIC:
+        is_scotopic = True
+    flag = HELFLAG_SCOTOPIC if is_scotopic else HELFLAG_PHOTOPIC
+    bnight = 1479.0
+    bnight_factor = 1645.0 / bnight
+    if bnight * bnight_factor > bsk_nl > bnight / bnight_factor:
+        flag |= 2
+    return flag
 
 
 def _vis_limit_mag_leb(
@@ -1572,9 +1700,6 @@ def _vis_limit_mag_leb(
         HELFLAG_VISLIM_DARK,
         HELFLAG_VISLIM_NOMOON,
         HELFLAG_BELOW_HORIZON,
-        HELFLAG_PHOTOPIC,
-        HELFLAG_SCOTOPIC,
-        HELFLAG_MIXED,
     )
 
     if not objname:
@@ -1596,12 +1721,22 @@ def _vis_limit_mag_leb(
 
     # Sun position
     sun_az, sun_alt, _ = _leb_body_altaz(
-        reader, tjdut, SUN, geopos_ll, pressure, temperature,
+        reader,
+        tjdut,
+        SUN,
+        geopos_ll,
+        pressure,
+        temperature,
     )
 
     # Moon position
     moon_az, moon_alt, _ = _leb_body_altaz(
-        reader, tjdut, MOON, geopos_ll, pressure, temperature,
+        reader,
+        tjdut,
+        MOON,
+        geopos_ll,
+        pressure,
+        temperature,
     )
 
     # Determine object
@@ -1613,10 +1748,16 @@ def _vis_limit_mag_leb(
     except ValueError:
         name_upper = objname.upper().strip()
         planet_names = {
-            "SUN": SUN, "MOON": MOON,
-            "MERCURY": 2, "VENUS": 3, "MARS": 4,
-            "JUPITER": 5, "SATURN": 6, "URANUS": 7,
-            "NEPTUNE": 8, "PLUTO": 9,
+            "SUN": SUN,
+            "MOON": MOON,
+            "MERCURY": 2,
+            "VENUS": 3,
+            "MARS": 4,
+            "JUPITER": 5,
+            "SATURN": 6,
+            "URANUS": 7,
+            "NEPTUNE": 8,
+            "PLUTO": 9,
         }
         if name_upper in planet_names:
             body_id = planet_names[name_upper]
@@ -1630,7 +1771,7 @@ def _vis_limit_mag_leb(
     if is_star_flag:
         try:
             star_result, _star_name_out, _retflag = fixstar2_ut(
-                objname, tjdut, flags & 0xFF
+                objname, tjdut, _heliacal_eph_flags(flags)
             )
             star_lon = star_result[0]
             star_lat = star_result[1]
@@ -1642,7 +1783,11 @@ def _vis_limit_mag_leb(
                 obj_mag = 2.0
 
             hor_result = azalt(
-                tjdut, ECL2HOR, geopos_ll, pressure, temperature,
+                tjdut,
+                ECL2HOR,
+                geopos_ll,
+                pressure,
+                temperature,
                 (star_lon, star_lat, 1.0),
             )
             obj_az = hor_result[0]
@@ -1657,13 +1802,18 @@ def _vis_limit_mag_leb(
 
         if body_id in _PLANET_MAP:
             az, alt_true, _ = _leb_body_altaz(
-                reader, tjdut, body_id, geopos_ll, pressure, temperature,
+                reader,
+                tjdut,
+                body_id,
+                geopos_ll,
+                pressure,
+                temperature,
             )
             obj_alt = alt_true
             obj_az = az
 
             try:
-                pheno_result = pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, _heliacal_eph_flags(flags))
                 obj_mag = pheno_result[4]
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0
@@ -1671,7 +1821,9 @@ def _vis_limit_mag_leb(
             raise ValueError(f"illegal planet number {body_id}.")
 
     if obj_alt < 0:
-        dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        # Reference convention: retval -2 with dret[0] = -100 marks an
+        # object below the local horizon (verified vs the reference ephemeris).
+        dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 
     use_dark_sky = bool(flags & HELFLAG_VISLIM_DARK)
@@ -1697,24 +1849,35 @@ def _vis_limit_mag_leb(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         if is_star_flag:
             from .fixed_stars import fixstar_ut as _sfut_vlm
+
             _star_ecl, _, _ = _sfut_vlm(objname, tjdut, FLG_SPEED)
             _star_pos = (_star_ecl[0], _star_ecl[1])
         else:
+            assert body_id is not None
             _body_ecl = _leb_ecliptic_pos(reader, tjdut, body_id, geopos_ll)
             _star_pos = (_body_ecl[0], _body_ecl[1])
         moon_ecl = _leb_ecliptic_pos(reader, tjdut, MOON, geopos_ll)
         sun_ecl = _leb_ecliptic_pos(reader, tjdut, SUN, geopos_ll)
         moon_obj_angle = angular_separation(
-            _star_pos[0], _star_pos[1], moon_ecl[0], moon_ecl[1],
+            _star_pos[0],
+            _star_pos[1],
+            moon_ecl[0],
+            moon_ecl[1],
         )
         sun_obj_angle = angular_separation(
-            _star_pos[0], _star_pos[1], sun_ecl[0], sun_ecl[1],
+            _star_pos[0],
+            _star_pos[1],
+            sun_ecl[0],
+            sun_ecl[1],
         )
     except (ValueError, TypeError, AttributeError):
         pass
@@ -1728,19 +1891,28 @@ def _vis_limit_mag_leb(
         moon_obj_angle=moon_obj_angle,
     )
 
-    apparent_obj_mag = obj_mag + schaefer.extinction(obj_alt)
-
-    if sun_alt >= -6:
-        vision_type = HELFLAG_PHOTOPIC
-    elif sun_alt >= -12:
-        vision_type = HELFLAG_MIXED
-    else:
-        vision_type = HELFLAG_SCOTOPIC
+    vision_type = _vislim_scotopic_flag(
+        schaefer,
+        sun_alt if not use_dark_sky else -90.0,
+        moon_alt if not exclude_moon else -90.0,
+        moon_phase,
+        obj_alt,
+        sun_obj_angle,
+        moon_obj_angle,
+        flags,
+    )
 
     dret = (
-        limiting_mag, obj_alt, obj_az,
-        sun_alt, sun_az, moon_alt, moon_az,
-        apparent_obj_mag, 0.0, 0.0,
+        limiting_mag,
+        obj_alt,
+        obj_az,
+        sun_alt,
+        sun_az,
+        moon_alt,
+        moon_az,
+        obj_mag,
+        0.0,
+        0.0,
     )
     return float(vision_type), dret
 
@@ -1835,8 +2007,17 @@ def _heliacal_ut_pythonic(
     if _leb_rdr is not None:
         try:
             return _heliacal_ut_leb(
-                _leb_rdr, jd_start, lat, lon, altitude,
-                pressure, temperature, humidity, body, event_type, flags,
+                _leb_rdr,
+                jd_start,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                humidity,
+                body,
+                event_type,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -1844,6 +2025,7 @@ def _heliacal_ut_pythonic(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
@@ -1977,7 +2159,7 @@ def _heliacal_ut_pythonic(
         """Get the elongation of body from Sun in degrees."""
         if not is_star:
             try:
-                pheno = pheno_ut(jd, body, flags)
+                pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
                 return pheno[2]  # Elongation
             except (ValueError, TypeError, ArithmeticError):
                 pass
@@ -1997,7 +2179,7 @@ def _heliacal_ut_pythonic(
             # For fixed stars, return the catalog magnitude
             return star_magnitude
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             return pheno[4]  # Visual magnitude
         except (ValueError, TypeError, ArithmeticError):
             return 0.0  # Default to bright magnitude
@@ -2470,17 +2652,40 @@ def _heliacal_ut_pythonic(
         return results
 
     def _search_heliacal_rising(jd_start: float) -> float:
-        """Search for heliacal rising using batched Skyfield computation."""
+        """Search for heliacal rising using batched Skyfield computation.
+
+        A heliacal rising is the first morning visibility after the body
+        emerged from a conjunction gap (was too close to the Sun). Requiring
+        only N consecutive invisible days is insufficient: mid-apparition a
+        bright planet can flicker invisible for a few days (Moon glare /
+        marginal twilight), which would be mis-reported as a rising. So the
+        invisibility streak must also have passed through low solar elongation
+        (a real conjunction gap), which a mid-apparition dip never does.
+
+        One legitimate case the elongation test alone misses: when the
+        conjunction happened *before* the search window, the body starts the
+        search already past conjunction but still invisible (e.g. Mars at 17 deg
+        and climbing), so the streak never dips below ELONG_GAP inside the
+        window even though the first visibility is a true rising. Accept it when
+        the body has not been visible at all since the search start
+        (seen_visible False) -- a mid-apparition flicker, visible before the
+        dip, never satisfies that.
+        """
+        ELONG_GAP = 10.0  # deg
         max_days = 800
 
         # Look back to establish initial visibility state.
         lookback_jds = [jd_start - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
         consecutive_invisible = 0
-        for vis, _ in lookback_vis:
+        min_elong = 999.0
+        seen_visible = False
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
             if not vis:
                 consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
             else:
+                seen_visible = True
                 break
 
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
@@ -2488,13 +2693,20 @@ def _heliacal_ut_pythonic(
             jd_days = [jd_start + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
 
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
                     consecutive_invisible += 1
+                    # use the day JD (always valid); jd_vis is a sentinel when
+                    # there is no twilight visibility window.
+                    min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
-                    if consecutive_invisible >= 5:
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                    ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
+                    min_elong = 999.0
+                    seen_visible = True
 
         return 0.0
 
@@ -2772,8 +2984,9 @@ def heliacal_ut(
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
     # atmo[3] is meteorological range / ktot, handled internally
 
-    # Convert humidity from percent to 0-1 range for internal use
-    humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
+    # datm[2] is relative humidity in percent (reference convention);
+    # convert to the 0-1 range used internally.
+    humidity = humidity_pct / 100.0
 
     # Parse objname to get body ID
     body_id = _parse_object_name(objname)
@@ -2792,24 +3005,102 @@ def heliacal_ut(
         flags=flags,
     )
 
-    # Build the result as 3 floats matching pyswisseph API
+    # Build the result as 3 floats matching the reference API
     jd1 = 0.0  # Start of visibility
     jd2 = 0.0  # Optimum visibility
     jd3 = 0.0  # End of visibility
 
     if jd_event > 0:
-        jd1 = jd_event  # Start visibility
+        jd1 = jd_event
 
-        # Calculate optimum and end visibility if details requested
         if not (flags & HELFLAG_NO_DETAILS):
-            # For detailed calculation, we estimate optimum and end times
-            # based on typical visibility window durations
-            # This is an approximation; full implementation would require
-            # more complex calculations
-            jd2 = jd_event  # Optimum (same as start for now)
-            jd3 = jd_event  # End (same as start for now)
+            # The reference refines three instants around the event: the
+            # optimum (maximum margin between the limiting magnitude and
+            # the body's extincted magnitude) and the two crossings where
+            # that margin vanishes (start and end of visibility).
+            jd1, jd2, jd3 = _heliacal_visibility_window(
+                jd_event, geopos, atmo, observer, objname, flags
+            )
 
     return (jd1, jd2, jd3)
+
+
+def _heliacal_visibility_window(
+    jd_event: float,
+    geopos: tuple,
+    atmo: tuple,
+    observer: tuple,
+    objname: str,
+    flags: int,
+) -> Tuple[float, float, float]:
+    """(start, optimum, end) of a heliacal visibility window.
+
+    The visibility margin is the limiting visual magnitude minus the
+    body's apparent magnitude with extinction; the body is visible
+    where the margin is positive. The optimum maximizes the margin, the
+    window limits are its zero crossings on either side. When a
+    crossing cannot be bracketed (e.g. the object stays visible into
+    darkness), the event time itself is reported for that limit.
+    """
+
+    pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
+    temperature = atmo[1] if len(atmo) > 1 else 15.0
+    humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
+    schaefer = create_schaefer_model(
+        pressure=pressure,
+        temperature=temperature,
+        humidity=humidity_pct if humidity_pct > 1.0 else humidity_pct * 100.0,
+        met_range=met_range if met_range >= 1.0 else 0.0,
+        altitude=geopos[2] if len(geopos) > 2 else 0.0,
+        observer_age=observer[0] if len(observer) > 0 else 36.0,
+        snellen=observer[1] if len(observer) > 1 else 1.0,
+    )
+
+    def _margin(jd: float) -> float:
+        retval, dret = vis_limit_mag(jd, geopos, atmo, observer, objname, flags)
+        if retval < 0:
+            return -99.0
+        return dret[0] - (dret[7] + schaefer.extinction(dret[1]))
+
+    # Optimum: maximum margin within ~3 hours of the event.
+    win = 0.12
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    lo, hi = jd_event - win, jd_event + win
+    a = hi - (hi - lo) / phi
+    b = lo + (hi - lo) / phi
+    fa, fb = _margin(a), _margin(b)
+    for _ in range(25):
+        if fa > fb:
+            hi, b, fb = b, a, fa
+            a = hi - (hi - lo) / phi
+            fa = _margin(a)
+        else:
+            lo, a, fa = a, b, fb
+            b = lo + (hi - lo) / phi
+            fb = _margin(b)
+        if hi - lo < 2e-5:
+            break
+    jd_opt = 0.5 * (lo + hi)
+
+    def _crossing(t_in: float, t_out: float) -> float:
+        f_in = _margin(t_in)
+        f_out = _margin(t_out)
+        if f_in <= 0.0 or f_out > 0.0:
+            return jd_event
+        for _ in range(25):
+            mid = 0.5 * (t_in + t_out)
+            if _margin(mid) > 0.0:
+                t_in = mid
+            else:
+                t_out = mid
+            if abs(t_out - t_in) < 2e-5:
+                break
+        return 0.5 * (t_in + t_out)
+
+    jd_start_vis = _crossing(jd_opt, jd_opt - win)
+    jd_end_vis = _crossing(jd_opt, jd_opt + win)
+    return jd_start_vis, jd_opt, jd_end_vis
 
 
 def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
@@ -2870,16 +3161,19 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
         return body_id
 
-    # Try to parse as planet number
+    # Try to parse as planet number. Only the int conversion may fall
+    # through to star resolution - the Sun/Moon rejection must escape
+    # (it used to be swallowed by this very except clause).
     try:
-        body_id = int(object_name)
-        if body_id == SUN:
-            raise ValueError("Sun is not valid for heliacal calculations")
-        if body_id == MOON and not allow_moon:
-            raise ValueError("Moon is not valid for heliacal calculations")
-        return body_id
+        parsed_body_id: int | None = int(object_name)
     except ValueError:
-        pass
+        parsed_body_id = None
+    if parsed_body_id is not None:
+        if parsed_body_id == SUN:
+            raise ValueError("Sun is not valid for heliacal calculations")
+        if parsed_body_id == MOON and not allow_moon:
+            raise ValueError("Moon is not valid for heliacal calculations")
+        return parsed_body_id
 
     # Try to resolve as a fixed star name
     from .fixed_stars import resolve_star_name
@@ -2895,6 +3189,170 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
         "planet IDs (2-9 for Mercury-Pluto), or fixed star names "
         "(Sirius, Regulus, Aldebaran, etc.)."
     )
+
+
+_TJD_INVALID = 99999999.0
+
+
+def _heliacal_eph_flags(flags: int) -> int:
+    """Reduce a heliacal flags word to its ephemeris-selection bits.
+
+    HELFLAG_* values share bit positions with FLG_* calculation flags
+    (e.g. HELFLAG_VISLIM_DARK == FLG_XYZ), so heliacal flags must never
+    reach calc/pheno/fixstar calls unmasked.
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    return flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
+
+
+_PHENO_BODY_NAMES = {
+    1: "Moon",
+    2: "Mercury",
+    3: "Venus",
+    4: "Mars",
+    5: "Jupiter",
+    6: "Saturn",
+    7: "Uranus",
+    8: "Neptune",
+    9: "Pluto",
+}
+
+
+def _pheno_rise_window(
+    jd: float,
+    body: int,
+    star_name: str,
+    event_type: int,
+    geopos3: tuple,
+    atmo4: tuple,
+    obs6: tuple,
+    flags: int,
+) -> Tuple[float, float, float, float, float, float, float, float]:
+    """Rise/set and visibility-window instants for heliacal_pheno_ut.
+
+    Reference scheme: the Sun's and the object's disc-center rise (event
+    types 1/4) or set (2/3) are searched from four hours before ``jd``;
+    the first/optimum/last visibility instants come from the visibility
+    margin scanned on the night side of the Sun's event, and the
+    sentinel 99999999.0 marks instants that do not exist. Returns
+    (rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop).
+    """
+    from .constants import (
+        BIT_DISC_CENTER,
+        CALC_RISE,
+        CALC_SET,
+        FLG_JPLEPH,
+        FLG_MOSEPH,
+    )
+    from .eclipse import rise_trans
+
+    eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
+    rs = CALC_RISE if event_type in (1, 4) else CALC_SET
+    is_star = bool(star_name)
+
+    rc_s, tr_s = rise_trans(
+        jd - 4.0 / 24.0, SUN, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    )
+    rise_s = tr_s[0] if rc_s == 0 else _TJD_INVALID
+    target = star_name if is_star else body
+    rc_o, tr_o = rise_trans(
+        jd - 4.0 / 24.0, target, rs | BIT_DISC_CENTER, geopos3, 0.0, 0.0, eph_flags
+    )
+    norise = rc_o != 0
+    rise_o = tr_o[0] if rc_o == 0 else _TJD_INVALID
+
+    lag = 0.0 if (norise or rc_s != 0) else rise_o - rise_s
+    tb_yallop = _TJD_INVALID
+    if not is_star and body == MOON and not norise and rc_s == 0:
+        tb_yallop = (rise_o * 4.0 + rise_s * 5.0) / 9.0
+
+    t_first = _TJD_INVALID
+    t_best = _TJD_INVALID
+    t_last = _TJD_INVALID
+    tvis = _TJD_INVALID
+
+    # Acronychal event types only carry a visibility window for the
+    # Moon and the inner planets (reference convention).
+    if event_type in (3, 4) and (is_star or body not in (1, 2, 3)):
+        return rise_o, rise_s, lag, t_first, t_best, t_last, 0.0, tb_yallop
+    if rc_s != 0:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+
+    objname = star_name if is_star else _PHENO_BODY_NAMES.get(body)
+    if objname is None:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+
+    _schaefer = create_schaefer_model(
+        pressure=atmo4[0],
+        temperature=atmo4[1],
+        humidity=atmo4[2],
+        met_range=atmo4[3] if atmo4[3] >= 1.0 else 0.0,
+        altitude=geopos3[2],
+        observer_age=obs6[0],
+        snellen=obs6[1],
+    )
+
+    def _margin(t: float) -> float:
+        retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
+        if retval < 0:
+            return -99.0
+        return dret_v[0] - (dret_v[7] + _schaefer.extinction(dret_v[1]))
+
+    win = 4.0 / 24.0
+    if rs == CALC_RISE:
+        lo, hi = rise_s - win, rise_s
+    else:
+        lo, hi = rise_s, rise_s + win
+
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    a = hi - (hi - lo) / phi
+    b = lo + (hi - lo) / phi
+    fa, fb = _margin(a), _margin(b)
+    g_lo, g_hi = lo, hi
+    for _ in range(22):
+        if fa > fb:
+            g_hi, b, fb = b, a, fa
+            a = g_hi - (g_hi - g_lo) / phi
+            fa = _margin(a)
+        else:
+            g_lo, a, fa = a, b, fb
+            b = g_lo + (g_hi - g_lo) / phi
+            fb = _margin(b)
+        if g_hi - g_lo < 3e-5:
+            break
+    t_peak = 0.5 * (g_lo + g_hi)
+    m_peak = _margin(t_peak)
+    if m_peak <= 0.0:
+        return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
+    t_best = t_peak
+
+    def _cross(t_in: float, t_out: float) -> float:
+        # Object still visible at the scan boundary: the reference's
+        # walk starts/stops there, so the boundary itself bounds the
+        # window (e.g. Venus is already visible right at sunset).
+        if _margin(t_out) > 0.0:
+            return t_out
+        for _ in range(22):
+            mid = 0.5 * (t_in + t_out)
+            if _margin(mid) > 0.0:
+                t_in = mid
+            else:
+                t_out = mid
+            if abs(t_out - t_in) < 3e-5:
+                break
+        return 0.5 * (t_in + t_out)
+
+    t_first = _cross(t_peak, lo)
+    t_last = _cross(t_peak, hi)
+    if not norise:
+        if rs == CALC_RISE and t_first != _TJD_INVALID:
+            t_first = max(t_first, rise_o)
+        elif rs == CALC_SET and t_last != _TJD_INVALID:
+            t_last = min(t_last, rise_o)
+    if t_first != _TJD_INVALID and t_last != _TJD_INVALID:
+        tvis = t_last - t_first
+    return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
 
 
 def _heliacal_pheno_ut_pythonic(
@@ -2986,8 +3444,17 @@ def _heliacal_pheno_ut_pythonic(
     if _leb_rdr is not None:
         try:
             return _heliacal_pheno_ut_leb(
-                _leb_rdr, jd, lat, lon, altitude,
-                pressure, temperature, humidity, body, event_type, flags,
+                _leb_rdr,
+                jd,
+                lat,
+                lon,
+                altitude,
+                pressure,
+                temperature,
+                humidity,
+                body,
+                event_type,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -2995,6 +3462,7 @@ def _heliacal_pheno_ut_pythonic(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
@@ -3126,15 +3594,17 @@ def _heliacal_pheno_ut_pythonic(
     sin_alt = max(-1.0, min(1.0, sin_alt))
     geo_alt_deg = math.degrees(math.asin(sin_alt))
 
-    # Calculate atmospheric refraction
-    # Use simplified formula: R = 1.02 / tan(h + 10.3/(h + 5.11)) in arcminutes
+    # Atmospheric refraction from true altitude, in arcminutes:
+    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
+    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
+    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
     if body_alt_deg > -1:
         refraction = 1.02 / math.tan(
             math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
         )
         refraction /= 60.0  # Convert arcminutes to degrees
     else:
-        refraction = 0.5  # Near horizon approximation
+        refraction = 0.5  # Near-horizon fallback (below the formula's range)
 
     # Apparent altitude (with refraction)
     app_alt_deg = body_alt_deg + refraction
@@ -3146,14 +3616,13 @@ def _heliacal_pheno_ut_pythonic(
     # Geocentric arcus visionis
     arcv_act = geo_alt_deg - sun_alt_deg
 
-    # Azimuth difference (absolute value, matching reference API convention)
-    daz_act = body_az_deg - sun_az_deg
+    # Azimuth difference, signed (reference convention: Sun minus object)
+    daz_act = sun_az_deg - body_az_deg
     # Normalize to -180 to +180
     while daz_act > 180:
         daz_act -= 360
     while daz_act < -180:
         daz_act += 360
-    daz_act = abs(daz_act)
 
     # Get elongation (longitude difference) from Sun
     # For fixed stars, always calculate manually since pheno_ut doesn't support them
@@ -3165,7 +3634,7 @@ def _heliacal_pheno_ut_pythonic(
         phase_angle = 0.0  # Stars don't have phase angle
     else:
         try:
-            pheno = pheno_ut(jd, body, flags)
+            pheno = pheno_ut(jd, body, _heliacal_eph_flags(flags))
             elongation = pheno[2]  # Elongation
             magnitude = pheno[4]  # Visual magnitude
             phase_angle = pheno[0]  # Phase angle (index 0, not 1)
@@ -3203,64 +3672,37 @@ def _heliacal_pheno_ut_pythonic(
         else:
             parallax = 0.0
 
-    # Calculate rise/set times for object and Sun
-    # For morning events, we look for rise times; for evening, set times
-    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
+    # Rise/set of the disc centers and the visibility window, the
+    # reference way (rise_trans searches from 4 hours before jd; the
+    # sentinel 99999999.0 marks instants that do not exist).
+    _star_name = ""
+    if is_star:
+        from .fixed_stars import STAR_CATALOG as _SC
 
-    # Use a simple estimate for rise/set time based on altitude
-    # Rise/set occurs when altitude crosses 0 (corrected for refraction)
-    # Time rate: approximately 1 degree of altitude per 4 minutes (at mid-latitudes)
-    rise_set_correction = -0.833  # Standard refraction + semidiameter for Sun
-
-    # Estimate object rise/set time
-    if body_alt_deg != 0:
-        # Rough estimate: time to rise/set based on altitude rate
-        # Altitude rate ~ 15 cos(lat) per hour at the horizon
-        alt_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-        if alt_rate > 0:
-            if is_morning:
-                # Object rising: how long until it crosses horizon
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd - time_to_horizon / 24.0
-            else:
-                # Object setting
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd + time_to_horizon / 24.0
-        else:
-            rise_o = jd
-    else:
-        rise_o = jd
-
-    # Estimate Sun rise/set time
-    if sun_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd + time_to_horizon / 24.0
-        else:
-            rise_s = jd
-    else:
-        rise_s = jd
-
-    # Lag time (object rise - Sun rise)
-    lag = rise_o - rise_s
-
-    # Visibility duration estimate (simplified)
-    # Based on how long the object is above horizon while Sun is below
-    if sun_alt_deg < -6 and body_alt_deg > 0:
-        # Object visible during civil twilight or darker
-        # Estimate visibility window
-        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0  # days
-    else:
-        tvis_vr = 0.0
+        for _entry in _SC:
+            if _entry.id == body:
+                _star_name = _entry.name
+                break
+    _geopos3 = (lon, lat, altitude)
+    _atmo4 = (
+        pressure,
+        temperature,
+        humidity * 100.0 if humidity <= 1.0 else humidity,
+        0.0,
+    )
+    _obs6 = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+    (
+        rise_o,
+        rise_s,
+        lag,
+        t_first_vr,
+        t_best_vr,
+        t_last_vr,
+        tvis_vr,
+        t_b_yallop,
+    ) = _pheno_rise_window(
+        jd, body, _star_name, event_type, _geopos3, _atmo4, _obs6, flags
+    )
 
     # Illumination percentage for all bodies
     # For planets: (1 + cos(phase_angle)) / 2 * 100
@@ -3276,7 +3718,7 @@ def _heliacal_pheno_ut_pythonic(
     if body == MOON:
         # Calculate Moon phase and crescent geometry
         try:
-            moon_pheno = pheno_ut(jd, MOON, flags)
+            moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
             phase_angle_deg = moon_pheno[0]  # [0] = phase angle in degrees
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
@@ -3309,29 +3751,6 @@ def _heliacal_pheno_ut_pythonic(
         q_yallop = 0.0
         q_crit = 0.0
 
-    # First, best, and last visibility times (VR = visibility rule)
-    # Simplified: based on Sun altitude thresholds
-    # First visibility: Sun at about -10
-    # Best visibility: Sun at about -8
-    # Last visibility: Sun at about -6
-    sun_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-    if sun_rate > 0:
-        if is_morning:
-            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
-            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
-            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
-        else:
-            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
-            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
-            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
-    else:
-        t_first_vr = jd
-        t_best_vr = jd
-        t_last_vr = jd
-
-    # Best time according to Yallop (for Moon)
-    t_b_yallop = t_best_vr  # Use same as best VR for simplicity
-
     # Fill in the result array
     dret[0] = body_alt_deg  # AltO - topocentric altitude (unrefracted)
     dret[1] = app_alt_deg  # AppAltO - apparent altitude (refracted)
@@ -3359,11 +3778,13 @@ def _heliacal_pheno_ut_pythonic(
     dret[23] = lag  # Lag - time difference
     dret[24] = tvis_vr  # TvisVR - visibility duration
     dret[25] = l_moon  # LMoon - crescent length
-    dret[26] = phase_angle  # CVAact (using phase angle)
+    dret[26] = elongation  # elong - elongation from the Sun
     dret[27] = illumination  # Illum - illumination percentage
     # dret[28] onwards are reserved, already 0.0
 
-    return tuple(dret), flags
+    # Coerce to native Python floats: several entries (alt/az from the Skyfield
+    # backend) are numpy.float64, and the public contract returns native floats.
+    return tuple(float(v) for v in dret), flags
 
 
 def heliacal_pheno_ut(
@@ -3379,7 +3800,7 @@ def heliacal_pheno_ut(
     Provides data relevant for the calculation of heliacal risings and settings.
 
     This is the reference-compatible wrapper around _heliacal_pheno_ut_pythonic(). It
-    accepts the same parameter layout as pyswisseph's heliacal_pheno_ut
+    accepts the same parameter layout as the reference ephemeris's heliacal_pheno_ut
     and returns a flat 50-element tuple.
 
     Args:
@@ -3404,8 +3825,8 @@ def heliacal_pheno_ut(
     temperature = atmo[1] if len(atmo) > 1 else 15.0
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
 
-    # Convert humidity from percent to 0-1 range
-    humidity = humidity_pct / 100.0 if humidity_pct > 1.0 else humidity_pct
+    # datm[2] is relative humidity in percent (reference convention)
+    humidity = humidity_pct / 100.0
 
     # Parse objname to body ID (Moon is allowed for pheno calculations)
     body_id = _parse_object_name(objname, allow_moon=True)
@@ -3536,7 +3957,13 @@ def vis_limit_mag(
     if _leb_rdr is not None:
         try:
             return _vis_limit_mag_leb(
-                _leb_rdr, tjdut, geopos, atmo, observer, objname, flags,
+                _leb_rdr,
+                tjdut,
+                geopos,
+                atmo,
+                observer,
+                objname,
+                flags,
             )
         except KeyError:
             pass  # Body not in LEB file
@@ -3544,6 +3971,7 @@ def vis_limit_mag(
             if "outside range" not in str(_leb_err).lower():
                 raise
             from .logging_config import get_logger
+
             get_logger().debug("LEB fallback: %s", _leb_err)
     # --- END LEB fast path ---
 
@@ -3556,9 +3984,6 @@ def vis_limit_mag(
         HELFLAG_VISLIM_DARK,
         HELFLAG_VISLIM_NOMOON,
         HELFLAG_BELOW_HORIZON,
-        HELFLAG_PHOTOPIC,
-        HELFLAG_SCOTOPIC,
-        HELFLAG_MIXED,
     )
     from skyfield.api import wgs84
 
@@ -3642,7 +4067,7 @@ def vis_limit_mag(
         # Fixed star calculation
         try:
             star_result, _star_name_out, _retflag = fixstar2_ut(
-                objname, tjdut, flags & 0xFF
+                objname, tjdut, _heliacal_eph_flags(flags)
             )
 
             # star_result is (lon, lat, dist, lon_speed, lat_speed, dist_speed)
@@ -3704,7 +4129,7 @@ def vis_limit_mag(
 
             # Get magnitude from pheno
             try:
-                pheno_result = pheno_ut(tjdut, body_id, flags)
+                pheno_result = pheno_ut(tjdut, body_id, _heliacal_eph_flags(flags))
                 obj_mag = pheno_result[4]  # Visual magnitude
             except (ValueError, TypeError, ArithmeticError):
                 obj_mag = 0.0  # Default bright
@@ -3714,7 +4139,9 @@ def vis_limit_mag(
     # Check if object is below horizon
     if obj_alt < 0:
         # Match reference API: return all zeros in data when below horizon
-        dret = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        # Reference convention: retval -2 with dret[0] = -100 marks an
+        # object below the local horizon (verified vs the reference ephemeris).
+        dret = (-100.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         return float(HELFLAG_BELOW_HORIZON), dret
 
     # Apply HELFLAG options
@@ -3743,24 +4170,33 @@ def vis_limit_mag(
     moon_obj_angle = 180.0
     sun_obj_angle = 180.0
     try:
-        moon_pheno = pheno_ut(tjdut, MOON, flags & 0xFF)
-        phase_angle = moon_pheno[0]
-        moon_phase = (1.0 - math.cos(math.radians(phase_angle))) / 2.0
+        moon_pheno = pheno_ut(tjdut, MOON, _heliacal_eph_flags(flags))
+        # pheno_ut[1] is the illuminated fraction (0 = new, 1 = full), exactly
+        # what SchaeferModel.sky_brightness_moon expects. Deriving it from the
+        # phase angle (pheno_ut[0], 0 deg = full) as (1 - cos)/2 inverts the
+        # convention — full moon would be passed as new and vice versa.
+        moon_phase = moon_pheno[1]
 
         # Calculate angular separation between object and Moon
-        moon_geo = earth.at(t).observe(moon).apparent()
         if is_fixed_star:
-            # For stars, use the computed position
-            moon_obj_angle = 90.0  # Default to 90 degrees
+            # Real separations from the star's ecliptic position vs the
+            # topocentric Moon and Sun (the old fixed 90-degree
+            # placeholders distorted the sky-brightness model).
+            from skyfield.framelib import ecliptic_frame
+
+            from .utils import angular_separation
+
+            m_lat, m_lon, _md = moon_app.frame_latlon(ecliptic_frame)
+            s_lat, s_lon, _sd = sun_app.frame_latlon(ecliptic_frame)
+            moon_obj_angle = angular_separation(
+                star_lon, star_lat, m_lon.degrees % 360.0, m_lat.degrees
+            )
+            sun_obj_angle = angular_separation(
+                star_lon, star_lat, s_lon.degrees % 360.0, s_lat.degrees
+            )
         else:
             body_app_geo = observer_at.at(t).observe(target).apparent()
             moon_obj_angle = body_app_geo.separation_from(moon_app).degrees
-
-        # Calculate elongation from Sun
-        sun_geo = earth.at(t).observe(sun).apparent()
-        if is_fixed_star:
-            sun_obj_angle = 90.0  # Default
-        else:
             sun_obj_angle = body_app_geo.separation_from(sun_app).degrees
     except (ValueError, TypeError, AttributeError):
         pass
@@ -3775,27 +4211,30 @@ def vis_limit_mag(
         moon_obj_angle=moon_obj_angle,
     )
 
-    # Apply extinction to object magnitude
-    apparent_obj_mag = obj_mag + schaefer.extinction(obj_alt)
+    vision_type = _vislim_scotopic_flag(
+        schaefer,
+        sun_alt if not use_dark_sky else -90.0,
+        moon_alt if not exclude_moon else -90.0,
+        moon_phase,
+        obj_alt,
+        sun_obj_angle,
+        moon_obj_angle,
+        flags,
+    )
 
-    # Determine vision type based on sky brightness
-    if sun_alt >= -6:
-        vision_type = HELFLAG_PHOTOPIC
-    elif sun_alt >= -12:
-        vision_type = HELFLAG_MIXED
-    else:
-        vision_type = HELFLAG_SCOTOPIC
-
-    # Build result tuple (10 elements to match reference API)
+    # Build result tuple (10 elements; dret[7] is the body's magnitude
+    # without extinction, the reference convention). The alt/az values come
+    # from the Skyfield backend as numpy.float64; coerce to native Python
+    # floats to honor the public native-float contract.
     dret = (
-        limiting_mag,  # 0: Limiting visual magnitude
-        obj_alt,  # 1: Altitude of object
-        obj_az,  # 2: Azimuth of object
-        sun_alt,  # 3: Altitude of Sun
-        sun_az,  # 4: Azimuth of Sun
-        moon_alt,  # 5: Altitude of Moon
-        moon_az,  # 6: Azimuth of Moon
-        apparent_obj_mag,  # 7: Apparent magnitude of object (with extinction)
+        float(limiting_mag),  # 0: Limiting visual magnitude
+        float(obj_alt),  # 1: Altitude of object
+        float(obj_az),  # 2: Azimuth of object
+        float(sun_alt),  # 3: Altitude of Sun
+        float(sun_az),  # 4: Azimuth of Sun
+        float(moon_alt),  # 5: Altitude of Moon
+        float(moon_az),  # 6: Azimuth of Moon
+        float(obj_mag),  # 7: Magnitude of object
         0.0,  # 8: Reserved
         0.0,  # 9: Reserved
     )

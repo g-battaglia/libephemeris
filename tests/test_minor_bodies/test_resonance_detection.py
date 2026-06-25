@@ -10,13 +10,11 @@ Tests verify:
 """
 
 import pytest
-import math
 from libephemeris.minor_bodies import (
     MINOR_BODY_ELEMENTS,
     detect_mean_motion_resonance,
     is_body_resonant,
     get_resonance_info,
-    ResonanceInfo,
     ResonanceResult,
     NEPTUNE_RESONANCES,
     NEPTUNE_A,

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 IERS data download and parsing for observed Delta T values.
 
@@ -27,6 +29,7 @@ References:
 
 from __future__ import annotations
 
+import math
 import os
 import ssl
 import threading
@@ -521,7 +524,7 @@ def _parse_finals_data(filepath: str) -> dict[float, IERSDataPoint]:
                 # Check if this is observed (I) or predicted (P)
                 # The flag is at column 58 (1-indexed), so 57 in Python
                 is_prediction = False
-                if len(line) > 57:
+                if len(line) > 57:  # pragma: no branch - earlier len<68 guard makes this always true
                     flag = line[57]
                     is_prediction = flag.upper() == "P"
 
@@ -573,15 +576,33 @@ def _parse_leap_seconds(filepath: str) -> list[LeapSecondEntry]:
 
     lines = content.strip().split("\n")
 
-    # Detect format based on content
-    if "NTP" in content or content.lstrip().startswith("#"):
-        # IETF format (NTP seconds since 1900)
+    # Detect format. The IETF leap-seconds.list is identified by its NTP-list
+    # markers (#$ last-update, #@ expiry) or the literal "NTP"/filename. Do NOT
+    # route on a bare leading '#': the primary IERS Leap_Second.dat is ALSO
+    # '#'-commented but has numeric MJD data rows, and routing it to the IETF
+    # parser silently discarded every downloaded IERS update (falling back to the
+    # hardcoded list forever).
+    is_ietf = (
+        "NTP" in content
+        or "#$" in content
+        or "#@" in content
+        or "leap-seconds.list" in content
+    )
+    if is_ietf:
         entries = _parse_leap_seconds_ietf(lines)
     else:
-        # IERS Bulletin C format
         entries = _parse_leap_seconds_iers(lines)
 
-    # If parsing failed, use hardcoded values as fallback
+    # If the chosen parser found nothing, try the other before giving up — a
+    # mis-detected file should still be parsed rather than silently dropped.
+    if not entries:
+        entries = (
+            _parse_leap_seconds_iers(lines)
+            if is_ietf
+            else _parse_leap_seconds_ietf(lines)
+        )
+
+    # If parsing still failed, use hardcoded values as fallback
     if not entries:
         entries = _get_hardcoded_leap_seconds()
 
@@ -589,7 +610,30 @@ def _parse_leap_seconds(filepath: str) -> list[LeapSecondEntry]:
 
 
 def _parse_leap_seconds_iers(lines: list[str]) -> list[LeapSecondEntry]:
-    """Parse IERS Bulletin C format leap seconds file."""
+    """Parse the IERS leap-seconds file (Leap_Second.dat).
+
+    Args:
+        lines: Lines read from an IERS leap-second data file.
+
+    Returns:
+        Parsed leap-second entries (one per recognised data row).
+
+    The primary IERS source uses all-numeric columns::
+
+        #  MJD        Date        TAI-UTC (s)
+        #           day month year
+        41317.0    1  1 1972      10
+        ...
+        57754.0    1  1 2017      37
+
+    i.e. ``MJD day month year TAI-UTC``. A textual ``year month-name day ...
+    TAI-UTC[= Ns]`` variant is also tolerated so callers feeding the Bulletin-C
+    prose form still parse.
+    """
+    months = {
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+    }
     entries: list[LeapSecondEntry] = []
 
     for line in lines:
@@ -599,55 +643,35 @@ def _parse_leap_seconds_iers(lines: list[str]) -> list[LeapSecondEntry]:
 
         try:
             parts = line.split()
-            if len(parts) >= 5:
-                year = int(parts[0])
-                month_str = parts[1].lower()
-                day = int(parts[2])
-                tai_utc = float(parts[4].rstrip("s"))
+            if len(parts) < 5:
+                continue
 
-                # Convert month name to number
-                months = {
-                    "jan": 1,
-                    "january": 1,
-                    "feb": 2,
-                    "february": 2,
-                    "mar": 3,
-                    "march": 3,
-                    "apr": 4,
-                    "april": 4,
-                    "may": 5,
-                    "jun": 6,
-                    "june": 6,
-                    "jul": 7,
-                    "july": 7,
-                    "aug": 8,
-                    "august": 8,
-                    "sep": 9,
-                    "sept": 9,
-                    "september": 9,
-                    "oct": 10,
-                    "october": 10,
-                    "nov": 11,
-                    "november": 11,
-                    "dec": 12,
-                    "december": 12,
-                }
-                month = months.get(month_str[:3], 0)
+            if parts[1].isdigit() and parts[2].isdigit() and parts[3].isdigit():
+                # Numeric Leap_Second.dat row: MJD day month year TAI-UTC
+                mjd = float(parts[0])
+                day = int(parts[1])
+                month = int(parts[2])
+                year = int(parts[3])
+                tai_utc = float(parts[4])
+            else:
+                # Textual variant: year month-name day ... TAI-UTC[= Ns]
+                year = int(parts[0])
+                month = months.get(parts[1].lower()[:3], 0)
                 if month == 0:
                     continue
-
-                # Convert to MJD
+                day = int(parts[2])
+                tai_utc = float(parts[4].rstrip("s"))
                 mjd = _calendar_to_mjd(year, month, day)
 
-                entries.append(
-                    LeapSecondEntry(
-                        mjd=mjd,
-                        tai_utc=tai_utc,
-                        year=year,
-                        month=month,
-                        day=day,
-                    )
+            entries.append(
+                LeapSecondEntry(
+                    mjd=mjd,
+                    tai_utc=tai_utc,
+                    year=year,
+                    month=month,
+                    day=day,
                 )
+            )
         except (ValueError, IndexError):
             continue
 
@@ -993,30 +1017,32 @@ def get_ut1_utc(mjd: float) -> Optional[float]:
     """
     _ensure_data_loaded()
 
-    if not _IERS_DATA:
+    # Snapshot: clear_iers_cache() rebinds the global under the lock, so a
+    # local binding makes the reads race-free.
+    data = _IERS_DATA
+    if not data:
         return None
 
-    # Look for exact match first
-    mjd_int = round(mjd)
-    if mjd_int in _IERS_DATA:
-        return _IERS_DATA[mjd_int].ut1_utc
-
-    # Try nearby dates for interpolation
-    mjd_floor = int(mjd)
+    # Interpolate between the bracketing daily entries. (The previous
+    # nearest-midnight lookup short-circuited before interpolation could
+    # ever run, turning DUT1 into a step function with ~ms-level error.)
+    mjd_floor = math.floor(mjd)
     mjd_ceil = mjd_floor + 1
+    frac = mjd - mjd_floor
 
-    if mjd_floor in _IERS_DATA and mjd_ceil in _IERS_DATA:
-        # Linear interpolation
-        ut1_utc_floor = _IERS_DATA[mjd_floor].ut1_utc
-        ut1_utc_ceil = _IERS_DATA[mjd_ceil].ut1_utc
-        frac = mjd - mjd_floor
+    if frac == 0.0 and mjd_floor in data:
+        return data[mjd_floor].ut1_utc
+
+    if mjd_floor in data and mjd_ceil in data:
+        ut1_utc_floor = data[mjd_floor].ut1_utc
+        ut1_utc_ceil = data[mjd_ceil].ut1_utc
         return ut1_utc_floor + frac * (ut1_utc_ceil - ut1_utc_floor)
 
-    # Try finding closest available date
-    if mjd_floor in _IERS_DATA:
-        return _IERS_DATA[mjd_floor].ut1_utc
-    if mjd_ceil in _IERS_DATA:
-        return _IERS_DATA[mjd_ceil].ut1_utc
+    # Edge of table: closest available date
+    if mjd_floor in data:
+        return data[mjd_floor].ut1_utc
+    if mjd_ceil in data:
+        return data[mjd_ceil].ut1_utc
 
     return None
 
@@ -1192,9 +1218,15 @@ def is_iers_data_available(jd: float) -> bool:
     Returns:
         True if IERS data is available for this date
     """
+    # Load on demand like every other getter — otherwise this returns
+    # False until some sibling function happens to load the table first.
+    _ensure_data_loaded()
     mjd = _jd_to_mjd(jd)
-    mjd_int = round(mjd)
-    return mjd_int in _IERS_DATA
+    # Mirror get_ut1_utc's bracketing (floor / floor+1): availability must be
+    # True exactly when get_ut1_utc would return a non-None value, otherwise the
+    # two disagree for the last ~half day of the table (round() vs floor()).
+    mjd_floor = math.floor(mjd)
+    return mjd_floor in _IERS_DATA or (mjd_floor + 1) in _IERS_DATA
 
 
 def clear_iers_cache() -> None:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Command-line interface for libephemeris.
 
 This module provides CLI commands for managing libephemeris data files.
@@ -51,15 +53,14 @@ def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-un
         click.echo("\nDownload cancelled.")
         sys.exit(130)
     except ImportError as e:
-        if not quiet:
-            click.echo(
-                f"Error: {e}\nInstall the nbody extra: pip install libephemeris[nbody]",
-                err=True,
-            )
+        # --quiet suppresses progress, never errors
+        click.echo(
+            f"Error: {e}\nInstall the nbody extra: pip install libephemeris[nbody]",
+            err=True,
+        )
         sys.exit(1)
     except (OSError, ValueError, RuntimeError) as e:
-        if not quiet:
-            click.echo(f"Error: {e}", err=True)
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
 
@@ -331,8 +332,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
     try:
         from ..state import get_calc_mode, get_precision_tier
     except Exception:
-        if not quiet:
-            click.echo("Error: could not read library configuration.", err=True)
+        click.echo("Error: could not read library configuration.", err=True)
         sys.exit(1)
 
     tier = get_precision_tier()
@@ -393,8 +393,7 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
         click.echo("\n  Download cancelled.")
         sys.exit(130)
     except (OSError, ValueError, RuntimeError) as e:
-        if not quiet:
-            click.echo(f"\n  {_y(f'Error: {e}')}", err=True)
+        click.echo(f"\n  {_y(f'Error: {e}')}", err=True)
         sys.exit(1)
 
 
@@ -406,7 +405,13 @@ def download_auto(force: bool, no_progress: bool, quiet: bool) -> None:
     short_help="Download ALL data files for every tier and mode (~5 GB + IERS).",
 )
 @_download_options
-def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip the ~5 GB download confirmation prompt",
+)
+def download_all(force: bool, no_progress: bool, quiet: bool, yes: bool) -> None:
     """Download every data file for complete offline readiness.
 
     Downloads LEB2 files, DE kernels, planet centers, SPK kernels, and IERS
@@ -433,6 +438,14 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
     from .init_wizard import _d, _g, _w, _y
 
     tiers = ["base", "medium", "extended"]
+
+    if not yes:
+        if not click.confirm(
+            "  About to download ~5-6 GB of data files. Continue?",
+            default=False,
+        ):
+            click.echo("  Cancelled.")
+            sys.exit(130)
 
     if not quiet:
         click.echo()
@@ -499,8 +512,7 @@ def download_all(force: bool, no_progress: bool, quiet: bool) -> None:
         click.echo("\n  Download cancelled.")
         sys.exit(130)
     except (ConnectionError, OSError, ValueError, RuntimeError) as e:
-        if not quiet:
-            click.echo(f"\n  {_y(f'Error: {e}')}", err=True)
+        click.echo(f"\n  {_y(f'Error: {e}')}", err=True)
         sys.exit(1)
 
 
@@ -700,9 +712,12 @@ def config() -> None:
     iers_auto = os.environ.get("LIBEPHEMERIS_IERS_AUTO_DOWNLOAD", "")
     iers_dt = os.environ.get("LIBEPHEMERIS_IERS_DELTA_T", "")
     click.echo(f"  Location: {data_dir}/iers_cache/")
-    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0)")
+    _cur = f"  [current: {iers_auto}]" if iers_auto else ""
+    click.echo(f"  Env var:  {_e('LIBEPHEMERIS_IERS_AUTO_DOWNLOAD')}  (1/0){_cur}")
+    _cur = f"  [current: {iers_dt}]" if iers_dt else ""
     click.echo(
         f"  Env var:  {_e('LIBEPHEMERIS_IERS_DELTA_T')}  (1/0, use observed Delta T)"
+        f"{_cur}"
     )
     click.echo("  Files:    finals2000A.data, Leap_Second.dat, deltat.data")
     click.echo()

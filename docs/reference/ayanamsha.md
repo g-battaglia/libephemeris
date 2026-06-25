@@ -1,6 +1,6 @@
 # Ayanamsha Definitions and Reference Systems
 
-This document provides comprehensive documentation of all 43 ayanamsha (sidereal zodiac) modes implemented in LibEphemeris. Each section explains the astronomical basis, historical origin, reference point, and the epoch when the ayanamsha was zero.
+This document provides comprehensive documentation of all 47 predefined ayanamsha (sidereal zodiac) modes implemented in LibEphemeris. Each section explains the astronomical basis, historical origin, reference point, and the epoch when the ayanamsha was zero.
 
 ## Table of Contents
 
@@ -884,6 +884,49 @@ Based on the Besselian epoch B1950.0, which was the standard reference epoch for
 
 ---
 
+## Additional Lahiri & Krishnamurti Variants
+
+These predefined modes refine the Lahiri and Krishnamurti families with alternative
+zero-point determinations.
+
+### SIDM_LAHIRI_1940 (43)
+
+**Lahiri (1940 Lahiri Commission value)**
+
+| Property | Value |
+|----------|-------|
+| Constant | `SIDM_LAHIRI_1940 = 43` |
+| Basis | Lahiri ayanamsha using the 1940 Calendar Reform Committee value |
+
+### SIDM_LAHIRI_VP285 (44)
+
+**Lahiri (Vernal Point 285 CE)**
+
+| Property | Value |
+|----------|-------|
+| Constant | `SIDM_LAHIRI_VP285 = 44` |
+| Basis | Lahiri family anchored to a vernal-point coincidence at 285 CE |
+
+### SIDM_KRISHNAMURTI_VP291 (45)
+
+**Krishnamurti (Vernal Point 291 CE)**
+
+| Property | Value |
+|----------|-------|
+| Constant | `SIDM_KRISHNAMURTI_VP291 = 45` |
+| Basis | Krishnamurti (KP) family anchored to a vernal-point coincidence at 291 CE |
+
+### SIDM_LAHIRI_ICRC (46)
+
+**Lahiri (ICRC, Indian Calendar Reform Committee)**
+
+| Property | Value |
+|----------|-------|
+| Constant | `SIDM_LAHIRI_ICRC = 46` |
+| Basis | Lahiri value as adopted by the Indian Calendar Reform Committee |
+
+---
+
 ## User-Defined Ayanamsha
 
 ### SIDM_USER (255)
@@ -950,7 +993,7 @@ For "True" modes, the actual stellar position is calculated:
 ### Mean vs True Ayanamsha
 
 - **Mean Ayanamsha**: `get_ayanamsa_ut()` returns the mean ayanamsha (without nutation)
-- **True Ayanamsha**: For sidereal planetary positions, LibEphemeris adds nutation in longitude to get the true ayanamsha (IAU 2006/2000A model, consistent with pyswisseph's behavior)
+- **True Ayanamsha**: For sidereal planetary positions, LibEphemeris adds nutation in longitude to get the true ayanamsha (IAU 2006/2000A model)
 
 ### Time System
 

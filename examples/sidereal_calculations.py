@@ -27,9 +27,6 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
     TRUE_NODE,
     # Calculation flags
     FLG_SWIEPH,

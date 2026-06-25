@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Planetary moon position calculations for libephemeris.
 
@@ -40,93 +42,67 @@ from typing import Any, Optional, Tuple
 from skyfield.framelib import ecliptic_frame
 from skyfield.positionlib import ICRF
 
-from .constants import FLG_HELCTR, FLG_SPEED, FLG_SIDEREAL
+from .constants import (
+    FLG_BARYCTR,
+    FLG_EQUATORIAL,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_NOABERR,
+    FLG_NONUT,
+    FLG_SIDEREAL,
+    FLG_SPEED,
+    FLG_TOPOCTR,
+    FLG_TRUEPOS,
+    # Legacy moon ids (deprecated aliases) and NAIF ids: constants.py is
+    # the single source of truth; re-exported here for backward compat.
+    MOON_OFFSET,
+    MOON_IO,
+    MOON_EUROPA,
+    MOON_GANYMEDE,
+    MOON_CALLISTO,
+    MOON_MIMAS,
+    MOON_ENCELADUS,
+    MOON_TETHYS,
+    MOON_DIONE,
+    MOON_RHEA,
+    MOON_TITAN,
+    MOON_HYPERION,
+    MOON_IAPETUS,
+    MOON_MIRANDA,
+    MOON_ARIEL,
+    MOON_UMBRIEL,
+    MOON_TITANIA,
+    MOON_OBERON,
+    MOON_TRITON,
+    MOON_PHOBOS,
+    MOON_DEIMOS,
+    MOON_CHARON,
+    NAIF_IO,
+    NAIF_EUROPA,
+    NAIF_GANYMEDE,
+    NAIF_CALLISTO,
+    NAIF_MIMAS,
+    NAIF_ENCELADUS,
+    NAIF_TETHYS,
+    NAIF_DIONE,
+    NAIF_RHEA,
+    NAIF_TITAN,
+    NAIF_HYPERION,
+    NAIF_IAPETUS,
+    NAIF_MIRANDA,
+    NAIF_ARIEL,
+    NAIF_UMBRIEL,
+    NAIF_TITANIA,
+    NAIF_OBERON,
+    NAIF_TRITON,
+    NAIF_PHOBOS,
+    NAIF_DEIMOS,
+    NAIF_CHARON,
+    PLMOON_OFFSET,
+)
+from .exceptions import EphemerisRangeError
 from .state import get_loader, get_planets, get_timescale
 
-
-# =============================================================================
-# PLANETARY MOON CONSTANTS
-# =============================================================================
-# Body IDs following reference API 2.10+ convention
-# Moon IDs start at MOON_OFFSET (9000) to avoid collision with other bodies
-
-MOON_OFFSET: int = 9000
-
-# Jupiter's Galilean Moons (discovered by Galileo in 1610)
-MOON_IO: int = MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
-MOON_EUROPA: int = MOON_OFFSET + 2  # Jupiter II - potential for life
-MOON_GANYMEDE: int = MOON_OFFSET + 3  # Jupiter III - largest moon in solar system
-MOON_CALLISTO: int = MOON_OFFSET + 4  # Jupiter IV - heavily cratered
-
-# Saturn's Major Moons
-MOON_MIMAS: int = MOON_OFFSET + 11  # Saturn I - "Death Star" moon
-MOON_ENCELADUS: int = MOON_OFFSET + 12  # Saturn II - geysers, potential life
-MOON_TETHYS: int = MOON_OFFSET + 13  # Saturn III - icy moon
-MOON_DIONE: int = MOON_OFFSET + 14  # Saturn IV - icy moon
-MOON_RHEA: int = MOON_OFFSET + 15  # Saturn V - second largest Saturn moon
-MOON_TITAN: int = (
-    MOON_OFFSET + 16
-)  # Saturn VI - largest Saturn moon, thick atmosphere
-MOON_HYPERION: int = MOON_OFFSET + 17  # Saturn VII - irregularly shaped
-MOON_IAPETUS: int = MOON_OFFSET + 18  # Saturn VIII - two-toned coloring
-
-# Uranus' Major Moons
-MOON_MIRANDA: int = MOON_OFFSET + 21  # Uranus V - extreme geological features
-MOON_ARIEL: int = MOON_OFFSET + 22  # Uranus I - brightest Uranian moon
-MOON_UMBRIEL: int = MOON_OFFSET + 23  # Uranus II - darkest Uranian moon
-MOON_TITANIA: int = MOON_OFFSET + 24  # Uranus III - largest Uranian moon
-MOON_OBERON: int = MOON_OFFSET + 25  # Uranus IV - outermost major Uranian moon
-
-# Neptune's Major Moon
-MOON_TRITON: int = MOON_OFFSET + 31  # Neptune I - retrograde orbit, captured KBO
-
-# Mars' Moons
-MOON_PHOBOS: int = MOON_OFFSET + 41  # Mars I - larger, closer moon
-MOON_DEIMOS: int = MOON_OFFSET + 42  # Mars II - smaller, farther moon
-
-# Pluto's Moon
-MOON_CHARON: int = (
-    MOON_OFFSET + 51
-)  # Pluto I - Pluto's largest moon (binary system)
-
-
-# =============================================================================
-# NAIF IDS FOR PLANETARY MOONS
-# =============================================================================
-# Standard NAIF SPICE IDs for planetary satellites
-
-# Jupiter system (5xx)
-NAIF_IO: int = 501
-NAIF_EUROPA: int = 502
-NAIF_GANYMEDE: int = 503
-NAIF_CALLISTO: int = 504
-
-# Saturn system (6xx)
-NAIF_MIMAS: int = 601
-NAIF_ENCELADUS: int = 602
-NAIF_TETHYS: int = 603
-NAIF_DIONE: int = 604
-NAIF_RHEA: int = 605
-NAIF_TITAN: int = 606
-NAIF_HYPERION: int = 607
-NAIF_IAPETUS: int = 608
-
-# Uranus system (7xx)
-NAIF_MIRANDA: int = 705
-NAIF_ARIEL: int = 701
-NAIF_UMBRIEL: int = 702
-NAIF_TITANIA: int = 703
-NAIF_OBERON: int = 704
-
-# Neptune system (8xx)
-NAIF_TRITON: int = 801
-
-# Mars system (4xx)
-NAIF_PHOBOS: int = 401
-NAIF_DEIMOS: int = 402
-
-# Pluto system (9xx)
-NAIF_CHARON: int = 901
 
 # Planet barycenters (for ephemeris lookup)
 NAIF_MARS_BARYCENTER: int = 4
@@ -287,24 +263,39 @@ def register_moon_spk(
 
     # Determine which moons to register
     if moons is not None:
-        # Use specified moons
+        # Use specified moons (legacy or canonical ids)
         for moon_id in moons:
-            if moon_id in MOON_NAIF_MAP:
-                naif_id = MOON_NAIF_MAP[moon_id]
-                # Verify NAIF ID exists in kernel
-                try:
-                    _ = kernel[naif_id]
-                    _MOON_SPK_BY_BODY[moon_id] = spk_file
-                except KeyError:
-                    pass  # Skip moons not in this kernel
-    else:
-        # Auto-detect moons in kernel
-        for moon_id, naif_id in MOON_NAIF_MAP.items():
+            naif_id = _moon_naif_id(moon_id)
+            if naif_id is None:
+                continue
+            # Verify NAIF ID exists in kernel
             try:
                 _ = kernel[naif_id]
-                _MOON_SPK_BY_BODY[moon_id] = spk_file
             except KeyError:
-                pass  # Moon not in this kernel
+                continue  # Skip moons not in this kernel
+            _MOON_SPK_BY_BODY[moon_id] = spk_file
+            _MOON_SPK_BY_BODY[PLMOON_OFFSET + naif_id] = spk_file
+    else:
+        # Auto-detect: register every satellite target the kernel can
+        # chain to the SSB, under its canonical id (PLMOON_OFFSET + NAIF);
+        # the 21 named moons get their legacy alias ids as well.
+        naif_targets: set[int] = set()
+        try:
+            for seg in kernel.spk.segments:
+                tgt = int(seg.target)
+                if 400 < tgt < 999:
+                    naif_targets.add(tgt)
+        except (AttributeError, TypeError):
+            naif_targets = set(MOON_NAIF_MAP.values())
+        legacy_by_naif = {n: m for m, n in MOON_NAIF_MAP.items()}
+        for naif_id in sorted(naif_targets):
+            try:
+                _ = kernel[naif_id]
+            except KeyError:
+                continue  # Cannot chain to SSB with loaded kernels
+            _MOON_SPK_BY_BODY[PLMOON_OFFSET + naif_id] = spk_file
+            if naif_id in legacy_by_naif:
+                _MOON_SPK_BY_BODY[legacy_by_naif[naif_id]] = spk_file
 
     if not any(spk_file == path for path in _MOON_SPK_BY_BODY.values()):
         raise ValueError(f"No valid planetary moons found in SPK kernel: {spk_file}")
@@ -320,22 +311,41 @@ def unregister_moon_spk(spk_file: str) -> None:
     Example:
         >>> unregister_moon_spk("jup365.bsp")
     """
+    # Match by exact path or by whole-basename equality. Anchoring on the full
+    # basename (rather than str.endswith) avoids two failure modes: an empty
+    # basename — os.path.basename("foo.bsp/") == "" — would make endswith("")
+    # true for every key and unregister ALL kernels, and a bare suffix like
+    # "jup365.bsp" would wrongly match "/alt/xjup365.bsp".
+    base = os.path.basename(spk_file)
+
+    def _matches(path: str) -> bool:
+        """Return whether a registered SPK path matches the requested file.
+
+        Args:
+            path: Registered SPK path to compare against ``spk_file``.
+
+        Returns:
+            True if ``path`` equals ``spk_file`` or shares its basename.
+        """
+        return path == spk_file or (base != "" and os.path.basename(path) == base)
+
     # Remove body registrations for this file
     moons_to_remove = [
-        moon_id
-        for moon_id, path in _MOON_SPK_BY_BODY.items()
-        if path == spk_file or path.endswith(os.path.basename(spk_file))
+        moon_id for moon_id, path in _MOON_SPK_BY_BODY.items() if _matches(path)
     ]
     for moon_id in moons_to_remove:
         del _MOON_SPK_BY_BODY[moon_id]
 
-    # Remove kernel from cache
-    if spk_file in _MOON_SPK_KERNELS:
+    # Remove kernel(s) from cache. register_moon_spk caches under the resolved
+    # absolute path, so an exact-key lookup on a bare basename would leave the
+    # kernel handle open and leaked; the basename match closes it.
+    kernel_keys = [k for k in _MOON_SPK_KERNELS if _matches(k)]
+    for k in kernel_keys:
         try:
-            _MOON_SPK_KERNELS[spk_file].close()
-        except (AttributeError, Exception):
+            _MOON_SPK_KERNELS[k].close()
+        except (AttributeError, OSError, ValueError):
             pass
-        del _MOON_SPK_KERNELS[spk_file]
+        del _MOON_SPK_KERNELS[k]
 
 
 def list_registered_moons() -> dict[int, str]:
@@ -354,12 +364,35 @@ def list_registered_moons() -> dict[int, str]:
     return dict(_MOON_SPK_BY_BODY)
 
 
+# Reverse map for naming canonical ids: NAIF id -> moon name
+_NAIF_NAMES: dict[int, str] = {
+    MOON_NAIF_MAP[mid]: name for mid, name in MOON_NAMES.items()
+}
+
+
+def _moon_naif_id(ipl: int) -> Optional[int]:
+    """NAIF satellite id for a moon body id, or None if not a moon id.
+
+    Accepts both the canonical scheme (PLMOON_OFFSET + NAIF id, e.g.
+    Io = 9501) and the legacy deprecated aliases (MOON_IO = 9001 etc.).
+    The canonical range covers every NAIF satellite id 401-998 plus the
+    9n99 planet-center ids, so moons without a named constant (e.g.
+    Amalthea = 9505) work as long as a registered kernel contains them.
+    """
+    legacy = MOON_NAIF_MAP.get(ipl)
+    if legacy is not None:
+        return legacy
+    if PLMOON_OFFSET + 400 < ipl < PLMOON_OFFSET + 1000:
+        return ipl - PLMOON_OFFSET
+    return None
+
+
 def get_moon_name(moon_id: int) -> str:
     """
     Get the human-readable name of a planetary moon.
 
     Args:
-        moon_id: Moon ID (MOON_*)
+        moon_id: Moon ID (canonical PLMOON_OFFSET + NAIF id, or legacy MOON_*)
 
     Returns:
         Moon name as string, or "Unknown Moon (ID)" if not recognized.
@@ -367,8 +400,16 @@ def get_moon_name(moon_id: int) -> str:
     Example:
         >>> get_moon_name(MOON_IO)
         'Io'
+        >>> get_moon_name(9501)
+        'Io'
     """
-    return MOON_NAMES.get(moon_id, f"Unknown Moon ({moon_id})")
+    name = MOON_NAMES.get(moon_id)
+    if name is not None:
+        return name
+    naif = _moon_naif_id(moon_id)
+    if naif is not None and naif in _NAIF_NAMES:
+        return _NAIF_NAMES[naif]
+    return f"Unknown Moon ({moon_id})"
 
 
 def is_planetary_moon(ipl: int) -> bool:
@@ -379,15 +420,18 @@ def is_planetary_moon(ipl: int) -> bool:
         ipl: Body ID to check
 
     Returns:
-        True if the ID is a planetary moon ID (MOON_*), False otherwise.
+        True for canonical moon ids (PLMOON_OFFSET + NAIF satellite id,
+        e.g. 9501 for Io) and for the legacy MOON_* aliases.
 
     Example:
         >>> is_planetary_moon(MOON_TITAN)
         True
+        >>> is_planetary_moon(9606)
+        True
         >>> is_planetary_moon(SATURN)
         False
     """
-    return ipl in MOON_NAIF_MAP
+    return _moon_naif_id(ipl) is not None
 
 
 # =============================================================================
@@ -405,155 +449,175 @@ def calc_moon_position(
 
     Internal function called by planets._calc_body() when a moon is requested.
 
+    Geocentric output is apparent: light-time iteration on the satellite
+    (unless FLG_TRUEPOS) and annual aberration (unless FLG_NOABERR).
+    Heliocentric and barycentric output stays geometric, matching the
+    library's other helio/bary paths.
+
     Args:
         t: Skyfield Time object
-        moon_id: Planetary moon ID (MOON_*)
-        iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, etc.)
+        moon_id: Moon ID (canonical PLMOON_OFFSET + NAIF id, or legacy MOON_*)
+        iflag: Calculation flags (FLG_SPEED, FLG_HELCTR, FLG_BARYCTR, etc.)
 
     Returns:
         Position tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         or None if moon not registered.
 
     Raises:
-        ValueError: If JD is outside SPK coverage
+        EphemerisRangeError: If JD is outside the SPK kernel's coverage
     """
-    from .planets import get_ayanamsa_ut
-
-    # Check if moon is registered
-    if moon_id not in _MOON_SPK_BY_BODY:
+    naif_id = _moon_naif_id(moon_id)
+    if naif_id is None:
         return None
 
-    spk_file = _MOON_SPK_BY_BODY[moon_id]
-    kernel = _MOON_SPK_KERNELS.get(spk_file)
-    if kernel is None:
-        return None
-
-    naif_id = MOON_NAIF_MAP[moon_id]
-
-    # Get moon target from kernel
-    try:
-        moon_target = kernel[naif_id]
-    except KeyError:
-        return None
-
-    # Get parent planet barycenter for proper coordinate calculation
-    # The satellite SPK uses planet barycenter as center
-    parent_naif = MOON_PARENT_MAP[moon_id]
-
-    # Get parent planet from satellite kernel (it should include planet barycenter)
-    try:
-        parent_target = kernel[parent_naif]
-    except KeyError:
-        # Fall back to main ephemeris for parent planet
-        planets = get_planets()
-        parent_names = {
-            NAIF_MARS_BARYCENTER: "mars barycenter",
-            NAIF_JUPITER_BARYCENTER: "jupiter barycenter",
-            NAIF_SATURN_BARYCENTER: "saturn barycenter",
-            NAIF_URANUS_BARYCENTER: "uranus barycenter",
-            NAIF_NEPTUNE_BARYCENTER: "neptune barycenter",
-            NAIF_PLUTO_BARYCENTER: "pluto barycenter",
-        }
-        parent_name = parent_names.get(parent_naif)
-        if parent_name:
+    # Find the registered kernel: by body id first, then by NAIF target
+    # scan (covers canonical ids the registration didn't key explicitly).
+    spk_file = _MOON_SPK_BY_BODY.get(moon_id) or _MOON_SPK_BY_BODY.get(
+        PLMOON_OFFSET + naif_id
+    )
+    kernel = _MOON_SPK_KERNELS.get(spk_file) if spk_file else None
+    moon_target = None
+    if kernel is not None:
+        try:
+            moon_target = kernel[naif_id]
+        except KeyError:
+            moon_target = None
+    if moon_target is None:
+        for cand in _MOON_SPK_KERNELS.values():
             try:
-                parent_target = planets[parent_name]
+                moon_target = cand[naif_id]
+                break
             except KeyError:
-                return None
-        else:
-            return None
+                continue
+    if moon_target is None:
+        return None
 
     # Get main ephemeris for Earth/Sun
     planets = get_planets()
 
     # Determine observer
     is_heliocentric = bool(iflag & FLG_HELCTR)
+    is_barycentric = bool(iflag & FLG_BARYCTR)
+    is_topocentric = (
+        bool(iflag & FLG_TOPOCTR) and not is_heliocentric and not is_barycentric
+    )
 
-    if is_heliocentric:
+    if is_barycentric:
+        observer = None  # solar-system barycenter: zero position/velocity
+    elif is_heliocentric:
         observer = planets["sun"]
+    elif is_topocentric:
+        # Topocentric: observer = geocenter + site, mirroring the planet path
+        # (planets._calc_body). Without a prior set_topo() this is an error, not
+        # a silent geocentric result — matching the reference API.
+        from .state import get_topo
+
+        topo = get_topo()
+        if topo is None:
+            from .exceptions import Error
+
+            raise Error(
+                "FLG_TOPOCTR requires a geographic position: call "
+                "set_topo(lon, lat, alt) first"
+            )
+        observer = planets["earth"] + topo
     else:
         observer = planets["earth"]
 
-    # Calculate moon position relative to parent planet barycenter
-    # Then add parent planet's position relative to SSB
-    moon_at_parent = moon_target.at(t)
-    parent_at_ssb = parent_target.at(t)
-    observer_at_ssb = observer.at(t)
+    # Skyfield chains SPK segments to the solar-system barycenter, so
+    # kernel[naif_id].at(t) is already SSB -> moon (satellite kernels like
+    # jup365/sat441 ship the SSB -> planet-barycenter segment; if a kernel
+    # cannot chain, kernel[naif_id] above raises KeyError).  Adding the
+    # parent barycenter again would double-count it (~5-30 AU error).
+    from .astrometry import apply_aberration_to_position
 
-    # Moon position = (moon relative to parent) + (parent relative to SSB)
-    # Observer position = (observer relative to SSB)
-    # Final position = moon_ssb - observer_ssb
+    C_AU_DAY = 173.144632674240
+    apply_light_time = (
+        not (iflag & FLG_TRUEPOS) and not is_heliocentric and not is_barycentric
+    )
+    apply_aberr = (
+        not (iflag & FLG_TRUEPOS)
+        and not (iflag & FLG_NOABERR)
+        and not is_heliocentric
+        and not is_barycentric
+    )
+    ts = get_timescale()
 
-    moon_xyz = moon_at_parent.position.au
-    parent_xyz = parent_at_ssb.position.au
-    observer_xyz = observer_at_ssb.position.au
+    def _rel_at(t_obs):
+        """Light-time corrected satellite-minus-observer vector (AU)."""
+        try:
+            if observer is None:
+                obs_at = None
+                obs_xyz = (0.0, 0.0, 0.0)
+            else:
+                obs_at = observer.at(t_obs)
+                obs_xyz = obs_at.position.au
+            t_emit = t_obs
+            rel = None
+            for _ in range(3):
+                tgt_xyz = moon_target.at(t_emit).position.au
+                rel = [tgt_xyz[i] - obs_xyz[i] for i in range(3)]
+                if not apply_light_time:
+                    break
+                dist_au = math.sqrt(rel[0] ** 2 + rel[1] ** 2 + rel[2] ** 2)
+                t_emit = ts.tt_jd(t_obs.tt - dist_au / C_AU_DAY)
+        except ValueError as e:
+            raise EphemerisRangeError(
+                f"JD {t_obs.tt:.1f} outside satellite SPK coverage for "
+                f"{get_moon_name(moon_id)}: {e}"
+            ) from e
+        if apply_aberr and obs_at is not None:
+            obs_vel = obs_at.velocity.au_per_d
+            rel = list(
+                apply_aberration_to_position(
+                    (rel[0], rel[1], rel[2]),
+                    (obs_vel[0], obs_vel[1], obs_vel[2]),
+                )
+            )
+        return rel
 
-    # Moon position relative to SSB = moon relative to parent + parent relative to SSB
-    moon_ssb = [moon_xyz[i] + parent_xyz[i] for i in range(3)]
+    def _ecl_at(t_obs):
+        rel = _rel_at(t_obs)
+        rel_pos = ICRF(rel, t=t_obs, center=399)
+        ecl = rel_pos.frame_latlon(ecliptic_frame)
+        lon = float(ecl[1].degrees) % 360.0
+        lat = float(ecl[0].degrees)
+        dist = float(ecl[2].au)
+        # FLG_NONUT: ecliptic_frame is the TRUE ecliptic of date (includes
+        # nutation in longitude Δψ); strip it for the mean ecliptic. Done per
+        # sample so the central-difference speed below inherits the correction
+        # automatically (no separate nutation-rate term needed).
+        #
+        # FLG_SIDEREAL|FLG_EQUATORIAL: the downstream _maybe_equatorial_convert
+        # rotates with the MEAN obliquity for sidereal output, so the longitude
+        # must also be the mean ecliptic (Δψ stripped) — otherwise the mismatch
+        # leaks ~Δψ·cos(ε) (~15-17") into RA/Dec. Mirror the node/Lilith _sid_eq
+        # rule in planets._calc_body_pctr.
+        #
+        # FLG_J2000: the J2000 ecliptic carries no nutation. _maybe_equatorial_convert
+        # precesses this longitude to J2000 with a precession-only matrix that never
+        # removes Δψ, so the of-date Δψ must be stripped here (mirroring the planet/
+        # SPK path, which omits nutation for J2000) — otherwise moons land ~Δψ (up to
+        # ~17") off the nutation-free J2000 frame used by every other J2000 body.
+        _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+        if (iflag & FLG_NONUT) or _sid_eq or (iflag & FLG_J2000):
+            from .cache import get_cached_nutation
 
-    # Moon position relative to observer
-    rel_xyz = [moon_ssb[i] - observer_xyz[i] for i in range(3)]
+            dpsi_rad, _ = get_cached_nutation(t_obs.tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
+        return (lon, lat, dist)
 
-    # Convert to ecliptic coordinates
-    rel_pos = ICRF(rel_xyz, t=t, center=399)
-
-    # Get ecliptic lat/lon
-    ecl_pos = rel_pos.frame_latlon(ecliptic_frame)
-    lat = ecl_pos[0].degrees
-    lon = ecl_pos[1].degrees
-    dist = ecl_pos[2].au
-
-    # Normalize longitude to 0-360
-    lon = lon % 360.0
+    lon, lat, dist = _ecl_at(t)
 
     # Calculate speeds if requested
     speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
 
     if iflag & FLG_SPEED:
         # Central difference numerical differentiation (1 second timestep)
-        ts = get_timescale()
         dt = 1.0 / 86400.0  # 1 second in days
 
-        t_prev = ts.tt_jd(t.tt - dt)
-        t_next = ts.tt_jd(t.tt + dt)
-
-        # Position at t - dt
-        moon_at_parent_prev = moon_target.at(t_prev)
-        parent_at_ssb_prev = parent_target.at(t_prev)
-        observer_at_ssb_prev = observer.at(t_prev)
-
-        moon_xyz_prev = moon_at_parent_prev.position.au
-        parent_xyz_prev = parent_at_ssb_prev.position.au
-        observer_xyz_prev = observer_at_ssb_prev.position.au
-
-        moon_ssb_prev = [moon_xyz_prev[i] + parent_xyz_prev[i] for i in range(3)]
-        rel_xyz_prev = [moon_ssb_prev[i] - observer_xyz_prev[i] for i in range(3)]
-
-        rel_pos_prev = ICRF(rel_xyz_prev, t=t_prev, center=399)
-        ecl_pos_prev = rel_pos_prev.frame_latlon(ecliptic_frame)
-
-        lat_prev = ecl_pos_prev[0].degrees
-        lon_prev = ecl_pos_prev[1].degrees % 360.0
-        dist_prev = ecl_pos_prev[2].au
-
-        # Position at t + dt
-        moon_at_parent_next = moon_target.at(t_next)
-        parent_at_ssb_next = parent_target.at(t_next)
-        observer_at_ssb_next = observer.at(t_next)
-
-        moon_xyz_next = moon_at_parent_next.position.au
-        parent_xyz_next = parent_at_ssb_next.position.au
-        observer_xyz_next = observer_at_ssb_next.position.au
-
-        moon_ssb_next = [moon_xyz_next[i] + parent_xyz_next[i] for i in range(3)]
-        rel_xyz_next = [moon_ssb_next[i] - observer_xyz_next[i] for i in range(3)]
-
-        rel_pos_next = ICRF(rel_xyz_next, t=t_next, center=399)
-        ecl_pos_next = rel_pos_next.frame_latlon(ecliptic_frame)
-
-        lat_next = ecl_pos_next[0].degrees
-        lon_next = ecl_pos_next[1].degrees % 360.0
-        dist_next = ecl_pos_next[2].au
+        lon_prev, lat_prev, dist_prev = _ecl_at(ts.tt_jd(t.tt - dt))
+        lon_next, lat_next, dist_next = _ecl_at(ts.tt_jd(t.tt + dt))
 
         # Compute rates using central difference (per day)
         speed_lon = (lon_next - lon_prev) / (2.0 * dt)
@@ -566,10 +630,21 @@ def calc_moon_position(
         if speed_lon < -180.0 / (2.0 * dt):
             speed_lon += 360.0 / (2.0 * dt)
 
-    # Apply sidereal correction if requested
-    if iflag & FLG_SIDEREAL:
-        ayanamsa = get_ayanamsa_ut(t.ut1)
-        lon = (lon - ayanamsa) % 360.0
+    # Apply sidereal correction if requested (ecliptic longitude only; for
+    # equatorial sidereal output the mean-equator-of-date frame carries the
+    # sidereal framing and no ayanamsa is subtracted — the same rule as
+    # planets._calc_body_pctr, gated on not-equatorial).
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+        # Route through the canonical flag-aware helper so the ayanamsa variant
+        # matches the longitude frame: when FLG_NONUT stripped Δψ above (mean
+        # ecliptic) the helper subtracts the MEAN ayanamsa, while an of-date
+        # (true) longitude gets the TRUE ayanamsa — subtracting get_ayanamsa_ut
+        # (always true) from a NONUT mean longitude left a spurious ~9-17"
+        # offset versus the planet path. The helper also removes the ~50"/yr
+        # ayanamsha drift from speed_lon under FLG_SPEED.
+        from .planets import _apply_sidereal_correction
+
+        lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
 
     return (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
@@ -589,11 +664,16 @@ def get_moon_coverage(moon_id: int) -> Optional[Tuple[float, float]]:
         >>> start, end = get_moon_coverage(MOON_IO)
         >>> print(f"Io coverage: JD {start:.1f} to {end:.1f}")
     """
-    if moon_id not in _MOON_SPK_BY_BODY:
+    # Resolve the kernel by body id first, then by canonical NAIF target
+    # (matches calc_moon_position so coverage is not None for moons keyed
+    # only under PLMOON_OFFSET + naif_id by the auto-detect path).
+    naif_id = _moon_naif_id(moon_id)
+    if naif_id is None:
         return None
-
-    spk_file = _MOON_SPK_BY_BODY[moon_id]
-    kernel = _MOON_SPK_KERNELS.get(spk_file)
+    spk_file = _MOON_SPK_BY_BODY.get(moon_id) or _MOON_SPK_BY_BODY.get(
+        PLMOON_OFFSET + naif_id
+    )
+    kernel = _MOON_SPK_KERNELS.get(spk_file) if spk_file else None
     if kernel is None:
         return None
 
@@ -629,7 +709,7 @@ def close_moon_kernels() -> None:
     for kernel in _MOON_SPK_KERNELS.values():
         try:
             kernel.close()
-        except (AttributeError, Exception):
+        except (AttributeError, OSError, ValueError):
             pass
 
     _MOON_SPK_KERNELS = {}

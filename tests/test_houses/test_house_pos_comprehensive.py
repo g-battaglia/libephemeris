@@ -7,7 +7,6 @@ works with various house systems, and is consistent with houses().
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -19,7 +18,6 @@ from libephemeris.constants import (
     VENUS,
     MARS,
     JUPITER,
-    FLG_SPEED,
 )
 
 

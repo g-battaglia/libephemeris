@@ -13,15 +13,11 @@ import pytest
 
 import libephemeris as swe
 from libephemeris.constants import (
-    FLG_SWIEPH,
-    FLG_SPEED,
     FLG_SIDEREAL,
     SIDM_LAHIRI,
     SIDM_FAGAN_BRADLEY,
     SIDM_RAMAN,
-    SIDM_KRISHNAMURTI,
 )
-from libephemeris.exceptions import PolarCircleError
 
 
 @pytest.fixture(autouse=True)

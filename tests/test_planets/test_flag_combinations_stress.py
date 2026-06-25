@@ -23,8 +23,6 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
     PLUTO,
     MEAN_NODE,
     TRUE_NODE,
@@ -32,7 +30,6 @@ from libephemeris.constants import (
     OSCU_APOG,
     CHIRON,
     INTP_APOG,
-    INTP_PERG,
     FLG_SPEED,
     FLG_HELCTR,
     FLG_TRUEPOS,
@@ -45,7 +42,6 @@ from libephemeris.constants import (
     FLG_RADIANS,
     FLG_SIDEREAL,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
 )
 
 # All single flags that can be combined

@@ -1,0 +1,180 @@
+# Intentional divergences from Swiss Ephemeris
+
+libephemeris aims for 1:1 behavioural compatibility with pyswisseph. In a small
+number of cases where Swiss Ephemeris has a demonstrable behavioural bug or returns
+a physically unbounded quantity, libephemeris deliberately departs from it to
+return the physically correct value. Each case is documented here so the difference
+is never a surprise.
+
+---
+
+## 1. `SIDEREAL | J2000` for lunar nodes and apsides
+
+**Status:** intentional divergence since the leb/precision branch.
+
+### Summary
+
+pyswisseph silently ignores `FLG_J2000` for four lunar bodies when `FLG_SIDEREAL`
+is also set:
+
+| Body | `SIDEREAL + J2000` in pyswisseph |
+|------|----------------------------------|
+| `MEAN_NODE` (10) | J2000 applied correctly |
+| `MEAN_APOG` (12) | J2000 applied correctly |
+| `TRUE_NODE` (11) | **J2000 silently ignored** |
+| `OSCU_APOG` (13) | **J2000 silently ignored** |
+| `INTP_APOG` (21) | **J2000 silently ignored** |
+| `INTP_PERG` (22) | **J2000 silently ignored** |
+
+libephemeris honours `FLG_J2000` for **all** bodies uniformly.
+
+**Impact for users:** if you use `FLG_SIDEREAL` without `FLG_J2000` (the vast
+majority of use cases), there is zero difference. The divergence only affects the
+specific combination `FLG_SIDEREAL | FLG_J2000` on these four bodies.
+
+### How it was detected
+
+During systematic validation of all sidereal flag combinations, an internal
+inconsistency appeared: `MEAN_NODE` with `SIDEREAL | J2000` returns a *different*
+longitude than with `SIDEREAL` alone (J2000 precession applied), while `TRUE_NODE`
+with `SIDEREAL | J2000` returns the *same* longitude as with `SIDEREAL` alone
+(J2000 precession not applied). Bodies of the same physical family respond
+differently to the same flag combination. This was confirmed across multiple dates,
+all ayanamsha modes, and both longitude and latitude. No error or warning is
+emitted; the `J2000` flag is accepted but silently discarded.
+
+### Why this is incorrect
+
+1. **Ayanamsha and J2000 precession are distinct operations.** Ayanamsha shifts the
+   longitude zero point along the ecliptic (a 1D rotation). J2000 precession changes
+   the reference plane from the ecliptic of date to the ecliptic of J2000.0 (a 3D
+   rotation accounting for the ~47"/century drift of the ecliptic plane). They are
+   geometrically independent and composable; applying one does not substitute for
+   the other.
+2. **Internal inconsistency.** If `SIDEREAL` and `J2000` were intended to be
+   incompatible for these bodies, the behaviour should be consistent across the
+   family. Instead mean bodies apply J2000 and true/osculating/interpolated bodies
+   do not — a code-path issue, not an API decision.
+3. **The error grows with distance from J2000**, consistent with missing
+   ecliptic-plane precession:
+
+   | Epoch | TrueNode delta | Physical meaning |
+   |-------|---------------|------------------|
+   | J2000.0 | ~0.004° | Frame bias only |
+   | 2024 CE | ~0.34° | 24 years of ecliptic precession |
+   | J1900 | ~1.40° | 100 years of ecliptic precession |
+   | 3000 CE | ~14.0° | 1000 years of ecliptic precession |
+
+4. **Physical sanity check fails.** The true node oscillates around the mean node
+   with amplitude ~±1.5°; the two should be within ~2° at any epoch. With the
+   pyswisseph behaviour at 0 CE, `|TrueNode − MeanNode|` under `SIDEREAL | J2000`
+   reaches ~29° — physically impossible. With the libephemeris fix it returns to
+   ~1.04°.
+
+### Numerical evidence
+
+All measurements use Lahiri ayanamsha (`SIDM_LAHIRI`).
+
+**SID+J2K vs SID-only (libephemeris, after fix):**
+
+| Epoch | Body | SID+J2K lon | SID lon | Delta |
+|-------|------|-------------|---------|-------|
+| 2024 | TrueNode | 15.280° | 15.618° | −0.339° |
+| 2024 | OscuApog | 190.790° | 191.128° | −0.339° |
+| 2024 | MeanNode | 15.774° | 16.113° | −0.339° |
+| 2024 | MeanApog | 169.639° | 169.978° | −0.339° |
+
+All four bodies show a consistent ~0.339° J2000 precession shift — as expected for a
+uniform coordinate transformation.
+
+**TrueNode vs MeanNode physical sanity:**
+
+| Epoch | With fix | Without fix (SE behaviour) |
+|-------|----------|---------------------------|
+| 2024 CE | 0.49° | 0.49° |
+| 0 CE | 1.04° | 28.85° |
+| 3000 CE | 1.37° | 15.37° |
+
+### The libephemeris fix
+
+For all Pipeline-B bodies (MeanNode, MeanApog, TrueNode, OscuApog, IntpApog,
+IntpPerg), when both `FLG_SIDEREAL` and `FLG_J2000` are set:
+
+1. Compute the tropical ecliptic-of-date position.
+2. Subtract **mean ayanamsha** (not true — the J2000 ecliptic frame has no nutation
+   component).
+3. Precess from ecliptic of date to J2000 ecliptic.
+4. If equatorial output is also requested, rotate to J2000 equatorial using J2000
+   obliquity.
+
+This is the same pipeline already used correctly for `MEAN_NODE` and `MEAN_APOG`;
+the fix extends it to the remaining four bodies.
+
+**Code locations.** `libephemeris/fast_calc.py` (LEB path): removed
+`_SID_J2K_SKIP_BODIES` and `_J2K_SKIP`, extended `_deferred_sid_j2k` to all
+ecliptic-direct bodies. `libephemeris/planets.py` (Skyfield path): removed the
+`_eff_flags = iflag & ~FLG_J2000` suppression from the TrueNode, OscuApog and
+IntpApog/IntpPerg handlers so they use `iflag` directly.
+
+**Test coverage.** `tests/test_sidereal/test_se_bug_j2k_nodes.py` (J2000 applied,
+physical sanity, LEB-vs-Skyfield consistency, documented SE divergence magnitude);
+`compare_scripts/tests/test_compare_sidereal_regression.py` and
+`tests/test_leb/compare/extended/test_extended_sidereal.py` (updated to verify the
+intentional divergence / LEB-vs-Skyfield agreement).
+
+### Methodology note
+
+This analysis was performed entirely through **black-box behavioural observation**
+of pyswisseph — comparing the outputs of different flag combinations across dates,
+bodies and ayanamsha modes. The Swiss Ephemeris source code was not inspected. The
+conclusions follow from the observed behaviour, the mathematical properties of the
+coordinate transformations involved, and the internal inconsistency between mean and
+true body handling.
+
+---
+
+## 2. Total-eclipse obscuration
+
+Obscuration is the fraction of the Sun's *area* covered by the Moon, so it is
+physically bounded by 1.0 (a total eclipse covers 100% of the Sun). libephemeris
+returns exactly **1.0** for total eclipses (`sol_eclipse_how` `attr[2]`,
+`sol_eclipse_obscuration_at_loc`, and `sol_eclipse_how_details`
+`max_obscuration`). pyswisseph instead reports the lunar/solar disc *area ratio*
+`(R_moon/R_sun)² ≈ 1.05–1.12 > 1` for total eclipses, which is not a fraction. This
+is an intentional choice for physical correctness; the "how much larger the Moon
+appears than the Sun" information remains available in the eclipse *magnitude*
+(`attr[0]`/`attr[8]`).
+
+Annular eclipses are identical to pyswisseph (`(R_moon/R_sun)² < 1`, the
+ring-residual area fraction) and partial eclipses use the standard two-disc lens
+overlap; both agree to ~1e-3. At a no-eclipse instant the obscuration is **0.0**
+from every entry point (`sol_eclipse_how`, `sol_eclipse_where`,
+`lun_occult_where`).
+
+---
+
+## 3. Of-date mean obliquity at deep-BCE epochs
+
+For the of-date mean obliquity, libephemeris uses the true angle between the
+Vondrák-2011 of-date equator and ecliptic poles (valid ±200,000 years), rather than
+the IAU 2006 obliquity polynomial (valid only a few centuries from J2000). At
+deep-BCE epochs Swiss Ephemeris reports an obliquity that matches neither model
+exactly — it sits between the rigorous Vondrák pole angle and the IAU 2006
+extrapolation. libephemeris keeps the physically-consistent Vondrák value rather
+than reproducing Swiss's value bit-for-bit. The deviation is bounded and benign,
+and — because obliquity does not affect ecliptic longitude — confined to ecliptic
+latitude:
+
+| Year | Swiss obliquity | Vondrák − Swiss | IAU 2006 − Swiss | Sun latitude (lib − Swiss) |
+|------|-----------------|-----------------|------------------|-----------------------------|
+| −3000 | 24.021270° | −6.475″ | +5.718″ | −5.999″ |
+| −1000 | 23.814592° | −1.040″ | +0.285″ | −1.048″ |
+| 0 | 23.695022° | −0.206″ | −0.010″ | −0.208″ |
+| 2000 | 23.439279° | 0.000″ | 0.000″ | 0.000″ |
+| 3000 | 23.309726° | +0.048″ | +0.010″ | −0.008″ |
+
+The deviation is identically zero in the modern era, sub-arcsecond within recorded
+history, and at −3000 (≤ ~6″ in latitude) already well below the
+ephemeris-generation floor on the planets (e.g. Mars ≈ 600″ at −3000). The of-date
+mean obliquity is taken from ERFA's Vondrák long-term routines
+(`erfa.ltpequ` / `erfa.ltpecl`).

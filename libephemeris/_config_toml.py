@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """TOML configuration file loader for libephemeris.
 
 Loads configuration from ``libephemeris-config.toml`` files,
@@ -36,7 +38,7 @@ from typing import Any, Dict, Optional, Union
 # TOML parser: stdlib on 3.11+, tomli package on 3.9/3.10
 if sys.version_info >= (3, 11):
     import tomllib
-else:
+else:  # pragma: no cover - Python <3.11 tomli shim; project requires 3.12+
     try:
         import tomli as tomllib  # type: ignore[no-redef]
     except ImportError:
@@ -84,6 +86,7 @@ _VALID_KEYS: Dict[str, type] = {
     "strict_precision": bool,
     "iers_auto_download": bool,
     "iers_delta_t": bool,
+    "deltat_model": str,
     "mmap_preload": bool,
     "mmap_preload_start": int,
     "mmap_preload_end": int,
@@ -157,7 +160,18 @@ def load_config(
     try:
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError:
+        _CONFIG_LOADED = True
+        return False
+    except tomllib.TOMLDecodeError as e:
+        # A malformed config silently ignored looks like "my settings
+        # don't apply" — say what is wrong and where.
+        import warnings
+
+        warnings.warn(
+            f"Ignoring malformed libephemeris config {config_path}: {e}",
+            stacklevel=2,
+        )
         _CONFIG_LOADED = True
         return False
 

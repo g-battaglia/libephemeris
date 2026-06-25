@@ -51,12 +51,12 @@ class TestGetPlanetName:
         assert get_planet_name(EARTH) == "Earth"
 
     def test_lunar_nodes(self):
-        """Test lunar node name lookups (pyswisseph uses lowercase)."""
+        """Test lunar node name lookups (the reference ephemeris uses lowercase)."""
         assert get_planet_name(MEAN_NODE) == "mean Node"
         assert get_planet_name(TRUE_NODE) == "true Node"
 
     def test_lunar_apogee(self):
-        """Test lunar apogee name lookups (pyswisseph uses lowercase/abbreviated)."""
+        """Test lunar apogee name lookups (the reference ephemeris uses lowercase/abbreviated)."""
         assert get_planet_name(MEAN_APOG) == "mean Apogee"
         assert get_planet_name(OSCU_APOG) == "osc. Apogee"
 

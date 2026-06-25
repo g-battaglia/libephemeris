@@ -7,8 +7,6 @@ for recent dates (1973-present).
 
 import pytest
 import os
-import tempfile
-import shutil
 
 from libephemeris import julday
 from libephemeris.iers_data import (
@@ -18,7 +16,6 @@ from libephemeris.iers_data import (
     is_observed_delta_t_available,
     get_delta_t_iers,
     clear_iers_cache,
-    delete_iers_cache_files,
     set_iers_cache_dir,
     set_iers_auto_download,
     get_iers_cache_info,

@@ -24,7 +24,6 @@ from libephemeris import (
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_ANNULAR,
-    ECL_PARTIAL,
 )
 
 pytestmark = pytest.mark.slow

@@ -1,9 +1,19 @@
 include LICENSE
+include LICENSING.md
+include COMMERCIAL-LICENSE.md
+include NOTICE.md
+include THIRD_PARTY_NOTICES.md
 include README.md
 include pyproject.toml
 recursive-include libephemeris *.py
 include libephemeris/py.typed
 recursive-include libephemeris/data *.csv
+
+# The leph dev CLI is repo tooling (repo-relative paths); it must not ship
+# in any artifact. setuptools' include-package-data (default true with
+# pyproject metadata) would otherwise pull these .py files into the wheel
+# as package data even though the package is not declared.
+prune libephemeris/dev_cli
 
 exclude tests/*
 exclude compare_scripts/*

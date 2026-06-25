@@ -12,16 +12,12 @@ Reference data sources:
 """
 
 import pytest
-import math
 from libephemeris import (
     julday,
     sol_eclipse_when_glob,
     lun_eclipse_when,
-    FLG_SWIEPH,
     ECL_TOTAL,
     ECL_ANNULAR,
-    ECL_PARTIAL,
-    ECL_PENUMBRAL,
 )
 
 pytestmark = pytest.mark.slow

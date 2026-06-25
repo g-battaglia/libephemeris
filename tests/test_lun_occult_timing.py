@@ -21,11 +21,7 @@ from libephemeris import (
     revjul,
     lun_occult_when_glob,
     lun_occult_when_loc,
-    ECL_TOTAL,
-    ECL_PARTIAL,
     VENUS,
-    MARS,
-    JUPITER,
     FLG_SWIEPH,
 )
 
@@ -148,7 +144,7 @@ class TestLunOccultWhenLocTopocentric:
             pytest.skip("No Venus occultation visible from Rome in search period")
 
     def test_swe_lun_occult_when_loc_api(self):
-        """Test the pyswisseph-compatible API."""
+        """Test the reference-API-compatible API."""
         jd_start = julday(2017, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0)  # Rome (lon, lat, alt)
 

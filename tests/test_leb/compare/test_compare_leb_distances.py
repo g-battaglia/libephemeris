@@ -16,7 +16,6 @@ from libephemeris.constants import (
 from .conftest import (
     TOLS,
     ICRS_PLANETS,
-    ASTEROID_BODIES,
     CompareHelper,
     filter_asteroid_dates,
 )

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Data file download utilities for libephemeris.
 
@@ -28,7 +30,7 @@ import sys
 import tempfile
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional
 
 import certifi
 
@@ -387,6 +389,9 @@ def download_file(
             chunk_size = 64 * 1024  # 64KB chunks
 
             with os.fdopen(temp_fd, "wb") as f:
+                # Ownership of the fd has transferred to f, which closes it on
+                # exit; mark it so the except clause below does not also close.
+                temp_fd = -1
                 while True:
                     chunk = response.read(chunk_size)
                     if not chunk:
@@ -414,6 +419,13 @@ def download_file(
         return True
 
     except (OSError, ValueError, KeyError, RuntimeError):
+        # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
+        # raised first); otherwise it leaks until the process exits.
+        if temp_fd != -1:
+            try:
+                os.close(temp_fd)
+            except OSError:
+                pass
         # Clean up temp file on error
         if os.path.exists(temp_path):
             os.unlink(temp_path)
@@ -539,14 +551,13 @@ def check_data_status() -> dict[str, dict]:
         - description: str
     """
     data_dir = get_data_dir()
-    workspace_root = Path(__file__).parent.parent
     status = {}
 
     for filename, info in DATA_FILES.items():
-        # Resolve path based on file type
-        if filename.startswith("planet_centers_"):
-            path = workspace_root / filename
-        elif filename.endswith((".leb", ".leb2")):
+        # Resolve path based on file type.  All downloads land under the
+        # data dir (download_planet_centers_for_tier and state.py agree
+        # on data_dir/planet_centers_<tier>.bsp).
+        if filename.endswith((".leb", ".leb2")):
             path = data_dir / "leb" / filename
         else:
             path = data_dir / filename
@@ -1129,13 +1140,16 @@ def init_all(
                 continue
 
             try:
+                # naif_id deliberately omitted: Horizons-generated kernels
+                # may use 20000000+N target IDs while SPK_BODY_NAME_MAP holds
+                # the classic 2000000+N; registration auto-detects the ID
+                # from the downloaded file.
                 download_spk_from_horizons(
                     body_id=horizons_id,
                     jd_start=jd_start,
                     jd_end=jd_end,
                     output_path=output_path,
                     ipl=ipl,
-                    naif_id=naif_id,
                 )
                 body_success += 1
                 result["spk_success"] += 1
@@ -1425,22 +1439,16 @@ def download_leb_for_tier(
         print(f"  {file_info['description']}")
         print()
 
-    try:
-        download_file(
-            url=str(file_info["url"]),
-            dest_path=dest_path,
-            description=filename,
-            expected_sha256=str(file_info["sha256"]),
-            show_progress=show_progress,
-        )
-    except (OSError, ValueError, KeyError, RuntimeError):
-        # Clean up partial file
-        if dest_path.exists():
-            try:
-                os.remove(dest_path)
-            except OSError:
-                pass
-        raise
+    # download_file streams to a temp file and only replaces dest_path
+    # after the hash verifies, so a failure here leaves any existing
+    # (force=True) valid file untouched — do not delete dest_path.
+    download_file(
+        url=str(file_info["url"]),
+        dest_path=dest_path,
+        description=filename,
+        expected_sha256=str(file_info["sha256"]),
+        show_progress=show_progress,
+    )
 
     # Validate the downloaded file
     if not _is_valid_leb(str(dest_path)):
@@ -1532,6 +1540,18 @@ def download_leb2_for_tier(
                 expected_sha256=file_info.get("sha256"),
                 show_progress=show_progress and not quiet,
             )
+            # Validate the downloaded file (download_file only checks the hash
+            # when one is present; a DATA_FILES entry without a sha256 would
+            # otherwise let a truncated/corrupt file through). Mirror
+            # download_leb_for_tier / _download_planet_centers_for_tier.
+            if not _is_valid_leb(str(dest_path)):
+                try:
+                    dest_path.unlink()
+                except OSError:
+                    pass
+                if not quiet:
+                    print(f"  [FAIL] {filename}: downloaded file is corrupt")
+                continue
             downloaded.append(dest_path)
             if not quiet:
                 print(f"  [OK] {filename}")
@@ -1573,7 +1593,6 @@ def _download_planet_centers_for_tier(
     Raises:
         Exception: If download fails
     """
-    import urllib.request
 
     logger = get_logger()
     filename = f"planet_centers_{tier_name}.bsp"
@@ -1602,61 +1621,27 @@ def _download_planet_centers_for_tier(
     if not quiet:
         print(f"  Downloading {filename} (~{expected_size_mb:.0f} MB)...")
 
-    dest_path.parent.mkdir(parents=True, exist_ok=True)
-    temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
+    # download_file streams to a temp file, verifies the release sha256,
+    # and atomically replaces dest_path — an existing (force=True) valid
+    # file survives any failure.
+    download_file(
+        url=str(url),
+        dest_path=dest_path,
+        description=filename,
+        expected_sha256=str(file_info["sha256"]) if file_info.get("sha256") else None,
+        show_progress=show_progress and not quiet,
+    )
 
-    try:
-        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        total_size = 0
+    if not _is_valid_bsp(str(dest_path)):
         try:
-            req = urllib.request.Request(url, method="HEAD")
-            with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
-                total_size = int(response.headers.get("Content-Length", 0))
-        except (OSError, ValueError, KeyError, RuntimeError):
+            os.remove(dest_path)
+        except OSError:
             pass
+        raise ValueError(
+            f"Downloaded file {filename} failed validation - corrupt or incomplete"
+        )
 
-        downloaded = 0
-        chunk_size = 1024 * 1024
+    if not quiet:
+        print(f"  Downloaded to {dest_path}")
 
-        with urllib.request.urlopen(url, timeout=300, context=_ssl_ctx) as response:
-            with os.fdopen(temp_fd, "wb") as f:
-                if show_progress and total_size > 0 and not quiet:
-                    progress = SimpleProgressBar(total_size, f"  {filename}")
-                    while True:
-                        chunk = response.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        progress.update(len(chunk))
-                    print()
-                else:
-                    while True:
-                        chunk = response.read(chunk_size)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if not quiet:
-                            print(
-                                f"\r  Downloaded {downloaded / 1024 / 1024:.1f} MB",
-                                end="",
-                            )
-
-        if not _is_valid_bsp(temp_path):
-            os.unlink(temp_path)
-            raise ValueError(
-                f"Downloaded file {filename} failed validation - corrupt or incomplete"
-            )
-
-        os.replace(temp_path, dest_path)
-
-        if not quiet:
-            print(f"  Downloaded to {dest_path}")
-
-        return dest_path
-
-    except (OSError, ValueError, KeyError, RuntimeError):
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-        raise
+    return dest_path

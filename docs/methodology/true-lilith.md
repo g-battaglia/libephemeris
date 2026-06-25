@@ -1,6 +1,6 @@
 # True Lilith (Osculating Lunar Apogee) Calculation
 
-LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving instantaneous Keplerian orbital elements from the Moon's geocentric state vectors obtained via JPL DE440/DE441, with calibrated perturbation corrections applied to achieve sub-arcminute agreement with Swiss Ephemeris.
+LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving instantaneous Keplerian orbital elements from the Moon's geocentric state vectors obtained via JPL DE440/DE441, with calibrated perturbation corrections applied to achieve sub-arcminute precision.
 
 ## Table of Contents
 
@@ -12,9 +12,7 @@ LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving inst
 - [Precision and Validation](#precision-and-validation)
   - [Measured Precision](#measured-precision)
   - [Lilith Method Selection Guide](#lilith-method-selection-guide)
-- [Comparison with Swiss Ephemeris](#comparison-with-swiss-ephemeris)
-  - [Sources of Residual Differences](#sources-of-residual-differences)
-  - [The Osculating Apogee Paradox](#the-osculating-apogee-paradox)
+- [The Osculating Apogee Concept](#the-osculating-apogee-concept)
 - [The Interpolated Apogee Alternative](#the-interpolated-apogee-alternative)
 - [References](#references)
 
@@ -22,7 +20,7 @@ LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving inst
 
 True Lilith, also known as the osculating lunar apogee, is the apogee point of the Moon's instantaneous (osculating) Keplerian orbit. Unlike Mean Lilith (which moves smoothly along the mean lunar orbit), True Lilith oscillates significantly due to solar gravitational perturbations.
 
-The standard method for computing the osculating apogee derives it directly from the Moon's **position and velocity vectors** (state vectors), from which the full set of osculating Keplerian orbital elements is obtained. This avoids the error introduced by analytical approximations and works directly with the numerical ephemeris. Both Swiss Ephemeris (via `OSCU_APOG`) and LibEphemeris use this approach.
+The standard method for computing the osculating apogee derives it directly from the Moon's **position and velocity vectors** (state vectors), from which the full set of osculating Keplerian orbital elements is obtained. This avoids the error introduced by analytical approximations and works directly with the numerical ephemeris. It is the standard osculating-apogee definition used by the `OSCU_APOG` body.
 
 ### Physical Context
 
@@ -105,47 +103,36 @@ LibEphemeris applies seven corrections to improve accuracy:
 
 ### Measured Precision
 
-Precision is measured via 500-date random sampling against Swiss Ephemeris (`OSCU_APOG`):
+Precision is measured via 500-date random sampling for the osculating apogee
+(`OSCU_APOG`), as measured differences:
 
 | Method | Mean Difference | Max Difference | RMS Difference |
 |--------|-----------------|----------------|----------------|
 | **True Lilith** (LibEphemeris) | ~52 arcsec (~0.015 deg) | ~235 arcsec (~0.065 deg) | ~60 arcsec (~0.017 deg) |
-| **Mean Lilith** | ~12 arcsec (~0.003 deg) | ~18 arcsec (~0.005 deg) | pyswisseph-compatible |
+| **Mean Lilith** | ~12 arcsec (~0.003 deg) | ~18 arcsec (~0.005 deg) | smooth / stable |
 | Interpolated Apogee | ~1.1 deg | ~3.3 deg | Different algorithm |
 
 For further precision benchmarks across all bodies, see [Precision Reference](../reference/precision.md).
 
 ### Lilith Method Selection Guide
 
-| Use Case | Recommended Method | Precision vs Swiss Ephemeris |
-|----------|-------------------|-------------------------------|
-| Osculating lunar apogee | **True Lilith** | ~0.015 deg mean |
-| Smooth, predictable motion | **Mean Lilith** | ~0.003 deg mean (compatible) |
-| Physical apogee passages | Interpolated Apogee | ~1.1 deg (different algorithm) |
-| Swiss Ephemeris compatibility (OSCU_APOG) | **True Lilith** | Sub-arcminute |
-| Swiss Ephemeris compatibility (MEAN_APOG) | **Mean Lilith** | Sub-arcminute |
+| Use Case | Recommended Method | Precision (measured) |
+|----------|-------------------|----------------------|
+| Osculating lunar apogee (`OSCU_APOG`) | **True Lilith** | ~0.015 deg mean |
+| Smooth, predictable motion (`MEAN_APOG`) | **Mean Lilith** | ~0.003 deg mean |
+| Physical apogee passages (`INTP_APOG`) | Interpolated Apogee | ~1.1 deg (different algorithm) |
 
 For applications requiring the osculating (instantaneous) lunar apogee, **True Lilith** (`calc_true_lilith`) is recommended. Its sub-arcminute precision makes it suitable for all practical astrological applications.
 
-For smooth motion without 30-degree oscillations, **Mean Lilith** (`calc_mean_lilith`) provides predictable behavior and excellent Swiss Ephemeris compatibility (~0.003 deg mean difference).
+For smooth motion without 30-degree oscillations, **Mean Lilith** (`calc_mean_lilith`) provides predictable behaviour with ~0.003° mean difference from the standard mean-apogee definition.
 
-## Comparison with Swiss Ephemeris
+## The Osculating Apogee Concept
 
-Both implementations use the same fundamental approach: **computing osculating orbital elements from the Moon's instantaneous state vectors**.
-
-### Sources of Residual Differences
-
-The small residual differences (~0.015 deg mean) between LibEphemeris and Swiss Ephemeris arise from:
-
-1. **Different Ephemeris Sources**:
-   - Swiss Ephemeris: Compressed JPL DE431 data with ~0.001" precision
-   - LibEphemeris: JPL DE440 via Skyfield (slightly different interpolation)
-
-2. **Perturbation Model Details**:
-   Minor differences in how solar and planetary perturbations are incorporated. Swiss Ephemeris may use integrated analytical lunar theory internally, while LibEphemeris applies calibrated post-hoc corrections.
-
-3. **Coordinate Transformation Differences**:
-   Small differences in precession, nutation, and obliquity models.
+The osculating apogee is derived from the Moon's instantaneous state vectors — the
+standard approach. Small residual differences against other engines (~0.015° mean)
+come from the ephemeris generation (DE440 vs older data), perturbation-model
+details, and minor precession/nutation/obliquity choices; the measured head-to-head
+is catalogued in the [Swiss Ephemeris Comparison](../comparison/index.md).
 
 ### The Osculating Apogee Paradox
 
@@ -153,7 +140,7 @@ The +/-30 degree monthly oscillation of the osculating apogee is an artifact of 
 
 1. **No "Correct" Answer**: There is no single "correct" osculating apogee because the concept itself is a simplification that does not accurately represent lunar motion.
 
-2. **Different Implementations Valid**: Both Swiss Ephemeris and LibEphemeris implementations are valid mathematical representations of the osculating apogee concept, even though they differ slightly.
+2. **Different Implementations Valid**: Different engines' implementations are all valid mathematical representations of the osculating apogee concept, even though they differ slightly.
 
 3. **True Lilith is Model-Dependent**: When solar perturbations are significant (as they always are for the Moon), the "osculating apogee" concept is inherently ambiguous.
 
@@ -161,7 +148,7 @@ The osculating apogee is a mathematical construct with limited physical meaning.
 
 ## The Interpolated Apogee Alternative
 
-The "interpolated" or "natural" apogee (`INTP_APOG` in Swiss Ephemeris) smooths out the 30-degree oscillations by interpolating between actual lunar apogee passages. This results in:
+The "interpolated" or "natural" apogee (`INTP_APOG`) smooths out the 30-degree oscillations by interpolating between actual lunar apogee passages. This results in:
 
 - Oscillation amplitude: **+/- 5 degrees** (vs. +/- 30 degrees for osculating)
 - More physically meaningful: represents actual variation of apogee passages

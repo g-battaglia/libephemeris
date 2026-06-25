@@ -30,7 +30,6 @@ from libephemeris.constants import (
     SATURN,
     # Calculation flags
     FLG_SWIEPH,
-    FLG_SPEED,
 )
 
 
@@ -248,7 +247,7 @@ def example_polar_latitudes() -> None:
         try:
             cusps, ascmc = eph.houses(jd, latitude, longitude, ord(sys_code))
             print(f"{sys_name:<16}{'OK':<12}{ascmc[0]:>11.2f}°{ascmc[1]:>11.2f}°")
-        except Exception as e:
+        except Exception:
             print(f"{sys_name:<16}{'FAILED':<12} (Polar circle issue)")
 
     print("\nRecommendations for polar latitudes:")

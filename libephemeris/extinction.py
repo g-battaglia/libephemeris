@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Atmospheric extinction model for libephemeris.
 
@@ -135,7 +137,9 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
         # Altitude in degrees for polynomial term
         h = altitude_deg
         denominator = sin_h + 0.50572 * ((h + 6.07995) ** (-1.6364))
-        if denominator <= 0:
+        if denominator <= 0:  # pragma: no cover - unreachable: a non-positive
+            # denominator requires a negative power base, which raises before
+            # this guard can return; kept as a defensive floor.
             return 40.0
         return min(1.0 / denominator, 40.0)
 
@@ -465,7 +469,7 @@ def calc_extinction_magnitude(
     Returns:
         Total extinction in magnitudes. This value should be added
         to the object's catalog magnitude to get apparent magnitude.
-        Returns a large value (99.0) for objects below the horizon.
+        Returns a large value (99.0) for objects at or below the horizon.
 
     Algorithm:
         extinction = k * X
@@ -483,14 +487,16 @@ def calc_extinction_magnitude(
         >>> calc_extinction_magnitude(5.0)   # Near horizon
         3.2...   # Significant extinction
         >>> calc_extinction_magnitude(0.0)   # Horizon
-        11.2...  # Very high extinction
+        99.0  # At or below the horizon: treated as essentially infinite
 
     References:
         - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
         - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
     """
-    # Objects below horizon have essentially infinite extinction
-    if altitude_deg < 0:
+    # Objects at or below the horizon have essentially infinite extinction.
+    # Use <= 0 (not < 0) to match calc_simple_extinction and avoid an ~88-mag
+    # discontinuity between altitude 0.0 (airmass capped at 40) and -0.0.
+    if altitude_deg <= 0:
         return 99.0
 
     # Calculate airmass
@@ -1020,9 +1026,10 @@ def calc_twilight_sky_brightness(
     limiting_mag = max(-2.0, min(limiting_mag, 7.0))
 
     # Convert mag/arcsec^2 to nanoLamberts
-    # Using: log10(nL) = 35.96 - 0.4 * B
-    # where B is surface brightness in mag/arcsec^2
-    nanolamberts = 10 ** (35.96 - 0.4 * surface_brightness)
+    # Standard photometric relation: nL = 10^((26.33 - B)/2.5)
+    # (B = 26.33 mag/arcsec^2 corresponds to 1 nL; the previous
+    # 10^(35.96 - 0.4*B) form was off by ~25 orders of magnitude)
+    nanolamberts = 10 ** ((26.33 - surface_brightness) / 2.5)
 
     return TwilightSkyBrightness(
         surface_brightness=surface_brightness,

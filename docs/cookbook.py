@@ -20,7 +20,7 @@ Usage:
     python cookbook.py
 
 Author: LibEphemeris Contributors
-License: LGPL-3.0
+License: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
 """
 
 from __future__ import annotations

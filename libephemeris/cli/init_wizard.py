@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Interactive configuration wizard for libephemeris.
 
 Progressive-disclosure wizard that adapts questions and descriptions
@@ -51,6 +53,41 @@ _TIER_RANGES: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 # UI styling
 # ---------------------------------------------------------------------------
+
+
+def _resolve_leb_entry(path: str, precision: str) -> str:
+    """Resolve a directory answer for leb_file to an actual LEB file.
+
+    set_leb_file() expects a file; users naturally type the leb/
+    directory here.  Prefer the merged LEB1 for the chosen tier, then
+    the LEB2 core group, then any .leb/.leb2 present; fall back to the
+    original answer unchanged.
+    """
+    if not os.path.isdir(path):
+        return path
+    candidates = [
+        os.path.join(path, f"ephemeris_{precision}.leb"),
+        os.path.join(path, f"{precision}_core.leb2"),
+    ]
+    for cand in candidates:
+        if os.path.isfile(cand):
+            return cand
+    try:
+        for name in sorted(os.listdir(path)):
+            if name.endswith((".leb", ".leb2")):
+                return os.path.join(path, name)
+    except OSError:
+        pass
+    return path
+
+
+def _toml_str(value: str) -> str:
+    """Escape a string for a TOML basic (double-quoted) value.
+
+    Windows paths contain backslashes and values may contain quotes —
+    emitting them raw produced invalid TOML escape sequences.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _g(t: str) -> str:
@@ -346,8 +383,8 @@ def _generate_toml(config: Dict[str, Any]) -> str:
 
     prec = config.get("precision", "medium")
     mode = config.get("mode", "auto")
-    lines.append(f'precision = "{prec}"')
-    lines.append(f'mode = "{mode}"')
+    lines.append(f'precision = "{_toml_str(prec)}"')
+    lines.append(f'mode = "{_toml_str(mode)}"')
     lines.append("")
 
     # --- Minor Bodies ---
@@ -371,31 +408,31 @@ def _generate_toml(config: Dict[str, Any]) -> str:
 
     log_level = config.get("log_level")
     if log_level and log_level != "WARNING":
-        lines.append(f'log_level = "{log_level}"')
+        lines.append(f'log_level = "{_toml_str(log_level)}"')
     else:
         lines.append('# log_level = "WARNING"')
 
     data_dir = config.get("data_dir")
     if data_dir:
-        lines.append(f'data_dir = "{data_dir}"')
+        lines.append(f'data_dir = "{_toml_str(data_dir)}"')
     else:
         lines.append(f'# data_dir = "{_DEFAULT_DATA_DIR}"')
 
     leb_file = config.get("leb_file")
     if leb_file:
-        lines.append(f'leb_file = "{leb_file}"')
+        lines.append(f'leb_file = "{_toml_str(leb_file)}"')
     else:
         lines.append('# leb_file = ""')
 
     spk_dir = config.get("spk_dir")
     if spk_dir:
-        lines.append(f'spk_dir = "{spk_dir}"')
+        lines.append(f'spk_dir = "{_toml_str(spk_dir)}"')
     else:
         lines.append('# spk_dir = ""')
 
     ephemeris = config.get("ephemeris")
     if ephemeris:
-        lines.append(f'ephemeris = "{ephemeris}"')
+        lines.append(f'ephemeris = "{_toml_str(ephemeris)}"')
     else:
         lines.append('# ephemeris = ""')
 
@@ -759,7 +796,9 @@ def run_wizard(
                     default=os.path.join(expanded, "leb"),
                 ).strip()
                 if leb:
-                    config["leb_file"] = leb
+                    config["leb_file"] = _resolve_leb_entry(
+                        leb, config.get("precision", "medium")
+                    )
 
             click.echo(_d("  Cache directory for downloaded minor body SPK kernels."))
             spk = click.prompt(
@@ -791,7 +830,9 @@ def run_wizard(
                     show_default=False,
                 ).strip()
                 if leb:
-                    config["leb_file"] = leb
+                    config["leb_file"] = _resolve_leb_entry(
+                        leb, config.get("precision", "medium")
+                    )
 
             if mode == "horizons":
                 click.echo(_d("  DE kernel and LEB are not needed in horizons mode"))

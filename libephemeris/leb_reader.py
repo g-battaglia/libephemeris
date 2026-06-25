@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Memory-mapped reader for .leb binary ephemeris files.
 
@@ -10,7 +12,6 @@ single-point performance (~1.5us per Clenshaw evaluation).
 
 from __future__ import annotations
 
-import math
 import mmap
 import os
 import struct
@@ -34,7 +35,6 @@ from .leb_format import (
     MAGIC,
     NUTATION_HEADER_SIZE,
     SECTION_BODY_INDEX,
-    SECTION_CHEBYSHEV,
     SECTION_DELTA_T,
     SECTION_DIR_SIZE,
     SECTION_NUTATION,
@@ -42,7 +42,6 @@ from .leb_format import (
     STAR_ENTRY_SIZE,
     VERSION,
     BodyEntry,
-    FileHeader,
     NutationHeader,
     SectionEntry,
     StarEntry,
@@ -51,7 +50,6 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
-    segment_byte_size,
     _madvise_ranges,
     _madvise_dontneed,
 )
@@ -191,7 +189,13 @@ class LEBReader:
 
         try:
             self._parse()
-        except (OSError, ValueError, KeyError):
+        except (struct.error, IndexError, KeyError) as exc:
+            # Truncated/corrupted files surface as struct/index/key errors
+            # deep in the unpackers; normalize to ValueError so callers
+            # (validation, Skyfield fallback) see one failure type.
+            self.close()
+            raise ValueError(f"Corrupted LEB file {path!r}: {exc}") from exc
+        except (OSError, ValueError):
             # Clean up mmap and file handle on parse failure
             self.close()
             raise
@@ -361,6 +365,14 @@ class LEBReader:
                 f"for body {body_id}"
             )
 
+        # Corrupted-header guard: a zero interval or empty segment table
+        # would otherwise surface as ZeroDivisionError / garbage reads.
+        if body.interval_days <= 0.0 or body.segment_count <= 0:
+            raise ValueError(
+                f"Corrupted LEB body entry {body_id}: interval_days="
+                f"{body.interval_days}, segment_count={body.segment_count}"
+            )
+
         # O(1) segment lookup
         seg_idx = int((jd - body.jd_start) / body.interval_days)
         seg_idx = max(0, min(seg_idx, body.segment_count - 1))
@@ -411,8 +423,14 @@ class LEBReader:
         return result  # type: ignore[return-value]
 
     def has_nutation(self) -> bool:
-        """Return True if this LEB file contains nutation data."""
-        return self._nutation is not None
+        """Return True if this LEB file contains usable nutation data.
+
+        A nutation section written with ``--skip-aux`` carries a header with
+        ``segment_count == 0`` and no coefficients; treating it as present
+        would make eval_nutation read the adjacent section's bytes as
+        coefficients, silently corrupting every position.
+        """
+        return self._nutation is not None and self._nutation.segment_count > 0
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles at a given Julian Day.
@@ -426,10 +444,13 @@ class LEBReader:
         Raises:
             ValueError: If nutation data is not available or JD out of range.
         """
-        if self._nutation is None:
+        if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
 
         nut = self._nutation
+
+        if nut.interval_days <= 0.0:
+            raise ValueError("Corrupted LEB nutation header: zero interval")
 
         if jd_tt < nut.jd_start or jd_tt > nut.jd_end:
             raise ValueError(
@@ -465,7 +486,8 @@ class LEBReader:
     def delta_t(self, jd: float) -> float:
         """Get Delta-T (TT - UT1) at a given Julian Day.
 
-        Uses cubic interpolation on the sparse table.
+        Uses linear interpolation on the sparse table (sufficient for the
+        30-day sample spacing).
 
         Args:
             jd: Julian Day (UT or TT -- the difference is negligible for lookup).
@@ -495,7 +517,7 @@ class LEBReader:
 
         # Linear interpolation (fast, sufficient for 30-day spacing)
         span = jds[idx + 1] - jds[idx]
-        if span == 0.0:
+        if span == 0.0:  # pragma: no cover - sorted Delta-T table has no duplicate adjacent JDs
             return vals[idx]
         t = (jd - jds[idx]) / span
         return vals[idx] + t * (vals[idx + 1] - vals[idx])

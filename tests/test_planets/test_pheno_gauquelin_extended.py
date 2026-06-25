@@ -18,11 +18,9 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
     FLG_SWIEPH,
     FLG_HELCTR,
     FLG_TRUEPOS,
-    FLG_TOPOCTR,
 )
 
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Reference API-compatible constants for libephemeris.
 
@@ -134,7 +136,6 @@ WHITE_MOON: int = (
 )  # 56 - White Moon Selena (opposite to Black Moon Lilith)
 
 SELENA: int = WHITE_MOON  # Alias - Selena is another name for White Moon
-SELENA: int = WHITE_MOON  # Reference API-compatible alias
 
 # Proserpina - hypothetical trans-Plutonian planet used by some astrologers
 # This is a hypothetical body not in the standard fictitious bodies set
@@ -868,6 +869,7 @@ HELFLAG_SEARCH_1_PERIOD: int = 1 << 11  # 2048 - Search one synodic period only
 HELFLAG_VISLIM_DARK: int = 1 << 12  # 4096 - Assume Sun at nadir (dark sky)
 HELFLAG_VISLIM_NOMOON: int = 1 << 13  # 8192 - Exclude Moon's contribution
 HELFLAG_VISLIM_PHOTOPIC: int = 1 << 14  # 16384 - Force photopic vision mode
+HELFLAG_VISLIM_SCOTOPIC: int = 1 << 15  # 32768 - Force scotopic vision mode
 HELFLAG_AV: int = 1 << 16  # 65536 - Arcus visionis method (VR)
 HELFLAG_AVKIND_VR: int = 1 << 16  # 65536 - Alias for HELFLAG_AV
 HELFLAG_AVKIND_PTO: int = 1 << 17  # 131072 - Ptolemy method
@@ -917,7 +919,7 @@ TIDAL_DE430: float = -25.82  # DE430
 TIDAL_DE431: float = -25.80  # DE431
 TIDAL_DE440: float = -25.936  # DE440 (current default)
 TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-TIDAL_DEFAULT: float = -25.8  # Default value (matches pyswisseph)
+TIDAL_DEFAULT: float = -25.8  # Default value (matches the reference ephemeris)
 TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
 # reference API-compatible aliases (without SE_ prefix)
@@ -951,11 +953,19 @@ DAYS_PER_JULIAN_CENTURY: float = 36525.0
 # =============================================================================
 # PLANETARY MOON IDENTIFIERS
 # =============================================================================
-# Body IDs for planetary satellites (moons) following reference API 2.10+ convention
-# These require satellite SPK files (jup365.bsp, sat441.bsp, etc.) to be registered
-# using register_moon_spk() before calculation.
+# Canonical body IDs for planetary satellites follow the reference API 2.10+
+# convention: ipl = PLMOON_OFFSET + NAIF satellite id, e.g. Io = 9501,
+# Titan = 9606, Charon = 9901.  Any NAIF satellite id (401-998) is accepted
+# this way; 9n99 addresses the planet's center of body (e.g. 9599 Jupiter).
+# Satellite SPK files (jup365.bsp, sat441.bsp, ...) must be registered with
+# register_moon_spk() before calculation.
+#
+# The MOON_* constants below use a legacy private numbering
+# (MOON_OFFSET + small index, e.g. Io = 9001) that predates the canonical
+# scheme.  They are kept as deprecated aliases; new code should use
+# PLMOON_OFFSET + NAIF id.
 
-MOON_OFFSET: int = 9000  # Base offset for planetary moon IDs
+MOON_OFFSET: int = 9000  # Base offset for legacy moon IDs (deprecated)
 
 # Jupiter's Galilean Moons (discovered by Galileo Galilei in 1610)
 MOON_IO: int = MOON_OFFSET + 1  # Jupiter I - innermost Galilean moon
@@ -1030,17 +1040,17 @@ NAIF_DEIMOS: int = 402
 NAIF_CHARON: int = 901
 
 # =============================================================================
-# BARE ALIASES FOR SE_* CONSTANTS (pyswisseph compatibility)
+# BARE ALIASES FOR SE_* CONSTANTS (reference-API compatibility)
 # =============================================================================
 # These provide the same constants without the SE_ prefix, matching the names
-# that pyswisseph exposes as module-level attributes (e.g. swe.ECL_NUT,
+# that the reference ephemeris exposes as module-level attributes (e.g. swe.ECL_NUT,
 # swe.MEAN_NODE, swe.CHIRON, etc.).
 
 # Special values
 
-# ADDITIONAL PYSWISSEPH-COMPATIBLE CONSTANTS
+# ADDITIONAL REFERENCE-API-COMPATIBLE CONSTANTS
 # =============================================================================
-# These constants match pyswisseph module-level attributes that were not
+# These constants match the reference ephemeris module-level attributes that were not
 # previously exported. Added for full API compatibility.
 
 # House cusps and special points
@@ -1069,6 +1079,30 @@ FICT_OFFSET_1: int = 39
 MAX_STNAME: int = 256
 NALL_NAT_POINTS: int = 38
 PLMOON_OFFSET: int = 9000
+
+# Canonical planetary-moon ids (PLMOON_OFFSET + NAIF satellite id).
+# These match the ipl numbers the reference API uses for its sepm* files.
+PLMOON_IO: int = PLMOON_OFFSET + NAIF_IO  # 9501
+PLMOON_EUROPA: int = PLMOON_OFFSET + NAIF_EUROPA  # 9502
+PLMOON_GANYMEDE: int = PLMOON_OFFSET + NAIF_GANYMEDE  # 9503
+PLMOON_CALLISTO: int = PLMOON_OFFSET + NAIF_CALLISTO  # 9504
+PLMOON_MIMAS: int = PLMOON_OFFSET + NAIF_MIMAS  # 9601
+PLMOON_ENCELADUS: int = PLMOON_OFFSET + NAIF_ENCELADUS  # 9602
+PLMOON_TETHYS: int = PLMOON_OFFSET + NAIF_TETHYS  # 9603
+PLMOON_DIONE: int = PLMOON_OFFSET + NAIF_DIONE  # 9604
+PLMOON_RHEA: int = PLMOON_OFFSET + NAIF_RHEA  # 9605
+PLMOON_TITAN: int = PLMOON_OFFSET + NAIF_TITAN  # 9606
+PLMOON_HYPERION: int = PLMOON_OFFSET + NAIF_HYPERION  # 9607
+PLMOON_IAPETUS: int = PLMOON_OFFSET + NAIF_IAPETUS  # 9608
+PLMOON_MIRANDA: int = PLMOON_OFFSET + NAIF_MIRANDA  # 9705
+PLMOON_ARIEL: int = PLMOON_OFFSET + NAIF_ARIEL  # 9701
+PLMOON_UMBRIEL: int = PLMOON_OFFSET + NAIF_UMBRIEL  # 9702
+PLMOON_TITANIA: int = PLMOON_OFFSET + NAIF_TITANIA  # 9703
+PLMOON_OBERON: int = PLMOON_OFFSET + NAIF_OBERON  # 9704
+PLMOON_TRITON: int = PLMOON_OFFSET + NAIF_TRITON  # 9801
+PLMOON_PHOBOS: int = PLMOON_OFFSET + NAIF_PHOBOS  # 9401
+PLMOON_DEIMOS: int = PLMOON_OFFSET + NAIF_DEIMOS  # 9402
+PLMOON_CHARON: int = PLMOON_OFFSET + NAIF_CHARON  # 9901
 
 # Additional calculation flags
 FLG_CENTER_BODY: int = 1048576
@@ -1193,8 +1227,8 @@ FNAME_DE431: str = "de431.eph"
 # The upstream reference distribution exports this single value under
 # the SE_-prefixed name, so we mirror it for 1:1 parity. This is the
 # one intentional exception to the "no SE_/SEFLG_/swe_ prefix" rule
-# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of
-# tests/test_api_compat/test_api_surface.py.
+# and is explicitly listed in ``ALLOWED_PREFIXED_NAMES`` of the
+# API-surface parity test, which lives in the separate validation repo.
 SE_FNAME_DE431: str = FNAME_DE431
 STARFILE: str = "sefstars.txt"
 STARFILE_OLD: str = "fixstars.cat"

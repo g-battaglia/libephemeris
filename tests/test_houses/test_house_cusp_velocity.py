@@ -1,7 +1,7 @@
 """
 Tests for house cusp velocity calculations in houses_ex2 and houses_armc_ex2.
 
-Velocities are always computed (matching pyswisseph behavior), regardless of
+Velocities are always computed (matching the reference ephemeris behavior), regardless of
 whether FLG_SPEED is set. The FLG_SPEED flag is accepted but has no effect
 on speed computation for house cusps.
 """
@@ -191,7 +191,7 @@ class TestHousesEx2SpeedFlag:
 
         # Most cusp velocities are zero (fixed at sign boundaries)
         # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
-        # to match pyswisseph behaviour.
+        # to match the reference ephemeris behaviour.
         for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
             assert cusps_speed1[i] == 0.0, (
                 f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed1[i]}"
@@ -321,7 +321,7 @@ class TestHousesEx2SpeedFlag:
 
         # Most cusp velocities are zero (fixed at sign boundaries)
         # but cusps 1,7 (ASC/DESC) and 4,10 (IC/MC) get ASC/MC speeds
-        # to match pyswisseph behaviour.
+        # to match the reference ephemeris behaviour.
         for i in [1, 2, 4, 5, 7, 8]:  # 0-indexed: cusps 2,3,5,6,8,9
             assert cusps_speed[i] == 0.0, (
                 f"Whole Sign cusp {i + 1} should be 0, got {cusps_speed[i]}"

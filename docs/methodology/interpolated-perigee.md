@@ -17,7 +17,7 @@ LibEphemeris computes the interpolated lunar perigee using a three-layer archite
 - [Precision and Validation](#precision-and-validation)
   - [Key Coefficient Changes (v1 to v2.2)](#key-coefficient-changes-v1-to-v22)
   - [Precision Evolution](#precision-evolution)
-- [Comparison with Swiss Ephemeris](#comparison-with-swiss-ephemeris)
+- [Smoothing philosophy](#smoothing-philosophy)
 - [Calibration Reproducibility](#calibration-reproducibility)
 - [References](#references)
 
@@ -32,7 +32,7 @@ These oscillations are substantial: approximately ±25 degrees from the mean pos
 
 The term "interpolated perigee" refers to a **smoothed** version of the instantaneous (osculating) perigee position, with short-period oscillations removed. There are different valid approaches to defining and computing this smoothing.
 
-The combined three-layer result achieves ~1.5 degree RMS agreement with Swiss Ephemeris (down from ~10–11 degrees in v1), while being grounded entirely in JPL ephemeris data rather than analytical lunar theory.
+The combined three-layer result achieves < 0.1° RMS agreement with the JPL DE441 ground truth (down from ~10–11° in v1), while being grounded entirely in JPL ephemeris data rather than analytical lunar theory.
 
 ## Method
 
@@ -166,45 +166,49 @@ The dramatic increase in the dominant sin(2D-2M') term (evection) from -9.62° t
 |--------|-----|------|
 | Perturbation series RMS (near J2000) | ~10–11° | ~2° |
 | Perturbation series RMS (full range) | ~10–11° | ~8° |
-| After correction table (vs SE) | ~10–11° | **~1.5°** |
-| After correction table (vs JPL) | N/A | **< 0.1°** |
+| After correction table (vs analytical theory) | ~10–11° | **~1.5°** |
+| After correction table (vs JPL ground truth) | N/A | **< 0.1°** |
 
-The remaining ~1.5° difference vs. Swiss Ephemeris is expected: it reflects the fundamental methodological difference between LibEphemeris (JPL-grounded numerical approach) and Swiss Ephemeris (ELP2000-82B analytical theory).
+The remaining ~1.5° difference vs. an analytical lunar theory is expected: it reflects the fundamental methodological difference between the JPL-grounded numerical approach and ELP2000-82B analytical term selection.
 
-## Comparison with Swiss Ephemeris
+## Smoothing philosophy
 
-### Swiss Ephemeris Approach (Moshier/ELP2000-82B)
+"Interpolated perigee" can be defined in more than one way, and engines differ in
+what they smooth and how.
 
-Swiss Ephemeris uses semi-analytical perturbation theory based on the ELP2000-82B lunar theory developed by Chapront-Touzé and Chapront. Perturbations are separated **analytically** based on their physical origin: "short-period" perturbations (periods less than a few months) are removed, and "long-period" perturbations that represent the true apsidal motion are retained.
+### Analytical term-selection
 
-### LibEphemeris Approach (JPL DE441 + Passage-Interpolated Fitting)
+One family of methods works inside a semi-analytical lunar theory (ELP2000-82B,
+Chapront-Touzé & Chapront): perturbations are separated **analytically** by physical
+origin, "short-period" terms (periods below a few months) are removed, and
+"long-period" terms representing the true apsidal motion are retained.
 
-LibEphemeris uses an empirical harmonic series calibrated against numerical ephemeris. Perigee passages are identified from JPL DE441 Moon positions (physical ground truth), spline interpolation between passages creates a smooth perigee longitude function, and harmonic series coefficients are fitted empirically to this function. A residual correction table absorbs remaining model error.
+### LibEphemeris — JPL DE441 + passage-interpolated fitting
 
-### Why the ~1.5° Residual Difference Exists
+LibEphemeris uses an empirical harmonic series calibrated against the numerical
+ephemeris: perigee passages are identified from JPL DE441 Moon positions (physical
+ground truth), spline interpolation between passages creates a smooth perigee
+longitude function, and harmonic coefficients are fitted empirically to it; a
+residual correction table absorbs the remaining model error.
 
-The two approaches differ in what is smoothed and how:
+**Analogy:** consider audio signal processing with bass and treble components. An
+analytical approach uses a filter that knows which frequencies are "signal" vs
+"noise" from the source characteristics. The LibEphemeris approach identifies the
+signal at known clean points (passage times), interpolates between them, then fits a
+harmonic model to the result. Both produce a smoothed result, but the outputs differ
+because the smoothing methodology differs.
 
-| Aspect | Swiss Ephemeris | LibEphemeris |
-|--------|----------------|--------------|
-| Ground truth | Analytical lunar theory | JPL numerical ephemeris |
-| Smoothing | Theory-based term selection | Passage-interpolated spline |
-| Perturbation definition | Physics-derived | Empirically fitted |
-| Extended range | ~-5400 to +5400 | -13200 to +17191 (DE441) |
-
-The ~1.5° difference is a consequence of different smoothing philosophies applied to the same underlying phenomenon, not an error in either implementation.
-
-**Analogy:** Consider audio signal processing with bass and treble components. The Swiss Ephemeris approach uses an intelligent filter that knows which frequencies represent "signal" vs. "noise" based on the source characteristics. The LibEphemeris approach identifies the signal at known clean points (passage times), interpolates between them, then fits a harmonic model to the result. Both produce a smoothed result, but the outputs differ because the smoothing methodology differs.
-
-### Date Range
+### Date range
 
 | Ephemeris | Valid Range |
 |-----------|-------------|
-| Swiss Ephemeris | ~-5400 to +5400 |
 | JPL DE440 | 1550 to 2650 |
 | JPL DE441 | -13200 to +17191 |
 
-Set `LIBEPHEMERIS_EPHEMERIS=de441.bsp` for extended date range coverage.
+Set `LIBEPHEMERIS_EPHEMERIS=de441.bsp` for extended date-range coverage.
+
+*The measured head-to-head with Swiss Ephemeris (~1.5° RMS, the smoothing-philosophy
+difference) is in the [Swiss Ephemeris Comparison](../comparison/known-differences.md).*
 
 ## Calibration Reproducibility
 

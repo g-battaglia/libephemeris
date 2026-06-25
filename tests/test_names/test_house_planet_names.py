@@ -165,9 +165,16 @@ class TestGetPlanetName:
     @pytest.mark.unit
     def test_unknown_body_returns_string(self):
         """Unknown body ID should return some string (not crash)."""
-        result = swe.get_planet_name(99999)
+        result = swe.get_planet_name(8888)
         assert isinstance(result, str)
         assert len(result) > 0
+
+    @pytest.mark.unit
+    def test_unknown_asteroid_returns_empty(self):
+        """Unknown AST_OFFSET ids return '' (reference parity)."""
+        # swe.get_planet_name(99999) == '' in the reference ephemeris (asteroid 89999,
+        # no name without its ephemeris file)
+        assert swe.get_planet_name(99999) == ""
 
     @pytest.mark.unit
     def test_get_planet_name_alias(self):

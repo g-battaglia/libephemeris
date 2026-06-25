@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
@@ -13,16 +12,11 @@ from libephemeris.constants import (
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
     MEAN_NODE,
     TRUE_NODE,
-    MEAN_APOG,
     FLG_SWIEPH,
     FLG_SPEED,
     FLG_SIDEREAL,
-    FLG_HELCTR,
     SIDM_LAHIRI,
 )
 

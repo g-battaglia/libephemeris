@@ -16,7 +16,6 @@ from libephemeris import (
     julday,
     sol_eclipse_obscuration_at_loc,
     _sol_eclipse_obscuration_at_loc_pythonic,
-    sol_eclipse_magnitude_at_loc,
     _sol_eclipse_magnitude_at_loc_pythonic,
     sol_eclipse_how,
     FLG_SWIEPH,
@@ -287,7 +286,7 @@ class TestConsistencyWithSweEclipseHow:
 
 
 class TestSweApiConvention:
-    """Test that swe_ version follows pyswisseph API conventions."""
+    """Test that swe_ version follows the reference ephemeris API conventions."""
 
     def test_geopos_lon_lat_order(self):
         """Test that geopos uses [lon, lat, alt] order."""

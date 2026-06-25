@@ -23,10 +23,7 @@ from libephemeris import spk_auto
 from libephemeris.constants import (
     CHIRON,
     CERES,
-    ERIS,
-    PHOLUS,
     NAIF_CHIRON,
-    NAIF_CERES,
     FLG_SPEED,
 )
 
@@ -180,7 +177,7 @@ class TestAstroqueryCheck:
         """Check returns True when astroquery is available."""
         # This test passes if astroquery is installed
         try:
-            from astroquery.jplhorizons import Horizons
+            from astroquery.jplhorizons import Horizons  # noqa: F401 (availability probe)
 
             assert spk_auto._check_astroquery_available() is True
         except ImportError:
@@ -1182,7 +1179,6 @@ class TestAutoGetSpkWithRegistration:
     @patch.object(spk_auto, "_download_spk_astroquery")
     def test_registers_spk_when_ipl_provided(self, mock_download, mock_check, tmp_path):
         """auto_get_spk registers SPK body when ipl is provided."""
-        from libephemeris import state
 
         # Mock download to create a file
         def create_file(**kwargs):

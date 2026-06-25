@@ -38,13 +38,13 @@ class TestCalcUtUnknownBody:
     def test_unknown_body_raises_error(self):
         """Test that unknown body ID raises UnknownBodyError."""
         jd = 2451545.0  # J2000.0
-        unknown_id = 99999
+        unknown_id = 8888
 
         with pytest.raises(UnknownBodyError) as exc_info:
             ephem.calc_ut(jd, unknown_id, 0)
 
         assert exc_info.value.body_id == unknown_id
-        assert "99999" in str(exc_info.value)
+        assert "8888" in str(exc_info.value)
         assert "Unknown body ID" in str(exc_info.value)
 
     def test_negative_unknown_id(self):
@@ -72,7 +72,7 @@ class TestCalcUtUnknownBody:
     def test_error_message_contains_guidance(self):
         """Test that error message provides useful guidance."""
         jd = 2451545.0
-        unknown_id = 99999
+        unknown_id = 8888
 
         with pytest.raises(UnknownBodyError) as exc_info:
             ephem.calc_ut(jd, unknown_id, 0)
@@ -87,9 +87,14 @@ class TestCalcUnknownBody:
     """Test calc with unknown body IDs."""
 
     def test_unknown_body_raises_error(self):
-        """Test that unknown body ID raises UnknownBodyError in calc."""
+        """Test that unknown body ID raises UnknownBodyError in calc.
+
+        88888 would be asteroid 78888 (any AST_OFFSET + N is attempted
+        via SPK/SBDB since WS7), so use an id below the asteroid range
+        that no dispatch claims.
+        """
         jd = 2451545.0
-        unknown_id = 88888
+        unknown_id = 8888
 
         with pytest.raises(UnknownBodyError) as exc_info:
             ephem.calc(jd, unknown_id, 0)
@@ -167,7 +172,7 @@ class TestExceptionCanBeCaught:
         jd = 2451545.0
         caught = False
         try:
-            ephem.calc_ut(jd, 99999, 0)
+            ephem.calc_ut(jd, 8888, 0)
         except UnknownBodyError:
             caught = True
         assert caught
@@ -177,7 +182,7 @@ class TestExceptionCanBeCaught:
         jd = 2451545.0
         caught = False
         try:
-            ephem.calc_ut(jd, 99999, 0)
+            ephem.calc_ut(jd, 8888, 0)
         except ephem.Error:
             caught = True
         assert caught

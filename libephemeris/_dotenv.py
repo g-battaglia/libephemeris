@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Minimal .env file loader using only the Python standard library.
 
 Provides automatic loading of environment variables from ``.env`` files
@@ -145,6 +147,12 @@ def load_dotenv(
             continue
 
         key, value = parsed
+
+        # Only the library's own namespace: a project .env regularly
+        # holds unrelated secrets (API keys, DB urls) that must not be
+        # exported into the process just because libephemeris imported.
+        if not key.startswith("LIBEPHEMERIS_"):
+            continue
 
         if override or key not in os.environ:
             os.environ[key] = value

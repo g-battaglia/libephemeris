@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
@@ -14,7 +13,6 @@ from libephemeris.constants import (
     CALC_SET,
     CALC_MTRANSIT,
     CALC_ITRANSIT,
-    FLG_SWIEPH,
 )
 
 JD_J2000 = 2451545.0

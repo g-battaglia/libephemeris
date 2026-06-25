@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Planetary position calculations for libephemeris.
 
@@ -44,7 +46,6 @@ References:
 from __future__ import annotations
 
 import math
-import warnings
 from typing import Tuple, TYPE_CHECKING
 
 from .tracing import _record
@@ -55,8 +56,17 @@ from skyfield.framelib import ecliptic_frame
 from dataclasses import dataclass
 import erfa
 
+from .precession_vondrak import (
+    vondrak_mean_obliquity_deg,
+    vondrak_mean_obliquity_rad,
+    vondrak_pn_matrix,
+    vondrak_precession_matrix,
+)
+
+from .exceptions import EphemerisRangeError
+
 if TYPE_CHECKING:
-    from .exceptions import EphemerisRangeError
+    pass
 
 # Combined exception tuple for catching both jplephem and Skyfield range errors
 _RANGE_ERRORS = (OutOfRangeError, SkyfieldRangeError)
@@ -88,13 +98,26 @@ from .constants import (
     VULKANUS,
     POSEIDON,
     ISIS,
+    AST_OFFSET,
+    NIBIRU,
+    HARRINGTON,
+    NEPTUNE_LEVERRIER,
+    NEPTUNE_ADAMS,
+    PLUTO_LOWELL,
+    PLUTO_PICKERING,
     CHIRON,
     PHOLUS,
     CERES,
     PALLAS,
     JUNO,
     VESTA,
+    FIXSTAR_OFFSET,
+    WHITE_MOON,
+    VULCAN,
+    PROSERPINA,
+    WALDEMATH,
     FLG_SPEED,
+    FLG_SWIEPH,
     FLG_HELCTR,
     FLG_TOPOCTR,
     FLG_SIDEREAL,
@@ -115,6 +138,57 @@ from .constants import (
     PARS_SPIRITUS,
     PARS_AMORIS,
     PARS_FIDEI,
+    SIDM_FAGAN_BRADLEY,
+    SIDM_LAHIRI,
+    SIDM_DELUCE,
+    SIDM_RAMAN,
+    SIDM_USHASHASHI,
+    SIDM_KRISHNAMURTI,
+    SIDM_DJWHAL_KHUL,
+    SIDM_YUKTESHWAR,
+    SIDM_JN_BHASIN,
+    SIDM_BABYL_KUGLER1,
+    SIDM_BABYL_KUGLER2,
+    SIDM_BABYL_KUGLER3,
+    SIDM_BABYL_HUBER,
+    SIDM_BABYL_ETPSC,
+    SIDM_BABYL_BRITTON,
+    SIDM_ALDEBARAN_15TAU,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_TRUE_MULA,
+    SIDM_TRUE_SHEORAN,
+    SIDM_HIPPARCHOS,
+    SIDM_SASSANIAN,
+    SIDM_J2000,
+    SIDM_J1900,
+    SIDM_B1950,
+    SIDM_SURYASIDDHANTA,
+    SIDM_SURYASIDDHANTA_MSUN,
+    SIDM_ARYABHATA,
+    SIDM_ARYABHATA_MSUN,
+    SIDM_ARYABHATA_522,
+    SIDM_SS_REVATI,
+    SIDM_SS_CITRA,
+    SIDM_GALCENT_0SAG,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_GALCENT_COCHRANE,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_GALEQU_FIORENZA,
+    SIDM_GALALIGN_MARDYKS,
+    SIDM_VALENS_MOON,
+    SIDM_LAHIRI_1940,
+    SIDM_LAHIRI_VP285,
+    SIDM_KRISHNAMURTI_VP291,
+    SIDM_LAHIRI_ICRC,
+    SIDM_USER,
+    NODBIT_MEAN,
+    NODBIT_OSCU,
+    NODBIT_FOPOINT,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
 )
@@ -172,7 +246,13 @@ _PLANET_NAMES = {
     INTP_APOG: "intp. Apogee",
     INTP_PERG: "intp. Perigee",
     EARTH: "Earth",
-    ISIS: "Transpluto",
+    ISIS: "Isis-Transpluto",
+    NIBIRU: "Nibiru",
+    HARRINGTON: "Harrington",
+    NEPTUNE_LEVERRIER: "Leverrier",
+    NEPTUNE_ADAMS: "Adams",
+    PLUTO_LOWELL: "Lowell",
+    PLUTO_PICKERING: "Pickering",
     CUPIDO: "Cupido",
     HADES: "Hades",
     ZEUS: "Zeus",
@@ -407,7 +487,7 @@ def _to_native_floats(values: tuple) -> PositionResult:
     - Type checking in downstream code
 
     This function ensures all values are native Python floats for
-    compatibility with the pyswisseph API contract.
+    compatibility with the reference API contract.
 
     Args:
         values: Tuple of 6 values (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -450,43 +530,15 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     lon, lat, dist, dlon, dlat, ddist = result
 
     if iflag & FLG_XYZ:
-        # Convert spherical (degrees) to Cartesian (AU)
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so this path
+        # stays identical to the LEB/Skyfield, Horizons, and fixed-star XYZ
+        # post-processing. Cast to native floats (inputs may be numpy.float64).
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        # Convert velocity from (deg/day, deg/day, AU/day) to Cartesian AU/day
-        # Using the Jacobian of the spherical-to-Cartesian transformation
-        dlon_rad = math.radians(dlon)  # rad/day
-        dlat_rad = math.radians(dlat)  # rad/day
-
-        vx = (
-            ddist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        x, y, z, vx, vy, vz = _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, dlon, dlat, ddist
         )
-        vy = (
-            ddist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = ddist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (
-            float(x),
-            float(y),
-            float(z),
-            float(vx),
-            float(vy),
-            float(vz),
-        )
+        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         # Convert angular values from degrees to radians
@@ -501,6 +553,47 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
         )
 
     return result
+
+
+def _south_node_from_north(
+    north_result: tuple[float, float, float, float, float, float], flags: int
+) -> tuple[float, float, float, float, float, float]:
+    """Derive the descending ("south") lunar node from the ascending node.
+
+    The south node is the antipode of the north node on the celestial sphere,
+    so it is obtained from the already-formatted north result.  The transform
+    depends on the output representation:
+
+    * ``FLG_XYZ`` (Cartesian): negate the position and velocity vectors.
+    * ``FLG_RADIANS`` (spherical radians): longitude + pi (mod 2*pi), with the
+      latitude and latitude-speed negated.
+    * default (spherical degrees): longitude + 180 (mod 360), with the
+      latitude and latitude-speed negated.
+
+    The previous code always did ``(north[0] + 180.0) % 360.0``; under
+    ``FLG_XYZ`` that added 180 to a Cartesian x-component, and under
+    ``FLG_RADIANS`` it added 180 to a radian longitude, both producing garbage.
+    """
+    if flags & FLG_XYZ:
+        # Cartesian: the antipode is the negated position (and velocity) vector.
+        return (
+            -north_result[0],
+            -north_result[1],
+            -north_result[2],
+            -north_result[3],
+            -north_result[4],
+            -north_result[5],
+        )
+    half_turn = math.pi if (flags & FLG_RADIANS) else 180.0
+    full_turn = 2.0 * math.pi if (flags & FLG_RADIANS) else 360.0
+    return (
+        (north_result[0] + half_turn) % full_turn,
+        -north_result[1],
+        north_result[2],
+        north_result[3],
+        -north_result[4],
+        north_result[5],
+    )
 
 
 def _body_uses_jpl_ephemeris(ipl: int) -> bool:
@@ -707,7 +800,63 @@ def get_planet_name(planet: int) -> str:
     """
     if planet in _PLANET_NAMES:
         return _PLANET_NAMES[planet]
+    if planet > AST_OFFSET:
+        # Numbered minor planets: the reference resolves the built-in
+        # set by asteroid number and returns an empty string for the
+        # rest (names normally come from the asteroid ephemeris files).
+        _BUILTIN_AST_NAMES = {
+            1: "Ceres",
+            2: "Pallas",
+            3: "Juno",
+            4: "Vesta",
+            2060: "Chiron",
+            5145: "Pholus",
+        }
+        return _BUILTIN_AST_NAMES.get(planet - AST_OFFSET, "")
+    from . import planetary_moons
+
+    if planetary_moons.is_planetary_moon(planet):
+        name = planetary_moons.get_moon_name(planet)
+        if not name.startswith("Unknown"):
+            return name
     return f"Unknown ({planet})"
+
+
+# The reference ephemeris treats calc_ut(jd, AST_OFFSET + 1, flags) identically to
+# calc_ut(jd, CERES, flags); same for the other built-in asteroids.
+_AST_NUMBER_REMAP = {
+    1: CERES,  # 17
+    2: PALLAS,  # 18
+    3: JUNO,  # 19
+    4: VESTA,  # 20
+    2060: CHIRON,  # 15
+    5145: PHOLUS,  # 16
+}
+
+
+def _remap_ast_offset(ipl: int) -> int:
+    """Map AST_OFFSET + N to the dedicated body id for built-in asteroids.
+
+    Must run before the LEB/Horizons dispatch so e.g. AST_OFFSET + 1 is
+    served from the same backend as CERES; other ids pass through.
+    """
+    if ipl > AST_OFFSET:
+        return _AST_NUMBER_REMAP.get(ipl - AST_OFFSET, ipl)
+    return ipl
+
+
+def _nutation_rate_deg_per_day(jd_tt: float, dt: float = 0.5) -> float:
+    """Central-difference rate of nutation in longitude (deg/day).
+
+    The lunar node/apse bodies are output on the true ecliptic of date,
+    so their reference-compatible speeds include d(dpsi)/dt (about
+    2e-6 deg/day at J2000); under FLG_NONUT the rate is excluded.
+    """
+    from .cache import get_cached_nutation
+
+    dpsi_prev, _ = get_cached_nutation(jd_tt - dt)
+    dpsi_next, _ = get_cached_nutation(jd_tt + dt)
+    return math.degrees(dpsi_next - dpsi_prev) / (2.0 * dt)
 
 
 def _try_auto_spk_download(t, ipl: int, iflag: int):
@@ -737,15 +886,17 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
     logger = get_logger()
 
-    # Check if this body is in the SPK download map
-    if ipl not in SPK_BODY_NAME_MAP:
-        return None
-
     # Skip bodies where JPL blocks SPK generation
     if ipl in SPK_AUTO_DOWNLOAD_BLOCKED:
         return None
 
-    horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
+    if ipl in SPK_BODY_NAME_MAP:
+        horizons_id, naif_id = SPK_BODY_NAME_MAP[ipl]
+    elif AST_OFFSET < ipl < FIXSTAR_OFFSET:
+        # Arbitrary numbered asteroid: Horizons small-body record syntax
+        horizons_id = f"{ipl - AST_OFFSET};"
+    else:
+        return None
 
     try:
         # Use the date range from the current precision tier so the downloaded
@@ -774,6 +925,11 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
 
     except (OSError, ValueError, KeyError, RuntimeError, TypeError) as e:
         logger.warning("Auto SPK download failed for body %d: %s", ipl, e)
+        return None
+    except EphemerisRangeError as e:
+        # The freshly downloaded kernel does not cover the requested epoch;
+        # fall back to the Keplerian path like any other SPK miss.
+        logger.warning("Auto SPK coverage miss for body %d: %s", ipl, e)
         return None
 
 
@@ -839,12 +995,24 @@ def calc_ut(
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
 
+    # The reference API echoes the ephemeris bit in the returned flags
+    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
+    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    from .constants import FLG_JPLEPH
+
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+
     # FLG_SPEED3: 3-position numerical differentiation for speed.
     # libephemeris already uses this method as its only speed computation,
     # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
     # where SPEED takes priority if both are set).
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+
+    # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
+    # dispatch so both id forms are served by the same backend.
+    planet = _remap_ast_offset(planet)
 
     # --- South nodes: derive from north node via the same dispatch path ---
     # South node = north node + 180° longitude, negated latitude.
@@ -859,15 +1027,7 @@ def calc_ut(
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
         north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        south_lon = (north_result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -north_result[1],
-            north_result[2],
-            north_result[3],
-            -north_result[4],
-            north_result[5],
-        ), retflag
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -906,6 +1066,15 @@ def calc_ut(
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
+                planet,
+                tjdut,
+                _hz_err,
+            )
+        except ConnectionError as _hz_err:
+            # Transient network/API failure — auto mode must keep working,
+            # so fall through to the Skyfield path.
+            get_logger().warning(
+                "body=%d jd=%.1f source=Horizons->fallback (network): %s",
                 planet,
                 tjdut,
                 _hz_err,
@@ -979,14 +1148,54 @@ def calc(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import FLG_MOSEPH
+    from .constants import ECL_NUT, FLG_MOSEPH
+
+    # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
+    # TT, so compute directly (calc_ut converts UT first; this mirror was
+    # missing here and ECL_NUT fell through to UnknownBodyError).
+    if planet == ECL_NUT:
+        # Of-date mean obliquity from the Vondrák 2011 long-term model (angle
+        # between the of-date equator and ecliptic poles), consistent with the
+        # precession used everywhere else and long-term valid. Nutation stays
+        # IAU 2006/2000A. See _calc_nutation_obliquity for the rationale.
+        mean_obliquity = vondrak_mean_obliquity_deg(tjdet)
+        dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjdet - 2451545.0)
+        delta_psi = math.degrees(dpsi_rad)
+        delta_eps = math.degrees(deps_rad)
+        return (
+            mean_obliquity + delta_eps,
+            mean_obliquity,
+            delta_psi,
+            delta_eps,
+            0.0,
+            0.0,
+        ), flags
 
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
 
+    # The reference API echoes the ephemeris bit in the returned flags
+    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
+    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    from .constants import FLG_JPLEPH
+
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+
     # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+
+    # Built-in asteroids by AST_OFFSET number (see calc_ut)
+    planet = _remap_ast_offset(planet)
+
+    # --- South nodes: derive from the north node via the same dispatch
+    # path (see calc_ut for the backend-consistency rationale) ---
+    from .constants import MEAN_NODE, TRUE_NODE
+
+    if planet in (-MEAN_NODE, -TRUE_NODE):
+        north_result, retflag = calc(tjdet, abs(planet), flags)
+        return _south_node_from_north(north_result, flags), retflag
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1030,6 +1239,14 @@ def calc(
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
+                planet,
+                tjdet,
+                _hz_err,
+            )
+        except ConnectionError as _hz_err:
+            # Transient network/API failure — fall through to Skyfield.
+            get_logger().warning(
+                "body=%d jd=%.1f source=Horizons->fallback (network): %s",
                 planet,
                 tjdet,
                 _hz_err,
@@ -1136,7 +1353,6 @@ def _calc_body_pctr(
     Returns:
         Tuple of (position_tuple, flags)
     """
-    from skyfield.framelib import ecliptic_frame
     from skyfield.positionlib import ICRF
 
     planets = get_planets()
@@ -1223,6 +1439,40 @@ def _calc_body_pctr(
             p = tgt_ret.position.au - obs_pos
             v = tgt_ret.velocity.au_per_d - obs_vel
 
+        # Gravitational light deflection by Sun/Jupiter/Saturn, applied before
+        # aberration (Skyfield .apparent() order) so calc_pctr matches calc()
+        # and the reference ephemeris. Without it, inner planets near the Sun were off by up
+        # to ~0.2". Skipped under FLG_NOGDEFL.
+        if not (iflag & FLG_NOGDEFL):
+            from .fast_calc import _apply_gravitational_deflection
+
+            p = np.array(
+                _apply_gravitational_deflection(
+                    (float(p[0]), float(p[1]), float(p[2])),
+                    (float(obs_pos[0]), float(obs_pos[1]), float(obs_pos[2])),
+                    float(t_fresh.tt),
+                    light_time,
+                    _SkyfieldDeflectorSource(planets),
+                )
+            )
+
+        # Stellar aberration about the OBSERVER's (center's) barycentric
+        # velocity -- the same relativistic correction Skyfield's .apparent()
+        # applies in calc(). Without it, calc_pctr(X, Earth) was missing the
+        # full annual aberration and diverged from the geocentric apparent
+        # calc(X) (and from the reference ephemeris) by up to ~20.5". Skipped under
+        # FLG_NOABERR; FLG_TRUEPOS already skips light-time + this block.
+        if not (iflag & FLG_NOABERR):
+            from .fast_calc import _apply_aberration
+
+            p = np.array(
+                _apply_aberration(
+                    (float(p[0]), float(p[1]), float(p[2])),
+                    (float(obs_vel[0]), float(obs_vel[1]), float(obs_vel[2])),
+                    light_time,
+                )
+            )
+
     # Create position object for coordinate conversion
     pos = ICRF(p, v, t=t_fresh, center=399)
 
@@ -1230,6 +1480,9 @@ def _calc_body_pctr(
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
     is_icrs = bool(iflag & FLG_ICRS)
     is_sidereal = bool(iflag & FLG_SIDEREAL)
+    # Mean equator of date when nutation is suppressed (FLG_NONUT) or the
+    # sidereal+equatorial frame is requested -- mirrors _calc_body.
+    _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
     p1, p2, p3 = 0.0, 0.0, 0.0
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
@@ -1239,32 +1492,47 @@ def _calc_body_pctr(
         if iflag & FLG_J2000:
             ra, dec, dist = pos.radec()
         elif is_icrs:
-            # ICRS equatorial of date: skip frame bias (B matrix).
+            # ICRS equator of date (no frame bias): Vondrák 2011 precession,
+            # with Skyfield nutation unless the mean equator is requested.
             import numpy as np
 
-            from skyfield.framelib import ICRS_to_J2000
-
-            xyz_icrs = np.array(pos.position.au)
-            # True equator: N × P (no B)
-            M_no_bias = t.M @ ICRS_to_J2000.T
-            xyz_eq = M_no_bias @ xyz_icrs
+            if _use_mean_equator:
+                pn = vondrak_precession_matrix(t.tt, frame_bias=False)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
+            xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist_val))
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+                if dist_val > 0
+                else 0.0
+            )
             p3 = dist_val
         else:
-            # True equator of date - use manual rotation to avoid Skyfield
-            # Time reify descriptor corruption
+            # Equator of date (with frame bias): Vondrák 2011 precession, with
+            # Skyfield nutation unless the mean equator is requested. Matches the
+            # LEB fast path.
             import numpy as np
 
-            # t.M is the precession-nutation matrix (ICRS -> true equator of date)
-            xyz_icrs = np.array(pos.position.au)
-            xyz_eq = t.M @ xyz_icrs
+            if _use_mean_equator:
+                pn = vondrak_precession_matrix(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            xyz_eq = np.array(pn) @ np.array(pos.position.au)
             xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
             dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist_val)) if dist_val > 0 else 0.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+                if dist_val > 0
+                else 0.0
+            )
             p3 = dist_val
         if iflag & FLG_J2000:
             p1 = ra.degrees
@@ -1286,36 +1554,64 @@ def _calc_body_pctr(
 
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             lon = math.degrees(math.atan2(ye, xe)) % 360.0
-            lat = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+            lat = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
 
             p1, p2, p3 = lon, lat, dist
         elif is_icrs:
-            # ICRS ecliptic of date: skip frame bias (B matrix).
+            # ICRS ecliptic of date (no frame bias): Vondrák 2011 precession,
+            # with Skyfield nutation unless FLG_NONUT requests the mean ecliptic,
+            # then rotate equator -> ecliptic by eps_true.
             import numpy as np
 
-            from skyfield.framelib import ICRS_to_J2000
-
-            R_ecl = ecliptic_frame.rotation_at(t)
-            R_icrs = R_ecl @ ICRS_to_J2000.T
-            xyz_icrs = np.array(pos.position.au)
-            xyz_ecl = R_icrs @ xyz_icrs
-            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            if iflag & FLG_NONUT:
+                pn = vondrak_precession_matrix(t.tt, frame_bias=False)
+                eps_true = vondrak_mean_obliquity_rad(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps_true = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps_true), math.sin(eps_true)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist))
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
             p3 = dist
         else:
-            # Ecliptic of date - use manual rotation to avoid Skyfield
-            # Time reify descriptor corruption
+            # Ecliptic of date: Vondrák 2011 precession, with Skyfield nutation
+            # unless FLG_NONUT requests the mean ecliptic, then rotate equator ->
+            # ecliptic by eps_true. Matches the LEB fast path.
             import numpy as np
 
-            R_ecl = ecliptic_frame.rotation_at(t)
-            xyz_icrs = np.array(pos.position.au)
-            xyz_ecl = R_ecl @ xyz_icrs
-            xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
+            if iflag & FLG_NONUT:
+                pn = vondrak_precession_matrix(t.tt)
+                eps_true = vondrak_mean_obliquity_rad(t.tt)
+            else:
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps_true), math.sin(eps_true)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-            p2 = math.degrees(math.asin(ze / dist)) if dist > 0 else 0.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
             p3 = dist
 
     # Calculate speed using central difference numerical differentiation if requested
@@ -1327,7 +1623,13 @@ def _calc_body_pctr(
         t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
-        # Get positions at t - dt and t + dt using the same method (without speed or sidereal)
+        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
+        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
+        # the tropical (true-equator) frame -- the same as the plain equatorial
+        # speed -- even though the sidereal POSITION uses the mean equator.
+        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
+        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
+        # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
         result_prev, _ = _calc_body_pctr(
             t_prev, ipl, iplctr, flags_no_speed_no_sidereal
@@ -1349,17 +1651,17 @@ def _calc_body_pctr(
         elif dp1 < -9000:
             dp1 += 360.0 / (2.0 * dt)
 
-    # Apply sidereal offset if requested (ecliptic only)
-    # Note: We use TRUE ayanamsha (mean + nutation) for planet positions,
-    # as is standard practice. get_ayanamsa_ut() returns mean ayanamsha.
+    # Apply sidereal offset if requested (ecliptic only).
+    # Routed through _get_ayanamsa_for_flags so FLG_NONUT/FLG_J2000 select
+    # the proper ayanamsha variant, consistent with _calc_body.
     if is_sidereal and not is_equatorial:
-        ayanamsa = _get_true_ayanamsa(t.ut1)
+        ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
         if iflag & FLG_SPEED:
-            ayanamsa_prev = _get_true_ayanamsa(t.ut1 - dt)
-            ayanamsa_next = _get_true_ayanamsa(t.ut1 + dt)
+            ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
+            ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
             da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
             dp1 -= da
 
@@ -1418,8 +1720,15 @@ def _calc_nutation_obliquity(
     """
     Calculate nutation and obliquity data for ECL_NUT (-1).
 
-    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a)
-    and IAU 2006 mean obliquity via erfa.obl06() for maximum precision.
+    Uses the IAU 2006/2000A nutation model via pyerfa (erfa.nut06a) and the
+    Vondrák 2011 long-term mean obliquity (the angle between the of-date equator
+    and ecliptic poles). The Vondrák obliquity is the self-consistent companion
+    to the Vondrák precession used throughout the reduction and stays rigorous at
+    remote epochs, where the IAU 2006 obliquity polynomial is an out-of-range
+    extrapolation. This differs from the reference ephemeris's reported obliquity by up
+    to ~6" only at deep-BCE dates (a deliberate, documented scientific
+    improvement); the effect is confined to ecliptic latitude -- ecliptic
+    longitude is unaffected by the obliquity choice.
 
     Args:
         jd: Julian Day in UT
@@ -1437,10 +1746,10 @@ def _calc_nutation_obliquity(
     t = ts.ut1_jd(jd)
 
     # Calculate Julian centuries from J2000.0
-    T = (jd - 2451545.0) / 36525.0
+    (jd - 2451545.0) / 36525.0
 
-    # Mean obliquity of the ecliptic (IAU 2006 via pyerfa)
-    mean_obliquity = math.degrees(erfa.obl06(2451545.0, t.tt - 2451545.0))
+    # Mean obliquity of the ecliptic (Vondrák 2011 long-term, via pyerfa poles)
+    mean_obliquity = vondrak_mean_obliquity_deg(t.tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
     dpsi_rad, deps_rad = erfa.nut06a(2451545.0, t.tt - 2451545.0)
@@ -1490,7 +1799,7 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     from .utils import cotrans_sp
 
     # For J2000 frame, use J2000 obliquity; otherwise use obliquity of date.
-    # Sidereal mode uses mean obliquity (no nutation), matching pyswisseph
+    # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris
     # which converts to equatorial using the precession-only frame.
     if iflag & FLG_J2000:
         eps = 23.4392911  # Mean obliquity at J2000.0
@@ -1534,7 +1843,28 @@ def _keplerian_position_at(
     from . import minor_bodies
     from .state import get_timescale
 
-    lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
+    if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
+        lon_hel, lat_hel, r_hel = minor_bodies.calc_minor_body_heliocentric(ipl, jd_tt)
+    else:
+        # Arbitrary numbered asteroid: Keplerian elements fetched from
+        # JPL SBDB (cached after the first call).  No element source at
+        # all means the body is genuinely unknown.
+        from .exceptions import UnknownBodyError
+
+        try:
+            lon_hel, lat_hel, r_hel = minor_bodies.calc_asteroid_by_number(
+                ipl - AST_OFFSET, jd_tt, use_spk=False
+            )
+        except (ValueError, ConnectionError, OSError) as e:
+            raise UnknownBodyError(
+                message=(
+                    f"Asteroid {ipl - AST_OFFSET} (body ID {ipl}): no SPK "
+                    f"registered and JPL SBDB lookup failed ({e}). Register "
+                    f"an SPK file or enable auto-download, or check the "
+                    f"asteroid number."
+                ),
+                body_id=ipl,
+            ) from e
 
     if iflag & FLG_HELCTR:
         return lon_hel, lat_hel, r_hel
@@ -1589,7 +1919,7 @@ def _assist_position_at(
         FileNotFoundError: If ephemeris data files not found.
     """
     from . import minor_bodies
-    from .rebound_integration import propagate_orbit_assist, AssistEphemConfig
+    from .rebound_integration import propagate_orbit_assist
     from .state import get_timescale
 
     elements = minor_bodies.MINOR_BODY_ELEMENTS[ipl]
@@ -1608,22 +1938,84 @@ def _assist_position_at(
     t = ts.tt_jd(jd_tt)
     sun = planets_dict["sun"]
     earth = planets_dict["earth"]
-    earth_helio = sun.at(t).observe(earth)
-    earth_xyz_ecl = earth_helio.frame_xyz(ecliptic_frame).au
 
-    lon_rad = math.radians(lon_hel)
-    lat_rad = math.radians(lat_hel)
-    x_hel_ecl = r_hel * math.cos(lat_rad) * math.cos(lon_rad)
-    y_hel_ecl = r_hel * math.cos(lat_rad) * math.sin(lon_rad)
-    z_hel_ecl = r_hel * math.sin(lat_rad)
+    # The ASSIST result is heliocentric ecliptic J2000 (rebound_integration
+    # rotates ICRS->ecliptic with the fixed J2000 obliquity), with position AND
+    # velocity available. Build the geocentric apparent place exactly like the
+    # SPK type-21 path: everything in ecliptic J2000, geometric heliocentric
+    # Earth, light-time retardation, then stellar aberration, then precession to
+    # of-date + nutation. The previous code differenced an of-date Earth
+    # (Skyfield ecliptic_frame) from the J2000 asteroid (a ~12 arcmin frame-mix)
+    # and applied neither light-time nor aberration (~25 arcsec more).
+    from .rebound_integration import _icrs_to_ecliptic_j2000
+    from .astrometry import (
+        C_LIGHT_AU_DAY,
+        apply_aberration_to_position,
+        precess_from_j2000,
+    )
+    from .cache import get_cached_nutation
 
-    x_geo_ecl = x_hel_ecl - earth_xyz_ecl[0]
-    y_geo_ecl = y_hel_ecl - earth_xyz_ecl[1]
-    z_geo_ecl = z_hel_ecl - earth_xyz_ecl[2]
+    ast_pos = [result.x, result.y, result.z]  # heliocentric ecliptic J2000, AU
+    ast_vel = [result.vx, result.vy, result.vz]  # AU/day
 
-    r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
-    lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
-    lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+    earth_helio_icrs = earth.at(t).position.au - sun.at(t).position.au
+    earth_helio_ecl = _icrs_to_ecliptic_j2000(
+        float(earth_helio_icrs[0]),
+        float(earth_helio_icrs[1]),
+        float(earth_helio_icrs[2]),
+    )
+
+    apply_light_time = not (iflag & FLG_TRUEPOS)
+    apply_aberration = not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR)
+
+    # Geocentric vector with light-time retardation. The asteroid's heliocentric
+    # velocity is effectively constant over the ~minutes-to-hours light time, so
+    # a first-order retardation (pos - vel*lt) matches re-integrating to
+    # jd_tt - lt without the extra N-body cost. Two iterations converge.
+    geo = [ast_pos[i] - earth_helio_ecl[i] for i in range(3)]
+    if apply_light_time:
+        for _ in range(2):
+            lt = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2) / C_LIGHT_AU_DAY
+            geo = [
+                (ast_pos[i] - ast_vel[i] * lt) - earth_helio_ecl[i]
+                for i in range(3)
+            ]
+
+    if apply_aberration:
+        # Aberration uses Earth's barycentric velocity in ecliptic J2000, per the
+        # IAU apparent-place convention shared with the SPK/planets pipeline.
+        earth_vel_bary_ecl = _icrs_to_ecliptic_j2000(
+            *(float(v) for v in earth.at(t).velocity.au_per_d)
+        )
+        geo = list(
+            apply_aberration_to_position(
+                (geo[0], geo[1], geo[2]),
+                (
+                    earth_vel_bary_ecl[0],
+                    earth_vel_bary_ecl[1],
+                    earth_vel_bary_ecl[2],
+                ),
+            )
+        )
+
+    r_geo = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2)
+    lon_j2000 = math.degrees(math.atan2(geo[1], geo[0])) % 360.0
+    lat_j2000 = math.degrees(math.asin(geo[2] / r_geo)) if r_geo > 0 else 0.0
+
+    # The geocentric vector is in the J2000 ecliptic; precess to the ecliptic of
+    # date and add nutation in longitude (Δψ) so the return matches the of-date
+    # true-ecliptic contract every other body branch follows (the caller then
+    # applies the J2000 / equatorial framing via _maybe_equatorial_convert).
+    # Δψ is omitted for NONUT (mean ecliptic) and for J2000 — there the caller
+    # precesses back to J2000, whose ecliptic carries no nutation. It is also
+    # omitted for SIDEREAL+EQUATORIAL: _maybe_equatorial_convert rotates that
+    # case with the MEAN obliquity, so the longitude must be the mean ecliptic
+    # too (mirrors the node/Lilith _sid_eq rule), else ~Δψ leaks into RA/Dec.
+    lon, lat = precess_from_j2000(lon_j2000, lat_j2000, jd_tt)
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000) and not _sid_eq:
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
 
@@ -1667,7 +2059,11 @@ def _calc_body(
 
     Supported body types:
         - Classical planets (Sun, Moon, Mercury-Pluto) via JPL DE440 ephemeris
-        - Lunar nodes (Mean/True North/South) via lunar.py
+        - Lunar nodes (Mean/True NORTH) via lunar.py. The south nodes
+          (negative ids) are NOT handled here: the public entry points
+          (calc/calc_ut and EphemerisContext) intercept them and derive the
+          antipode via planets._south_node_from_north, so _calc_body only ever
+          receives the positive (north) node id.
         - Lilith/Lunar apogee (Mean/Osculating) via lunar.py
         - Minor bodies (asteroids, TNOs) via minor_bodies.py with rigorous geocentric conversion
         - Fixed stars (Regulus, Spica) via fixed_stars.py
@@ -1711,21 +2107,9 @@ def _calc_body(
     if ipl == SUN and (iflag & FLG_HELCTR):
         return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
 
-    # Remap AST_OFFSET + N to dedicated body IDs for special asteroids.
-    # pyswisseph treats calc_ut(jd, 10001, flags) identically to calc_ut(jd, 17, flags)
-    # (both compute Ceres). We mirror this behavior.
-    if ipl >= AST_OFFSET:
-        _ast_num = ipl - AST_OFFSET
-        _AST_REMAP = {
-            1: CERES,  # 17
-            2: PALLAS,  # 18
-            3: JUNO,  # 19
-            4: VESTA,  # 20
-            2060: CHIRON,  # 15
-            5145: PHOLUS,  # 16
-        }
-        if _ast_num in _AST_REMAP:
-            ipl = _AST_REMAP[_ast_num]
+    # Remap AST_OFFSET + N to dedicated body IDs for built-in asteroids
+    # (idempotent safety net; calc/calc_ut already remap pre-dispatch).
+    ipl = _remap_ast_offset(ipl)
 
     # Handle planetary moons (Galilean moons, Titan, etc.)
     if planetary_moons.is_planetary_moon(ipl):
@@ -1733,8 +2117,15 @@ def _calc_body(
         if result is not None:
             result = _maybe_equatorial_convert(result, t.tt, iflag)
             return result, iflag
-        # If moon not registered, return zeros (body not available)
-        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+        # No registered satellite SPK covers this moon.  The reference
+        # API raises here too (a missing-ephemeris-file error).
+        from .exceptions import Error
+
+        raise Error(
+            f"no satellite SPK registered for "
+            f"{planetary_moons.get_moon_name(ipl)} (body {ipl}); "
+            f"call register_moon_spk() with e.g. jup365.bsp/sat441.bsp"
+        )
 
     # Handle lunar nodes (Mean/True North/South)
     if ipl in [MEAN_NODE, TRUE_NODE]:
@@ -1743,9 +2134,9 @@ def _calc_body(
         if ipl == MEAN_NODE:
             lon = lunar.calc_mean_lunar_node(jd_tt)
             # The Meeus polynomial returns mean ecliptic of date.
-            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if not (iflag & FLG_NONUT) and not _sid_eq:
@@ -1767,6 +2158,10 @@ def _calc_body(
                 elif lon_diff < -180:
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
+                # True-ecliptic output: the speed includes the nutation
+                # rate, exactly like the position includes dpsi.
+                if not (iflag & FLG_NONUT) and not _sid_eq:
+                    dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -1777,7 +2172,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lunar_node(jd_tt)
             # TrueNode includes nutation effects in its perturbation terms.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if (iflag & FLG_NONUT) or _sid_eq:
@@ -1786,9 +2181,9 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic terms from ELP2000-82B theory.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & FLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -1808,6 +2203,11 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
+                    # The raw true-node curve contains nutation; under
+                    # NONUT (mean-ecliptic output) remove its rate, the
+                    # same way dpsi was removed from the position.
+                    if (iflag & FLG_NONUT) or _sid_eq:
+                        dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
                     ValueError,
@@ -1824,28 +2224,14 @@ def _calc_body(
                     )
             # Apply sidereal correction if requested (not for equatorial output).
             # FLG_J2000 is honored for TrueNode, same as MeanNode.
-            # pyswisseph silently ignores J2000 for TrueNode when sidereal is
+            # the reference ephemeris silently ignores J2000 for TrueNode when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
-            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            # See docs/comparison/intentional-divergences.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
             result = _maybe_equatorial_convert(result, jd_tt, iflag)
             return _to_native_floats(result), iflag
-
-    # South nodes are 180° from north nodes
-    if ipl in [-MEAN_NODE, -TRUE_NODE]:
-        north_ipl = abs(ipl)
-        result, flags = _calc_body(t, north_ipl, iflag)
-        south_lon = (result[0] + 180.0) % 360.0
-        return (
-            south_lon,
-            -result[1],
-            result[2],
-            result[3],
-            -result[4],
-            result[5],
-        ), flags
 
     # Handle Lilith (Mean/Osculating Apogee)
     if ipl in [MEAN_APOG, OSCU_APOG]:
@@ -1854,9 +2240,9 @@ def _calc_body(
         if ipl == MEAN_APOG:
             lon, lat = lunar.calc_mean_lilith_with_latitude(jd_tt)
             # The analytical formula returns mean ecliptic of date.
-            # Swiss Ephemeris outputs in the true ecliptic of date,
+            # The reference ephemeris outputs in the true ecliptic of date,
             # so add nutation in longitude (dpsi) unless NONUT is set.
-            # When SIDEREAL+EQUATORIAL, pyswisseph outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if not (iflag & FLG_NONUT) and not _sid_eq:
@@ -1865,9 +2251,9 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon + math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic correction terms.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat = 0.0, 0.0
             if iflag & FLG_SPEED:
                 dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -1881,6 +2267,10 @@ def _calc_body(
                     lon_diff += 360.0
                 dlon = lon_diff / (2.0 * dt)
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
+                # True-ecliptic output: include the nutation rate, like
+                # the position includes dpsi.
+                if not (iflag & FLG_NONUT) and not _sid_eq:
+                    dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -1891,7 +2281,7 @@ def _calc_body(
             lon, lat, dist = lunar.calc_true_lilith(jd_tt)
             # OscuApog includes nutation effects in its orbital computation.
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
-            # When SIDEREAL+EQUATORIAL, pyswisseph also outputs mean ecliptic
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
             if (iflag & FLG_NONUT) or _sid_eq:
@@ -1900,12 +2290,15 @@ def _calc_body(
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
                 lon = (lon - math.degrees(dpsi_rad)) % 360.0
             # Calculate velocity via central difference numerical differentiation
-            # Using ±0.5 days to capture perturbation effects that a 1-second
-            # step would miss, ensuring velocity reflects the actual rate of
-            # change including all periodic terms from orbital mechanics.
+            # The ±0.5-day step low-passes oscillations shorter than about
+            # a day (a tiny step would track them exactly); the reference
+            # smooths these speeds comparably.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & FLG_SPEED:
-                dt = 0.5  # 0.5 days for perturbation-corrected velocity
+                # 0.05 d (~1.2 h): converged derivative of the osculating
+                # curve; a 0.5 d window low-passes its fast oscillations
+                # and was ~2x further from the reference speeds.
+                dt = 0.05
                 try:
                     lon_prev, lat_prev, dist_prev = lunar.calc_true_lilith(jd_tt - dt)
                     lon_next, lat_next, dist_next = lunar.calc_true_lilith(jd_tt + dt)
@@ -1918,6 +2311,10 @@ def _calc_body(
                     dlon = lon_diff / (2.0 * dt)
                     dlat = (lat_next - lat_prev) / (2.0 * dt)
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
+                    # The raw osculating curve contains nutation; under
+                    # NONUT (mean-ecliptic output) remove its rate.
+                    if (iflag & FLG_NONUT) or _sid_eq:
+                        dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
                     ValueError,
@@ -1933,9 +2330,9 @@ def _calc_body(
                     )
             # Apply sidereal correction if requested (not for equatorial output).
             # FLG_J2000 is honored for OscuApog, same as MeanApog.
-            # pyswisseph silently ignores J2000 for OscuApog when sidereal is
+            # the reference ephemeris silently ignores J2000 for OscuApog when sidereal is
             # set — LibEphemeris intentionally fixes this behavioral bug.
-            # See docs/reference/se-bug-sidereal-j2000-nodes.md
+            # See docs/comparison/intentional-divergences.md
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
@@ -1950,10 +2347,21 @@ def _calc_body(
             lon, lat, dist = lunar.calc_interpolated_apogee(jd_tt)
         else:  # INTP_PERG
             lon, lat, dist = lunar.calc_interpolated_perigee(jd_tt)
+        # The interpolated apse curves are calibrated against the true
+        # ecliptic of date (nutation included).  Under NONUT — or under
+        # SIDEREAL+EQUATORIAL, where the reference outputs the mean
+        # ecliptic converted with mean obliquity — subtract dpsi, the
+        # same convention as TRUE_NODE/OSCU_APOG.
+        _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
+        if (iflag & FLG_NONUT) or _sid_eq:
+            from .cache import get_cached_nutation
+
+            dpsi_rad, _ = get_cached_nutation(jd_tt)
+            lon = (lon - math.degrees(dpsi_rad)) % 360.0
         # Calculate velocity via central difference numerical differentiation
-        # Using ±0.5 days to capture perturbation effects that a 1-second
-        # step would miss, ensuring velocity reflects the actual rate of
-        # change including all periodic terms.
+        # The ±0.5-day step low-passes oscillations shorter than about
+        # a day (a tiny step would track them exactly); the reference
+        # smooths these speeds comparably.
         dlon, dlat, ddist = 0.0, 0.0, 0.0
         if iflag & FLG_SPEED:
             dt = 0.5  # 0.5 days for perturbation-corrected velocity
@@ -1980,11 +2388,15 @@ def _calc_body(
             dlon = lon_diff / (2.0 * dt)
             dlat = (lat_next - lat_prev) / (2.0 * dt)
             ddist = (dist_next - dist_prev) / (2.0 * dt)
+            # The interpolated curves are true-ecliptic; under NONUT
+            # (mean-ecliptic output) remove the nutation rate.
+            if (iflag & FLG_NONUT) or _sid_eq:
+                dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
         # Apply sidereal correction if requested (not for equatorial output).
         # FLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
-        # pyswisseph silently ignores J2000 for these bodies when sidereal is
+        # the reference ephemeris silently ignores J2000 for these bodies when sidereal is
         # set — LibEphemeris intentionally fixes this behavioral bug.
-        # See docs/reference/se-bug-sidereal-j2000-nodes.md
+        # See docs/comparison/intentional-divergences.md
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
         result = (lon, lat, dist, dlon, dlat, ddist)
@@ -2047,10 +2459,16 @@ def _calc_body(
         prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
         nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
         dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        if dlon > 180.0:
-            dlon -= 360.0
-        elif dlon < -180.0:
-            dlon += 360.0
+        # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360), so a
+        # crossing is a ~360 deg jump in the raw difference; after dividing by
+        # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
+        # Valid only because these bodies are slow (<<90 deg/day at dt_v=1): a
+        # real speed above 180/(2*dt_v) cannot occur, so it can only be a wrap.
+        # Do NOT reuse this for fast bodies -- it would misread real motion.
+        if dlon > 180.0 / (2.0 * dt_v):
+            dlon -= 360.0 / (2.0 * dt_v)
+        elif dlon < -180.0 / (2.0 * dt_v):
+            dlon += 360.0 / (2.0 * dt_v)
         dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
@@ -2122,10 +2540,13 @@ def _calc_body(
         prev = _get_transpluto_geo_j2000(jd_tt - dt_v)
         nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
         dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        if dlon > 180.0:
-            dlon -= 360.0
-        elif dlon < -180.0:
-            dlon += 360.0
+        # Unwrap a 0/360 boundary crossing (see the Uranian path above): the
+        # threshold and correction must carry the 1/(2*dt_v) factor. Valid only
+        # for slow bodies (<<90 deg/day at dt_v=1); do NOT reuse for fast ones.
+        if dlon > 180.0 / (2.0 * dt_v):
+            dlon -= 360.0 / (2.0 * dt_v)
+        elif dlon < -180.0 / (2.0 * dt_v):
+            dlon += 360.0 / (2.0 * dt_v)
         dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
@@ -2143,15 +2564,113 @@ def _calc_body(
         return _to_native_floats(result), iflag
 
     # Handle White Moon (Selena), Vulcan, Proserpina, Waldemath — fictitious bodies (IDs 55-58)
-    # These are geocentric symbolic points computed in hypothetical.py.
-    # White Moon = Mean Lilith + 180° (ecliptic of date), same coordinate system as Mean Apogee.
-    if ipl in (WHITE_MOON, VULCAN, PROSERPINA, WALDEMATH):
+    # White Moon and Waldemath are geocentric constructions; Vulcan and
+    # Proserpina are heliocentric orbits and must be converted to
+    # geocentric (with light-time retardation) like any orbiting body.
+    _FICT_HELIO_IDS = (
+        NIBIRU,
+        HARRINGTON,
+        NEPTUNE_LEVERRIER,
+        NEPTUNE_ADAMS,
+        PLUTO_LOWELL,
+        PLUTO_PICKERING,
+    )
+    if ipl in (WHITE_MOON, VULCAN, PROSERPINA, WALDEMATH) or ipl in _FICT_HELIO_IDS:
         from . import hypothetical
 
         jd_tt = t.tt
         is_sidereal = bool(iflag & FLG_SIDEREAL)
 
-        pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+        if ipl in (VULCAN, PROSERPINA) or ipl in _FICT_HELIO_IDS:
+            from skyfield.framelib import ecliptic_J2000_frame
+            from .astrometry import _precess_ecliptic
+
+            _C_AU_DAY = 173.144632674240
+            if ipl == VULCAN:
+                _calc_helio = hypothetical.calc_vulcan
+            elif ipl == PROSERPINA:
+                _calc_helio = hypothetical.calc_proserpina
+            else:
+
+                def _calc_helio(jd, _ipl=ipl):
+                    return hypothetical.calc_fictitious_position(_ipl, jd)
+
+            def _helio_xyz_j2000(jd: float) -> Tuple[float, float, float]:
+                """Heliocentric J2000-ecliptic cartesian position (AU)."""
+                h = _calc_helio(jd)
+                if ipl in (VULCAN, PROSERPINA):
+                    # These element sets use the equinox of date; rotate
+                    # to J2000 so the Earth subtraction is
+                    # frame-consistent.
+                    lon_j, lat_j = _precess_ecliptic(h[0], h[1], jd, 2451545.0)
+                else:
+                    # The predicted-planet propagation already returns
+                    # J2000 ecliptic coordinates.
+                    lon_j, lat_j = h[0], h[1]
+                lon_r = math.radians(lon_j)
+                lat_r = math.radians(lat_j)
+                cl = math.cos(lat_r)
+                return (
+                    h[2] * cl * math.cos(lon_r),
+                    h[2] * cl * math.sin(lon_r),
+                    h[2] * math.sin(lat_r),
+                )
+
+            def _geo_of_date(jd: float) -> Tuple[float, float, float]:
+                """Geocentric mean-ecliptic-of-date spherical position."""
+                ts_i = get_timescale()
+                t_i = ts_i.tt_jd(jd)
+                earth_h = planets["sun"].at(t_i).observe(planets["earth"])
+                exyz = earth_h.frame_xyz(ecliptic_J2000_frame).au
+                ex, ey, ez = float(exyz[0]), float(exyz[1]), float(exyz[2])
+
+                # Light-time iteration: target retarded, observer fixed
+                lt = 0.0
+                xg = yg = zg = 0.0
+                for _ in range(3):
+                    bx, by, bz = _helio_xyz_j2000(jd - lt)
+                    xg, yg, zg = bx - ex, by - ey, bz - ez
+                    lt = math.sqrt(xg * xg + yg * yg + zg * zg) / _C_AU_DAY
+
+                rg = math.sqrt(xg * xg + yg * yg + zg * zg)
+                lon_g = math.degrees(math.atan2(yg, xg)) % 360.0
+                sin_lat = max(-1.0, min(1.0, zg / rg)) if rg > 0 else 0.0
+                lat_g = math.degrees(math.asin(sin_lat))
+                # Back to mean ecliptic of date
+                lon_g, lat_g = _precess_ecliptic(lon_g, lat_g, 2451545.0, jd)
+                return lon_g, lat_g, rg
+
+            if iflag & FLG_HELCTR:
+                pos = _calc_helio(jd_tt)
+                if ipl in _FICT_HELIO_IDS:
+                    # calc_fictitious_position returns J2000 ecliptic for the
+                    # predicted planets; precess to the mean ecliptic of date so
+                    # the shared "mean ecliptic of date (+ nutation)" treatment
+                    # below is frame-consistent. Without this, a J2000 longitude
+                    # would get Δψ added (and be reported) without ever being
+                    # precessed to of-date. VULCAN/PROSERPINA already use the
+                    # equinox of date and need no rotation.
+                    from .fast_calc import _general_precession_rate_deg_day
+
+                    h_lon, h_lat = _precess_ecliptic(pos[0], pos[1], 2451545.0, jd_tt)
+                    h_dlon = pos[3] + _general_precession_rate_deg_day(jd_tt)
+                    pos = (h_lon, h_lat, pos[2], h_dlon, pos[4], pos[5])
+            else:
+                g_lon, g_lat, g_dist = _geo_of_date(jd_tt)
+                dt_v = 0.1
+                prev = _geo_of_date(jd_tt - dt_v)
+                nxt = _geo_of_date(jd_tt + dt_v)
+                g_dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+                if g_dlon > 180.0 / (2.0 * dt_v):
+                    g_dlon -= 360.0 / (2.0 * dt_v)
+                elif g_dlon < -180.0 / (2.0 * dt_v):
+                    g_dlon += 360.0 / (2.0 * dt_v)
+                g_dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+                g_ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+                pos = (g_lon, g_lat, g_dist, g_dlon, g_dlat, g_ddist)
+        else:
+            pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
+
         lon, lat, dist = pos[0], pos[1], pos[2]
         dlon, dlat, ddist = pos[3], pos[4], pos[5]
 
@@ -2175,8 +2694,11 @@ def _calc_body(
     # through the Skyfield observe/apparent pipeline (same as planets).
     # This avoids the ~0.3" systematic error from the legacy ecliptic J2000
     # + manual precession/nutation approach in _calc_type21_position.
+    # Arbitrary numbered asteroids (AST_OFFSET + N, below the fixed-star
+    # range) take the same pipeline: registered SPK -> auto-SPK ->
+    # Keplerian elements (curated table or JPL SBDB) -> UnknownBodyError.
     _spk_type21_target = None
-    if ipl in minor_bodies.MINOR_BODY_ELEMENTS:
+    if ipl in minor_bodies.MINOR_BODY_ELEMENTS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
         from . import spk
         from .state import get_auto_spk_download, get_strict_precision
         from .exceptions import SPKRequiredError
@@ -2184,7 +2706,7 @@ def _calc_body(
         from .logging_config import get_logger
 
         # First check if already registered
-        _spk_type21_target = spk.get_spk_type21_target(ipl)
+        _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
 
         _auto_download_attempted = False
         if _spk_type21_target is None:
@@ -2197,14 +2719,19 @@ def _calc_body(
                 except (OSError, ValueError, KeyError, RuntimeError, TypeError):
                     pass
                 # Re-check after download
-                _spk_type21_target = spk.get_spk_type21_target(ipl)
+                _spk_type21_target = spk.get_spk_type21_target(ipl, t.tt)
 
         if _spk_type21_target is not None:
             # Route through the planet pipeline below (observe/apparent)
             pass
         else:
             # Fallback: try the legacy calc_spk_body_position (non-type21 SPK)
-            spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+            try:
+                spk_result = spk.calc_spk_body_position(t, ipl, iflag)
+            except EphemerisRangeError:
+                # Outside the registered kernel's coverage — continue to
+                # the Keplerian path (documented out-of-coverage behavior).
+                spk_result = None
             if spk_result is not None:
                 get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
                 _record(ipl, "SPK")
@@ -2217,7 +2744,10 @@ def _calc_body(
             # (e.g. due to third-party library incompatibility) — allow
             # Keplerian fallback rather than blocking the calculation entirely.
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
-                if ipl not in SPK_AUTO_DOWNLOAD_BLOCKED and not _auto_download_attempted:
+                if (
+                    ipl not in SPK_AUTO_DOWNLOAD_BLOCKED
+                    and not _auto_download_attempted
+                ):
                     horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
                     body_name = spk._get_body_name(ipl) or str(ipl)
                     raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
@@ -2225,10 +2755,14 @@ def _calc_body(
             jd_tt = t.tt
 
             # Try ASSIST N-body integration fallback if available
+            # (only for bodies with curated elements; arbitrary SBDB
+            # asteroids have no initial conditions for the integrator)
             try:
                 from .rebound_integration import check_assist_data_available
 
-                if check_assist_data_available():
+                if ipl in minor_bodies.MINOR_BODY_ELEMENTS and (
+                    check_assist_data_available()
+                ):
                     lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
 
                     speed_lon = 0.0
@@ -2251,6 +2785,14 @@ def _calc_body(
                         if speed_lon < -180.0 / (2.0 * dt):
                             speed_lon += 360.0 / (2.0 * dt)
 
+                    # Sidereal offset (ecliptic only) — like every other body
+                    # branch; without this the ASSIST fallback silently returned
+                    # a tropical longitude for FLG_SIDEREAL requests.
+                    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+                        lon, speed_lon = _apply_sidereal_correction(
+                            lon, speed_lon, t.ut1, iflag
+                        )
+
                     get_logger().debug(
                         "body=%d jd=%.1f source=ASSIST (n-body)", ipl, jd_tt
                     )
@@ -2265,10 +2807,13 @@ def _calc_body(
             except (ImportError, RuntimeError, ValueError, FileNotFoundError):
                 pass
 
-            # Keplerian as last resort — reduced precision, warn the user
+            # Keplerian as last resort — reduced precision, warn the user.
+            # Measured vs JPL: the unperturbed two-body fit drifts to ~1-2 deg
+            # outside the SPK window (it omits planetary perturbations), not
+            # arcminutes — state that honestly so callers don't trust it.
             get_logger().warning(
                 "body=%d jd=%.1f source=Keplerian (fallback). "
-                "Precision is limited (arcminute-level). "
+                "Precision is degraded (~1-2 degrees; unperturbed two-body). "
                 "Install SPK kernels or enable auto-download for higher accuracy.",
                 ipl,
                 jd_tt,
@@ -2296,6 +2841,13 @@ def _calc_body(
                 if speed_lon < -180.0 / (2.0 * dt):
                     speed_lon += 360.0 / (2.0 * dt)
 
+            # Sidereal offset (ecliptic only) — the Keplerian fallback likewise
+            # dropped FLG_SIDEREAL, returning tropical for sidereal requests.
+            if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+                lon, speed_lon = _apply_sidereal_correction(
+                    lon, speed_lon, t.ut1, iflag
+                )
+
             return _to_native_floats(
                 _maybe_equatorial_convert(
                     (lon, lat, dist, speed_lon, speed_lat, speed_dist), jd_tt, iflag
@@ -2314,9 +2866,7 @@ def _calc_body(
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            raise ValueError(
-                "Angles require observer location. Call set_topo() first."
-            )
+            raise ValueError("Angles require observer location. Call set_topo() first.")
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -2405,7 +2955,16 @@ def _calc_body(
         # In Skyfield, the SSB is the origin (center=0), so we don't need an observer
         observer = None
         icrf_center = 0  # SSB
-    elif (iflag & FLG_TOPOCTR) and observer_topo:
+    elif iflag & FLG_TOPOCTR:
+        if observer_topo is None:
+            from .exceptions import Error
+
+            # Matching the reference API: topocentric positions without a
+            # prior set_topo() are an error, not a silent geocentric result.
+            raise Error(
+                "FLG_TOPOCTR requires a geographic position: call "
+                "set_topo(lon, lat, alt) first"
+            )
         earth = planets["earth"]
         observer = earth + observer_topo
         icrf_center = observer_topo
@@ -2457,13 +3016,26 @@ def _calc_body(
             # Get initial geometric position
             p, v = get_vector(t)
 
-            # Iterative light-time correction (2-3 iterations is enough)
+            # Light-time iteration: retard only the target; the observer
+            # (Sun or SSB) stays at the observation time. Retarding both
+            # shifts the result by the observer's barycentric motion over
+            # the light time (up to ~10 mas for the outer planets) and
+            # diverges from the LEB pipeline.
+            if observer is not None:
+                _obs_at = observer.at(t)
+                _obs_pos_lt = _obs_at.position.au
+                _obs_vel_lt = _obs_at.velocity.au_per_d
+            else:
+                _obs_pos_lt = np.zeros(3)
+                _obs_vel_lt = np.zeros(3)
+
             for _ in range(3):
                 dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
                 light_time = dist / C_AU_PER_DAY
                 ts_lt = get_timescale()
-                t_retarded = ts_lt.tdb_jd(t.tdb - light_time)
-                p, v = get_vector(t_retarded)
+                _tgt_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time))
+                p = _tgt_ret.position.au - _obs_pos_lt
+                v = _tgt_ret.velocity.au_per_d - _obs_vel_lt
 
             from skyfield.positionlib import ICRF
 
@@ -2472,8 +3044,15 @@ def _calc_body(
             # Cache observer.at(t) to avoid recomputing Earth's position
             # for every planet at the same JD
             obs_at_t = get_cached_observer_at(observer, t)
-            if iflag & FLG_NOABERR:
-                pos = obs_at_t.observe(target)  # Astrometric
+            if (iflag & FLG_NOABERR) and (iflag & FLG_NOGDEFL):
+                # Astrometric (the reference FLG_ASTROMETRIC combination)
+                pos = obs_at_t.observe(target)
+            elif iflag & FLG_NOABERR:
+                # Reference semantics: NOABERR disables only aberration;
+                # gravitational light deflection still applies (that is
+                # why FLG_ASTROMETRIC is defined as NOABERR|NOGDEFL).
+                astrometric = obs_at_t.observe(target)
+                pos = _apply_deflection_only(astrometric, t, icrf_center, planets)
             elif iflag & FLG_NOGDEFL:
                 # Aberration without gravitational deflection:
                 # Pass empty deflectors tuple to skip Sun/Jupiter/Saturn
@@ -2510,167 +3089,67 @@ def _calc_body(
             p1 = ra.hours * 15.0
             p2 = dec.degrees
             p3 = dist.au
-
-            # Velocities?
-            # Skyfield doesn't give RA/Dec rates directly.
-            # We can use numerical differentiation if speed is requested.
-            if iflag & FLG_SPEED:
-                # Calculate velocity using central difference for J2000
-                dt = 1.0 / 86400.0
-                ts_inner = get_timescale()  # Fix: get ts locally
-
-                # Helper to get J2000 RA/Dec at t
-                def get_j2000_coord(t_):
-                    from skyfield.positionlib import ICRF
-
-                    if (
-                        iflag & FLG_TRUEPOS
-                        or (iflag & FLG_BARYCTR)
-                        or (iflag & FLG_HELCTR)
-                    ):
-                        p_, v_ = get_vector(t_)
-                        pos_ = ICRF(
-                            p_,
-                            v_,
-                            t=t_,
-                            center=icrf_center,
-                        )
-                    else:
-                        obs_at_t_ = get_cached_observer_at(observer, t_)
-                        if iflag & FLG_NOABERR:
-                            pos_ = obs_at_t_.observe(target)
-                        elif iflag & FLG_NOGDEFL:
-                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
-                        else:
-                            pos_ = obs_at_t_.observe(target).apparent()
-                    ra_, dec_, dist_ = pos_.radec()
-                    return ra_.hours * 15.0, dec_.degrees, dist_.au
-
-                # Central difference: get t-dt and t+dt
-                p1_prev, p2_prev, p3_prev = get_j2000_coord(ts_inner.tt_jd(t.tt - dt))
-                p1_next, p2_next, p3_next = get_j2000_coord(ts_inner.tt_jd(t.tt + dt))
-                dp1 = (p1_next - p1_prev) / (2.0 * dt)
-                dp2 = (p2_next - p2_prev) / (2.0 * dt)
-                dp3 = (p3_next - p3_prev) / (2.0 * dt)
-                if dp1 > 9000:
-                    dp1 -= 360 / (2.0 * dt)
-                if dp1 < -9000:
-                    dp1 += 360 / (2.0 * dt)
+            # Speeds are computed once in the generic central-difference
+            # block below (section 4); an in-branch duplicate previously
+            # ran two extra full pipeline evaluations whose results were
+            # unconditionally discarded.
         else:
             # Equator of Date (true or mean depending on NONUT/SIDEREAL flags)
             # Use the already-computed pos (with light-time correction) for the
             # main position. This is critical for HELCTR/BARYCTR where pos
             # includes iterative light-time correction applied in section 3.
-            # When SIDEREAL+EQUATORIAL, pyswisseph uses mean equator (no nutation),
+            # When SIDEREAL+EQUATORIAL, the reference ephemeris uses mean equator (no nutation),
             # same as NONUT behavior.
             _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
             if is_icrs:
-                # ICRS equatorial of date: skip frame bias (B matrix).
-                # t.M = N × P × B; for ICRS we want N × P = t.M × B^T.
-                # t.P is precession-only (J2000 dyn → mean of date).
+                # ICRS equator of date (no frame bias): Vondrák 2011 precession,
+                # with nutation unless the mean equator is requested.
                 import numpy as np
-
-                from skyfield.framelib import ICRS_to_J2000
 
                 xyz_icrs = np.array(pos.position.au)
                 if _use_mean_equator:
-                    # Mean equator: P only (no B, no N)
-                    xyz_eq = t.precession_matrix() @ xyz_icrs
+                    pn = vondrak_precession_matrix(t.tt, frame_bias=False)
                 else:
-                    # True equator: N × P (no B)
-                    M_no_bias = t.M @ ICRS_to_J2000.T
-                    xyz_eq = M_no_bias @ xyz_icrs
+                    dpsi, deps = t._nutation_angles_radians
+                    pn, _eps_true = vondrak_pn_matrix(
+                        t.tt, float(dpsi), float(deps), frame_bias=False
+                    )
+                xyz_eq = np.array(pn) @ xyz_icrs
                 xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
                 dist = math.sqrt(xe * xe + ye * ye + ze * ze)
                 p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
+                p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
                 p3 = dist
             elif _use_mean_equator:
-                # Compute mean equatorial coords directly to avoid Skyfield's
-                # mean_equator_and_equinox_of_date frame which accesses t.P
-                # (the reify descriptor corrupts t.precession_matrix).
+                # Mean equator of date (with frame bias): Vondrák precession.
                 import numpy as np
 
-                P = t.precession_matrix()
-                from skyfield.framelib import ICRS_to_J2000
-
-                R = P @ ICRS_to_J2000
-                xyz_icrs = np.array(pos.position.au)
-                xyz_eq = R @ xyz_icrs
+                pn = vondrak_precession_matrix(t.tt)
+                xyz_eq = np.array(pn) @ np.array(pos.position.au)
                 xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
                 dist = math.sqrt(xe * xe + ye * ye + ze * ze)
                 p1 = math.degrees(math.atan2(ye, xe)) % 360.0
                 p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
                 p3 = dist
             else:
-                from skyfield.framelib import true_equator_and_equinox_of_date
+                # True equator of date (with frame bias): Vondrák precession +
+                # Skyfield nutation, matching the LEB fast path.
+                import numpy as np
 
-                dec_, ra_, dist_ = pos.frame_latlon(true_equator_and_equinox_of_date)
-                p1, p2, p3 = ra_.degrees, dec_.degrees, dist_.au
+                dpsi, deps = t._nutation_angles_radians
+                pn, _eps_true = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
+                xyz_eq = np.array(pn) @ np.array(pos.position.au)
+                xe, ye, ze = float(xyz_eq[0]), float(xyz_eq[1]), float(xyz_eq[2])
+                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+                p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                p3 = dist
 
-            if iflag & FLG_SPEED:
-                # Central difference numerical differentiation for speeds
-                # 1 second timestep provides good balance
-                dt = 1.0 / 86400.0  # 1 second in days
-
-                # Helper to get coord at time t_ (for speed neighbors only).
-                # Uses fresh observer.at() without cache to avoid Skyfield
-                # Time reify descriptor state corruption between calls.
-                def get_coord(t_):
-                    from skyfield.positionlib import ICRF
-
-                    if (
-                        iflag & FLG_TRUEPOS
-                        or (iflag & FLG_BARYCTR)
-                        or (iflag & FLG_HELCTR)
-                    ):
-                        p_, v_ = get_vector(t_)
-                        pos_ = ICRF(
-                            p_,
-                            v_,
-                            t=t_,
-                            center=icrf_center,
-                        )
-                    else:
-                        obs_at_t_ = observer.at(t_)
-                        if iflag & FLG_NOABERR:
-                            pos_ = obs_at_t_.observe(target)
-                        elif iflag & FLG_NOGDEFL:
-                            pos_ = obs_at_t_.observe(target).apparent(deflectors=())
-                        else:
-                            pos_ = obs_at_t_.observe(target).apparent()
-
-                    if _use_mean_equator:
-                        from skyfield.framelib import mean_equator_and_equinox_of_date
-
-                        dec_, ra_, dist_ = pos_.frame_latlon(
-                            mean_equator_and_equinox_of_date
-                        )
-                        return ra_.degrees, dec_.degrees, dist_.au
-                    else:
-                        from skyfield.framelib import true_equator_and_equinox_of_date
-
-                        dec_, ra_, dist_ = pos_.frame_latlon(
-                            true_equator_and_equinox_of_date
-                        )
-                    return ra_.degrees, dec_.degrees, dist_.au
-
-                ts = get_timescale()
-                # Central difference: create fresh Time objects to avoid
-                # Skyfield reify descriptor state leakage between calls
-                t_prev = ts.tt_jd(float(t.tt - dt))
-                t_next = ts.tt_jd(float(t.tt + dt))
-                p1_prev, p2_prev, p3_prev = get_coord(t_prev)
-                p1_next, p2_next, p3_next = get_coord(t_next)
-                dp1 = (p1_next - p1_prev) / (2.0 * dt)
-                dp2 = (p2_next - p2_prev) / (2.0 * dt)
-                dp3 = (p3_next - p3_prev) / (2.0 * dt)
-                # Handle 360 wrap for RA
-                if dp1 > 9000:
-                    dp1 -= 360 / (2.0 * dt)
-                if dp1 < -9000:
-                    dp1 += 360 / (2.0 * dt)
+            # Speeds are computed once in the generic central-difference
+            # block below (section 4); the previous in-branch duplicate
+            # ran two extra full pipeline evaluations whose results were
+            # unconditionally discarded before that block.
 
     else:
         # Ecliptic (Long/Lat)
@@ -2695,75 +3174,42 @@ def _calc_body(
             # Convert to spherical
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             lon = math.degrees(math.atan2(ye, xe)) % 360.0
-            lat = math.degrees(math.asin(ze / dist))
+            lat = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
 
             p1, p2, p3 = lon, lat, dist
 
         else:
-            # Ecliptic of Date (true or mean depending on NONUT flag)
+            # Ecliptic of date: reduce ICRS -> equator of date with Vondrák 2011
+            # precession (the same single source as the LEB fast path), then
+            # rotate equator -> ecliptic about the equinox by the obliquity. The
+            # mean variant (FLG_NONUT) drops nutation; the frame bias is dropped
+            # for FLG_ICRS.
+            import numpy as np
+
             if iflag & FLG_NONUT:
-                # Mean ecliptic of date: precession only, no nutation
-                # Full chain: mean_ecliptic = rot_x(-ε) @ P @ B  (B = ICRS_to_J2000)
-                # ICRS mode: mean_ecliptic = rot_x(-ε) @ P       (skip frame bias)
-                from skyfield.framelib import ICRS_to_J2000
-                from skyfield.functions import mxm, rot_x
-
-                mean_obliquity = t._mean_obliquity_radians
-                if is_icrs:
-                    mean_ecl_matrix = mxm(rot_x(-mean_obliquity), t.precession_matrix())
-                else:
-                    mean_ecl_matrix = mxm(
-                        rot_x(-mean_obliquity),
-                        mxm(t.precession_matrix(), ICRS_to_J2000),
-                    )
-                # Transform ICRS position to mean ecliptic
-                import numpy as np
-
-                xyz_icrs = np.array(pos.position.au)
-                xyz_ecl = mean_ecl_matrix @ xyz_icrs
-                xe, ye, ze = xyz_ecl
-                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
-                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
-                p3 = dist
+                # Mean ecliptic of date (precession only, no nutation).
+                eps = vondrak_mean_obliquity_rad(t.tt)
+                pn = vondrak_precession_matrix(t.tt, frame_bias=not is_icrs)
             elif is_icrs:
-                # ICRS ecliptic of date: skip frame bias (B matrix).
-                # ecliptic_frame.rotation_at(t) = rot_x(-ε_true) @ t.M
-                # where t.M = N @ P @ B.  For ICRS: rot_x(-ε_true) @ N @ P
-                # = ecliptic_frame.rotation_at(t) @ B^T
-                import numpy as np
-
-                from skyfield.framelib import ICRS_to_J2000
-
-                R_ecl = ecliptic_frame.rotation_at(t)
-                R_icrs = R_ecl @ ICRS_to_J2000.T
-                xyz_icrs = np.array(pos.position.au)
-                xyz_ecl = R_icrs @ xyz_icrs
-                xe, ye, ze = float(xyz_ecl[0]), float(xyz_ecl[1]), float(xyz_ecl[2])
-                dist = math.sqrt(xe * xe + ye * ye + ze * ze)
-                p1 = math.degrees(math.atan2(ye, xe)) % 360.0
-                p2 = math.degrees(math.asin(ze / dist))
-                p3 = dist
+                # ICRS ecliptic of date (no frame bias).
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps = vondrak_pn_matrix(
+                    t.tt, float(dpsi), float(deps), frame_bias=False
+                )
             else:
-                try:
-                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-                except TypeError:
-                    # Skyfield Time reify corruption: recompute with fresh Time
-                    from .cache import clear_observer_cache
+                # True ecliptic of date.
+                dpsi, deps = t._nutation_angles_radians
+                pn, eps = vondrak_pn_matrix(t.tt, float(dpsi), float(deps))
 
-                    clear_observer_cache()
-                    t_fresh = get_timescale().tt_jd(float(t.tt))
-                    obs_fresh = observer.at(t_fresh)
-                    if iflag & FLG_NOABERR:
-                        pos = obs_fresh.observe(target)
-                    elif iflag & FLG_NOGDEFL:
-                        pos = obs_fresh.observe(target).apparent(deflectors=())
-                    else:
-                        pos = obs_fresh.observe(target).apparent()
-                    lat_, lon_, dist_ = pos.frame_latlon(ecliptic_frame)
-                p1 = lon_.degrees
-                p2 = lat_.degrees
-                p3 = dist_.au
+            xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+            ce, se = math.cos(eps), math.sin(eps)
+            xe = float(xq)
+            ye = float(yq) * ce + float(zq) * se
+            ze = -float(yq) * se + float(zq) * ce
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+            p3 = dist
 
     # 4. Speed (Central Difference Numerical Differentiation if requested)
     # Using central differences: f'(x) ≈ [f(x+h) - f(x-h)] / (2h)
@@ -2786,9 +3232,13 @@ def _calc_body(
         t_prev = ts_inner.tt_jd(t.tt - dt)
         t_next = ts_inner.tt_jd(t.tt + dt)
 
-        # CRITICAL: Remove SIDEREAL flag from recursive call to ensure both positions
-        # are in the same frame (tropical) before calculating velocity.
-        # We'll apply sidereal conversion to the velocity afterwards.
+        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
+        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
+        # the tropical (true-equator) frame -- the same as the plain equatorial
+        # speed -- even though the sidereal POSITION uses the mean equator.
+        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
+        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
+        # ecliptic output the ayanamsha rate is applied to the velocity below.
         flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
         try:
             result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
@@ -2822,7 +3272,7 @@ def _calc_body(
 
     # 5. Sidereal Mode
     # Sidereal correction is applied to ecliptic longitude only.
-    # Pyswisseph ignores sidereal flag when outputting equatorial coords.
+    # The reference ephemeris ignores sidereal flag when outputting equatorial coords.
     # Use NONUT-aware ayanamsha when FLG_NONUT is set.
     if is_sidereal and not is_equatorial:
         ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
@@ -3201,26 +3651,29 @@ def _get_star_position_ecliptic(
     """
     Calculate ecliptic longitude of a fixed star at given date.
 
-    Uses the full Skyfield astrometric pipeline which includes:
+    Uses the Skyfield astrometric pipeline for the apparent ICRS direction:
       - Proper motion propagation (rigorous space motion with radial velocity)
-      - IAU 2006 precession with GCRS->J2000 frame bias
-      - IAU 2000A nutation (1365 terms, ~0.1 mas)
-      - Annual aberration (~20.5" correction)
+      - Annual aberration (~20.5" correction) + light deflection
 
-    The result is the apparent ecliptic longitude on the true ecliptic of date.
+    then rotates that apparent ICRS vector to the **Vondrák 2011 ecliptic of
+    date** (the same frame `_calc_body` uses), rather than Skyfield's IAU 2006
+    `ecliptic_frame`. This keeps the star-based ayanamsha modes (True Citra /
+    Revati / Galactic) on the library's precession+obliquity model so they stay
+    consistent with the planet longitudes — and with the reference ephemeris — at remote
+    epochs. Nutation is IAU 2006/2000A (via `erfa.nut06a`).
 
     Args:
         star: Star catalog data (J2000.0 ICRS coordinates, proper motion, parallax, radial velocity)
         tjd_tt: Julian Day in Terrestrial Time (TT)
-        eps_true: True obliquity of ecliptic at date (unused, kept for API compatibility;
-                  Skyfield's ecliptic_frame handles the obliquity internally)
+        eps_true: True obliquity of date in degrees (Vondrák mean + nutation),
+                  used for the equator-of-date -> ecliptic-of-date rotation.
 
     Returns:
         Ecliptic longitude of date in degrees (0-360)
 
     References:
         - Skyfield: Brandon Rhodes, skyfield.readthedocs.io
-        - IAU 2006 precession: Capitaine et al. A&A 412, 567-586 (2003)
+        - Vondrák, Capitaine & Wallace, A&A 534, A22 (2011) — long-term precession
         - IAU 2000A nutation: Mathews, Herring & Buffett, JGR 107 (2002)
     """
     # Convert StarData to Skyfield Star object
@@ -3244,11 +3697,20 @@ def _get_star_position_ecliptic(
 
     # earth.at(t).observe(star) applies proper motion + light-time
     # .apparent() applies aberration + deflection
-    # .frame_latlon(ecliptic_frame) transforms to true ecliptic of date
     pos = earth.at(t).observe(star_obj).apparent()
-    lat, lon, dist = pos.frame_latlon(ecliptic_frame)
 
-    return lon.degrees
+    # Rotate the apparent ICRS direction to the Vondrák ecliptic of date (same
+    # reduction as _calc_body), not Skyfield's IAU 2006 ecliptic_frame.
+    import numpy as np
+
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
+    pn, _eps = vondrak_pn_matrix(tjd_tt, float(dpsi_rad), float(deps_rad))
+    xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
+    eps_rad = math.radians(eps_true)
+    ce, se = math.cos(eps_rad), math.sin(eps_rad)
+    xe = float(xq)
+    ye = float(yq) * ce + float(zq) * se
+    return math.degrees(math.atan2(ye, xe)) % 360.0
 
 
 def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
@@ -3484,15 +3946,17 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         SIDM_J2000,
         SIDM_VALENS_MOON,
     ]:
-        # Calculate Obliquity of Date (eps_true) using IAU 2006 obliquity via pyerfa
-        eps0 = math.degrees(erfa.obl06(2451545.0, tjd_tt - 2451545.0))
+        # Of-date mean obliquity from the Vondrák 2011 long-term model (via the
+        # pyerfa equator/ecliptic poles), consistent with the precession used
+        # everywhere else and long-term valid; nutation stays IAU 2006/2000A.
+        eps0 = vondrak_mean_obliquity_deg(tjd_tt)
 
         # Use IAU 2006/2000A nutation model via pyerfa for maximum precision
         # Provides ~0.01-0.05 mas accuracy, consistent with all other code paths
         dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
 
         # Convert from radians to degrees
-        dpsi_deg = math.degrees(dpsi_rad)
+        math.degrees(dpsi_rad)
         deps_deg = math.degrees(deps_rad)
 
         eps_true = eps0 + deps_deg
@@ -3936,7 +4400,7 @@ def get_ayanamsa(tjdet: float) -> float:
         Properly converts TT to UT1 using Skyfield's timescale with Delta T correction.
         Delta T (TT - UT) varies from ~32s (year 2000) to minutes (historical times).
         While ayanamsa changes slowly (~50"/century), correct conversion ensures
-        consistency with the pyswisseph API contract.
+        consistency with the reference API contract.
     """
     ts = get_timescale()
     t_tt = ts.tt_jd(tjdet)
@@ -3949,7 +4413,7 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     Calculate ayanamsa with extended flags for Ephemeris Time.
 
     Uses the sidereal mode set via set_sid_mode(). Returns the ayanamsa
-    value along with the return flags, matching pyswisseph signature.
+    value along with the return flags, matching the reference signature.
 
     Args:
         tjdet: Julian Day in Ephemeris Time (TT/ET)
@@ -3971,10 +4435,10 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     """
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
-    ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode)
-    # Return FLG_SWIEPH as retflag (matching pyswisseph behaviour),
-    # not the raw input ``flags``.
-    return (FLG_SWIEPH, float(ayanamsa))
+    ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode, flags)
+    # retflag echoes the input flags with FLG_SWIEPH added (reference
+    # behaviour: 0 -> 2, FLG_NONUT -> 66).
+    return (flags | FLG_SWIEPH, float(ayanamsa))
 
 
 def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
@@ -4007,19 +4471,24 @@ def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     tjd_tt = t_ut.tt  # Convert UT1 to TT
     sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
-    ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode)
-    # Return FLG_SWIEPH as retflag (matching pyswisseph behaviour),
-    # not the raw input ``flags``.
-    return (FLG_SWIEPH, float(ayanamsa))
+    ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode, flags)
+    # retflag echoes the input flags with FLG_SWIEPH added (reference
+    # behaviour: 0 -> 2, FLG_NONUT -> 66).
+    return (flags | FLG_SWIEPH, float(ayanamsa))
 
 
-def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
+def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> float:
     """
     Internal function to calculate the ayanamsa value for a given TT and sid_mode.
+
+    The _ex variants of the reference API return the *true* ayanamsha
+    (mean + nutation in longitude) unless FLG_NONUT is set — that is the
+    distinction from the plain get_ayanamsa, which returns the mean value.
 
     Args:
         tjd_tt: Julian Day in Terrestrial Time (TT)
         sid_mode: Sidereal mode constant
+        flags: Calculation flags; FLG_NONUT selects the mean ayanamsha.
 
     Returns:
         Ayanamsa value in degrees
@@ -4027,7 +4496,69 @@ def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int) -> float:
     ts = get_timescale()
     t_obj = ts.tt_jd(tjd_tt)
     tjd_ut = t_obj.ut1
-    return _calc_ayanamsa(tjd_ut, sid_mode)
+    if flags & FLG_NONUT:
+        return _calc_ayanamsa(tjd_ut, sid_mode)
+    return _get_true_ayanamsa(tjd_ut)
+
+
+class _SkyfieldDeflectorSource:
+    """Adapter exposing the Skyfield kernel via LEBReader's eval_body API.
+
+    Lets the Skyfield path reuse fast_calc._apply_gravitational_deflection
+    (the shared PPN formula) for the NOABERR-only flag combination, where
+    deflection must be applied without aberration.
+    """
+
+    _NAMES = {0: "sun", 5: "jupiter barycenter", 6: "saturn barycenter"}
+
+    def __init__(self, planets_kernel):
+        self._planets = planets_kernel
+
+    def eval_body(self, body_id: int, jd_tt: float):
+        name = self._NAMES[body_id]  # KeyError -> deflector skipped upstream
+        ts = get_timescale()
+        t = ts.tt_jd(jd_tt)
+        at = self._planets[name].at(t)
+        p = at.position.au
+        v = at.velocity.au_per_d
+        return (
+            (float(p[0]), float(p[1]), float(p[2])),
+            (float(v[0]), float(v[1]), float(v[2])),
+        )
+
+
+def _apply_deflection_only(astrometric, t, icrf_center, planets_kernel):
+    """Apply gravitational deflection to an astrometric position (no aberration).
+
+    Skyfield has no built-in deflection-without-aberration mode, so the
+    geocentric astrometric vector is deflected with the shared PPN routine
+    and re-wrapped as an ICRF position for the downstream frame transforms.
+    """
+    from skyfield.positionlib import ICRF
+
+    from .fast_calc import _apply_gravitational_deflection
+
+    geo = astrometric.position.au
+    geo_t = (float(geo[0]), float(geo[1]), float(geo[2]))
+    obs = astrometric.center_barycentric
+    obs_pos = obs.position.au
+    obs_t = (float(obs_pos[0]), float(obs_pos[1]), float(obs_pos[2]))
+    lt = float(astrometric.light_time)
+
+    source = _SkyfieldDeflectorSource(planets_kernel)
+    deflected = _apply_gravitational_deflection(
+        geo_t,
+        obs_t,
+        t.tt,
+        lt,
+        source,  # type: ignore[arg-type]
+    )
+    return ICRF(
+        (deflected[0], deflected[1], deflected[2]),
+        astrometric.velocity.au_per_d,
+        t=t,
+        center=icrf_center,
+    )
 
 
 # Position tuple type for nod_aps results
@@ -4118,7 +4649,7 @@ class HeliocentricNodApsWarning(UserWarning):
 
     .. deprecated::
         This warning is no longer emitted since libephemeris now uses geocentric
-        osculating elements for nod_aps calculations, matching pyswisseph's
+        osculating elements for nod_aps calculations, matching the reference ephemeris's
         approach. Kept for backward compatibility.
     """
 
@@ -4142,7 +4673,7 @@ def _calc_nod_aps(
     descending node, perihelion, and aphelion on the instantaneous orbit, then
     converts these positions to geocentric ecliptic coordinates of date.
 
-    This approach matches pyswisseph's geocentric interpretation: the returned
+    This approach matches the reference ephemeris's geocentric interpretation: the returned
     longitudes represent where the node/apse appears in the ecliptic as seen
     from Earth.
 
@@ -4157,8 +4688,6 @@ def _calc_nod_aps(
         Tuple of (ascending_node, descending_node, perihelion, aphelion)
         Each element is a PosTuple: (longitude, latitude, distance, dlon, dlat, ddist)
     """
-    from .cache import get_true_obliquity
-
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     # Unsupported bodies
@@ -4169,15 +4698,49 @@ def _calc_nod_aps(
     if ipl in (SUN, EARTH):
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
+    # Speeds on request: differentiate the assembled outputs by central
+    # difference (the reference API computes near-instantaneous rates).
+    if iflag & FLG_SPEED:
+        ts = get_timescale()
+        dt_spd = 0.001  # days (~86 s)
+        base_flags = iflag & ~FLG_SPEED
+        now = _calc_nod_aps(t, ipl, base_flags, method)
+        prev = _calc_nod_aps(ts.tt_jd(t.tt - dt_spd), ipl, base_flags, method)
+        nxt = _calc_nod_aps(ts.tt_jd(t.tt + dt_spd), ipl, base_flags, method)
+
+        def _with_speed(cur: PosTuple, pre: PosTuple, nex: PosTuple) -> PosTuple:
+            dlon = (nex[0] - pre[0] + 180.0) % 360.0 - 180.0
+            return (
+                cur[0],
+                cur[1],
+                cur[2],
+                dlon / (2.0 * dt_spd),
+                (nex[1] - pre[1]) / (2.0 * dt_spd),
+                (nex[2] - pre[2]) / (2.0 * dt_spd),
+            )
+
+        return (
+            _with_speed(now[0], prev[0], nxt[0]),
+            _with_speed(now[1], prev[1], nxt[1]),
+            _with_speed(now[2], prev[2], nxt[2]),
+            _with_speed(now[3], prev[3], nxt[3]),
+        )
+
     planets = get_planets()
     jd_tt = t.tt
 
-    # --- ICRS → ecliptic of date rotation ---
-    # Step 1: precession-nutation matrix (ICRS → true equator of date)
-    pnm = erfa.pnm06a(_J2000_JD, jd_tt - _J2000_JD)
-    # Step 2: true obliquity for equator-of-date → ecliptic-of-date
-    eps_deg = get_true_obliquity(jd_tt)
-    eps_rad = math.radians(eps_deg)
+    # --- ICRS → ecliptic of date rotation (Vondrák 2011, matching calc()) ---
+    # Step 1: precession(-nutation) matrix (ICRS → equator of date) from the same
+    # Vondrák long-term precession used by the main reduction. Under FLG_NONUT
+    # the mean equator/obliquity are used (no nutation); otherwise nutation stays
+    # IAU 2006/2000A. Step 2: the matching obliquity rotates equator-of-date →
+    # ecliptic-of-date.
+    if iflag & FLG_NONUT:
+        pnm = vondrak_precession_matrix(jd_tt)
+        eps_rad = vondrak_mean_obliquity_rad(jd_tt)
+    else:
+        dpsi_n, deps_n = erfa.nut06a(_J2000_JD, jd_tt - _J2000_JD)
+        pnm, eps_rad = vondrak_pn_matrix(jd_tt, float(dpsi_n), float(deps_n))
     cos_eps = math.cos(eps_rad)
     sin_eps = math.sin(eps_rad)
 
@@ -4216,7 +4779,7 @@ def _calc_nod_aps(
     # elements from geocentric state vectors.
     # NODBIT_MEAN → MEAN_NODE + MEAN_APOG
     # NODBIT_OSCU → TRUE_NODE + OSCU_APOG
-    # This matches pyswisseph behavior.
+    # This matches the reference behavior.
     if ipl == MOON:
         jd_ut = t.ut1
         # Strip output-format bits (FLG_RADIANS / FLG_XYZ) and FLG_SPEED:
@@ -4244,12 +4807,25 @@ def _calc_nod_aps(
         apog_lat = apog_pos[1]
         apog_dist = apog_pos[2]
 
-        # Perigee is 180° from apogee
+        # Perigee: opposite point of the same orbit — longitude +180°,
+        # latitude mirrored, and the *perigee* distance (the reference API
+        # returns physically distinct apsis distances).
         peri_lon = (apog_lon + 180.0) % 360.0
+        peri_lat = -apog_lat
+        if method & NODBIT_OSCU:
+            # Distance of the osculating perigee from the instantaneous
+            # ellipse (lon/lat above already follow the apogee transform).
+            from .lunar import calc_osculating_perigee
+
+            peri_dist = calc_osculating_perigee(jd_tt)[2]
+        else:
+            # Mean ellipse identity: r_peri = 2a − r_apog with the
+            # reference constants a = 0.002569555, r_apog = 0.002710625 AU.
+            peri_dist = 2.0 * 0.002569555 - apog_dist
 
         # Build output: nodes and apsides from lunar theory
-        xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
-        xndsc: PosTuple = (
+        moon_xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
+        moon_xndsc: PosTuple = (
             (node_lon + 180.0) % 360.0,
             -node_lat,
             node_dist,
@@ -4257,10 +4833,10 @@ def _calc_nod_aps(
             0.0,
             0.0,
         )
-        xperi: PosTuple = (peri_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
-        xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        moon_xperi: PosTuple = (peri_lon, peri_lat, peri_dist, 0.0, 0.0, 0.0)
+        moon_xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
 
-        return (xnasc, xndsc, xperi, xaphe)
+        return (moon_xnasc, moon_xndsc, moon_xperi, moon_xaphe)
 
     else:
         # Heliocentric ICRS vectors
@@ -4361,7 +4937,7 @@ def _calc_nod_aps(
         anti-perihelion direction. In the perifocal frame this is the
         point (-2ae, 0, 0).
 
-        This matches the pyswisseph convention which returns the second
+        This matches the reference convention which returns the second
         focal point in the aphelion/apogee slot of nod_aps results.
         """
         # Distance from primary focus to second focus = 2 * a * e
@@ -4416,6 +4992,16 @@ def _calc_nod_aps(
     geo_peri = _to_geo_lonlat(pos_peri)
     geo_aphe = _to_geo_lonlat(pos_aphe)
 
+    # Sidereal output: subtract the ayanamsha from the longitudes,
+    # consistent with calc_ut (issue #29: the flag was silently ignored
+    # for planetary nodes/apsides).
+    if iflag & FLG_SIDEREAL:
+        aya = _get_ayanamsa_for_flags(t.ut1, iflag)
+        geo_asc = ((geo_asc[0] - aya) % 360.0, geo_asc[1], geo_asc[2])
+        geo_dsc = ((geo_dsc[0] - aya) % 360.0, geo_dsc[1], geo_dsc[2])
+        geo_peri = ((geo_peri[0] - aya) % 360.0, geo_peri[1], geo_peri[2])
+        geo_aphe = ((geo_aphe[0] - aya) % 360.0, geo_aphe[1], geo_aphe[2])
+
     # Build output tuples (lon, lat, dist, speed_lon, speed_lat, speed_dist)
     xnasc: PosTuple = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)
     xndsc: PosTuple = (geo_dsc[0], geo_dsc[1], geo_dsc[2], 0.0, 0.0, 0.0)
@@ -4425,13 +5011,11 @@ def _calc_nod_aps(
     return (xnasc, xndsc, xperi, xaphe)
 
 
-def get_orbital_elements(
-    tjdet: float, planet: int, flags: int
-) -> Tuple[float, ...]:
+def get_orbital_elements(tjdet: float, planet: int, flags: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for a celestial body.
 
-    Reference API compatible function matching pyswisseph signature.
+    Reference API compatible function matching the reference signature.
 
     This function computes the osculating (instantaneous) orbital elements
     for a planet at a given time. The elements describe the elliptical orbit
@@ -4479,9 +5063,7 @@ def get_orbital_elements(
     return _calc_orbital_elements(t, planet, flags)
 
 
-def get_orbital_elements_ut(
-    tjd_ut: float, ipl: int, iflag: int
-) -> Tuple[float, ...]:
+def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Calculate Keplerian orbital elements for Universal Time.
 
@@ -4544,8 +5126,10 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # For Moon, use geocentric orbit (around Earth)
     if ipl == MOON:
         center = planets["earth"]
-        # GM_Earth in AU^3/day^2 (from solar mass ratio)
-        GM = 0.01720209895**2 / 332946.0
+        # Two-body mu for the Moon's geocentric osculating orbit must use
+        # GM(Earth+Moon): Sun/(Earth+Moon) mass ratio = 328900.5596
+        # (Earth alone, 332946, biases the semi-major axis ~+1.2%).
+        GM = 0.01720209895**2 / 328900.5596
     else:
         center = planets["sun"]
         # GM_sun in AU^3/day^2
@@ -4581,7 +5165,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
 
     # Radial velocity
     r_dot_v = x * vx + y * vy + z * vz
-    v_r = r_dot_v / r_mag
+    r_dot_v / r_mag
 
     # Specific angular momentum vector h = r x v
     hx = y * vz - z * vy
@@ -4757,7 +5341,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     L_deg = math.degrees(L)
     varpi_deg = math.degrees(varpi)
 
-    # Build the 17-element tuple matching pyswisseph index layout
+    # Build the 17-element tuple matching the reference index layout
     elements = (
         a,  # [0] Semi-major axis (AU)
         e,  # [1] Eccentricity
@@ -4778,7 +5362,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         Q,  # [16] Aphelion distance (AU)
     )
 
-    # Pad to 50 elements for pyswisseph compatibility
+    # Pad to 50 elements for reference-API compatibility
     elements_50 = elements + tuple([0.0] * (50 - len(elements)))
     return elements_50
 
@@ -4789,7 +5373,7 @@ def orbit_max_min_true_distance(
     """
     Calculate the maximum, minimum, and current true geocentric distances.
 
-    Reference API compatible function matching pyswisseph
+    Reference API compatible function matching the reference
     ``orbit_max_min_true_distance``.
 
     This function computes the maximum and minimum true distances from Earth
@@ -4810,7 +5394,7 @@ def orbit_max_min_true_distance(
 
     Returns:
         Tuple of (max_distance, min_distance, true_distance) in AU.
-        Order matches pyswisseph: (max, min, true).
+        Order matches the reference ephemeris: (max, min, true).
 
     Example:
         >>> from libephemeris import orbit_max_min_true_distance, MARS
@@ -5119,7 +5703,7 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
         diameter_deg = 2 * radius_km / distance_km * RAD_TO_DEG
                      = 2 * radius_km / (distance_au * AU_KM) * (180 / pi)
 
-    Returns degrees for pyswisseph API compatibility (pheno_ut attr[3]).
+    Returns degrees for reference-API compatibility (pheno_ut attr[3]).
 
     Args:
         radius_km: Physical radius of the body in kilometers
@@ -5132,7 +5716,7 @@ def _calc_apparent_diameter(radius_km: float, distance_au: float) -> float:
         return 0.0
     distance_km = distance_au * _AU_KM
     # Angular diameter = 2 * arctan(radius/distance) ≈ 2 * radius/distance (small angle)
-    # Convert from radians to degrees (not arcseconds) for pyswisseph compatibility
+    # Convert from radians to degrees (not arcseconds) for reference-API compatibility
     return 2.0 * radius_km / distance_km * _RAD_TO_ARCSEC / 3600.0
 
 
@@ -5240,7 +5824,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags.
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph).
+        Tuple of 20 floats (matching the reference ephemeris).
 
     Raises:
         KeyError: If the body is not available in the LEB reader.
@@ -5264,8 +5848,18 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     base_flags = FLG_SPEED | (iflag & FLG_TRUEPOS)
 
     # Unsupported bodies (nodes, apogees, etc.) — match _calc_pheno() behavior
-    _PHENO_SUPPORTED = {SUN, MOON, MERCURY, VENUS, MARS,
-                        JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
+    _PHENO_SUPPORTED = {
+        SUN,
+        MOON,
+        MERCURY,
+        VENUS,
+        MARS,
+        JUPITER,
+        SATURN,
+        URANUS,
+        NEPTUNE,
+        PLUTO,
+    }
     if ipl not in _PHENO_SUPPORTED:
         return (0.0,) * 20
 
@@ -5322,7 +5916,11 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         body_xyz, _ = _leb_calc(tjd_ut, ipl, _xyz_flags)
         sun_xyz, _ = _leb_calc(tjd_ut, SUN, _xyz_flags)
         # body→Sun and body→Earth vectors
-        bs = (sun_xyz[0] - body_xyz[0], sun_xyz[1] - body_xyz[1], sun_xyz[2] - body_xyz[2])
+        bs = (
+            sun_xyz[0] - body_xyz[0],
+            sun_xyz[1] - body_xyz[1],
+            sun_xyz[2] - body_xyz[2],
+        )
         be = (-body_xyz[0], -body_xyz[1], -body_xyz[2])
         dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
         mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
@@ -5386,9 +5984,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
 
 
-def pheno_ut(
-    tjdut: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Universal Time.
 
@@ -5401,7 +5997,7 @@ def pheno_ut(
         flags: Calculation flags (FLG_TRUEPOS, FLG_HELCTR, etc.)
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph):
+        Tuple of 20 floats (matching the reference ephemeris):
             - [0]: Phase angle (Earth-planet-Sun) in degrees
             - [1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
             - [2]: Elongation of planet from Sun in degrees
@@ -5443,9 +6039,7 @@ def pheno_ut(
     return _calc_pheno(t, planet, flags)
 
 
-def pheno(
-    tjdet: float, planet: int, flags: int = FLG_SWIEPH
-) -> Tuple[float, ...]:
+def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ...]:
     """
     Compute planetary phenomena for Ephemeris Time (TT/ET).
 
@@ -5457,7 +6051,7 @@ def pheno(
         flags: Calculation flags
 
     Returns:
-        Tuple of 20 floats (matching pyswisseph):
+        Tuple of 20 floats (matching the reference ephemeris):
             - [0]: Phase angle, [1]: Phase, [2]: Elongation,
             - [3]: Diameter, [4]: Magnitude, [5-19]: Reserved (0.0)
 
@@ -5504,7 +6098,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         iflag: Calculation flags
 
     Returns:
-        Tuple of 20 floats (bare tuple, matching pyswisseph).
+        Tuple of 20 floats (bare tuple, matching the reference ephemeris).
     """
 
     from .cache import get_cached_observer_at
@@ -5789,7 +6383,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         tjd,
     )
 
-    # Return tuple with at least 20 elements (pyswisseph API compatibility)
+    # Return tuple with at least 20 elements (reference-API compatibility)
     attr = (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
     return attr
 
@@ -5809,7 +6403,7 @@ def _calc_planet_magnitude(
     Calculate visual magnitude of a planet.
 
     Uses Mallama 2018 formulas for Mercury, Venus, Mars, Jupiter, Saturn
-    for pyswisseph API compatibility. These formulas are from:
+    for reference-API compatibility. These formulas are from:
     A. Mallama, J. Hilton, "Computing Apparent Planetary Magnitudes for
     The Astronomical Almanac" (2018).
 

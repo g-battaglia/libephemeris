@@ -75,11 +75,13 @@ Resolution priority (highest to lowest):
 3. Precision tier (`LIBEPHEMERIS_PRECISION` env var or `set_precision_tier()`)
 4. Default: `de440.bsp` (medium tier)
 
-### Swiss Ephemeris comparison
+### FLG_MOSEPH handling
 
-Swiss Ephemeris uses JPL DE431 (older generation, 2013) repackaged into its own binary format. DE440/DE441 (2021) incorporate 8 additional years of observational data, including improved Juno-era Jupiter observations and MESSENGER-era Mercury data, and use the updated ICRF 3.0 reference frame.
-
-When `FLG_MOSEPH` is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris (VSOP87 for planets, ELP2000-82B for Moon), which has errors of ~1 arcsecond for inner planets and ~10+ arcseconds for outer planets at historical dates. LibEphemeris accepts `FLG_MOSEPH` for API compatibility but silently ignores it -- all calculations always use the full JPL numerical integration.
+The `FLG_MOSEPH` flag — which in some engines selects a Moshier semi-analytical
+fallback (VSOP87 for planets, ELP2000-82B for the Moon, with errors of ~1" for
+inner planets and ~10+" for outer planets at historical dates) — is accepted for
+API compatibility but ignored. Every libephemeris calculation always uses the full
+JPL numerical integration.
 
 ---
 
@@ -99,11 +101,12 @@ LibEphemeris uses the **IAU 2006/2000A** nutation model via the IAU ERFA library
 
 The model computes nutation in longitude (Δψ) and nutation in obliquity (Δε) from the five Delaunay fundamental arguments plus nine planetary fundamental arguments, with corrections from the IAU 2006 precession-rate adjustments (Capitaine et al. 2005).
 
-### Swiss Ephemeris comparison
+### Full-precision override
 
-Swiss Ephemeris uses the same IAU 2006/2000A model. Both implementations achieve sub-milliarcsecond nutation. The difference between the two is negligible (<0.01 mas).
-
-However, Skyfield's internal nutation (used before pyerfa integration) defaults to IAU 2000B, a truncated model with only **77 terms** and ~1 milliarcsecond precision. LibEphemeris overrides this with the full 1365-term model via pyerfa for all planet and house calculations.
+Skyfield's internal nutation (used before pyerfa integration) defaults to IAU
+2000B, a truncated model with only **77 terms** and ~1 milliarcsecond precision.
+LibEphemeris overrides this with the full 1365-term model via pyerfa for all planet
+and house calculations.
 
 ### Impact on ecliptic longitude
 
@@ -124,10 +127,6 @@ LibEphemeris uses the **IAU 2006 precession** model via `erfa.pmat06()`, impleme
 | J2000 obliquity | 84381.406 arcseconds (23°26'21.406") |
 | Standard | IERS Conventions 2010, ch. 5 |
 
-### Swiss Ephemeris comparison
-
-Swiss Ephemeris also uses IAU 2006 precession. Both implementations are equivalent for this component.
-
 ### Frame bias (ICRS to J2000)
 
 The rotation from the International Celestial Reference System (ICRS) to the mean equator and equinox of J2000.0 is applied via the combined bias-precession-nutation matrix from `erfa.pnm06a()`. This matrix incorporates the frame bias angles (dα₀ = −14.6 mas, ξ₀ = −16.617 mas, η₀ = −6.819 mas) defined in the IERS Conventions.
@@ -146,9 +145,10 @@ The maximum annual aberration is ~20.5 arcseconds. Relativistic corrections to t
 
 Skyfield's `.apparent()` method also applies gravitational light deflection by the Sun (maximum ~1.75 arcseconds at the solar limb, falling as 1/sin(θ)). This correction is significant for planets near solar conjunction.
 
-### Swiss Ephemeris comparison
+### Diurnal aberration
 
-Swiss Ephemeris implements the same corrections (annual aberration + solar gravitational deflection). Both libraries omit diurnal aberration (~0.3 arcseconds maximum), which is below the threshold of astrological significance.
+LibEphemeris omits diurnal aberration (~0.3 arcseconds maximum), which is below the
+threshold of astrological significance.
 
 ---
 
@@ -283,10 +283,6 @@ The velocity component of the COB offset is computed via central difference nume
 v_offset = [offset(t + 0.5s) - offset(t - 0.5s)] / 1s
 ```
 
-### Swiss Ephemeris comparison
-
-Standard Swiss Ephemeris returns **system barycenters** for outer planets. The `FLG_CENTER_BODY` flag (a newer, less commonly used feature) enables planet center positions, but requires additional satellite ephemeris files. LibEphemeris applies the correction **transparently** to all calculations, achieving better default precision for Jupiter, Saturn, Neptune, and Pluto without requiring any user configuration.
-
 ---
 
 ## 6. Velocity Computation
@@ -308,11 +304,11 @@ dp/dt = [p(t + dt) - p(t - dt)] / (2 · dt)
 
 The central difference method is O(h²) accurate, meaning halving the step size reduces the error by a factor of 4.
 
-### Swiss Ephemeris comparison
+### Accuracy
 
-Swiss Ephemeris computes velocities analytically by differentiating the Chebyshev polynomial representation of the JPL ephemeris. This avoids the O(h²) truncation error of numerical differentiation but requires maintaining separate derivative code.
-
-The practical difference is <0.001°/day for all planets. For the Moon, speed differences of up to ~0.01°/day have been measured, primarily because the numerical method samples the position function at different points than the analytical derivative.
+The central-difference method is accurate to <0.001°/day for all planets. For the
+Moon, the numerical sampling introduces up to ~0.01°/day relative to an analytic
+derivative.
 
 ---
 
@@ -366,11 +362,11 @@ Houses use the true obliquity (mean obliquity + nutation in obliquity) from `erf
 ARMC = (GAST × 15°/h + geographic_longitude) mod 360°
 ```
 
-### Supported systems (24)
+### Supported systems (25)
 
-All major house systems are implemented with the same spherical trigonometry as Swiss Ephemeris:
+All major house systems are implemented with standard spherical trigonometry:
 
-`P` Placidus, `K` Koch, `O` Porphyry, `R` Regiomontanus, `C` Campanus, `E` Equal (Asc), `A`/`D` Equal (MC), `W` Whole Sign, `M` Morinus, `B` Alcabitius, `T` Polich-Page/Topocentric, `U` Krusinski, `G` Gauquelin (36-sector), `V` Vehlow, `X` Meridian, `H` Horizontal, `F` Carter, `S` Sripati, `L` Pullen SD, `Q` Pullen SR, `N` Natural Gradient, `Y` APC, `I`/`i` Sunshine.
+`P` Placidus, `K` Koch, `O` Porphyry, `R` Regiomontanus, `C` Campanus, `E`/`A` Equal (from Asc), `D` Equal (from MC), `W` Whole Sign, `M` Morinus, `B` Alcabitius, `T` Polich-Page/Topocentric, `U` Krusinski, `G` Gauquelin (36-sector), `V` Vehlow, `X` Meridian, `H` Horizontal, `F` Carter, `S` Sripati, `L` Pullen SD, `Q` Pullen SR, `N` Natural Gradient, `Y` APC, `I` Sunshine (Treindl), `i` Sunshine (Makransky), `J` Savard-A.
 
 ### Convergence tolerance
 
@@ -380,7 +376,7 @@ Iterative systems (Placidus, Koch) use a convergence threshold of 10⁻⁷ degre
 
 Above the polar circle (~66.56° = 90° − obliquity), Placidus and Koch are geometrically undefined because some ecliptic points never rise or set. LibEphemeris raises `PolarCircleError` with the option to fall back to Porphyry via `houses_with_fallback()`.
 
-### Measured precision vs Swiss Ephemeris
+### Measured precision
 
 | Component | Max difference |
 |-----------|---------------|
@@ -432,7 +428,7 @@ The codebase contains a comprehensive ELP2000-82B perturbation series (~170 term
 
 The Earth eccentricity factor E = 1.0 − 0.002516·T − 0.0000074·T² is applied to Sun-dependent terms per Meeus convention.
 
-> **Note:** These perturbation corrections are **not currently applied** to the True Node calculation. Investigation revealed that the ELP2000-82B series was designed for the *mean* lunar node, not the geometric node derived from state vectors via `h = r × v`. Applying the series to the geometric node produced errors of tens of degrees, confirming the two approaches are incompatible. The geometric method from Stage 1 is used alone. The residual vs Swiss Ephemeris (~8.9 arcsec mean, ~0.14° max) reflects the fundamental methodological difference. See [Precision History](../development/precision-history.md) for the full investigation record.
+> **Note:** These perturbation corrections are **not currently applied** to the True Node calculation. Investigation revealed that the ELP2000-82B series was designed for the *mean* lunar node, not the geometric node derived from state vectors via `h = r × v`. Applying the series to the geometric node produced errors of tens of degrees, confirming the two approaches are incompatible. The geometric method from Stage 1 is used alone. The residual against an analytical mean-node series (~8.9 arcsec mean, ~0.14° max) reflects the fundamental methodological difference. See [Precision History](../development/precision-history.md) for the full investigation record.
 
 ### Mean Node
 
@@ -460,7 +456,7 @@ Uses the Moshier analytical method: ELP2000-82B perturbation series (~50 harmoni
 
 Fundamental arguments include T⁵ corrections from Chapront et al. (2002).
 
-### Measured precision vs Swiss Ephemeris
+### Measured precision
 
 | Point | Max difference | Mean difference | Independent verification |
 |-------|---------------|-----------------|------------------------|
@@ -471,7 +467,10 @@ Fundamental arguments include T⁵ corrections from Chapront et al. (2002).
 | Interpolated Apogee | ~1300 arcsec (0.36°) | ~350 arcsec (0.10°) | Genuine algorithm difference (JPL DE440 vs ELP2000). |
 | Interpolated Perigee | ~9400 arcsec (2.6°) | ~1650 arcsec (0.46°) | Intentional — JPL DE440 physical passages vs truncated ELP2000. |
 
-**J2000 frame (FLG_J2000) for lunar bodies:** LibEphemeris is **more accurate** than Swiss Ephemeris for J2000 frame transformations of analytically-computed bodies. At J2000.0 epoch, tropical and J2000 ecliptic coordinates are identical by definition (zero precession). LibEphemeris correctly returns zero shift; Swiss Ephemeris applies a spurious ~14" offset. Verified independently against astropy/ERFA.
+**J2000 frame (FLG_J2000) for lunar bodies:** at the J2000.0 epoch, tropical and
+J2000 ecliptic coordinates are identical by definition (zero precession), and
+LibEphemeris correctly returns zero shift for analytically-computed bodies, verified
+independently against astropy/ERFA.
 
 ---
 
@@ -497,12 +496,6 @@ download_delta_t_data()
 set_iers_delta_t_enabled(True)
 ```
 
-### Swiss Ephemeris comparison
-
-Swiss Ephemeris uses Espenak & Meeus (2006) polynomials for historical Delta T. The Stephenson et al. (2016) model used by LibEphemeris is more recent and generally considered more accurate for dates before 1600 CE, where direct observations are sparse.
-
-For modern dates (1900--2100), both implementations agree to within ~1 second.
-
 ### Typical Delta T values
 
 | Year | ΔT (seconds) |
@@ -520,17 +513,17 @@ For modern dates (1900--2100), both implementations agree to within ~1 second.
 
 ### Star catalog
 
-116 stars from the **Hipparcos catalog** (ESA 1997), with proper motions updated to the **van Leeuwen 2007 new Hipparcos reduction** (A&A 474, 653-664). The catalog covers all bright and astrologically significant stars: the 4 Royal Stars, Behenian stars, Pleiades cluster, Hyades, and full zodiacal constellation coverage.
+1,447 stars from the **Hipparcos catalog** (ESA 1997), with proper motions updated to the **van Leeuwen 2007 new Hipparcos reduction** (A&A 474, 653-664). The catalog covers all bright and astrologically significant stars: the 4 Royal Stars, Behenian stars, Pleiades cluster, Hyades, and full zodiacal constellation coverage.
 
 | Property | Value |
 |----------|-------|
 | Epoch | J2000.0 (ICRS) |
 | Source | Hipparcos catalog (HIP numbers) |
 | Proper motions | van Leeuwen 2007 (I/311/hip2) for 99 stars; original Hipparcos 1997 for remainder |
-| Count | 116 stars |
+| Count | 1,447 stars |
 | Data per star | RA, Dec, PM_RA (with cos δ), PM_Dec, visual magnitude |
 
-**Independent verification:** All stars cross-checked against SIMBAD J2000 positions. Principal stars verified to < 0.02" against SIMBAD. Two catalog bugs found and fixed during audit (Algedi wrong component, Asellus Borealis wrong HIP number). See [swisseph-comparison.md §6.6](swisseph-comparison.md#66-fixed-star-catalog--cross-checked-against-hipparcos-simbad) for full details.
+**Independent verification:** All stars cross-checked against SIMBAD J2000 positions. Principal stars verified to < 0.02" against SIMBAD. Two catalog bugs found and fixed during audit (Algedi wrong component, Asellus Borealis wrong HIP number).
 
 ### Proper motion
 
@@ -549,21 +542,22 @@ Precision: <0.01 arcsec over ±100 years; <1 arcsec over ±500 years.
 3. Apparent position via `observer.at(t).observe(star).apparent()` (aberration + gravitational deflection)
 4. Ecliptic coordinates via `frame_latlon(ecliptic_frame)` (IAU 2006 precession + IAU 2006/2000A nutation)
 
-### Swiss Ephemeris comparison
+### Supported flags
 
-Swiss Ephemeris uses a larger catalog (~1000+ stars from its own bundled star catalog). Both use Hipparcos data; LibEphemeris uses the updated van Leeuwen 2007 proper motions while Swiss Ephemeris uses original 1997 values. Star positions agree to < 0.51" for all 101 comparable stars. Five stars resolve to different physical components due to different IAU WGSN name conventions (Menkar, Algedi, Algieba, Albireo, Almach).
-
-All meaningful FLG flags are now supported for fixed star calculations: `FLG_SIDEREAL`, `FLG_J2000`, `FLG_NONUT`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_TRUEPOS`, `FLG_MOSEPH`, `FLG_SPEED3`, `FLG_TOPOCTR`.
+The catalog uses the updated van Leeuwen 2007 proper motions. All meaningful FLG
+flags are supported for fixed-star calculations: `FLG_SIDEREAL`, `FLG_J2000`,
+`FLG_NONUT`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_TRUEPOS`, `FLG_MOSEPH`, `FLG_SPEED3`,
+`FLG_TOPOCTR`.
 
 ---
 
 ## 12. Ayanamsha (Sidereal Modes)
 
-43 ayanamsha systems are supported, matching the full Swiss Ephemeris set.
+47 predefined ayanamsha systems are supported, covering the full set of standard sidereal modes.
 
 ### Formula-based ayanamshas
 
-| Category | Examples | Max difference vs SwissEph |
+| Category | Examples | Max difference (measured) |
 |----------|----------|---------------------------|
 | Standard | Fagan-Bradley, Lahiri, Raman | <0.0002° |
 | Epoch-based | J2000, J1900, B1950 | <0.0002° |
@@ -593,7 +587,7 @@ Calculated using Besselian elements with the full JPL DE ephemeris for Sun and M
 
 | Property | Precision |
 |----------|-----------|
-| Eclipse maximum timing | <10 seconds vs Swiss Ephemeris |
+| Eclipse maximum timing | <10 seconds (measured) |
 | Contact times | <10 seconds |
 | Eclipse magnitude | ~0.01 |
 | Path width | ~1 km |
@@ -612,8 +606,8 @@ Saros and Inex series numbers are computed from eclipse-to-eclipse relationships
 
 Computed using the Bennett (1982) atmospheric refraction formula with configurable atmospheric conditions (pressure, temperature).
 
-| Event | Precision vs Swiss Ephemeris |
-|-------|------------------------------|
+| Event | Precision (measured) |
+|-------|----------------------|
 | Sunrise/sunset | <30 seconds |
 | Moonrise/moonset | <30 seconds |
 | Meridian transit | <30 seconds |
@@ -635,7 +629,7 @@ Timing precision: <1 day for heliacal rising/setting events.
 
 ## 16. Planetary Positions -- Measured Precision
 
-Tested against Swiss Ephemeris at 100+ random dates within DE440 range (1550--2650 CE):
+Validated across 100+ random dates within the DE440 range (1550--2650 CE):
 
 ### Longitude
 
@@ -652,7 +646,7 @@ Tested against Swiss Ephemeris at 100+ random dates within DE440 range (1550--26
 | Neptune | 1.17 arcsec | 0.24 arcsec |
 | Pluto | 0.75 arcsec | 0.26 arcsec |
 
-All differences are **sub-arcsecond** except the Moon (~3 arcseconds), which reflects the different nutation models and COB correction pipelines between the two libraries. Both values are well within the precision of the underlying DE ephemeris.
+All differences are **sub-arcsecond** except the Moon (~3 arcseconds), which reflects the nutation-model and COB-correction pipeline choices. All values are well within the precision of the underlying DE ephemeris.
 
 ### Latitude
 
@@ -671,7 +665,7 @@ All differences are **sub-arcsecond** except the Moon (~3 arcseconds), which ref
 
 ### Source of measured differences
 
-The differences between LibEphemeris and Swiss Ephemeris are **not errors** in either library. They arise from intentional methodological choices:
+These measured differences are **not errors**. They arise from intentional methodological choices:
 
 | Source | Typical contribution |
 |--------|---------------------|
@@ -691,21 +685,21 @@ LibEphemeris implements `pheno_ut()` / `pheno()` for computing observable planet
 
 The phase angle (Sun-Body-Earth angle) is computed using 3D vector geometry (dot product of geocentric position vectors), which is numerically stable for all configurations including the extremely elongated Sun-Moon-Earth triangle. This avoids the numerical instability of the law-of-cosines approach for bodies at very different distances.
 
-| Body | Max diff vs SE | Notes |
-|------|---------------|-------|
+| Body | Max diff (measured) | Notes |
+|------|---------------------|-------|
 | Sun | 0" | Exact (always 0) |
-| Moon | < 1" | Irreducible JPL vs SE ephemeris difference |
+| Moon | < 1" | Irreducible ephemeris difference |
 | Inner planets | < 20" | Irreducible ephemeris difference |
 | Outer planets | < 24" | Irreducible ephemeris difference |
 
-The 4--24" differences for planets arise from the different underlying ephemerides (JPL DE440 vs DE431) and are not correctable.
+The 4--24" differences for planets arise from the different underlying ephemeris generation and are not correctable.
 
 ### Visual Magnitude
 
 LibEphemeris uses **Mallama & Hilton (2018)** formulas for all planets, published in *The Astronomical Journal* and adopted by the Astronomical Almanac. These are the current standard for planetary magnitude computation.
 
-| Body | Formula | Reference | Max diff vs SE |
-|------|---------|-----------|---------------|
+| Body | Formula | Reference | Max diff (measured) |
+|------|---------|-----------|---------------------|
 | Sun | V(1,0) = -26.86 at 1 AU | Mallama & Hilton 2018 | 0.0000 mag |
 | Moon | V = -12.73 + 0.026\|alpha\| + 4e-9\|alpha\|^4 | Astronomical Almanac, Allen's Astrophysical Quantities | 0.03 mag (normal), 0.2 mag (thin crescent) |
 | Mercury | 6th-order polynomial in alpha | Mallama & Hilton 2018 | 0.001 mag |
@@ -729,30 +723,24 @@ For phase angles > 165 degrees (very thin crescents near new moon), the Astronom
 
 LibEphemeris uses **IAU 2015 equatorial radii** for all bodies, which is the standard adopted by the Astronomical Almanac for computing apparent angular diameters.
 
-| Body | LibEphemeris radius (km) | Standard | SE radius (km) | SE standard |
-|------|------------------------|----------|----------------|-------------|
-| Sun | 695,700.0 | IAU 2015 nominal | 696,002.6 | Internal |
-| Moon | 1,737.4 | IAU mean | 1,737.5 | ~IAU |
-| Mercury | 2,439.7 | IAU equatorial | 2,439.4 | ~IAU |
-| Venus | 6,051.8 | IAU equatorial | 6,051.8 | IAU |
-| Mars | 3,396.2 | IAU equatorial | 3,389.5 | Mean volumetric |
-| Jupiter | 71,492.0 | IAU equatorial | 69,911.0 | Mean volumetric |
-| Saturn | 60,268.0 | IAU equatorial | 58,232.0 | Mean volumetric |
-| Uranus | 25,559.0 | IAU equatorial | 25,362.0 | Mean volumetric |
-| Neptune | 24,764.0 | IAU equatorial | 24,622.0 | Mean volumetric |
-| Pluto | 1,188.3 | IAU mean | 1,188.3 | IAU mean |
+| Body | LibEphemeris radius (km) | Standard |
+|------|------------------------|----------|
+| Sun | 695,700.0 | IAU 2015 nominal |
+| Moon | 1,737.4 | IAU mean |
+| Mercury | 2,439.7 | IAU equatorial |
+| Venus | 6,051.8 | IAU equatorial |
+| Mars | 3,396.2 | IAU equatorial |
+| Jupiter | 71,492.0 | IAU equatorial |
+| Saturn | 60,268.0 | IAU equatorial |
+| Uranus | 25,559.0 | IAU equatorial |
+| Neptune | 24,764.0 | IAU equatorial |
+| Pluto | 1,188.3 | IAU mean |
 
-The equatorial radius is the correct choice for apparent diameter because it represents the maximum cross-section as seen from an external observer. The mean volumetric radius used by Swiss Ephemeris produces systematically smaller diameters (2--3.5% for giant planets). The IAU equatorial values are the standard used in the Astronomical Almanac and professional observatory software.
-
-### Swiss Ephemeris comparison
-
-The differences in `pheno_ut` between LibEphemeris and Swiss Ephemeris fall into three categories:
-
-1. **Irreducible ephemeris differences** (phase angle, elongation): 4--24 arcseconds for planets, caused by DE440 vs DE431. These cannot be eliminated and represent the improved accuracy of the newer ephemeris.
-
-2. **Intentional methodology differences** (apparent diameter): 2--3.5% for giant planets, caused by using IAU equatorial radii vs mean volumetric radii. The IAU values are the professional standard.
-
-3. **Equivalent precision** (magnitude): < 0.01 mag for all planets except Moon thin crescents and Pluto. Both libraries use similar Mallama 2018 formulas; residual differences are from distance calculations via different ephemerides.
+The equatorial radius is the correct choice for apparent diameter because it
+represents the maximum cross-section as seen from an external observer. A mean
+volumetric radius produces systematically smaller diameters (2--3.5% for giant
+planets); the IAU equatorial values are the standard used in the Astronomical
+Almanac and professional observatory software.
 
 ---
 
@@ -786,7 +774,7 @@ Memory overhead per context: ~1 KB. Ephemeris files (DE440: ~119 MB) are loaded 
 
 ## 20. Comprehensive Precision Audit
 
-A deep cross-validation audit was performed across all calculation modes and coordinate systems. This section summarizes the findings.
+A deep cross-validation audit was performed across all calculation modes and coordinate systems, using `pyswisseph` as a black-box validation oracle. This section summarizes the findings.
 
 ### Planetary positions at extreme dates
 
@@ -800,11 +788,11 @@ Tested all 10 major bodies (Sun through Pluto) at dates spanning 1551--2649 CE (
 | 16th--17th century | 1551--1600 | ~11" | Moon only exceeds threshold |
 | 22nd--27th century | 2149--2649 | up to 283" | Moon most sensitive; outer planets remain <3" |
 
-The divergence at extreme dates is driven by Delta-T model differences (Stephenson et al. 2016 vs Espenak & Meeus 2006). The Moon's rapid motion (~13°/day) amplifies any time-base discrepancy. Outer planets are insensitive due to slow motion and remain within tolerance at all dates.
+The divergence at extreme dates is driven by ΔT-extrapolation differences. The Moon's rapid motion (~13°/day) amplifies any time-base discrepancy. Outer planets are insensitive due to slow motion and remain within tolerance at all dates.
 
 ### Fixed stars
 
-Tested 116 stars at 3 epochs (J2000, J2025, J2100). Proper motions updated to van Leeuwen 2007 (new Hipparcos reduction). All stars independently cross-checked against SIMBAD.
+Tested 116 representative stars at 3 epochs (J2000, J2025, J2100). Proper motions updated to van Leeuwen 2007 (new Hipparcos reduction). All stars independently cross-checked against SIMBAD.
 
 | Metric | Value |
 |--------|-------|
@@ -814,7 +802,7 @@ Tested 116 stars at 3 epochs (J2000, J2025, J2100). Proper motions updated to va
 | Stars within 0.1" | 80% of 101 comparable stars |
 | Catalog bugs found & fixed | 2 (Algedi wrong component, Asellus Borealis wrong HIP) |
 
-Remaining sub-arcsecond differences are from Skyfield vs Swiss Ephemeris precession/nutation pipeline differences. High proper motion stars (Sirius, Rigil Kentaurus) show largest differences due to annual parallax (not modeled).
+Remaining sub-arcsecond differences are from precession/nutation pipeline choices. High proper motion stars (Sirius, Rigil Kentaurus) show largest differences due to annual parallax (not modeled).
 
 ### House cusps at extreme latitudes
 
@@ -863,10 +851,10 @@ Tested Lahiri, Raman, Krishnamurti, and Fagan/Bradley ayanamshas.
 |-----|-------------------|-------|
 | Modern (1900--2025) | <1 sec | Both use IERS observed data |
 | Historical (1700--1900) | <1 sec | Model blending differences |
-| Pre-telescope (<1700) | up to 187 sec | Different models (SMH 2016 vs E&M 2006) |
-| Future (>2025) | up to 297 sec (at 2500) | Both extrapolate with different parabolas |
+| Pre-telescope (<1700) | up to 187 sec | Different deep-past ΔT reconstructions |
+| Future (>2025) | up to 297 sec (at 2500) | Different future parabolic extrapolations |
 
-LibEphemeris uses the more recent Stephenson, Morrison & Hohenkerk (2016) model. For the modern era where observed data exists, both libraries agree to sub-second precision.
+LibEphemeris uses the Stephenson, Morrison & Hohenkerk (2016) reconstruction. For the modern era where observed data exists, agreement is sub-second.
 
 ### Ecliptic obliquity and nutation
 
@@ -877,17 +865,23 @@ LibEphemeris uses the more recent Stephenson, Morrison & Hohenkerk (2016) model.
 | Nutation in longitude | 0.0013" |
 | Nutation in obliquity | 0.00087" |
 
-Sub-milliarcsecond agreement across all tested dates (1800--2200). Both libraries implement IAU 2006/2000A correctly.
+Sub-milliarcsecond agreement across all tested dates (1800--2200), implementing IAU 2006/2000A correctly.
 
 ### FLG_MOSEPH behavior
 
-When `FLG_MOSEPH` (flag value 4) is passed, Swiss Ephemeris falls back to the Moshier semi-analytical ephemeris. LibEphemeris accepts this flag for API compatibility but always uses JPL DE440. The resulting differences (typically <0.2" for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug in either library.
+The `FLG_MOSEPH` flag (value 4) is accepted for API compatibility but always
+resolves to JPL DE440 — there is no Moshier semi-analytical fallback. Against an
+engine that does fall back to Moshier the resulting differences (typically <0.2"
+for modern dates) reflect the lower precision of the Moshier ephemeris, not a bug.
 
 ---
 
 ## See Also
 
-- **[Swiss Ephemeris Comparison](swisseph-comparison.md)** — Exhaustive comparison between libephemeris and pyswisseph, including measured precision tables, known differences with detailed explanations, bugs found and fixed, and API signature differences. Based on 1,619 automated tests covering all 87 `swe_*` functions.
+- **[Swiss Ephemeris Comparison](../comparison/index.md)** — the centralized
+  head-to-head with pyswisseph: measured precision tables, known differences with
+  detailed explanations, intentional divergences, bugs found and fixed, and API
+  signature differences.
 
 ---
 

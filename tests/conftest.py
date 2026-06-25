@@ -2,9 +2,7 @@
 pytest configuration and shared fixtures for LibEphemeris tests.
 
 This module provides test infrastructure for libephemeris standalone tests
-(no pyswisseph/swisseph dependency required).
-
-For comparison tests against pyswisseph, see compare_scripts/tests/conftest.py
+(no external reference-ephemeris dependency required).
 """
 
 import logging
@@ -48,7 +46,7 @@ def disable_strict_precision_for_tests():
     ephem.set_strict_precision(False)
     yield
     # Restore original state
-    ephem.set_strict_precision(original if original else None)
+    ephem.set_strict_precision(original)
 
 
 # ============================================================================
@@ -65,7 +63,15 @@ def disable_auto_spk_download_for_tests():
     original = ephem.get_auto_spk_download()
     ephem.set_auto_spk_download(False)
     yield
-    ephem.set_auto_spk_download(original if original else None)
+    ephem.set_auto_spk_download(original)
+
+
+# NOTE on calc-mode isolation: since issue #30, close() preserves an
+# explicitly set calculation mode (process-level configuration). The
+# reset_ephemeris_state fixture below restores _CALC_MODE per test; test
+# modules that must run without LEB (regardless of earlier explicit
+# set_calc_mode calls in the worker) should monkeypatch
+# state._CALC_MODE to None themselves rather than relying on close().
 
 
 # ============================================================================
@@ -748,7 +754,4 @@ def pytest_configure(config):
         "markers", "network: marks tests that require network access"
     )
     config.addinivalue_line("markers", "precision: mark test as high-precision")
-    config.addinivalue_line(
-        "markers", "comparison: mark test as comparison with pyswisseph"
-    )
     config.addinivalue_line("markers", "edge_case: mark test as edge case")

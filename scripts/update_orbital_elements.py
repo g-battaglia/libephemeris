@@ -45,7 +45,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from libephemeris.minor_bodies import OrbitalElements
+    from libephemeris.minor_bodies import OrbitalElements  # noqa: F401 (availability probe)
 
 # Ensure libephemeris can be imported from the project root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -507,7 +507,10 @@ Quarterly Maintenance:
 
     # Import MINOR_BODY_ELEMENTS
     try:
-        from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, OrbitalElements
+        from libephemeris.minor_bodies import (  # noqa: F401 (probe)
+            MINOR_BODY_ELEMENTS,
+            OrbitalElements,
+        )
         from libephemeris.constants import (
             CHIRON,
             PHOLUS,

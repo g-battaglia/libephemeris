@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (
@@ -12,8 +11,6 @@ from libephemeris.constants import (
     ECL_ANNULAR,
     ECL_PARTIAL,
     ECL_PENUMBRAL,
-    ECL_CENTRAL,
-    ECL_NONCENTRAL,
     FLG_SWIEPH,
 )
 

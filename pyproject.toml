@@ -1,16 +1,21 @@
 [project]
 name = "libephemeris"
-version = "2.0.2"
+version = "3.0.0rc1"
 description = "A high-precision, open-source astronomical ephemeris library for Python, powered by Skyfield."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "AGPL-3.0-only"
-license-files = ["LICENSE"]
+license-files = [
+    "LICENSE",
+    "LICENSING.md",
+    "NOTICE.md",
+    "THIRD_PARTY_NOTICES.md",
+]
 authors = [
-    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+    { name = "Giacomo Battaglia", email = "kerykeion.astrology@gmail.com" }
 ]
 maintainers = [
-    { name = "Giacomo Battaglia", email = "giacomo@libephemeris.dev" }
+    { name = "Giacomo Battaglia", email = "kerykeion.astrology@gmail.com" }
 ]
 keywords = [
     "astronomy",
@@ -25,7 +30,7 @@ keywords = [
     "zodiac",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
@@ -52,7 +57,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Star catalog building (scripts/build_star_catalog.py)
+# Star catalog building (scripts/build_star_catalog_v2.py)
 stars = [
     "astropy>=5.0.0",
 ]
@@ -71,7 +76,6 @@ dev = [
     "black>=25.1.0",
     "mypy>=1.0.0",
     "poethepoet>=0.37.0,<0.38.0",
-    "pyswisseph>=2.10.3.2",  # Comparison/validation tests only — not a runtime dependency
     "pytest>=8.0.0,<9.0.0",
     "pytest-xdist>=3.5.0",
     "ruff>=0.14.6",
@@ -101,7 +105,9 @@ Changelog = "https://github.com/g-battaglia/libephemeris/blob/main/CHANGELOG.md"
 
 [project.scripts]
 libephemeris = "libephemeris.cli:main"
-leph = "libephemeris.dev_cli:main"
+# leph (the dev CLI) is repo tooling with repo-relative paths and is
+# deliberately NOT shipped in the wheel.  From a source checkout use
+# ./leph, `python -m libephemeris.dev_cli`, or `poe leph -- <args>`.
 
 
 
@@ -110,11 +116,13 @@ requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
+# libephemeris.dev_cli (the leph dev CLI) is intentionally excluded:
+# it is repo tooling with repo-relative paths (tests/, scripts/, data/)
+# that only works from a source checkout.
 packages = [
     "libephemeris",
     "libephemeris.cli",
     "libephemeris.contrib",
-    "libephemeris.dev_cli",
     "libephemeris.moon_theories",
     "libephemeris.vendor",
 ]
@@ -131,72 +139,63 @@ libephemeris = ["py.typed", "data/*.csv", "data/leb2/base_core.leb2"]
 #
 # Naming convention:
 #   test:<backend>:<variant>         — unit tests via <backend>
-#   test:compare:<backend>:<variant> — libephemeris vs pyswisseph via <backend>
 #
-# Test matrix: every backend gets core / fast / full / compare / compare:full.
+# Test matrix: every backend gets core / fast / full.
 # ---------------------------------------------------------------------------
 
 [tool.poe.tasks]
 
-# --- Setup ---
-"setup:reference" = {cmd = "python scripts/download_reference_data.py", help = "Download reference data for comparison tests (~3.4 MB)"}
+# Dev CLI launcher (leph is not a wheel entry point; see project.scripts)
+leph = {cmd = "python -m libephemeris.dev_cli", help = "Run the leph dev CLI (poe leph -- <args>)"}
 
 # --- Code quality ---
-lint = {cmd = "leph code lint", help = "Lint all Python files (ruff, auto-fix)"}
-format = {cmd = "leph code format", help = "Format all Python files (ruff)"}
-typecheck = {cmd = "leph code typecheck", help = "Type-check libephemeris (mypy)"}
+lint = {cmd = "python -m libephemeris.dev_cli code lint", help = "Lint all Python files (ruff, auto-fix)"}
+format = {cmd = "python -m libephemeris.dev_cli code format", help = "Format all Python files (ruff)"}
+typecheck = {cmd = "python -m libephemeris.dev_cli code typecheck", help = "Type-check libephemeris (mypy)"}
 
 # --- Skyfield backend: core / fast / full ---
-"test:skyfield:core" = {cmd = "leph test skyfield essential", help = "Skyfield essential ~490 tests, ~20s (parallel)"}
-"test:skyfield:fast" = {cmd = "leph test skyfield unit-fast", help = "Skyfield unit tests ~5890, ~1 min (parallel, no @slow)"}
-"test:skyfield:full" = {cmd = "leph test skyfield all-full-fast", help = "Skyfield ALL tests including @slow (parallel)"}
+"test:skyfield:core" = {cmd = "python -m libephemeris.dev_cli test skyfield essential", help = "Skyfield essential ~490 tests, ~20s (parallel)"}
+"test:skyfield:fast" = {cmd = "python -m libephemeris.dev_cli test skyfield unit-fast", help = "Skyfield unit tests ~5890, ~1 min (parallel, no @slow)"}
+"test:skyfield:full" = {cmd = "python -m libephemeris.dev_cli test skyfield all-full-fast", help = "Skyfield ALL tests including @slow (parallel)"}
 
 # --- LEB backend: core / fast / full ---
-"test:leb:core" = {cmd = "leph test leb-backend essential", help = "LEB essential ~490 tests, ~20s (parallel)"}
-"test:leb:fast" = {cmd = "leph test leb-backend unit-fast", help = "LEB unit tests ~5890, ~1 min (parallel, no @slow) [RECOMMENDED]"}
-"test:leb:full" = {cmd = "leph test leb-backend unit-full", help = "LEB ALL unit tests including @slow (sequential)"}
+"test:leb:core" = {cmd = "python -m libephemeris.dev_cli test leb-backend essential", help = "LEB essential ~490 tests, ~20s (parallel)"}
+"test:leb:fast" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-fast", help = "LEB unit tests ~5890, ~1 min (parallel, no @slow) [RECOMMENDED]"}
+"test:leb:full" = {cmd = "python -m libephemeris.dev_cli test leb-backend unit-full", help = "LEB ALL unit tests including @slow (sequential)"}
 
 # --- Horizons backend: core / fast / full ---
-"test:horizons:core" = {cmd = "leph test horizons precision-quick", help = "Horizons quick precision check, 50 dates (~15s)"}
-"test:horizons:fast" = {cmd = "leph test horizons precision", help = "Horizons precision 13 bodies, 200 dates (~45s)"}
-"test:horizons:full" = {cmd = "leph test horizons vs-leb", help = "Horizons cross-validate against LEB2 (15 bodies, 100 dates)"}
-
-# --- Compare: libephemeris vs pyswisseph ---
-"test:compare:skyfield" = {cmd = "leph test compare skyfield-fast", help = "Compare vs pyswisseph via Skyfield (parallel, no @slow)"}
-"test:compare:skyfield:full" = {cmd = "leph test compare skyfield-full", help = "Compare vs pyswisseph via Skyfield (ALL tests)"}
-"test:compare:leb" = {cmd = "leph test compare leb-backend", help = "Compare vs pyswisseph via LEB backend (no @slow)"}
-"test:compare:leb:full" = {cmd = "leph test compare leb-backend-full", help = "Compare vs pyswisseph via LEB backend (ALL tests)"}
-"test:compare:horizons" = {cmd = "leph test compare horizons-backend", help = "Compare vs pyswisseph via Horizons API (no @slow)"}
-"test:compare:horizons:full" = {cmd = "leph test compare horizons-backend-full", help = "Compare vs pyswisseph via Horizons API (ALL tests)"}
-"test:houses" = {cmd = "leph test compare houses", help = "Compare all 25 house systems (26 codes) vs pyswisseph with precision report"}
+"test:horizons:core" = {cmd = "python -m libephemeris.dev_cli test horizons precision-quick", help = "Horizons quick precision check, 50 dates (~15s)"}
+"test:horizons:fast" = {cmd = "python -m libephemeris.dev_cli test horizons precision", help = "Horizons precision 13 bodies, 200 dates (~45s)"}
+"test:horizons:full" = {cmd = "python -m libephemeris.dev_cli test horizons vs-leb", help = "Horizons cross-validate against LEB2 (15 bodies, 100 dates)"}
 
 # --- Coverage ---
-coverage = {cmd = "leph test coverage run", help = "Tests with coverage reports (no @slow)"}
+coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Tests with coverage reports (no @slow)"}
 
 # --- LEB1 generation + verification (resumable group workflow) ---
-"leb:generate:base" = {cmd = "leph leb generate base groups", help = "Generate base tier LEB via group workflow (resumable)"}
-"leb:generate:medium" = {cmd = "leph leb generate medium groups", help = "Generate medium tier LEB via group workflow (resumable)"}
-"leb:generate:extended" = {cmd = "leph leb generate extended groups", help = "Generate extended tier LEB via group workflow (resumable)"}
-"leb:verify:base" = {cmd = "leph leb verify base", help = "Verify base tier LEB file vs Skyfield"}
-"leb:verify:medium" = {cmd = "leph leb verify medium", help = "Verify medium tier LEB file vs Skyfield"}
-"leb:verify:extended" = {cmd = "leph leb verify extended", help = "Verify extended tier LEB file vs Skyfield"}
+"leb:generate:base" = {cmd = "python -m libephemeris.dev_cli leb generate base groups", help = "Generate base tier LEB via group workflow (resumable)"}
+"leb:generate:medium" = {cmd = "python -m libephemeris.dev_cli leb generate medium groups", help = "Generate medium tier LEB via group workflow (resumable)"}
+"leb:generate:extended" = {cmd = "python -m libephemeris.dev_cli leb generate extended groups", help = "Generate extended tier LEB via group workflow (resumable)"}
+"leb:verify:base" = {cmd = "python -m libephemeris.dev_cli leb verify base", help = "Verify base tier LEB file vs Skyfield"}
+"leb:verify:medium" = {cmd = "python -m libephemeris.dev_cli leb verify medium", help = "Verify medium tier LEB file vs Skyfield"}
+"leb:verify:extended" = {cmd = "python -m libephemeris.dev_cli leb verify extended", help = "Verify extended tier LEB file vs Skyfield"}
 
 # --- LEB2 conversion + verification ---
-"leb2:convert:base" = {cmd = "leph leb2 convert base", help = "Convert base tier LEB1 -> LEB2 (all 4 body groups)"}
-"leb2:convert:medium" = {cmd = "leph leb2 convert medium", help = "Convert medium tier LEB1 -> LEB2 (all 4 body groups)"}
-"leb2:convert:extended" = {cmd = "leph leb2 convert extended", help = "Convert extended tier LEB1 -> LEB2 (all 4 body groups)"}
-"leb2:verify:base" = {cmd = "leph leb2 verify base", help = "Verify base tier LEB2 vs LEB1 (<0.003\")"}
-"leb2:verify:medium" = {cmd = "leph leb2 verify medium", help = "Verify medium tier LEB2 vs LEB1 (<0.003\")"}
-"leb2:verify:extended" = {cmd = "leph leb2 verify extended", help = "Verify extended tier LEB2 vs LEB1 (<0.003\")"}
+"leb2:convert:base" = {cmd = "python -m libephemeris.dev_cli leb2 convert base", help = "Convert base tier LEB1 -> LEB2 (all 4 body groups)"}
+"leb2:convert:medium" = {cmd = "python -m libephemeris.dev_cli leb2 convert medium", help = "Convert medium tier LEB1 -> LEB2 (all 4 body groups)"}
+"leb2:convert:extended" = {cmd = "python -m libephemeris.dev_cli leb2 convert extended", help = "Convert extended tier LEB1 -> LEB2 (all 4 body groups)"}
+"leb2:verify:base" = {cmd = "python -m libephemeris.dev_cli leb2 verify base", help = "Verify base tier LEB2 vs LEB1 (<0.003\")"}
+"leb2:verify:medium" = {cmd = "python -m libephemeris.dev_cli leb2 verify medium", help = "Verify medium tier LEB2 vs LEB1 (<0.003\")"}
+"leb2:verify:extended" = {cmd = "python -m libephemeris.dev_cli leb2 verify extended", help = "Verify extended tier LEB2 vs LEB1 (<0.003\")"}
 
-[tool.pytest.ini_options]
-markers = [
-    "leb_compare: LEB vs Skyfield comparison tests (medium tier)",
-    "leb_compare_base: LEB vs Skyfield comparison tests (base tier)",
-    "leb_compare_extended: LEB vs Skyfield comparison tests (extended tier)",
-    "leb_compare_crosstier: Cross-tier consistency tests",
-    "slow: Slow tests excluded from default runs",
-]
+# --- Licensing / provenance gates (local poe tasks only; no CI) ---
+"license:check" = {cmd = "python scripts/check_spdx_headers.py --check", help = "Verify SPDX headers on all shipped source files"}
+"provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Swiss Ephemeris / PyMeeus fingerprint sweep over libephemeris/ (zero-hit gate)"}
+"provenance:hypothetical" = {cmd = "python scripts/check_hypothetical_provenance.py", help = "Verify Uranian/Transpluto elements trace to published sources (zero-mismatch gate)"}
+"wheel:audit" = {cmd = "python scripts/check_wheel_contents.py", help = "Build the wheel and verify packaged contents"}
+
+# pytest configuration lives in pytest.ini (single source of truth);
+# a [tool.pytest.ini_options] section here would be silently ignored
+# because pytest.ini takes precedence.
 
 [tool.mypy]
 python_version = "3.12"
@@ -204,26 +203,40 @@ warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
 
-[tool.ruff]
-exclude = ["compare_scripts"]
-
 [tool.black]
 line-length = 88
 target-version = ["py312"]
 include = '\.pyi?$'
-extend-exclude = '''
-/(
-  compare_scripts
-)/
-'''
 
 [tool.ruff.lint]
-# Ignore star imports (F403, F405) - the library uses star imports for constants
-# Ignore unused imports in __init__.py (F401) - re-exports for public API
-# Ignore module level imports not at top of file (E402) - intentional for __init__.py
-ignore = ["F403", "F405", "F401", "E402"]
-# Also ignore unused local variables (F841) for now - complex astronomical calculations
-extend-ignore = ["F841"]
+# No global ignores: the former blanket F401/F403/F405/E402/F841 list hid
+# real unused imports and variables everywhere.  Files that legitimately
+# star-import or re-export get targeted exemptions below.
+
+[tool.ruff.lint.per-file-ignores]
+# Public API surface: re-exports (F401), star imports (F403/F405) and
+# deliberate late imports after __version__ bootstrapping (E402).
+"libephemeris/__init__.py" = ["F401", "F403", "F405", "E402"]
+# Star-imports the constants module by design (late, after the typed
+# explicit imports — E402 is the documented layout there).
+"libephemeris/planets.py" = ["F403", "F405", "E402"]
+# Test modules conventionally star-import the package/constants; unused
+# locals in tests (ignored tuple components etc.) are accepted noise;
+# E402 covers the pytest.importorskip()-before-import pattern.
+"tests/*" = ["F403", "F405", "F841", "E402"]
+# conftest files re-import fixtures from sibling conftests to register
+# them — those imports look unused but are load-bearing for pytest.
+"tests/**/conftest.py" = ["F401", "F403", "F405"]
+# Re-exports the legacy MOON_*/NAIF_* ids for backward compatibility.
+"libephemeris/planetary_moons.py" = ["F401"]
+# Test bootstrap star-imports the package to expose every symbol.
+"tests/conftest.py" = ["F403", "F405"]
+# Star-imports the constants module by design.
+"libephemeris/houses.py" = ["F403", "F405"]
+# Vendored third-party code (spktype21): kept byte-compatible upstream.
+"libephemeris/vendor/*" = ["E731", "E741"]
+# Standalone scripts insert the repo root on sys.path before importing.
+"scripts/*" = ["E402"]
 
 [tool.coverage.run]
 source = ["libephemeris"]
@@ -231,6 +244,17 @@ branch = true
 parallel = true
 omit = [
     "libephemeris/__pycache__/*",
+    # Out of scope for the 100% target: dev tooling, interactive wizard, vendored code.
+    "libephemeris/dev_cli/*",          # dev tooling (leph CLI), not shipped behavior
+    "libephemeris/cli/*",              # interactive init wizard
+    "libephemeris/vendor/*",           # vendored third-party (spktype21)
+    # Generated data tables (pure coefficients, no logic to exercise).
+    "libephemeris/lunar_apse_corrections.py",
+    "libephemeris/multi_epoch_data.py",
+    "libephemeris/lunar_corrections.py",
+    "libephemeris/true_node_terms.py",
+    "libephemeris/star_catalog_gen.py",
+    "libephemeris/moon_theories/tass17_data.py",
 ]
 
 [tool.coverage.paths]

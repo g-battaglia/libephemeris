@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Exception classes for libephemeris.
 
 This module provides a comprehensive exception hierarchy for ephemeris calculations.
@@ -395,7 +397,7 @@ class SPKNotFoundError(DataNotFoundError):
         lines.append("2. Download and register in one step:")
         if body_id and body_name:
             lines.append(
-                f'   >>> eph.download_and_register_spk("{body_id}", eph.SE_{body_name.upper()})'
+                f'   >>> eph.download_and_register_spk("{body_id}", eph.{body_name.upper()})'
             )
         else:
             lines.append(
@@ -494,7 +496,7 @@ class SPKRequiredError(DataNotFoundError):
             "For accurate calculations, you must either:",
             "",
             "1. Download and register SPK:",
-            f'   >>> eph.download_and_register_spk("{horizons_id}", eph.SE_{body_name.upper()}, '
+            f'   >>> eph.download_and_register_spk("{horizons_id}", eph.{body_name.upper()}, '
             f'"1900-01-01", "2100-01-01")',
             "",
             "2. Enable automatic SPK download:",

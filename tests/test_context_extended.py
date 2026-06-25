@@ -14,7 +14,6 @@ These tests explicitly verify:
 
 import concurrent.futures
 import threading
-from typing import Optional
 
 import pytest
 from skyfield.api import Loader
@@ -150,11 +149,11 @@ class TestGetTimescaleLazyInitialization:
         assert ctx_module._SHARED_TS is not None
         assert ctx_module._SHARED_TS is ts
 
-    def test_get_timescale_also_initializes_loader(self):
+    def test_get_timescale_does_not_initialize_loader(self):
         """
-        get_timescale() should also initialize the loader as a dependency.
-
-        The timescale is created via loader.timescale().
+        get_timescale() reuses state.get_timescale() (one timescale per
+        process) and must NOT initialize the context's own loader as a
+        side effect.
         """
         assert ctx_module._SHARED_LOADER is None
         assert ctx_module._SHARED_TS is None
@@ -162,8 +161,8 @@ class TestGetTimescaleLazyInitialization:
         ctx = EphemerisContext()
         ts = ctx.get_timescale()
 
-        # Both should now be initialized
-        assert ctx_module._SHARED_LOADER is not None
+        # The shared timescale is set; the loader stays untouched
+        assert ctx_module._SHARED_LOADER is None
         assert ctx_module._SHARED_TS is not None
         assert ts is ctx_module._SHARED_TS
 

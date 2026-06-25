@@ -15,7 +15,6 @@ Reference data sources:
 """
 
 import pytest
-import math
 from libephemeris import (
     julday,
     calc_eclipse_first_contact_c1,
@@ -23,7 +22,6 @@ from libephemeris import (
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_ANNULAR,
-    ECL_PARTIAL,
 )
 
 pytestmark = pytest.mark.slow

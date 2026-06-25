@@ -234,7 +234,7 @@ class TestPlutoMagnitudeReturnFormat:
     def test_pheno_ut_returns_correct_structure(self):
         """Verify pheno_ut returns correct flat tuple structure for Pluto.
 
-        pyswisseph returns a flat tuple of 20 floats (not a tuple-of-tuples).
+        The reference ephemeris returns a flat tuple of 20 floats (not a tuple-of-tuples).
         """
         jd = julday(2024, 1, 1, 0)
         result = ephem.pheno_ut(jd, PLUTO, 0)

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Arabic Parts (Lots) calculations for libephemeris.
 
@@ -288,20 +290,34 @@ def calc_all_arabic_parts(
         >>> print(parts['Pars_Fortunae'])
         255.5
 
+    Raises:
+        KeyError: If any required position ('Asc', 'Sun', 'Moon', 'Mercury',
+            'Venus') is missing. The parts are meaningless when computed from a
+            placeholder longitude, so a missing input fails fast rather than
+            silently producing a plausible-but-wrong result.
+
     Note:
-        Missing keys will default to 0.0. Ensure all required positions
-        are present for accurate results.
+        Only 'Sun_lat' is optional (defaults to 0.0); the five longitude keys
+        above are required.
 
         For accurate day/night determination at extreme latitudes (|lat| > 60°),
         provide jd, geo_lat, and geo_lon parameters. This enables 3D horizontal
         coordinate calculation instead of the simplified 2D ecliptic method.
     """
-    asc = positions.get("Asc", 0.0)
-    sun = positions.get("Sun", 0.0)
+    required = ("Asc", "Sun", "Moon", "Mercury", "Venus")
+    missing = [k for k in required if k not in positions]
+    if missing:
+        raise KeyError(
+            "calc_all_arabic_parts missing required position(s): "
+            + ", ".join(missing)
+        )
+
+    asc = positions["Asc"]
+    sun = positions["Sun"]
     sun_lat = positions.get("Sun_lat", 0.0)
-    moon = positions.get("Moon", 0.0)
-    mercury = positions.get("Mercury", 0.0)
-    venus = positions.get("Venus", 0.0)
+    moon = positions["Moon"]
+    mercury = positions["Mercury"]
+    venus = positions["Venus"]
 
     is_diurnal = is_day_chart(
         sun, asc, jd=jd, geo_lat=geo_lat, geo_lon=geo_lon, sun_lat=sun_lat

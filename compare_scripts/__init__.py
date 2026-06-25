@@ -1,1 +1,0 @@
-# Compare scripts package

@@ -57,7 +57,7 @@ class TestFixstarMag:
     def test_fixstar_mag_return_structure(self):
         """Test the return structure of fixstar_mag.
 
-        pyswisseph fixstar_mag returns (magnitude, star_name) tuple.
+        The reference ephemeris fixstar_mag returns (magnitude, star_name) tuple.
         """
         result = ephem.fixstar_mag("Regulus")
 
@@ -112,7 +112,7 @@ class TestFixstar2Mag:
         assert mag == pytest.approx(1.40, abs=0.01)
 
     def test_fixstar2_mag_hip_number_with_comma(self):
-        """Test lookup by HIP number with leading comma (pyswisseph format)."""
+        """Test lookup by HIP number with leading comma (reference ephemeris format)."""
         mag, name = ephem.fixstar2_mag(",65474")
 
         assert name == "Spica,alVir", f"Expected 'Spica,alVir', got '{name}'"

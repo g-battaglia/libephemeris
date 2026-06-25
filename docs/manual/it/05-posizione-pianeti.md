@@ -215,7 +215,7 @@ import libephemeris as ephem
 
 jd = ephem.julday(2024, 4, 8, 21.0)
 
-attr, _ = ephem.pheno_ut(jd, ephem.JUPITER, 0)
+attr = ephem.pheno_ut(jd, ephem.JUPITER, 0)
 
 angolo_fase = attr[0]    # angolo Sole-Pianeta-Terra (gradi)
 fase = attr[1]           # frazione illuminata del disco (0.0–1.0)

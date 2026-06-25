@@ -13,7 +13,6 @@ from libephemeris.constants import (
     SUN,
     MOON,
     FLG_SWIEPH,
-    FLG_SPEED,
 )
 
 JD_J2000 = 2451545.0
@@ -33,7 +32,9 @@ class TestSolcrossBackwards:
         """Previous Sun crossing must be within the past year."""
         jd = swe.solcross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
-        assert JD_J2000 - jd < 370, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        assert JD_J2000 - jd < 370, (
+            f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        )
         sun, _ = swe.calc_ut(jd, SUN, FLG_SWIEPH)
         err = abs(sun[0] - degree)
         if err > 180:
@@ -48,10 +49,20 @@ class TestSolcrossBackwards:
         assert abs(delta - TROPICAL_YEAR) < 2.0, f"Round-trip delta {delta} not ~1 yr"
 
     def test_solcross_forward_back_symmetric(self):
-        """next then back yields the previous crossing; fwd from there = next."""
+        """next then back yields the previous crossing; fwd from there = next.
+
+        A forward search started exactly AT a crossing returns that
+        same instant (reference-ephemeris-verified: swe.solcross_ut from its own
+        returned crossing gives dt = 0.000000000); navigation steps
+        forward by adding a small epsilon past the found crossing.
+        """
         jd_next = swe.solcross_ut(55.0, JD_J2000)
         jd_prev = swe.solcross_ut(55.0, jd_next, backwards=True)
-        jd_forward_again = swe.solcross_ut(55.0, jd_prev)
+        # exactly at a crossing: the crossing "now" is returned
+        jd_same = swe.solcross_ut(55.0, jd_prev)
+        assert abs(jd_same - jd_prev) * 86400 < 0.1
+        # epsilon-forward: the next crossing
+        jd_forward_again = swe.solcross_ut(55.0, jd_prev + 1.0 / 86400.0)
         err_sec = abs(jd_forward_again - jd_next) * 86400
         assert err_sec < 0.1, f"Forward-from-prev ≠ next: {err_sec}s"
 
@@ -62,6 +73,13 @@ class TestSolcrossBackwards:
         for _ in range(3):
             jd = swe.solcross_ut(55.0, jd)
             forward_marks.append(jd)
+            # Epsilon-forward past this crossing so the next search advances:
+            # like the reference ephemeris, solcross_ut from an exact crossing returns that
+            # same crossing (see test_solcross_forward_back_symmetric above).
+            jd += 1.0 / 86400.0
+        # Navigate backward from the last mark exactly: the backward at-crossing
+        # guard steps a full cycle to the previous crossing.
+        jd = forward_marks[-1]
         for expected in reversed(forward_marks[:-1]):
             jd = swe.solcross_ut(55.0, jd, backwards=True)
             assert abs(jd - expected) * 86400 < 0.1
@@ -76,7 +94,9 @@ class TestMooncrossBackwards:
         """Previous Moon crossing must be within the past sidereal month."""
         jd = swe.mooncross_ut(degree, JD_J2000, FLG_SWIEPH, backwards=True)
         assert jd < JD_J2000
-        assert JD_J2000 - jd < 30, f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        assert JD_J2000 - jd < 30, (
+            f"Previous {degree}° too far back: {JD_J2000 - jd} days"
+        )
         moon, _ = swe.calc_ut(jd, MOON, FLG_SWIEPH)
         err = abs(moon[0] - degree)
         if err > 180:
@@ -91,13 +111,17 @@ class TestMooncrossBackwards:
         assert abs(delta - SIDEREAL_MONTH) < 0.5, f"Delta {delta} ≠ ~27.32d"
 
     def test_mooncross_multi_step(self):
+        """Forward/backward navigation with epsilon-stepping past each
+        found crossing (a search started exactly at a crossing may
+        return that same instant — see the solcross test above)."""
+        eps = 1.0 / 86400.0
         jd = JD_J2000
         forward_marks = []
         for _ in range(3):
-            jd = swe.mooncross_ut(120.0, jd)
+            jd = swe.mooncross_ut(120.0, jd + eps)
             forward_marks.append(jd)
         for expected in reversed(forward_marks[:-1]):
-            jd = swe.mooncross_ut(120.0, jd, backwards=True)
+            jd = swe.mooncross_ut(120.0, jd - eps, backwards=True)
             assert abs(jd - expected) * 86400 < 0.1
 
 

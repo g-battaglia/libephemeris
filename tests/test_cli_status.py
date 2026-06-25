@@ -403,7 +403,7 @@ def test_download_all_includes_iers_downloads(monkeypatch):
     runner = CliRunner()
     result = runner.invoke(
         cli_module.cli,
-        ["download", "all", "--force", "--no-progress", "--quiet"],
+        ["download", "all", "--force", "--no-progress", "--quiet", "--yes"],
     )
 
     assert result.exit_code == 0, result.output

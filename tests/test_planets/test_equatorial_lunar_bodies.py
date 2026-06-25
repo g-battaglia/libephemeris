@@ -10,13 +10,11 @@ the equatorial conversion entirely, returning ecliptic coordinates
 regardless of the FLG_EQUATORIAL flag.
 """
 
-import math
 import pytest
 
 from libephemeris import calc_ut
 from libephemeris.constants import (
     SUN,
-    MOON,
     MEAN_NODE,
     TRUE_NODE,
     MEAN_APOG,

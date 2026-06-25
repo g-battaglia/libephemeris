@@ -46,7 +46,7 @@ class TestExceptionHierarchyStructure:
 
     @pytest.mark.unit
     def test_error_is_exception(self):
-        """Error should inherit from Exception (pyswisseph compatibility)."""
+        """Error should inherit from Exception (reference-API compatibility)."""
         assert issubclass(Error, Exception)
 
     @pytest.mark.unit

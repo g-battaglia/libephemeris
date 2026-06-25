@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import FLG_SWIEPH
 
 
 @pytest.fixture(autouse=True)

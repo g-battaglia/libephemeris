@@ -12,8 +12,6 @@ from libephemeris.true_node_terms import (
     TrueNodeTerm,
     MAIN_SOLAR_TERMS,
     SECOND_ORDER_SOLAR_TERMS,
-    THIRD_ORDER_TERMS,
-    F_INCLINATION_TERMS,
     VENUS_TERMS,
     MARS_TERMS,
     JUPITER_TERMS,

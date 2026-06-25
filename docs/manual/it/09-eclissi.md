@@ -167,7 +167,7 @@ lat, lon = 41.9028, 12.4964  # Roma
 
 # Cerca la prossima eclissi solare visibile da Roma
 ecl_type, tempi, attr = ephem.sol_eclipse_when_loc(
-    jd, lat, lon, altitude=0.0
+    jd, (lon, lat, 0.0)
 )
 
 jd_max = tempi[0]

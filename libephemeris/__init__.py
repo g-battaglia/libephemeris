@@ -1,6 +1,8 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """LibEphemeris -- high-precision astronomical ephemeris library.
 
-Pure Python, API-compatible with PySwissEphemeris, using NASA JPL
+Pure Python, API-compatible with the reference ephemeris, using NASA JPL
 DE440/DE441 ephemerides via Skyfield and IAU 2006/2000A standards via pyerfa.
 
 Calculation backend:
@@ -41,6 +43,7 @@ _load_config()
 del _load_config
 
 from .constants import *
+from .constants import FLG_SPEED, GREG_CAL, JUL_CAL
 from .logging_config import (
     get_logger,
     set_log_level,
@@ -181,6 +184,9 @@ from .state import (
     # IERS Delta T configuration
     set_iers_delta_t_enabled,
     get_iers_delta_t_enabled,
+    # Delta T model selection
+    set_delta_t_model,
+    get_delta_t_model,
     # Strict precision mode
     set_strict_precision,
     get_strict_precision,
@@ -633,16 +639,16 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "2.0.2"
+__version__ = "3.0.0rc1"
 version = __version__
 __author__ = "Giacomo Battaglia"
-__license__ = "AGPL-3.0"
+__license__ = "AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial"
 
 # Note: the original Pythonic variants of sol_eclipse_*, lun_eclipse_*,
 # lun_occult_when_loc, heliacal_ut, heliacal_pheno_ut, and gauquelin_sector
 # are imported above as _*_pythonic from their source modules. They are
 # kept as private helpers, NOT re-exported as public bare names. The
-# public bare names are the pyswisseph-compatible wrappers.
+# public bare names are the reference-API-compatible wrappers.
 
 __all__ = [
     # .env file loader
@@ -925,7 +931,7 @@ __all__ = [
     "azalt_rev",
     "refrac",
     "refrac_extended",
-    # swe_ prefixed utility aliases (pyswisseph compatibility)
+    # swe_ prefixed utility aliases (reference-API compatibility)
     "get_planet_name",
     "version",
     "ECL2HOR",
@@ -989,6 +995,9 @@ __all__ = [
     # IERS Delta T configuration
     "set_iers_delta_t_enabled",
     "get_iers_delta_t_enabled",
+    # Delta T model selection
+    "set_delta_t_model",
+    "get_delta_t_model",
     # Strict precision mode
     "set_strict_precision",
     "get_strict_precision",
@@ -1106,7 +1115,7 @@ __all__ = [
     "FLG_JPLEPH",
     "FLG_SWIEPH",
     "FLG_MOSEPH",
-    # Bare-name constants (pyswisseph-compatible, without SE_/SEFLG_ prefix)
+    # Bare-name constants (reference-API-compatible, without SE_/SEFLG_ prefix)
     "ACRONYCHAL_RISING",
     "ACRONYCHAL_SETTING",
     "ADMETOS",
@@ -1224,6 +1233,7 @@ __all__ = [
     "HELFLAG_VISLIM_DARK",
     "HELFLAG_VISLIM_NOMOON",
     "HELFLAG_VISLIM_PHOTOPIC",
+    "HELFLAG_VISLIM_SCOTOPIC",
     "HELIACAL_RISING",
     "HELIACAL_SETTING",
     "INTP_APOG",

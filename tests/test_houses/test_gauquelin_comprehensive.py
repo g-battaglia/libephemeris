@@ -13,14 +13,8 @@ import libephemeris as swe
 from libephemeris.constants import (
     SUN,
     MOON,
-    MERCURY,
-    VENUS,
     MARS,
     JUPITER,
-    SATURN,
-    FLG_SWIEPH,
-    FLG_TOPOCTR,
-    FLG_SPEED,
 )
 
 

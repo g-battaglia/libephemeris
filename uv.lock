@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "2.0.1"
+version = "3.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
@@ -588,7 +588,6 @@ dev = [
     { name = "markdown" },
     { name = "mypy" },
     { name = "poethepoet" },
-    { name = "pyswisseph" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-sugar" },
@@ -630,7 +629,6 @@ requires-dist = [
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "poethepoet", marker = "extra == 'dev'", specifier = ">=0.37.0,<0.38.0" },
     { name = "pyerfa", specifier = ">=2.0.0" },
-    { name = "pyswisseph", marker = "extra == 'dev'", specifier = ">=2.10.3.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0,<9.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.1.1" },
@@ -1152,12 +1150,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/e7/82/28175b2414effca1c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/24/12818598c362d7f300f18e74db45963dbcb85150324092410c8b49405e42/pyproject_hooks-1.2.0-py3-none-any.whl", hash = "sha256:9e5c6bfa8dcc30091c74b0cf803c81fdd29d94f01992a7707bc97babb1141913", size = 10216, upload-time = "2024-09-29T09:24:11.978Z" },
 ]
-
-[[package]]
-name = "pyswisseph"
-version = "2.10.3.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/66/a6/db70d67a00dda42ebd033538c086879328f4c17f670eafe8aca2f11abfef/pyswisseph-2.10.3.2.tar.gz", hash = "sha256:c54c305e83dbd5d2b71e58d8a69d8ee41de24c4d3328ce09e2af860a3537624d", size = 6940913, upload-time = "2023-06-04T17:05:53.293Z" }
 
 [[package]]
 name = "pytest"

@@ -1,7 +1,7 @@
 """
-Test that error messages match pyswisseph format for client code compatibility.
+Test that error messages match the reference ephemeris format for client code compatibility.
 
-This module tests that libephemeris error messages use the same format as pyswisseph,
+This module tests that libephemeris error messages use the same format as the reference ephemeris,
 allowing existing client code that does pattern matching on error messages to work
 correctly with libephemeris.
 
@@ -17,15 +17,14 @@ from libephemeris.exceptions import Error
 
 
 class TestErrorMessageFormat:
-    """Test that error messages match pyswisseph format."""
+    """Test that error messages match the reference ephemeris format."""
 
     def test_illegal_planet_number_format_in_message(self):
         """
         Error messages for invalid planets should contain 'illegal planet number'.
 
-        pyswisseph uses format: "illegal planet number {n}."
+        The reference ephemeris uses format: "illegal planet number {n}."
         """
-        import libephemeris as ephem
 
         # These should fail silently (return zeros) rather than raise
         # because invalid planets in _calc_body just return zeros
@@ -36,7 +35,7 @@ class TestErrorMessageFormat:
         """
         Error messages for stars not found should contain 'could not find star name'.
 
-        pyswisseph uses format: "could not find star name {name}"
+        The reference ephemeris uses format: "could not find star name {name}"
         """
         from libephemeris.fixed_stars import fixstar_ut, fixstar2_ut
 
@@ -52,7 +51,7 @@ class TestErrorMessageFormat:
         """
         Error messages for polar circle houses should contain 'polar circle'.
 
-        libephemeris uses a more descriptive format than pyswisseph:
+        libephemeris uses a more descriptive format than the reference ephemeris:
         "(within Northern polar circle)" with suggestions for alternatives.
         """
         import libephemeris as ephem
@@ -116,7 +115,7 @@ class TestPatternMatchingCompatibility:
     """
     Test that client code can pattern match on error messages.
 
-    These tests simulate what existing pyswisseph client code might do.
+    These tests simulate what existing reference ephemeris client code might do.
     """
 
     def test_can_detect_illegal_planet_pattern(self):

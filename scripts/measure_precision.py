@@ -75,7 +75,7 @@ def angular_sep_arcsec(lon1, lat1, lon2, lat2):
     lon1r, lat1r = math.radians(lon1), math.radians(lat1)
     lon2r, lat2r = math.radians(lon2), math.radians(lat2)
     dlon = lon2r - lon1r
-    dlat = lat2r - lat1r
+    lat2r - lat1r
     # Vincenty formula for better numerical stability
     a = math.cos(lat2r) * math.sin(dlon)
     b = math.cos(lat1r) * math.sin(lat2r) - math.sin(lat1r) * math.cos(

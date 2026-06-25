@@ -14,7 +14,6 @@ Key tests:
 4. Integration with calc_interpolated_apogee() produces improved results
 """
 
-import math
 import pytest
 from libephemeris.lunar import (
     _calc_elp2000_apogee_perturbations,

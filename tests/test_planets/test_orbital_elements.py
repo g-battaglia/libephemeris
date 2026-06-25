@@ -10,7 +10,7 @@ This function calculates Keplerian orbital elements:
 - Mean anomaly (M)
 - And other derived parameters
 
-The function returns a 50-element tuple matching pyswisseph's format.
+The function returns a 50-element tuple matching the reference ephemeris's format.
 """
 
 import pytest

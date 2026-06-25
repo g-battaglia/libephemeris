@@ -15,7 +15,6 @@ are skipped by default. Set LIBEPHEMERIS_TEST_MOON_SPK=1 to run them.
 
 import os
 import pytest
-from unittest.mock import patch, MagicMock
 
 import libephemeris as eph
 from libephemeris import planetary_moons, state
@@ -70,6 +69,42 @@ class TestMoonConstants:
         assert MOON_PHOBOS == MOON_OFFSET + 41  # 9041
         assert MOON_DEIMOS == MOON_OFFSET + 42  # 9042
         assert MOON_CHARON == MOON_OFFSET + 51  # 9051
+
+
+class TestCanonicalMoonIds:
+    """Canonical scheme: ipl = PLMOON_OFFSET + NAIF id (reference parity)."""
+
+    def test_canonical_constants(self):
+        """PLMOON_* constants encode PLMOON_OFFSET + NAIF id."""
+        assert eph.PLMOON_OFFSET == 9000
+        assert eph.PLMOON_IO == 9501
+        assert eph.PLMOON_TITAN == 9606
+        assert eph.PLMOON_CHARON == 9901
+        assert eph.PLMOON_PHOBOS == 9401
+
+    def test_canonical_ids_are_moons(self):
+        """is_planetary_moon accepts canonical ids, including unnamed ones."""
+        assert planetary_moons.is_planetary_moon(9501) is True  # Io
+        assert planetary_moons.is_planetary_moon(9606) is True  # Titan
+        assert planetary_moons.is_planetary_moon(9505) is True  # Amalthea
+        assert planetary_moons.is_planetary_moon(9599) is True  # Jupiter COB
+        # Below the NAIF satellite range: not moons
+        assert planetary_moons.is_planetary_moon(9000) is False
+        assert planetary_moons.is_planetary_moon(9400) is False
+
+    def test_legacy_and_canonical_resolve_same_naif(self):
+        """Legacy aliases and canonical ids map to the same NAIF target."""
+        assert planetary_moons._moon_naif_id(MOON_IO) == 501
+        assert planetary_moons._moon_naif_id(9501) == 501
+        assert planetary_moons._moon_naif_id(MOON_TITAN) == 606
+        assert planetary_moons._moon_naif_id(9606) == 606
+
+    def test_canonical_names(self):
+        """get_moon_name and get_planet_name resolve canonical ids."""
+        assert planetary_moons.get_moon_name(9501) == "Io"
+        assert planetary_moons.get_moon_name(9606) == "Titan"
+        assert eph.get_planet_name(9501) == "Io"
+        assert eph.get_planet_name(MOON_IO) == "Io"
 
 
 class TestNaifMapping:
@@ -195,15 +230,20 @@ class TestMoonPositionUnregistered:
         """Clean up after each test."""
         planetary_moons.close_moon_kernels()
 
-    def test_calc_ut_unregistered_moon_returns_zeros(self):
-        """Test that calc_ut returns zeros for unregistered moon."""
-        jd = 2451545.0  # J2000.0
-        pos, flag = eph.calc_ut(jd, MOON_IO, FLG_SPEED)
+    def test_calc_ut_unregistered_moon_raises(self):
+        """calc_ut raises Error for an unregistered moon (reference parity).
 
-        # Unregistered moon should return zeros
-        assert pos[0] == 0.0  # longitude
-        assert pos[1] == 0.0  # latitude
-        assert pos[2] == 0.0  # distance
+        The reference API raises (reporting that the satellite ephemeris file
+        'sepm9501.se1' is not found) when the satellite ephemeris is
+        unavailable; silent zeros would be
+        indistinguishable from a real position.
+        """
+        jd = 2451545.0  # J2000.0
+        with pytest.raises(eph.Error):
+            eph.calc_ut(jd, MOON_IO, FLG_SPEED)
+        # Canonical id (PLMOON_OFFSET + NAIF, Io = 9501) behaves the same
+        with pytest.raises(eph.Error):
+            eph.calc_ut(jd, 9501, FLG_SPEED)
 
 
 class TestMoonParentMapping:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """LEB1 binary ephemeris generation and verification commands.
 
 Replaces 28 poe tasks: leb:generate:*, leb:verify:*.
@@ -64,9 +66,9 @@ def _gen(args: list[str]) -> None:
     "planetary positions. At runtime they provide ~14x speedup over computing\n"
     "positions from DE440 kernels via Skyfield.\n\n"
     "Three precision tiers are available:\n\n"
-    "  base      de440s, 1850-2150   (~5 MB)\n"
-    "  medium    de440,  1550-2650   (~20 MB, default)\n"
-    "  extended  de441, -5000 to 5000 (~180 MB)\n\n"
+    "  base      de440s, 1850-2150    (~53 MB)\n"
+    "  medium    de440,  1550-2650    (~175 MB, default)\n"
+    "  extended  de441, -5000 to 5000 (~1.6 GB)\n\n"
     "Recommended workflow (avoids macOS multiprocessing deadlocks):\n\n"
     "  leph leb generate medium groups   # planets + asteroids + analytical + merge\n"
     "  leph leb verify medium            # verify the generated file",

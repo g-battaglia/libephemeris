@@ -12,7 +12,6 @@ Test categories:
 """
 
 import math
-from datetime import datetime
 
 import pytest
 
@@ -337,7 +336,6 @@ class TestPNM06aMatrix:
     @pytest.mark.skipif(not HAS_ERFA, reason="pyerfa not installed")
     def test_pnm06a_at_j2000_near_identity(self):
         """At J2000.0, the matrix should be close to identity (small corrections)."""
-        import numpy as np
 
         rbpn = get_erfa_pnm06a_matrix(J2000_JD)
 

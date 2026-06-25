@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Time conversion utilities for libephemeris.
 
@@ -6,7 +8,7 @@ Implements standard astronomical time functions for conversions between:
 - Gregorian and Julian calendar systems
 - UT1 (Universal Time) and TT (Terrestrial Time)
 
-Functions provide pyswisseph-compatible API signatures.
+Functions provide reference-API-compatible signatures.
 All algorithms follow Meeus "Astronomical Algorithms" (1998).
 """
 
@@ -25,7 +27,12 @@ from .constants import (
     FLG_SWIEPH,
 )
 from .cache import get_cached_time_ut1
-from .state import get_delta_t_userdef, get_iers_delta_t_enabled, get_timescale
+from .state import (
+    get_delta_t_model,
+    get_delta_t_userdef,
+    get_iers_delta_t_enabled,
+    get_timescale,
+)
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
@@ -52,7 +59,7 @@ def julday(
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
     if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"swisseph.julday: invalid calendar ({cal})")
+        raise ValueError(f"julday: invalid calendar ({cal})")
 
     if month <= 2:
         year -= 1
@@ -99,7 +106,7 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
         unless Julian calendar explicitly requested.
     """
     if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"swisseph.revjul: invalid calendar ({cal})")
+        raise ValueError(f"revjul: invalid calendar ({cal})")
 
     jd = jd + 0.5
     z = _floor(jd)
@@ -137,6 +144,105 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     return year, month, day, hour
 
 
+def _deltat_espenak_meeus(year: float) -> float:
+    """Delta T in **seconds** via the Espenak & Meeus (2006) polynomial set.
+
+    This is the classic model used by NASA's eclipse predictions, valid for
+    roughly -1999 to +3000 (with a parabolic tail outside). ``year`` is a
+    decimal Gregorian year (``year + (month-0.5)/12``).
+
+    Reference: Espenak, F. & Meeus, J. (2006), "Five Millennium Canon of Solar
+    Eclipses: -1999 to +3000"; NASA GSFC polynomial expressions for Delta T.
+    """
+    y = year
+    if y < -500:
+        u = (y - 1820) / 100.0
+        return -20 + 32 * u * u
+    if y < 500:
+        u = y / 100.0
+        return (
+            10583.6
+            - 1014.41 * u
+            + 33.78311 * u**2
+            - 5.952053 * u**3
+            - 0.1798452 * u**4
+            + 0.022174192 * u**5
+            + 0.0090316521 * u**6
+        )
+    if y < 1600:
+        u = (y - 1000) / 100.0
+        return (
+            1574.2
+            - 556.01 * u
+            + 71.23472 * u**2
+            + 0.319781 * u**3
+            - 0.8503463 * u**4
+            - 0.005050998 * u**5
+            + 0.0083572073 * u**6
+        )
+    if y < 1700:
+        t = y - 1600
+        return 120 - 0.9808 * t - 0.01532 * t**2 + t**3 / 7129.0
+    if y < 1800:
+        t = y - 1700
+        return (
+            8.83 + 0.1603 * t - 0.0059285 * t**2 + 0.00013336 * t**3 - t**4 / 1174000.0
+        )
+    if y < 1860:
+        t = y - 1800
+        return (
+            13.72
+            - 0.332447 * t
+            + 0.0068612 * t**2
+            + 0.0041116 * t**3
+            - 0.00037436 * t**4
+            + 0.0000121272 * t**5
+            - 0.0000001699 * t**6
+            + 0.000000000875 * t**7
+        )
+    if y < 1900:
+        t = y - 1860
+        return (
+            7.62
+            + 0.5737 * t
+            - 0.251754 * t**2
+            + 0.01680668 * t**3
+            - 0.0004473624 * t**4
+            + t**5 / 233174.0
+        )
+    if y < 1920:
+        t = y - 1900
+        return (
+            -2.79 + 1.494119 * t - 0.0598939 * t**2 + 0.0061966 * t**3 - 0.000197 * t**4
+        )
+    if y < 1941:
+        t = y - 1920
+        return 21.20 + 0.84493 * t - 0.076100 * t**2 + 0.0020936 * t**3
+    if y < 1961:
+        t = y - 1950
+        return 29.07 + 0.407 * t - t**2 / 233.0 + t**3 / 2547.0
+    if y < 1986:
+        t = y - 1975
+        return 45.45 + 1.067 * t - t**2 / 260.0 - t**3 / 718.0
+    if y < 2005:
+        t = y - 2000
+        return (
+            63.86
+            + 0.3345 * t
+            - 0.060374 * t**2
+            + 0.0017275 * t**3
+            + 0.000651814 * t**4
+            + 0.00002373599 * t**5
+        )
+    if y < 2050:
+        t = y - 2000
+        return 62.92 + 0.32217 * t + 0.005589 * t**2
+    if y < 2150:
+        return -20 + 32 * ((y - 1820) / 100.0) ** 2 - 0.5628 * (2150 - y)
+    u = (y - 1820) / 100.0
+    return -20 + 32 * u * u
+
+
 def deltat(tjdut: float) -> float:
     """
     Calculate Delta T (TT - UT1) for a given Julian Day.
@@ -162,9 +268,15 @@ def deltat(tjdut: float) -> float:
             from IERS is used. This provides the highest precision for
             recent dates (typically 1973-present).
 
-        **Priority 3: Skyfield's Delta T model (default)**
-            Uses Skyfield's implementation of the Stephenson, Morrison, and
-            Hohenkerk (2016) model:
+        **Priority 3: Selected Delta T model**
+            Uses the model chosen via ``set_delta_t_model()`` (or the
+            ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / ``deltat_model``
+            TOML key). The default is ``smh2016`` — Skyfield's implementation of
+            the Stephenson, Morrison, and Hohenkerk (2016) model; selecting
+            ``espenak_meeus`` instead uses the classic NASA Espenak & Meeus
+            (2006) polynomial set.
+
+            The default ``smh2016`` model resolves as follows:
 
             **For historical dates (720 BC - ~2016):**
                 Uses cubic spline interpolation from Table S15 published in
@@ -179,6 +291,18 @@ def deltat(tjdut: float) -> float:
             **For modern/recent dates:**
                 Uses observed IERS (International Earth Rotation Service) data,
                 smoothly blended with the historical model.
+
+        **Scope of the userdef / IERS / model overrides**
+            These three priorities set the ΔT returned by ``deltat()`` /
+            ``deltat_ex()`` and hence the TT used by every calculation that
+            converts UT to TT through them: eclipses, heliacal events, long-term
+            sidereal time, and the LEB / fast / Horizons position backends. The
+            Skyfield position backend instead obtains TT from Skyfield's own
+            internal ΔT model (SMH-2016 + IERS), so its planetary positions are
+            unaffected by ``set_delta_t_userdef()``, the IERS toggle, or
+            ``set_delta_t_model()``. Selecting a model therefore changes
+            positions in the default (LEB) backend but not in ``"skyfield"``
+            mode — a pre-existing property of all three ΔT overrides.
 
         Typical values:
             - Year 1000: ~1500 seconds
@@ -207,9 +331,27 @@ def deltat(tjdut: float) -> float:
             if delta_t_seconds is not None:
                 # IERS returns seconds, convert to days
                 return delta_t_seconds / 86400.0
-        except (ValueError, ArithmeticError):
-            # Fall back to Skyfield if IERS data fails
-            pass
+        except Exception as exc:  # noqa: BLE001  # robust fallback, any error
+            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
+            # feeds every downstream position calculation, so a robust fallback
+            # must not let an unexpected exception type (OSError, KeyError, ...)
+            # escape and crash the whole pipeline. Log at debug so the silent
+            # fallback is still observable when diagnosing Delta T discrepancies.
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
+            )
+
+    # Selected Delta T model (after userdef / IERS). Default is Skyfield's
+    # SMH-2016; ``espenak_meeus`` uses the classic NASA polynomials. (Exact
+    # parity with the reference ephemeris, when needed for validation, is
+    # injected externally via set_delta_t_userdef() — libephemeris never imports
+    # any third-party ephemeris library, to stay license-independent.)
+    if get_delta_t_model() == "espenak_meeus":
+        year, month, _day, _hour = revjul(tjdut)
+        decimal_year = year + (month - 0.5) / 12.0
+        return _deltat_espenak_meeus(decimal_year) / 86400.0
 
     t = get_cached_time_ut1(tjdut)
     delta_t_seconds = float(t.delta_t)
@@ -245,9 +387,11 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
             from IERS is used. This provides the highest precision for
             recent dates (typically 1973-present).
 
-        **Priority 3: Skyfield's Delta T model (default)**
-            Uses Skyfield's implementation of the Stephenson, Morrison, and
-            Hohenkerk (2016) model.
+        **Priority 3: Selected Delta T model**
+            Uses the configured Delta T model. The default is Skyfield's
+            implementation of the Stephenson, Morrison, and Hohenkerk (2016)
+            model; ``espenak_meeus`` selects the Espenak & Meeus polynomial
+            model.
 
         Since libephemeris uses Skyfield which internally uses JPL data,
         FLG_SWIEPH and FLG_JPLEPH produce identical results.
@@ -270,37 +414,14 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
         "Measurement of the Earth's rotation: 720 BC to AD 2015."
         Proceedings of the Royal Society A, 472: 20160404.
     """
-    # Check for user-defined Delta T first
-    userdef_dt = get_delta_t_userdef()
-    if userdef_dt is not None:
-        return userdef_dt
-
     # Check for valid ephemeris flags
     ephe_selection = flag & (FLG_JPLEPH | FLG_SWIEPH)
 
-    # All ephemeris modes use the same Skyfield Delta T model
-    # FLG_SWIEPH and FLG_JPLEPH both use Skyfield/JPL internally
-    # FLG_MOSEPH is accepted for compatibility but ignored
+    # All ephemeris modes use the same selected Delta T model.
+    # FLG_MOSEPH is accepted for compatibility but ignored.
     _ = ephe_selection  # Explicitly unused: all modes use same Delta T
 
-    # Check for IERS Delta T if enabled
-    if get_iers_delta_t_enabled():
-        try:
-            from . import iers_data
-
-            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
-            if delta_t_seconds is not None:
-                # IERS returns seconds, convert to days
-                return delta_t_seconds / 86400.0
-        except (ValueError, ArithmeticError):
-            # Fall back to Skyfield if IERS data fails
-            pass
-
-    t = get_cached_time_ut1(tjdut)
-    delta_t_seconds = float(t.delta_t)
-    delta_t = delta_t_seconds / 86400.0
-
-    return delta_t
+    return deltat(tjdut)
 
 
 def date_conversion(
@@ -339,7 +460,7 @@ def date_conversion(
         >>> date_conversion(1582, 10, 5, 12.0, 'g')
         (1582, 10, 15, 12.0)
     """
-    # Accept bytes calendar (pyswisseph uses b'g'/b'j')
+    # Accept bytes calendar (the reference ephemeris uses b'g'/b'j')
     if isinstance(calendar, bytes):
         calendar = calendar.decode("ascii")
     calendar = calendar.lower()
@@ -457,17 +578,31 @@ def utc_to_jd(
     """
     # Validate leap second: second=60 is only valid at 23:59:60 on dates
     # where a leap second was actually inserted (end of June 30 or Dec 31).
+    # Raises the project Error (reference API raises its Error class too).
     if second >= 60.0:
+        from .exceptions import Error
+
         if hour != 23 or minute != 59:
-            raise ValueError(
+            raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
             )
         if not _is_leap_second_date(year, month, day):
-            raise ValueError(
+            raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
             )
+
+    # Before 1972 UTC (with leap seconds) did not exist; the reference API
+    # treats the input as UT1 directly: jd_ut1 is the literal calendar JD
+    # and jd_et = jd_ut1 + Delta T. (Routing through Skyfield's ts.utc()
+    # would clamp TAI-UTC to 10 s, drifting up to tens of minutes in
+    # antiquity — verified +24 s at 1800, -27 min at year 1000.)
+    if year < 1972:
+        decimal_hour = hour + minute / 60.0 + second / 3600.0
+        jd_ut1 = julday(year, month, day, decimal_hour, calendar)
+        jd_et = jd_ut1 + deltat(jd_ut1)
+        return float(jd_et), float(jd_ut1)
 
     ts = get_timescale()
 
@@ -489,6 +624,18 @@ def utc_to_jd(
 
     # Explicit float cast to satisfy type checker (Skyfield uses lazy reify decorator)
     return float(t.tt), float(t.ut1)
+
+
+def _jd_to_calendar_tuple(
+    jd: float, calendar: int
+) -> tuple[int, int, int, int, int, float]:
+    """Split a Julian Day into (y, m, d, hh, mm, ss.s) calendar components."""
+    y, m, d, decimal_hour = revjul(jd, calendar)
+    hh = int(decimal_hour)
+    minute_frac = (decimal_hour - hh) * 60.0
+    mm = int(minute_frac)
+    ss = (minute_frac - mm) * 60.0
+    return y, m, d, hh, mm, ss
 
 
 def jdet_to_utc(
@@ -528,6 +675,13 @@ def jdet_to_utc(
         >>> print(f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:05.2f}")
         2000-01-01 11:58:55.82
     """
+    # Pre-1972 there is no UTC: the reference API returns the UT1 calendar
+    # date directly (jd_ut1 = jd_et - Delta T, fixed-point refined).
+    jd_ut1_est = jd_et - deltat(jd_et)
+    jd_ut1_est = jd_et - deltat(jd_ut1_est)
+    if revjul(jd_ut1_est, GREG_CAL)[0] < 1972:
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
+
     ts = get_timescale()
 
     # Create a Skyfield Time object from TT Julian Day
@@ -599,6 +753,10 @@ def jdut1_to_utc(
         2020-06-15 14:30:00.00
     """
     ts = get_timescale()
+
+    # Pre-1972 there is no UTC: return the UT1 calendar date directly.
+    if revjul(jd_ut1, GREG_CAL)[0] < 1972:
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day
     t = ts.ut1_jd(jd_ut1)
@@ -693,7 +851,7 @@ def time_equ(jd: float) -> float:
         >>> eot = time_equ(jd)
         >>> eot_minutes = eot * 1440
         >>> print(f"Equation of Time: {eot_minutes:.2f} minutes")
-        Equation of Time: -3.05 minutes
+        Equation of Time: -3.29 minutes
     """
     # The equation of time is derived from the relationship:
     #   E = GAST - RA_sun + 12h - UT
@@ -875,7 +1033,7 @@ def _sidtime_internal(
 
     # Normalize to 0-24 hours range
     last = last % 24.0
-    if last < 0:
+    if last < 0:  # pragma: no cover - modulo by positive 24.0 is always >= 0
         last += 24.0
 
     return last
@@ -950,8 +1108,7 @@ def sidtime(
 
     Note:
         - When obliquity/nutation are None, uses IAU 2000B nutation model
-        - GMST is computed using the IAU 1982 formula from Meeus
-          "Astronomical Algorithms" Chapter 12
+        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
         - Result is normalized to the range 0-24 hours
         - For Greenwich sidereal time, use longitude=0.0
 
@@ -1004,8 +1161,7 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
 
     Note:
         - This function is equivalent to calling _sidtime_internal(jd, 0.0, obliquity, nutation)
-        - GMST is computed using the IAU 1982 formula from Meeus
-          "Astronomical Algorithms" Chapter 12
+        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
         - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
         - Result is normalized to the range 0-24 hours
 
@@ -1309,7 +1465,7 @@ def utc_time_zone(
     to obtain the equivalent UTC date/time. Handles all date boundary
     crossings (day, month, year) correctly.
 
-    This matches the pyswisseph convention: the offset is **subtracted**
+    This matches the reference convention: the offset is **subtracted**
     from the input time.
 
     Args:
@@ -1341,42 +1497,43 @@ def utc_time_zone(
         >>> utc_time_zone(2024, 1, 15, 12, 0, 0.0, -5)
         (2024, 1, 15, 17, 0, 0.0)
     """
-    # Convert local time to decimal hours
-    decimal_hour = hour + minute / 60.0 + second / 3600.0
+    # Component-wise arithmetic (no decimal-hour round trip): the seconds
+    # value passes through bit-exact — including a leap-second input
+    # (second >= 60), which the reference API preserves — and no
+    # millisecond rounding is applied.
+    offset_min_f = timezone_offset * 60.0
+    offset_min = round(offset_min_f)
+    # Sub-minute offset residue (rare, e.g. historical LMT zones)
+    offset_sec = (offset_min_f - offset_min) * 60.0
 
-    # Convert to Julian Day
-    jd = julday(year, month, day, decimal_hour, GREG_CAL)
+    out_second = second - offset_sec
+    minute_carry = 0
+    # Keep a leap second (60 <= s < 61) untouched by normalization
+    if out_second >= 61.0 or (out_second >= 60.0 and second < 60.0):
+        out_second -= 60.0
+        minute_carry += 1
+    elif out_second < 0.0:
+        out_second += 60.0
+        minute_carry -= 1
 
-    # Subtract timezone offset to get UTC (convert hours to days)
-    jd_local = jd - timezone_offset / 24.0
+    total_min = hour * 60 + minute - offset_min + minute_carry
+    day_shift, total_min = divmod(total_min, 1440)
 
-    # Convert back to calendar date
-    local_year, local_month, local_day, local_decimal_hour = revjul(
-        jd_local, GREG_CAL
+    local_hour = total_min // 60
+    local_minute = total_min % 60
+
+    if day_shift == 0:
+        local_year, local_month, local_day = year, month, day
+    else:
+        # Date arithmetic via JD at noon (immune to time-of-day rounding)
+        jd_noon = julday(year, month, day, 12.0, GREG_CAL) + day_shift
+        local_year, local_month, local_day, _ = revjul(jd_noon, GREG_CAL)
+
+    return (
+        local_year,
+        local_month,
+        local_day,
+        int(local_hour),
+        int(local_minute),
+        float(out_second),
     )
-
-    # Extract time components from decimal hour with rounding to avoid
-    # floating-point precision issues (e.g., 11.4999999 -> 11.5)
-    # Round to millisecond precision (3 decimal places in seconds)
-    # This is sufficient for timezone conversions and avoids floating-point errors
-    total_seconds = local_decimal_hour * 3600.0
-    total_seconds = round(total_seconds, 3)
-
-    local_hour = int(total_seconds // 3600)
-    remaining = total_seconds - local_hour * 3600
-    local_minute = int(remaining // 60)
-    local_second = remaining - local_minute * 60
-
-    # Handle edge case where rounding pushes us to 60 seconds
-    if local_second >= 60.0:
-        local_second -= 60.0
-        local_minute += 1
-    if local_minute >= 60:
-        local_minute -= 60
-        local_hour += 1
-    if local_hour >= 24:
-        local_hour -= 24
-        # Day already handled by revjul, this shouldn't happen
-        # but included for safety
-
-    return local_year, local_month, local_day, local_hour, local_minute, local_second

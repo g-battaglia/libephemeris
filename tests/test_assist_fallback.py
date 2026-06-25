@@ -9,7 +9,7 @@ Tests verify:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from dataclasses import dataclass
 import math
 
@@ -17,8 +17,6 @@ import libephemeris as eph
 from libephemeris import state
 from libephemeris.constants import (
     SEDNA,
-    CERES,
-    CHIRON,
     FLG_SPEED,
     FLG_HELCTR,
 )

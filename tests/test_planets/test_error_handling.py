@@ -16,24 +16,15 @@ import libephemeris as swe
 from libephemeris.constants import (
     SUN,
     MOON,
-    MARS,
-    JUPITER,
-    PLUTO,
     MEAN_NODE,
     TRUE_NODE,
     MEAN_APOG,
     OSCU_APOG,
     FLG_SPEED,
     FLG_HELCTR,
-    FLG_TOPOCTR,
-    FLG_EQUATORIAL,
-    FLG_SIDEREAL,
-    SIDM_LAHIRI,
-    AST_OFFSET,
 )
 from libephemeris.exceptions import (
     CoordinateError,
-    UnknownBodyError,
     PolarCircleError,
 )
 
@@ -57,11 +48,18 @@ class TestInvalidBodyIds:
             swe.calc_ut(jd, 999999, 0)
 
     @pytest.mark.unit
-    def test_body_id_49_raises(self):
-        """Body ID 49 (beyond Transpluto=48) should raise."""
+    def test_body_id_49_computes_nibiru(self):
+        """Body ID 49 (Nibiru) is a supported predicted planet since WS7."""
+        jd = 2451545.0
+        pos, _ = swe.calc_ut(jd, 49, 0)
+        assert 0 <= pos[0] < 360
+
+    @pytest.mark.unit
+    def test_body_id_59_raises(self):
+        """Body ID 59 (beyond the fictitious set 40-58) should raise."""
         jd = 2451545.0
         with pytest.raises(Exception):
-            swe.calc_ut(jd, 49, 0)
+            swe.calc_ut(jd, 59, 0)
 
 
 class TestInvalidCoordinates:

@@ -7,7 +7,7 @@ and calculates their phase times.
 Reference data from NASA Eclipse website:
 https://eclipse.gsfc.nasa.gov/lunar.html
 
-Times tuple layout (10 elements, pyswisseph-compatible):
+Times tuple layout (10 elements, reference-API compatible):
     [0]: Time of maximum eclipse
     [1]: Reserved
     [2]: Time of partial eclipse beginning (Moon enters umbra)
@@ -55,7 +55,7 @@ class TestLunEclipseWhen:
 
         ecl_type, times = lun_eclipse_when(jd_start)
 
-        # Should return 10-element tuple (pyswisseph layout)
+        # Should return 10-element tuple (reference-API layout)
         assert len(times) == 10
         # All elements should be floats
         assert all(isinstance(t, float) for t in times)

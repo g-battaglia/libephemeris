@@ -23,8 +23,6 @@ from libephemeris import (
     MARS,
     JUPITER,
     SATURN,
-    SUN,
-    MOON,
     HELIACAL_RISING,
     HELIACAL_SETTING,
     EVENING_FIRST,
@@ -349,7 +347,7 @@ class TestHeliacalAtmosphericConditions:
 
 
 class TestSweHeliacalUt:
-    """Test heliacal_ut pyswisseph-compatible API."""
+    """Test heliacal_ut reference-API-compatible API."""
 
     def test_swe_heliacal_ut_basic_call(self):
         """Test basic heliacal_ut call with array parameters."""

@@ -9,7 +9,7 @@ Tests verify:
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import libephemeris as eph
 from libephemeris import state
 from libephemeris.constants import (

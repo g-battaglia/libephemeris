@@ -5,6 +5,567 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+_No unreleased changes._
+
+## [3.0.0rc1] - 2026-06-25
+
+First **release candidate** of the **v3.0.0** line. This entry is the
+consolidated, authoritative record of everything that changed since
+**v2.0.0**; the per-alpha entries (`3.0.0a1`–`3.0.0a6`) below preserve the
+granular development history. The RC ships to PyPI on the pre-release channel
+(`pip install --pre libephemeris`) and is intended to be promoted to `3.0.0`
+final **with no further code changes** if it proves clean.
+
+> **Compatibility.** v3 keeps the **v2 canonical bare-name public API** (no
+> `swe_`/`SE_`/`SEFLG_` prefixes; sole exception `SE_FNAME_DE431`) and **1:1
+> result-compatibility** with the reference ephemeris, _except_ for the
+> deliberate, documented divergences in
+> `docs/comparison/intentional-divergences.md`. The major-version bump is
+> driven by the **new dual license** and the **observable behavior changes**
+> listed under _Changed_ — not by an API redesign. If you pinned v2 values for
+> sidereal positions, Arabic parts, eclipse attributes, fixed stars, or
+> remote-epoch charts, re-check them against _Changed_ before upgrading.
+
+### Licensing & provenance
+
+- **Dual licensing.** LibEphemeris is now offered under
+  `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the same codebase is
+  available under the AGPL (PyPI wheels stay AGPL-3.0-only) or, for
+  closed-source / SaaS use without source disclosure, under a commercial
+  license arranged directly with the copyright holder. Owned source files carry
+  the SPDX expression and are gated by `scripts/check_spdx_headers.py`; vendored
+  files keep their permissive (MIT) upstream licenses. See `LICENSING.md`,
+  `COMMERCIAL-LICENSE.md`, `THIRD_PARTY_NOTICES.md`, and `NOTICE.md`.
+- **Clean-room provenance footing.** The Galilean satellite module
+  (`moon_theories/galilean.py`) was rewritten clean-room from the published
+  Lieske 1998 / Meeus ch. 44 theory, removing the last LGPL-3.0 component; its
+  output is unchanged to floating-point re-association level (sub-nanometre per
+  moon component over 1800–2200). The package now contains **no copyleft code**;
+  the only third-party files are permissive (MIT): `vendor/spktype21.py`,
+  `moon_theories/tass17.py`, and `moon_theories/tass17_data.py`. Provenance is
+  enforced by local gates (`license:check`, `provenance:sweep`,
+  `provenance:hypothetical`, `wheel:audit`) extended to cover `docs/` and
+  `scripts/`, with a PyMeeus zero-hit class. The Uranian/Transpluto orbital
+  elements are gated to published sources. See
+  `docs/methodology/galilean-clean-room-2026-06.md`.
+
+### Added
+
+- **Long-term Vondrák 2011 precession & of-date obliquity** across the whole
+  pipeline (`libephemeris/precession_vondrak.py`, via PyERFA's reference
+  `ltp`/`ltpb`/`ltpecl`/`ltpequ`), valid ±200,000 years — replacing the IAU 2006
+  polynomial that is only valid a few centuries from J2000. One consistent
+  precession+obliquity frame now drives the LEB fast path, the Skyfield
+  reference path, and the ecliptic-body / SPK / fixed-star paths uniformly.
+- **Multi-era Delta T with a selectable model.** New `set_delta_t_model()` /
+  `get_delta_t_model()`, the `LIBEPHEMERIS_DELTAT_MODEL` environment variable,
+  and the `deltat_model` TOML key choose the ΔT model used after the
+  user-defined / IERS-observed priorities: `smh2016` (default,
+  Stephenson-Morrison-Hohenkerk 2016) or `espenak_meeus` (a self-contained
+  clean-room implementation of the NASA Espenak & Meeus 2006 polynomials). Both
+  are clean-room.
+- **Long-term sidereal-time house cusps** (`libephemeris/sidereal_longterm.py`)
+  that stay correct across the full supported date range, plus **true
+  time-derivative cusp/angle speeds** in `houses_ex2` (centered finite
+  difference of the full house solution).
+- **Functional live NASA JPL Horizons HTTP backend** for planets, asteroids,
+  analytical Mean Node/Apogee and Uranians, with sidereal/XYZ/NONUT/speed-aware
+  framing; selected via `set_calc_mode("horizons")` or `"auto"`.
+- **Any numbered asteroid** via `AST_OFFSET + N` (SPK → SBDB Keplerian
+  fallback); predicted/fictitious bodies (Vulcan, White Moon, Proserpina) and
+  Planet X delegated to the canonical element path.
+- **Backward (reverse-in-time) search** for lunar eclipses and occultations;
+  direction-aware `planet_occult_when_glob` / `lun_occult_when_glob`.
+- **Rebuilt 1,447-star fixed-star catalog** from public sources (Hipparcos /
+  VizieR / IAU-CSN), 116 entries cross-checked against SIMBAD, with catalog
+  integrity guards.
+- **Page-cache management** retained from the v1.x line (`reader.cool()`,
+  `release_data_cache()`) for containerised deployments.
+
+### Changed (observable behavior — re-check if you pinned v2 values)
+
+- **Default sidereal ayanamsha is Fagan/Bradley** (reference parity); set
+  `set_sid_mode(SIDM_LAHIRI)` explicitly if you depend on Lahiri.
+- **Remote-epoch positions and house cusps** move under Vondrák 2011 long-term
+  precession/obliquity and long-term sidereal time: cusps that were off by up to
+  ~3° at ±8000 yr and the Sun's ~36″→~6″ longitude error at year −3000 are now
+  corrected. **Modern (near-J2000) results are unchanged to sub-milliarcsecond**,
+  but the golden regression baselines were regenerated. The of-date mean
+  obliquity comes from the Vondrák poles everywhere (incl. the `ECL_NUT`
+  pseudo-body, galactic sidereal modes, and `nod_aps`); it differs from the
+  reference's reported obliquity by ≤ ~6″ only at deep-BCE dates, an effect
+  confined to ecliptic latitude (longitude/ARMC unaffected) — a deliberate,
+  documented improvement.
+- **Eclipse return flags and arrays** match the reference exactly: the invented
+  `ECL_GRAZING` bit and local `ANNULAR_TOTAL` classification are gone, `when_loc`
+  reports geometric contact times with visibility only in the `*_VISIBLE` bits,
+  fabricated fallback contact times are now `0.0`, and `sol_eclipse_where` /
+  `lun_occult_where` fill `geopos[2..9]` and the no-eclipse cells as the
+  reference does. Besselian elements are built on the true equator of date with
+  NASA sign conventions (x east-positive, l2 negative for total).
+- **Solar-eclipse obscuration is a true fraction in [0, 1]**: a total eclipse
+  clamps to `1.0` (the `(R_moon/R_sun)²` area ratio belongs to the magnitude),
+  and a no-eclipse instant reports `0.0` from every entry point. The
+  lunar-eclipse magnitude/contact helpers route through a single canonical
+  shadow model (the previous second model disagreed by up to ~0.011 in magnitude
+  and tens-to-hundreds of seconds in contact times).
+- **Error policy:** search/not-found conditions raise `libephemeris.Error`
+  (was `RuntimeError`); LEB out-of-range and ephemeris-range failures raise
+  `EphemerisRangeError`; `FLG_TOPOCTR` without `set_topo()` raises instead of
+  silently returning geocentric.
+- **Fixed stars:** results return `"Name,nomenclature"`, use strict reference
+  name-resolution (comma = exact nomenclature key, `%` wildcard, sequential
+  digits), honor `FLG_TOPOCTR` (~0.18″ diurnal aberration), and return
+  reference-style retflags; `fixstar2` / `fixstar2_ut` reach parity (previously
+  ignored `FLG_TOPOCTR` and echoed input flags). The catalog was rebuilt
+  (1,447 stars).
+- **`houses_ex2` cusp/angle speeds are now true time derivatives** (centered
+  finite difference) for P/K and the guiding-point (Asc/MC) rate for the
+  sign-locked systems (W/N/U); sidereal cusp speeds are sampled on the
+  sidereal-aware path, so positions and speeds are frame-consistent.
+- **Planetary moons:** canonical ids are `PLMOON_OFFSET + NAIF` (Io 9501);
+  unregistered moons raise; geocentric positions are apparent (light-time +
+  aberration).
+- **The Keplerian minor-body fallback outputs the ecliptic of date** (was
+  J2000, ~1290″ bias at 2026); `FLG_SIDEREAL` now applies on the asteroid
+  ASSIST/Keplerian fallback.
+- **Interpolated apogee/perigee honor `FLG_NONUT`**; node/apse speeds include
+  the nutation rate in true-ecliptic output; the apse residual tables were
+  regenerated.
+- **`calc_planet_x_lowell` / `calc_planet_x_pickering`** now return the same
+  position as the canonical `calc()` path (Hoyt 1980 elements); results move by
+  up to ~158° versus the old dedicated element sets.
+- **Crossings:** a search started exactly at a crossing returns that instant
+  (no full-cycle dead-band skip), and `cross_ut` finds an imminent retrograde
+  crossing instead of jumping past it.
+- **`FLG_NOABERR` no longer disables gravitational deflection**;
+  `utc_to_jd` / `jdet_to_utc` / `jdut1_to_utc` treat pre-1972 input as UT1 per
+  their documented semantics.
+- **Packaging/CLI:** the `leph` dev CLI and `libephemeris.dev_cli` are no longer
+  shipped in wheels (repo tooling only); `libephemeris download all` prompts for
+  confirmation (use `--yes`) and `--quiet` no longer suppresses error output;
+  `.env` loading only exports `LIBEPHEMERIS_*` keys.
+
+### Fixed
+
+- **`houses_ex2` / `houses_armc_ex2` cusp-speed overrides** were silently
+  bypassed when `hsys` was passed as `bytes` (`b'W'`) or `str` — the
+  reference-API-idiomatic form — because the override branches compared the raw
+  argument against integer `ord()` codes. The identifier is now normalized once,
+  so Whole-Sign / Aries / Krusinski / Porphyry cusp speeds (and the Koch/Placidus
+  finite-difference step) are correct for every input form, restoring 1:1
+  parity.
+- **Native Python floats** are returned throughout: the `heliacal_pheno_ut`
+  and `vis_limit_mag` dret tuples on the Skyfield backend (alt/az came back as
+  `numpy.float64`), the eclipse `*_at_loc` helpers, and the shared
+  spherical-to-cartesian velocity helper.
+- **Heliacal Moon brightness** used a linear phase-angle map `(1 − f)·180°`
+  that over-brightened gibbous phases; it now uses the exact geometric relation
+  `acos(2f − 1)`.
+- **Horizons backend:** analytical bodies (Mean Node, Mean Apogee) are
+  dispatched before the `FLG_NONUT` rejection; sidereal/equatorial framing uses
+  the true ayanamsa, subtracts the precession rate from the sidereal longitude
+  speed, rotates XYZ output by the ayanamsa, gates deflection on `TRUEPOS`, and
+  gates sidereal/heliocentric/barycentric speed on `FLG_SPEED`; Uranian output is
+  precessed J2000→of-date and its speed zeroed without `FLG_SPEED`; deflectors
+  are prefetched only when deflection runs.
+- **Fixed-star sidereal speed** finite-difference is wrapped to the shortest
+  arc (removes a spurious ~360°/day jump at the 0°/360° ayanamsa boundary);
+  rigorous 3D space motion is used for proper motion on the LEB path;
+  `fixstar*` return native floats; corrupt/mis-assigned catalog names were fixed
+  (Tyl, Unurgunite, the th01Ori Trapezium components, and 5 others), with
+  catalog integrity guards.
+- **LEB / SPK robustness:** corrupted-file handling and a zstd lock; LEB
+  out-of-range raises `EphemerisRangeError`; LEB→Skyfield fallback added for
+  eclipse search loops; the type-21 MDA-record cache is keyed on
+  `(target, center)` with a coverage margin widened past worst-case light-time;
+  light-time applied to heliocentric SPK paths. SPK auto-download re-registers a
+  body when its resolved `(file, NAIF id)` changes.
+- **ASSIST / COB frames:** asteroid self-interaction avoided in
+  `propagate_orbit_assist`; correct ASSIST frame in `propagate_trajectory`; a
+  numpy float64 array passed to ASSIST particle params; COB frame normalization.
+- **Aerosol extinction** no longer double-scales a directly supplied coefficient
+  (`0 < value < 1`) by altitude.
+- **Other correctness:** the plutino resonant libration argument uses the
+  longitude of perihelion; the longitude-speed wrap-around correction is applied
+  consistently across `planets`, `fast_calc` and the Uranian bodies; the
+  south-node antipode is correct under `FLG_XYZ` / `FLG_RADIANS`;
+  `EphemerisContext` south nodes route through `_south_node_from_north`; the
+  2050 GMST continuity offset (~2″ jump) in `sidereal_longterm` is corrected;
+  the IERS ΔT lookup logs its Skyfield fallback at debug level instead of
+  swallowing the error.
+
+### Removed
+
+- The `leph` dev CLI and `libephemeris.dev_cli` are no longer included in built
+  wheels (use `./leph` or `python -m libephemeris.dev_cli` from a source
+  checkout).
+- The invented eclipse `ECL_GRAZING` retflag bit and the local `ANNULAR_TOTAL`
+  classification (the reference does not emit them).
+- The last copyleft (LGPL-3.0) code path (the legacy Galilean implementation),
+  replaced by the clean-room module.
+- All comparison/validation tooling and the lunar calibration/generation
+  workflow were extracted into a separate `validation/` repository; the orphaned
+  `test_precision_report` was removed.
+
+### Documentation
+
+- **Documentation made engine-neutral; head-to-head comparisons centralized.**
+  The methodology and reference pages now explain libephemeris's own models on
+  their own merits. All comparison material is consolidated into a new
+  `docs/comparison/` section (`index`, `precision`, `known-differences`,
+  `intentional-divergences`, `api-compatibility`), which absorbs and replaces the
+  former `docs/reference/swisseph-comparison.md`, `docs/reference/divergences.md`,
+  and `docs/reference/se-bug-sidereal-j2000-nodes.md` (now removed). The Sphinx
+  nav gains a comparison section and lists the previously-orphaned
+  `methodology/delta-t` and `methodology/sidereal-time-longterm` pages.
+- **Documentation completeness, accuracy & navigation pass.** The canonical full
+  API reference (`docs/api_reference.rst`) is de-orphaned; stale counts corrected
+  everywhere to match the code — **47 ayanamsha modes**, **25 house systems
+  (26 codes)**, **1,447-star catalog** (116 SIMBAD-cross-checked); Sphinx
+  `release`/`version` now read dynamically from package metadata (was pinned to
+  1.0.0). Documented **9 previously-missing calculation flags** and added
+  `find_station_ut` / `next_retrograde_ut`; fixed broken examples/signatures
+  (`register_spk_body`, `download_spk`, `register_moon_spk`, `houses`,
+  `deltat_ex`, `get_ayanamsa_ex_ut`); removed the false `swe_`-prefixed alias
+  claims from the migration guide.
+- **New methodology & reference pages:** `methodology/delta-t.md`,
+  `methodology/sidereal-time-longterm.md`,
+  `methodology/galilean-clean-room-2026-06.md`, an updated
+  `methodology/pyerfa-integration.md`, and recorded divergence verdicts
+  (heliacal 2–3 d, Uranian lib-vs-reference ~33″, extreme-date fidelity, lunar
+  osculating, sidereal ayanamsha fixed-epoch exactness, orbital-element
+  adjudication). The README highlights the modern multi-era ΔT.
+- **User-manual correctness pass (this RC):** corrected documented examples that
+  would crash if copied (`rise_trans`, `pheno_ut`, `sol_eclipse_when_loc`
+  signatures), the understated fixed-star catalog size (was "~100", now ~1,447),
+  and the remaining engine-name leaks in chapters 10/13 — in both the English and
+  Italian manuals. Aligned `AGENTS.md` with the bare-name public-API rule.
+
+### Tests & validation
+
+- **100% line-coverage campaign** across 30+ modules (astrometry, utils,
+  time_utils, context, fast_calc, leb2_reader, tass17, uranian, contrib,
+  schaefer, refraction, planetary_moons, profiling, leb_reader, and the
+  network/IO + pure-logic remainder), with a scoped coverage-omit policy.
+- **Oracle-free guards:** metamorphic relations (internal consistency),
+  defining-condition invariants for the event solvers, a native-float contract
+  guard, global-state isolation guards, and fixed-star catalog integrity guards.
+- **Independent (non-reference) validation:** an erfa cross-check of
+  `rise_trans`, Besselian elements vs independent geometry, eclipse magnitude +
+  occultation timing vs geometry, and a live numerical validation of the Horizons
+  backend.
+- **Deep multi-round three-reference validation** (library vs reference vs an
+  exact mathematical oracle) recorded across rounds v4/v5 with no new bugs; the
+  exhaustive audit harness now proves 100% public-callable coverage.
+
+## [3.0.0a6] - 2026-06-24
+
+### Added
+
+- **Delta T model selector.** `set_delta_t_model()` / `get_delta_t_model()` and the
+  `LIBEPHEMERIS_DELTAT_MODEL` environment variable (and `deltat_model` TOML key)
+  select the ΔT model used after the user-defined / IERS-observed priorities:
+  `smh2016` (default, Stephenson-Morrison-Hohenkerk 2016 via Skyfield) or
+  `espenak_meeus` (a self-contained, clean-room implementation of the classic NASA
+  Espenak & Meeus 2006 polynomials). Both are clean-room; **libephemeris never
+  imports pyswisseph.** See `docs/methodology/delta-t.md`.
+
+### Documentation
+
+- **New `docs/methodology/delta-t.md`** — comprehensive ΔT documentation: the
+  piecewise (multi-era) model, proof it is not a single diverging formula, the new
+  model selector, the clean-room/licensing constraint, the validation method
+  (Swiss ΔT injected externally via `set_delta_t_userdef`, with the
+  `swe.set_delta_t_userdef(-1.0)` pollution caveat), and the vs-Swiss comparison.
+- **Corrected `docs/reference/swisseph-comparison.md`** — modern Swiss Ephemeris
+  (≥ SE 2.06) uses Stephenson-Morrison-Hohenkerk 2016, **not** Espenak & Meeus
+  2006 (verified empirically); the libraries differ only in the deep-past/future
+  ΔT *extrapolation*. Added: at matched ΔT, positions agree to < 0.1″ (Moon
+  ~0.001″) to year 2300; and a new section on house cusps / Ascendant at remote
+  epochs.
+- **`docs/methodology/sidereal-time-longterm.md`** — added a "Comparison against
+  Swiss Ephemeris (matched ΔT)" section: the Ascendant residual outside 1850–2050
+  is purely the long-term sidereal-time (ARMC) model difference (obliquity/nutation
+  match to < 0.002″); the ~1.9″ step at 2050 is a **Swiss-side** discontinuity
+  (libephemeris is self-continuous there); verdict benign-model-difference.
+
+## [3.0.0a5] - 2026-06-24
+
+Correctness, lint, and documentation fixes from an external code review. Each
+finding was verified against the current code; only the valid ones were applied.
+
+### Fixed
+
+- **Heliacal Moon brightness used a wrong phase-angle conversion.** The sky-
+  brightness model mapped the Moon's illuminated fraction to a phase angle with
+  a linear formula `(1 - f) * 180°`, which over-brightened gibbous phases. It now
+  uses the correct geometric relation `acos(2f - 1)`, so heliacal visibility under
+  moonlight is computed accurately.
+- **Sidereal house cusp speeds mixed frames.** `houses_ex2` sampled the cusp/angle
+  velocities on the tropical path while returning sidereal positions; under
+  `FLG_SIDEREAL` the speeds are now sampled on the same sidereal-aware path, so
+  positions and speeds are frame-consistent.
+- **Horizons backend flag handling.** Analytical bodies (Mean Node, Mean Apogee)
+  are now dispatched before the `FLG_NONUT` rejection, so their nutation-free
+  output is honored instead of falling back; Uranian-body speed components are
+  zeroed when `FLG_SPEED` is not requested, matching the other code paths.
+- **Fixed-star sidereal speed wrap.** The ayanamsa finite-difference used in the
+  sidereal speed correction is now wrapped to the shortest arc, removing a
+  spurious ~360°/day jump when the ayanamsa crosses 0°/360°.
+- **SPK auto-download re-registration.** A body is re-registered when its resolved
+  `(file, NAIF id)` changes — not only when the path changes — so a corrected
+  target id or an in-place re-download is picked up.
+- **Aerosol extinction double-scaling.** A directly supplied aerosol coefficient
+  (`0 < value < 1`) is returned as the final value at the observer, no longer
+  scaled again by altitude (coefficients derived from visibility/humidity still
+  scale). This matches the documented behavior.
+- Native Python floats are returned from the shared spherical-to-cartesian
+  velocity helper even when callers pass numpy scalars.
+
+### Changed
+
+- The IERS ΔT lookup now logs its fallback to Skyfield at debug level instead of
+  swallowing the error silently.
+
+### Docs
+
+- Corrected docstrings: extinction at/below the horizon returns `99.0`; the
+  `set_sid_mode` default is Fagan/Bradley; the `houses_ex2` velocity path is
+  described as a centered finite difference; added Google-style `Args`/`Returns`
+  to `_matches`, `_lterm_offset`, and `_parse_leap_seconds_iers`.
+- Lint cleanups: ambiguous Unicode glyphs in comments/docstrings replaced with
+  ASCII; intentional broad exception handlers annotated explicitly.
+
+## [3.0.0a4] - 2026-06-17
+
+### Changed
+
+- **House cusps use a long-term sidereal-time and obliquity model
+  (Vondrák 2011).** The house path previously took its sidereal time (ARMC) from
+  an IAU-2006 CIO sidereal time, a polynomial valid only a few centuries that
+  diverges by degrees at remote epochs (house cusps were off by up to ~3° at
+  ±8000 years). Cusps are now derived from the long-term Vondrák 2011 model
+  (valid ±200,000 years) via a stable geometric construction
+  (`libephemeris/sidereal_longterm.py`), so they stay correct across the whole
+  supported date range. Modern results are unchanged (sub-milliarcsecond near
+  J2000); only remote epochs change, where they become correct. The of-date mean
+  obliquity is now a single shared realization used by both the house cusps and
+  the position pipeline, so a chart's angles and bodies sit in one
+  self-consistent precession/obliquity frame.
+- **House cusp speeds are the true time derivative.** `houses_ex2` now reports
+  each cusp/angle speed as the genuine dλ/dt of the full house solution (centered
+  time difference, 2 s step), so the reported speed integrates to the cusp's
+  actual motion. For the iteratively-solved systems (Placidus, Koch) this is
+  markedly more accurate than an analytic speed approximation near the polar
+  circle. Sign-locked systems (Whole Sign, Aries, Krusinski) report the
+  guiding-point (Asc/MC) rate; `houses_armc_ex2` is unchanged (ARMC-only input).
+
+### Docs
+
+- New `docs/methodology/sidereal-time-longterm.md` and expanded README /
+  `docs/PRECISION.md` sections documenting the long-term house accuracy and the
+  true cusp-speed method, including where LibEphemeris is measurably more
+  accurate than analytic/short-range approaches.
+
+## [3.0.0a3] - 2026-06-16
+
+### Fixed
+
+- **`fixstar2` / `fixstar2_ut` parity with the reference.** The flexible-lookup
+  star functions now honor `FLG_TOPOCTR` (applying the ~0.18" diurnal-aberration
+  topocentric shift) and return the reference-style return flag (e.g. `2`, with
+  `FLG_SWIEPH` added when no ephemeris bit is given), mirroring the legacy
+  `fixstar` / `fixstar_ut`. Previously the docs-recommended `fixstar2*` path
+  silently ignored `FLG_TOPOCTR` and echoed the preprocessed input flags.
+  Positions match pyswisseph to <0.001"; return flags now match exactly.
+- **Native floats from the eclipse `*_at_loc` helpers.**
+  `sol_eclipse_magnitude_at_loc` and `sol_eclipse_obscuration_at_loc` now return
+  a native Python `float` on the Skyfield backend (they could leak
+  `numpy.float64`); the LEB backend was already correct.
+
+### Changed
+
+- **SPK type-21 aberration frame.** The vendored type-21 asteroid path now uses
+  the observer's barycentric (SSB) velocity for stellar aberration, matching the
+  IAU apparent-place convention used by the main planet pipeline (was the
+  heliocentric Earth velocity; effect ~0.009").
+
+### Added
+
+- SPDX license header on `precession_vondrak.py`, completing dual-licensing
+  header coverage (the `check_spdx_headers` gate is green again).
+
+### Docs
+
+- Corrected stale documentation: the fixed-star precession model (Vondrák 2011,
+  not IAU 2006), the Galilean moon-position frame (J2000 ecliptic, not ICRF), the
+  `batch_fixstars_ut` topocentric note, and the crossing-solver exception type in
+  the LEB testing guide (`Error`, not `RuntimeError`).
+
+## [3.0.0a2] - 2026-06-16
+
+### Changed
+
+- **Long-term precession (Vondrák 2011).** The apparent-place reduction now uses
+  the Vondrák, Capitaine & Wallace (2011) long-term precession model (A&A 534,
+  A22), valid ±200,000 years, instead of the IAU 2006 precession polynomial which
+  is only valid for a few centuries around J2000. At extreme dates this matches
+  Swiss Ephemeris's precession (Swiss uses the same model since v1.78) — the Sun's
+  longitude error at year -3000 drops from ~36" to ~6" (the residual being the
+  DE441-vs-DE431 ephemeris difference, which Vondrák does not affect). Modern
+  results are unchanged to sub-milliarcsecond (Vondrák ≡ IAU 2006 near J2000), so
+  the golden regression baseline was regenerated. The of-date mean obliquity is
+  likewise taken from the Vondrák poles (long-term valid) **everywhere** —
+  including the `ECL_NUT` pseudo-body, the galactic-frame sidereal modes, and the
+  node/apside (`nod_aps`) reduction — so the whole library shares one consistent
+  precession+obliquity model. This is the rigorous of-date obliquity (the true
+  equator/ecliptic pole angle) and is a **deliberate, documented scientific
+  improvement** over the IAU 2006 obliquity polynomial's out-of-range
+  extrapolation; it differs from Swiss's reported obliquity by ≤ ~6″ only at
+  deep-BCE dates, an effect confined to ecliptic latitude (longitude is unaffected
+  by the obliquity choice) and below the planetary ephemeris floor there. See the
+  measured table in `docs/methodology/pyerfa-integration.md` and
+  `scripts/validate_vondrak_vs_swiss.py`. Implemented via PyERFA's reference
+  `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA, clean-room — no GPL source
+  consulted); see `libephemeris/precession_vondrak.py`. Touches the LEB fast path,
+  the Skyfield reference path, and the ecliptic-body / SPK / fixed-star paths
+  uniformly.
+
+## [3.0.0a1] - 2026-06-15
+
+First **v3 alpha**.  v3 introduces **dual licensing** — `AGPL-3.0-only OR
+LicenseRef-LibEphemeris-Commercial` — on a clean-room provenance footing, and
+ships the 2026-06 full-project review fix series (workstreams WS0-WS12) plus
+the audit-round-v10 correctness fixes.  Most fixes are internal corrections;
+the items below DELIBERATELY change observable behavior to match the Swiss
+Ephemeris reference or to correct measured errors.
+
+> **Alpha.** Published for early integration and feedback.  The public API is
+> the stable v2 canonical surface; the major-version bump is driven by the
+> licensing change and the deliberate behavior changes listed below.  The
+> commercial-license terms are still under counsel review (see `LICENSING.md`).
+
+### Behavior changes
+
+- Default sidereal ayanamsha is Fagan/Bradley (reference parity);
+  Lahiri remains available via `set_sid_mode(SIDM_LAHIRI)`.
+- Eclipse functions return the reference's exact retflag bits and
+  zero-filled cells: the invented `ECL_GRAZING` bit and local
+  `ANNULAR_TOTAL` classifications are gone, when_loc reports geometric
+  contact times with visibility only in the `*_VISIBLE` bits, and
+  fabricated fallback contact times are now 0.0.
+- `sol_eclipse_where`/`lun_occult_where` fill `geopos[2..9]` and the
+  no-eclipse cells the way the reference does.
+- Besselian elements are built on the true equator of date with NASA
+  sign conventions (x east-positive, l2 negative for total).
+- Search/not-found conditions raise `libephemeris.Error` (reference
+  parity) instead of `RuntimeError`; LEB out-of-range and ephemeris
+  range failures raise `EphemerisRangeError`; `FLG_TOPOCTR` without
+  `set_topo()` raises instead of silently returning geocentric.
+- Fixed-star functions return "Name,nomenclature", use strict
+  reference name-resolution semantics (comma = exact nomenclature key,
+  '%' wildcard, sequential digits), and honor `FLG_TOPOCTR`; the star
+  catalog is rebuilt from public sources (1447 stars).
+- Planetary moons: canonical ids are PLMOON_OFFSET + NAIF (Io 9501);
+  unregistered moons raise like the reference; geocentric positions
+  are apparent (light-time + aberration).
+- Any numbered asteroid works via AST_OFFSET + N (SPK -> SBDB
+  Keplerian fallback); unknown bodies raise `UnknownBodyError`.
+- The Keplerian minor-body fallback outputs the ecliptic of date
+  (previously J2000, ~1290" bias at 2026).
+- Interpolated apogee/perigee honor `FLG_NONUT`; node/apse speeds
+  include the nutation rate in true-ecliptic output; the apse residual
+  tables were regenerated (node residuals at the rounding floor).
+- `utc_to_jd`/`jdet_to_utc`/`jdut1_to_utc` treat pre-1972 input as UT1
+  per their documented semantics.
+- `.env` loading only exports `LIBEPHEMERIS_*` keys.
+- `libephemeris download all` asks for confirmation (use `--yes` to
+  skip); `--quiet` no longer suppresses error output.
+- The `leph` dev CLI and `libephemeris.dev_cli` are no longer shipped
+  in wheels (repo tooling; use `./leph` or
+  `python -m libephemeris.dev_cli` from a checkout).
+
+- Houses: the clean-room harness (26 systems x 130-point grid,
+  houses_armc + house_pos vs pyswisseph) reports zero gated
+  mismatches.  Sunshine 'i' honors the Sun-declination parameter and
+  raises for a circumpolar Sun; sidereal cusps use the mean-equinox
+  ayanamsha like the reference (13.9" shift); sidereal Aries-house
+  cusps stay at 0/30/...; Placidus converges through the polar-circle
+  hairline by bisection; Regiomontanus/Koch house positions handle
+  polar and meridian-degenerate bodies like the reference; unknown
+  house codes raise inside the polar circle; houses_ex2 cusp speeds
+  follow the reference's structure for N/U/O (true derivatives are
+  kept for P/K, which match the reference's own cusp motion better
+  than its reported approximation).
+- Crossings: a search started exactly at a crossing returns that
+  instant (the dead-band skip of a full cycle is gone, matching
+  swe.solcross); cross_ut finds an imminent retrograde crossing
+  instead of jumping past it; Brent step guards use a time epsilon
+  instead of degree tolerances.
+
+### Behavior changes (cont.)
+
+- Planet X Lowell/Pickering: `calc_planet_x_lowell` and
+  `calc_planet_x_pickering` now return the same position as
+  `calc_hypothetical_position` / the main `calc()` API for these bodies.
+  Previously the dedicated functions used a separate element set
+  (Lowell i=10°, Pickering a=51.9 AU) and skipped the equinox→J2000
+  precession, so they disagreed with the dispatcher (which uses the
+  published Hoyt 1980 elements from `data/fictitious_orbits.csv`) by up to
+  ~158°. They now delegate to that canonical path. The legacy
+  `LOWELL_PLANET_X_ELEMENTS` / `PICKERING_PLANET_X_ELEMENTS` constants are
+  retained but no longer drive the calculation (see CLEAN.md).
+
+### Licensing / provenance
+
+- **Dual licensing.** LibEphemeris is now offered under
+  `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the same codebase is
+  available under the AGPL (PyPI wheels stay AGPL-3.0-only) or, for
+  closed-source / SaaS use without source disclosure, under a commercial
+  license from the copyright holder.  Owned source files carry the SPDX
+  expression and are gated by `scripts/check_spdx_headers.py`; vendored files
+  keep their permissive (MIT) upstream licenses.  See `LICENSING.md`,
+  `COMMERCIAL-LICENSE.md`, `THIRD_PARTY_NOTICES.md`, and `NOTICE.md`.
+- The Galilean satellite module (`moon_theories/galilean.py`) was rewritten
+  clean-room from the published Lieske 1998 / Meeus ch. 44 theory, removing
+  the last LGPL-3.0 component; it is now dual-licensed like the rest of the
+  project. Output is unchanged to floating-point re-association level
+  (sub-nanometre per moon component over 1800-2200). The package now
+  contains no copyleft code; the only third-party files are permissive
+  (MIT): `vendor/spktype21.py`, `moon_theories/tass17.py`, and
+  `moon_theories/tass17_data.py` (the last relabeled MIT to match its
+  Stellarium-derived data). The provenance CI gate gained a PyMeeus
+  zero-hit class. See
+  `docs/methodology/galilean-clean-room-2026-06.md`.
+
+### Eclipse correctness (audit round v10)
+
+- Solar-eclipse obscuration is a true fraction in `[0, 1]`: a total eclipse
+  clamps to `1.0` (the `(R_moon/R_sun)²` area ratio belongs to the magnitude,
+  not the obscuration), and a no-eclipse instant reports `0.0` from every
+  entry point — it previously leaked a `1.0` fallback through
+  `sol_eclipse_where` / `lun_occult_where`.
+- The lunar-eclipse magnitude and contact helpers, and
+  `_lun_eclipse_how_pythonic`, now route through the single canonical shadow
+  model; they previously used a second model that disagreed by up to ~0.011
+  in magnitude and tens-to-hundreds of seconds in contact times.
+- Solar-eclipse path width is characterized against NASA's Five Millennium
+  Canon (documented agreement band, regression-guarded).
+
+### Other corrections
+
+- The plutino resonant libration argument uses the longitude of perihelion.
+- The longitude-speed wrap-around correction is applied consistently across
+  `planets`, `fast_calc`, and the Uranian bodies (`hypothetical`).
+
+See REVIEW-2026-06-10.md and the WS0-WS12 commit series for the full
+fix inventory (houses provenance rewrite, eclipse/rise/heliacal
+geometry cores, error-policy sweep, COB/ASSIST frame fixes, lint
+debt).
+
 ## [2.0.2] - 2026-06-03
 
 ### Fixed
@@ -17,6 +578,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   occultation within 20 years" even where events exist. The clamp now uses
   the kernel's true upper bound (max end_jd). `base`/`medium` single-segment
   DE440 kernels were unaffected.
+
+## [2.0.1] - 2026-05-18
+
+### Fixed
+
+- `is_day_chart`: inverted 2D ecliptic day/night logic (issue #1) —
+  charts near the horizon classified day as night and vice versa.
 
 ## [2.0.0] - 2026-05-14
 

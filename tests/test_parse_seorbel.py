@@ -6,7 +6,6 @@ for parsing hypothetical/fictitious body orbital elements files, as well
 as the bundled fictitious_orbits.csv dataset included with libephemeris.
 """
 
-import math
 import tempfile
 from pathlib import Path
 

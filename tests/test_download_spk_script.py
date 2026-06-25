@@ -10,9 +10,7 @@ These tests verify the script's functionality including:
 
 import os
 import sys
-import pytest
 from unittest.mock import patch, MagicMock
-from io import StringIO
 
 # Add scripts directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
@@ -195,10 +193,8 @@ class TestIsoToJd:
 
     def test_iso_to_jd_j2000(self):
         """Test conversion of J2000 epoch date."""
-        from scripts.download_spk import download_spk_for_body
 
         # Load the module to access internal function
-        import scripts.download_spk as download_module
 
         # We can't directly access _iso_to_jd, but we can test the effect
         # through the overall function or recreate the logic
@@ -319,7 +315,6 @@ class TestArgumentParsing:
 
     def test_default_date_range(self, monkeypatch):
         """Test that default date range is 2000-2100."""
-        import argparse
         from scripts.download_spk import main, _init_bodies
 
         _init_bodies()

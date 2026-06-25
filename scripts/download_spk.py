@@ -114,7 +114,6 @@ def download_spk_for_body(
         Tuple of (success_count, skipped_count, failed_count)
     """
     from libephemeris import spk_auto
-    from libephemeris.spk_auto import _iso_to_jd
 
     body_name_lower = body_name.lower()
     if body_name_lower not in AVAILABLE_BODIES:

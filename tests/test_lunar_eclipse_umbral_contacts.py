@@ -267,7 +267,7 @@ class TestUmbralContactKnownEclipses:
     def test_november_2022_total_lunar_eclipse_umbral_contacts(self):
         """Test November 8, 2022 total lunar eclipse umbral contacts.
 
-        Reference times from lun_eclipse_when (consistent with pyswisseph):
+        Reference times from lun_eclipse_when (consistent with the reference ephemeris):
         - U1 (Partial begins): 2022 Nov 08 at 09:09:34 UT
         - U2 (Total begins): 2022 Nov 08 at 10:17:26 UT
         - Maximum: 2022 Nov 08 at 10:59:12 UT

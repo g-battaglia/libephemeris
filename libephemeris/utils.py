@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Utility functions for libephemeris.
 
@@ -9,7 +11,7 @@ from __future__ import annotations
 
 import math
 import erfa
-from typing import Optional, Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union, cast, overload
 
 # Azalt calculation method flags (compatible with the reference API)
 ECL2HOR: int = 0  # Ecliptic coordinates to horizontal
@@ -24,6 +26,18 @@ TRUE_TO_APP: int = 0  # True altitude to apparent altitude
 APP_TO_TRUE: int = 1  # Apparent altitude to true altitude
 
 
+@overload
+def cotrans_sp(
+    coord: "Sequence[float]", eps_or_speed: float
+) -> "Tuple[float, float, float, float, float, float]": ...
+
+
+@overload
+def cotrans_sp(
+    coord: "Sequence[float]", eps_or_speed: "Sequence[float]", eps: float
+) -> "Tuple[Tuple[float, float, float], Tuple[float, float, float]]": ...
+
+
 def cotrans_sp(
     coord: "Sequence[float]",
     eps_or_speed: "Union[float, Sequence[float]]",
@@ -33,7 +47,7 @@ def cotrans_sp(
     Transform coordinates and velocities between ecliptic and equatorial systems.
 
     Supports two calling conventions:
-      1. PySwissEph-compatible: cotrans_sp(coord_6, eps) -> flat 6-tuple
+      1. Reference-API-compatible: cotrans_sp(coord_6, eps) -> flat 6-tuple
       2. Split form: cotrans_sp(coord_3, speed_3, eps) -> (coord_3, speed_3)
 
     The direction of transformation depends on the sign of obliquity:
@@ -52,7 +66,7 @@ def cotrans_sp(
     """
     if eps is not None:
         # 3-arg form: cotrans_sp(coord_3, speed_3, eps)
-        speed_seq = eps_or_speed
+        speed_seq = cast(Sequence[float], eps_or_speed)
         obliquity = float(eps)
         lon = float(coord[0])
         lat = float(coord[1])
@@ -63,7 +77,7 @@ def cotrans_sp(
         _split_return = True
     else:
         # 2-arg form: cotrans_sp(coord_6, eps)
-        obliquity = float(eps_or_speed)
+        obliquity = float(cast(float, eps_or_speed))
         lon = float(coord[0])
         lat = float(coord[1])
         dist = float(coord[2])
@@ -72,7 +86,7 @@ def cotrans_sp(
         dist_speed = float(coord[5])
         _split_return = False
     # Convert to radians
-    # Negate obliquity to match the pyswisseph API convention
+    # Negate obliquity to match the reference API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
     eps_rad = math.radians(-obliquity)
@@ -204,8 +218,10 @@ def azalt(
         - Reference API convention: Azimuth is measured from South, westward.
           This differs from the common convention (from North, eastward).
           To convert: az_from_north = (azimuth + 180) % 360
-        - Refraction is calculated using the Bennett formula, which is accurate
-          to about 0.07 arcmin for altitudes above 15°.
+        - Refraction is ray-traced through the ICAO Standard Atmosphere
+          (see ``libephemeris/refraction.py`` for the model and References);
+          it agrees with the common empirical fits (Bennett 1982,
+          Sæmundsson 1986) within the envelope documented there.
         - When pressure=0, no refraction is applied (apparent_alt = true_alt)
         - For objects below the horizon (negative altitude), refraction is
           extrapolated but becomes less accurate.
@@ -301,23 +317,30 @@ def azalt(
 
     # Normalize azimuth to 0-360 range
     azimuth = azimuth % 360.0
-    if azimuth < 0:
+    if azimuth < 0:  # pragma: no cover - modulo by positive 360.0 is always >= 0
         azimuth += 360.0
 
-    # pressure=0 means "no refraction" (pyswisseph convention).
-    # Only apply refraction when pressure is explicitly positive.
+    # Reference API convention for azalt(): pressure 0 does NOT disable
+    # refraction here (that is refrac()'s convention) — it means "estimate
+    # the pressure from the observer's altitude" using the standard
+    # atmosphere, then apply refraction.
+    if pressure <= 0:
+        pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.0) ** 5.255
 
     # Calculate atmospheric refraction via ICAO ray-tracing
-    if pressure > 0 and alt_true > -2.0:
-        alt_apparent, _ = refrac_extended(
-            alt_true,
-            altitude,
-            pressure,
-            temperature,
-            flag=TRUE_TO_APP,
-        )
-    else:
-        # No refraction correction
+    alt_apparent, _ = refrac_extended(
+        alt_true,
+        altitude,
+        pressure,
+        temperature,
+        flag=TRUE_TO_APP,
+    )
+
+    # Reference API convention (and refrac()'s): if refraction cannot lift the
+    # object above the horizon, report the true altitude — no refraction is
+    # applied below the horizon. refrac_extended() omits this clamp, so apply it
+    # here to keep azalt's apparent altitude 1:1 with swe.azalt below 0°.
+    if alt_apparent < 0.0:
         alt_apparent = alt_true
 
     return (azimuth, alt_true, alt_apparent)
@@ -370,7 +393,7 @@ def azalt_rev(
     # Extract geopos components
     lon = geopos[0]
     lat = geopos[1]
-    altitude = geopos[2]
+    geopos[2]
 
     from .time_utils import _sidtime_internal
     from .state import get_timescale
@@ -420,15 +443,18 @@ def azalt_rev(
     cos_lat = math.cos(lat_rad)
     sin_lat = math.sin(lat_rad)
 
-    if abs(cos_dec) < 1e-10 or abs(sin_lat) < 1e-10:
-        # At poles or object at celestial pole, hour angle is undefined
-        # Use 0 as default
+    if abs(cos_dec) < 1e-10 or abs(cos_lat) < 1e-10:
+        # Object at a celestial pole, or observer at a geographic pole:
+        # the hour angle is genuinely undefined there.
         ha = 0.0
     else:
         sin_H = math.sin(az_rad) * math.cos(alt_rad) / cos_dec
-        cos_H = (math.cos(az_rad) * math.cos(alt_rad) + sin_dec * cos_lat) / (
-            cos_dec * sin_lat
-        )
+        # cos(H) from the altitude identity
+        #   sin(alt) = sin(lat)·sin(dec) + cos(lat)·cos(dec)·cos(H)
+        # which avoids the sin(lat) division of the azimuth identity —
+        # geographic latitude 0 (a perfectly normal input) is no longer a
+        # degenerate case returning RA = LST for every azimuth/altitude.
+        cos_H = (math.sin(alt_rad) - sin_lat * sin_dec) / (cos_dec * cos_lat)
 
         ha_rad = math.atan2(sin_H, cos_H)
         ha = math.degrees(ha_rad)
@@ -490,11 +516,12 @@ def refrac(
     Notes:
         - At the horizon (0 degrees), refraction is approximately 34 arcminutes
           (0.567 degrees) under standard atmospheric conditions.
-        - The formula used is the Saemund-Bennett formula, which is accurate
-          to about 0.07 arcminutes for altitudes above 15 degrees.
-        - For altitudes below -2 degrees, refraction is extrapolated linearly.
-        - Pressure and temperature adjustments follow the standard formula:
-          correction = (pressure / 1010) * (283 / (273 + temperature))
+        - Refraction is ray-traced through the ICAO Standard Atmosphere (see
+          ``libephemeris/refraction.py`` for the model and References), not
+          an empirical curve fit; it agrees with the Bennett 1982 /
+          Sæmundsson 1986 fits within the envelope documented there.
+        - Pressure and temperature enter through the atmospheric model
+          (refractive index n ∝ P/T), not a separate correction factor.
 
     Examples:
         >>> # True altitude at horizon -> apparent altitude is higher
@@ -628,8 +655,9 @@ def refrac_extended(
         )
         true_alt = apparent_alt - refraction
 
-    # Dip of the horizon for elevated observers
-    dip = calc_dip(geoalt, lapserate)
+    # Dip of the horizon for elevated observers (pressure/temperature
+    # scale the refraction part of the dip — up to ~190" at 1000 m)
+    dip = calc_dip(geoalt, lapserate, atpress, attemp)
 
     # Return the converted altitude and detail tuple
     if flag == TRUE_TO_APP:
@@ -672,7 +700,7 @@ def cotrans(
     dist = coord[2]
 
     # Convert to radians
-    # Negate obliquity to match the pyswisseph API convention
+    # Negate obliquity to match the reference API convention
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
     eps_rad = math.radians(-eps)
@@ -736,7 +764,13 @@ def degnorm(x: float) -> float:
         >>> degnorm(720)
         0.0
     """
-    return x % 360.0
+    result = x % 360.0
+    # Python's modulo can return exactly 360.0 for tiny negative inputs
+    # (e.g. (-1e-17) % 360.0 == 360.0); snap that artifact to 0.0 to keep
+    # the documented [0, 360) contract (legitimate near-360 values pass).
+    if result >= 360.0:
+        return 0.0
+    return result
 
 
 TWO_PI = 2.0 * math.pi
@@ -770,7 +804,12 @@ def radnorm(x: float) -> float:
         >>> radnorm(4 * math.pi)  # 720 degrees -> 0
         0.0
     """
-    return x % TWO_PI
+    result = x % TWO_PI
+    # Same snap as degnorm: keep the [0, 2*pi) contract for tiny negative
+    # inputs whose modulo lands exactly on the upper bound.
+    if result >= TWO_PI:
+        return 0.0
+    return result
 
 
 def difdeg2n(p1: float, p2: float) -> float:
@@ -1009,7 +1048,7 @@ def csroundsec(cs: int) -> int:
     Notes:
         - 1 centisecond = 1/100 arcsecond
         - Uses truncation-toward-zero integer division with +50 offset
-        - Special handling at degree boundaries (30° for positive, 90° for negative)
+        - Round-down at every 30° multiple in both signs (reference behavior)
 
     Examples:
         >>> csroundsec(150)  # 1.50 arcseconds -> 2 arcseconds = 200 cs
@@ -1042,10 +1081,11 @@ def csroundsec(cs: int) -> int:
     if cs > 0 and result % 10800000 == 0 and result != 0 and cs < result:
         return result - 100
 
-    # Boundary correction for negative values at quadrant boundaries
-    # (90° = 32,400,000 cs). Same principle: prevent rounding across -90°/-180° etc.
+    # Boundary correction for negative values: the reference API applies
+    # the same 30°-multiple round-down on the negative side (verified:
+    # csroundsec(-10800149) = -10800100, and likewise at -60°, -90°, ...).
     if cs < 0:
-        if result != 0 and result % 32400000 == 0 and cs <= result - 100:
+        if result != 0 and result % 10800000 == 0 and cs <= result - 100:
             return result - 100
         # Negative values in (-100, 0) round to 0; values <= -100 round to -100
         # when the standard formula yields 0 (truncation toward zero artifact)
@@ -1181,7 +1221,7 @@ def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
             minutes = 0
             degrees += 1
 
-    # Format matching pyswisseph: "{deg}{char}{min:02d}" or
+    # Format matching the reference ephemeris: "{deg}{char}{min:02d}" or
     # "{deg}{char}{min:02d}'{sec:02d}"
     if seconds == 0:
         return f"{degrees}{direction}{minutes:02d}"
@@ -1204,36 +1244,37 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
 
     Returns:
         Formatted string representing the time in hours, minutes, seconds.
-        Format: "HH:MM:SS" (e.g., "12:34:56")
+        Format: "HH:MM:SS" with zero-padded fields (e.g., "12:34:56")
 
     Notes:
         - 1 centisecond = 1/100 second
         - 1 second = 100 centiseconds
         - 1 minute = 6000 centiseconds
         - 1 hour = 360000 centiseconds
-        - Negative values produce negative hour strings (e.g., "-1:00:00")
+        - Hours are zero-padded and wrap modulo 24, so negative values map
+          into the 0-23 range (e.g., -360000 cs -> "23:00:00")
         - Seconds are rounded to whole numbers (centiseconds are rounded)
 
     Examples:
         >>> cs2timestr(0)
-        ' 0:00:00'
+        '00:00:00'
         >>> cs2timestr(360000)  # 1 hour
-        ' 1:00:00'
+        '01:00:00'
         >>> cs2timestr(4526050)  # 12:34:21 (with rounding from .50)
         '12:34:21'
-        >>> cs2timestr(-360000)  # -1 hour
-        '-1:00:00'
+        >>> cs2timestr(-360000)  # -1 hour wraps mod 24
+        '23:00:00'
     """
-    # Accept bytes separator (pyswisseph uses b':')
+    # Accept bytes separator (the reference ephemeris uses b':')
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
-    # Handle sign
-    if cs < 0:
-        sign = -1
-        cs = -cs
-    else:
-        sign = 1
+    # Wrap the whole magnitude into one day [0, 24h) before extracting fields.
+    # Applying the sign to the hours field alone left sub-hour negatives (e.g.
+    # -6000 cs = -1 min) indistinguishable from their positive counterpart and
+    # broke the documented wrap ("-360000 cs -> 23:00:00"). Python's modulo maps
+    # negatives into the positive range, so -6000 -> 23:59:00 as intended.
+    cs = cs % (24 * 360000)
 
     # Extract hours, minutes, and seconds
     # 1 hour = 60 * 60 * 100 = 360000 centiseconds
@@ -1254,13 +1295,9 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
             minutes = 0
             hours += 1
 
-    # Apply sign to hours
-    if sign < 0:
-        hours = -hours
-
     # Format the string matching reference API format
     # Format: "%02d<sep>%02d<sep>%02d"
-    # Hours are mod 24 to match pyswisseph behavior
+    # A rounding carry can push 23:59:59.5x up to 24:00:00; wrap back to 00.
     hours = hours % 24
     if suppresszero:
         if seconds == 0:
@@ -1305,7 +1342,7 @@ def deg_midp(x1: float, x2: float) -> float:
     diff = x2 - x1
 
     # When both arcs are equally long (diff exactly ±180) we follow the
-    # pyswisseph convention: always take the positive (clockwise) half,
+    # the reference convention: always take the positive (clockwise) half,
     # i.e. treat -180 the same as +180.
     if diff > 180.0:
         diff -= 360.0
@@ -1353,7 +1390,7 @@ def rad_midp(x: float, y: float) -> float:
     diff = y - x
 
     # When both arcs are equally long (diff exactly ±π) we follow the
-    # pyswisseph convention: always take the positive (clockwise) half.
+    # the reference convention: always take the positive (clockwise) half.
     if diff > math.pi:
         diff -= TWO_PI
     elif diff < -math.pi:
@@ -1376,7 +1413,7 @@ def d2l(d: float) -> int:
     "round half away from zero" semantics (also known as commercial rounding).
     This is standard practice in astronomical computation software.
 
-    Compatible with the pyswisseph swe.d2l() API.
+    Compatible with the reference swe.d2l() API.
 
     Args:
         d: A floating-point number to convert.
@@ -1389,7 +1426,7 @@ def d2l(d: float) -> int:
         - This differs from Python's built-in round() function, which uses
           "round half to even" (banker's rounding) for Python 3.
         - Used internally for coordinate conversions and also exposed
-          publicly for consistency with the pyswisseph API.
+          publicly for consistency with the reference API.
 
     Examples:
         >>> d2l(1.4)

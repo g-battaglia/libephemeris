@@ -8,7 +8,6 @@ and that the fixstar_ut function handles various star names and dates.
 from __future__ import annotations
 
 import math
-import random
 
 import pytest
 

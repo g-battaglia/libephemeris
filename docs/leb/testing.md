@@ -414,8 +414,8 @@ cp data/leb/ephemeris_medium.leb /Volumes/Data/libephemeris/leb/
 | Test | Reason |
 |------|--------|
 | Jupiter/Saturn geocentric crossing | Pre-existing bug in `crossing.py` solver (not LEB) |
-| Mars 180° geocentric crossing | `RuntimeError: Maximum iterations reached` (not LEB) |
-| Saturn 180°/270° heliocentric crossing | `RuntimeError: Heliocentric crossing search diverged` (not LEB) |
+| Mars 180° geocentric crossing | `Error: Maximum iterations reached` (not LEB) |
+| Saturn 180°/270° heliocentric crossing | `Error: Heliocentric crossing search diverged` (not LEB) |
 
 ### skip
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 REBOUND/ASSIST integration for ephemeris-quality asteroid orbit propagation.
 
@@ -61,10 +63,10 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Tuple, List, Callable
+from typing import TYPE_CHECKING, Optional, Tuple, List
 
 if TYPE_CHECKING:
     from .minor_bodies import OrbitalElements
@@ -295,7 +297,6 @@ def _download_single_file(
         quiet: Suppress all non-error output.
     """
     import hashlib
-    import ssl
     import tempfile
     import urllib.request
 
@@ -346,8 +347,9 @@ def _download_single_file(
             actual_mb = dest.stat().st_size / (1024 * 1024)
             print(f"  Done ({actual_mb:.1f} MB, sha256: {sha256.hexdigest()[:16]}...)")
 
-    except (ImportError, RuntimeError, ValueError):
-        # Clean up temp file on error
+    except (ImportError, RuntimeError, ValueError, OSError):
+        # Clean up temp file on error.  OSError also covers the
+        # urllib.error.URLError network failures raised mid-download.
         try:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -452,6 +454,80 @@ def download_assist_data(
     return data_dir
 
 
+# Mean obliquity at J2000.0 — the same 23.4392911 deg constant spk.py
+# uses for its ICRS <-> ecliptic J2000 rotations, so states converted
+# here live in the identical ecliptic frame as the SPK/Keplerian paths.
+_EPS_J2000_RAD: float = math.radians(23.4392911)
+
+
+def _ecliptic_j2000_to_icrs(
+    x: float, y: float, z: float
+) -> Tuple[float, float, float]:
+    """Rotate a vector from ecliptic J2000 to equatorial ICRS."""
+    ce = math.cos(_EPS_J2000_RAD)
+    se = math.sin(_EPS_J2000_RAD)
+    return (x, y * ce - z * se, y * se + z * ce)
+
+
+def _icrs_to_ecliptic_j2000(
+    x: float, y: float, z: float
+) -> Tuple[float, float, float]:
+    """Rotate a vector from equatorial ICRS to ecliptic J2000."""
+    ce = math.cos(_EPS_J2000_RAD)
+    se = math.sin(_EPS_J2000_RAD)
+    return (x, y * ce + z * se, -y * se + z * ce)
+
+
+# ASSIST integrates the test particle in the gravity of the Sun, the planets and
+# the major-asteroid perturbers baked into the small-body ephemeris (sb441-n16:
+# Ceres, Pallas, Juno, Vesta, Hygiea, Iris, ...). When the body being propagated
+# *is* one of those perturbers, ASSIST adds that perturber's own (near-singular)
+# acceleration onto the coincident test particle, which wrecks the integration
+# (the orbit goes retrograde / diverges). ASSIST's Python API can only toggle the
+# whole ASTEROIDS force, so when a self-coincidence is detected we drop it for
+# that single integration. The omitted effect — the *other* major asteroids on
+# the target — is < ~0.01" over a year, far below the catastrophic self term.
+_ASSIST_SELF_AU: float = 1e-4  # ~15000 km: far below inter-asteroid separations,
+#                                far above the ~0 self-coincidence of a perturber.
+
+
+def _assist_disable_self_perturber(extras, ephem, x, y, z, t_rel) -> Optional[str]:
+    """If the test particle at barycentric ICRF (x, y, z) AU coincides with an
+    ASSIST asteroid perturber at time ``t_rel`` (= jd_tt - ephem.jd_ref), remove
+    the ASTEROIDS force from ``extras`` to avoid a self-interaction singularity.
+
+    Returns the matched perturber name, or None if there is no coincidence.
+    """
+    try:
+        from assist.ephem import ASSIST_BODY_IDS
+    except Exception:  # noqa: BLE001 (older/newer assist without the table)
+        return None
+    hit = None
+    for bid, name in ASSIST_BODY_IDS.items():
+        if bid < 11:  # 0-10 are Sun..Pluto (real bodies, never the "self" case)
+            continue
+        try:
+            a = ephem.get_particle(name, t_rel)
+        except Exception:  # noqa: BLE001
+            continue
+        if (x - a.x) ** 2 + (y - a.y) ** 2 + (z - a.z) ** 2 < _ASSIST_SELF_AU ** 2:
+            hit = name
+            break
+    if hit is not None and "ASTEROIDS" in extras.forces:
+        import warnings
+
+        extras.forces = [f for f in extras.forces if f != "ASTEROIDS"]
+        warnings.warn(
+            f"propagate: the body being propagated coincides with the ASSIST "
+            f"asteroid perturber '{hit}', so the ASTEROIDS force was disabled for "
+            f"this integration to avoid a self-interaction singularity (the "
+            f"perturbations from the other major asteroids, < ~0.01\", are "
+            f"omitted).",
+            stacklevel=3,
+        )
+    return hit
+
+
 @dataclass
 class PropagationResult:
     """Result of orbit propagation.
@@ -503,7 +579,7 @@ def check_rebound_available() -> bool:
         bool: True if REBOUND can be imported, False otherwise.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -517,7 +593,7 @@ def check_assist_available() -> bool:
         bool: True if ASSIST can be imported, False otherwise.
     """
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -575,7 +651,7 @@ def get_rebound_version() -> Optional[str]:
         str: Version string if installed, None otherwise.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
 
         return rebound.__version__
     except ImportError:
@@ -589,7 +665,7 @@ def get_assist_version() -> Optional[str]:
         str: Version string if installed, None otherwise.
     """
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
 
         return assist.__version__
     except ImportError:
@@ -653,7 +729,7 @@ def _elements_to_cartesian(
         dict with keys ``x, y, z, vx, vy, vz`` suitable for
         ``rebound.Simulation.add(m=0, ...)``.
     """
-    import rebound
+    import rebound  # noqa: F401 (availability probe)
 
     # Gaussian gravitational constant squared -> G*M_sun in AU^3/day^2
     k_squared = 0.00029591220828559
@@ -712,7 +788,7 @@ def propagate_orbit_rebound(
         >>> print(f"Ceres at {result.ecliptic_lon:.4f} deg, {result.distance:.4f} AU")
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "REBOUND is required for n-body orbit propagation. "
@@ -827,16 +903,21 @@ def propagate_orbit_assist(
     Note:
         Requires ~1 GB of ephemeris data files. See module docstring for
         download instructions.
+
+        jd_start/jd_end are TT Julian Dates and are passed to ASSIST, which
+        expects TDB. TT is used directly as an approximation of TDB; the
+        TT-TDB difference is <= ~1.7 ms and is negligible for these
+        integrations.
     """
     try:
-        import rebound
+        import rebound  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "REBOUND is required for ASSIST. Install with: pip install rebound"
         )
 
     try:
-        import assist
+        import assist  # noqa: F401 (availability probe)
     except ImportError:
         raise ImportError(
             "ASSIST is required for ephemeris-quality integration. "
@@ -878,24 +959,44 @@ def propagate_orbit_assist(
     # Attach ASSIST extras
     extras = assist.Extras(sim, ephem)
 
-    # Configure non-gravitational forces if requested
-    if include_non_gravitational:
-        # Set Marsden model parameters
-        # A1: radial, A2: transverse, A3: normal components
-        extras.particle_params = {
-            "A1": A1,
-            "A2": A2,
-            "A3": A3,
-        }
-
-    # Convert orbital elements to heliocentric Cartesian state.
-    # ASSIST manages the Sun internally, so we must supply Cartesian
-    # coordinates — orbital-element keywords require a massive primary
-    # which does not exist in the ASSIST simulation.
+    # Convert orbital elements to heliocentric ecliptic-J2000 Cartesian
+    # state.  ASSIST integrates in the *equatorial ICRF frame with the
+    # solar-system barycenter at the origin* (time = TDB days relative
+    # to ephem.jd_ref), so rotate ecliptic -> equatorial and shift the
+    # origin by the Sun's barycentric state from ASSIST's own ephemeris.
     cart = _elements_to_cartesian(elements, jd_start)
 
-    # Add test particle with Cartesian state
-    sim.add(m=0.0, **cart)
+    sun0 = ephem.get_particle("sun", jd_start - ephem.jd_ref)
+    x0, y0, z0 = _ecliptic_j2000_to_icrs(cart["x"], cart["y"], cart["z"])
+    vx0, vy0, vz0 = _ecliptic_j2000_to_icrs(cart["vx"], cart["vy"], cart["vz"])
+
+    # Add test particle with barycentric equatorial state
+    sim.add(
+        m=0.0,
+        x=x0 + sun0.x,
+        y=y0 + sun0.y,
+        z=z0 + sun0.z,
+        vx=vx0 + sun0.vx,
+        vy=vy0 + sun0.vy,
+        vz=vz0 + sun0.vz,
+    )
+
+    # Avoid the self-interaction singularity when the propagated body is itself
+    # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/Juno/...).
+    _assist_disable_self_perturber(
+        extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+        jd_start - ephem.jd_ref,
+    )
+
+    # Configure non-gravitational forces if requested.  ASSIST's API
+    # takes a flat array of 3 Marsden parameters (A1 radial, A2
+    # transverse, A3 normal) per particle, after the particle exists.
+    # The setter requires a numpy float64 array (it calls value.ctypes on
+    # it); a plain Python list raises AttributeError.
+    if include_non_gravitational:
+        import numpy as np
+
+        extras.particle_params = np.array([A1, A2, A3], dtype=np.float64)
 
     # Set initial time (JD - reference JD)
     sim.t = jd_start - ephem.jd_ref
@@ -906,16 +1007,22 @@ def propagate_orbit_assist(
     # Integrate
     sim.integrate(t_end)
 
-    # Get particle state
+    # Get particle state (barycentric equatorial ICRF) and convert back
+    # to the heliocentric ecliptic J2000 frame PropagationResult uses.
     p = sim.particles[0]
+    sun1 = ephem.get_particle("sun", t_end)
+    xh, yh, zh = _icrs_to_ecliptic_j2000(p.x - sun1.x, p.y - sun1.y, p.z - sun1.z)
+    vxh, vyh, vzh = _icrs_to_ecliptic_j2000(
+        p.vx - sun1.vx, p.vy - sun1.vy, p.vz - sun1.vz
+    )
 
     return PropagationResult(
-        x=p.x,
-        y=p.y,
-        z=p.z,
-        vx=p.vx,
-        vy=p.vy,
-        vz=p.vz,
+        x=xh,
+        y=yh,
+        z=zh,
+        vx=vxh,
+        vy=vyh,
+        vz=vzh,
         jd_tt=jd_end,
     )
 
@@ -945,6 +1052,11 @@ def propagate_trajectory(
     Returns:
         List[PropagationResult]: Positions and velocities at each time
 
+    Note:
+        When use_assist=True, jd_start/jd_end (TT) are passed to ASSIST,
+        which expects TDB. TT is used directly as an approximation of TDB;
+        the TT-TDB difference is <= ~1.7 ms and is negligible here.
+
     Example:
         >>> trajectory = propagate_trajectory(elements, jd_start, jd_end, num_points=365)
         >>> for point in trajectory:
@@ -957,8 +1069,8 @@ def propagate_trajectory(
 
     if use_assist and check_assist_available():
         try:
-            import rebound
-            import assist
+            import rebound  # noqa: F401 (availability probe)
+            import assist  # noqa: F401 (availability probe)
 
             # Configure ephemeris
             if ephem_config is None:
@@ -976,8 +1088,37 @@ def propagate_trajectory(
                 sim = rebound.Simulation()
                 extras = assist.Extras(sim, ephem)
 
+                # ASSIST integrates in the equatorial ICRF frame with the
+                # solar-system barycenter at the origin (same convention as
+                # propagate_orbit_assist), so rotate ecliptic -> equatorial
+                # and shift the origin by the Sun's barycentric state before
+                # adding the particle, then undo both at each output epoch.
                 cart = _elements_to_cartesian(elements, jd_start)
-                sim.add(m=0.0, **cart)
+                sun0 = ephem.get_particle("sun", jd_start - ephem.jd_ref)
+                x0, y0, z0 = _ecliptic_j2000_to_icrs(cart["x"], cart["y"], cart["z"])
+                vx0, vy0, vz0 = _ecliptic_j2000_to_icrs(
+                    cart["vx"], cart["vy"], cart["vz"]
+                )
+                sim.add(
+                    m=0.0,
+                    x=x0 + sun0.x,
+                    y=y0 + sun0.y,
+                    z=z0 + sun0.z,
+                    vx=vx0 + sun0.vx,
+                    vy=vy0 + sun0.vy,
+                    vz=vz0 + sun0.vz,
+                )
+
+                # Avoid the self-interaction singularity when the body is itself
+                # one of ASSIST's asteroid perturbers (Ceres/Vesta/Pallas/...).
+                # Evaluated once before the loop on purpose: the match is by the
+                # identity of the propagated body versus the fixed ASSIST
+                # perturber set, which does not change along the trajectory, so a
+                # per-step re-check would be redundant.
+                _assist_disable_self_perturber(
+                    extras, ephem, x0 + sun0.x, y0 + sun0.y, z0 + sun0.z,
+                    jd_start - ephem.jd_ref,
+                )
 
                 sim.t = jd_start - ephem.jd_ref
 
@@ -985,9 +1126,16 @@ def propagate_trajectory(
                     t = jd_start + i * dt
                     sim.integrate(t - ephem.jd_ref)
                     p = sim.particles[0]
+                    sun_t = ephem.get_particle("sun", t - ephem.jd_ref)
+                    xh, yh, zh = _icrs_to_ecliptic_j2000(
+                        p.x - sun_t.x, p.y - sun_t.y, p.z - sun_t.z
+                    )
+                    vxh, vyh, vzh = _icrs_to_ecliptic_j2000(
+                        p.vx - sun_t.vx, p.vy - sun_t.vy, p.vz - sun_t.vz
+                    )
                     results.append(
                         PropagationResult(
-                            x=p.x, y=p.y, z=p.z, vx=p.vx, vy=p.vy, vz=p.vz, jd_tt=t
+                            x=xh, y=yh, z=zh, vx=vxh, vy=vyh, vz=vzh, jd_tt=t
                         )
                     )
 
@@ -1002,7 +1150,7 @@ def propagate_trajectory(
             "Install with: pip install rebound"
         )
 
-    import rebound
+    import rebound  # noqa: F401 (availability probe)
 
     k_squared = 0.00029591220828559
     sim = rebound.Simulation()

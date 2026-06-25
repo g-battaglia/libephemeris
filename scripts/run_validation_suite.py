@@ -429,7 +429,7 @@ def main():
         all_pass &= section_fn()
 
     elapsed = time.time() - t0
-    total_checks = sum(1 for _ in [])  # placeholder
+    sum(1 for _ in [])  # placeholder
 
     print(f"\n{'=' * 60}")
     print(f"  VERDICT: {'ALL PASS' if all_pass else 'FAILURES DETECTED'}")

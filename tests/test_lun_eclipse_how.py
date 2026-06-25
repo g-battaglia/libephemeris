@@ -77,9 +77,11 @@ class TestLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_no_eclipse, (london_lon, london_lat, 0.0))
 
-        # Umbral and penumbral magnitudes should be zero
+        # No umbral immersion; the penumbral measure stays as the
+        # (negative) distance-from-penumbra value, the reference
+        # convention (verified against the reference ephemeris 2.10.03).
         assert attr[0] == 0.0
-        assert attr[1] == 0.0
+        assert attr[1] < 0.0
         # Eclipse type should be 0
         assert ecl_type == 0
 
@@ -119,11 +121,12 @@ class TestLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_eclipse, (rio_lon, rio_lat, 0.0))
 
-        # Check if Moon is above horizon
-        moon_alt = attr[5]
-        if moon_alt > -1.0:
-            # Should have visibility flag set
-            assert ecl_type & ECL_VISIBLE
+        # Above the horizon during the eclipse the phase is reported;
+        # the reference encodes visibility by zeroing the retflag below
+        # the horizon, never by an ECL_VISIBLE bit in this function.
+        apparent_alt = attr[6]
+        if apparent_alt > 0.0:
+            assert ecl_type & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
 
     def test_eclipse_type_detection(self):
         """Test that eclipse type is correctly detected."""
@@ -186,10 +189,10 @@ class TestLunEclipseHow:
 
 
 class TestSweLunEclipseHow:
-    """Test suite for lun_eclipse_how with pyswisseph-compatible signature."""
+    """Test suite for lun_eclipse_how with the reference-API-compatible signature."""
 
-    def test_pyswisseph_signature(self):
-        """Test the pyswisseph-compatible signature with geopos parameter."""
+    def test_reference_signature(self):
+        """Test the reference-API-compatible signature with geopos parameter."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
         # geopos = [longitude, latitude, altitude]
         rome_geopos = [12.4964, 41.9028, 0]
@@ -213,8 +216,10 @@ class TestSweLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_eclipse, la_geopos, FLG_SWIEPH)
 
-        # Moon should be visible from LA (totality visible)
-        assert ecl_type & ECL_VISIBLE
+        # Totality in progress and Moon above the horizon: the retflag
+        # carries the phase (the reference ephemeris 2.10.03 returns ECL_TOTAL here;
+        # no visibility bits are set by this function).
+        assert ecl_type & ECL_TOTAL
 
         # Umbral magnitude should be > 1 for total eclipse at maximum
         assert attr[0] > 1.0  # Total eclipse at maximum
@@ -249,8 +254,9 @@ class TestSweLunEclipseHow:
 
         ecl_type, attr = lun_eclipse_how(jd_eclipse, tokyo_geopos, FLG_SWIEPH)
 
-        # Moon should be visible from Tokyo
-        assert ecl_type & ECL_VISIBLE
+        # Eclipse in progress and Moon above the horizon: the phase is
+        # reported in the retflag (no visibility bits in this function).
+        assert ecl_type & (ECL_TOTAL | ECL_PARTIAL | ECL_PENUMBRAL)
 
         # Umbral magnitude should be positive
         assert attr[0] > 0
@@ -301,7 +307,7 @@ class TestSweLunEclipseHow:
         assert abs(attr[8] - attr[0]) < 1e-10
 
     def test_geopos_longitude_first(self):
-        """Test that geopos uses longitude-first order (pyswisseph convention)."""
+        """Test that geopos uses longitude-first order (reference ephemeris convention)."""
         jd_eclipse = julday(2022, 5, 16, 4.2)
 
         # Rome: lon=12.4964, lat=41.9028
@@ -477,7 +483,7 @@ class TestLunEclipseHowEdgeCases:
 class TestValidationRequirements:
     """Tests for ECLIPSE-005 validation requirements.
 
-    These tests verify the implementation matches pyswisseph output
+    These tests verify the implementation matches the reference ephemeris output
     within the specified tolerances for the 2022-Nov-08 total lunar eclipse.
 
     Reference: Nov 8, 2022 total lunar eclipse
@@ -500,10 +506,8 @@ class TestValidationRequirements:
 
         retflag, attr = lun_eclipse_how(jd_max, la_geopos, FLG_SWIEPH)
 
-        # Moon should be visible
-        assert retflag & ECL_VISIBLE, "Moon should be visible from LA"
-
-        # Eclipse should be total
+        # Eclipse should be total and observable (nonzero retflag means
+        # the Moon stands above the local horizon)
         assert retflag & ECL_TOTAL, "Eclipse should be total"
 
         # Umbral magnitude should be > 1 for total eclipse
@@ -555,8 +559,8 @@ class TestValidationRequirements:
 
         retflag, attr = lun_eclipse_how(jd_max, tokyo_geopos, FLG_SWIEPH)
 
-        # Moon should be visible from Tokyo
-        assert retflag & ECL_VISIBLE, "Moon should be visible from Tokyo"
+        # A nonzero retflag means the eclipse is observable from Tokyo
+        assert retflag != 0, "Eclipse should be observable from Tokyo"
 
         # Moon should be above horizon
         moon_alt = attr[5]
@@ -596,8 +600,8 @@ class TestValidationRequirements:
         moon_alt_correct = attr_correct[5]
         moon_alt_wrong = attr_wrong[5]
 
-        # Correct LA should have Moon visible and high
-        assert retflag_correct & ECL_VISIBLE, (
+        # Correct LA should have the eclipse observable (nonzero retflag)
+        assert retflag_correct != 0, (
             "Moon should be visible at correct LA position"
         )
         assert moon_alt_correct > 30, (

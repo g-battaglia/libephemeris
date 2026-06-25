@@ -10,6 +10,7 @@ LibEphemeris integrates PyERFA (the Python wrapper for the IAU SOFA/ERFA library
   - [Error Growth Over Time](#error-growth-over-time)
   - [Obliquity](#obliquity)
   - [Precession-Nutation Matrix](#precession-nutation-matrix)
+  - [Long-Term Precession (Vondrák 2011)](#long-term-precession-vondrák-2011)
   - [Cached Nutation](#cached-nutation)
 - [API Reference](#api-reference)
 - [Precision and Validation](#precision-and-validation)
@@ -66,6 +67,56 @@ from libephemeris.erfa_nutation import get_erfa_pnm06a_matrix
 # Returns the precession-nutation matrix for J2000 to date transformation
 matrix = get_erfa_pnm06a_matrix(jd_tt)
 ```
+
+### Long-Term Precession (Vondrák 2011)
+
+The IAU 2006 precession is a polynomial only valid for a few centuries around
+J2000; at remote epochs it diverges rapidly (for example the Sun's ecliptic
+longitude is ~36" off at year -3000). For its apparent-place reduction
+LibEphemeris therefore uses the **long-term precession model of Vondrák,
+Capitaine & Wallace (2011)**, "New precession expressions, valid for long time
+intervals" (A&A 534, A22), which is fitted to a numerical integration and stays
+accurate over ±200,000 years while agreeing with IAU 2006 to sub-milliarcsecond
+precision near J2000.
+
+The model is obtained directly from PyERFA's reference Vondrák routines — no
+coefficients are transcribed by hand and no copyleft source is consulted:
+
+```python
+import erfa
+epj = 2000.0 + (jd_tt - 2451545.0) / 365.25
+P = erfa.ltpb(epj)      # ICRS -> mean equator/equinox of date (frame bias included)
+pecl = erfa.ltpecl(epj) # ecliptic pole (for the of-date mean obliquity)
+pequ = erfa.ltpequ(epj) # equator pole
+```
+
+`libephemeris/precession_vondrak.py` wraps these into the matrix builders used by
+every reduction path (the LEB fast path, the Skyfield reference path, and the
+ecliptic-body / SPK / fixed-star paths). The of-date mean obliquity is taken as
+the angle between the Vondrák equator and ecliptic poles (long-term valid),
+replacing the IAU 2006 obliquity polynomial which also diverges at remote epochs.
+Nutation remains IAU 2006/2000A and is layered on top of the Vondrák precession.
+
+The remaining model floor at deep-BCE dates is the underlying ephemeris generation
+(DE441), which the precession model does not affect.
+
+#### Of-date mean obliquity — a long-term-valid choice
+
+The of-date mean obliquity used in every reduction (and reported by the `ECL_NUT`
+pseudo-body) is the **true angle between the of-date equator and ecliptic poles**
+of the Vondrák model (`erfa.ltpequ` · `erfa.ltpecl`). This is the self-consistent
+companion to the Vondrák precession and stays rigorous over ±200,000 years,
+replacing the IAU 2006 obliquity polynomial (`erfa.obl06`), which is only valid a
+few centuries from J2000 and is an out-of-range extrapolation at remote epochs.
+
+Crucially, **the obliquity choice does not affect ecliptic longitude** — for a body
+near the ecliptic the longitude is invariant to a small tilt of the frame; only the
+latitude absorbs it. So the choice is confined to ecliptic latitude (sub-arcsecond
+within recorded history, identically zero in the modern era, and at deep-BCE still
+well below the ephemeris-generation floor on the planets). How this of-date
+obliquity compares against Swiss Ephemeris at deep-BCE epochs — a small, deliberate,
+bounded deviation — is documented in the
+[Swiss Ephemeris Comparison](../comparison/intentional-divergences.md#3-of-date-mean-obliquity-at-deep-bce-epochs).
 
 ### Cached Nutation
 
@@ -126,27 +177,26 @@ The precision improvement is most significant for:
 
 ## Installation
 
-PyERFA is an optional dependency. Install it with:
+PyERFA is a **required runtime dependency** (declared in `pyproject.toml`) and is
+installed automatically with LibEphemeris:
 
 ```bash
-pip install pyerfa
+pip install libephemeris
 ```
 
-Or with LibEphemeris extras:
+The precession/nutation/obliquity reductions are built directly on PyERFA, so it
+is always present at runtime. The pure-Python analytical helpers that remain in
+`astrometry.py` (Lieske precession, the IAU 2006 obliquity polynomial, the
+numpy nutation series) are **reference/test-only**: they are exercised by the
+no-erfa unit tests (which monkeypatch the erfa flag off) but are not a runtime
+fallback, since a real install always has PyERFA.
 
-```bash
-pip install libephemeris[precision]
-```
-
-To verify PyERFA is available:
+To confirm PyERFA is available:
 
 ```python
 from libephemeris.erfa_nutation import has_erfa
-if has_erfa():
-    print("PyERFA is available for high-precision calculations")
+assert has_erfa()  # always true in a normal install
 ```
-
-When PyERFA is not installed, LibEphemeris falls back seamlessly to its built-in approximations.
 
 ## References
 

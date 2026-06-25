@@ -10,13 +10,13 @@ Features
 --------
 
 - **pyswisseph Compatible**: Drop-in replacement for pyswisseph
-- **Pure Python**: No C extensions required
+- **Readable Python**: the ephemeris algorithms are plain, inspectable Python (on the standard NumPy/Skyfield/pyerfa stack)
 - **High Precision**: Uses NASA JPL DE440/DE441 ephemeris via Skyfield
 - **Four Calculation Modes**: auto, skyfield, leb, horizons
 - **25 House Systems**: Including Placidus, Koch, Whole Sign, and more (26 codes with A/E alias)
-- **43 Ayanamshas**: Full sidereal zodiac support
+- **47 Ayanamshas**: Full sidereal zodiac support
 - **Eclipses**: Solar and lunar eclipse calculations
-- **Fixed Stars**: 116 Hipparcos stars with proper motion
+- **Fixed Stars**: 1,447 Hipparcos stars with proper motion
 - **Minor Bodies**: Asteroids, centaurs, and TNOs with SPK kernel support
 
 Quick Start
@@ -65,6 +65,12 @@ Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: API Reference
+
+   api_reference
+
+.. toctree::
+   :maxdepth: 2
    :caption: Architecture
 
    architecture/horizons-backend
@@ -76,10 +82,8 @@ Contents
 
    reference/precision
    reference/flags
-   reference/divergences
    reference/house-systems
    reference/ayanamsha
-   reference/swisseph-comparison
    reference/known-bugs
 
 .. toctree::
@@ -87,13 +91,26 @@ Contents
    :caption: Methodology
 
    methodology/overview
+   methodology/delta-t
+   methodology/sidereal-time-longterm
    methodology/planet-centers-spk
    methodology/lunar-apsides
    methodology/interpolated-apogee
    methodology/interpolated-perigee
    methodology/true-lilith
+   methodology/hypothetical-bodies
    methodology/pyerfa-integration
    methodology/rebound-integration
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Swiss Ephemeris Comparison
+
+   comparison/index
+   comparison/precision
+   comparison/known-differences
+   comparison/intentional-divergences
+   comparison/api-compatibility
 
 .. toctree::
    :maxdepth: 2

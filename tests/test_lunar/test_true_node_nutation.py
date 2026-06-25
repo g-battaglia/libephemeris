@@ -11,7 +11,7 @@ with an 18.6-year dominant period matching the lunar node precession.
 import math
 import pytest
 import random
-from libephemeris.lunar import calc_true_lunar_node, _mean_obliquity_radians
+from libephemeris.lunar import calc_true_lunar_node
 from skyfield.nutationlib import iau2000a_radians
 from libephemeris.state import get_timescale
 

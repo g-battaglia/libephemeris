@@ -351,7 +351,6 @@ def sweep_flag_combinations(reader) -> dict:
 
     # Verify fallback produces identical results to pure Skyfield
     print("\n  Fallback identity (fallback result == pure Skyfield):")
-    fallback_identity_pass = True
     for flag_name, flags in fallback_flags.items():
         for body_id in [0, 1, 4]:
             try:

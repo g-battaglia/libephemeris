@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Astropy integration evaluation for libephemeris.
 
@@ -45,7 +47,7 @@ could supplement (not replace) the existing Skyfield-based calculations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 
 def check_astropy_available() -> bool:
@@ -62,7 +64,7 @@ def check_astropy_available() -> bool:
     """
     try:
         import astropy.time
-        import astropy.coordinates
+        import astropy.coordinates  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -125,9 +127,13 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
 
     from astropy.time import Time
     from .state import get_timescale
-    from .time_utils import deltat
 
-    # Skyfield calculations
+    # Scale caveat: the input jd_utc is handed to Skyfield as UT1 and to
+    # astropy as both UTC and UT1.  |UT1 - UTC| is kept below 0.9 s by
+    # leap seconds, so the comparison values below carry an inherent
+    # uncertainty of up to ~0.9 s (delta_t_difference_ms reflects the
+    # two libraries' delta-T tables *plus* this scale conflation).  For
+    # exact work convert the input explicitly before comparing.
     ts = get_timescale()
     t_sf = ts.ut1_jd(jd_utc)
     skyfield_delta_t = float(t_sf.delta_t)  # seconds
@@ -136,8 +142,7 @@ def compare_time_conversions(jd_utc: float) -> dict[str, Any]:
     # Astropy calculations
     t_ap = Time(jd_utc, format="jd", scale="utc")
 
-    # Delta T from astropy (TT - UT1)
-    # Note: astropy uses UT1, we approximate with UTC for comparison
+    # Delta T from astropy (TT - UT1), treating the input as UT1
     t_ut1 = Time(jd_utc, format="jd", scale="ut1")
     astropy_delta_t = (t_ap.tt.jd - t_ut1.jd) * 86400.0  # seconds
 
@@ -240,6 +245,11 @@ def parse_time_string(time_string: str, format: str | None = None) -> float:
         - MJD: Modified Julian Day
         - GPS: GPS seconds
 
+    Note:
+        Auto-detection (format=None) only recognizes the string-based date
+        formats (ISO, FITS). The numeric formats (unix, mjd, gps) are NOT
+        auto-detected and require an explicit ``format=`` argument.
+
     Example:
         >>> from libephemeris.astropy_integration import parse_time_string
         >>> jd = parse_time_string("2000-01-01T12:00:00")
@@ -314,11 +324,10 @@ def compare_coordinate_transforms(
         SkyCoord,
         EarthLocation,
         AltAz,
-        Galactic,
         BarycentricMeanEcliptic,
     )
     import astropy.units as u
-    from skyfield.api import Star, Topos
+    from skyfield.api import Star, wgs84
     from .state import get_planets, get_timescale
 
     # Skyfield calculation
@@ -329,7 +338,7 @@ def compare_coordinate_transforms(
 
     # Create star and observer
     star = Star(ra_hours=ra_deg / 15.0, dec_degrees=dec_deg)
-    observer = earth + Topos(latitude_degrees=lat_deg, longitude_degrees=lon_deg)
+    observer = earth + wgs84.latlon(lat_deg, lon_deg)
 
     # Calculate alt/az with Skyfield
     apparent = observer.at(t_sf).observe(star).apparent()

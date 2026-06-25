@@ -16,7 +16,6 @@ pytestmark = pytest.mark.slow
 
 from libephemeris import (
     julday,
-    revjul,
     lun_occult_when_glob,
     ECL_GRAZING,
     ECL_TOTAL,

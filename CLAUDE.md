@@ -9,6 +9,11 @@ VERY IMPORTANT:
 
 Uses `uv` for dependencies and `poe` (poethepoet) for task running.
 
+The `leph` dev CLI is repo tooling and is not shipped in wheels: from a
+source checkout use `./leph`, `python -m libephemeris.dev_cli`, or
+`poe leph -- <args>` (an installed editable venv may still expose a
+`leph` script).
+
 ```bash
 uv pip install -e ".[dev]"        # Install with dev dependencies
 poe lint                          # Ruff linter with auto-fix
@@ -73,13 +78,15 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **IntpApog/IntpPerig** | ~1-2° (pre-regen) | ~1-2° (pre-regen) | ~1-2° (pre-regen) |
 | **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
-**Known limitation**: At extreme dates (beyond ±2000 years from J2000), Meeus nutation polynomial degradation adds ~0.003" to ecliptic body errors. This is a physical limit of the nutation series, not a Chebyshev fit error. Test tolerance floor: 0.005" for extended extreme-date tests only.
+**Precession at extreme dates**: the apparent-place reduction uses the **Vondrák 2011** long-term precession (valid ±200,000 years), via pyerfa — see `libephemeris/precession_vondrak.py`. This replaced the IAU 2006 precession (only valid a few centuries from J2000, ~36" off for the Sun at year -3000) and matches Swiss Ephemeris's precession model. Modern results are unchanged (Vondrák ≡ IAU 2006 to <1 mas near J2000).
+
+**Known limitations at extreme dates**: (1) the nutation series still adds ~0.003" of degradation beyond ±2000 years (a physical limit, not a Chebyshev fit error; test floor 0.005" for extended extreme-date tests). (2) Versus pyswisseph specifically, the underlying ephemeris differs (libephemeris DE441 vs Swiss .se1/DE431), an irreducible floor of tens-to-hundreds of arcsec for planets at deep-BCE dates that Vondrák does NOT remove (e.g. Mars ~600" at -3000). For the Sun this floor is small (~6" at -3000 once precession and ΔT are accounted for).
 
 **Asteroid SPK coverage**: Safe range 1920-2080 CE. Outside this range, SPK data is unavailable and calculations use Keplerian fallback (catastrophically wrong for LEB compare tests). Test dates are filtered to this range.
 
 ## Binary Ephemeris Mode (LEB)
 
-Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags (`FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, `FLG_NONUT`).
+Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags — notably `FLG_TOPOCTR` (raises/falls back per body class), `FLG_XYZ`, `FLG_RADIANS`; `FLG_NONUT` is handled on the LEB path for most bodies.
 
 ```python
 from libephemeris import set_leb_file
@@ -175,9 +182,14 @@ Set via `set_calc_mode()` or env var `LIBEPHEMERIS_MODE`.
 
 ## Lunar Calibration Workflow
 
-1. `leph calibrate perigee` (or `leph calibrate perigee-quick` for quick 2-min run)
+The calibration/generation tooling (which fits coefficients against the reference
+ephemeris as a black-box oracle) now lives in the **separate `validation/` repo**,
+not in this library. Workflow:
+
+1. From `validation/`: run the perigee calibration (`validation/calibrate/calibrate_perigee_perturbations.py`)
 2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. `leph generate lunar-corrections` (regenerates `lunar_corrections.py`)
-4. `leph test lunar perigee`
+3. From `validation/`: regenerate the residual table (`validation/calibrate/generate_lunar_apse_corrections.py --write`),
+   which rewrites `lunar_apse_corrections.py` (the live residual table) in this repo
+4. `leph test lunar perigee` (the reference-free perigee tests in this repo)
 
 See `docs/methodology/interpolated-perigee.md` for the full methodology.

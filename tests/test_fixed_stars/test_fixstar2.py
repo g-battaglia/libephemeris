@@ -53,7 +53,7 @@ class TestFixstar2TT:
         assert 149 < pos[0] < 151, f"Regulus lon: {pos[0]:.2f} out of range"
 
     def test_fixstar2_hip_number_with_comma(self, standard_jd):
-        """Test lookup by HIP number with leading comma (pyswisseph format)."""
+        """Test lookup by HIP number with leading comma (reference ephemeris format)."""
         # Spica is HIP 65474
         pos, name, retflag = ephem.fixstar2(",65474", standard_jd, 0)
 

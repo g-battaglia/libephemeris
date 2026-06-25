@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Performance profiling utilities for libephemeris.
 
@@ -512,7 +514,7 @@ def run_full_profile(iterations: int = 500, verbose: bool = True) -> dict:
             print(f"\n{report.summary()}")
 
             suggestions = identify_optimization_opportunities(report)
-            if suggestions:
+            if suggestions:  # pragma: no branch - identify_* always returns a non-empty list
                 print("\nOPTIMIZATION SUGGESTIONS:")
                 for s in suggestions:
                     print(f"  - {s}")

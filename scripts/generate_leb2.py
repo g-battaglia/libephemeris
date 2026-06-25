@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 import mmap
 import os
-import struct
 import sys
 import time
 from typing import Optional
@@ -39,37 +38,26 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from libephemeris.leb_compression import (
     BODY_TARGET_AU,
     DEFAULT_TARGET_AU,
-    compress_body,
     compress_body_chunked,
     compute_mantissa_bits,
 )
 from libephemeris.leb_format import (
-    BODY_ENTRY_FMT,
     BODY_ENTRY_SIZE,
     CHUNK_ENTRY_SIZE,
     CHUNK_INDEX_HEADER_SIZE,
     CHUNK_INTERVAL_DAYS,
     COMPRESSED_BODY_ENTRY_SIZE,
     COMPRESSION_ZSTD_TRUNC_SHUFFLE,
-    DELTA_T_ENTRY_FMT,
-    DELTA_T_ENTRY_SIZE,
-    DELTA_T_HEADER_FMT,
-    DELTA_T_HEADER_SIZE,
-    HEADER_FMT,
     HEADER_SIZE,
     LEB2_MAGIC,
     LEB2_VERSION,
     MAGIC,
-    NUTATION_HEADER_SIZE,
     SECTION_BODY_INDEX,
-    SECTION_CHEBYSHEV,
     SECTION_COMPRESSED_CHEBYSHEV,
     SECTION_DELTA_T,
-    SECTION_DIR_FMT,
     SECTION_DIR_SIZE,
     SECTION_NUTATION,
     SECTION_STARS,
-    STAR_ENTRY_SIZE,
     ChunkEntry,
     CompressedBodyEntry,
     FileHeader,
@@ -657,8 +645,6 @@ def generate_and_compress(
     import tempfile
 
     ephem_file, tier_start, tier_end, tier_name = TIER_CONFIGS[tier]
-    start = start_year or tier_start
-    end = end_year or tier_end
 
     # Determine which bodies to generate
     if group:

@@ -14,7 +14,6 @@ import random
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import FLG_SPEED
 from libephemeris.exceptions import PolarCircleError
 
 

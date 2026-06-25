@@ -14,16 +14,11 @@ import pytest
 
 from libephemeris import (
     julday,
-    revjul,
     sol_eclipse_when_glob,
     sol_eclipse_when_loc,
     lun_eclipse_when,
-    lun_eclipse_when_loc,
-    ECL_TOTAL,
     ECL_PARTIAL,
     ECL_PENUMBRAL,
-    ECL_GRAZING,
-    ECL_ANNULAR,
 )
 from libephemeris.eclipse import (
     _is_shallow_eclipse,

@@ -7,7 +7,6 @@ import textwrap
 from pathlib import Path
 from unittest import mock
 
-import pytest
 
 from libephemeris._dotenv import _parse_line, _find_env_file, load_dotenv
 
@@ -98,37 +97,37 @@ class TestLoadDotenv:
 
     def test_load_from_explicit_path(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("TEST_DOTENV_A=hello\nTEST_DOTENV_B=world\n")
+        env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_A=hello\nLIBEPHEMERIS_TEST_DOTENV_B=world\n")
 
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TEST_DOTENV_A", None)
-            os.environ.pop("TEST_DOTENV_B", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_A", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_B", None)
 
             result = load_dotenv(env_file)
 
             assert result is True
-            assert os.environ["TEST_DOTENV_A"] == "hello"
-            assert os.environ["TEST_DOTENV_B"] == "world"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_A"] == "hello"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_B"] == "world"
 
         # Cleanup
-        os.environ.pop("TEST_DOTENV_A", None)
-        os.environ.pop("TEST_DOTENV_B", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_A", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_B", None)
 
     def test_does_not_override_existing(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("TEST_DOTENV_X=from_file\n")
+        env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_X=from_file\n")
 
-        with mock.patch.dict(os.environ, {"TEST_DOTENV_X": "from_env"}, clear=False):
+        with mock.patch.dict(os.environ, {"LIBEPHEMERIS_TEST_DOTENV_X": "from_env"}, clear=False):
             load_dotenv(env_file)
-            assert os.environ["TEST_DOTENV_X"] == "from_env"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_X"] == "from_env"
 
     def test_override_existing_when_flag_set(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("TEST_DOTENV_Y=from_file\n")
+        env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_Y=from_file\n")
 
-        with mock.patch.dict(os.environ, {"TEST_DOTENV_Y": "from_env"}, clear=False):
+        with mock.patch.dict(os.environ, {"LIBEPHEMERIS_TEST_DOTENV_Y": "from_env"}, clear=False):
             load_dotenv(env_file, override=True)
-            assert os.environ["TEST_DOTENV_Y"] == "from_file"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_Y"] == "from_file"
 
     def test_returns_false_when_file_missing(self, tmp_path: Path) -> None:
         result = load_dotenv(tmp_path / "nonexistent.env")
@@ -150,53 +149,53 @@ class TestLoadDotenv:
         env_file.write_text(
             textwrap.dedent("""\
                 # This is a comment
-                TEST_DOTENV_C=value1
+                LIBEPHEMERIS_TEST_DOTENV_C=value1
 
                 # Another comment
-                TEST_DOTENV_D=value2
+                LIBEPHEMERIS_TEST_DOTENV_D=value2
             """)
         )
 
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TEST_DOTENV_C", None)
-            os.environ.pop("TEST_DOTENV_D", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_C", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_D", None)
 
             load_dotenv(env_file)
 
-            assert os.environ["TEST_DOTENV_C"] == "value1"
-            assert os.environ["TEST_DOTENV_D"] == "value2"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_C"] == "value1"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_D"] == "value2"
 
-        os.environ.pop("TEST_DOTENV_C", None)
-        os.environ.pop("TEST_DOTENV_D", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_C", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_D", None)
 
     def test_handles_export_prefix(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("export TEST_DOTENV_E=exported_val\n")
+        env_file.write_text("export LIBEPHEMERIS_TEST_DOTENV_E=exported_val\n")
 
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TEST_DOTENV_E", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_E", None)
             load_dotenv(env_file)
-            assert os.environ["TEST_DOTENV_E"] == "exported_val"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_E"] == "exported_val"
 
-        os.environ.pop("TEST_DOTENV_E", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_E", None)
 
     def test_handles_quoted_values_with_spaces(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "TEST_DOTENV_F=\"hello world\"\nTEST_DOTENV_G='single quoted'\n"
+            "LIBEPHEMERIS_TEST_DOTENV_F=\"hello world\"\nLIBEPHEMERIS_TEST_DOTENV_G='single quoted'\n"
         )
 
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TEST_DOTENV_F", None)
-            os.environ.pop("TEST_DOTENV_G", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_F", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_G", None)
 
             load_dotenv(env_file)
 
-            assert os.environ["TEST_DOTENV_F"] == "hello world"
-            assert os.environ["TEST_DOTENV_G"] == "single quoted"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_F"] == "hello world"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_G"] == "single quoted"
 
-        os.environ.pop("TEST_DOTENV_F", None)
-        os.environ.pop("TEST_DOTENV_G", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_F", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_G", None)
 
     def test_real_world_libephemeris_config(self, tmp_path: Path) -> None:
         """Test with realistic libephemeris environment variables."""
@@ -229,17 +228,39 @@ class TestLoadDotenv:
         for k in keys:
             os.environ.pop(k, None)
 
+
+    def test_non_libephemeris_keys_are_not_exported(self, tmp_path):
+        """Keys outside LIBEPHEMERIS_* never reach os.environ.
+
+        A project .env regularly holds unrelated secrets; importing the
+        library must not export them into the process.
+        """
+        import os
+
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "SECRET_API_KEY=hunter2\nLIBEPHEMERIS_TEST_DOTENV_OK=1\n"
+        )
+        os.environ.pop("SECRET_API_KEY", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_OK", None)
+        try:
+            assert load_dotenv(env_file) is True
+            assert "SECRET_API_KEY" not in os.environ
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_OK"] == "1"
+        finally:
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_OK", None)
+
     def test_string_path_argument(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("TEST_DOTENV_H=strpath\n")
+        env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_H=strpath\n")
 
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TEST_DOTENV_H", None)
+            os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_H", None)
             result = load_dotenv(str(env_file))
             assert result is True
-            assert os.environ["TEST_DOTENV_H"] == "strpath"
+            assert os.environ["LIBEPHEMERIS_TEST_DOTENV_H"] == "strpath"
 
-        os.environ.pop("TEST_DOTENV_H", None)
+        os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_H", None)
 
 
 # =============================================================================
@@ -342,3 +363,27 @@ class TestPublicAPI:
         import libephemeris
 
         assert "load_dotenv" in libephemeris.__all__
+
+
+class TestErrorBranches:
+    """Cover the defensive except arms."""
+
+    def test_find_env_file_skips_raising_search_path(self, monkeypatch) -> None:
+        import libephemeris._dotenv as dotenv
+
+        def _boom() -> Path:
+            raise OSError("unreadable home dir")
+
+        monkeypatch.delenv(dotenv._ENV_FILE_VAR, raising=False)
+        monkeypatch.setattr(dotenv, "_SEARCH_PATHS", (_boom,))
+
+        # The raising search path is swallowed; no candidate -> None.
+        assert dotenv._find_env_file() is None
+
+    def test_load_dotenv_returns_false_on_unreadable_file(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        # A file that exists but cannot be decoded as UTF-8 must yield False.
+        bad = tmp_path / "bad.env"
+        bad.write_bytes(b"\xff\xfe\x00invalid")
+        assert load_dotenv(str(bad)) is False

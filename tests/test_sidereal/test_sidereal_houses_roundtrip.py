@@ -7,7 +7,6 @@ and that sidereal houses_ex is consistent across modes.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

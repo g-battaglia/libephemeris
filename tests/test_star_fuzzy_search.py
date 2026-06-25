@@ -21,23 +21,12 @@ from libephemeris.constants import (
     BETELGEUSE,
     FOMALHAUT,
     ALDEBARAN,
-    ALGOL,
     ARCTURUS,
-    ANTARES,
     RIGEL,
     VEGA,
-    POLARIS,
-    PROCYON,
-    CAPELLA,
-    DENEB,
-    ALTAIR,
     SIRIUS,
     SPICA_STAR,
     REGULUS,
-    CANOPUS,
-    ACHERNAR,
-    CASTOR,
-    POLLUX,
 )
 
 
@@ -169,9 +158,9 @@ class TestSweFixstarUtWithFuzzy:
         pos3, name3, _ = fixstar_ut("Beetlejuice", standard_jd, 0)
 
         # All should return Betelgeuse
-        assert name1 == "Betelgeuse"
-        assert name2 == "Betelgeuse"
-        assert name3 == "Betelgeuse"
+        assert name1 == "Betelgeuse,alOri"
+        assert name2 == "Betelgeuse,alOri"
+        assert name3 == "Betelgeuse,alOri"
 
         # All should return the same position
         assert abs(pos1[0] - pos2[0]) < 0.0001
@@ -182,8 +171,8 @@ class TestSweFixstarUtWithFuzzy:
         pos1, name1, _ = fixstar_ut("Fomalhaut", standard_jd, 0)
         pos2, name2, _ = fixstar_ut("Formalhaut", standard_jd, 0)
 
-        assert name1 == "Fomalhaut"
-        assert name2 == "Fomalhaut"
+        assert name1 == "Fomalhaut,alPsA"
+        assert name2 == "Fomalhaut,alPsA"
         assert abs(pos1[0] - pos2[0]) < 0.0001
 
 
@@ -265,37 +254,38 @@ class TestStarAliasesAlternateSpellings:
 
 
 @pytest.mark.integration
-class TestPyswissephCompatibility:
-    """Integration tests for pyswisseph API compatibility with fuzzy matching."""
+class TestReferenceCompatibility:
+    """Integration tests for reference ephemeris API compatibility with fuzzy matching."""
 
     @pytest.fixture
     def standard_jd(self):
         """J2000.0 epoch as Julian Day."""
         return 2451545.0
 
-    def test_pyswisseph_betelgeuse_variant_behavior(self, standard_jd):
-        """Test that alternate spellings work like pyswisseph."""
-        # In pyswisseph, fixstar can find stars by various names
+    def test_reference_betelgeuse_variant_behavior(self, standard_jd):
+        """Test that alternate spellings work like the reference ephemeris."""
+        # In the reference ephemeris, fixstar can find stars by various names
         # Our implementation should be compatible
         pos, name, retflag = fixstar_ut("Betelgeux", standard_jd, 0)
-        assert name == "Betelgeuse", f"Expected 'Betelgeuse', got '{name}'"
+        assert name == "Betelgeuse,alOri", f"Expected 'Betelgeuse,alOri', got '{name}'"
         # Betelgeuse is in Gemini/Orion, around 87-89 degrees
         assert 80 < pos[0] < 95, f"Betelgeuse longitude {pos[0]} out of expected range"
 
-    def test_pyswisseph_fomalhaut_variant_behavior(self, standard_jd):
-        """Test that Fomalhaut alternate spellings work like pyswisseph."""
+    def test_reference_fomalhaut_variant_behavior(self, standard_jd):
+        """Test that Fomalhaut alternate spellings work like the reference ephemeris."""
         pos, name, retflag = fixstar_ut("Formalhaut", standard_jd, 0)
-        assert name == "Fomalhaut", f"Expected 'Fomalhaut', got '{name}'"
+        assert name == "Fomalhaut,alPsA", f"Expected 'Fomalhaut,alPsA', got '{name}'"
         # Fomalhaut is around 3-4 degrees Pisces (333-334 degrees ecliptic)
         assert 330 < pos[0] < 340, f"Fomalhaut longitude {pos[0]} out of expected range"
 
     def test_all_royal_stars_with_variants(self, standard_jd):
         """Test the four Royal Stars work with their variant spellings."""
+        # The reference returns "Name,nomenclature" for resolved stars.
         royal_star_tests = [
-            ("Aldebran", "Aldebaran"),  # Watcher of the East
-            ("Regulus", "Regulus"),  # Watcher of the North (no common variant)
-            ("Antaries", "Antares"),  # Watcher of the West
-            ("Formalhaut", "Fomalhaut"),  # Watcher of the South
+            ("Aldebran", "Aldebaran,alTau"),  # Watcher of the East
+            ("Regulus", "Regulus,alLeo"),  # Watcher of the North
+            ("Antaries", "Antares,alSco"),  # Watcher of the West
+            ("Formalhaut", "Fomalhaut,alPsA"),  # Watcher of the South
         ]
         for variant, expected_name in royal_star_tests:
             pos, name, retflag = fixstar_ut(variant, standard_jd, 0)

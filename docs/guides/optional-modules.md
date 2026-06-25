@@ -197,8 +197,8 @@ covering 2015-2023) exists and can be registered manually:
 import libephemeris as swe
 
 swe.register_spk_body(
-    "/path/to/bennu_refdrmc_v1.bsp",
     ipl=swe.BENNU,
+    spk_file="/path/to/bennu_refdrmc_v1.bsp",
     naif_id=2101955,
 )
 pos, _ = swe.calc_ut(2458849.5, swe.BENNU, 0)  # 2020-01-01

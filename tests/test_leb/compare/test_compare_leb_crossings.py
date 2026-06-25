@@ -12,7 +12,6 @@ import pytest
 import libephemeris as ephem
 from libephemeris.constants import (
     SUN,
-    MOON,
     MARS,
     JUPITER,
     SATURN,

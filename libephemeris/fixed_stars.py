@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Fixed star position calculations for libephemeris.
 
 Computes ecliptic positions for bright fixed stars with:
 - Proper motion correction (rigorous space motion approach)
-- IAU 2006 precession from J2000 to date
+- Long-term precession (Vondrák 2011) from J2000 to date
 - IAU 2000A nutation model (1365 terms) for sub-milliarcsecond precision
 - Equatorial to ecliptic coordinate transformation
 
@@ -185,11 +187,9 @@ from .constants import (
     FLG_MOSEPH,
     FLG_XYZ,
     FLG_RADIANS,
-    FLG_ICRS,
     FLG_TRUEPOS,
     FLG_TOPOCTR,
     J2000,
-    J1991_25,
     DAYS_PER_JULIAN_YEAR,
 )
 from .utils import cotrans_sp
@@ -365,1772 +365,33 @@ def propagate_proper_motion(
     return ra_target, dec_target
 
 
-# Extended star catalog with names and catalog numbers
+# Extended star catalog, built from the generated data table
+# (libephemeris/star_catalog_gen.py). The table is produced by
+# scripts/build_star_catalog_v2.py exclusively from public sources:
+# Hipparcos New Reduction (van Leeuwen 2007, VizieR I/311) astrometry,
+# ESA 1997 Hipparcos magnitudes (I/239), the Kostjuk (2004)
+# Bayer/Flamsteed cross index (IV/27A), XHIP radial velocities
+# (V/137D) and IAU WGSN proper names. Internal IDs of the library's
+# original curated stars are preserved by the generator.
+from .star_catalog_gen import STAR_ROWS as _STAR_ROWS  # noqa: E402
+
 STAR_CATALOG: List[StarCatalogEntry] = [
     StarCatalogEntry(
-        id=REGULUS,
-        name="Regulus",
-        nomenclature="alLeo",
-        hip_number=49669,
-        data=StarData(
-            ra_j2000=152.092958,  # 10h 08m 22.3s (Alpha Leonis)
-            dec_j2000=11.967208,  # +11° 58' 02"
-            pm_ra=-0.24873,  # -248.73 mas/yr (westward)
-            pm_dec=0.00559,  # +5.59 mas/yr (northward)
-            parallax_mas=41.13,
-            radial_km_per_s=-18.06,
-        ),
-        magnitude=1.40,  # Visual magnitude
-    ),
-    StarCatalogEntry(
-        id=SPICA_STAR,
-        name="Spica",
-        nomenclature="alVir",
-        hip_number=65474,
-        data=StarData(
-            ra_j2000=201.298247,  # 13h 25m 11.6s (Alpha Virginis)
-            dec_j2000=-11.161319,  # -11° 09' 41"
-            pm_ra=-0.04235,  # -42.35 mas/yr
-            pm_dec=-0.03067,  # -30.67 mas/yr
-            parallax_mas=13.06,
-            radial_km_per_s=-22.85,
-        ),
-        magnitude=1.04,  # Visual magnitude
-    ),
-    StarCatalogEntry(
-        id=ALGOL,
-        name="Algol",
-        nomenclature="bePer",
-        hip_number=14576,
-        data=StarData(
-            ra_j2000=47.042219,  # 03h 08m 10.1s
-            dec_j2000=40.955647,  # +40° 57' 20"
-            pm_ra=0.00299,  # 2.99 mas/yr
-            pm_dec=-0.00166,  # -1.66 mas/yr
-            parallax_mas=36.27,
-            radial_km_per_s=21.84,
-        ),
-        magnitude=2.12,
-    ),
-    StarCatalogEntry(
-        id=SIRIUS,
-        name="Sirius",
-        nomenclature="alCMa",
-        hip_number=32349,
-        data=StarData(
-            ra_j2000=101.287155,  # 06h 45m 08.9s
-            dec_j2000=-16.716116,  # -16° 42' 58"
-            pm_ra=-0.54601,  # -546.01 mas/yr
-            pm_dec=-1.22307,  # -1223.07 mas/yr
-            parallax_mas=379.21,
-            radial_km_per_s=-7.14,
-        ),
-        magnitude=-1.46,
-    ),
-    StarCatalogEntry(
-        id=ALDEBARAN,
-        name="Aldebaran",
-        nomenclature="alTau",
-        hip_number=21421,
-        data=StarData(
-            ra_j2000=68.980163,  # 04h 35m 55.2s
-            dec_j2000=16.509302,  # +16° 30' 33"
-            pm_ra=0.06345,  # 63.45 mas/yr
-            pm_dec=-0.18894,  # -188.94 mas/yr
-            parallax_mas=48.94,
-            radial_km_per_s=68.1,
-        ),
-        magnitude=0.85,
-    ),
-    StarCatalogEntry(
-        id=ANTARES,
-        name="Antares",
-        nomenclature="alSco",
-        hip_number=80763,
-        data=StarData(
-            ra_j2000=247.351915,  # 16h 29m 24.5s
-            dec_j2000=-26.432003,  # -26° 25' 55"
-            pm_ra=-0.01211,  # -12.11 mas/yr
-            pm_dec=-0.02330,  # -23.30 mas/yr
-            parallax_mas=5.89,
-            radial_km_per_s=-13.31,
-        ),
-        magnitude=1.06,
-    ),
-    StarCatalogEntry(
-        id=VEGA,
-        name="Vega",
-        nomenclature="alLyr",
-        hip_number=91262,
-        data=StarData(
-            ra_j2000=279.234735,  # 18h 36m 56.3s
-            dec_j2000=38.783689,  # +38° 47' 01"
-            pm_ra=0.20094,  # 200.94 mas/yr
-            pm_dec=0.28623,  # 286.23 mas/yr
-            parallax_mas=130.23,
-            radial_km_per_s=-19.21,
-        ),
-        magnitude=0.03,
-    ),
-    StarCatalogEntry(
-        id=POLARIS,
-        name="Polaris",
-        nomenclature="alUMi",
-        hip_number=11767,
-        data=StarData(
-            ra_j2000=37.954561,  # 02h 31m 49.1s
-            dec_j2000=89.264109,  # +89° 15' 51"
-            pm_ra=0.04448,  # 44.48 mas/yr
-            pm_dec=-0.01185,  # -11.85 mas/yr
-            parallax_mas=7.54,
-            radial_km_per_s=-14.06,
-        ),
-        magnitude=1.98,
-    ),
-    StarCatalogEntry(
-        id=FOMALHAUT,
-        name="Fomalhaut",
-        nomenclature="alPsA",
-        hip_number=113368,
-        data=StarData(
-            ra_j2000=344.412693,  # 22h 57m 39.0s
-            dec_j2000=-29.622237,  # -29° 37' 20"
-            pm_ra=0.32895,  # 328.95 mas/yr
-            pm_dec=-0.16467,  # -164.67 mas/yr
-            parallax_mas=129.81,
-            radial_km_per_s=28.9,
-        ),
-        magnitude=1.16,
-    ),
-    StarCatalogEntry(
-        id=BETELGEUSE,
-        name="Betelgeuse",
-        nomenclature="alOri",
-        hip_number=27989,
-        data=StarData(
-            ra_j2000=88.792939,  # 05h 55m 10.3s
-            dec_j2000=7.407064,  # +07° 24' 25"
-            pm_ra=0.02754,  # 27.54 mas/yr
-            pm_dec=0.01130,  # 11.30 mas/yr
-            parallax_mas=6.55,
-            radial_km_per_s=26.74,
-        ),
-        magnitude=0.42,
-    ),
-    StarCatalogEntry(
-        id=RIGEL,
-        name="Rigel",
-        nomenclature="beOri",
-        hip_number=24436,
-        data=StarData(
-            ra_j2000=78.634467,  # 05h 14m 32.3s
-            dec_j2000=-8.201638,  # -08° 12' 06"
-            pm_ra=0.00131,  # 1.31 mas/yr
-            pm_dec=0.00050,  # 0.50 mas/yr
-            parallax_mas=3.78,
-            radial_km_per_s=25.0,
-        ),
-        magnitude=0.12,
-    ),
-    StarCatalogEntry(
-        id=PROCYON,
-        name="Procyon",
-        nomenclature="alCMi",
-        hip_number=37279,
-        data=StarData(
-            ra_j2000=114.825493,  # 07h 39m 18.1s
-            dec_j2000=5.224993,  # +05° 13' 30"
-            pm_ra=-0.71459,  # -714.59 mas/yr
-            pm_dec=-1.03680,  # -1036.80 mas/yr
-            parallax_mas=284.56,
-            radial_km_per_s=-11.18,
-        ),
-        magnitude=0.34,
-    ),
-    StarCatalogEntry(
-        id=CAPELLA,
-        name="Capella",
-        nomenclature="alAur",
-        hip_number=24608,
-        data=StarData(
-            ra_j2000=79.172328,  # 05h 16m 41.4s
-            dec_j2000=45.997991,  # +45° 59' 53"
-            pm_ra=0.07525,  # 75.25 mas/yr
-            pm_dec=-0.42689,  # -426.89 mas/yr
-            parallax_mas=76.2,
-            radial_km_per_s=38.45,
-        ),
-        magnitude=0.08,
-    ),
-    StarCatalogEntry(
-        id=ARCTURUS,
-        name="Arcturus",
-        nomenclature="alBoo",
-        hip_number=69673,
-        data=StarData(
-            ra_j2000=213.915300,  # 14h 15m 39.7s
-            dec_j2000=19.182409,  # +19° 10' 57"
-            pm_ra=-1.09339,  # -1093.39 mas/yr
-            pm_dec=-2.00006,  # -2000.06 mas/yr
-            parallax_mas=88.83,
-            radial_km_per_s=-31.79,
-        ),
-        magnitude=-0.04,
-    ),
-    StarCatalogEntry(
-        id=DENEB,
-        name="Deneb",
-        nomenclature="alCyg",
-        hip_number=102098,
-        data=StarData(
-            ra_j2000=310.357980,  # 20h 41m 25.9s
-            dec_j2000=45.280339,  # +45° 16' 49"
-            pm_ra=0.00201,  # 2.01 mas/yr
-            pm_dec=0.00185,  # 1.85 mas/yr
-            parallax_mas=2.31,
-            radial_km_per_s=2.55,
-        ),
-        magnitude=1.25,
-    ),
-    StarCatalogEntry(
-        id=POLLUX,
-        name="Pollux",
-        nomenclature="beGem",
-        hip_number=37826,
-        data=StarData(
-            ra_j2000=116.328958,  # 07h 45m 18.9s
-            dec_j2000=28.026199,  # +28° 01' 34"
-            pm_ra=-0.62655,  # -626.55 mas/yr
-            pm_dec=-0.04580,  # -45.80 mas/yr
-            parallax_mas=96.54,
-            radial_km_per_s=-4.11,
-        ),
-        magnitude=1.14,
-    ),
-    StarCatalogEntry(
-        id=CASTOR,
-        name="Castor",
-        nomenclature="alGem",
-        hip_number=36850,
-        data=StarData(
-            ra_j2000=113.649428,  # 07h 34m 35.9s
-            dec_j2000=31.888276,  # +31° 53' 18"
-            pm_ra=-0.19145,  # -191.45 mas/yr
-            pm_dec=-0.14519,  # -145.19 mas/yr
-            parallax_mas=64.12,
-            radial_km_per_s=0.6,
-        ),
-        magnitude=1.58,
-    ),
-    StarCatalogEntry(
-        id=ALTAIR,
-        name="Altair",
-        nomenclature="alAql",
-        hip_number=97649,
-        data=StarData(
-            ra_j2000=297.695827,  # 19h 50m 47.0s
-            dec_j2000=8.868321,  # +08° 52' 06"
-            pm_ra=0.53623,  # 536.23 mas/yr
-            pm_dec=0.38529,  # 385.29 mas/yr
-            parallax_mas=194.95,
-            radial_km_per_s=-17.0,
-        ),
-        magnitude=0.77,
-    ),
-    StarCatalogEntry(
-        id=ACHERNAR,
-        name="Achernar",
-        nomenclature="alEri",
-        hip_number=7588,
-        data=StarData(
-            ra_j2000=24.428523,  # 01h 37m 42.8s
-            dec_j2000=-57.236753,  # -57° 14' 12"
-            pm_ra=0.08700,  # 87.00 mas/yr
-            pm_dec=-0.03824,  # -38.24 mas/yr
-            parallax_mas=23.39,
-            radial_km_per_s=28.46,
-        ),
-        magnitude=0.46,
-    ),
-    StarCatalogEntry(
-        id=CANOPUS,
-        name="Canopus",
-        nomenclature="alCar",
-        hip_number=30438,
-        data=StarData(
-            ra_j2000=95.987958,  # 06h 23m 57.1s
-            dec_j2000=-52.695661,  # -52° 41' 44"
-            pm_ra=0.01993,  # 19.93 mas/yr
-            pm_dec=0.02324,  # 23.24 mas/yr
-            parallax_mas=10.55,
-            radial_km_per_s=21.67,
-        ),
-        magnitude=-0.72,
-    ),
-    StarCatalogEntry(
-        id=ACRUX,
-        name="Acrux",
-        nomenclature="alCru",
-        hip_number=60718,
-        data=StarData(
-            ra_j2000=186.649563,  # 12h 26m 35.9s
-            dec_j2000=-63.099093,  # -63° 05' 57"
-            pm_ra=-0.03583,  # -35.83 mas/yr
-            pm_dec=-0.01486,  # -14.86 mas/yr
-            parallax_mas=10.13,
-            radial_km_per_s=-0.64,
-        ),
-        magnitude=0.76,
-    ),
-    StarCatalogEntry(
-        id=MIMOSA,
-        name="Mimosa",
-        nomenclature="beCru",
-        hip_number=62434,
-        data=StarData(
-            ra_j2000=191.930263,  # 12h 47m 43.3s
-            dec_j2000=-59.688764,  # -59° 41' 19"
-            pm_ra=-0.04297,  # -42.97 mas/yr
-            pm_dec=-0.01618,  # -16.18 mas/yr
-            parallax_mas=11.71,
-            radial_km_per_s=-7.57,
-        ),
-        magnitude=1.25,
-    ),
-    StarCatalogEntry(
-        id=GACRUX,
-        name="Gacrux",
-        nomenclature="gaCru",
-        hip_number=61084,
-        data=StarData(
-            ra_j2000=187.791498,  # 12h 31m 09.9s
-            dec_j2000=-57.113213,  # -57° 06' 48"
-            pm_ra=0.02823,  # 28.23 mas/yr
-            pm_dec=-0.26508,  # -265.08 mas/yr
-            parallax_mas=36.83,
-            radial_km_per_s=4.97,
-        ),
-        magnitude=1.64,
-    ),
-    StarCatalogEntry(
-        id=HADAR,
-        name="Hadar",
-        nomenclature="beCen",
-        hip_number=68702,
-        data=StarData(
-            ra_j2000=210.955856,  # 14h 03m 49.4s (ICRS, Hipparcos HIP 68702)
-            dec_j2000=-60.373035,  # -60° 22' 22.9"
-            pm_ra=-0.03327,  # -33.27 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.02316,  # -23.16 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=8.32,
-            radial_km_per_s=-3.74,
-        ),
-        magnitude=0.61,
-    ),
-    StarCatalogEntry(
-        id=RIGIL_KENT,
-        name="Rigil Kentaurus",
-        nomenclature="alCen",
-        hip_number=71683,
-        data=StarData(
-            ra_j2000=219.902066,  # 14h 39m 36.5s
-            dec_j2000=-60.833976,  # -60° 50' 02"
-            pm_ra=-3.67925,  # -3679.25 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=0.47367,  # 473.67 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=742.0,
-            radial_km_per_s=-37.06,
-        ),
-        magnitude=-0.27,
-    ),
-    StarCatalogEntry(
-        id=SHAULA,
-        name="Shaula",
-        nomenclature="laSco",
-        hip_number=85927,
-        data=StarData(
-            ra_j2000=263.402167,  # 17h 33m 36.5s
-            dec_j2000=-37.103824,  # -37° 06' 14"
-            pm_ra=-0.00853,  # -8.53 mas/yr
-            pm_dec=-0.03080,  # -30.80 mas/yr
-            parallax_mas=5.71,
-            radial_km_per_s=-3.34,
-        ),
-        magnitude=1.62,
-    ),
-    StarCatalogEntry(
-        id=BELLATRIX,
-        name="Bellatrix",
-        nomenclature="gaOri",
-        hip_number=25336,
-        data=StarData(
-            ra_j2000=81.282764,  # 05h 25m 07.9s
-            dec_j2000=6.349703,  # +06° 20' 59"
-            pm_ra=-0.00811,  # -8.11 mas/yr
-            pm_dec=-0.01288,  # -12.88 mas/yr
-            parallax_mas=12.92,
-            radial_km_per_s=26.8,
-        ),
-        magnitude=1.64,
-    ),
-    StarCatalogEntry(
-        id=ELNATH,
-        name="Elnath",
-        nomenclature="beTau",
-        hip_number=25428,
-        data=StarData(
-            ra_j2000=81.572971,  # 05h 26m 17.5s
-            dec_j2000=28.607452,  # +28° 36' 27"
-            pm_ra=0.02276,  # 22.76 mas/yr
-            pm_dec=-0.17358,  # -173.58 mas/yr
-            parallax_mas=24.36,
-            radial_km_per_s=21.7,
-        ),
-        magnitude=1.65,
-    ),
-    StarCatalogEntry(
-        id=MIRA,
-        name="Mira",
-        nomenclature="omCet",
-        hip_number=10826,
-        data=StarData(
-            ra_j2000=34.836617,  # 02h 19m 20.8s
-            dec_j2000=-2.977640,  # -02° 58' 40"
-            pm_ra=0.00933,  # 9.33 mas/yr
-            pm_dec=-0.23736,  # -237.36 mas/yr
-            parallax_mas=10.91,
-            radial_km_per_s=88.96,
-        ),
-        magnitude=3.04,
-    ),
-    StarCatalogEntry(
-        id=ALNILAM,
-        name="Alnilam",
-        nomenclature="epOri",
-        hip_number=26311,
-        data=StarData(
-            ra_j2000=84.053389,  # 05h 36m 12.8s
-            dec_j2000=-1.201919,  # -01° 12' 07"
-            pm_ra=0.00144,  # 1.44 mas/yr
-            pm_dec=-0.00078,  # -0.78 mas/yr
-            parallax_mas=1.65,
-            radial_km_per_s=32.26,
-        ),
-        magnitude=1.69,
-    ),
-    StarCatalogEntry(
-        id=ALNITAK,
-        name="Alnitak",
-        nomenclature="zeOri",
-        hip_number=26727,
-        data=StarData(
-            ra_j2000=85.189694,  # 05h 40m 45.5s
-            dec_j2000=-1.942574,  # -01° 56' 33"
-            pm_ra=0.00319,  # 3.19 mas/yr
-            pm_dec=0.00203,  # 2.03 mas/yr
-            parallax_mas=4.43,
-            radial_km_per_s=-0.8,
-        ),
-        magnitude=1.74,
-    ),
-    StarCatalogEntry(
-        id=MINTAKA,
-        name="Mintaka",
-        nomenclature="deOri",
-        hip_number=25930,
-        data=StarData(
-            ra_j2000=83.001667,  # 05h 32m 00.4s
-            dec_j2000=-0.299095,  # -00° 17' 57"
-            pm_ra=0.00064,  # 0.64 mas/yr
-            pm_dec=-0.00069,  # -0.69 mas/yr
-            parallax_mas=4.71,
-            radial_km_per_s=24.07,
-        ),
-        magnitude=2.23,
-    ),
-    StarCatalogEntry(
-        id=SAIPH,
-        name="Saiph",
-        nomenclature="kaOri",
-        hip_number=27366,
-        data=StarData(
-            ra_j2000=86.939119,  # 05h 47m 45.4s
-            dec_j2000=-9.669605,  # -09° 40' 11"
-            pm_ra=0.00146,  # 1.46 mas/yr
-            pm_dec=-0.00128,  # -1.28 mas/yr
-            parallax_mas=5.04,
-            radial_km_per_s=27.05,
-        ),
-        magnitude=2.06,
-    ),
-    StarCatalogEntry(
-        id=MEISSA,
-        name="Meissa",
-        nomenclature="laOri",
-        hip_number=26207,
-        data=StarData(
-            ra_j2000=83.784486,  # 05h 35m 08.3s
-            dec_j2000=9.934156,  # +09° 56' 03"
-            pm_ra=-0.00034,  # -0.34 mas/yr
-            pm_dec=-0.00294,  # -2.94 mas/yr
-            parallax_mas=2.97,
-            radial_km_per_s=38.31,
-        ),
-        magnitude=3.33,
-    ),
-    StarCatalogEntry(
-        id=DIPHDA,
-        name="Diphda",
-        nomenclature="beCet",
-        hip_number=3419,
-        data=StarData(
-            ra_j2000=10.897379,  # 00h 43m 35.4s
-            dec_j2000=-17.986606,  # -17° 59' 12"
-            pm_ra=0.23255,  # 232.55 mas/yr
-            pm_dec=0.03199,  # 31.99 mas/yr
-            parallax_mas=33.86,
-            radial_km_per_s=41.98,
-        ),
-        magnitude=2.04,
-    ),
-    StarCatalogEntry(
-        id=ALPHARD,
-        name="Alphard",
-        nomenclature="alHya",
-        hip_number=46390,
-        data=StarData(
-            ra_j2000=141.896847,  # 09h 27m 35.2s
-            dec_j2000=-8.658602,  # -08° 39' 31"
-            pm_ra=-0.01523,  # -15.23 mas/yr
-            pm_dec=0.03437,  # 34.37 mas/yr
-            parallax_mas=18.09,
-            radial_km_per_s=-24.73,
-        ),
-        magnitude=1.98,
-    ),
-    StarCatalogEntry(
-        id=RASALHAGUE,
-        name="Rasalhague",
-        nomenclature="alOph",
-        hip_number=86032,
-        data=StarData(
-            ra_j2000=263.733627,  # 17h 34m 56.1s
-            dec_j2000=12.560035,  # +12° 33' 36"
-            pm_ra=0.10807,  # 108.07 mas/yr
-            pm_dec=-0.22157,  # -221.57 mas/yr
-            parallax_mas=67.13,
-            radial_km_per_s=4.76,
-        ),
-        magnitude=2.07,
-    ),
-    StarCatalogEntry(
-        id=ETAMIN,
-        name="Etamin",
-        nomenclature="gaDra",
-        hip_number=87833,
-        data=StarData(
-            ra_j2000=269.151541,  # 17h 56m 36.4s
-            dec_j2000=51.488896,  # +51° 29' 20"
-            pm_ra=-0.00848,  # -8.48 mas/yr
-            pm_dec=-0.02279,  # -22.79 mas/yr
-            parallax_mas=21.14,
-            radial_km_per_s=-24.85,
-        ),
-        magnitude=2.23,
-    ),
-    StarCatalogEntry(
-        id=KOCHAB,
-        name="Kochab",
-        nomenclature="beUMi",
-        hip_number=72607,
-        data=StarData(
-            ra_j2000=222.676357,  # 14h 50m 42.3s
-            dec_j2000=74.155504,  # +74° 09' 20"
-            pm_ra=-0.03261,  # -32.61 mas/yr
-            pm_dec=0.01142,  # 11.42 mas/yr
-            parallax_mas=24.91,
-            radial_km_per_s=16.17,
-        ),
-        magnitude=2.08,
-    ),
-    StarCatalogEntry(
-        id=ALKAID,
-        name="Alkaid",
-        nomenclature="etUMa",
-        hip_number=67301,
-        data=StarData(
-            ra_j2000=206.885157,  # 13h 47m 32.4s
-            dec_j2000=49.313267,  # +49° 18' 48"
-            pm_ra=-0.12117,  # -121.17 mas/yr
-            pm_dec=-0.01491,  # -14.91 mas/yr
-            parallax_mas=31.38,
-            radial_km_per_s=-29.2,
-        ),
-        magnitude=1.86,
-    ),
-    StarCatalogEntry(
-        id=DUBHE,
-        name="Dubhe",
-        nomenclature="alUMa",
-        hip_number=54061,
-        data=StarData(
-            ra_j2000=165.931965,  # 11h 03m 43.7s
-            dec_j2000=61.751035,  # +61° 45' 03"
-            pm_ra=-0.13411,  # -134.11 mas/yr
-            pm_dec=-0.03470,  # -34.70 mas/yr
-            parallax_mas=26.54,
-            radial_km_per_s=-22.81,
-        ),
-        magnitude=1.79,
-    ),
-    StarCatalogEntry(
-        id=MERAK,
-        name="Merak",
-        nomenclature="beUMa",
-        hip_number=53910,
-        data=StarData(
-            ra_j2000=165.460319,  # 11h 01m 50.5s
-            dec_j2000=56.382426,  # +56° 22' 57"
-            pm_ra=0.08143,  # 81.43 mas/yr
-            pm_dec=0.03349,  # 33.49 mas/yr
-            parallax_mas=40.9,
-            radial_km_per_s=-25.75,
-        ),
-        magnitude=2.37,
-    ),
-    StarCatalogEntry(
-        id=ALIOTH,
-        name="Alioth",
-        nomenclature="epUMa",
-        hip_number=62956,
-        data=StarData(
-            ra_j2000=193.507290,  # 12h 54m 01.7s
-            dec_j2000=55.959823,  # +55° 57' 35"
-            pm_ra=0.11191,  # 111.91 mas/yr
-            pm_dec=-0.00824,  # -8.24 mas/yr
-            parallax_mas=39.51,
-            radial_km_per_s=-25.76,
-        ),
-        magnitude=1.77,
-    ),
-    StarCatalogEntry(
-        id=MIZAR,
-        name="Mizar",
-        nomenclature="zeUMa",
-        hip_number=65378,
-        data=StarData(
-            ra_j2000=200.981429,  # 13h 23m 55.5s
-            dec_j2000=54.925362,  # +54° 55' 31"
-            pm_ra=0.11901,  # 119.01 mas/yr
-            pm_dec=-0.02597,  # -25.97 mas/yr
-            parallax_mas=38.01,
-            radial_km_per_s=-23.08,
-        ),
-        magnitude=2.23,
-    ),
-    StarCatalogEntry(
-        id=ALCOR,
-        name="Alcor",
-        nomenclature="80UMa",
-        hip_number=65477,
-        data=StarData(
-            ra_j2000=201.306403,  # 13h 25m 13.5s
-            dec_j2000=54.987954,  # +54° 59' 17"
-            pm_ra=0.12021,  # 120.21 mas/yr
-            pm_dec=-0.01604,  # -16.04 mas/yr
-            parallax_mas=39.91,
-            radial_km_per_s=-26.57,
-        ),
-        magnitude=3.99,
-    ),
-    StarCatalogEntry(
-        id=PHECDA,
-        name="Phecda",
-        nomenclature="gaUMa",
-        hip_number=58001,
-        data=StarData(
-            ra_j2000=178.457679,  # 11h 53m 49.8s (Gamma Ursae Majoris)
-            dec_j2000=53.694758,  # +53° 41' 41"
-            pm_ra=0.10768,  # 107.68 mas/yr
-            pm_dec=0.01101,  # 11.01 mas/yr
-            parallax_mas=39.21,
-            radial_km_per_s=-28.76,
-        ),
-        magnitude=2.44,
-    ),
-    StarCatalogEntry(
-        id=MEGREZ,
-        name="Megrez",
-        nomenclature="deUMa",
-        hip_number=59774,
-        data=StarData(
-            ra_j2000=183.856503,  # 12h 15m 25.6s (Delta Ursae Majoris)
-            dec_j2000=57.032615,  # +57° 01' 57"
-            pm_ra=0.10411,  # 104.11 mas/yr
-            pm_dec=0.00730,  # 7.30 mas/yr
-            parallax_mas=40.51,
-            radial_km_per_s=-32.48,
-        ),
-        magnitude=3.31,
-    ),
-    StarCatalogEntry(
-        id=VINDEMIATRIX,
-        name="Vindemiatrix",
-        nomenclature="epVir",
-        hip_number=63608,
-        data=StarData(
-            ra_j2000=195.544157,  # 13h 02m 10.6s
-            dec_j2000=10.959149,  # +10° 57' 33"
-            pm_ra=-0.27380,  # -273.80 mas/yr
-            pm_dec=0.01996,  # 19.96 mas/yr
-            parallax_mas=29.76,
-            radial_km_per_s=-43.32,
-        ),
-        magnitude=2.83,
-    ),
-    StarCatalogEntry(
-        id=ZUBENELGENUBI,
-        name="Zubenelgenubi",
-        nomenclature="alLib",
-        hip_number=72622,
-        data=StarData(
-            ra_j2000=222.719638,  # 14h 50m 52.7s
-            dec_j2000=-16.041778,  # -16° 02' 30"
-            pm_ra=-0.10568,  # -105.68 mas/yr
-            pm_dec=-0.06840,  # -68.40 mas/yr
-            parallax_mas=43.03,
-            radial_km_per_s=-36.82,
-        ),
-        magnitude=2.75,
-    ),
-    StarCatalogEntry(
-        id=ZUBENESCHAMALI,
-        name="Zubeneschamali",
-        nomenclature="beLib",
-        hip_number=74785,
-        data=StarData(
-            ra_j2000=229.251724,  # 15h 17m 00.4s
-            dec_j2000=-9.382914,  # -09° 22' 58"
-            pm_ra=-0.09810,  # -98.10 mas/yr
-            pm_dec=-0.01965,  # -19.65 mas/yr
-            parallax_mas=17.62,
-            radial_km_per_s=-60.47,
-        ),
-        magnitude=2.61,
-    ),
-    StarCatalogEntry(
-        id=UNUKALHAI,
-        name="Unukalhai",
-        nomenclature="alSer",
-        hip_number=77070,
-        data=StarData(
-            ra_j2000=236.067089,  # 15h 44m 16.1s
-            dec_j2000=6.425628,  # +06° 25' 32"
-            pm_ra=0.13384,  # 133.84 mas/yr
-            pm_dec=0.04481,  # 44.81 mas/yr
-            parallax_mas=44.1,
-            radial_km_per_s=-18.12,
-        ),
-        magnitude=2.65,
-    ),
-    StarCatalogEntry(
-        id=ALGIEBA,
-        name="Algieba",
-        nomenclature="gaLeo",
-        hip_number=50583,
-        data=StarData(
-            ra_j2000=154.993144,  # 10h 19m 58.4s
-            dec_j2000=19.841489,  # +19° 50' 30"
-            pm_ra=0.30430,  # 304.30 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.15428,  # -154.28 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=25.96,
-            radial_km_per_s=-57.44,
-        ),
-        magnitude=2.08,
-    ),
-    StarCatalogEntry(
-        id=DENEBOLA,
-        name="Denebola",
-        nomenclature="beLeo",
-        hip_number=57632,
-        data=StarData(
-            ra_j2000=177.264910,  # 11h 49m 03.6s
-            dec_j2000=14.572058,  # +14° 34' 19"
-            pm_ra=-0.49768,  # -497.68 mas/yr
-            pm_dec=-0.11467,  # -114.67 mas/yr
-            parallax_mas=90.91,
-            radial_km_per_s=-28.35,
-        ),
-        magnitude=2.14,
-    ),
-    StarCatalogEntry(
-        id=MARKAB,
-        name="Markab",
-        nomenclature="alPeg",
-        hip_number=113963,
-        data=StarData(
-            ra_j2000=346.190223,  # 23h 04m 45.7s
-            dec_j2000=15.205267,  # +15° 12' 19"
-            pm_ra=0.06040,  # 60.40 mas/yr
-            pm_dec=-0.04130,  # -41.30 mas/yr
-            parallax_mas=24.46,
-            radial_km_per_s=24.32,
-        ),
-        magnitude=2.49,
-    ),
-    StarCatalogEntry(
-        id=SCHEAT,
-        name="Scheat",
-        nomenclature="bePeg",
-        hip_number=113881,
-        data=StarData(
-            ra_j2000=345.943514,  # 23h 03m 46.5s
-            dec_j2000=28.082785,  # +28° 04' 58"
-            pm_ra=0.18765,  # 187.65 mas/yr
-            pm_dec=0.13693,  # 136.93 mas/yr
-            parallax_mas=16.64,
-            radial_km_per_s=35.66,
-        ),
-        magnitude=2.42,
-    ),
-    # ======== BEHENIAN FIXED STARS (additional) ========
-    StarCatalogEntry(
-        id=ALCYONE,
-        name="Alcyone",
-        nomenclature="etTau",
-        hip_number=17702,
-        data=StarData(
-            ra_j2000=56.871152,  # 03h 47m 29.1s (Eta Tauri, brightest Pleiad)
-            dec_j2000=24.105136,  # +24° 06' 18"
-            pm_ra=0.01934,  # 19.34 mas/yr
-            pm_dec=-0.04367,  # -43.67 mas/yr
-            parallax_mas=8.09,
-            radial_km_per_s=34.09,
-        ),
-        magnitude=2.87,
-    ),
-    StarCatalogEntry(
-        id=ALGORAB,
-        name="Algorab",
-        nomenclature="deCrv",
-        hip_number=60965,
-        data=StarData(
-            ra_j2000=187.466063,  # 12h 29m 51.9s (Delta Corvi)
-            dec_j2000=-16.515431,  # -16° 30' 56"
-            pm_ra=-0.21049,  # -210.49 mas/yr
-            pm_dec=-0.13874,  # -138.74 mas/yr
-            parallax_mas=37.55,
-            radial_km_per_s=-18.15,
-        ),
-        magnitude=2.95,
-    ),
-    StarCatalogEntry(
-        id=ALPHECCA,
-        name="Alphecca",
-        nomenclature="alCrB",
-        hip_number=76267,
-        data=StarData(
-            ra_j2000=233.671953,  # 15h 34m 41.3s (Alpha Coronae Borealis)
-            dec_j2000=26.714693,  # +26° 42' 53"
-            pm_ra=0.12027,  # 120.27 mas/yr
-            pm_dec=-0.08958,  # -89.58 mas/yr
-            parallax_mas=43.46,
-            radial_km_per_s=-17.74,
-        ),
-        magnitude=2.23,
-    ),
-    StarCatalogEntry(
-        id=DENEB_ALGEDI,
-        name="Deneb Algedi",
-        nomenclature="deCap",
-        hip_number=107556,
-        data=StarData(
-            ra_j2000=326.760184,  # 21h 47m 02.4s (Delta Capricorni)
-            dec_j2000=-16.127287,  # -16° 07' 38"
-            pm_ra=0.26170,  # 261.70 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.29670,  # -296.70 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=84.27,
-            radial_km_per_s=16.22,
-        ),
-        magnitude=2.81,
-    ),
-    # ======== PLEIADES CLUSTER STARS ========
-    # The Pleiades (M45) is an open star cluster in Taurus
-    # These are the 9 brightest named stars visible to the naked eye
-    StarCatalogEntry(
-        id=ASTEROPE,
-        name="Asterope",
-        nomenclature="21Tau",
-        hip_number=17579,
-        data=StarData(
-            ra_j2000=56.476958,  # 03h 45m 54.5s (21 Tauri)
-            dec_j2000=24.554722,  # +24° 33' 17"
-            pm_ra=0.02018,  # 20.18 mas/yr
-            pm_dec=-0.04487,  # -44.87 mas/yr
-            parallax_mas=8.77,
-            radial_km_per_s=21.45,
-        ),
-        magnitude=5.76,
-    ),
-    StarCatalogEntry(
-        id=CELAENO,
-        name="Celaeno",
-        nomenclature="16Tau",
-        hip_number=17489,
-        data=StarData(
-            ra_j2000=56.200830,  # 03h 44m 48.2s (16 Tauri)
-            dec_j2000=24.289389,  # +24° 17' 22"
-            pm_ra=0.02038,  # 20.38 mas/yr
-            pm_dec=-0.04481,  # -44.81 mas/yr
-            parallax_mas=8.65,
-            radial_km_per_s=24.78,
-        ),
-        magnitude=5.45,
-    ),
-    StarCatalogEntry(
-        id=ELECTRA,
-        name="Electra",
-        nomenclature="17Tau",
-        hip_number=17499,
-        data=StarData(
-            ra_j2000=56.218908,  # 03h 44m 52.5s (17 Tauri)
-            dec_j2000=24.113336,  # +24° 06' 48"
-            pm_ra=0.02084,  # 20.84 mas/yr
-            pm_dec=-0.04606,  # -46.06 mas/yr
-            parallax_mas=8.06,
-            radial_km_per_s=19.85,
-        ),
-        magnitude=3.70,
-    ),
-    StarCatalogEntry(
-        id=MAIA,
-        name="Maia",
-        nomenclature="20Tau",
-        hip_number=17573,
-        data=StarData(
-            ra_j2000=56.456819,  # 03h 45m 49.6s (20 Tauri)
-            dec_j2000=24.367750,  # +24° 22' 04"
-            pm_ra=0.02095,  # 20.95 mas/yr
-            pm_dec=-0.04598,  # -45.98 mas/yr
-            parallax_mas=8.51,
-            radial_km_per_s=33.1,
-        ),
-        magnitude=3.87,
-    ),
-    StarCatalogEntry(
-        id=MEROPE,
-        name="Merope",
-        nomenclature="23Tau",
-        hip_number=17608,
-        data=StarData(
-            ra_j2000=56.581502,  # 03h 46m 19.6s (23 Tauri)
-            dec_j2000=23.948353,  # +23° 56' 54"
-            pm_ra=0.02113,  # 21.13 mas/yr
-            pm_dec=-0.04365,  # -43.65 mas/yr
-            parallax_mas=8.58,
-            radial_km_per_s=23.12,
-        ),
-        magnitude=4.14,
-    ),
-    StarCatalogEntry(
-        id=TAYGETA,
-        name="Taygeta",
-        nomenclature="19Tau",
-        hip_number=17531,
-        data=StarData(
-            ra_j2000=56.302063,  # 03h 45m 12.5s (19 Tauri)
-            dec_j2000=24.467278,  # +24° 28' 02"
-            pm_ra=0.02124,  # 21.24 mas/yr
-            pm_dec=-0.04056,  # -40.56 mas/yr
-            parallax_mas=7.97,
-            radial_km_per_s=37.47,
-        ),
-        magnitude=4.30,
-    ),
-    StarCatalogEntry(
-        id=ATLAS,
-        name="Atlas",
-        nomenclature="27Tau",
-        hip_number=17847,
-        data=StarData(
-            ra_j2000=57.290596,  # 03h 49m 09.7s (27 Tauri)
-            dec_j2000=24.053417,  # +24° 03' 12"
-            pm_ra=0.01770,  # 17.70 mas/yr
-            pm_dec=-0.04418,  # -44.18 mas/yr
-            parallax_mas=8.53,
-            radial_km_per_s=25.28,
-        ),
-        magnitude=3.62,
-    ),
-    StarCatalogEntry(
-        id=PLEIONE,
-        name="Pleione",
-        nomenclature="28Tau",
-        hip_number=17851,
-        data=StarData(
-            ra_j2000=57.296738,  # 03h 49m 11.2s (28 Tauri)
-            dec_j2000=24.136750,  # +24° 08' 12"
-            pm_ra=0.01807,  # 18.07 mas/yr
-            pm_dec=-0.04720,  # -47.20 mas/yr
-            parallax_mas=8.54,
-            radial_km_per_s=34.14,
-        ),
-        magnitude=5.09,
-    ),
-    # ======== HYADES CLUSTER STARS ========
-    # The Hyades is an open star cluster in Taurus, one of the nearest to Earth
-    # These are the brightest named members visible to the naked eye
-    StarCatalogEntry(
-        id=PRIMA_HYADUM,
-        name="Prima Hyadum",
-        nomenclature="gaTau",
-        hip_number=20205,
-        data=StarData(
-            ra_j2000=64.948349,  # 04h 19m 47.6s (Gamma Tauri)
-            dec_j2000=15.627643,  # +15° 37' 40"
-            pm_ra=0.11546,  # 115.46 mas/yr
-            pm_dec=-0.02342,  # -23.42 mas/yr
-            parallax_mas=20.19,
-            radial_km_per_s=54.6,
-        ),
-        magnitude=3.65,
-    ),
-    StarCatalogEntry(
-        id=SECUNDA_HYADUM,
-        name="Secunda Hyadum",
-        nomenclature="de1Tau",
-        hip_number=20455,
-        data=StarData(
-            ra_j2000=65.733719,  # 04h 22m 56.1s (Delta^1 Tauri)
-            dec_j2000=17.542514,  # +17° 32' 33"
-            pm_ra=0.10656,  # 106.56 mas/yr
-            pm_dec=-0.02918,  # -29.18 mas/yr
-            parallax_mas=20.96,
-            radial_km_per_s=58.87,
-        ),
-        magnitude=3.77,
-    ),
-    StarCatalogEntry(
-        id=THETA_TAURI,
-        name="Theta Tauri",
-        nomenclature="th2Tau",
-        hip_number=20894,
-        data=StarData(
-            ra_j2000=67.165586,  # 04h 28m 39.7s (Theta^2 Tauri)
-            dec_j2000=15.870882,  # +15° 52' 15"
-            pm_ra=0.10842,  # 108.42 mas/yr
-            pm_dec=-0.02674,  # -26.74 mas/yr
-        ),
-        magnitude=3.40,
-    ),
-    StarCatalogEntry(
-        id=AIN,
-        name="Ain",
-        nomenclature="epTau",
-        hip_number=20889,
-        data=StarData(
-            ra_j2000=67.154163,  # 04h 28m 37.0s (Epsilon Tauri)
-            dec_j2000=19.180560,  # +19° 10' 50"
-            pm_ra=0.10619,  # 106.19 mas/yr
-            pm_dec=-0.03784,  # -37.84 mas/yr
-            parallax_mas=22.24,
-            radial_km_per_s=53.5,
-        ),
-        magnitude=3.53,
-    ),
-    # ======== SOUTHERN CROSS (CRUX) CONSTELLATION ========
-    # Completing the Crux constellation - Acrux, Mimosa, Gacrux already defined above
-    StarCatalogEntry(
-        id=DELTA_CRUCIS,
-        name="Delta Crucis",
-        nomenclature="deCru",
-        hip_number=59747,
-        data=StarData(
-            ra_j2000=183.786301,  # 12h 15m 08.7s (Delta Crucis)
-            dec_j2000=-58.748927,  # -58° 44' 56"
-            pm_ra=-0.03581,  # -35.81 mas/yr
-            pm_dec=-0.01036,  # -10.36 mas/yr
-        ),
-        magnitude=2.80,
-    ),
-    # ======== CENTAURUS CONSTELLATION ========
-    # Completing the bright stars of Centaurus (Alpha and Beta already defined above)
-    StarCatalogEntry(
-        id=MENKENT,
-        name="Menkent",
-        nomenclature="thCen",
-        hip_number=68933,
-        data=StarData(
-            ra_j2000=211.670528,  # 14h 06m 40.9s (Theta Centauri)
-            dec_j2000=-36.369958,  # -36° 22' 12"
-            pm_ra=-0.52053,  # -520.53 mas/yr
-            pm_dec=-0.51806,  # -518.06 mas/yr
-            parallax_mas=55.45,
-            radial_km_per_s=-24.68,
-        ),
-        magnitude=2.06,
-    ),
-    StarCatalogEntry(
-        id=MUHLIFAIN,
-        name="Muhlifain",
-        nomenclature="gaCen",
-        hip_number=61932,
-        data=StarData(
-            ra_j2000=190.379200,  # 12h 41m 31.0s (Gamma Centauri)
-            dec_j2000=-48.959889,  # -48° 57' 36"
-            pm_ra=-0.18572,  # -185.72 mas/yr
-            pm_dec=0.00579,  # 5.79 mas/yr
-            parallax_mas=25.06,
-            radial_km_per_s=-28.46,
-        ),
-        magnitude=2.17,
-    ),
-    StarCatalogEntry(
-        id=EPSILON_CENTAURI,
-        name="Epsilon Centauri",
-        nomenclature="epCen",
-        hip_number=66657,
-        data=StarData(
-            ra_j2000=204.971958,  # 13h 39m 53.3s (Epsilon Centauri)
-            dec_j2000=-53.466389,  # -53° 27' 59"
-            pm_ra=-0.01530,  # -15.30 mas/yr
-            pm_dec=-0.01172,  # -11.72 mas/yr
-        ),
-        magnitude=2.30,
-    ),
-    StarCatalogEntry(
-        id=ETA_CENTAURI,
-        name="Eta Centauri",
-        nomenclature="etCen",
-        hip_number=71352,
-        data=StarData(
-            ra_j2000=218.876841,  # 14h 35m 30.4s (Eta Centauri)
-            dec_j2000=-42.157811,  # -42° 09' 28"
-            pm_ra=-0.03473,  # -34.73 mas/yr
-            pm_dec=-0.03272,  # -32.72 mas/yr
-        ),
-        magnitude=2.31,
-    ),
-    StarCatalogEntry(
-        id=ZETA_CENTAURI,
-        name="Zeta Centauri",
-        nomenclature="zeCen",
-        hip_number=68002,
-        data=StarData(
-            ra_j2000=208.885225,  # 13h 55m 32.5s (Zeta Centauri)
-            dec_j2000=-47.288375,  # -47° 17' 18"
-            pm_ra=-0.05737,  # -57.37 mas/yr
-            pm_dec=-0.04455,  # -44.55 mas/yr
-        ),
-        magnitude=2.55,
-    ),
-    # Scorpius constellation stars
-    StarCatalogEntry(
-        id=SARGAS,
-        name="Sargas",
-        nomenclature="thSco",
-        hip_number=86228,
-        data=StarData(
-            ra_j2000=264.329711,  # 17h 37m 19.1s
-            dec_j2000=-42.997824,  # -42° 59' 52"
-            pm_ra=0.00554,  # 5.54 mas/yr
-            pm_dec=-0.00312,  # -3.12 mas/yr
-            parallax_mas=10.86,
-            radial_km_per_s=1.55,
-        ),
-        magnitude=1.87,
-    ),
-    StarCatalogEntry(
-        id=DSCHUBBA,
-        name="Dschubba",
-        nomenclature="deSco",
-        hip_number=78401,
-        data=StarData(
-            ra_j2000=240.083359,  # 16h 00m 20.0s
-            dec_j2000=-22.621710,  # -22° 37' 18"
-            pm_ra=-0.01021,  # -10.21 mas/yr
-            pm_dec=-0.03541,  # -35.41 mas/yr
-            parallax_mas=6.64,
-            radial_km_per_s=-24.62,
-        ),
-        magnitude=2.32,
-    ),
-    StarCatalogEntry(
-        id=GRAFFIAS,
-        name="Graffias",
-        nomenclature="beSco",
-        hip_number=78820,
-        data=StarData(
-            ra_j2000=241.359296,  # 16h 05m 26.2s
-            dec_j2000=-19.805453,  # -19° 48' 20"
-            pm_ra=-0.00520,  # -5.20 mas/yr
-            pm_dec=-0.02404,  # -24.04 mas/yr
-            parallax_mas=8.07,
-            radial_km_per_s=-22.73,
-        ),
-        magnitude=2.56,
-    ),
-    StarCatalogEntry(
-        id=LESATH,
-        name="Lesath",
-        nomenclature="upSco",
-        hip_number=85696,
-        data=StarData(
-            ra_j2000=262.690901,  # 17h 30m 45.8s
-            dec_j2000=-37.295811,  # -37° 17' 45"
-            pm_ra=-0.00237,  # -2.37 mas/yr
-            pm_dec=-0.03009,  # -30.09 mas/yr
-            parallax_mas=5.66,
-            radial_km_per_s=-18.89,
-        ),
-        magnitude=2.70,
-    ),
-    # Leo constellation stars
-    StarCatalogEntry(
-        id=ZOSMA,
-        name="Zosma",
-        nomenclature="deLeo",
-        hip_number=54872,
-        data=StarData(
-            ra_j2000=168.527089,  # 11h 14m 06.5s (Delta Leonis)
-            dec_j2000=20.523611,  # +20° 31' 25"
-            pm_ra=0.14342,  # 143.42 mas/yr
-            pm_dec=-0.12988,  # -129.88 mas/yr
-            parallax_mas=55.82,
-            radial_km_per_s=-48.24,
-        ),
-        magnitude=2.56,
-    ),
-    # ======== ZODIACAL CONSTELLATION BRIGHT STARS ========
-    # Stars from zodiacal constellations used in astrological interpretation
-    # ======== ARIES CONSTELLATION ========
-    # The Ram - first sign of the zodiac
-    StarCatalogEntry(
-        id=HAMAL,
-        name="Hamal",
-        nomenclature="alAri",
-        hip_number=9884,
-        data=StarData(
-            ra_j2000=31.793357,  # 02h 07m 10.4s (Alpha Arietis)
-            dec_j2000=23.462418,  # +23° 27' 45"
-            pm_ra=0.18855,  # 188.55 mas/yr
-            pm_dec=-0.14808,  # -148.08 mas/yr
-            parallax_mas=49.56,
-            radial_km_per_s=11.2,
-        ),
-        magnitude=2.00,
-    ),
-    StarCatalogEntry(
-        id=SHERATAN,
-        name="Sheratan",
-        nomenclature="beAri",
-        hip_number=8903,
-        data=StarData(
-            ra_j2000=28.660046,  # 01h 54m 38.4s (Beta Arietis)
-            dec_j2000=20.808031,  # +20° 48' 29"
-            pm_ra=0.09874,  # 98.74 mas/yr
-            pm_dec=-0.11041,  # -110.41 mas/yr
-            parallax_mas=55.6,
-            radial_km_per_s=23.46,
-        ),
-        magnitude=2.64,
-    ),
-    StarCatalogEntry(
-        id=MESARTHIM,
-        name="Mesarthim",
-        nomenclature="gaAri",
-        hip_number=8832,
-        data=StarData(
-            ra_j2000=28.382551,  # 01h 53m 31.8s (Gamma Arietis)
-            dec_j2000=19.293852,  # +19° 17' 38"
-            pm_ra=0.07920,  # 79.20 mas/yr
-            pm_dec=-0.09763,  # -97.63 mas/yr
-            parallax_mas=19.88,
-            radial_km_per_s=23.69,
-        ),
-        magnitude=3.88,
-    ),
-    # ======== CANCER CONSTELLATION ========
-    # The Crab - features the Beehive Cluster (M44)
-    StarCatalogEntry(
-        id=ACUBENS,
-        name="Acubens",
-        nomenclature="alCnc",
-        hip_number=44066,
-        data=StarData(
-            ra_j2000=134.621761,  # 08h 58m 29.2s (Alpha Cancri)
-            dec_j2000=11.857700,  # +11° 51' 28"
-            pm_ra=0.04323,  # 43.23 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.02963,  # -29.63 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=17.32,
-            radial_km_per_s=-28.86,
-        ),
-        magnitude=4.25,
-    ),
-    StarCatalogEntry(
-        id=TARF,
-        name="Tarf",
-        nomenclature="beCnc",
-        hip_number=42911,
-        data=StarData(
-            ra_j2000=130.821442,  # 08h 43m 17.1s (Beta Cancri)
-            dec_j2000=9.185544,  # +09° 11' 08"
-            pm_ra=-0.01767,  # -17.67 mas/yr
-            pm_dec=-0.22926,  # -229.26 mas/yr
-        ),
-        magnitude=3.52,
-    ),
-    StarCatalogEntry(
-        id=ASELLUS_BOREALIS,
-        name="Asellus Borealis",
-        nomenclature="gaCnc",
-        hip_number=42806,
-        data=StarData(
-            ra_j2000=130.821446,  # 08h 43m 17.1s (ICRS, Hipparcos HIP 42806)
-            dec_j2000=21.468499,  # +21° 28' 06.6"
-            pm_ra=-0.10351,  # -103.51 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.03948,  # -39.48 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=18.0,
-            radial_km_per_s=16.56,
-        ),
-        magnitude=4.66,
-    ),
-    StarCatalogEntry(
-        id=ASELLUS_AUSTRALIS,
-        name="Asellus Australis",
-        nomenclature="deCnc",
-        hip_number=42911,  # Corrected HIP number for Delta Cancri
-        data=StarData(
-            ra_j2000=131.171247,  # 08h 44m 41.1s (ICRS, Hipparcos HIP 42911)
-            dec_j2000=18.154306,  # +18° 09' 15.5"
-            pm_ra=-0.01767,  # -17.67 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.22926,  # -229.26 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=24.98,
-            radial_km_per_s=1.72,
-        ),
-        magnitude=3.94,
-    ),
-    # ======== SAGITTARIUS CONSTELLATION ========
-    # The Archer - prominent in the summer sky, contains galactic center
-    StarCatalogEntry(
-        id=KAUS_AUSTRALIS,
-        name="Kaus Australis",
-        nomenclature="epSgr",
-        hip_number=90185,
-        data=StarData(
-            ra_j2000=276.042993,  # 18h 24m 10.3s (Epsilon Sagittarii)
-            dec_j2000=-34.384616,  # -34° 23' 05"
-            pm_ra=-0.03942,  # -39.42 mas/yr
-            pm_dec=-0.12420,  # -124.20 mas/yr
-            parallax_mas=22.76,
-            radial_km_per_s=-19.63,
-        ),
-        magnitude=1.85,
-    ),
-    StarCatalogEntry(
-        id=NUNKI,
-        name="Nunki",
-        nomenclature="siSgr",
-        hip_number=92855,
-        data=StarData(
-            ra_j2000=283.816360,  # 18h 55m 15.9s (Sigma Sagittarii)
-            dec_j2000=-26.296724,  # -26° 17' 48"
-            pm_ra=0.01514,  # 15.14 mas/yr
-            pm_dec=-0.05343,  # -53.43 mas/yr
-            parallax_mas=14.32,
-            radial_km_per_s=-10.42,
-        ),
-        magnitude=2.02,
-    ),
-    StarCatalogEntry(
-        id=KAUS_MEDIA,
-        name="Kaus Media",
-        nomenclature="deSgr",
-        hip_number=89931,
-        data=StarData(
-            ra_j2000=275.248508,  # 18h 20m 59.6s (Delta Sagittarii)
-            dec_j2000=-29.828104,  # -29° 49' 41"
-            pm_ra=0.03254,  # 32.54 mas/yr
-            pm_dec=-0.02557,  # -25.57 mas/yr
-            parallax_mas=9.38,
-            radial_km_per_s=-34.58,
-        ),
-        magnitude=2.70,
-    ),
-    StarCatalogEntry(
-        id=KAUS_BOREALIS,
-        name="Kaus Borealis",
-        nomenclature="laSgr",
-        hip_number=90496,
-        data=StarData(
-            ra_j2000=276.992681,  # 18h 27m 58.2s (Lambda Sagittarii)
-            dec_j2000=-25.421701,  # -25° 25' 18"
-            pm_ra=-0.04476,  # -44.76 mas/yr
-            pm_dec=-0.18566,  # -185.66 mas/yr
-            parallax_mas=41.72,
-            radial_km_per_s=-46.4,
-        ),
-        magnitude=2.81,
-    ),
-    StarCatalogEntry(
-        id=ASCELLA,
-        name="Ascella",
-        nomenclature="zeSgr",
-        hip_number=93506,
-        data=StarData(
-            ra_j2000=285.653043,  # 19h 02m 36.7s (Zeta Sagittarii)
-            dec_j2000=-29.880063,  # -29° 52' 48"
-            pm_ra=0.01079,  # 10.79 mas/yr
-            pm_dec=0.02111,  # 21.11 mas/yr
-            parallax_mas=36.98,
-            radial_km_per_s=26.64,
-        ),
-        magnitude=2.59,
-    ),
-    # ======== CAPRICORNUS CONSTELLATION ========
-    # The Sea Goat - complementing Deneb Algedi already defined above
-    StarCatalogEntry(
-        id=ALGEDI,
-        name="Algedi",
-        nomenclature="alCap",
-        hip_number=100064,
-        data=StarData(
-            ra_j2000=304.513565,  # 20h 18m 03.3s (ICRS, Hipparcos HIP 100064)
-            dec_j2000=-12.544852,  # -12° 32' 41.5"
-            pm_ra=0.06263,  # 62.63 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=0.00266,  # 2.66 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=5.73,
-            radial_km_per_s=-21.67,
-        ),
-        magnitude=3.57,
-    ),
-    StarCatalogEntry(
-        id=DABIH,
-        name="Dabih",
-        nomenclature="beCap",
-        hip_number=100345,
-        data=StarData(
-            ra_j2000=305.252803,  # 20h 21m 00.7s (Beta Capricorni)
-            dec_j2000=-14.781405,  # -14° 46' 53"
-            pm_ra=0.04492,  # 44.92 mas/yr
-            pm_dec=0.00738,  # 7.38 mas/yr
-            parallax_mas=9.98,
-            radial_km_per_s=-5.74,
-        ),
-        magnitude=3.08,
-    ),
-    StarCatalogEntry(
-        id=NASHIRA,
-        name="Nashira",
-        nomenclature="gaCap",
-        hip_number=106985,
-        data=StarData(
-            ra_j2000=325.022735,  # 21h 40m 05.5s (Gamma Capricorni)
-            dec_j2000=-16.662308,  # -16° 39' 44"
-            pm_ra=0.18756,  # 187.56 mas/yr
-            pm_dec=-0.02245,  # -22.45 mas/yr
-            parallax_mas=20.77,
-            radial_km_per_s=-10.0,
-        ),
-        magnitude=3.68,
-    ),
-    # ======== AQUARIUS CONSTELLATION ========
-    # The Water Bearer
-    StarCatalogEntry(
-        id=SADALSUUD,
-        name="Sadalsuud",
-        nomenclature="beAqr",
-        hip_number=106278,
-        data=StarData(
-            ra_j2000=322.889715,  # 21h 31m 33.5s (Beta Aquarii)
-            dec_j2000=-5.571172,  # -05° 34' 16"
-            pm_ra=0.01877,  # 18.77 mas/yr
-            pm_dec=-0.00821,  # -8.21 mas/yr
-            parallax_mas=6.07,
-            radial_km_per_s=29.66,
-        ),
-        magnitude=2.87,
-    ),
-    StarCatalogEntry(
-        id=SADALMELIK,
-        name="Sadalmelik",
-        nomenclature="alAqr",
-        hip_number=109074,
-        data=StarData(
-            ra_j2000=331.445983,  # 22h 05m 47.0s (Alpha Aquarii)
-            dec_j2000=-0.319849,  # -00° 19' 11"
-            pm_ra=0.01825,  # 18.25 mas/yr
-            pm_dec=-0.00939,  # -9.39 mas/yr
-            parallax_mas=6.23,
-            radial_km_per_s=37.65,
-        ),
-        magnitude=2.96,
-    ),
-    StarCatalogEntry(
-        id=SKAT,
-        name="Skat",
-        nomenclature="deAqr",
-        hip_number=113136,
-        data=StarData(
-            ra_j2000=343.662556,  # 22h 54m 39.0s (Delta Aquarii)
-            dec_j2000=-15.820827,  # -15° 49' 15"
-            pm_ra=-0.04260,  # -42.60 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.02789,  # -27.89 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=20.31,
-            radial_km_per_s=44.84,
-        ),
-        magnitude=3.27,
-    ),
-    # ======== PISCES CONSTELLATION ========
-    # The Fishes - where the vernal equinox currently resides
-    StarCatalogEntry(
-        id=ETA_PISCIUM,
-        name="Eta Piscium",
-        nomenclature="etPsc",
-        hip_number=5742,
-        data=StarData(
-            ra_j2000=18.437089,  # 01h 13m 44.9s (Eta Piscium)
-            dec_j2000=15.345823,  # +15° 20' 45"
-            pm_ra=0.01750,  # 17.50 mas/yr
-            pm_dec=-0.02204,  # -22.04 mas/yr
-        ),
-        magnitude=3.62,
-    ),
-    StarCatalogEntry(
-        id=ALRESCHA,
-        name="Alrescha",
-        nomenclature="alPsc",
-        hip_number=7097,
-        data=StarData(
-            ra_j2000=30.511749,  # 02h 02m 02.8s (ICRS, Hipparcos HIP 7097)
-            dec_j2000=2.763761,  # +02° 45' 49.5"
-            pm_ra=0.02714,  # 27.14 mas/yr (Hipparcos, van Leeuwen 2007)
-            pm_dec=-0.00264,  # -2.64 mas/yr (Hipparcos, van Leeuwen 2007)
-            parallax_mas=21.66,
-            radial_km_per_s=31.77,
-        ),
-        magnitude=3.82,
-    ),
-    # ======== ANDROMEDA CONSTELLATION ========
-    # Data: ESA Hipparcos catalogue (ESA SP-1200, 1997) via CDS/SIMBAD
-    StarCatalogEntry(
-        id=ALPHERATZ,
-        name="Alpheratz",
-        nomenclature="alAnd",
-        hip_number=677,
-        data=StarData(
-            ra_j2000=2.096916,  # 00h 08m 23.3s (Alpha Andromedae, HIP 677)
-            dec_j2000=29.090431,  # +29° 05' 25.6"
-            pm_ra=0.13746,  # 137.46 mas/yr (mu_alpha*, includes cos(dec))
-            pm_dec=-0.16344,  # -163.44 mas/yr
-            parallax_mas=33.62,
-            radial_km_per_s=15.84,
-        ),
-        magnitude=2.06,
-    ),
-    # ======== PEGASUS CONSTELLATION - additional stars ========
-    StarCatalogEntry(
-        id=ALGENIB,
-        name="Algenib",
-        nomenclature="gaPeg",
-        hip_number=1067,
-        data=StarData(
-            ra_j2000=3.308968,  # 00h 13m 14.2s (Gamma Pegasi, HIP 1067)
-            dec_j2000=15.183598,  # +15° 11' 01.0"
-            pm_ra=0.00198,  # 1.98 mas/yr
-            pm_dec=-0.00928,  # -9.28 mas/yr
-            parallax_mas=8.33,
-            radial_km_per_s=23.62,
-        ),
-        magnitude=2.84,
-    ),
-    # ======== GEMINI CONSTELLATION - additional stars ========
-    # Data: ESA Hipparcos catalogue via CDS/SIMBAD
-    StarCatalogEntry(
-        id=PROPUS,
-        name="Propus",
-        nomenclature="etGem",
-        hip_number=29655,
-        data=StarData(
-            ra_j2000=93.719355,  # 06h 14m 52.6s (Eta Geminorum, HIP 29655)
-            dec_j2000=22.506787,  # +22° 30' 24.4"
-            pm_ra=-0.06246,  # -62.46 mas/yr
-            pm_dec=-0.01212,  # -12.12 mas/yr
-            parallax_mas=8.48,
-            radial_km_per_s=26.52,
-        ),
-        magnitude=3.28,
-    ),
-    StarCatalogEntry(
-        id=TEJAT,
-        name="Tejat",
-        nomenclature="muGem",
-        hip_number=30343,
-        data=StarData(
-            ra_j2000=95.740112,  # 06h 22m 57.6s (Mu Geminorum, HIP 30343)
-            dec_j2000=22.513583,  # +22° 30' 48.9"
-            pm_ra=0.05639,  # 56.39 mas/yr
-            pm_dec=-0.11003,  # -110.03 mas/yr
-            parallax_mas=14.08,
-            radial_km_per_s=57.27,
-        ),
-        magnitude=2.87,
-    ),
-    StarCatalogEntry(
-        id=ALHENA,
-        name="Alhena",
-        nomenclature="gaGem",
-        hip_number=31681,
-        data=StarData(
-            ra_j2000=99.427960,  # 06h 37m 42.7s (Gamma Geminorum, HIP 31681)
-            dec_j2000=16.399280,  # +16° 23' 57.4"
-            pm_ra=0.01381,  # 13.81 mas/yr
-            pm_dec=-0.05496,  # -54.96 mas/yr
-            parallax_mas=29.84,
-            radial_km_per_s=-11.68,
-        ),
-        magnitude=1.92,
-    ),
-    StarCatalogEntry(
-        id=WASAT,
-        name="Wasat",
-        nomenclature="deGem",
-        hip_number=35550,
-        data=StarData(
-            ra_j2000=110.030727,  # 07h 20m 07.4s (Delta Geminorum, HIP 35550)
-            dec_j2000=21.982304,  # +21° 58' 56.3"
-            pm_ra=-0.01513,  # -15.13 mas/yr
-            pm_dec=-0.00979,  # -9.79 mas/yr
-            parallax_mas=53.94,
-            radial_km_per_s=-1.6,
-        ),
-        magnitude=3.53,
-    ),
-    # ======== CANIS MAJOR CONSTELLATION - additional stars ========
-    StarCatalogEntry(
-        id=ADHARA,
-        name="Adhara",
-        nomenclature="epCMa",
-        hip_number=33579,
-        data=StarData(
-            ra_j2000=104.656453,  # 06h 58m 37.5s (Epsilon CMa, HIP 33579)
-            dec_j2000=-28.972086,  # -28° 58' 19.5"
-            pm_ra=0.00324,  # 3.24 mas/yr
-            pm_dec=0.00133,  # 1.33 mas/yr
-            parallax_mas=8.05,
-            radial_km_per_s=4.02,
-        ),
-        magnitude=1.50,
-    ),
-    StarCatalogEntry(
-        id=WEZEN,
-        name="Wezen",
-        nomenclature="deCMa",
-        hip_number=34444,
-        data=StarData(
-            ra_j2000=107.097850,  # 07h 08m 23.5s (Delta CMa, HIP 34444)
-            dec_j2000=-26.393200,  # -26° 23' 35.5"
-            pm_ra=-0.00312,  # -3.12 mas/yr
-            pm_dec=0.00331,  # 3.31 mas/yr
-            parallax_mas=2.03,
-            radial_km_per_s=53.82,
-        ),
-        magnitude=1.84,
-    ),
-    # ======== DRACO CONSTELLATION ========
-    StarCatalogEntry(
-        id=THUBAN,
-        name="Thuban",
-        nomenclature="alDra",
-        hip_number=68756,
-        data=StarData(
-            ra_j2000=211.097323,  # 14h 04m 23.4s (Alpha Draconis, HIP 68756)
-            dec_j2000=64.375870,  # +64° 22' 33.1"
-            pm_ra=-0.05634,  # -56.34 mas/yr
-            pm_dec=0.01721,  # 17.21 mas/yr
-            parallax_mas=10.76,
-            radial_km_per_s=-21.48,
-        ),
-        magnitude=3.68,
-    ),
-    # ======== HERCULES CONSTELLATION ========
-    StarCatalogEntry(
-        id=RASALGETHI,
-        name="Rasalgethi",
-        nomenclature="alHer",
-        hip_number=84345,
-        data=StarData(
-            ra_j2000=258.661909,  # 17h 14m 38.9s (Alpha1 Herculis, HIP 84345)
-            dec_j2000=14.390341,  # +14° 23' 25.2"
-            pm_ra=-0.00732,  # -7.32 mas/yr
-            pm_dec=0.03607,  # 36.07 mas/yr
-            parallax_mas=9.07,
-            radial_km_per_s=-35.22,
-        ),
-        magnitude=3.06,  # Variable (SRC), mean V from Bright Star Catalogue
-    ),
-    # ======== CYGNUS CONSTELLATION ========
-    StarCatalogEntry(
-        id=ALBIREO,
-        name="Albireo",
-        nomenclature="beCyg",
-        hip_number=95947,
-        data=StarData(
-            ra_j2000=292.680315,  # 19h 30m 43.3s (Beta1 Cygni, HIP 95947)
-            dec_j2000=27.959674,  # +27° 57' 34.8"
-            pm_ra=-0.00717,  # -7.17 mas/yr
-            pm_dec=-0.00615,  # -6.15 mas/yr
-            parallax_mas=7.51,
-            radial_km_per_s=1.29,
-        ),
-        magnitude=3.08,
-    ),
-    # ======== ANDROMEDA CONSTELLATION (additional) ========
-    StarCatalogEntry(
-        id=MIRACH,
-        name="Mirach",
-        nomenclature="beAnd",
-        hip_number=5447,
-        data=StarData(
-            ra_j2000=17.433013,  # 01h 09m 43.9s (Beta Andromedae, HIP 5447)
-            dec_j2000=35.620557,  # +35° 37' 14.0"
-            pm_ra=0.17590,  # 175.90 mas/yr
-            pm_dec=-0.11220,  # -112.20 mas/yr
-            parallax_mas=16.52,
-            radial_km_per_s=28.07,
-        ),
-        magnitude=2.05,
-    ),
-    StarCatalogEntry(
-        id=ALMACH,
-        name="Almach",
-        nomenclature="ga1And",
-        hip_number=9640,
-        data=StarData(
-            ra_j2000=30.974803,  # 02h 03m 53.9s (Gamma1 Andromedae, HIP 9640)
-            dec_j2000=42.329725,  # +42° 19' 47.0"
-            pm_ra=0.04232,  # 42.32 mas/yr
-            pm_dec=-0.04930,  # -49.30 mas/yr
-            parallax_mas=9.19,
-            radial_km_per_s=-1.9,
-        ),
-        magnitude=2.10,
-    ),
-    # ======== CETUS CONSTELLATION ========
-    StarCatalogEntry(
-        id=MENKAR,
-        name="Menkar",
-        nomenclature="alCet",
-        hip_number=14135,
-        data=StarData(
-            ra_j2000=45.569885,  # 03h 02m 16.8s (Alpha Ceti, HIP 14135)
-            dec_j2000=4.089737,  # +04° 05' 23.1"
-            pm_ra=-0.01041,  # -10.41 mas/yr
-            pm_dec=-0.07685,  # -76.85 mas/yr
-            parallax_mas=5.66,
-            radial_km_per_s=35.32,
-        ),
-        magnitude=2.54,
-    ),
+        id=_r[0],
+        name=_r[1],
+        nomenclature=_r[2],
+        hip_number=_r[3],
+        data=StarData(
+            ra_j2000=_r[4],
+            dec_j2000=_r[5],
+            pm_ra=_r[6],
+            pm_dec=_r[7],
+            parallax_mas=_r[8],
+            radial_km_per_s=_r[9],
+        ),
+        magnitude=_r[10],
+    )
+    for _r in _STAR_ROWS
 ]
 
 # Fixed star catalog (J2000.0 ICRS coordinates from Hipparcos)
@@ -2139,6 +400,27 @@ FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 
 # Build lookup from canonical name to star ID
 _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
+
+# Build lookup from HIP number to catalog entry.
+_HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
+
+# Curated, individually-validated traditional-name corrections (name -> HIP).
+# Kept separate from the larger STAR_NAME_TO_HIP map, which is the name->HIP
+# lookup for get_hip_from_star_name (not the fixstar resolver path). HIP is
+# stable across catalog regeneration, unlike the generated row ids. Each entry
+# verified against the reference ephemeris + IAU/WGSN:
+#   Alaraph = beta Vir (Zavijava) -- not Spica
+#   Gienah Corvi = gamma Crv (Gienah) -- not delta Crv (Algorab)
+#   Atri = delta UMa (Megrez) -- Hindu Saptarishi name
+#   Nash = gamma-2 Sgr (Alnasl)
+#   Deli = eta Aqr -- Hebrew name (Greek Hydria)
+_NAME_HIP_FIX = {
+    "ALARAPH": 57757,
+    "GIENAH CORVI": 59803,
+    "ATRI": 59774,
+    "NASH": 88635,
+    "DELI": 111497,
+}
 
 
 # =============================================================================
@@ -2167,7 +449,7 @@ GREEK_LETTER_ABBREV: dict[str, str] = {
     "MU": "mu",
     "NU": "nu",
     "XI": "xi",
-    "OMICRON": "om",
+    "OMICRON": "omi",
     "PI": "pi",
     "RHO": "rh",
     "SIGMA": "si",
@@ -2176,7 +458,7 @@ GREEK_LETTER_ABBREV: dict[str, str] = {
     "PHI": "ph",
     "CHI": "ch",
     "PSI": "ps",
-    "OMEGA": "om",  # Note: same abbrev as omicron in some catalogs
+    "OMEGA": "om",  # omicron is "omi"; only omega abbreviates to "om"
 }
 
 # Constellation names (genitive and nominative forms) to 3-letter IAU abbreviations
@@ -2578,7 +860,8 @@ STAR_ALIASES: dict[str, int] = {
     "67 VIR": SPICA_STAR,
     "α VIR": SPICA_STAR,
     "AZIMECH": SPICA_STAR,
-    "ALARAPH": SPICA_STAR,
+    # NOTE: "Alaraph" is beta Vir (Zavijava), not Spica — resolved via
+    # STAR_NAME_TO_HIP instead (see ALARAPH there).
     "ALVIR": SPICA_STAR,
     "SUNBULA": SPICA_STAR,
     "VIRGIN'S SPIKE": SPICA_STAR,
@@ -2811,7 +1094,10 @@ STAR_ALIASES: dict[str, int] = {
     "ALPHA CEN": RIGIL_KENT,
     "α CEN": RIGIL_KENT,
     "ALCEN": RIGIL_KENT,
-    "TOLIMAN": RIGIL_KENT,
+    # Toliman is the IAU name of alpha Cen B (catalog id 1000846); the
+    # exact catalog name takes precedence, so this legacy alias only
+    # documents the historical usage.
+    "TOLIMAN": 1000846,
     "RIGIL KENT": RIGIL_KENT,
     "FOOT OF CENTAUR": RIGIL_KENT,
     "BUNGULA": RIGIL_KENT,
@@ -3100,7 +1386,8 @@ STAR_ALIASES: dict[str, int] = {
     "δ CRV": ALGORAB,
     "DECRV": ALGORAB,
     "AL-GHIRAB": ALGORAB,
-    "GIENAH CORVI": ALGORAB,
+    # NOTE: "Gienah Corvi" is gamma Crv (Gienah), not delta Crv (Algorab) —
+    # resolved via STAR_NAME_TO_HIP instead (see GIENAH CORVI there).
     # ======== ALPHECCA (Alpha Coronae Borealis) - BEHENIAN ========
     "GEMMA": ALPHECCA,
     "ALPHA CORONAE BOREALIS": ALPHECCA,
@@ -3743,13 +2030,16 @@ def resolve_star_name(name: str) -> int | None:
     if "," in normalized:
         normalized = normalized.split(",")[0].strip()
 
-    # 1. Try exact match in STAR_ALIASES
-    if normalized in STAR_ALIASES:
-        return STAR_ALIASES[normalized]
-
-    # 2. Try exact match against canonical star names
+    # 1. Try exact match against canonical star names — a star's own
+    # catalog name outranks a legacy alias pointing elsewhere (e.g.
+    # 'Suhail' is the IAU name of lambda Velorum but also a historical
+    # alias of Canopus).
     if normalized in _STAR_NAME_TO_ID:
         return _STAR_NAME_TO_ID[normalized]
+
+    # 2. Try exact match in STAR_ALIASES
+    if normalized in STAR_ALIASES:
+        return STAR_ALIASES[normalized]
 
     # 3. Try exact match against nomenclature (e.g., "ALLEO", "BEPER")
     for entry in STAR_CATALOG:
@@ -3826,7 +2116,9 @@ def _calc_star_position_from_observer(
         dec_degrees=star_data.dec_j2000,
         ra_mas_per_year=star_data.pm_ra * 1000.0,  # arcsec/yr to mas/yr
         dec_mas_per_year=star_data.pm_dec * 1000.0,
-        parallax_mas=star_data.parallax_mas,  # Trigonometric parallax for distance
+        # Stars without a measured parallax get the reference default
+        # (0.0001249 arcsec = 0.1249 mas).
+        parallax_mas=star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249,
         radial_km_per_s=star_data.radial_km_per_s,  # Radial velocity for distance change
     )
 
@@ -3849,11 +2141,10 @@ def _calc_star_position_from_observer(
     # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
     lat = ecl[0].degrees
     lon = ecl[1].degrees % 360.0
-    # Distance from parallax (AU). Stars without parallax data (parallax_mas=0)
-    # will have a very large distance from Skyfield; cap at 100000 AU for those.
+    # Distance from parallax (AU). Stars without measured parallax use
+    # the reference's default of 0.0001249 arcsec (the Star object below
+    # already received it), so the distance stays finite and consistent.
     dist = ecl[2].au
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
 
     return lon, lat, dist
 
@@ -3881,9 +2172,7 @@ def _calc_star_position_leb(
         _apply_aberration,
         _apply_gravitational_deflection,
         _cartesian_to_spherical,
-        _fw2m,
         _get_leb_frame_data,
-        _iau2006_precession_angles,
         _mat3_vec3,
         _rotate_equatorial_to_ecliptic,
         _rotate_icrs_to_ecliptic_j2000,
@@ -3905,49 +2194,68 @@ def _calc_star_position_leb(
     # 1. Earth position and velocity from LEB (ICRS barycentric)
     earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
 
-    # 2. Propagate proper motion from J2000 to observation date
-    ra_date, dec_date = propagate_proper_motion(
-        star_data.ra_j2000,
-        star_data.dec_j2000,
-        star_data.pm_ra,
-        star_data.pm_dec,
-        J2000,
-        jd_tt,
+    # 2. Star ICRS position via rigorous 3D space motion.
+    #    Mirrors Skyfield's Star._compute_vectors (the reference used by
+    #    _calc_star_position_from_observer): build the J2000 position and
+    #    space-velocity vectors from (ra, dec, parallax, proper motion, radial
+    #    velocity), then propagate them linearly in 3D.  A first-order
+    #    propagation in RA/Dec diverges from this reference by up to ~0.27" for
+    #    the highest proper-motion stars (e.g. eps Ind, Rigil Kentaurus) already
+    #    within the base tier, growing to arcminutes/degrees at millennial
+    #    epochs; the 3D form tracks the Skyfield reference to the LEB pipeline
+    #    floor (<0.005" across the full catalogue).
+    _ASEC2RAD = math.pi / 180.0 / 3600.0
+    _C_M_PER_S = 299792458.0
+    _AU_KM = 149597870.7
+    # Reference default parallax 0.1249 mas for stars without a measured value
+    # (the same value Skyfield receives in the reference path).
+    px_mas = star_data.parallax_mas if star_data.parallax_mas > 0.0 else 0.1249
+    ra_rad = math.radians(star_data.ra_j2000)
+    dec_rad = math.radians(star_data.dec_j2000)
+    cra = math.cos(ra_rad)
+    sra = math.sin(ra_rad)
+    cdc = math.cos(dec_rad)
+    sdc = math.sin(dec_rad)
+    dist_internal = 1.0 / math.sin(px_mas * 1.0e-3 * _ASEC2RAD)  # AU
+    pos0 = (
+        dist_internal * cdc * cra,
+        dist_internal * cdc * sra,
+        dist_internal * sdc,
     )
-
-    # 3. RA/Dec → ICRS Cartesian
-    if star_data.parallax_mas > 0.0:
-        dist_internal = 206265000.0 / star_data.parallax_mas
-    else:
-        dist_internal = 1e12
-
-    # Apply radial velocity correction to distance (matching Skyfield Star behavior)
-    if star_data.radial_km_per_s != 0.0 and dist_internal < 1e11:
-        dt_years = (jd_tt - J2000) / DAYS_PER_JULIAN_YEAR
-        au_per_year = star_data.radial_km_per_s * 365.25 * 86400.0 / 149597870.7
-        dist_internal += au_per_year * dt_years
-
-    ra_rad = math.radians(ra_date)
-    dec_rad = math.radians(dec_date)
-    cos_dec = math.cos(dec_rad)
+    # Doppler factor: accounts for the changing light-travel time to the star.
+    k = 1.0 / (1.0 - star_data.radial_km_per_s / _C_M_PER_S * 1000.0)
+    # Proper motion (mas/yr; pm_ra already includes cos(dec)) and radial
+    # velocity as orthogonal AU/day components.
+    pmr = (star_data.pm_ra * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    pmd = (star_data.pm_dec * 1000.0) / (px_mas * DAYS_PER_JULIAN_YEAR) * k
+    rvl = star_data.radial_km_per_s * 86400.0 / _AU_KM * k
+    vel = (
+        -pmr * sra - pmd * sdc * cra + rvl * cdc * cra,
+        pmr * cra - pmd * sdc * sra + rvl * cdc * sra,
+        pmd * cdc + rvl * sdc,
+    )
+    dt_days = jd_tt - J2000
     star_icrs = (
-        dist_internal * cos_dec * math.cos(ra_rad),
-        dist_internal * cos_dec * math.sin(ra_rad),
-        dist_internal * math.sin(dec_rad),
+        pos0[0] + vel[0] * dt_days,
+        pos0[1] + vel[1] * dt_days,
+        pos0[2] + vel[2] * dt_days,
     )
 
     # 4. Geocentric vector
     geo = _vec3_sub(star_icrs, earth_pos)
 
-    # 5. Light-time (zero for stars without parallax — infinite direction)
+    # 5. Light-time. dist_internal above is always finite (zero-parallax stars
+    # use the clamped 0.1249 mas default), so the geocentric distance is finite
+    # too — compute light-time from it for every star, matching the Skyfield
+    # reference path, which feeds the same clamped default into observe() and
+    # always retards. (Gating on the raw parallax instead would leave the one
+    # zero-parallax catalog star on the lt=0 / first-order-aberration branch
+    # while the reference used the relativistic, light-retarded one.)
     # Note: for finite-distance stars, proper motion is not re-evaluated
     # at the retarded epoch (jd_tt - lt).  The error is < 0.001" for all
     # catalog stars because lt is at most ~few years and pm is < 10"/yr.
-    if star_data.parallax_mas > 0.0:
-        geo_dist = _vec3_dist(geo)
-        lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
-    else:
-        lt = 0.0
+    geo_dist = _vec3_dist(geo)
+    lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
 
     # 6. Gravitational deflection (skip if noaberr or nogdefl)
     if not noaberr and not nogdefl:
@@ -3965,21 +2273,28 @@ def _calc_star_position_leb(
         try:
             pn_mat, _dpsi, _deps, eps_true_rad = _get_leb_frame_data(reader, jd_tt)
         except (KeyError, ValueError, AttributeError):
+            # Reader without nutation data: nutation from erfa, precession from
+            # the Vondrák 2011 long-term model (same source as _get_leb_frame_data).
             import erfa
 
+            from .precession_vondrak import vondrak_pn_matrix
+
             dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
-            gamb, phib, psib, epsa = _iau2006_precession_angles(jd_tt)
-            eps_true_rad = epsa + deps_rad
-            pn_mat = _fw2m(gamb, phib, psib + dpsi_rad, eps_true_rad)
+            pn_mat, eps_true_rad = vondrak_pn_matrix(
+                jd_tt, float(dpsi_rad), float(deps_rad)
+            )
         geo_eq = _mat3_vec3(pn_mat, geo)
         ecl = _rotate_equatorial_to_ecliptic(
             geo_eq[0], geo_eq[1], geo_eq[2], eps_true_rad
         )
         lon, lat, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
 
-    if star_data.parallax_mas == 0.0:
-        dist = 100000.0
-
+    # Zero-parallax stars keep the finite distance from the clamped 0.1249 mas
+    # default (~1.65e9 AU) computed above — the same value the Skyfield backend
+    # and the reference ephemeris return for them (verified: the reference
+    # gives 1.650118e9 AU for a zero-parallax star). The previous override to
+    # 100000.0 AU diverged from both backends and from this path's own
+    # light-time, which was already computed from the finite distance.
     return lon, lat, dist
 
 
@@ -3989,6 +2304,7 @@ def _calc_star_position_skyfield(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position using Skyfield Star class with proper aberration.
@@ -4020,7 +2336,13 @@ def _calc_star_position_skyfield(
 
     t = get_timescale().tt_jd(jd_tt)
     earth = get_planets()["earth"]
-    earth_at_t = earth.at(t)
+    if topo is not None:
+        from skyfield.api import wgs84
+
+        observer = earth + wgs84.latlon(topo[1], topo[0], topo[2])
+        earth_at_t = observer.at(t)
+    else:
+        earth_at_t = earth.at(t)
     return _calc_star_position_from_observer(
         star_id, earth_at_t, noaberr, nogdefl, j2000_frame
     )
@@ -4032,6 +2354,7 @@ def calc_fixed_star_position(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
@@ -4068,7 +2391,9 @@ def calc_fixed_star_position(
     """
     from .state import get_leb_reader
 
-    if get_leb_reader() is not None:
+    # The LEB star path is geocentric; topocentric requests go through
+    # Skyfield (same convention as the planet pipeline).
+    if topo is None and get_leb_reader() is not None:
         try:
             return _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame
@@ -4079,9 +2404,10 @@ def calc_fixed_star_position(
             if "outside range" not in str(_leb_err).lower():
                 raise  # Re-raise unexpected ValueError
             from .logging_config import get_logger
+
             get_logger().debug("LEB star fallback: %s", _leb_err)
     return _calc_star_position_skyfield(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
     )
 
 
@@ -4091,6 +2417,7 @@ def calc_fixed_star_velocity(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    topo: "tuple | None" = None,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
@@ -4129,15 +2456,15 @@ def calc_fixed_star_velocity(
 
     # Calculate position at current time (for return value)
     lon, lat, dist = calc_fixed_star_position(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
     )
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
     lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo
     )
     lon_next, lat_next, dist_next = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame
+        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo
     )
 
     # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
@@ -4152,10 +2479,121 @@ def calc_fixed_star_velocity(
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
     speed_lat = lat_next - lat_prev
 
-    # pyswisseph returns 0.0 for fixed star distance speed
-    speed_dist = 0.0
+    # Distance speed: radial motion (the star's radial velocity plus the
+    # Earth's orbital radial component) - the reference reports it.
+    speed_dist = dist_next - dist_prev
 
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
+
+
+def _se_star_key(name: str) -> str:
+    """Reference search key for a traditional star name.
+
+    The reference removes every whitespace character and lowercases the
+    traditional-name part; the Bayer/Flamsteed part after a comma keeps
+    its case.
+    """
+    s = "".join(ch for ch in name if not ch.isspace())
+    head, sep, tail = s.partition(",")
+    return head.lower() + sep + tail
+
+
+_SE_SORTED_CATALOG: "list | None" = None
+
+
+def _se_sorted_catalog():
+    """Catalog entries sorted by their reference search key.
+
+    Sequential star numbers ("1", "2", ...) index this order, mirroring
+    the reference's sorted in-memory star list (its v2 behavior; the
+    sequence is specific to the catalog shipped with this library).
+    """
+    global _SE_SORTED_CATALOG
+    if _SE_SORTED_CATALOG is None:
+        _SE_SORTED_CATALOG = sorted(STAR_CATALOG, key=lambda e: _se_star_key(e.name))
+    return _SE_SORTED_CATALOG
+
+
+def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
+    """Resolve a star with the reference's exact search semantics.
+
+    Mirrors the reference resolution rules:
+    - leading comma: the rest is a Bayer/Flamsteed nomenclature key,
+      matched exactly (case preserved): ",alTau" -> Aldebaran;
+    - "name,nomenclature": the traditional-name part is ignored and the
+      nomenclature key decides;
+    - leading digit: 1-based sequential number in the sorted catalog;
+    - trailing '%' on a traditional name: prefix wildcard (a '%'
+      anywhere else is an error);
+    - otherwise: exact traditional-name match (whitespace removed,
+      case-insensitive).
+
+    No fuzzy matching, Bayer-word parsing or prefix guessing happens
+    here - those remain available in the library's own search helpers
+    (resolve_star_name, search helpers), not in the reference-named
+    functions.
+
+    Returns:
+        (star_id, error_message, "Name,nomenclature"); on error the id
+        is -1 and the canonical name is None.
+    """
+    sstar = _se_star_key(star_name)
+    if not sstar:
+        return -1, "star name empty", None
+
+    def _found(entry) -> tuple[int, None, str]:
+        return entry.id, None, f"{entry.name},{entry.nomenclature}"
+
+    # ",nomenclature" or "name,nomenclature": nomenclature key search.
+    if "," in sstar:
+        key = sstar[sstar.index(",") + 1 :]
+        if not key:
+            return -1, f"could not find star name {sstar}", None
+        for entry in STAR_CATALOG:
+            if "".join(entry.nomenclature.split()) == key:
+                return _found(entry)
+        return -1, f"could not find star name ,{key}", None
+
+    # Sequential star number.
+    if sstar[0].isdigit():
+        digits = ""
+        for ch in sstar:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        star_nr = int(digits)
+        ordered = _se_sorted_catalog()
+        if star_nr < 1 or star_nr > len(ordered):
+            return (
+                -1,
+                f"sequential fixed star number {star_nr} is not available",
+                None,
+            )
+        return _found(ordered[star_nr - 1])
+
+    # Trailing '%' wildcard on the traditional name.
+    if "%" in sstar:
+        if not sstar.endswith("%") or sstar.count("%") != 1:
+            return -1, f"invalid search string {sstar}", None
+        prefix = sstar[:-1]
+        for entry in _se_sorted_catalog():
+            if _se_star_key(entry.name).startswith(prefix):
+                return _found(entry)
+        return -1, f"star search string {sstar} did not match", None
+
+    # Exact traditional-name match. The alias table plays the role of
+    # the reference catalog's additional name lines per star, so exact
+    # alias keys resolve too (still no fuzzy or prefix matching).
+    for entry in STAR_CATALOG:
+        if _se_star_key(entry.name) == sstar:
+            return _found(entry)
+    for alias, star_id in STAR_ALIASES.items():
+        if _se_star_key(alias) == sstar:
+            for entry in STAR_CATALOG:
+                if entry.id == star_id:
+                    return _found(entry)
+    return -1, f"could not find star name {sstar}", None
 
 
 def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
@@ -4176,19 +2614,15 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
         Tuple of (star_id, error_message, canonical_name).
         If error, star_id is -1 and canonical_name is None.
     """
-    star_id = resolve_star_name(star_name)
-    if star_id is not None:
-        canonical_name = get_canonical_star_name(star_id)
-        return star_id, None, canonical_name
-
-    return -1, f"could not find star name {star_name.lower()}", None
+    return _resolve_star_se(star_name)
 
 
 def _preprocess_flags(iflag: int) -> int:
     """Preprocess calculation flags for fixed star functions.
 
     Strips ephemeris selection flags (MOSEPH) and converts SPEED3 to SPEED.
-    FLG_TOPOCTR is accepted silently (stars at infinite distance).
+    FLG_TOPOCTR is kept: the observer position contributes diurnal
+    aberration (and, for the nearest stars, a tiny diurnal parallax).
 
     Args:
         iflag: Raw input flags
@@ -4201,9 +2635,41 @@ def _preprocess_flags(iflag: int) -> int:
     # FLG_SPEED3: treat as FLG_SPEED
     if iflag & FLG_SPEED3:
         iflag = (iflag & ~FLG_SPEED3) | FLG_SPEED
-    # FLG_TOPOCTR: silently accept (stars at infinite distance, no parallax)
-    iflag = iflag & ~FLG_TOPOCTR
     return iflag
+
+
+def _fixstar_ret_flags(flags_in: int) -> int:
+    """Return flags echoed to the caller (reference convention).
+
+    The input flags come back verbatim, with FLG_SWIEPH added when no
+    ephemeris-selection bit was given (MOSEPH echoes as given).
+    """
+    from .constants import FLG_JPLEPH
+
+    if not (flags_in & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
+        return flags_in | FLG_SWIEPH
+    return flags_in
+
+
+def _fixstar_topo() -> tuple:
+    """(lon, lat, alt) for FLG_TOPOCTR star calculations.
+
+    Raises Error when no geographic position has been set, like the
+    planet path does.
+    """
+    from .state import get_topo
+
+    topo = get_topo()
+    if topo is None:
+        raise Error(
+            "topocentric position requested (FLG_TOPOCTR) but no "
+            "geographic position set; call set_topo() first"
+        )
+    return (
+        topo.longitude.degrees,
+        topo.latitude.degrees,
+        topo.elevation.m,
+    )
 
 
 def _apply_fixstar_flags(
@@ -4262,8 +2728,12 @@ def _apply_fixstar_flags(
     # ---- 2. Equatorial coordinate transformation ----
     if is_equatorial:
         if iflag & FLG_J2000:
-            # J2000 obliquity for J2000 equatorial frame
-            eps = 23.4392911  # IAU 2006 mean obliquity at J2000.0
+            # J2000 obliquity for J2000 equatorial frame.
+            # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
+            # Kept to match the planet J2000-equatorial path (planets.py) so
+            # star and planet declinations share one J2000 frame; the strict
+            # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
+            eps = 23.4392911
         elif iflag & FLG_NONUT:
             # Mean equator of date: use mean obliquity (no nutation)
             eps = get_mean_obliquity(jd_tt)
@@ -4291,37 +2761,43 @@ def _apply_fixstar_flags(
         ayanamsa = get_ayanamsa_ut(tjd_ut)
         lon = (lon - ayanamsa) % 360.0
 
+        # Correct the first-coordinate speed for the ayanamsha drift rate
+        # (~50"/yr), mirroring the planet path (planets.py): the speed was
+        # built on the tropical frame, so the of-date ayanamsa motion must be
+        # removed for sidereal SPEED output. Without this, a star's sidereal
+        # speed_lon is returned identical to its tropical value.
+        if iflag & FLG_SPEED:
+            dt_day = 0.5
+            ayan_prev = get_ayanamsa_ut(tjd_ut - dt_day)
+            ayan_next = get_ayanamsa_ut(tjd_ut + dt_day)
+            # get_ayanamsa_ut returns a normalised [0, 360) angle, so wrap the
+            # finite-difference delta to the shortest arc before dividing; an
+            # unwrapped 0/360 crossing would inject a spurious ~360 deg/day jump.
+            ayan_delta = ayan_next - ayan_prev
+            if ayan_delta > 180.0:
+                ayan_delta -= 360.0
+            elif ayan_delta < -180.0:
+                ayan_delta += 360.0
+            speed_lon -= ayan_delta / (2.0 * dt_day)
+
     # ---- 4. Output format conversion ----
+    # Cast to native Python floats (upstream Skyfield/numpy ops can leak
+    # numpy.float64) before any output path, so every fixstar* return is native.
+    lon, lat, dist = float(lon), float(lat), float(dist)
+    speed_lon = float(speed_lon)
+    speed_lat = float(speed_lat)
+    speed_dist = float(speed_dist)
     result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
 
     if iflag & FLG_XYZ:
-        lon_rad = math.radians(lon)
-        lat_rad = math.radians(lat)
-        cos_lat = math.cos(lat_rad)
-        sin_lat = math.sin(lat_rad)
-        cos_lon = math.cos(lon_rad)
-        sin_lon = math.sin(lon_rad)
+        # Spherical(deg)→Cartesian+velocity via the shared helper, so star XYZ
+        # output stays identical to the planet/Horizons XYZ post-processing.
+        # Inputs are already native floats (cast above), so the result is too.
+        from .fast_calc import _spherical_to_cartesian_with_velocity
 
-        x = dist * cos_lat * cos_lon
-        y = dist * cos_lat * sin_lon
-        z = dist * sin_lat
-
-        dlon_rad = math.radians(speed_lon)
-        dlat_rad = math.radians(speed_lat)
-
-        vx = (
-            speed_dist * cos_lat * cos_lon
-            - dist * sin_lat * cos_lon * dlat_rad
-            - dist * cos_lat * sin_lon * dlon_rad
+        return _spherical_to_cartesian_with_velocity(
+            lon, lat, dist, speed_lon, speed_lat, speed_dist
         )
-        vy = (
-            speed_dist * cos_lat * sin_lon
-            - dist * sin_lat * sin_lon * dlat_rad
-            + dist * cos_lat * cos_lon * dlon_rad
-        )
-        vz = speed_dist * sin_lat + dist * cos_lat * dlat_rad
-
-        return (float(x), float(y), float(z), float(vx), float(vy), float(vz))
 
     if iflag & FLG_RADIANS:
         return (
@@ -4367,6 +2843,7 @@ def fixstar_ut(
         >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     star_id, error, canonical_name = _resolve_star_id(star)
@@ -4385,21 +2862,22 @@ def fixstar_ut(
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", flags)
+        return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -4419,7 +2897,32 @@ def batch_fixstars_ut(
 
     The result order matches the input order. When ``skip_errors`` is True,
     unresolved stars keep their input slot as ``None``.
+
+    Note:
+        The fast geocentric batch path does not support ``FLG_TOPOCTR``. When
+        that flag is set the function transparently delegates to the
+        topocentric single-star path (``fixstar2_ut``) per star, so batch and
+        single-star output agree (the diurnal *aberration* that ``FLG_TOPOCTR``
+        adds is ~0.2"); only the per-star fast path is bypassed.
     """
+    # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
+    # below; rather than silently return geocentric positions that disagree
+    # with fixstar2_ut, delegate per star to the topocentric single-star path.
+    if flags & FLG_TOPOCTR:
+        topo_results: list[
+            Tuple[Tuple[float, float, float, float, float, float], str, int] | None
+        ] = []
+        for star_name in stars:
+            try:
+                topo_results.append(fixstar2_ut(star_name, tjdut, flags))
+            except Error:
+                if skip_errors:
+                    topo_results.append(None)
+                    continue
+                raise
+        return tuple(topo_results)
+
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     results: list[
@@ -4457,10 +2960,10 @@ def batch_fixstars_ut(
                     star_id, jd_tt, noaberr, nogdefl, use_j2000
                 )
                 if want_speed:
-                    lon_prev, lat_prev, _ = _calc_star_position_leb(
+                    lon_prev, lat_prev, dist_prev = _calc_star_position_leb(
                         star_id, jd_tt - 0.5, noaberr, nogdefl, use_j2000
                     )
-                    lon_next, lat_next, _ = _calc_star_position_leb(
+                    lon_next, lat_next, dist_next = _calc_star_position_leb(
                         star_id, jd_tt + 0.5, noaberr, nogdefl, use_j2000
                     )
                     speed_lon = lon_next - lon_prev
@@ -4469,7 +2972,7 @@ def batch_fixstars_ut(
                     elif speed_lon < -180.0:
                         speed_lon += 360.0
                     speed_lat = lat_next - lat_prev
-                    speed_dist = 0.0
+                    speed_dist = dist_next - dist_prev
                 else:
                     speed_lon = 0.0
                     speed_lat = 0.0
@@ -4479,7 +2982,7 @@ def batch_fixstars_ut(
                 result = _apply_fixstar_flags(
                     result, jd_tt, flags, j2000_native=use_j2000
                 )
-                results[index] = (result, canonical_name, flags)
+                results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
         except KeyError:
             pass  # Body not in LEB file
@@ -4511,10 +3014,10 @@ def batch_fixstars_ut(
                 star_id, earth_at_t, noaberr, nogdefl, use_j2000
             )
             if want_speed:
-                lon_prev, lat_prev, _dist_prev = _calc_star_position_from_observer(
+                lon_prev, lat_prev, dist_prev = _calc_star_position_from_observer(
                     star_id, earth_at_prev, noaberr, nogdefl, use_j2000
                 )
-                lon_next, lat_next, _dist_next = _calc_star_position_from_observer(
+                lon_next, lat_next, dist_next = _calc_star_position_from_observer(
                     star_id, earth_at_next, noaberr, nogdefl, use_j2000
                 )
                 speed_lon = lon_next - lon_prev
@@ -4523,17 +3026,15 @@ def batch_fixstars_ut(
                 elif speed_lon < -180.0:
                     speed_lon += 360.0
                 speed_lat = lat_next - lat_prev
-                speed_dist = 0.0
+                speed_dist = dist_next - dist_prev
             else:
                 speed_lon = 0.0
                 speed_lat = 0.0
                 speed_dist = 0.0
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            result = _apply_fixstar_flags(
-                result, jd_tt, flags, j2000_native=use_j2000
-            )
-            results[index] = (result, canonical_name, flags)
+            result = _apply_fixstar_flags(result, jd_tt, flags, j2000_native=use_j2000)
+            results[index] = (result, canonical_name, ret_flags)
         except Error:
             if skip_errors:
                 continue
@@ -4581,6 +3082,7 @@ def fixstar(
         >>> pos, name, retflag = fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     star_id, error, canonical_name = _resolve_star_id(star)
@@ -4591,21 +3093,22 @@ def fixstar(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, canonical_name or "", flags)
+        return (result, canonical_name or "", ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -4697,6 +3200,25 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         if entry.nomenclature.upper() == search_upper:
             return entry, None
 
+    # 2b. Try exact alias match. Alternate spellings and traditional names
+    # (e.g. "Betelgeux", "Beetlejuice", "Formalhaut") are explicit aliases,
+    # so they resolve exactly here rather than by a lossy fuzzy guess below.
+    alias_id = STAR_ALIASES.get(search_upper)
+    if alias_id is not None:
+        for entry in STAR_CATALOG:
+            if entry.id == alias_id:
+                return entry, None
+
+    # 2c. Curated traditional-name corrections (HIP-keyed, stable across
+    # regen). Resolves names that are not catalog entry names or aliases to the
+    # correct star (e.g. "Alaraph" -> beta Vir / Zavijava, "Atri" -> delta UMa
+    # / Megrez), overriding the looser prefix tiers below.
+    fix_hip = _NAME_HIP_FIX.get(search_upper)
+    if fix_hip is not None:
+        fix_entry = _HIP_TO_ENTRY.get(fix_hip)
+        if fix_entry is not None:
+            return fix_entry, None
+
     # 3. Try Bayer designation with Greek letter names (e.g., "Alpha Leonis")
     parsed_nomenclature = _parse_bayer_designation(search)
     if parsed_nomenclature:
@@ -4737,24 +3259,13 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
         names = ", ".join(m.name for m in matches)
         return None, f"Ambiguous star name '{star_name}' matches: {names}"
 
-    # 6. Try substring match in name (anywhere in the name)
-    for entry in STAR_CATALOG:
-        if search_upper in entry.name.upper():
-            matches.append(entry)
-
-    if len(matches) == 1:
-        return matches[0], None
-    elif len(matches) > 1:
-        names = ", ".join(m.name for m in matches)
-        return None, f"Ambiguous star name '{star_name}' matches: {names}"
-
-    # 7. Try phonetic fuzzy matching for common misspellings
-    fuzzy_result = _fuzzy_match_star(star_name)
-    if fuzzy_result is not None:
-        for entry in STAR_CATALOG:
-            if entry.id == fuzzy_result:
-                return entry, None
-
+    # No substring-anywhere or phonetic fuzzy fallback here: those tiers
+    # silently returned an unrelated but similarly-spelled star (e.g.
+    # "Chort"->kaRet, "Pushya"->psHya, "Messier 42"->muSer, "Alrai"->Cebalrai)
+    # for any valid name absent from this catalog, diverging from the reference
+    # ephemeris (which errors on unknown names). Legitimate alternate
+    # spellings are handled by the exact-alias tier above; an unresolved name
+    # now returns an honest error instead of a wrong star.
     return None, f"could not find star name {star_name.lower()}"
 
 
@@ -4800,6 +3311,7 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     entry, error = _resolve_star2(star)
@@ -4815,22 +3327,23 @@ def fixstar2_ut(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, flags)
+        return (result, star_name_out, ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -4878,6 +3391,7 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
+    ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
     entry, error = _resolve_star2(star)
@@ -4888,22 +3402,23 @@ def fixstar2(
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL)
         use_j2000 = bool(flags & FLG_J2000)
+        topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
         star_name_out = _format_star_name(entry)
         result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
 
-        return (result, star_name_out, flags)
+        return (result, star_name_out, ret_flags)
     except Error:
         raise
     except (OSError, ValueError, KeyError) as e:
@@ -4988,7 +3503,7 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ALPHERATZ": 677,  # Alpha Andromedae
     "ALPHERG": 7097,  # Eta Piscium
     "ALRAKIS": 83608,  # Mu Draconis
-    "ALRESCHA": 7097,  # Alpha Piscium (IAU: HIP 9487 for A component, HIP 7097 is the catalog entry)
+    "ALRESCHA": 9487,  # Alpha Piscium (HIP 7097 is Alpherg/Eta Piscium)
     "ALRUBA": 86782,  # Draconis
     "ALSAFI": 96100,  # Sigma Draconis
     "ALSCIAUKAT": 41075,  # 31 Lyncis
@@ -5316,57 +3831,57 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "SADALSUUD": 106278,  # Beta Aquarii
     "SADR": 100453,  # Gamma Cygni
     "SAIPH": 27366,  # Kappa Orionis
-    "SALM": 98066,  # Tau Pegasi
+    "SALM": 115250,  # Tau Pegasi
     "SARGAS": 86228,  # Theta Scorpii
-    "SARIN": 79992,  # Delta Herculis
+    "SARIN": 84379,  # Delta Herculis
     "SCHEAT": 113881,  # Beta Pegasi
     "SCHEDAR": 3179,  # Alpha Cassiopeiae
     "SECUNDA HYADUM": 20455,  # Delta1 Tauri
-    "SEGIN": 4427,  # Epsilon Cassiopeiae
+    "SEGIN": 8886,  # Epsilon Cassiopeiae
     "SEGINUS": 71075,  # Gamma Bootis
     "SHAULA": 85927,  # Lambda Scorpii
     "SHAMA": 69701,  # HD 99109
     "SHERATAN": 8903,  # Beta Arietis
     "SIKA": 50782,  # HD 99491
     "SIRIUS": 32349,  # Alpha Canis Majoris
-    "SITULA": 110672,  # Kappa Aquarii
+    "SITULA": 111710,  # Kappa Aquarii
     "SKAT": 113136,  # Delta Aquarii
     "SPICA": 65474,  # Alpha Virginis
     "STRIBOR": 91085,  # HD 171028
     "SUBRA": 47508,  # Omicron Leonis
     "SUHAIL": 44816,  # Lambda Velorum
     "SULAFAT": 93194,  # Gamma Lyrae
-    "SYRMA": 71957,  # Iota Virginis
+    "SYRMA": 69701,  # Iota Virginis
     # T
     "TABIT": 22449,  # Pi3 Orionis
-    "TAIYANGSHOU": 54539,  # Chi Ursae Majoris
-    "TAIYI": 53759,  # 8 Draconis
+    "TAIYANGSHOU": 57399,  # Chi Ursae Majoris
+    "TAIYI": 63076,  # 8 Draconis
     "TALITHA": 44127,  # Iota Ursae Majoris
-    "TANIA AUSTRALIS": 51250,  # Mu Ursae Majoris
-    "TANIA BOREALIS": 50801,  # Lambda Ursae Majoris
-    "TARAZED": 95501,  # Gamma Aquilae
+    "TANIA AUSTRALIS": 50801,  # Mu Ursae Majoris
+    "TANIA BOREALIS": 50372,  # Lambda Ursae Majoris
+    "TARAZED": 97278,  # Gamma Aquilae
     "TAYGETA": 17531,  # 19 Tauri (Pleiades)
     "TEBERDA": 94256,  # HD 178813
-    "TEGMINE": 43103,  # Zeta1 Cancri
+    "TEGMINE": 40167,  # Zeta1 Cancri
     "TEJAT": 30343,  # Mu Geminorum (HIP 30343, corrected from erroneous 32362)
     "THUBAN": 68756,  # Alpha Draconis
-    "TIAKI": 23015,  # Beta Gruis
-    "TIANGUAN": 25930,  # Zeta Tauri
-    "TIANYI": 52403,  # 7 Draconis
-    "TITAWIN": 9683,  # Upsilon Andromedae
+    "TIAKI": 112122,  # Beta Gruis
+    "TIANGUAN": 26451,  # Zeta Tauri
+    "TIANYI": 62423,  # 7 Draconis
+    "TITAWIN": 7513,  # Upsilon Andromedae (HIP 7513; 9683 was a typo)
     "TOLIMAN": 71681,  # Alpha Centauri B
-    "TONATIUH": 43177,  # HD 104985
-    "TORCULAR": 6193,  # Omicron Piscium
-    "TUREIS": 42913,  # Rho Puppis
-    "TYL": 91919,  # Epsilon Draconis
+    "TONATIUH": 58952,  # HD 104985
+    "TORCULAR": 8198,  # Omicron Piscium
+    "TUREIS": 39757,  # Rho Puppis
+    "TYL": 97433,  # Epsilon Draconis (was 91919 = eps-1 Lyrae, wrong)
     # U
-    "UKDAH": 52863,  # Iota Hydrae
+    "UKDAH": 47431,  # Iota Hydrae
     "UNUKALHAI": 77070,  # Alpha Serpentis
-    "UNURGUNITE": 34444,  # Sigma Canis Majoris
+    "UNURGUNITE": 33856,  # Sigma Canis Majoris (was 34444 = Wezen/del CMa, wrong)
     "URUK": 116076,  # HD 231701
     # V
     "VEGA": 91262,  # Alpha Lyrae
-    "VERITATE": 74793,  # 14 Andromedae
+    "VERITATE": 116076,  # 14 Andromedae
     "VINDEMIATRIX": 63608,  # Epsilon Virginis
     "WASAT": 35550,  # Delta Geminorum
     "WAZN": 27628,  # Beta Columbae
@@ -5374,18 +3889,18 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     # X
     "XAMIDIMURA": 82514,  # Mu1 Scorpii
     # Y
-    "YED POSTERIOR": 86284,  # Epsilon Ophiuchi
-    "YED PRIOR": 83000,  # Delta Ophiuchi
+    "YED POSTERIOR": 79882,  # Epsilon Ophiuchi
+    "YED PRIOR": 79593,  # Delta Ophiuchi
     "YILDUN": 85822,  # Delta Ursae Minoris
     # Z
     "ZANIAH": 60129,  # Eta Virginis
     "ZAURAK": 18543,  # Gamma Eridani
     "ZAVIJAVA": 57757,  # Beta Virginis
-    "ZHANG": 49641,  # Upsilon1 Hydrae
-    "ZIBAL": 20535,  # Zeta Eridani
+    "ZHANG": 48356,  # Upsilon1 Hydrae
+    "ZIBAL": 15197,  # Zeta Eridani
     "ZOSMA": 54872,  # Delta Leonis
     "ZUBENELGENUBI": 72622,  # Alpha2 Librae
-    "ZUBENELHAKRABI": 76470,  # Gamma Librae
+    "ZUBENELHAKRABI": 76333,  # Gamma Librae
     "ZUBENESCHAMALI": 74785,  # Beta Librae
     # =========================================================================
     # BAYER DESIGNATIONS (Greek letter + constellation)
@@ -5765,8 +4280,8 @@ STAR_NAME_TO_HIP: dict[str, int] = {
     "ETA PEG": 112158,
     "ETA PERSEI": 13268,
     "ETA PER": 13268,
-    "ETA PISCIUM": 5742,  # (consistent with STAR_CATALOG)
-    "ETA PSC": 5742,
+    "ETA PISCIUM": 7097,  # (consistent with STAR_CATALOG)
+    "ETA PSC": 7097,
     "ETA SAGITTARII": 89642,
     "ETA SGR": 89642,
     "ETA SCORPII": 84143,
@@ -6048,7 +4563,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     Lightweight function that returns only the magnitude, useful for
     visibility calculations where position is not needed.
 
-    Compatible with pyswisseph: returns (magnitude, star_name) on success,
+    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:
@@ -6074,7 +4589,7 @@ def fixstar_mag(star: str) -> Tuple[float, str]:
     if star_id not in _STAR_MAGNITUDES:
         raise Error(f"Magnitude not available for star ID {star_id}")
 
-    # Build "Name,Nomenclature" format matching pyswisseph
+    # Build "Name,Nomenclature" format matching the reference ephemeris
     for entry in STAR_CATALOG:
         if entry.id == star_id:
             star_name_out = _format_star_name(entry)
@@ -6097,7 +4612,7 @@ def fixstar2_mag(star: str) -> Tuple[float, str]:
     Returns the magnitude and the full star name, useful for
     visibility calculations where position is not needed.
 
-    Compatible with pyswisseph: returns (magnitude, star_name) on success,
+    Compatible with the reference ephemeris: returns (magnitude, star_name) on success,
     raises Error if the star is not found.
 
     Args:

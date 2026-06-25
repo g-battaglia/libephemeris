@@ -2,7 +2,7 @@
 Tests for the cs2lonlatstr centiseconds to longitude/latitude string conversion function.
 
 Tests verify that cs2lonlatstr correctly converts angles in centiseconds to
-the compact pyswisseph format (e.g., "45N30", "122E15'30").
+the compact reference ephemeris format (e.g., "45N30", "122E15'30").
 """
 
 import libephemeris as ephem

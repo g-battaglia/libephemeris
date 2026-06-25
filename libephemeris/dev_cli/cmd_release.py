@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Release commands: upload LEB files to GitHub Releases.
 
 Replaces 5 poe tasks: release:leb, release:leb:base/medium/extended, release:leb:dry-run.

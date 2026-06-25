@@ -2,7 +2,7 @@
 API compatibility and return type tests.
 
 Verifies that all public API functions return the expected types
-and formats, ensuring compatibility with pyswisseph.
+and formats, ensuring compatibility with the reference ephemeris.
 """
 
 from __future__ import annotations
@@ -27,11 +27,7 @@ from libephemeris.constants import (
     INTP_PERG,
     CHIRON,
     FLG_SPEED,
-    FLG_HELCTR,
-    FLG_EQUATORIAL,
-    FLG_SIDEREAL,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
     GREG_CAL,
 )
 

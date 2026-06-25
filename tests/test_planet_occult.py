@@ -22,6 +22,7 @@ import pytest
 
 pytestmark = pytest.mark.slow
 
+from libephemeris.exceptions import Error
 from libephemeris import (
     julday,
     planet_occult_when_glob,
@@ -97,20 +98,20 @@ class TestPlanetOccultWhenGlob:
 
         Planetary occultations are so rare that we may not find one in most
         search windows. This test verifies the function eventually terminates
-        (either with a result or with RuntimeError).
+        (either with a result or with exceptions.Error).
         """
         # Use a short search range with inner planets for faster test
         jd_start = julday(2000, 1, 1, 0)
 
         try:
-            # This will either find an event or raise RuntimeError
+            # This will either find an event or raise Error
             retflags, tret = planet_occult_when_glob(
                 jd_start, VENUS, MARS, "", FLG_SWIEPH, 0
             )
             # If it returns, verify structure
             assert len(tret) == 10
             assert isinstance(retflags, int)
-        except RuntimeError as e:
+        except Error as e:
             # Expected if no occultation found
             assert "No planetary occultation" in str(e)
 
@@ -179,7 +180,7 @@ class TestPlanetOccultReturnStructure:
         jd_start = julday(2000, 1, 1, 0)
 
         # Function should accept these parameters without error
-        # (it will raise RuntimeError because no occultation found, which is expected)
+        # (it will raise Error because no occultation is found, which is expected)
         try:
             retflags, tret = planet_occult_when_glob(
                 jd_start, VENUS, MARS, "", FLG_SWIEPH, 0
@@ -187,7 +188,7 @@ class TestPlanetOccultReturnStructure:
             # If we somehow found an event, verify structure
             assert len(tret) == 10
             assert isinstance(retflags, int)
-        except RuntimeError as e:
+        except Error as e:
             # Expected - no occultation found
             assert "No planetary occultation" in str(e)
 
@@ -203,7 +204,7 @@ class TestPlanetOccultReturnStructure:
             assert isinstance(retflag, int)
             assert len(times) == 10
             assert len(attr) == 20
-        except RuntimeError as e:
+        except Error as e:
             # Expected - no occultation found
             assert "No planetary occultation" in str(e)
 
@@ -225,10 +226,6 @@ class TestPlanetOccultImports:
 
     def test_swe_aliases_are_same_function(self):
         """Test that swe_* are aliases to base functions."""
-        from libephemeris import (
-            planet_occult_when_glob,
-            planet_occult_when_loc,
-        )
 
 
 

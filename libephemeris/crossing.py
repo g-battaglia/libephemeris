@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Crossing event calculations for libephemeris.
 
@@ -36,6 +38,7 @@ from __future__ import annotations
 
 from typing import Callable, Tuple
 
+from .exceptions import Error
 from .constants import FLG_SWIEPH, FLG_SPEED, FLG_HELCTR, SUN, MOON
 from .exceptions import EphemerisRangeError, CalculationError
 from .planets import calc_ut, calc
@@ -114,6 +117,13 @@ def _is_near_station(speed: float) -> bool:
     return abs(speed) < STATION_SPEED_THRESHOLD
 
 
+# Minimal bracket width (days) below which Brent switches to bisection.
+# This is the step-size guard of Brent's method and is a TIME quantity
+# (~1 ms); the function tolerances (degrees or deg/day) must not be
+# compared against day intervals.
+_BRENT_TIME_EPS_DAYS = 1e-8
+
+
 def _brent_find_crossing(
     get_position_func: Callable[[float], Tuple[float, float]],
     x2cross: float,
@@ -140,7 +150,7 @@ def _brent_find_crossing(
         float: Julian Day of crossing
 
     Raises:
-        RuntimeError: If no root is bracketed or convergence fails
+        Error: If no root is bracketed or convergence fails
 
     Algorithm:
         Brent's method is guaranteed to converge if the function changes sign
@@ -168,9 +178,7 @@ def _brent_find_crossing(
     if fa * fb > 0:
         # Root not bracketed - try to expand the bracket
         # This can happen if we guessed the bracket wrong
-        raise RuntimeError(
-            f"Brent's method: root not bracketed. f(a)={fa:.6f}, f(b)={fb:.6f}"
-        )
+        raise Error(f"Brent's method: root not bracketed. f(a)={fa:.6f}, f(b)={fb:.6f}")
 
     # Ensure |f(a)| >= |f(b)| (b is the better guess)
     if abs(fa) < abs(fb):
@@ -203,8 +211,8 @@ def _brent_find_crossing(
         )
         cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
         cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
-        cond4 = mflag and abs(jd_b - c) < tolerance
-        cond5 = not mflag and abs(c - d) < tolerance
+        cond4 = mflag and abs(jd_b - c) < _BRENT_TIME_EPS_DAYS
+        cond5 = not mflag and abs(c - d) < _BRENT_TIME_EPS_DAYS
 
         if cond1 or cond2 or cond3 or cond4 or cond5:
             # Bisection
@@ -258,7 +266,7 @@ def _find_bracket_for_crossing(
         Tuple[float, float]: (jd_a, jd_b) bracket containing the crossing
 
     Raises:
-        RuntimeError: If no crossing is found in the interval
+        Error: If no crossing is found in the interval
     """
     step = (jd_end - jd_start) / num_samples
 
@@ -287,9 +295,48 @@ def _find_bracket_for_crossing(
         prev_jd = curr_jd
         prev_diff = curr_diff
 
-    raise RuntimeError(
+    raise Error(
         f"No crossing found in interval [{jd_start}, {jd_end}] for target {x2cross}°"
     )
+
+
+def _forward_first_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    tjdut: float,
+    max_range: float,
+    tolerance: float,
+) -> float:
+    """First crossing at or after ``tjdut`` via a forward bracket scan + Brent.
+
+    Forward-only by construction (scans only [tjdut, tjdut+max_range] and returns
+    the first sign change). The sample step scales with ``max_range`` so the scan
+    stays cheap even for slow outer planets whose first crossing of a target lying
+    behind them can be a full orbit (years–centuries) ahead. Raises ``Error`` if
+    no crossing lies within ``max_range``.
+    """
+    num_samples = min(4000, max(int(max_range / 0.5), 200))
+    jd_a, jd_b = _find_bracket_for_crossing(
+        get_position_func, x2cross, tjdut, tjdut + max_range, num_samples=num_samples
+    )
+    return _brent_find_crossing(
+        get_position_func, x2cross, jd_a, jd_b, tolerance, 100
+    )
+
+
+def _cross_max_range(planet: int, speed_default: float) -> float:
+    """Forward search horizon (days) for a planet's longitude crossing, sized to
+    cover at least one orbital period so a target lying behind a slow planet is
+    still found ahead."""
+    if abs(speed_default) < 0.01:
+        return 100000.0  # very slow (Pluto ~248 yr period)
+    if abs(speed_default) < 0.05:
+        return 40000.0   # Saturn/Uranus/Neptune
+    if abs(speed_default) < 0.1:
+        return 5000.0    # Jupiter (~12 yr)
+    if planet in (2, 3):
+        return 500.0     # Mercury, Venus
+    return 800.0         # Mars and others
 
 
 def solcross_ut(
@@ -313,7 +360,7 @@ def solcross_ut(
         float: Julian Day of crossing (UT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Algorithm:
         1. Get current Sun position and velocity
@@ -339,7 +386,7 @@ def solcross_ut(
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
+        raise Error(f"Failed to calculate Sun position: {e}") from e
 
     # Initial time estimate (linear approximation)
     if speed == 0:
@@ -370,12 +417,12 @@ def solcross_ut(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        # If already very close, look for next complete crossing
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -388,7 +435,7 @@ def solcross_ut(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate Sun position during iteration: {e}"
             ) from e
 
@@ -409,9 +456,9 @@ def solcross_ut(
 
         # Safety: prevent divergence
         if abs(jd - jd_guess) > 366:
-            raise RuntimeError("Solar crossing search diverged")
+            raise Error("Solar crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in solar crossing calculation")
+    raise Error("Maximum iterations reached in solar crossing calculation")
 
 
 def solcross(
@@ -438,7 +485,7 @@ def solcross(
         float: Julian Day of crossing (TT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
@@ -469,7 +516,7 @@ def solcross(
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate Sun position: {e}") from e
+        raise Error(f"Failed to calculate Sun position: {e}") from e
 
     # Initial time estimate (linear approximation)
     if speed == 0:
@@ -490,12 +537,12 @@ def solcross(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        # If already very close, look for next complete crossing
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -507,7 +554,7 @@ def solcross(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate Sun position during iteration: {e}"
             ) from e
 
@@ -528,9 +575,9 @@ def solcross(
 
         # Safety: prevent divergence
         if abs(jd - jd_guess) > 366:
-            raise RuntimeError("Solar crossing search diverged")
+            raise Error("Solar crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in solar crossing calculation")
+    raise Error("Maximum iterations reached in solar crossing calculation")
 
 
 def mooncross_ut(
@@ -554,7 +601,7 @@ def mooncross_ut(
         float: Julian Day of crossing (UT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         Moon moves ~13° per day (27.3 day cycle).
@@ -577,7 +624,7 @@ def mooncross_ut(
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
+        raise Error(f"Failed to calculate Moon position: {e}") from e
 
     # Initial time estimate
     if speed == 0:
@@ -597,11 +644,12 @@ def mooncross_ut(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdut + dt_guess
@@ -614,7 +662,7 @@ def mooncross_ut(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate Moon position during iteration: {e}"
             ) from e
 
@@ -635,9 +683,9 @@ def mooncross_ut(
 
         # Safety check
         if abs(jd - jd_guess) > 31:  # More than a month
-            raise RuntimeError("Moon crossing search diverged")
+            raise Error("Moon crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in moon crossing calculation")
+    raise Error("Maximum iterations reached in moon crossing calculation")
 
 
 def mooncross(
@@ -664,7 +712,7 @@ def mooncross(
         float: Julian Day of crossing (TT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
@@ -697,7 +745,7 @@ def mooncross(
         lon_start = pos[0]
         speed = pos[3]  # degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
+        raise Error(f"Failed to calculate Moon position: {e}") from e
 
     # Initial time estimate
     if speed == 0:
@@ -717,11 +765,12 @@ def mooncross(
         if speed < 0 and diff > 0:
             diff -= 360.0
 
-        if abs(diff) < 1e-5:
-            if speed > 0:
-                diff += 360.0
-            else:
-                diff -= 360.0
+        # No dead-band skip here: (x2cross - lon) % 360 already maps a
+        # just-passed target to ~360 (next cycle), while a body exactly
+        # at or seconds before the target legitimately crosses now —
+        # the reference returns the immediate crossing (verified:
+        # swe.solcross_ut from the exact crossing instant returns that
+        # instant, not one cycle later).
 
     dt_guess = diff / speed
     jd_guess = tjdet + dt_guess
@@ -733,7 +782,7 @@ def mooncross(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate Moon position during iteration: {e}"
             ) from e
 
@@ -754,9 +803,9 @@ def mooncross(
 
         # Safety check
         if abs(jd - jd_guess) > 31:  # More than a month
-            raise RuntimeError("Moon crossing search diverged")
+            raise Error("Moon crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in moon crossing calculation")
+    raise Error("Maximum iterations reached in moon crossing calculation")
 
 
 def mooncross_node_ut(
@@ -783,7 +832,7 @@ def mooncross_node_ut(
                and ecliptic latitude (should be ~0) at the crossing moment
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Algorithm:
         1. Convert UT to TT for internal calculation
@@ -797,6 +846,12 @@ def mooncross_node_ut(
 
         Moon crosses each node approximately every 13.6 days (half the nodal
         month of ~27.2 days).
+
+        This routine solves for libephemeris's own ecliptic-latitude-zero
+        crossing, which differs from the reference ephemeris's node-crossing
+        definition (the reference solves Moon-longitude == node-longitude).
+        The two definitions can disagree by up to ~80 seconds of time. This
+        is a known, deliberate deviation from the reference.
 
     Example:
         >>> # Find next lunar node crossing
@@ -851,12 +906,18 @@ def mooncross_node(
                and ecliptic latitude (should be ~0) at the crossing moment
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
         which varies from ~32 seconds (year 2000) to minutes (historical times).
         For most astrological applications, use mooncross_node_ut() instead.
+
+        This routine solves for libephemeris's own ecliptic-latitude-zero
+        crossing, which differs from the reference ephemeris's node-crossing
+        definition (the reference solves Moon-longitude == node-longitude).
+        The two definitions can disagree by up to ~80 seconds of time. This
+        is a known, deliberate deviation from the reference.
 
     Example:
         >>> # Find next lunar node crossing using TT
@@ -873,7 +934,7 @@ def mooncross_node(
         lat = pos[1]  # ecliptic latitude
         lat_speed = pos[4]  # latitude velocity in degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate Moon position: {e}") from e
+        raise Error(f"Failed to calculate Moon position: {e}") from e
 
     # If latitude velocity is zero or very small, use average value
     if abs(lat_speed) < 0.1:
@@ -927,7 +988,7 @@ def mooncross_node(
             lat = pos[1]
             lat_speed = pos[4]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate Moon position during iteration: {e}"
             ) from e
 
@@ -938,7 +999,9 @@ def mooncross_node(
             # seconds before/after tjdet yet wide enough to reject the
             # numerically identical "same event" case when the caller starts
             # at the exact node crossing itself.
-            if (not backwards and jd > tjdet + 1e-6) or (backwards and jd < tjdet - 1e-6):
+            if (not backwards and jd > tjdet + 1e-6) or (
+                backwards and jd < tjdet - 1e-6
+            ):
                 return (jd, pos[0], lat)
             # Converged on the wrong side of tjdet — nudge to the next
             # (or previous) crossing and keep iterating.
@@ -957,9 +1020,9 @@ def mooncross_node(
         elif backwards and jd > tjdet:
             jd = tjdet - HALF_NODAL_MONTH / 2
         elif abs(jd - tjdet) > 30:
-            raise RuntimeError("Moon node crossing search diverged")
+            raise Error("Moon node crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in moon node crossing calculation")
+    raise Error("Maximum iterations reached in moon node crossing calculation")
 
 
 def cross_ut(
@@ -980,7 +1043,7 @@ def cross_ut(
         float: Julian Day of crossing (UT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         Uses adaptive iteration count based on typical planet speed.
@@ -1000,7 +1063,7 @@ def cross_ut(
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(f"Failed to calculate planet position: {e}") from e
+        raise Error(f"Failed to calculate planet position: {e}") from e
 
     # Estimate typical speed if near zero
     # Geocentric average speeds (°/day) - slower planets need more iterations
@@ -1030,8 +1093,61 @@ def cross_ut(
     else:
         effective_speed = speed if abs(speed) > 0.001 else speed_default
 
-    if abs(diff) < 1e-5:
-        diff = 360.0  # Already at target, look for next crossing
+    # No dead-band skip: (x2cross - lon) % 360 maps a just-passed
+    # target to ~360 already, and a body exactly at the target crosses
+    # NOW (same convention as solcross/mooncross).
+
+    # Newton-Raphson assumes near-monotonic prograde motion and mishandles
+    # crossings near a retrograde loop, in several ways that all return the wrong
+    # crossing:
+    #   * target just BEHIND now, reached via an imminent retrograde dip (even
+    #     while still prograde, approaching a station) -> NR projects a full orbit
+    #     ahead and returns a crossing months-to-decades too late;
+    #   * currently RETROGRADE with a target it last passed in the recent past ->
+    #     NR can step backward and converge to a PAST crossing (before tjdut),
+    #     violating the forward-only contract;
+    #   * near a station, the step diff/speed explodes and the search diverges.
+    # In all of these the chronologically first crossing lies within ~one synodic
+    # period, so scan forward from tjdut for the first wrapped sign change and
+    # refine. The scan is forward-only by construction and early-exits on the
+    # first crossing, so it is cheap whenever one exists soon. The fast common
+    # case (prograde, target ahead, away from a station) skips it and uses NR.
+    _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0,
+                  7: 6.0, 8: 5.0, 9: 4.0}
+    _SYNODIC = {2: 116.0, 3: 584.0, 4: 780.0, 5: 399.0, 6: 378.0,
+                7: 370.0, 8: 367.0, 9: 367.0}
+    diff_back = (lon_start - x2cross) % 360.0
+    if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(
+        planet, 22.0
+    ):
+        scan_window = _SYNODIC.get(planet, 800.0) * 1.2
+
+        def _delta(jd_time: float) -> float:
+            lon_t = calc_ut(jd_time, planet, flags)[0][0]
+            return (lon_t - x2cross + 180.0) % 360.0 - 180.0
+
+        d_prev = _delta(tjdut)
+        step = 0.5
+        t_prev = tjdut
+        t_scan = tjdut + step
+        while t_scan <= tjdut + scan_window:
+            d_cur = _delta(t_scan)
+            if d_prev == 0.0:
+                return float(t_prev)
+            if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
+                lo, hi = t_prev, t_scan
+                f_lo = _delta(lo)
+                for _ in range(60):
+                    mid = 0.5 * (lo + hi)
+                    f_mid = _delta(mid)
+                    if f_lo * f_mid <= 0:
+                        hi = mid
+                    else:
+                        lo = mid
+                        f_lo = f_mid
+                return float(0.5 * (lo + hi))
+            t_prev, d_prev = t_scan, d_cur
+            t_scan += step
 
     dt_guess = diff / effective_speed
     jd_guess = tjdut + dt_guess
@@ -1080,13 +1196,14 @@ def cross_ut(
             return _brent_find_crossing(
                 get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
             )
-        except RuntimeError:
+        except (Error, RuntimeError):
             # If Brent's method fails, fall through to Newton-Raphson as last resort
             pass
 
     # Newton-Raphson iteration
     jd = jd_guess
     station_fallback_triggered = False
+    max_range = _cross_max_range(planet, speed_default)
 
     for iteration in range(max_iter):
         try:
@@ -1094,7 +1211,7 @@ def cross_ut(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate planet position during iteration: {e}"
             ) from e
 
@@ -1104,7 +1221,18 @@ def cross_ut(
 
         # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
-            return jd
+            if jd >= tjdut - 1e-6:
+                return jd
+            # Newton converged to a PAST crossing — the wrapped step diff/speed
+            # walked backward (e.g. a target far behind a prograde planet, whose
+            # first forward crossing is a whole orbit ahead). Forward-only is a
+            # hard contract: return the first crossing at or after tjdut instead.
+            try:
+                return _forward_first_crossing(
+                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                )
+            except (Error, RuntimeError):
+                raise Error("Planet crossing search diverged")
 
         # Detect if we've encountered a station or retrograde during iteration.
         # Retrograde (speed < 0) causes NR to step backward in time, which
@@ -1140,7 +1268,7 @@ def cross_ut(
                     NR_TOLERANCE,
                     max_iter - iteration,
                 )
-            except RuntimeError:
+            except (Error, RuntimeError):
                 # If Brent fails, continue with Newton-Raphson
                 pass
 
@@ -1152,26 +1280,28 @@ def cross_ut(
 
         jd += diff / speed
 
-        # Safety: longer range for slower planets, also account for retrograde
-        # Outer planets can take years to cross a given longitude due to
-        # retrograde periods and long orbital periods. Jupiter's orbital
-        # period is ~12 years (~4333 days), Saturn ~29 years, etc.
-        if abs(speed_default) < 0.01:
-            max_range = 100000  # Very slow planets (Pluto ~248yr period)
-        elif abs(speed_default) < 0.05:
-            max_range = (
-                40000  # Slow outer planets (Saturn ~29yr, Uranus ~84yr, Neptune ~165yr)
-            )
-        elif abs(speed_default) < 0.1:
-            max_range = 5000  # Jupiter (~12yr orbital period)
-        elif planet in (2, 3):  # Mercury, Venus
-            max_range = 500  # Fast inner planets with multiple crossings/year
-        else:
-            max_range = 800  # Mars and others
-        if abs(jd - tjdut) > max_range:  # Use tjdut not jd_guess
-            raise RuntimeError("Planet crossing search diverged")
+        # Safety: if Newton wandered beyond one orbital period from tjdut
+        # (typically a near-station overshoot where diff/speed explodes as
+        # speed -> 0), fall back to a forward bracket scan + Brent — a crossing
+        # exists at or after tjdut within max_range. Forward-only by construction.
+        if abs(jd - tjdut) > max_range:
+            try:
+                return _forward_first_crossing(
+                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                )
+            except (Error, RuntimeError):
+                raise Error("Planet crossing search diverged")
 
-    raise RuntimeError("Maximum iterations reached in planet crossing calculation")
+    # Newton-Raphson exhausted its iterations without converging — e.g. a far
+    # crossing of a very slow planet that NR keeps oscillating around within
+    # max_range (so neither the divergence nor the backward guard fired). The
+    # forward bracket scan is the robust catch-all.
+    try:
+        return _forward_first_crossing(
+            get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+        )
+    except (Error, RuntimeError):
+        raise Error("Maximum iterations reached in planet crossing calculation")
 
 
 def helio_cross_ut(
@@ -1203,7 +1333,7 @@ def helio_cross_ut(
         float: Julian Day of crossing (UT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         Heliocentric positions show where planets are relative to the Sun,
@@ -1234,9 +1364,7 @@ def helio_cross_ut(
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(
-            f"Failed to calculate heliocentric planet position: {e}"
-        ) from e
+        raise Error(f"Failed to calculate heliocentric planet position: {e}") from e
 
     # Estimate typical heliocentric speed if near zero
     # Heliocentric speeds are different from geocentric due to no retrograde
@@ -1312,7 +1440,7 @@ def helio_cross_ut(
             return _brent_find_crossing(
                 get_helio_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
             )
-        except RuntimeError:
+        except (Error, RuntimeError):
             pass  # Fall through to Newton-Raphson
 
     jd = jd_guess
@@ -1322,7 +1450,7 @@ def helio_cross_ut(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate heliocentric position during iteration: {e}"
             ) from e
 
@@ -1349,11 +1477,9 @@ def helio_cross_ut(
         base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
         max_range = max(base_range, abs(dt_guess) * 2.0)
         if abs(jd - tjdut) > max_range:
-            raise RuntimeError("Heliocentric crossing search diverged")
+            raise Error("Heliocentric crossing search diverged")
 
-    raise RuntimeError(
-        "Maximum iterations reached in heliocentric crossing calculation"
-    )
+    raise Error("Maximum iterations reached in heliocentric crossing calculation")
 
 
 def helio_cross(
@@ -1385,7 +1511,7 @@ def helio_cross(
         float: Julian Day of crossing (TT)
 
     Raises:
-        RuntimeError: If convergence fails or calculation error occurs
+        Error: If convergence fails or calculation error occurs
 
     Note:
         TT (Terrestrial Time) differs from UT (Universal Time) by Delta T,
@@ -1412,9 +1538,7 @@ def helio_cross(
         lon_start = pos[0]
         speed = pos[3]
     except (EphemerisRangeError, CalculationError, ValueError) as e:
-        raise RuntimeError(
-            f"Failed to calculate heliocentric planet position: {e}"
-        ) from e
+        raise Error(f"Failed to calculate heliocentric planet position: {e}") from e
 
     # Estimate typical heliocentric speed if near zero
     typical_speeds = {
@@ -1486,7 +1610,7 @@ def helio_cross(
             return _brent_find_crossing(
                 get_helio_position_tt, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
             )
-        except RuntimeError:
+        except (Error, RuntimeError):
             pass  # Fall through to Newton-Raphson
 
     jd = jd_guess
@@ -1496,7 +1620,7 @@ def helio_cross(
             lon = pos[0]
             speed = pos[3]
         except (EphemerisRangeError, CalculationError, ValueError) as e:
-            raise RuntimeError(
+            raise Error(
                 f"Failed to calculate heliocentric position during iteration: {e}"
             ) from e
 
@@ -1520,11 +1644,9 @@ def helio_cross(
         base_range = 500.0 if abs(speed_default) < 0.05 else 400.0
         max_range = max(base_range, abs(dt_guess) * 2.0)
         if abs(jd - tjdet) > max_range:
-            raise RuntimeError("Heliocentric crossing search diverged")
+            raise Error("Heliocentric crossing search diverged")
 
-    raise RuntimeError(
-        "Maximum iterations reached in heliocentric crossing calculation"
-    )
+    raise Error("Maximum iterations reached in heliocentric crossing calculation")
 
 
 # =============================================================================
@@ -1655,16 +1777,14 @@ def _brent_find_station(
         float: Julian Day when velocity = 0
 
     Raises:
-        RuntimeError: If root not bracketed or convergence fails
+        Error: If root not bracketed or convergence fails
     """
     fa = get_speed_func(jd_a)
     fb = get_speed_func(jd_b)
 
     # Check if root is bracketed (velocity changes sign)
     if fa * fb > 0:
-        raise RuntimeError(
-            f"Station not bracketed: speed(a)={fa:.6f}, speed(b)={fb:.6f}"
-        )
+        raise Error(f"Station not bracketed: speed(a)={fa:.6f}, speed(b)={fb:.6f}")
 
     # Ensure |f(a)| >= |f(b)|
     if abs(fa) < abs(fb):
@@ -1697,8 +1817,8 @@ def _brent_find_station(
         )
         cond2 = mflag and abs(s - jd_b) >= abs(jd_b - c) / 2
         cond3 = not mflag and abs(s - jd_b) >= abs(c - d) / 2
-        cond4 = mflag and abs(jd_b - c) < tolerance * 86400
-        cond5 = not mflag and abs(c - d) < tolerance * 86400
+        cond4 = mflag and abs(jd_b - c) < _BRENT_TIME_EPS_DAYS
+        cond5 = not mflag and abs(c - d) < _BRENT_TIME_EPS_DAYS
 
         if cond1 or cond2 or cond3 or cond4 or cond5:
             s = (jd_a + jd_b) / 2
@@ -1746,7 +1866,7 @@ def _find_station_bracket(
         Tuple[float, float]: (jd_a, jd_b) bracket containing a station
 
     Raises:
-        RuntimeError: If no station found in interval
+        Error: If no station found in interval
     """
     step = (jd_end - jd_start) / num_samples
 
@@ -1766,9 +1886,7 @@ def _find_station_bracket(
         jd_prev = jd_curr
         speed_prev = speed_curr
 
-    raise RuntimeError(
-        f"No station found for planet {planet_id} in [{jd_start}, {jd_end}]"
-    )
+    raise Error(f"No station found for planet {planet_id} in [{jd_start}, {jd_end}]")
 
 
 def find_station_ut(
@@ -1797,7 +1915,7 @@ def find_station_ut(
 
     Raises:
         ValueError: If planet_id is Sun or Moon (never station)
-        RuntimeError: If convergence fails or no station found
+        Error: If convergence fails or no station found
 
     Note:
         Sun and Moon never go retrograde from Earth's perspective.
@@ -1850,7 +1968,7 @@ def find_station_ut(
         return pos[3]
 
     # Get current motion direction
-    current_speed = get_speed(jd_ut)
+    get_speed(jd_ut)
 
     jd_search_start = jd_ut
     max_attempts = 4  # Allow searching up to 2 full synodic periods
@@ -1888,11 +2006,11 @@ def find_station_ut(
             # Not the right type, search for next station
             jd_search_start = jd_station + 1.0
 
-        except RuntimeError:
+        except (Error, RuntimeError):
             # No station found in this window, extend search
             jd_search_start = jd_search_start + search_window
 
-    raise RuntimeError(f"Could not find {station_type} station for planet {planet_id}")
+    raise Error(f"Could not find {station_type} station for planet {planet_id}")
 
 
 def next_retrograde_ut(
@@ -1913,7 +2031,7 @@ def next_retrograde_ut(
 
     Raises:
         ValueError: If planet is Sun or Moon
-        RuntimeError: If stations cannot be found
+        Error: If stations cannot be found
 
     Example:
         >>> jd_sr, jd_sd = next_retrograde_ut(MERCURY, jd_now)
@@ -2035,7 +2153,7 @@ def get_station_info(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> di
             "is_currently_retrograde": current_retrograde,
             "velocity": current_velocity,
         }
-    except RuntimeError as e:
+    except (Error, RuntimeError) as e:
         # Return partial info if station search fails
         return {
             "jd_station": None,

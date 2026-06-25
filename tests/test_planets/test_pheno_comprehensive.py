@@ -21,8 +21,6 @@ from libephemeris.constants import (
     URANUS,
     NEPTUNE,
     PLUTO,
-    CHIRON,
-    FLG_SWIEPH,
 )
 
 

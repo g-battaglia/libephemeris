@@ -1,20 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 ELP2000-82B True Node Perturbation Term Table for libephemeris.
 
 This module contains the perturbation coefficients for computing the True Lunar Node
 based on the ELP2000-82B theory by Chapront-Touze & Chapront.
 
-The table includes 50+ terms organized by category:
-1. Main Solar Perturbation Terms
-2. Second-Order Solar Terms
-3. Third-Order Terms
-4. F-Related (Inclination) Terms
-5. Venus Perturbation Terms
-6. Mars Perturbation Terms
-7. Jupiter Perturbation Terms
-8. Saturn Perturbation Terms
-9. Long-Period Terms (Evection, Variation, Annual Equation)
-10. Second-Order Coupling Terms
+The table includes 99 terms organized into the categories returned by
+get_terms_by_category():
+1. Main Solar Perturbation Terms (main_solar)
+2. Second-Order Solar Terms (second_order_solar)
+3. Third-Order Terms (third_order)
+4. F-Related (Inclination) Terms (f_inclination)
+5. Venus Perturbation Terms (venus)
+6. Mars Perturbation Terms (mars)
+7. Jupiter Perturbation Terms (jupiter)
+8. Saturn Perturbation Terms (saturn)
+9. Evection Terms (evection)
+10. Variation Terms (variation)
+11. Annual-Equation Terms (annual_equation)
+12. Second-Order Coupling Terms (second_order_coupling)
+13. Parallactic Terms (parallactic)
 
 Each term is represented as a NamedTuple containing:
 - amplitude: Coefficient in degrees

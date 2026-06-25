@@ -7,7 +7,6 @@ for all core bodies across multiple dates and flag combinations.
 
 from __future__ import annotations
 
-import math
 import random
 
 import pytest
@@ -27,16 +26,13 @@ from libephemeris.constants import (
     MEAN_NODE,
     TRUE_NODE,
     MEAN_APOG,
-    OSCU_APOG,
     FLG_SPEED,
     FLG_EQUATORIAL,
     FLG_SIDEREAL,
     FLG_J2000,
     FLG_NOABERR,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
 )
-from libephemeris.state import get_calc_mode
 
 
 def _random_jds(n: int, seed: int = 42) -> list[float]:

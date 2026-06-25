@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """LEB2 compressed ephemeris: convert LEB1 -> LEB2, verify accuracy.
 
 Replaces 8 poe tasks: leb2:convert:*, leb2:verify:*.

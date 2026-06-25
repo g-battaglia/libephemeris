@@ -11,7 +11,6 @@ Tests verify:
 3. Transpluto eccentricity of 0.3 produces expected distance variation
 """
 
-import math
 import pytest
 
 from libephemeris.hypothetical import (

@@ -7,7 +7,6 @@ actual implementation.
 """
 
 import math
-import pytest
 
 from libephemeris import lunar
 from libephemeris.lunar import (
@@ -55,7 +54,7 @@ class TestModuleDocumentation:
         """Verify docstring includes references."""
         doc = lunar.__doc__
         assert "Chapront" in doc or "Meeus" in doc
-        assert "ELP" in doc or "pyswisseph" in doc or "JPL" in doc
+        assert "ELP" in doc or "JPL" in doc
 
 
 class TestCalcTrueLunarNodeDocumentation:

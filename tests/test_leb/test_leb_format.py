@@ -331,3 +331,117 @@ class TestMagicAndVersion:
     @pytest.mark.unit
     def test_version_is_1(self):
         assert VERSION == 1
+
+
+class _FakeMM:
+    """Minimal mmap stand-in for madvise helper tests."""
+
+    def __init__(self, length, raise_on_madvise=False):
+        self._len = length
+        self.raise_on_madvise = raise_on_madvise
+        self.calls = []
+
+    def __len__(self):
+        return self._len
+
+    def madvise(self, *args):
+        self.calls.append(args)
+        if self.raise_on_madvise:
+            raise OSError("madvise failed")
+
+
+class TestCompressedFormatRoundTrips:
+    """LEB2 write-side packers (used by the generator, not the reader)."""
+
+    def test_compressed_body_entry_round_trip(self):
+        from libephemeris.leb_format import (
+            COMPRESSED_BODY_ENTRY_SIZE,
+            CompressedBodyEntry,
+            read_compressed_body_entry,
+            write_compressed_body_entry,
+        )
+
+        entry = CompressedBodyEntry(
+            body_id=7,
+            coord_type=1,
+            segment_count=42,
+            jd_start=2451545.0,
+            jd_end=2469545.0,
+            interval_days=32.0,
+            degree=13,
+            components=3,
+            data_offset=4096,
+            compressed_size=1234,
+            uncompressed_size=5678,
+        )
+        buf = bytearray(COMPRESSED_BODY_ENTRY_SIZE)
+        write_compressed_body_entry(buf, 0, entry)
+        assert read_compressed_body_entry(buf, 0) == entry
+
+    def test_chunk_index_header_round_trip(self):
+        from libephemeris.leb_format import (
+            CHUNK_INDEX_HEADER_SIZE,
+            read_chunk_index_header,
+            write_chunk_index_header,
+        )
+
+        buf = bytearray(CHUNK_INDEX_HEADER_SIZE)
+        write_chunk_index_header(buf, 0, chunk_count=5, chunk_interval_days=3650.0)
+        count, interval = read_chunk_index_header(buf, 0)
+        assert count == 5
+        assert interval == 3650.0
+
+    def test_chunk_entry_round_trip(self):
+        from libephemeris.leb_format import (
+            CHUNK_ENTRY_SIZE,
+            ChunkEntry,
+            read_chunk_entry,
+            write_chunk_entry,
+        )
+
+        entry = ChunkEntry(
+            jd_start=2451545.0,
+            jd_end=2455197.0,
+            blob_offset=8192,
+            compressed_size=999,
+            uncompressed_size=4096,
+            segment_start=10,
+            segment_count=20,
+        )
+        buf = bytearray(CHUNK_ENTRY_SIZE)
+        write_chunk_entry(buf, 0, entry)
+        assert read_chunk_entry(buf, 0) == entry
+
+
+class TestMadviseHelpers:
+    def test_madvise_ranges_skips_nonpositive_length(self):
+        from libephemeris.leb_format import _PAGE_SIZE, _madvise_ranges
+
+        mm = _FakeMM(10)
+        # offset past the (tiny) mapping -> page-aligned start exceeds len ->
+        # computed length <= 0 -> the range is skipped, madvise never called.
+        _madvise_ranges(mm, [(2 * _PAGE_SIZE, 8)])
+        assert mm.calls == []
+
+    def test_madvise_ranges_swallows_errors(self):
+        from libephemeris.leb_format import _madvise_ranges
+
+        mm = _FakeMM(1_000_000, raise_on_madvise=True)
+        # Should not raise even though madvise() throws.
+        _madvise_ranges(mm, [(0, 100)])
+        assert mm.calls  # madvise was attempted
+
+    def test_madvise_dontneed_none_is_noop(self):
+        from libephemeris.leb_format import _madvise_dontneed
+
+        _madvise_dontneed(None)  # no error
+
+    def test_madvise_dontneed_success_and_error(self):
+        from libephemeris.leb_format import _madvise_dontneed
+
+        ok = _FakeMM(100)
+        _madvise_dontneed(ok)
+        assert ok.calls
+
+        bad = _FakeMM(100, raise_on_madvise=True)
+        _madvise_dontneed(bad)  # error swallowed

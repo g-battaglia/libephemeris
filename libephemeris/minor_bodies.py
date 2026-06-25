@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Minor body calculations for asteroids and Trans-Neptunian Objects (TNOs).
 
@@ -44,6 +46,7 @@ import math
 from dataclasses import dataclass
 from typing import Tuple, Optional, NamedTuple
 from .logging_config import get_logger
+from .exceptions import EphemerisRangeError
 from .constants import (
     CHIRON,
     PHOLUS,
@@ -715,16 +718,20 @@ def calc_resonant_argument_plutino(
     Calculate the resonant argument φ for a plutino (2:3 resonance).
 
     For the 2:3 mean motion resonance with Neptune:
-        φ = 3λ_TNO - 2λ_Neptune - ω_TNO
+        φ = 3λ_TNO - 2λ_Neptune - ϖ_TNO
 
     where:
         λ_TNO = Ω + ω + M (mean longitude of the TNO)
         λ_Neptune = mean longitude of Neptune
-        ω_TNO = argument of perihelion of the TNO
+        ϖ_TNO = Ω + ω (longitude of perihelion of the TNO)
 
-    This argument librates (oscillates) around a center value rather than
-    circulating through 360°, which is the defining characteristic of
-    bodies captured in resonance.
+    The longitude of perihelion ϖ (a true longitude measured from the reference
+    direction) is used rather than the argument of perihelion ω (measured from
+    the node). This makes φ a proper resonant angle: the integer coefficients of
+    the longitude-like terms sum to zero (3 - 2 - 1 = 0), so φ is invariant under
+    a rotation of the reference longitude origin. φ librates (oscillates) around
+    180° rather than circulating through 360°, the defining characteristic of
+    bodies captured in the resonance.
 
     Args:
         elements: Orbital elements of the plutino
@@ -735,14 +742,18 @@ def calc_resonant_argument_plutino(
     Returns:
         float: The resonant argument φ in degrees
     """
-    # Calculate mean longitude of the TNO: λ = Ω + ω + M
+    # Mean longitude of the TNO: λ = Ω + ω + M
     lambda_tno = (elements.Omega + omega_pert + M_pert) % 360.0
+
+    # Longitude of perihelion: ϖ = Ω + ω (a true longitude, unlike the
+    # argument of perihelion ω which is measured from the node).
+    varpi_tno = (elements.Omega + omega_pert) % 360.0
 
     # Get Neptune's mean longitude at this time
     lambda_neptune = calc_neptune_mean_longitude(jd_tt)
 
-    # Resonant argument for 2:3 resonance: φ = 3λ_body - 2λ_Neptune - ω_body
-    phi = (3.0 * lambda_tno - 2.0 * lambda_neptune - omega_pert) % 360.0
+    # Resonant argument for the 2:3 resonance: φ = 3λ_body - 2λ_Neptune - ϖ_body
+    phi = (3.0 * lambda_tno - 2.0 * lambda_neptune - varpi_tno) % 360.0
 
     return phi
 
@@ -801,20 +812,14 @@ def calc_libration_correction(
     omega_lib = 2.0 * math.pi / params.period
     libration_angle = omega_lib * dt + params.phase_j2000
 
-    # M2: Generalized resonance scaling
-    # For a p:q resonance: φ = (p+q)λ - qλ_N - pω
-    # Rearranging: λ = (φ + qλ_N + pω) / (p+q)
-    # So Δλ = Δφ / (p+q)
-    # For 2:3 resonance: Δλ = Δφ / 5... wait, that's wrong.
-    # Actually for 2:3: φ = 3λ - 2λ_N - ω, so λ = (φ + 2λ_N + ω) / 3
-    # So Δλ = Δφ / 3, i.e. we divide by q (the larger number in exterior resonance)
-    # More generally: Δλ = Δφ / (p + q) where p:q has p < q for exterior resonances
-    # But the original code used /3 for 2:3, which is dividing by q.
-    # The correct derivation: φ = (p+q)λ_body - q·λ_N - p·ω_body
-    # => λ_body = (φ + q·λ_N + p·ω_body) / (p+q)
-    # => Δλ_body = Δφ / (p+q)
-    resonance_sum = params.resonance_p + params.resonance_q
-    delta_lambda = (params.amplitude / float(resonance_sum)) * math.sin(libration_angle)
+    # Resonant-argument scaling: for an exterior p:q mean-motion
+    # resonance the argument is phi = q*lambda_body - p*lambda_N
+    # - (q - p)*pomega_body, so d(phi)/d(lambda_body) = q and a
+    # libration of the argument maps to the longitude as
+    # dlambda = dphi / q (for the 2:3 plutino resonance: /3).
+    delta_lambda = (params.amplitude / float(params.resonance_q)) * math.sin(
+        libration_angle
+    )
 
     return delta_lambda
 
@@ -1415,7 +1420,8 @@ def apply_secular_perturbations(
             - Omega_pert: Perturbed longitude of ascending node (degrees)
             - M_pert: Perturbed mean anomaly at target time (degrees)
             - n_pert: Perturbed mean motion (degrees/day)
-            - e_pert: Perturbed eccentricity (dimensionless, 0 < e < 1)
+            - e_pert: Perturbed eccentricity (dimensionless, 0 <= e <= 0.999;
+              capped below the parabolic limit, but no positive floor)
             - i_pert: Perturbed inclination (degrees)
 
     See Also:
@@ -1469,8 +1475,11 @@ def apply_secular_perturbations(
     k_t = k_forced + e_free * math.cos(g * dt + beta)
 
     e_pert = math.sqrt(h_t * h_t + k_t * k_t)
-    # Clamp to physical range [0.001, 0.999] to prevent numerical issues
-    e_pert = max(0.001, min(e_pert, 0.999))
+    # Clamp to the physical range [0.0, 0.999]: cap below 1 (parabolic) but do
+    # NOT impose a positive floor — a genuinely near-circular orbit must keep
+    # its small eccentricity. The downstream anomaly solver uses the (h, k)
+    # vectors and handles e == 0 fine, so no positive floor is needed.
+    e_pert = max(0.0, min(e_pert, 0.999))
 
     # Inclination vector evolution
     i0_rad = math.radians(elements.i)
@@ -2010,21 +2019,56 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
     Returns:
         The OrbitalElements instance closest in time to jd_tt
     """
-    # Start with the original single-epoch elements as the default best
-    best = MINOR_BODY_ELEMENTS[body_id]
-    best_dt = abs(jd_tt - best.epoch)
-
-    if body_id not in MINOR_BODY_ELEMENTS_MULTI:
-        return best
-
-    # Scan multi-epoch entries for the nearest one
-    for elem in MINOR_BODY_ELEMENTS_MULTI[body_id]:
-        dt = abs(jd_tt - elem.epoch)
-        if dt < best_dt:
-            best = elem
-            best_dt = dt
-
+    best, second, _w = _get_epoch_elements_blend(body_id, jd_tt)
     return best
+
+
+# Half-width of the cross-fade window centered on the midpoint between
+# adjacent element epochs.  Inside the window, positions from the two
+# bracketing element sets are blended linearly so the switch between
+# epochs (each propagated up to ~5 years two-body) does not step.
+_EPOCH_BLEND_HALF_DAYS: float = 182.625  # half a Julian year
+
+
+def _get_epoch_elements_blend(
+    body_id: int, jd_tt: float
+) -> tuple[OrbitalElements, Optional[OrbitalElements], float]:
+    """Nearest element epoch plus a cross-fade partner near midpoints.
+
+    Returns (primary, secondary, weight): ``primary`` is the nearest
+    epoch's elements.  Within ±_EPOCH_BLEND_HALF_DAYS of the midpoint
+    between two adjacent epochs, ``secondary`` is the other bracketing
+    epoch and ``weight`` (0..0.5] is the secondary's linear blend
+    fraction; otherwise ``secondary`` is None and ``weight`` is 0.0.
+    """
+    base = MINOR_BODY_ELEMENTS[body_id]
+    entries = MINOR_BODY_ELEMENTS_MULTI.get(body_id)
+    if not entries:
+        return base, None, 0.0
+
+    # Multi-epoch entries are generated in ascending epoch order; the
+    # single-epoch base participates as a fallback only when it is
+    # nearer than every table entry (e.g. outside the table range).
+    nearest = min(entries, key=lambda e: abs(jd_tt - e.epoch))
+    if abs(jd_tt - base.epoch) < abs(jd_tt - nearest.epoch):
+        return base, None, 0.0
+
+    idx = entries.index(nearest)
+    if jd_tt >= nearest.epoch and idx + 1 < len(entries):
+        other = entries[idx + 1]
+    elif jd_tt < nearest.epoch and idx > 0:
+        other = entries[idx - 1]
+    else:
+        return nearest, None, 0.0
+
+    midpoint = (nearest.epoch + other.epoch) / 2.0
+    dist = abs(jd_tt - midpoint)
+    if dist >= _EPOCH_BLEND_HALF_DAYS:
+        return nearest, None, 0.0
+
+    # weight ramps 0.5 at the midpoint -> 0 at the window edge
+    weight = 0.5 * (1.0 - dist / _EPOCH_BLEND_HALF_DAYS)
+    return nearest, other, weight
 
 
 def solve_kepler_equation_elliptic(M: float, e: float, tol: float = 1e-8) -> float:
@@ -2363,7 +2407,7 @@ def _calc_short_period_correction(
 
         # Second-order eccentricity correction: modulate with e
         # This adds the e·cos(2M - M_J) term from Brouwer eq. 15.22
-        cos_diff = math.cos(lambda_body - lambda_p)
+        math.cos(lambda_body - lambda_p)
         delta_lambda += (
             -amplitude
             * e
@@ -2548,8 +2592,9 @@ def calc_minor_body_position(
             math.sqrt(e + 1) * math.sinh(H / 2),
             math.sqrt(e - 1) * math.cosh(H / 2),
         )
-        # Distance from hyperbolic anomaly
-        r = elements.a * (e * math.cosh(H) - 1)
+        # Distance from hyperbolic anomaly. Hyperbolic orbits carry
+        # a < 0, so the magnitude is needed: r = |a| (e cosh H - 1).
+        r = abs(elements.a) * (e * math.cosh(H) - 1)
 
     # Position in orbital plane (perifocal frame)
     x_orb = r * math.cos(nu)
@@ -2662,20 +2707,40 @@ def calc_minor_body_heliocentric(
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
-        except (ImportError, ValueError, KeyError):
+        except (ImportError, ValueError, KeyError, EphemerisRangeError):
             # Fall through to Keplerian calculation
             pass
 
     # Fall back to Keplerian calculation
     # Use multi-epoch elements if available for better accuracy
-    # Pass body_id to enable resonant libration correction for plutinos
-    elements = _get_closest_epoch_elements(body_id, jd_tt)
+    # Pass body_id to enable resonant libration correction for plutinos.
+    # Near the midpoint between adjacent element epochs the two
+    # propagations are cross-faded in Cartesian space so the nearest-
+    # epoch switch does not step the position.
+    elements, blend_elements, blend_w = _get_epoch_elements_blend(body_id, jd_tt)
     x, y, z = calc_minor_body_position(elements, jd_tt, body_id=body_id)
+    if blend_elements is not None and blend_w > 0.0:
+        xb, yb, zb = calc_minor_body_position(
+            blend_elements, jd_tt, body_id=body_id
+        )
+        x = x * (1.0 - blend_w) + xb * blend_w
+        y = y * (1.0 - blend_w) + yb * blend_w
+        z = z * (1.0 - blend_w) + zb * blend_w
 
     # Convert Cartesian to spherical coordinates
     r = math.sqrt(x**2 + y**2 + z**2)
     lon = math.degrees(math.atan2(y, x)) % 360.0
     lat = math.degrees(math.asin(z / r))
+
+    # Frame contract: the orbital-element tables are referenced to the
+    # J2000 ecliptic (fit from JPL VECTORS), so calc_minor_body_position
+    # returns J2000 ecliptic coordinates.  Precess to the ecliptic of
+    # date so this fallback agrees with the SPK branch above (measured
+    # bias before this correction: ~1290" at 2026, i.e. 26 yr of
+    # general precession).
+    from .astrometry import _precess_ecliptic
+
+    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
     return lon, lat, r
 
@@ -2776,16 +2841,21 @@ def fetch_orbital_elements_from_sbdb(
 
         # Map SBDB element names to our structure
         # SBDB uses: e, a, q, i, om (node), w (arg peri), ma (mean anom), n (mean motion)
+        # A record missing any of the core elements cannot be propagated;
+        # zero-filling them would yield a fictitious orbit, so give None.
+        for _key in ("a", "e", "i", "n"):
+            if elem_dict.get(_key) is None:
+                return None
         orbital_elements = OrbitalElements(
             name=body_name,
             epoch=epoch_jd,
-            a=elem_dict.get("a", 0.0),  # Semi-major axis
-            e=elem_dict.get("e", 0.0),  # Eccentricity
-            i=elem_dict.get("i", 0.0),  # Inclination
+            a=elem_dict["a"],  # Semi-major axis
+            e=elem_dict["e"],  # Eccentricity
+            i=elem_dict["i"],  # Inclination
             omega=elem_dict.get("w", 0.0),  # Argument of perihelion
             Omega=elem_dict.get("om", 0.0),  # Longitude of ascending node
             M0=elem_dict.get("ma", 0.0),  # Mean anomaly
-            n=elem_dict.get("n", 0.0),  # Mean motion
+            n=elem_dict["n"],  # Mean motion
         )
 
         # Cache the result
@@ -3029,7 +3099,7 @@ def clear_asteroid_name_cache() -> int:
 # - Centaur Chiron (2060) - frequently used in astrology
 # Format: body_id -> (asteroid_number, horizons_id, naif_id, body_name)
 
-from .constants import (
+from .constants import (  # noqa: E402 (section-local import)
     CERES,
     PALLAS,
     JUNO,
@@ -3288,6 +3358,12 @@ def auto_download_asteroid_spk(
     except (ValueError, KeyError) as e:
         logger.warning("Auto SPK download failed for %s: %s", body_name, e)
         return None
+    except (ConnectionError, OSError) as e:
+        # Network failures and the downloader's not-found errors are the
+        # documented no-exception cases of this helper: log and let the
+        # caller fall back (Keplerian elements or UnknownBodyError).
+        logger.warning("Auto SPK download failed for %s: %s", body_name, e)
+        return None
 
 
 def is_spk_available_for_body(body_id: int) -> bool:
@@ -3533,7 +3609,7 @@ def calc_asteroid_by_number(
                 if result is not None:
                     lon, lat, dist, _, _, _ = result
                     return lon, lat, dist
-        except (ImportError, ValueError):
+        except (ImportError, ValueError, EphemerisRangeError):
             # Fall through to Keplerian calculation
             pass
 
@@ -3546,12 +3622,20 @@ def calc_asteroid_by_number(
             "Check if the asteroid number is valid."
         )
 
-    # Calculate position using Keplerian mechanics with perturbations
+    # Calculate position using Keplerian mechanics with perturbations.
+    # Frame contract: calc_minor_body_position returns coordinates in the
+    # frame the elements are referenced to.  SBDB osculating elements are
+    # J2000 ecliptic, so precess to the ecliptic of date below — matching
+    # the SPK branch above and calc_minor_body_heliocentric.
     x, y, z = calc_minor_body_position(elements, jd_tt)
 
     # Convert Cartesian to spherical coordinates
     r = math.sqrt(x**2 + y**2 + z**2)
     lon = math.degrees(math.atan2(y, x)) % 360.0
     lat = math.degrees(math.asin(z / r))
+
+    from .astrometry import _precess_ecliptic
+
+    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
     return lon, lat, r

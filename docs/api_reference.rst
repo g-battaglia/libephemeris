@@ -77,11 +77,11 @@ EphemerisContext
       :param ephe_path: Optional path to directory containing ephemeris files.
                         If None, uses default workspace directory.
       :type ephe_path: str, optional
-       :param ephe_file: Ephemeris file to use (default: ``"de440.bsp"``).
-                         Supported files: ``"de440s.bsp"`` (1849--2150, lightweight),
-                         ``"de440.bsp"`` (1550--2650, default),
-                         ``"de441.bsp"`` (-13200 to +17191, extended range).
-       :type ephe_file: str
+      :param ephe_file: Ephemeris file to use (default: ``"de440.bsp"``).
+                        Supported files: ``"de440s.bsp"`` (1849--2150, lightweight),
+                        ``"de440.bsp"`` (1550--2650, default),
+                        ``"de441.bsp"`` (-13200 to +17191, extended range).
+      :type ephe_file: str
 
    .. method:: set_topo(lon, lat, alt)
 
@@ -265,8 +265,8 @@ deltat_ex / deltat_ex
    :type tjd: float
    :param ephe_flag: Ephemeris selection flag (FLG_SWIEPH, FLG_JPLEPH). Note: FLG_MOSEPH is accepted for compatibility but silently ignored — all calculations use JPL DE440/DE441.
    :type ephe_flag: int
-   :returns: Tuple of (delta_t, error_message)
-   :rtype: tuple[float, str]
+   :returns: Delta T (TT − UT1) in days
+   :rtype: float
 
    **Example:**
 
@@ -580,7 +580,7 @@ House Functions
 houses / houses
 ~~~~~~~~~~~~~~~~~~~
 
-.. function:: houses(tjd_ut, lat, lon, hsys)
+.. function:: houses(tjd_ut, lat, lon, hsys=ord('P'), iflag=0)
 
    Calculate house cusps and angles (ASCMC).
 
@@ -592,10 +592,12 @@ houses / houses
    :type lon: float
    :param hsys: House system as ASCII code (ord('P') for Placidus, etc.)
    :type hsys: int
-   :returns: Tuple of (cusps, ascmc) where cusps is a list of 12 longitudes
+   :param iflag: Optional calculation flags (e.g. ``FLG_SIDEREAL``, or ``FLG_MOSEPH`` to allow the extended date range)
+   :type iflag: int
+   :returns: Tuple of (cusps, ascmc) where cusps is a tuple of 12 longitudes
              and ascmc contains angles [ASC, MC, ARMC, Vertex, Equasc, Co-asc Koch,
              Co-asc Munkasey, Polar Asc]
-   :rtype: tuple[list[float], list[float]]
+   :rtype: tuple[tuple[float, ...], tuple[float, ...]]
 
    **Supported House Systems:**
 
@@ -967,6 +969,44 @@ cross_ut
    :type iflag: int
    :returns: Julian Day of crossing
    :rtype: float
+
+
+find_station_ut
+~~~~~~~~~~~~~~~
+
+.. function:: find_station_ut(planet_id, jd_ut, station_type='any', flag=FLG_SWIEPH)
+
+   Find the next planetary station (stationary point) after a given date — where a
+   planet's apparent longitudinal motion changes direction (retrograde ↔ direct).
+
+   :param planet_id: Planet ID
+   :type planet_id: int
+   :param jd_ut: Julian Day (UT) to start the search from
+   :type jd_ut: float
+   :param station_type: ``'any'``, ``'retrograde'`` (SR), or ``'direct'`` (SD)
+   :type station_type: str
+   :param flag: Calculation flags
+   :type flag: int
+   :returns: Tuple of (Julian Day of the station, station type label)
+   :rtype: tuple[float, str]
+
+
+next_retrograde_ut
+~~~~~~~~~~~~~~~~~~
+
+.. function:: next_retrograde_ut(planet_id, jd_ut, flag=FLG_SWIEPH)
+
+   Find the next retrograde period for a planet, returning the start (SR) and end
+   (SD) Julian Days.
+
+   :param planet_id: Planet ID
+   :type planet_id: int
+   :param jd_ut: Julian Day (UT) to start the search from
+   :type jd_ut: float
+   :param flag: Calculation flags
+   :type flag: int
+   :returns: Tuple of (retrograde start JD, retrograde end JD)
+   :rtype: tuple[float, float]
 
 
 helio_cross_ut / helio_cross_ut
@@ -1971,6 +2011,7 @@ Centaurs
 
 .. data:: CHIRON
    :value: 15
+   :no-index:
 
    Chiron (2060)
 
@@ -2407,12 +2448,14 @@ using JPL satellite ephemeris SPK files.
 Moon Registration
 ~~~~~~~~~~~~~~~~~
 
-.. function:: register_moon_spk(spk_path)
+.. function:: register_moon_spk(spk_file, moons=None)
 
    Register a planetary satellite SPK file for moon calculations.
 
-   :param spk_path: Path to satellite SPK file (e.g., "jup365.bsp" for Jupiter moons)
-   :type spk_path: str
+   :param spk_file: Path to satellite SPK file (e.g., "jup365.bsp" for Jupiter moons)
+   :type spk_file: str
+   :param moons: Optional list of specific moon IDs to register; if ``None``, auto-detects all moons in the file
+   :type moons: list[int] | None
 
    **Supported SPK files:**
 

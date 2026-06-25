@@ -374,7 +374,7 @@ class TestCalcMode:
             set_calc_mode("leb")
             # Prevent auto-discovery from ~/.libephemeris/leb/
             with patch("libephemeris.state._discover_leb_file", return_value=None):
-                with pytest.raises(RuntimeError, match="LIBEPHEMERIS_MODE=leb"):
+                with pytest.raises(RuntimeError, match="no .leb file configured"):
                     get_leb_reader()
         finally:
             set_calc_mode(None)
@@ -431,14 +431,20 @@ class TestCalcMode:
             ephem.set_leb_file(old_leb)
 
     @pytest.mark.integration
-    def test_close_resets_calc_mode(self):
-        """close() should reset calc mode to auto."""
+    def test_close_preserves_calc_mode(self):
+        """close() preserves the explicit calc mode (issue #30).
+
+        The mode set via set_calc_mode() is process-level configuration;
+        resetting it on close() silently re-enabled the auto fallback
+        chain. Clearing requires an explicit set_calc_mode(None).
+        """
         from libephemeris.state import get_calc_mode, set_calc_mode
 
         set_calc_mode("skyfield")
         assert get_calc_mode() == "skyfield"
         ephem.close()
-        assert get_calc_mode() == "auto"
+        assert get_calc_mode() == "skyfield"
+        set_calc_mode(None)
 
     @pytest.mark.integration
     def test_context_respects_global_skyfield_mode(self, test_leb_file):

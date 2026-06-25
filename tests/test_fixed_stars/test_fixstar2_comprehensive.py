@@ -10,7 +10,6 @@ import math
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import FLG_SWIEPH, FLG_SPEED
 
 
 @pytest.fixture(autouse=True)

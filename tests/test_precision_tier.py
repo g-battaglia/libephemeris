@@ -19,7 +19,6 @@ from libephemeris import state
 from libephemeris.state import (
     PrecisionTier,
     TIERS,
-    _get_current_tier,
     _get_effective_ephemeris_file,
     get_precision_tier,
     get_spk_date_range_for_tier,

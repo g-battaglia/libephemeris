@@ -26,21 +26,22 @@ jd = ephem.julday(2024, 6, 21, 0.0)  # Summer solstice
 lat, lon = 45.4642, 9.1900  # Milan
 
 # Sunrise
-jd_sunrise, ret = ephem.rise_trans(
+ret, tret = ephem.rise_trans(
     jd, ephem.SUN,
-    lat, lon,
-    altitude=0.0,
-    pressure=1013.25,
-    temperature=15.0,
-    rsmi=ephem.CALC_RISE
+    ephem.CALC_RISE,
+    (lon, lat, 0.0),
+    atpress=1013.25,
+    attemp=15.0
 )
+jd_sunrise = tret[0]  # the event Julian Day
 
 # Sunset
-jd_sunset, ret = ephem.rise_trans(
+ret, tret = ephem.rise_trans(
     jd, ephem.SUN,
-    lat, lon,
-    rsmi=ephem.CALC_SET
+    ephem.CALC_SET,
+    (lon, lat, 0.0)
 )
+jd_sunset = tret[0]
 
 # Convert to local time (CEST = UT + 2)
 tz_offset = 2  # summer daylight saving time
@@ -86,15 +87,17 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Rome
 
-jd_rise, ret = ephem.rise_trans(
-    jd, ephem.MOON, lat, lon,
-    rsmi=ephem.CALC_RISE
+ret, tret = ephem.rise_trans(
+    jd, ephem.MOON, ephem.CALC_RISE,
+    (lon, lat, 0.0)
 )
+jd_rise = tret[0]
 
-jd_set, ret = ephem.rise_trans(
-    jd, ephem.MOON, lat, lon,
-    rsmi=ephem.CALC_SET
+ret, tret = ephem.rise_trans(
+    jd, ephem.MOON, ephem.CALC_SET,
+    (lon, lat, 0.0)
 )
+jd_set = tret[0]
 
 if jd_rise > 0 and jd_set > 0:
     _, _, _, h_rise = ephem.revjul(jd_rise)
@@ -119,9 +122,9 @@ import libephemeris as ephem
 
 # Sun in Tromsø on June 21st — it never sets
 jd = ephem.julday(2024, 6, 21, 0.0)
-jd_set, ret = ephem.rise_trans(
-    jd, ephem.SUN, 69.6, 19.0,
-    rsmi=ephem.CALC_SET
+ret, tret = ephem.rise_trans(
+    jd, ephem.SUN, ephem.CALC_SET,
+    (19.0, 69.6, 0.0)
 )
 
 if ret == -2:
@@ -145,10 +148,11 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Rome
 
 # Sun's meridian transit = solar noon
-jd_transit, ret = ephem.rise_trans(
-    jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_MTRANSIT
+ret, tret = ephem.rise_trans(
+    jd, ephem.SUN, ephem.CALC_MTRANSIT,
+    (lon, lat, 0.0)
 )
+jd_transit = tret[0]
 
 _, _, _, h = ephem.revjul(jd_transit)
 print(f"Solar noon in Rome:  {int(h):02d}:{int((h % 1) * 60):02d} UT")
@@ -191,20 +195,24 @@ def local_time(jd_event, tz_offset):
     return f"{int(h):02d}:{int((h % 1) * 60):02d}"
 
 # Sunset
-jd_s, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET, (lon, lat, 0.0))
+jd_s = tret[0]
 
 # End of civil twilight (Sun at -6°)
-jd_civ, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT, (lon, lat, 0.0))
+jd_civ = tret[0]
 
 # End of nautical twilight (Sun at -12°)
-jd_nau, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT, (lon, lat, 0.0))
+jd_nau = tret[0]
 
 # End of astronomical twilight (Sun at -18°)
-jd_ast, ret = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT)
+ret, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT, (lon, lat, 0.0))
+jd_ast = tret[0]
 
 print(f"Sunset:                       {local_time(jd_s, tz_offset)}")
 print(f"End of civil twilight:        {local_time(jd_civ, tz_offset)}")
@@ -319,11 +327,12 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 45.4642, 9.1900  # Milan
 
 # The Alps to the north raise the horizon by about 2 degrees
-jd_sunrise, _ = ephem.rise_trans_true_hor(
-    jd, ephem.SUN, lat, lon,
-    horizon_altitude=2.0,  # horizon at 2° above the plane
-    rsmi=ephem.CALC_RISE
+_, tret = ephem.rise_trans_true_hor(
+    jd, ephem.SUN, ephem.CALC_RISE,
+    (lon, lat, 0.0),
+    horhgt=2.0,  # horizon raised 2° above the plane
 )
+jd_sunrise = tret[0]
 
 _, _, _, h = ephem.revjul(jd_sunrise)
 print(f"Sunrise with 2° horizon: {int(h):02d}:{int((h % 1) * 60):02d} UT")
@@ -382,7 +391,7 @@ The four types of heliacal events are:
 
 - `MORNING_LAST` (4) — **morning last appearance**: for inner planets, the last day of visibility in the morning before inferior conjunction. Only for inner planets.
 
-### The PySwissEph compatible API
+### The reference-ephemeris-compatible API
 
 For complete control over atmospheric conditions and the capabilities of the observer, use `heliacal_ut`:
 
@@ -558,8 +567,8 @@ In this chapter, we learned how to calculate when celestial bodies are visible i
 
 **Introduced functions:**
 
-- `rise_trans(jd, planet, lat, lon, rsmi=CALC_RISE)` — finds the next rising, setting, or meridian transit of a celestial body
-- `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — like `rise_trans` but with a custom horizon altitude
+- `rise_trans(jd, body, rsmi, geopos)` — finds the next rising, setting, or meridian transit of a celestial body
+- `rise_trans_true_hor(jd, body, rsmi, geopos, horhgt=0.0)` — like `rise_trans` but with a custom horizon altitude
 - `refrac(altitude, pressure, temperature, calc_flag)` — converts between true and apparent altitude (or vice versa), taking refraction into account
 - `refrac_extended(altitude, altitude_geo, ...)` — extended refraction with dip of the horizon for observers at high altitudes
 - `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — finds the date of a heliacal event (first/last visibility)

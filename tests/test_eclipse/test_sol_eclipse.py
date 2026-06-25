@@ -34,7 +34,7 @@ class TestSolEclipseWhenGlob:
         assert ecl_type != 0
 
     def test_returns_ten_time_values(self):
-        """Should return tuple of 10 time values like pyswisseph."""
+        """Should return tuple of 10 time values like the reference ephemeris."""
         jd_start = julday(2024, 1, 1, 0)
 
         _, times = sol_eclipse_when_glob(jd_start)
@@ -299,7 +299,7 @@ class TestSolEclipseWhenLoc:
         _, times, attr = sol_eclipse_when_loc(jd_start, (lon, lat, 0.0))
 
         assert len(times) == 10
-        assert len(attr) == 20  # swe_ version returns 20-element attr tuple
+        assert len(attr) == 20  # reference version returns 20-element attr tuple
 
     def test_time_order_is_correct(self):
         """Eclipse phase times should be in chronological order."""
@@ -444,11 +444,11 @@ class TestSolEclipseWhenLoc:
 
         assert times[0] > jd_start
 
-    def test_swe_version_provides_pyswisseph_compatible_interface(self):
-        """sol_eclipse_when_loc provides pyswisseph-compatible interface.
+    def test_swe_version_provides_reference_compatible_interface(self):
+        """sol_eclipse_when_loc provides reference-API-compatible interface.
 
         Note: Both sol_eclipse_when_loc and sol_eclipse_when_loc now use the
-        same swe_-compatible signature with geopos tuple.
+        same reference-compatible signature with geopos tuple.
         """
         from libephemeris import FLG_SWIEPH
 
@@ -456,10 +456,10 @@ class TestSolEclipseWhenLoc:
         lat, lon, altitude = 35.0, -100.0, 0.0
         geopos = (lon, lat, altitude)  # geopos uses (lon, lat, alt) order
 
-        # Call sol_eclipse_when_loc (now uses swe_ signature)
+        # Call sol_eclipse_when_loc (now uses reference signature)
         ecl_type1, times1, attr1 = sol_eclipse_when_loc(jd_start, geopos)
 
-        # Call sol_eclipse_when_loc (pyswisseph-style with geopos sequence)
+        # Call sol_eclipse_when_loc (reference-style with geopos sequence)
         ecl_type2, times2, attr2 = sol_eclipse_when_loc(
             jd_start, geopos, FLG_SWIEPH
         )
@@ -520,7 +520,7 @@ class TestSolEclipseWhere:
     """Tests for sol_eclipse_where function."""
 
     def test_returns_correct_tuple_sizes(self):
-        """Should return geopos tuple of 10 and attr tuple of 20 elements per pyswisseph."""
+        """Should return geopos tuple of 10 and attr tuple of 20 elements per the reference ephemeris."""
         from libephemeris import sol_eclipse_where
 
         # First find an eclipse to get a valid time
@@ -601,8 +601,14 @@ class TestSolEclipseWhere:
             # Sun altitude at central line should be valid
             assert -90 <= sun_altitude <= 90
 
-    def test_non_eclipse_time_returns_zeros(self):
-        """Time far from any eclipse should return zeros."""
+    def test_non_eclipse_time_returns_zero_flag_with_proximity_point(self):
+        """A no-eclipse instant gives retflag 0 with the closest-approach point.
+
+        The reference convention (verified against the reference ephemeris 2.10.03) keeps
+        geopos[0..1] at the surface point of maximum proximity of the shadow
+        axis and reports a negative magnitude measure in attr[0]; only
+        geopos[2..9] stay zero.
+        """
         from libephemeris import sol_eclipse_where
 
         # Random time not during an eclipse (full moon time)
@@ -610,10 +616,12 @@ class TestSolEclipseWhere:
 
         ecl_type, geopos, attr = sol_eclipse_where(jd_non_eclipse)
 
-        # Should return zeros or partial flag
-        if ecl_type == 0:
-            assert geopos[0] == 0.0
-            assert geopos[1] == 0.0
+        assert ecl_type == 0
+        assert -180.0 <= geopos[0] <= 180.0
+        assert -90.0 <= geopos[1] <= 90.0
+        assert attr[0] < 0.0
+        for i in range(2, 10):
+            assert geopos[i] == 0.0
 
     def test_april_2024_eclipse_path(self):
         """Test April 8, 2024 total eclipse path."""
@@ -659,8 +667,8 @@ class TestSolEclipseWhere:
             # Core shadow diameter should be non-zero for central eclipse
             assert path_width != 0
 
-    def test_swe_version_provides_pyswisseph_compatible_interface(self):
-        """sol_eclipse_where and sol_eclipse_where produce equivalent results.
+    def test_swe_version_provides_reference_compatible_interface(self):
+        """sol_eclipse_where and sol_eclipse_where produce equivalent results, with a reference-compatible interface.
 
         Note: sol_eclipse_where is a wrapper that calls sol_eclipse_where internally.
         They are distinct functions with the same interface that produce identical results.
@@ -912,11 +920,11 @@ class TestSolEclipseHow:
 
         assert len(attr) == 20
 
-    def test_swe_version_provides_pyswisseph_compatible_interface(self):
+    def test_swe_version_provides_reference_compatible_interface(self):
         """sol_eclipse_how and sol_eclipse_how produce equivalent results.
 
         Note: Both sol_eclipse_how and sol_eclipse_how now use the same
-        swe_-compatible signature with geopos tuple.
+        reference-compatible signature with geopos tuple.
         They produce identical results for the same location.
         """
         from libephemeris import sol_eclipse_how
@@ -1079,7 +1087,7 @@ class TestKnownEclipseValidation:
         )
 
     def test_return_tuple_has_ten_elements(self):
-        """Verify the tret tuple has exactly 10 elements like pyswisseph."""
+        """Verify the tret tuple has exactly 10 elements like the reference ephemeris."""
         jd_start = 2460400.0
 
         ecl_type, times = sol_eclipse_when_glob(jd_start)
@@ -1263,7 +1271,6 @@ class TestSolEclipseMaxTime:
 
     def test_swe_alias_exists(self):
         """sol_eclipse_max_time should be an alias."""
-        from libephemeris import sol_eclipse_max_time
 
 
     def test_known_eclipse_april_2024_precision(self):

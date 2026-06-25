@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Caching utilities for libephemeris hot path optimization.
 
@@ -28,6 +30,8 @@ from functools import lru_cache
 from typing import Tuple
 
 import erfa
+
+from .precession_vondrak import vondrak_mean_obliquity_deg
 
 
 # Cache size limits
@@ -94,13 +98,10 @@ def get_cached_obliquity(jd_tt: float) -> Tuple[float, float]:
     """
     Get cached mean and true obliquity for a Julian Day.
 
-    Uses IAU 2006 mean obliquity (via erfa.obl06) and IAU 2006/2000A
-    nutation (via erfa.nut06a) for true obliquity, providing consistency
-    with all other code paths in libephemeris.
-
-    Mean obliquity formula (IAU 2006, Capitaine et al. 2003):
-        eps0 = 84381.406″ - 46.836769″T - 0.0001831″T² + 0.00200340″T³
-               - 0.000000576″T⁴ - 0.0000000434″T⁵
+    Uses the Vondrák 2011 long-term mean obliquity (via erfa, see
+    ``precession_vondrak``) and IAU 2006/2000A nutation (via erfa.nut06a) for
+    the true obliquity, consistent with the Vondrák precession used elsewhere
+    and valid at remote epochs where the IAU 2006 obliquity polynomial diverges.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -108,10 +109,8 @@ def get_cached_obliquity(jd_tt: float) -> Tuple[float, float]:
     Returns:
         Tuple of (mean_obliquity, true_obliquity) in degrees
     """
-    # Mean obliquity via IAU 2006 (erfa.obl06)
-    # Returns mean obliquity in radians
-    eps0_rad = erfa.obl06(_J2000_JD, jd_tt - _J2000_JD)
-    eps0 = math.degrees(eps0_rad)
+    # Of-date mean obliquity via the Vondrák 2011 long-term model.
+    eps0 = vondrak_mean_obliquity_deg(jd_tt)
 
     # Nutation in obliquity from IAU 2006/2000A
     _, deps_rad = get_cached_nutation(jd_tt)
@@ -124,13 +123,13 @@ def get_cached_obliquity(jd_tt: float) -> Tuple[float, float]:
 
 
 def get_mean_obliquity(jd_tt: float) -> float:
-    """Get mean obliquity in degrees (IAU 2006)."""
+    """Get mean obliquity in degrees (Vondrák 2011 long-term)."""
     eps0, _ = get_cached_obliquity(jd_tt)
     return eps0
 
 
 def get_true_obliquity(jd_tt: float) -> float:
-    """Get true obliquity in degrees (IAU 2006 + nutation)."""
+    """Get true obliquity in degrees (Vondrák 2011 mean + IAU 2006/2000A nutation)."""
     _, eps = get_cached_obliquity(jd_tt)
     return eps
 
@@ -259,8 +258,7 @@ def clear_caches() -> None:
     try:
         from . import refraction as _refraction
 
-        _refraction._refr_cache_key = ()
-        _refraction._refr_cache_func = None
+        _refraction._refr_cache_entry = None
     except ImportError:
         pass
 

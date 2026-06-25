@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pytest
 import libephemeris as swe
 from libephemeris.constants import (

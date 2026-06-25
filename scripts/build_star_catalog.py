@@ -2,6 +2,14 @@
 """
 Build Star Catalog from Hipparcos using astroquery.vizier.
 
+SUPERSEDED — DO NOT USE TO REGENERATE THE SHIPPED CATALOG.
+    The shipped catalog (libephemeris/star_catalog_gen.py) is produced by
+    scripts/build_star_catalog_v2.py from van Leeuwen 2007 (CDS I/311).
+    This v1 builder contains the known-wrong HIP name mappings that caused
+    REVIEW-2026-06-10 item C9 (HIP 5742/7097/42911 mislabeled "Eta
+    Piscium"/"Alrescha"/"Tarf"); it is retained only for the historical
+    record and its unit tests, not for regeneration. See CLEAN.md.
+
 This script fetches astrologically relevant stars from the Hipparcos I/239/hip_main
 catalog via VizieR and generates StarCatalogEntry data compatible with
 fixstar/fixstar2 functions in libephemeris.
@@ -46,7 +54,6 @@ import os
 import sys
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from typing import Optional
 
 # Ensure libephemeris can be imported from the project root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -10,23 +10,17 @@ Reference eclipse: April 8, 2024 total solar eclipse
 - NYC: Partial eclipse with ~90% obscuration
 """
 
-import math
 import pytest
 
 pytestmark = pytest.mark.slow
 
 from libephemeris import (
     julday,
-    revjul,
     sol_eclipse_how_details,
     _sol_eclipse_how_details_pythonic,
     sol_eclipse_how,
     sol_eclipse_when_loc,
     FLG_SWIEPH,
-    ECL_TOTAL,
-    ECL_PARTIAL,
-    ECL_ANNULAR,
-    ECL_VISIBLE,
 )
 
 
@@ -333,7 +327,7 @@ class TestSolEclipseHowDetailsLegacy:
             tjd_ut, 32.7767, -96.797, 0, FLG_SWIEPH
         )
 
-        # pyswisseph style: geopos = [lon, lat, alt]
+        # reference-API style: geopos = [lon, lat, alt]
         result_swe = sol_eclipse_how_details(
             tjd_ut, [-96.797, 32.7767, 0], FLG_SWIEPH
         )

@@ -22,10 +22,7 @@ from libephemeris.constants import (
     URANUS,
     NEPTUNE,
     PLUTO,
-    EARTH,
-    MEAN_NODE,
     TRUE_NODE,
-    MEAN_APOG,
     OSCU_APOG,
     INTP_APOG,
     INTP_PERG,
@@ -34,8 +31,6 @@ from libephemeris.constants import (
 )
 
 from tests.test_leb.compare.conftest import (
-    ICRS_PLANETS,
-    ECLIPTIC_BODIES,
     CompareHelper,
 )
 

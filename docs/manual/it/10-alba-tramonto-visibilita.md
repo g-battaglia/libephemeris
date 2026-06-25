@@ -26,21 +26,22 @@ jd = ephem.julday(2024, 6, 21, 0.0)  # Solstizio d'estate
 lat, lon = 45.4642, 9.1900  # Milano
 
 # Alba (rise)
-jd_alba, ret = ephem.rise_trans(
+ret, tret = ephem.rise_trans(
     jd, ephem.SUN,
-    lat, lon,
-    altitude=0.0,
-    pressure=1013.25,
-    temperature=15.0,
-    rsmi=ephem.CALC_RISE
+    ephem.CALC_RISE,
+    (lon, lat, 0.0),
+    atpress=1013.25,
+    attemp=15.0
 )
+jd_alba = tret[0]  # il giorno giuliano dell'evento
 
 # Tramonto (set)
-jd_tramonto, ret = ephem.rise_trans(
+ret, tret = ephem.rise_trans(
     jd, ephem.SUN,
-    lat, lon,
-    rsmi=ephem.CALC_SET
+    ephem.CALC_SET,
+    (lon, lat, 0.0)
 )
+jd_tramonto = tret[0]
 
 # Converti in ore locali (CEST = UT + 2)
 fuso = 2  # ora legale estiva
@@ -86,15 +87,17 @@ import libephemeris as ephem
 jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Roma
 
-jd_rise, ret = ephem.rise_trans(
-    jd, ephem.MOON, lat, lon,
-    rsmi=ephem.CALC_RISE
+ret, tret = ephem.rise_trans(
+    jd, ephem.MOON, ephem.CALC_RISE,
+    (lon, lat, 0.0)
 )
+jd_rise = tret[0]
 
-jd_set, ret = ephem.rise_trans(
-    jd, ephem.MOON, lat, lon,
-    rsmi=ephem.CALC_SET
+ret, tret = ephem.rise_trans(
+    jd, ephem.MOON, ephem.CALC_SET,
+    (lon, lat, 0.0)
 )
+jd_set = tret[0]
 
 if jd_rise > 0 and jd_set > 0:
     _, _, _, h_rise = ephem.revjul(jd_rise)
@@ -119,9 +122,9 @@ import libephemeris as ephem
 
 # Sole a Tromsø il 21 giugno — non tramonta mai
 jd = ephem.julday(2024, 6, 21, 0.0)
-jd_set, ret = ephem.rise_trans(
-    jd, ephem.SUN, 69.6, 19.0,
-    rsmi=ephem.CALC_SET
+ret, tret = ephem.rise_trans(
+    jd, ephem.SUN, ephem.CALC_SET,
+    (19.0, 69.6, 0.0)
 )
 
 if ret == -2:
@@ -145,10 +148,11 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 41.9028, 12.4964  # Roma
 
 # Transito del Sole al meridiano = mezzogiorno solare
-jd_transit, ret = ephem.rise_trans(
-    jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_MTRANSIT
+ret, tret = ephem.rise_trans(
+    jd, ephem.SUN, ephem.CALC_MTRANSIT,
+    (lon, lat, 0.0)
 )
+jd_transit = tret[0]
 
 _, _, _, h = ephem.revjul(jd_transit)
 print(f"Mezzogiorno solare a Roma: {int(h):02d}:{int((h % 1) * 60):02d} UT")
@@ -191,20 +195,24 @@ def ora_locale(jd_evento, fuso):
     return f"{int(h):02d}:{int((h % 1) * 60):02d}"
 
 # Tramonto
-jd_t, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET, (lon, lat, 0.0))
+jd_t = tret[0]
 
 # Fine crepuscolo civile (Sole a -6°)
-jd_civ, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_CIVIL_TWILIGHT, (lon, lat, 0.0))
+jd_civ = tret[0]
 
 # Fine crepuscolo nautico (Sole a -12°)
-jd_nau, _ = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT)
+_, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_NAUTIC_TWILIGHT, (lon, lat, 0.0))
+jd_nau = tret[0]
 
 # Fine crepuscolo astronomico (Sole a -18°)
-jd_ast, ret = ephem.rise_trans(jd, ephem.SUN, lat, lon,
-    rsmi=ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT)
+ret, tret = ephem.rise_trans(jd, ephem.SUN,
+    ephem.CALC_SET | ephem.BIT_ASTRO_TWILIGHT, (lon, lat, 0.0))
+jd_ast = tret[0]
 
 print(f"Tramonto:                {ora_locale(jd_t, fuso)}")
 print(f"Fine crepuscolo civile:  {ora_locale(jd_civ, fuso)}")
@@ -319,11 +327,12 @@ jd = ephem.julday(2024, 4, 8, 0.0)
 lat, lon = 45.4642, 9.1900  # Milano
 
 # Le Alpi a nord alzano l'orizzonte di circa 2 gradi
-jd_alba, _ = ephem.rise_trans_true_hor(
-    jd, ephem.SUN, lat, lon,
-    horizon_altitude=2.0,  # orizzonte a 2° sopra il piano
-    rsmi=ephem.CALC_RISE
+_, tret = ephem.rise_trans_true_hor(
+    jd, ephem.SUN, ephem.CALC_RISE,
+    (lon, lat, 0.0),
+    horhgt=2.0,  # orizzonte alzato di 2° sopra il piano
 )
+jd_alba = tret[0]
 
 _, _, _, h = ephem.revjul(jd_alba)
 print(f"Alba con orizzonte a 2°: {int(h):02d}:{int((h % 1) * 60):02d} UT")
@@ -382,7 +391,7 @@ I quattro tipi di evento eliacale sono:
 
 - `MORNING_LAST` (4) — **ultima apparizione mattutina**: per i pianeti interni, l'ultimo giorno di visibilità al mattino prima della congiunzione inferiore. Solo per pianeti interni.
 
-### L'API compatibile con PySwissEph
+### L'API compatibile con l'efemeride di riferimento
 
 Per controllo completo sulle condizioni atmosferiche e le capacità dell'osservatore, usa `heliacal_ut`:
 
@@ -558,8 +567,8 @@ In questo capitolo abbiamo imparato a calcolare quando i corpi celesti sono visi
 
 **Funzioni introdotte:**
 
-- `rise_trans(jd, planet, lat, lon, rsmi=CALC_RISE)` — trova il prossimo sorgere, tramonto o transito al meridiano di un corpo celeste
-- `rise_trans_true_hor(jd, planet, lat, lon, horizon_altitude=0.0, rsmi=...)` — come `rise_trans` ma con altezza personalizzata dell'orizzonte
+- `rise_trans(jd, body, rsmi, geopos)` — trova il prossimo sorgere, tramonto o transito al meridiano di un corpo celeste
+- `rise_trans_true_hor(jd, body, rsmi, geopos, horhgt=0.0)` — come `rise_trans` ma con altezza personalizzata dell'orizzonte
 - `refrac(altitude, pressure, temperature, calc_flag)` — converte tra altezza vera e apparente (o viceversa), tenendo conto della rifrazione
 - `refrac_extended(altitude, altitude_geo, ...)` — rifrazione estesa con dip dell'orizzonte per osservatori in quota
 - `heliacal_ut(jd, geopos, datm, dobs, object_name, event_type)` — trova la data di un evento eliacale (prima/ultima visibilità)

@@ -8,8 +8,6 @@ import libephemeris as swe
 from libephemeris.constants import (
     ECL_NUT,
     FLG_SWIEPH,
-    SUN,
-    MOON,
 )
 
 JD_J2000 = 2451545.0

@@ -7,7 +7,6 @@ differentiation for Chiron, Ceres, Pallas, Juno, Vesta, and Uranians.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 

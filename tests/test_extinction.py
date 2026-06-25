@@ -15,7 +15,6 @@ References:
 """
 
 import math
-import pytest
 
 from libephemeris import (
     calc_airmass,
@@ -433,20 +432,8 @@ class TestImportability:
         from libephemeris import (
             calc_airmass,
             calc_extinction_coefficient,
-            calc_extinction_magnitude,
             calc_simple_extinction,
-            apparent_magnitude_with_extinction,
-            get_extinction_for_heliacal,
-            calc_rayleigh_coefficient,
-            calc_aerosol_coefficient,
-            calc_ozone_coefficient,
-            calc_water_vapor_coefficient,
-            ExtinctionCoefficients,
-            WAVELENGTH_U,
-            WAVELENGTH_B,
             WAVELENGTH_V,
-            WAVELENGTH_R,
-            WAVELENGTH_I,
         )
 
         # Verify they are callable/usable

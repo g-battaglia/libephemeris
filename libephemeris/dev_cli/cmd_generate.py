@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Data generation commands: planet centers SPK, lunar corrections, Keplerian elements.
 
 Replaces 8 poe tasks: generate-planet-centers:*, generate-lunar-corrections,
@@ -25,7 +27,8 @@ def _python(args: list[str]) -> None:
     "the library at runtime. Most developers never need to run these unless\n"
     "they are updating the underlying data or adding new bodies.\n\n"
     "  planet-centers   COB-corrected SPKs for sub-arcsecond gas giant positions\n"
-    "  lunar-corrections  Precomputed mean lunar element correction tables\n"
+    "  apse-corrections   Interpolated apogee/perigee residual tables (live)\n"
+    "  lunar-corrections  [legacy] Mean lunar element correction tables\n"
     "  keplerian-elements Multi-epoch orbital elements for Keplerian fallback",
 )
 def generate_group() -> None:
@@ -105,15 +108,13 @@ def planet_centers_spk() -> None:
 
 @generate_group.command(
     "lunar-corrections",
-    short_help="Regenerate mean lunar element correction tables.",
+    short_help="[legacy] Regenerate mean lunar element correction tables.",
 )
 def lunar_corrections() -> None:
-    """Regenerate precomputed correction tables for mean lunar elements.
+    """[legacy] Regenerate libephemeris/lunar_corrections.py.
 
-    Computes (geometric_mean - analytical_mean) corrections over the full
-    DE441 date range and writes them to libephemeris/lunar_corrections.py.
-    Run this after updating perigee calibration coefficients.
-    Requires: de441.bsp to be downloaded.
+    The tables this writes are not consumed by any runtime path (see
+    CLEAN.md).  Kept for reference.
     """
     _python(["scripts/generate_lunar_corrections.py", "--force"])
 

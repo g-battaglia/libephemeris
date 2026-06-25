@@ -1,4 +1,6 @@
-"""Test commands: unit tests, comparison tests, lunar, LEB, LEB2, Horizons, coverage.
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
+"""Test commands: unit tests, lunar, LEB, LEB2, Horizons, coverage.
 
 Replaces 48 poe test tasks with clearly named hierarchical commands.
 Every command name makes it explicit WHAT is being tested and HOW (which backend).
@@ -6,7 +8,6 @@ Every command name makes it explicit WHAT is being tested and HOW (which backend
 Naming convention:
   - ``skyfield``      = unit tests using Skyfield/DE440 backend
   - ``leb-backend``   = unit tests using LEB precomputed backend
-  - ``compare``       = libephemeris vs pyswisseph comparison
   - ``lunar``         = lunar module (nodes, apsides, Lilith)
   - ``leb-format``    = LEB binary format (reader/writer/precision)
   - ``leb2-format``   = LEB2 compressed format
@@ -33,7 +34,9 @@ def _pytest(args: list[str], env: dict[str, str] | None = None) -> None:
     run_env: dict[str, str] | None = None
     if env:
         run_env = {**os.environ, **env}
-    sys.exit(subprocess.call(["pytest", *args], env=run_env))
+    # sys.executable -m pytest: always the venv's pytest, not whatever
+    # 'pytest' resolves to on PATH
+    sys.exit(subprocess.call([sys.executable, "-m", "pytest", *args], env=run_env))
 
 
 def _python(args: list[str], env: dict[str, str] | None = None) -> None:
@@ -51,8 +54,8 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
 
 @click.group(
     "test",
-    short_help="Run tests: unit, comparison, lunar, LEB, Horizons, coverage.",
-    help="Run tests: unit, comparison, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~490 tests, ~20s\n  leph test leb-backend unit-fast    # ~5890 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
+    short_help="Run tests: unit, lunar, LEB, Horizons, coverage.",
+    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~490 tests, ~20s\n  leph test leb-backend unit-fast    # ~5890 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
 )
 def test_group() -> None:
     """Test runner with clear backend/target naming."""
@@ -64,7 +67,7 @@ def test_group() -> None:
 
 # Test file lists for essential and smoke subsets
 _ESSENTIAL_FILES = [
-    "tests/test_planets/test_central_difference_velocity.py",
+    "tests/test_planets/test_api_return_types.py",
     "tests/test_planets/test_nod_aps.py",
     "tests/test_houses/test_house_algorithms.py",
     "tests/test_lunar_eclipse.py",
@@ -92,7 +95,6 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "tests/test_ephemeris_config.py",
     "tests/test_extinction.py",
     "tests/test_logging_config.py",
-    "tests/test_packaging.py",
     "tests/test_dotenv.py",
     "tests/test_type_safety.py",
     "tests/test_golden_regression.py",
@@ -129,14 +131,13 @@ def skyfield_group() -> None:
 
 @skyfield_group.command(
     "all",
-    short_help="Run all tests (unit + compare) sequentially, no @slow.",
+    short_help="Run all unit tests sequentially, no @slow.",
 )
 def skyfield_all() -> None:
-    """Run all tests (unit + compare) sequentially, excluding @slow markers.
+    """Run all unit tests sequentially, excluding @slow markers.
 
-    Runs ~5890 tests from tests/ and compare_scripts/tests/ directories.
-    Compare tests only run if pyswisseph is installed. Sequential execution
-    means slower but easier to debug failures. Takes ~5 min.
+    Runs the tests/ tree (pytest.ini testpaths).
+    Sequential execution means slower but easier to debug failures.
     """
     _pytest(["-m", "not slow"])
 
@@ -221,7 +222,6 @@ def unit() -> None:
     """Run all unit tests from the tests/ directory sequentially with verbose output.
 
     Excludes @slow-marked tests. ~5890 tests, takes ~2 min.
-    Does NOT include compare_scripts/ tests (use 'all' for those).
     """
     _pytest(["tests/", "-v", "-m", "not slow"])
 
@@ -339,187 +339,11 @@ test_group.add_command(leb_backend_group)
 
 
 # ===========================================================================
-# leph test compare — libephemeris vs pyswisseph comparison
-# ===========================================================================
-
-
-@click.group(
-    "compare",
-    short_help="Compare libephemeris vs pyswisseph (Skyfield, LEB, or Horizons backend).",
-    help="Compare libephemeris output against pyswisseph (the C reference implementation).\n\n"
-    "These tests call the same function with the same inputs on both libraries\n"
-    "and assert that the results match within tolerance. This is the primary\n"
-    "way to verify that libephemeris is a faithful reimplementation.\n\n"
-    "Requires: pyswisseph to be installed (pip install pyswisseph).\n"
-    "Tests live in compare_scripts/tests/.\n\n"
-    "You can compare via different backends to validate each calculation path:\n\n"
-    "  leph test compare skyfield          # via Skyfield/DE440\n"
-    "  leph test compare leb-backend       # via LEB precomputed\n"
-    "  leph test compare horizons-backend  # via NASA Horizons API",
-)
-def compare_group() -> None:
-    """Comparison tests against pyswisseph."""
-
-
-@compare_group.command(
-    short_help="Compare via Skyfield/DE440, excluding @slow.",
-)
-def skyfield() -> None:
-    """Compare via Skyfield/DE440 backend, excluding @slow tests.
-
-    Standard comparison: libephemeris computes positions using Skyfield,
-    pyswisseph computes using its built-in Swiss Ephemeris. Results are
-    compared for all supported bodies and flags.
-    """
-    _pytest(["compare_scripts/tests/", "-v", "-m", "not slow"])
-
-
-@compare_group.command(
-    "skyfield-full",
-    short_help="Compare via Skyfield/DE440, ALL tests including @slow.",
-)
-def skyfield_full() -> None:
-    """Compare via Skyfield/DE440 backend, ALL tests including @slow."""
-    _pytest(["compare_scripts/tests/", "-v"])
-
-
-@compare_group.command(
-    "skyfield-fast",
-    short_help="Compare via Skyfield/DE440, parallel (-n auto).",
-)
-def skyfield_fast() -> None:
-    """Compare via Skyfield/DE440 backend, parallel across CPU cores (-n auto)."""
-    _pytest(["compare_scripts/tests/", "-n", "auto", "-m", "not slow"])
-
-
-@compare_group.command(
-    "skyfield-jpl",
-    short_help="Compare via Skyfield with explicit env var, no @slow.",
-)
-def skyfield_jpl() -> None:
-    """Compare via Skyfield with explicit LIBEPHEMERIS_COMPARE_MODE=skyfield env var.
-
-    Same calculation path as 'skyfield' but forces the env var for explicitness.
-    Useful when testing compare mode dispatch logic.
-    """
-    _pytest(
-        ["compare_scripts/tests/", "-v", "-m", "not slow"],
-        env={"LIBEPHEMERIS_COMPARE_MODE": "skyfield"},
-    )
-
-
-@compare_group.command(
-    "skyfield-jpl-full",
-    short_help="Compare via Skyfield with explicit env var, ALL tests.",
-)
-def skyfield_jpl_full() -> None:
-    """Compare via Skyfield with explicit env var, ALL tests including @slow."""
-    _pytest(
-        ["compare_scripts/tests/", "-v"],
-        env={"LIBEPHEMERIS_COMPARE_MODE": "skyfield"},
-    )
-
-
-@compare_group.command(
-    "leb-backend",
-    short_help="Compare via LEB backend vs pyswisseph, no @slow.",
-)
-def leb_backend() -> None:
-    """Compare via LEB precomputed backend vs pyswisseph, excluding @slow.
-
-    Validates that LEB Chebyshev approximations produce the same results
-    as pyswisseph. This tests end-to-end accuracy of the LEB pipeline.
-    Requires data/leb/ephemeris_medium.leb.
-    """
-    _pytest(
-        ["compare_scripts/tests/", "-v", "-m", "not slow"],
-        env={
-            "LIBEPHEMERIS_COMPARE_MODE": "leb",
-            "LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb",
-        },
-    )
-
-
-@compare_group.command(
-    "leb-backend-full",
-    short_help="Compare via LEB backend vs pyswisseph, ALL tests.",
-)
-def leb_backend_full() -> None:
-    """Compare via LEB backend vs pyswisseph, ALL tests including @slow."""
-    _pytest(
-        ["compare_scripts/tests/", "-v"],
-        env={
-            "LIBEPHEMERIS_COMPARE_MODE": "leb",
-            "LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb",
-        },
-    )
-
-
-@compare_group.command(
-    "horizons-backend",
-    short_help="Compare via Horizons API vs pyswisseph (requires internet).",
-)
-def horizons_backend() -> None:
-    """Compare via NASA JPL Horizons API vs pyswisseph (requires internet).
-
-    Validates that the Horizons live-query backend produces results
-    consistent with pyswisseph. Slower due to HTTP requests.
-    """
-    _pytest(
-        ["compare_scripts/tests/", "-v", "-m", "not slow"],
-        env={"LIBEPHEMERIS_COMPARE_MODE": "horizons"},
-    )
-
-
-@compare_group.command(
-    "horizons-backend-full",
-    short_help="Compare via Horizons API vs pyswisseph, ALL tests.",
-)
-def horizons_backend_full() -> None:
-    """Compare via Horizons API vs pyswisseph, ALL tests including @slow.
-
-    Full comparison including slow iterative tests. Requires internet.
-    """
-    _pytest(
-        ["compare_scripts/tests/", "-v"],
-        env={"LIBEPHEMERIS_COMPARE_MODE": "horizons"},
-    )
-
-
-@compare_group.command(
-    "houses",
-    short_help="Compare all 25 house systems (26 codes) vs pyswisseph with precision report.",
-)
-def compare_houses() -> None:
-    """Compare all 25 house systems (26 codes) against pyswisseph.
-
-    Tests cusps, all 8 ASCMC values, houses_armc, house_pos, and sidereal
-    houses across 8 locations and 12 dates. Prints per-system precision report
-    showing max error for each value.
-
-    \b
-    Coverage:
-      - houses: 24 systems × 8 locations × 12 dates (cusps + 8 ASCMC)
-      - houses_armc: 24 systems × 12 ARMC × 4 latitudes
-      - house_pos: 12 systems × 18 longitudes × 3 body latitudes
-      - houses_ex sidereal: 8 systems × 3 ayanamshas × 6 dates
-    """
-    _pytest([
-        "compare_scripts/tests/test_houses_comprehensive.py",
-        "-v", "-s",
-    ])
-
-
-test_group.add_command(compare_group)
-
-
-# ===========================================================================
 # leph test lunar — Lunar module tests
 # ===========================================================================
 
 _LILITH_FILES = [
     "tests/test_lunar/test_mean_lilith_enhanced.py",
-    "tests/test_lunar/test_true_lilith_precision.py",
     "tests/test_lunar/test_true_lilith_annual_equation.py",
     "tests/test_lunar/test_true_lilith_evection_secondary.py",
     "tests/test_lunar/test_true_lilith_parallactic_inequality.py",
@@ -553,15 +377,14 @@ def lunar_all() -> None:
 def perigee() -> None:
     """Test ELP2000 perigee perturbation coefficients, interpolated and osculating perigee.
 
-    Runs 3 test files: elp2000_perigee_perturbations, interpolated_perigee,
-    osculating_perigee. Run this after calibrating perigee coefficients.
+    Runs 2 test files: elp2000_perigee_perturbations, interpolated_perigee.
+    Run this after calibrating perigee coefficients.
     """
     _pytest(
         [
             "-v",
             "tests/test_lunar/test_elp2000_perigee_perturbations.py",
             "tests/test_lunar/test_interpolated_perigee.py",
-            "tests/test_lunar/test_osculating_perigee.py",
         ]
     )
 
@@ -789,7 +612,8 @@ def vs_skyfield_all() -> None:
             "tests/test_leb/compare/",
             "-v",
             "-m",
-            "leb_compare or leb_compare_base or leb_compare_extended or leb_compare_crosstier",
+            "leb_compare or leb_compare_base or leb_compare_medium "
+            "or leb_compare_extended or leb_compare_crosstier",
         ]
     )
 

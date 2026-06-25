@@ -22,21 +22,11 @@ os.environ.pop("LIBEPHEMERIS_LEB", None)
 
 import libephemeris as ephem
 from libephemeris.constants import (
-    SUN,
-    MOON,
-    MERCURY,
-    VENUS,
-    MARS,
-    JUPITER,
-    SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
     EARTH,
     FLG_SPEED,
 )
 from libephemeris.state import get_planets, get_timescale, get_planet_center_segment
-from libephemeris.planets import _PLANET_FALLBACK, _PLANET_CENTER_NAIF_IDS
+from libephemeris.planets import _PLANET_CENTER_NAIF_IDS
 from libephemeris.moon_theories import get_cob_offset
 from libephemeris.leb_reader import LEBReader
 from libephemeris.fast_calc import fast_calc_tt

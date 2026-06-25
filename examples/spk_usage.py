@@ -93,7 +93,7 @@ def example_compare_precision():
             print(f"  Keplerian: {pos_kep[0]:.4f} deg")
 
             # Download and register SPK
-            path = eph.download_and_register_spk(
+            _path = eph.download_and_register_spk(
                 body="2060",
                 ipl=eph.CHIRON,
                 start="2020-01-01",
@@ -141,7 +141,7 @@ def example_multiple_bodies():
             print(f"\nDownloading SPK files for {len(bodies)} bodies...")
 
             for number, ipl, naif_id, name in bodies:
-                path = eph.download_and_register_spk(
+                _path = eph.download_and_register_spk(
                     body=number,
                     ipl=ipl,
                     start="2020-01-01",

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Automatic SPK download and caching for minor bodies using astroquery.
 
@@ -38,6 +40,34 @@ from typing import Dict, Optional, Union
 
 from .logging_config import get_logger
 from .download import _is_valid_bsp
+from .exceptions import Error
+
+
+def _detect_naif_id_from_file(
+    spk_path: str, preferred: Optional[int] = None
+) -> Optional[int]:
+    """Read the target NAIF ID from a downloaded SPK file.
+
+    Horizons-generated small-body kernels may number their targets
+    20000000+N while the classic convention is 2000000+N; the file itself
+    is the source of truth.  Returns ``preferred`` when it is present in
+    the file, the single small-body target when the file has exactly one,
+    otherwise None.
+    """
+    from . import spk
+
+    try:
+        targets = spk._get_spk_targets(spk_path)
+    except (OSError, ValueError, KeyError, ImportError):
+        return None
+    if not targets:
+        return None
+    if preferred is not None and preferred in targets:
+        return preferred
+    small_bodies = [t for t in targets if t > 1000000]
+    if len(small_bodies) == 1:
+        return small_bodies[0]
+    return None
 
 
 # =============================================================================
@@ -325,8 +355,14 @@ def _download_spk_astroquery(
             overwrite=True,
         )
 
-        logger.info("SPK download complete: %s", os.path.basename(result_path))
-        return result_path
+        # download_spk names the file with its own convention; callers rely
+        # on the file living at exactly output_path (cache lookups,
+        # registration), so move it there.
+        if os.path.abspath(result_path) != os.path.abspath(output_path):
+            os.replace(result_path, output_path)
+
+        logger.info("SPK download complete: %s", os.path.basename(output_path))
+        return output_path
     except (OSError, ValueError, KeyError, ImportError) as e:
         raise ValueError(
             f"Failed to download SPK for '{body_id}' from JPL Horizons: {e}"
@@ -336,7 +372,7 @@ def _download_spk_astroquery(
 def _check_astroquery_available() -> bool:
     """Check if astroquery is available."""
     try:
-        from astroquery.jplhorizons import Horizons
+        from astroquery.jplhorizons import Horizons  # noqa: F401 (availability probe)
 
         return True
     except ImportError:
@@ -525,7 +561,9 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
 
     if force or not os.path.exists(cache_path):
         with _AUTO_SPK_LOCK:
-            if not os.path.exists(cache_path):
+            # Re-check under the lock; honor force even if another thread
+            # (or a previous run) left a file here.
+            if force or not os.path.exists(cache_path):
                 _download_spk_astroquery(
                     body_id=config.body_id,
                     start=config.start,
@@ -534,8 +572,13 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
                 )
         config.spk_path = cache_path
 
-    # Deduce NAIF ID if not provided
+    # Resolve the NAIF ID: explicit > detected from the file > deduced.
+    # Horizons-generated kernels may use 20000000+N target IDs while the
+    # classic convention is 2000000+N — reading the file is authoritative.
     naif_id = config.naif_id
+    detected = _detect_naif_id_from_file(cache_path, naif_id)
+    if detected is not None:
+        naif_id = detected
     if naif_id is None:
         naif_id = spk._deduce_naif_id(config.body_id)
         if naif_id is None:
@@ -543,12 +586,17 @@ def _ensure_spk_downloaded(config: AutoSpkConfig, force: bool = False) -> str:
                 f"Cannot deduce NAIF ID for '{config.body_id}'. "
                 "Please provide naif_id explicitly in enable_auto_spk()."
             )
-        config.naif_id = naif_id
+    config.naif_id = naif_id
 
-    # Register the SPK body if not already registered
+    # Register the SPK body, or re-register if it now resolves to a different
+    # (path, NAIF id). A forced re-download with a wider date range produces a
+    # new cache path (the filename hashes the range), and _detect_naif_id_from_file
+    # may correct naif_id for the same path; a presence- or path-only check would
+    # leave the stale registration in place and calc_ut would keep using it.
     from . import state
 
-    if config.ipl not in state._SPK_BODY_MAP:
+    existing = state._SPK_BODY_MAP.get(config.ipl)
+    if existing is None or existing != (cache_path, naif_id):
         spk.register_spk_body(config.ipl, cache_path, naif_id)
 
     return cache_path
@@ -573,8 +621,9 @@ def try_auto_download(ipl: int) -> Optional[str]:
 
     try:
         return _ensure_spk_downloaded(config)
-    except (OSError, ValueError, KeyError, ImportError):
+    except (OSError, ValueError, KeyError, ImportError, Error):
         # Log error but don't raise - fall back to Keplerian
+        # (Error covers SPKNotFoundError raised by registration)
         return None
 
 
@@ -697,7 +746,9 @@ def list_cached_spk(
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = DEFAULT_AUTO_SPK_DIR
-        dirs_to_check = [default_cache, resolved_dir]
+        # Dedupe: in the default configuration both entries resolve to the
+        # same directory, which would double-count sizes and listings.
+        dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -851,7 +902,9 @@ def get_cache_size(cache_dir: Optional[str] = None) -> float:
 
         resolved_dir = get_spk_cache_dir() or DEFAULT_AUTO_SPK_DIR
         default_cache = DEFAULT_AUTO_SPK_DIR
-        dirs_to_check = [default_cache, resolved_dir]
+        # Dedupe: in the default configuration both entries resolve to the
+        # same directory, which would double-count sizes and listings.
+        dirs_to_check = list(dict.fromkeys([default_cache, resolved_dir]))
 
     for dir_path in dirs_to_check:
         if not os.path.exists(dir_path):
@@ -1006,28 +1059,15 @@ def enable_common_bodies(
         VESTA,
         ERIS,
         SEDNA,
-        NAIF_CHIRON,
-        NAIF_PHOLUS,
-        NAIF_CERES,
-        NAIF_PALLAS,
-        NAIF_JUNO,
-        NAIF_VESTA,
-        NAIF_ERIS,
-        NAIF_SEDNA,
+        SPK_BODY_NAME_MAP,
     )
 
-    common_bodies = [
-        (CHIRON, "2060", NAIF_CHIRON),
-        (PHOLUS, "5145", NAIF_PHOLUS),
-        (CERES, "1", NAIF_CERES),
-        (PALLAS, "2", NAIF_PALLAS),
-        (JUNO, "3", NAIF_JUNO),
-        (VESTA, "4", NAIF_VESTA),
-        (ERIS, "136199", NAIF_ERIS),
-        (SEDNA, "90377", NAIF_SEDNA),
-    ]
-
-    for ipl, body_id, naif_id in common_bodies:
+    # Use the canonical Horizons command strings from SPK_BODY_NAME_MAP:
+    # bare numbers like "1".."4" collide with planet-barycenter indices on
+    # Horizons ("SPK creation is not available for pre-computed objects"),
+    # so Ceres..Vesta need the "Name;" small-body syntax.
+    for ipl in (CHIRON, PHOLUS, CERES, PALLAS, JUNO, VESTA, ERIS, SEDNA):
+        body_id, naif_id = SPK_BODY_NAME_MAP[ipl]
         enable_auto_spk(
             ipl=ipl,
             body_id=body_id,
@@ -1060,16 +1100,18 @@ def _jd_to_iso_date(jd: float) -> str:
         str: ISO date string (YYYY-MM-DD)
     """
     # Julian Day to calendar date conversion
-    # Algorithm from Meeus, Astronomical Algorithms
+    # Algorithm from Meeus, Astronomical Algorithms.
+    # Use the proleptic Gregorian calendar for ALL dates so this is the exact
+    # inverse of _iso_to_jd (which always applies the Gregorian correction
+    # b = 2 - a + a//4). A z < 2299161 Julian branch would drift these two
+    # apart by ~10 days for pre-1582 dates (e.g. medium/extended tier starts),
+    # corrupting the SPK request window and cache filenames.
     jd = jd + 0.5
     z = int(jd)
-    f = jd - z
+    jd - z
 
-    if z < 2299161:
-        a = z
-    else:
-        alpha = int((z - 1867216.25) / 36524.25)
-        a = z + 1 + alpha - int(alpha / 4)
+    alpha = int((z - 1867216.25) / 36524.25)
+    a = z + 1 + alpha - int(alpha / 4)
 
     b = a + 1524
     c = int((b - 122.1) / 365.25)
@@ -1108,10 +1150,17 @@ def _iso_to_jd(date_str: str) -> float:
         >>> _iso_to_jd("2000-01-01")
         2451544.5
         >>> _iso_to_jd("1550-01-01")
-        2287184.5
+        2287185.5
     """
-    parts = date_str.split("-")
+    # A BCE date from _jd_to_iso_date renders the year with a leading '-'
+    # (e.g. "-1975-11-07"); strip it before splitting so the year sign is not
+    # mistaken for a field separator (which would make int("") raise).
+    neg_year = date_str.startswith("-")
+    core = date_str[1:] if neg_year else date_str
+    parts = core.split("-")
     year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+    if neg_year:
+        year = -year
 
     # Algorithm from Meeus, Astronomical Algorithms
     if month <= 2:
@@ -1199,8 +1248,15 @@ def _find_covering_spk(
                 file_jd_end = float(parts[-1])
 
                 # Check if this file covers our requested range
-                # We compare truncated integer values since filenames use truncated JDs
-                # Add 1 to file_jd_end to account for the truncation (covers the full day)
+                # Filenames store int()-truncated JDs, so file_jd_end is the
+                # floor of the kernel's true end (true_end >= file_jd_end) and
+                # file_jd_start is the floor of its true start. We compare on the
+                # truncated request bounds; the kernels are generated with a
+                # light-time margin past the nominal range (see the type-21
+                # coverage-margin widening), so the up-to-one-day truncation gap
+                # at the end is absorbed by that margin, and any genuine
+                # out-of-coverage read is still caught by _is_valid_bsp / the
+                # eval-time range check.
                 if file_jd_start <= int(jd_start) and file_jd_end >= int(jd_end):
                     filepath = os.path.join(cache_dir, filename)
                     if _is_valid_bsp(filepath):
@@ -1449,7 +1505,13 @@ def _register_spk_after_download(
     """
     from . import spk
 
-    # Deduce NAIF ID if not provided
+    # The file's own target IDs are authoritative (Horizons kernels may use
+    # 20000000+N where the classic convention is 2000000+N).
+    detected = _detect_naif_id_from_file(spk_path, naif_id)
+    if detected is not None:
+        naif_id = detected
+
+    # Deduce NAIF ID if still unknown
     if naif_id is None:
         naif_id = spk._deduce_naif_id(str(body_id))
         if naif_id is None:

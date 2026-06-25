@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: MIT
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """A supporting module for jplephem to handle data type 21 (Version 0.1.0)
 
 VENDORED by libephemeris from spktype21==0.1.0 (PyPI).
@@ -55,6 +57,8 @@ jplephem : https://pypi.org/project/jplephem/
 SPICE Toolkit : http://naif.jpl.nasa.gov/naif/toolkit.html
 """
 
+import threading
+
 from numpy import array, zeros, reshape
 from jplephem.daf import DAF
 from jplephem.names import target_names
@@ -92,8 +96,21 @@ class SPKType21(object):
         self.W = zeros(MAXTRM + 2)
         
         # initialize for compute_type21
-        self.mda_record_exist = False
+        # Per-body cache of the last MDA record: (target, center) -> (record,
+        # lb, ub). The mda_lb/mda_ub window is NOT body-specific, so a single
+        # slot keyed only on time would return the wrong body's state when
+        # multiple type-21 targets share one .bsp/instance. Keying on
+        # (target, center) also avoids cache thrashing when callers interleave
+        # several bodies in the same time window. The key space is tiny (a
+        # handful of small-body targets), so no eviction is needed.
+        self._mda_cache = {}
         self.current_segment_exist = False
+
+        # libephemeris addition: the evaluation work arrays (G/FC/WC/W/KQ,
+        # REFPOS/REFVEL, mda_record, current_segment) are instance state
+        # mutated by spke21()/compute_type21(); kernels are cached and
+        # shared across calc threads, so evaluation must be serialized.
+        self._compute_lock = threading.Lock()
         
     @classmethod
     def open(cls, path):
@@ -132,17 +149,34 @@ class SPKType21(object):
         """
         eval_sec = (jd1 - T0)
         eval_sec = (eval_sec + jd2) * S_PER_DAY
-        
-        if self.mda_record_exist:
-            if eval_sec >= self.mda_lb and eval_sec < self.mda_ub:
-                result = self.spke21(eval_sec, self.mda_record)
-                return result[0:3], result[3:]
-        
-        self.mda_record, self.mda_lb, self.mda_ub = self.get_MDA_record(eval_sec, target, center)
-        self.mda_record_exists = True
-        
-        result = self.spke21(eval_sec, self.mda_record)
-        return result[0:3], result[3:]
+
+        with self._compute_lock:
+            key = (target, center)
+            cached = self._mda_cache.get(key)
+            if cached is not None:
+                mda_record, mda_lb, mda_ub, mda_segment = cached
+                if mda_lb <= eval_sec < mda_ub:
+                    # spke21 reads MAXDIM from self.current_segment; restore the
+                    # segment this record came from so a cache hit for one body
+                    # does not inherit a stale MAXDIM from another body whose
+                    # type-21 segments share this same SPKType21 instance.
+                    self.current_segment = mda_segment
+                    self.current_segment_exist = True
+                    result = self.spke21(eval_sec, mda_record)
+                    return result[0:3], result[3:]
+
+            mda_record, mda_lb, mda_ub = self.get_MDA_record(
+                eval_sec, target, center
+            )
+            self._mda_cache[key] = (
+                mda_record,
+                mda_lb,
+                mda_ub,
+                self.current_segment,
+            )
+
+            result = self.spke21(eval_sec, mda_record)
+            return result[0:3], result[3:]
                 
     def get_MDA_record(self, eval_sec, target, center):
         """Return a EMDA record for defined epoch.

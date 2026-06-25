@@ -9,7 +9,6 @@ These tests verify the script's functionality including:
 - API response parsing (mocked)
 """
 
-import json
 import os
 import sys
 import pytest

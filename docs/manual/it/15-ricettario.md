@@ -387,7 +387,7 @@ print()
 trovate = 0
 for _ in range(20):  # cerca fino a 20 eclissi avanti
     ecl_type, times, attr = ephem.sol_eclipse_when_loc(
-        jd, lat, lon, alt
+        jd, (lon, lat, alt)
     )
     if ecl_type > 0 and attr[0] > 0.01:
         jd_max = times[0]
@@ -540,9 +540,10 @@ lat, lon = 41.9, 12.5
 jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Trova il tramonto esatto del Sole
-jd_tram, _ = ephem.rise_trans(
-    jd_noon, ephem.SUN, lat, lon, rsmi=2
+_, tret = ephem.rise_trans(
+    jd_noon, ephem.SUN, 2, (lon, lat, 0.0)
 )
+jd_tram = tret[0]
 anno, mese, giorno, ora = ephem.revjul(jd_tram)
 ore_t = int(ora)
 min_t = int((ora - ore_t) * 60)
@@ -580,7 +581,7 @@ for body_id, nome in pianeti:
     elong = abs(ephem.difdeg2n(pos[0], pos_sole[0]))
 
     # Magnitudine apparente
-    pheno, _ = ephem.pheno_ut(jd_sera, body_id, 0)
+    pheno = ephem.pheno_ut(jd_sera, body_id, 0)
     mag = pheno[4]
 
     # Direzione cardinale
@@ -767,15 +768,18 @@ lat, lon = 41.9, 12.5  # Roma
 jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Trova alba, tramonto e alba successiva
-jd_alba, _ = ephem.rise_trans(
-    jd_noon - 0.5, ephem.SUN, lat, lon, rsmi=1
+_, tret = ephem.rise_trans(
+    jd_noon - 0.5, ephem.SUN, 1, (lon, lat, 0.0)
 )
-jd_tram, _ = ephem.rise_trans(
-    jd_noon, ephem.SUN, lat, lon, rsmi=2
+jd_alba = tret[0]
+_, tret = ephem.rise_trans(
+    jd_noon, ephem.SUN, 2, (lon, lat, 0.0)
 )
-jd_alba_dom, _ = ephem.rise_trans(
-    jd_tram, ephem.SUN, lat, lon, rsmi=1
+jd_tram = tret[0]
+_, tret = ephem.rise_trans(
+    jd_tram, ephem.SUN, 1, (lon, lat, 0.0)
 )
+jd_alba_dom = tret[0]
 
 _, _, _, o_alba = ephem.revjul(jd_alba)
 _, _, _, o_tram = ephem.revjul(jd_tram)
@@ -983,9 +987,9 @@ Ogni ricetta è autocontenuta e pronta all'uso: basta copiare il codice, modific
 - `mooncross_ut(x, jd)` — attraversamento della Luna a una longitudine
 - `find_station_ut(body, jd, tipo)` — prossima stazione retrograda/diretta (da `libephemeris.crossing`)
 - `is_retrograde(body, jd)` — verifica retrogradazione (da `libephemeris.crossing`)
-- `sol_eclipse_when_loc(jd, lat, lon, alt)` — eclissi solare locale
+- `sol_eclipse_when_loc(jd, geopos)` — eclissi solare locale
 - `set_sid_mode(mode)` / `get_ayanamsa_ut(jd)` — zodiaco siderale
-- `rise_trans(jd, body, lat, lon, rsmi=...)` — alba e tramonto
+- `rise_trans(jd, body, rsmi, geopos)` — alba e tramonto
 - `azalt(jd, flag, geopos, press, temp, xin)` — coordinate orizzontali
 - `pheno_ut(jd, body, flag)` — fenomeni (magnitudine, fase, elongazione)
 - `set_topo(lon, lat, alt)` — posizione dell'osservatore

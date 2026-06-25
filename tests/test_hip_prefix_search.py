@@ -2,7 +2,7 @@
 Unit tests for HIP prefix search functionality in star lookup.
 
 Tests the ability to search for stars using "HIP NNNNN" format,
-which is required for pyswisseph fixstar2 compatibility.
+which is required for reference ephemeris fixstar2 compatibility.
 
 Examples:
     - "HIP 49669" -> Regulus
@@ -166,7 +166,7 @@ class TestHipPrefixConsistency:
         """Test that HIP prefix search returns same result as comma prefix search."""
         # Search with HIP prefix
         entry_hip, err_hip = _resolve_star2("HIP 65474")
-        # Search with comma prefix (pyswisseph HIP format)
+        # Search with comma prefix (reference ephemeris HIP format)
         entry_comma, err_comma = _resolve_star2(",65474")
 
         assert err_hip is None

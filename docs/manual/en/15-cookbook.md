@@ -387,7 +387,7 @@ print()
 found = 0
 for _ in range(20):  # search up to 20 eclipses ahead
     ecl_type, times, attr = ephem.sol_eclipse_when_loc(
-        jd, lat, lon, alt
+        jd, (lon, lat, alt)
     )
     if ecl_type > 0 and attr[0] > 0.01:
         jd_max = times[0]
@@ -540,9 +540,10 @@ lat, lon = 41.9, 12.5
 jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Find the exact sunset time
-jd_set, _ = ephem.rise_trans(
-    jd_noon, ephem.SUN, lat, lon, rsmi=2
+_, tret = ephem.rise_trans(
+    jd_noon, ephem.SUN, 2, (lon, lat, 0.0)
 )
+jd_set = tret[0]
 year, month, day, hour = ephem.revjul(jd_set)
 hours_s = int(hour)
 minutes_s = int((hour - hours_s) * 60)
@@ -580,7 +581,7 @@ for body_id, name in planets:
     elong = abs(ephem.difdeg2n(pos[0], pos_sun[0]))
 
     # Apparent magnitude
-    pheno, _ = ephem.pheno_ut(jd_evening, body_id, 0)
+    pheno = ephem.pheno_ut(jd_evening, body_id, 0)
     mag = pheno[4]
 
     # Cardinal direction
@@ -767,15 +768,18 @@ lat, lon = 41.9, 12.5  # Rome
 jd_noon = ephem.julday(2024, 4, 8, 12.0)
 
 # Find sunrise, sunset, and next sunrise
-jd_rise, _ = ephem.rise_trans(
-    jd_noon - 0.5, ephem.SUN, lat, lon, rsmi=1
+_, tret = ephem.rise_trans(
+    jd_noon - 0.5, ephem.SUN, 1, (lon, lat, 0.0)
 )
-jd_set, _ = ephem.rise_trans(
-    jd_noon, ephem.SUN, lat, lon, rsmi=2
+jd_rise = tret[0]
+_, tret = ephem.rise_trans(
+    jd_noon, ephem.SUN, 2, (lon, lat, 0.0)
 )
-jd_rise_tmrw, _ = ephem.rise_trans(
-    jd_set, ephem.SUN, lat, lon, rsmi=1
+jd_set = tret[0]
+_, tret = ephem.rise_trans(
+    jd_set, ephem.SUN, 1, (lon, lat, 0.0)
 )
+jd_rise_tmrw = tret[0]
 
 _, _, _, h_rise = ephem.revjul(jd_rise)
 _, _, _, h_set = ephem.revjul(jd_set)
@@ -983,9 +987,9 @@ Each recipe is self-contained and ready to use: just copy the code, modify the d
 - `mooncross_ut(x, jd)` — Moon crossing at a longitude
 - `find_station_ut(body, jd, type)` — next retrograde/direct station (from `libephemeris.crossing`)
 - `is_retrograde(body, jd)` — retrograde verification (from `libephemeris.crossing`)
-- `sol_eclipse_when_loc(jd, lat, lon, alt)` — local solar eclipse
+- `sol_eclipse_when_loc(jd, geopos)` — local solar eclipse
 - `set_sid_mode(mode)` / `get_ayanamsa_ut(jd)` — sidereal zodiac
-- `rise_trans(jd, body, lat, lon, rsmi=...)` — sunrise and sunset
+- `rise_trans(jd, body, rsmi, geopos)` — sunrise and sunset
 - `azalt(jd, flag, geopos, press, temp, xin)` — horizontal coordinates
 - `pheno_ut(jd, body, flag)` — phenomena (magnitude, phase, elongation)
 - `set_topo(lon, lat, alt)` — observer's position

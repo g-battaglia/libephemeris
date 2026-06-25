@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Thread-safe ephemeris context for libephemeris.
 
@@ -25,12 +27,15 @@ import os
 import threading
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
+from .constants import MEAN_NODE, TRUE_NODE
 from .tracing import _record
 from skyfield.api import Loader, Topos
 from skyfield.timelib import Timescale
 from skyfield.jpllib import SpiceKernel
 
 if TYPE_CHECKING:
+    from .leb_composite import CompositeLEBReader
+    from .leb2_reader import LEB2Reader
     from .leb_reader import LEBReader
 
 
@@ -57,7 +62,9 @@ class EphemerisContext:
 
     Attributes:
         topo: Observer topocentric location (or None for geocentric)
-        sidereal_mode: Active sidereal mode ID (1 = Lahiri by default)
+        sidereal_mode: Active sidereal mode ID (0 = Fagan/Bradley by default,
+            matching the module-level API's default when set_sid_mode is never
+            called)
         sidereal_t0: Reference epoch for custom ayanamsha (JD)
         sidereal_ayan_t0: Ayanamsha value at reference epoch (degrees)
 
@@ -84,10 +91,23 @@ class EphemerisContext:
                       Supported files: "de440s.bsp" (1849-2150, lightweight),
                       "de440.bsp" (1550-2650, default), "de441.bsp" (-13200 to
                       +17191, extended range).
+
+        Note:
+            ``ephe_path``/``ephe_file`` select the *process-wide* shared kernel,
+            not a per-context one: all contexts deliberately share a single
+            loaded JPL kernel to save memory (see ``get_planets``). The first
+            context whose calculation triggers the load wins — a later context
+            constructed with a different ``ephe_file`` updates the shared
+            selection only if the kernel has not been loaded yet, otherwise the
+            already-loaded kernel is reused and the new ``ephe_file`` is ignored.
+            Calculation state (topo, sidereal mode, SPK map) IS per-context.
         """
         # Instance-specific state (NOT shared between contexts)
         self.topo: Optional[Topos] = None
-        self.sidereal_mode: int = 1  # Default: Lahiri (SIDM_LAHIRI)
+        # Default Fagan/Bradley (0) to match the module-level API: get_sid_mode()
+        # returns 0 when set_sid_mode was never called, so a fresh context and the
+        # module API must agree for an unset FLG_SIDEREAL request.
+        self.sidereal_mode: int = 0  # Default: Fagan/Bradley (SIDM_FAGAN_BRADLEY)
         self.sidereal_t0: float = 2451545.0  # J2000.0
         self.sidereal_ayan_t0: float = 0.0
         self._angles_cache: dict[str, float] = {}
@@ -97,7 +117,7 @@ class EphemerisContext:
 
         # LEB binary ephemeris configuration (per-context)
         self._leb_file: Optional[str] = None
-        self._leb_reader: Optional["LEBReader"] = None
+        self._leb_reader: Optional["LEBReader | LEB2Reader | CompositeLEBReader"] = None
 
         # Ephemeris configuration (for this context)
         self._ephe_path = ephe_path
@@ -122,7 +142,7 @@ class EphemerisContext:
         global _SHARED_LOADER
         if _SHARED_LOADER is None:
             with _SHARED_LOCK:
-                if _SHARED_LOADER is None:  # Double-checked locking
+                if _SHARED_LOADER is None:  # pragma: no branch - double-checked locking; the race arc only triggers under concurrent first-init
                     from .state import _get_data_dir
 
                     _SHARED_LOADER = Loader(_get_data_dir())
@@ -132,7 +152,12 @@ class EphemerisContext:
         """
         Get shared Skyfield timescale object.
 
-        Thread-safe lazy initialization. All contexts share the same timescale.
+        Thread-safe lazy initialization. All contexts share the same
+        timescale — and crucially the SAME one as the module-level API:
+        state.get_timescale() builds an enhanced timescale with merged
+        historical Delta-T (1657-1973). A plain load.timescale() here
+        diverged from module calc_ut by up to ~0.7 s of Delta-T (~0.4"
+        of Moon longitude) for pre-1973 dates.
 
         Returns:
             Timescale: Skyfield timescale for time conversions (UTC, TT, etc.)
@@ -141,8 +166,9 @@ class EphemerisContext:
         if _SHARED_TS is None:
             with _SHARED_LOCK:
                 if _SHARED_TS is None:  # Double-checked locking
-                    load = self.get_loader()
-                    _SHARED_TS = load.timescale()
+                    from .state import get_timescale as _state_get_timescale
+
+                    _SHARED_TS = _state_get_timescale()
         return _SHARED_TS
 
     def get_planets(self) -> SpiceKernel:
@@ -199,7 +225,7 @@ class EphemerisContext:
         self._leb_file = filepath
         self._leb_reader = None
 
-    def get_leb_reader(self) -> Optional["LEBReader"]:
+    def get_leb_reader(self) -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
         """Get the active LEBReader for this context, if any.
 
         If the .leb file path is invalid or the file is corrupted,
@@ -269,7 +295,7 @@ class EphemerisContext:
 
         Note:
             Affects all position calculations when FLG_SIDEREAL is set.
-            Default is Lahiri (SIDM_LAHIRI = 1) if never set.
+            Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0) if never set.
         """
         self.sidereal_mode = mode
         self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0
@@ -473,6 +499,17 @@ class EphemerisContext:
             >>> pos, retflag = ctx.calc_ut(2451545.0, MARS, FLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
+        # South nodes: derive from the north node via this same context path,
+        # mirroring the module-level calc_ut(). The descending node must be
+        # intercepted here because no downstream path derives it (_calc_body has
+        # no antipode branch), and the antipode is representation-dependent
+        # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
+        if ipl in (-MEAN_NODE, -TRUE_NODE):
+            from .planets import _south_node_from_north
+
+            north_result, retflag = self.calc_ut(tjd_ut, abs(ipl), iflag)
+            return _south_node_from_north(north_result, iflag), retflag
+
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
         if reader is None:
@@ -486,6 +523,13 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
+                _ctx_topo = None
+                if self.topo is not None:
+                    _ctx_topo = (
+                        float(self.topo.longitude.degrees),
+                        float(self.topo.latitude.degrees),
+                        float(self.topo.elevation.m),
+                    )
                 result = fast_calc.fast_calc_ut(
                     reader,
                     tjd_ut,
@@ -494,6 +538,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
 
@@ -543,6 +588,14 @@ class EphemerisContext:
             TT differs from UT by Delta T (~32s for year 2000).
             For most astrological applications, use calc_ut() instead.
         """
+        # South nodes: derive from the north node via this same context path,
+        # mirroring the module-level calc().
+        if ipl in (-MEAN_NODE, -TRUE_NODE):
+            from .planets import _south_node_from_north
+
+            north_result, retflag = self.calc(tjd, abs(ipl), iflag)
+            return _south_node_from_north(north_result, iflag), retflag
+
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
         if reader is None:
@@ -555,6 +608,13 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
+                _ctx_topo_tt = None
+                if self.topo is not None:
+                    _ctx_topo_tt = (
+                        float(self.topo.longitude.degrees),
+                        float(self.topo.latitude.degrees),
+                        float(self.topo.elevation.m),
+                    )
                 result = fast_calc.fast_calc_tt(
                     reader,
                     tjd,
@@ -563,6 +623,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
+                    topo=_ctx_topo_tt,
                 )
                 from .logging_config import get_logger
 
@@ -654,6 +715,9 @@ class EphemerisContext:
               resources (ephemeris files, timescale, loader)
             - After calling close(), the next calculation on any context
               will automatically reload resources as needed
+            - The timescale cache is reset at the state level too, so the
+              reload picks up fresh time data (IERS table, leap seconds)
+              instead of the previously cached singleton
             - Instance-specific state (topo, sidereal_mode, angles_cache)
               is NOT affected - only shared resources are reset
 
@@ -671,7 +735,7 @@ class EphemerisContext:
             if _SHARED_PLANETS is not None:
                 try:
                     _SHARED_PLANETS.close()
-                except (AttributeError, Exception):
+                except (AttributeError, OSError, ValueError):
                     # SpiceKernel may not have close() in all versions,
                     # or may already be closed
                     pass
@@ -682,3 +746,14 @@ class EphemerisContext:
             _SHARED_TS = None
             _SHARED_EPHE_PATH = None
             _SHARED_EPHE_FILE = "de440.bsp"
+
+            # _SHARED_TS caches the singleton built by state.get_timescale();
+            # clearing the reference alone would re-cache the same live
+            # object on the next call. Reset the state-level cache too so
+            # time data (IERS table, leap seconds) is actually rebuilt.
+            # Lock order _SHARED_LOCK -> state._INIT_LOCK matches
+            # get_timescale() above; state never takes locks in the
+            # reverse order.
+            from .state import _reset_timescale
+
+            _reset_timescale()

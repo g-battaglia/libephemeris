@@ -7,7 +7,6 @@ correct eclipse types, and plausible timing values.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -17,8 +16,6 @@ from libephemeris.constants import (
     ECL_ANNULAR,
     ECL_PARTIAL,
     ECL_PENUMBRAL,
-    ECL_CENTRAL,
-    ECL_NONCENTRAL,
 )
 
 

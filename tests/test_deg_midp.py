@@ -76,7 +76,7 @@ class TestDegMidpOppositeAngles:
     def test_deg_midp_180_0(self):
         """Test midpoint between 180 and 0.
 
-        When both arcs are equally long (180°), pyswisseph chooses the
+        When both arcs are equally long (180°), the reference ephemeris chooses the
         positive (clockwise) arc, yielding 270° not 90°.
         """
         result = ephem.deg_midp(180, 0)

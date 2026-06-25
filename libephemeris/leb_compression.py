@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 LEB2 compression primitives.
 
@@ -16,6 +18,8 @@ Truncated floats are valid float64 values — no special handling needed at eval
 """
 
 from __future__ import annotations
+
+import threading
 
 import numpy as np
 import zstandard as zstd
@@ -175,6 +179,10 @@ def unshuffle_bytes(data: bytes, element_size: int = 8) -> bytes:
 
 _COMPRESSOR = zstd.ZstdCompressor(level=19)
 _DECOMPRESSOR = zstd.ZstdDecompressor()
+# python-zstandard forbids concurrent use of one (de)compressor context;
+# the decompressor runs on the process-wide LEB reader from any thread
+# calling calc_ut, so it must be serialized.
+_DECOMPRESSOR_LOCK = threading.Lock()
 
 
 def compress_body(
@@ -266,9 +274,16 @@ def decompress_body(
 
     Returns:
         Raw coefficient bytes in segment-major layout (same as LEB1).
+
+    Raises:
+        ValueError: If the blob is not valid zstd data (corrupted file).
     """
-    decompressed = _DECOMPRESSOR.decompress(
-        compressed, max_output_size=uncompressed_size
-    )
+    try:
+        with _DECOMPRESSOR_LOCK:
+            decompressed = _DECOMPRESSOR.decompress(
+                compressed, max_output_size=uncompressed_size
+            )
+    except zstd.ZstdError as exc:
+        raise ValueError(f"Corrupted LEB2 data: {exc}") from exc
     unshuffled = unshuffle_bytes(decompressed)
     return reorder_segment_major(unshuffled, segment_count, degree, components)

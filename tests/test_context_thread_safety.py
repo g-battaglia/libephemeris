@@ -11,7 +11,7 @@ verifying that multiple threads can perform calculations concurrently with:
 Each test uses 10+ threads to stress test the library's thread-safety mechanisms.
 
 Note: Since the module-level API uses global state which is not thread-safe by design
-(matching pyswisseph behavior), these tests verify that the state management
+(matching the reference ephemeris behavior), these tests verify that the state management
 doesn't crash under concurrent access and that EphemerisContext provides proper
 isolation for thread-safe concurrent calculations.
 """
@@ -183,8 +183,10 @@ class TestContextResourceSharing:
         """Module-level API uses shared timescale."""
         from libephemeris import state
 
-        # Pre-load
-        ephem.calc_ut(2451545.0, SUN, 0)
+        # Explicitly load the timescale (calc_ut may use the LEB fast
+        # path, which never touches state._TS; an earlier test may have
+        # reset it via EphemerisContext.close()).
+        state.get_timescale()
 
         # Verify timescale is loaded
         assert state._TS is not None
@@ -236,7 +238,7 @@ class TestConcurrentModuleLevelAPI:
     Stress tests for concurrent access to module-level API.
 
     Note: The module-level API is NOT thread-safe by design (matching
-    pyswisseph behavior). These tests verify the API doesn't crash
+    the reference ephemeris behavior). These tests verify the API doesn't crash
     under concurrent access, though results may not be deterministic
     when different threads modify global state.
     """
@@ -1227,7 +1229,6 @@ class TestEphemerisContextClose:
         Multiple threads calling close() and doing calculations concurrently
         should not cause crashes or data corruption.
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
         num_threads = 12
@@ -1276,7 +1277,6 @@ class TestEphemerisContextClose:
         This is the critical test for detecting race conditions between
         close() and calculation operations.
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
         num_calc_threads = 10
@@ -1389,7 +1389,6 @@ class TestEphemerisContextClose:
 
         Verify that sidereal mode settings work correctly after close().
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
 
@@ -1432,7 +1431,6 @@ class TestEphemerisContextClose:
 
         Verify that house calculations work correctly after close().
         """
-        from libephemeris import context as ctx_module
 
         jd = 2451545.0
 

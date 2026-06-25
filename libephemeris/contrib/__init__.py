@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """libephemeris.contrib — extended astrology helpers.
 
 Zodiac and nakshatra constants, Vedic planet IDs, classical aspect
@@ -517,7 +519,7 @@ def raman_houses(jd: float, geolon: float, geolat: float) -> tuple[float, ...]:
     12 cusps as a 12-tuple (house 1 at index 0)."""
     from .. import houses as _houses
 
-    cusps, _ascmc = _houses(jd, geolat, geolon, b"S")
+    cusps, _ascmc = _houses(jd, geolat, geolon, ord("S"))
     return tuple(cusps)
 
 
@@ -890,8 +892,8 @@ def _not_implemented(name: str) -> _Any:
             f"libephemeris.contrib.{name}() is not implemented. "
             "This function requires the optional SQLite atlas/timezone "
             "databases shipped with the upstream reference distribution. "
-            "If you need it, install pyswisseph and call "
-            f"swisseph.contrib.{name}() directly."
+            "If you need it, install the upstream reference Python binding "
+            f"and call its contrib.{name}() directly."
         )
 
     _stub.__name__ = name

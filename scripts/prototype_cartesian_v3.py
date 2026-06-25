@@ -114,7 +114,7 @@ def test_segment(body_id, body_name, seg_start, seg_end, degree, n_test=100):
 
     # Reference values at test points
     ref_sph = eval_apparent_ecliptic_spherical(body_id, test_jds)
-    ref_cart = eval_apparent_ecliptic_cartesian(body_id, test_jds)
+    eval_apparent_ecliptic_cartesian(body_id, test_jds)
 
     for k in range(n_test):
         tau = (test_jds[k] - mid) / half

@@ -1,7 +1,7 @@
 """
 Comprehensive tests for utc_time_zone() function.
 
-pyswisseph semantics: utc_time_zone converts LOCAL time to UTC by
+Reference ephemeris semantics: utc_time_zone converts LOCAL time to UTC by
 SUBTRACTING the timezone offset.  E.g. 10:00 CET (UTC+1) → 09:00 UTC.
 
 Tests cover:

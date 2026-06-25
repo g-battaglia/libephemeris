@@ -16,7 +16,6 @@ import os
 import sys
 from unittest.mock import patch
 
-import pytest
 
 
 class TestGetLogger:
@@ -24,7 +23,7 @@ class TestGetLogger:
 
     def test_get_logger_returns_logger(self):
         """get_logger should return a logging.Logger instance."""
-        from libephemeris.logging_config import get_logger, _logger_configured
+        from libephemeris.logging_config import get_logger
 
         # Reset the logger configured flag for testing
         import libephemeris.logging_config as lc
@@ -631,3 +630,39 @@ class TestEnvVarIntegration:
             assert logger.isEnabledFor(logging.ERROR)
         finally:
             set_log_level(original_level)
+
+
+class TestLogLevelTomlFallback:
+    """Cover the TOML fallback branch in _get_log_level_from_env()."""
+
+    def test_toml_value_used_when_env_absent(self, monkeypatch):
+        import libephemeris._config_toml as toml_mod
+        from libephemeris import logging_config
+
+        monkeypatch.delenv(logging_config.LIBEPHEMERIS_LOG_LEVEL_ENV, raising=False)
+        monkeypatch.setattr(toml_mod, "get_str", lambda _key: "debug")
+
+        assert logging_config._get_log_level_from_env() == logging.DEBUG
+
+    def test_toml_lookup_failure_falls_back_to_warning(self, monkeypatch):
+        import libephemeris._config_toml as toml_mod
+        from libephemeris import logging_config
+
+        def _boom(_key):
+            raise RuntimeError("toml read failed")
+
+        monkeypatch.delenv(logging_config.LIBEPHEMERIS_LOG_LEVEL_ENV, raising=False)
+        monkeypatch.setattr(toml_mod, "get_str", _boom)
+
+        assert logging_config._get_log_level_from_env() == logging.WARNING
+
+
+class TestFormatFileSizePetabyte:
+    """Cover format_file_size petabyte tail."""
+
+    def test_petabyte_range(self):
+        from libephemeris.logging_config import format_file_size
+
+        result = format_file_size(2 * 1024**5)
+        assert result.endswith("PB")
+        assert result.startswith("2.0")

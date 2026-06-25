@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Uranian moon orbital theory for Uranus barycenter correction.
 
@@ -18,7 +20,11 @@ References:
 - Jacobson, R.A. (2014) "The orbits of the Uranian satellites and rings"
   AJ 148, 76
 
-Precision: ~100-200 km (~0.005-0.01 arcsec at Uranus opposition distance)
+Precision: mean circular elements without the GUST86 periodic terms —
+moon positions are good to a few thousand km (phases and rounded nodes
+dominate).  Weighted by the ~1e-5 moon/planet mass ratios, the resulting
+COB offset error is tens of km, i.e. sub-milliarcsecond at Uranus
+opposition distance, far below the planet_centers SPK alternative.
 """
 
 from __future__ import annotations
@@ -127,39 +133,33 @@ URANUS_POLE_DEC: float = math.radians(-15.175)  # Declination of pole
 
 
 def _compute_uranus_to_icrf_matrix() -> Tuple[Tuple[float, ...], ...]:
-    """Compute rotation matrix from Uranus equatorial frame to ICRF."""
-    # Rotation to align Uranus pole with ICRF north pole
-    # First rotate by -RA around z-axis, then by (90 - dec) around y-axis
+    """Compute rotation matrix from Uranus equatorial frame to ICRF.
 
+    The Uranus-equator frame is the IAU non-rotating body frame:
+    +z along the IAU pole (alpha0, delta0), +x along the ascending node
+    of the body equator on the ICRF equator (the IAU node Q, at right
+    ascension alpha0 + 90deg).  The moon node longitudes above are
+    measured from that origin.
+
+    The matrix columns are the frame's basis vectors expressed in ICRF,
+    so for a vector u in the body-equator frame, v_icrf = M @ u.
+    """
     cos_ra = math.cos(URANUS_POLE_RA)
     sin_ra = math.sin(URANUS_POLE_RA)
     cos_dec = math.cos(URANUS_POLE_DEC)
     sin_dec = math.sin(URANUS_POLE_DEC)
 
-    # Rotation: Uranus equatorial -> ICRF
-    # R = Ry(90+dec) @ Rz(ra)
-    # Note: Uranus has a retrograde rotation (pole points "south")
-
-    # Simplified: rotate from Uranus equatorial (where +z is Uranus north pole)
-    # to ICRF (where +z is ecliptic north)
-
-    # Matrix elements
-    m11 = cos_ra * cos_dec - sin_ra * sin_dec * 0  # simplified
-    m12 = -sin_ra
-    m13 = cos_ra * sin_dec
-
-    m21 = sin_ra * cos_dec + cos_ra * sin_dec * 0
-    m22 = cos_ra
-    m23 = sin_ra * sin_dec
-
-    m31 = -sin_dec
-    m32 = 0
-    m33 = cos_dec
+    # x-axis: IAU node direction (RA = alpha0 + 90deg, Dec = 0)
+    x_axis = (-sin_ra, cos_ra, 0.0)
+    # z-axis: pole direction
+    z_axis = (cos_dec * cos_ra, cos_dec * sin_ra, sin_dec)
+    # y-axis: z cross x (right-handed)
+    y_axis = (-sin_dec * cos_ra, -sin_dec * sin_ra, cos_dec)
 
     return (
-        (m11, m12, m13),
-        (m21, m22, m23),
-        (m31, m32, m33),
+        (x_axis[0], y_axis[0], z_axis[0]),
+        (x_axis[1], y_axis[1], z_axis[1]),
+        (x_axis[2], y_axis[2], z_axis[2]),
     )
 
 
@@ -240,7 +240,6 @@ def _moon_position_kepler(
     # Position in orbital plane (perifocal frame)
     x_peri = r * math.cos(nu)
     y_peri = r * math.sin(nu)
-    z_peri = 0.0
 
     # Rotation matrices
     cos_omega = math.cos(omega)

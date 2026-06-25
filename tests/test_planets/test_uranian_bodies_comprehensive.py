@@ -22,7 +22,6 @@ from libephemeris.constants import (
     FLG_NOABERR,
     FLG_SIDEREAL,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
 )
 
 

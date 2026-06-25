@@ -13,7 +13,6 @@ To regenerate the golden file after an intentional change:
 from __future__ import annotations
 
 import json
-import math
 import os
 import warnings
 

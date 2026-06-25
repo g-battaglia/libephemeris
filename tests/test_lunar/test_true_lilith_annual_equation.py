@@ -21,7 +21,6 @@ References:
 """
 
 import math
-import pytest
 from libephemeris.lunar import calc_true_lilith, calc_mean_lilith
 
 

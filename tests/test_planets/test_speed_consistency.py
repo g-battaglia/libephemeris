@@ -7,7 +7,6 @@ with numerical differentiation of positions.
 
 from __future__ import annotations
 
-import math
 
 import pytest
 
@@ -24,8 +23,6 @@ from libephemeris.constants import (
     NEPTUNE,
     PLUTO,
     MEAN_NODE,
-    TRUE_NODE,
-    CHIRON,
     FLG_SWIEPH,
     FLG_SPEED,
 )

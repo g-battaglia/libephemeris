@@ -162,7 +162,7 @@ Luna di Waldemath: 61.36°
 
 ## 13.3 Orbite fittizie personalizzate
 
-Se hai bisogno di un corpo ipotetico non incluso nella libreria, puoi definire la tua orbita. La libreria usa un formato di file con elementi orbitali (compatibile con il formato `seorbel.txt` della Swiss Ephemeris).
+Se hai bisogno di un corpo ipotetico non incluso nella libreria, puoi definire la tua orbita. La libreria usa un formato di file con elementi orbitali (compatibile con un formato di file di elementi orbitali dell'efemeride di riferimento (`seorbel.txt`)).
 
 ### Caricare orbite predefinite
 

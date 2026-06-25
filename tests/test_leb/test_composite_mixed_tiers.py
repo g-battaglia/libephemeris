@@ -15,10 +15,7 @@ from libephemeris.leb_composite import CompositeLEBReader
 from libephemeris.constants import (
     SUN,
     MOON,
-    MARS,
-    JUPITER,
     CHIRON,
-    CERES,
 )
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

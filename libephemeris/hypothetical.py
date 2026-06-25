@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Hypothetical and fictitious body calculations for libephemeris.
 
@@ -32,11 +34,17 @@ Other Fictitious Bodies:
     - Waldemath Moon: Dr. Waldemath's hypothetical second moon of Earth (body #18)
       Note: This is different from Mean Lilith and True Lilith which are lunar apogee points
 
-References:
-    - Reference API documentation
-    - Witte, Alfred: "Regelwerk fuer Planetenbilder" (1932)
-    - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
-    - Landscheidt: "Cosmic Cybernetics" (1973)
+References (orbital-element sources; see data/fictitious_orbits.csv and
+docs/methodology/hypothetical-bodies.md for the per-body source table):
+    - Witte, A. & Lefeldt, H. (1928). "Regelwerk für Planetenbilder."
+      Hamburg: Ludwig Rudolph. (Hamburg-school Uranian planets)
+    - Neely, J. (1988). "The Uranian Planets." NCGR Research Journal,
+      vol. 1. (refined Uranian elements)
+    - Strubell, M. (1952). "Die Sterne" 3/1952, p. 70ff. (Transpluto/Isis)
+    - Abramov, V. (unpublished). (Proserpina)
+    - Hoyt, W.G. (1980). "Planets X and Pluto." Univ. of Arizona Press.
+      (historical Neptune / Pluto predictions)
+    - Harrington, R.S. (1988). "The Location of Planet X." AJ 96(4), 1476.
 """
 
 from __future__ import annotations
@@ -44,9 +52,11 @@ from __future__ import annotations
 import erfa
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, Any, List, Optional, Union
+from typing import Tuple, Dict, List, Optional, Union, cast
+# NIBIRU..PLUTO_PICKERING are deliberately (re)defined below with their
+# documentation and aliases; constants.py carries the same values.
 from .constants import FICT_OFFSET
 
 
@@ -71,9 +81,7 @@ TRANSPLUTO: int = ISIS  # Alias
 NIBIRU: int = FICT_OFFSET + 9  # 49 - Sitchin's hypothetical planet
 HARRINGTON: int = FICT_OFFSET + 10  # 50 - Harrington's Planet X
 NEPTUNE_LEVERRIER: int = FICT_OFFSET + 11  # 51 - Leverrier's Neptune position
-PLANET_X_LEVERRIER: int = (
-    NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X"
-)
+PLANET_X_LEVERRIER: int = NEPTUNE_LEVERRIER  # Alias - Leverrier's calculated "Planet X"
 NEPTUNE_ADAMS: int = FICT_OFFSET + 12  # 52 - Adams' Neptune position
 PLANET_X_ADAMS: int = (
     NEPTUNE_ADAMS  # Alias - Adams' calculated "Planet X" (independently derived)
@@ -128,7 +136,7 @@ WALDEMATH: int = WALDEMATH
 # B = oscillation frequency (degrees per century)
 #
 # Note: Different sources give slightly different parameters. These values
-# are from the Hamburg School tradition for pyswisseph compatibility.
+# are from the Hamburg School tradition for reference-API compatibility.
 
 
 @dataclass
@@ -158,13 +166,15 @@ class UranianElements:
     phase_rate: float = 0.0
 
 
-# Uranian planet polynomial parameters for simplified position computation.
-# Source: Witte/Sieggrun, Regelwerk fur Planetenbilder (Hamburg School, 1928).
-# L0 and n values derived from the published ephemeris tables (Witte 1928,
-# refined by Neely 1988). The amplitude/phase/phase_rate terms represent
-# periodic corrections from the Hamburg School tradition to approximate
-# the equation of center and other perturbations for these hypothetical orbits.
-# See scripts/derive_hypothetical_elements.py for independent Keplerian verification.
+# Legacy mean-longitude oscillation table — a historical fit calibrated
+# against the reference ephemeris output, NOT consulted by any calculation path (the
+# unified Keplerian propagation in URANIAN_KEPLERIAN_ELEMENTS superseded
+# it; see calc_uranian_longitude). Retained only for module-API stability
+# (tests pin its membership/range). The L0 / amplitude / phase / phase_rate
+# values are oracle-calibrated, not attested in Hamburg-school literature;
+# the published elements live in URANIAN_KEPLERIAN_ELEMENTS and
+# data/fictitious_orbits.csv. Disclosed in NOTICE.md ("Calibration Data
+# Disclosure") and enforced by scripts/check_hypothetical_provenance.py.
 URANIAN_ELEMENTS: Dict[int, UranianElements] = {
     CUPIDO: UranianElements(
         name="Cupido",
@@ -318,7 +328,7 @@ CUPIDO_KEPLERIAN_ELEMENTS = CupidoKeplerianElements(
     i=0.0,  # Assumed on ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=105.301693,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=105.301693,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0037945179,  # Mean motion deg/day (Kepler's 3rd law from a=40.99837 AU)
 )
 
@@ -355,14 +365,16 @@ class HadesKeplerianElements:
     n: float
 
 
-# Hades Keplerian elements
-# Source: Witte/Sieggrun, Regelwerk fur Planetenbilder (Hamburg School, 1928)
-# Epoch J1900.0 (JD 2415020.0); a=50.66744 AU, e=0.00245, i=1.05 deg
+# Hades Keplerian elements — LEGACY display table, not consulted at runtime
+# (the live element set is URANIAN_KEPLERIAN_ELEMENTS[HADES], whose M0 is
+# the published Neely mean anomaly 27.6496 from data/fictitious_orbits.csv).
 #
-# Note: M0 here is mean anomaly (M). The unified URANIAN_KEPLERIAN_ELEMENTS
-# dict uses mean longitude (L = M + omega + Omega) for its M0 field.
-# Both are self-consistent within their respective usage contexts.
-# See scripts/derive_hypothetical_elements.py for the derivation.
+# Note on M0: the published mean anomaly at J1900 is 27.6496 (CSV / live
+# dict). The value 26.850162 below is a RETIRED calibration artifact of an
+# earlier mean-longitude propagation path: its old unified mean longitude
+# 336.363662 minus (omega 148.1796 + Omega 161.3339) = 26.850162. It is
+# kept only so this unused dataclass instance stays stable for the tests
+# that pin it; scripts/check_hypothetical_provenance.py freezes it.
 HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     name="Hades",
     epoch=2415020.0,  # J1900.0
@@ -371,7 +383,7 @@ HADES_KEPLERIAN_ELEMENTS = HadesKeplerianElements(
     i=1.0500,  # Inclination in degrees
     omega=148.1796,  # Argument of perihelion in degrees
     Omega=161.3339,  # Longitude of ascending node in degrees
-    M0=26.850162,  # Mean anomaly at epoch in degrees (derived from Witte/Sieggrun 1928)
+    M0=26.850162,  # RETIRED calibration artifact (see note above); unused
     n=0.00278759,  # Mean motion deg/day (Kepler's 3rd law from a=50.66744 AU)
 )
 
@@ -419,7 +431,7 @@ ZEUS_KEPLERIAN_ELEMENTS = ZeusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=104.289095,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=104.289095,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0022203750,  # Mean motion deg/day (Kepler's 3rd law from a=59.21436 AU)
 )
 
@@ -467,7 +479,7 @@ KRONOS_KEPLERIAN_ELEMENTS = KronosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=17.111353,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=17.111353,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0019351856,  # Mean motion deg/day (Kepler's 3rd law from a=64.81690 AU)
 )
 
@@ -515,7 +527,7 @@ APOLLON_KEPLERIAN_ELEMENTS = ApollonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=138.565328,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=138.565328,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0017177599,  # Mean motion deg/day (Kepler's 3rd law from a=70.29949 AU)
 )
 
@@ -563,7 +575,7 @@ ADMETOS_KEPLERIAN_ELEMENTS = AdmetosKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=350.613913,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=350.613913,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0016016766,  # Mean motion deg/day (Kepler's 3rd law from a=73.62765 AU)
 )
 
@@ -612,7 +624,7 @@ VULKANUS_KEPLERIAN_ELEMENTS = VulkanusKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=55.397715,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=55.397715,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0015069325,  # Mean motion deg/day (Kepler's 3rd law from a=77.25568 AU)
 )
 
@@ -661,7 +673,7 @@ POSEIDON_KEPLERIAN_ELEMENTS = PoseidonKeplerianElements(
     i=0.0,  # On ecliptic
     omega=0.0,  # Irrelevant for e=0
     Omega=0.0,  # Assumed zero ascending node
-    L0=166.140256,  # Mean longitude at J1900.0 (derived from Witte/Sieggrun 1928 ephemeris tables)
+    L0=166.140256,  # Mean longitude at J1900.0 (legacy oracle-calibrated fit, unused at runtime; published elements live in URANIAN_KEPLERIAN_ELEMENTS / data/fictitious_orbits.csv)
     n=0.0013256078,  # Mean motion deg/day (Kepler's 3rd law from a=83.66907 AU)
 )
 
@@ -781,8 +793,14 @@ class UranianKeplerianElements:
 #   6. Precess equatorial from equinox to J2000
 #   7. Rotate equatorial -> ecliptic at J2000 obliquity
 #
-# Orbital elements: Witte/Sieggruen, refined by James Neely
-# M0 values are MEAN ANOMALY at epoch (not mean longitude)
+# Orbital elements (the single source of truth, identical to
+# data/fictitious_orbits.csv — enforced by
+# scripts/check_hypothetical_provenance.py):
+#   Witte, A. & Lefeldt, H. (1928). "Regelwerk für Planetenbilder."
+#     Hamburg: Ludwig Rudolph.
+#   Neely, J. (1988). "The Uranian Planets." NCGR Research Journal, vol. 1
+#     (refined elements).
+# M0 values are MEAN ANOMALY at epoch (not mean longitude).
 #
 # Gaussian gravitational constant: k = 0.01720209895 rad/day
 # -> daily motion = 0.9856076686 deg/day / a^1.5
@@ -893,7 +911,7 @@ URANIAN_KEPLERIAN_ELEMENTS: Dict[int, UranianKeplerianElements] = {
 # Transpluto (Isis) elements
 # Source: Strubell, "Die Sterne" 3/1952, p. 70ff
 # Original elements: epoch JD 2368547.66, equinox JD 2431456.5, a=77.775 AU, e=0.3
-# Elements below are derived at J2000 epoch for pyswisseph compatibility.
+# Elements below are derived at J2000 epoch for reference-API compatibility.
 HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ISIS: HypotheticalElements(
         name="Transpluto/Isis",
@@ -908,17 +926,19 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ),
     PROSERPINA: HypotheticalElements(
         name="Proserpina",
-        epoch=2451545.0,  # J2000.0
-        a=81.0,  # Semi-major axis in AU (trans-Plutonian)
-        e=0.0,  # Circular orbit (simplest astrological model)
+        # Published elements by Valentin Abramov (Tartu, Estonia), the set
+        # in standard astrological use for the hypothetical trans-Plutonian
+        # Proserpina: epoch J1900, equinox of date, circular orbit.
+        epoch=2415020.0,  # J1900.0
+        a=79.225630,  # Semi-major axis in AU (Abramov)
+        e=0.0,  # Circular orbit
         i=0.0,  # On ecliptic plane
         omega=0.0,  # Irrelevant for circular orbit
-        Omega=0.0,  # Assumed zero ascending node
-        M0=0.0,  # Mean anomaly at J2000.0 (arbitrary starting point)
-        # Mean motion: n = 360 / (a^1.5 * 365.25) deg/day
-        # Period = 81^1.5 = 729.3 years
-        # n = 360 / (729.3 * 365.25) = 0.001352 deg/day
-        n=360.0 / (81.0**1.5 * 365.25),  # ~0.001352 deg/day
+        Omega=0.0,  # Zero ascending node
+        M0=170.73,  # Mean anomaly at J1900 (Abramov)
+        # Mean motion from the Gaussian gravitational constant
+        # (k = 0.01720209895 rad/day => 0.9856076686 deg/day at 1 AU)
+        n=0.9856076686 / (79.225630**1.5),  # deg/day
     ),
 }
 
@@ -1342,10 +1362,11 @@ class OrbitalElements:
         Returns:
             Mean motion in degrees per day.
         """
-        # n = 360 / (a^1.5 * 365.25) for heliocentric orbits
-        # For geocentric orbits, this would need Earth's GM, but we use
-        # an approximate formula.
-        return 360.0 / (self.semi_axis**1.5 * 365.25)
+        # Gaussian mean motion for heliocentric orbits:
+        # n = k * 180/pi / a^1.5 = 0.9856076686 / a^1.5 deg/day.
+        # (Geocentric bodies encode their motion in the mean-anomaly
+        # polynomial instead.)
+        return 0.9856076686 / self.semi_axis**1.5
 
 
 # Standard epoch Julian Day values
@@ -2070,6 +2091,20 @@ def calc_orbital_position(
     pos_prev = _calc_orbital_position_raw(elem, jd_tt - dt_step)
     pos_next = _calc_orbital_position_raw(elem, jd_tt + dt_step)
 
+    # Elements referred to a fixed equinox are precessed to J2000 (the
+    # frame this function documents); equinox-of-date elements (JDATE)
+    # stay in their of-date frame. The same rotation applies to the
+    # speed samples so the rates stay frame-consistent.
+    tequ = elem.equinox_jd
+    if tequ is not None and abs(tequ - 2451545.0) > 1e-6:
+        from .astrometry import _precess_ecliptic
+
+        longitude, latitude = _precess_ecliptic(longitude, latitude, tequ, 2451545.0)
+        p_lon, p_lat = _precess_ecliptic(pos_prev[0], pos_prev[1], tequ, 2451545.0)
+        n_lon, n_lat = _precess_ecliptic(pos_next[0], pos_next[1], tequ, 2451545.0)
+        pos_prev = (p_lon, p_lat, pos_prev[2])
+        pos_next = (n_lon, n_lat, pos_next[2])
+
     dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
     # Handle wrap-around
     if dlon > 180.0 / (2.0 * dt_step):
@@ -2197,6 +2232,135 @@ def get_hypothetical_name(ipl: int) -> str:
     return HYPOTHETICAL_NAMES.get(ipl, f"Unknown ({ipl})")
 
 
+# Orbital elements of the classical hypothetical/predicted planets the
+# reference exposes as bodies 49-54. The values are historical data from
+# the published predictions (collected, like every fictitious-body
+# element set, in the standard orbital-elements file format):
+# - Nibiru: elements as circulated in the astrological community for
+#   Z. Sitchin's popular "12th planet" lore.
+# - Harrington: R.S. Harrington's Planet X search orbit (AJ 96, 1476,
+#   1988).
+# - Leverrier / Adams: the 1846 theoretical orbits of Neptune by
+#   U. Le Verrier (CRAS 23) and J.C. Adams.
+# - Lowell: P. Lowell, "Memoir on a Trans-Neptunian Planet" (1915).
+# - Pickering: W.H. Pickering's Planet P prediction (1928).
+FICTITIOUS_ORBITAL_ELEMENTS = {
+    NIBIRU: OrbitalElements(
+        name="Nibiru",
+        epoch_jd=1856113.380954,
+        equinox_jd=1856113.380954,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(0.0),
+        semi_axis=234.8921,
+        eccentricity=TPolynomial(0.981092),
+        arg_perihelion=TPolynomial(103.966),
+        asc_node=TPolynomial(-44.567),
+        inclination=TPolynomial(158.708),
+    ),
+    HARRINGTON: OrbitalElements(
+        name="Harrington",
+        epoch_jd=2374696.5,
+        equinox_jd=2451545.0,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(0.0),
+        semi_axis=101.2,
+        eccentricity=TPolynomial(0.411),
+        arg_perihelion=TPolynomial(208.5),
+        asc_node=TPolynomial(275.4),
+        inclination=TPolynomial(32.4),
+    ),
+    NEPTUNE_LEVERRIER: OrbitalElements(
+        name="Leverrier",
+        epoch_jd=2395662.5,
+        equinox_jd=2395662.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(34.05),
+        semi_axis=36.15,
+        eccentricity=TPolynomial(0.10761),
+        arg_perihelion=TPolynomial(284.75),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    NEPTUNE_ADAMS: OrbitalElements(
+        name="Adams",
+        epoch_jd=2395662.5,
+        equinox_jd=2395662.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(24.28),
+        semi_axis=37.25,
+        eccentricity=TPolynomial(0.12062),
+        arg_perihelion=TPolynomial(299.11),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    PLUTO_LOWELL: OrbitalElements(
+        name="Lowell",
+        epoch_jd=2425977.5,
+        equinox_jd=2425977.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(281.0),
+        semi_axis=43.0,
+        eccentricity=TPolynomial(0.202),
+        arg_perihelion=TPolynomial(204.9),
+        asc_node=TPolynomial(0.0),
+        inclination=TPolynomial(0.0),
+    ),
+    PLUTO_PICKERING: OrbitalElements(
+        name="Pickering",
+        epoch_jd=2425977.5,
+        equinox_jd=2425977.5,
+        equinox_is_jdate=False,
+        mean_anomaly=TPolynomial(48.95),
+        semi_axis=55.1,
+        eccentricity=TPolynomial(0.31),
+        arg_perihelion=TPolynomial(280.1),
+        asc_node=TPolynomial(100.0),
+        inclination=TPolynomial(15.0),
+    ),
+}
+
+
+def calc_fictitious_position(
+    ipl: int, jd_tt: float
+) -> Tuple[float, float, float, float, float, float]:
+    """Heliocentric position of a classical predicted planet (49-54).
+
+    Full Keplerian propagation of the published prediction orbits with
+    equinox precession; see FICTITIOUS_ORBITAL_ELEMENTS for the sources.
+
+    Returns (lon, lat, dist, dlon, dlat, ddist), J2000 ecliptic.
+    """
+    elem = FICTITIOUS_ORBITAL_ELEMENTS.get(ipl)
+    if elem is None:
+        from .exceptions import UnknownBodyError
+
+        raise UnknownBodyError(message=f"no fictitious elements for body {ipl}")
+
+    # Propagate through _keplerian_to_ecliptic_j2000: it applies the
+    # element-equinox precession to J2000 correctly and uses the
+    # Gaussian mean motion (calc_orbital_position does neither).
+    from types import SimpleNamespace
+
+    ad = SimpleNamespace(
+        epoch=elem.epoch_jd,
+        M0=elem.mean_anomaly.evaluate(0.0),
+        n=0.9856076686 / elem.semi_axis**1.5,
+        e=elem.eccentricity.evaluate(0.0),
+        a=elem.semi_axis,
+        omega=elem.arg_perihelion.evaluate(0.0),
+        Omega=elem.asc_node.evaluate(0.0),
+        i=elem.inclination.evaluate(0.0),
+        equinox_jd=elem.equinox_jd,
+    )
+    ad_typed = cast(UranianKeplerianElements, ad)
+    lon, lat, dist = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt)
+    h = 0.5
+    lon_p, lat_p, dist_p = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt - h)
+    lon_n, lat_n, dist_n = _keplerian_to_ecliptic_j2000(ad_typed, jd_tt + h)
+    dlon = ((lon_n - lon_p + 180.0) % 360.0) - 180.0
+    return (lon, lat, dist, dlon, lat_n - lat_p, dist_n - dist_p)
+
+
 def calc_uranian_longitude(ipl: int, jd_tt: float) -> float:
     """
     Calculate the ecliptic longitude of a Uranian (Hamburg School) planet.
@@ -2221,26 +2385,13 @@ def calc_uranian_longitude(ipl: int, jd_tt: float) -> float:
         >>> lon = calc_uranian_longitude(CUPIDO, 2451545.0)  # J2000.0
         >>> print(f"Cupido longitude: {lon:.4f}")
     """
-    if ipl not in URANIAN_ELEMENTS:
+    if ipl not in URANIAN_KEPLERIAN_ELEMENTS:
         raise ValueError(f"Body ID {ipl} is not a valid Uranian planet")
 
-    elements = URANIAN_ELEMENTS[ipl]
-
-    # Calculate T = Julian centuries from J2000.0
-    T = (jd_tt - 2451545.0) / 36525.0
-
-    # Mean longitude
-    longitude = elements.L0 + elements.n * T
-
-    # Add periodic oscillation if amplitude is non-zero
-    if elements.amplitude != 0.0:
-        arg = elements.phase + elements.phase_rate * T
-        longitude += elements.amplitude * math.sin(math.radians(arg))
-
-    # Normalize to 0-360 degrees
-    longitude = longitude % 360.0
-
-    return longitude
+    # Delegate to the verified Keplerian element set; the legacy
+    # mean-longitude oscillation table (URANIAN_ELEMENTS) carries
+    # contradictory values and is no longer consulted.
+    return calc_uranian_planet(ipl, jd_tt)[0]
 
 
 def calc_uranian_position(
@@ -2274,49 +2425,12 @@ def calc_uranian_position(
         >>> pos = calc_uranian_position(KRONOS, 2451545.0)
         >>> print(f"Kronos at {pos[0]:.4f} deg, dist {pos[2]:.2f} AU")
     """
-    if ipl not in URANIAN_ELEMENTS:
+    if ipl not in URANIAN_KEPLERIAN_ELEMENTS:
         raise ValueError(f"Body ID {ipl} is not a valid Uranian planet")
 
-    elements = URANIAN_ELEMENTS[ipl]
-
-    # Calculate longitude
-    longitude = calc_uranian_longitude(ipl, jd_tt)
-
-    # Latitude is assumed to be 0 (on ecliptic)
-    latitude = 0.0
-
-    # Estimate distance from mean motion using Kepler's 3rd law
-    # n (deg/century) -> n (deg/day) = n / 36525
-    # n (rad/day) = n (deg/day) * pi / 180
-    # For circular orbit: n = sqrt(GM / a^3), where GM = k^2 (Gaussian constant)
-    # k = 0.01720209895 AU^(3/2) / day
-    # n = k / a^(3/2)  => a = (k / n)^(2/3)
-    n_deg_per_day = elements.n / 36525.0
-    n_rad_per_day = math.radians(n_deg_per_day)
-    k = 0.01720209895  # Gaussian gravitational constant
-
-    if n_rad_per_day > 0:
-        distance = (k / n_rad_per_day) ** (2.0 / 3.0)
-    else:
-        distance = 100.0  # Default large distance
-
-    # Calculate velocity (central difference numerical differentiation)
-    dt = 1.0 / 86400.0  # 1 second in days
-    lon_prev = calc_uranian_longitude(ipl, jd_tt - dt)
-    lon_next = calc_uranian_longitude(ipl, jd_tt + dt)
-
-    # Handle wrap-around
-    dlon = (lon_next - lon_prev) / (2.0 * dt)
-    if dlon > 180.0 / (2.0 * dt):
-        dlon -= 360.0 / (2.0 * dt)
-    elif dlon < -180.0 / (2.0 * dt):
-        dlon += 360.0 / (2.0 * dt)
-
-    # Latitude and distance are constant
-    dlat = 0.0
-    ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the verified Keplerian element set (see
+    # calc_uranian_longitude).
+    return calc_uranian_planet(ipl, jd_tt)
 
 
 def calc_cupido(jd_tt: float) -> Tuple[float, float, float, float, float, float]:
@@ -2871,11 +2985,17 @@ def calc_uranian_planet(
     pos_next = _keplerian_to_ecliptic_j2000(elements, jd_tt + dt_step)
 
     dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around at 0/360 boundary
-    if dlon > 180.0:
-        dlon -= 360.0
-    elif dlon < -180.0:
-        dlon += 360.0
+    # Handle wrap-around at the 0/360 boundary. The positions are normalised to
+    # [0, 360), so a boundary crossing shows up as a ~360 deg jump in the raw
+    # difference; after dividing by 2*dt_step the artefact is ~360/(2*dt_step),
+    # so the detection threshold and correction must carry the same factor.
+    # Valid only because these bodies are slow (<<90 deg/day at dt_step=1): a
+    # real speed above 180/(2*dt_step) cannot occur, so it can only be a wrap.
+    # Do NOT reuse this for fast bodies -- it would misread real motion.
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
 
     dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
     ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
@@ -3282,115 +3402,31 @@ def calc_white_moon_position(
     jd_tt: float,
     use_true_lilith: bool = False,
 ) -> Tuple[float, float, float, float, float, float]:
-    """
-    Calculate the position of the White Moon (Selena).
+    """Position of the White Moon (Selena).
 
-    The White Moon (also called Selena) is a symbolic astrological point defined
-    as the lunar perigee - the point 180 degrees opposite to Black Moon Lilith
-    (the lunar apogee). It represents the closest approach of the Moon to Earth,
-    symbolically associated with positive lunar qualities.
+    Uses the published circular geocentric orbit (the standard
+    orbital-elements convention for this body): mean longitude
+    242.2205555 + 5143.5418158*T degrees (T in Julian centuries from
+    J2000, equinox of date), radius 0.05280098949 AU, zero eccentricity
+    and inclination. The longitude advances 0.140822 degrees/day
+    (a 7-year cycle).
 
-    Definition:
-        White Moon Selena = Mean Lilith + 180° (default, matching reference API)
-        This uses the mean lunar apogee, which ignores short-period oscillations.
-
-    True Lilith-based Definition:
-        White Moon Selena = True Lilith + 180° (optional via use_true_lilith=True)
-        This uses the osculating (true) lunar apogee, which includes perturbations.
-        The true apogee oscillates ±5-10° from the mean position.
-
-    Astronomical Background:
-        - Black Moon Lilith (lunar apogee) = point where Moon is farthest from Earth
-        - White Moon Selena (lunar perigee) = point where Moon is closest to Earth
-        - Mean apogee progresses at ~40.69°/year (apsidal precession period ~8.85 years)
+    The ``use_true_lilith`` parameter is kept for backward compatibility
+    and is ignored: the reference defines Selena by these elements, not
+    as the anti-apogee.
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
-        use_true_lilith: If True, calculate based on True (osculating) Lilith
-                         instead of Mean Lilith. Default is False to match
-                         the reference API convention.
+        use_true_lilith: Ignored (kept for API compatibility).
 
     Returns:
-        Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
-            - longitude: Ecliptic longitude in degrees (0-360)
-            - latitude: Ecliptic latitude in degrees (0 for mean-based, varies for true)
-            - distance: Distance (0 for symbolic point, or apogee distance for true)
-            - dlon: Daily longitude change in degrees/day
-            - dlat: Daily latitude change in degrees/day
-            - ddist: Daily distance change in AU/day
-
-    Note:
-        This is a symbolic calculation. The White Moon is not a physical body,
-        but rather a calculated point representing the lunar perigee direction.
-
-    Example:
-        >>> from libephemeris.hypothetical import calc_white_moon_position
-        >>> pos = calc_white_moon_position(2451545.0)  # J2000.0, mean-based
-        >>> print(f"White Moon at {pos[0]:.4f} deg")
-        >>> pos_true = calc_white_moon_position(2451545.0, use_true_lilith=True)
-        >>> print(f"White Moon (true) at {pos_true[0]:.4f} deg")
-
-    References:
-        - Reference documentation on fictitious objects
-        - Jacobson: "The Dark Moon Lilith in Astrology" (1961)
+        Tuple of (longitude, latitude, distance, dlon, dlat, ddist) -
+        geocentric ecliptic of date, distance in AU.
     """
-    # Import lunar module to get Lilith position
-    from . import lunar
-
-    if use_true_lilith:
-        # Use True (osculating) Lilith - includes perturbations
-        lilith_lon, lilith_lat, lilith_dist = lunar.calc_true_lilith(jd_tt)
-
-        # White Moon is opposite to Black Moon
-        longitude = (lilith_lon + 180.0) % 360.0
-
-        # For true-based calculation, latitude is opposite (symmetric point)
-        # Note: True Lilith has non-zero latitude due to inclination of apsidal line
-        latitude = -lilith_lat  # Opposite point has opposite latitude
-
-        # Distance is same as Lilith (apogee distance = perigee distance conceptually,
-        # but for a symbolic point we use 0)
-        distance = 0.0  # Symbolic point, no meaningful distance
-
-        # Calculate velocity via numerical differentiation
-        dt = 1.0 / 86400.0  # 1 second step
-        lilith_next_lon, lilith_next_lat, _ = lunar.calc_true_lilith(jd_tt + dt)
-
-        lilith_dlon = (lilith_next_lon - lilith_lon) / dt
-        # Handle wrap-around
-        if lilith_dlon > 180.0 / dt:
-            lilith_dlon -= 360.0 / dt
-        elif lilith_dlon < -180.0 / dt:
-            lilith_dlon += 360.0 / dt
-
-        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
-        dlat = -(lilith_next_lat - lilith_lat) / dt  # Opposite latitude change
-        ddist = 0.0
-    else:
-        # Use Mean Lilith - default, standard approach
-        lilith_lon = lunar.calc_mean_lilith(jd_tt)
-
-        # White Moon is opposite to Black Moon
-        longitude = (lilith_lon + 180.0) % 360.0
-
-        # Latitude, distance, and velocities are simplified for mean calculation
-        latitude = 0.0
-        distance = 0.0  # Symbolic point, no meaningful distance
-
-        # Calculate velocity via numerical differentiation
-        dt = 1.0 / 86400.0  # 1 second step
-        lilith_next = lunar.calc_mean_lilith(jd_tt + dt)
-        lilith_dlon = (lilith_next - lilith_lon) / dt
-        if lilith_dlon > 180.0 / dt:
-            lilith_dlon -= 360.0 / dt
-        elif lilith_dlon < -180.0 / dt:
-            lilith_dlon += 360.0 / dt
-
-        dlon = lilith_dlon  # Same rate, just offset by 180 degrees
-        dlat = 0.0
-        ddist = 0.0
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    t_cent = (jd_tt - 2451545.0) / 36525.0
+    lon = (242.2205555 + 5143.5418158 * t_cent) % 360.0
+    dlon = 5143.5418158 / 36525.0
+    return (lon, 0.0, 0.05280098949, dlon, 0.0, 0.0)
 
 
 def calc_waldemath_position(
@@ -3445,11 +3481,11 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
     cycles of death and rebirth, and the shadow self.
 
     Orbital elements used (traditional astrological):
-        - Epoch: J2000.0 (JD 2451545.0)
-        - Semi-major axis: 81.0 AU (beyond Neptune and Pluto)
+        - Epoch: J1900.0 (JD 2415020.0)
+        - Semi-major axis: 79.225630 AU (beyond Neptune and Pluto)
         - Eccentricity: 0.0 (circular orbit)
         - Inclination: 0.0 degrees (on ecliptic)
-        - Orbital period: ~729 years (derived from Kepler's 3rd law)
+        - Orbital period: ~705 years (derived from Kepler's 3rd law)
 
     Note: Different astrologers may use different orbital elements for Proserpina.
     This implementation uses a simple circular orbit model.
@@ -3461,7 +3497,7 @@ def calc_proserpina(jd_tt: float) -> Tuple[float, float, float, float, float, fl
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
             - longitude: Heliocentric ecliptic longitude in degrees (0-360)
             - latitude: Ecliptic latitude in degrees (0 for circular orbit on ecliptic)
-            - distance: Distance from Sun in AU (81.0 AU, constant for circular orbit)
+            - distance: Distance from Sun in AU (79.225630 AU, constant for circular orbit)
             - dlon: Daily longitude change in degrees/day
             - dlat: Daily latitude change in degrees/day (0)
             - ddist: Daily distance change in AU/day (0 for circular orbit)
@@ -3534,67 +3570,12 @@ def calc_planet_x_lowell(
         >>> pos = calc_planet_x_lowell(2451545.0)  # J2000.0
         >>> print(f"Planet X Lowell at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = LOWELL_PLANET_X_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to ecliptic frame
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    # Convert to spherical coordinates
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    # Calculate velocity via central difference numerical differentiation
-    dt_step = 1.0  # 1 day step for daily velocity
-    pos_prev = _calc_planet_x_lowell_raw(jd_tt - dt_step)
-    pos_next = _calc_planet_x_lowell_raw(jd_tt + dt_step)
-
-    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around
-    if dlon > 180.0 / (2.0 * dt_step):
-        dlon -= 360.0 / (2.0 * dt_step)
-    elif dlon < -180.0 / (2.0 * dt_step):
-        dlon += 360.0 / (2.0 * dt_step)
-
-    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
-    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the canonical published-element path (Hoyt 1980, via
+    # data/fictitious_orbits.csv) that calc_hypothetical_position and the
+    # public calc() API already use for this body, so every route agrees.
+    # The legacy LOWELL_PLANET_X_ELEMENTS set and _calc_planet_x_lowell_raw
+    # are no longer consulted at runtime (see CLEAN.md).
+    return calc_fictitious_position(PLUTO_LOWELL, jd_tt)
 
 
 def _calc_planet_x_lowell_raw(jd_tt: float) -> Tuple[float, float, float]:
@@ -3683,67 +3664,13 @@ def calc_planet_x_pickering(
         >>> pos = calc_planet_x_pickering(2451545.0)  # J2000.0
         >>> print(f"Planet X Pickering at {pos[0]:.4f} deg, distance {pos[2]:.2f} AU")
     """
-    elements = PICKERING_PLANET_X_ELEMENTS
-
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
-
-    # Mean anomaly
-    M = (elements.M0 + elements.n * dt) % 360.0
-    M_rad = math.radians(M)
-
-    # Solve Kepler's equation for eccentric anomaly
-    E = _solve_kepler_equation(M_rad, elements.e)
-
-    # True anomaly
-    sqrt_term = math.sqrt((1.0 + elements.e) / (1.0 - elements.e))
-    nu = 2.0 * math.atan(sqrt_term * math.tan(E / 2.0))
-
-    # Distance from Sun (heliocentric)
-    r = elements.a * (1.0 - elements.e * math.cos(E))
-
-    # Argument of latitude (measured from ascending node)
-    u = nu + math.radians(elements.omega)
-
-    # Convert to ecliptic coordinates
-    i_rad = math.radians(elements.i)
-    Omega_rad = math.radians(elements.Omega)
-
-    # Position in orbital plane
-    x_orb = r * math.cos(u)
-    y_orb = r * math.sin(u)
-
-    # Rotate to ecliptic frame
-    cos_i = math.cos(i_rad)
-    sin_i = math.sin(i_rad)
-    cos_Omega = math.cos(Omega_rad)
-    sin_Omega = math.sin(Omega_rad)
-
-    x_ecl = cos_Omega * x_orb - sin_Omega * cos_i * y_orb
-    y_ecl = sin_Omega * x_orb + cos_Omega * cos_i * y_orb
-    z_ecl = sin_i * y_orb
-
-    # Convert to spherical coordinates
-    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
-    latitude = math.degrees(math.asin(z_ecl / r)) if r > 0 else 0.0
-    distance = r
-
-    # Calculate velocity via central difference numerical differentiation
-    dt_step = 1.0  # 1 day step for daily velocity
-    pos_prev = _calc_planet_x_pickering_raw(jd_tt - dt_step)
-    pos_next = _calc_planet_x_pickering_raw(jd_tt + dt_step)
-
-    dlon = (pos_next[0] - pos_prev[0]) / (2.0 * dt_step)
-    # Handle wrap-around
-    if dlon > 180.0 / (2.0 * dt_step):
-        dlon -= 360.0 / (2.0 * dt_step)
-    elif dlon < -180.0 / (2.0 * dt_step):
-        dlon += 360.0 / (2.0 * dt_step)
-
-    dlat = (pos_next[1] - pos_prev[1]) / (2.0 * dt_step)
-    ddist = (pos_next[2] - pos_prev[2]) / (2.0 * dt_step)
-
-    return (longitude, latitude, distance, dlon, dlat, ddist)
+    # Delegate to the canonical published-element path (Hoyt 1980, via
+    # data/fictitious_orbits.csv) that calc_hypothetical_position and the
+    # public calc() API already use for this body, so every route agrees.
+    # The legacy PICKERING_PLANET_X_ELEMENTS set and
+    # _calc_planet_x_pickering_raw are no longer consulted at runtime
+    # (see CLEAN.md).
+    return calc_fictitious_position(PLUTO_PICKERING, jd_tt)
 
 
 def _calc_planet_x_pickering_raw(jd_tt: float) -> Tuple[float, float, float]:
@@ -3832,6 +3759,9 @@ def calc_hypothetical_position(
     # (Witte/Sieggruen elements refined by Neely 1988)
     if ipl in URANIAN_KEPLERIAN_ELEMENTS:
         return calc_uranian_planet(ipl, jd_tt)
+
+    if ipl in FICTITIOUS_ORBITAL_ELEMENTS:
+        return calc_fictitious_position(ipl, jd_tt)
 
     # Transpluto / Isis
     if ipl == ISIS:

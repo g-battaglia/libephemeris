@@ -16,15 +16,9 @@ from libephemeris.constants import (
     SUN,
     MOON,
     MERCURY,
-    VENUS,
     MARS,
     JUPITER,
     SATURN,
-    URANUS,
-    NEPTUNE,
-    PLUTO,
-    CHIRON,
-    EARTH,
     FLG_SWIEPH,
     FLG_SPEED,
     FLG_HELCTR,
@@ -36,7 +30,6 @@ from libephemeris.constants import (
     FLG_NOGDEFL,
     FLG_EQUATORIAL,
     SIDM_LAHIRI,
-    SIDM_FAGAN_BRADLEY,
 )
 
 

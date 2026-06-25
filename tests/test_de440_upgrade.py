@@ -34,17 +34,17 @@ class TestDE440Default:
     def test_tidal_default_is_de440(self):
         """Verify tidal acceleration constants.
 
-        TIDAL_DEFAULT matches pyswisseph TIDAL_DEFAULT (-25.8).
+        TIDAL_DEFAULT matches the reference ephemeris TIDAL_DEFAULT (-25.8).
         TIDAL_DE440 and TIDAL_DE441 use the JPL DE441 value (-25.936).
         """
-        assert TIDAL_DEFAULT == -25.8  # Matches pyswisseph TIDAL_DEFAULT
+        assert TIDAL_DEFAULT == -25.8  # Matches the reference ephemeris TIDAL_DEFAULT
         assert TIDAL_DE440 == -25.936
         assert TIDAL_DE441 == -25.936  # DE441 uses same value
 
     def test_get_tid_acc_returns_de440_default(self):
         """Verify that get_tid_acc() returns the default tidal acceleration value.
 
-        The default tidal acceleration matches pyswisseph TIDAL_DEFAULT (-25.8),
+        The default tidal acceleration matches the reference ephemeris TIDAL_DEFAULT (-25.8),
         not the DE440-specific value (-25.936).
         """
         # Reset to ensure default state

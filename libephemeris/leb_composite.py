@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """
 Composite reader that wraps multiple LEB readers (LEB1 and/or LEB2).
 
@@ -13,7 +15,8 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from contextlib import suppress
+from typing import Any, Dict, List, Optional, Tuple
 
 from .leb_format import StarEntry
 
@@ -36,7 +39,7 @@ class CompositeLEBReader:
             raise ValueError("CompositeLEBReader requires at least one reader")
 
         self._readers = readers
-        self._body_map: Dict[int, object] = {}  # body_id -> reader
+        self._body_map: Dict[int, Any] = {}  # body_id -> reader
 
         # Build body -> reader dispatch map
         for reader in readers:
@@ -45,7 +48,7 @@ class CompositeLEBReader:
                     self._body_map[body_id] = reader
 
         # Expose _bodies for fast_calc.py compatibility (accesses reader._bodies[ipl])
-        self._bodies = {}
+        self._bodies: Dict[int, Any] = {}
         for reader in readers:
             for body_id, entry in reader._bodies.items():
                 if body_id not in self._bodies:
@@ -58,8 +61,8 @@ class CompositeLEBReader:
         for reader in readers:
             if (
                 self._nutation_reader is None
-                and hasattr(reader, "_nutation")
-                and reader._nutation is not None
+                and hasattr(reader, "has_nutation")
+                and reader.has_nutation()
             ):
                 self._nutation_reader = reader
             if (
@@ -99,15 +102,58 @@ class CompositeLEBReader:
         if not leb_files:
             raise FileNotFoundError(f"No .leb/.leb2 files found in {directory}")
 
+        # Tier detection. Filenames encode the tier either as {tier}_{group}
+        # (group-file scheme), as {custom}_{tier}_{group}, or as a bare
+        # known-tier token (e.g. ephemeris_base.leb); files with no recognizable
+        # tier are not constrained by the guard below.
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+        _KNOWN_TIERS = {"base", "medium", "extended"}
+
+        def _file_tier(path: str) -> Optional[str]:
+            parts = os.path.basename(path).rsplit(".", 1)[0].split("_")
+            if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
+                prefix = "_".join(parts[:-1])
+                if prefix in _KNOWN_TIERS:
+                    return prefix
+                # A custom multi-token prefix (e.g. "myset_base") is not itself a
+                # known tier; fall through to the token scan so an embedded
+                # tier token ("base") is still detected rather than returning None.
+            for token in parts:
+                if token in _KNOWN_TIERS:
+                    return token
+            return None
+
+        # Open the readers first, then apply the tier guard to the files that
+        # actually opened. Computing tiers from filenames alone would let a
+        # corrupt/0-byte different-tier stub (e.g. an interrupted download) abort
+        # a composite that the skip-invalid loop would otherwise have built.
         readers = []
+        opened_paths = []
         for path in leb_files:
             try:
                 readers.append(open_leb(path))
+                opened_paths.append(path)
             except (ValueError, OSError):
                 continue  # skip invalid files
 
         if not readers:
             raise ValueError(f"No valid .leb files found in {directory}")
+
+        # Tier guard: refuse to silently merge files from different tiers
+        # (e.g. base_core.leb2 + medium_core.leb2) — they share body ids but
+        # cover different date ranges with different fits, so a first-wins merge
+        # would corrupt positions. Mirrors the tier check in
+        # from_file_with_companions.
+        tiers = {t for t in (_file_tier(p) for p in opened_paths) if t is not None}
+        if len(tiers) > 1:
+            for reader in readers:
+                with suppress(OSError, ValueError, KeyError, AttributeError):
+                    reader.close()
+            raise ValueError(
+                "Refusing to build a composite from mixed tiers in "
+                f"{directory}: {sorted(tiers)}. All files must share one tier "
+                "(base/medium/extended)."
+            )
 
         return cls(readers)
 
@@ -138,14 +184,24 @@ class CompositeLEBReader:
 
         readers = [open_leb(path)]
 
-        if len(parts) >= 2:
-            prefix = parts[0]  # e.g., "base"
-            # Find companion files with same prefix (both extensions)
+        # Companions exist only for the group-file naming scheme
+        # ({tier}_{group}.leb2).  A merged file (e.g. "ephemeris_base.leb")
+        # is complete on its own — a bare first-token prefix match would
+        # pull in other tiers ("ephemeris_medium.leb", ...) and stale
+        # partials, silently mixing tiers in one composite.
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+
+        if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
+            prefix = "_".join(parts[:-1])  # e.g., "base"
             companions = sorted(
                 glob.glob(os.path.join(directory, f"{prefix}_*.leb"))
                 + glob.glob(os.path.join(directory, f"{prefix}_*.leb2"))
             )
             for companion_path in companions:
+                cname = os.path.basename(companion_path).rsplit(".", 1)[0]
+                cparts = cname.split("_")
+                if cparts[:-1] != parts[:-1] or cparts[-1] not in _GROUP_SUFFIXES:
+                    continue
                 if os.path.abspath(companion_path) != os.path.abspath(path):
                     try:
                         readers.append(open_leb(companion_path))
@@ -225,6 +281,12 @@ class CompositeLEBReader:
                 pass
         self._readers.clear()
         self._body_map.clear()
+        # Drop aux-reader references too: they point at now-closed readers,
+        # and a post-close delta_t()/eval_nutation() should fail with the
+        # clean "no data" ValueError rather than a struct/TypeError.
+        self._nutation_reader = None
+        self._delta_t_reader = None
+        self._star_reader = None
 
     def __enter__(self) -> "CompositeLEBReader":
         return self

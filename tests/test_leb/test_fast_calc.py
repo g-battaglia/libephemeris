@@ -829,7 +829,7 @@ class TestSiderealRegressionBug2:
 
 class TestSiderealRegressionBug3:
     """Bug 3 regression (commit 9f0fde7):
-    pyswisseph ignores FLG_J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
+    the reference ephemeris ignores FLG_J2000 for TrueNode, OscuApog, IntpApog, IntpPerg
     when SIDEREAL is set.  MeanNode and MeanApog precess to J2000 normally.
 
     Only MeanNode is in the test LEB.  We verify MeanNode SID+J2K DOES differ

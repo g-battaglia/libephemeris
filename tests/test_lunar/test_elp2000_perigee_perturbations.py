@@ -65,58 +65,6 @@ class TestELP2000PerigeePerturbationsBasic:
         assert isinstance(pert, float)
 
 
-class TestELP2000PerigeePerturbationsPrecision:
-    """Precision tests.
-
-    Since JPL-derived interpolated perigee differs from SE by ~11 deg RMS,
-    these tests use relaxed thresholds for SE comparison.
-    """
-
-    def test_precision_at_j2000(self):
-        """Test precision at J2000.0 epoch - accept up to 15 deg SE difference."""
-        swe = pytest.importorskip("swisseph")
-
-        jd_ut = 2451545.0
-        jd_tt = jd_ut + 69.184 / 86400.0
-
-        pos_se, _ = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
-        se_lon = pos_se[0]
-
-        our_lon, _, _ = lunar.calc_interpolated_perigee(jd_tt)
-
-        error = normalize_angle_diff(our_lon - se_lon)
-        assert abs(error) < 15.0, f"Error at J2000.0: {error} deg"
-
-    def test_se_comparison_intrinsic_difference(self):
-        """Verify that SE-JPL difference is in expected range (~1-2 deg RMS).
-
-        This documents the intrinsic difference between the JPL-calibrated
-        v2.2 perturbation series and SE's Moshier analytical method.
-        With the v2.2 calibration + correction table, this should be ~1-2 deg.
-        """
-        swe = pytest.importorskip("swisseph")
-
-        errors = []
-        for year in range(1900, 2101, 10):
-            jd_ut = julday(year, 1, 15, 12.0)
-            jd_tt = jd_ut + 69.184 / 86400.0
-
-            pos_se, _ = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
-            se_lon = pos_se[0]
-
-            our_lon, _, _ = lunar.calc_interpolated_perigee(jd_tt)
-            error = normalize_angle_diff(our_lon - se_lon)
-            errors.append(error)
-
-        rms_error = math.sqrt(sum(e**2 for e in errors) / len(errors))
-        max_error = max(abs(e) for e in errors)
-
-        assert rms_error < 5.0, (
-            f"Expected < 5 deg RMS JPL-SE difference, got {rms_error:.2f} deg"
-        )
-        assert max_error < 10.0, f"Max error {max_error:.2f} deg unexpectedly high"
-
-
 class TestELP2000PerigeePerturbationsTerms:
     """Test specific perturbation term contributions."""
 
@@ -158,19 +106,6 @@ class TestELP2000PerigeePerturbationsEdgeCases:
         our_lon, _, _ = lunar.calc_interpolated_perigee(jd_tt)
         assert 0.0 <= our_lon < 360.0, f"Longitude {our_lon} not in [0, 360)"
 
-    def test_at_year_2100(self):
-        """Test calculation at year 2100."""
-        swe = pytest.importorskip("swisseph")
-
-        jd_ut = julday(2100, 12, 31, 0.0)
-        jd_tt = jd_ut + 69.184 / 86400.0
-
-        our_lon, _, _ = lunar.calc_interpolated_perigee(jd_tt)
-
-        pos_se, _ = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
-        error = normalize_angle_diff(our_lon - pos_se[0])
-        assert abs(error) < 15.0, f"Error at 2100: {error} deg"
-
     def test_continuity_over_month(self):
         """Test that perigee position is continuous over a month."""
         prev_lon = None
@@ -193,7 +128,7 @@ class TestELP2000PerigeePerturbationsJPL:
     """JPL self-consistency tests.
 
     These validate the interpolated perigee against known physical properties
-    derived from JPL DE440/DE441, without requiring swisseph.
+    derived from JPL DE440/DE441, without requiring any external reference.
 
     Tests cover:
     - Mean apsidal precession rate (~40.69 deg/yr, Simon et al. 1994)
@@ -431,28 +366,4 @@ class TestELP2000PerigeePerturbationsSupermoon:
 
             assert 0.0 <= our_lon < 360.0, (
                 f"Invalid longitude {our_lon} at {year}-{month}-{day}"
-            )
-
-    def test_supermoon_se_comparison(self):
-        """Test SE comparison at supermoon dates with relaxed threshold."""
-        swe = pytest.importorskip("swisseph")
-
-        test_dates = [
-            (2015, 9, 27),
-            (2016, 11, 14),
-            (2019, 2, 19),
-            (2021, 4, 27),
-            (2023, 8, 30),
-        ]
-
-        for year, month, day in test_dates:
-            jd_ut = julday(year, month, day, 0.0)
-            jd_tt = jd_ut + 69.184 / 86400.0
-
-            pos_se, _ = swe.calc_ut(jd_ut, swe.INTP_PERG, 0)
-            our_lon, _, _ = lunar.calc_interpolated_perigee(jd_tt)
-
-            error = normalize_angle_diff(our_lon - pos_se[0])
-            assert abs(error) < 15.0, (
-                f"Error at supermoon {year}-{month}-{day}: {error} deg"
             )

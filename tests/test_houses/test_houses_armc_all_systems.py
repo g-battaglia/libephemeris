@@ -12,7 +12,6 @@ import math
 import pytest
 
 import libephemeris as swe
-from libephemeris.constants import FLG_SWIEPH
 from libephemeris.exceptions import PolarCircleError
 
 

@@ -16,7 +16,6 @@ from libephemeris.crossing import (
     get_station_info,
     _is_near_station,
     STATION_SPEED_THRESHOLD,
-    STATION_VELOCITY_TOLERANCE,
 )
 from libephemeris.constants import (
     SUN,

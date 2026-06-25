@@ -350,3 +350,101 @@ class TestCalcAsteroidNetworkIntegration:
         assert 0 <= lon < 360
         assert -90 <= lat <= 90
         assert dist > 0
+
+
+class TestArbitraryAsteroidViaCalcUt:
+    """calc_ut accepts any AST_OFFSET + N (registered SPK -> auto-SPK ->
+    Keplerian/SBDB -> UnknownBodyError)."""
+
+    def setup_method(self):
+        clear_asteroid_elements_cache()
+
+    def _mock_urlopen(self, payload):
+        import json
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(payload).encode("utf-8")
+        mock_response.__enter__ = lambda x: mock_response
+        mock_response.__exit__ = lambda *args: None
+        return mock_response
+
+    def test_calc_ut_arbitrary_asteroid_keplerian(self):
+        """An asteroid outside the curated table computes via SBDB elements."""
+        import urllib.request
+
+        import libephemeris as swe
+        from libephemeris import state
+
+        prev = state.get_auto_spk_download()
+        state.set_auto_spk_download(False)
+        try:
+            with patch.object(
+                urllib.request,
+                "urlopen",
+                return_value=self._mock_urlopen(MOCK_SBDB_RESPONSE_SMALL),
+            ):
+                pos, retflag = swe.calc_ut(2451545.0, AST_OFFSET + 12345, 0)
+            assert len(pos) == 6
+            assert all(type(v) is float for v in pos)
+            assert 0 <= pos[0] < 360
+            assert -90 <= pos[1] <= 90
+            # a=2.5, e=0.15 main-belt orbit seen from Earth
+            assert 1.0 < pos[2] < 4.0
+        finally:
+            state.set_auto_spk_download(prev)
+
+    def test_calc_ut_unknown_asteroid_raises_unknown_body(self):
+        """SBDB failure surfaces as UnknownBodyError, not silent zeros."""
+        import urllib.error
+        import urllib.request
+
+        import libephemeris as swe
+        from libephemeris import state
+        from libephemeris.exceptions import UnknownBodyError
+
+        prev = state.get_auto_spk_download()
+        state.set_auto_spk_download(False)
+        try:
+            with patch.object(
+                urllib.request,
+                "urlopen",
+                side_effect=urllib.error.URLError("offline"),
+            ):
+                with pytest.raises(UnknownBodyError):
+                    swe.calc_ut(2451545.0, AST_OFFSET + 876543, 0)
+        finally:
+            state.set_auto_spk_download(prev)
+
+    def test_builtin_remap_unchanged(self):
+        """AST_OFFSET + 1 still computes Ceres via the dedicated pipeline."""
+        import libephemeris as swe
+        from libephemeris.constants import CERES
+
+        pos_ast, _ = swe.calc_ut(2451545.0, AST_OFFSET + 1, 0)
+        pos_ceres, _ = swe.calc_ut(2451545.0, CERES, 0)
+        assert pos_ast == pos_ceres
+
+
+class TestKeplerianFrameContract:
+    """Keplerian fallback output is ecliptic of date (matches SPK paths)."""
+
+    def test_curated_keplerian_close_to_spk_grade_near_now(self):
+        """Without the J2000->date precession this is off by ~1300"."""
+        import libephemeris as swe
+        from libephemeris.constants import CERES, FLG_HELCTR, FLG_TRUEPOS
+        from libephemeris.minor_bodies import calc_minor_body_heliocentric
+
+        jd = 2461204.5  # 2026-06-13
+        lon_k, lat_k, _ = calc_minor_body_heliocentric(CERES, jd, use_spk=False)
+        pos_ref, _ = swe.calc_ut(
+            jd - 69.0 / 86400.0, CERES, FLG_HELCTR | FLG_TRUEPOS
+        )
+        dlon = (
+            abs((pos_ref[0] - lon_k + 180) % 360 - 180)
+            * 3600
+            * math.cos(math.radians(lat_k))
+        )
+        # Multi-epoch curated elements stay within tens of arcsec of the
+        # SPK/DE-grade position near the present epoch; the pre-fix frame
+        # bias alone was ~1290".
+        assert dlon < 300.0, f"frame bias? dlon={dlon:.1f} arcsec"

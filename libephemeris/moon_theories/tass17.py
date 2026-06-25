@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Third-party/adapted code — see file docstring and THIRD_PARTY_NOTICES.md
 """
 TASS 1.7 - Theorie Analytique des Satellites de Saturne.
 
@@ -294,11 +296,9 @@ def _elliptic_to_rectangular(
     # First rotate by omega (argument of perihelion) in orbital plane
     x_rot = x_orb * cos_omega - y_orb * sin_omega
     y_rot = x_orb * sin_omega + y_orb * cos_omega
-    z_rot = 0.0
 
     vx_rot = vx_orb * cos_omega - vy_orb * sin_omega
     vy_rot = vx_orb * sin_omega + vy_orb * cos_omega
-    vz_rot = 0.0
 
     # Then rotate by inclination around x-axis
     y_incl = y_rot * cos_i

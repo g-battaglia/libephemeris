@@ -25,7 +25,6 @@ from libephemeris.constants import (
     OSCU_APOG,
     INTP_APOG,
     INTP_PERG,
-    CHIRON,
     FLG_SPEED,
     FLG_SIDEREAL,
     FLG_EQUATORIAL,
@@ -295,9 +294,9 @@ class TestExtSiderealJ2000:
         """True bodies SID+J2K: LEB vs Skyfield (SE bug fix applied).
 
         LibEphemeris intentionally honors FLG_J2000 for TrueNode/OscuApog
-        (pyswisseph silently ignores it — this is a behavioral bug).
+        (the reference ephemeris silently ignores it — this is a behavioral bug).
         Both LEB and Skyfield paths must produce consistent results.
-        See docs/reference/se-bug-sidereal-j2000-nodes.md
+        See docs/comparison/intentional-divergences.md
         """
         flags = FLG_SPEED | FLG_SIDEREAL | FLG_J2000
         max_err = 0.0

@@ -68,7 +68,7 @@ ARIES_STARS = [
 
 # ======== CANCER CONSTELLATION STARS ========
 CANCER_STARS = [
-    (TARF, "Tarf", 42911, 3.52),  # Beta Cnc - brightest
+    (TARF, "Tarf", 40526, 3.52),  # Beta Cnc - brightest
     (ASELLUS_AUSTRALIS, "Asellus Australis", 42911, 3.94),  # Delta Cnc
     (ACUBENS, "Acubens", 44066, 4.25),  # Alpha Cnc
     (ASELLUS_BOREALIS, "Asellus Borealis", 42806, 4.66),  # Gamma Cnc
@@ -104,8 +104,8 @@ AQUARIUS_STARS = [
 
 # ======== PISCES CONSTELLATION STARS ========
 PISCES_STARS = [
-    (ETA_PISCIUM, "Eta Piscium", 5742, 3.62),  # Eta Psc - brightest
-    (ALRESCHA, "Alrescha", 7097, 3.82),  # Alpha Psc
+    (ETA_PISCIUM, "Eta Piscium", 7097, 3.62),  # Eta Psc - brightest
+    (ALRESCHA, "Alrescha", 9487, 3.82),  # Alpha Psc
 ]
 
 
@@ -388,3 +388,42 @@ class TestZodiacalConstellationCoverage:
                 f"Zodiacal constellation {constellation} should have at least "
                 f"{min_count} stars, found {count}"
             )
+
+
+# Regression pins for the three catalog entries that were corrupted in an
+# earlier hand-maintained catalog and fixed in WS6c/WS9a (see
+# REVIEW-2026-06-10.md item C9): Tarf carried delta-Cnc's HIP/position,
+# Eta Piscium's RA was off by ~4.4°, and Alrescha mixed alpha-Psc with
+# eta-Psc's proper motion and the wrong HIP. The catalog is now generated
+# from van Leeuwen 2007 (CDS I/311) by scripts/build_star_catalog_v2.py;
+# these pins keep a regeneration from silently re-introducing the swap.
+# Reference values: van Leeuwen, F. (2007), A&A 474, 653 (CDS I/311/hip2),
+# positions propagated J1991.25 -> J2000.0.
+C9_CATALOG_PINS = [
+    # name,           HIP,    RA_J2000_deg,   Dec_J2000_deg, nomenclature
+    ("Tarf",          40526, 124.128837533,  9.185543869,  "beCnc"),
+    ("Eta Piscium",    7097,  22.870876074, 15.345824593,  "etPsc"),
+    ("Alrescha",       9487,  30.511748813,  2.763761377,  "alPsc"),
+]
+
+
+class TestC9CatalogRegression:
+    """Pin the three formerly-corrupt entries (REVIEW-2026-06-10 C9)."""
+
+    @pytest.mark.parametrize("name,hip,ra,dec,nomen", C9_CATALOG_PINS)
+    def test_c9_entry_astrometry(self, name, hip, ra, dec, nomen):
+        matches = [e for e in STAR_CATALOG if e.name == name]
+        assert len(matches) == 1, f"expected exactly one {name!r} entry"
+        entry = matches[0]
+        assert entry.hip_number == hip, (
+            f"{name}: HIP {entry.hip_number} != {hip} (C9 swap regression)"
+        )
+        assert entry.nomenclature == nomen, (
+            f"{name}: nomenclature {entry.nomenclature!r} != {nomen!r}"
+        )
+        assert entry.data.ra_j2000 == pytest.approx(ra, abs=1e-6), (
+            f"{name}: RA {entry.data.ra_j2000} != {ra}"
+        )
+        assert entry.data.dec_j2000 == pytest.approx(dec, abs=1e-6), (
+            f"{name}: Dec {entry.data.dec_j2000} != {dec}"
+        )
