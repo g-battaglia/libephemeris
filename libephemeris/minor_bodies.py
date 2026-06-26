@@ -3062,6 +3062,11 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
                 else:
                     return None
 
+        # Numbered asteroids start at 1; a bare offset (e.g. spkid 20000000) or a
+        # zero designation yields 0, which is not a valid asteroid number.
+        if asteroid_number <= 0:
+            return None
+
         # Cache the result for future lookups
         _ASTEROID_NAME_CACHE[name_lower] = asteroid_number
 

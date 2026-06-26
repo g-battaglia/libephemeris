@@ -1870,8 +1870,8 @@ def houses_ex2(
         cusps_speed = tuple(cs)
     elif _hsys_code(hsys) == ord("O"):
         # Porphyry: the reference derives the intermediate cusp speeds from the
-        # angle rates as v = v_mc + k·(v_asc − v_mc)/3 with k = 3,2,1,0 for cusps
-        # 1–4 and k = 4,5 for cusps 5–6 (continuing the progression across the IC
+        # angle rates as v = v_mc + k*(v_asc - v_mc)/3 with k = 3,2,1,0 for cusps
+        # 1-4 and k = 4,5 for cusps 5-6 (continuing the progression across the IC
         # rather than re-interpolating toward the Descendant). houses_armc_ex2
         # already applies this; mirror it here so both speed APIs agree and stay
         # 1:1 with the reference.

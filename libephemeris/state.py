@@ -1145,13 +1145,13 @@ def set_topo(lon: float, lat: float, alt: float = 0.0) -> None:
     Set observer's topocentric location for planet calculations.
 
     Args:
-        lon: Geographic longitude in degrees (East positive, range -180 to 180)
+        lon: Geographic longitude in degrees (East positive, range -180 to 360)
         lat: Geographic latitude in degrees (North positive, range -90 to 90)
         alt: Elevation above sea level in meters
 
     Raises:
         CoordinateError: If latitude is outside [-90, 90] or
-                        longitude is outside [-180, 180]
+                        longitude is outside [-180, 360]
 
     Note:
         Required for topocentric calculations (FLG_TOPOCTR),

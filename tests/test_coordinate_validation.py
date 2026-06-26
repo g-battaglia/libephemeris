@@ -233,8 +233,10 @@ class TestSweHousesValidation:
         cusps_east, ascmc_east = ephem.houses(jd, 45.0, 200.0, ord("P"))
         cusps_signed, ascmc_signed = ephem.houses(jd, 45.0, -160.0, ord("P"))
         assert len(cusps_east) == 12
-        for ce, cs in zip(cusps_east, cusps_signed):
+        for ce, cs in zip(cusps_east, cusps_signed, strict=True):
             assert abs(ce - cs) < 1e-6, (ce, cs)
+        for ae, a_s in zip(ascmc_east, ascmc_signed, strict=True):
+            assert abs(ae - a_s) < 1e-6, (ae, a_s)
 
 
 class TestSweHousesArmcValidation:
