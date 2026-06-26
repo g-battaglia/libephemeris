@@ -815,31 +815,38 @@ def validate_latitude(lat: float, func_name: str = "") -> None:
 
 
 def validate_longitude(lon: float, func_name: str = "") -> None:
-    """Validate that longitude is within valid range [-180, 180].
+    """Validate that longitude is within valid range [-180, 360].
+
+    Accepts both the signed convention ([-180, 180], west negative) and the
+    east-positive convention ([0, 360)), since the reference ephemeris
+    interprets geographic longitude modulo 360 degrees. The value is used
+    as-is: the underlying sidereal-time and observer geometry are periodic in
+    360 degrees, so 200 and -160 yield identical results.
 
     Args:
         lon: Geographic longitude in degrees
         func_name: Optional function name for error message context
 
     Raises:
-        CoordinateError: If longitude is outside [-180, 180] range
+        CoordinateError: If longitude is outside [-180, 360] range
 
     Example:
-        >>> validate_longitude(12.5)  # OK
-        >>> validate_longitude(200.0)  # Raises CoordinateError
+        >>> validate_longitude(12.5)   # OK (signed)
+        >>> validate_longitude(200.0)  # OK (east-positive, = -160 deg)
+        >>> validate_longitude(400.0)  # Raises CoordinateError
     """
-    if lon < -180.0 or lon > 180.0:
+    if lon < -180.0 or lon > 360.0:
         prefix = f"{func_name}: " if func_name else ""
         message = (
             f"{prefix}longitude {lon} is out of valid range. "
-            f"Longitude must be between -180 and 180 degrees."
+            f"Longitude must be between -180 and 360 degrees."
         )
         raise CoordinateError(
             message=message,
             coordinate_name="longitude",
             value=lon,
             min_value=-180.0,
-            max_value=180.0,
+            max_value=360.0,
         )
 
 
@@ -853,7 +860,7 @@ def validate_coordinates(lat: float, lon: float, func_name: str = "") -> None:
 
     Raises:
         CoordinateError: If latitude is outside [-90, 90] or
-                        longitude is outside [-180, 180]
+                        longitude is outside [-180, 360]
 
     Example:
         >>> validate_coordinates(41.9, 12.5)  # OK (Rome)

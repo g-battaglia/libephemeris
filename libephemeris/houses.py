@@ -1857,7 +1857,8 @@ def houses_ex2(
     # jumps. For these we report the speed of the point that drives the wheel —
     # the Ascendant rate on cusps 1/7, the MC rate on 4/10, zero on the
     # intermediates — i.e. the astrologically meaningful daily motion of the
-    # chart frame. Every other system (including Porphyry) keeps the true
+    # chart frame. Porphyry ('O') uses the reference's analytic cusp-speed
+    # progression (handled below); every other system keeps the true
     # time-derivative computed above, which by construction integrates to the
     # cusp's actual motion.
     if _hsys_code(hsys) in (ord("W"), ord("N"), ord("U")):
@@ -1867,6 +1868,18 @@ def houses_ex2(
         cs[6] = ascmc_speed[0]  # cusp 7  = Desc
         cs[9] = ascmc_speed[1]  # cusp 10 = MC
         cusps_speed = tuple(cs)
+    elif _hsys_code(hsys) == ord("O"):
+        # Porphyry: the reference derives the intermediate cusp speeds from the
+        # angle rates as v = v_mc + k·(v_asc − v_mc)/3 with k = 3,2,1,0 for cusps
+        # 1–4 and k = 4,5 for cusps 5–6 (continuing the progression across the IC
+        # rather than re-interpolating toward the Descendant). houses_armc_ex2
+        # already applies this; mirror it here so both speed APIs agree and stay
+        # 1:1 with the reference.
+        v_asc = ascmc_speed[0]
+        v_mc = ascmc_speed[1]
+        step = (v_asc - v_mc) / 3.0
+        ks = [3, 2, 1, 0, 4, 5]
+        cusps_speed = tuple(v_mc + ks[i % 6] * step for i in range(len(cusps)))
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 

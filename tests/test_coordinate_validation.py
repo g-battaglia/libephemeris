@@ -96,15 +96,20 @@ class TestValidateLongitude:
         for lon in valid_values:
             validate_longitude(lon)  # Should not raise
 
+    def test_valid_east_longitudes(self):
+        """East-positive longitudes in (180, 360] should not raise."""
+        for lon in [181.0, 200.0, 270.0, 359.999, 360.0]:
+            validate_longitude(lon)  # Should not raise
+
     def test_invalid_longitude_too_high(self):
-        """Longitude above 180 should raise CoordinateError."""
+        """Longitude above 360 should raise CoordinateError."""
         with pytest.raises(CoordinateError) as exc_info:
-            validate_longitude(181.0)
+            validate_longitude(361.0)
         error = exc_info.value
         assert error.coordinate_name == "longitude"
-        assert error.value == 181.0
+        assert error.value == 361.0
         assert error.min_value == -180.0
-        assert error.max_value == 180.0
+        assert error.max_value == 360.0
 
     def test_invalid_longitude_too_low(self):
         """Longitude below -180 should raise CoordinateError."""
@@ -117,7 +122,7 @@ class TestValidateLongitude:
     def test_longitude_with_func_name(self):
         """Error message should include function name when provided."""
         with pytest.raises(CoordinateError) as exc_info:
-            validate_longitude(200.0, "test_func")
+            validate_longitude(400.0, "test_func")
         assert "test_func" in str(exc_info.value)
 
 
@@ -145,14 +150,14 @@ class TestValidateCoordinates:
     def test_invalid_longitude_in_coordinates(self):
         """Invalid longitude should raise CoordinateError."""
         with pytest.raises(CoordinateError) as exc_info:
-            validate_coordinates(0.0, 200.0)
+            validate_coordinates(0.0, 400.0)
         assert exc_info.value.coordinate_name == "longitude"
 
     def test_latitude_checked_before_longitude(self):
         """Latitude should be validated before longitude."""
         # Both are invalid, but latitude error should be raised first
         with pytest.raises(CoordinateError) as exc_info:
-            validate_coordinates(100.0, 200.0)
+            validate_coordinates(100.0, 400.0)
         assert exc_info.value.coordinate_name == "latitude"
 
 
@@ -175,7 +180,7 @@ class TestSetTopoValidation:
     def test_set_topo_invalid_longitude(self):
         """set_topo with invalid longitude should raise CoordinateError."""
         with pytest.raises(CoordinateError) as exc_info:
-            ephem.set_topo(200.0, 45.0, 0)
+            ephem.set_topo(400.0, 45.0, 0)
         error = exc_info.value
         assert error.coordinate_name == "longitude"
         assert "set_topo" in str(error)
@@ -184,6 +189,10 @@ class TestSetTopoValidation:
         """set_topo should accept boundary values."""
         ephem.set_topo(180.0, 90.0, 0)  # Should not raise
         ephem.set_topo(-180.0, -90.0, 0)  # Should not raise
+
+    def test_set_topo_east_longitude(self):
+        """set_topo should accept east-positive longitude in (180, 360]."""
+        ephem.set_topo(200.0, 45.0, 0)  # Should not raise (= -160 deg)
 
 
 class TestSweHousesValidation:
@@ -209,10 +218,23 @@ class TestSweHousesValidation:
         """houses with invalid longitude should raise CoordinateError."""
         jd = 2451545.0
         with pytest.raises(CoordinateError) as exc_info:
-            ephem.houses(jd, 45.0, 200.0, ord("P"))
+            ephem.houses(jd, 45.0, 400.0, ord("P"))
         error = exc_info.value
         assert error.coordinate_name == "longitude"
         assert "houses" in str(error)
+
+    def test_swe_houses_east_longitude(self):
+        """houses accepts east-positive longitude (0-360) like the reference.
+
+        200 deg E is the same meridian as -160 deg, so the cusps must match
+        those computed with the signed longitude.
+        """
+        jd = 2451545.0
+        cusps_east, ascmc_east = ephem.houses(jd, 45.0, 200.0, ord("P"))
+        cusps_signed, ascmc_signed = ephem.houses(jd, 45.0, -160.0, ord("P"))
+        assert len(cusps_east) == 12
+        for ce, cs in zip(cusps_east, cusps_signed):
+            assert abs(ce - cs) < 1e-6, (ce, cs)
 
 
 class TestSweHousesArmcValidation:
@@ -255,7 +277,7 @@ class TestContextSetTopoValidation:
         """Context set_topo with invalid longitude should raise CoordinateError."""
         ctx = ephem.EphemerisContext()
         with pytest.raises(CoordinateError) as exc_info:
-            ctx.set_topo(185.0, 45.0, 0)
+            ctx.set_topo(400.0, 45.0, 0)
         assert exc_info.value.coordinate_name == "longitude"
 
 
@@ -279,7 +301,7 @@ class TestErrorMessageClarity:
     def test_longitude_error_message_includes_range(self):
         """Error message should include the valid range."""
         with pytest.raises(CoordinateError) as exc_info:
-            validate_longitude(200.0)
+            validate_longitude(400.0)
         msg = str(exc_info.value)
         assert "-180" in msg
-        assert "180" in msg
+        assert "360" in msg

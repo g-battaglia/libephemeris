@@ -78,10 +78,10 @@ class TestInvalidCoordinates:
             swe.set_topo(0.0, -91.0, 0.0)
 
     @pytest.mark.unit
-    def test_longitude_above_180(self):
-        """Longitude > 180 should raise CoordinateError."""
+    def test_longitude_above_360(self):
+        """Longitude > 360 should raise CoordinateError."""
         with pytest.raises((CoordinateError, ValueError)):
-            swe.set_topo(181.0, 0.0, 0.0)
+            swe.set_topo(400.0, 0.0, 0.0)
 
     @pytest.mark.unit
     def test_longitude_below_minus_180(self):

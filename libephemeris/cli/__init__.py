@@ -48,7 +48,7 @@ from .shared import TIER_INFO, leb_download_help, tier_download_help
 def _handle_download(func, quiet: bool, **kwargs) -> None:  # type: ignore[no-untyped-def]
     """Run a download function with standard error handling."""
     try:
-        func(**kwargs)
+        func(quiet=quiet, **kwargs)
     except KeyboardInterrupt:
         click.echo("\nDownload cancelled.")
         sys.exit(130)

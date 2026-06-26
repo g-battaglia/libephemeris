@@ -3034,9 +3034,14 @@ def get_asteroid_number(name: str, timeout: float = 30.0) -> Optional[int]:
         spkid = obj_data.get("spkid")
         if spkid:
             try:
-                # SPK-ID format for asteroids: 2XXXXXX (2000000 + number)
+                # SBDB returns the NAIF SPK-ID. Numbered asteroids use either the
+                # modern 8-digit scheme (20000000 + number, e.g. Ceres = 20000001)
+                # or the legacy 7-digit scheme (2000000 + number). Check the modern
+                # offset first, since a modern ID also exceeds the legacy threshold.
                 spkid_int = int(spkid)
-                if spkid_int >= 2000000:
+                if spkid_int >= 20000000:
+                    asteroid_number = spkid_int - 20000000
+                elif spkid_int >= 2000000:
                     asteroid_number = spkid_int - 2000000
                 else:
                     # Some objects have direct SPK-IDs

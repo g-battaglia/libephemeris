@@ -488,6 +488,16 @@ def download_planet_centers(
             show_progress=show_progress,
         )
 
+        if not _is_valid_bsp(str(dest_path)):
+            try:
+                os.remove(dest_path)
+            except OSError:
+                pass
+            raise ValueError(
+                "Downloaded file planet_centers.bsp failed validation - "
+                "corrupt or incomplete"
+            )
+
         if not quiet:
             print()
             print(f"Downloaded to: {dest_path}")

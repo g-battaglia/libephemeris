@@ -72,9 +72,9 @@ class TestTopoSetup:
 
     @pytest.mark.unit
     def test_set_topo_invalid_longitude_raises(self):
-        """set_topo should raise on longitude > 180."""
+        """set_topo should raise on longitude outside [-180, 360]."""
         with pytest.raises(Exception):
-            swe.set_topo(181.0, 0.0, 0.0)
+            swe.set_topo(400.0, 0.0, 0.0)
 
 
 class TestTopoBasicPositions:

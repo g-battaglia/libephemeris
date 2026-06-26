@@ -319,7 +319,8 @@ def test_download_planet_centers_corrupt_then_download(tmp_path, monkeypatch, ca
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     dest = tmp_path / "planet_centers.bsp"
     dest.write_bytes(b"corrupt")
-    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
+    # Cached file is corrupt (invalid), the freshly downloaded one is valid.
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: Path(p).read_bytes() == b"fresh")
 
     def _fake_download_file(url, dest_path, **kwargs):
         Path(dest_path).write_bytes(b"fresh")
@@ -338,15 +339,35 @@ def test_download_planet_centers_corrupt_remove_oserror(tmp_path, monkeypatch):
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     dest = tmp_path / "planet_centers.bsp"
     dest.write_bytes(b"corrupt")
-    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
+    # Cached file is corrupt (invalid), the freshly downloaded one is valid.
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: Path(p).read_bytes() == b"fresh")
 
     def _raise_remove(path):
         raise OSError("cannot remove")
 
     monkeypatch.setattr(dl.os, "remove", _raise_remove)
-    monkeypatch.setattr(dl, "download_file", lambda url, dest_path, **kw: True)
+    monkeypatch.setattr(
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"fresh"),
+    )
     result = dl.download_planet_centers(force=False, quiet=True)
     assert result == dest
+
+
+def test_download_planet_centers_download_invalid(tmp_path, monkeypatch):
+    """A download that produces an invalid BSP is removed and raises ValueError."""
+    monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
+    monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
+    monkeypatch.setattr(
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
+    )
+    with pytest.raises(ValueError, match="failed validation"):
+        dl.download_planet_centers(force=True, quiet=True)
+    # The corrupt download must not be left behind.
+    assert not (tmp_path / "planet_centers.bsp").exists()
 
 
 def test_download_planet_centers_http_404(tmp_path, monkeypatch, capsys):
