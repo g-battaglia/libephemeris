@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _No unreleased changes._
 
+## [3.0.0rc2] - 2026-06-29
+
+Second **release candidate** of the **v3.0.0** line, and the first to ship under
+the new license: it **relicenses the project to the Apache License 2.0** (the
+`3.0.0rc1` line was AGPL-3.0/commercial). Published on the PyPI pre-release
+channel (`pip install --pre libephemeris`). There are no functional code changes
+versus `3.0.0rc1` beyond the licensing and metadata updates below; the full v3
+change record is the `[3.0.0rc1]` entry (and the per-alpha entries) below.
+
+### Changed
+
+- **License: relicensed from `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`
+  (dual AGPL + commercial) to the permissive `Apache-2.0`.** The `LICENSE` file
+  now carries the Apache License 2.0 text; every owned source file's SPDX header,
+  the public `__license__` dunder, and the PyPI `license` metadata are updated to
+  `Apache-2.0`. The provenance gate (`scripts/check_spdx_headers.py`) now expects
+  the Apache identifier. The three vendored files stay MIT. Versions published
+  under the previous AGPL/commercial grants (≤ `3.0.0rc1`) remain available under
+  those terms.
+- **Removed the commercial-licensing scaffolding.** Deleted `COMMERCIAL-LICENSE.md`
+  and rewrote `LICENSING.md`, `NOTICE.md`, and `THIRD_PARTY_NOTICES.md` for the
+  single permissive Apache-2.0 grant (provenance and independence records kept).
+- **Documented the optional `nbody` extra.** `rebound`/`assist` are GPL-3.0 and
+  are pulled only by the opt-in `libephemeris[nbody]` / `[all]` extra (never
+  bundled in any artifact); installing it forms a GPL-governed combination for
+  that user. The core library and its required runtime dependencies are fully
+  permissive. See `THIRD_PARTY_NOTICES.md`.
+
+### Note
+
+- `3.0.0rc1` was the AGPL/commercial release candidate; `3.0.0rc2` is the first
+  Apache-2.0 candidate. Because PyPI versions are immutable, the Apache build
+  carries a new pre-release number rather than re-publishing `3.0.0rc1`. The
+  `3.0.0` final will follow once the candidate proves clean.
+
 ## [3.0.0rc1] - 2026-06-25
 
 First **release candidate** of the **v3.0.0** line. This entry is the

@@ -4,7 +4,7 @@ subtitle: "High-precision astronomical calculations with Python"
 author: "Giacomo Battaglia"
 lang: en-US
 date: "2026"
-rights: "AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial"
+rights: "Apache-2.0"
 description: |
   Complete manual for LibEphemeris, a Python library for high-precision
   astronomical and astrological calculations powered by JPL DE440/DE441

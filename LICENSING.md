@@ -1,55 +1,45 @@
 # Licensing
 
-LibEphemeris is **dual-licensed**: every release of the same codebase is
-offered under two alternative grants, and you choose the one you use it
-under.
+LibEphemeris is licensed under the **Apache License, Version 2.0**
+(`Apache-2.0`) — a permissive open-source license. See the [LICENSE](LICENSE)
+file for the full text.
 
-## 1. Open source — AGPL-3.0-only
+You may use, modify, and redistribute LibEphemeris — including in
+closed-source and commercial products — subject to the terms of the Apache
+License 2.0, most notably preservation of copyright, license, and attribution
+notices and the [NOTICE](NOTICE.md) file.
 
-The default license is the [GNU Affero General Public License v3](LICENSE)
-(AGPL-3.0-only). It is free for any use — including commercial use — as
-long as you comply with its terms, most notably: if you distribute the
-software or make a modified version available to users over a network,
-you must make the corresponding source code available under the AGPL.
+The packages published on PyPI are Apache-2.0.
 
-The packages published on PyPI are AGPL-3.0-only.
+## Copyright
 
-## 2. Commercial license
+Copyright (c) 2025-2026 Giacomo Battaglia.
 
-Organizations that cannot or do not want to comply with the AGPL (for
-example: embedding LibEphemeris in a closed-source product, or running a
-SaaS without source disclosure) can obtain a commercial license from the
-copyright holder instead.
+Every owned source file carries the SPDX expression
+`Apache-2.0`. The independent-implementation and provenance record is in
+[NOTICE.md](NOTICE.md).
 
-Commercial-licensing terms are arranged directly with the copyright holder
-on request — please get in touch:
+## Third-party components
 
-- Contact: Giacomo Battaglia — <kerykeion.astrology@gmail.com>
+A few vendored/adapted files keep their own upstream licenses — they are all
+permissive (MIT) and Apache-2.0 compatible. The full inventory, license
+texts, and the runtime/dev dependency licenses are in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## How the dual license works
-
-- Giacomo Battaglia is the copyright holder of LibEphemeris (provenance:
-  [NOTICE.md](NOTICE.md)).
-- Each owned source file carries the SPDX expression
-  `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`: the recipient may
-  elect either grant.
-- **Exceptions**: a few vendored/adapted files keep their upstream
-  licenses (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)); they are
-  all permissive (MIT). There is no copyleft code in the package: the
-  Galilean satellite module was rewritten clean-room in June 2026 from the
-  published Lieske 1998 / Meeus theory and is now dual-licensed like the
-  rest of the project (see
-  [docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md)).
-- Versions up to and including the 2.x series were published under
-  AGPL-3.0-only; those grants remain valid for those published versions.
+**Optional `nbody` extra:** the opt-in `libephemeris[nbody]` feature pulls in
+`rebound` and `assist`, which are licensed **GPL-3.0-or-later**. They are not
+part of the core install and are never bundled in any LibEphemeris artifact;
+installing the extra forms a combined work that is, for that user, governed by
+the GPL. The core library and all required runtime dependencies are permissive.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
 
 ## Contributions
 
-External contributions are accepted only with a contributor agreement that
-licenses the contribution to the maintainer for distribution under **both**
-grants (AGPL-3.0-only and the commercial license). Opening a pull request
-constitutes agreement unless stated otherwise; a formal CLA flow will be
-added before external contributions are merged.
+Contributions are accepted under the terms of the Apache License 2.0: unless
+you explicitly state otherwise, any contribution you intentionally submit for
+inclusion in the work shall be licensed as Apache-2.0, without any additional
+terms or conditions (Apache-2.0, Section 5). No separate contributor license
+agreement is required.
 
 ## Relationship to Swiss Ephemeris
 
@@ -58,11 +48,10 @@ signature-compatible with pyswisseph; it does not contain Swiss Ephemeris
 code and has no license relationship with Astrodienst AG (details and
 provenance record: [NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product
 of Astrodienst AG; the name is used here nominatively only.
-pyswisseph appears solely in the `dev` extra as a black-box test oracle
-and is never a runtime dependency.
+pyswisseph is used only as a black-box test oracle in the separate
+validation tooling; it is not declared among this package's dependencies
+(not even in the `dev` extra) and is never a runtime dependency.
 
 ---
 
-*This document describes the project's licensing model; it is not legal
-advice. Commercial-licensing terms are arranged directly with the
-copyright holder — contact <kerykeion.astrology@gmail.com>.*
+*This document describes the project's licensing; it is not legal advice.*

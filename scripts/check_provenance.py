@@ -69,11 +69,12 @@ PYMEEUS_RE = re.compile(
 )
 # Copyleft license declarations (case-insensitive). Matches L/GPL token
 # forms (LGPL, GPL, GPLv2/v3, GPL-2.0/3.0, LGPL-3.0) and the spelled-out
-# "GNU/Lesser General Public License", but NOT AGPL-3.0 (this project's own
-# license): the leading word boundary means the GPL inside "AGPL" is not at
-# a token start, and "GNU Affero General Public" breaks the GNU...general
-# adjacency. Word boundaries also avoid false hits on substrings such as the
-# "gPl" inside "PickeringPlanet".
+# "GNU/Lesser General Public License", but NOT AGPL (which now appears only
+# in historical release notes and the dev-only test oracle, never in this
+# project's shipped Apache-2.0 headers): the leading word boundary means the
+# GPL inside "AGPL" is not at a token start, and "GNU Affero General Public"
+# breaks the GNU...general adjacency. Word boundaries also avoid false hits
+# on substrings such as the "gPl" inside "PickeringPlanet".
 COPYLEFT_RE = re.compile(
     r"\bL?GPL(?:[-\s]?v?[23](?:\.0)?)?\b"
     r"|\blesser\s+general\s+public\b"

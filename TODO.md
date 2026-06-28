@@ -67,9 +67,6 @@ examples). Everything below is low-impact and can be batched later.
 
 ### Packaging decisions (confirm, then document)
 
-- Decide whether `COMMERCIAL-LICENSE.md` should be added to pyproject
-  `license-files` so the commercial terms ship in the wheel's `dist-info`
-  (currently sdist-only, reachable via the shipped `LICENSING.md`).
 - For manifest clarity, consider adding the `data/leb2/*.leb2` path to
   `MANIFEST.in` (it already ships correctly via setuptools package-data; this is
   cosmetic so the two manifests don't appear to disagree).

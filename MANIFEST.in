@@ -1,6 +1,5 @@
 include LICENSE
 include LICENSING.md
-include COMMERCIAL-LICENSE.md
 include NOTICE.md
 include THIRD_PARTY_NOTICES.md
 include README.md

@@ -2,8 +2,8 @@
 """Check (or stamp) SPDX license headers on shipped source files.
 
 Every Python file under ``libephemeris/`` must carry an SPDX identifier in
-its first lines.  Owned files are dual-licensed; vendored/adapted files keep
-their upstream identifier (see ``EXCEPTIONS`` and THIRD_PARTY_NOTICES.md).
+its first lines.  Owned files are Apache-2.0 licensed; vendored/adapted files
+keep their upstream identifier (see ``EXCEPTIONS`` and THIRD_PARTY_NOTICES.md).
 
 Usage:
     python scripts/check_spdx_headers.py --check   # CI gate (default)
@@ -23,11 +23,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PACKAGE_ROOT = REPO_ROOT / "libephemeris"
 
-DUAL_LICENSE = "AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial"
+PROJECT_LICENSE = "Apache-2.0"
 COPYRIGHT_LINE = "# Copyright (c) 2025-2026 Giacomo Battaglia"
 
 # Vendored or adapted third-party code keeps its upstream license and must
-# NOT be stamped with the dual license.  Paths relative to the repo root.
+# NOT be stamped with the project license.  Paths relative to the repo root.
 EXCEPTIONS: dict[str, str] = {
     "libephemeris/vendor/spktype21.py": "MIT",
     "libephemeris/moon_theories/tass17.py": "MIT",
@@ -44,7 +44,7 @@ HEAD_LINES = 6  # the identifier must appear within the first lines
 
 def expected_expression(path: Path) -> str:
     rel = path.relative_to(REPO_ROOT).as_posix()
-    return EXCEPTIONS.get(rel, DUAL_LICENSE)
+    return EXCEPTIONS.get(rel, PROJECT_LICENSE)
 
 
 def find_spdx(lines: list[str]) -> str | None:
@@ -58,7 +58,7 @@ def find_spdx(lines: list[str]) -> str | None:
 def header_lines(path: Path) -> list[str]:
     expr = expected_expression(path)
     lines = [f"# SPDX-License-Identifier: {expr}"]
-    if expr == DUAL_LICENSE:
+    if expr == PROJECT_LICENSE:
         lines.append(COPYRIGHT_LINE)
     else:
         lines.append(THIRD_PARTY_NOTE)

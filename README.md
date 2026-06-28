@@ -4,7 +4,7 @@
     <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/badge/pypi-v3.0.0rc1-blue" alt="PyPI Version">
+    <img src="https://img.shields.io/badge/pypi-v3.0.0rc2-blue" alt="PyPI Version">
     <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
@@ -194,13 +194,16 @@ Learn more at [kerykeion.net](https://kerykeion.net).
 
 ## License
 
-Dual-licensed:
+Licensed under the **[Apache License 2.0](LICENSE)** — a permissive license
+free for any use, including closed-source and commercial products, subject to
+preservation of copyright, license, and attribution notices. See
+[LICENSING.md](LICENSING.md) for details. PyPI releases carry this license.
 
-- **[AGPL-3.0-only](LICENSE)** — free for any use that complies with the
-  AGPL (including network/SaaS source-disclosure obligations). PyPI
-  releases carry this license.
-- **Commercial license** — for closed-source products and services; see
-  [LICENSING.md](LICENSING.md).
+> **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
+> `assist` (GPL-3.0-or-later), which are not part of the core install and are
+> never bundled. Installing that extra makes your combined installation subject
+> to the GPL; the core library and its required dependencies are permissive.
+> See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 LibEphemeris is an independent, API-compatible implementation; it contains
 no Swiss Ephemeris code ([NOTICE.md](NOTICE.md),

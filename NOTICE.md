@@ -110,7 +110,7 @@ theory, and an independent implementation was produced from that
 specification alone — without reference to PyMeeus or the prior module.
 The rewrite reproduces the prior numeric output to floating-point
 re-association level (sub-nanometre per moon component over 1800–2200) and
-is now owned by the project under the dual license. Process and
+is now owned by the project and licensed Apache-2.0. Process and
 independence record:
 [docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md).
 
@@ -126,9 +126,7 @@ tables contain numeric program *output* — computed positions of the lunar
 apsides — not Swiss Ephemeris source expression; the fitting pipeline and
 all runtime code are original. The INTP_* bodies are constructs defined by
 the reference API, so 1:1 behavioral parity requires fitting to reference
-output. This is disclosed for transparency and is part of the legal review
-checklist for the commercial edition (see
-[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)).
+output. This is disclosed for transparency.
 
 A third, smaller item: the **legacy Uranian display tables** in
 `libephemeris/hypothetical.py` (`URANIAN_ELEMENTS` and the per-body
@@ -158,13 +156,11 @@ or endorsed by, Astrodienst AG.
 
 ## License
 
-LibEphemeris is **dual-licensed**: under the **GNU Affero General Public
-License v3** (AGPL-3.0-only — see the [LICENSE](LICENSE) file) or,
-alternatively, under a commercial license available from the copyright
-holder (see [LICENSING.md](LICENSING.md) and
-[COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)). Owned source files carry
-the SPDX expression `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`;
-vendored/adapted modules keep their own identifiers.
+LibEphemeris is licensed under the **Apache License, Version 2.0**
+(`Apache-2.0` — see the [LICENSE](LICENSE) file and
+[LICENSING.md](LICENSING.md)). Owned source files carry the SPDX expression
+`Apache-2.0`; vendored/adapted modules keep their own identifiers (all
+permissive — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
 This project has no license dependency on, and no license obligation toward,
 the Swiss Ephemeris or Astrodienst AG.

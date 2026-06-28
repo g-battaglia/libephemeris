@@ -21,7 +21,7 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 
 | Metric                      | Value                                  |
 |-----------------------------|----------------------------------------|
-| Package version             | 3.0.0rc1                               |
+| Package version             | 3.0.0rc2                               |
 | Python support              | 3.12 - 3.14                            |
 | Library source files        | 70+ `.py` files in `libephemeris/`     |
 | Total library LOC           | ~100,000 lines                         |

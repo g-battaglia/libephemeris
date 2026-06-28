@@ -7,28 +7,33 @@ current release.
 
 ---
 
-## 3.0.0rc1 — the v3.0.0 release candidate (2026-06-25)
+## 3.0.0rc2 — the v3.0.0 release candidate (2026-06-29)
 
-**v3.0.0 is the dual-licensed (AGPL-3.0-only OR commercial), clean-room
-provenance release** that re-grounds the whole library on long-term-valid models
-(Vondrák 2011 precession & obliquity, long-term sidereal-time house cusps, a
-multi-era Delta T with a selectable model) and ships a full review-driven
-correctness sweep across eclipses, houses, fixed stars, minor bodies, and the
-LEB / Horizons backends — while keeping the v2 canonical bare-name public API and
-1:1 reference parity except for documented intentional divergences.
+**v3.0.0 is the Apache-2.0, clean-room provenance release** that re-grounds the
+whole library on long-term-valid models (Vondrák 2011 precession & obliquity,
+long-term sidereal-time house cusps, a multi-era Delta T with a selectable
+model) and ships a full review-driven correctness sweep across eclipses,
+houses, fixed stars, minor bodies, and the LEB / Horizons backends — while
+keeping the v2 canonical bare-name public API and 1:1 reference parity except
+for documented intentional divergences.
 
-This is the first **release candidate** of the v3 line, published on the PyPI
-pre-release channel and intended to be promoted to `3.0.0` final unchanged if it
+`3.0.0rc2` is the **second release candidate** of the v3 line and the first to
+ship under the new license: it **relicenses the project from the previous
+AGPL-3.0 / commercial dual license to the permissive Apache License 2.0** (see
+[`LICENSE`](LICENSE) and [`LICENSING.md`](LICENSING.md)). It is published on the
+PyPI pre-release channel and will be promoted to `3.0.0` final unchanged if it
 proves clean.
 
 ```bash
-pip install --pre libephemeris==3.0.0rc1
+pip install --pre libephemeris==3.0.0rc2
 ```
 
 Highlights:
 
-- **Dual licensing** — `AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial`, on
-  a clean-room provenance footing with no copyleft code (see `LICENSING.md`).
+- **Apache-2.0 license** — permissive, free for closed-source and commercial
+  use, on a clean-room provenance footing with no copyleft code in the shipped
+  package (see `LICENSING.md` / `THIRD_PARTY_NOTICES.md`). The optional `nbody`
+  extra pulls in GPL-3.0 `rebound`/`assist`, which are never bundled.
 - **Vondrák 2011 long-term precession & obliquity** across the whole pipeline
   (valid ±200,000 years); modern results unchanged to sub-milliarcsecond.
 - **Multi-era Delta T** with a selectable model (`set_delta_t_model`).
@@ -43,12 +48,12 @@ Highlights:
 (default sidereal ayanamsha, eclipse retflags/obscuration, error policy, fixed
 stars, remote-epoch positions, house speeds). Re-check any pinned values against
 the migration table in
-[`release-notes/v3.0.0rc1.md`](release-notes/v3.0.0rc1.md),
+[`release-notes/v3.0.0rc2.md`](release-notes/v3.0.0rc2.md),
 [`docs/guides/migration-guide.md`](docs/guides/migration-guide.md), and
 [`docs/comparison/intentional-divergences.md`](docs/comparison/intentional-divergences.md).
 
 Full detail:
-[release-notes/v3.0.0rc1.md](release-notes/v3.0.0rc1.md) ·
+[release-notes/v3.0.0rc2.md](release-notes/v3.0.0rc2.md) ·
 [CHANGELOG.md](CHANGELOG.md).
 
 ---

@@ -599,7 +599,7 @@ The implementer:
   implementation.
 - Module header, exactly these first two lines:
   ```
-  # SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-LibEphemeris-Commercial
+  # SPDX-License-Identifier: Apache-2.0
   # Copyright (c) 2025-2026 Giacomo Battaglia
   ```
 - Style: `from __future__ import annotations`; Google-style docstrings

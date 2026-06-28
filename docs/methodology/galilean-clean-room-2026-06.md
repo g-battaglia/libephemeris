@@ -5,9 +5,10 @@
 `libephemeris/moon_theories/galilean.py` was, through v2.1.0, an adaptation
 of PyMeeus's `JupiterMoons.py` and carried `SPDX-License-Identifier:
 LGPL-3.0-only`. To make every shipped line owned by the project (or
-permissively licensed) for the dual AGPL/commercial grant, the module was
-**rewritten clean-room** from the published theory and the LGPL exception
-retired.
+permissively licensed), the module was **rewritten clean-room** from the
+published theory and the LGPL exception retired. (At the time of the rewrite
+the project was dual-licensed AGPL-3.0/commercial; it was relicensed to
+Apache-2.0 for v3.0.0.)
 
 The rewrite reproduces the prior numeric output to **floating-point
 re-association level** (worst per-component moon difference 2.85×10⁻⁹ km
@@ -107,7 +108,7 @@ alongside the existing Swiss Ephemeris classes.
 ```
 .venv/bin/python scripts/verify_galilean_clean_room.py --check tasks/results/galilean_baseline.json
 pytest tests/test_planetary_moons.py tests/test_gas_giant_planet_center.py -q
-poe license:check        # galilean.py now dual-licensed; no SPDX exception
+poe license:check        # galilean.py now Apache-2.0; no SPDX exception
 poe provenance:sweep     # 0 hits incl. the PyMeeus class
 poe wheel:audit          # galilean.py still required-and-present
 poe lint && poe typecheck
