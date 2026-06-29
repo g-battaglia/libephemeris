@@ -1238,6 +1238,37 @@ def _spk_covers_range(
         kernel.close()
 
 
+def _find_covering_cached_spk(
+    body_id: int,
+    jd_start: float,
+    jd_end: float,
+) -> Optional[str]:
+    """Return an already-cached SPK path that covers [jd_start, jd_end] for
+    this body, or None.
+
+    The auto-download registers the first kernel it finds (often a narrower
+    range from a prior tier). When the registered kernel is too narrow, a
+    wider one may still be sitting in the cache from an earlier run — prefer
+    it over a slow, timeout-prone forced re-download of the whole tier range.
+    """
+    import glob
+
+    from libephemeris.constants import SPK_BODY_NAME_MAP
+    from libephemeris.spk_auto import DEFAULT_AUTO_SPK_DIR
+
+    entry = SPK_BODY_NAME_MAP.get(body_id)
+    if entry is None:
+        return None
+    # Numbered asteroids cache as "{number}_{start}_{end}.bsp"; the horizons_id
+    # is the number string (drop the trailing ";" used for SBDB lookups).
+    prefix = str(entry[0]).rstrip(";")
+    cache_dir = os.environ.get("LIBEPHEMERIS_SPK_DIR", DEFAULT_AUTO_SPK_DIR)
+    for path in sorted(glob.glob(os.path.join(cache_dir, f"{prefix}_*.bsp"))):
+        if _spk_covers_range(path, body_id, jd_start, jd_end):
+            return path
+    return None
+
+
 def _get_asteroid_spk_range(
     spk_file: str,
     body_id: int,
@@ -2265,9 +2296,23 @@ def assemble_leb(
             if bid in _SPK_BODY_MAP:
                 cached_file, _ = _SPK_BODY_MAP[bid]
                 if not _spk_covers_range(cached_file, bid, jd_start, jd_end):
-                    need_force = True
-                    if verbose:
-                        print(f"    {name}: cached SPK too narrow, re-downloading...")
+                    # The registered kernel is too narrow — prefer a wider one
+                    # already in the cache over a forced (slow, timeout-prone)
+                    # re-download of the whole tier range.
+                    covering = _find_covering_cached_spk(bid, jd_start, jd_end)
+                    if covering is not None:
+                        from libephemeris import spk as _spk
+
+                        _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
+                        if verbose:
+                            print(
+                                f"    {name}: using cached wider SPK "
+                                f"{os.path.basename(covering)}"
+                            )
+                    else:
+                        need_force = True
+                        if verbose:
+                            print(f"    {name}: cached SPK too narrow, re-downloading...")
 
             try:
                 auto_download_asteroid_spk(
