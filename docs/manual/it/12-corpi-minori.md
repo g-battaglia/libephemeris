@@ -79,6 +79,8 @@ Eris: 24.74°
 
 Quando chiedi la posizione di un corpo minore, la libreria prova diversi metodi in ordine, dal più preciso al meno preciso:
 
+**0. LEB precomputato** — Se è caricata un'effemeride binaria LEB che contiene il corpo, vengono usati direttamente i suoi polinomi di Chebyshev precomputati (nessuna connessione, nessuna lettura SPK per chiamata). È il percorso più veloce. Da questa release ~31 corpi minori esotici (centauri, TNO, asteroidi near-Earth) sono distribuiti in un companion opzionale `{tier}_exotics.leb2`, fittato dai kernel SPK di JPL Horizons, così nella loro finestra di copertura (~1600–2500 d.C.) combaciano con la reference a precisione SPK — invece di cadere sul fallback kepleriano più sotto. Fuori da quella finestra la catena prosegue. Gli asteroidi near-Earth caotici sono best-effort e degradano a date storiche (le soluzioni orbitali di Horizons e della reference divergono sotto integrazione all'indietro).
+
 **1. Kernel SPK** — Se un file binario JPL (formato SPK/BSP) è registrato per quel corpo, lo usa. Precisione: sub-secondo d'arco. È il metodo gold standard.
 
 **2. Download SPK automatico** — Se il download automatico è abilitato e il kernel non è disponibile localmente, la libreria lo scarica da JPL Horizons. Funziona per tutti i 37 corpi nella mappa SPK.

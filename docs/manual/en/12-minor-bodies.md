@@ -79,6 +79,8 @@ Eris: 24.74°
 
 When you request the position of a minor body, the library tries different methods in order, from most precise to least precise:
 
+**0. Precomputed LEB** — If a LEB binary ephemeris is loaded and contains the body, its precomputed Chebyshev polynomials are used directly (no Internet, no per-call SPK read). This is the fastest path. As of this release ~31 exotic minor bodies (centaurs, TNOs, near-Earth asteroids) are shipped in an opt-in `{tier}_exotics.leb2` companion, fitted from JPL Horizons SPK, so within their coverage window (~1600–2500 CE) they match the reference at SPK precision — instead of dropping to the Keplerian fallback below. Outside that window the chain continues. Chaotic near-Earth asteroids are best-effort and degrade at historic dates (the Horizons and reference orbit solutions diverge under back-integration).
+
 **1. SPK Kernel** — If a JPL binary file (SPK/BSP format) is registered for that body, it uses it. Precision: sub-arcsecond. It is the gold standard method.
 
 **2. Automatic SPK download** — If automatic download is enabled and the kernel is not available locally, the library downloads it from JPL Horizons. Works for all 37 bodies in the SPK map.

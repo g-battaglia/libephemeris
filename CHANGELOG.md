@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+
+- **Exotic minor bodies precomputed into the LEB binary ephemeris.** ~31 centaurs,
+  TNOs and near-Earth asteroids (Eris, Sedna, Pholus, Nessus, Chariklo, Quaoar,
+  Eros, Apophis, Hygiea, Psyche, …) now resolve from the precomputed LEB Chebyshev
+  ephemeris instead of the unperturbed Keplerian two-body fallback used outside the
+  SPK auto-download window. The source data is JPL Horizons SPK — the same
+  derivation the reference ephemeris uses — so within each body's coverage window
+  the result matches the reference at SPK precision (measured median 0.22" at modern
+  dates, down from ~52" for the Keplerian fallback). A canonical registry
+  (`libephemeris/exotic_bodies.py`) drives the body table, Chebyshev parameters and
+  compression targets; `libephemeris/leb_groups.py` centralises the LEB group names
+  so generation, merge, download, the setup wizard and status stay in sync. The new
+  bodies ship as an opt-in `{tier}_exotics.leb2` companion (the default install is
+  unchanged). Bennu is excluded (JPL Horizons blocks its SPK generation).
+
+  Precision notes (honest): main-belt, TNO and centaur bodies match the reference
+  well; chaotic near-Earth asteroids (Apophis, Toutatis, Icarus, Itokawa) are
+  best-effort and degrade at historic dates, where the Horizons and reference orbit
+  solutions diverge under back-integration — an irreducible source difference, not a
+  fit error. Coverage is the JPL Horizons SPK window (~1600–2500 CE); outside it
+  these bodies transparently fall back to the previous behaviour.
+
+### Fixed
+
+- **SPK generation no longer forces a doomed wide re-download when a kernel covering
+  the requested range is already cached.** The previous behaviour re-downloaded the
+  whole multi-century tier range, frequently timed out against JPL Horizons, and
+  dropped the body; the generator now reuses any cached kernel that covers the range.
 
 ## [3.0.0rc2] - 2026-06-29
 
