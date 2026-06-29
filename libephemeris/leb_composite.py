@@ -106,7 +106,7 @@ class CompositeLEBReader:
         # (group-file scheme), as {custom}_{tier}_{group}, or as a bare
         # known-tier token (e.g. ephemeris_base.leb); files with no recognizable
         # tier are not constrained by the guard below.
-        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
         _KNOWN_TIERS = {"base", "medium", "extended"}
 
         def _file_tier(path: str) -> Optional[str]:
@@ -189,7 +189,7 @@ class CompositeLEBReader:
         # is complete on its own — a bare first-token prefix match would
         # pull in other tiers ("ephemeris_medium.leb", ...) and stale
         # partials, silently mixing tiers in one composite.
-        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians"}
+        _GROUP_SUFFIXES = {"core", "asteroids", "apogee", "uranians", "exotics"}
 
         if len(parts) >= 2 and parts[-1] in _GROUP_SUFFIXES:
             prefix = "_".join(parts[:-1])  # e.g., "base"

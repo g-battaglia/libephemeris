@@ -16,6 +16,8 @@ import sys
 
 import click
 
+from libephemeris.leb_groups import LEB1_GROUPS
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -29,22 +31,11 @@ _TIER_INFO = {
     "extended": "de441, -5000 to 5000",
 }
 
+# Partial files merged into the final {tier}.leb — derived from the canonical
+# group partition so a new group (e.g. exotics) is never silently omitted.
 _MERGE_FILES = {
-    "base": [
-        "data/leb/ephemeris_base_planets.leb",
-        "data/leb/ephemeris_base_asteroids.leb",
-        "data/leb/ephemeris_base_analytical.leb",
-    ],
-    "medium": [
-        "data/leb/ephemeris_medium_planets.leb",
-        "data/leb/ephemeris_medium_asteroids.leb",
-        "data/leb/ephemeris_medium_analytical.leb",
-    ],
-    "extended": [
-        "data/leb/ephemeris_extended_planets.leb",
-        "data/leb/ephemeris_extended_asteroids.leb",
-        "data/leb/ephemeris_extended_analytical.leb",
-    ],
+    tier: [f"data/leb/ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS]
+    for tier in _TIERS
 }
 
 
@@ -70,7 +61,7 @@ def _gen(args: list[str]) -> None:
     "  medium    de440,  1550-2650    (~175 MB, default)\n"
     "  extended  de441, -5000 to 5000 (~1.6 GB)\n\n"
     "Recommended workflow (avoids macOS multiprocessing deadlocks):\n\n"
-    "  leph leb generate medium groups   # planets + asteroids + analytical + merge\n"
+    "  leph leb generate medium groups   # all body groups + merge\n"
     "  leph leb verify medium            # verify the generated file",
 )
 def leb_group() -> None:
@@ -176,20 +167,23 @@ def _make_tier_group(tier: str) -> click.Group:
 
     merge.__doc__ = f"Merge {tier} tier partial files into ephemeris_{tier}.leb."
 
+    _groups_desc = " + ".join(LEB1_GROUPS) + " + merge"
+
     @tier_group.command(
-        short_help=f"Full {tier} tier group workflow: planets + asteroids + analytical + merge.",
+        short_help=f"Full {tier} tier group workflow: {_groups_desc}.",
     )
     def groups() -> None:
-        """Full group workflow: planets + asteroids + analytical + merge.
+        """Full group workflow: all body groups + merge.
 
         Recommended over 'full' to avoid macOS multiprocessing deadlocks.
         """
-        for step, step_args in [
-            ("planets", ["--tier", tier, "--group", "planets"]),
-            ("asteroids", ["--tier", tier, "--group", "asteroids"]),
-            ("analytical", ["--tier", tier, "--group", "analytical"]),
-            ("merge", ["--tier", tier, "--merge", *_MERGE_FILES[tier], "--verify"]),
-        ]:
+        steps = [
+            (g, ["--tier", tier, "--group", g]) for g in LEB1_GROUPS
+        ]
+        steps.append(
+            ("merge", ["--tier", tier, "--merge", *_MERGE_FILES[tier], "--verify"])
+        )
+        for step, step_args in steps:
             click.echo(f"\n--- {tier}/{step} ---\n")
             ret = subprocess.call(
                 [sys.executable, "scripts/generate_leb.py", *step_args]
@@ -197,7 +191,7 @@ def _make_tier_group(tier: str) -> click.Group:
             if ret != 0:
                 sys.exit(ret)
 
-    groups.__doc__ = f"Generate {tier} tier via groups (planets + asteroids + analytical) then merge."
+    groups.__doc__ = f"Generate {tier} tier via groups ({' + '.join(LEB1_GROUPS)}) then merge."
 
     @tier_group.command(
         short_help=f"Generate {tier} tier one body at a time (lowest memory).",

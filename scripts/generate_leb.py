@@ -157,6 +157,11 @@ from libephemeris.leb_format import (
     write_section_dir,
     write_star_entry,
 )
+from libephemeris.exotic_bodies import (
+    EXOTIC_IDS,
+    naif_map as _exotic_naif,
+    name_map as _exotic_names,
+)
 
 # =============================================================================
 # CONSTANTS
@@ -224,6 +229,8 @@ BODY_NAMES = {
     47: "Poseidon",
     48: "Transpluto",
 }
+# Exotic minor bodies (centaurs/TNOs/NEAs) — labels from the registry.
+BODY_NAMES.update(_exotic_names())
 
 # Reverse lookup: case-insensitive name → body ID.
 # Supports both canonical names ("Mean Node") and short aliases ("moon").
@@ -295,17 +302,24 @@ _ASTEROID_NAIF = {
     19: 2000003,  # Juno
     20: 2000004,  # Vesta
 }
+# Exotic minor bodies (centaurs/TNOs/NEAs) — registry is the single source of
+# truth. Membership in _ASTEROID_NAIF is the gate that routes a body through
+# the SPK-Chebyshev generation path (download, per-body coverage clamp, verify).
+_ASTEROID_NAIF.update(_exotic_naif())
 
 # Body groups for independent generation + merge workflow.
 # Each group can be generated as a standalone .leb file and later merged.
 BODY_GROUPS: dict[str, List[int]] = {
     "planets": sorted(_PLANET_MAP.keys()),  # 11 planets (ICRS_BARY, vectorized)
-    "asteroids": sorted(_ASTEROID_NAIF.keys()),  # 5 asteroids (ICRS_BARY, spktype21)
+    # Classic asteroids = SPK bodies minus the exotic registry (stays correct if
+    # a 6th classic is ever added to _ASTEROID_NAIF without touching EXOTIC_IDS).
+    "asteroids": sorted(set(_ASTEROID_NAIF) - set(EXOTIC_IDS)),
+    "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs (ICRS_BARY, spktype21)
     "analytical": sorted(
         bid
         for bid in BODY_PARAMS
         if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF
-    ),  # 15 ecliptic/helio analytical bodies
+    ),  # ecliptic/helio analytical bodies
 }
 
 
@@ -2328,6 +2342,18 @@ def assemble_leb(
                     "  Excluded asteroids will NOT be in the LEB file. "
                     "They will use live Skyfield/SPK at runtime."
                 )
+            # Fail fast on an UNEXPECTED exotic drop: every registry body is
+            # supposed to have an obtainable SPK over its coverage window, so a
+            # silent exclusion would ship an incomplete file that looks fine.
+            dropped_exotics = sorted(set(excluded_asteroids) & set(EXOTIC_IDS))
+            if dropped_exotics:
+                names = [BODY_NAMES.get(b, str(b)) for b in dropped_exotics]
+                raise RuntimeError(
+                    "Exotic minor bodies were dropped (no SPK obtainable): "
+                    + ", ".join(names)
+                    + ". Pre-download their SPK (scripts/download_max_range_spk.py) "
+                    "or remove them from libephemeris.exotic_bodies."
+                )
 
         if verbose:
             print()
@@ -3373,7 +3399,7 @@ def main():
     )
     parser.add_argument(
         "--group",
-        choices=["planets", "asteroids", "analytical"],
+        choices=["planets", "asteroids", "exotics", "analytical"],
         default=None,
         help="Generate only a specific body group (partial file). "
         "Use --merge to combine partial files afterward.",
@@ -3597,8 +3623,10 @@ def main():
                     )
                     sys.exit(result.returncode)
         else:
-            # Group mode (default): one subprocess per group
-            groups = ["planets", "asteroids", "analytical"]
+            # Group mode (default): one subprocess per group. Derive from
+            # BODY_GROUPS so every defined group (incl. exotics) is generated
+            # and merged — matching the --single branch above.
+            groups = list(BODY_GROUPS.keys())
 
             for i, group in enumerate(groups, 1):
                 partial = _group_output_path(output, group)

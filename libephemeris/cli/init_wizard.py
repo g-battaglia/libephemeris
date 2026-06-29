@@ -21,6 +21,8 @@ from typing import Any, Dict, List, Optional
 
 import click
 
+from ..leb_groups import LEB2_GROUPS
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,11 +38,22 @@ _DE_KERNELS: Dict[str, tuple] = {
 
 _PC_SIZES: Dict[str, float] = {"base": 25.4, "medium": 72.6, "extended": 222.6}
 
-_LEB2_GROUPS = ["core", "asteroids", "apogee", "uranians"]
+_LEB2_GROUPS = list(LEB2_GROUPS)
+# Compressed LEB2 sizes (MB) per tier/group. "exotics" base is measured;
+# medium/extended exotics are estimates pending regeneration (1600-2500 island).
 _LEB2_SIZES: Dict[str, Dict[str, float]] = {
-    "base": {"core": 10.6, "asteroids": 8.7, "apogee": 11.4, "uranians": 2.1},
-    "medium": {"core": 38.3, "asteroids": 29.2, "apogee": 42.1, "uranians": 9.3},
-    "extended": {"core": 334.9, "asteroids": 86.2, "apogee": 391.7, "uranians": 84.0},
+    "base": {
+        "core": 10.6, "asteroids": 8.7, "exotics": 59.0,
+        "apogee": 11.4, "uranians": 2.1,
+    },
+    "medium": {
+        "core": 38.3, "asteroids": 29.2, "exotics": 177.0,
+        "apogee": 42.1, "uranians": 9.3,
+    },
+    "extended": {
+        "core": 334.9, "asteroids": 86.2, "exotics": 177.0,
+        "apogee": 391.7, "uranians": 84.0,
+    },
 }
 
 _TIER_RANGES: Dict[str, str] = {

@@ -27,6 +27,8 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+from .exotic_bodies import body_params as _exotic_body_params
+
 # =============================================================================
 # FORMAT CONSTANTS
 # =============================================================================
@@ -269,6 +271,12 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
     47: (256, 7, COORD_HELIO_ECL, 3),  # POSEIDON
     48: (256, 7, COORD_HELIO_ECL, 3),  # ISIS
 }
+
+# Exotic minor bodies (centaurs / TNOs / NEAs) served from JPL SPK over their
+# coverage window — interval/degree per orbital class. Registry is the single
+# source of truth: libephemeris.exotic_bodies.
+for _bid, (_interval, _degree) in _exotic_body_params().items():
+    BODY_PARAMS[_bid] = (_interval, _degree, COORD_ICRS_BARY, 3)
 
 
 # =============================================================================

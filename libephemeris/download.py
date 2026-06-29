@@ -34,6 +34,7 @@ from typing import Any, Optional
 
 import certifi
 
+from .leb_groups import LEB2_GROUPS as _CANONICAL_LEB2_GROUPS
 from .logging_config import get_logger
 
 
@@ -704,7 +705,7 @@ def print_data_status(as_json: bool = False, verbose: int = 0) -> None:
 
     # --- LEB2 Compressed Files ---
     leb2_info: dict[str, dict[str, Any]] = {}
-    leb2_groups = ["core", "asteroids", "apogee", "uranians"]
+    leb2_groups = list(_CANONICAL_LEB2_GROUPS)
     for tier_name in ["base", "medium", "extended"]:
         for group in leb2_groups:
             filename = f"{tier_name}_{group}.leb2"
@@ -1487,7 +1488,10 @@ def download_leb_for_tier(
     return dest_path
 
 
-LEB2_GROUPS = ["core", "asteroids", "apogee", "uranians"]
+# Canonical distribution groups (incl. exotics). A group with no DATA_FILES
+# manifest entry yet (e.g. exotics until its artifact is published) is skipped
+# gracefully with a visible message rather than silently omitted.
+LEB2_GROUPS = list(_CANONICAL_LEB2_GROUPS)
 
 
 def download_leb2_for_tier(

@@ -24,6 +24,8 @@ import threading
 import numpy as np
 import zstandard as zstd
 
+from .exotic_bodies import target_au_map as _exotic_target_au
+
 # Default target: 0.001 arcsecond expressed in AU
 # 0.001" = 4.848e-9 radians; at 1 AU distance = 4.848e-9 AU positional error
 DEFAULT_TARGET_AU = 5e-9
@@ -42,6 +44,10 @@ BODY_TARGET_AU: dict[int, float] = {
     3: 1e-10,  # Venus   — d_geo ~ 0.27 AU, closest inner planet to Earth
     4: 1e-10,  # Mars    — d_geo ~ 0.37 AU
 }
+
+# Exotic minor bodies with tighter-than-default targets (close-approach NEAs).
+# Registry is the single source of truth: libephemeris.exotic_bodies.
+BODY_TARGET_AU.update(_exotic_target_au())
 
 
 # ---------------------------------------------------------------------------

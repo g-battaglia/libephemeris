@@ -12,27 +12,18 @@ import click
 
 from .. import __version__
 from ..constants import SPK_AUTO_DOWNLOAD_BLOCKED
+from ..leb_groups import LEB1_GROUPS, LEB2_GROUPS
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _LEB1_DIR = _PROJECT_ROOT / "data" / "leb"
 _LEB2_DIR = _PROJECT_ROOT / "data" / "leb2"
-_LEB2_GROUPS = ["core", "asteroids", "apogee", "uranians"]
+_LEB2_GROUPS = list(LEB2_GROUPS)
+# Per-tier LEB1 partial paths — derived from the canonical group partition.
 _LEB1_PARTIALS = {
-    "base": {
-        "planets": _LEB1_DIR / "ephemeris_base_planets.leb",
-        "asteroids": _LEB1_DIR / "ephemeris_base_asteroids.leb",
-        "analytical": _LEB1_DIR / "ephemeris_base_analytical.leb",
-    },
-    "medium": {
-        "planets": _LEB1_DIR / "ephemeris_medium_planets.leb",
-        "asteroids": _LEB1_DIR / "ephemeris_medium_asteroids.leb",
-        "analytical": _LEB1_DIR / "ephemeris_medium_analytical.leb",
-    },
-    "extended": {
-        "planets": _LEB1_DIR / "ephemeris_extended_planets.leb",
-        "asteroids": _LEB1_DIR / "ephemeris_extended_asteroids.leb",
-        "analytical": _LEB1_DIR / "ephemeris_extended_analytical.leb",
-    },
+    tier: {
+        g: _LEB1_DIR / f"ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS
+    }
+    for tier in ("base", "medium", "extended")
 }
 _PLANET_CENTER_SOURCE_FILES = {
     "base": ["jup204.bsp", "sat319.bsp", "ura083.bsp", "nep050.bsp", "plu017.bsp"],

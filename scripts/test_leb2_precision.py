@@ -57,6 +57,10 @@ BODY_NAMES = {
     47: "Poseidon",
     48: "Transpluto",
 }
+# Exotic minor bodies (centaurs/TNOs/NEAs) — registry is the source of truth.
+from libephemeris.exotic_bodies import name_map as _exotic_names  # noqa: E402
+
+BODY_NAMES.update(_exotic_names())
 
 ALL_BODIES = sorted(BODY_NAMES.keys())
 HELIO_ONLY = {40, 41, 42, 43, 44, 45, 46, 47, 48}

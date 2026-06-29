@@ -72,6 +72,10 @@ from libephemeris.leb_format import (
     write_header,
     write_section_dir,
 )
+from libephemeris.exotic_bodies import (
+    EXOTIC_IDS,
+    name_map as _exotic_names,
+)
 
 # =============================================================================
 # BODY GROUPS
@@ -82,6 +86,7 @@ LEB2_GROUPS = {
     "asteroids": sorted([15, 17, 18, 19, 20]),
     "apogee": sorted([13, 21, 22]),
     "uranians": sorted([40, 41, 42, 43, 44, 45, 46, 47, 48]),
+    "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs — registry source of truth
 }
 
 BODY_NAMES = {
@@ -117,6 +122,7 @@ BODY_NAMES = {
     47: "Poseidon",
     48: "Transpluto",
 }
+BODY_NAMES.update(_exotic_names())  # exotic minor bodies — registry labels
 
 
 # =============================================================================
