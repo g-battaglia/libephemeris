@@ -158,6 +158,7 @@ from libephemeris.leb_format import (
     write_star_entry,
 )
 from libephemeris.exotic_bodies import (
+    EXOTIC_EXTENDED_IDS,
     EXOTIC_IDS,
     naif_map as _exotic_naif,
     name_map as _exotic_names,
@@ -1760,6 +1761,168 @@ def generate_body_icrs_asteroid(
         kernel.close()
 
 
+# Anchor epoch for N-body seeding: J2000, the best-determined JPL state for
+# every body and central inside the 1600-2500 SPK window, so the BCE and CE
+# integration arcs are ~equal length (halving worst-case error growth).
+_NBODY_ANCHOR_JD = 2451545.0
+# DE440 planet ephemeris coverage (linux_p1550p2650.440), JD ~1550..2650.
+_DE440_JD_LO, _DE440_JD_HI = 2287184.5, 2688976.5
+
+
+def _resolve_assist_config_for_range(jd_start: float, jd_end: float):
+    """Return an AssistEphemConfig suitable for [jd_start, jd_end].
+
+    For ranges within DE440 (1550-2650) the default config is fine. For deep
+    time it builds a config with the DE441 long ephemeris pinned EXPLICITLY —
+    AssistEphemConfig searches DE440 first, so with both files present the bare
+    default would silently cap the integration at 1550-2650.
+    """
+    from libephemeris.rebound_integration import (
+        _ASSIST_DEFAULT_DIR,
+        AssistEphemConfig,
+    )
+
+    needs_deep = jd_start < _DE440_JD_LO or jd_end > _DE440_JD_HI
+    if not needs_deep:
+        return AssistEphemConfig()
+
+    de441 = _ASSIST_DEFAULT_DIR / "linux_m13000p17000.441"
+    if not de441.exists():
+        raise RuntimeError(
+            "Deep-time N-body generation needs the DE441 planet ephemeris "
+            "'linux_m13000p17000.441' (-13000..+17000), which is absent. "
+            "Run `download_assist_data(planets_de441=True)` (~2.6 GB) or place "
+            f"the file in {_ASSIST_DEFAULT_DIR}. With only the DE440 file ASSIST "
+            "would silently cap at 1550-2650."
+        )
+    return AssistEphemConfig(planets_file=str(de441))
+
+
+def generate_body_icrs_asteroid_nbody(
+    body_id: int,
+    jd_start: float,
+    jd_end: float,
+    interval_days: float,
+    degree: int,
+    label: str = "",
+    verbose: bool = False,
+) -> Tuple[List[np.ndarray], float]:
+    """Generate ICRS-barycentric Chebyshev coefficients for an exotic body via
+    N-body integration (rebound/ASSIST), seeded from its SPK state.
+
+    Mirrors ``generate_body_icrs_asteroid`` but replaces the SPK position source
+    with an ASSIST integration, so the body can be covered far beyond the
+    1600-2500 SPK window (deep time). ASSIST integrates in SSB-barycentric
+    equatorial ICRF AU — the exact ``all_values`` frame the Chebyshev fitter
+    expects for ``COORD_ICRS_BARY`` — so the raw particle state is read without
+    any rotation and fed to the identical fitter.
+    """
+    import assist  # noqa: F401  (ASSIST/REBOUND are dev-only deps)
+    import rebound
+
+    from libephemeris.rebound_integration import _assist_disable_self_perturber
+    from libephemeris.state import _SPK_BODY_MAP
+
+    AU_KM = 149597870.7
+
+    spk_info = _SPK_BODY_MAP.get(body_id)
+    if spk_info is None:
+        raise RuntimeError(
+            f"N-body seeding needs a registered SPK for body {body_id}; none found."
+        )
+    spk_file, naif_id = spk_info
+
+    cfg = _resolve_assist_config_for_range(jd_start, jd_end)
+    ephem = (
+        assist.Ephem(cfg.planets_file, cfg.asteroids_file)
+        if cfg.asteroids_file
+        else assist.Ephem(cfg.planets_file)
+    )
+
+    # --- seed: SPK heliocentric equatorial-ICRS state at the anchor → SSB AU ---
+    from spktype21 import SPKType21
+
+    kernel = SPKType21.open(spk_file)
+    try:
+        # Derive center/target from the kernel (the registered NAIF id may use
+        # either the 2000000+N or 20000000+N convention) — same as the SPK
+        # worker. center_id is the Sun (10) for these heliocentric type-21 SPKs.
+        center_id = kernel.segments[0].center
+        target_id = kernel.segments[0].target
+        if center_id != 10:
+            raise RuntimeError(
+                f"N-body seed expects a heliocentric SPK (center=10) for body "
+                f"{body_id}; got center={center_id}."
+            )
+        pos_km, vel_km_s = kernel.compute_type21(
+            center_id, target_id, _NBODY_ANCHOR_JD
+        )
+    finally:
+        kernel.close()
+    pos_au = np.asarray(pos_km, dtype=float) / AU_KM
+    vel_au_d = np.asarray(vel_km_s, dtype=float) * 86400.0 / AU_KM
+    sun0 = ephem.get_particle("sun", _NBODY_ANCHOR_JD - ephem.jd_ref)
+    seed = dict(
+        x=pos_au[0] + sun0.x, y=pos_au[1] + sun0.y, z=pos_au[2] + sun0.z,
+        vx=vel_au_d[0] + sun0.vx, vy=vel_au_d[1] + sun0.vy, vz=vel_au_d[2] + sun0.vz,
+    )
+
+    # --- sample grid: exactly the nodes/verify points the fitter reads back ---
+    all_jds, n_segments, pts_per_seg = _compute_all_segment_jds(
+        jd_start, jd_end, interval_days, degree
+    )
+    all_values = np.empty((len(all_jds), 3), dtype=float)
+    order = np.argsort(all_jds)
+    fwd = [int(i) for i in order if all_jds[i] >= _NBODY_ANCHOR_JD]  # ascending
+    bwd = [int(i) for i in reversed(order) if all_jds[i] < _NBODY_ANCHOR_JD]  # desc
+
+    def _new_sim():
+        sim = rebound.Simulation()
+        extras = assist.Extras(sim, ephem)
+        sim.add(m=0.0, **seed)
+        # Disable the ASTEROIDS force when the body IS one of the sb441-n16
+        # perturbers (Hygiea etc.) to avoid the self-singularity.
+        _assist_disable_self_perturber(
+            extras, ephem, seed["x"], seed["y"], seed["z"],
+            _NBODY_ANCHOR_JD - ephem.jd_ref,
+        )
+        sim.t = _NBODY_ANCHOR_JD - ephem.jd_ref
+        sim.integrator = "ias15"
+        return sim, extras
+
+    n_done = 0
+    for sweep in (fwd, bwd):
+        sim, _extras = _new_sim()  # re-seed per direction (clean anchor each way)
+        for i in sweep:
+            sim.integrate(float(all_jds[i]) - ephem.jd_ref)
+            p = sim.particles[0]
+            all_values[i, 0] = p.x  # raw SSB barycentric ICRF AU — no rotation
+            all_values[i, 1] = p.y
+            all_values[i, 2] = p.z
+            n_done += 1
+            if verbose and n_done % 2000 == 0:
+                print(
+                    f"\r  {label or body_id} (n-body) {n_done}/{len(all_jds)} pts",
+                    end="",
+                    flush=True,
+                )
+    if verbose:
+        print()
+
+    return _fit_and_verify_from_values(
+        all_values,
+        jd_start,
+        jd_end,
+        interval_days,
+        degree,
+        3,
+        n_segments,
+        pts_per_seg,
+        label=label,
+        verbose=verbose,
+    )
+
+
 def generate_body_ecliptic(
     body_id: int,
     jd_start: float,
@@ -2147,8 +2310,13 @@ def generate_single_body(
     jd_start: float,
     jd_end: float,
     verbose: bool = False,
+    nbody: bool = False,
 ) -> Tuple[int, List[np.ndarray], float]:
     """Generate Chebyshev data for a single body.
+
+    When ``nbody`` is True the asteroid path uses the N-body (rebound/ASSIST)
+    worker instead of SPK — for deep-time (extended-tier) exotic bodies whose
+    SPK coverage (1600-2500) cannot reach the requested range.
 
     Returns:
         (body_id, coefficients_list, max_error)
@@ -2169,7 +2337,12 @@ def generate_single_body(
                 verbose=verbose,
             )
         else:
-            coeffs, error = generate_body_icrs_asteroid(
+            _asteroid_gen = (
+                generate_body_icrs_asteroid_nbody
+                if nbody
+                else generate_body_icrs_asteroid
+            )
+            coeffs, error = _asteroid_gen(
                 body_id,
                 jd_start,
                 jd_end,
@@ -2223,6 +2396,7 @@ def assemble_leb(
     workers: int = 1,
     verbose: bool = True,
     skip_aux: bool = False,
+    tier: Optional[str] = None,
 ) -> None:
     """Assemble a complete .leb file.
 
@@ -2237,9 +2411,30 @@ def assemble_leb(
             The resulting file will only contain body coefficients.  Useful
             when generating single-body partial files that will be merged
             later (merge takes aux data from the first file that has it).
+        tier: Precision tier ("base"/"medium"/"extended"). On the extended
+            tier the regular exotic bodies (EXOTIC_EXTENDED_IDS) are generated
+            via N-body instead of SPK (their SPK only covers 1600-2500), and
+            the chaotic NEA exotics are excluded entirely.
     """
     if bodies is None:
         bodies = sorted(BODY_PARAMS.keys())
+
+    # Extended tier: route the 23 regular exotics through the N-body worker and
+    # drop the 8 chaotic NEA exotics (no Swiss long-file reference; integration
+    # diverges over millennia).
+    nbody_ids: set[int] = set()
+    if tier == "extended":
+        nbody_ids = set(EXOTIC_EXTENDED_IDS)
+        nea_ids = set(EXOTIC_IDS) - set(EXOTIC_EXTENDED_IDS)
+        dropped = [b for b in bodies if b in nea_ids]
+        if dropped:
+            bodies = [b for b in bodies if b not in nea_ids]
+            if verbose:
+                names = ", ".join(BODY_NAMES.get(b, str(b)) for b in dropped)
+                print(
+                    f"  Extended tier: excluding {len(dropped)} chaotic NEA "
+                    f"exotic(s): {names}"
+                )
 
     now_jd = J2000 + (time.time() / 86400.0 - 10957.5)  # Approximate current JD
 
@@ -2286,6 +2481,36 @@ def assemble_leb(
 
         for bid in asteroid_bodies:
             name = BODY_NAMES.get(bid, f"Body {bid}")
+
+            # N-body (extended) bodies: the SPK is used ONLY to seed the
+            # integration at the J2000 anchor, so a modest anchor-covering
+            # kernel suffices (Horizons cannot serve the -5000..+5000 range).
+            # Register such a kernel, then claim the FULL extended range.
+            if bid in nbody_ids:
+                a_lo, a_hi = _NBODY_ANCHOR_JD - 400.0, _NBODY_ANCHOR_JD + 400.0
+                if not (bid in _SPK_BODY_MAP
+                        and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)):
+                    covering = _find_covering_cached_spk(bid, a_lo, a_hi)
+                    if covering is not None:
+                        from libephemeris import spk as _spk
+                        _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
+                    else:
+                        try:
+                            auto_download_asteroid_spk(
+                                bid, jd_start=a_lo, jd_end=a_hi, force=False
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            if verbose:
+                                print(f"    {name}: anchor SPK download failed: {exc}")
+                if bid not in _SPK_BODY_MAP:
+                    excluded_asteroids.append(bid)
+                    if verbose:
+                        print(f"    {name}: no anchor SPK available (EXCLUDED)")
+                    continue
+                body_jd_ranges[bid] = (jd_start, jd_end)
+                if verbose:
+                    print(f"    {name}: N-body over full tier range (anchor SPK ok)")
+                continue
 
             # Check if an already-cached SPK covers the full range.
             # auto_download_asteroid_spk() short-circuits when a body is
@@ -2439,7 +2664,7 @@ def assemble_leb(
     for bid in asteroid_bodies_gen:
         ast_start, ast_end = body_jd_ranges.get(bid, (jd_start, jd_end))
         bid, coeffs, error = generate_single_body(
-            bid, ast_start, ast_end, verbose=verbose
+            bid, ast_start, ast_end, verbose=verbose, nbody=(bid in nbody_ids)
         )
         body_data[bid] = coeffs
         body_errors[bid] = error
@@ -3721,6 +3946,7 @@ def main():
             workers=args.workers,
             verbose=not args.quiet,
             skip_aux=args.skip_aux,
+            tier=args.tier,
         )
         elapsed = time.time() - t0
 

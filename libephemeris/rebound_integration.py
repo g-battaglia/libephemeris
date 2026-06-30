@@ -134,6 +134,11 @@ _ASSIST_ASTEROIDS_FILENAMES = [
 _ASSIST_PLANETS_URL = (
     "https://ssd.jpl.nasa.gov/ftp/eph/planets/Linux/de440/linux_p1550p2650.440"
 )
+# DE441 long planet ephemeris (-13000..+17000) — needed only for deep-time
+# (extended-tier) N-body generation; ~2.6 GB, opt-in download.
+_ASSIST_PLANETS_DE441_URL = (
+    "https://ssd.jpl.nasa.gov/ftp/eph/planets/Linux/de441/linux_m13000p17000.441"
+)
 _ASSIST_ASTEROIDS_URL = (
     "https://ssd.jpl.nasa.gov/ftp/eph/small_bodies/asteroids_de441/sb441-n16.bsp"
 )
@@ -218,6 +223,7 @@ class AssistEphemConfig:
 # Used for basic integrity verification after download.
 _ASSIST_EXPECTED_SIZES = {
     "linux_p1550p2650.440": 102272352,  # ~98 MB
+    "linux_m13000p17000.441": 2788676624,  # ~2.6 GB (DE441, deep-time)
     "sb441-n16.bsp": 645727232,  # ~616 MB
 }
 
@@ -362,6 +368,7 @@ def download_assist_data(
     target_dir: Optional[str] = None,
     planets: bool = True,
     asteroids: bool = True,
+    planets_de441: bool = False,
     force: bool = False,
     show_progress: bool = True,
     quiet: bool = False,
@@ -379,6 +386,8 @@ def download_assist_data(
         target_dir: Directory to save files (default: ~/.libephemeris/assist/).
         planets: Download planet ephemeris (~98 MB).
         asteroids: Download asteroid perturbers (~616 MB).
+        planets_de441: Download the DE441 long planet ephemeris (~2.6 GB),
+            needed only for deep-time (extended-tier) N-body generation.
         force: Re-download even if files exist and are valid.
         show_progress: Show download progress bar.
         quiet: Suppress all non-error output.
@@ -408,6 +417,12 @@ def download_assist_data(
     _ASSIST_FILES = [
         (planets, _ASSIST_PLANETS_URL, "linux_p1550p2650.440", "Planet ephemeris"),
         (asteroids, _ASSIST_ASTEROIDS_URL, "sb441-n16.bsp", "Asteroid perturbers"),
+        (
+            planets_de441,
+            _ASSIST_PLANETS_DE441_URL,
+            "linux_m13000p17000.441",
+            "Planet ephemeris (DE441, deep-time, ~2.6 GB)",
+        ),
     ]
 
     downloaded = 0
