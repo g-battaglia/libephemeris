@@ -23,12 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bodies ship as an opt-in `{tier}_exotics.leb2` companion (the default install is
   unchanged). Bennu is excluded (JPL Horizons blocks its SPK generation).
 
-  Precision notes (honest): main-belt, TNO and centaur bodies match the reference
+  Precision notes (honest): within the JPL Horizons SPK window (~1600–2500 CE,
+  the base and medium tiers) main-belt, TNO and centaur bodies match the reference
   well; chaotic near-Earth asteroids (Apophis, Toutatis, Icarus, Itokawa) are
   best-effort and degrade at historic dates, where the Horizons and reference orbit
   solutions diverge under back-integration — an irreducible source difference, not a
-  fit error. Coverage is the JPL Horizons SPK window (~1600–2500 CE); outside it
-  these bodies transparently fall back to the previous behaviour.
+  fit error. Outside a body's coverage these transparently fall back to the previous
+  behaviour.
+
+- **Extended tier (−5000..+5000) deep-time coverage for the 23 regular exotic
+  bodies** (TNOs, centaurs, main-belt; chaotic NEAs excluded), produced offline by
+  N-body integration (rebound/ASSIST on JPL DE441) seeded from each body's SPK state
+  — Horizons SPK itself stops at ~1600–2500. Honest framing: at deep dates this is a
+  **consistency check between two independent DE441 integrations** (ours vs the
+  reference's own), not a sub-arcsec guarantee. Agreement is exact at the modern
+  anchor and the divergence grows with time from it: TNOs tens-to-hundreds of
+  arcsec, main-belt similar, chaotic centaurs up to degrees at the BCE extremes
+  (irreducible — the two solutions' initial conditions differ). Still a large
+  improvement over the degree-level Keplerian fallback it replaces.
 
 ### Fixed
 
