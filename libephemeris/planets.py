@@ -579,6 +579,27 @@ def _normalize_calc_flags(flags: int) -> int:
     return flags
 
 
+def _plaus_ephemeris_flags(flags: int) -> int:
+    """Force exactly one ephemeris bit, like the reference plaus_iflag().
+
+    Used by calc_pctr(), whose upstream counterpart normalizes flags via
+    plaus_iflag() only: the ephemeris bits become mutually exclusive with
+    FLG_SWIEPH as the default (priority MOSEPH > JPLEPH > SWIEPH, matching
+    sweph.c), but — unlike calc()/calc_ut() — FLG_MOSEPH is NOT stripped
+    and FLG_SPEED3 is NOT remapped, so retflag matches the reference.
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    ephmask = FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH
+    if flags & FLG_MOSEPH:
+        epheflag = FLG_MOSEPH
+    elif flags & FLG_JPLEPH:
+        epheflag = FLG_JPLEPH
+    else:
+        epheflag = FLG_SWIEPH
+    return (flags & ~ephmask) | epheflag
+
+
 def _strip_output_flags(flags: int) -> int:
     """Remove output-format bits (FLG_XYZ, FLG_RADIANS) from calc flags.
 
@@ -1070,18 +1091,10 @@ def calc_ut(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            if isinstance(_leb_err, ValueError):
-                # range -> DEBUG, corruption -> WARNING (shared convention)
-                from .leb_reader import log_leb_fallback
+            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            from .leb_reader import log_leb_fallback
 
-                log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
-            else:
-                get_logger().debug(
-                    "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                    planet,
-                    tjdut,
-                    _leb_err,
-                )
+            log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
     # --- END LEB fast path ---
 
     # --- Horizons path: use NASA JPL Horizons API when no local ephemeris ---
@@ -1214,18 +1227,10 @@ def calc(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            if isinstance(_leb_err, ValueError):
-                # range -> DEBUG, corruption -> WARNING (shared convention)
-                from .leb_reader import log_leb_fallback
+            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            from .leb_reader import log_leb_fallback
 
-                log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
-            else:
-                get_logger().debug(
-                    "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                    planet,
-                    tjdet,
-                    _leb_err,
-                )
+            log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
     # --- END LEB fast path ---
 
     # --- Horizons path ---
@@ -1333,6 +1338,11 @@ def calc_pctr(
         validate_jd_range(tjdet, planet, "calc_pctr")
 
     from .cache import get_cached_time_tt
+
+    # Reference plaus_iflag() semantics: exactly one ephemeris bit in
+    # retflag (SWIEPH default). Unlike calc()/calc_ut(), FLG_MOSEPH is
+    # not stripped and FLG_SPEED3 is not remapped here.
+    flags = _plaus_ephemeris_flags(flags)
 
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body_pctr
     # since they are output format flags, not calculation flags.
@@ -6050,11 +6060,9 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
     if reader is not None and not (flags & _unsupported_pheno_flags):
         try:
             return _calc_pheno_leb(tjdut, planet, flags)
-        except KeyError:
-            pass
-        except ValueError as _leb_err:
-            # Fall back for out-of-range AND corrupted LEB data, aligned
-            # with the calc_ut()/fixed-star convention.
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back for missing bodies, out-of-range AND corrupted LEB
+            # data, aligned with the calc_ut()/fixed-star convention.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("pheno", _leb_err)
@@ -6095,10 +6103,9 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
 
             tjd_ut = tjdet - deltat(tjdet)
             return _calc_pheno_leb(tjd_ut, planet, flags)
-        except KeyError:
-            pass
-        except ValueError as _leb_err:
-            # Fall back for out-of-range AND corrupted LEB data (see pheno_ut)
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back for missing bodies, out-of-range AND corrupted LEB
+            # data (see pheno_ut)
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("pheno", _leb_err)

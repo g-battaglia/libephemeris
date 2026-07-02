@@ -499,102 +499,7 @@ class EphemerisContext:
             >>> pos, retflag = ctx.calc_ut(2451545.0, MARS, FLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
-        from .constants import ECL_NUT
-        from .planets import (
-            _calc_nutation_obliquity,
-            _normalize_calc_flags,
-            _remap_ast_offset,
-        )
-
-        # Same normalization preamble as the module-level calc_ut(), so the
-        # context entry point stays 1:1 with the reference API (FLG_MOSEPH
-        # strip, ephemeris-bit echo, FLG_SPEED3 mapping) on every path,
-        # including the LEB fast path.
-        iflag = _normalize_calc_flags(iflag)
-
-        # Handle ECL_NUT (-1), like the module-level calc_ut()
-        if ipl == ECL_NUT:
-            return _calc_nutation_obliquity(tjd_ut, iflag)
-
-        # Built-in asteroids by AST_OFFSET number (see module calc_ut)
-        ipl = _remap_ast_offset(ipl)
-
-        # South nodes: derive from the north node via this same context path,
-        # mirroring the module-level calc_ut(). The descending node must be
-        # intercepted here because no downstream path derives it (_calc_body has
-        # no antipode branch), and the antipode is representation-dependent
-        # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
-        if ipl in (-MEAN_NODE, -TRUE_NODE):
-            from .planets import _south_node_from_north
-
-            north_result, retflag = self.calc_ut(tjd_ut, abs(ipl), iflag)
-            return _south_node_from_north(north_result, iflag), retflag
-
-        # --- LEB fast path: try binary ephemeris first ---
-        reader = self.get_leb_reader()
-        if reader is None:
-            # Fall back to global reader if context has no .leb
-            from . import state
-
-            reader = state.get_leb_reader()
-
-        if reader is not None:
-            try:
-                from . import fast_calc
-
-                # Pass sidereal params explicitly (thread-safe, no global swap)
-                _ctx_topo = None
-                if self.topo is not None:
-                    _ctx_topo = (
-                        float(self.topo.longitude.degrees),
-                        float(self.topo.latitude.degrees),
-                        float(self.topo.elevation.m),
-                    )
-                result = fast_calc.fast_calc_ut(
-                    reader,
-                    tjd_ut,
-                    ipl,
-                    iflag,
-                    sid_mode=self.sidereal_mode,
-                    sid_t0=self.sidereal_t0,
-                    sid_ayan_t0=self.sidereal_ayan_t0,
-                    topo=_ctx_topo,
-                )
-                from .logging_config import get_logger
-
-                get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd_ut)
-                _record(ipl, "LEB")
-                return result
-            except (KeyError, ValueError) as _leb_err:
-                if isinstance(_leb_err, ValueError):
-                    # range -> DEBUG, corruption -> WARNING (shared convention)
-                    from .leb_reader import log_leb_fallback
-
-                    log_leb_fallback(
-                        f"body={ipl} jd={tjd_ut:.1f} (context)", _leb_err
-                    )
-                else:
-                    from .logging_config import get_logger
-
-                    get_logger().debug(
-                        "body=%d jd=%.1f source=LEB->fallback (context)",
-                        ipl,
-                        tjd_ut,
-                    )
-        # --- END LEB fast path ---
-
-        from .planets import (
-            _calc_body_with_context,
-            _finalize_output_flags,
-            _strip_output_flags,
-        )
-
-        ts = self.get_timescale()
-        t = ts.ut1_jd(tjd_ut)
-        # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
-        # the module-level calc_ut(); _calc_body does not apply them.
-        pos, retflag = _calc_body_with_context(t, ipl, _strip_output_flags(iflag), self)
-        return _finalize_output_flags(pos, retflag, iflag)
+        return self._calc_impl(tjd_ut, ipl, iflag, ut=True)
 
     def calc(
         self, tjd: float, ipl: int, iflag: int
@@ -623,35 +528,57 @@ class EphemerisContext:
             TT differs from UT by Delta T (~32s for year 2000).
             For most astrological applications, use calc_ut() instead.
         """
+        return self._calc_impl(tjd, ipl, iflag, ut=False)
+
+    def _calc_impl(
+        self, tjd: float, ipl: int, iflag: int, *, ut: bool
+    ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+        """Shared implementation of calc_ut() and calc().
+
+        The two public entry points differ only in the time scale of
+        ``tjd`` — UT1 (``ut=True``) vs TT (``ut=False``) — which selects
+        the fast_calc variant, the Skyfield time constructor, and the
+        ECL_NUT helper. One body keeps the parity with the module-level
+        API structural instead of maintained across near-identical copies.
+        """
         from .constants import ECL_NUT
         from .planets import (
+            _calc_nutation_obliquity,
             _calc_nutation_obliquity_tt,
             _normalize_calc_flags,
             _remap_ast_offset,
         )
 
-        # Same normalization preamble as the module-level calc() (see
-        # calc_ut above for the rationale).
+        # Same normalization preamble as the module-level calc_ut()/calc(),
+        # so the context entry points stay 1:1 with the reference API
+        # (FLG_MOSEPH strip, ephemeris-bit echo, FLG_SPEED3 mapping) on
+        # every path, including the LEB fast path.
         iflag = _normalize_calc_flags(iflag)
 
-        # Handle ECL_NUT (-1): the input is already TT, compute directly
+        # Handle ECL_NUT (-1), like the module-level entry points
         if ipl == ECL_NUT:
+            if ut:
+                return _calc_nutation_obliquity(tjd, iflag)
             return _calc_nutation_obliquity_tt(tjd, iflag)
 
-        # Built-in asteroids by AST_OFFSET number (see module calc)
+        # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
 
         # South nodes: derive from the north node via this same context path,
-        # mirroring the module-level calc().
+        # mirroring the module-level entry points. The descending node must be
+        # intercepted here because no downstream path derives it (_calc_body has
+        # no antipode branch), and the antipode is representation-dependent
+        # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         if ipl in (-MEAN_NODE, -TRUE_NODE):
             from .planets import _south_node_from_north
 
-            north_result, retflag = self.calc(tjd, abs(ipl), iflag)
+            north_result, retflag = self._calc_impl(tjd, abs(ipl), iflag, ut=ut)
             return _south_node_from_north(north_result, iflag), retflag
 
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
         if reader is None:
+            # Fall back to global reader if context has no .leb
             from . import state
 
             reader = state.get_leb_reader()
@@ -661,14 +588,15 @@ class EphemerisContext:
                 from . import fast_calc
 
                 # Pass sidereal params explicitly (thread-safe, no global swap)
-                _ctx_topo_tt = None
+                _ctx_topo = None
                 if self.topo is not None:
-                    _ctx_topo_tt = (
+                    _ctx_topo = (
                         float(self.topo.longitude.degrees),
                         float(self.topo.latitude.degrees),
                         float(self.topo.elevation.m),
                     )
-                result = fast_calc.fast_calc_tt(
+                fast = fast_calc.fast_calc_ut if ut else fast_calc.fast_calc_tt
+                result = fast(
                     reader,
                     tjd,
                     ipl,
@@ -676,7 +604,7 @@ class EphemerisContext:
                     sid_mode=self.sidereal_mode,
                     sid_t0=self.sidereal_t0,
                     sid_ayan_t0=self.sidereal_ayan_t0,
-                    topo=_ctx_topo_tt,
+                    topo=_ctx_topo,
                 )
                 from .logging_config import get_logger
 
@@ -684,21 +612,10 @@ class EphemerisContext:
                 _record(ipl, "LEB")
                 return result
             except (KeyError, ValueError) as _leb_err:
-                if isinstance(_leb_err, ValueError):
-                    # range -> DEBUG, corruption -> WARNING (shared convention)
-                    from .leb_reader import log_leb_fallback
+                # missing body / out-of-range -> DEBUG, corruption -> WARNING
+                from .leb_reader import log_leb_fallback
 
-                    log_leb_fallback(
-                        f"body={ipl} jd={tjd:.1f} (context)", _leb_err
-                    )
-                else:
-                    from .logging_config import get_logger
-
-                    get_logger().debug(
-                        "body=%d jd=%.1f source=LEB->fallback (context)",
-                        ipl,
-                        tjd,
-                    )
+                log_leb_fallback(f"body={ipl} jd={tjd:.1f} (context)", _leb_err)
         # --- END LEB fast path ---
 
         from .planets import (
@@ -708,9 +625,9 @@ class EphemerisContext:
         )
 
         ts = self.get_timescale()
-        t = ts.tt_jd(tjd)
+        t = ts.ut1_jd(tjd) if ut else ts.tt_jd(tjd)
         # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
-        # the module-level calc(); _calc_body does not apply them.
+        # the module-level entry points; _calc_body does not apply them.
         pos, retflag = _calc_body_with_context(t, ipl, _strip_output_flags(iflag), self)
         return _finalize_output_flags(pos, retflag, iflag)
 
@@ -764,13 +681,15 @@ class EphemerisContext:
         from .planets import (
             _calc_body_pctr_with_context,
             _finalize_output_flags,
+            _plaus_ephemeris_flags,
             _strip_output_flags,
         )
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
-        # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
-        # the module-level calc_pctr(); _calc_body_pctr does not apply them.
+        # Reference plaus_iflag() semantics + output-format flags, exactly
+        # like the module-level calc_pctr().
+        iflag = _plaus_ephemeris_flags(iflag)
         pos, retflag = _calc_body_pctr_with_context(
             t, ipl, iplctr, _strip_output_flags(iflag), self
         )
