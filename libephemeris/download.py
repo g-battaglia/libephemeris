@@ -343,14 +343,24 @@ def publish_temp_file(temp_path: str | Path, dest_path: str | Path) -> None:
     restore world-readable permissions first. os.chmod is used because
     os.fchmod is Unix-only before Python 3.13.
 
+    The chmod is best-effort: filesystems without POSIX permission support
+    (some CIFS/SMB or vfat/exFAT mounts) raise on chmod, and a
+    permission-cosmetic step must not discard an already-downloaded,
+    hash-verified file.
+
     Args:
         temp_path: The fully-written temporary file to publish.
         dest_path: Final destination path (atomically replaced).
 
     Raises:
-        OSError: If the chmod or the atomic replace fails.
+        OSError: If the atomic replace fails.
     """
-    os.chmod(temp_path, 0o644)
+    try:
+        os.chmod(temp_path, 0o644)
+    except OSError as exc:
+        get_logger().debug(
+            "Could not set 0644 on %s (non-POSIX filesystem?): %s", temp_path, exc
+        )
     os.replace(temp_path, dest_path)
 
 

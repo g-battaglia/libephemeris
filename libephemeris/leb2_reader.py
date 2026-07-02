@@ -300,14 +300,18 @@ class LEB2Reader:
         self._chunk_cache[key] = decompressed
         return decompressed
 
-    def _decompress_body(self, body_id: int) -> None:
-        """Decompress a body's full coefficients (v1 legacy)."""
+    def _decompress_body(self, body_id: int) -> bytes:
+        """Return a v1 body's full decompressed coefficients (cached)."""
         # Lock-free fast path (see _decompress_chunk)
-        if body_id in self._cache:
-            return
+        cached = self._cache.get(body_id)
+        if cached is not None:
+            return cached
+        # Double-checked lock (decompression is stored under the lock)
         with self._decomp_lock:
-            if body_id not in self._cache:
-                self._decompress_body_uncached(body_id)
+            cached = self._cache.get(body_id)
+            if cached is not None:
+                return cached
+            return self._decompress_body_uncached(body_id)
 
     def _decompress_body_uncached(self, body_id: int) -> bytes:
         """Decompress a v1 body's coefficients and store them in the cache."""
@@ -462,12 +466,11 @@ class LEB2Reader:
             coeffs = struct.unpack_from(f"<{n_coeffs}d", chunk_data, byte_offset)
         else:
             # v1: decompress full body on first access
-            if body_id not in self._cache:
-                self._decompress_body(body_id)
+            body_data = self._decompress_body(body_id)
             deg1 = body.degree + 1
             n_coeffs = body.components * deg1
             byte_offset = seg_idx * n_coeffs * 8
-            coeffs = struct.unpack_from(f"<{n_coeffs}d", self._cache[body_id], byte_offset)
+            coeffs = struct.unpack_from(f"<{n_coeffs}d", body_data, byte_offset)
 
         # Compute tau
         seg_start = body.jd_start + seg_idx * body.interval_days
