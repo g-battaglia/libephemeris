@@ -542,12 +542,7 @@ class EphemerisContext:
         API structural instead of maintained across near-identical copies.
         """
         from .constants import ECL_NUT
-        from .planets import (
-            _calc_nutation_obliquity,
-            _calc_nutation_obliquity_tt,
-            _normalize_calc_flags,
-            _remap_ast_offset,
-        )
+        from .planets import _normalize_calc_flags, _remap_ast_offset
 
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
@@ -557,6 +552,11 @@ class EphemerisContext:
 
         # Handle ECL_NUT (-1), like the module-level entry points
         if ipl == ECL_NUT:
+            from .planets import (
+                _calc_nutation_obliquity,
+                _calc_nutation_obliquity_tt,
+            )
+
             if ut:
                 return _calc_nutation_obliquity(tjd, iflag)
             return _calc_nutation_obliquity_tt(tjd, iflag)

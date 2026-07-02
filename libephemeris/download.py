@@ -342,6 +342,13 @@ def publish_temp_file(temp_path: str | Path, dest_path: str | Path) -> None:
     shared data dirs (LIBEPHEMERIS_DATA_DIR, shared IERS/SPK caches) —
     restore world-readable permissions first. os.chmod is used because
     os.fchmod is Unix-only before Python 3.13.
+
+    Args:
+        temp_path: The fully-written temporary file to publish.
+        dest_path: Final destination path (atomically replaced).
+
+    Raises:
+        OSError: If the chmod or the atomic replace fails.
     """
     os.chmod(temp_path, 0o644)
     os.replace(temp_path, dest_path)

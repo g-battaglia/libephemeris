@@ -338,6 +338,15 @@ class LEB2Reader:
         compressed = self._mm[
             entry.data_offset: entry.data_offset + entry.compressed_size
         ]
+        # An mmap slice past EOF silently returns fewer bytes — surface a
+        # clear truncation error instead of an opaque zstd failure (same
+        # guard as the v2 chunk path).
+        if len(compressed) < entry.compressed_size:
+            raise LEBCorruptionError(
+                f"Truncated LEB2 file: body {body_id} needs "
+                f"{entry.compressed_size} bytes at offset {entry.data_offset}, "
+                f"only {len(compressed)} available"
+            )
         data = decompress_body(
             bytes(compressed),
             entry.uncompressed_size,
