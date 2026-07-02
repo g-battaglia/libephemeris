@@ -555,6 +555,24 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     return result
 
 
+def _strip_output_flags(flags: int) -> int:
+    """Remove output-format bits (FLG_XYZ, FLG_RADIANS) from calc flags.
+
+    They are output-format flags, not calculation flags: entry points strip
+    them before the calculation and re-apply them on the result via
+    _finalize_output_flags(). Keeping the pair in shared helpers prevents an
+    entry point from echoing the flags in retflag without honoring them.
+    """
+    return flags & ~FLG_XYZ & ~FLG_RADIANS
+
+
+def _finalize_output_flags(
+    pos: PositionResult, retflag: int, flags: int
+) -> Tuple[PositionResult, int]:
+    """Apply output-format flags to a result and echo them in retflag."""
+    return _apply_output_flags(pos, flags), retflag | (flags & (FLG_XYZ | FLG_RADIANS))
+
+
 def _south_node_from_north(
     north_result: tuple[float, float, float, float, float, float], flags: int
 ) -> tuple[float, float, float, float, float, float]:
@@ -1089,7 +1107,7 @@ def calc_ut(
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
     # We apply them after the calculation is complete.
-    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+    calc_iflag = _strip_output_flags(flags)
 
     from .cache import get_cached_time_ut1
 
@@ -1101,11 +1119,8 @@ def calc_ut(
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
             _record(planet, "Skyfield")
-        # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, flags)
-        # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
-        return pos, retflag
+        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        return _finalize_output_flags(pos, retflag, flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
     except ValueError as e:
@@ -1261,7 +1276,7 @@ def calc(
 
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
-    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+    calc_iflag = _strip_output_flags(flags)
 
     from .cache import get_cached_time_tt
 
@@ -1271,11 +1286,8 @@ def calc(
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
             _record(planet, "Skyfield")
-        # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, flags)
-        # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
-        return pos, retflag
+        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        return _finalize_output_flags(pos, retflag, flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:
@@ -1333,16 +1345,13 @@ def calc_pctr(
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body_pctr
     # since they are output format flags, not calculation flags.
     # We apply them after the calculation is complete.
-    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+    calc_iflag = _strip_output_flags(flags)
 
     t = get_cached_time_tt(tjdet)
     try:
         pos, retflag = _calc_body_pctr(t, planet, center, calc_iflag)
-        # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, flags)
-        # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
-        return pos, retflag
+        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        return _finalize_output_flags(pos, retflag, flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
@@ -2871,7 +2880,8 @@ def _calc_body(
     # (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
     # handling as the dedicated fixed-star entry point.
     if ipl in fixed_stars.FIXED_STARS:
-        star_name = fixed_stars._STAR_ID_TO_NAME[ipl]
+        star_name = fixed_stars.get_canonical_star_name(ipl)
+        assert star_name is not None  # ipl is in FIXED_STARS
         pos, _star, _retflag = fixed_stars.fixstar_ut(star_name, t.ut1, iflag)
         return _to_native_floats(pos), iflag
 

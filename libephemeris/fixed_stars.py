@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 from skyfield.api import Star
+from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
 
 from .constants import (
@@ -2093,10 +2094,7 @@ def get_canonical_star_name(star_id: int) -> str | None:
     Returns:
         Canonical star name (e.g., "Regulus") or None if not found
     """
-    for entry in STAR_CATALOG:
-        if entry.id == star_id:
-            return entry.name
-    return None
+    return _STAR_ID_TO_NAME.get(star_id)
 
 
 def _calc_star_position_from_observer(
@@ -2405,8 +2403,10 @@ def calc_fixed_star_position(
         except KeyError:
             pass  # Body (EARTH) not in LEB file
         except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise  # Re-raise unexpected ValueError
+            # Fall back to Skyfield for out-of-range dates AND for
+            # corrupted/truncated LEB data, mirroring the planet path
+            # (calc_ut catches KeyError/ValueError from the LEB reader
+            # and falls through to Skyfield).
             from .logging_config import get_logger
 
             get_logger().debug("LEB star fallback: %s", _leb_err)
@@ -2884,6 +2884,13 @@ def fixstar_ut(
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
+    except SkyfieldRangeError as e:
+        # Preserve the range-error type: callers handling
+        # EphemerisRangeError (like the calc_ut() dispatch) must not see
+        # a generic Error for an out-of-range date.
+        from .planets import _wrap_ephemeris_range_error
+
+        raise _wrap_ephemeris_range_error(e, t.tt) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -2991,8 +2998,11 @@ def batch_fixstars_ut(
         except KeyError:
             pass  # Body not in LEB file
         except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+            # Fall back to Skyfield for out-of-range dates AND for
+            # corrupted/truncated LEB data (see calc_fixed_star_position).
+            from .logging_config import get_logger
+
+            get_logger().debug("LEB star batch fallback: %s", _leb_err)
 
     if _leb_ok:
         return tuple(results)
@@ -3043,6 +3053,12 @@ def batch_fixstars_ut(
             if skip_errors:
                 continue
             raise
+        except SkyfieldRangeError as e:
+            if skip_errors:
+                continue
+            from .planets import _wrap_ephemeris_range_error
+
+            raise _wrap_ephemeris_range_error(e, jd_tt) from e
         except (OSError, ValueError, KeyError) as e:
             if skip_errors:
                 continue
@@ -3115,6 +3131,13 @@ def fixstar(
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
+    except SkyfieldRangeError as e:
+        # Preserve the range-error type: callers handling
+        # EphemerisRangeError (like the calc_ut() dispatch) must not see
+        # a generic Error for an out-of-range date.
+        from .planets import _wrap_ephemeris_range_error
+
+        raise _wrap_ephemeris_range_error(e, tjdet) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -3350,6 +3373,13 @@ def fixstar2_ut(
         return (result, star_name_out, ret_flags)
     except Error:
         raise
+    except SkyfieldRangeError as e:
+        # Preserve the range-error type: callers handling
+        # EphemerisRangeError (like the calc_ut() dispatch) must not see
+        # a generic Error for an out-of-range date.
+        from .planets import _wrap_ephemeris_range_error
+
+        raise _wrap_ephemeris_range_error(e, t.tt) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -3425,6 +3455,13 @@ def fixstar2(
         return (result, star_name_out, ret_flags)
     except Error:
         raise
+    except SkyfieldRangeError as e:
+        # Preserve the range-error type: callers handling
+        # EphemerisRangeError (like the calc_ut() dispatch) must not see
+        # a generic Error for an out-of-range date.
+        from .planets import _wrap_ephemeris_range_error
+
+        raise _wrap_ephemeris_range_error(e, tjdet) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 

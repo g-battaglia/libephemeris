@@ -555,11 +555,18 @@ class EphemerisContext:
                 )
         # --- END LEB fast path ---
 
-        from .planets import _calc_body_with_context
+        from .planets import (
+            _calc_body_with_context,
+            _finalize_output_flags,
+            _strip_output_flags,
+        )
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
-        return _calc_body_with_context(t, ipl, iflag, self)
+        # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
+        # the module-level calc_ut(); _calc_body does not apply them.
+        pos, retflag = _calc_body_with_context(t, ipl, _strip_output_flags(iflag), self)
+        return _finalize_output_flags(pos, retflag, iflag)
 
     def calc(
         self, tjd: float, ipl: int, iflag: int
@@ -640,11 +647,18 @@ class EphemerisContext:
                 )
         # --- END LEB fast path ---
 
-        from .planets import _calc_body_with_context
+        from .planets import (
+            _calc_body_with_context,
+            _finalize_output_flags,
+            _strip_output_flags,
+        )
 
         ts = self.get_timescale()
         t = ts.tt_jd(tjd)
-        return _calc_body_with_context(t, ipl, iflag, self)
+        # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
+        # the module-level calc(); _calc_body does not apply them.
+        pos, retflag = _calc_body_with_context(t, ipl, _strip_output_flags(iflag), self)
+        return _finalize_output_flags(pos, retflag, iflag)
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int
@@ -693,11 +707,20 @@ class EphemerisContext:
             >>> # Position of Moon as seen from Mars
             >>> pos, retflag = ctx.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         """
-        from .planets import _calc_body_pctr_with_context
+        from .planets import (
+            _calc_body_pctr_with_context,
+            _finalize_output_flags,
+            _strip_output_flags,
+        )
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
-        return _calc_body_pctr_with_context(t, ipl, iplctr, iflag, self)
+        # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
+        # the module-level calc_pctr(); _calc_body_pctr does not apply them.
+        pos, retflag = _calc_body_pctr_with_context(
+            t, ipl, iplctr, _strip_output_flags(iflag), self
+        )
+        return _finalize_output_flags(pos, retflag, iflag)
 
     @classmethod
     def close(cls) -> None:
