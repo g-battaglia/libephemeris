@@ -57,10 +57,9 @@ def julday(
     Note:
         Transition date: Oct 15, 1582 (Gregorian) = Oct 5, 1582 (Julian)
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
+        Any cal value other than GREG_CAL behaves as JUL_CAL, matching the
+        reference API (which never validates the calendar flag).
     """
-    if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"julday: invalid calendar ({cal})")
-
     if month <= 2:
         year -= 1
         month += 12
@@ -104,10 +103,9 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     Note:
         Automatic Gregorian calendar used for JD >= 2299161 (Oct 15, 1582)
         unless Julian calendar explicitly requested.
+        Any cal value other than GREG_CAL behaves as JUL_CAL, matching the
+        reference API (which never validates the calendar flag).
     """
-    if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"revjul: invalid calendar ({cal})")
-
     jd = jd + 0.5
     z = _floor(jd)
     f = jd - z

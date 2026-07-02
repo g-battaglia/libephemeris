@@ -21,7 +21,7 @@ import sys
 import pytest
 
 from libephemeris import state
-from libephemeris.constants import GREG_CAL
+from libephemeris.constants import GREG_CAL, JUL_CAL
 from libephemeris.exceptions import Error
 from libephemeris import iers_data
 from libephemeris import time_utils
@@ -41,24 +41,27 @@ J2000 = 2451545.0
 
 
 # ---------------------------------------------------------------------------
-# julday / revjul invalid-calendar guards (lines 57, 104)
+# julday / revjul non-Gregorian calendar flags
 # ---------------------------------------------------------------------------
 
 
 class TestCalendarGuards:
-    """Invalid calendar flags must raise ValueError."""
+    """Any cal value other than GREG_CAL behaves as JUL_CAL.
+
+    The reference API never validates the calendar flag: any value other
+    than SE_GREG_CAL falls through to the Julian branch. Raising would be
+    a 1:1 compatibility break.
+    """
 
     @pytest.mark.unit
-    def test_julday_invalid_calendar(self):
-        """julday rejects a calendar flag other than GREG_CAL/JUL_CAL."""
-        with pytest.raises(ValueError, match="invalid calendar"):
-            julday(2000, 1, 1, 12.0, cal=99)
+    def test_julday_nonstandard_calendar_behaves_as_julian(self):
+        """julday treats a calendar flag other than GREG_CAL as Julian."""
+        assert julday(2000, 1, 1, 12.0, cal=99) == julday(2000, 1, 1, 12.0, cal=JUL_CAL)
 
     @pytest.mark.unit
-    def test_revjul_invalid_calendar(self):
-        """revjul rejects a calendar flag other than GREG_CAL/JUL_CAL."""
-        with pytest.raises(ValueError, match="invalid calendar"):
-            revjul(J2000, cal=99)
+    def test_revjul_nonstandard_calendar_behaves_as_julian(self):
+        """revjul treats a calendar flag other than GREG_CAL as Julian."""
+        assert revjul(J2000, cal=99) == revjul(J2000, cal=JUL_CAL)
 
 
 # ---------------------------------------------------------------------------

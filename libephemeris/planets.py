@@ -988,10 +988,6 @@ def calc_ut(
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT, FLG_MOSEPH
 
-    # Handle ECL_NUT (-1) - returns nutation and obliquity
-    if planet == ECL_NUT:
-        return _calc_nutation_obliquity(tjdut, flags)
-
     # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
     flags = flags & ~FLG_MOSEPH
 
@@ -1002,6 +998,11 @@ def calc_ut(
 
     if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
         flags |= FLG_SWIEPH
+
+    # Handle ECL_NUT (-1) - returns nutation and obliquity
+    # (after flag cleaning, so retflag matches the reference API)
+    if planet == ECL_NUT:
+        return _calc_nutation_obliquity(tjdut, flags)
 
     # FLG_SPEED3: 3-position numerical differentiation for speed.
     # libephemeris already uses this method as its only speed computation,
@@ -1150,9 +1151,21 @@ def calc(
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT, FLG_MOSEPH
 
+    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
+    flags = flags & ~FLG_MOSEPH
+
+    # The reference API echoes the ephemeris bit in the returned flags
+    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
+    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
+    from .constants import FLG_JPLEPH
+
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
+    # Placed after flag cleaning so retflag matches the reference API.
     if planet == ECL_NUT:
         # Of-date mean obliquity from the Vondrák 2011 long-term model (angle
         # between the of-date equator and ecliptic poles), consistent with the
@@ -1170,17 +1183,6 @@ def calc(
             0.0,
             0.0,
         ), flags
-
-    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    flags = flags & ~FLG_MOSEPH
-
-    # The reference API echoes the ephemeris bit in the returned flags
-    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
-    from .constants import FLG_JPLEPH
-
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
-        flags |= FLG_SWIEPH
 
     # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
     if flags & FLG_SPEED3:
@@ -1328,9 +1330,19 @@ def calc_pctr(
 
     from .cache import get_cached_time_tt
 
+    # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body_pctr
+    # since they are output format flags, not calculation flags.
+    # We apply them after the calculation is complete.
+    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+
     t = get_cached_time_tt(tjdet)
     try:
-        return _calc_body_pctr(t, planet, center, flags)
+        pos, retflag = _calc_body_pctr(t, planet, center, calc_iflag)
+        # Apply output format flags (XYZ, RADIANS)
+        pos = _apply_output_flags(pos, flags)
+        # Restore output format flags in retflag (they were stripped for calc)
+        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
+        return pos, retflag
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
@@ -1645,10 +1657,11 @@ def _calc_body_pctr(
         dp2 = (p2_next - p2_prev) / (2.0 * dt)
         dp3 = (p3_next - p3_prev) / (2.0 * dt)
 
-        # Handle longitude wrap-around
-        if dp1 > 9000:
+        # Handle longitude wrap-around (same threshold as _calc_body)
+        wrap_threshold = 180.0 / (2.0 * dt)
+        if dp1 > wrap_threshold:
             dp1 -= 360.0 / (2.0 * dt)
-        elif dp1 < -9000:
+        elif dp1 < -wrap_threshold:
             dp1 += 360.0 / (2.0 * dt)
 
     # Apply sidereal offset if requested (ecliptic only).
@@ -2854,19 +2867,21 @@ def _calc_body(
                 )
             ), iflag
 
-    # Handle fixed stars
+    # Handle fixed stars — delegate to fixstar_ut() so every flag
+    # (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
+    # handling as the dedicated fixed-star entry point.
     if ipl in fixed_stars.FIXED_STARS:
-        jd_tt = t.tt
-        lon, lat, dist = fixed_stars.calc_fixed_star_position(ipl, jd_tt)
-        result = (lon, lat, dist, 0.0, 0.0, 0.0)
-        result = _maybe_equatorial_convert(result, jd_tt, iflag)
-        return _to_native_floats(result), iflag
+        star_name = fixed_stars._STAR_ID_TO_NAME[ipl]
+        pos, _star, _retflag = fixed_stars.fixstar_ut(star_name, t.ut1, iflag)
+        return _to_native_floats(pos), iflag
 
     # Handle astrological angles (requires observer location)
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            raise ValueError("Angles require observer location. Call set_topo() first.")
+            from .exceptions import Error
+
+            raise Error("Angles require observer location. Call set_topo() first.")
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -2880,7 +2895,9 @@ def _calc_body(
     if ARABIC_OFFSET <= ipl < ARABIC_OFFSET + 100:
         cache = get_angles_cache()
         if not cache:
-            raise ValueError(
+            from .exceptions import Error
+
+            raise Error(
                 "Arabic parts require pre-calculated positions. Call calc_angles() first."
             )
 

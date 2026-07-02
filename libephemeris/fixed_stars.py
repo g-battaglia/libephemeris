@@ -401,6 +401,10 @@ FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 # Build lookup from canonical name to star ID
 _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
 
+# Reverse lookup from star ID to canonical name (used by the calc_ut/calc
+# fixed-star dispatch to delegate to fixstar_ut).
+_STAR_ID_TO_NAME = {entry.id: entry.name for entry in STAR_CATALOG}
+
 # Build lookup from HIP number to catalog entry.
 _HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
 
