@@ -45,6 +45,8 @@ References:
 
 from __future__ import annotations
 
+from contextlib import contextmanager as _contextmanager
+
 import math
 from typing import Tuple, TYPE_CHECKING
 
@@ -1068,12 +1070,16 @@ def calc_ut(
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT
 
-    flags = _normalize_calc_flags(flags)
-
-    # Handle ECL_NUT (-1) - returns nutation and obliquity
-    # (after flag cleaning, so retflag matches the reference API)
+    # Handle ECL_NUT (-1) - returns nutation and obliquity.
+    # The reference normalizes ECL_NUT flags plaus_iflag-style: exactly one
+    # ephemeris bit, but FLG_MOSEPH is KEPT and FLG_SPEED3 is NOT remapped
+    # (verified vs pyswisseph 2.10.03: MOSEPH -> 4, MOSEPH|SPEED3 -> 132,
+    # flags=0 -> 2) — so it must run on the raw flags, before
+    # _normalize_calc_flags strips MOSEPH.
     if planet == ECL_NUT:
-        return _calc_nutation_obliquity(tjdut, flags)
+        return _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
+
+    flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
     # dispatch so both id forms are served by the same backend.
@@ -1210,14 +1216,14 @@ def calc(
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT
 
-    flags = _normalize_calc_flags(flags)
-
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
-    # Placed after flag cleaning so retflag matches the reference API.
+    # plaus_iflag-style flag handling on the raw flags (see calc_ut).
     if planet == ECL_NUT:
-        return _calc_nutation_obliquity_tt(tjdet, flags)
+        return _calc_nutation_obliquity_tt(tjdet, _plaus_ephemeris_flags(flags))
+
+    flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
     planet = _remap_ast_offset(planet)
@@ -3333,6 +3339,55 @@ def _calc_body(
     return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
 
+@_contextmanager
+def _swapped_context_state(ctx):
+    """Temporarily install an EphemerisContext's per-instance state globally.
+
+    The core calculation code (_calc_body, horizons_calc_ut, ayanamsha
+    helpers) reads observer/sidereal settings from module globals; context
+    calls swap them in under _CONTEXT_SWAP_LOCK so the save-set-restore
+    cycle is atomic across threads.
+    """
+    from . import state
+
+    with state._CONTEXT_SWAP_LOCK:
+        saved = (
+            state._TOPO,
+            state._SIDEREAL_MODE,
+            state._SIDEREAL_T0,
+            state._SIDEREAL_AYAN_T0,
+            state._ANGLES_CACHE,
+        )
+        state._TOPO = ctx.topo
+        state._SIDEREAL_MODE = ctx.sidereal_mode
+        state._SIDEREAL_T0 = ctx.sidereal_t0
+        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        state._ANGLES_CACHE = ctx._angles_cache
+        try:
+            yield
+        finally:
+            (
+                state._TOPO,
+                state._SIDEREAL_MODE,
+                state._SIDEREAL_T0,
+                state._SIDEREAL_AYAN_T0,
+                state._ANGLES_CACHE,
+            ) = saved
+
+
+def _horizons_calc_with_context(client, tjd_ut: float, ipl: int, iflag: int, ctx):
+    """horizons_calc_ut() under the context's state (thread-safe swap).
+
+    horizons_calc_ut reads the global sidereal/observer state (e.g. via
+    _get_ayanamsa_for_flags), so per-context settings must be swapped in
+    exactly like _calc_body_with_context does.
+    """
+    from . import horizons_backend
+
+    with _swapped_context_state(ctx):
+        return horizons_backend.horizons_calc_ut(client, tjd_ut, ipl, iflag)
+
+
 def _calc_body_with_context(
     t, ipl: int, iflag: int, ctx
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -3358,33 +3413,8 @@ def _calc_body_with_context(
         save-set-restore cycle is atomic across threads. Without this lock,
         concurrent calls could interleave and corrupt each other's state.
     """
-    from . import state
-
-    with state._CONTEXT_SWAP_LOCK:
-        # Save current global state
-        old_topo = state._TOPO
-        old_sid_mode = state._SIDEREAL_MODE
-        old_sid_t0 = state._SIDEREAL_T0
-        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-        old_angles_cache = state._ANGLES_CACHE
-
-        try:
-            # Temporarily set global state from context
-            state._TOPO = ctx.topo
-            state._SIDEREAL_MODE = ctx.sidereal_mode
-            state._SIDEREAL_T0 = ctx.sidereal_t0
-            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-            state._ANGLES_CACHE = ctx._angles_cache
-
-            # Use existing calculation logic
-            return _calc_body(t, ipl, iflag)
-        finally:
-            # Restore global state
-            state._TOPO = old_topo
-            state._SIDEREAL_MODE = old_sid_mode
-            state._SIDEREAL_T0 = old_sid_t0
-            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-            state._ANGLES_CACHE = old_angles_cache
+    with _swapped_context_state(ctx):
+        return _calc_body(t, ipl, iflag)
 
 
 def _calc_body_pctr_with_context(
@@ -3409,33 +3439,8 @@ def _calc_body_pctr_with_context(
         This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
         save-set-restore cycle is atomic across threads.
     """
-    from . import state
-
-    with state._CONTEXT_SWAP_LOCK:
-        # Save current global state
-        old_topo = state._TOPO
-        old_sid_mode = state._SIDEREAL_MODE
-        old_sid_t0 = state._SIDEREAL_T0
-        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-        old_angles_cache = state._ANGLES_CACHE
-
-        try:
-            # Temporarily set global state from context
-            state._TOPO = ctx.topo
-            state._SIDEREAL_MODE = ctx.sidereal_mode
-            state._SIDEREAL_T0 = ctx.sidereal_t0
-            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-            state._ANGLES_CACHE = ctx._angles_cache
-
-            # Use existing calculation logic
-            return _calc_body_pctr(t, ipl, iplctr, iflag)
-        finally:
-            # Restore global state
-            state._TOPO = old_topo
-            state._SIDEREAL_MODE = old_sid_mode
-            state._SIDEREAL_T0 = old_sid_t0
-            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-            state._ANGLES_CACHE = old_angles_cache
+    with _swapped_context_state(ctx):
+        return _calc_body_pctr(t, ipl, iplctr, iflag)
 
 
 def get_ayanamsa_ut(tjdut: float) -> float:

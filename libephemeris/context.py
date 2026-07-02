@@ -544,22 +544,26 @@ class EphemerisContext:
         from .constants import ECL_NUT
         from .planets import _normalize_calc_flags, _remap_ast_offset
 
+        # Handle ECL_NUT (-1), like the module-level entry points: the
+        # reference uses plaus_iflag-style flag handling here (MOSEPH kept,
+        # SPEED3 not remapped), so it runs on the raw flags.
+        if ipl == ECL_NUT:
+            from .planets import (
+                _calc_nutation_obliquity,
+                _calc_nutation_obliquity_tt,
+                _plaus_ephemeris_flags,
+            )
+
+            iflag = _plaus_ephemeris_flags(iflag)
+            if ut:
+                return _calc_nutation_obliquity(tjd, iflag)
+            return _calc_nutation_obliquity_tt(tjd, iflag)
+
         # Same normalization preamble as the module-level calc_ut()/calc(),
         # so the context entry points stay 1:1 with the reference API
         # (FLG_MOSEPH strip, ephemeris-bit echo, FLG_SPEED3 mapping) on
         # every path, including the LEB fast path.
         iflag = _normalize_calc_flags(iflag)
-
-        # Handle ECL_NUT (-1), like the module-level entry points
-        if ipl == ECL_NUT:
-            from .planets import (
-                _calc_nutation_obliquity,
-                _calc_nutation_obliquity_tt,
-            )
-
-            if ut:
-                return _calc_nutation_obliquity(tjd, iflag)
-            return _calc_nutation_obliquity_tt(tjd, iflag)
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
@@ -618,17 +622,84 @@ class EphemerisContext:
                 log_leb_fallback(f"body={ipl} jd={tjd:.1f} (context)", _leb_err)
         # --- END LEB fast path ---
 
+        # --- Horizons path: mirror the module-level dispatch. Without this,
+        # set_calc_mode("horizons") silently computed via Skyfield on the
+        # context API (or failed without a local DE440). Runs under the
+        # context-state swap so per-context sidereal settings are honored.
+        from .state import get_horizons_client
+
+        h_client = get_horizons_client()
+        if h_client is not None:
+            from .logging_config import get_logger
+            from .planets import _horizons_calc_with_context
+
+            try:
+                if ut:
+                    jd_ut_approx = tjd
+                else:
+                    from .time_utils import deltat
+
+                    # calc uses TT, convert to UT for horizons_calc_ut
+                    jd_ut_approx = tjd - deltat(tjd)
+                result = _horizons_calc_with_context(
+                    h_client, jd_ut_approx, ipl, iflag, self
+                )
+                get_logger().debug(
+                    "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
+                )
+                _record(ipl, "Horizons")
+                return result
+            except KeyError as _hz_err:
+                get_logger().debug(
+                    "body=%d jd=%.1f source=Horizons->fallback (context) reason=%s",
+                    ipl,
+                    tjd,
+                    _hz_err,
+                )
+            except ConnectionError as _hz_err:
+                # Transient network/API failure — fall through to Skyfield.
+                get_logger().warning(
+                    "body=%d jd=%.1f source=Horizons->fallback (context, network): %s",
+                    ipl,
+                    tjd,
+                    _hz_err,
+                )
+        # --- END Horizons path ---
+
+        from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+
+        from .exceptions import validate_jd_range
         from .planets import (
+            _body_uses_jpl_ephemeris,
             _calc_body_with_context,
             _finalize_output_flags,
             _strip_output_flags,
+            _wrap_ephemeris_range_error,
         )
+
+        # Same out-of-range handling as the module-level entry points:
+        # validate the JD first and wrap Skyfield's range error in the
+        # library EphemerisRangeError so `except EphemerisRangeError`
+        # works identically on the context API.
+        if _body_uses_jpl_ephemeris(ipl):
+            validate_jd_range(tjd, ipl, "calc_ut" if ut else "calc")
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd) if ut else ts.tt_jd(tjd)
         # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
         # the module-level entry points; _calc_body does not apply them.
-        pos, retflag = _calc_body_with_context(t, ipl, _strip_output_flags(iflag), self)
+        try:
+            pos, retflag = _calc_body_with_context(
+                t, ipl, _strip_output_flags(iflag), self
+            )
+        except SkyfieldRangeError as e:
+            raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
+        except ValueError as e:
+            # SPK type 21 kernels raise ValueError for out-of-coverage dates
+            # (same conversion as the module-level entry points).
+            if "Invalid Time" in str(e) or "time" in str(e).lower():
+                raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
+            raise
         return _finalize_output_flags(pos, retflag, iflag)
 
     def houses(
@@ -678,18 +749,33 @@ class EphemerisContext:
             >>> # Position of Moon as seen from Mars
             >>> pos, retflag = ctx.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         """
-        from .planets import _calc_body_pctr_with_context, _run_pctr_pipeline
+        from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
+
+        from .exceptions import validate_jd_range
+        from .planets import (
+            _body_uses_jpl_ephemeris,
+            _calc_body_pctr_with_context,
+            _run_pctr_pipeline,
+            _wrap_ephemeris_range_error,
+        )
+
+        # Same out-of-range handling as the module-level calc_pctr()
+        if _body_uses_jpl_ephemeris(ipl) or _body_uses_jpl_ephemeris(iplctr):
+            validate_jd_range(tjd_ut, ipl, "calc_pctr")
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
         # Same plaus_iflag/output-flag pipeline as the module-level
         # calc_pctr(), shared so the semantics cannot drift.
-        return _run_pctr_pipeline(
-            lambda calc_iflag: _calc_body_pctr_with_context(
-                t, ipl, iplctr, calc_iflag, self
-            ),
-            iflag,
-        )
+        try:
+            return _run_pctr_pipeline(
+                lambda calc_iflag: _calc_body_pctr_with_context(
+                    t, ipl, iplctr, calc_iflag, self
+                ),
+                iflag,
+            )
+        except SkyfieldRangeError as e:
+            raise _wrap_ephemeris_range_error(e, tjd_ut, ipl) from e
 
     @classmethod
     def close(cls) -> None:
