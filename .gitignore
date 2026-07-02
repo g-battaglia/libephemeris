@@ -66,3 +66,5 @@ docs/build/
 
 # JS tooling
 node_modules/
+/data/leb2/base_core.leb2
+/HANDOFF.md
