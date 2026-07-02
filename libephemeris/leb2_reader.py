@@ -58,11 +58,11 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
-    LEBCorruptionError,
     validate_entry_count,
     _madvise_ranges,
     _madvise_dontneed,
 )
+from .exceptions import LEBCorruptionError
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
 

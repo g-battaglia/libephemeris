@@ -27,6 +27,9 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+# LEBCorruptionError lives in exceptions.py (project convention: library
+# exceptions belong there); validate_entry_count below raises it.
+from .exceptions import LEBCorruptionError
 from .exotic_bodies import body_params as _exotic_body_params
 
 # =============================================================================
@@ -358,18 +361,6 @@ def write_body_entry(buf: bytearray, offset: int, entry: BodyEntry) -> None:
         entry.components,
         entry.data_offset,
     )
-
-
-class LEBCorruptionError(ValueError):
-    """A LEB/LEB2 file is corrupted or truncated.
-
-    Subclasses ValueError so the existing fallback handlers (which catch
-    ValueError) keep working unchanged; the distinct type lets
-    log_leb_fallback report corruption at WARNING while routine
-    out-of-range fallbacks stay at DEBUG — string-matching on messages
-    misclassified legitimate fallbacks (e.g. "outside nutation range",
-    "No Delta-T data in this LEB file").
-    """
 
 
 def validate_entry_count(

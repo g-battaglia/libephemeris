@@ -24,8 +24,7 @@ import threading
 import numpy as np
 import zstandard as zstd
 
-from .leb_format import LEBCorruptionError
-
+from .exceptions import LEBCorruptionError
 from .exotic_bodies import target_au_map as _exotic_target_au
 
 # Default target: 0.001 arcsecond expressed in AU
