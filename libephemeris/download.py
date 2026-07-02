@@ -1504,8 +1504,8 @@ def download_leb2_for_tier(
 ) -> list:
     """Download LEB2 compressed modular ephemeris files for a tier.
 
-    Downloads group files (core, asteroids, apogee, uranians) from GitHub
-    Releases to ~/.libephemeris/leb/.
+    Downloads group files (core, asteroids, exotics, apogee, uranians)
+    from GitHub Releases to ~/.libephemeris/leb/.
 
     Args:
         tier_name: One of "base", "medium", "extended"
