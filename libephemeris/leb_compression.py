@@ -290,6 +290,15 @@ def decompress_body(
                 compressed, max_output_size=uncompressed_size
             )
     except zstd.ZstdError as exc:
-        raise ValueError(f"Corrupted LEB2 data: {exc}") from exc
+        raise ValueError(
+            f"Corrupted LEB2 data (possibly truncated file): {exc}"
+        ) from exc
+    if len(decompressed) != uncompressed_size:
+        # A valid-but-short frame would otherwise surface as a cryptic
+        # numpy reshape error in reorder_segment_major.
+        raise ValueError(
+            f"Corrupted LEB2 data: decompressed to {len(decompressed)} bytes, "
+            f"expected {uncompressed_size}"
+        )
     unshuffled = unshuffle_bytes(decompressed)
     return reorder_segment_major(unshuffled, segment_count, degree, components)

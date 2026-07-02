@@ -19,6 +19,7 @@ from __future__ import annotations
 import mmap
 import os
 import struct
+import threading
 from bisect import bisect_right
 from typing import Dict, List, Optional, Tuple
 
@@ -82,6 +83,7 @@ class LEB2Reader:
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
+        self._chunk_cache_lock = threading.Lock()
         self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
         self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
@@ -203,7 +205,8 @@ class LEB2Reader:
     def _decompress_chunk(self, body_id: int, chunk_idx: int) -> bytes:
         """Decompress a single chunk (v2)."""
         key = (body_id, chunk_idx)
-        cached = self._chunk_cache.get(key)
+        with self._chunk_cache_lock:
+            cached = self._chunk_cache.get(key)
         if cached is not None:
             return cached
 
@@ -222,6 +225,14 @@ class LEB2Reader:
         compressed = self._mm[
             chunk.blob_offset: chunk.blob_offset + chunk.compressed_size
         ]
+        # An mmap slice past EOF silently returns fewer bytes — surface a
+        # clear truncation error instead of an opaque zstd failure.
+        if len(compressed) < chunk.compressed_size:
+            raise ValueError(
+                f"Truncated LEB2 file: chunk (body {body_id}, chunk "
+                f"{chunk_idx}) needs {chunk.compressed_size} bytes at offset "
+                f"{chunk.blob_offset}, only {len(compressed)} available"
+            )
         decompressed = decompress_body(
             bytes(compressed),
             chunk.uncompressed_size,
@@ -231,9 +242,10 @@ class LEB2Reader:
         )
 
         # Bounded cache: keep max 64 chunks in memory
-        if len(self._chunk_cache) > 64:
-            self._chunk_cache.clear()
-        self._chunk_cache[key] = decompressed
+        with self._chunk_cache_lock:
+            if len(self._chunk_cache) > 64:
+                self._chunk_cache.clear()
+            self._chunk_cache[key] = decompressed
         return decompressed
 
     def _decompress_body(self, body_id: int) -> None:

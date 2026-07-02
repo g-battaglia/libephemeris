@@ -228,6 +228,15 @@ class LEBReader:
         self._bodies: Dict[int, BodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
+            # Corrupted-header guard: an inflated body_count would otherwise
+            # read past the section into adjacent data, silently creating
+            # garbage BodyEntry records.
+            if self._header.body_count * BODY_ENTRY_SIZE > sec.size:
+                raise ValueError(
+                    f"Corrupted LEB header: body_count={self._header.body_count} "
+                    f"needs {self._header.body_count * BODY_ENTRY_SIZE} bytes, "
+                    f"body index section has {sec.size}"
+                )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * BODY_ENTRY_SIZE
                 entry = read_body_entry(self._mm, offset)
@@ -392,6 +401,15 @@ class LEBReader:
         deg1 = body.degree + 1
         n_coeffs = body.components * deg1
         byte_offset = body.data_offset + seg_idx * n_coeffs * 8
+        # Corrupted-entry guard: a garbage data_offset would make
+        # struct.unpack_from raise struct.error, which is NOT a ValueError
+        # and would bypass the callers' LEB->Skyfield fallback handling.
+        if byte_offset < 0 or byte_offset + n_coeffs * 8 > len(self._mm):
+            raise ValueError(
+                f"Corrupted LEB body entry {body_id}: coefficient data at "
+                f"offset {byte_offset} (+{n_coeffs * 8} bytes) is outside "
+                f"the file (size {len(self._mm)})"
+            )
         coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
 
         # Evaluate each component via Clenshaw
