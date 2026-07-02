@@ -499,6 +499,26 @@ class EphemerisContext:
             >>> pos, retflag = ctx.calc_ut(2451545.0, MARS, FLG_SPEED)
             >>> lon, lat, dist = pos[0], pos[1], pos[2]
         """
+        from .constants import ECL_NUT
+        from .planets import (
+            _calc_nutation_obliquity,
+            _normalize_calc_flags,
+            _remap_ast_offset,
+        )
+
+        # Same normalization preamble as the module-level calc_ut(), so the
+        # context entry point stays 1:1 with the reference API (FLG_MOSEPH
+        # strip, ephemeris-bit echo, FLG_SPEED3 mapping) on every path,
+        # including the LEB fast path.
+        iflag = _normalize_calc_flags(iflag)
+
+        # Handle ECL_NUT (-1), like the module-level calc_ut()
+        if ipl == ECL_NUT:
+            return _calc_nutation_obliquity(tjd_ut, iflag)
+
+        # Built-in asteroids by AST_OFFSET number (see module calc_ut)
+        ipl = _remap_ast_offset(ipl)
+
         # South nodes: derive from the north node via this same context path,
         # mirroring the module-level calc_ut(). The descending node must be
         # intercepted here because no downstream path derives it (_calc_body has
@@ -545,14 +565,22 @@ class EphemerisContext:
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd_ut)
                 _record(ipl, "LEB")
                 return result
-            except (KeyError, ValueError):
-                from .logging_config import get_logger
+            except (KeyError, ValueError) as _leb_err:
+                if isinstance(_leb_err, ValueError):
+                    # range -> DEBUG, corruption -> WARNING (shared convention)
+                    from .leb_reader import log_leb_fallback
 
-                get_logger().debug(
-                    "body=%d jd=%.1f source=LEB->fallback (context)",
-                    ipl,
-                    tjd_ut,
-                )
+                    log_leb_fallback(
+                        f"body={ipl} jd={tjd_ut:.1f} (context)", _leb_err
+                    )
+                else:
+                    from .logging_config import get_logger
+
+                    get_logger().debug(
+                        "body=%d jd=%.1f source=LEB->fallback (context)",
+                        ipl,
+                        tjd_ut,
+                    )
         # --- END LEB fast path ---
 
         from .planets import (
@@ -595,6 +623,24 @@ class EphemerisContext:
             TT differs from UT by Delta T (~32s for year 2000).
             For most astrological applications, use calc_ut() instead.
         """
+        from .constants import ECL_NUT
+        from .planets import (
+            _calc_nutation_obliquity_tt,
+            _normalize_calc_flags,
+            _remap_ast_offset,
+        )
+
+        # Same normalization preamble as the module-level calc() (see
+        # calc_ut above for the rationale).
+        iflag = _normalize_calc_flags(iflag)
+
+        # Handle ECL_NUT (-1): the input is already TT, compute directly
+        if ipl == ECL_NUT:
+            return _calc_nutation_obliquity_tt(tjd, iflag)
+
+        # Built-in asteroids by AST_OFFSET number (see module calc)
+        ipl = _remap_ast_offset(ipl)
+
         # South nodes: derive from the north node via this same context path,
         # mirroring the module-level calc().
         if ipl in (-MEAN_NODE, -TRUE_NODE):
@@ -637,14 +683,22 @@ class EphemerisContext:
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
                 _record(ipl, "LEB")
                 return result
-            except (KeyError, ValueError):
-                from .logging_config import get_logger
+            except (KeyError, ValueError) as _leb_err:
+                if isinstance(_leb_err, ValueError):
+                    # range -> DEBUG, corruption -> WARNING (shared convention)
+                    from .leb_reader import log_leb_fallback
 
-                get_logger().debug(
-                    "body=%d jd=%.1f source=LEB->fallback (context)",
-                    ipl,
-                    tjd,
-                )
+                    log_leb_fallback(
+                        f"body={ipl} jd={tjd:.1f} (context)", _leb_err
+                    )
+                else:
+                    from .logging_config import get_logger
+
+                    get_logger().debug(
+                        "body=%d jd=%.1f source=LEB->fallback (context)",
+                        ipl,
+                        tjd,
+                    )
         # --- END LEB fast path ---
 
         from .planets import (

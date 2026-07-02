@@ -555,6 +555,30 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     return result
 
 
+def _normalize_calc_flags(flags: int) -> int:
+    """Normalize calculation flags the way the reference API does.
+
+    Shared by the module-level calc()/calc_ut() and the EphemerisContext
+    entry points so both stay 1:1 with the reference behavior:
+
+    - FLG_MOSEPH is accepted for compatibility but stripped (all
+      calculations use the JPL DE440/DE441 path).
+    - An ephemeris bit is ensured, so retflag echoes FLG_SWIEPH when the
+      caller passed none.
+    - FLG_SPEED3 maps to FLG_SPEED: 3-position numerical differentiation
+      is already the only speed method used (matching SE behavior where
+      SPEED takes priority if both are set).
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    flags = flags & ~FLG_MOSEPH
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+    if flags & FLG_SPEED3:
+        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+    return flags
+
+
 def _strip_output_flags(flags: int) -> int:
     """Remove output-format bits (FLG_XYZ, FLG_RADIANS) from calc flags.
 
@@ -1004,30 +1028,14 @@ def calc_ut(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import ECL_NUT, FLG_MOSEPH
+    from .constants import ECL_NUT
 
-    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    flags = flags & ~FLG_MOSEPH
-
-    # The reference API echoes the ephemeris bit in the returned flags
-    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
-    from .constants import FLG_JPLEPH
-
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
-        flags |= FLG_SWIEPH
+    flags = _normalize_calc_flags(flags)
 
     # Handle ECL_NUT (-1) - returns nutation and obliquity
     # (after flag cleaning, so retflag matches the reference API)
     if planet == ECL_NUT:
         return _calc_nutation_obliquity(tjdut, flags)
-
-    # FLG_SPEED3: 3-position numerical differentiation for speed.
-    # libephemeris already uses this method as its only speed computation,
-    # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
-    # where SPEED takes priority if both are set).
-    if flags & FLG_SPEED3:
-        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
 
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
     # dispatch so both id forms are served by the same backend.
@@ -1062,12 +1070,18 @@ def calc_ut(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet,
-                tjdut,
-                _leb_err,
-            )
+            if isinstance(_leb_err, ValueError):
+                # range -> DEBUG, corruption -> WARNING (shared convention)
+                from .leb_reader import log_leb_fallback
+
+                log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
+            else:
+                get_logger().debug(
+                    "body=%d jd=%.1f source=LEB->fallback reason=%s",
+                    planet,
+                    tjdut,
+                    _leb_err,
+                )
     # --- END LEB fast path ---
 
     # --- Horizons path: use NASA JPL Horizons API when no local ephemeris ---
@@ -1164,44 +1178,16 @@ def calc(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import ECL_NUT, FLG_MOSEPH
+    from .constants import ECL_NUT
 
-    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    flags = flags & ~FLG_MOSEPH
-
-    # The reference API echoes the ephemeris bit in the returned flags
-    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
-    from .constants import FLG_JPLEPH
-
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
-        flags |= FLG_SWIEPH
+    flags = _normalize_calc_flags(flags)
 
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
     # Placed after flag cleaning so retflag matches the reference API.
     if planet == ECL_NUT:
-        # Of-date mean obliquity from the Vondrák 2011 long-term model (angle
-        # between the of-date equator and ecliptic poles), consistent with the
-        # precession used everywhere else and long-term valid. Nutation stays
-        # IAU 2006/2000A. See _calc_nutation_obliquity for the rationale.
-        mean_obliquity = vondrak_mean_obliquity_deg(tjdet)
-        dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjdet - 2451545.0)
-        delta_psi = math.degrees(dpsi_rad)
-        delta_eps = math.degrees(deps_rad)
-        return (
-            mean_obliquity + delta_eps,
-            mean_obliquity,
-            delta_psi,
-            delta_eps,
-            0.0,
-            0.0,
-        ), flags
-
-    # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
-    if flags & FLG_SPEED3:
-        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+        return _calc_nutation_obliquity_tt(tjdet, flags)
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
     planet = _remap_ast_offset(planet)
@@ -1228,12 +1214,18 @@ def calc(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet,
-                tjdet,
-                _leb_err,
-            )
+            if isinstance(_leb_err, ValueError):
+                # range -> DEBUG, corruption -> WARNING (shared convention)
+                from .leb_reader import log_leb_fallback
+
+                log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
+            else:
+                get_logger().debug(
+                    "body=%d jd=%.1f source=LEB->fallback reason=%s",
+                    planet,
+                    tjdet,
+                    _leb_err,
+                )
     # --- END LEB fast path ---
 
     # --- Horizons path ---
@@ -1761,20 +1753,24 @@ def _calc_nutation_obliquity(
             - Data tuple: (true_obliquity, mean_obliquity, nutation_longitude, nutation_obliquity, 0, 0)
             - Return flag
     """
-    import math
     from .state import get_timescale
 
     ts = get_timescale()
     t = ts.ut1_jd(jd)
+    return _calc_nutation_obliquity_tt(t.tt, iflag)
 
-    # Calculate Julian centuries from J2000.0
-    (jd - 2451545.0) / 36525.0
+
+def _calc_nutation_obliquity_tt(
+    jd_tt: float, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """ECL_NUT data for a TT Julian Day (see _calc_nutation_obliquity)."""
+    import math
 
     # Mean obliquity of the ecliptic (Vondrák 2011 long-term, via pyerfa poles)
-    mean_obliquity = vondrak_mean_obliquity_deg(t.tt)
+    mean_obliquity = vondrak_mean_obliquity_deg(jd_tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
-    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, t.tt - 2451545.0)
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
     delta_psi = math.degrees(dpsi_rad)
     delta_eps = math.degrees(deps_rad)
 
@@ -6057,8 +6053,11 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
         except KeyError:
             pass
         except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+            # Fall back for out-of-range AND corrupted LEB data, aligned
+            # with the calc_ut()/fixed-star convention.
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback("pheno", _leb_err)
     # --- END LEB fast path ---
 
     ts = get_timescale()
@@ -6099,8 +6098,10 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
         except KeyError:
             pass
         except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+            # Fall back for out-of-range AND corrupted LEB data (see pheno_ut)
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback("pheno", _leb_err)
     # --- END LEB fast path ---
 
     ts = get_timescale()
