@@ -360,6 +360,26 @@ def write_body_entry(buf: bytearray, offset: int, entry: BodyEntry) -> None:
     )
 
 
+def validate_body_index(
+    body_count: int, entry_size: int, section_size: int, label: str
+) -> None:
+    """Reject a body_count that does not fit in the body index section.
+
+    Corrupted-header guard shared by the LEB1 and LEB2 readers: an inflated
+    body_count would otherwise read past the section into adjacent data,
+    silently creating garbage body entries.
+
+    Raises:
+        ValueError: If body_count * entry_size exceeds section_size.
+    """
+    if body_count * entry_size > section_size:
+        raise ValueError(
+            f"Corrupted {label} header: body_count={body_count} needs "
+            f"{body_count * entry_size} bytes, body index section has "
+            f"{section_size}"
+        )
+
+
 def read_body_entry(data: Any, offset: int) -> BodyEntry:
     """Unpack a BodyEntry from bytes at the given offset."""
     fields = struct.unpack_from(BODY_ENTRY_FMT, data, offset)

@@ -50,6 +50,7 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
+    validate_body_index,
     _madvise_ranges,
     _madvise_dontneed,
 )
@@ -228,15 +229,9 @@ class LEBReader:
         self._bodies: Dict[int, BodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
-            # Corrupted-header guard: an inflated body_count would otherwise
-            # read past the section into adjacent data, silently creating
-            # garbage BodyEntry records.
-            if self._header.body_count * BODY_ENTRY_SIZE > sec.size:
-                raise ValueError(
-                    f"Corrupted LEB header: body_count={self._header.body_count} "
-                    f"needs {self._header.body_count * BODY_ENTRY_SIZE} bytes, "
-                    f"body index section has {sec.size}"
-                )
+            validate_body_index(
+                self._header.body_count, BODY_ENTRY_SIZE, sec.size, "LEB"
+            )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * BODY_ENTRY_SIZE
                 entry = read_body_entry(self._mm, offset)
@@ -571,6 +566,29 @@ class LEBReader:
             except (OSError, ValueError, KeyError):
                 pass
             self._file = None  # type: ignore[assignment]
+
+
+def log_leb_fallback(context: str, err: Exception) -> None:
+    """Log a LEB -> Skyfield fallback with severity matched to the cause.
+
+    Out-of-range dates are a routine, by-design fallback (DEBUG); any other
+    ValueError from the LEB layer means corrupted/truncated data, which the
+    caller silently absorbs by recomputing via Skyfield on every call — that
+    deserves a visible WARNING (same rationale as the Horizons fetch_batch
+    logging).
+
+    Args:
+        context: Short label of the calling path (e.g. "star", "pheno").
+        err: The exception that triggered the fallback.
+    """
+    from .logging_config import get_logger
+
+    if "outside range" in str(err).lower():
+        get_logger().debug("LEB %s fallback: %s", context, err)
+    else:
+        get_logger().warning(
+            "LEB %s fallback (corrupted or truncated LEB data?): %s", context, err
+        )
 
 
 def open_leb(path: str) -> Union["LEBReader", "LEB2Reader"]:

@@ -58,6 +58,7 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
+    validate_body_index,
     _madvise_ranges,
     _madvise_dontneed,
 )
@@ -141,15 +142,12 @@ class LEB2Reader:
         self._bodies: Dict[int, CompressedBodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
-            # Corrupted-header guard: an inflated body_count would otherwise
-            # read past the section into adjacent data, silently creating
-            # garbage entries (same check as LEBReader._parse).
-            if self._header.body_count * COMPRESSED_BODY_ENTRY_SIZE > sec.size:
-                raise ValueError(
-                    f"Corrupted LEB2 header: body_count={self._header.body_count} "
-                    f"needs {self._header.body_count * COMPRESSED_BODY_ENTRY_SIZE} "
-                    f"bytes, body index section has {sec.size}"
-                )
+            validate_body_index(
+                self._header.body_count,
+                COMPRESSED_BODY_ENTRY_SIZE,
+                sec.size,
+                "LEB2",
+            )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
                 entry = read_compressed_body_entry(self._mm, offset)
@@ -233,6 +231,10 @@ class LEB2Reader:
         Threads asking for a key that is already being decompressed wait on
         the owner's event instead of redoing the (expensive) zstd work, then
         re-check the cache. If the owner failed, a waiter takes over.
+
+        Callers check the cache lock-free before entering (dict.get is
+        atomic under the GIL), so this only runs on cache misses — the
+        eval hot path never touches the lock.
         """
         while True:
             with self._decomp_lock:
@@ -256,6 +258,12 @@ class LEB2Reader:
     def _decompress_chunk(self, body_id: int, chunk_idx: int) -> bytes:
         """Decompress a single chunk (v2)."""
         key = (body_id, chunk_idx)
+        # Lock-free fast path: chunk hits dominate the eval hot path
+        # (decade-scale chunks vs day-scale queries), and dict.get is
+        # atomic under the GIL — same argument as _eval_cache.
+        cached = self._chunk_cache.get(key)
+        if cached is not None:
+            return cached
         return self._dedup_decompress(
             key,
             lambda: self._chunk_cache.get(key),
@@ -296,7 +304,9 @@ class LEB2Reader:
             body.components,
         )
 
-        # Bounded cache: keep max 64 chunks in memory
+        # Bounded cache: keep max 64 chunks in memory. The clear() may
+        # occasionally evict an entry another owner just stored (waiters
+        # then re-decompress on their next miss) — rare and benign.
         with self._decomp_lock:
             if len(self._chunk_cache) > 64:
                 self._chunk_cache.clear()
@@ -305,6 +315,9 @@ class LEB2Reader:
 
     def _decompress_body(self, body_id: int) -> None:
         """Decompress a body's full coefficients (v1 legacy)."""
+        # Lock-free fast path (see _decompress_chunk)
+        if body_id in self._cache:
+            return
         # chunk_idx -1 cannot clash with v2 chunk keys (chunk_idx >= 0)
         key = (body_id, -1)
         self._dedup_decompress(
