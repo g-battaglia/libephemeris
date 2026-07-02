@@ -21,7 +21,7 @@ import sys
 import pytest
 
 from libephemeris import state
-from libephemeris.constants import GREG_CAL, JUL_CAL
+from libephemeris.constants import GREG_CAL
 from libephemeris.exceptions import Error
 from libephemeris import iers_data
 from libephemeris import time_utils
@@ -41,27 +41,48 @@ J2000 = 2451545.0
 
 
 # ---------------------------------------------------------------------------
-# julday / revjul non-Gregorian calendar flags
+# julday / revjul / utc_to_jd / jdet_to_utc / jdut1_to_utc calendar guards
 # ---------------------------------------------------------------------------
 
 
 class TestCalendarGuards:
-    """Any cal value other than GREG_CAL behaves as JUL_CAL.
+    """Invalid calendar flags must raise ValueError.
 
-    The reference API never validates the calendar flag: any value other
-    than SE_GREG_CAL falls through to the Julian branch. Raising would be
-    a 1:1 compatibility break.
+    The reference binding validates the calendar flag in all five
+    functions (e.g. `swisseph.julday: invalid calendar (99)`); without
+    the guard cal=99 would mean Julian in julday()/revjul() but Gregorian
+    in the UTC conversion functions.
     """
 
     @pytest.mark.unit
-    def test_julday_nonstandard_calendar_behaves_as_julian(self):
-        """julday treats a calendar flag other than GREG_CAL as Julian."""
-        assert julday(2000, 1, 1, 12.0, cal=99) == julday(2000, 1, 1, 12.0, cal=JUL_CAL)
+    def test_julday_invalid_calendar(self):
+        """julday rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            julday(2000, 1, 1, 12.0, cal=99)
 
     @pytest.mark.unit
-    def test_revjul_nonstandard_calendar_behaves_as_julian(self):
-        """revjul treats a calendar flag other than GREG_CAL as Julian."""
-        assert revjul(J2000, cal=99) == revjul(J2000, cal=JUL_CAL)
+    def test_revjul_invalid_calendar(self):
+        """revjul rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            revjul(J2000, cal=99)
+
+    @pytest.mark.unit
+    def test_utc_to_jd_invalid_calendar(self):
+        """utc_to_jd rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.utc_to_jd(2000, 1, 1, 12, 0, 0.0, calendar=99)
+
+    @pytest.mark.unit
+    def test_jdet_to_utc_invalid_calendar(self):
+        """jdet_to_utc rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.jdet_to_utc(J2000, calendar=99)
+
+    @pytest.mark.unit
+    def test_jdut1_to_utc_invalid_calendar(self):
+        """jdut1_to_utc rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.jdut1_to_utc(J2000, calendar=99)
 
 
 # ---------------------------------------------------------------------------
