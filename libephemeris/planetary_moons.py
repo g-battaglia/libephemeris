@@ -35,6 +35,8 @@ References:
     - Reference API 2.10+ moon support
 """
 
+from __future__ import annotations
+
 import math
 import os
 from typing import Any, Optional, Tuple
