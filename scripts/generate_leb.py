@@ -1203,7 +1203,7 @@ def _spk_covers_range(
         True if coverage is sufficient, False otherwise.
     """
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:
@@ -1289,7 +1289,7 @@ def _get_asteroid_spk_range(
         (jd_start, jd_end) or None if the file cannot be read.
     """
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:
@@ -1652,7 +1652,7 @@ def generate_body_icrs_asteroid(
 
     spk_file, naif_id = spk_info
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception as exc:
@@ -1842,7 +1842,7 @@ def generate_body_icrs_asteroid_nbody(
     )
 
     # --- seed: SPK heliocentric equatorial-ICRS state at the anchor → SSB AU ---
-    from spktype21 import SPKType21
+    from libephemeris.vendor.spktype21 import SPKType21
 
     kernel = SPKType21.open(spk_file)
     try:
@@ -3510,7 +3510,7 @@ def _verify_icrs_asteroid(
 
     spk_file, naif_id = spk_info
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:
