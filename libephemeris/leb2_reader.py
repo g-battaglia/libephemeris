@@ -83,7 +83,12 @@ class LEB2Reader:
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
-        self._chunk_cache_lock = threading.Lock()
+        # Guards _cache/_chunk_cache and deduplicates concurrent
+        # decompression of the same body/chunk via per-key in-flight events.
+        # (_eval_cache stays lock-free: a tiny memo of result tuples whose
+        # dict get/set are atomic under the GIL.)
+        self._decomp_lock = threading.Lock()
+        self._decomp_inflight: Dict[Tuple[int, int], threading.Event] = {}
         self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
         self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
@@ -136,6 +141,15 @@ class LEB2Reader:
         self._bodies: Dict[int, CompressedBodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
+            # Corrupted-header guard: an inflated body_count would otherwise
+            # read past the section into adjacent data, silently creating
+            # garbage entries (same check as LEBReader._parse).
+            if self._header.body_count * COMPRESSED_BODY_ENTRY_SIZE > sec.size:
+                raise ValueError(
+                    f"Corrupted LEB2 header: body_count={self._header.body_count} "
+                    f"needs {self._header.body_count * COMPRESSED_BODY_ENTRY_SIZE} "
+                    f"bytes, body index section has {sec.size}"
+                )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
                 entry = read_compressed_body_entry(self._mm, offset)
@@ -183,6 +197,17 @@ class LEB2Reader:
         chunk_count, _ = read_chunk_index_header(self._mm, offset)
         offset += CHUNK_INDEX_HEADER_SIZE
 
+        # Corrupted-entry guard: an inflated u32 chunk_count (up to ~4e9)
+        # would otherwise allocate billions of ChunkEntry objects and read
+        # far past the chunk index.
+        if chunk_count * CHUNK_ENTRY_SIZE > len(self._mm) - offset:
+            raise ValueError(
+                f"Corrupted LEB2 chunk index (body {entry.body_id}): "
+                f"chunk_count={chunk_count} needs "
+                f"{chunk_count * CHUNK_ENTRY_SIZE} bytes, "
+                f"{len(self._mm) - offset} available"
+            )
+
         chunks = []
         for i in range(chunk_count):
             chunk = read_chunk_entry(self._mm, offset + i * CHUNK_ENTRY_SIZE)
@@ -202,14 +227,44 @@ class LEB2Reader:
                 hi = mid
         return lo
 
+    def _dedup_decompress(self, key: Tuple[int, int], cache_get, work) -> bytes:
+        """Run `work()` once per key across concurrent threads.
+
+        Threads asking for a key that is already being decompressed wait on
+        the owner's event instead of redoing the (expensive) zstd work, then
+        re-check the cache. If the owner failed, a waiter takes over.
+        """
+        while True:
+            with self._decomp_lock:
+                cached = cache_get()
+                if cached is not None:
+                    return cached
+                inflight = self._decomp_inflight.get(key)
+                if inflight is None:
+                    inflight = threading.Event()
+                    self._decomp_inflight[key] = inflight
+                    break
+            inflight.wait()
+
+        try:
+            return work()
+        finally:
+            with self._decomp_lock:
+                self._decomp_inflight.pop(key, None)
+            inflight.set()
+
     def _decompress_chunk(self, body_id: int, chunk_idx: int) -> bytes:
         """Decompress a single chunk (v2)."""
         key = (body_id, chunk_idx)
-        with self._chunk_cache_lock:
-            cached = self._chunk_cache.get(key)
-        if cached is not None:
-            return cached
+        return self._dedup_decompress(
+            key,
+            lambda: self._chunk_cache.get(key),
+            lambda: self._decompress_chunk_uncached(body_id, chunk_idx),
+        )
 
+    def _decompress_chunk_uncached(self, body_id: int, chunk_idx: int) -> bytes:
+        """Decompress a single chunk (v2) and store it in the chunk cache."""
+        key = (body_id, chunk_idx)
         body = self._bodies[body_id]
         chunk = self._chunk_index[body_id][chunk_idx]
 
@@ -242,7 +297,7 @@ class LEB2Reader:
         )
 
         # Bounded cache: keep max 64 chunks in memory
-        with self._chunk_cache_lock:
+        with self._decomp_lock:
             if len(self._chunk_cache) > 64:
                 self._chunk_cache.clear()
             self._chunk_cache[key] = decompressed
@@ -250,6 +305,16 @@ class LEB2Reader:
 
     def _decompress_body(self, body_id: int) -> None:
         """Decompress a body's full coefficients (v1 legacy)."""
+        # chunk_idx -1 cannot clash with v2 chunk keys (chunk_idx >= 0)
+        key = (body_id, -1)
+        self._dedup_decompress(
+            key,
+            lambda: self._cache.get(body_id),
+            lambda: self._decompress_body_uncached(body_id),
+        )
+
+    def _decompress_body_uncached(self, body_id: int) -> bytes:
+        """Decompress a v1 body's coefficients and store them in the cache."""
         entry = self._bodies[body_id]
         expected = entry.segment_count * (entry.degree + 1) * entry.components * 8
         if entry.uncompressed_size != expected:
@@ -260,13 +325,16 @@ class LEB2Reader:
         compressed = self._mm[
             entry.data_offset: entry.data_offset + entry.compressed_size
         ]
-        self._cache[body_id] = decompress_body(
+        data = decompress_body(
             bytes(compressed),
             entry.uncompressed_size,
             entry.segment_count,
             entry.degree,
             entry.components,
         )
+        with self._decomp_lock:
+            self._cache[body_id] = data
+        return data
 
     def __enter__(self) -> "LEB2Reader":
         return self
