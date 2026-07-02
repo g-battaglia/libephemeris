@@ -575,7 +575,10 @@ class PropagationResult:
     @property
     def ecliptic_lat(self) -> float:
         """Ecliptic latitude in degrees (-90 to +90)."""
-        return math.degrees(math.asin(self.z / self.distance))
+        dist = self.distance
+        if dist == 0.0:
+            return 0.0
+        return math.degrees(math.asin(self.z / dist))
 
     @property
     def distance(self) -> float:

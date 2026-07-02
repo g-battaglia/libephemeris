@@ -244,8 +244,18 @@ class HorizonsClient:
                 key = futures[fut]
                 try:
                     results[key] = fut.result()
-                except (OSError, ValueError, KeyError):
-                    pass  # skip failed fetches
+                except (OSError, ValueError, KeyError) as exc:
+                    # Skip the failed fetch (callers detect the missing key)
+                    # but keep the post-retry cause visible for diagnosis:
+                    # rate limits, DNS failures etc. would otherwise surface
+                    # only as a generic "failed to fetch" downstream.
+                    logger.warning(
+                        "Horizons batch fetch failed for %s @ JD %.6f (%s): %s",
+                        key[0],
+                        key[1],
+                        key[2],
+                        exc,
+                    )
 
         return results
 

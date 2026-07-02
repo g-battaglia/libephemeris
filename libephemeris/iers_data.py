@@ -32,6 +32,7 @@ from __future__ import annotations
 import math
 import os
 import ssl
+import tempfile
 import threading
 import time
 import urllib.request
@@ -308,11 +309,22 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
         if dir_path and not os.path.exists(dir_path):
             os.makedirs(dir_path, exist_ok=True)
 
-        # Write to temporary file first, then rename (atomic operation)
-        temp_path = output_path + ".tmp"
-        with open(temp_path, "wb") as f:
-            f.write(content)
-        os.replace(temp_path, output_path)
+        # Write to a unique temporary file first, then rename (atomic).
+        # A predictable ".tmp" suffix would race between processes
+        # downloading the same file concurrently.
+        fd, temp_path = tempfile.mkstemp(
+            dir=dir_path or ".", prefix=os.path.basename(output_path) + "."
+        )
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(content)
+            os.replace(temp_path, output_path)
+        except OSError:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
         return True
     except (urllib.error.URLError, OSError, TimeoutError):
         return False
