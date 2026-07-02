@@ -2401,13 +2401,10 @@ def calc_fixed_star_position(
             return _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame
             )
-        except KeyError:
-            pass  # Body (EARTH) not in LEB file
-        except ValueError as _leb_err:
-            # Fall back to Skyfield for out-of-range dates AND for
-            # corrupted/truncated LEB data, mirroring the planet path
-            # (calc_ut catches KeyError/ValueError from the LEB reader
-            # and falls through to Skyfield). Corruption logs a WARNING.
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data, mirroring the planet path.
+            # Corruption logs a WARNING.
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("star", _leb_err)
@@ -2992,11 +2989,9 @@ def batch_fixstars_ut(
                 )
                 results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
-        except KeyError:
-            pass  # Body not in LEB file
-        except ValueError as _leb_err:
-            # Fall back to Skyfield for out-of-range dates AND for
-            # corrupted/truncated LEB data (see calc_fixed_star_position).
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data (see calc_fixed_star_position).
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("star batch", _leb_err)

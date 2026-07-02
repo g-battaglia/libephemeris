@@ -58,7 +58,8 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
-    validate_body_index,
+    LEBCorruptionError,
+    validate_entry_count,
     _madvise_ranges,
     _madvise_dontneed,
 )
@@ -103,7 +104,7 @@ class LEB2Reader:
             # Normalize truncated/corrupted-file failures to ValueError so
             # validation and the Skyfield fallback see one failure type.
             self.close()
-            raise ValueError(f"Corrupted LEB2 file {path!r}: {exc}") from exc
+            raise LEBCorruptionError(f"Corrupted LEB2 file {path!r}: {exc}") from exc
         except (OSError, ValueError):
             self.close()
             raise
@@ -142,11 +143,11 @@ class LEB2Reader:
         self._bodies: Dict[int, CompressedBodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
-            validate_body_index(
+            validate_entry_count(
                 self._header.body_count,
                 COMPRESSED_BODY_ENTRY_SIZE,
                 sec.size,
-                "LEB2",
+                "LEB2 body index",
             )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
@@ -198,13 +199,12 @@ class LEB2Reader:
         # Corrupted-entry guard: an inflated u32 chunk_count (up to ~4e9)
         # would otherwise allocate billions of ChunkEntry objects and read
         # far past the chunk index.
-        if chunk_count * CHUNK_ENTRY_SIZE > len(self._mm) - offset:
-            raise ValueError(
-                f"Corrupted LEB2 chunk index (body {entry.body_id}): "
-                f"chunk_count={chunk_count} needs "
-                f"{chunk_count * CHUNK_ENTRY_SIZE} bytes, "
-                f"{len(self._mm) - offset} available"
-            )
+        validate_entry_count(
+            chunk_count,
+            CHUNK_ENTRY_SIZE,
+            len(self._mm) - offset,
+            f"LEB2 chunk index (body {entry.body_id})",
+        )
 
         chunks = []
         for i in range(chunk_count):
@@ -280,7 +280,7 @@ class LEB2Reader:
         # caps the decompression allocation for corrupted/crafted files.
         expected = chunk.segment_count * (body.degree + 1) * body.components * 8
         if chunk.uncompressed_size != expected:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB2 chunk (body {body_id}, chunk {chunk_idx}): "
                 f"uncompressed_size {chunk.uncompressed_size} != expected {expected}"
             )
@@ -291,7 +291,7 @@ class LEB2Reader:
         # An mmap slice past EOF silently returns fewer bytes — surface a
         # clear truncation error instead of an opaque zstd failure.
         if len(compressed) < chunk.compressed_size:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Truncated LEB2 file: chunk (body {body_id}, chunk "
                 f"{chunk_idx}) needs {chunk.compressed_size} bytes at offset "
                 f"{chunk.blob_offset}, only {len(compressed)} available"
@@ -331,7 +331,7 @@ class LEB2Reader:
         entry = self._bodies[body_id]
         expected = entry.segment_count * (entry.degree + 1) * entry.components * 8
         if entry.uncompressed_size != expected:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB2 body entry {body_id}: uncompressed_size "
                 f"{entry.uncompressed_size} != expected {expected}"
             )

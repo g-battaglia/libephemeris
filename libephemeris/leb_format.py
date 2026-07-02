@@ -360,23 +360,41 @@ def write_body_entry(buf: bytearray, offset: int, entry: BodyEntry) -> None:
     )
 
 
-def validate_body_index(
-    body_count: int, entry_size: int, section_size: int, label: str
-) -> None:
-    """Reject a body_count that does not fit in the body index section.
+class LEBCorruptionError(ValueError):
+    """A LEB/LEB2 file is corrupted or truncated.
 
-    Corrupted-header guard shared by the LEB1 and LEB2 readers: an inflated
-    body_count would otherwise read past the section into adjacent data,
-    silently creating garbage body entries.
+    Subclasses ValueError so the existing fallback handlers (which catch
+    ValueError) keep working unchanged; the distinct type lets
+    log_leb_fallback report corruption at WARNING while routine
+    out-of-range fallbacks stay at DEBUG — string-matching on messages
+    misclassified legitimate fallbacks (e.g. "outside nutation range",
+    "No Delta-T data in this LEB file").
+    """
+
+
+def validate_entry_count(
+    count: int, entry_size: int, available: int, what: str
+) -> None:
+    """Reject an entry count that does not fit in the available bytes.
+
+    Corrupted-header guard shared by the LEB1/LEB2 body indices and the
+    LEB2 chunk index: an inflated count would otherwise read past the
+    section into adjacent data (or allocate billions of entries).
+
+    Args:
+        count: Number of entries declared by the header.
+        entry_size: Size of one entry in bytes.
+        available: Bytes actually available for the entries.
+        what: Human-readable label for the error message
+            (e.g. "LEB body index", "LEB2 chunk index (body 1)").
 
     Raises:
-        ValueError: If body_count * entry_size exceeds section_size.
+        LEBCorruptionError: If count * entry_size exceeds available.
     """
-    if body_count * entry_size > section_size:
-        raise ValueError(
-            f"Corrupted {label} header: body_count={body_count} needs "
-            f"{body_count * entry_size} bytes, body index section has "
-            f"{section_size}"
+    if count * entry_size > available:
+        raise LEBCorruptionError(
+            f"Corrupted {what}: {count} entries need "
+            f"{count * entry_size} bytes, {available} available"
         )
 
 

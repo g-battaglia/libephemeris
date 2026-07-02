@@ -50,7 +50,8 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
-    validate_body_index,
+    LEBCorruptionError,
+    validate_entry_count,
     _madvise_ranges,
     _madvise_dontneed,
 )
@@ -195,7 +196,7 @@ class LEBReader:
             # deep in the unpackers; normalize to ValueError so callers
             # (validation, Skyfield fallback) see one failure type.
             self.close()
-            raise ValueError(f"Corrupted LEB file {path!r}: {exc}") from exc
+            raise LEBCorruptionError(f"Corrupted LEB file {path!r}: {exc}") from exc
         except (OSError, ValueError):
             # Clean up mmap and file handle on parse failure
             self.close()
@@ -229,8 +230,8 @@ class LEBReader:
         self._bodies: Dict[int, BodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
-            validate_body_index(
-                self._header.body_count, BODY_ENTRY_SIZE, sec.size, "LEB"
+            validate_entry_count(
+                self._header.body_count, BODY_ENTRY_SIZE, sec.size, "LEB body index"
             )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * BODY_ENTRY_SIZE
@@ -372,7 +373,7 @@ class LEBReader:
         # Corrupted-header guard: a zero interval or empty segment table
         # would otherwise surface as ZeroDivisionError / garbage reads.
         if body.interval_days <= 0.0 or body.segment_count <= 0:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB body entry {body_id}: interval_days="
                 f"{body.interval_days}, segment_count={body.segment_count}"
             )
@@ -400,7 +401,7 @@ class LEBReader:
         # struct.unpack_from raise struct.error, which is NOT a ValueError
         # and would bypass the callers' LEB->Skyfield fallback handling.
         if byte_offset < 0 or byte_offset + n_coeffs * 8 > len(self._mm):
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB body entry {body_id}: coefficient data at "
                 f"offset {byte_offset} (+{n_coeffs * 8} bytes) is outside "
                 f"the file (size {len(self._mm)})"
@@ -571,11 +572,13 @@ class LEBReader:
 def log_leb_fallback(context: str, err: Exception) -> None:
     """Log a LEB -> Skyfield fallback with severity matched to the cause.
 
-    Out-of-range dates are a routine, by-design fallback (DEBUG); any other
-    ValueError from the LEB layer means corrupted/truncated data, which the
-    caller silently absorbs by recomputing via Skyfield on every call — that
-    deserves a visible WARNING (same rationale as the Horizons fetch_batch
-    logging).
+    KeyError (body not in the file) and plain ValueError (out-of-range
+    dates, missing sections, unsupported flags) are routine, by-design
+    fallbacks (DEBUG). LEBCorruptionError means corrupted/truncated data,
+    which the caller silently absorbs by recomputing via Skyfield on every
+    call — that deserves a visible WARNING (same rationale as the Horizons
+    fetch_batch logging). Classification is by exception type: matching on
+    message substrings misclassified legitimate fallbacks.
 
     Args:
         context: Short label of the calling path (e.g. "star", "pheno").
@@ -583,12 +586,12 @@ def log_leb_fallback(context: str, err: Exception) -> None:
     """
     from .logging_config import get_logger
 
-    if "outside range" in str(err).lower():
-        get_logger().debug("LEB %s fallback: %s", context, err)
-    else:
+    if isinstance(err, LEBCorruptionError):
         get_logger().warning(
-            "LEB %s fallback (corrupted or truncated LEB data?): %s", context, err
+            "LEB %s fallback (corrupted or truncated LEB data): %s", context, err
         )
+    else:
+        get_logger().debug("LEB %s fallback: %s", context, err)
 
 
 def open_leb(path: str) -> Union["LEBReader", "LEB2Reader"]:

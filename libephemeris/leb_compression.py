@@ -24,6 +24,8 @@ import threading
 import numpy as np
 import zstandard as zstd
 
+from .leb_format import LEBCorruptionError
+
 from .exotic_bodies import target_au_map as _exotic_target_au
 
 # Default target: 0.001 arcsecond expressed in AU
@@ -290,13 +292,13 @@ def decompress_body(
                 compressed, max_output_size=uncompressed_size
             )
     except zstd.ZstdError as exc:
-        raise ValueError(
+        raise LEBCorruptionError(
             f"Corrupted LEB2 data (possibly truncated file): {exc}"
         ) from exc
     if len(decompressed) != uncompressed_size:
         # A valid-but-short frame would otherwise surface as a cryptic
         # numpy reshape error in reorder_segment_major.
-        raise ValueError(
+        raise LEBCorruptionError(
             f"Corrupted LEB2 data: decompressed to {len(decompressed)} bytes, "
             f"expected {uncompressed_size}"
         )
