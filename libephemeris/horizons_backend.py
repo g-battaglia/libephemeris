@@ -253,13 +253,16 @@ class HorizonsClient:
                 try:
                     results[key] = fut.result()
                 except (OSError, ValueError, KeyError) as exc:
-                    # Skip the failed fetch (callers detect the missing key)
-                    # but keep the post-retry cause visible for diagnosis:
-                    # rate limits, DNS failures etc. would otherwise surface
-                    # only as a generic "failed to fetch" downstream.
+                    # Skip the failed fetch and record the post-retry cause so
+                    # the caller can chain it. Log at DEBUG only: a missing
+                    # deflector (Sun/Jupiter/Saturn) is recovered gracefully by
+                    # _apply_deflection_horizons, so a WARNING here would be
+                    # spurious on the normal path — horizons_calc_ut raises the
+                    # aggregated WARNING/error at the decision point when
+                    # target/Earth are actually missing.
                     if errors is not None:
                         errors[key] = exc
-                    logger.warning(
+                    logger.debug(
                         "Horizons batch fetch failed for %s @ JD %.6f (%s): %s",
                         key[0],
                         key[1],

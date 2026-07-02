@@ -535,11 +535,21 @@ class EphemerisContext:
     ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
         """Shared implementation of calc_ut() and calc().
 
-        The two public entry points differ only in the time scale of
-        ``tjd`` — UT1 (``ut=True``) vs TT (``ut=False``) — which selects
-        the fast_calc variant, the Skyfield time constructor, and the
-        ECL_NUT helper. One body keeps the parity with the module-level
-        API structural instead of maintained across near-identical copies.
+        calc_ut() and calc() differ only in the time scale of ``tjd`` —
+        UT1 (``ut=True``) vs TT (``ut=False``) — which selects the
+        fast_calc variant, the Skyfield time constructor, and the ECL_NUT
+        helper. Keeping the two in one body makes their parity structural
+        rather than maintained by hand across near-identical copies.
+
+        Args:
+            tjd: Julian Day, in UT1 if ``ut`` else TT.
+            ipl: Planet/body ID (SUN, MOON, ...).
+            iflag: Calculation flags.
+            ut: True for the calc_ut() (UT1) entry point, False for calc()
+                (TT).
+
+        Returns:
+            ``((lon, lat, dist, dlon, dlat, ddist), retflag)``.
         """
         from .constants import ECL_NUT
         from .planets import _normalize_calc_flags, _remap_ast_offset
