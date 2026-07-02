@@ -468,7 +468,9 @@ def download_spk(
                         "Downloaded SPK data failed validation - corrupt or incomplete"
                     )
 
-                os.replace(temp_path, filepath)
+                from .download import publish_temp_file
+
+                publish_temp_file(temp_path, filepath)
             except (OSError, ValueError, KeyError, IndexError):
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)

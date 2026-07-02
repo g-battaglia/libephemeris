@@ -346,8 +346,10 @@ def _download_single_file(
             if progress:
                 progress.close()
 
-        # Atomic move to final destination
-        os.replace(temp_path, dest)
+        # Atomic move to final destination (also restores 0644 permissions)
+        from .download import publish_temp_file
+
+        publish_temp_file(temp_path, dest)
 
         if not quiet:
             actual_mb = dest.stat().st_size / (1024 * 1024)

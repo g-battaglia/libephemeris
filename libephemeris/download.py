@@ -333,6 +333,20 @@ def _get_progress_bar(total: int, description: str) -> Any:
     return SimpleProgressBar(total, description)
 
 
+def publish_temp_file(temp_path: str | Path, dest_path: str | Path) -> None:
+    """Publish an atomically-downloaded temp file at its final path.
+
+    Shared by every mkstemp-based downloader (DE kernels, LEB2 groups, IERS
+    tables, SPK kernels, ASSIST data). mkstemp creates files 0600 and
+    os.replace preserves the mode, which would lock other users out of
+    shared data dirs (LIBEPHEMERIS_DATA_DIR, shared IERS/SPK caches) —
+    restore world-readable permissions first. os.chmod is used because
+    os.fchmod is Unix-only before Python 3.13.
+    """
+    os.chmod(temp_path, 0o644)
+    os.replace(temp_path, dest_path)
+
+
 def download_file(
     url: str,
     dest_path: Path,
@@ -361,10 +375,6 @@ def download_file(
     # Use a temporary file for atomic download
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
-    # mkstemp creates the file 0600 and os.replace preserves it; restore
-    # world-readable permissions so shared data dirs (LIBEPHEMERIS_DATA_DIR)
-    # stay usable by other users.
-    os.fchmod(temp_fd, 0o644)
 
     try:
         # Open URL and get content length
@@ -419,7 +429,7 @@ def download_file(
                 )
 
         # Atomic move to final destination
-        os.replace(temp_path, dest_path)
+        publish_temp_file(temp_path, dest_path)
         logger.info("Download complete: %s", dest_path.name)
         return True
 
