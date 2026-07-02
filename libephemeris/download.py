@@ -353,6 +353,7 @@ def download_file(
     description: str = "Downloading",
     expected_sha256: Optional[str] = None,
     show_progress: bool = True,
+    timeout: int = 30,
 ) -> bool:
     """Download a file with progress bar.
 
@@ -362,6 +363,7 @@ def download_file(
         description: Description to show in progress bar
         expected_sha256: Expected SHA256 hash (optional, for verification)
         show_progress: Whether to show progress bar
+        timeout: Network timeout in seconds
 
     Returns:
         True if download successful, False otherwise
@@ -386,7 +388,7 @@ def download_file(
         logger.info("Downloading %s...", description)
 
         _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx) as response:
             total_size = int(response.headers.get("Content-Length", 0))
 
             if total_size > 0:

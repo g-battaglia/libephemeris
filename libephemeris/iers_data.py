@@ -31,8 +31,6 @@ from __future__ import annotations
 
 import math
 import os
-import ssl
-import tempfile
 import threading
 import time
 import urllib.request
@@ -40,7 +38,6 @@ import urllib.error
 from typing import Optional, Union
 from dataclasses import dataclass
 
-import certifi
 
 from .logging_config import get_logger
 
@@ -287,6 +284,11 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
     """
     Download a file from a URL to a local path.
 
+    Thin returns-bool wrapper around download.download_file(), which
+    provides the shared atomic pipeline (mkstemp -> chunked streaming ->
+    publish_temp_file with world-readable permissions -> cleanup on
+    error). Never raises.
+
     Args:
         url: URL to download from
         output_path: Local path to save the file
@@ -295,44 +297,26 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
     Returns:
         True if download succeeded, False otherwise
     """
+    from pathlib import Path
+
+    from .download import download_file
+
     try:
-        req = urllib.request.Request(
+        return download_file(
             url,
-            headers={"User-Agent": "libephemeris/1.0 (astronomical ephemeris library)"},
+            Path(output_path),
+            description=os.path.basename(output_path),
+            show_progress=False,
+            timeout=timeout,
         )
-        _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx) as response:
-            content = response.read()
-
-        # Ensure directory exists
-        dir_path = os.path.dirname(output_path)
-        if dir_path and not os.path.exists(dir_path):
-            os.makedirs(dir_path, exist_ok=True)
-
-        # Write to a unique temporary file first, then rename (atomic).
-        # A predictable ".tmp" suffix would race between processes
-        # downloading the same file concurrently.
-        fd, temp_path = tempfile.mkstemp(
-            dir=dir_path or ".", prefix=os.path.basename(output_path) + "."
-        )
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(content)
-            # publish_temp_file restores world-readable permissions so a
-            # shared cache dir (e.g.
-            # set_iers_cache_dir("/data/ephemeris/iers_cache")) stays
-            # usable by other users.
-            from .download import publish_temp_file
-
-            publish_temp_file(temp_path, output_path)
-        except OSError:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
-            raise
-        return True
-    except (urllib.error.URLError, OSError, TimeoutError):
+    except (
+        urllib.error.URLError,
+        OSError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        TimeoutError,
+    ):
         return False
 
 
