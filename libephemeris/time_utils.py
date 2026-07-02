@@ -38,6 +38,20 @@ from .state import (
 JD_GREGORIAN_REFORM = 2299161
 
 
+def _validate_calendar(cal: int, func_name: str) -> None:
+    """Reject calendar flags other than GREG_CAL/JUL_CAL.
+
+    The reference binding validates the calendar flag in every calendar
+    conversion function (e.g. ``swisseph.julday: invalid calendar (99)``);
+    all five libephemeris counterparts share this guard.
+
+    Raises:
+        ValueError: If cal is neither GREG_CAL nor JUL_CAL.
+    """
+    if cal not in (GREG_CAL, JUL_CAL):
+        raise ValueError(f"{func_name}: invalid calendar ({cal})")
+
+
 def julday(
     year: int, month: int, day: int, hour: float = 12.0, cal: int = GREG_CAL
 ) -> float:
@@ -58,8 +72,7 @@ def julday(
         Transition date: Oct 15, 1582 (Gregorian) = Oct 5, 1582 (Julian)
         JD 2451545.0 = Jan 1, 2000 12:00 TT (J2000.0 epoch)
     """
-    if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"julday: invalid calendar ({cal})")
+    _validate_calendar(cal, "julday")
 
     if month <= 2:
         year -= 1
@@ -105,8 +118,7 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
         Automatic Gregorian calendar used for JD >= 2299161 (Oct 15, 1582)
         unless Julian calendar explicitly requested.
     """
-    if cal not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"revjul: invalid calendar ({cal})")
+    _validate_calendar(cal, "revjul")
 
     jd = jd + 0.5
     z = _floor(jd)
@@ -580,8 +592,7 @@ def utc_to_jd(
     # too, like julday()/revjul(). Without this guard cal=99 would mean
     # Julian in julday() but Gregorian here (and even flip interpretation
     # across the 1972 boundary, where the pre-UTC branch defers to julday).
-    if calendar not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"utc_to_jd: invalid calendar ({calendar})")
+    _validate_calendar(calendar, "utc_to_jd")
 
     # Validate leap second: second=60 is only valid at 23:59:60 on dates
     # where a leap second was actually inserted (end of June 30 or Dec 31).
@@ -683,8 +694,7 @@ def jdet_to_utc(
         2000-01-01 11:58:55.82
     """
     # Reference-API parity: validate the calendar flag like julday()/revjul()
-    if calendar not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"jdet_to_utc: invalid calendar ({calendar})")
+    _validate_calendar(calendar, "jdet_to_utc")
 
     # Pre-1972 there is no UTC: the reference API returns the UT1 calendar
     # date directly (jd_ut1 = jd_et - Delta T, fixed-point refined).
@@ -764,8 +774,7 @@ def jdut1_to_utc(
         2020-06-15 14:30:00.00
     """
     # Reference-API parity: validate the calendar flag like julday()/revjul()
-    if calendar not in (GREG_CAL, JUL_CAL):
-        raise ValueError(f"jdut1_to_utc: invalid calendar ({calendar})")
+    _validate_calendar(calendar, "jdut1_to_utc")
 
     ts = get_timescale()
 
