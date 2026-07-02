@@ -361,6 +361,10 @@ def download_file(
     # Use a temporary file for atomic download
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     temp_fd, temp_path = tempfile.mkstemp(dir=dest_path.parent, suffix=".download")
+    # mkstemp creates the file 0600 and os.replace preserves it; restore
+    # world-readable permissions so shared data dirs (LIBEPHEMERIS_DATA_DIR)
+    # stay usable by other users.
+    os.fchmod(temp_fd, 0o644)
 
     try:
         # Open URL and get content length

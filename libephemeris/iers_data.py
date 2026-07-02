@@ -316,6 +316,11 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
             dir=dir_path or ".", prefix=os.path.basename(output_path) + "."
         )
         try:
+            # mkstemp creates the file 0600 and os.replace preserves it;
+            # restore world-readable permissions so a shared cache dir
+            # (e.g. set_iers_cache_dir("/data/ephemeris/iers_cache"))
+            # stays usable by other users.
+            os.fchmod(fd, 0o644)
             with os.fdopen(fd, "wb") as f:
                 f.write(content)
             os.replace(temp_path, output_path)
