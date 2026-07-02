@@ -49,7 +49,7 @@ class TestCalendarGuards:
     """Invalid calendar flags must raise ValueError.
 
     The reference binding validates the calendar flag in all five
-    functions (e.g. `swisseph.julday: invalid calendar (99)`); without
+    functions (raising on an invalid flag such as ``cal=99``); without
     the guard cal=99 would mean Julian in julday()/revjul() but Gregorian
     in the UTC conversion functions.
     """
