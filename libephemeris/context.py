@@ -733,6 +733,13 @@ class EphemerisContext:
 
         Thread-safe calculation using this context's state.
 
+        Note:
+            This context method takes **UT1**, unlike the module-level
+            ``calc_pctr()`` which takes TT (mirroring ``swe_calc_pctr``). It
+            is the planet-centric analogue of ``calc_ut()``; use
+            ``EphemerisContext.calc()`` semantics (TT) only for the geocentric
+            entry points. This UT1 interpretation predates the v3 refactor.
+
         Args:
             tjd_ut: Julian Day in Universal Time (UT1)
             ipl: Target planet/body ID (SUN, MOON, etc.)
