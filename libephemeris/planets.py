@@ -584,17 +584,22 @@ def _plaus_ephemeris_flags(flags: int) -> int:
 
     Used by calc_pctr(), whose upstream counterpart normalizes flags via
     plaus_iflag() only: the ephemeris bits become mutually exclusive with
-    FLG_SWIEPH as the default (priority MOSEPH > JPLEPH > SWIEPH, matching
-    sweph.c), but — unlike calc()/calc_ut() — FLG_MOSEPH is NOT stripped
-    and FLG_SPEED3 is NOT remapped, so retflag matches the reference.
+    FLG_SWIEPH as the default. plaus_iflag() in sweph.c uses sequential
+    overwrites where the LAST assignment wins, giving priority
+    JPLEPH > SWIEPH > MOSEPH (verified vs pyswisseph 2.10.03:
+    FLG_JPLEPH|FLG_MOSEPH echoes retflag=FLG_JPLEPH). Unlike
+    calc()/calc_ut(), FLG_MOSEPH is NOT stripped and FLG_SPEED3 is NOT
+    remapped here, so retflag matches the reference.
     """
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
     ephmask = FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH
-    if flags & FLG_MOSEPH:
-        epheflag = FLG_MOSEPH
-    elif flags & FLG_JPLEPH:
+    if flags & FLG_JPLEPH:
         epheflag = FLG_JPLEPH
+    elif flags & FLG_SWIEPH:
+        epheflag = FLG_SWIEPH
+    elif flags & FLG_MOSEPH:
+        epheflag = FLG_MOSEPH
     else:
         epheflag = FLG_SWIEPH
     return (flags & ~ephmask) | epheflag
@@ -616,6 +621,18 @@ def _finalize_output_flags(
 ) -> Tuple[PositionResult, int]:
     """Apply output-format flags to a result and echo them in retflag."""
     return _apply_output_flags(pos, flags), retflag | (flags & (FLG_XYZ | FLG_RADIANS))
+
+
+def _run_pctr_pipeline(calc_fn, flags: int) -> Tuple[PositionResult, int]:
+    """plaus_iflag -> strip -> compute -> finalize, shared by calc_pctr().
+
+    Both the module-level calc_pctr() and EphemerisContext.calc_pctr()
+    route through this so their flag semantics cannot drift apart;
+    ``calc_fn`` receives the stripped calculation flags.
+    """
+    flags = _plaus_ephemeris_flags(flags)
+    pos, retflag = calc_fn(_strip_output_flags(flags))
+    return _finalize_output_flags(pos, retflag, flags)
 
 
 def _south_node_from_north(
@@ -1339,21 +1356,12 @@ def calc_pctr(
 
     from .cache import get_cached_time_tt
 
-    # Reference plaus_iflag() semantics: exactly one ephemeris bit in
-    # retflag (SWIEPH default). Unlike calc()/calc_ut(), FLG_MOSEPH is
-    # not stripped and FLG_SPEED3 is not remapped here.
-    flags = _plaus_ephemeris_flags(flags)
-
-    # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body_pctr
-    # since they are output format flags, not calculation flags.
-    # We apply them after the calculation is complete.
-    calc_iflag = _strip_output_flags(flags)
-
     t = get_cached_time_tt(tjdet)
     try:
-        pos, retflag = _calc_body_pctr(t, planet, center, calc_iflag)
-        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
-        return _finalize_output_flags(pos, retflag, flags)
+        return _run_pctr_pipeline(
+            lambda calc_iflag: _calc_body_pctr(t, planet, center, calc_iflag),
+            flags,
+        )
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
@@ -2882,13 +2890,16 @@ def _calc_body(
                 )
             ), iflag
 
-    # Handle fixed stars — delegate to fixstar_ut() so every flag
-    # (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
-    # handling as the dedicated fixed-star entry point.
+    # Handle fixed stars — delegate to the fixstar_ut() computation so every
+    # flag (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
+    # handling as the dedicated entry point. Dispatch BY ID: resolving the
+    # traditional name is ambiguous (Flamsteed names starting with digits,
+    # e.g. "29Psc", parse as sequential catalog numbers).
     if ipl in fixed_stars.FIXED_STARS:
         star_name = fixed_stars.get_canonical_star_name(ipl)
-        assert star_name is not None  # ipl is in FIXED_STARS
-        pos, _star, _retflag = fixed_stars.fixstar_ut(star_name, t.ut1, iflag)
+        pos, _star, _retflag = fixed_stars._fixstar_ut_by_id(
+            ipl, star_name, t.ut1, iflag
+        )
         return _to_native_floats(pos), iflag
 
     # Handle astrological angles (requires observer location)

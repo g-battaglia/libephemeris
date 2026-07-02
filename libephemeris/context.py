@@ -678,22 +678,18 @@ class EphemerisContext:
             >>> # Position of Moon as seen from Mars
             >>> pos, retflag = ctx.calc_pctr(2451545.0, MOON, MARS, FLG_SPEED)
         """
-        from .planets import (
-            _calc_body_pctr_with_context,
-            _finalize_output_flags,
-            _plaus_ephemeris_flags,
-            _strip_output_flags,
-        )
+        from .planets import _calc_body_pctr_with_context, _run_pctr_pipeline
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
-        # Reference plaus_iflag() semantics + output-format flags, exactly
-        # like the module-level calc_pctr().
-        iflag = _plaus_ephemeris_flags(iflag)
-        pos, retflag = _calc_body_pctr_with_context(
-            t, ipl, iplctr, _strip_output_flags(iflag), self
+        # Same plaus_iflag/output-flag pipeline as the module-level
+        # calc_pctr(), shared so the semantics cannot drift.
+        return _run_pctr_pipeline(
+            lambda calc_iflag: _calc_body_pctr_with_context(
+                t, ipl, iplctr, calc_iflag, self
+            ),
+            iflag,
         )
-        return _finalize_output_flags(pos, retflag, iflag)
 
     @classmethod
     def close(cls) -> None:

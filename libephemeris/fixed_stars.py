@@ -2408,9 +2408,16 @@ def calc_fixed_star_position(
             from .leb_reader import log_leb_fallback
 
             log_leb_fallback("star", _leb_err)
-    return _calc_star_position_skyfield(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
-    )
+    try:
+        return _calc_star_position_skyfield(
+            star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
+        )
+    except SkyfieldRangeError as e:
+        # Wrap once here: every star entry point (fixstar_ut, fixstar,
+        # fixstar2*, velocity, calc_ut dispatch) funnels through this
+        # function, so out-of-range dates raise the library
+        # EphemerisRangeError everywhere.
+        raise _wrap_ephemeris_range_error(e, jd_tt) from e
 
 
 def calc_fixed_star_velocity(
@@ -2845,12 +2852,28 @@ def fixstar_ut(
         >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
-    ret_flags = _fixstar_ret_flags(flags)
-    flags = _preprocess_flags(flags)
-
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
+    return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
+
+
+def _fixstar_ut_by_id(
+    star_id: int,
+    canonical_name: str | None,
+    tjdut: float,
+    flags: int,
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
+    """fixstar_ut() computation for an already-resolved catalog id.
+
+    Used by fixstar_ut() after name resolution and by the calc_ut()/calc()
+    fixed-star dispatch, which already holds the id: routing the dispatch
+    through the traditional NAME was ambiguous (Flamsteed names starting
+    with digits, e.g. "29Psc", resolve as sequential catalog numbers and
+    returned the wrong star for 289 of the 1447 catalog entries).
+    """
+    ret_flags = _fixstar_ret_flags(flags)
+    flags = _preprocess_flags(flags)
 
     # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
@@ -2882,9 +2905,6 @@ def fixstar_ut(
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
-    except SkyfieldRangeError as e:
-        # Preserve the range-error type for out-of-range dates
-        raise _wrap_ephemeris_range_error(e, t.tt) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -3003,16 +3023,21 @@ def batch_fixstars_ut(
     from .state import get_planets
 
     earth = get_planets()["earth"]
-    earth_at_t = earth.at(t)
+    try:
+        earth_at_t = earth.at(t)
 
-    if want_speed:
-        t_prev = ts.tt_jd(jd_tt - 0.5)
-        t_next = ts.tt_jd(jd_tt + 0.5)
-        earth_at_prev = earth.at(t_prev)
-        earth_at_next = earth.at(t_next)
-    else:
-        earth_at_prev = None
-        earth_at_next = None
+        if want_speed:
+            t_prev = ts.tt_jd(jd_tt - 0.5)
+            t_next = ts.tt_jd(jd_tt + 0.5)
+            earth_at_prev = earth.at(t_prev)
+            earth_at_next = earth.at(t_next)
+        else:
+            earth_at_prev = None
+            earth_at_next = None
+    except SkyfieldRangeError as e:
+        # This sits outside the per-star loop (the Earth position is shared
+        # by every star), so wrap the range error here as well.
+        raise _wrap_ephemeris_range_error(e, jd_tt) from e
 
     for index, star_id, canonical_name in resolved:
         try:
@@ -3045,10 +3070,6 @@ def batch_fixstars_ut(
             if skip_errors:
                 continue
             raise
-        except SkyfieldRangeError as e:
-            if skip_errors:
-                continue
-            raise _wrap_ephemeris_range_error(e, jd_tt) from e
         except (OSError, ValueError, KeyError) as e:
             if skip_errors:
                 continue
@@ -3121,9 +3142,6 @@ def fixstar(
         return (result, canonical_name or "", ret_flags)
     except Error:
         raise
-    except SkyfieldRangeError as e:
-        # Preserve the range-error type for out-of-range dates
-        raise _wrap_ephemeris_range_error(e, tjdet) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -3359,9 +3377,6 @@ def fixstar2_ut(
         return (result, star_name_out, ret_flags)
     except Error:
         raise
-    except SkyfieldRangeError as e:
-        # Preserve the range-error type for out-of-range dates
-        raise _wrap_ephemeris_range_error(e, t.tt) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
@@ -3437,9 +3452,6 @@ def fixstar2(
         return (result, star_name_out, ret_flags)
     except Error:
         raise
-    except SkyfieldRangeError as e:
-        # Preserve the range-error type for out-of-range dates
-        raise _wrap_ephemeris_range_error(e, tjdet) from e
     except (OSError, ValueError, KeyError) as e:
         raise Error(str(e)) from e
 
