@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger("libephemeris")
 
@@ -210,16 +210,24 @@ class HorizonsClient:
     def fetch_batch(
         self,
         requests: List[Tuple[str, float, str]],
+        errors: Optional[Dict[Tuple[str, float, str], Exception]] = None,
     ) -> Dict[Tuple[str, float, str], StateVector]:
         """Fetch multiple state vectors in parallel.
 
         Args:
             requests: List of (command, jd, center) tuples.
+            errors: Optional dict populated with the exception of each
+                failed fetch, keyed like the results — lets callers chain
+                the real cause instead of raising a generic failure.
 
         Returns:
             Dict mapping (command, jd, center) -> StateVector.
         """
-        # Filter out cached results
+        # Filter out cached results.
+        # The batch interface is TDB-only (all callers pass jd_tt): the
+        # cache key hardcodes the time type on purpose. A future UT-based
+        # caller must extend the request tuples, NOT reuse this method,
+        # or it would read TDB-cached vectors as if they were UT.
         to_fetch = []
         results = {}
         for cmd, jd, center in requests:
@@ -249,6 +257,8 @@ class HorizonsClient:
                     # but keep the post-retry cause visible for diagnosis:
                     # rate limits, DNS failures etc. would otherwise surface
                     # only as a generic "failed to fetch" downstream.
+                    if errors is not None:
+                        errors[key] = exc
                     logger.warning(
                         "Horizons batch fetch failed for %s @ JD %.6f (%s): %s",
                         key[0],
@@ -311,39 +321,31 @@ class HorizonsClient:
             )
 
         data_block = result_text[soe_idx + 5 : eoe_idx].strip()
-        # CSV format: JDTDB, Calendar Date, X, Y, Z, VX, VY, VZ, LT, RG, RR,
+        # VEC_TABLE='2' + CSV_FORMAT='YES' fixes the record shape:
+        # JDTDB, Calendar Date, X, Y, Z, VX, VY, VZ,
         lines = [line.strip() for line in data_block.split("\n") if line.strip()]
         if not lines:
             raise ValueError(f"Empty data block in Horizons response for {command}")
 
-        # Parse the first (and only) data line
-        # CSV fields are comma-separated
-        values = []
-        for line in lines:
-            for field in line.split(","):
-                field = field.strip()
-                if field:
-                    try:
-                        values.append(float(field))
-                    except ValueError:
-                        pass  # skip non-numeric (calendar date string)
-
-        # We need at least: JDTDB, X, Y, Z, VX, VY, VZ (7 values)
-        if len(values) < 7:
+        # Parse the first (and only, single-epoch TLIST) data record
+        # positionally by CSV field: accumulating every parseable float
+        # across the block would let a stray numeric token shift the
+        # coordinate indices silently.
+        fields = [f.strip() for f in lines[0].split(",")]
+        if len(fields) < 8:
             raise ValueError(
-                f"Insufficient data in Horizons response for {command}: "
-                f"got {len(values)} values, need at least 7"
+                f"Malformed data record in Horizons response for {command}: "
+                f"got {len(fields)} CSV fields, need at least 8"
             )
+        try:
+            x, y, z, vx, vy, vz = (float(fields[i]) for i in range(2, 8))
+        except ValueError as exc:
+            raise ValueError(
+                f"Malformed data record in Horizons response for {command}: "
+                f"non-numeric state-vector field ({exc})"
+            ) from exc
 
-        # Values: [JDTDB, X, Y, Z, VX, VY, VZ, ...]
-        return StateVector(
-            x=values[1],
-            y=values[2],
-            z=values[3],
-            vx=values[4],
-            vy=values[5],
-            vz=values[6],
-        )
+        return StateVector(x=x, y=y, z=z, vx=vx, vy=vy, vz=vz)
 
     def clear_cache(self) -> None:
         with self._cache_lock:
@@ -520,13 +522,22 @@ def horizons_calc_ut(
             ("5", jd_tt, "@0"),  # Jupiter barycenter (deflector)
             ("6", jd_tt, "@0"),  # Saturn barycenter (deflector)
         ]
-    batch = client.fetch_batch(prefetch_cmds)
+    batch_errors: Dict[Tuple[str, float, str], Exception] = {}
+    batch = client.fetch_batch(prefetch_cmds, errors=batch_errors)
 
     target_sv = batch.get((command, jd_tt, "@0"))
     earth_sv = batch.get(("399", jd_tt, "@0"))
 
     if target_sv is None or earth_sv is None:
-        raise ConnectionError(f"Failed to fetch target/Earth for body {body_id}")
+        # Chain the real post-retry cause (rate limit, DNS, parse error)
+        # instead of hiding it behind a generic failure message.
+        cause = batch_errors.get((command, jd_tt, "@0")) or batch_errors.get(
+            ("399", jd_tt, "@0")
+        )
+        msg = f"Failed to fetch target/Earth for body {body_id}"
+        if cause is not None:
+            msg = f"{msg}: {cause}"
+        raise ConnectionError(msg) from cause
 
     # Geometric geocentric
     geo = (
