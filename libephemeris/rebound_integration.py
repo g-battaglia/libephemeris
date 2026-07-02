@@ -580,7 +580,8 @@ class PropagationResult:
         dist = self.distance
         if dist == 0.0:
             return 0.0
-        return math.degrees(math.asin(self.z / dist))
+        # Clamp: with subnormal components z/dist can round above 1.0
+        return math.degrees(math.asin(max(-1.0, min(1.0, self.z / dist))))
 
     @property
     def distance(self) -> float:
