@@ -1028,10 +1028,10 @@ def test_house_pos_default_fallback_zero_width(monkeypatch):
 
     monkeypatch.setattr(H, "houses_armc", fake_armc)
     # Body exactly on the coincident cusp -> returns that house.
-    pos_on = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("F"), 10.0, 0.0)
+    pos_on = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("L"), 10.0, 0.0)
     assert pos_on == pytest.approx(1.0)
     # Body away from the cusp -> no house matches, returns 1.0.
-    pos_off = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("F"), 123.0, 0.0)
+    pos_off = H._house_pos_pythonic(200.0, ROME_LAT, EPS, ord("L"), 123.0, 0.0)
     assert pos_off == 1.0
 
 
