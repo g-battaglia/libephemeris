@@ -142,7 +142,9 @@ class EphemerisContext:
         global _SHARED_LOADER
         if _SHARED_LOADER is None:
             with _SHARED_LOCK:
-                if _SHARED_LOADER is None:  # pragma: no branch - double-checked locking; the race arc only triggers under concurrent first-init
+                if (
+                    _SHARED_LOADER is None
+                ):  # pragma: no branch - double-checked locking; the race arc only triggers under concurrent first-init
                     from .state import _get_data_dir
 
                     _SHARED_LOADER = Loader(_get_data_dir())
@@ -643,6 +645,8 @@ class EphemerisContext:
             from .logging_config import get_logger
             from . import horizons_backend
 
+            from .planets import _swapped_context_state
+
             try:
                 if ut:
                     jd_ut_approx = tjd
@@ -651,13 +655,17 @@ class EphemerisContext:
 
                     # calc uses TT, convert to UT for horizons_calc_ut
                     jd_ut_approx = tjd - deltat(tjd)
-                # Pass this context's sidereal mode explicitly so the network
-                # call runs WITHOUT holding the global-state swap lock — the
-                # only global that horizons_calc_ut reads is the sidereal mode
-                # (it rejects FLG_TOPOCTR, so it never reads the observer).
-                result = horizons_backend.horizons_calc_ut(
-                    h_client, jd_ut_approx, ipl, iflag, self.sidereal_mode
-                )
+                # horizons_calc_ut passes sid_mode explicitly, but the SIDM_USER
+                # ayanamsha (reference epoch t0 and ayan_t0) is still read from
+                # the module-level sidereal globals by get_ayanamsa downstream.
+                # Run the call under _swapped_context_state — the same swap the
+                # Skyfield path uses — so this context's per-instance t0/ayan_t0
+                # (and mode) are honored, and the read happens under
+                # _CONTEXT_SWAP_LOCK rather than unlocked against global state.
+                with _swapped_context_state(self):
+                    result = horizons_backend.horizons_calc_ut(
+                        h_client, jd_ut_approx, ipl, iflag, self.sidereal_mode
+                    )
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
                 )
@@ -670,8 +678,10 @@ class EphemerisContext:
                     tjd,
                     _hz_err,
                 )
-            except ConnectionError as _hz_err:
-                # Transient network/API failure — fall through to Skyfield.
+            except (ConnectionError, ValueError, OSError) as _hz_err:
+                # Transient network/API failure, or a ValueError/OSError raised
+                # from the HELCTR / velocity path — fall through to Skyfield
+                # rather than let it escape the context calc.
                 get_logger().warning(
                     "body=%d jd=%.1f source=Horizons->fallback (context, network): %s",
                     ipl,

@@ -1805,6 +1805,67 @@ def _calc_nutation_obliquity_tt(
     return (true_obliquity, mean_obliquity, delta_psi, delta_eps, 0.0, 0.0), iflag
 
 
+def _precess_ecliptic_state(
+    lon: float,
+    lat: float,
+    dlon: float,
+    dlat: float,
+    jd_tt: float,
+    to_j2000: bool,
+) -> Tuple[float, float, float, float]:
+    """Precess an ecliptic (lon, lat) position *and* its (dlon, dlat) rate.
+
+    Transforms between the ecliptic of date at ``jd_tt`` and the J2000
+    ecliptic. Unlike a bare position precession, the longitude/latitude
+    rates are carried through consistently so the returned velocity is the
+    exact time derivative of the returned position in the target frame.
+
+    The rate is obtained by finite-differencing the full precession map
+    with the *of-date epoch varying* between samples. That varying epoch is
+    what makes the transform capture the ~50.29"/yr drift of the equinox
+    (general precession) in addition to the fixed rotation of the axes: a
+    body's longitude speed therefore differs between the of-date and J2000
+    frames by the precession rate (~0.14"/day), matching the reference API.
+
+    Args:
+        lon: Ecliptic longitude in degrees (source frame).
+        lat: Ecliptic latitude in degrees (source frame).
+        dlon: Longitude rate in degrees/day (source frame).
+        dlat: Latitude rate in degrees/day (source frame).
+        jd_tt: Julian Day (TT) defining the of-date frame.
+        to_j2000: True to map of-date -> J2000; False for J2000 -> of-date.
+
+    Returns:
+        Tuple ``(lon2, lat2, dlon2, dlat2)`` in the target frame.
+    """
+    from .astrometry import _precess_ecliptic
+
+    J2000 = 2451545.0
+    dt = 0.5
+    if to_j2000:
+        lon2, lat2 = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        lo_m, la_m = _precess_ecliptic(
+            lon - dlon * dt, lat - dlat * dt, jd_tt - dt, J2000
+        )
+        lo_p, la_p = _precess_ecliptic(
+            lon + dlon * dt, lat + dlat * dt, jd_tt + dt, J2000
+        )
+    else:
+        lon2, lat2 = _precess_ecliptic(lon, lat, J2000, jd_tt)
+        lo_m, la_m = _precess_ecliptic(
+            lon - dlon * dt, lat - dlat * dt, J2000, jd_tt - dt
+        )
+        lo_p, la_p = _precess_ecliptic(
+            lon + dlon * dt, lat + dlat * dt, J2000, jd_tt + dt
+        )
+    d = lo_p - lo_m
+    if d > 180.0:
+        d -= 360.0
+    elif d < -180.0:
+        d += 360.0
+    return lon2, lat2, d / (2.0 * dt), (la_p - la_m) / (2.0 * dt)
+
+
 def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     """Convert ecliptic coordinates to equatorial if FLG_EQUATORIAL is set.
 
@@ -1827,12 +1888,22 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     """
     lon, lat, dist, dlon, dlat, ddist = result
 
-    # Apply precession from date to J2000 if requested
+    # Apply precession from date to J2000 if requested. The velocity is
+    # precessed alongside the position (not left in the of-date frame) so the
+    # J2000 speed is the true time derivative of the J2000 position — it
+    # differs from the of-date speed by the general-precession rate. When the
+    # equatorial conversion below runs, it then rotates a J2000-frame velocity
+    # (not a frame-mixed one) through the J2000 obliquity.
     if iflag & FLG_J2000:
-        from .astrometry import _precess_ecliptic
-
         J2000 = 2451545.0
-        lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        if iflag & FLG_SPEED:
+            lon, lat, dlon, dlat = _precess_ecliptic_state(
+                lon, lat, dlon, dlat, jd_tt, to_j2000=True
+            )
+        else:
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
 
     if not (iflag & FLG_EQUATORIAL):
         return (lon, lat, dist, dlon, dlat, ddist)
@@ -2019,8 +2090,7 @@ def _assist_position_at(
         for _ in range(2):
             lt = math.sqrt(geo[0] ** 2 + geo[1] ** 2 + geo[2] ** 2) / C_LIGHT_AU_DAY
             geo = [
-                (ast_pos[i] - ast_vel[i] * lt) - earth_helio_ecl[i]
-                for i in range(3)
+                (ast_pos[i] - ast_vel[i] * lt) - earth_helio_ecl[i] for i in range(3)
             ]
 
     if apply_aberration:
@@ -2464,9 +2534,18 @@ def _calc_body(
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
             if not is_j2000:
-                from .astrometry import _precess_ecliptic
+                # Precess J2000 -> ecliptic of date. Carry the velocity
+                # through the same precession (do not leave it in the J2000
+                # frame) so the of-date speed is the time derivative of the
+                # of-date position and picks up the general-precession rate.
+                if iflag & FLG_SPEED:
+                    lon, lat, dlon, dlat = _precess_ecliptic_state(
+                        lon, lat, dlon, dlat, jd_tt, to_j2000=False
+                    )
+                else:
+                    from .astrometry import _precess_ecliptic
 
-                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+                    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -2518,9 +2597,17 @@ def _calc_body(
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
         if not is_j2000:
-            from .astrometry import _precess_ecliptic
+            # Precess J2000 -> ecliptic of date, carrying the velocity so the
+            # of-date speed is the derivative of the of-date position (see the
+            # heliocentric branch above).
+            if iflag & FLG_SPEED:
+                lon, lat, dlon, dlat = _precess_ecliptic_state(
+                    lon, lat, dlon, dlat, jd_tt, to_j2000=False
+                )
+            else:
+                from .astrometry import _precess_ecliptic
 
-            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -2544,9 +2631,17 @@ def _calc_body(
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
             if not is_j2000:
-                from .astrometry import _precess_ecliptic
+                # Precess J2000 -> ecliptic of date, carrying the velocity so
+                # the of-date speed is the derivative of the of-date position
+                # (see the Uranian heliocentric branch above).
+                if iflag & FLG_SPEED:
+                    lon, lat, dlon, dlat = _precess_ecliptic_state(
+                        lon, lat, dlon, dlat, jd_tt, to_j2000=False
+                    )
+                else:
+                    from .astrometry import _precess_ecliptic
 
-                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+                    lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -2596,9 +2691,17 @@ def _calc_body(
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
         if not is_j2000:
-            from .astrometry import _precess_ecliptic
+            # Precess J2000 -> ecliptic of date, carrying the velocity so the
+            # of-date speed is the derivative of the of-date position (see the
+            # Uranian branch above).
+            if iflag & FLG_SPEED:
+                lon, lat, dlon, dlat = _precess_ecliptic_state(
+                    lon, lat, dlon, dlat, jd_tt, to_j2000=False
+                )
+            else:
+                from .astrometry import _precess_ecliptic
 
-            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+                lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
         # Apply sidereal correction if requested (not for equatorial output)
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -5925,8 +6028,9 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
         )
 
-        # attr[1] = illuminated fraction: the Sun is fully illuminated (1.0).
-        return (0.0, 1.0, 0.0, diameter, magnitude) + (0.0,) * 15
+        # attr[1] = illuminated fraction: reported 0.0 for the Sun to match
+        # the reference API (which treats it as inapplicable), not 1.0.
+        return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
 
     # ------------------------------------------------------------------
     # Geocentric ecliptic positions of target and Sun
@@ -6056,7 +6160,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
             - [5-19]: Reserved (0.0)
 
     Note:
-        - For the Sun: phase angle = 0, phase = 1.0, elongation = 0
+        - For the Sun: phase angle = 0, phase = 0.0 (reference-API parity), elongation = 0
         - For the Moon: Hapke photometric model with opposition surge correction
         - Phase = 0.0 means new (fully dark), Phase = 1.0 means full (fully illuminated)
         - Elongation is measured from the Sun (0° = conjunction, 180° = opposition)
@@ -6174,7 +6278,9 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
-        phase = 1.0  # Sun is fully illuminated from Earth (phase angle 0 -> fraction 1)
+        phase = (
+            0.0  # reference-API parity: illuminated fraction reported 0.0 for the Sun
+        )
         elongation = 0.0
 
         # Apparent diameter of Sun based on physical radius
