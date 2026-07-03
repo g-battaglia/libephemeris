@@ -209,6 +209,43 @@ class TestFix3GlobTretLayout:
         )
 
 
+class TestHybridEclipseContactTimes:
+    """A hybrid (annular-total) eclipse must still report U1/U4 and the
+    center-line instants. ``ECL_ANNULAR_TOTAL`` (32) shares no bits with
+    ``ECL_TOTAL`` (4) or ``ECL_ANNULAR`` (8), so the umbral-contact and
+    center-line blocks used to be skipped -> tret[4..7] came back 0.0."""
+
+    # Reference sol_eclipse_when_glob tret for the 2023-04-20 hybrid eclipse.
+    ORACLE = {
+        4: 2460054.609177,  # totality begins (U1)
+        5: 2460054.747716,  # totality ends (U4)
+        6: 2460054.609197,  # center line begins
+        7: 2460054.747665,  # center line ends
+    }
+
+    def test_hybrid_reports_umbral_and_centerline(self):
+        jd_start = julday(2023, 4, 1, 0.0)
+        _require_ephemeris(jd_start)
+
+        etype, tret = _sol_eclipse_when_glob_pythonic(
+            jd_start, eclipse_type=ECL_ANNULAR_TOTAL
+        )
+        assert etype & ECL_ANNULAR_TOTAL, f"expected a hybrid eclipse, got {etype}"
+
+        # The regressed behaviour was exactly 0.0 for these four instants.
+        for i, ref in self.ORACLE.items():
+            assert tret[i] != 0.0, f"tret[{i}] lost (hybrid regression)"
+            assert abs(tret[i] - ref) < 1e-3, (
+                f"tret[{i}]={tret[i]:.6f} vs reference {ref:.6f}"
+            )
+
+        # Ordering: U1 < max < U4 and the center line lies within totality.
+        assert tret[4] < tret[0] < tret[5]
+        assert tret[4] <= tret[6] and tret[7] <= tret[5]
+        # Annular<->total transition instants stay 0.0 (as the reference here).
+        assert tret[8] == 0.0 and tret[9] == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Fix 4: lun_occult_when_loc rise/set at tret[5]/[6], not [7]/[8]
 # ---------------------------------------------------------------------------

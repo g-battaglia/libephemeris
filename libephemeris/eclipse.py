@@ -1576,9 +1576,14 @@ def _calculate_eclipse_phases_besselian(
     Returns:
         Tuple of 10 floats with phase times (JD UT), matching reference API format
     """
-    bool(eclipse_type & ECL_CENTRAL)
     is_total = bool(eclipse_type & ECL_TOTAL)
     is_annular = bool(eclipse_type & ECL_ANNULAR)
+    # A hybrid (annular-total) eclipse sets ECL_ANNULAR_TOTAL only — it shares
+    # no bits with ECL_TOTAL/ECL_ANNULAR — so it too has an umbral axis that
+    # touches Earth and a center line. Without this it would lose U1/U4 and
+    # the center-line instants (tret[4..7]), which the reference returns.
+    is_hybrid = bool(eclipse_type & ECL_ANNULAR_TOTAL)
+    has_umbral_contact = is_total or is_annular or is_hybrid
 
     # Get l1 (penumbral limit) and l2 (umbral limit) at maximum
     l1 = _calc_penumbra_limit(jd_max)
@@ -1604,7 +1609,7 @@ def _calculate_eclipse_phases_besselian(
     t_second_contact = 0.0
     t_third_contact = 0.0
 
-    if (is_total or is_annular) and abs(l2) > 0:
+    if has_umbral_contact and abs(l2) > 0:
         # The umbra/antumbra first and last touches Earth at EXTERIOR
         # tangency: shadow-axis distance = 1 + |l2|. (The previous
         # interior criterion 1 - |l2| — umbra entirely inside the disc —
@@ -1647,7 +1652,7 @@ def _calculate_eclipse_phases_besselian(
     # fundamental-plane disc while gamma < 1.
     t_cl_begin = 0.0
     t_cl_end = 0.0
-    if (is_total or is_annular) and gamma_max < 1.0:
+    if has_umbral_contact and gamma_max < 1.0:
         t_cl_begin = _find_contact_time_besselian(
             jd_max, 1.0, search_before=True, search_range=0.10
         )
@@ -2652,13 +2657,13 @@ def _calculate_local_eclipse_phases_impl(
         jd_local_max, jd_local_max + contact_search, sum_radii, is_increasing=True
     )
 
-    # Check if first and fourth contacts are valid (Sun above horizon)
-    first_alt, _ = _get_sun_altaz(jd_first)
-    fourth_alt, _ = _get_sun_altaz(jd_fourth)
-
-    if first_alt < -1.0:
+    # Check if first and fourth contacts are valid (Sun above horizon).
+    # An unresolved contact is already 0.0; skip the altaz test there, since
+    # evaluating the Sun at JD 0 (year -4712) falls outside the default
+    # medium-tier ephemeris coverage and would raise.
+    if jd_first and _get_sun_altaz(jd_first)[0] < -1.0:
         jd_first = 0.0
-    if fourth_alt < -1.0:
+    if jd_fourth and _get_sun_altaz(jd_fourth)[0] < -1.0:
         jd_fourth = 0.0
 
     # Second and third contacts (for total/annular eclipses)
@@ -2681,13 +2686,10 @@ def _calculate_local_eclipse_phases_impl(
             is_increasing=True,
         )
 
-        # Check visibility
-        second_alt, _ = _get_sun_altaz(jd_second)
-        third_alt, _ = _get_sun_altaz(jd_third)
-
-        if second_alt < -1.0:
+        # Check visibility (skip unresolved 0.0 contacts, see above)
+        if jd_second and _get_sun_altaz(jd_second)[0] < -1.0:
             jd_second = 0.0
-        if third_alt < -1.0:
+        if jd_third and _get_sun_altaz(jd_third)[0] < -1.0:
             jd_third = 0.0
 
     return (
