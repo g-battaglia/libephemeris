@@ -29,6 +29,7 @@ References:
 
 from __future__ import annotations
 
+import http.client
 import math
 import os
 import threading
@@ -316,6 +317,7 @@ def _download_file(url: str, output_path: str, timeout: int = 30) -> bool:
         KeyError,
         RuntimeError,
         TimeoutError,
+        http.client.HTTPException,
     ):
         return False
 

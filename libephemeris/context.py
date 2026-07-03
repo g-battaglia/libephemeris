@@ -641,7 +641,7 @@ class EphemerisContext:
         h_client = get_horizons_client()
         if h_client is not None:
             from .logging_config import get_logger
-            from .planets import _horizons_calc_with_context
+            from . import horizons_backend
 
             try:
                 if ut:
@@ -651,8 +651,12 @@ class EphemerisContext:
 
                     # calc uses TT, convert to UT for horizons_calc_ut
                     jd_ut_approx = tjd - deltat(tjd)
-                result = _horizons_calc_with_context(
-                    h_client, jd_ut_approx, ipl, iflag, self
+                # Pass this context's sidereal mode explicitly so the network
+                # call runs WITHOUT holding the global-state swap lock — the
+                # only global that horizons_calc_ut reads is the sidereal mode
+                # (it rejects FLG_TOPOCTR, so it never reads the observer).
+                result = horizons_backend.horizons_calc_ut(
+                    h_client, jd_ut_approx, ipl, iflag, self.sidereal_mode
                 )
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
@@ -710,6 +714,10 @@ class EphemerisContext:
             if "Invalid Time" in str(e) or "time" in str(e).lower():
                 raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
             raise
+        # Record dispatch source, like the LEB/Horizons branches above and
+        # the module-level entry points (the context LEB/Horizons paths call
+        # _record; the Skyfield fallback must too for telemetry parity).
+        _record(ipl, "Skyfield")
         return _finalize_output_flags(pos, retflag, iflag)
 
     def houses(

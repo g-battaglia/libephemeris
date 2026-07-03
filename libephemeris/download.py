@@ -24,6 +24,7 @@ which are still accurate to ~0.1 arcseconds.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import os
 import ssl
 import sys
@@ -452,7 +453,10 @@ def download_file(
         logger.info("Download complete: %s", dest_path.name)
         return True
 
-    except (OSError, ValueError, KeyError, RuntimeError):
+    # http.client.HTTPException (e.g. IncompleteRead when the server closes
+    # the connection mid-body) is NOT an OSError, so it must be caught
+    # explicitly to clean up the temp file instead of orphaning it.
+    except (OSError, ValueError, KeyError, RuntimeError, http.client.HTTPException):
         # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
         # raised first); otherwise it leaks until the process exits.
         if temp_fd != -1:

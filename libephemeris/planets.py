@@ -2063,7 +2063,7 @@ def _assist_position_at(
 
 
 def _apply_sidereal_correction(
-    lon: float, dlon: float, ut1: float, iflag: int
+    lon: float, dlon: float, ut1: float, iflag: int, sid_mode: int | None = None
 ) -> Tuple[float, float]:
     """Apply sidereal ayanamsa correction to ecliptic longitude and its velocity.
 
@@ -2075,16 +2075,19 @@ def _apply_sidereal_correction(
         dlon: Longitude velocity in degrees/day.
         ut1: Julian Day in UT1.
         iflag: Calculation flags (checked for FLG_SPEED).
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         Tuple of (corrected_lon, corrected_dlon).
     """
-    ayanamsa = _get_ayanamsa_for_flags(ut1, iflag)
+    ayanamsa = _get_ayanamsa_for_flags(ut1, iflag, sid_mode)
     lon = (lon - ayanamsa) % 360.0
     if iflag & FLG_SPEED:
         dt_aya = 1.0 / 86400.0
-        ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag)
-        ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag)
+        ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag, sid_mode)
+        ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag, sid_mode)
         da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
         dlon -= da
     return lon, dlon
@@ -3375,19 +3378,6 @@ def _swapped_context_state(ctx):
             ) = saved
 
 
-def _horizons_calc_with_context(client, tjd_ut: float, ipl: int, iflag: int, ctx):
-    """horizons_calc_ut() under the context's state (thread-safe swap).
-
-    horizons_calc_ut reads the global sidereal/observer state (e.g. via
-    _get_ayanamsa_for_flags), so per-context settings must be swapped in
-    exactly like _calc_body_with_context does.
-    """
-    from . import horizons_backend
-
-    with _swapped_context_state(ctx):
-        return horizons_backend.horizons_calc_ut(client, tjd_ut, ipl, iflag)
-
-
 def _calc_body_with_context(
     t, ipl: int, iflag: int, ctx
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -4218,7 +4208,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     return ayanamsa % 360.0
 
 
-def _get_true_ayanamsa(tjd_ut: float) -> float:
+def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
     """
     Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
 
@@ -4228,11 +4218,15 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
 
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         True ayanamsha in degrees (mean ayanamsha + nutation in longitude)
     """
-    sid_mode = get_sid_mode()
+    if sid_mode is None:
+        sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
 
     # Get mean ayanamsha
@@ -4247,7 +4241,9 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
     return (mean_ayanamsa + nutation_deg) % 360.0
 
 
-def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
+def _get_ayanamsa_for_flags(
+    tjd_ut: float, iflag: int, sid_mode: int | None = None
+) -> float:
     """Get appropriate ayanamsha based on calculation flags.
 
     Returns mean ayanamsha (no nutation) when FLG_NONUT or FLG_J2000 is
@@ -4258,15 +4254,19 @@ def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         iflag: Calculation flags bitmask
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         Ayanamsha in degrees
     """
     if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
-        sid_mode = get_sid_mode()
+        if sid_mode is None:
+            sid_mode = get_sid_mode()
         assert isinstance(sid_mode, int)
         return _calc_ayanamsa(tjd_ut, sid_mode)
-    return _get_true_ayanamsa(tjd_ut)
+    return _get_true_ayanamsa(tjd_ut, sid_mode)
 
 
 def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:

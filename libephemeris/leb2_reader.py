@@ -579,16 +579,22 @@ class LEB2Reader:
 
     def close(self) -> None:
         """Close the memory-mapped file and release resources."""
-        self._eval_cache.clear()
-        self._cache.clear()
-        self._chunk_cache.clear()
-        self._chunk_index.clear()
-        if self._mm is not None:
-            try:
-                self._mm.close()
-            except (OSError, ValueError, KeyError):
-                pass
-            self._mm = None  # type: ignore[assignment]
+        # Hold _decomp_lock so an in-flight decompression (which reads the
+        # mmap and mutates the caches under this same lock) completes before
+        # we clear the caches and unmap — otherwise a concurrent eval could
+        # touch a closed mmap. _decomp_lock is created in __init__ before
+        # _parse(), so it always exists even on an early-parse-failure close.
+        with self._decomp_lock:
+            self._eval_cache.clear()
+            self._cache.clear()
+            self._chunk_cache.clear()
+            self._chunk_index.clear()
+            if self._mm is not None:
+                try:
+                    self._mm.close()
+                except (OSError, ValueError, KeyError):
+                    pass
+                self._mm = None  # type: ignore[assignment]
         if self._file is not None:
             try:
                 self._file.close()

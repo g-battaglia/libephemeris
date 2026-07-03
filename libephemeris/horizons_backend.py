@@ -385,6 +385,7 @@ def horizons_calc_ut(
     jd_ut: float,
     body_id: int,
     iflag: int,
+    sid_mode: int | None = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate body position via Horizons API.
 
@@ -395,6 +396,10 @@ def horizons_calc_ut(
         jd_ut: Julian Day UT.
         body_id: SE_* body constant.
         iflag: The reference-ephemeris calculation flags.
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets EphemerisContext dispatch through
+            Horizons without swapping the global sidereal mode across the
+            network call (thread-safe, like fast_calc's sid_mode).
 
     Returns:
         ((lon, lat, dist, dlon, dlat, ddist), iflag)
@@ -420,7 +425,7 @@ def horizons_calc_ut(
     # (it conditionally omits Δψ), so it must be dispatched BEFORE the generic
     # FLG_NONUT rejection below, otherwise that handling is unreachable.
     if body_id in _ANALYTICAL_BODIES:
-        return _calc_analytical(jd_ut, body_id, iflag)
+        return _calc_analytical(jd_ut, body_id, iflag, sid_mode)
 
     if iflag & FLG_NONUT:
         # The state-vector frames below always include nutation; defer to
@@ -433,7 +438,7 @@ def horizons_calc_ut(
             raise KeyError(
                 f"Uranian body {body_id} geocentric not supported via Horizons"
             )
-        return _calc_uranian(jd_ut, body_id, iflag)
+        return _calc_uranian(jd_ut, body_id, iflag, sid_mode)
 
     # Bodies not in Horizons command map
     if body_id not in _HORIZONS_COMMAND:
@@ -492,7 +497,7 @@ def horizons_calc_ut(
             # ephemeris and the geocentric branch below, which zeroes velocity).
             if not (iflag & FLG_SPEED):
                 rel_vel = (0.0, 0.0, 0.0)
-            return _to_ecliptic_output(rel_pos, rel_vel, jd_tt, jd_ut, iflag)
+            return _to_ecliptic_output(rel_pos, rel_vel, jd_tt, jd_ut, iflag, sid_mode)
 
         # Barycentric: the SSB is inertial, so retardation is just an
         # earlier evaluation epoch.
@@ -506,7 +511,7 @@ def horizons_calc_ut(
         # ephemeris and the geocentric branch below, which passes a zero
         # velocity in that case).
         bary_vel = sv.vel if (iflag & FLG_SPEED) else (0.0, 0.0, 0.0)
-        return _to_ecliptic_output(sv.pos, bary_vel, jd_tt, jd_ut, iflag)
+        return _to_ecliptic_output(sv.pos, bary_vel, jd_tt, jd_ut, iflag, sid_mode)
 
     # Deflection is skipped for true geometric positions and when explicitly
     # disabled; only prefetch the deflectors when it will actually run.
@@ -583,7 +588,7 @@ def horizons_calc_ut(
 
     # Speeds only on request — they cost several extra HTTP round-trips
     if not (iflag & FLG_SPEED):
-        return _to_ecliptic_output(geo, (0.0, 0.0, 0.0), jd_tt, jd_ut, iflag)
+        return _to_ecliptic_output(geo, (0.0, 0.0, 0.0), jd_tt, jd_ut, iflag, sid_mode)
 
     # Velocity via numerical derivative of the apparent position
     # Compute position at jd + dt to get d(apparent_pos)/dt
@@ -640,7 +645,7 @@ def horizons_calc_ut(
         (geo2[2] - geo[2]) / dt,
     )
 
-    return _to_ecliptic_output(geo, geo_vel, jd_tt, jd_ut, iflag)
+    return _to_ecliptic_output(geo, geo_vel, jd_tt, jd_ut, iflag, sid_mode)
 
 
 class _HorizonsDeflectorSource:
@@ -706,6 +711,7 @@ def _to_ecliptic_output(
     jd_tt: float,
     jd_ut: float,
     iflag: int,
+    sid_mode: int | None = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Convert ICRS Cartesian to ecliptic spherical output."""
     from .constants import (
@@ -793,7 +799,7 @@ def _to_ecliptic_output(
         # correctly returns the mean ayanamsa for FLG_NONUT/FLG_J2000 (where the
         # position carries no nutation), so the J2000 ecliptic branch above
         # stays correct.
-        ayan = _get_ayanamsa_for_flags(jd_ut, iflag)
+        ayan = _get_ayanamsa_for_flags(jd_ut, iflag, sid_mode)
         lon = (lon - ayan) % 360.0
 
         # Sidereal speed correction (ayanamsa drift): the ayanamsa drifts
@@ -855,7 +861,7 @@ def _to_ecliptic_output(
 
 
 def _calc_analytical(
-    jd_ut: float, body_id: int, iflag: int
+    jd_ut: float, body_id: int, iflag: int, sid_mode: int | None = None
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate analytical body (Mean Node, Mean Apogee/Lilith).
 
@@ -935,7 +941,7 @@ def _calc_analytical(
     # ecliptic longitude only — equatorial sidereal output uses the mean-equator
     # frame in _maybe_equatorial_convert with no ayanamsa.
     if is_sidereal and not (iflag & FLG_EQUATORIAL):
-        lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag)
+        lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
 
     result = (lon, lat, dist, dlon, dlat, 0.0)
     # FLG_J2000 (precession) and FLG_EQUATORIAL conversion, then the output
@@ -946,7 +952,7 @@ def _calc_analytical(
 
 
 def _calc_uranian(
-    jd_ut: float, body_id: int, iflag: int
+    jd_ut: float, body_id: int, iflag: int, sid_mode: int | None = None
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Calculate Uranian hypothetical body (heliocentric only)."""
     from .time_utils import deltat
@@ -982,7 +988,7 @@ def _calc_uranian(
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import _apply_sidereal_correction
 
-        lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag)
+        lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
 
     # Equatorial conversion and output-representation flags, mirroring the
     # canonical heliocentric Uranian path (planets._calc_body lines ~2446-2451,
