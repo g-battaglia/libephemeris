@@ -110,7 +110,7 @@ MASS_RATIO_SATURN = 1.0 / 3497.901768  # ~2.858e-4
 JUPITER_A = 5.2026  # Semi-major axis (AU)
 JUPITER_E = 0.0485  # Mean eccentricity
 JUPITER_I = 1.303  # Mean inclination (degrees)
-JUPITER_OMEGA = 274.25  # Mean longitude of perihelion (degrees)
+JUPITER_OMEGA = 274.25  # Mean argument of perihelion (deg); varpi = omega + node = 14.7
 JUPITER_NODE = 100.46  # Mean longitude of ascending node (degrees)
 JUPITER_N = 0.08309  # Mean motion (degrees/day)
 
@@ -118,7 +118,7 @@ JUPITER_N = 0.08309  # Mean motion (degrees/day)
 SATURN_A = 9.5549  # Semi-major axis (AU)
 SATURN_E = 0.0555  # Mean eccentricity
 SATURN_I = 2.489  # Mean inclination (degrees)
-SATURN_OMEGA = 339.39  # Mean longitude of perihelion (degrees)
+SATURN_OMEGA = 339.39  # Mean argument of perihelion (deg); varpi = omega + node = 93.1
 SATURN_NODE = 113.66  # Mean longitude of ascending node (degrees)
 SATURN_N = 0.03346  # Mean motion (degrees/day)
 
@@ -126,7 +126,7 @@ SATURN_N = 0.03346  # Mean motion (degrees/day)
 URANUS_A = 19.2184  # Semi-major axis (AU)
 URANUS_E = 0.0457  # Mean eccentricity
 URANUS_I = 0.772  # Mean inclination (degrees)
-URANUS_OMEGA = 170.9  # Mean argument of perihelion (degrees)
+URANUS_OMEGA = 96.9  # Mean argument of perihelion (deg); varpi = omega + node = 170.9
 URANUS_NODE = 74.0  # Mean longitude of ascending node (degrees)
 URANUS_N = 0.01177  # Mean motion (degrees/day)
 
@@ -138,7 +138,7 @@ MASS_RATIO_URANUS = 1.0 / 22902  # ~4.366e-5
 NEPTUNE_A = 30.1104  # Semi-major axis (AU)
 NEPTUNE_E = 0.0086  # Mean eccentricity
 NEPTUNE_I = 1.769  # Mean inclination (degrees)
-NEPTUNE_OMEGA = 44.9  # Mean argument of perihelion (degrees)
+NEPTUNE_OMEGA = 273.2  # Mean argument of perihelion (deg); varpi = omega + node = 44.9
 NEPTUNE_NODE = 131.7  # Mean longitude of ascending node (degrees)
 NEPTUNE_N = 0.006021  # Mean motion (degrees/day)
 
@@ -898,7 +898,9 @@ def _calc_laplace_coefficients(alpha: float, s: float, j: int) -> float:
             weight = 1.0 if (k == 0 or k == n_steps) else 2.0
             result += weight * integrand * dpsi / 2.0
 
-    return result / math.pi
+    # b_s^(j) = (2/pi) * integral (Murray & Dermott 6.67); `result` is the
+    # trapezoidal integral over [0, pi], so the prefactor is 2/pi, not 1/pi.
+    return 2.0 * result / math.pi
 
 
 def calc_secular_perturbation_rates(
