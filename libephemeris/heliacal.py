@@ -2019,14 +2019,13 @@ def _heliacal_ut_pythonic(
                 event_type,
                 flags,
             )
-        except KeyError:
-            pass  # Body not in LEB file
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
-            from .logging_config import get_logger
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data, same convention as the
+            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .leb_reader import log_leb_fallback
 
-            get_logger().debug("LEB fallback: %s", _leb_err)
+            log_leb_fallback("heliacal", _leb_err)
     # --- END LEB fast path ---
 
     from .constants import (
@@ -3456,14 +3455,13 @@ def _heliacal_pheno_ut_pythonic(
                 event_type,
                 flags,
             )
-        except KeyError:
-            pass  # Body not in LEB file
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
-            from .logging_config import get_logger
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data, same convention as the
+            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .leb_reader import log_leb_fallback
 
-            get_logger().debug("LEB fallback: %s", _leb_err)
+            log_leb_fallback("heliacal", _leb_err)
     # --- END LEB fast path ---
 
     from .constants import (
@@ -3965,14 +3963,13 @@ def vis_limit_mag(
                 objname,
                 flags,
             )
-        except KeyError:
-            pass  # Body not in LEB file
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
-            from .logging_config import get_logger
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data, same convention as the
+            # calc_ut()/fixed-star paths (corruption logs a WARNING).
+            from .leb_reader import log_leb_fallback
 
-            get_logger().debug("LEB fallback: %s", _leb_err)
+            log_leb_fallback("heliacal", _leb_err)
     # --- END LEB fast path ---
 
     from .planets import _PLANET_MAP, pheno_ut

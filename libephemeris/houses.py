@@ -2061,7 +2061,6 @@ def _houses_placidus(
 
             sin_ra = math.sin(math.radians(ra))
             tan_dec = sin_ra * math.tan(rad_eps)
-            math.atan(tan_dec)
 
             # Calculate semi-arc (or part of it)
             # tan(lat) * tan(dec)

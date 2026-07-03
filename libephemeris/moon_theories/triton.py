@@ -15,6 +15,8 @@ Reference:
 Precision: ~20-50 km (sufficient for ~0.003 arcsec at Neptune's distance)
 """
 
+from __future__ import annotations
+
 import math
 from typing import Tuple
 

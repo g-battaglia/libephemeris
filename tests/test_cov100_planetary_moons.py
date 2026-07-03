@@ -484,7 +484,9 @@ def test_calc_position_sidereal(monkeypatch):
     # (_apply_sidereal_correction -> _get_ayanamsa_for_flags), matching the
     # planet path, instead of subtracting the mean get_ayanamsa_ut directly.
     monkeypatch.setattr(
-        planets_mod, "_get_ayanamsa_for_flags", lambda jd, iflag: 30.0
+        planets_mod,
+        "_get_ayanamsa_for_flags",
+        lambda jd, iflag, sid_mode=None: 30.0,
     )
 
     tropical = pm.calc_moon_position(t, MOON_IO, FLG_TRUEPOS | FLG_NOABERR)

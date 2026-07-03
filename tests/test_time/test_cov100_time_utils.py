@@ -41,12 +41,18 @@ J2000 = 2451545.0
 
 
 # ---------------------------------------------------------------------------
-# julday / revjul invalid-calendar guards (lines 57, 104)
+# julday / revjul / utc_to_jd / jdet_to_utc / jdut1_to_utc calendar guards
 # ---------------------------------------------------------------------------
 
 
 class TestCalendarGuards:
-    """Invalid calendar flags must raise ValueError."""
+    """Invalid calendar flags must raise ValueError.
+
+    The reference binding validates the calendar flag in all five
+    functions (raising on an invalid flag such as ``cal=99``); without
+    the guard cal=99 would mean Julian in julday()/revjul() but Gregorian
+    in the UTC conversion functions.
+    """
 
     @pytest.mark.unit
     def test_julday_invalid_calendar(self):
@@ -59,6 +65,24 @@ class TestCalendarGuards:
         """revjul rejects a calendar flag other than GREG_CAL/JUL_CAL."""
         with pytest.raises(ValueError, match="invalid calendar"):
             revjul(J2000, cal=99)
+
+    @pytest.mark.unit
+    def test_utc_to_jd_invalid_calendar(self):
+        """utc_to_jd rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.utc_to_jd(2000, 1, 1, 12, 0, 0.0, calendar=99)
+
+    @pytest.mark.unit
+    def test_jdet_to_utc_invalid_calendar(self):
+        """jdet_to_utc rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.jdet_to_utc(J2000, calendar=99)
+
+    @pytest.mark.unit
+    def test_jdut1_to_utc_invalid_calendar(self):
+        """jdut1_to_utc rejects a calendar flag other than GREG_CAL/JUL_CAL."""
+        with pytest.raises(ValueError, match="invalid calendar"):
+            time_utils.jdut1_to_utc(J2000, calendar=99)
 
 
 # ---------------------------------------------------------------------------

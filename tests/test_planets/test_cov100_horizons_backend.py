@@ -97,12 +97,14 @@ class FakeHorizonsClient:
             raise KeyError(command)
         return _sv(*p)
 
-    def fetch_batch(self, requests):
+    def fetch_batch(self, requests, errors=None):
         out = {}
         for cmd, jd, center in requests:
             p = self._POS.get(cmd)
             if p is not None:
                 out[(cmd, jd, center)] = _sv(*p)
+            elif errors is not None:
+                errors[(cmd, jd, center)] = KeyError(cmd)
         return out
 
 
@@ -501,12 +503,16 @@ class TestCalcUtGeocentric:
 
     def test_target_or_earth_missing_raises_connectionerror(self):
         class _PartialClient(FakeHorizonsClient):
-            def fetch_batch(self, requests):
+            def fetch_batch(self, requests, errors=None):
                 # Return Earth but not the target -> ConnectionError path.
                 out = {}
                 for cmd, jd, center in requests:
                     if cmd == "399":
                         out[(cmd, jd, center)] = _sv(*self._POS["399"])
+                    elif errors is not None:
+                        errors[(cmd, jd, center)] = ConnectionError(
+                            "simulated rate limit"
+                        )
                 return out
 
         with pytest.raises(ConnectionError):

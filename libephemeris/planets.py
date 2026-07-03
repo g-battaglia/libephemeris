@@ -45,6 +45,8 @@ References:
 
 from __future__ import annotations
 
+from contextlib import contextmanager as _contextmanager
+
 import math
 from typing import Tuple, TYPE_CHECKING
 
@@ -555,6 +557,86 @@ def _apply_output_flags(result: PositionResult, iflag: int) -> PositionResult:
     return result
 
 
+def _normalize_calc_flags(flags: int) -> int:
+    """Normalize calculation flags the way the reference API does.
+
+    Shared by the module-level calc()/calc_ut() and the EphemerisContext
+    entry points so both stay 1:1 with the reference behavior:
+
+    - FLG_MOSEPH is accepted for compatibility but stripped (all
+      calculations use the JPL DE440/DE441 path).
+    - An ephemeris bit is ensured, so retflag echoes FLG_SWIEPH when the
+      caller passed none.
+    - FLG_SPEED3 maps to FLG_SPEED: 3-position numerical differentiation
+      is already the only speed method used (matching SE behavior where
+      SPEED takes priority if both are set).
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    flags = flags & ~FLG_MOSEPH
+    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        flags |= FLG_SWIEPH
+    if flags & FLG_SPEED3:
+        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+    return flags
+
+
+def _plaus_ephemeris_flags(flags: int) -> int:
+    """Force exactly one ephemeris bit, like the reference plaus_iflag().
+
+    Used by calc_pctr(), whose upstream counterpart normalizes flags via
+    plaus_iflag() only: the ephemeris bits become mutually exclusive with
+    FLG_SWIEPH as the default. plaus_iflag() in sweph.c uses sequential
+    overwrites where the LAST assignment wins, giving priority
+    JPLEPH > SWIEPH > MOSEPH (verified vs pyswisseph 2.10.03:
+    FLG_JPLEPH|FLG_MOSEPH echoes retflag=FLG_JPLEPH). Unlike
+    calc()/calc_ut(), FLG_MOSEPH is NOT stripped and FLG_SPEED3 is NOT
+    remapped here, so retflag matches the reference.
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    ephmask = FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH
+    if flags & FLG_JPLEPH:
+        epheflag = FLG_JPLEPH
+    elif flags & FLG_SWIEPH:
+        epheflag = FLG_SWIEPH
+    elif flags & FLG_MOSEPH:
+        epheflag = FLG_MOSEPH
+    else:
+        epheflag = FLG_SWIEPH
+    return (flags & ~ephmask) | epheflag
+
+
+def _strip_output_flags(flags: int) -> int:
+    """Remove output-format bits (FLG_XYZ, FLG_RADIANS) from calc flags.
+
+    They are output-format flags, not calculation flags: entry points strip
+    them before the calculation and re-apply them on the result via
+    _finalize_output_flags(). Keeping the pair in shared helpers prevents an
+    entry point from echoing the flags in retflag without honoring them.
+    """
+    return flags & ~FLG_XYZ & ~FLG_RADIANS
+
+
+def _finalize_output_flags(
+    pos: PositionResult, retflag: int, flags: int
+) -> Tuple[PositionResult, int]:
+    """Apply output-format flags to a result and echo them in retflag."""
+    return _apply_output_flags(pos, flags), retflag | (flags & (FLG_XYZ | FLG_RADIANS))
+
+
+def _run_pctr_pipeline(calc_fn, flags: int) -> Tuple[PositionResult, int]:
+    """plaus_iflag -> strip -> compute -> finalize, shared by calc_pctr().
+
+    Both the module-level calc_pctr() and EphemerisContext.calc_pctr()
+    route through this so their flag semantics cannot drift apart;
+    ``calc_fn`` receives the stripped calculation flags.
+    """
+    flags = _plaus_ephemeris_flags(flags)
+    pos, retflag = calc_fn(_strip_output_flags(flags))
+    return _finalize_output_flags(pos, retflag, flags)
+
+
 def _south_node_from_north(
     north_result: tuple[float, float, float, float, float, float], flags: int
 ) -> tuple[float, float, float, float, float, float]:
@@ -986,29 +1068,18 @@ def calc_ut(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import ECL_NUT, FLG_MOSEPH
+    from .constants import ECL_NUT
 
-    # Handle ECL_NUT (-1) - returns nutation and obliquity
+    # Handle ECL_NUT (-1) - returns nutation and obliquity.
+    # The reference normalizes ECL_NUT flags plaus_iflag-style: exactly one
+    # ephemeris bit, but FLG_MOSEPH is KEPT and FLG_SPEED3 is NOT remapped
+    # (verified vs pyswisseph 2.10.03: MOSEPH -> 4, MOSEPH|SPEED3 -> 132,
+    # flags=0 -> 2) — so it must run on the raw flags, before
+    # _normalize_calc_flags strips MOSEPH.
     if planet == ECL_NUT:
-        return _calc_nutation_obliquity(tjdut, flags)
+        return _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
 
-    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    flags = flags & ~FLG_MOSEPH
-
-    # The reference API echoes the ephemeris bit in the returned flags
-    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
-    from .constants import FLG_JPLEPH
-
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
-        flags |= FLG_SWIEPH
-
-    # FLG_SPEED3: 3-position numerical differentiation for speed.
-    # libephemeris already uses this method as its only speed computation,
-    # so SPEED3 is treated as equivalent to SPEED (matching SE behavior
-    # where SPEED takes priority if both are set).
-    if flags & FLG_SPEED3:
-        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+    flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
     # dispatch so both id forms are served by the same backend.
@@ -1043,12 +1114,10 @@ def calc_ut(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet,
-                tjdut,
-                _leb_err,
-            )
+            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback(f"body={planet} jd={tjdut:.1f}", _leb_err)
     # --- END LEB fast path ---
 
     # --- Horizons path: use NASA JPL Horizons API when no local ephemeris ---
@@ -1088,7 +1157,7 @@ def calc_ut(
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
     # We apply them after the calculation is complete.
-    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+    calc_iflag = _strip_output_flags(flags)
 
     from .cache import get_cached_time_ut1
 
@@ -1100,11 +1169,8 @@ def calc_ut(
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
             _record(planet, "Skyfield")
-        # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, flags)
-        # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
-        return pos, retflag
+        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        return _finalize_output_flags(pos, retflag, flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
     except ValueError as e:
@@ -1148,43 +1214,16 @@ def calc(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
-    from .constants import ECL_NUT, FLG_MOSEPH
+    from .constants import ECL_NUT
 
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
+    # plaus_iflag-style flag handling on the raw flags (see calc_ut).
     if planet == ECL_NUT:
-        # Of-date mean obliquity from the Vondrák 2011 long-term model (angle
-        # between the of-date equator and ecliptic poles), consistent with the
-        # precession used everywhere else and long-term valid. Nutation stays
-        # IAU 2006/2000A. See _calc_nutation_obliquity for the rationale.
-        mean_obliquity = vondrak_mean_obliquity_deg(tjdet)
-        dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjdet - 2451545.0)
-        delta_psi = math.degrees(dpsi_rad)
-        delta_eps = math.degrees(deps_rad)
-        return (
-            mean_obliquity + delta_eps,
-            mean_obliquity,
-            delta_psi,
-            delta_eps,
-            0.0,
-            0.0,
-        ), flags
+        return _calc_nutation_obliquity_tt(tjdet, _plaus_ephemeris_flags(flags))
 
-    # Strip FLG_MOSEPH bit — accepted for compatibility, always uses JPL
-    flags = flags & ~FLG_MOSEPH
-
-    # The reference API echoes the ephemeris bit in the returned flags
-    # (flags=0 -> retflag includes FLG_SWIEPH). All calculations use the
-    # reference-equivalent JPL DE440/DE441 path, so ensure an ephemeris bit.
-    from .constants import FLG_JPLEPH
-
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
-        flags |= FLG_SWIEPH
-
-    # FLG_SPEED3: treat as FLG_SPEED (see calc_ut for rationale)
-    if flags & FLG_SPEED3:
-        flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+    flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
     planet = _remap_ast_offset(planet)
@@ -1211,12 +1250,10 @@ def calc(
             _record(planet, "LEB")
             return result
         except (KeyError, ValueError) as _leb_err:
-            get_logger().debug(
-                "body=%d jd=%.1f source=LEB->fallback reason=%s",
-                planet,
-                tjdet,
-                _leb_err,
-            )
+            # missing body / out-of-range -> DEBUG, corruption -> WARNING
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback(f"body={planet} jd={tjdet:.1f}", _leb_err)
     # --- END LEB fast path ---
 
     # --- Horizons path ---
@@ -1259,7 +1296,7 @@ def calc(
 
     # Strip FLG_XYZ and FLG_RADIANS from the flags passed to _calc_body
     # since they are output format flags, not calculation flags.
-    calc_iflag = flags & ~FLG_XYZ & ~FLG_RADIANS
+    calc_iflag = _strip_output_flags(flags)
 
     from .cache import get_cached_time_tt
 
@@ -1269,11 +1306,8 @@ def calc(
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
             _record(planet, "Skyfield")
-        # Apply output format flags (XYZ, RADIANS)
-        pos = _apply_output_flags(pos, flags)
-        # Restore output format flags in retflag (they were stripped for calc)
-        retflag |= flags & (FLG_XYZ | FLG_RADIANS)
-        return pos, retflag
+        # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
+        return _finalize_output_flags(pos, retflag, flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:
@@ -1330,7 +1364,10 @@ def calc_pctr(
 
     t = get_cached_time_tt(tjdet)
     try:
-        return _calc_body_pctr(t, planet, center, flags)
+        return _run_pctr_pipeline(
+            lambda calc_iflag: _calc_body_pctr(t, planet, center, calc_iflag),
+            flags,
+        )
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
 
@@ -1645,10 +1682,11 @@ def _calc_body_pctr(
         dp2 = (p2_next - p2_prev) / (2.0 * dt)
         dp3 = (p3_next - p3_prev) / (2.0 * dt)
 
-        # Handle longitude wrap-around
-        if dp1 > 9000:
+        # Handle longitude wrap-around (same threshold as _calc_body)
+        wrap_threshold = 180.0 / (2.0 * dt)
+        if dp1 > wrap_threshold:
             dp1 -= 360.0 / (2.0 * dt)
-        elif dp1 < -9000:
+        elif dp1 < -wrap_threshold:
             dp1 += 360.0 / (2.0 * dt)
 
     # Apply sidereal offset if requested (ecliptic only).
@@ -1739,20 +1777,24 @@ def _calc_nutation_obliquity(
             - Data tuple: (true_obliquity, mean_obliquity, nutation_longitude, nutation_obliquity, 0, 0)
             - Return flag
     """
-    import math
     from .state import get_timescale
 
     ts = get_timescale()
     t = ts.ut1_jd(jd)
+    return _calc_nutation_obliquity_tt(t.tt, iflag)
 
-    # Calculate Julian centuries from J2000.0
-    (jd - 2451545.0) / 36525.0
+
+def _calc_nutation_obliquity_tt(
+    jd_tt: float, iflag: int
+) -> Tuple[Tuple[float, float, float, float, float, float], int]:
+    """ECL_NUT data for a TT Julian Day (see _calc_nutation_obliquity)."""
+    import math
 
     # Mean obliquity of the ecliptic (Vondrák 2011 long-term, via pyerfa poles)
-    mean_obliquity = vondrak_mean_obliquity_deg(t.tt)
+    mean_obliquity = vondrak_mean_obliquity_deg(jd_tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
-    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, t.tt - 2451545.0)
+    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
     delta_psi = math.degrees(dpsi_rad)
     delta_eps = math.degrees(deps_rad)
 
@@ -2021,7 +2063,7 @@ def _assist_position_at(
 
 
 def _apply_sidereal_correction(
-    lon: float, dlon: float, ut1: float, iflag: int
+    lon: float, dlon: float, ut1: float, iflag: int, sid_mode: int | None = None
 ) -> Tuple[float, float]:
     """Apply sidereal ayanamsa correction to ecliptic longitude and its velocity.
 
@@ -2033,16 +2075,19 @@ def _apply_sidereal_correction(
         dlon: Longitude velocity in degrees/day.
         ut1: Julian Day in UT1.
         iflag: Calculation flags (checked for FLG_SPEED).
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         Tuple of (corrected_lon, corrected_dlon).
     """
-    ayanamsa = _get_ayanamsa_for_flags(ut1, iflag)
+    ayanamsa = _get_ayanamsa_for_flags(ut1, iflag, sid_mode)
     lon = (lon - ayanamsa) % 360.0
     if iflag & FLG_SPEED:
         dt_aya = 1.0 / 86400.0
-        ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag)
-        ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag)
+        ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag, sid_mode)
+        ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag, sid_mode)
         da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
         dlon -= da
     return lon, dlon
@@ -2854,19 +2899,25 @@ def _calc_body(
                 )
             ), iflag
 
-    # Handle fixed stars
+    # Handle fixed stars — delegate to the fixstar_ut() computation so every
+    # flag (FLG_SIDEREAL, FLG_EQUATORIAL, FLG_SPEED, ...) gets the exact same
+    # handling as the dedicated entry point. Dispatch BY ID: resolving the
+    # traditional name is ambiguous (Flamsteed names starting with digits,
+    # e.g. "29Psc", parse as sequential catalog numbers).
     if ipl in fixed_stars.FIXED_STARS:
-        jd_tt = t.tt
-        lon, lat, dist = fixed_stars.calc_fixed_star_position(ipl, jd_tt)
-        result = (lon, lat, dist, 0.0, 0.0, 0.0)
-        result = _maybe_equatorial_convert(result, jd_tt, iflag)
-        return _to_native_floats(result), iflag
+        star_name = fixed_stars.get_canonical_star_name(ipl)
+        pos, _star, _retflag = fixed_stars._fixstar_ut_by_id(
+            ipl, star_name, t.ut1, iflag
+        )
+        return _to_native_floats(pos), iflag
 
     # Handle astrological angles (requires observer location)
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            raise ValueError("Angles require observer location. Call set_topo() first.")
+            from .exceptions import Error
+
+            raise Error("Angles require observer location. Call set_topo() first.")
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -2880,7 +2931,9 @@ def _calc_body(
     if ARABIC_OFFSET <= ipl < ARABIC_OFFSET + 100:
         cache = get_angles_cache()
         if not cache:
-            raise ValueError(
+            from .exceptions import Error
+
+            raise Error(
                 "Arabic parts require pre-calculated positions. Call calc_angles() first."
             )
 
@@ -3289,6 +3342,42 @@ def _calc_body(
     return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
 
+@_contextmanager
+def _swapped_context_state(ctx):
+    """Temporarily install an EphemerisContext's per-instance state globally.
+
+    The core calculation code (_calc_body, horizons_calc_ut, ayanamsha
+    helpers) reads observer/sidereal settings from module globals; context
+    calls swap them in under _CONTEXT_SWAP_LOCK so the save-set-restore
+    cycle is atomic across threads.
+    """
+    from . import state
+
+    with state._CONTEXT_SWAP_LOCK:
+        saved = (
+            state._TOPO,
+            state._SIDEREAL_MODE,
+            state._SIDEREAL_T0,
+            state._SIDEREAL_AYAN_T0,
+            state._ANGLES_CACHE,
+        )
+        state._TOPO = ctx.topo
+        state._SIDEREAL_MODE = ctx.sidereal_mode
+        state._SIDEREAL_T0 = ctx.sidereal_t0
+        state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
+        state._ANGLES_CACHE = ctx._angles_cache
+        try:
+            yield
+        finally:
+            (
+                state._TOPO,
+                state._SIDEREAL_MODE,
+                state._SIDEREAL_T0,
+                state._SIDEREAL_AYAN_T0,
+                state._ANGLES_CACHE,
+            ) = saved
+
+
 def _calc_body_with_context(
     t, ipl: int, iflag: int, ctx
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -3314,33 +3403,8 @@ def _calc_body_with_context(
         save-set-restore cycle is atomic across threads. Without this lock,
         concurrent calls could interleave and corrupt each other's state.
     """
-    from . import state
-
-    with state._CONTEXT_SWAP_LOCK:
-        # Save current global state
-        old_topo = state._TOPO
-        old_sid_mode = state._SIDEREAL_MODE
-        old_sid_t0 = state._SIDEREAL_T0
-        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-        old_angles_cache = state._ANGLES_CACHE
-
-        try:
-            # Temporarily set global state from context
-            state._TOPO = ctx.topo
-            state._SIDEREAL_MODE = ctx.sidereal_mode
-            state._SIDEREAL_T0 = ctx.sidereal_t0
-            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-            state._ANGLES_CACHE = ctx._angles_cache
-
-            # Use existing calculation logic
-            return _calc_body(t, ipl, iflag)
-        finally:
-            # Restore global state
-            state._TOPO = old_topo
-            state._SIDEREAL_MODE = old_sid_mode
-            state._SIDEREAL_T0 = old_sid_t0
-            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-            state._ANGLES_CACHE = old_angles_cache
+    with _swapped_context_state(ctx):
+        return _calc_body(t, ipl, iflag)
 
 
 def _calc_body_pctr_with_context(
@@ -3365,33 +3429,8 @@ def _calc_body_pctr_with_context(
         This function acquires state._CONTEXT_SWAP_LOCK to ensure that the
         save-set-restore cycle is atomic across threads.
     """
-    from . import state
-
-    with state._CONTEXT_SWAP_LOCK:
-        # Save current global state
-        old_topo = state._TOPO
-        old_sid_mode = state._SIDEREAL_MODE
-        old_sid_t0 = state._SIDEREAL_T0
-        old_sid_ayan_t0 = state._SIDEREAL_AYAN_T0
-        old_angles_cache = state._ANGLES_CACHE
-
-        try:
-            # Temporarily set global state from context
-            state._TOPO = ctx.topo
-            state._SIDEREAL_MODE = ctx.sidereal_mode
-            state._SIDEREAL_T0 = ctx.sidereal_t0
-            state._SIDEREAL_AYAN_T0 = ctx.sidereal_ayan_t0
-            state._ANGLES_CACHE = ctx._angles_cache
-
-            # Use existing calculation logic
-            return _calc_body_pctr(t, ipl, iplctr, iflag)
-        finally:
-            # Restore global state
-            state._TOPO = old_topo
-            state._SIDEREAL_MODE = old_sid_mode
-            state._SIDEREAL_T0 = old_sid_t0
-            state._SIDEREAL_AYAN_T0 = old_sid_ayan_t0
-            state._ANGLES_CACHE = old_angles_cache
+    with _swapped_context_state(ctx):
+        return _calc_body_pctr(t, ipl, iplctr, iflag)
 
 
 def get_ayanamsa_ut(tjdut: float) -> float:
@@ -4169,7 +4208,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
     return ayanamsa % 360.0
 
 
-def _get_true_ayanamsa(tjd_ut: float) -> float:
+def _get_true_ayanamsa(tjd_ut: float, sid_mode: int | None = None) -> float:
     """
     Get TRUE ayanamsha (mean + nutation) for sidereal planet position calculations.
 
@@ -4179,11 +4218,15 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
 
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         True ayanamsha in degrees (mean ayanamsha + nutation in longitude)
     """
-    sid_mode = get_sid_mode()
+    if sid_mode is None:
+        sid_mode = get_sid_mode()
     assert isinstance(sid_mode, int)
 
     # Get mean ayanamsha
@@ -4198,7 +4241,9 @@ def _get_true_ayanamsa(tjd_ut: float) -> float:
     return (mean_ayanamsa + nutation_deg) % 360.0
 
 
-def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
+def _get_ayanamsa_for_flags(
+    tjd_ut: float, iflag: int, sid_mode: int | None = None
+) -> float:
     """Get appropriate ayanamsha based on calculation flags.
 
     Returns mean ayanamsha (no nutation) when FLG_NONUT or FLG_J2000 is
@@ -4209,15 +4254,19 @@ def _get_ayanamsa_for_flags(tjd_ut: float, iflag: int) -> float:
     Args:
         tjd_ut: Julian Day in Universal Time (UT1)
         iflag: Calculation flags bitmask
+        sid_mode: Sidereal mode override; reads the global state when None.
+            An explicit value lets thread-safe callers (EphemerisContext,
+            Horizons) avoid swapping the global sidereal mode.
 
     Returns:
         Ayanamsha in degrees
     """
     if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
-        sid_mode = get_sid_mode()
+        if sid_mode is None:
+            sid_mode = get_sid_mode()
         assert isinstance(sid_mode, int)
         return _calc_ayanamsa(tjd_ut, sid_mode)
-    return _get_true_ayanamsa(tjd_ut)
+    return _get_true_ayanamsa(tjd_ut, sid_mode)
 
 
 def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
@@ -6027,11 +6076,12 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
     if reader is not None and not (flags & _unsupported_pheno_flags):
         try:
             return _calc_pheno_leb(tjdut, planet, flags)
-        except KeyError:
-            pass
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back for missing bodies, out-of-range AND corrupted LEB
+            # data, aligned with the calc_ut()/fixed-star convention.
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback("pheno", _leb_err)
     # --- END LEB fast path ---
 
     ts = get_timescale()
@@ -6069,11 +6119,12 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
 
             tjd_ut = tjdet - deltat(tjdet)
             return _calc_pheno_leb(tjd_ut, planet, flags)
-        except KeyError:
-            pass
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back for missing bodies, out-of-range AND corrupted LEB
+            # data (see pheno_ut)
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback("pheno", _leb_err)
     # --- END LEB fast path ---
 
     ts = get_timescale()

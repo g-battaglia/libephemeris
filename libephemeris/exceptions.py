@@ -780,6 +780,23 @@ class ConfigurationError(Error):
         )
 
 
+class LEBCorruptionError(ValueError):
+    """A LEB/LEB2 binary ephemeris file is corrupted or truncated.
+
+    Deliberately subclasses ``ValueError`` (not :class:`Error`) so the
+    existing LEB -> Skyfield fallback handlers, which catch ``ValueError``
+    from the LEB layer, keep working unchanged. The distinct type lets the
+    fallback logging report genuine corruption at WARNING while routine
+    out-of-range fallbacks stay at DEBUG — classifying by type instead of
+    by message substring, which misclassified legitimate fallbacks (e.g.
+    "outside nutation range", "No Delta-T data in this LEB file").
+
+    This is an internal robustness signal for the binary readers rather
+    than a user-facing API exception; it is not re-exported from the
+    package root.
+    """
+
+
 # =============================================================================
 # VALIDATION HELPER FUNCTIONS
 # =============================================================================

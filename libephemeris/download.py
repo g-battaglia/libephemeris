@@ -24,6 +24,7 @@ which are still accurate to ~0.1 arcseconds.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import os
 import ssl
 import sys
@@ -333,12 +334,44 @@ def _get_progress_bar(total: int, description: str) -> Any:
     return SimpleProgressBar(total, description)
 
 
+def publish_temp_file(temp_path: str | Path, dest_path: str | Path) -> None:
+    """Publish an atomically-downloaded temp file at its final path.
+
+    Shared by every mkstemp-based downloader (DE kernels, LEB2 groups, IERS
+    tables, SPK kernels, ASSIST data). mkstemp creates files 0600 and
+    os.replace preserves the mode, which would lock other users out of
+    shared data dirs (LIBEPHEMERIS_DATA_DIR, shared IERS/SPK caches) —
+    restore world-readable permissions first. os.chmod is used because
+    os.fchmod is Unix-only before Python 3.13.
+
+    The chmod is best-effort: filesystems without POSIX permission support
+    (some CIFS/SMB or vfat/exFAT mounts) raise on chmod, and a
+    permission-cosmetic step must not discard an already-downloaded,
+    hash-verified file.
+
+    Args:
+        temp_path: The fully-written temporary file to publish.
+        dest_path: Final destination path (atomically replaced).
+
+    Raises:
+        OSError: If the atomic replace fails.
+    """
+    try:
+        os.chmod(temp_path, 0o644)
+    except OSError as exc:
+        get_logger().debug(
+            "Could not set 0644 on %s (non-POSIX filesystem?): %s", temp_path, exc
+        )
+    os.replace(temp_path, dest_path)
+
+
 def download_file(
     url: str,
     dest_path: Path,
     description: str = "Downloading",
     expected_sha256: Optional[str] = None,
     show_progress: bool = True,
+    timeout: int = 30,
 ) -> bool:
     """Download a file with progress bar.
 
@@ -348,6 +381,7 @@ def download_file(
         description: Description to show in progress bar
         expected_sha256: Expected SHA256 hash (optional, for verification)
         show_progress: Whether to show progress bar
+        timeout: Network timeout in seconds
 
     Returns:
         True if download successful, False otherwise
@@ -372,7 +406,7 @@ def download_file(
         logger.info("Downloading %s...", description)
 
         _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-        with urllib.request.urlopen(req, timeout=30, context=_ssl_ctx) as response:
+        with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx) as response:
             total_size = int(response.headers.get("Content-Length", 0))
 
             if total_size > 0:
@@ -415,11 +449,14 @@ def download_file(
                 )
 
         # Atomic move to final destination
-        os.replace(temp_path, dest_path)
+        publish_temp_file(temp_path, dest_path)
         logger.info("Download complete: %s", dest_path.name)
         return True
 
-    except (OSError, ValueError, KeyError, RuntimeError):
+    # http.client.HTTPException (e.g. IncompleteRead when the server closes
+    # the connection mid-body) is NOT an OSError, so it must be caught
+    # explicitly to clean up the temp file instead of orphaning it.
+    except (OSError, ValueError, KeyError, RuntimeError, http.client.HTTPException):
         # Close the temp fd if it was never handed to os.fdopen (e.g. urlopen
         # raised first); otherwise it leaks until the process exits.
         if temp_fd != -1:
@@ -1504,8 +1541,8 @@ def download_leb2_for_tier(
 ) -> list:
     """Download LEB2 compressed modular ephemeris files for a tier.
 
-    Downloads group files (core, asteroids, apogee, uranians) from GitHub
-    Releases to ~/.libephemeris/leb/.
+    Downloads group files (core, asteroids, exotics, apogee, uranians)
+    from GitHub Releases to ~/.libephemeris/leb/.
 
     Args:
         tier_name: One of "base", "medium", "extended"

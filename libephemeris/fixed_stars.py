@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 from skyfield.api import Star
+from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
 from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
 
 from .constants import (
@@ -195,6 +196,7 @@ from .constants import (
 from .utils import cotrans_sp
 from .cache import get_true_obliquity, get_mean_obliquity
 from .exceptions import Error
+from .planets import _wrap_ephemeris_range_error
 
 
 @dataclass
@@ -400,6 +402,10 @@ FIXED_STARS = {entry.id: entry.data for entry in STAR_CATALOG}
 
 # Build lookup from canonical name to star ID
 _STAR_NAME_TO_ID = {entry.name.upper(): entry.id for entry in STAR_CATALOG}
+
+# Reverse lookup from star ID to canonical name (used by the calc_ut/calc
+# fixed-star dispatch to delegate to fixstar_ut).
+_STAR_ID_TO_NAME = {entry.id: entry.name for entry in STAR_CATALOG}
 
 # Build lookup from HIP number to catalog entry.
 _HIP_TO_ENTRY = {entry.hip_number: entry for entry in STAR_CATALOG}
@@ -2089,10 +2095,7 @@ def get_canonical_star_name(star_id: int) -> str | None:
     Returns:
         Canonical star name (e.g., "Regulus") or None if not found
     """
-    for entry in STAR_CATALOG:
-        if entry.id == star_id:
-            return entry.name
-    return None
+    return _STAR_ID_TO_NAME.get(star_id)
 
 
 def _calc_star_position_from_observer(
@@ -2398,17 +2401,23 @@ def calc_fixed_star_position(
             return _calc_star_position_leb(
                 star_id, jd_tt, noaberr, nogdefl, j2000_frame
             )
-        except KeyError:
-            pass  # Body (EARTH) not in LEB file
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise  # Re-raise unexpected ValueError
-            from .logging_config import get_logger
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data, mirroring the planet path.
+            # Corruption logs a WARNING.
+            from .leb_reader import log_leb_fallback
 
-            get_logger().debug("LEB star fallback: %s", _leb_err)
-    return _calc_star_position_skyfield(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
-    )
+            log_leb_fallback("star", _leb_err)
+    try:
+        return _calc_star_position_skyfield(
+            star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
+        )
+    except SkyfieldRangeError as e:
+        # Wrap once here: every star entry point (fixstar_ut, fixstar,
+        # fixstar2*, velocity, calc_ut dispatch) funnels through this
+        # function, so out-of-range dates raise the library
+        # EphemerisRangeError everywhere.
+        raise _wrap_ephemeris_range_error(e, jd_tt) from e
 
 
 def calc_fixed_star_velocity(
@@ -2843,12 +2852,28 @@ def fixstar_ut(
         >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
-    ret_flags = _fixstar_ret_flags(flags)
-    flags = _preprocess_flags(flags)
-
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
+    return _fixstar_ut_by_id(star_id, canonical_name, tjdut, flags)
+
+
+def _fixstar_ut_by_id(
+    star_id: int,
+    canonical_name: str | None,
+    tjdut: float,
+    flags: int,
+) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
+    """fixstar_ut() computation for an already-resolved catalog id.
+
+    Used by fixstar_ut() after name resolution and by the calc_ut()/calc()
+    fixed-star dispatch, which already holds the id: routing the dispatch
+    through the traditional NAME was ambiguous (Flamsteed names starting
+    with digits, e.g. "29Psc", resolve as sequential catalog numbers and
+    returned the wrong star for 289 of the 1447 catalog entries).
+    """
+    ret_flags = _fixstar_ret_flags(flags)
+    flags = _preprocess_flags(flags)
 
     # Convert UT to TT using timescale (applies Delta T)
     from .state import get_timescale
@@ -2984,11 +3009,12 @@ def batch_fixstars_ut(
                 )
                 results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
-        except KeyError:
-            pass  # Body not in LEB file
-        except ValueError as _leb_err:
-            if "outside range" not in str(_leb_err).lower():
-                raise
+        except (KeyError, ValueError) as _leb_err:
+            # Fall back to Skyfield for missing bodies, out-of-range dates
+            # AND corrupted/truncated LEB data (see calc_fixed_star_position).
+            from .leb_reader import log_leb_fallback
+
+            log_leb_fallback("star batch", _leb_err)
 
     if _leb_ok:
         return tuple(results)
@@ -2997,16 +3023,21 @@ def batch_fixstars_ut(
     from .state import get_planets
 
     earth = get_planets()["earth"]
-    earth_at_t = earth.at(t)
+    try:
+        earth_at_t = earth.at(t)
 
-    if want_speed:
-        t_prev = ts.tt_jd(jd_tt - 0.5)
-        t_next = ts.tt_jd(jd_tt + 0.5)
-        earth_at_prev = earth.at(t_prev)
-        earth_at_next = earth.at(t_next)
-    else:
-        earth_at_prev = None
-        earth_at_next = None
+        if want_speed:
+            t_prev = ts.tt_jd(jd_tt - 0.5)
+            t_next = ts.tt_jd(jd_tt + 0.5)
+            earth_at_prev = earth.at(t_prev)
+            earth_at_next = earth.at(t_next)
+        else:
+            earth_at_prev = None
+            earth_at_next = None
+    except SkyfieldRangeError as e:
+        # This sits outside the per-star loop (the Earth position is shared
+        # by every star), so wrap the range error here as well.
+        raise _wrap_ephemeris_range_error(e, jd_tt) from e
 
     for index, star_id, canonical_name in resolved:
         try:

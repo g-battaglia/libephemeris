@@ -1203,7 +1203,7 @@ def _spk_covers_range(
         True if coverage is sufficient, False otherwise.
     """
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:
@@ -1255,14 +1255,16 @@ def _find_covering_cached_spk(
     import glob
 
     from libephemeris.constants import SPK_BODY_NAME_MAP
+    from libephemeris.spk import _sanitize_filename
     from libephemeris.spk_auto import DEFAULT_AUTO_SPK_DIR
 
     entry = SPK_BODY_NAME_MAP.get(body_id)
     if entry is None:
         return None
-    # Numbered asteroids cache as "{number}_{start}_{end}.bsp"; the horizons_id
-    # is the number string (drop the trailing ";" used for SBDB lookups).
-    prefix = str(entry[0]).rstrip(";")
+    # Cached files are named "{_sanitize_filename(horizons_id)}_{start}_{end}.bsp"
+    # (lowercased); build the glob prefix with the same helper so mixed-case
+    # ids like "Hygiea;" match on case-sensitive filesystems.
+    prefix = _sanitize_filename(str(entry[0]))
     cache_dir = os.environ.get("LIBEPHEMERIS_SPK_DIR", DEFAULT_AUTO_SPK_DIR)
     for path in sorted(glob.glob(os.path.join(cache_dir, f"{prefix}_*.bsp"))):
         if _spk_covers_range(path, body_id, jd_start, jd_end):
@@ -1287,7 +1289,7 @@ def _get_asteroid_spk_range(
         (jd_start, jd_end) or None if the file cannot be read.
     """
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:
@@ -1650,7 +1652,7 @@ def generate_body_icrs_asteroid(
 
     spk_file, naif_id = spk_info
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception as exc:
@@ -1840,7 +1842,7 @@ def generate_body_icrs_asteroid_nbody(
     )
 
     # --- seed: SPK heliocentric equatorial-ICRS state at the anchor → SSB AU ---
-    from spktype21 import SPKType21
+    from libephemeris.vendor.spktype21 import SPKType21
 
     kernel = SPKType21.open(spk_file)
     try:
@@ -2496,13 +2498,22 @@ def assemble_leb(
                         _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
                     else:
                         try:
+                            # force when already registered: auto_download
+                            # short-circuits on a registered body even if its
+                            # kernel is too narrow for the anchor epoch.
                             auto_download_asteroid_spk(
-                                bid, jd_start=a_lo, jd_end=a_hi, force=False
+                                bid,
+                                jd_start=a_lo,
+                                jd_end=a_hi,
+                                force=bid in _SPK_BODY_MAP,
                             )
                         except Exception as exc:  # noqa: BLE001
                             if verbose:
                                 print(f"    {name}: anchor SPK download failed: {exc}")
-                if bid not in _SPK_BODY_MAP:
+                if not (
+                    bid in _SPK_BODY_MAP
+                    and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)
+                ):
                     excluded_asteroids.append(bid)
                     if verbose:
                         print(f"    {name}: no anchor SPK available (EXCLUDED)")
@@ -3499,7 +3510,7 @@ def _verify_icrs_asteroid(
 
     spk_file, naif_id = spk_info
     try:
-        from spktype21 import SPKType21
+        from libephemeris.vendor.spktype21 import SPKType21
 
         kernel = SPKType21.open(spk_file)
     except Exception:

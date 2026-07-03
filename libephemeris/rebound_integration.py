@@ -346,8 +346,10 @@ def _download_single_file(
             if progress:
                 progress.close()
 
-        # Atomic move to final destination
-        os.replace(temp_path, dest)
+        # Atomic move to final destination (also restores 0644 permissions)
+        from .download import publish_temp_file
+
+        publish_temp_file(temp_path, dest)
 
         if not quiet:
             actual_mb = dest.stat().st_size / (1024 * 1024)
@@ -575,7 +577,11 @@ class PropagationResult:
     @property
     def ecliptic_lat(self) -> float:
         """Ecliptic latitude in degrees (-90 to +90)."""
-        return math.degrees(math.asin(self.z / self.distance))
+        dist = self.distance
+        if dist == 0.0:
+            return 0.0
+        # Clamp: with subnormal components z/dist can round above 1.0
+        return math.degrees(math.asin(max(-1.0, min(1.0, self.z / dist))))
 
     @property
     def distance(self) -> float:

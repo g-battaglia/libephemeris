@@ -27,6 +27,9 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+# LEBCorruptionError lives in exceptions.py (project convention: library
+# exceptions belong there); validate_entry_count below raises it.
+from .exceptions import LEBCorruptionError
 from .exotic_bodies import body_params as _exotic_body_params
 
 # =============================================================================
@@ -358,6 +361,32 @@ def write_body_entry(buf: bytearray, offset: int, entry: BodyEntry) -> None:
         entry.components,
         entry.data_offset,
     )
+
+
+def validate_entry_count(
+    count: int, entry_size: int, available: int, what: str
+) -> None:
+    """Reject an entry count that does not fit in the available bytes.
+
+    Corrupted-header guard shared by the LEB1/LEB2 body indices and the
+    LEB2 chunk index: an inflated count would otherwise read past the
+    section into adjacent data (or allocate billions of entries).
+
+    Args:
+        count: Number of entries declared by the header.
+        entry_size: Size of one entry in bytes.
+        available: Bytes actually available for the entries.
+        what: Human-readable label for the error message
+            (e.g. "LEB body index", "LEB2 chunk index (body 1)").
+
+    Raises:
+        LEBCorruptionError: If count * entry_size exceeds available.
+    """
+    if count * entry_size > available:
+        raise LEBCorruptionError(
+            f"Corrupted {what}: {count} entries need "
+            f"{count * entry_size} bytes, {available} available"
+        )
 
 
 def read_body_entry(data: Any, offset: int) -> BodyEntry:

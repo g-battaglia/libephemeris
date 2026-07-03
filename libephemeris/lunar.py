@@ -381,7 +381,8 @@ def _calc_mean_apse_analytical(jd_tt: float) -> float:
     cos_incl = math.cos(incl_rad)
     sin_incl = math.sin(incl_rad)
     y_new = y * cos_incl - z * sin_incl
-    y * sin_incl + z * cos_incl
+    # z_new (= y*sin_incl + z*cos_incl) is not needed: the projection onto
+    # the ecliptic only uses atan2(y_new, x).
 
     lon_from_node_proj = math.atan2(y_new, x)
 

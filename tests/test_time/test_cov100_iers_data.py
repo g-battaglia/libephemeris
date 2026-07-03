@@ -40,17 +40,27 @@ def _isolated_iers_state(tmp_path):
 
 @contextmanager
 def _fake_urlopen(content: bytes):
-    """Patch urllib.request.urlopen to return a context manager yielding bytes."""
+    """Patch urllib.request.urlopen to return a context manager yielding bytes.
+
+    Mimics the http.client response contract used by the shared
+    download.download_file() pipeline: .headers and chunked .read(size).
+    """
 
     class _Resp:
+        headers = {"Content-Length": str(len(content))}
+
+        def __init__(self):
+            self._data = content
+
         def __enter__(self):
             return self
 
         def __exit__(self, *exc):
             return False
 
-        def read(self):
-            return content
+        def read(self, size=-1):
+            data, self._data = self._data, b""
+            return data
 
     with mock.patch("urllib.request.urlopen", return_value=_Resp()) as m:
         yield m

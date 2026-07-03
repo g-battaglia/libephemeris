@@ -308,16 +308,18 @@ def test_calc_position_leb_outside_range_falls_back(monkeypatch):
     assert 0.0 <= lon < 360.0
 
 
-def test_calc_position_leb_other_valueerror_reraises(monkeypatch):
-    """A non-'outside range' ValueError is re-raised (2382-2383)."""
+def test_calc_position_leb_valueerror_falls_back(monkeypatch):
+    """Any LEB ValueError (out-of-range OR corruption) falls back to Skyfield,
+    mirroring the planet path (calc_ut catches ValueError from the LEB
+    reader and falls through)."""
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_other(*a, **k):
-        raise ValueError("some other problem")
+        raise ValueError("Corrupted LEB2 data: simulated")
 
     monkeypatch.setattr(fs, "_calc_star_position_leb", raise_other)
-    with pytest.raises(ValueError):
-        fs.calc_fixed_star_position(REGULUS, JD)
+    lon, lat, dist = fs.calc_fixed_star_position(REGULUS, JD)
+    assert 0.0 <= lon < 360.0  # Skyfield fallback produced a real position
 
 
 # ---------------------------------------------------------------------------
@@ -631,16 +633,18 @@ def test_batch_leb_outside_range_falls_back(monkeypatch):
     assert results[0][1] == "Regulus,alLeo"
 
 
-def test_batch_leb_other_valueerror_reraises(monkeypatch):
-    """A non-'outside range' ValueError on the LEB batch path re-raises."""
+def test_batch_leb_valueerror_falls_back(monkeypatch):
+    """Any LEB ValueError on the batch path falls back to Skyfield
+    (out-of-range AND corrupted/truncated data alike)."""
     monkeypatch.setattr(state, "get_leb_reader", lambda: object())
 
     def raise_other(*a, **k):
-        raise ValueError("some other problem")
+        raise ValueError("Corrupted LEB2 data: simulated")
 
     monkeypatch.setattr(fs, "_calc_star_position_leb", raise_other)
-    with pytest.raises(ValueError):
-        fs.batch_fixstars_ut(["Regulus"], JD, 0)
+    results = fs.batch_fixstars_ut(["Regulus"], JD, 0)
+    assert results[0] is not None
+    assert 0.0 <= results[0][0][0] < 360.0
 
 
 def test_batch_leb_speed_wraparound_positive(monkeypatch):

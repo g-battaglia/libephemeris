@@ -19,6 +19,7 @@ from __future__ import annotations
 import mmap
 import os
 import struct
+import threading
 from bisect import bisect_right
 from typing import Dict, List, Optional, Tuple
 
@@ -57,9 +58,11 @@ from .leb_format import (
     read_nutation_header,
     read_section_dir,
     read_star_entry,
+    validate_entry_count,
     _madvise_ranges,
     _madvise_dontneed,
 )
+from .exceptions import LEBCorruptionError
 from .leb_reader import _clenshaw, _clenshaw_with_derivative
 
 
@@ -82,6 +85,12 @@ class LEB2Reader:
         self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
+        # Guards _cache/_chunk_cache and serializes decompression: chunks
+        # decompress in ~0.05 ms, so a plain double-checked lock is adequate
+        # and concurrent requests for the same chunk never redo the zstd
+        # work. (_eval_cache stays lock-free: a tiny memo of result tuples
+        # whose dict get/set are atomic under the GIL.)
+        self._decomp_lock = threading.Lock()
         self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
         self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
@@ -95,7 +104,7 @@ class LEB2Reader:
             # Normalize truncated/corrupted-file failures to ValueError so
             # validation and the Skyfield fallback see one failure type.
             self.close()
-            raise ValueError(f"Corrupted LEB2 file {path!r}: {exc}") from exc
+            raise LEBCorruptionError(f"Corrupted LEB2 file {path!r}: {exc}") from exc
         except (OSError, ValueError):
             self.close()
             raise
@@ -134,6 +143,12 @@ class LEB2Reader:
         self._bodies: Dict[int, CompressedBodyEntry] = {}
         if SECTION_BODY_INDEX in self._sections:
             sec = self._sections[SECTION_BODY_INDEX]
+            validate_entry_count(
+                self._header.body_count,
+                COMPRESSED_BODY_ENTRY_SIZE,
+                sec.size,
+                "LEB2 body index",
+            )
             for i in range(self._header.body_count):
                 offset = sec.offset + i * COMPRESSED_BODY_ENTRY_SIZE
                 entry = read_compressed_body_entry(self._mm, offset)
@@ -181,6 +196,16 @@ class LEB2Reader:
         chunk_count, _ = read_chunk_index_header(self._mm, offset)
         offset += CHUNK_INDEX_HEADER_SIZE
 
+        # Corrupted-entry guard: an inflated u32 chunk_count (up to ~4e9)
+        # would otherwise allocate billions of ChunkEntry objects and read
+        # far past the chunk index.
+        validate_entry_count(
+            chunk_count,
+            CHUNK_ENTRY_SIZE,
+            len(self._mm) - offset,
+            f"LEB2 chunk index (body {entry.body_id})",
+        )
+
         chunks = []
         for i in range(chunk_count):
             chunk = read_chunk_entry(self._mm, offset + i * CHUNK_ENTRY_SIZE)
@@ -200,13 +225,49 @@ class LEB2Reader:
                 hi = mid
         return lo
 
+    def _read_blob(self, offset: int, size: int, what: str) -> bytes:
+        """Slice `size` bytes from the mmap, rejecting truncated files.
+
+        An mmap slice past EOF silently returns fewer bytes — surface a
+        clear truncation error instead of an opaque zstd failure.
+
+        Args:
+            offset: Byte offset of the blob in the file.
+            size: Expected blob size in bytes.
+            what: Human-readable label for the error message.
+
+        Raises:
+            LEBCorruptionError: If fewer than `size` bytes are available.
+        """
+        blob = self._mm[offset : offset + size]
+        if len(blob) < size:
+            raise LEBCorruptionError(
+                f"Truncated LEB2 file: {what} needs {size} bytes at "
+                f"offset {offset}, only {len(blob)} available"
+            )
+        return bytes(blob)
+
     def _decompress_chunk(self, body_id: int, chunk_idx: int) -> bytes:
         """Decompress a single chunk (v2)."""
         key = (body_id, chunk_idx)
+        # Lock-free fast path: chunk hits dominate the eval hot path
+        # (decade-scale chunks vs day-scale queries), and dict.get is
+        # atomic under the GIL — same argument as _eval_cache.
         cached = self._chunk_cache.get(key)
         if cached is not None:
             return cached
+        # Double-checked lock: decompression is ~0.05 ms per chunk, so
+        # holding the lock through the work is adequate and concurrent
+        # requests for the same chunk never redo the zstd work.
+        with self._decomp_lock:
+            cached = self._chunk_cache.get(key)
+            if cached is not None:
+                return cached
+            return self._decompress_chunk_uncached(body_id, chunk_idx)
 
+    def _decompress_chunk_uncached(self, body_id: int, chunk_idx: int) -> bytes:
+        """Decompress a single chunk (v2) and store it in the chunk cache."""
+        key = (body_id, chunk_idx)
         body = self._bodies[body_id]
         chunk = self._chunk_index[body_id][chunk_idx]
 
@@ -214,47 +275,66 @@ class LEB2Reader:
         # caps the decompression allocation for corrupted/crafted files.
         expected = chunk.segment_count * (body.degree + 1) * body.components * 8
         if chunk.uncompressed_size != expected:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB2 chunk (body {body_id}, chunk {chunk_idx}): "
                 f"uncompressed_size {chunk.uncompressed_size} != expected {expected}"
             )
 
-        compressed = self._mm[
-            chunk.blob_offset: chunk.blob_offset + chunk.compressed_size
-        ]
+        compressed = self._read_blob(
+            chunk.blob_offset,
+            chunk.compressed_size,
+            f"chunk (body {body_id}, chunk {chunk_idx})",
+        )
         decompressed = decompress_body(
-            bytes(compressed),
+            compressed,
             chunk.uncompressed_size,
             chunk.segment_count,
             body.degree,
             body.components,
         )
 
-        # Bounded cache: keep max 64 chunks in memory
+        # Bounded cache: keep max 64 chunks in memory. Runs under
+        # _decomp_lock (held by the caller).
         if len(self._chunk_cache) > 64:
             self._chunk_cache.clear()
         self._chunk_cache[key] = decompressed
         return decompressed
 
-    def _decompress_body(self, body_id: int) -> None:
-        """Decompress a body's full coefficients (v1 legacy)."""
+    def _decompress_body(self, body_id: int) -> bytes:
+        """Return a v1 body's full decompressed coefficients (cached)."""
+        # Lock-free fast path (see _decompress_chunk)
+        cached = self._cache.get(body_id)
+        if cached is not None:
+            return cached
+        # Double-checked lock (decompression is stored under the lock)
+        with self._decomp_lock:
+            cached = self._cache.get(body_id)
+            if cached is not None:
+                return cached
+            return self._decompress_body_uncached(body_id)
+
+    def _decompress_body_uncached(self, body_id: int) -> bytes:
+        """Decompress a v1 body's coefficients and store them in the cache."""
         entry = self._bodies[body_id]
         expected = entry.segment_count * (entry.degree + 1) * entry.components * 8
         if entry.uncompressed_size != expected:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB2 body entry {body_id}: uncompressed_size "
                 f"{entry.uncompressed_size} != expected {expected}"
             )
-        compressed = self._mm[
-            entry.data_offset: entry.data_offset + entry.compressed_size
-        ]
-        self._cache[body_id] = decompress_body(
-            bytes(compressed),
+        compressed = self._read_blob(
+            entry.data_offset, entry.compressed_size, f"body {body_id}"
+        )
+        data = decompress_body(
+            compressed,
             entry.uncompressed_size,
             entry.segment_count,
             entry.degree,
             entry.components,
         )
+        # Runs under _decomp_lock (held by the caller)
+        self._cache[body_id] = data
+        return data
 
     def __enter__(self) -> "LEB2Reader":
         return self
@@ -386,12 +466,11 @@ class LEB2Reader:
             coeffs = struct.unpack_from(f"<{n_coeffs}d", chunk_data, byte_offset)
         else:
             # v1: decompress full body on first access
-            if body_id not in self._cache:
-                self._decompress_body(body_id)
+            body_data = self._decompress_body(body_id)
             deg1 = body.degree + 1
             n_coeffs = body.components * deg1
             byte_offset = seg_idx * n_coeffs * 8
-            coeffs = struct.unpack_from(f"<{n_coeffs}d", self._cache[body_id], byte_offset)
+            coeffs = struct.unpack_from(f"<{n_coeffs}d", body_data, byte_offset)
 
         # Compute tau
         seg_start = body.jd_start + seg_idx * body.interval_days
@@ -500,16 +579,22 @@ class LEB2Reader:
 
     def close(self) -> None:
         """Close the memory-mapped file and release resources."""
-        self._eval_cache.clear()
-        self._cache.clear()
-        self._chunk_cache.clear()
-        self._chunk_index.clear()
-        if self._mm is not None:
-            try:
-                self._mm.close()
-            except (OSError, ValueError, KeyError):
-                pass
-            self._mm = None  # type: ignore[assignment]
+        # Hold _decomp_lock so an in-flight decompression (which reads the
+        # mmap and mutates the caches under this same lock) completes before
+        # we clear the caches and unmap — otherwise a concurrent eval could
+        # touch a closed mmap. _decomp_lock is created in __init__ before
+        # _parse(), so it always exists even on an early-parse-failure close.
+        with self._decomp_lock:
+            self._eval_cache.clear()
+            self._cache.clear()
+            self._chunk_cache.clear()
+            self._chunk_index.clear()
+            if self._mm is not None:
+                try:
+                    self._mm.close()
+                except (OSError, ValueError, KeyError):
+                    pass
+                self._mm = None  # type: ignore[assignment]
         if self._file is not None:
             try:
                 self._file.close()
