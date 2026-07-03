@@ -1538,7 +1538,11 @@ def _split_deg_nakshatra(
     # like 90° + ROUND_MIN offset).
     ddeg += offset
     nak_idx = int(ddeg / nakshatra_span)
-    if nak_idx >= 27:
+    # Reference parity: only the exact 360 deg rollover (index 27, i.e.
+    # ddeg in [360, 373.33)) wraps to 0; a raw longitude >= 373.33 keeps its
+    # computed index (e.g. 476.58 -> 35), rather than collapsing every index
+    # >= 27 to 0.
+    if nak_idx == 27:
         nak_idx = 0
     pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
 

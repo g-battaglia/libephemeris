@@ -99,6 +99,19 @@ class TestTime:
         assert (year, month, day) == (1582, 10, 14)
 
 
+class TestSplitDeg:
+    def test_nakshatra_index_for_unnormalized_longitude(self) -> None:
+        """split_deg with the nakshatra flag keeps the raw index for a
+        longitude >= 373.33 deg, wrapping only the exact 360 rollover (idx 27),
+        matching the reference API."""
+        nak = le.SPLIT_DEG_NAKSHATRA
+        assert le.split_deg(360.0, nak)[4] == 0  # exact rollover -> 0
+        assert le.split_deg(365.0, nak)[4] == 0  # index 27 -> 0
+        assert le.split_deg(373.4, nak)[4] == 28  # index 28 kept
+        assert le.split_deg(476.58, nak)[4] == 35
+        assert le.split_deg(700.0, nak)[4] == 52
+
+
 class TestReaderResourceSafety:
     def test_zero_byte_leb_file_does_not_leak_fd(self, tmp_path) -> None:
         """A 0-byte stub raises without leaking the open file descriptor."""
