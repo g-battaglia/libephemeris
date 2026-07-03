@@ -250,9 +250,14 @@ def azalt(
     t = ts.ut1_jd(tjdut)
     jd_tt = t.tt
 
-    # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
-    eps0_rad = erfa.obl06(2451545.0, jd_tt - 2451545.0)
-    eps0 = math.degrees(eps0_rad)
+    # Mean obliquity via the Vondrák 2011 long-term model — the same of-date
+    # mean obliquity calc_ut/fast_calc use to express ecliptic-of-date
+    # coordinates, so this horizon conversion shares their ecliptic frame. The
+    # IAU 2006 obliquity polynomial (erfa.obl06) diverges by several arcsec at
+    # deep-BCE dates and would put the ecliptic here in a different frame.
+    from .precession_vondrak import vondrak_mean_obliquity_deg
+
+    eps0 = vondrak_mean_obliquity_deg(jd_tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
     dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
@@ -404,9 +409,14 @@ def azalt_rev(
     t = ts.ut1_jd(tjdut)
     jd_tt = t.tt
 
-    # Mean obliquity IAU 2006 (Hilton et al. 2006, via pyerfa)
-    eps0_rad = erfa.obl06(2451545.0, jd_tt - 2451545.0)
-    eps0 = math.degrees(eps0_rad)
+    # Mean obliquity via the Vondrák 2011 long-term model — the same of-date
+    # mean obliquity calc_ut/fast_calc use to express ecliptic-of-date
+    # coordinates, so this horizon conversion shares their ecliptic frame. The
+    # IAU 2006 obliquity polynomial (erfa.obl06) diverges by several arcsec at
+    # deep-BCE dates and would put the ecliptic here in a different frame.
+    from .precession_vondrak import vondrak_mean_obliquity_deg
+
+    eps0 = vondrak_mean_obliquity_deg(jd_tt)
 
     # Nutation IAU 2006/2000A via pyerfa (~0.01-0.05 mas precision)
     dpsi_rad, deps_rad = erfa.nut06a(2451545.0, jd_tt - 2451545.0)
@@ -1694,9 +1704,7 @@ def calc_angles(jd_ut: float, lat: float, lon: float):
     return angles_dict
 
 
-def angular_separation(
-    lon1: float, lat1: float, lon2: float, lat2: float
-) -> float:
+def angular_separation(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     """Compute the great-circle angular separation between two points.
 
     Uses the Vincenty formula, which is numerically stable at all

@@ -1023,8 +1023,10 @@ def _sidtime_internal(
     This is the full implementation used by both sidtime() and sidtime0().
     For most applications, use sidtime(jd) or sidtime0(jd, eps, nut) instead.
 
-    Uses the IAU 2006 GMST formula (Capitaine et al. 2003) via ERFA for
-    maximum precision, with an IAU 1982 polynomial fallback.
+    GMST comes from the library's single long-term (Vondrák 2011) sidereal-time
+    source, the same one the house/ARMC engine uses; inside the modern window
+    (1850-2050) that source is the IAU 2006 GMST expression (Capitaine et al.
+    2003), so modern results are unchanged.
 
     Args:
         jd: Julian Day number in UT (Universal Time)
@@ -1064,42 +1066,26 @@ def _sidtime_internal(
 
 
 def _gmst06(jd_ut1: float) -> float:
-    """Compute Greenwich Mean Sidereal Time using IAU 2006 formula.
+    """Compute Greenwich Mean Sidereal Time (radians).
 
-    Uses ``erfa.gmst06()`` (Capitaine et al. 2003) which is the current
-    IAU standard.  Falls back to the IAU 1982 polynomial when pyerfa is
-    unavailable.
+    Routes through the library's single long-term GMST source,
+    :func:`libephemeris.sidereal_longterm.mean_sidereal_time_deg` (Vondrák
+    2011) — the same realization the house/ARMC engine uses. Inside the modern
+    window (1850-2050) that source *is* the IAU 2006 GMST expression (Capitaine
+    et al. 2003), so modern results are unchanged; outside it the long-term
+    geometric construction keeps public sidereal time consistent with the
+    house cusps at remote epochs, where an IAU 2006 precession-in-RA polynomial
+    diverges (by ~0.66° at year -3000).
 
     Args:
         jd_ut1: Julian Day number in UT1.
 
     Returns:
-        GMST in radians (unwrapped, may exceed 2*pi).
+        GMST in radians in [0, 2*pi).
     """
-    import math
+    from .sidereal_longterm import mean_sidereal_time_deg
 
-    # IAU 2006 GMST requires both UT1 and TT.  Compute Delta-T to get TT.
-    delta_t = deltat(jd_ut1)  # days
-    jd_tt = jd_ut1 + delta_t
-
-    try:
-        import erfa
-
-        return float(erfa.gmst06(jd_ut1, 0.0, jd_tt, 0.0))
-    except ImportError:
-        pass
-
-    # ----- Fallback: IAU 1982 polynomial (Meeus Ch.12 eq.12.4) -----
-    jd_0h = math.floor(jd_ut1 + 0.5) - 0.5
-    T = (jd_0h - 2451545.0) / 36525.0
-    theta0_seconds = (
-        24110.54841 + 8640184.812866 * T + 0.093104 * T**2 - 0.0000062 * T**3
-    )
-    theta0_hours = theta0_seconds / 3600.0
-    ut_hours = (jd_ut1 - jd_0h) * 24.0
-    sidereal_from_ut = ut_hours * 1.00273790935
-    gmst_hours = theta0_hours + sidereal_from_ut
-    return math.radians(gmst_hours * 15.0)
+    return math.radians(mean_sidereal_time_deg(jd_ut1))
 
 
 def sidtime(
@@ -1132,7 +1118,9 @@ def sidtime(
 
     Note:
         - When obliquity/nutation are None, uses IAU 2000B nutation model
-        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
+        - GMST comes from the long-term (Vondrák 2011) sidereal-time source
+          (the IAU 2006 GMST expression inside 1850-2050); this keeps sidtime
+          consistent with the house/ARMC engine at remote epochs
         - Result is normalized to the range 0-24 hours
         - For Greenwich sidereal time, use longitude=0.0
 
@@ -1185,7 +1173,8 @@ def sidtime0(jd: float, obliquity: float, nutation: float) -> float:
 
     Note:
         - This function is equivalent to calling _sidtime_internal(jd, 0.0, obliquity, nutation)
-        - GMST is computed using the IAU 2006 formula (erfa.gmst06)
+        - GMST comes from the long-term (Vondrák 2011) sidereal-time source
+          (the IAU 2006 GMST expression inside 1850-2050)
         - The equation of equinoxes = nutation_in_longitude * cos(obliquity)
         - Result is normalized to the range 0-24 hours
 
