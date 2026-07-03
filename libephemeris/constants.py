@@ -942,7 +942,7 @@ J1991_25: float = 2448349.0625
 J1900: float = 2415020.0
 
 # B1950.0 epoch: Jan 0.923, 1950 - Besselian epoch for FK4 catalog
-B1950: float = 2433282.4235
+B1950: float = 2433282.42345905
 
 # Days per Julian year (exactly 365.25 days)
 DAYS_PER_JULIAN_YEAR: float = 365.25

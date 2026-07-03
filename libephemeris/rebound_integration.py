@@ -1233,7 +1233,12 @@ def compare_with_keplerian(
     x_kep, y_kep, z_kep = calc_minor_body_position(elements, jd_tt)
     r_kep = math.sqrt(x_kep**2 + y_kep**2 + z_kep**2)
     lon_kep = math.degrees(math.atan2(y_kep, x_kep)) % 360.0
-    lat_kep = math.degrees(math.asin(z_kep / r_kep))
+    # Guard the origin and clamp asin (r >= |z| but rounding can nudge past
+    # +-1), mirroring PropagationResult.ecliptic_lat.
+    if r_kep > 0.0:
+        lat_kep = math.degrees(math.asin(max(-1.0, min(1.0, z_kep / r_kep))))
+    else:
+        lat_kep = 0.0
 
     # REBOUND/ASSIST result
     jd_start = elements.epoch
