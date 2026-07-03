@@ -45,7 +45,7 @@ class TestFlamsteedDesignationParsing:
         assert result == "32 LEO"
 
     def test_parse_87_leonis(self):
-        """87 Leonis (Regulus) should parse to '87 LEO'."""
+        """87 Leonis should parse to '87 LEO' (Regulus is 32 Leonis, not 87)."""
         result = _parse_flamsteed_designation("87 Leonis")
         assert result == "87 LEO"
 
@@ -195,14 +195,14 @@ class TestConstellationCoverage:
 class TestResolveStarNameWithFlamsteed:
     """Tests for resolve_star_name with Flamsteed designations."""
 
-    def test_resolve_87_leonis(self):
-        """87 Leonis should resolve to Regulus (REGULUS)."""
-        result = resolve_star_name("87 Leonis")
+    def test_resolve_32_leonis(self):
+        """32 Leonis should resolve to Regulus (REGULUS)."""
+        result = resolve_star_name("32 Leonis")
         assert result == REGULUS
 
-    def test_resolve_87_leo(self):
-        """87 Leo should also resolve to Regulus."""
-        result = resolve_star_name("87 Leo")
+    def test_resolve_32_leo(self):
+        """32 Leo should also resolve to Regulus."""
+        result = resolve_star_name("32 Leo")
         assert result == REGULUS
 
     def test_resolve_67_virginis(self):
@@ -273,9 +273,9 @@ class TestResolveStarNameWithFlamsteed:
 
     def test_resolve_case_insensitive(self):
         """Resolution should be case-insensitive."""
-        result1 = resolve_star_name("87 LEONIS")
-        result2 = resolve_star_name("87 leonis")
-        result3 = resolve_star_name("87 Leonis")
+        result1 = resolve_star_name("32 LEONIS")
+        result2 = resolve_star_name("32 leonis")
+        result3 = resolve_star_name("32 Leonis")
         assert result1 == result2 == result3 == REGULUS
 
 
@@ -283,9 +283,9 @@ class TestResolveStarNameWithFlamsteed:
 class TestResolve2StarWithFlamsteed:
     """Tests for _resolve_star2 with Flamsteed designations."""
 
-    def test_resolve2_87_leonis(self):
-        """87 Leonis should resolve to Regulus catalog entry."""
-        entry, err = _resolve_star2("87 Leonis")
+    def test_resolve2_32_leonis(self):
+        """32 Leonis should resolve to Regulus catalog entry."""
+        entry, err = _resolve_star2("32 Leonis")
         assert err is None
         assert entry is not None
         assert entry.id == REGULUS
@@ -319,10 +319,10 @@ class TestResolve2StarWithFlamsteed:
 class TestSweFixstar2WithFlamsteed:
     """Tests for fixstar2 and fixstar2_ut with Flamsteed designations."""
 
-    def test_swe_fixstar2_ut_87_leonis(self):
-        """fixstar2_ut should find Regulus via '87 Leonis'."""
+    def test_swe_fixstar2_ut_32_leonis(self):
+        """fixstar2_ut should find Regulus via '32 Leonis'."""
         jd = 2451545.0  # J2000.0
-        pos, name, flag = fixstar2_ut("87 Leonis", jd, 0)
+        pos, name, flag = fixstar2_ut("32 Leonis", jd, 0)
         assert "Regulus" in name
         assert 110 < pos[0] < 160  # Rough longitude check
 

@@ -5925,7 +5925,8 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             -26.86 + 5.0 * math.log10(sun_dist_au) if sun_dist_au > 0 else -26.86
         )
 
-        return (0.0, 0.0, 0.0, diameter, magnitude) + (0.0,) * 15
+        # attr[1] = illuminated fraction: the Sun is fully illuminated (1.0).
+        return (0.0, 1.0, 0.0, diameter, magnitude) + (0.0,) * 15
 
     # ------------------------------------------------------------------
     # Geocentric ecliptic positions of target and Sun
@@ -6173,7 +6174,7 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         _, _, sun_dist = sun_pos.radec()
 
         phase_angle = 0.0
-        phase = 0.0  # Phase (illuminated fraction) is inapplicable for the Sun
+        phase = 1.0  # Sun is fully illuminated from Earth (phase angle 0 -> fraction 1)
         elongation = 0.0
 
         # Apparent diameter of Sun based on physical radius

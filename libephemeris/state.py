@@ -50,11 +50,13 @@ def _resolve_data_dir() -> str:
     """
     env_value = os.environ.get(_DATA_DIR_ENV_VAR, "").strip()
     if env_value:
-        return os.path.abspath(env_value)
+        return os.path.abspath(os.path.expanduser(env_value))
     from ._config_toml import get_str as _toml_str
 
     toml_value = _toml_str("data_dir")
-    return os.path.abspath(toml_value if toml_value else DEFAULT_DATA_DIR)
+    return os.path.abspath(
+        os.path.expanduser(toml_value if toml_value else DEFAULT_DATA_DIR)
+    )
 
 
 def _get_data_dir() -> str:
@@ -552,6 +554,9 @@ def _get_leb_reader_locked(mode):
                 logger.debug("Auto-discovered LEB file: %s", path)
 
         if path is not None:
+            # Expand a leading ~ from env/TOML/explicit config (the shell
+            # cannot pre-expand values read from a file).
+            path = os.path.expanduser(path)
             try:
                 basename = os.path.splitext(os.path.basename(path))[0]
                 if "_" in basename:
@@ -2089,13 +2094,13 @@ def get_spk_cache_dir() -> Optional[str]:
         return _SPK_CACHE_DIR
     env_dir = os.environ.get(_SPK_CACHE_DIR_ENV_VAR)
     if env_dir:
-        return env_dir
+        return os.path.expanduser(env_dir)
     # TOML config fallback
     from ._config_toml import get_str as _toml_str
 
     toml_value = _toml_str("spk_dir")
     if toml_value:
-        return toml_value
+        return os.path.expanduser(toml_value)
     return None
 
 

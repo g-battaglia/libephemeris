@@ -141,12 +141,14 @@ def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
             # denominator requires a negative power base, which raises before
             # this guard can return; kept as a defensive floor.
             return 40.0
-        return min(1.0 / denominator, 40.0)
+        # Physical airmass floor is 1.0 (at the zenith); the empirical
+        # denominator slightly exceeds 1 there and would return <1 otherwise.
+        return min(max(1.0 / denominator, 1.0), 40.0)
 
     elif method == "rozenberg":
         # Rozenberg (1966) formula, good for very low altitudes
         cos_z = math.cos(zenith_rad)
-        return 1.0 / (cos_z + 0.025 * math.exp(-11.0 * cos_z))
+        return max(1.0 / (cos_z + 0.025 * math.exp(-11.0 * cos_z)), 1.0)
 
     else:
         # Default to Kasten & Young

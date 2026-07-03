@@ -249,7 +249,7 @@ class EphemerisContext:
                 return None
         return self._leb_reader
 
-    def set_topo(self, lon: float, lat: float, alt: float) -> None:
+    def set_topo(self, lon: float, lat: float, alt: float = 0.0) -> None:
         """
         Set observer's topocentric location for calculations.
 
