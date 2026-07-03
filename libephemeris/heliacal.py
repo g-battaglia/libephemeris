@@ -965,6 +965,7 @@ def _heliacal_ut_leb(
     body: int,
     event_type: int,
     flags: int,
+    met_range: float = 0.0,
 ) -> tuple:
     """LEB-backed implementation of _heliacal_ut_pythonic().
 
@@ -1078,6 +1079,7 @@ def _heliacal_ut_leb(
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
+        met_range=met_range,
     )
 
     def _get_moon_data(jd: float):
@@ -1360,6 +1362,7 @@ def _heliacal_pheno_ut_leb(
     body: int,
     event_type: int,
     flags: int,
+    met_range: float = 0.0,
 ) -> tuple:
     """LEB-backed implementation of _heliacal_pheno_ut_pythonic()."""
     from .constants import (
@@ -1523,6 +1526,7 @@ def _heliacal_pheno_ut_leb(
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
+        met_range=met_range,
     )
     k_act = schaefer.k_total
     min_tav = schaefer.arcus_visionis_required(magnitude)
@@ -1928,6 +1932,7 @@ def _heliacal_ut_pythonic(
     body: int = SUN,
     event_type: int = 1,
     flags: int = FLG_SWIEPH,
+    met_range: float = 0.0,
 ) -> Tuple[float, int]:
     """
     Calculate heliacal rising or setting time for a celestial body.
@@ -2018,6 +2023,7 @@ def _heliacal_ut_pythonic(
                 body,
                 event_type,
                 flags,
+                met_range,
             )
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
@@ -2189,6 +2195,7 @@ def _heliacal_ut_pythonic(
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,  # Convert to %
         altitude=altitude,
+        met_range=met_range,
     )
 
     def _get_moon_data(jd: float) -> Tuple[float, float, float]:
@@ -2981,7 +2988,10 @@ def heliacal_ut(
     pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
     temperature = atmo[1] if len(atmo) > 1 else 15.0
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
-    # atmo[3] is meteorological range / ktot, handled internally
+    # atmo[3] is the meteorological range in km (or ktot if 0 < value < 1).
+    # It drives atmospheric extinction and materially shifts the event date,
+    # so thread it into the search (0.0 = auto clear-sky, the reference default).
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
 
     # datm[2] is relative humidity in percent (reference convention);
     # convert to the 0-1 range used internally.
@@ -3002,6 +3012,7 @@ def heliacal_ut(
         body=body_id,
         event_type=eventtype,
         flags=flags,
+        met_range=met_range,
     )
 
     # Build the result as 3 floats matching the reference API
@@ -3050,7 +3061,11 @@ def _heliacal_visibility_window(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity_pct if humidity_pct > 1.0 else humidity_pct * 100.0,
-        met_range=met_range if met_range >= 1.0 else 0.0,
+        # Use the full met_range (including a 0<ktot<1 override) so this
+        # model's extinction term matches the k that vis_limit_mag applies to
+        # the limiting magnitude in _margin; gating it to >=1.0 mixed a
+        # ktot-override limiting mag with a recomputed-k extinction term.
+        met_range=met_range,
         altitude=geopos[2] if len(geopos) > 2 else 0.0,
         observer_age=observer[0] if len(observer) > 0 else 36.0,
         snellen=observer[1] if len(observer) > 1 else 1.0,
@@ -3365,6 +3380,7 @@ def _heliacal_pheno_ut_pythonic(
     body: int = SUN,
     event_type: int = 1,
     flags: int = FLG_SWIEPH,
+    met_range: float = 0.0,
 ) -> Tuple[Tuple[float, ...], int]:
     """
     Provides data relevant for the calculation of heliacal risings and settings.
@@ -3454,6 +3470,7 @@ def _heliacal_pheno_ut_pythonic(
                 body,
                 event_type,
                 flags,
+                met_range,
             )
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
@@ -3653,6 +3670,7 @@ def _heliacal_pheno_ut_pythonic(
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
+        met_range=met_range,
     )
     k_act = schaefer.k_total
     min_tav = schaefer.arcus_visionis_required(magnitude)
@@ -3686,7 +3704,7 @@ def _heliacal_pheno_ut_pythonic(
         pressure,
         temperature,
         humidity * 100.0 if humidity <= 1.0 else humidity,
-        0.0,
+        met_range,
     )
     _obs6 = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
     (
@@ -3822,6 +3840,8 @@ def heliacal_pheno_ut(
     pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
     temperature = atmo[1] if len(atmo) > 1 else 15.0
     humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
+    # atmo[3]: meteorological range (km) or ktot (0<v<1); drives extinction.
+    met_range = atmo[3] if len(atmo) > 3 else 0.0
 
     # datm[2] is relative humidity in percent (reference convention)
     humidity = humidity_pct / 100.0
@@ -3841,6 +3861,7 @@ def heliacal_pheno_ut(
         body=body_id,
         event_type=eventtype,
         flags=flags,
+        met_range=met_range,
     )
 
     # Return flat 50-tuple (matching reference API)

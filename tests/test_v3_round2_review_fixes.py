@@ -158,5 +158,30 @@ class TestCalcFlags:
         assert le.calc_ut(jd, SUN, 0)[1] & FLG_SWIEPH
 
 
+class TestHeliacalMetRange:
+    @pytest.mark.slow
+    def test_heliacal_ut_honours_atmo_turbidity(self) -> None:
+        """heliacal_ut must thread atmo[3] (meteorological range) into the
+        event search: a hazy atmosphere delays first visibility relative to a
+        clear one. Previously atmo[3] was dropped, so the date was identical."""
+        jd0 = le.julday(2000, 1, 1, 0.0)
+        geopos = (12.5, 41.9, 0.0)
+        dobs = (36.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+
+        def rising(met_range: float) -> float:
+            atmo = (1013.25, 15.0, 40.0, met_range)
+            jd1, _, _ = le.heliacal_ut(
+                jd0, geopos, atmo, dobs, "Venus", le.HELIACAL_RISING
+            )
+            return jd1
+
+        clear = rising(40.0)  # 40 km meteorological range
+        hazy = rising(5.0)  # 5 km -> much more extinction
+        assert clear > 0 and hazy > 0
+        # Hazier air pushes the heliacal rising later (and by more than a day,
+        # so this cannot be numerical noise).
+        assert hazy > clear + 1.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
