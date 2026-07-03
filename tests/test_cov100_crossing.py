@@ -959,10 +959,11 @@ class TestHelioCrossUt:
         assert jd < J2000
 
     def test_forward_at_current_lon(self):
-        # diff < 1e-5 -> add 360 forward (line 1317).
+        # A target equal to the current longitude is an imminent crossing:
+        # the reference API returns ~the query epoch (not one period later).
         pos, _ = ephem.calc_ut(J2000, MARS, FLG_HELCTR | FLG_SPEED)
         jd = helio_cross_ut(MARS, pos[0], J2000)
-        assert jd > J2000
+        assert jd == pytest.approx(J2000, abs=1e-4)
 
     def test_backward_at_current_lon(self):
         # diff in [0, 1e-5] -> elif branch (line 1311).
@@ -1098,7 +1099,7 @@ class TestHelioCrossTT:
 
     def test_forward_at_current_lon(self):
         pos, _ = ephem.calc(J2000, MARS, FLG_HELCTR | FLG_SPEED)
-        assert helio_cross(MARS, pos[0], J2000) > J2000
+        assert helio_cross(MARS, pos[0], J2000) == pytest.approx(J2000, abs=1e-4)
 
     def test_backward_at_current_lon(self):
         pos, _ = ephem.calc(J2000, MARS, FLG_HELCTR | FLG_SPEED)
@@ -1434,7 +1435,14 @@ class TestGetStationInfo:
         def fake_find(planet_id, jd_ut, st="any", flag=0):
             raise Error("no station")
 
+        def fake_find_prev(planet_id, jd_ut, flag=0):
+            raise Error("no station")
+
+        # get_station_info now searches BOTH directions; the partial-info
+        # branch is reached only when both the forward and backward searches
+        # fail, so patch both.
         monkeypatch.setattr(crmod, "find_station_ut", fake_find)
+        monkeypatch.setattr(crmod, "_find_previous_station_ut", fake_find_prev)
         info = get_station_info(MERCURY, J2000)
         assert info["jd_station"] is None
         assert "error" in info

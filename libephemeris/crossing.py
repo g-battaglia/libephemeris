@@ -248,6 +248,7 @@ def _find_bracket_for_crossing(
     jd_start: float,
     jd_end: float,
     num_samples: int = 20,
+    from_end: bool = False,
 ) -> Tuple[float, float]:
     """
     Find a bracket [jd_a, jd_b] where the crossing occurs.
@@ -261,9 +262,15 @@ def _find_bracket_for_crossing(
         jd_start: Start of search interval
         jd_end: End of search interval
         num_samples: Number of samples to take
+        from_end: If False (default), scan forward from ``jd_start`` and return
+            the FIRST (oldest) crossing in the interval. If True, scan backward
+            from ``jd_end`` and return the LAST (most recent) crossing, i.e. the
+            one nearest ``jd_end``. A backward search wants the nearest PAST
+            crossing, which is the one adjacent to ``jd_end`` — not the oldest.
 
     Returns:
-        Tuple[float, float]: (jd_a, jd_b) bracket containing the crossing
+        Tuple[float, float]: (jd_a, jd_b) bracket containing the crossing,
+        always ordered so jd_a < jd_b.
 
     Raises:
         Error: If no crossing is found in the interval
@@ -277,6 +284,29 @@ def _find_bracket_for_crossing(
             diff -= 360
         return diff
 
+    # The wrapping filter below rejects sign changes at the antipodal point
+    # (target+180°): a genuine crossing passes smoothly through 0 (small values
+    # on each side), while antipodal wrapping shows diffs near ±180° that jump
+    # by ~360°. Reject sign changes where the jump exceeds 180°.
+    if from_end:
+        # Walk backward from jd_end so the first sign change we hit is the
+        # crossing closest to jd_end (the nearest past crossing).
+        next_jd = jd_end
+        next_diff = get_diff(jd_end)
+        for i in range(num_samples - 1, -1, -1):
+            curr_jd = jd_start + i * step
+            curr_diff = get_diff(curr_jd)
+
+            if curr_diff * next_diff <= 0 and abs(curr_diff - next_diff) < 180:
+                return (curr_jd, next_jd)
+
+            next_jd = curr_jd
+            next_diff = curr_diff
+
+        raise Error(
+            f"No crossing found in interval [{jd_start}, {jd_end}] for target {x2cross}°"
+        )
+
     prev_jd = jd_start
     prev_diff = get_diff(jd_start)
 
@@ -285,10 +315,6 @@ def _find_bracket_for_crossing(
         curr_diff = get_diff(curr_jd)
 
         # Check for sign change (crossing).
-        # Filter out wrapping artifacts at target+180°: a genuine crossing
-        # has diff smoothly passing through 0 (small values on each side),
-        # while wrapping at the antipodal point has diffs near ±180° that
-        # jump by ~360°. Reject sign changes where the jump exceeds 180°.
         if prev_diff * curr_diff <= 0 and abs(prev_diff - curr_diff) < 180:
             return (prev_jd, curr_jd)
 
@@ -319,9 +345,7 @@ def _forward_first_crossing(
     jd_a, jd_b = _find_bracket_for_crossing(
         get_position_func, x2cross, tjdut, tjdut + max_range, num_samples=num_samples
     )
-    return _brent_find_crossing(
-        get_position_func, x2cross, jd_a, jd_b, tolerance, 100
-    )
+    return _brent_find_crossing(get_position_func, x2cross, jd_a, jd_b, tolerance, 100)
 
 
 def _cross_max_range(planet: int, speed_default: float) -> float:
@@ -331,12 +355,12 @@ def _cross_max_range(planet: int, speed_default: float) -> float:
     if abs(speed_default) < 0.01:
         return 100000.0  # very slow (Pluto ~248 yr period)
     if abs(speed_default) < 0.05:
-        return 40000.0   # Saturn/Uranus/Neptune
+        return 40000.0  # Saturn/Uranus/Neptune
     if abs(speed_default) < 0.1:
-        return 5000.0    # Jupiter (~12 yr)
+        return 5000.0  # Jupiter (~12 yr)
     if planet in (2, 3):
-        return 500.0     # Mercury, Venus
-    return 800.0         # Mars and others
+        return 500.0  # Mercury, Venus
+    return 800.0  # Mars and others
 
 
 def solcross_ut(
@@ -1112,14 +1136,19 @@ def cross_ut(
     # refine. The scan is forward-only by construction and early-exits on the
     # first crossing, so it is cheap whenever one exists soon. The fast common
     # case (prograde, target ahead, away from a station) skips it and uses NR.
-    _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0,
-                  7: 6.0, 8: 5.0, 9: 4.0}
-    _SYNODIC = {2: 116.0, 3: 584.0, 4: 780.0, 5: 399.0, 6: 378.0,
-                7: 370.0, 8: 367.0, 9: 367.0}
+    _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0, 7: 6.0, 8: 5.0, 9: 4.0}
+    _SYNODIC = {
+        2: 116.0,
+        3: 584.0,
+        4: 780.0,
+        5: 399.0,
+        6: 378.0,
+        7: 370.0,
+        8: 367.0,
+        9: 367.0,
+    }
     diff_back = (lon_start - x2cross) % 360.0
-    if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(
-        planet, 22.0
-    ):
+    if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(planet, 22.0):
         scan_window = _SYNODIC.get(planet, 800.0) * 1.2
 
         def _delta(jd_time: float) -> float:
@@ -1387,7 +1416,10 @@ def helio_cross_ut(
     # Heliocentric planets don't go retrograde (except for very minor perturbations)
     # so we search forward by default, or backward if requested
     if backwards:
-        # For backward search, find the previous crossing
+        # For backward search, map diff from [0, 360) into (-360, 0] so the
+        # guess points into the past. A target essentially at the current
+        # longitude resolves to a full cycle back (the nearest strictly-past
+        # crossing).
         if diff > 1e-5:
             diff -= 360.0
         elif diff > -1e-5:
@@ -1396,8 +1428,11 @@ def helio_cross_ut(
             speed = speed_default
         dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
     else:
-        if diff < 1e-5:
-            diff += 360.0
+        # No forward dead-band: a body a hair before (or exactly at) the target
+        # legitimately crosses now, and the reference returns that imminent
+        # crossing — not one orbital period later. This mirrors solcross/
+        # mooncross/cross_ut, which have no dead-band either. (x2cross - lon)
+        # % 360 already maps a just-passed target to ~360, i.e. the next cycle.
         if abs(speed) < 0.0001:
             speed = speed_default
         dt_guess = diff / speed
@@ -1435,6 +1470,9 @@ def helio_cross_ut(
                 jd_bracket_start,
                 jd_bracket_end,
                 num_samples=bracket_samples,
+                # Backward search must return the NEAREST past crossing (the
+                # one adjacent to tjdut), so scan the bracket from the tjdut end.
+                from_end=backwards,
             )
 
             return _brent_find_crossing(
@@ -1558,7 +1596,10 @@ def helio_cross(
     diff = (x2cross - lon_start) % 360.0
 
     if backwards:
-        # For backward search, find the previous crossing
+        # For backward search, map diff from [0, 360) into (-360, 0] so the
+        # guess points into the past. A target essentially at the current
+        # longitude resolves to a full cycle back (the nearest strictly-past
+        # crossing).
         if diff > 1e-5:
             diff -= 360.0
         elif diff > -1e-5:
@@ -1567,8 +1608,11 @@ def helio_cross(
             speed = speed_default
         dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
     else:
-        if diff < 1e-5:
-            diff += 360.0
+        # No forward dead-band: a body a hair before (or exactly at) the target
+        # legitimately crosses now, and the reference returns that imminent
+        # crossing — not one orbital period later. This mirrors solcross/
+        # mooncross/cross_ut, which have no dead-band either. (x2cross - lon)
+        # % 360 already maps a just-passed target to ~360, i.e. the next cycle.
         if abs(speed) < 0.0001:
             speed = speed_default
         dt_guess = diff / speed
@@ -1605,6 +1649,9 @@ def helio_cross(
                 jd_bracket_start,
                 jd_bracket_end,
                 num_samples=bracket_samples,
+                # Backward search must return the NEAREST past crossing (the
+                # one adjacent to tjdet), so scan the bracket from the tjdet end.
+                from_end=backwards,
             )
 
             return _brent_find_crossing(
@@ -2105,6 +2152,85 @@ def calc_velocity_at_station(
     return (v_lon, v_lat, v_dist)
 
 
+def _find_previous_station_ut(
+    planet_id: int,
+    jd_ut: float,
+    flag: int = FLG_SWIEPH,
+) -> Tuple[float, str]:
+    """
+    Find the most recent planetary station strictly before ``jd_ut``.
+
+    The backward counterpart of :func:`find_station_ut`: it scans backward from
+    ``jd_ut`` and returns the nearest PAST station (velocity sign change),
+    together with its type. Used by :func:`get_station_info` so a just-passed
+    station can be reported with a negative ``days_to_station``.
+
+    Args:
+        planet_id: Planet ID (MERCURY through PLUTO)
+        jd_ut: Julian Day (UT) to search backward from
+        flag: Calculation flags
+
+    Returns:
+        Tuple[float, str]: (Julian Day of station, station type "SR" or "SD")
+
+    Raises:
+        ValueError: If planet_id is Sun or Moon (never station)
+        Error: If no station is found within the search window
+    """
+    if planet_id in (SUN, MOON):
+        raise ValueError("Sun and Moon do not have retrograde stations")
+
+    # Same synodic periods as find_station_ut. The gap to the previous station
+    # is at most a bit under one synodic period, so scan back a full period.
+    synodic_periods = {
+        2: 116,  # Mercury
+        3: 584,  # Venus
+        4: 780,  # Mars
+        5: 399,  # Jupiter
+        6: 378,  # Saturn
+        7: 370,  # Uranus
+        8: 367,  # Neptune
+        9: 367,  # Pluto
+    }
+    search_window = float(synodic_periods.get(planet_id, 400))
+
+    def get_speed(jd: float) -> float:
+        pos, _ = calc_ut(jd, planet_id, flag | FLG_SPEED)
+        return pos[3]
+
+    # ~2-day resolution keeps us well below the shortest retrograde arc
+    # (Mercury's, ~21 days) so no station pair is stepped over.
+    num_samples = max(60, int(search_window / 2))
+    step = search_window / num_samples
+
+    jd_next = jd_ut
+    speed_next = get_speed(jd_ut)
+
+    for i in range(1, num_samples + 1):
+        jd_curr = jd_ut - i * step
+        speed_curr = get_speed(jd_curr)
+
+        # First velocity sign change scanning backward = nearest past station.
+        if speed_next * speed_curr <= 0:
+            jd_station = _brent_find_station(
+                get_speed, jd_curr, jd_next, STATION_VELOCITY_TOLERANCE
+            )
+
+            speed_before = get_speed(jd_station - 1.0)
+            speed_after = get_speed(jd_station + 1.0)
+            if speed_before > 0 and speed_after < 0:
+                found_type = "SR"  # Stationary Retrograde
+            else:
+                found_type = "SD"  # Stationary Direct
+
+            return (jd_station, found_type)
+
+        jd_next = jd_curr
+        speed_next = speed_curr
+
+    raise Error(f"No previous station found for planet {planet_id}")
+
+
 def get_station_info(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> dict:
     """
     Get comprehensive information about the nearest station.
@@ -2138,23 +2264,22 @@ def get_station_info(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> di
     current_velocity = pos[3]
     current_retrograde = current_velocity < 0
 
-    # Find next station
+    # Find the NEAREST station in either direction. find_station_ut searches
+    # strictly forward, so on its own it never reports a just-passed station;
+    # pair it with the backward search and keep whichever is closer in time.
+    candidates = []  # (jd_station, station_type)
+    forward_error = None
     try:
-        jd_next, stype_next = find_station_ut(planet_id, jd_ut, "any", flag)
-
-        # Get position at station
-        pos_station, _ = calc_ut(jd_next, planet_id, flag)
-
-        return {
-            "jd_station": jd_next,
-            "station_type": stype_next,
-            "days_to_station": jd_next - jd_ut,
-            "longitude_at_station": pos_station[0],
-            "is_currently_retrograde": current_retrograde,
-            "velocity": current_velocity,
-        }
+        candidates.append(find_station_ut(planet_id, jd_ut, "any", flag))
     except (Error, RuntimeError) as e:
-        # Return partial info if station search fails
+        forward_error = e
+    try:
+        candidates.append(_find_previous_station_ut(planet_id, jd_ut, flag))
+    except (Error, RuntimeError) as e:
+        forward_error = forward_error or e
+
+    if not candidates:
+        # Return partial info if both searches fail
         return {
             "jd_station": None,
             "station_type": None,
@@ -2162,5 +2287,19 @@ def get_station_info(planet_id: int, jd_ut: float, flag: int = FLG_SWIEPH) -> di
             "longitude_at_station": None,
             "is_currently_retrograde": current_retrograde,
             "velocity": current_velocity,
-            "error": str(e),
+            "error": str(forward_error),
         }
+
+    # Nearest by absolute time distance. days_to_station is signed: negative
+    # when the nearest station is in the past.
+    jd_station, stype = min(candidates, key=lambda c: abs(c[0] - jd_ut))
+    pos_station, _ = calc_ut(jd_station, planet_id, flag)
+
+    return {
+        "jd_station": jd_station,
+        "station_type": stype,
+        "days_to_station": jd_station - jd_ut,
+        "longitude_at_station": pos_station[0],
+        "is_currently_retrograde": current_retrograde,
+        "velocity": current_velocity,
+    }
