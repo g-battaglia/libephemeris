@@ -460,11 +460,12 @@ class TestSimpleCircularBodies:
         assert a == b
 
     def test_waldemath_position(self):
-        """Waldemath delegates to calc_waldemath (line 3461)."""
+        """Waldemath delegates to calc_waldemath (Koch eccentric+inclined orbit)."""
         lon, lat, dist, dlon, dlat, ddist = calc_waldemath_position(J2000)
         assert 0.0 <= lon < 360.0
         assert dist > 0.0
-        assert lat == 0.0
+        # i = 2.5 deg -> the ecliptic latitude is non-zero (not the old e=i=0 stub).
+        assert abs(lat) > 0.5
 
     def test_proserpina(self):
         """Proserpina propagates a circular orbit (lines 3504-3526)."""

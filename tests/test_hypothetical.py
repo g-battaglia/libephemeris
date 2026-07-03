@@ -1340,337 +1340,84 @@ class TestVulcanTimeDependentElements:
 
 
 class TestWaldemathGeocentricMoon:
+    """Waldemath's hypothetical second moon of Earth (body 58).
+
+    Waldemath is a GEOCENTRIC body using the canonical Koch-reconstructed
+    orbit (D. Koch, from Waldemath's 1898 elements) bundled in
+    data/fictitious_orbits.csv and the reference seorbel dataset: an
+    ECCENTRIC (e=0.1587), INCLINED (i=2.5 deg) orbit referred to the 1898
+    ecliptic/equinox, propagated with per-century rates. (It is NOT the
+    circular, zero-inclination, J2000 approximation used before v3.0.0,
+    which was ~144 deg off in longitude.)
+
+    Reference longitudes below come from an independent ephemeris oracle
+    configured with the canonical seorbel elements (validation only; the
+    oracle is not imported).
     """
-    Tests for Waldemath's hypothetical geocentric moon of Earth.
 
-    CRITICAL: Waldemath Moon is a GEOCENTRIC body (orbits Earth, not Sun).
-    The semi-major axis of 0.0029833 AU represents distance from EARTH, not Sun.
-    If treated as heliocentric, the calculated positions would be completely wrong.
-
-    These tests verify:
-    1. Semi-major axis 0.0029833 AU is interpreted as geocentric distance
-    2. Position calculation produces expected orbital period of ~119 days
-    3. The body is geocentric (orbits Earth) not heliocentric (orbits Sun)
-    """
+    # Reference calc(jd_tt, Waldemath, FLG_SPEED) -> (lon, lat, dist) of date.
+    ORACLE = {
+        2451545.0: (33.298377, -1.244808, 0.0059506),
+        2451575.0: (127.342257, 2.274187, 0.0074868),
+        2469807.5: (85.301034, -1.811749, 0.0079256),
+        2433282.5: (305.402980, 1.495715, 0.0075233),
+        2415020.5: (275.588858, 0.776383, 0.0069718),
+    }
 
     @pytest.mark.unit
-    def test_waldemath_elements_semi_axis_geocentric(self):
-        """
-        Verify Waldemath's semi-major axis is correctly defined as geocentric distance.
+    def test_elements_are_the_koch_orbit(self):
+        from libephemeris.hypothetical import WALDEMATH_ELEMENTS as W
 
-        The semi-major axis of 0.0029833 AU represents the distance from Earth,
-        NOT from the Sun. This value (~446,200 km) places it at about 1.16x the
-        Moon's mean distance from Earth.
-        """
-        from libephemeris.hypothetical import WALDEMATH_ELEMENTS
-
-        # Verify the semi-major axis value
-        assert WALDEMATH_ELEMENTS.a == pytest.approx(0.0029833, rel=1e-6), (
-            f"Waldemath semi-major axis should be 0.0029833 AU, got {WALDEMATH_ELEMENTS.a}"
-        )
-
-        # Verify this is a geocentric distance (much smaller than 1 AU)
-        # If heliocentric, this would be inside the Sun!
-        assert WALDEMATH_ELEMENTS.a < 0.01, (
-            "Waldemath semi-major axis should be << 1 AU (geocentric distance)"
-        )
-
-        # Convert to km and verify it's Earth-orbit scale
-        # 1 AU = 149,597,870.7 km
-        AU_TO_KM = 149597870.7
-        distance_km = WALDEMATH_ELEMENTS.a * AU_TO_KM
-
-        # Should be ~446,200 km (about 1.16x Moon's distance of ~384,400 km)
-        assert 400000 < distance_km < 500000, (
-            f"Waldemath distance {distance_km:.0f} km should be ~446,200 km "
-            "(Earth-satellite scale, not heliocentric)"
-        )
+        assert W.epoch == pytest.approx(2414290.95827875, abs=1e-5)
+        assert W.a == pytest.approx(0.0068400705250028, rel=1e-9)
+        assert W.e == pytest.approx(0.1587, abs=1e-9)
+        assert W.i == pytest.approx(2.5, abs=1e-9)
+        assert W.M0 == pytest.approx(70.3407215, abs=1e-6)
+        assert W.M_rate == pytest.approx(109023.2634989, rel=1e-9)
+        assert W.omega_rate == pytest.approx(2393.47417444, rel=1e-9)
+        assert W.Omega_rate == pytest.approx(-1131.71719709, rel=1e-9)
 
     @pytest.mark.unit
-    def test_waldemath_orbital_period_approximately_119_days(self):
-        """
-        Verify Waldemath Moon has an orbital period of approximately 119 days.
-
-        The period is derived from Kepler's 3rd law for Earth orbits:
-        T = 2*pi*sqrt(a³/GM_Earth)
-
-        For a = 0.0029833 AU = 446,200 km:
-        Period = 2*pi*sqrt((446,200)³ / 398600.4) / 86400 ≈ 119 days
-        """
-        from libephemeris.hypothetical import WALDEMATH_ELEMENTS
-
-        # Calculate orbital period from mean motion
-        # n = 360 / period_days, so period_days = 360 / n
-        period_days = 360.0 / WALDEMATH_ELEMENTS.n
-
-        # Period should be approximately 119 days
-        assert period_days == pytest.approx(119, rel=0.01), (
-            f"Waldemath orbital period should be ~119 days, got {period_days:.2f} days"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_mean_motion_correct(self):
-        """
-        Verify Waldemath's mean motion is consistent with ~119 day period.
-
-        Mean motion n = 360 / period = 360 / 119 ≈ 3.025 degrees/day
-        """
-        from libephemeris.hypothetical import WALDEMATH_ELEMENTS
-
-        # Expected mean motion for 119-day period
-        expected_n = 360.0 / 119.0  # ≈ 3.025 deg/day
-
-        assert WALDEMATH_ELEMENTS.n == pytest.approx(expected_n, rel=0.01), (
-            f"Waldemath mean motion should be ~{expected_n:.3f} deg/day, "
-            f"got {WALDEMATH_ELEMENTS.n:.6f} deg/day"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_distance_is_geocentric_not_heliocentric(self):
-        """
-        Verify calc_waldemath returns geocentric distance (Earth-Waldemath),
-        NOT heliocentric distance (Sun-Waldemath).
-
-        A heliocentric interpretation of 0.0029833 AU would place the body
-        inside the Sun (at ~446,000 km from Sun's center, well within the
-        Sun's radius of 696,000 km). This is obviously wrong.
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
-
-        # Get position at J2000
-        lon, lat, dist, dlon, dlat, ddist = calc_waldemath(J2000)
-
-        # Distance returned should be the geocentric distance
-        assert dist == pytest.approx(WALDEMATH_ELEMENTS.a, rel=1e-6), (
-            f"Waldemath distance should be geocentric ({WALDEMATH_ELEMENTS.a} AU), "
-            f"got {dist} AU"
-        )
-
-        # Verify distance is much less than 1 AU (clearly Earth-satellite scale)
-        assert dist < 0.01, (
-            f"Waldemath distance should be << 1 AU (geocentric), got {dist} AU"
-        )
-
-        # If this were heliocentric, the distance would be ~1 AU (Earth's orbit)
-        # or at least some reasonable heliocentric distance
-        assert dist < 0.1, (
-            "Distance confirms geocentric reference frame (not heliocentric)"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_completes_orbit_in_119_days(self):
-        """
-        Verify Waldemath Moon returns to approximately the same position after 119 days.
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
-
-        # Calculate position at J2000
-        lon_start, _, _, _, _, _ = calc_waldemath(J2000)
-
-        # Calculate expected orbital period
-        period_days = 360.0 / WALDEMATH_ELEMENTS.n
-
-        # Calculate position after one orbital period
-        lon_end, _, _, _, _, _ = calc_waldemath(J2000 + period_days)
-
-        # Should return to within a few degrees of starting position
-        delta = abs(lon_end - lon_start)
-        if delta > 180:
-            delta = 360 - delta
-
-        assert delta < 2.0, (
-            f"Waldemath after one orbit: start={lon_start:.4f}, "
-            f"end={lon_end:.4f}, delta={delta:.4f} deg (should be ~0)"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_velocity_matches_geocentric_orbit(self):
-        """
-        Verify Waldemath's angular velocity is consistent with a geocentric orbit.
-
-        For a 119-day geocentric orbit, the mean motion is ~3.025 deg/day.
-        This is MUCH faster than any heliocentric body would move at 0.003 AU
-        (which would be inside the Sun anyway).
-        """
+    def test_geocentric_earth_satellite_scale(self):
         from libephemeris.hypothetical import calc_waldemath
 
-        # Get velocity at J2000
-        lon, lat, dist, dlon, dlat, ddist = calc_waldemath(J2000)
-
-        # Expected mean motion for 119-day period
-        expected_n = 360.0 / 119.0  # ≈ 3.025 deg/day
-
-        assert dlon == pytest.approx(expected_n, rel=0.01), (
-            f"Waldemath velocity {dlon:.4f} deg/day should match "
-            f"geocentric orbital velocity ~{expected_n:.4f} deg/day"
-        )
-
-        # Compare to heliocentric bodies:
-        # - Mercury (0.387 AU): ~4.09 deg/day (fastest planet)
-        # - Neptune (30 AU): ~0.006 deg/day (slowest major planet)
-        # Waldemath at 0.003 AU heliocentric would imply ~67 deg/day!
-        # Our ~3 deg/day proves it's geocentric, not heliocentric
+        # Geocentric distance stays well inside Earth-satellite scale
+        # (a few thousandths of an AU), never near 1 AU (heliocentric).
+        for jd in (J2000, J2000 + 30, J2000 + 60):
+            _, _, dist, _, _, _ = calc_waldemath(jd)
+            assert 0.003 < dist < 0.02
 
     @pytest.mark.unit
-    def test_waldemath_longitude_at_j2000_epoch(self):
-        """
-        Verify Waldemath's longitude at J2000 equals the mean longitude at epoch.
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
+    def test_orbit_is_eccentric_and_inclined(self):
+        from libephemeris.hypothetical import calc_waldemath
 
-        # At epoch (J2000), the longitude should equal L0
-        lon, lat, dist, dlon, dlat, ddist = calc_waldemath(WALDEMATH_ELEMENTS.epoch)
-
-        assert lon == pytest.approx(WALDEMATH_ELEMENTS.L0, abs=0.0001), (
-            f"Waldemath longitude at epoch should be {WALDEMATH_ELEMENTS.L0:.4f}, "
-            f"got {lon:.4f}"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_longitude_after_one_day(self):
-        """
-        Verify Waldemath's longitude increases by mean motion after one day.
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
-
-        lon1, _, _, _, _, _ = calc_waldemath(J2000)
-        lon2, _, _, _, _, _ = calc_waldemath(J2000 + 1)
-
-        # Change should equal mean motion
-        delta = lon2 - lon1
-        if delta < -180:
-            delta += 360
-        elif delta > 180:
-            delta -= 360
-
-        assert delta == pytest.approx(WALDEMATH_ELEMENTS.n, abs=0.0001), (
-            f"Waldemath daily motion should be {WALDEMATH_ELEMENTS.n:.6f}, "
-            f"got {delta:.6f}"
-        )
+        dists, lats = [], []
+        for k in range(0, 120, 10):
+            _, lat, dist, _, _, _ = calc_waldemath(J2000 + k)
+            dists.append(dist)
+            lats.append(lat)
+        # e=0.1587 -> the geocentric distance must vary across the orbit.
+        assert max(dists) - min(dists) > 0.002
+        # i=2.5 deg -> the ecliptic latitude must oscillate off the ecliptic.
+        assert max(lats) > 1.0 and min(lats) < -1.0
 
     @pytest.mark.unit
-    def test_waldemath_circular_orbit_constant_distance(self):
-        """
-        Verify Waldemath maintains constant distance (circular orbit, e=0).
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
+    def test_period_about_120_days(self):
+        from libephemeris.hypothetical import WALDEMATH_ELEMENTS as W
 
-        # Check distance at multiple points in orbit
-        test_dates = [J2000, J2000 + 30, J2000 + 60, J2000 + 90, J2000 + 119]
-
-        for jd in test_dates:
-            _, _, dist, _, _, ddist = calc_waldemath(jd)
-
-            # Distance should always equal semi-major axis for e=0
-            assert dist == pytest.approx(WALDEMATH_ELEMENTS.a, rel=1e-6), (
-                f"Waldemath distance at JD {jd} should be constant "
-                f"(circular orbit), got {dist} AU"
-            )
-
-            # Distance change rate should be zero for circular orbit
-            assert ddist == 0.0, (
-                f"Waldemath ddist should be 0 for circular orbit, got {ddist}"
-            )
+        period_days = 360.0 / W.n
+        assert period_days == pytest.approx(120.6, rel=0.02)
 
     @pytest.mark.unit
-    def test_waldemath_on_ecliptic(self):
-        """
-        Verify Waldemath has zero inclination (orbits in ecliptic plane).
-        """
-        from libephemeris.hypothetical import calc_waldemath, WALDEMATH_ELEMENTS
+    def test_position_matches_reference_oracle(self):
+        """Full pipeline (of date + nutation) is 1:1 with the reference to
+        sub-arcsecond in longitude across a century."""
+        import libephemeris as le
+        from libephemeris.constants import FLG_SPEED, WALDEMATH
 
-        # Verify inclination is zero
-        assert WALDEMATH_ELEMENTS.i == 0.0, (
-            f"Waldemath inclination should be 0, got {WALDEMATH_ELEMENTS.i}"
-        )
-
-        # Verify latitude is always zero
-        test_dates = [J2000, J2000 + 30, J2000 + 60, J2000 + 90, J2000 + 119]
-
-        for jd in test_dates:
-            _, lat, _, _, dlat, _ = calc_waldemath(jd)
-
-            assert lat == 0.0, f"Waldemath latitude should be 0, got {lat}"
-            assert dlat == 0.0, f"Waldemath dlat should be 0, got {dlat}"
-
-    @pytest.mark.unit
-    def test_waldemath_differs_from_heliocentric_interpretation(self):
-        """
-        Demonstrate that geocentric Waldemath position differs from
-        what a heliocentric interpretation would produce.
-
-        If Waldemath were heliocentric at 0.003 AU:
-        - It would be inside the Sun (Sun's radius is ~0.00465 AU)
-        - Its period would be ~0.05 days (about 1 hour!)
-        - It would move ~7200 deg/day (not ~3 deg/day)
-
-        This test confirms our implementation uses geocentric mechanics.
-        """
-        from libephemeris.hypothetical import WALDEMATH_ELEMENTS
-
-        # Heliocentric period (Kepler's 3rd law): T = a^1.5 years
-        # For a = 0.0029833 AU: T = 0.0029833^1.5 = 0.000163 years = 0.059 days
-        heliocentric_period_years = WALDEMATH_ELEMENTS.a**1.5
-        heliocentric_period_days = heliocentric_period_years * 365.25
-
-        # Geocentric period from our elements
-        geocentric_period_days = 360.0 / WALDEMATH_ELEMENTS.n
-
-        # These should be VERY different
-        # Heliocentric: ~0.059 days, Geocentric: ~119 days
-        assert heliocentric_period_days < 0.1, (
-            f"Heliocentric interpretation would give period of "
-            f"{heliocentric_period_days:.4f} days (inside the Sun!)"
-        )
-
-        assert geocentric_period_days > 100, (
-            f"Geocentric period is {geocentric_period_days:.2f} days "
-            "(reasonable for Earth satellite)"
-        )
-
-        # The ratio should be about 2000x different
-        ratio = geocentric_period_days / heliocentric_period_days
-        assert ratio > 1000, (
-            f"Geocentric period is {ratio:.0f}x longer than heliocentric would be, "
-            "confirming geocentric interpretation is used"
-        )
-
-    @pytest.mark.unit
-    def test_waldemath_distance_earth_satellite_scale(self):
-        """
-        Verify Waldemath's distance is on the scale of Earth satellites/Moon.
-
-        Key reference distances:
-        - Moon's mean distance: 384,400 km = 0.00257 AU
-        - Waldemath distance: 446,200 km = 0.00298 AU
-        - Earth's radius: 6,371 km
-        - Sun's radius: 696,000 km = 0.00465 AU
-
-        Waldemath at 0.003 AU is about 1.16x the Moon's distance, clearly
-        a geocentric satellite, not a heliocentric body.
-        """
-        from libephemeris.hypothetical import WALDEMATH_ELEMENTS
-
-        # 1 AU in km
-        AU_TO_KM = 149597870.7
-
-        # Moon's mean distance
-        moon_distance_au = 384400 / AU_TO_KM  # ~0.00257 AU
-
-        # Waldemath is about 1.16x Moon's distance
-        ratio_to_moon = WALDEMATH_ELEMENTS.a / moon_distance_au
-
-        assert 1.0 < ratio_to_moon < 1.5, (
-            f"Waldemath is at {ratio_to_moon:.2f}x Moon's distance, "
-            "confirming Earth-satellite scale"
-        )
-
-        # Sun's radius in AU
-        sun_radius_au = 696000 / AU_TO_KM  # ~0.00465 AU
-
-        # Waldemath's distance is LESS than Sun's radius
-        # This proves it cannot be heliocentric (would be inside Sun)
-        assert WALDEMATH_ELEMENTS.a < sun_radius_au, (
-            f"Waldemath at {WALDEMATH_ELEMENTS.a} AU would be INSIDE "
-            f"the Sun ({sun_radius_au:.5f} AU radius) if heliocentric!"
-        )
+        for jd, (olon, olat, odist) in self.ORACLE.items():
+            xx, _ = le.calc(jd, WALDEMATH, FLG_SPEED)
+            dlon = ((xx[0] - olon + 180.0) % 360.0) - 180.0
+            assert abs(dlon) < 5e-3, f"jd={jd} lon {xx[0]:.5f} vs {olon:.5f}"
+            assert abs(xx[1] - olat) < 5e-3, f"jd={jd} lat {xx[1]:.5f} vs {olat:.5f}"
+            assert abs(xx[2] - odist) < 5e-6, f"jd={jd} dist {xx[2]} vs {odist}"

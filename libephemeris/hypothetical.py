@@ -1049,14 +1049,19 @@ class WaldemathElements:
 
     Attributes:
         name: Name of the body
-        epoch: Reference epoch (Julian Day TT) - J2000.0
+        epoch: Reference epoch (Julian Day TT) of the elements.
         a: Semi-major axis (AU) - geocentric distance from Earth
-        e: Eccentricity (0 for circular orbit)
+        e: Eccentricity
         i: Inclination (degrees)
-        omega: Argument of perihelion (degrees)
-        Omega: Longitude of ascending node (degrees)
-        L0: Mean longitude at epoch (degrees)
+        omega: Argument of perihelion at epoch (degrees)
+        Omega: Longitude of ascending node at epoch (degrees)
+        L0: Mean longitude at epoch (degrees) = M0 + omega + Omega
         n: Mean motion (degrees per day)
+        M0: Mean anomaly at epoch (degrees)
+        M_rate: Mean-anomaly rate (degrees per Julian century)
+        omega_rate: Argument-of-perihelion rate (degrees per Julian century)
+        Omega_rate: Node rate (degrees per Julian century)
+        equinox: Equinox/ecliptic JD the elements are referred to (0 -> epoch)
     """
 
     name: str
@@ -1068,6 +1073,11 @@ class WaldemathElements:
     Omega: float
     L0: float
     n: float
+    M0: float = 0.0
+    M_rate: float = 0.0
+    omega_rate: float = 0.0
+    Omega_rate: float = 0.0
+    equinox: float = 0.0
 
 
 # Waldemath Moon orbital elements
@@ -1075,23 +1085,28 @@ class WaldemathElements:
 # Epoch J2000.0 (JD 2451545.0); a=0.0029833 AU, geocentric circular orbit
 #
 # Mean motion calculation:
-# For a geocentric orbit, period = 2*pi*sqrt(a³/mu) where mu = GM_Earth
-# a = 0.0029833 AU = 446,200 km
-# GM_Earth = 398600.4 km³/s²
-# Period ≈ 119 days
-# n = 360 / 119 ≈ 3.025 deg/day
+# Canonical Koch-reconstructed geocentric orbit (D. Koch, from Waldemath's
+# 1898 published values), as bundled in data/fictitious_orbits.csv and the
+# reference seorbel dataset. The elements are referred to the ecliptic and
+# equinox of the 1898 epoch and are propagated with per-century rates, so the
+# orbit is eccentric (e=0.1587) and inclined (i=2.5 deg) - NOT the circular
+# J2000 approximation used previously (which was ~144 deg off in longitude).
+# Mean motion n = M_rate / 36525 = 2.9849 deg/day (period ~120.6 days).
 WALDEMATH_ELEMENTS = WaldemathElements(
     name="Waldemath",
-    epoch=2451545.0,  # J2000.0
-    a=0.0029833,  # Semi-major axis in AU (geocentric distance)
-    e=0.0,  # Circular orbit
-    i=0.0,  # On ecliptic plane
-    omega=0.0,  # Irrelevant for e=0
-    Omega=0.0,  # Assumed zero ascending node
-    L0=248.8833,  # Mean longitude at J2000.0 (degrees)
-    # Mean motion derived from orbital period of ~119 days
-    # n = 360 / 119 ≈ 3.025 deg/day
-    n=3.024873,  # degrees per day
+    epoch=2414290.95827875,  # 1898 element epoch (JD TT)
+    a=0.0068400705250028,  # Semi-major axis (AU, geocentric)
+    e=0.1587,  # Eccentricity
+    i=2.5,  # Inclination (degrees)
+    omega=8.14049594,  # Argument of perihelion at epoch (degrees)
+    Omega=136.24878256,  # Ascending node at epoch (degrees)
+    L0=(70.3407215 + 8.14049594 + 136.24878256) % 360.0,  # mean longitude
+    n=109023.2634989 / 36525.0,  # Mean motion (degrees/day)
+    M0=70.3407215,  # Mean anomaly at epoch (degrees)
+    M_rate=109023.2634989,  # deg / Julian century
+    omega_rate=2393.47417444,  # deg / Julian century
+    Omega_rate=-1131.71719709,  # deg / Julian century
+    equinox=2414290.95827875,  # elements referred to the 1898 ecliptic/equinox
 )
 
 
@@ -3154,15 +3169,20 @@ def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, flo
     - The second focus of the lunar orbit
 
     Waldemath claimed to have observed this body in 1898, describing it as a dark
-    moon with an orbital period of approximately 119 days.
+    moon with an orbital period of approximately 120 days.
 
-    Orbital elements:
-        - Epoch: J2000.0 (JD 2451545.0)
-        - Semi-major axis: 0.0029833 AU (~446,200 km, ~1.16x Moon distance)
-        - Eccentricity: 0.0 (circular orbit)
-        - Inclination: 0.0 degrees (on ecliptic)
-        - Mean longitude at epoch: 248.8833 degrees
-        - Orbital period: ~119 days
+    Uses the canonical Koch-reconstructed geocentric Keplerian orbit
+    (``WALDEMATH_ELEMENTS``, from data/fictitious_orbits.csv), propagated with
+    per-century rates and precessed from the 1898 element equinox to the mean
+    ecliptic of date. Matches the reference to sub-arcsecond in longitude.
+
+    Orbital elements (1898 epoch):
+        - Epoch: JD 2414290.95828 (1898)
+        - Semi-major axis: 0.006840 AU (geocentric)
+        - Eccentricity: 0.1587
+        - Inclination: 2.5 degrees
+        - Mean anomaly at epoch: 70.3407 degrees (+ per-century rate)
+        - Orbital period: ~120.6 days
 
     Args:
         jd_tt: Julian Day in Terrestrial Time (TT)
@@ -3170,38 +3190,68 @@ def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, flo
     Returns:
         Tuple of (longitude, latitude, distance, dlon, dlat, ddist)
             - longitude: Geocentric ecliptic longitude in degrees (0-360)
-            - latitude: Ecliptic latitude in degrees (0 for circular ecliptic orbit)
+            - latitude: Ecliptic latitude in degrees
             - distance: Distance from Earth in AU
             - dlon: Daily longitude change in degrees/day
-            - dlat: Daily latitude change in degrees/day (0)
-            - ddist: Daily distance change in AU/day (0 for circular orbit)
+            - dlat: Daily latitude change in degrees/day
+            - ddist: Daily distance change in AU/day
 
     Example:
         >>> from libephemeris.hypothetical import calc_waldemath
         >>> pos = calc_waldemath(2451545.0)  # J2000.0
         >>> print(f"Waldemath at {pos[0]:.4f} deg, distance {pos[2]:.6f} AU")
     """
-    elements = WALDEMATH_ELEMENTS
+    from .astrometry import _precess_ecliptic
 
-    # Time since epoch in days
-    dt = jd_tt - elements.epoch
+    el = WALDEMATH_ELEMENTS
+    equinox = el.equinox or el.epoch
 
-    # For a circular orbit (e = 0), mean longitude = true longitude
-    # Simply propagate the mean longitude
-    longitude = (elements.L0 + elements.n * dt) % 360.0
+    def _raw(jd: float) -> Tuple[float, float, float]:
+        """Geocentric mean-ecliptic-of-date (lon, lat, dist) at jd_tt."""
+        # Elements propagated with per-century rates (T in Julian centuries).
+        t_cy = (jd - el.epoch) / 36525.0
+        m_rad = math.radians((el.M0 + el.M_rate * t_cy) % 360.0)
+        omega = math.radians((el.omega + el.omega_rate * t_cy) % 360.0)
+        node = math.radians((el.Omega + el.Omega_rate * t_cy) % 360.0)
 
-    # Waldemath is assumed to be on the ecliptic (zero inclination)
-    latitude = 0.0
+        ecc_anom = _solve_kepler_equation(m_rad, el.e)
+        nu = 2.0 * math.atan(
+            math.sqrt((1.0 + el.e) / (1.0 - el.e)) * math.tan(ecc_anom / 2.0)
+        )
+        r = el.a * (1.0 - el.e * math.cos(ecc_anom))
 
-    # Distance is constant for circular orbit (equal to semi-major axis)
-    distance = elements.a
+        # Argument of latitude and rotation into the ecliptic of the elements.
+        u = nu + omega
+        i_rad = math.radians(el.i)
+        x_orb = r * math.cos(u)
+        y_orb = r * math.sin(u)
+        cos_i, sin_i = math.cos(i_rad), math.sin(i_rad)
+        cos_node, sin_node = math.cos(node), math.sin(node)
+        x_ecl = cos_node * x_orb - sin_node * cos_i * y_orb
+        y_ecl = sin_node * x_orb + cos_node * cos_i * y_orb
+        z_ecl = sin_i * y_orb
 
-    # Daily motion is simply the mean motion for circular orbit
-    dlon = elements.n
+        lon = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
+        lat = math.degrees(math.asin(max(-1.0, min(1.0, z_ecl / r)))) if r > 0 else 0.0
+        # The elements are referred to the 1898 ecliptic/equinox; precess the
+        # geocentric direction to the mean ecliptic of date (the frame the
+        # dispatcher expects, before it adds nutation).
+        lon, lat = _precess_ecliptic(lon, lat, equinox, jd)
+        return lon, lat, r
 
-    # No latitude or distance change for circular orbit on ecliptic
-    dlat = 0.0
-    ddist = 0.0
+    longitude, latitude, distance = _raw(jd_tt)
+
+    # Velocity via central-difference numerical differentiation (1 s step).
+    dt_step = 1.0 / 86400.0
+    prev = _raw(jd_tt - dt_step)
+    nxt = _raw(jd_tt + dt_step)
+    dlon = (nxt[0] - prev[0]) / (2.0 * dt_step)
+    if dlon > 180.0 / (2.0 * dt_step):
+        dlon -= 360.0 / (2.0 * dt_step)
+    elif dlon < -180.0 / (2.0 * dt_step):
+        dlon += 360.0 / (2.0 * dt_step)
+    dlat = (nxt[1] - prev[1]) / (2.0 * dt_step)
+    ddist = (nxt[2] - prev[2]) / (2.0 * dt_step)
 
     return (longitude, latitude, distance, dlon, dlat, ddist)
 
