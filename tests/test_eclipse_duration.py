@@ -102,23 +102,27 @@ class TestSolarEclipseDurationTotalEclipses:
             f"Duration {duration:.2f} min is outside reasonable range (1-300 min)"
         )
 
-    def test_total_eclipse_duration_consistency(self):
-        """Test that duration equals C3 - C2 in minutes."""
+    def test_total_eclipse_duration_is_local_totality(self):
+        """Duration is the central-line totality (minutes), not the global
+        umbra-path duration (hours).
+
+        calc_solar_eclipse_duration reports the duration of totality at the
+        point of greatest eclipse (max ~7.5 min), NOT (global C3 - C2), which
+        is the hours-long span the umbra sweeps across Earth (U1 -> U4).
+        """
         jd_start = julday(2024, 1, 1, 0.0)
         _, times = sol_eclipse_when_glob(jd_start, ecltype=ECL_TOTAL)
         jd_max = times[0]
 
         duration = calc_solar_eclipse_duration(jd_max)
+        # Physically-bounded totality duration (2024-04-08 is ~4.5 min).
+        assert 0.0 < duration < 8.0, f"totality duration {duration:.4f} min"
+
+        # It must be far smaller than the global U1->U4 path duration (hours).
         jd_c2 = calc_eclipse_second_contact_c2(jd_max)
         jd_c3 = calc_eclipse_third_contact_c3(jd_max)
-
-        # Calculate expected duration from contact times
-        expected_duration = (jd_c3 - jd_c2) * 24.0 * 60.0
-
-        # Durations should match exactly
-        assert abs(duration - expected_duration) < 0.001, (
-            f"Duration {duration:.4f} should equal (C3 - C2) {expected_duration:.4f}"
-        )
+        path_duration = (jd_c3 - jd_c2) * 24.0 * 60.0
+        assert duration < path_duration
 
 
 class TestSolarEclipseDurationAnnularEclipses:

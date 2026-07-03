@@ -1449,8 +1449,13 @@ def _calc_umbra_limit(jd: float) -> float:
     sun_dist_km = sun_dist_au * AU_TO_KM
     moon_dist_km = moon_dist_au * AU_TO_KM
 
-    # Umbral cone half-angle
-    f2 = math.atan((SUN_RADIUS_KM - MOON_RADIUS_KM) / sun_dist_km)
+    # Umbral cone half-angle. The cone is subtended by the difference of the
+    # solar and lunar radii over the Sun-Moon distance (NOT the Earth-Sun
+    # distance): this matches the sibling Besselian models (_besselian_core,
+    # _eclipse_where_core), which use the Sun-to-Moon separation. Using the
+    # Earth-Sun distance here left l2 ~0.0006-0.0008 Earth radii off.
+    sun_moon_dist_km = sun_dist_km - moon_dist_km
+    f2 = math.atan((SUN_RADIUS_KM - MOON_RADIUS_KM) / sun_moon_dist_km)
 
     # Distance from Moon to umbra vertex
     umbra_vertex_km = MOON_RADIUS_KM / math.tan(f2) if f2 > 1e-10 else float("inf")
@@ -2115,17 +2120,26 @@ def _sol_eclipse_when_glob_pythonic(
     Returns:
         Tuple containing (matching reference API format):
             - retflag: Eclipse type flags bitmask (ECL_* constants)
-            - tret: Tuple of 10 floats with eclipse phase times (JD UT):
+            - tret: Tuple of 10 floats with eclipse phase times (JD UT),
+              matching the reference sol_eclipse_when_glob() layout (these
+              are GLOBAL instants for the whole Earth, not observer-local
+              contacts):
                 [0]: Time of maximum eclipse
-                [1]: Time of first contact (partial begins)
-                [2]: Time of second contact (central phase begins, or 0)
-                [3]: Time of third contact (central phase ends, or 0)
-                [4]: Time of fourth contact (partial ends)
-                [5]: Time of sunrise on central line (or 0)
-                [6]: Time of sunset on central line (or 0)
-                [7]: Time when annular-total eclipse starts (or 0)
-                [8]: Time when annular-total eclipse ends (or 0)
-                [9]: Reserved (0)
+                [1]: Time when the eclipse is central at local apparent noon
+                [2]: Time when the eclipse begins (penumbra first touches
+                     Earth anywhere; 0 if not found)
+                [3]: Time when the eclipse ends (penumbra last leaves Earth
+                     anywhere; 0 if not found)
+                [4]: Time when totality/annularity begins anywhere on Earth
+                     (umbra/antumbra first touches Earth; 0 if none)
+                [5]: Time when totality/annularity ends anywhere on Earth
+                     (umbra/antumbra last leaves Earth; 0 if none)
+                [6]: Time when the central line begins (0 if none)
+                [7]: Time when the central line ends (0 if none)
+                [8]: Time when a hybrid (annular-total) eclipse becomes
+                     total (0; not implemented)
+                [9]: Time when a hybrid (annular-total) eclipse becomes
+                     annular again (0; not implemented)
 
     Raises:
         Error: If no eclipse found within search limit
@@ -5885,10 +5899,12 @@ def lun_occult_when_loc(
                 [2]: Time of second contact (full occultation begins, or 0)
                 [3]: Time of third contact (full occultation ends, or 0)
                 [4]: Time of fourth contact (occultation ends)
-                [5]: Reserved (0)
-                [6]: Reserved (0)
-                [7]: Time of moonrise (if Moon rises during occultation, else 0)
-                [8]: Time of moonset (if Moon sets during occultation, else 0)
+                [5]: Time the occulted body rises, if it rises between first
+                     and fourth contact (else 0)
+                [6]: Time the occulted body sets, if it sets between first
+                     and fourth contact (else 0)
+                [7]: Reserved (0)
+                [8]: Reserved (0)
                 [9]: Reserved (0)
             - attr: Tuple of 20 floats with occultation attributes:
                 [0]: Fraction of target diameter covered by Moon (magnitude)
@@ -10390,9 +10406,11 @@ def calc_solar_eclipse_duration(
     Calculate the duration of totality or annularity for a solar eclipse.
 
     For central solar eclipses (total or annular), this function calculates
-    the duration of the central phase - the time between second contact (C2)
-    and third contact (C3). This represents the length of time the umbral
-    (total) or antumbral (annular) shadow touches Earth's surface.
+    the maximum duration of the central phase on the central line - the local
+    time between second contact (C2) and third contact (C3) at the point of
+    greatest eclipse. This is the length of time an observer at the shadow
+    center sees totality (total eclipse) or annularity (annular eclipse), and
+    is a few minutes long.
 
     For non-central eclipses (partial only), the function returns 0.0 since
     there is no totality or annularity phase.
@@ -10400,8 +10418,9 @@ def calc_solar_eclipse_duration(
     Args:
         jd_max: Julian Day (UT) of eclipse maximum. This should be the time
                 of greatest eclipse, which can be obtained from _sol_eclipse_when_glob_pythonic()
-                or _sol_eclipse_when_loc_pythonic(). The function calculates C2 and C3
-                relative to this time.
+                or _sol_eclipse_when_loc_pythonic(). The function locates the
+                central-line point at this time and computes the local C2 and
+                C3 there.
         flags: Calculation flags (FLG_SWIEPH by default). Controls which
                ephemeris to use for the underlying calculations.
 
@@ -10412,13 +10431,15 @@ def calc_solar_eclipse_duration(
         - The input time is not near a valid solar eclipse
 
     Algorithm:
-        1. Calculate second contact C2 (when central phase begins)
-        2. Calculate third contact C3 (when central phase ends)
+        1. Locate the central-line (shadow-center) point at maximum eclipse
+           via sol_eclipse_where()
+        2. Compute the local second (C2) and third (C3) contact times at that
+           point via _calculate_local_eclipse_phases()
         3. Return (C3 - C2) converted from days to minutes
 
     Precision:
-        The calculation achieves timing precision better than 1 second,
-        resulting in duration precision of approximately ±0.03 minutes (±2 seconds).
+        The central-line duration matches the reference local maximum-eclipse
+        duration to within about ±0.05 minutes (±3 seconds).
 
     Example:
         >>> from libephemeris import julday, _sol_eclipse_when_glob_pythonic
@@ -10432,13 +10453,13 @@ def calc_solar_eclipse_duration(
         >>> print(f"Duration of totality: {duration:.2f} minutes")
 
     Note:
-        - This is the global duration (time umbra/antumbra is on Earth anywhere)
-        - Local duration at a specific observer location is typically shorter
-        - For local eclipse duration, use _sol_eclipse_when_loc_pythonic() which provides
-          contact times for the specific location
+        - This is the central-line maximum duration (as seen from the point of
+          greatest eclipse), the same quantity the reference reports as the
+          local maximum-eclipse duration
+        - Duration at other observer locations on the path is typically shorter;
+          for a specific location use _sol_eclipse_when_loc_pythonic()
         - Total solar eclipses can have central durations up to ~7.5 minutes
         - Annular eclipses can have central durations up to ~12 minutes
-        - The global duration is always longer than any local duration
 
     See Also:
         - calc_eclipse_second_contact_c2: Calculate C2 (central phase begins)
@@ -10453,18 +10474,33 @@ def calc_solar_eclipse_duration(
         - Espenak & Meeus "Five Millennium Canon of Solar Eclipses"
         - Explanatory Supplement to the Astronomical Almanac (2013), Ch. 11
     """
-    # Calculate C2 (second contact - central phase begins)
-    jd_c2 = calc_eclipse_second_contact_c2(jd_max, flags=flags)
-
-    # Check if central phase exists
-    if jd_c2 == 0.0:
+    # The central-line maximum duration of totality/annularity is the
+    # LOCAL second-to-third-contact interval at the point of greatest
+    # eclipse (the shadow-center point on the central line), which is what
+    # this function's docstring promises (~minutes).
+    #
+    # calc_eclipse_second_contact_c2 / calc_eclipse_third_contact_c3 return
+    # the GLOBAL U1/U4 instants — when the umbra/antumbra first and last
+    # touches Earth ANYWHERE — whose difference is the hours-long shadow-
+    # path duration, not the local totality duration. Using them here made
+    # this function return path duration in hours instead of the promised
+    # minutes-long central-line duration.
+    retflag, geopos, _attr = sol_eclipse_where(jd_max, flags)
+    if not (retflag & ECL_CENTRAL):
+        # Partial or non-central eclipse: there is no central line and so
+        # no totality/annularity duration.
         return 0.0
 
-    # Calculate C3 (third contact - central phase ends)
-    jd_c3 = calc_eclipse_third_contact_c3(jd_max, flags=flags)
+    center_lon = geopos[0]
+    center_lat = geopos[1]
 
-    # Check if C3 was found
-    if jd_c3 == 0.0:
+    # Local circumstances on the central line at the shadow-center point.
+    local = _calculate_local_eclipse_phases(jd_max, center_lat, center_lon, 0.0)
+    jd_c2 = local[2]  # local second contact (central phase begins)
+    jd_c3 = local[3]  # local third contact (central phase ends)
+
+    # Second/third contact only exist for a central eclipse at this point.
+    if jd_c2 <= 0.0 or jd_c3 <= 0.0:
         return 0.0
 
     # Calculate duration in minutes (C3 - C2) * 24 hours * 60 minutes
@@ -11317,9 +11353,12 @@ def calc_eclipse_central_line(
         >>> # Find April 8, 2024 total solar eclipse
         >>> jd = julday(2024, 1, 1, 0.0)
         >>> ecl_type, times_ecl = _sol_eclipse_when_glob_pythonic(jd)
-        >>> jd_c1, jd_c4 = times_ecl[1], times_ecl[4]  # First and fourth contacts
+        >>> # Bound the path by when totality/annularity begins (U1, tret[4])
+        >>> # and ends (U4, tret[5]) anywhere on Earth -- the span over which
+        >>> # the central line exists (see _sol_eclipse_when_glob_pythonic).
+        >>> jd_u1, jd_u4 = times_ecl[4], times_ecl[5]
         >>> # Calculate central line path
-        >>> times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=5.0)
+        >>> times, lats, lons = calc_eclipse_central_line(jd_u1, jd_u4, step_minutes=5.0)
         >>> for i in range(len(times)):
         ...     print(f"JD {times[i]:.5f}: lat={lats[i]:.2f}°, lon={lons[i]:.2f}°")
 
@@ -12866,8 +12905,22 @@ def planet_occult_when_glob(
         target_ra1, target_dec1, _ = _get_target_position(jd_max - dt_test)
         target_ra2, target_dec2, _ = _get_target_position(jd_max + dt_test)
 
-        # Relative motion
+        # Relative motion. The RA differences are measured in degrees along
+        # the equator; they must be scaled by cos(dec) to become true angular
+        # displacements on the sky before being combined with the declination
+        # component (which is already a true angular chord). Without this
+        # factor the relative speed is overestimated at non-zero declination
+        # (by 1/cos(dec)), which makes the derived contact times too short and
+        # inconsistent with the great-circle separations used for min_sep and
+        # the thresholds. At dec = 0, cos(dec) = 1 and behaviour is unchanged.
+        mean_dec_rad = math.radians(
+            (occ_dec1 + occ_dec2 + target_dec1 + target_dec2) / 4.0
+        )
+        cos_dec = math.cos(mean_dec_rad)
         d_ra = (occ_ra2 - occ_ra1) - (target_ra2 - target_ra1)
+        # Normalize the RA difference across the 0h/24h (0/360 deg) wrap.
+        d_ra = (d_ra + 180.0) % 360.0 - 180.0
+        d_ra *= cos_dec
         d_dec = (occ_dec2 - occ_dec1) - (target_dec2 - target_dec1)
         relative_speed = math.sqrt(d_ra**2 + d_dec**2) / (2 * dt_test)
 
