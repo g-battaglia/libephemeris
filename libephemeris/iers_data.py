@@ -506,18 +506,21 @@ def _parse_finals_data(filepath: str) -> dict[float, IERSDataPoint]:
                 month = int(line[2:4].strip())
                 day = int(line[4:6].strip())
 
-                # Convert 2-digit year to 4-digit
-                # Assuming data from 1973-2099
-                if year_2digit >= 73:
-                    year = 1900 + year_2digit
-                else:
-                    year = 2000 + year_2digit
-
                 # Parse MJD
                 mjd_str = line[7:15].strip()
                 if not mjd_str:
                     continue
                 mjd = float(mjd_str)
+
+                # Convert 2-digit year to 4-digit using the MJD, per the IERS
+                # finals2000A readme -- NOT a fixed 2-digit-year pivot. A pivot
+                # such as ">= 73 -> 1900s" misdates every row from 2073 onward
+                # (2073 would decode as 1973). MJD 51544.0 = 2000-01-01, so
+                # rows on/after that epoch are 2000+, everything earlier 1900+.
+                if mjd >= 51544.0:
+                    year = 2000 + year_2digit
+                else:
+                    year = 1900 + year_2digit
 
                 # Parse UT1-UTC value (columns 59-68, 1-indexed, so 58:68 in Python)
                 ut1_utc_str = line[58:68].strip()
@@ -528,7 +531,9 @@ def _parse_finals_data(filepath: str) -> dict[float, IERSDataPoint]:
                 # Check if this is observed (I) or predicted (P)
                 # The flag is at column 58 (1-indexed), so 57 in Python
                 is_prediction = False
-                if len(line) > 57:  # pragma: no branch - earlier len<68 guard makes this always true
+                if (
+                    len(line) > 57
+                ):  # pragma: no branch - earlier len<68 guard makes this always true
                     flag = line[57]
                     is_prediction = flag.upper() == "P"
 
@@ -635,8 +640,18 @@ def _parse_leap_seconds_iers(lines: list[str]) -> list[LeapSecondEntry]:
     prose form still parse.
     """
     months = {
-        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "may": 5,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
     }
     entries: list[LeapSecondEntry] = []
 
@@ -779,15 +794,24 @@ def _get_hardcoded_leap_seconds() -> list[LeapSecondEntry]:
 
 def _parse_delta_t_data(filepath: str) -> list[DeltaTDataPoint]:
     """
-    Parse IERS Delta T data file.
+    Parse an IERS Delta T data file.
 
-    The file format is simple whitespace-separated columns:
-        YEAR MONTH DAY DELTA_T
+    Two on-disk layouts are supported, matching the two download sources:
 
-    Where DELTA_T is in seconds.
+    * Primary ``deltat.data`` -- whitespace-separated ``YEAR MONTH DAY DELTA_T``
+      with Delta T (TT - UT1) already in seconds.
+    * Backup EOP 14 C04 (``EOP_..._C04_..._one_file_1962-now.txt``) --
+      ``year month day MJD x y UT1-UTC ...``. Here column 4 is the **MJD**, not
+      Delta T, and column 7 is UT1-UTC. Reading column 4 as Delta T (the old
+      behaviour) silently ingested MJD values (~40000-60000) as Delta T. For
+      this layout Delta T is derived as ``TAI-UTC + 32.184 - (UT1-UTC)``.
+
+    A sanity band rejects any row whose Delta T is implausibly large/small
+    (e.g. an MJD misread as Delta T), so a mis-detected column can never poison
+    the table.
 
     Args:
-        filepath: Path to the deltat.data file
+        filepath: Path to the deltat.data / C04 file
 
     Returns:
         List of DeltaTDataPoint sorted by MJD
@@ -802,32 +826,52 @@ def _parse_delta_t_data(filepath: str) -> list[DeltaTDataPoint]:
 
             try:
                 parts = line.split()
-                if len(parts) >= 4:
-                    year = int(parts[0])
-                    month = int(parts[1])
-                    day = int(parts[2])
-                    delta_t = float(parts[3])
+                if len(parts) < 4:
+                    continue
 
-                    # Validate ranges
-                    if not (1900 <= year <= 2100):
-                        continue
-                    if not (1 <= month <= 12):
-                        continue
-                    if not (1 <= day <= 31):
-                        continue
+                year = int(parts[0])
+                month = int(parts[1])
+                day = int(parts[2])
 
-                    # Calculate MJD
-                    mjd = _calendar_to_mjd(year, month, day)
+                # Validate ranges
+                if not (1900 <= year <= 2100):
+                    continue
+                if not (1 <= month <= 12):
+                    continue
+                if not (1 <= day <= 31):
+                    continue
 
-                    entries.append(
-                        DeltaTDataPoint(
-                            mjd=mjd,
-                            year=year,
-                            month=month,
-                            day=day,
-                            delta_t=delta_t,
-                        )
+                # Calculate MJD
+                mjd = _calendar_to_mjd(year, month, day)
+
+                # Distinguish the two layouts. In the C04 backup the 4th column
+                # is the MJD (matching this row's date) and there are further
+                # columns (x, y, UT1-UTC, ...). In deltat.data the 4th column is
+                # Delta T itself and there is nothing after it.
+                col4 = float(parts[3])
+                is_c04 = len(parts) >= 7 and abs(col4 - mjd) < 1.0
+                if is_c04:
+                    ut1_utc = float(parts[6])
+                    delta_t = get_tai_utc(mjd) + 32.184 - ut1_utc
+                else:
+                    delta_t = col4
+
+                # Sanity bound: observed Delta T is tens of seconds across the
+                # covered epoch (1962-present, ~33-75 s). Reject anything wildly
+                # outside a plausible band so an MJD (or any mis-parsed column)
+                # can never be ingested as Delta T.
+                if not (-500.0 <= delta_t <= 1000.0):
+                    continue
+
+                entries.append(
+                    DeltaTDataPoint(
+                        mjd=mjd,
+                        year=year,
+                        month=month,
+                        day=day,
+                        delta_t=delta_t,
                     )
+                )
             except (ValueError, IndexError):
                 # Skip malformed lines
                 continue
@@ -980,6 +1024,60 @@ def _ensure_data_loaded() -> None:
         load_iers_data()
 
 
+# First integer-leap-second epoch: 1972-01-01 (MJD 41317.0). Before this the
+# UTC system was "rate-based" and TAI-UTC followed a piecewise-linear law.
+_FIRST_LEAP_SECOND_MJD = 41317.0
+
+# Pre-1972 TAI-UTC piecewise-linear model (the standard IERS/ERFA 1961-1971
+# table). Each row is ``(valid_from_mjd, offset_s, ref_mjd, rate_s_per_day)``
+# and TAI-UTC = offset + (mjd - ref_mjd) * rate for the last row whose
+# valid_from_mjd <= mjd. Sourced from the IERS "TAI-UTC" table (identical to
+# the values ERFA's dat() uses), so it agrees with the reference model.
+_PRE_1972_TAI_UTC: list[tuple[float, float, float, float]] = [
+    (37300.0, 1.4228180, 37300.0, 0.0012960),  # 1961 Jan 1
+    (37512.0, 1.3728180, 37300.0, 0.0012960),  # 1961 Aug 1
+    (37665.0, 1.8458580, 37665.0, 0.0011232),  # 1962 Jan 1
+    (38334.0, 1.9458580, 37665.0, 0.0011232),  # 1963 Nov 1
+    (38395.0, 3.2401300, 38761.0, 0.0012960),  # 1964 Jan 1
+    (38486.0, 3.3401300, 38761.0, 0.0012960),  # 1964 Apr 1
+    (38639.0, 3.4401300, 38761.0, 0.0012960),  # 1964 Sep 1
+    (38761.0, 3.5401300, 38761.0, 0.0012960),  # 1965 Jan 1
+    (38820.0, 3.6401300, 38761.0, 0.0012960),  # 1965 Mar 1
+    (38881.0, 3.7401300, 38761.0, 0.0012960),  # 1965 Jul 1
+    (38939.0, 3.8401300, 38761.0, 0.0012960),  # 1965 Sep 1
+    (39126.0, 4.3131700, 39126.0, 0.0025920),  # 1966 Jan 1
+    (39887.0, 4.2131700, 39126.0, 0.0025920),  # 1968 Feb 1
+]
+
+
+def _pre_1972_tai_utc(mjd: float) -> float:
+    """Return TAI-UTC (seconds) for a pre-1972 MJD via the rate-based model.
+
+    Implements the standard IERS 1961-1971 piecewise-linear TAI-UTC law. For
+    dates before 1961-01-01 (before UTC existed) the value is clamped to the
+    earliest tabulated offset; such deep-historical values are an approximation
+    only and TAI-UTC is not physically defined there.
+
+    Args:
+        mjd: Modified Julian Date (expected < 1972-01-01).
+
+    Returns:
+        TAI-UTC in seconds.
+    """
+    # Clamp below the start of the table (pre-1961: UTC undefined).
+    if mjd < _PRE_1972_TAI_UTC[0][0]:
+        offset, ref_mjd, rate = _PRE_1972_TAI_UTC[0][1:]
+        return offset + (_PRE_1972_TAI_UTC[0][0] - ref_mjd) * rate
+
+    offset, ref_mjd, rate = _PRE_1972_TAI_UTC[0][1:]
+    for valid_from, off, ref, r in _PRE_1972_TAI_UTC:
+        if mjd >= valid_from:
+            offset, ref_mjd, rate = off, ref, r
+        else:
+            break
+    return offset + (mjd - ref_mjd) * rate
+
+
 def get_tai_utc(mjd: float) -> float:
     """
     Get TAI-UTC (leap seconds) for a given MJD.
@@ -992,7 +1090,16 @@ def get_tai_utc(mjd: float) -> float:
     """
     _ensure_data_loaded()
 
-    if not _LEAP_SECONDS:
+    # Pre-1972 the UTC system was rate-based; the integer-leap-second table
+    # does not cover it. Use the piecewise-linear model instead of returning
+    # 0.0 (the true offset was ~1.4-10 s across 1961-1971). This branch is
+    # independent of the loaded leap-second table.
+    if mjd < _FIRST_LEAP_SECOND_MJD:
+        return _pre_1972_tai_utc(mjd)
+
+    # Snapshot: clear_iers_cache() rebinds the global under the lock.
+    leap_seconds = _LEAP_SECONDS
+    if not leap_seconds:
         # Fallback: use approximate value for modern dates
         if mjd >= 57754.0:  # 2017-01-01
             return 37.0
@@ -1000,7 +1107,7 @@ def get_tai_utc(mjd: float) -> float:
 
     # Find the applicable leap second entry
     tai_utc = 0.0
-    for entry in _LEAP_SECONDS:
+    for entry in leap_seconds:
         if mjd >= entry.mjd:
             tai_utc = entry.tai_utc
         else:
@@ -1040,7 +1147,21 @@ def get_ut1_utc(mjd: float) -> Optional[float]:
     if mjd_floor in data and mjd_ceil in data:
         ut1_utc_floor = data[mjd_floor].ut1_utc
         ut1_utc_ceil = data[mjd_ceil].ut1_utc
-        return ut1_utc_floor + frac * (ut1_utc_ceil - ut1_utc_floor)
+        # Interpolate on UT1-TAI, which is continuous across leap seconds,
+        # rather than on UT1-UTC directly. On a leap-second day UT1-UTC steps
+        # by ~1 s between the two day-boundary values; interpolating UT1-UTC
+        # linearly would smear that 1 s step across the day and put a ~0.5 s
+        # dip in Delta T at midday on the ~27 leap-second days. Subtracting the
+        # (integer, step-valued) TAI-UTC removes the step; adding it back at
+        # the query instant re-applies the correct integer offset for that
+        # side of the leap. On non-leap days the TAI-UTC terms cancel and this
+        # reduces exactly to plain UT1-UTC interpolation.
+        tai_utc_floor = get_tai_utc(mjd_floor)
+        tai_utc_ceil = get_tai_utc(mjd_ceil)
+        ut1_tai_floor = ut1_utc_floor - tai_utc_floor
+        ut1_tai_ceil = ut1_utc_ceil - tai_utc_ceil
+        ut1_tai = ut1_tai_floor + frac * (ut1_tai_ceil - ut1_tai_floor)
+        return ut1_tai + get_tai_utc(mjd)
 
     # Edge of table: closest available date
     if mjd_floor in data:
@@ -1074,29 +1195,32 @@ def get_observed_delta_t(jd: float) -> Optional[float]:
     """
     _ensure_data_loaded()
 
-    if not _DELTA_T_DATA:
+    # Snapshot: clear_iers_cache() rebinds the global under the lock, so bind
+    # it once to keep the range check and the subsequent indexing race-free.
+    delta_t_data = _DELTA_T_DATA
+    if not delta_t_data:
         return None
 
     mjd = _jd_to_mjd(jd)
 
     # Check if we're within the data range
-    if mjd < _DELTA_T_DATA[0].mjd or mjd > _DELTA_T_DATA[-1].mjd:
+    if mjd < delta_t_data[0].mjd or mjd > delta_t_data[-1].mjd:
         return None
 
     # Binary search for the bracket
     left = 0
-    right = len(_DELTA_T_DATA) - 1
+    right = len(delta_t_data) - 1
 
     while left < right - 1:
         mid = (left + right) // 2
-        if _DELTA_T_DATA[mid].mjd <= mjd:
+        if delta_t_data[mid].mjd <= mjd:
             left = mid
         else:
             right = mid
 
     # Linear interpolation between the two nearest points
-    p1 = _DELTA_T_DATA[left]
-    p2 = _DELTA_T_DATA[right]
+    p1 = delta_t_data[left]
+    p2 = delta_t_data[right]
 
     if p1.mjd == p2.mjd:
         return p1.delta_t
@@ -1119,11 +1243,13 @@ def get_observed_delta_t_data_range() -> Optional[tuple[float, float]]:
     """
     _ensure_data_loaded()
 
-    if not _DELTA_T_DATA:
+    # Snapshot: guard against a concurrent clear_iers_cache() rebinding.
+    delta_t_data = _DELTA_T_DATA
+    if not delta_t_data:
         return None
 
-    mjd_min = _DELTA_T_DATA[0].mjd
-    mjd_max = _DELTA_T_DATA[-1].mjd
+    mjd_min = delta_t_data[0].mjd
+    mjd_max = delta_t_data[-1].mjd
 
     return _mjd_to_jd(mjd_min), _mjd_to_jd(mjd_max)
 
@@ -1140,11 +1266,13 @@ def is_observed_delta_t_available(jd: float) -> bool:
     """
     _ensure_data_loaded()
 
-    if not _DELTA_T_DATA:
+    # Snapshot: guard against a concurrent clear_iers_cache() rebinding.
+    delta_t_data = _DELTA_T_DATA
+    if not delta_t_data:
         return False
 
     mjd = _jd_to_mjd(jd)
-    return _DELTA_T_DATA[0].mjd <= mjd <= _DELTA_T_DATA[-1].mjd
+    return delta_t_data[0].mjd <= mjd <= delta_t_data[-1].mjd
 
 
 def get_delta_t_iers(jd: float) -> Optional[float]:
@@ -1202,10 +1330,12 @@ def get_iers_data_range() -> Optional[tuple[float, float]]:
     """
     _ensure_data_loaded()
 
-    if not _IERS_DATA:
+    # Snapshot: guard against a concurrent clear_iers_cache() rebinding.
+    data = _IERS_DATA
+    if not data:
         return None
 
-    mjd_values = list(_IERS_DATA.keys())
+    mjd_values = list(data.keys())
     mjd_min = min(mjd_values)
     mjd_max = max(mjd_values)
 
@@ -1225,12 +1355,14 @@ def is_iers_data_available(jd: float) -> bool:
     # Load on demand like every other getter — otherwise this returns
     # False until some sibling function happens to load the table first.
     _ensure_data_loaded()
+    # Snapshot: guard against a concurrent clear_iers_cache() rebinding.
+    data = _IERS_DATA
     mjd = _jd_to_mjd(jd)
     # Mirror get_ut1_utc's bracketing (floor / floor+1): availability must be
     # True exactly when get_ut1_utc would return a non-None value, otherwise the
     # two disagree for the last ~half day of the table (round() vs floor()).
     mjd_floor = math.floor(mjd)
-    return mjd_floor in _IERS_DATA or (mjd_floor + 1) in _IERS_DATA
+    return mjd_floor in data or (mjd_floor + 1) in data
 
 
 def clear_iers_cache() -> None:

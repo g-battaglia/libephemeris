@@ -744,10 +744,13 @@ class TestGetTaiUtc:
             assert iers_data.get_tai_utc(58000.0) == 37.0
 
     def test_fallback_old(self):
-        """No leap seconds loaded, old date -> 32.0 (line 974)."""
+        """No leap seconds loaded, post-1972 date -> 32.0 fallback."""
         iers_data.clear_iers_cache()
         with mock.patch.object(iers_data, "_ensure_data_loaded", lambda: None):
-            assert iers_data.get_tai_utc(40000.0) == 32.0
+            # A post-1972 MJD (1995) with no leap-second table reaches the
+            # 32.0 fallback. Pre-1972 dates now use the piecewise TAI-UTC model
+            # instead and never reach this branch.
+            assert iers_data.get_tai_utc(50000.0) == 32.0
 
     def test_lookup_with_loaded_leap_seconds(self, monkeypatch):
         """Leap seconds present -> the lookup loop runs (lines 977-984)."""
@@ -756,8 +759,10 @@ class TestGetTaiUtc:
         monkeypatch.setattr(iers_data, "_ensure_data_loaded", lambda: None)
         # A modern MJD (after 2017-01-01, mjd 57754) -> 37 leap seconds.
         assert iers_data.get_tai_utc(58000.0) == pytest.approx(37.0)
-        # A date before the first entry -> the else/break path leaves 0.0.
-        assert iers_data.get_tai_utc(0.0) == pytest.approx(0.0)
+        # A date before the first leap second (pre-1972) now uses the
+        # piecewise pre-1972 TAI-UTC model, clamped to the earliest offset
+        # for very old dates, rather than returning 0.0.
+        assert iers_data.get_tai_utc(0.0) == pytest.approx(1.422818, abs=1e-5)
 
 
 # ---------------------------------------------------------------------------
