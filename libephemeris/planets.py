@@ -565,8 +565,11 @@ def _normalize_calc_flags(flags: int) -> int:
 
     - FLG_MOSEPH is accepted for compatibility but stripped (all
       calculations use the JPL DE440/DE441 path).
-    - An ephemeris bit is ensured, so retflag echoes FLG_SWIEPH when the
-      caller passed none.
+    - Exactly one ephemeris bit is echoed, never two: the reference
+      plaus_iflag() makes the ephemeris bits mutually exclusive, so a
+      caller passing FLG_JPLEPH|FLG_SWIEPH must get a single-bit retflag
+      (JPLEPH wins, matching the reference's sequential-overwrite priority
+      JPLEPH > SWIEPH). FLG_SWIEPH is echoed when the caller passed none.
     - FLG_SPEED3 maps to FLG_SPEED: 3-position numerical differentiation
       is already the only speed method used (matching SE behavior where
       SPEED takes priority if both are set).
@@ -574,7 +577,11 @@ def _normalize_calc_flags(flags: int) -> int:
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
     flags = flags & ~FLG_MOSEPH
-    if not (flags & (FLG_JPLEPH | FLG_SWIEPH)):
+    if flags & FLG_JPLEPH:
+        # JPLEPH takes priority; ensure the ephemeris bits stay mutually
+        # exclusive so retflag never echoes both (the reference never does).
+        flags &= ~FLG_SWIEPH
+    elif not (flags & FLG_SWIEPH):
         flags |= FLG_SWIEPH
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
@@ -1139,9 +1146,11 @@ def calc_ut(
                 tjdut,
                 _hz_err,
             )
-        except ConnectionError as _hz_err:
-            # Transient network/API failure — auto mode must keep working,
-            # so fall through to the Skyfield path.
+        except (ConnectionError, ValueError, OSError) as _hz_err:
+            # Transient network/API failure, or a ValueError/OSError raised
+            # from the HELCTR / velocity / analytical path — fall through to
+            # the Skyfield path (same fallback the context API uses) rather
+            # than let it escape calc_ut.
             get_logger().warning(
                 "body=%d jd=%.1f source=Horizons->fallback (network): %s",
                 planet,
@@ -1280,8 +1289,11 @@ def calc(
                 tjdet,
                 _hz_err,
             )
-        except ConnectionError as _hz_err:
-            # Transient network/API failure — fall through to Skyfield.
+        except (ConnectionError, ValueError, OSError) as _hz_err:
+            # Transient network/API failure, or a ValueError/OSError raised
+            # from the HELCTR / velocity / analytical path — fall through to
+            # the Skyfield path (same fallback the context API uses) rather
+            # than let it escape calc.
             get_logger().warning(
                 "body=%d jd=%.1f source=Horizons->fallback (network): %s",
                 planet,
