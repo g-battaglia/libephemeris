@@ -3789,7 +3789,9 @@ def _rotate_spherical_x_axis(x: List[float], eps: float) -> List[float]:
 
     if r_new > 0:
         lon_new = math.degrees(math.atan2(y_new, x_new))
-        lat_new = math.degrees(math.asin(z_new / r_new))
+        # r_new >= |z_new| mathematically, but rounding can push the ratio a
+        # hair past +-1; clamp so asin never raises a domain error.
+        lat_new = math.degrees(math.asin(max(-1.0, min(1.0, z_new / r_new))))
     else:
         lon_new = 0.0
         lat_new = 0.0
@@ -4647,12 +4649,16 @@ def _apc_cusp(house: int, lat_rad: float, eps_rad: float, armc_rad: float) -> fl
         asc_diff = 0.0
         asc_declination = 0.0
     else:
-        asc_diff = math.atan(
-            math.tan(lat_rad)
-            * math.tan(eps_rad)
-            * math.cos(armc_rad)
-            / (1 + math.tan(lat_rad) * math.tan(eps_rad) * math.sin(armc_rad))
-        )
+        _tphi_teps = math.tan(lat_rad) * math.tan(eps_rad)
+        _numer = _tphi_teps * math.cos(armc_rad)
+        _denom = 1 + _tphi_teps * math.sin(armc_rad)
+        if _denom == 0.0:
+            # Inside the polar circle the denominator can vanish at one armc.
+            # The C reference divides in IEEE arithmetic, so atan(+-inf) gives
+            # +-pi/2; match that limit instead of raising ZeroDivisionError.
+            asc_diff = math.copysign(math.pi / 2, _numer)
+        else:
+            asc_diff = math.atan(_numer / _denom)
 
         if abs(math.degrees(lat_rad)) < _NEAR_ZERO:
             # Equator limit: the parallel through the Ascendant degenerates;
