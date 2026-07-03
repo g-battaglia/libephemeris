@@ -259,6 +259,15 @@ class LEBReader:
         if SECTION_DELTA_T in self._sections:
             sec = self._sections[SECTION_DELTA_T]
             n_entries, _ = struct.unpack_from(DELTA_T_HEADER_FMT, self._mm, sec.offset)
+            # Same corrupted-count guard as the body index: an inflated
+            # n_entries would otherwise ingest adjacent-section bytes as
+            # (jd, deltaT) pairs and silently return wrong TT<->UT1 offsets.
+            validate_entry_count(
+                n_entries,
+                DELTA_T_ENTRY_SIZE,
+                sec.size - DELTA_T_HEADER_SIZE,
+                "LEB Delta-T table",
+            )
             data_offset = sec.offset + DELTA_T_HEADER_SIZE
             for i in range(n_entries):
                 off = data_offset + i * DELTA_T_ENTRY_SIZE
@@ -496,6 +505,15 @@ class LEBReader:
         n_coeffs = nut.components * deg1
         seg_size = n_coeffs * 8
         byte_offset = self._nutation_data_offset + seg_idx * seg_size
+        # Same corrupted-entry guard as eval_body: struct.unpack_from would
+        # raise struct.error (NOT a ValueError) on a truncated nutation
+        # section and bypass the callers' LEB->Skyfield fallback.
+        if byte_offset < 0 or byte_offset + seg_size > len(self._mm):
+            raise LEBCorruptionError(
+                f"Corrupted LEB nutation entry: coefficient data at offset "
+                f"{byte_offset} (+{seg_size} bytes) is outside the file "
+                f"(size {len(self._mm)})"
+            )
         coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
 
         # Evaluate dpsi and deps
