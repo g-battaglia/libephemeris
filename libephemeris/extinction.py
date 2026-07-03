@@ -199,16 +199,22 @@ def calc_rayleigh_coefficient(
     k_ref = 0.1451  # Rayleigh coefficient at sea level, V-band
     wavelength_ref = 550.0  # V-band reference wavelength
 
-    # Pressure correction (higher pressure = more scattering)
-    pressure_factor = pressure_mbar / DEFAULT_PRESSURE_MBAR
-
-    # Altitude correction (less atmosphere at higher altitudes)
-    altitude_factor = math.exp(-altitude_m / SCALE_HEIGHT_M)
+    # Air-column reduction: pressure and altitude both describe the *same*
+    # physical quantity (the mass of air above the observer). Applying both
+    # would double-count it, so we use exactly one:
+    #   - If the caller supplied a site pressure, it already encodes the
+    #     reduced column (P ~= 1013.25 * exp(-h / H)), so use it directly.
+    #   - Otherwise (pressure left at the sea-level default) derive the
+    #     reduction from the observer altitude via the barometric formula.
+    if pressure_mbar != DEFAULT_PRESSURE_MBAR:
+        column_factor = pressure_mbar / DEFAULT_PRESSURE_MBAR
+    else:
+        column_factor = math.exp(-altitude_m / SCALE_HEIGHT_M)
 
     # Wavelength dependence (Rayleigh scattering ~ lambda^-4)
     wavelength_factor = (wavelength_ref / wavelength_nm) ** 4
 
-    return k_ref * pressure_factor * altitude_factor * wavelength_factor
+    return k_ref * column_factor * wavelength_factor
 
 
 def calc_aerosol_coefficient(
@@ -1355,9 +1361,16 @@ def calc_contrast_threshold(
         limiting_mag = base_limit + brightness_factor
     elif eye_adaptation == "mesopic":
         # Mesopic (twilight) vision
-        # At B=18, limit ~4.5-5.0; at B=16, limit ~3.5-4.0
-        # Linear interpolation in this range
-        limiting_mag = 2.0 + (sky_brightness - 16.0) * 0.5
+        # At B=16, limit ~3.4; at B=18, limit ~4.4; at B=20, limit ~5.4
+        # The intercept (3.4) makes this branch continuous with the photopic
+        # branch at the 16 mag/arcsec^2 boundary: the photopic branch reaches
+        # 1.0 + (16.0 - 10.0) * 0.4 = 3.4 there. Without this offset the
+        # mesopic branch restarted near 2.0, so a *darker* sky produced a
+        # *smaller* limiting magnitude (physically impossible). The intercept
+        # keeps limiting magnitude monotonically non-decreasing as the sky
+        # darkens across the photopic/mesopic transition, and stays below the
+        # dark branch's value at B=20 (5.55) so monotonicity holds there too.
+        limiting_mag = 3.4 + (sky_brightness - 16.0) * 0.5
     else:  # photopic
         # Photopic (daylight) vision: worst sensitivity for point sources
         # At B=8 (civil twilight), limit ~0-1.0
