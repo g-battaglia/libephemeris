@@ -30,7 +30,9 @@ keywords = [
     "zodiac",
 ]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    # Bumped to "5 - Production/Stable" at the v3.0.0 final tag (with the
+    # version bump off rc2); kept Beta while the version is a pre-release.
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
