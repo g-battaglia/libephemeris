@@ -1230,43 +1230,41 @@ def _find_covering_spk(
     body_str = str(body_id).lower()
     safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
 
-    # Look for files matching this body
+    # Read the ACTUAL coverage from each candidate kernel's segment metadata
+    # rather than parsing the filename. Cached files appear under several naming
+    # schemes and only one encodes the JD range:
+    #   - body_<jdstart>_<jdend>.bsp  (_generate_spk_cache_filename)
+    #   - body_<YYYYMM>_<YYYYMM>.bsp  (download_spk)
+    #   - body_<md5hash>.bsp          (AutoSpkConfig.get_cache_filename)
+    # The old filename-parsing path recognised only the first, so YYYYMM- and
+    # hash-named kernels were never detected as covering and triggered
+    # redundant re-downloads. get_spk_coverage() reads the real time span from
+    # the kernel, so all three schemes are handled correctly.
+    from .spk import get_spk_coverage
+
     for filename in os.listdir(cache_dir):
         if not filename.endswith(".bsp"):
             continue
 
-        # Check if filename matches our body
+        # Every scheme prefixes the sanitized body id followed by "_".
         if not filename.startswith(safe_body_id + "_"):
             continue
 
-        # Extract JD range from filename (format: body_jdstart_jdend.bsp)
-        parts = filename[:-4].split("_")  # Remove .bsp
-        if len(parts) >= 3:
-            try:
-                # Get the last two parts as JD values
-                file_jd_start = float(parts[-2])
-                file_jd_end = float(parts[-1])
+        filepath = os.path.abspath(os.path.join(cache_dir, filename))
 
-                # Check if this file covers our requested range
-                # Filenames store int()-truncated JDs, so file_jd_end is the
-                # floor of the kernel's true end (true_end >= file_jd_end) and
-                # file_jd_start is the floor of its true start. We compare on the
-                # truncated request bounds; the kernels are generated with a
-                # light-time margin past the nominal range (see the type-21
-                # coverage-margin widening), so the up-to-one-day truncation gap
-                # at the end is absorbed by that margin, and any genuine
-                # out-of-coverage read is still caught by _is_valid_bsp / the
-                # eval-time range check.
-                if file_jd_start <= int(jd_start) and file_jd_end >= int(jd_end):
-                    filepath = os.path.join(cache_dir, filename)
-                    if _is_valid_bsp(filepath):
-                        return filepath
-                    logger = get_logger()
-                    logger.warning(
-                        "Cached SPK file %s is corrupted, skipping", filepath
-                    )
-            except ValueError:
-                continue
+        try:
+            coverage = get_spk_coverage(filepath)
+        except (OSError, ValueError, KeyError, IndexError, ImportError):
+            continue
+        if coverage is None:
+            continue
+
+        file_jd_start, file_jd_end = coverage
+        # Does this kernel actually cover the requested range?
+        if file_jd_start <= jd_start and file_jd_end >= jd_end:
+            if _is_valid_bsp(filepath):
+                return filepath
+            get_logger().warning("Cached SPK file %s is corrupted, skipping", filepath)
 
     return None
 
