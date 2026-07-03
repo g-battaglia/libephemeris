@@ -372,7 +372,10 @@ def compare_coordinate_transforms(
         "astropy_alt": astropy_alt,
         "astropy_az": astropy_az,
         "alt_difference_arcsec": (skyfield_alt - astropy_alt) * 3600,
-        "az_difference_arcsec": (skyfield_az - astropy_az) * 3600,
+        # Wrap the azimuth delta to (-180, 180] so a star near due north
+        # (azimuths straddling 360/0) does not report a ~360 deg difference.
+        "az_difference_arcsec": ((skyfield_az - astropy_az + 180.0) % 360.0 - 180.0)
+        * 3600,
         "astropy_galactic_l": galactic.l.deg,
         "astropy_galactic_b": galactic.b.deg,
         "astropy_ecliptic_lon": ecliptic.lon.deg,

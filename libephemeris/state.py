@@ -748,10 +748,20 @@ def get_timescale() -> Timescale:
             if _TS is None:
                 try:
                     _TS = _build_enhanced_timescale()
-                except (ImportError, FileNotFoundError, RuntimeError, ValueError):
+                except (
+                    ImportError,
+                    FileNotFoundError,
+                    RuntimeError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    TypeError,
+                ):
                     # If anything goes wrong with the merge, fall back to the
                     # standard Skyfield timescale so the library never fails to
-                    # initialise.
+                    # initialise. KeyError/IndexError/TypeError guard against a
+                    # Skyfield version renaming/reshaping its bundled iers.npz /
+                    # historic_deltat data, which the fallback exists to survive.
                     get_logger().warning(
                         "Failed to build enhanced timescale with historical "
                         "Delta T data; falling back to standard Skyfield timescale."

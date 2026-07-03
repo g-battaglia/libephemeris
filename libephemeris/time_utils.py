@@ -479,12 +479,12 @@ def date_conversion(
     if calendar not in ("j", "g"):
         raise ValueError(f"calendar must be 'j' or 'g', got: {calendar!r}")
 
-    # Determine the input calendar based on the date
-    # First convert to JD using Gregorian to check the date
+    # Determine the input calendar from the calendar DATE, not an
+    # hour-inclusive JD. JD_GREGORIAN_REFORM is NOON of 1582-10-15, so an
+    # instant in the 00:00-11:59 window of the reform day would compare below
+    # it and be misclassified as Julian input (a spurious ~10-day shift).
     jd_as_greg = julday(year, month, day, hour, GREG_CAL)
-
-    # If the date is before Oct 15, 1582, assume Julian input
-    if jd_as_greg < JD_GREGORIAN_REFORM:
+    if (year, month, day) < (1582, 10, 15):
         input_cal = JUL_CAL
         jd = julday(year, month, day, hour, JUL_CAL)
     else:

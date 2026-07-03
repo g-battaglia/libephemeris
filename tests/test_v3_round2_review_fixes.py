@@ -81,6 +81,24 @@ class TestHypothetical:
             calc_hypothetical_position(59, 2451545.0)
 
 
+class TestTime:
+    def test_date_conversion_reform_day_morning_not_shifted(self) -> None:
+        """An instant in the 00:00-11:59 window of the Gregorian reform day
+        (1582-10-15) must not be misclassified as Julian and shifted +10 days."""
+        from libephemeris.time_utils import date_conversion
+
+        year, month, day, hour = date_conversion(1582, 10, 15, 6.0, "g")
+        assert (year, month, day) == (1582, 10, 15)
+
+    def test_date_conversion_before_reform_is_julian(self) -> None:
+        """A date before the reform is still treated as Julian input."""
+        from libephemeris.time_utils import date_conversion
+
+        year, month, day, hour = date_conversion(1582, 10, 4, 6.0, "g")
+        # 1582-10-04 (Julian) -> 1582-10-14 (Gregorian)
+        assert (year, month, day) == (1582, 10, 14)
+
+
 class TestReaderResourceSafety:
     def test_zero_byte_leb_file_does_not_leak_fd(self, tmp_path) -> None:
         """A 0-byte stub raises without leaking the open file descriptor."""

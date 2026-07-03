@@ -1161,8 +1161,12 @@ def propagate_trajectory(
                     )
 
                 return results
-        except (ImportError, FileNotFoundError):
-            pass  # Fall back to REBOUND
+        except (ImportError, FileNotFoundError, RuntimeError, ValueError):
+            # Fall back to REBOUND. Besides a missing module/file, ASSIST and
+            # rebound raise RuntimeError/ValueError when the integration epoch
+            # falls outside the loaded planet-ephemeris date range; the 2-body
+            # REBOUND path below needs no ephemeris file and can still succeed.
+            pass
 
     # Use REBOUND without ASSIST
     if not check_rebound_available():
@@ -1237,7 +1241,10 @@ def compare_with_keplerian(
     if use_assist and check_assist_available():
         try:
             result = propagate_orbit_assist(elements, jd_start, jd_tt, ephem_config)
-        except (ImportError, FileNotFoundError):
+        except (ImportError, FileNotFoundError, RuntimeError, ValueError):
+            # Same ASSIST->REBOUND fallback as propagate_trajectory: an epoch
+            # outside the loaded planet-ephemeris range raises RuntimeError/
+            # ValueError, which the 2-body REBOUND path can still handle.
             result = propagate_orbit_rebound(elements, jd_start, jd_tt)
     else:
         result = propagate_orbit_rebound(elements, jd_start, jd_tt)
