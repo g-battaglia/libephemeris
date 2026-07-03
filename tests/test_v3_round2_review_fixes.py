@@ -59,5 +59,48 @@ class TestRobustness:
         assert "~" not in resolved
 
 
+class TestStarResolution:
+    def test_greek_single_letter_alias_resolves_in_all_resolvers(self) -> None:
+        """'α Leo' must resolve to Regulus in resolve_star_name and _resolve_star2
+        (the .upper() of a lowercase Greek letter differs from the key)."""
+        from libephemeris.fixed_stars import _resolve_star2, resolve_star_name
+
+        assert resolve_star_name("α Leo") == 1000001
+        entry, err = _resolve_star2("α Leo")
+        assert err is None
+        assert entry is not None and entry.id == 1000001
+
+
+class TestHypothetical:
+    def test_undefined_fictitious_id_raises(self) -> None:
+        """An id in the fictitious range but without an ephemeris must raise,
+        not return a phantom (0,0,0) position."""
+        from libephemeris.hypothetical import calc_hypothetical_position
+
+        with pytest.raises(ValueError):
+            calc_hypothetical_position(59, 2451545.0)
+
+
+class TestReaderResourceSafety:
+    def test_zero_byte_leb_file_does_not_leak_fd(self, tmp_path) -> None:
+        """A 0-byte stub raises without leaking the open file descriptor."""
+        import gc
+        import warnings
+
+        from libephemeris.leb2_reader import LEB2Reader
+        from libephemeris.leb_reader import LEBReader
+
+        stub = tmp_path / "empty_base_core.leb"
+        stub.write_bytes(b"")
+
+        for reader_cls in (LEBReader, LEB2Reader):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                with pytest.raises((ValueError, OSError)):
+                    reader_cls(str(stub))
+                gc.collect()
+            assert not [w for w in caught if issubclass(w.category, ResourceWarning)]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

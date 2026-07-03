@@ -1814,6 +1814,15 @@ STAR_ALIASES: dict[str, int] = {
     "ALCET": MENKAR,
 }
 
+# Case-normalized view of STAR_ALIASES for exact lookups. Built with the same
+# str.upper() the resolvers apply to their input, so Greek single-letter keys
+# (e.g. "α LEO") stay reachable: 'α'.upper() == 'Α' on both the key and the
+# query, whereas comparing an uppercased query against a lowercase-Greek key
+# never matches.
+_STAR_ALIASES_UPPER: dict[str, int] = {
+    alias.upper(): star_id for alias, star_id in STAR_ALIASES.items()
+}
+
 
 # Phonetic normalization for fuzzy matching of star common names
 # Maps phonetically similar character sequences to canonical forms
@@ -2043,9 +2052,10 @@ def resolve_star_name(name: str) -> int | None:
     if normalized in _STAR_NAME_TO_ID:
         return _STAR_NAME_TO_ID[normalized]
 
-    # 2. Try exact match in STAR_ALIASES
-    if normalized in STAR_ALIASES:
-        return STAR_ALIASES[normalized]
+    # 2. Try exact match in STAR_ALIASES (case-normalized so Greek
+    #    single-letter aliases like "α Leo" resolve, not just Latin ones)
+    if normalized in _STAR_ALIASES_UPPER:
+        return _STAR_ALIASES_UPPER[normalized]
 
     # 3. Try exact match against nomenclature (e.g., "ALLEO", "BEPER")
     for entry in STAR_CATALOG:
@@ -3234,7 +3244,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     # 2b. Try exact alias match. Alternate spellings and traditional names
     # (e.g. "Betelgeux", "Beetlejuice", "Formalhaut") are explicit aliases,
     # so they resolve exactly here rather than by a lossy fuzzy guess below.
-    alias_id = STAR_ALIASES.get(search_upper)
+    alias_id = _STAR_ALIASES_UPPER.get(search_upper)
     if alias_id is not None:
         for entry in STAR_CATALOG:
             if entry.id == alias_id:

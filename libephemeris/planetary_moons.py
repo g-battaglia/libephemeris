@@ -261,6 +261,14 @@ def register_moon_spk(
     # Load kernel
     load = get_loader()
     kernel = load(spk_file)
+    # Close any previously-registered handle for the same file before
+    # rebinding, otherwise a re-registration leaks the old fd/mmap.
+    prev = _MOON_SPK_KERNELS.get(spk_file)
+    if prev is not None and prev is not kernel:
+        try:
+            prev.close()
+        except (AttributeError, OSError, ValueError):
+            pass
     _MOON_SPK_KERNELS[spk_file] = kernel
 
     # Determine which moons to register
@@ -300,6 +308,14 @@ def register_moon_spk(
                 _MOON_SPK_BY_BODY[legacy_by_naif[naif_id]] = spk_file
 
     if not any(spk_file == path for path in _MOON_SPK_BY_BODY.values()):
+        # Registration failed: drop and close the kernel we just cached so a
+        # failed call does not leave an open handle behind.
+        failed = _MOON_SPK_KERNELS.pop(spk_file, None)
+        if failed is not None:
+            try:
+                failed.close()
+            except (AttributeError, OSError, ValueError):
+                pass
         raise ValueError(f"No valid planetary moons found in SPK kernel: {spk_file}")
 
 

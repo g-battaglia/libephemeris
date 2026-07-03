@@ -3795,8 +3795,13 @@ def calc_hypothetical_position(
     if ipl in HYPOTHETICAL_ELEMENTS:
         return _calc_keplerian_position(ipl, jd_tt)
 
-    # Unknown hypothetical body - return zeros
-    return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    # In the fictitious id range but with no defined ephemeris: raise rather
+    # than return a phantom (0,0,0) position at 0 deg Aries / 0 AU. Matches the
+    # function's documented ValueError contract and the reference API, which
+    # errors for an out-of-range fictitious body.
+    raise ValueError(
+        f"Body ID {ipl} is in the fictitious range but has no defined ephemeris"
+    )
 
 
 def list_hypothetical_bodies() -> Dict[int, str]:

@@ -587,11 +587,12 @@ class TestHypotheticalDispatch:
         out = calc_hypothetical_position(PLANET_X_PICKERING, J2000)
         assert 0.0 <= out[0] < 360.0
 
-    def test_unmapped_hypothetical_returns_zeros(self):
-        """A hypothetical id with no handler returns zeros (line 3793)."""
+    def test_unmapped_hypothetical_raises(self):
+        """A hypothetical id with no handler raises instead of returning a
+        phantom (0,0,0) position."""
         # 69 = FICT_OFFSET + 29: inside the hypothetical range but unmapped.
-        out = calc_hypothetical_position(69, J2000)
-        assert out == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        with pytest.raises(ValueError):
+            calc_hypothetical_position(69, J2000)
 
 
 def _unwrapped_central_dlon(body_id, jd, h=1.0):

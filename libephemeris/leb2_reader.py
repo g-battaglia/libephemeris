@@ -82,7 +82,14 @@ class LEB2Reader:
 
         self._path = path
         self._file = open(path, "rb")
-        self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+            self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        except (ValueError, OSError):
+            # 0-byte stub (interrupted download) raises "cannot mmap an empty
+            # file"; close the fd before propagating (close() below cannot run
+            # yet -- _decomp_lock/_mm are not set at this point).
+            self._file.close()
+            raise
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
         self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
         # Guards _cache/_chunk_cache and serializes decompression: chunks

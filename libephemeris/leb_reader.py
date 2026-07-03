@@ -183,7 +183,14 @@ class LEBReader:
 
         self._path = path
         self._file = open(path, "rb")
-        self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+            self._mm = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
+        except (ValueError, OSError):
+            # e.g. a 0-byte stub from an interrupted download raises
+            # "cannot mmap an empty file"; close the fd before propagating
+            # so scanning a directory of stubs cannot exhaust descriptors.
+            self._file.close()
+            raise
         self._eval_cache: Dict[
             Tuple[int, float],
             Tuple[Tuple[float, float, float], Tuple[float, float, float]],
