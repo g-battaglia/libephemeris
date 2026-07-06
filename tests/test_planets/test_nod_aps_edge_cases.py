@@ -126,6 +126,37 @@ class TestNodApsZeroBodies:
         assert len(result) == 4
 
 
+class TestNodApsMinorBodiesRaise:
+    """nod_aps raises for asteroids/centaurs (unsupported in this version).
+
+    Guards against silently returning zeros, which would read as a node at
+    0° Aries. Planned for a future release (see NEXT.md).
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "body",
+        [
+            swe.CHIRON,
+            swe.PHOLUS,
+            swe.CERES,
+            swe.PALLAS,
+            swe.JUNO,
+            swe.VESTA,
+            17066,  # numbered asteroid (AST_OFFSET + 7066, Nessus)
+        ],
+    )
+    def test_minor_body_nod_aps_raises(self, body):
+        with pytest.raises(swe.Error, match="not supported for minor bodies"):
+            swe.nod_aps_ut(JD_J2000, body, NODBIT_OSCU)
+
+    @pytest.mark.unit
+    def test_planets_still_work(self):
+        """The guard must not affect the supported planets."""
+        result = swe.nod_aps_ut(JD_J2000, MARS, NODBIT_OSCU)
+        assert 0.0 <= result[0][0] < 360.0
+
+
 class TestNodApsBoundaryDates:
     """Test nod_aps at boundary dates."""
 

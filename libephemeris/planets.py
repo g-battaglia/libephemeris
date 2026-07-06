@@ -4038,6 +4038,11 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         - Star positions from Hipparcos/Gaia catalogs
     """
 
+    # Defensive: strip any SIDBIT_* projection flags (>= 256). set_sid_mode()
+    # already masks and warns; this guards direct/override calls so a composite
+    # mode computes the base ayanamsha instead of silently falling back to Lahiri.
+    sid_mode = sid_mode & 0xFF
+
     # Reference date for most ayanamshas
     # J2000 = JD 2451545.0 = 2000-01-01 12:00 TT
     J2000 = 2451545.0
@@ -5028,6 +5033,13 @@ def _nodaps_to_j2000(lon_deg: float, lat_deg: float, jd_tt: float) -> tuple:
     return lon_j, lat_j
 
 
+# Minor bodies whose nodes/apsides the reference computes but this version
+# does not yet: the curated asteroids/centaurs plus any numbered asteroid
+# (AST_OFFSET..FIXSTAR_OFFSET). nod_aps raises for these rather than
+# returning a plausible-looking zero. Planned for a future release; see NEXT.md.
+_MINOR_BODY_NODAPS = frozenset({CHIRON, PHOLUS, CERES, PALLAS, JUNO, VESTA})
+
+
 def _calc_nod_aps(
     t, ipl: int, iflag: int, method: int
 ) -> Tuple[PosTuple, PosTuple, PosTuple, PosTuple]:
@@ -5056,7 +5068,19 @@ def _calc_nod_aps(
     """
     zero_pos: PosTuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
-    # Unsupported bodies
+    # Minor bodies (asteroids/centaurs): the reference computes their
+    # nodes/apsides, but this version does not. Raise a clear error rather
+    # than returning zeros, which would read as a node at 0° Aries.
+    if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
+        from .exceptions import Error
+
+        raise Error(
+            f"nod_aps is not supported for minor bodies (asteroids/centaurs) "
+            f"in this version (body id {ipl}); planned for a future release."
+        )
+
+    # Other unsupported bodies (lunar points, Uranians, fictitious): nodes and
+    # apsides are not applicable here — return zeros.
     if ipl not in _PLANET_MAP:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 

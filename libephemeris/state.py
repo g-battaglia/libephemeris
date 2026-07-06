@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import threading
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Literal, Optional, Tuple, Union, overload
 from skyfield.api import Loader, Topos
@@ -1219,6 +1220,23 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
         Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY) if never set,
         matching the reference API.
     """
+    # Strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
+    # USER_UT, ECL_DATE, NO_PREC_OFFSET, PREC_ORIG). These select alternative
+    # ecliptic/equinox projections not implemented in this version; keeping
+    # only the base ayanamsha mode avoids the silent wrong fallback the
+    # composite value would otherwise trigger downstream. Warn so the caller
+    # knows the projection was dropped rather than applied.
+    sidbits = mode & ~0xFF
+    if sidbits:
+        warnings.warn(
+            f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "
+            f"this version and were ignored; using base ayanamsha mode "
+            f"{mode & 0xFF}.",
+            UserWarning,
+            stacklevel=2,
+        )
+        mode = mode & 0xFF
+
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
     with _STATE_LOCK:
         _SIDEREAL_MODE = mode

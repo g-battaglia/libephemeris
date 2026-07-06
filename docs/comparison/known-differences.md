@@ -352,6 +352,13 @@ pyswisseph). Its **distance** (and `FLG_XYZ` output) is correct only on the
 (~0.0015 AU vs the correct ~0.0024 AU) rather than recomputing the osculating node
 radius. Use the default/Skyfield mode if you need the True Node distance.
 
+**Minor bodies not yet supported (raises).** `nod_aps_ut`/`nod_aps` compute
+nodes/apsides only for the Sun, Moon and the eight planets in this version. For
+asteroids and centaurs (Chiron, Pholus, Ceres, Pallas, Juno, Vesta and any
+numbered asteroid) the reference computes real values, whereas this version
+**raises `Error`** rather than returning a plausible-looking zero (which would
+read as a node at 0° Aries). Planned for a future release; see `NEXT.md`.
+
 ### 8. Phenomena (`pheno_ut`)
 
 Phase angle: inner planets < 1"; outer planets up to ~18" (position differences
@@ -388,6 +395,13 @@ distance from J2000: ~0" at J2000 for star-anchored "True" modes rising to ~40" 
 small fixed-star proper-motion / galactic-frame-definition differences (§4). This is
 a definitional difference in those niche modes, not an error: every fixed-epoch mode
 is exact.
+
+**10.3 SIDBIT projection flags (not yet supported).** The `SIDBIT_*` flags
+(`ECL_T0`, `SSY_PLANE`, `USER_UT`, `ECL_DATE`, `NO_PREC_OFFSET`, `PREC_ORIG`; all
+≥ 256) select alternative ecliptic/equinox projections that this version does not
+implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping the
+base ayanamsha mode — rather than the composite value silently falling back to
+Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release; see `NEXT.md`.
 
 ### 11. Crossing functions
 
