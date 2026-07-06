@@ -135,21 +135,25 @@ true body handling.
 
 ## 2. Total-eclipse obscuration
 
-Obscuration is the fraction of the Sun's *area* covered by the Moon, so it is
-physically bounded by 1.0 (a total eclipse covers 100% of the Sun). libephemeris
-returns exactly **1.0** for total eclipses (`sol_eclipse_how` `attr[2]`,
-`sol_eclipse_obscuration_at_loc`, and `sol_eclipse_how_details`
-`max_obscuration`). pyswisseph instead reports the lunar/solar disc *area ratio*
-`(R_moon/R_sun)² ≈ 1.05–1.12 > 1` for total eclipses, which is not a fraction. This
-is an intentional choice for physical correctness; the "how much larger the Moon
-appears than the Sun" information remains available in the eclipse *magnitude*
-(`attr[0]`/`attr[8]`).
+**Status: divergence removed in the v3.0.0 review (round 2).** The
+reference-compatible entry points (`sol_eclipse_how` `attr[2]`,
+`sol_eclipse_when_loc` `attr[2]`, `sol_eclipse_where` `attr[2]`,
+`lun_occult_where` `attr[2]`) now report exactly what the reference API
+reports for total eclipses: the lunar/solar disc *area ratio*
+`(R_moon/R_sun)² ≈ 1.05–1.12 > 1` (e.g. ~1.1167 at the Dallas maximum of
+2024-04-08). An earlier release clamped this to 1.0 (the physically-bounded
+covered fraction); that clamp broke 1:1 parity and has been reverted.
 
-Annular eclipses are identical to pyswisseph (`(R_moon/R_sun)² < 1`, the
-ring-residual area fraction) and partial eclipses use the standard two-disc lens
-overlap; both agree to ~1e-3. At a no-eclipse instant the obscuration is **0.0**
-from every entry point (`sol_eclipse_how`, `sol_eclipse_where`,
-`lun_occult_where`).
+The convenience extensions that are **not** part of the reference API —
+`sol_eclipse_obscuration_at_loc` and `sol_eclipse_how_details`
+`max_obscuration` — still return the physically-bounded covered fraction
+(1.0 when the Sun is fully covered), as their own documentation states.
+
+Annular eclipses report `(R_moon/R_sun)² < 1` (the ring-residual area
+fraction, identical in both conventions) and partial eclipses use the
+standard two-disc lens overlap; both agree with the reference to ~1e-3. At a
+no-eclipse instant the obscuration is **0.0** from every entry point
+(`sol_eclipse_how`, `sol_eclipse_where`, `lun_occult_where`).
 
 ---
 
@@ -178,3 +182,53 @@ history, and at −3000 (≤ ~6″ in latitude) already well below the
 ephemeris-generation floor on the planets (e.g. Mars ≈ 600″ at −3000). The of-date
 mean obliquity is taken from ERFA's Vondrák long-term routines
 (`erfa.ltpequ` / `erfa.ltpecl`).
+
+---
+
+## 4. `nod_aps` MEAN latitude-speed slot
+
+For the MEAN node/apsis method the reference engine fills the latitude-speed
+slot (`xperi[4]` / `xaphe[4]`) with the **latitude evaluated one day later**,
+not with a rate: probing shows `lat_spd == lat(t + 1 day)` to full printed
+precision at every epoch, while the longitude and distance slots contain a
+genuine forward difference over one day, `(x(t+1d) − x(t)) / 1d` (both
+verified black-box, e.g. Moon MEAN perigee at J2000: reference
+`lat = −3.419715`, `lat_spd = −3.408674 = lat(t+1d)`).
+
+libephemeris reproduces the one-day forward-difference convention for the
+longitude and distance speeds (exact match for the Moon), but returns the
+true forward-difference **rate** for the latitude speed — a value like
+−3.4°/day for a point whose latitude changes by 0.011°/day is a defect, not
+a convention. Consumers of the reference's MEAN `lat_spd` are reading a
+position, so no astrological result can depend on it being reproduced.
+
+Note: for the MEAN apsides of the *planets* the reference longitude/distance
+speeds follow yet another (not yet identified) convention that differs from
+both a one-day forward difference and a near-instantaneous rate by up to
+~0.15°/day (Mercury/Venus); this residual is under investigation and only
+affects the speed channels, not the positions.
+
+## 5. `deltat_ex` has no side effect on `get_tid_acc`
+
+In the reference API, calling `deltat_ex(jd, FLG_MOSEPH)` in automatic mode
+*mutates* the stored tidal acceleration (a later `get_tid_acc()` returns
+−25.58). libephemeris computes the same ΔT value (the tid-acc adjustment is
+applied functionally) but keeps `deltat_ex` pure: `get_tid_acc()` only
+changes when `set_tid_acc()` is called. Only introspection via
+`get_tid_acc()` after `deltat_ex` can observe the difference.
+
+## 6. `nod_aps` node positions: transient light-time spikes
+
+With default flags the reference engine applies its apparent-position
+correction to each node/apsis point with a per-point numerical scheme that
+occasionally glitches: on isolated days (~15 days out of 3653 sampled over
+1995-2005 for Jupiter) one node — and only one — jumps by up to ~3.5" while
+its reported speed spikes an order of magnitude, and with `FLG_TRUEPOS` the
+same call returns exactly antipodal nodes again (0.000000"). The median
+default-flag deviation is 0.015" (p99 ≈ 0.43").
+
+libephemeris applies its aberration correction analytically, so its nodes
+are exactly antipodal at all times and agree with the reference to ≤0.03"
+outside those spike days. The spikes are not reproduced. Validation
+comparisons of node positions should either use `FLG_TRUEPOS` or tolerate
+the reference's p99 (~0.5").

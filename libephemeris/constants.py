@@ -100,9 +100,7 @@ PLANET_X_LEVERRIER: int = (
 # Planet X Adams - Adams' calculated "Planet X" (independently derived, similar to Leverrier's)
 # John Couch Adams independently predicted Neptune's position around the same time as Leverrier.
 # This uses Adams' orbital elements prediction (FICT_OFFSET + 12 = 52).
-PLANET_X_ADAMS: int = (
-    FICT_OFFSET + 12
-)  # 52 - Adams' Planet X (Neptune prediction)
+PLANET_X_ADAMS: int = FICT_OFFSET + 12  # 52 - Adams' Planet X (Neptune prediction)
 
 # Planet X Lowell - Percival Lowell's predicted "Planet X" that led to Pluto's discovery
 # Lowell predicted a trans-Neptunian planet based on perceived perturbations in Uranus's orbit.
@@ -110,9 +108,7 @@ PLANET_X_ADAMS: int = (
 # though Pluto was too small to be Lowell's predicted Planet X.
 # This uses Lowell's orbital elements prediction (FICT_OFFSET + 13 = 53).
 # Orbital elements (1915 prediction): a=43.0 AU, e=0.202, i=10°
-PLANET_X_LOWELL: int = (
-    FICT_OFFSET + 13
-)  # 53 - Lowell's Planet X (Pluto prediction)
+PLANET_X_LOWELL: int = FICT_OFFSET + 13  # 53 - Lowell's Planet X (Pluto prediction)
 
 # Planet X Pickering - William H. Pickering's predicted "Planet O" (1919)
 # Pickering proposed several trans-Neptunian planets (Planet O, P, Q, R, S, T, U).
@@ -124,9 +120,7 @@ PLANET_X_LOWELL: int = (
 # Like Lowell's Planet X, these predictions were based on supposed perturbations in outer
 # planet orbits, which later proved to be observational errors.
 # This uses Pickering's orbital elements prediction (FICT_OFFSET + 14 = 54).
-PLANET_X_PICKERING: int = (
-    FICT_OFFSET + 14
-)  # 54 - Pickering's Planet O/X prediction
+PLANET_X_PICKERING: int = FICT_OFFSET + 14  # 54 - Pickering's Planet O/X prediction
 
 # White Moon (Selena) - Point opposite to Black Moon Lilith (lunar perigee = apogee + 180°)
 # Calculated as Mean Lilith + 180° (i.e., the mean lunar perigee)
@@ -155,16 +149,12 @@ QUAOAR: int = 50000 + AST_OFFSET  # Classical KBO
 NESSUS: int = 7066 + AST_OFFSET  # Centaur, astrologically important
 ASBOLUS: int = 8405 + AST_OFFSET  # Centaur, astrologically significant
 CHARIKLO: int = 10199 + AST_OFFSET  # Centaur, largest known, has ring system
-GONGGONG: int = (
-    225088 + AST_OFFSET
-)  # TNO, dwarf planet candidate (formerly 2007 OR10)
+GONGGONG: int = 225088 + AST_OFFSET  # TNO, dwarf planet candidate (formerly 2007 OR10)
 APOPHIS: int = 99942 + AST_OFFSET  # Near-Earth asteroid, close approach 2029
 HYGIEA: int = 10 + AST_OFFSET  # Fourth largest asteroid, dwarf planet candidate
 INTERAMNIA: int = 704 + AST_OFFSET  # Fifth largest asteroid, main belt
 DAVIDA: int = 511 + AST_OFFSET  # Seventh largest asteroid, main belt
-EUROPA_AST: int = (
-    52 + AST_OFFSET
-)  # 52 Europa (main belt asteroid, not Jupiter's moon)
+EUROPA_AST: int = 52 + AST_OFFSET  # 52 Europa (main belt asteroid, not Jupiter's moon)
 SYLVIA: int = (
     87 + AST_OFFSET
 )  # 87 Sylvia (triple asteroid system with moons Romulus and Remus)
@@ -334,6 +324,7 @@ SPK_BODY_NAME_MAP: dict[int, tuple[str, int]] = {
     RYUGU: ("162173", NAIF_RYUGU),  # 162173 Ryugu (Apollo asteroid)
 }
 
+
 def get_horizons_id(ipl: int) -> str | None:
     """
     Get the JPL Horizons target identifier for a libephemeris body ID.
@@ -353,6 +344,7 @@ def get_horizons_id(ipl: int) -> str | None:
     if ipl in SPK_BODY_NAME_MAP:
         return SPK_BODY_NAME_MAP[ipl][0]
     return None
+
 
 def get_naif_id_from_ipl(ipl: int) -> int | None:
     """
@@ -374,6 +366,7 @@ def get_naif_id_from_ipl(ipl: int) -> int | None:
         return SPK_BODY_NAME_MAP[ipl][1]
     return None
 
+
 def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
     """
     Get both Horizons ID and NAIF ID for a libephemeris body.
@@ -391,6 +384,7 @@ def get_spk_body_info_from_map(ipl: int) -> tuple[str, int] | None:
         ('136199', 2136199)
     """
     return SPK_BODY_NAME_MAP.get(ipl)
+
 
 # =============================================================================
 # SPK AUTO-DOWNLOAD BLOCKED BODIES
@@ -413,6 +407,7 @@ SPK_AUTO_DOWNLOAD_BLOCKED: dict[int, str] = {
     ),
 }
 
+
 def is_spk_auto_download_blocked(ipl: int) -> bool:
     """Return True if JPL Horizons blocks SPK generation for this body.
 
@@ -427,6 +422,7 @@ def is_spk_auto_download_blocked(ipl: int) -> bool:
         True if auto-download is blocked for this body.
     """
     return ipl in SPK_AUTO_DOWNLOAD_BLOCKED
+
 
 # =============================================================================
 # REQUIRED SPK BODIES FOR HIGH-PRECISION CALCULATIONS
@@ -547,9 +543,7 @@ PHECDA: int = FIXSTAR_OFFSET + 70  # Gamma Ursae Majoris - bowl star
 MEGREZ: int = FIXSTAR_OFFSET + 71  # Delta Ursae Majoris - bowl-handle junction
 
 # Crux (Southern Cross) - completing the constellation
-DELTA_CRUCIS: int = (
-    FIXSTAR_OFFSET + 72
-)  # Delta Crucis - fourth star of Southern Cross
+DELTA_CRUCIS: int = FIXSTAR_OFFSET + 72  # Delta Crucis - fourth star of Southern Cross
 
 # Centaurus - completing the bright stars of the constellation
 MENKENT: int = FIXSTAR_OFFSET + 73  # Theta Centauri
@@ -876,10 +870,7 @@ HELFLAG_AVKIND_PTO: int = 1 << 17  # 131072 - Ptolemy method
 HELFLAG_AVKIND_MIN7: int = 1 << 18  # 262144 - Babylonian method (min 7°)
 HELFLAG_AVKIND_MIN9: int = 1 << 19  # 524288 - Babylonian method (min 9°)
 HELFLAG_AVKIND: int = (  # 983040 - Mask for all AV kind bits
-    HELFLAG_AVKIND_VR
-    | HELFLAG_AVKIND_PTO
-    | HELFLAG_AVKIND_MIN7
-    | HELFLAG_AVKIND_MIN9
+    HELFLAG_AVKIND_VR | HELFLAG_AVKIND_PTO | HELFLAG_AVKIND_MIN7 | HELFLAG_AVKIND_MIN9
 )
 
 # reference API-compatible aliases (without SE_ prefix)
@@ -919,7 +910,10 @@ TIDAL_DE430: float = -25.82  # DE430
 TIDAL_DE431: float = -25.80  # DE431
 TIDAL_DE440: float = -25.936  # DE440 (current default)
 TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-TIDAL_DEFAULT: float = -25.8  # Default value (matches the reference ephemeris)
+# Default tidal acceleration: the DE440/DE441 value, matching both this
+# library's ephemeris and the reference API's own default (verified
+# black-box: its get_tid_acc() returns -25.936 out of the box).
+TIDAL_DEFAULT: float = TIDAL_DE440
 TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
 # reference API-compatible aliases (without SE_ prefix)

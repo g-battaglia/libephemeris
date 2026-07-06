@@ -90,13 +90,26 @@ class TestLeapSecondValues:
         )
 
     def test_tai_utc_before_first_leap_second(self):
-        """Verify TAI-UTC is 0 before the leap second system (pre-1972)."""
+        """Verify pre-1972 TAI-UTC follows the rate-based (rubber-second) model.
+
+        Before the 1972 leap-second system, UTC tracked TAI via the IERS
+        piecewise-linear frequency-offset law, not integer steps. get_tai_utc
+        implements that model for pre-1972 dates (it is NOT 0: the true
+        offset grew from ~1.4 s in 1961 to ~10 s by the end of 1971).
+        """
         load_iers_data()
 
         # December 31, 1971 - day before first leap second
         mjd_pre_1972 = _calendar_to_mjd(1971, 12, 31) + 0.5
         tai_utc = get_tai_utc(mjd_pre_1972)
-        assert tai_utc == 0.0, f"TAI-UTC before 1972 should be 0, got {tai_utc}"
+        # 1968-02-01 segment: 4.2131700 s + (MJD - 39126) * 0.002592 s/day
+        expected = 4.2131700 + (mjd_pre_1972 - 39126.0) * 0.002592
+        assert tai_utc == pytest.approx(expected, abs=1e-9), (
+            f"pre-1972 TAI-UTC should follow the rate-based model "
+            f"({expected:.6f}s), got {tai_utc}"
+        )
+        # Sanity: just below the first integer step (10 s at 1972-01-01).
+        assert 9.0 < tai_utc < 10.0
 
     def test_tai_utc_after_last_known_leap_second(self):
         """Verify TAI-UTC remains at 37 after 2017-01-01."""

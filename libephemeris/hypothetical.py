@@ -49,7 +49,6 @@ docs/methodology/hypothetical-bodies.md for the per-body source table):
 
 from __future__ import annotations
 
-import erfa
 import math
 import re
 from dataclasses import dataclass
@@ -789,9 +788,9 @@ class UranianKeplerianElements:
 #   2. Solve Kepler's equation: M = E - e*sin(E) -> eccentric anomaly E
 #   3. Position in orbital plane: x = a*(cosE - e), y = a*sqrt(1-e²)*sinE
 #   4. Transform via Gaussian vectors (PQR matrix) to ecliptic in equinox frame
-#   5. Rotate ecliptic -> equatorial at equinox obliquity
-#   6. Precess equatorial from equinox to J2000
-#   7. Rotate equatorial -> ecliptic at J2000 obliquity
+#   5. Precess the ecliptic direction from the element equinox to J2000 via
+#      astrometry._precess_ecliptic (Vondrák 2011 long-term precession, the
+#      same realization used downstream for the J2000 -> of-date step)
 #
 # Orbital elements (the single source of truth, identical to
 # data/fictitious_orbits.csv — enforced by
@@ -2830,9 +2829,10 @@ def _keplerian_to_ecliptic_j2000(
     3. Compute position in orbital plane: x = a*(cosE - e), y = a*sqrt(1-e^2)*sinE
     4. Apply Gaussian vectors (PQR matrix) to transform to ecliptic Cartesian
        coordinates in the equinox reference frame
-    5. If equinox != J2000: rotate ecliptic -> equatorial at equinox obliquity,
-       precess equatorial from equinox epoch to J2000, then rotate back to
-       ecliptic J2000
+    5. If equinox != J2000: precess the ecliptic direction from the element
+       equinox to J2000 via ``astrometry._precess_ecliptic`` (Vondrák 2011
+       long-term precession — the same realization the caller later uses for
+       the J2000 -> of-date step, keeping the two rotations frame-consistent)
 
     This algorithm matches standard Keplerian orbit propagation as described
     in Meeus "Astronomical Algorithms" Ch. 33 and other celestial mechanics
@@ -2896,50 +2896,35 @@ def _keplerian_to_ecliptic_j2000(
     y_ecl = Py * x_orb + Qy * y_orb
     z_ecl = Pz * x_orb + Qz * y_orb
 
-    # If equinox != J2000, transform to J2000 frame via precession
-    tequ = elements.equinox_jd
-    if abs(tequ - _J2000_JD) > 1e-6:
-        # Step 1: Ecliptic -> equatorial at equinox epoch obliquity
-        # Rotation around x-axis by -eps (ecliptic to equator)
-        eps = float(erfa.obl06(_J2000_JD, tequ - _J2000_JD))
-        cos_eps = math.cos(eps)
-        sin_eps = math.sin(eps)
-
-        x_eq = x_ecl
-        y_eq = y_ecl * cos_eps - z_ecl * sin_eps
-        z_eq = y_ecl * sin_eps + z_ecl * cos_eps
-
-        # Step 2: Precess equatorial from equinox epoch to J2000
-        # erfa.pmat06 gives the rotation matrix FROM J2000 TO date.
-        # To go from date TO J2000, apply the transpose (inverse of rotation).
-        P = erfa.pmat06(_J2000_JD, tequ - _J2000_JD)
-        # P^T maps date -> J2000
-        x_j2000 = P[0][0] * x_eq + P[1][0] * y_eq + P[2][0] * z_eq
-        y_j2000 = P[0][1] * x_eq + P[1][1] * y_eq + P[2][1] * z_eq
-        z_j2000 = P[0][2] * x_eq + P[1][2] * y_eq + P[2][2] * z_eq
-
-        # Step 3: Equatorial J2000 -> ecliptic J2000
-        # Rotation around x-axis by +eps_j2000 (equator to ecliptic)
-        eps_j2000 = float(erfa.obl06(_J2000_JD, 0.0))
-        cos_eps0 = math.cos(eps_j2000)
-        sin_eps0 = math.sin(eps_j2000)
-
-        x_ecl_final = x_j2000
-        y_ecl_final = y_j2000 * cos_eps0 + z_j2000 * sin_eps0
-        z_ecl_final = -y_j2000 * sin_eps0 + z_j2000 * cos_eps0
-    else:
-        x_ecl_final = x_ecl
-        y_ecl_final = y_ecl
-        z_ecl_final = z_ecl
-
-    # Cartesian -> spherical coordinates
-    r = math.sqrt(x_ecl_final**2 + y_ecl_final**2 + z_ecl_final**2)
-    longitude = math.degrees(math.atan2(y_ecl_final, x_ecl_final)) % 360.0
+    # Cartesian -> spherical coordinates (ecliptic frame of the element equinox).
+    # The radius uses the analytic Keplerian relation r = a*(1 - e*cosE), which
+    # is exactly the norm of the orbital-plane vector (and of the ecliptic
+    # vector: the PQR matrix is a pure rotation). Computing it analytically
+    # instead of via the Cartesian norm avoids ULP-level floating-point noise,
+    # so a circular orbit (e = 0) yields the bit-identical constant distance a
+    # at every date.
+    r = elements.a * (1.0 - e * cos_E)
+    longitude = math.degrees(math.atan2(y_ecl, x_ecl)) % 360.0
     if r > 0:
-        sin_lat = max(-1.0, min(1.0, z_ecl_final / r))
+        sin_lat = max(-1.0, min(1.0, z_ecl / r))
         latitude = math.degrees(math.asin(sin_lat))
     else:
         latitude = 0.0
+
+    # If equinox != J2000, precess to the J2000 ecliptic frame. This MUST use
+    # the same long-term (Vondrák 2011) precession/obliquity realization as
+    # the downstream J2000 -> of-date step (astrometry._precess_ecliptic), so
+    # the equinox hop and the of-date reduction compose in one consistent
+    # frame. Mixing models here (previously an IAU 2006 rotation, a
+    # short-term polynomial) produces a "J2000 ecliptic" that is not the one
+    # the Vondrák of-date step expects — a frame mismatch that grows with the
+    # span between the target date and J2000. Precession is a pure rotation,
+    # so the distance r is unchanged.
+    tequ = elements.equinox_jd
+    if abs(tequ - _J2000_JD) > 1e-6:
+        from .astrometry import _precess_ecliptic
+
+        longitude, latitude = _precess_ecliptic(longitude, latitude, tequ, _J2000_JD)
 
     return (longitude, latitude, r)
 

@@ -859,7 +859,12 @@ class TestAutoGetSpk:
         """Existing covering file is registered when ipl given (line 1421)."""
         f = tmp_path / "2060_2450000_2470000.bsp"
         f.write_bytes(b"x")
-        with patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
+        # _find_covering_spk reads real segment metadata via get_spk_coverage;
+        # the dummy file has none, so patch it to report a covering span.
+        with patch(
+            "libephemeris.spk.get_spk_coverage",
+            return_value=(2450000.0, 2470000.0),
+        ), patch.object(spk_auto, "_is_valid_bsp", return_value=True), \
                 patch.object(
                     spk_auto, "_register_spk_after_download"
                 ) as mock_reg:

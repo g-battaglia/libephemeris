@@ -46,6 +46,7 @@ References:
 from __future__ import annotations
 
 from contextlib import contextmanager as _contextmanager
+from functools import lru_cache
 
 import math
 from typing import Tuple, TYPE_CHECKING
@@ -190,6 +191,7 @@ from .constants import (
     SIDM_USER,
     NODBIT_MEAN,
     NODBIT_OSCU,
+    NODBIT_OSCU_BAR,
     NODBIT_FOPOINT,
     _MOON_MEAN_DIST_AU,
     _MOON_MEAN_APOG_DIST_AU,
@@ -2265,8 +2267,11 @@ def _calc_body(
             # so add nutation in longitude (dpsi) unless NONUT is set.
             # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
+            # J2000 output is likewise the mean ecliptic precessed to J2000:
+            # the reference treats FLG_J2000 as implying no nutation here.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-            if not (iflag & FLG_NONUT) and not _sid_eq:
+            _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+            if not _no_nut:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -2287,7 +2292,7 @@ def _calc_body(
                 dlon = lon_diff / (2.0 * dt)
                 # True-ecliptic output: the speed includes the nutation
                 # rate, exactly like the position includes dpsi.
-                if not (iflag & FLG_NONUT) and not _sid_eq:
+                if not _no_nut:
                     dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -2301,8 +2306,11 @@ def _calc_body(
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
             # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
+            # J2000 output is likewise nutation-free (mean ecliptic precessed
+            # to J2000), matching the reference.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-            if (iflag & FLG_NONUT) or _sid_eq:
+            _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+            if _no_nut:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -2333,7 +2341,7 @@ def _calc_body(
                     # The raw true-node curve contains nutation; under
                     # NONUT (mean-ecliptic output) remove its rate, the
                     # same way dpsi was removed from the position.
-                    if (iflag & FLG_NONUT) or _sid_eq:
+                    if _no_nut:
                         dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
@@ -2371,8 +2379,11 @@ def _calc_body(
             # so add nutation in longitude (dpsi) unless NONUT is set.
             # When SIDEREAL+EQUATORIAL, the reference ephemeris outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so skip dpsi.
+            # J2000 output is likewise the mean ecliptic precessed to J2000:
+            # the reference treats FLG_J2000 as implying no nutation here.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-            if not (iflag & FLG_NONUT) and not _sid_eq:
+            _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+            if not _no_nut:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -2396,7 +2407,7 @@ def _calc_body(
                 dlat = (lat_next - lat_prev) / (2.0 * dt)
                 # True-ecliptic output: include the nutation rate, like
                 # the position includes dpsi.
-                if not (iflag & FLG_NONUT) and not _sid_eq:
+                if not _no_nut:
                     dlon += _nutation_rate_deg_per_day(jd_tt, dt)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -2410,8 +2421,11 @@ def _calc_body(
             # When NONUT is set, subtract dpsi to get mean ecliptic position.
             # When SIDEREAL+EQUATORIAL, the reference ephemeris also outputs mean ecliptic
             # (no nutation) converted with mean obliquity, so strip dpsi too.
+            # J2000 output is likewise nutation-free (mean ecliptic precessed
+            # to J2000), matching the reference.
             _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-            if (iflag & FLG_NONUT) or _sid_eq:
+            _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+            if _no_nut:
                 from .cache import get_cached_nutation
 
                 dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -2440,7 +2454,7 @@ def _calc_body(
                     ddist = (dist_next - dist_prev) / (2.0 * dt)
                     # The raw osculating curve contains nutation; under
                     # NONUT (mean-ecliptic output) remove its rate.
-                    if (iflag & FLG_NONUT) or _sid_eq:
+                    if _no_nut:
                         dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
                 except (
                     IndexError,
@@ -2478,9 +2492,11 @@ def _calc_body(
         # ecliptic of date (nutation included).  Under NONUT — or under
         # SIDEREAL+EQUATORIAL, where the reference outputs the mean
         # ecliptic converted with mean obliquity — subtract dpsi, the
-        # same convention as TRUE_NODE/OSCU_APOG.
+        # same convention as TRUE_NODE/OSCU_APOG.  J2000 output is
+        # likewise nutation-free, matching the reference.
         _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-        if (iflag & FLG_NONUT) or _sid_eq:
+        _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+        if _no_nut:
             from .cache import get_cached_nutation
 
             dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -2517,7 +2533,7 @@ def _calc_body(
             ddist = (dist_next - dist_prev) / (2.0 * dt)
             # The interpolated curves are true-ecliptic; under NONUT
             # (mean-ecliptic output) remove the nutation rate.
-            if (iflag & FLG_NONUT) or _sid_eq:
+            if _no_nut:
                 dlon -= _nutation_rate_deg_per_day(jd_tt, dt)
         # Apply sidereal correction if requested (not for equatorial output).
         # FLG_J2000 is honored for IntpApog/IntpPerg, same as MeanApog.
@@ -2834,9 +2850,12 @@ def _calc_body(
         lon, lat, dist = pos[0], pos[1], pos[2]
         dlon, dlat, ddist = pos[3], pos[4], pos[5]
 
-        # These functions return mean ecliptic of date. Add nutation unless suppressed.
+        # These functions return mean ecliptic of date. Add nutation unless
+        # suppressed (NONUT, SIDEREAL+EQUATORIAL, or J2000 output, which is
+        # the mean ecliptic precessed to J2000 like the reference).
         _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-        if not (iflag & FLG_NONUT) and not _sid_eq:
+        _no_nut = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+        if not _no_nut:
             from .cache import get_cached_nutation
 
             dpsi_rad, _ = get_cached_nutation(jd_tt)
@@ -3030,9 +3049,13 @@ def _calc_body(
     if ANGLE_OFFSET <= ipl < ARABIC_OFFSET:
         topo = get_topo()
         if topo is None:
-            from .exceptions import Error
+            from .exceptions import ConfigurationError
 
-            raise Error("Angles require observer location. Call set_topo() first.")
+            raise ConfigurationError(
+                "Angles require observer location. Call set_topo() first.",
+                missing_config="observer_location",
+                suggestion="Call set_topo(lon, lat, alt) first",
+            )
 
         # Extract lat/lon from topo
         lat = topo.latitude.degrees
@@ -3046,10 +3069,13 @@ def _calc_body(
     if ARABIC_OFFSET <= ipl < ARABIC_OFFSET + 100:
         cache = get_angles_cache()
         if not cache:
-            from .exceptions import Error
+            from .exceptions import ConfigurationError
 
-            raise Error(
-                "Arabic parts require pre-calculated positions. Call calc_angles() first."
+            raise ConfigurationError(
+                "Arabic parts require pre-calculated positions. "
+                "Call calc_angles() first.",
+                missing_config="angles_cache",
+                suggestion="Call calc_angles() first",
             )
 
         # Map part IDs to calculation functions
@@ -3125,13 +3151,15 @@ def _calc_body(
         icrf_center = 0  # SSB
     elif iflag & FLG_TOPOCTR:
         if observer_topo is None:
-            from .exceptions import Error
+            from .exceptions import ConfigurationError
 
             # Matching the reference API: topocentric positions without a
             # prior set_topo() are an error, not a silent geocentric result.
-            raise Error(
+            raise ConfigurationError(
                 "FLG_TOPOCTR requires a geographic position: call "
-                "set_topo(lon, lat, alt) first"
+                "set_topo(lon, lat, alt) first",
+                missing_config="observer_location",
+                suggestion="Call set_topo(lon, lat, alt) first",
             )
         earth = planets["earth"]
         observer = earth + observer_topo
@@ -3800,7 +3828,86 @@ STARS = {
 
 
 def _get_star_position_ecliptic(
-    star: StarData, tjd_tt: float, eps_true: float
+    star: StarData,
+    tjd_tt: float,
+    eps_true: float,
+    nonut: bool = False,
+    geometric: bool = False,
+) -> float:
+    """Interpolating wrapper: see _star_position_ecliptic_uncached.
+
+    The anchor longitude varies slowly (precession ~0.14"/day, proper
+    motion <0.01"/day, annual aberration <0.36"/day), so it is evaluated
+    exactly only at memoized 8-day grid nodes and interpolated with a
+    Lagrange quadratic in between. The fastest term (annual aberration,
+    ~20.5" sinusoid) leaves a cubic residual below 0.004" over a 16-day
+    node span — negligible against the pipeline's own precision — while
+    cutting the per-call cost of the star-based ayanamsha modes by the
+    node-reuse factor (the full Skyfield pipeline runs only at nodes).
+    """
+    h = 8.0  # node spacing in days
+    base = math.floor(tjd_tt / (2.0 * h)) * (2.0 * h)
+    # Under nonut the true obliquity argument is unused: normalize it so
+    # the node cache key does not vary with the caller's request date.
+    eps_key = 0.0 if nonut else eps_true
+
+    def _node(jd_node: float) -> float:
+        return _star_position_ecliptic_cached(
+            star.ra_j2000,
+            star.dec_j2000,
+            star.pm_ra,
+            star.pm_dec,
+            star.parallax,
+            star.radial_velocity,
+            jd_node,
+            eps_key,
+            nonut,
+            geometric,
+        )
+
+    y0, y1, y2 = _node(base), _node(base + h), _node(base + 2.0 * h)
+    # Unwrap around y1 so the quadratic never crosses the 0/360 seam
+    y0 += (y1 - y0 + 180.0) % 360.0 - 180.0 - (y1 - y0)
+    y2 += (y1 - y2 + 180.0) % 360.0 - 180.0 - (y1 - y2)
+    x = (tjd_tt - base) / h  # in [0, 2]
+    lon = (
+        y0 * (x - 1.0) * (x - 2.0) / 2.0 - y1 * x * (x - 2.0) + y2 * x * (x - 1.0) / 2.0
+    )
+    return lon % 360.0
+
+
+@lru_cache(maxsize=1024)
+def _star_position_ecliptic_cached(
+    ra_j2000: float,
+    dec_j2000: float,
+    pm_ra: float,
+    pm_dec: float,
+    parallax: float,
+    radial_velocity: float,
+    tjd_tt: float,
+    eps_true: float,
+    nonut: bool,
+    geometric: bool,
+) -> float:
+    star = StarData(
+        ra_j2000=ra_j2000,
+        dec_j2000=dec_j2000,
+        pm_ra=pm_ra,
+        pm_dec=pm_dec,
+        parallax=parallax,
+        radial_velocity=radial_velocity,
+    )
+    return _star_position_ecliptic_uncached(
+        star, tjd_tt, eps_true, nonut=nonut, geometric=geometric
+    )
+
+
+def _star_position_ecliptic_uncached(
+    star: StarData,
+    tjd_tt: float,
+    eps_true: float,
+    nonut: bool = False,
+    geometric: bool = False,
 ) -> float:
     """
     Calculate ecliptic longitude of a fixed star at given date.
@@ -3821,6 +3928,16 @@ def _get_star_position_ecliptic(
         tjd_tt: Julian Day in Terrestrial Time (TT)
         eps_true: True obliquity of date in degrees (Vondrák mean + nutation),
                   used for the equator-of-date -> ecliptic-of-date rotation.
+        nonut: When True, return the longitude on the MEAN ecliptic of date
+            (precession-only rotation, mean obliquity; ``eps_true`` is
+            ignored). Aberration and light deflection stay applied. This is
+            the anchor the reference API uses for the star-based ayanamsha
+            modes: the mean ayanamsha is the NONUT star longitude, and the
+            true ayanamsha adds the nutation in longitude once.
+        geometric: When True, skip aberration and light deflection (use the
+            astrometric direction). Required for geometric directions such
+            as the galactic pole, which the reference API does not treat as
+            light sources.
 
     Returns:
         Ecliptic longitude of date in degrees (0-360)
@@ -3849,18 +3966,26 @@ def _get_star_position_ecliptic(
     t = ts.tt_jd(tjd_tt)
     earth = planets["earth"]
 
-    # earth.at(t).observe(star) applies proper motion + light-time
-    # .apparent() applies aberration + deflection
-    pos = earth.at(t).observe(star_obj).apparent()
+    # earth.at(t).observe(star) applies proper motion + light-time;
+    # .apparent() applies aberration + deflection (skipped for geometric
+    # directions like the galactic pole).
+    pos = earth.at(t).observe(star_obj)
+    if not geometric:
+        pos = pos.apparent()
 
     # Rotate the apparent ICRS direction to the Vondrák ecliptic of date (same
     # reduction as _calc_body), not Skyfield's IAU 2006 ecliptic_frame.
     import numpy as np
 
-    dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
-    pn, _eps = vondrak_pn_matrix(tjd_tt, float(dpsi_rad), float(deps_rad))
+    if nonut:
+        # Mean ecliptic of date: precession-only rotation, mean obliquity.
+        pn = vondrak_precession_matrix(tjd_tt)
+        eps_rad = vondrak_mean_obliquity_rad(tjd_tt)
+    else:
+        dpsi_rad, deps_rad = erfa.nut06a(2451545.0, tjd_tt - 2451545.0)
+        pn, _eps = vondrak_pn_matrix(tjd_tt, float(dpsi_rad), float(deps_rad))
+        eps_rad = math.radians(eps_true)
     xq, yq, zq = np.array(pn) @ np.array(pos.position.au)
-    eps_rad = math.radians(eps_true)
     ce, se = math.cos(eps_rad), math.sin(eps_rad)
     xe = float(xq)
     ye = float(yq) * ce + float(zq) * se
@@ -4118,39 +4243,38 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         val = 0.0
 
         if sid_mode == SIDM_TRUE_CITRA:
-            star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
+            star_lon = _get_star_position_ecliptic(
+                STARS["SPICA"], tjd_tt, eps_true, nonut=True
+            )
             val = star_lon - 180.0
 
         elif sid_mode == SIDM_TRUE_REVATI:
             # True Revati: Zeta Piscium at 29°50' Pisces (359.8333° sidereal)
-            # ayanamsha = star_lon - sidereal_reference = star_lon - 359.8333
-            # which is equivalent to: star_lon + 0.1667 (since 360 - 359.8333)
-            # Calibrated offset: 0.16761483° (accounts for star catalog precision)
-            # at J2000 to account for differences in star catalog data
-            star_lon = _get_star_position_ecliptic(STARS["REVATI"], tjd_tt, eps_true)
-            val = star_lon + 0.16761483
+            # ayanamsha = star_lon - 359°50' = star_lon + 0.1666667
+            # (the previous "calibrated" 0.16761483 offset was compensating
+            # the double-counted nutation removed from the star anchor)
+            star_lon = _get_star_position_ecliptic(
+                STARS["REVATI"], tjd_tt, eps_true, nonut=True
+            )
+            val = star_lon + (10.0 / 60.0)
 
         elif sid_mode == SIDM_TRUE_PUSHYA:
-            # True Pushya: Delta Cancri at 16° Cancer (106° sidereal)
-            # Uses quadratic formula fitted to high-precision star positions:
-            # aya = ayan_t0 + prec_rate * T + quadratic_term * T^2
-            # where T = Julian centuries from J2000
-            # Max error: <0.12 arcsec across 1800-2100
-            ayan_t0 = 22.7271025119  # Ayanamsha at J2000
-            prec_rate = 1.3980525123  # deg/century (includes star proper motion)
-            quad_term = 0.0003185103  # deg/century^2
-            val = ayan_t0 + prec_rate * T + quad_term * T * T
+            # True Pushya: Delta Cancri (Asellus Australis) at 16° Cancer
+            # (106° sidereal). Computed dynamically from the star position
+            # (proper motion included), like the other true-star modes.
+            star_lon = _get_star_position_ecliptic(
+                STARS["PUSHYA"], tjd_tt, eps_true, nonut=True
+            )
+            val = star_lon - 106.0
 
         elif sid_mode == SIDM_TRUE_MULA:
-            # True Mula: Lambda Scorpii at 0° Sagittarius (240° sidereal)
-            # Uses quadratic formula fitted to high-precision star positions:
-            # aya = ayan_t0 + prec_rate * T + quadratic_term * T^2
-            # where T = Julian centuries from J2000
-            # Max error: <0.09 arcsec across 1800-2100
-            ayan_t0 = 24.5799809434  # Ayanamsha at J2000
-            prec_rate = 1.3966437961  # deg/century (includes star proper motion)
-            quad_term = 0.0003297118  # deg/century^2
-            val = ayan_t0 + prec_rate * T + quad_term * T * T
+            # True Mula: Lambda Scorpii (Shaula) at 0° Sagittarius
+            # (240° sidereal). Computed dynamically from the star position
+            # (proper motion included), like the other true-star modes.
+            star_lon = _get_star_position_ecliptic(
+                STARS["MULA"], tjd_tt, eps_true, nonut=True
+            )
+            val = star_lon - 240.0
 
         elif sid_mode == SIDM_GALCENT_0SAG:
             # Galactic Center at 0° Sagittarius (240° ecliptic longitude).
@@ -4179,7 +4303,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             # The ayanamsha is then (node - 240°), placing the galactic centre near
             # 0° Sagittarius (240° ecliptic). Formula validated against IAU 1958 frame.
             gp_lon = _get_star_position_ecliptic(
-                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
+                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true, nonut=True, geometric=True
             )
             node = (gp_lon + 90.0) % 360.0
             val = node - 240.0
@@ -4190,7 +4314,7 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             # (0.052920°). The ascending node offset is adjusted to reflect the
             # updated zero-point of the true galactic equator on the ecliptic.
             gp_lon = _get_star_position_ecliptic(
-                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
+                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true, nonut=True, geometric=True
             )
             node = (gp_lon + 90.0) % 360.0
             val = node - 239.94708
@@ -4201,27 +4325,36 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             # falls at the middle of Mula (Lambda Scorpii region).
             # Offset 246.6137° places the ayanamsha ~23.41° at J2000 (Mula alignment).
             gp_lon = _get_star_position_ecliptic(
-                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
+                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true, nonut=True, geometric=True
             )
             node = (gp_lon + 90.0) % 360.0
             val = node - 246.6137
 
         elif sid_mode == SIDM_GALALIGN_MARDYKS:
             # Galactic Alignment (Raymond Mardyks).
-            # Same node formula as IAU 1958, offset 240° (galactic centre at 0° Sag).
-            gp_lon = _get_star_position_ecliptic(
-                STARS["GAL_NORTH_POLE"], tjd_tt, eps_true
+            # Formula-based in the reference API: fixed J2000 value plus the
+            # general-precession polynomial (verified black-box; a node
+            # formula oscillates ±25" against it).
+            ayan_t0_mardyks = 30.01779390499155
+            prec_arcsec = (
+                _PREC_C1 * T
+                + _PREC_C2 * T**2
+                + _PREC_C3 * T**3
+                + _PREC_C4 * T**4
+                + _PREC_C5 * T**5
             )
-            node = (gp_lon + 90.0) % 360.0
-            val = node - 240.0
+            val = ayan_t0_mardyks + prec_arcsec / 3600.0
 
         elif sid_mode == SIDM_TRUE_SHEORAN:
-            # True Sheoran: Spica (alpha Virginis) defines the reference.
-            # The target sidereal position of Spica is 178.60170° (28°36' Virgo).
-            # ayanamsha = star_lon - 178.60170
-            # At J2000: Spica ~203.836°, ayanamsha ~25.234°.
-            star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
-            val = star_lon - 178.60170
+            # True Sheoran: anchored to Delta Cancri (Asellus Australis),
+            # NOT Spica — identified black-box by scanning the full star
+            # catalog for zero drift against the reference output
+            # (offset constant to 0.0000000" over 1700-2300).
+            # ayanamsha = star_lon - 103°29'33.511979"
+            star_lon = _get_star_position_ecliptic(
+                STARS["PUSHYA"], tjd_tt, eps_true, nonut=True
+            )
+            val = star_lon - 103.4926422163
 
         elif sid_mode == SIDM_GALCENT_MULA_WILHELM:
             # Galactic Center at Middle of Mula nakshatra (Ernst Wilhelm).
@@ -4260,12 +4393,26 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             return val % 360.0
 
         elif sid_mode == SIDM_VALENS_MOON:
-            # Valens (Moon): Spica (alpha Virginis) defines the reference.
-            # The target sidereal position of Spica is 181.04054° (1°02'26\" Libra).
-            # ayanamsha = star_lon - 181.04054
-            # At J2000: Spica ~203.836°, ayanamsha ~22.796°.
-            star_lon = _get_star_position_ecliptic(STARS["SPICA"], tjd_tt, eps_true)
-            val = star_lon - 181.04054
+            # Vettius Valens (Moon): NOT star-anchored at runtime — the
+            # reference computes it as a user-style epoch formula with
+            # ayan_t0 = -2.9422° at t0 = JD 1775845.5 counted in UT
+            # (verified black-box to 0.000000001": insensitive to
+            # TRUEPOS/NOABERR, exact with the UT epoch semantics).
+            from .time_utils import deltat
+
+            t0_tt = 1775845.5 + deltat(1775845.5)
+            T0_val = (t0_tt - J2000) / 36525.0
+
+            def _prec_poly_valens(Tc: float) -> float:
+                return (
+                    _PREC_C1 * Tc
+                    + _PREC_C2 * Tc**2
+                    + _PREC_C3 * Tc**3
+                    + _PREC_C4 * Tc**4
+                    + _PREC_C5 * Tc**5
+                )
+
+            val = -2.9422 + (_prec_poly_valens(T) - _prec_poly_valens(T0_val)) / 3600.0
 
         return val % 360.0
 
@@ -4825,6 +4972,61 @@ _J2000_JD = 2451545.0
 # Gaussian gravitational constant squared: GM_sun in AU^3/day^2
 _GM_SUN = 0.01720209895**2
 
+# Reciprocal system-mass ratios (Sun / planet system), IAU/DE-consistent.
+# Osculating elements use the two-body GM = GM_sun * (1 + 1/ratio): the
+# perihelion direction of a low-eccentricity orbit is sensitive to GM at
+# the ~0.1 deg level for Jupiter, so the planet mass cannot be neglected.
+_SUN_MASS_RATIOS = {
+    MERCURY: 6023600.0,
+    VENUS: 408523.71,
+    EARTH: 328900.5596,  # Earth + Moon
+    MARS: 3098708.0,
+    JUPITER: 1047.3486,
+    SATURN: 3497.898,
+    URANUS: 22902.98,
+    NEPTUNE: 19412.24,
+    PLUTO: 135200000.0,
+}
+
+
+def _nodaps_to_j2000(lon_deg: float, lat_deg: float, jd_tt: float) -> tuple:
+    """Precess a nod_aps of-date ecliptic coordinate to the J2000 frame.
+
+    Reproduces the reference chain exactly (verified black-box to <0.1"):
+    rotate ecliptic→equatorial and back with the J2000 mean obliquity on
+    BOTH sides, around the equatorial (Vondrák) precession — nutation in
+    the of-date coordinate is deliberately NOT removed.
+    """
+    eps_j = vondrak_mean_obliquity_rad(_J2000_JD)
+    p_date = vondrak_precession_matrix(jd_tt)
+    p_j2k = vondrak_precession_matrix(_J2000_JD)
+    cl = math.cos(math.radians(lat_deg))
+    v = [
+        cl * math.cos(math.radians(lon_deg)),
+        cl * math.sin(math.radians(lon_deg)),
+        math.sin(math.radians(lat_deg)),
+    ]
+    ce, se = math.cos(eps_j), math.sin(eps_j)
+    # ecliptic → equatorial (J2000 obliquity)
+    v = [v[0], v[1] * ce - v[2] * se, v[1] * se + v[2] * ce]
+    # equator of date → ICRS (transpose) → equator J2000
+    v = [
+        p_date[0][0] * v[0] + p_date[1][0] * v[1] + p_date[2][0] * v[2],
+        p_date[0][1] * v[0] + p_date[1][1] * v[1] + p_date[2][1] * v[2],
+        p_date[0][2] * v[0] + p_date[1][2] * v[1] + p_date[2][2] * v[2],
+    ]
+    v = [
+        p_j2k[0][0] * v[0] + p_j2k[0][1] * v[1] + p_j2k[0][2] * v[2],
+        p_j2k[1][0] * v[0] + p_j2k[1][1] * v[1] + p_j2k[1][2] * v[2],
+        p_j2k[2][0] * v[0] + p_j2k[2][1] * v[1] + p_j2k[2][2] * v[2],
+    ]
+    # equatorial → ecliptic (J2000 obliquity)
+    v = [v[0], v[1] * ce + v[2] * se, -v[1] * se + v[2] * ce]
+    lon_j = math.degrees(math.atan2(v[1], v[0])) % 360.0
+    r = math.sqrt(v[0] ** 2 + v[1] ** 2 + v[2] ** 2)
+    lat_j = math.degrees(math.asin(max(-1.0, min(1.0, v[2] / r))))
+    return lon_j, lat_j
+
 
 def _calc_nod_aps(
     t, ipl: int, iflag: int, method: int
@@ -4858,21 +5060,59 @@ def _calc_nod_aps(
     if ipl not in _PLANET_MAP:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    # Sun and Earth don't have meaningful heliocentric orbital nodes/apsides
-    if ipl in (SUN, EARTH):
+    # Earth has no meaningful heliocentric nodes/apsides here (its orbit
+    # defines the ecliptic; the observer sits on it). The Sun is handled
+    # below as the apparent solar orbit (Earth's orbit mirrored), matching
+    # the reference.
+    if ipl == EARTH:
         return (zero_pos, zero_pos, zero_pos, zero_pos)
 
-    # Speeds on request: differentiate the assembled outputs by central
-    # difference (the reference API computes near-instantaneous rates).
+    # Speeds on request.
+    #
+    # Moon MEAN: the reference derives the rates as a FORWARD difference
+    # over one day, x(t+1d) − x(t) — reproduced exactly for the
+    # longitude and distance channels. Its latitude-speed slot instead
+    # contains the LATITUDE AT t+1d, not a rate (a defect, verified
+    # black-box); we return the true forward-difference rate — see
+    # docs/comparison/intentional-divergences.md.
+    #
+    # Everything else (planet MEAN nodes, OSCU/OSCU_BAR): near-
+    # instantaneous central difference, which matches the reference's
+    # node rates to ~0.03"/day. The reference's planet MEAN *apsis*
+    # speeds follow a further, not yet identified convention
+    # (~0.05 deg/day away from any positional difference scheme); the
+    # positions themselves agree.
     if iflag & FLG_SPEED:
         ts = get_timescale()
-        dt_spd = 0.001  # days (~86 s)
         base_flags = iflag & ~FLG_SPEED
         now = _calc_nod_aps(t, ipl, base_flags, method)
+        if ipl == MOON and not (method & (NODBIT_OSCU | NODBIT_OSCU_BAR)):
+            dt_fwd = 1.0  # day (reference MEAN-speed convention)
+            nxt = _calc_nod_aps(ts.tt_jd(t.tt + dt_fwd), ipl, base_flags, method)
+
+            def _with_speed(cur: PosTuple, nex: PosTuple) -> PosTuple:
+                dlon = (nex[0] - cur[0] + 180.0) % 360.0 - 180.0
+                return (
+                    cur[0],
+                    cur[1],
+                    cur[2],
+                    dlon / dt_fwd,
+                    (nex[1] - cur[1]) / dt_fwd,
+                    (nex[2] - cur[2]) / dt_fwd,
+                )
+
+            return (
+                _with_speed(now[0], nxt[0]),
+                _with_speed(now[1], nxt[1]),
+                _with_speed(now[2], nxt[2]),
+                _with_speed(now[3], nxt[3]),
+            )
+
+        dt_spd = 0.001  # days (~86 s)
         prev = _calc_nod_aps(ts.tt_jd(t.tt - dt_spd), ipl, base_flags, method)
         nxt = _calc_nod_aps(ts.tt_jd(t.tt + dt_spd), ipl, base_flags, method)
 
-        def _with_speed(cur: PosTuple, pre: PosTuple, nex: PosTuple) -> PosTuple:
+        def _with_speed_c(cur: PosTuple, pre: PosTuple, nex: PosTuple) -> PosTuple:
             dlon = (nex[0] - pre[0] + 180.0) % 360.0 - 180.0
             return (
                 cur[0],
@@ -4884,10 +5124,10 @@ def _calc_nod_aps(
             )
 
         return (
-            _with_speed(now[0], prev[0], nxt[0]),
-            _with_speed(now[1], prev[1], nxt[1]),
-            _with_speed(now[2], prev[2], nxt[2]),
-            _with_speed(now[3], prev[3], nxt[3]),
+            _with_speed_c(now[0], prev[0], nxt[0]),
+            _with_speed_c(now[1], prev[1], nxt[1]),
+            _with_speed_c(now[2], prev[2], nxt[2]),
+            _with_speed_c(now[3], prev[3], nxt[3]),
         )
 
     planets = get_planets()
@@ -4899,6 +5139,9 @@ def _calc_nod_aps(
     # the mean equator/obliquity are used (no nutation); otherwise nutation stays
     # IAU 2006/2000A. Step 2: the matching obliquity rotates equator-of-date →
     # ecliptic-of-date.
+    # FLG_J2000 is handled at the end by precessing the finished of-date
+    # coordinates to J2000: the reference does NOT strip nutation from
+    # nod_aps J2000 output (unlike calc), so the of-date frame stays as-is.
     if iflag & FLG_NONUT:
         pnm = vondrak_precession_matrix(jd_tt)
         eps_rad = vondrak_mean_obliquity_rad(jd_tt)
@@ -4949,10 +5192,16 @@ def _calc_nod_aps(
         # Strip output-format bits (FLG_RADIANS / FLG_XYZ) and FLG_SPEED:
         # we need calc_ut() to return spherical (lon_deg, lat_deg, dist)
         # below so we can re-assemble nod_aps output in those units.
-        calc_flags = iflag & ~FLG_SPEED & ~FLG_RADIANS & ~FLG_XYZ
+        # FLG_J2000 is stripped too: the reference precesses the finished
+        # true-of-date points to J2000 (nutation NOT removed), which is
+        # applied at the end of this branch.
+        calc_flags = iflag & ~FLG_SPEED & ~FLG_RADIANS & ~FLG_XYZ & ~FLG_J2000
 
-        # Select node and apogee bodies based on method
-        if method & NODBIT_OSCU:
+        # Select node and apogee bodies based on method.
+        # NODBIT_OSCU_BAR is treated as OSCU for the Moon, matching the
+        # reference (a barycentric variant is meaningless for the
+        # geocentric lunar orbit).
+        if method & (NODBIT_OSCU | NODBIT_OSCU_BAR):
             node_body = TRUE_NODE
             apog_body = OSCU_APOG
         else:
@@ -4963,7 +5212,6 @@ def _calc_nod_aps(
         node_pos, _ = calc_ut(jd_ut, node_body, calc_flags)
         node_lon = node_pos[0]
         node_lat = node_pos[1]
-        node_dist = node_pos[2]
 
         # Apogee from lunar theory
         apog_pos, _ = calc_ut(jd_ut, apog_body, calc_flags)
@@ -4976,7 +5224,7 @@ def _calc_nod_aps(
         # returns physically distinct apsis distances).
         peri_lon = (apog_lon + 180.0) % 360.0
         peri_lat = -apog_lat
-        if method & NODBIT_OSCU:
+        if method & (NODBIT_OSCU | NODBIT_OSCU_BAR):
             # Distance of the osculating perigee from the instantaneous
             # ellipse (lon/lat above already follow the apogee transform).
             from .lunar import calc_osculating_perigee
@@ -4987,83 +5235,155 @@ def _calc_nod_aps(
             # reference constants a = 0.002569555, r_apog = 0.002710625 AU.
             peri_dist = 2.0 * 0.002569555 - apog_dist
 
+        # Node distances from the orbit ellipse: evaluate
+        # r = a(1−e²)/(1+e·cos ν) at the node's true anomaly, like the
+        # reference (the node bodies' own distance channel is not used).
+        a_orb = 0.5 * (peri_dist + apog_dist)
+        e_orb = (apog_dist - peri_dist) / (apog_dist + peri_dist)
+        p_orb = a_orb * (1.0 - e_orb * e_orb)
+        u_node = math.radians((node_lon - peri_lon) % 360.0)
+        nasc_dist = p_orb / (1.0 + e_orb * math.cos(u_node))
+        ndsc_dist = p_orb / (1.0 - e_orb * math.cos(u_node))
+
+        def _moon_point(lon_d: float, lat_d: float, dist: float) -> PosTuple:
+            """Assemble a lunar point, honoring HELCTR and J2000 output."""
+            if iflag & FLG_HELCTR:
+                # Heliocentric coordinates of the geocentric point: add
+                # Earth's heliocentric vector (reference behavior).
+                cl = math.cos(math.radians(lat_d))
+                gx = dist * cl * math.cos(math.radians(lon_d)) + r_earth_ecl[0]
+                gy = dist * cl * math.sin(math.radians(lon_d)) + r_earth_ecl[1]
+                gz = dist * math.sin(math.radians(lat_d)) + r_earth_ecl[2]
+                dist = math.sqrt(gx**2 + gy**2 + gz**2)
+                lon_d = math.degrees(math.atan2(gy, gx)) % 360.0
+                lat_d = math.degrees(math.asin(max(-1.0, min(1.0, gz / dist))))
+            if iflag & FLG_J2000:
+                lon_d, lat_d = _nodaps_to_j2000(lon_d, lat_d, jd_tt)
+            return (lon_d, lat_d, dist, 0.0, 0.0, 0.0)
+
         # Build output: nodes and apsides from lunar theory
-        moon_xnasc: PosTuple = (node_lon, node_lat, node_dist, 0.0, 0.0, 0.0)
-        moon_xndsc: PosTuple = (
-            (node_lon + 180.0) % 360.0,
-            -node_lat,
-            node_dist,
-            0.0,
-            0.0,
-            0.0,
-        )
-        moon_xperi: PosTuple = (peri_lon, peri_lat, peri_dist, 0.0, 0.0, 0.0)
-        moon_xaphe: PosTuple = (apog_lon, apog_lat, apog_dist, 0.0, 0.0, 0.0)
+        moon_xnasc = _moon_point(node_lon, node_lat, nasc_dist)
+        moon_xndsc = _moon_point((node_lon + 180.0) % 360.0, -node_lat, ndsc_dist)
+        moon_xperi = _moon_point(peri_lon, peri_lat, peri_dist)
+        if method & NODBIT_FOPOINT:
+            # Second focus of the ellipse in the aphelion slot: same
+            # direction as the apogee, at distance 2ae = r_apog − r_peri
+            # from the Earth focus (reference convention).
+            moon_xaphe = _moon_point(apog_lon, apog_lat, apog_dist - peri_dist)
+        else:
+            moon_xaphe = _moon_point(apog_lon, apog_lat, apog_dist)
 
         return (moon_xnasc, moon_xndsc, moon_xperi, moon_xaphe)
 
     else:
-        # Heliocentric ICRS vectors
-        r_icrs = target_pos.position.au - sun_pos.position.au
-        v_icrs = target_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
-        GM = _GM_SUN
-        is_geocentric = False
+        is_helio = bool(iflag & FLG_HELCTR)
+        # For the Sun the reference returns the apsides of the apparent
+        # solar orbit: Earth's orbit mirrored through the origin.
+        mirror_sun = ipl == SUN
+        elem_ipl = EARTH if mirror_sun else ipl
 
-    # Convert to ecliptic of date
-    r_ecl = _icrs_to_ecliptic(r_icrs)
-    v_ecl = _icrs_to_ecliptic(v_icrs)
+        # NODBIT_MEAN (the default) uses the published mean-element
+        # polynomials (Meeus Table 31.A / Simon et al. 1994); bodies
+        # without mean elements (e.g. Pluto) fall back to osculating
+        # state vectors, matching the reference.
+        mean_el = None
+        bar_mode = False
+        if not (method & (NODBIT_OSCU | NODBIT_OSCU_BAR)):
+            from .planetary_mean_elements import mean_orbital_elements
 
-    # --- Compute osculating orbital elements ---
-    r_mag = math.sqrt(r_ecl[0] ** 2 + r_ecl[1] ** 2 + r_ecl[2] ** 2)
-    v_mag = math.sqrt(v_ecl[0] ** 2 + v_ecl[1] ** 2 + v_ecl[2] ** 2)
+            mean_el = mean_orbital_elements(elem_ipl, jd_tt)
 
-    # Angular momentum vector h = r × v
-    hx = r_ecl[1] * v_ecl[2] - r_ecl[2] * v_ecl[1]
-    hy = r_ecl[2] * v_ecl[0] - r_ecl[0] * v_ecl[2]
-    hz = r_ecl[0] * v_ecl[1] - r_ecl[1] * v_ecl[0]
-    h_mag = math.sqrt(hx**2 + hy**2 + hz**2)
-
-    # Inclination
-    incl = math.acos(max(-1.0, min(1.0, hz / h_mag))) if h_mag > 0 else 0.0
-
-    # Node vector n = k × h (k = ecliptic pole = [0, 0, 1])
-    nx = -hy
-    ny = hx
-    n_mag = math.sqrt(nx**2 + ny**2)
-
-    # Longitude of ascending node
-    if n_mag > 1e-10:
-        Omega = math.atan2(ny, nx)
-        if Omega < 0:
-            Omega += 2.0 * math.pi
+    mean_frame = False
+    if mean_el is not None:
+        # --- Mean elements (mean ecliptic and equinox of date) ---
+        a, e_mag, i_deg, om_deg, pi_deg = mean_el
+        incl = math.radians(i_deg)
+        Omega = math.radians(om_deg)
+        omega = math.radians((pi_deg - om_deg) % 360.0)
+        p = a * (1.0 - e_mag**2)
+        mean_frame = True
     else:
-        Omega = 0.0
+        # --- Osculating elements from JPL state vectors ---
+        # NODBIT_OSCU_BAR uses solar-system-barycentric vectors for the
+        # planets beyond Jupiter (reference behavior); everything else is
+        # heliocentric.
+        bar_mode = bool(method & NODBIT_OSCU_BAR) and ipl in (
+            SATURN,
+            URANUS,
+            NEPTUNE,
+            PLUTO,
+        )
+        if mirror_sun:
+            # The reference derives the solar orbit from the Earth-Moon
+            # barycenter (the Earth-alone osculating elements wobble by
+            # ~0.2 deg in perihelion direction from the Moon's pull).
+            emb_pos = planets["earth barycenter"].at(t)
+            r_icrs = emb_pos.position.au - sun_pos.position.au
+            v_icrs = emb_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+        elif bar_mode:
+            # SSB-relative vectors for the planets beyond Jupiter.
+            r_icrs = target_pos.position.au
+            v_icrs = target_pos.velocity.au_per_d
+        else:
+            r_icrs = target_pos.position.au - sun_pos.position.au
+            v_icrs = target_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+        mass_ratio = _SUN_MASS_RATIOS.get(elem_ipl)
+        GM = _GM_SUN * (1.0 + 1.0 / mass_ratio) if mass_ratio else _GM_SUN
 
-    # Eccentricity vector e = (v × h) / μ - r̂
-    r_dot_v = r_ecl[0] * v_ecl[0] + r_ecl[1] * v_ecl[1] + r_ecl[2] * v_ecl[2]
-    coef1 = v_mag**2 / GM - 1.0 / r_mag
-    coef2 = r_dot_v / GM
+        # Convert to the output ecliptic frame (of date, or J2000)
+        r_ecl = _icrs_to_ecliptic(r_icrs)
+        v_ecl = _icrs_to_ecliptic(v_icrs)
 
-    ex = coef1 * r_ecl[0] - coef2 * v_ecl[0]
-    ey = coef1 * r_ecl[1] - coef2 * v_ecl[1]
-    ez = coef1 * r_ecl[2] - coef2 * v_ecl[2]
-    e_mag = math.sqrt(ex**2 + ey**2 + ez**2)
+        r_mag = math.sqrt(r_ecl[0] ** 2 + r_ecl[1] ** 2 + r_ecl[2] ** 2)
+        v_mag = math.sqrt(v_ecl[0] ** 2 + v_ecl[1] ** 2 + v_ecl[2] ** 2)
 
-    # Argument of perihelion (or perigee for Moon)
-    if n_mag > 1e-10 and e_mag > 1e-10:
-        n_dot_e = nx * ex + ny * ey
-        cos_omega = max(-1.0, min(1.0, n_dot_e / (n_mag * e_mag)))
-        omega = math.acos(cos_omega)
-        if ez < 0:
-            omega = 2.0 * math.pi - omega
-    else:
-        omega = 0.0
+        # Angular momentum vector h = r × v
+        hx = r_ecl[1] * v_ecl[2] - r_ecl[2] * v_ecl[1]
+        hy = r_ecl[2] * v_ecl[0] - r_ecl[0] * v_ecl[2]
+        hz = r_ecl[0] * v_ecl[1] - r_ecl[1] * v_ecl[0]
+        h_mag = math.sqrt(hx**2 + hy**2 + hz**2)
 
-    # Semi-major axis
-    a = 1.0 / (2.0 / r_mag - v_mag**2 / GM)
+        # Inclination
+        incl = math.acos(max(-1.0, min(1.0, hz / h_mag))) if h_mag > 0 else 0.0
 
-    # Semi-latus rectum
-    p = a * (1.0 - e_mag**2) if e_mag < 1.0 else h_mag**2 / GM
+        # Node vector n = k × h (k = ecliptic pole = [0, 0, 1])
+        nx = -hy
+        ny = hx
+        n_mag = math.sqrt(nx**2 + ny**2)
+
+        # Longitude of ascending node
+        if n_mag > 1e-10:
+            Omega = math.atan2(ny, nx)
+            if Omega < 0:
+                Omega += 2.0 * math.pi
+        else:
+            Omega = 0.0
+
+        # Eccentricity vector e = (v × h) / μ - r̂
+        r_dot_v = r_ecl[0] * v_ecl[0] + r_ecl[1] * v_ecl[1] + r_ecl[2] * v_ecl[2]
+        coef1 = v_mag**2 / GM - 1.0 / r_mag
+        coef2 = r_dot_v / GM
+
+        ex = coef1 * r_ecl[0] - coef2 * v_ecl[0]
+        ey = coef1 * r_ecl[1] - coef2 * v_ecl[1]
+        ez = coef1 * r_ecl[2] - coef2 * v_ecl[2]
+        e_mag = math.sqrt(ex**2 + ey**2 + ez**2)
+
+        # Argument of perihelion (or perigee for Moon)
+        if n_mag > 1e-10 and e_mag > 1e-10:
+            n_dot_e = nx * ex + ny * ey
+            cos_omega = max(-1.0, min(1.0, n_dot_e / (n_mag * e_mag)))
+            omega = math.acos(cos_omega)
+            if ez < 0:
+                omega = 2.0 * math.pi - omega
+        else:
+            omega = 0.0
+
+        # Semi-major axis
+        a = 1.0 / (2.0 / r_mag - v_mag**2 / GM)
+
+        # Semi-latus rectum
+        p = a * (1.0 - e_mag**2) if e_mag < 1.0 else h_mag**2 / GM
 
     # --- Compute 3D positions of nodes and apsides in orbital frame ---
     cos_Omega = math.cos(Omega)
@@ -5115,19 +5435,78 @@ def _calc_nod_aps(
         fze = (sin_omega * sin_incl) * fx_orb
         return (fxe, fye, fze, f_dist)
 
-    def _to_geo_lonlat(center_pos):
-        """Convert center-relative ecliptic position to geocentric lon/lat/dist.
+    # --- Frame alignment for mean-element points -------------------------
+    # Mean elements refer to the mean equinox of date; the of-date output
+    # frame is the true equinox of date, so rotate by the nutation in
+    # longitude unless NONUT. (FLG_J2000 precesses the finished of-date
+    # coordinates at the end, nutation included — reference behavior.)
+    if mean_frame and not (iflag & FLG_NONUT):
+        from .cache import get_cached_nutation
 
-        For planets: helio_pos → geocentric (subtract Earth position).
-        For Moon: already geocentric (just convert to lon/lat).
+        _dpsi_rad, _ = get_cached_nutation(jd_tt)
+        _cos_dpsi = math.cos(_dpsi_rad)
+        _sin_dpsi = math.sin(_dpsi_rad)
+
+        def _align_mean(vec):
+            return (
+                vec[0] * _cos_dpsi - vec[1] * _sin_dpsi,
+                vec[0] * _sin_dpsi + vec[1] * _cos_dpsi,
+                vec[2],
+            )
+    else:
+
+        def _align_mean(vec):
+            return vec
+
+    # Observer barycentric velocity in the output frame, for the annual
+    # aberration the reference applies to these points unless suppressed.
+    apply_aberr = (
+        not is_helio and not mirror_sun and not (iflag & (FLG_TRUEPOS | FLG_NOABERR))
+    )
+    if apply_aberr:
+        from .astrometry import apply_aberration_to_position
+
+        _v_obs = earth_pos.velocity.au_per_d
+        v_obs_ecl = _icrs_to_ecliptic((_v_obs[0], _v_obs[1], _v_obs[2]))
+
+    # Observer position vector in the working frame. For OSCU_BAR the
+    # points are SSB-relative, so the observer is the barycentric Earth
+    # (or the barycentric Sun under FLG_HELCTR) for frame consistency;
+    # otherwise the heliocentric Earth (None = no subtraction, points are
+    # already observer-relative).
+    if bar_mode and is_helio:
+        _s_bary = sun_pos.position.au
+        r_obs_ecl = _icrs_to_ecliptic((_s_bary[0], _s_bary[1], _s_bary[2]))
+    elif bar_mode:
+        _e_bary = earth_pos.position.au
+        r_obs_ecl = _icrs_to_ecliptic((_e_bary[0], _e_bary[1], _e_bary[2]))
+    elif is_helio:
+        r_obs_ecl = None
+    else:
+        r_obs_ecl = r_earth_ecl
+
+    def _to_geo_lonlat(center_pos):
+        """Convert an orbit-frame point to output lon/lat/dist.
+
+        Planets: heliocentric point → geocentric (subtract Earth) unless
+        FLG_HELCTR. Sun: the apparent solar orbit is Earth's mirrored
+        through the origin, so the geocentric point is the negated
+        heliocentric one. Aberration is applied per the flag gate above.
         """
-        if is_geocentric:
-            # Moon positions are already geocentric
-            gx, gy, gz = center_pos[0], center_pos[1], center_pos[2]
+        px, py, pz = _align_mean((center_pos[0], center_pos[1], center_pos[2]))
+        if mirror_sun and not is_helio:
+            # Geocentric solar-orbit point = heliocentric Earth-orbit
+            # point mirrored through the origin. With HELCTR the
+            # reference returns the Earth-orbit point itself.
+            gx, gy, gz = -px, -py, -pz
+        elif r_obs_ecl is None or mirror_sun:
+            gx, gy, gz = px, py, pz
         else:
-            gx = center_pos[0] - r_earth_ecl[0]
-            gy = center_pos[1] - r_earth_ecl[1]
-            gz = center_pos[2] - r_earth_ecl[2]
+            gx = px - r_obs_ecl[0]
+            gy = py - r_obs_ecl[1]
+            gz = pz - r_obs_ecl[2]
+        if apply_aberr:
+            gx, gy, gz = apply_aberration_to_position((gx, gy, gz), v_obs_ecl)
         r_geo = math.sqrt(gx**2 + gy**2 + gz**2)
         lon = math.degrees(math.atan2(gy, gx)) % 360.0
         lat = (
@@ -5150,11 +5529,32 @@ def _calc_nod_aps(
     else:
         pos_aphe = _orbit_pos_3d(math.pi)
 
-    # Convert to geocentric ecliptic coordinates
-    geo_asc = _to_geo_lonlat(pos_asc)
-    geo_dsc = _to_geo_lonlat(pos_dsc)
+    # Convert to output ecliptic coordinates
+    if mirror_sun:
+        # The solar orbit lies in the ecliptic plane by construction: the
+        # reference returns zeros for the Sun's node slots.
+        geo_asc = (0.0, 0.0, 0.0)
+        geo_dsc = (0.0, 0.0, 0.0)
+    else:
+        geo_asc = _to_geo_lonlat(pos_asc)
+        geo_dsc = _to_geo_lonlat(pos_dsc)
     geo_peri = _to_geo_lonlat(pos_peri)
     geo_aphe = _to_geo_lonlat(pos_aphe)
+
+    # J2000 output: precess the finished of-date coordinates (the
+    # reference does not remove nutation from nod_aps J2000 output).
+    if iflag & FLG_J2000:
+
+        def _prec_j2000(g):
+            if g[2] == 0.0:
+                return g
+            lon_j, lat_j = _nodaps_to_j2000(g[0], g[1], jd_tt)
+            return (lon_j, lat_j, g[2])
+
+        geo_asc = _prec_j2000(geo_asc)
+        geo_dsc = _prec_j2000(geo_dsc)
+        geo_peri = _prec_j2000(geo_peri)
+        geo_aphe = _prec_j2000(geo_aphe)
 
     # Sidereal output: subtract the ayanamsha from the longitudes,
     # consistent with calc_ut (issue #29: the flag was silently ignored
@@ -5849,6 +6249,49 @@ _BODY_RADIUS_KM = {
     PLUTO: 1188.3,  # Pluto mean radius
 }
 
+# Asteroid photometric data for pheno: IAU H-G system (H absolute
+# magnitude, G slope parameter) and mean diameters. Values reproduce the
+# reference API output exactly (verified black-box; note the reference
+# uses H=6.50 for Chiron, not the MPC 5.92).
+_ASTEROID_HG = {
+    CHIRON: (6.50, 0.15),
+    PHOLUS: (7.00, 0.15),
+    CERES: (3.34, 0.12),
+    PALLAS: (4.13, 0.11),
+    JUNO: (5.33, 0.32),
+    VESTA: (3.20, 0.32),
+}
+_ASTEROID_DIAMETER_KM = {
+    CHIRON: 271.4,
+    PHOLUS: 290.0,
+    CERES: 939.4,
+    PALLAS: 545.0,
+    JUNO: 246.6,
+    VESTA: 525.4,
+}
+
+
+def _asteroid_hg_magnitude(
+    ipl: int, phase_angle_deg: float, helio_dist: float, geo_dist: float
+) -> float:
+    """Visual magnitude from the IAU H-G phase system.
+
+    mag = H + 5*log10(r*Delta) - 2.5*log10((1-G)*phi1 + G*phi2) with the
+    standard phi1/phi2 phase functions (Bowell et al. 1989).
+    """
+    h_mag, g_slope = _ASTEROID_HG[ipl]
+    if helio_dist <= 0 or geo_dist <= 0:
+        return h_mag
+    tan_half = math.tan(math.radians(phase_angle_deg) / 2.0)
+    phi1 = math.exp(-3.33 * tan_half**0.63)
+    phi2 = math.exp(-1.87 * tan_half**1.22)
+    blend = (1.0 - g_slope) * phi1 + g_slope * phi2
+    mag = h_mag + 5.0 * math.log10(helio_dist * geo_dist)
+    if blend > 0:
+        mag -= 2.5 * math.log10(blend)
+    return mag
+
+
 # 1 AU in kilometers (IAU 2012 definition)
 _AU_KM = 149597870.7
 
@@ -6024,7 +6467,7 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
         NEPTUNE,
         PLUTO,
     }
-    if ipl not in _PHENO_SUPPORTED:
+    if ipl not in _PHENO_SUPPORTED and ipl not in _ASTEROID_HG:
         return (0.0,) * 20
 
     # ------------------------------------------------------------------
@@ -6072,22 +6515,85 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     # ------------------------------------------------------------------
     # Phase angle
     # ------------------------------------------------------------------
-    # Compute phase angle from 3D vectors (matching _calc_pheno).
-    # For the Moon the scalar law-of-cosines loses precision near syzygies;
-    # for planets the difference is small but we use vectors uniformly.
+    # Reference recipe (same as _calc_pheno): the body→Sun leg is the
+    # geometric heliocentric direction at the retarded epoch t − τ + δ
+    # aberrated with the body's barycentric velocity; the body→Earth leg
+    # is the apparent geocentric direction. Under FLG_TRUEPOS both legs
+    # are geometric at t (exact reference match).
     try:
-        from .constants import FLG_XYZ, FLG_EQUATORIAL, FLG_J2000
+        from .astrometry import C_LIGHT_AU_DAY
+        from .time_utils import deltat as _deltat
 
-        _xyz_flags = base_flags | FLG_XYZ | FLG_EQUATORIAL | FLG_J2000
-        body_xyz, _ = _leb_calc(tjd_ut, ipl, _xyz_flags)
-        sun_xyz, _ = _leb_calc(tjd_ut, SUN, _xyz_flags)
-        # body→Sun and body→Earth vectors
-        bs = (
-            sun_xyz[0] - body_xyz[0],
-            sun_xyz[1] - body_xyz[1],
-            sun_xyz[2] - body_xyz[2],
+        jd_tt_ph = tjd_ut + _deltat(tjd_ut)
+        # body→Earth: antipode of the body's apparent ecliptic direction
+        _lat_r = math.radians(target_lat)
+        _lon_r = math.radians(target_lon)
+        be = (
+            -math.cos(_lat_r) * math.cos(_lon_r),
+            -math.cos(_lat_r) * math.sin(_lon_r),
+            -math.sin(_lat_r),
         )
-        be = (-body_xyz[0], -body_xyz[1], -body_xyz[2])
+        if iflag & FLG_TRUEPOS:
+            # Geometric Sun−body from the (TRUEPOS) spherical outputs
+            _slat = math.radians(sun_lat)
+            _slon = math.radians(sun_lon)
+            s_vec = (
+                sun_dist * math.cos(_slat) * math.cos(_slon),
+                sun_dist * math.cos(_slat) * math.sin(_slon),
+                sun_dist * math.sin(_slat),
+            )
+            b_vec = (
+                -geo_dist * be[0],
+                -geo_dist * be[1],
+                -geo_dist * be[2],
+            )
+            bs = (
+                s_vec[0] - b_vec[0],
+                s_vec[1] - b_vec[1],
+                s_vec[2] - b_vec[2],
+            )
+        else:
+            tau = geo_dist / C_LIGHT_AU_DAY
+            t_ret = jd_tt_ph - tau
+            xb, vb = reader.eval_body(ipl, t_ret)
+            if ipl == MOON:
+                delta = 0.0
+            else:
+                xs, _ = reader.eval_body(SUN, t_ret)
+                r_hel = math.sqrt(
+                    (xb[0] - xs[0]) ** 2 + (xb[1] - xs[1]) ** 2 + (xb[2] - xs[2]) ** 2
+                )
+                r_bar = math.sqrt(xb[0] ** 2 + xb[1] ** 2 + xb[2] ** 2)
+                delta = (r_hel - r_bar) / C_LIGHT_AU_DAY
+            t2 = t_ret + delta
+            xb2, _ = reader.eval_body(ipl, t2)
+            xs2, _ = reader.eval_body(SUN, t2)
+            xh = (xb2[0] - xs2[0], xb2[1] - xs2[1], xb2[2] - xs2[2])
+            rh = math.sqrt(xh[0] ** 2 + xh[1] ** 2 + xh[2] ** 2)
+            bs_icrs = (
+                -xh[0] / rh + vb[0] / C_LIGHT_AU_DAY,
+                -xh[1] / rh + vb[1] / C_LIGHT_AU_DAY,
+                -xh[2] / rh + vb[2] / C_LIGHT_AU_DAY,
+            )
+            # Rotate ICRS → true ecliptic of date to match the be frame
+            pn_mat, _, _, eps_rad = fast_calc._get_leb_frame_data(reader, jd_tt_ph)
+            xq = (
+                pn_mat[0][0] * bs_icrs[0]
+                + pn_mat[0][1] * bs_icrs[1]
+                + pn_mat[0][2] * bs_icrs[2]
+            )
+            yq = (
+                pn_mat[1][0] * bs_icrs[0]
+                + pn_mat[1][1] * bs_icrs[1]
+                + pn_mat[1][2] * bs_icrs[2]
+            )
+            zq = (
+                pn_mat[2][0] * bs_icrs[0]
+                + pn_mat[2][1] * bs_icrs[1]
+                + pn_mat[2][2] * bs_icrs[2]
+            )
+            ce, se = math.cos(eps_rad), math.sin(eps_rad)
+            bs = (xq, yq * ce + zq * se, -yq * se + zq * ce)
         dot = bs[0] * be[0] + bs[1] * be[1] + bs[2] * be[2]
         mag_bs = math.sqrt(bs[0] ** 2 + bs[1] ** 2 + bs[2] ** 2)
         mag_be = math.sqrt(be[0] ** 2 + be[1] ** 2 + be[2] ** 2)
@@ -6115,7 +6621,10 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     # ------------------------------------------------------------------
     # Apparent diameter
     # ------------------------------------------------------------------
-    body_radius_km = _BODY_RADIUS_KM.get(ipl, 1000.0)
+    if ipl in _ASTEROID_DIAMETER_KM:
+        body_radius_km = _ASTEROID_DIAMETER_KM[ipl] / 2.0
+    else:
+        body_radius_km = _BODY_RADIUS_KM.get(ipl, 1000.0)
     diameter = _calc_apparent_diameter(body_radius_km, geo_dist)
 
     # ------------------------------------------------------------------
@@ -6123,6 +6632,8 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
     # ------------------------------------------------------------------
     if ipl == MOON:
         magnitude = _calc_moon_magnitude(phase_angle, geo_dist, helio_dist)
+    elif ipl in _ASTEROID_HG:
+        magnitude = _asteroid_hg_magnitude(ipl, phase_angle, helio_dist, geo_dist)
     else:
         # For Saturn we need ecliptic coordinates for ring tilt
         geo_lon = float(target_pos[0])
@@ -6146,6 +6657,46 @@ def _calc_pheno_leb(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float, ...]:
             helio_lat,
             tjd,
         )
+
+    return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
+
+
+def _calc_pheno_asteroid(t, ipl: int, iflag: int) -> Tuple[float, ...]:
+    """Phenomena for the curated asteroids (Chiron..Vesta, Pholus).
+
+    Positions come from calc_ut (whatever backend serves the body); the
+    phase angle uses the law of cosines on the geocentric, heliocentric
+    and Earth-Sun distances, and the magnitude the IAU H-G system with
+    the reference-matching constants in _ASTEROID_HG.
+    """
+    from .utils import angular_separation
+
+    jd_ut = t.ut1
+    base_flags = iflag & (FLG_TRUEPOS | FLG_NONUT)
+
+    target_pos, _ = calc_ut(jd_ut, ipl, base_flags)
+    sun_pos, _ = calc_ut(jd_ut, SUN, base_flags)
+    helio_pos, _ = calc_ut(jd_ut, ipl, base_flags | FLG_HELCTR)
+
+    geo_dist = float(target_pos[2])
+    helio_dist = float(helio_pos[2])
+    sun_dist = float(sun_pos[2])
+
+    elongation = angular_separation(
+        float(target_pos[0]), float(target_pos[1]), float(sun_pos[0]), float(sun_pos[1])
+    )
+
+    if geo_dist > 0 and helio_dist > 0:
+        cos_pa = (geo_dist**2 + helio_dist**2 - sun_dist**2) / (
+            2.0 * geo_dist * helio_dist
+        )
+        phase_angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_pa))))
+    else:
+        phase_angle = 0.0
+    phase = (1.0 + math.cos(math.radians(phase_angle))) / 2.0
+
+    diameter = _calc_apparent_diameter(_ASTEROID_DIAMETER_KM[ipl] / 2.0, geo_dist)
+    magnitude = _asteroid_hg_magnitude(ipl, phase_angle, helio_dist, geo_dist)
 
     return (phase_angle, phase, elongation, diameter, magnitude) + (0.0,) * 15
 
@@ -6249,6 +6800,42 @@ def pheno(tjdet: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float, ..
     return _calc_pheno(t, planet, flags)
 
 
+def _pheno_sun_dir_reference(t, target, sun, tau_days: float, is_moon: bool):
+    """Body→Sun direction for the reference phase-angle recipe (ICRS).
+
+    Characterized black-box to ≤0.05" on all planets and the Moon: the
+    reference evaluates the body's geometric heliocentric direction at
+    the retarded epoch t − τ + δ — τ the geocentric light time, and
+    δ = (r_helio − r_bary)/c the light time of the Sun-SSB offset along
+    the line of sight (zero for the Moon) — then aberrates it to first
+    order with the body's BARYCENTRIC velocity at t − τ.
+    """
+    from .astrometry import C_LIGHT_AU_DAY
+
+    ts = get_timescale()
+    t_ret = ts.tt_jd(t.tt - tau_days)
+    b_state = target.at(t_ret)
+    xb = b_state.position.au
+    vb = b_state.velocity.au_per_d
+    if is_moon:
+        delta = 0.0
+    else:
+        xs = sun.at(t_ret).position.au
+        r_hel = math.sqrt(
+            (xb[0] - xs[0]) ** 2 + (xb[1] - xs[1]) ** 2 + (xb[2] - xs[2]) ** 2
+        )
+        r_bar = math.sqrt(xb[0] ** 2 + xb[1] ** 2 + xb[2] ** 2)
+        delta = (r_hel - r_bar) / C_LIGHT_AU_DAY
+    t2 = ts.tt_jd(t.tt - tau_days + delta)
+    xh = target.at(t2).position.au - sun.at(t2).position.au
+    rh = math.sqrt(xh[0] ** 2 + xh[1] ** 2 + xh[2] ** 2)
+    return (
+        -xh[0] / rh + vb[0] / C_LIGHT_AU_DAY,
+        -xh[1] / rh + vb[1] / C_LIGHT_AU_DAY,
+        -xh[2] / rh + vb[2] / C_LIGHT_AU_DAY,
+    )
+
+
 def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Internal function to compute planetary phenomena.
@@ -6325,6 +6912,10 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
                 target = planets[_PLANET_FALLBACK[target_name]]
             else:
                 raise
+    elif ipl in _ASTEROID_HG:
+        # Curated asteroids: positions via calc_ut (SPK/Keplerian backend),
+        # photometry via the IAU H-G system (reference behavior).
+        return _calc_pheno_asteroid(t, ipl, iflag)
     else:
         # Unsupported body - return zeros
         attr = (0.0,) * 20
@@ -6389,16 +6980,26 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         M = target_pos_geo.position.au  # Moon position
         S = sun_from_earth.position.au  # Sun position
 
-        # Vectors from Moon to Sun and from Moon to Earth
+        # Sun-Moon distance (for the magnitude model below)
         vec_moon_to_sun = S - M
         vec_moon_to_earth = -M
-
-        dot_prod = sum(a * b for a, b in zip(vec_moon_to_sun, vec_moon_to_earth))
         mag_ms = math.sqrt(sum(x**2 for x in vec_moon_to_sun))
         mag_me = math.sqrt(sum(x**2 for x in vec_moon_to_earth))
 
-        if mag_ms > 0 and mag_me > 0:
-            cos_phase = dot_prod / (mag_ms * mag_me)
+        # Phase angle: reference recipe — retarded geometric heliocentric
+        # direction aberrated with the Moon's barycentric velocity (δ=0
+        # for the Moon), against the apparent geocentric direction.
+        if iflag & FLG_TRUEPOS:
+            bs = vec_moon_to_sun  # geometric at t: exact reference match
+        else:
+            tau = mag_me / 173.1446326846693
+            bs = _pheno_sun_dir_reference(t, target, sun, tau, is_moon=True)
+
+        dot_prod = sum(a * b for a, b in zip(bs, vec_moon_to_earth))
+        mag_bs = math.sqrt(sum(x**2 for x in bs))
+
+        if mag_bs > 0 and mag_me > 0:
+            cos_phase = dot_prod / (mag_bs * mag_me)
             cos_phase = max(-1.0, min(1.0, cos_phase))
             phase_angle = math.degrees(math.acos(cos_phase))
         else:
@@ -6436,20 +7037,27 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         cos_elong = max(-1.0, min(1.0, cos_elong))
         elongation = math.degrees(math.acos(cos_elong))
 
-        # Phase angle calculation using 3D vector approach
-        # The phase angle is the angle at the planet vertex between the
-        # Sun-Planet and Earth-Planet directions. Using position vectors
-        # avoids numerical issues with the law-of-cosines for scalar distances.
+        # Phase angle: angle at the planet vertex between the planet→Sun
+        # and planet→Earth directions. The planet→Sun leg follows the
+        # reference recipe (retarded geometric heliocentric direction,
+        # aberrated with the planet's barycentric velocity); under
+        # FLG_TRUEPOS both legs are geometric at t (exact match).
         P = target_pos_geo.position.au  # Planet position (geocentric)
         S = sun_pos_geo.position.au  # Sun position (geocentric)
 
-        # Vectors from planet to Sun and from planet to Earth
-        vec_planet_to_sun = S - P
         vec_planet_to_earth = -P
+        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
+
+        if iflag & FLG_TRUEPOS:
+            vec_planet_to_sun = S - P
+        else:
+            tau = mag_pe / 173.1446326846693
+            vec_planet_to_sun = _pheno_sun_dir_reference(
+                t, target, sun, tau, is_moon=False
+            )
 
         dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
         mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
-        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
 
         if mag_ps > 0 and mag_pe > 0:
             cos_phase = dot_prod / (mag_ps * mag_pe)
@@ -6483,16 +7091,24 @@ def _calc_pheno(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         cos_elong = max(-1.0, min(1.0, cos_elong))
         elongation = math.degrees(math.acos(cos_elong))
 
-        # Phase angle using 3D vectors from Earth
+        # Phase angle using 3D vectors from Earth (reference recipe for
+        # the planet→Sun leg, like the geocentric branch above)
         P = _earth_target.position.au
         S = _earth_sun.position.au
 
-        vec_planet_to_sun = S - P
         vec_planet_to_earth = -P
+        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
+
+        if iflag & FLG_TRUEPOS:
+            vec_planet_to_sun = S - P
+        else:
+            tau = mag_pe / 173.1446326846693
+            vec_planet_to_sun = _pheno_sun_dir_reference(
+                t, target, sun, tau, is_moon=(ipl == MOON)
+            )
 
         dot_prod = sum(a * b for a, b in zip(vec_planet_to_sun, vec_planet_to_earth))
         mag_ps = math.sqrt(sum(x**2 for x in vec_planet_to_sun))
-        mag_pe = math.sqrt(sum(x**2 for x in vec_planet_to_earth))
 
         if mag_ps > 0 and mag_pe > 0:
             cos_phase = dot_prod / (mag_ps * mag_pe)

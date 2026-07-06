@@ -70,16 +70,23 @@ class TestNodApsBasic:
                 assert isinstance(val, (int, float)), f"{name}[{i}] should be numeric"
 
     @pytest.mark.unit
-    def test_sun_returns_zeros(self):
-        """Sun should return zero positions (no heliocentric orbit)."""
+    def test_sun_solar_orbit_apsides(self):
+        """Sun returns the apparent solar-orbit apsides, zero nodes.
+
+        The reference API mirrors Earth's orbit through the origin: the
+        perihelion of the solar orbit sits near lon 282.9 deg at J2000
+        (Earth's perihelion + 180), and the node slots are zeros because
+        the solar orbit lies in the ecliptic plane.
+        """
         jd = 2451545.0
         nasc, ndsc, peri, aphe = ephem.nod_aps_ut(jd, SUN, NODBIT_MEAN)
 
-        # All positions should be zero for Sun
         assert nasc[0] == 0.0
         assert ndsc[0] == 0.0
-        assert peri[0] == 0.0
-        assert aphe[0] == 0.0
+        assert abs(peri[0] - 282.9335) < 0.01
+        assert abs(aphe[0] - 102.9335) < 0.01
+        assert abs(peri[2] - 0.9833) < 0.001
+        assert abs(aphe[2] - 1.0167) < 0.001
 
     @pytest.mark.unit
     def test_earth_returns_zeros(self):

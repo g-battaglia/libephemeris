@@ -34,24 +34,27 @@ class TestDE440Default:
     def test_tidal_default_is_de440(self):
         """Verify tidal acceleration constants.
 
-        TIDAL_DEFAULT matches the reference ephemeris TIDAL_DEFAULT (-25.8).
-        TIDAL_DE440 and TIDAL_DE441 use the JPL DE441 value (-25.936).
+        TIDAL_DEFAULT is the DE440/DE441 value (-25.936), matching both
+        this library's ephemeris and the reference API's runtime default
+        (its get_tid_acc() returns -25.936 out of the box, despite its
+        own -25.8 named constant).
         """
-        assert TIDAL_DEFAULT == -25.8  # Matches the reference ephemeris TIDAL_DEFAULT
+        assert TIDAL_DEFAULT == TIDAL_DE440
         assert TIDAL_DE440 == -25.936
         assert TIDAL_DE441 == -25.936  # DE441 uses same value
 
     def test_get_tid_acc_returns_de440_default(self):
         """Verify that get_tid_acc() returns the default tidal acceleration value.
 
-        The default tidal acceleration matches the reference ephemeris TIDAL_DEFAULT (-25.8),
-        not the DE440-specific value (-25.936).
+        The default is the DE440 value (-25.936), which is also the
+        reference API's default and the zero point of the Delta T
+        tidal-acceleration adjustment.
         """
         # Reset to ensure default state
         ephem.close()
 
         tid_acc = ephem.get_tid_acc()
-        assert tid_acc == TIDAL_DEFAULT
+        assert tid_acc == TIDAL_DE440
 
 
 class TestDE440DateRange:

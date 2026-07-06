@@ -250,10 +250,16 @@ class TestObscurationNoEclipse:
 
 
 class TestConsistencyWithSweEclipseHow:
-    """Test consistency with sol_eclipse_how function."""
+    """Test consistency with sol_eclipse_how function.
+
+    ``sol_eclipse_how`` attr[2] follows the reference API: during totality
+    it is the Moon/Sun disc area ratio (> 1). The extension helper reports
+    the physically-bounded covered fraction instead, so the two agree once
+    the reference value is capped at 1.0 (identical outside totality).
+    """
 
     def test_obscuration_matches_eclipse_how(self):
-        """Test that obscuration matches attr[2] from sol_eclipse_how."""
+        """Test that obscuration matches capped attr[2] from sol_eclipse_how."""
         jd = 2460409.28
         lat, lon = 32.7767, -96.797
         geopos = [lon, lat, 0]
@@ -261,9 +267,9 @@ class TestConsistencyWithSweEclipseHow:
         obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
         _, attr = sol_eclipse_how(jd, geopos, FLG_SWIEPH)
 
-        # Obscuration is attr[2] in sol_eclipse_how
-        assert abs(obscuration - attr[2]) < 0.01, (
-            f"Obscuration {obscuration:.4f} should match "
+        # Obscuration is attr[2] in sol_eclipse_how, capped during totality
+        assert abs(obscuration - min(1.0, attr[2])) < 0.01, (
+            f"Obscuration {obscuration:.4f} should match capped "
             f"sol_eclipse_how attr[2]={attr[2]:.4f}"
         )
 
@@ -279,9 +285,9 @@ class TestConsistencyWithSweEclipseHow:
             obscuration = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
             _, attr = sol_eclipse_how(jd, geopos, FLG_SWIEPH)
 
-            assert abs(obscuration - attr[2]) < 0.01, (
+            assert abs(obscuration - min(1.0, attr[2])) < 0.01, (
                 f"At JD {jd}: obscuration {obscuration:.4f} differs from "
-                f"sol_eclipse_how attr[2]={attr[2]:.4f}"
+                f"capped sol_eclipse_how attr[2]={attr[2]:.4f}"
             )
 
 
@@ -294,7 +300,9 @@ class TestSweApiConvention:
         dallas_lat, dallas_lon = 32.7767, -96.797
 
         # Legacy function: lat, lon order
-        result_legacy = _sol_eclipse_obscuration_at_loc_pythonic(jd, dallas_lat, dallas_lon)
+        result_legacy = _sol_eclipse_obscuration_at_loc_pythonic(
+            jd, dallas_lat, dallas_lon
+        )
 
         # swe version: geopos = [lon, lat, alt]
         result_swe = sol_eclipse_obscuration_at_loc(
@@ -313,7 +321,9 @@ class TestEdgeCases:
         jd = 2460409.28
         lat, lon = 32.7767, -96.797
 
-        obscuration_sea_level = _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon, altitude=0)
+        obscuration_sea_level = _sol_eclipse_obscuration_at_loc_pythonic(
+            jd, lat, lon, altitude=0
+        )
         obscuration_high_alt = _sol_eclipse_obscuration_at_loc_pythonic(
             jd, lat, lon, altitude=5000
         )
@@ -369,7 +379,8 @@ class TestObscurationPhysicalProperties:
         # Times before maximum (increasing obscuration)
         times_before_max = [2460409.24, 2460409.26, 2460409.28]
         obscurations = [
-            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon) for jd in times_before_max
+            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+            for jd in times_before_max
         ]
 
         # Check increasing trend (with some tolerance for edge effects)
@@ -386,7 +397,8 @@ class TestObscurationPhysicalProperties:
         # Times after maximum (decreasing obscuration)
         times_after_max = [2460409.28, 2460409.30, 2460409.32]
         obscurations = [
-            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon) for jd in times_after_max
+            _sol_eclipse_obscuration_at_loc_pythonic(jd, lat, lon)
+            for jd in times_after_max
         ]
 
         # Check decreasing trend

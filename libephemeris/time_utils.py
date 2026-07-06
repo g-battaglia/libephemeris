@@ -23,19 +23,36 @@ from .constants import (
     GREG_CAL,
     JUL_CAL,
     FLG_EQUATORIAL,
-    FLG_JPLEPH,
+    FLG_MOSEPH,
     FLG_SWIEPH,
+    TIDAL_DE440,
+    TIDAL_MOSEPH,
 )
 from .cache import get_cached_time_ut1
 from .state import (
+    _tid_acc_is_set,
     get_delta_t_model,
     get_delta_t_userdef,
     get_iers_delta_t_enabled,
+    get_tid_acc,
     get_timescale,
 )
 
 # Julian Day of Gregorian calendar reform: Oct 15, 1582
 JD_GREGORIAN_REFORM = 2299161
+
+# --- Tidal-acceleration adjustment of Delta T (reference-API parity) -------
+# Epoch at which the adjustment vanishes: Gregorian-calendar year 1955.0,
+# i.e. JD 2451545.0 - 45 * 365.2425 = 2435109.0875. Before this epoch the
+# reference API rescales Delta T for a non-default tidal acceleration; from
+# 1955.0 onwards Delta T is pinned by modern observations (and their forward
+# extrapolation) and the adjustment is exactly zero.
+_TID_ACC_EPOCH_JD = 2435109.0875
+# Measured coefficient in s per (arcsec/cy^2) per Julian-century^2. Solving
+# the reference API's deltat() black-box for pairs of dates gives this value
+# constant to 10 significant digits across tidal accelerations in
+# [-26.5, -22.0] and years -3000..+3000.
+_TID_ACC_COEF = -0.9100373728
 
 
 def _validate_calendar(cal: int, func_name: str) -> None:
@@ -255,6 +272,87 @@ def _deltat_espenak_meeus(year: float) -> float:
     return -20 + 32 * u * u
 
 
+def _tid_acc_adjustment_seconds(tjdut: float, tid_acc: float) -> float:
+    """Delta T adjustment (seconds) for a non-default tidal acceleration.
+
+    Empirically characterized against the reference API as a black box: for
+    dates before the 1955.0 epoch the reference rescales Delta T by
+
+        ``-0.9100373728 * (tid_acc - TIDAL_DE440) * u**2``   [seconds]
+
+    where ``u = (tjdut - 2435109.0875) / 36525.0`` (Julian centuries before
+    the Gregorian-calendar-year epoch 1955.0); from 1955.0 onwards the
+    adjustment is exactly zero (verified out to year +3000). The adjustment
+    is linear in ``tid_acc`` and vanishes at the reference's own default
+    tidal acceleration TIDAL_DE440 (-25.936), so with the library default
+    this returns exactly 0.0 and Delta T is bit-for-bit unchanged.
+
+    Args:
+        tjdut: Julian Day number in UT1.
+        tid_acc: Tidal acceleration in arcsec/century^2.
+
+    Returns:
+        Adjustment to add to Delta T, in seconds.
+    """
+    dacc = tid_acc - TIDAL_DE440
+    if dacc == 0.0 or tjdut >= _TID_ACC_EPOCH_JD:
+        return 0.0
+    u = (tjdut - _TID_ACC_EPOCH_JD) / 36525.0
+    return _TID_ACC_COEF * dacc * u * u
+
+
+def _deltat_with_tid_acc(tjdut: float, tid_acc: float) -> float:
+    """Delta T in days for an explicit tidal acceleration.
+
+    Shared core of :func:`deltat` and :func:`deltat_ex`: resolves the
+    userdef / IERS / model priority chain documented in :func:`deltat`,
+    then applies the tidal-acceleration adjustment for ``tid_acc`` (zero
+    at the default TIDAL_DE440, and zero for all dates from 1955.0 on).
+    A user-defined Delta T is a hard override and is never adjusted.
+    """
+    # Check for user-defined Delta T first
+    userdef_dt = get_delta_t_userdef()
+    if userdef_dt is not None:
+        return userdef_dt
+
+    adjust_seconds = _tid_acc_adjustment_seconds(tjdut, tid_acc)
+
+    # Check for IERS Delta T if enabled
+    if get_iers_delta_t_enabled():
+        try:
+            from . import iers_data
+
+            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
+            if delta_t_seconds is not None:
+                # IERS returns seconds, convert to days
+                return (delta_t_seconds + adjust_seconds) / 86400.0
+        except Exception as exc:  # noqa: BLE001  # robust fallback, any error
+            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
+            # feeds every downstream position calculation, so a robust fallback
+            # must not let an unexpected exception type (OSError, KeyError, ...)
+            # escape and crash the whole pipeline. Log at debug so the silent
+            # fallback is still observable when diagnosing Delta T discrepancies.
+            from .logging_config import get_logger
+
+            get_logger().debug(
+                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
+            )
+
+    # Selected Delta T model (after userdef / IERS). Default is Skyfield's
+    # SMH-2016; ``espenak_meeus`` uses the classic NASA polynomials. (Exact
+    # parity with the reference ephemeris, when needed for validation, is
+    # injected externally via set_delta_t_userdef() — libephemeris never imports
+    # any third-party ephemeris library, to stay license-independent.)
+    if get_delta_t_model() == "espenak_meeus":
+        year, month, _day, _hour = revjul(tjdut)
+        decimal_year = year + (month - 0.5) / 12.0
+        return (_deltat_espenak_meeus(decimal_year) + adjust_seconds) / 86400.0
+
+    t = get_cached_time_ut1(tjdut)
+    delta_t_seconds = float(t.delta_t)
+    return (delta_t_seconds + adjust_seconds) / 86400.0
+
+
 def deltat(tjdut: float) -> float:
     """
     Calculate Delta T (TT - UT1) for a given Julian Day.
@@ -316,6 +414,14 @@ def deltat(tjdut: float) -> float:
             positions in the default (LEB) backend but not in ``"skyfield"``
             mode — a pre-existing property of all three ΔT overrides.
 
+        **Tidal acceleration (set_tid_acc)**
+            For dates before 1955.0, a non-default tidal acceleration set
+            via ``set_tid_acc()`` rescales the computed Delta T exactly as
+            the reference API does (see
+            :func:`_tid_acc_adjustment_seconds`). At the default value
+            (TIDAL_DE440, -25.936 arcsec/cy^2) the adjustment is exactly
+            zero. A user-defined Delta T is never adjusted.
+
         Typical values:
             - Year 1000: ~1500 seconds
             - Year 1800: ~14 seconds
@@ -329,45 +435,7 @@ def deltat(tjdut: float) -> float:
         Proceedings of the Royal Society A, 472: 20160404.
         https://doi.org/10.1098/rspa.2016.0404
     """
-    # Check for user-defined Delta T first
-    userdef_dt = get_delta_t_userdef()
-    if userdef_dt is not None:
-        return userdef_dt
-
-    # Check for IERS Delta T if enabled
-    if get_iers_delta_t_enabled():
-        try:
-            from . import iers_data
-
-            delta_t_seconds = iers_data.get_delta_t_iers(tjdut)
-            if delta_t_seconds is not None:
-                # IERS returns seconds, convert to days
-                return delta_t_seconds / 86400.0
-        except Exception as exc:  # noqa: BLE001  # robust fallback, any error
-            # Fall back to Skyfield if IERS data fails for ANY reason — Delta T
-            # feeds every downstream position calculation, so a robust fallback
-            # must not let an unexpected exception type (OSError, KeyError, ...)
-            # escape and crash the whole pipeline. Log at debug so the silent
-            # fallback is still observable when diagnosing Delta T discrepancies.
-            from .logging_config import get_logger
-
-            get_logger().debug(
-                "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
-            )
-
-    # Selected Delta T model (after userdef / IERS). Default is Skyfield's
-    # SMH-2016; ``espenak_meeus`` uses the classic NASA polynomials. (Exact
-    # parity with the reference ephemeris, when needed for validation, is
-    # injected externally via set_delta_t_userdef() — libephemeris never imports
-    # any third-party ephemeris library, to stay license-independent.)
-    if get_delta_t_model() == "espenak_meeus":
-        year, month, _day, _hour = revjul(tjdut)
-        decimal_year = year + (month - 0.5) / 12.0
-        return _deltat_espenak_meeus(decimal_year) / 86400.0
-
-    t = get_cached_time_ut1(tjdut)
-    delta_t_seconds = float(t.delta_t)
-    return delta_t_seconds / 86400.0
+    return _deltat_with_tid_acc(tjdut, get_tid_acc())
 
 
 def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
@@ -381,8 +449,9 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
         tjdut: Julian Day number in UT1
         flag: Ephemeris selection flag:
             - FLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
-            - FLG_JPLEPH (1): Use JPL ephemeris
-            - FLG_MOSEPH (4): Accepted for compatibility (same Delta T)
+            - FLG_JPLEPH (1): Use JPL ephemeris (same Delta T as FLG_SWIEPH)
+            - FLG_MOSEPH (4): Use the semi-analytical ephemeris tidal
+              acceleration (TIDAL_MOSEPH, -25.58 arcsec/cy^2) for Delta T
 
     Returns:
         float: Delta T in days (TT - UT1)
@@ -408,9 +477,15 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
         Since libephemeris uses Skyfield which internally uses JPL data,
         FLG_SWIEPH and FLG_JPLEPH produce identical results.
 
-        FLG_MOSEPH uses the same Skyfield Delta T model and returns the
-        default Delta T value (this flag only affects position calculations,
-        not time conversions).
+        **FLG_MOSEPH** applies the tidal-acceleration adjustment for
+        TIDAL_MOSEPH (-25.58 arcsec/cy^2) to the computed Delta T, exactly
+        as the reference API does — a measurable difference only for dates
+        before 1955.0 (see :func:`_tid_acc_adjustment_seconds`). The
+        reference's precedence is honoured:
+
+        - a tidal acceleration explicitly set via set_tid_acc() wins over
+          the flag-implied one;
+        - FLG_SWIEPH wins over FLG_MOSEPH when both bits are set.
 
         If a user-defined Delta T has been set via set_delta_t_userdef(),
         that value will be returned instead of the computed value.
@@ -426,14 +501,14 @@ def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
         "Measurement of the Earth's rotation: 720 BC to AD 2015."
         Proceedings of the Royal Society A, 472: 20160404.
     """
-    # Check for valid ephemeris flags
-    ephe_selection = flag & (FLG_JPLEPH | FLG_SWIEPH)
+    # FLG_MOSEPH selects the semi-analytical ephemeris tidal acceleration,
+    # unless the user explicitly set one (set_tid_acc() wins) or FLG_SWIEPH
+    # is also set (measured reference precedence: SWIEPH > MOSEPH > JPLEPH).
+    if flag & FLG_MOSEPH and not flag & FLG_SWIEPH and not _tid_acc_is_set():
+        return _deltat_with_tid_acc(tjdut, TIDAL_MOSEPH)
 
-    # All ephemeris modes use the same selected Delta T model.
-    # FLG_MOSEPH is accepted for compatibility but ignored.
-    _ = ephe_selection  # Explicitly unused: all modes use same Delta T
-
-    return deltat(tjdut)
+    # All other ephemeris flags use the same Delta T as deltat().
+    return _deltat_with_tid_acc(tjdut, get_tid_acc())
 
 
 def date_conversion(

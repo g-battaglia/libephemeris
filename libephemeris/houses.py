@@ -460,7 +460,7 @@ def angular_diff(a: float, b: float) -> float:
     return diff
 
 
-def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
+def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     """
     Calculate the Vertex (intersection of Prime Vertical and Ecliptic in Western hemisphere).
 
@@ -476,7 +476,6 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
         armc_deg: Right Ascension of Midheaven (sidereal time) in degrees
         eps: True obliquity of ecliptic in degrees
         lat: Geographic latitude in degrees
-        mc: Midheaven longitude in degrees (for hemisphere verification)
 
     Returns:
         Vertex longitude in degrees (western hemisphere)
@@ -501,10 +500,23 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float, mc: float) -> float:
     vtx_rad = math.atan2(num, den)
     vtx = math.degrees(vtx_rad) % 360.0
 
-    # Ensure Vertex is in Western Hemisphere relative to MC
-    # Vertex should be West of MC (i.e., behind it in diurnal motion)
-    diff = (vtx - mc) % 360.0
-    if diff < 180.0:
+    # The atan2 above yields one of the two antipodal intersections of the
+    # prime vertical with the ecliptic; the Vertex is the WESTERN one.
+    # Disambiguate in the equatorial frame: convert the candidate to right
+    # ascension and require an hour angle in (0, 180), i.e. west of the
+    # upper meridian.  (A previous version compared the candidate's
+    # *ecliptic* longitude against the ARMC, an *equatorial* longitude;
+    # that mixed-frame test is off by up to ~2.5 deg and flipped the
+    # Vertex by 180 deg whenever it fell within that margin of
+    # ARMC + 180, which is reachable at |lat| < eps.  Verified against
+    # the reference API on a dense armc x lat x eps grid.)
+    vtx_r = math.radians(vtx)
+    ra_vtx = (
+        math.degrees(math.atan2(math.cos(eps_rad) * math.sin(vtx_r), math.cos(vtx_r)))
+        % 360.0
+    )
+    hour_angle = (armc_deg - ra_vtx) % 360.0
+    if not (0.0 < hour_angle < 180.0):
         vtx = (vtx + 180.0) % 360.0
 
     return vtx
@@ -753,13 +765,12 @@ def houses(
         asc = 0.0
 
     # Vertex uses armc_deg (Original)
-    # Hemisphere check relative to TRUE ARMC (West of True ARMC)
     # The horizontal system computes its equator-degenerate angles on
     # the negative-latitude side (reference behavior — its vertex and
     # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
     # lat -> 0+ limits).
     _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
-    vertex = _calc_vertex(armc_deg, eps, _vtx_lat, armc_deg)
+    vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -1328,13 +1339,12 @@ def houses_armc(
         asc = 0.0
 
     # Vertex uses armc_deg (Original)
-    # Hemisphere check relative to TRUE ARMC (West of True ARMC)
     # The horizontal system computes its equator-degenerate angles on
     # the negative-latitude side (reference behavior — its vertex and
     # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
     # lat -> 0+ limits).
     _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
-    vertex = _calc_vertex(armc_deg, eps, _vtx_lat, armc_deg)
+    vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
 
     # Equatorial Ascendant (East Point)
     # This is the intersection of the ecliptic with the celestial equator in the east
@@ -1555,14 +1565,16 @@ def houses_armc_ex2(
     # ratio 360/360.9856 ≈ 0.27 %.
     _SIDEREAL_RATE = 360.98564736629  # ARMC degrees per mean solar day
 
-    # ARMC step for the finite difference.
-    # Koch and Placidus use a 1-second step (nested trig amplifies
-    # truncation error at the 1-minute step).
-    # All other systems use a 1-minute step.
-    if hsys_code in (ord("K"), ord("P")):
-        d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
-    else:
-        d_armc = _SIDEREAL_RATE / 1440.0  # sidereal degrees per 1 minute
+    # ARMC step for the finite difference: 1 second of sidereal rotation
+    # for every system.  At the 1-minute step previously used for the
+    # non-iterative systems, the centered difference's truncation error
+    # reached ~0.14 deg/day on fast-moving cusps (e.g. the Equal cusps at
+    # ARMC 270, lat 60, where the ascendant rate peaks at ~1580 deg/day)
+    # and ~0.0025 deg/day on the ascmc rates.  The reference API's speeds
+    # match the true d(cusp)/d(ARMC) derivative to ~1e-5 deg/day, and the
+    # 1-second step reproduces that (verified against the reference on an
+    # armc x lat grid across all house systems).
+    d_armc = _SIDEREAL_RATE / 86400.0  # sidereal degrees per 1 second
 
     # Calculate positions at ARMC ± d_armc
     cusps_before, ascmc_before = houses_armc(armc - d_armc, lat, eps, hsys, ascmc9)
@@ -1577,23 +1589,31 @@ def houses_armc_ex2(
             diff += 360
         return diff
 
+    def fd_speed(after: float, before: float) -> float:
+        """Centered-difference rate in deg/day; 0.0 across a discontinuity.
+
+        A change larger than 90 deg across the ±1 s window cannot be smooth
+        motion (it would require a rate above ~3.9e6 deg/day); it is a genuine
+        jump of the angle — e.g. the Vertex flipping between the equinoxes at
+        lat 0 when the ARMC crosses 0/180.  No derivative exists there and the
+        reference API reports 0.0 for such angles.
+        """
+        diff = angular_diff_local(after, before)
+        if abs(diff) > 90.0:
+            return 0.0
+        return diff / (2 * d_armc) * _SIDEREAL_RATE
+
     # Velocities in deg/day = d(cusp)/d(ARMC) * (ARMC deg/day)
     # Since d_armc already equals _SIDEREAL_RATE * dt, dividing by
     # (2*d_armc) and then multiplying by _SIDEREAL_RATE is equivalent to
     # dividing by (2*dt).  Using d_armc directly avoids a separate dt
     # variable: speed = Δcusp / (2*d_armc) * _SIDEREAL_RATE.
     cusps_speed = tuple(
-        angular_diff_local(cusps_after[i], cusps_before[i])
-        / (2 * d_armc)
-        * _SIDEREAL_RATE
-        for i in range(len(cusps))
+        fd_speed(cusps_after[i], cusps_before[i]) for i in range(len(cusps))
     )
 
     ascmc_speed = tuple(
-        angular_diff_local(ascmc_after[i], ascmc_before[i])
-        / (2 * d_armc)
-        * _SIDEREAL_RATE
-        for i in range(len(ascmc))
+        fd_speed(ascmc_after[i], ascmc_before[i]) for i in range(len(ascmc))
     )
 
     # ── System-specific cusp speed overrides ──────────────────────
@@ -1643,6 +1663,14 @@ def houses_armc_ex2(
     # included. Callers that have the time should prefer houses_ex2(), which
     # finite-differences the full house solution in time and so captures every
     # time-dependent term exactly.
+    #
+    # Known deviation: for the intermediate Placidus, Koch, and Gauquelin
+    # sector cusps the reference API does NOT return d(cusp)/d(ARMC) —
+    # its reported rates differ from the numerical derivative of its
+    # *own* cusp positions (up to ~1.4 deg/day for Placidus and tens of
+    # deg/day for Koch/Gauquelin), so it evidently uses a separate speed
+    # model for those systems.  We deliberately keep the true derivative
+    # here.
 
     return cusps, ascmc, cusps_speed, ascmc_speed
 
@@ -5290,27 +5318,32 @@ def _house_pos_pythonic(
 
         pos_deg = 0.0
         if not invalid and abs(mc_semi_arc) > 0:
-            # Small tolerance for floating-point boundary checks.
-            # When a body is exactly on the MC or IC, the fraction can be
-            # -1e-17 instead of 0.0 due to IEEE 754 rounding.
-            # Both boundaries are strict, matching the reference: a
-            # fraction of exactly 0.0 (body on the meridian with zero
-            # AD) is valid, but -1e-17 from a cancelling md/AD pair or
-            # a fraction at/above 2 is classified undefined.  Bodies
-            # exactly on the validity edge are decided by the same
-            # comparisons the reference applies.
+            # The valid fraction range is the closed interval [0, 2]: both
+            # endpoints are reached by real bodies.  A body exactly on the
+            # meridian lands on a fraction of 0 or 2 depending on which
+            # side of the east/west split above IEEE 754 noise pushed its
+            # meridian distance (e.g. md_upper = -1e-14 for a body on the
+            # MC selects the west branch, whose fraction is then exactly
+            # 2).  The reference API places such bodies in house 10 (MC)
+            # or house 4 (IC), never in the "undefined" class, so the
+            # boundary checks accept [0, 2] with a small tolerance for
+            # rounding noise and clamp back into the interval; only
+            # fractions genuinely outside (circumpolar area) stay
+            # undefined.  Verified against the reference on a dense
+            # armc x lat x lon grid including exact cusp coincidences.
+            _FRACTION_TOL = 1e-9
             if md_upper >= 0:  # east
                 arc_fraction = (md_upper - ad_body + ad_mc) / mc_semi_arc
-                if arc_fraction >= 2.0 or arc_fraction < 0.0:
-                    invalid = True
-                else:
-                    pos_deg = (arc_fraction - 1.0) * 90.0
             else:  # west
                 md_from_lower = md_upper + 180.0
                 arc_fraction = (md_from_lower + ad_body + ad_mc) / mc_semi_arc
-                if arc_fraction >= 2.0 or arc_fraction < 0.0:
-                    invalid = True
-                else:
+            if arc_fraction < -_FRACTION_TOL or arc_fraction > 2.0 + _FRACTION_TOL:
+                invalid = True
+            else:
+                arc_fraction = min(max(arc_fraction, 0.0), 2.0)
+                if md_upper >= 0:  # east
+                    pos_deg = (arc_fraction - 1.0) * 90.0
+                else:  # west
                     pos_deg = (arc_fraction + 1.0) * 90.0
 
         if invalid:

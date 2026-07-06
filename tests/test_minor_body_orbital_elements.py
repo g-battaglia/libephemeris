@@ -109,11 +109,21 @@ class TestOrbitalElementsEpoch:
     """Tests for orbital elements epoch."""
 
     def test_all_bodies_at_correct_epoch(self, all_minor_body_ids):
-        """Verify all bodies have epoch JD 2461000.5."""
+        """Verify all bodies have epoch JD 2461000.5.
+
+        Exception: Bennu's elements are extracted from the OSIRIS-REx
+        mission kernel, whose heliocentric coverage (2015-2023) does not
+        include the common epoch; its state is taken mid-coverage at
+        JD 2459000.5 (a JPL-quality state matters more than epoch
+        uniformity for an Apollo PHA with Earth close approaches).
+        """
+        from libephemeris.minor_bodies import BENNU
+
         for body_id in all_minor_body_ids:
             elements = MINOR_BODY_ELEMENTS[body_id]
-            assert elements.epoch == EXPECTED_EPOCH, (
-                f"{elements.name}: epoch {elements.epoch} != expected {EXPECTED_EPOCH}"
+            expected = 2459000.5 if body_id == BENNU else EXPECTED_EPOCH
+            assert elements.epoch == expected, (
+                f"{elements.name}: epoch {elements.epoch} != expected {expected}"
             )
 
     def test_expected_number_of_bodies(self):

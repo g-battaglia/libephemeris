@@ -1970,14 +1970,21 @@ MINOR_BODY_ELEMENTS = {
     ),
     BENNU: OrbitalElements(
         name="Bennu",
-        epoch=2461000.5,
-        a=1.126391025894812,  # Apollo PHA, OSIRIS-REx sample return mission target (~490 m)
-        e=0.2037450762416414,  # Moderate eccentricity (q=0.90 AU, Q=1.36 AU)
-        i=6.03494377024794,  # Low inclination
-        omega=66.22306084084298,
-        Omega=2.06086619569642,
-        M0=265.1247751080418,  # Propagated from epoch 2455562.5
-        n=0.8244613503320309,  # ~1.20 year period (437 days)
+        # Osculating state extracted directly from the OSIRIS-REx mission
+        # kernel (bennu_refdrmc_v1.bsp, heliocentric segment) at an epoch
+        # inside its 2015-2023 coverage, converted to heliocentric
+        # ecliptic-J2000 elements with this module's GM_SUN. A JPL-quality
+        # initial state matters for Bennu: the previous entry carried a
+        # mean anomaly propagated across Earth close approaches, which is
+        # exactly what Keplerian propagation cannot do for an Apollo PHA.
+        epoch=2459000.5,
+        a=1.1259079132384175,  # Apollo PHA, OSIRIS-REx target (~490 m)
+        e=0.20369086358508753,  # Moderate eccentricity (q=0.90 AU, Q=1.36 AU)
+        i=6.03413689825826,  # Low inclination
+        omega=66.33783320932424,
+        Omega=2.007318336507548,
+        M0=57.600772525206764,
+        n=0.8249920559507995,  # ~1.20 year period (437 days)
     ),
     RYUGU: OrbitalElements(
         name="Ryugu",

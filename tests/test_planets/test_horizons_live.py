@@ -83,6 +83,23 @@ def test_horizons_asteroid_heliocentric_matches_skyfield(horizons_vs_skyfield):
     match the Skyfield/SPK backend to < 1" — the regression guard for the kind of
     wrong-frame / wrong-direction backend bug that motivated this file."""
     flags = FLG_SWIEPH | FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS
+    # The Skyfield baseline is only reference-grade when Ceres comes from a
+    # local SPK kernel. Without one the library silently falls back to a
+    # two-body Keplerian model (~1-2 deg error) — no 1" comparison is
+    # possible against that, so skip rather than fail on a missing kernel.
+    L.set_calc_mode("skyfield")
+    token = L.start_tracing()
+    try:
+        L.calc(J2000, CERES, flags)
+        source = L.get_trace_results().get(CERES)
+    finally:
+        token.var.reset(token)
+        L.set_calc_mode("auto")
+    if source != "SPK":
+        pytest.skip(
+            f"no local SPK kernel for Ceres (Skyfield source: {source}); "
+            'baseline too coarse for a 1" comparison'
+        )
     hor, sky = horizons_vs_skyfield(J2000, CERES, flags)
     assert _ang_diff(hor[0], sky[0]) * 3600.0 < 1.0
     assert abs(hor[2] - sky[2]) < 1e-4

@@ -107,12 +107,15 @@ class TestCs2timestrNegativeValues:
         assert "12:" in result
 
     def test_cs2timestr_negative_with_minutes(self):
-        """Test conversion of negative value with minutes (-1h30m wraps to 23:30)."""
+        """Test conversion of negative value with minutes (-1h30m wraps to 22:30)."""
         cs_value = -(CS_HOUR + 30 * CS_MINUTE)  # -1 hour 30 minutes
         result = ephem.cs2timestr(cs_value)
-        # -1 hour mod 24 = 23, minutes stay at 30
-        assert "23:" in result
-        assert ":30:" in result
+        # The WHOLE value wraps modulo 24h (documented contract), so
+        # -1.5h == 22.5h -> 22:30:00. (Applying the sign to the hours field
+        # alone would give 23:30 but breaks sub-hour negatives; the reference
+        # API's output for negative cs is undefined garbage, so the total
+        # wrap is this library's sane, documented behavior.)
+        assert "22:30:00" in result
 
 
 class TestCs2timestrLargeValues:

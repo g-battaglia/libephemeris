@@ -398,3 +398,116 @@ class TestFix5PlanetOccultContactSpeed:
         assert abs(tret[2] - true_first) * 86400.0 < 2.0
         assert abs(tret[3] - true_fourth) * 86400.0 < 2.0
         assert retflag != 0
+
+
+# ---------------------------------------------------------------------------
+# Round 2 fix A: total-eclipse obscuration is the disc area ratio
+# ---------------------------------------------------------------------------
+class TestRound2TotalObscurationAreaRatio:
+    """``attr[2]`` for a total eclipse is the Moon/Sun disc *area ratio*
+    (> 1 in totality), exactly as the reference API reports it — not a
+    fraction clamped to 1.0. Oracle: 1.1166797 at the Dallas local
+    maximum of the 2024-04-08 eclipse (reference ephemeris 2.10.03)."""
+
+    # Reference sol_eclipse_when_loc local maximum for Dallas, TX.
+    JD_LOC_MAX_DALLAS = 2460409.2796699
+    DALLAS = (-96.797, 32.777, 0.0)
+    OBSCURATION_REF = 1.1166797
+
+    def test_total_obscuration_is_area_ratio_above_one(self):
+        _require_ephemeris(self.JD_LOC_MAX_DALLAS)
+
+        rc, attr = E.sol_eclipse_how(self.JD_LOC_MAX_DALLAS, self.DALLAS)
+        assert rc & ECL_TOTAL, f"expected local totality, got {rc:#x}"
+        # The obscuration is the squared diameter ratio, > 1 in totality.
+        assert attr[2] == pytest.approx(attr[1] ** 2, rel=1e-9)
+        assert attr[2] > 1.0
+        assert attr[2] == pytest.approx(self.OBSCURATION_REF, abs=2e-3)
+
+
+# ---------------------------------------------------------------------------
+# Round 2 fix B: hybrid classification by core-shadow sign change
+# ---------------------------------------------------------------------------
+class TestRound2HybridSignChange:
+    """The annular-total classification uses the physical criterion (the
+    core-shadow width changes sign along the central path) instead of the
+    old static ``|l2| < 0.002`` threshold. 2005-04-08 is hybrid despite
+    l2 ~ +0.0024 at maximum (was misclassified annular) and 2002-12-04 is
+    total despite l2 ~ -0.0020 (was misclassified hybrid). Expected
+    retflags are the reference oracle values."""
+
+    CASES = [
+        ("hybrid_2005", (2005, 4, 1), ECL_ANNULAR_TOTAL | ECL_CENTRAL),
+        ("total_2002", (2002, 11, 25), ECL_TOTAL | ECL_CENTRAL),
+        ("hybrid_2013", (2013, 10, 25), ECL_ANNULAR_TOTAL | ECL_CENTRAL),
+        ("total_2024", (2024, 4, 1), ECL_TOTAL | ECL_CENTRAL),
+        ("hybrid_2023", (2023, 4, 12), ECL_ANNULAR_TOTAL | ECL_CENTRAL),
+        ("total_2006", (2006, 3, 20), ECL_TOTAL | ECL_CENTRAL),
+        ("annular_2019", (2019, 12, 18), ECL_ANNULAR | ECL_CENTRAL),
+    ]
+
+    @pytest.mark.parametrize("label,start,expected", CASES, ids=[c[0] for c in CASES])
+    def test_glob_retflag_matches_reference(self, label, start, expected):
+        jd0 = julday(start[0], start[1], start[2], 0.0)
+        _require_ephemeris(jd0)
+
+        retflag, _tret = E.sol_eclipse_when_glob(jd0)
+        assert retflag == expected, (
+            f"{label}: retflag {retflag:#x} != reference {expected:#x}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Round 2 fix C: backwards accepts direction strings, rejects garbage
+# ---------------------------------------------------------------------------
+class TestRound2BackwardsCoercion:
+    """A truthy direction string like "forward" used to select a *backward*
+    search. ``_coerce_backwards`` now interprets strings explicitly, keeps
+    bool/int semantics (including the ECL_ONE_TRY bit on the occultation
+    functions) and raises TypeError on anything unrecognized."""
+
+    def test_coerce_backwards_values(self):
+        from libephemeris.eclipse import _coerce_backwards
+
+        assert _coerce_backwards(True) is True
+        assert _coerce_backwards(False) is False
+        assert _coerce_backwards(0) is False
+        assert _coerce_backwards(2) is True
+        for text in ("backward", "Backwards", " TRUE ", "1"):
+            assert _coerce_backwards(text) is True, text
+        for text in ("forward", "Forwards", "false", "0", ""):
+            assert _coerce_backwards(text) is False, text
+        with pytest.raises(TypeError):
+            _coerce_backwards("sideways")
+        with pytest.raises(TypeError):
+            _coerce_backwards(1.5)  # type: ignore[arg-type]
+
+    def test_forward_string_searches_forward(self):
+        jd0 = julday(2024, 1, 1, 0.0)
+        _require_ephemeris(jd0)
+
+        _rf, tret_str = E.sol_eclipse_when_glob(jd0, backwards="forward")
+        _rf2, tret_bool = E.sol_eclipse_when_glob(jd0, backwards=False)
+        assert tret_str[0] == tret_bool[0]
+        assert tret_str[0] > jd0, "'forward' must not search backward"
+
+    def test_backward_string_searches_backward(self):
+        jd0 = julday(2024, 1, 1, 0.0)
+        _require_ephemeris(jd0)
+
+        _rf, tret = E.lun_eclipse_when(jd0, backwards="backwards")
+        assert tret[0] < jd0, "'backwards' must search backward"
+
+    def test_one_try_flag_preserved_on_occultations(self):
+        from libephemeris.constants import ECL_ONE_TRY
+
+        jd0 = julday(2024, 1, 1, 0.0)
+        _require_ephemeris(jd0)
+
+        retflag, tret = E.lun_occult_when_glob(
+            jd0, VENUS, ecltype=0, backwards=ECL_ONE_TRY
+        )
+        # One-try miss case: retflag 0 with a forward continuation date —
+        # the ECL_ONE_TRY bit must not be read as a backward search.
+        assert retflag == 0
+        assert tret[0] > jd0

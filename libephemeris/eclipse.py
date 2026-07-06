@@ -203,6 +203,44 @@ def _ecl_eph_flags(flags: int) -> int:
     return flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
 
 
+def _coerce_backwards(value: "bool | int | str") -> bool:
+    """Coerce a public ``backwards`` argument to a plain bool.
+
+    A truthy string like ``"forward"`` would silently select a *backward*
+    search under plain truthiness, so direction strings are interpreted
+    explicitly instead.
+
+    Args:
+        value: Search direction. Booleans pass through, ints use their
+            truthiness, strings (case-insensitive, surrounding whitespace
+            stripped) map "backward"/"backwards"/"true"/"1" to True and
+            "forward"/"forwards"/"false"/"0"/"" to False.
+
+    Returns:
+        True for a backward search, False for a forward search.
+
+    Raises:
+        TypeError: If ``value`` is an unrecognized string or an
+            unsupported type.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return bool(value)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("backward", "backwards", "true", "1"):
+            return True
+        if text in ("forward", "forwards", "false", "0", ""):
+            return False
+        raise TypeError(
+            f"invalid backwards value {value!r}: expected a bool, an int, "
+            "or one of 'backward'/'backwards'/'true'/'1' (backward search) "
+            "or 'forward'/'forwards'/'false'/'0'/'' (forward search)"
+        )
+    raise TypeError(f"backwards must be a bool, int or str, got {type(value).__name__}")
+
+
 def _topo_sun_moon(
     jd: float, geopos: "Sequence[float]", reader
 ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
@@ -457,8 +495,9 @@ def _sol_how_core(
     allowing for refraction and the observer's horizon dip.
 
     attr: [0] magnitude as diameter fraction (negative when the limbs do
-    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration,
-    [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
+    not yet overlap), [1] lunar/solar diameter ratio, [2] obscuration
+    (the lunar/solar disc area ratio during totality, > 1 per reference
+    behavior), [3] 0 (callers fill the core-shadow width), [4] azimuth of the Sun,
     [5] true altitude, [6] apparent altitude, [7] Moon-Sun center
     separation in degrees, [8] NASA magnitude, [9]/[10] saros series and
     member.
@@ -499,14 +538,12 @@ def _sol_how_core(
         attr[2] = 0.0
     elif rsun <= 0.0:
         attr[2] = 1.0
-    elif retc == ECL_TOTAL:
-        # The (larger) Moon fully covers the Sun: the obscured fraction of the
-        # solar disc is 100%. (The Moon/Sun area ratio (rmoon/rsun)**2 exceeds
-        # 1 here and is the eclipse magnitude's domain, not the obscuration.)
-        attr[2] = 1.0
-    elif retc == ECL_ANNULAR:
-        # A ring of Sun remains around the smaller Moon: the obscured fraction
-        # is the ratio of the lunar to the solar disc area.
+    elif retc in (ECL_TOTAL, ECL_ANNULAR):
+        # One disc lies entirely within the other: the reference API reports
+        # the lunar/solar disc area ratio. Total (larger Moon): the ratio
+        # exceeds 1 - reference behavior, deliberately not clamped to the
+        # physical 100% fraction. Annular (smaller Moon): a ring of Sun
+        # remains and the ratio is the obscured fraction (< 1).
         attr[2] = (rmoon / rsun) ** 2
     elif dctr <= 0.0:
         # Exactly concentric discs in the partial branch are reachable only at
@@ -980,10 +1017,11 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
         d: Center-to-center separation in degrees
 
     Returns:
-        Obscuration as a fraction in [0, 1]: 1.0 for a total eclipse (the Sun
-        is fully covered), (r_moon/r_sun)^2 for an annular eclipse (a ring of
-        Sun remains), and the two-disc lens-overlap fraction for a partial
-        eclipse.
+        Obscuration: the Moon/Sun disc area ratio (r_moon/r_sun)^2 when one
+        disc lies entirely within the other (> 1 for a total eclipse, < 1
+        for an annular one — reference behavior, deliberately not clamped),
+        the two-disc lens-overlap fraction for a partial eclipse, and 0.0
+        with no overlap.
     """
     # Handle edge case: no overlap
     if d >= r_sun + r_moon:
@@ -991,9 +1029,9 @@ def _calculate_obscuration_safe(r_sun: float, r_moon: float, d: float) -> float:
 
     # Edge case: one disc lies entirely within the other (or is concentric).
     if d <= abs(r_sun - r_moon) or d < MINIMUM_SEPARATION_FOR_LENS:
-        # Total (Moon >= Sun): the Sun is fully covered -> 1.0.
+        # Total (Moon >= Sun): area ratio > 1 (reference behavior).
         # Annular (Moon < Sun): a ring remains -> disc area ratio < 1.0.
-        return 1.0 if r_moon >= r_sun else (r_moon / r_sun) ** 2
+        return (r_moon / r_sun) ** 2
 
     # Calculate lens-shaped intersection area
     # d1 is distance from Sun center to intersection chord
@@ -1676,6 +1714,63 @@ def _calculate_eclipse_phases_besselian(
     )
 
 
+def _is_hybrid_solar_eclipse(jd_max: float, l2: float) -> bool:
+    """Physical hybrid (annular-total) test: does the core shadow's
+    character change along the central phase?
+
+    A hybrid eclipse is total around maximum, where the Earth's surface
+    bulges closest to the Moon, and annular near the ends of the central
+    path, where the surface falls back towards the fundamental plane. So
+    instead of a static threshold on ``l2`` at maximum, sample the
+    core-shadow width at the ground point (negative when the umbra
+    reaches the surface) between the umbral contacts U1 and U4: the
+    eclipse is hybrid iff the width changes sign along the path.
+
+    Args:
+        jd_max: Julian Day (UT) of the eclipse maximum.
+        l2: Umbral/antumbral shadow radius on the fundamental plane at
+            ``jd_max`` (Earth radii, negative for umbra).
+
+    Returns:
+        True when the core-shadow width changes sign along the central
+        phase (annular-total eclipse).
+    """
+    # Fast reject: between the path ends (surface near the fundamental
+    # plane) and maximum (surface up to one Earth radius closer to the
+    # Moon), Earth's curvature shrinks the core-shadow radius by at most
+    # ~tan(f2) ~ 0.0047 Earth radii (~30 km). Outside this band around
+    # zero no sign change is possible: l2 < 0 stays total, large l2 > 0
+    # stays annular. Margins cover the drift of l2 over the window.
+    if l2 < -0.001 or l2 > 0.006:
+        return False
+
+    # Umbral contacts U1/U4 (exterior tangency), as in
+    # _calculate_eclipse_phases_besselian().
+    umbral_limit = 1.0 + abs(l2)
+    t_u1 = _find_contact_time_besselian(
+        jd_max, umbral_limit, search_before=True, search_range=0.10
+    )
+    t_u4 = _find_contact_time_besselian(
+        jd_max, umbral_limit, search_before=False, search_range=0.10
+    )
+    if t_u1 and t_u4 and t_u4 > t_u1:
+        sample_times = [t_u1 + f * (t_u4 - t_u1) for f in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    else:
+        # Contacts unresolved: fall back to the maximum alone (no sign
+        # change observable from a single sample -> not hybrid).
+        sample_times = [jd_max]
+
+    widths = []
+    for t in sample_times:
+        try:
+            _rc, _lon, _lat, dcore = _eclipse_where_core(t)
+        except (KeyError, ValueError, ArithmeticError) as _exc:
+            _reraise_if_leb_range_error(_exc)
+            continue
+        widths.append(dcore[0])
+    return bool(widths) and min(widths) < 0.0 < max(widths)
+
+
 def _calculate_eclipse_type_and_magnitude(
     jd: float,
 ) -> Tuple[int, float, float, float]:
@@ -1777,15 +1872,15 @@ def _calculate_eclipse_type_and_magnitude(
 
     eclipse_type = ECL_PARTIAL | ECL_NONCENTRAL
 
-    # Hybrid detection: the umbra/antumbra cone tip is very close to
-    # Earth's surface, so the eclipse transitions between total and
-    # annular along its path (|l2| small enough for a sign change).
-    is_hybrid = abs(l2) < 0.002  # ~13 km, empirical threshold
-
+    # Hybrid detection (annular-total): the umbra/antumbra cone tip is so
+    # close to Earth's surface that the core-shadow width changes sign
+    # along the central path. _is_hybrid_solar_eclipse() applies the
+    # physical criterion (sign change between the umbral contacts) and is
+    # only evaluated once the umbra/antumbra is known to touch Earth.
     if abs(gamma) <= 1.0:
         # Central: the shadow axis intersects Earth.
         # l2 < 0: umbra (total); l2 > 0: antumbra (annular).
-        if is_hybrid:
+        if _is_hybrid_solar_eclipse(jd, l2):
             eclipse_type = ECL_ANNULAR_TOTAL | ECL_CENTRAL
         elif l2 < 0:
             eclipse_type = ECL_TOTAL | ECL_CENTRAL
@@ -1795,7 +1890,7 @@ def _calculate_eclipse_type_and_magnitude(
         # Noncentral total/annular (~1% of eclipses): the umbra/antumbra
         # touches Earth but the shadow axis misses it. The reference
         # classifies these as TOTAL|NONCENTRAL / ANNULAR|NONCENTRAL.
-        if is_hybrid:
+        if _is_hybrid_solar_eclipse(jd, l2):
             eclipse_type = ECL_ANNULAR_TOTAL | ECL_NONCENTRAL
         elif l2 < 0:
             eclipse_type = ECL_TOTAL | ECL_NONCENTRAL
@@ -2330,7 +2425,7 @@ def sol_eclipse_when_glob(
     tjdut: float,
     flags: int = FLG_SWIEPH,
     ecltype: int = 0,
-    backwards: bool = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """Find the next (or previous) global solar eclipse (reference-API-compatible).
 
@@ -2340,12 +2435,13 @@ def sol_eclipse_when_glob(
         tjdut: Julian Day (UT) to start search from.
         flags: Calculation flags (default FLG_SWIEPH).
         ecltype: Eclipse type filter bitmask (0 = any).
-        backwards: If True, search backward in time.
+        backwards: If True, search backward in time. Also accepts 0/1 and
+            the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
         Tuple of (retflag, tret) matching the reference ephemeris.
     """
-    direction = "backward" if backwards else "forward"
+    direction = "backward" if _coerce_backwards(backwards) else "forward"
     return _sol_eclipse_when_glob_pythonic(
         tjdut, flags=flags, eclipse_type=ecltype, search_direction=direction
     )
@@ -2933,7 +3029,7 @@ def sol_eclipse_when_loc(
     tjdut: float,
     geopos: "Sequence[float]",
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Find the next solar eclipse visible from a geographic location.
 
@@ -2946,7 +3042,7 @@ def sol_eclipse_when_loc(
         tjdut,
         geopos,
         flags,
-        backwards,
+        _coerce_backwards(backwards),
     )
 
 
@@ -4823,7 +4919,7 @@ def lun_eclipse_when(
     tjdut: float,
     flags: int = FLG_SWIEPH,
     ecltype: int = 0,
-    backwards: bool = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """Find the next (or previous) lunar eclipse globally (reference-API-compatible).
 
@@ -4833,13 +4929,17 @@ def lun_eclipse_when(
         tjdut: Julian Day (UT) to start search from.
         flags: Calculation flags (default FLG_SWIEPH).
         ecltype: Eclipse type filter bitmask (0 = any).
-        backwards: If True, search backward in time.
+        backwards: If True, search backward in time. Also accepts 0/1 and
+            the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
         Tuple of (retflag, tret) matching the reference ephemeris.
     """
     return _lun_eclipse_when_pythonic(
-        tjdut, flags=flags, eclipse_type=ecltype, backwards=backwards
+        tjdut,
+        flags=flags,
+        eclipse_type=ecltype,
+        backwards=_coerce_backwards(backwards),
     )
 
 
@@ -4988,7 +5088,7 @@ def lun_eclipse_when_loc(
     tjdut: float,
     geopos: "Sequence[float]",
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """Find the next lunar eclipse visible from a geographic position (reference-API-compatible).
 
@@ -4998,7 +5098,8 @@ def lun_eclipse_when_loc(
         tjdut: Julian Day (UT) to start search from.
         geopos: Sequence of [longitude, latitude, altitude].
         flags: Calculation flags (default FLG_SWIEPH).
-        backwards: If True, search backward in time.
+        backwards: If True, search backward in time. Also accepts 0/1 and
+            the direction strings understood by :func:`_coerce_backwards`.
 
     Returns:
         Tuple of (retflag, tret, attr) matching the reference ephemeris.
@@ -5017,7 +5118,7 @@ def lun_eclipse_when_loc(
         lon,
         altitude,
         flags,
-        backwards,
+        _coerce_backwards(backwards),
     )
 
 
@@ -5339,7 +5440,7 @@ def lun_occult_when_glob(
     body: "int | str",
     flags: int = FLG_SWIEPH,
     ecltype: int = 0,
-    backwards: "bool | int" = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...]]:
     """
     Find the next lunar occultation of a planet or star anywhere on Earth.
@@ -5351,11 +5452,13 @@ def lun_occult_when_glob(
         ecltype: Occultation-type filter (ECL_TOTAL, ECL_PARTIAL,
             ECL_CENTRAL, ECL_NONCENTRAL, or 0 for any). Annular types
             only exist when the occulted body is the Sun.
-        backwards: False/0 searches forward, True/1 backward. The value
-            may carry ECL_ONE_TRY: then only the conjunction nearest the
-            start date is examined - if it shows no occultation of the
-            wanted type, the function returns retflag 0 with tret[0]
-            holding a date from which to continue the search.
+        backwards: False/0 searches forward, True/1 backward; direction
+            strings are accepted per :func:`_coerce_backwards`. The int
+            value may carry ECL_ONE_TRY: then only the conjunction
+            nearest the start date is examined - if it shows no
+            occultation of the wanted type, the function returns
+            retflag 0 with tret[0] holding a date from which to
+            continue the search.
 
     Returns:
         Tuple containing:
@@ -5384,7 +5487,13 @@ def lun_occult_when_glob(
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
 
-    back_i = int(backwards)
+    # bools/ints keep their flag bits (ECL_ONE_TRY rides on the int);
+    # direction strings are coerced to a plain 0/1.
+    back_i = (
+        int(_coerce_backwards(backwards))
+        if isinstance(backwards, str)
+        else int(backwards)
+    )
     one_try = bool(back_i & ECL_ONE_TRY)
     backward = bool(back_i & 1)
     direction = -1 if backward else 1
@@ -5864,7 +5973,7 @@ def lun_occult_when_loc(
     body: "int | str",
     geopos: "Sequence[float]",
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: "bool | int | str" = False,
 ) -> Tuple[int, Tuple[float, ...], Tuple[float, ...]]:
     """
     Find the next lunar occultation visible from a specific location.
@@ -5884,7 +5993,9 @@ def lun_occult_when_loc(
         geopos: Sequence of [longitude_degrees, latitude_degrees, altitude_meters]
                 NOTE: longitude comes first (this matches reference API convention)
         flags: Calculation flags (FLG_SWIEPH, etc.)
-        backwards: If True, search backward in time instead of forward
+        backwards: If True, search backward in time instead of forward;
+            direction strings are accepted per :func:`_coerce_backwards`
+            and the int value may carry ECL_ONE_TRY
 
     Returns:
         Tuple containing:
@@ -5954,6 +6065,14 @@ def lun_occult_when_loc(
         planet = body
         star_name = ""
 
+    # bools/ints keep their flag bits (ECL_ONE_TRY rides on the int);
+    # direction strings are coerced to a plain 0/1.
+    back_i = (
+        int(_coerce_backwards(backwards))
+        if isinstance(backwards, str)
+        else int(backwards)
+    )
+
     # Call the internal implementation with LEB→Skyfield fallback
     ecl_type, times, attr = _call_with_leb_skyfield_fallback(
         _lun_occult_when_loc_pythonic,
@@ -5964,7 +6083,7 @@ def lun_occult_when_loc(
         lon,
         altitude,
         flags,
-        backwards,
+        back_i,
     )
 
     # Return in reference API order: (retflags, tret, attr)

@@ -322,7 +322,8 @@ altitudes (physically meaningless region).
 
 **6.1 Solar eclipses.** Timing (`tret[0]`) typically < 10 s; geography (`geopos`)
 typically < 1°; type flags may differ for borderline cases. Total-eclipse
-**obscuration** is a deliberate divergence — see
+**obscuration** matches the reference (disc area ratio > 1 in totality) from the
+reference-compatible entry points; a former clamp to 1.0 was removed — see
 [Intentional divergences §2](intentional-divergences.md#2-total-eclipse-obscuration).
 
 **6.2 Lunar eclipses.** Timing within ~10 s for most events.
@@ -428,6 +429,18 @@ with no Moshier fallback.
 
 Typically agree within 0.01 sectors; small divergences (< 0.1) from the underlying
 position and cusp differences.
+
+### 16. pheno phase angle (attr[0])
+
+The reference engine computes the Sun-body-Earth phase angle with an internal
+vector recipe that black-box probing could not fully reproduce: no combination
+of apparent / light-time-only / geometric positions matches it for every body
+(apparent geocentric vectors match the Moon to <1" but leave 5-25" on planets
+and asteroids; distance-based law-of-cosines behaves conversely). LibEphemeris
+uses apparent geocentric vectors (Moon, planets) and the law of cosines on
+distances (asteroids), leaving a residual of roughly 5-25 arcsec in attr[0]
+(≲0.001 magnitudes through the H-G system, ≲1e-4 in illuminated fraction).
+Elongation, diameter and magnitude agree to reference precision.
 
 ### Hyper-validation results
 

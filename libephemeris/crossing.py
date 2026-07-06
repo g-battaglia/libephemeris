@@ -40,6 +40,7 @@ from typing import Callable, Tuple
 
 from .exceptions import Error
 from .constants import FLG_SWIEPH, FLG_SPEED, FLG_HELCTR, SUN, MOON
+from .eclipse import _coerce_backwards
 from .exceptions import EphemerisRangeError, CalculationError
 from .planets import calc_ut, calc
 
@@ -367,7 +368,7 @@ def solcross_ut(
     x2cross: float,
     tjdut: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude.
@@ -379,6 +380,9 @@ def solcross_ut(
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -403,6 +407,7 @@ def solcross_ut(
         >>> # Find PREVIOUS Aries ingress
         >>> jd_prev = solcross_ut(0.0, jd_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     try:
@@ -489,7 +494,7 @@ def solcross(
     x2cross: float,
     tjdet: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when the Sun crosses a specific ecliptic longitude (TT version).
@@ -504,6 +509,9 @@ def solcross(
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -533,6 +541,7 @@ def solcross(
         >>> # Find previous Aries ingress using TT
         >>> jd_prev_tt = solcross(0.0, jd_tt_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     try:
@@ -608,7 +617,7 @@ def mooncross_ut(
     x2cross: float,
     tjdut: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude.
@@ -620,6 +629,9 @@ def mooncross_ut(
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -641,6 +653,7 @@ def mooncross_ut(
         >>> # Find PREVIOUS Moon crossing of 0°
         >>> jd_prev = mooncross_ut(0.0, jd_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     try:
@@ -716,7 +729,7 @@ def mooncross(
     x2cross: float,
     tjdet: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when the Moon crosses a specific ecliptic longitude (TT version).
@@ -731,6 +744,9 @@ def mooncross(
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -762,6 +778,7 @@ def mooncross(
         >>> # Find previous Moon crossing of 0° using TT
         >>> jd_prev_tt = mooncross(0.0, jd_tt_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     try:
@@ -835,7 +852,7 @@ def mooncross(
 def mooncross_node_ut(
     tjdut: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (ascending or descending).
@@ -850,6 +867,9 @@ def mooncross_node_ut(
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         tuple: (jd_cross, xlon, xlat) - Julian Day of crossing, ecliptic longitude,
@@ -886,6 +906,8 @@ def mooncross_node_ut(
         >>> # Find PREVIOUS lunar node crossing
         >>> jd_prev, _, _ = mooncross_node_ut(jd_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
+
     from .state import get_timescale
 
     # Convert UT to TT for the TT-based search
@@ -906,7 +928,7 @@ def mooncross_node_ut(
 def mooncross_node(
     tjdet: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> Tuple[float, float, float]:
     """
     Find when the Moon crosses its own orbital node (TT version).
@@ -924,6 +946,9 @@ def mooncross_node(
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.)
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         tuple: (jd_cross, xlon, xlat) - Julian Day of crossing (TT), ecliptic longitude,
@@ -949,6 +974,8 @@ def mooncross_node(
         >>> # Find previous lunar node crossing using TT
         >>> jd_prev_tt, _, _ = mooncross_node(jd_tt_now, backwards=True)
     """
+    backwards = _coerce_backwards(backwards)
+
     # Half nodal month - time between successive node crossings
     HALF_NODAL_MONTH = 13.6
     direction = -1.0 if backwards else 1.0
@@ -1338,7 +1365,7 @@ def helio_cross_ut(
     x2cross: float,
     tjdut: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when a planet crosses a specific heliocentric ecliptic longitude.
@@ -1357,6 +1384,9 @@ def helio_cross_ut(
         tjdut: Julian Day (UT) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.). FLG_HELCTR is automatically added.
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (UT)
@@ -1383,6 +1413,7 @@ def helio_cross_ut(
         >>> # Find when Earth crosses 90° as seen from the Sun
         >>> jd_earth_cross = helio_cross_ut(EARTH, 90.0, jd_now)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     # Always add FLG_HELCTR for heliocentric calculations
@@ -1525,7 +1556,7 @@ def helio_cross(
     x2cross: float,
     tjdet: float,
     flags: int = FLG_SWIEPH,
-    backwards: bool = False,
+    backwards: bool | int | str = False,
 ) -> float:
     """
     Find when a planet crosses a specific heliocentric ecliptic longitude (TT version).
@@ -1544,6 +1575,9 @@ def helio_cross(
         tjdet: Julian Day in Terrestrial Time (TT/ET) to start search from
         flags: Calculation flags (FLG_SWIEPH, etc.). FLG_HELCTR is automatically added.
         backwards: If True, search backward in time instead of forward.
+            Also accepts ints and the direction strings understood by
+            :func:`libephemeris.eclipse._coerce_backwards` (e.g.
+            ``"forward"``, ``"backward"``).
 
     Returns:
         float: Julian Day of crossing (TT)
@@ -1566,6 +1600,7 @@ def helio_cross(
         >>> # Find when Mars crosses 0° heliocentric longitude using TT
         >>> jd_cross_tt = helio_cross(MARS, 0.0, jd_tt_now)
     """
+    backwards = _coerce_backwards(backwards)
     x2cross = x2cross % 360.0
 
     # Always add FLG_HELCTR for heliocentric calculations

@@ -1239,6 +1239,13 @@ def _calc_type21_position(
                 speed_lon -= 360.0 / (2.0 * dt)
             elif speed_lon < -180.0 / (2.0 * dt):
                 speed_lon += 360.0 / (2.0 * dt)
+            # At (numerically) the ecliptic pole the longitude -- atan2 of
+            # two ~zero components -- is undefined, so its central difference
+            # measures the arbitrary branch picked at each sample, not a
+            # physical rate. Report 0.0, matching the xy_sq == 0 guard of the
+            # analytic derivative this central difference replaced.
+            if max(abs(lat), abs(lat_prev), abs(lat_next)) >= 90.0 - 1e-9:
+                speed_lon = 0.0
         else:
             speed_lon, speed_lat, speed_dist = 0.0, 0.0, 0.0
     else:

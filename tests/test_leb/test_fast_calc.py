@@ -600,13 +600,25 @@ class TestAyanamsa:
         assert abs(aya - aya_fb) > 0.5, "Lahiri and Fagan-Bradley should differ"
 
     @pytest.mark.integration
-    def test_star_based_mode_raises(self, leb_reader):
-        """Star-based sidereal modes should raise KeyError."""
+    def test_star_based_mode_delegates(self, leb_reader):
+        """Star-based modes delegate the anchor to the Skyfield pipeline.
+
+        The LEB fast path used to reject star-based sidereal modes with a
+        KeyError, forcing the whole calculation onto Skyfield. It now
+        computes the (memoized) star anchor via the Skyfield pipeline
+        while the body itself stays on LEB, so the mean ayanamsha must
+        match the reference implementation in planets.
+        """
+        from libephemeris.planets import _calc_ayanamsa
+        from libephemeris.time_utils import deltat
+
         jd_start, jd_end = leb_reader.jd_range
         jd_mid = (jd_start + jd_end) / 2.0
 
-        with pytest.raises(KeyError, match="Star-based"):
-            _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=17)
+        aya = _calc_ayanamsa_from_leb(leb_reader, jd_mid, sid_mode=27)
+        jd_ut = jd_mid - deltat(jd_mid)
+        expected = _calc_ayanamsa(jd_ut, 27)
+        assert abs(aya - expected) < 1e-9, f"LEB {aya} vs Skyfield {expected}"
 
 
 # =============================================================================

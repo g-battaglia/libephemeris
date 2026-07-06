@@ -993,7 +993,17 @@ def _calc_ayanamsa_from_leb(
     mode = sid_mode if sid_mode is not None else 0
 
     if mode in _STAR_BASED_MODES:
-        raise KeyError(f"Star-based sidereal mode {mode} requires Skyfield")
+        # Star-based / galactic anchors need the Skyfield star pipeline,
+        # but only for the (memoized) anchor longitude: the planet itself
+        # can stay on the LEB fast path. Late import avoids a cycle.
+        from .planets import _calc_ayanamsa
+
+        # _calc_ayanamsa takes UT; approximate the inverse TT->UT with the
+        # same deltat used by the forward conversion (sub-ms accuracy).
+        from .time_utils import deltat
+
+        jd_ut = jd_tt - deltat(jd_tt)
+        return _calc_ayanamsa(jd_ut, mode)
 
     if mode == 255:
         # SIDM_USER: custom user-defined ayanamsha
@@ -1430,6 +1440,56 @@ def _pipeline_icrs(
 # =============================================================================
 
 
+# Geocentric gravitational parameter of the Earth-Moon system in
+# AU^3/day^2: GM_sun (Gaussian constant squared) over the Sun/(E+M)
+# mass ratio.
+_GM_EARTH_MOON = 0.01720209895**2 / 328900.5596
+
+
+def _osculating_node_radius(reader: "LEBReaderLike", jd_tt: float) -> float:
+    """Osculating-ellipse radius at the Moon's ascending node.
+
+    Reconstructs the geocentric lunar state vector from the LEB Moon and
+    Earth channels (barycentric ICRS Chebyshev states), rotates it to the
+    ecliptic of date, computes the instantaneous two-body elements, and
+    evaluates r = p / (1 + e*cos(nu_node)). This matches the node
+    distance the reference ephemeris and the Skyfield backend return
+    (~0.0024 AU).
+    """
+    moon_pos, moon_vel = reader.eval_body(MOON, jd_tt)
+    earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
+    pn_mat, _, _, eps_rad = _frame_data(jd_tt)
+    ce, se = math.cos(eps_rad), math.sin(eps_rad)
+
+    def _to_ecl(vec):
+        x, y, z = _mat3_vec3(pn_mat, vec)
+        return (x, y * ce + z * se, -y * se + z * ce)
+
+    r = _to_ecl(tuple(moon_pos[i] - earth_pos[i] for i in range(3)))
+    v = _to_ecl(tuple(moon_vel[i] - earth_vel[i] for i in range(3)))
+    hx = r[1] * v[2] - r[2] * v[1]
+    hy = r[2] * v[0] - r[0] * v[2]
+    hz = r[0] * v[1] - r[1] * v[0]
+    h2 = hx * hx + hy * hy + hz * hz
+    p = h2 / _GM_EARTH_MOON
+    r_mag = math.sqrt(r[0] ** 2 + r[1] ** 2 + r[2] ** 2)
+    v2 = v[0] ** 2 + v[1] ** 2 + v[2] ** 2
+    r_dot_v = r[0] * v[0] + r[1] * v[1] + r[2] * v[2]
+    c1 = v2 / _GM_EARTH_MOON - 1.0 / r_mag
+    c2 = r_dot_v / _GM_EARTH_MOON
+    ex = c1 * r[0] - c2 * v[0]
+    ey = c1 * r[1] - c2 * v[1]
+    ez = c1 * r[2] - c2 * v[2]
+    e_mag = math.sqrt(ex * ex + ey * ey + ez * ez)
+    # Ascending node direction n = k x h; cos(nu_node) = n_hat . e_hat
+    nx, ny = -hy, hx
+    n_mag = math.hypot(nx, ny)
+    if n_mag <= 0.0 or e_mag <= 0.0:
+        raise ValueError("degenerate lunar state")
+    cos_nu = (nx * ex + ny * ey) / (n_mag * e_mag)
+    return p / (1.0 + e_mag * max(-1.0, min(1.0, cos_nu)))
+
+
 def _pipeline_ecliptic(
     reader: "LEBReaderLike",
     jd_tt: float,
@@ -1451,14 +1511,16 @@ def _pipeline_ecliptic(
         # LEB stores 0 for dist; the reference ephemeris returns mean distance constant.
         dist = _MOON_MEAN_DIST_AU
     elif ipl == TRUE_NODE:
-        # KNOWN LIMITATION (see docs/comparison/known-differences.md §7): the LEB-stored value is an
-        # h_mag proxy (~0.0015 AU), NOT the osculating node radius the reference ephemeris and
-        # the Skyfield backend return (~0.0024 AU). Recomputing it standalone
-        # would require reconstructing the geocentric-ecliptic Moon state inside
-        # this pipeline; the longitude/latitude (the used quantities) are correct,
-        # so the distance proxy is left as-is and documented. Use the Skyfield
-        # backend if the True Node distance / FLG_XYZ is needed.
-        pass  # keep dist proxy from LEB (lon/lat correct; distance documented)
+        # The LEB-stored value is an h_mag proxy (~0.0015 AU), NOT the
+        # osculating node radius the reference ephemeris and the Skyfield
+        # backend return (~0.0024 AU). Reconstruct the geocentric lunar
+        # state from the LEB Moon channel (position plus Chebyshev
+        # derivatives) and evaluate the osculating-ellipse radius at the
+        # ascending node.
+        try:
+            dist = _osculating_node_radius(reader, jd_tt)
+        except (KeyError, ValueError, ArithmeticError):
+            pass  # keep the stored proxy if the Moon channel is missing
     elif ipl == MEAN_APOG:
         # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
         # Override with 3-harmonic model fitted to the reference ephemeris output:
@@ -1479,21 +1541,23 @@ def _pipeline_ecliptic(
     # Nutation handling for ecliptic-direct bodies.
     # Mean bodies are stored without nutation; true bodies include it.
     # FLG_NONUT: output on mean ecliptic (no nutation).
+    # FLG_J2000: output is the mean ecliptic precessed to J2000, so it is
+    # nutation-free as well (matching the reference behavior).
     # Velocity is NOT corrected — the Skyfield path also computes
     # velocity from the un-nutated polynomial.
     _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
-    _want_nonut_b = bool(iflag & FLG_NONUT)
+    _want_nonut_b = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
 
     if ipl in (MEAN_NODE, MEAN_APOG):
         # Mean bodies stored without nutation. Add dpsi for true ecliptic,
-        # UNLESS NONUT or sidereal+equatorial (both want mean ecliptic).
-        if not _sid_eq and not _want_nonut_b:
+        # UNLESS the output frame is nutation-free (see above).
+        if not _want_nonut_b:
             _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon + math.degrees(dpsi_rad)) % 360.0
     elif ipl in (TRUE_NODE, OSCU_APOG, INTP_APOG, INTP_PERG):
-        # True/osculating bodies include nutation. Strip dpsi when NONUT
-        # or sidereal+equatorial (both want mean ecliptic).
-        if _sid_eq or _want_nonut_b:
+        # True/osculating bodies include nutation. Strip dpsi when the
+        # output frame is nutation-free (see above).
+        if _want_nonut_b:
             _, dpsi_rad, _, _ = _frame_data(jd_tt)
             lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
@@ -2015,7 +2079,14 @@ def _fast_calc_core(
             and bool(iflag & FLG_J2000)
             and not bool(iflag & FLG_EQUATORIAL)
         )
-        _pipe_flags = (iflag & ~FLG_J2000) if _deferred_sid_j2k else iflag
+        # When deferring, run the pipeline with FLG_NONUT in place of
+        # FLG_J2000: the J2000 output frame is nutation-free (matching the
+        # Skyfield path), and the deferred _precess_ecliptic below is a
+        # pure precession rotation that cannot remove a nutation offset
+        # baked into the of-date longitude.
+        _pipe_flags = (
+            (iflag & ~FLG_J2000) | FLG_NONUT if _deferred_sid_j2k else iflag
+        )
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
             reader, jd_tt, ipl, _pipe_flags
         )

@@ -602,7 +602,13 @@ class TestGenerateSpkCacheFilename:
 
 
 class TestFindCoveringSpk:
-    """Test finding existing SPK files that cover a date range."""
+    """Test finding existing SPK files that cover a date range.
+
+    ``_find_covering_spk`` reads each candidate kernel's REAL time span via
+    ``get_spk_coverage`` (segment metadata), not the filename. The dummy files
+    written here have no segments, so tests patch ``get_spk_coverage`` to
+    emulate a kernel whose metadata matches the intended coverage.
+    """
 
     def test_no_cache_dir(self, tmp_path):
         """Returns None if cache directory doesn't exist."""
@@ -618,9 +624,10 @@ class TestFindCoveringSpk:
         )
         assert result is None
 
+    @patch("libephemeris.spk.get_spk_coverage", return_value=(2458849.5, 2462502.5))
     @patch("libephemeris.spk_auto._is_valid_bsp", return_value=True)
-    def test_finds_exact_match(self, mock_valid, tmp_path):
-        """Finds an SPK file with exact matching range."""
+    def test_finds_exact_match(self, mock_valid, mock_cov, tmp_path):
+        """Finds an SPK file whose coverage exactly matches the range."""
         # Create a dummy SPK file with matching name
         spk_file = tmp_path / "2060_2458849_2462502.bsp"
         spk_file.write_bytes(b"dummy")
@@ -630,8 +637,9 @@ class TestFindCoveringSpk:
         )
         assert result == str(spk_file)
 
+    @patch("libephemeris.spk.get_spk_coverage", return_value=(2450000.0, 2470000.0))
     @patch("libephemeris.spk_auto._is_valid_bsp", return_value=True)
-    def test_finds_covering_file(self, mock_valid, tmp_path):
+    def test_finds_covering_file(self, mock_valid, mock_cov, tmp_path):
         """Finds an SPK file that covers the requested range."""
         # Create a file with wider range
         spk_file = tmp_path / "2060_2450000_2470000.bsp"
@@ -642,10 +650,22 @@ class TestFindCoveringSpk:
         )
         assert result == str(spk_file)
 
-    def test_ignores_non_covering_file(self, tmp_path):
+    @patch("libephemeris.spk.get_spk_coverage", return_value=(2459000.0, 2460000.0))
+    def test_ignores_non_covering_file(self, mock_cov, tmp_path):
         """Ignores an SPK file that doesn't cover the range."""
         # Create a file with narrower range
         spk_file = tmp_path / "2060_2459000_2460000.bsp"
+        spk_file.write_bytes(b"dummy")
+
+        result = spk_auto._find_covering_spk(
+            "2060", 2458849.5, 2462502.5, str(tmp_path)
+        )
+        assert result is None
+
+    def test_ignores_unreadable_coverage(self, tmp_path):
+        """Ignores a candidate whose segment metadata cannot be read."""
+        # No get_spk_coverage patch: the dummy payload has no SPK segments.
+        spk_file = tmp_path / "2060_2450000_2470000.bsp"
         spk_file.write_bytes(b"dummy")
 
         result = spk_auto._find_covering_spk(
@@ -695,9 +715,12 @@ class TestAutoGetSpkCaching:
             assert result == str(spk_file)
             mock_download.assert_not_called()
 
+    @patch("libephemeris.spk.get_spk_coverage", return_value=(2450000.0, 2470000.0))
     @patch("libephemeris.spk_auto._is_valid_bsp", return_value=True)
-    def test_uses_covering_file(self, mock_valid, tmp_path):
+    def test_uses_covering_file(self, mock_valid, mock_cov, tmp_path):
         """Uses a file that covers the requested range."""
+        # Coverage is read from segment metadata, so the dummy file needs a
+        # patched get_spk_coverage to be recognized as covering.
         wide_file = tmp_path / "2060_2450000_2470000.bsp"
         wide_file.write_bytes(b"wide range SPK")
 

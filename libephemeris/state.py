@@ -1437,13 +1437,14 @@ def set_tid_acc(acc: float) -> None:
     Set the tidal acceleration used in Delta T calculations.
 
     The tidal acceleration of the Moon affects the long-term extrapolation
-    of Delta T (TT - UT1) in the reference implementation. Different JPL
-    ephemeris files assume different values.
+    of Delta T (TT - UT1). Different JPL ephemeris files assume different
+    values.
 
-    NOTE: in libephemeris the stored value is informational only — Delta T
-    comes from the userdef override, IERS data, or the Skyfield/enhanced
-    timescale, none of which consult this setting. get_tid_acc() returns
-    whatever was set here, for reference-API compatibility.
+    Setting a non-default value rescales the Delta T returned by deltat()
+    and deltat_ex() for dates before 1955.0, exactly as the reference API
+    does (see ``time_utils._tid_acc_adjustment_seconds`` for the measured
+    formula). From 1955.0 onwards Delta T is pinned by modern observations
+    and is not affected by this setting.
 
     Args:
         acc: Tidal acceleration in arcsec/century^2.
@@ -1451,10 +1452,10 @@ def set_tid_acc(acc: float) -> None:
              or TIDAL_AUTOMATIC (999999) to use the default.
 
     Note:
-        - The default value is based on DE440 (-25.936 arcsec/cy^2)
-        - This setting primarily affects Delta T calculations for dates
-          far from the present (historical studies, ancient astronomy)
-        - For modern dates (1900-2100), the effect is negligible
+        - The default value is based on DE440 (-25.936 arcsec/cy^2),
+          which leaves Delta T unchanged
+        - This setting only affects Delta T calculations for dates
+          before 1955 (historical studies, ancient astronomy)
         - Common values:
           - DE421: -25.85 arcsec/cy^2
           - DE431: -25.80 arcsec/cy^2
@@ -1482,7 +1483,9 @@ def get_tid_acc() -> float:
 
     Returns:
         float: The tidal acceleration in arcsec/century^2.
-               Returns TIDAL_DEFAULT (-25.8) if not explicitly set.
+               Returns TIDAL_DE440 (-25.936) if not explicitly set — the
+               default of the reference API and the value consistent with
+               the DE440/DE441 ephemeris used by this library.
 
     Note:
         The tidal acceleration affects how Delta T is extrapolated for dates
@@ -1500,11 +1503,22 @@ def get_tid_acc() -> float:
         >>> get_tid_acc()
         -25.936
     """
-    from .constants import TIDAL_DEFAULT
+    from .constants import TIDAL_DE440
 
     if _TIDAL_ACCELERATION is None:
-        return TIDAL_DEFAULT
+        return TIDAL_DE440
     return _TIDAL_ACCELERATION
+
+
+def _tid_acc_is_set() -> bool:
+    """Return True if a tidal acceleration was explicitly set.
+
+    Used by ``deltat_ex()`` to decide whether FLG_MOSEPH selects its own
+    tidal acceleration (TIDAL_MOSEPH) or defers to the user's setting,
+    matching the reference API's precedence (a set_tid_acc() value wins
+    over the flag-implied one).
+    """
+    return _TIDAL_ACCELERATION is not None
 
 
 def set_delta_t_userdef(acc: Optional[float]) -> None:
