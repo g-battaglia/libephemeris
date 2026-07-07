@@ -265,6 +265,20 @@ class TestHeliacalRegression:
         assert abs(r_leb[3] - r_sf[3]) < 5.0, "Body azimuth off by > 5°"
         assert abs(r_leb[5] - r_sf[5]) < 5.0, "Sun azimuth off by > 5°"
 
+    def test_vis_limit_mag_star_azimuth_convention(self):
+        from libephemeris.heliacal import vis_limit_mag
+
+        atmo = (1013.25, 15.0, 50.0, 0.25)
+        observer = (25.0, 1.0, 1, 1, 0, 0)
+        _ret_leb, dret_leb = _run_leb(
+            vis_limit_mag, JD_TEST, GEOPOS_ROME, atmo, observer, "Arcturus", 0
+        )
+        _ret_sf, dret_sf = _run_skyfield(
+            vis_limit_mag, JD_TEST, GEOPOS_ROME, atmo, observer, "Arcturus", 0
+        )
+
+        assert abs(dret_leb[2] - dret_sf[2]) < 5.0, "Star azimuth off by > 5°"
+
 
 # =========================================================================
 # 5. Eclipse

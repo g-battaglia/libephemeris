@@ -42,6 +42,7 @@ from .constants import (
     FIXSTAR_OFFSET,
     FLG_SPEED,
     FLG_SWIEPH,
+    HELFLAG_HIGH_PRECISION,
     HELFLAG_VISLIM_PHOTOPIC,
     HELFLAG_VISLIM_SCOTOPIC,
 )
@@ -1247,6 +1248,7 @@ def _heliacal_ut_leb(
         # been visible at all since the start of the search (seen_visible False),
         # which a mid-apparition flicker -- visible before the dip -- never is.
         ELONG_GAP = 10.0  # deg: streak min elongation below this == near conjunction
+        ELONG_START_GAP = 30.0
         max_days = 800
         lookback_jds = [jd_start_inner - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=True)
@@ -1269,8 +1271,15 @@ def _heliacal_ut_leb(
                     consecutive_invisible += 1
                     min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
+                    current_elong = _get_elongation(jd_day)
+                    pre_window_gap = (
+                        not seen_visible
+                        and not (flags & HELFLAG_HIGH_PRECISION)
+                        and min_elong <= ELONG_START_GAP
+                        and current_elong >= min_elong + 2.0
+                    )
                     if consecutive_invisible >= 5 and (
-                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                        is_star or min_elong <= ELONG_GAP or pre_window_gap
                     ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
@@ -1299,36 +1308,71 @@ def _heliacal_ut_leb(
         return 0.0
 
     def _search_evening_first(jd_start_inner: float) -> float:
+        ELONG_GAP = 10.0
+        ELONG_START_GAP = 30.0
         max_days = 800
-        was_invisible = False
+        lookback_jds = [jd_start_inner - i for i in range(1, 7)]
+        lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=False)
+        consecutive_invisible = 0
+        min_elong = 999.0
+        seen_visible = False
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
+            if not vis:
+                consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
+            else:
+                seen_visible = True
+                break
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=False)
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
-                    was_invisible = True
-                elif was_invisible:
-                    return _refine_heliacal_time(jd_vis, is_morning=False)
+                    consecutive_invisible += 1
+                    min_elong = min(min_elong, _get_elongation(jd_day))
+                else:
+                    current_elong = _get_elongation(jd_day)
+                    pre_window_gap = (
+                        not seen_visible
+                        and not (flags & HELFLAG_HIGH_PRECISION)
+                        and min_elong <= ELONG_START_GAP
+                        and current_elong >= min_elong + 2.0
+                    )
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or pre_window_gap
+                    ):
+                        return _refine_heliacal_time(jd_vis, is_morning=False)
+                    consecutive_invisible = 0
+                    min_elong = 999.0
+                    seen_visible = True
         return 0.0
 
     def _search_morning_last(jd_start_inner: float) -> float:
+        ELONG_GAP = 10.0
         max_days = 800
         last_visible_jd = 0.0
         found_visible = False
         consecutive_invisible = 0
+        streak_min_elong = 999.0
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if vis:
                     last_visible_jd = jd_vis
                     found_visible = True
                     consecutive_invisible = 0
+                    streak_min_elong = 999.0
                 elif found_visible:
                     consecutive_invisible += 1
-                    if consecutive_invisible >= 3 and last_visible_jd > 0:
+                    streak_min_elong = min(streak_min_elong, _get_elongation(jd_day))
+                    if (
+                        consecutive_invisible >= 3
+                        and streak_min_elong <= ELONG_GAP
+                        and last_visible_jd > 0
+                    ):
                         return _refine_heliacal_time(last_visible_jd, is_morning=True)
         return last_visible_jd if last_visible_jd > 0 else 0.0
 
@@ -1794,7 +1838,7 @@ def _vis_limit_mag_leb(
                 temperature,
                 (star_lon, star_lat, 1.0),
             )
-            obj_az = hor_result[0]
+            obj_az = (hor_result[0] + 180.0) % 360.0
             obj_alt = hor_result[1]
         except ValueError:
             raise
@@ -2678,6 +2722,7 @@ def _heliacal_ut_pythonic(
         dip, never satisfies that.
         """
         ELONG_GAP = 10.0  # deg
+        ELONG_START_GAP = 30.0
         max_days = 800
 
         # Look back to establish initial visibility state.
@@ -2706,8 +2751,15 @@ def _heliacal_ut_pythonic(
                     # there is no twilight visibility window.
                     min_elong = min(min_elong, _get_elongation(jd_day))
                 else:
+                    current_elong = _get_elongation(jd_day)
+                    pre_window_gap = (
+                        not seen_visible
+                        and not (flags & HELFLAG_HIGH_PRECISION)
+                        and min_elong <= ELONG_START_GAP
+                        and current_elong >= min_elong + 2.0
+                    )
                     if consecutive_invisible >= 5 and (
-                        is_star or min_elong <= ELONG_GAP or not seen_visible
+                        is_star or min_elong <= ELONG_GAP or pre_window_gap
                     ):
                         return _refine_heliacal_time(jd_vis, is_morning=True)
                     consecutive_invisible = 0
@@ -2742,42 +2794,77 @@ def _heliacal_ut_pythonic(
 
     def _search_evening_first(jd_start: float) -> float:
         """Search for evening first visibility using batched computation."""
+        ELONG_GAP = 10.0
+        ELONG_START_GAP = 30.0
         max_days = 800
-        was_invisible = False
+        lookback_jds = [jd_start - i for i in range(1, 7)]
+        lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=False)
+        consecutive_invisible = 0
+        min_elong = 999.0
+        seen_visible = False
+        for jd_lb, (vis, _) in zip(lookback_jds, lookback_vis):
+            if not vis:
+                consecutive_invisible += 1
+                min_elong = min(min_elong, _get_elongation(jd_lb))
+            else:
+                seen_visible = True
+                break
 
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=False)
 
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if not vis:
-                    was_invisible = True
-                elif was_invisible:
-                    return _refine_heliacal_time(jd_vis, is_morning=False)
+                    consecutive_invisible += 1
+                    min_elong = min(min_elong, _get_elongation(jd_day))
+                else:
+                    current_elong = _get_elongation(jd_day)
+                    pre_window_gap = (
+                        not seen_visible
+                        and not (flags & HELFLAG_HIGH_PRECISION)
+                        and min_elong <= ELONG_START_GAP
+                        and current_elong >= min_elong + 2.0
+                    )
+                    if consecutive_invisible >= 5 and (
+                        is_star or min_elong <= ELONG_GAP or pre_window_gap
+                    ):
+                        return _refine_heliacal_time(jd_vis, is_morning=False)
+                    consecutive_invisible = 0
+                    min_elong = 999.0
+                    seen_visible = True
 
         return 0.0
 
     def _search_morning_last(jd_start: float) -> float:
         """Search for morning last visibility using batched computation."""
+        ELONG_GAP = 10.0
         max_days = 800
         last_visible_jd = 0.0
         found_visible = False
         consecutive_invisible = 0
+        streak_min_elong = 999.0
 
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start + d for d in range(batch_start, batch_end)]
             vis_results = _batch_check_twilight_visibility(jd_days, morning=True)
 
-            for vis, jd_vis in vis_results:
+            for (vis, jd_vis), jd_day in zip(vis_results, jd_days):
                 if vis:
                     last_visible_jd = jd_vis
                     found_visible = True
                     consecutive_invisible = 0
+                    streak_min_elong = 999.0
                 elif found_visible:
                     consecutive_invisible += 1
-                    if consecutive_invisible >= 3 and last_visible_jd > 0:
+                    streak_min_elong = min(streak_min_elong, _get_elongation(jd_day))
+                    if (
+                        consecutive_invisible >= 3
+                        and streak_min_elong <= ELONG_GAP
+                        and last_visible_jd > 0
+                    ):
                         return _refine_heliacal_time(last_visible_jd, is_morning=True)
 
         return last_visible_jd if last_visible_jd > 0 else 0.0
@@ -3100,8 +3187,10 @@ def _heliacal_visibility_window(
     def _crossing(t_in: float, t_out: float) -> float:
         f_in = _margin(t_in)
         f_out = _margin(t_out)
-        if f_in <= 0.0 or f_out > 0.0:
+        if f_in <= 0.0:
             return jd_event
+        if f_out > 0.0:
+            return t_out
         for _ in range(25):
             mid = 0.5 * (t_in + t_out)
             if _margin(mid) > 0.0:
@@ -3146,6 +3235,14 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
         PLUTO,
     )
 
+    if not isinstance(object_name, str):
+        parsed_body_id = int(object_name)
+        if parsed_body_id == SUN:
+            raise ValueError("Sun is not valid for heliacal calculations")
+        if parsed_body_id == MOON and not allow_moon:
+            raise ValueError("Moon is not valid for heliacal calculations")
+        return parsed_body_id
+
     # Normalize name
     name_upper = object_name.upper().strip()
 
@@ -3175,20 +3272,6 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
 
         return body_id
 
-    # Try to parse as planet number. Only the int conversion may fall
-    # through to star resolution - the Sun/Moon rejection must escape
-    # (it used to be swallowed by this very except clause).
-    try:
-        parsed_body_id: int | None = int(object_name)
-    except ValueError:
-        parsed_body_id = None
-    if parsed_body_id is not None:
-        if parsed_body_id == SUN:
-            raise ValueError("Sun is not valid for heliacal calculations")
-        if parsed_body_id == MOON and not allow_moon:
-            raise ValueError("Moon is not valid for heliacal calculations")
-        return parsed_body_id
-
     # Try to resolve as a fixed star name
     from .fixed_stars import resolve_star_name
 
@@ -3200,7 +3283,7 @@ def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
     raise ValueError(
         f"Object '{object_name}' not recognized. "
         "Use planet names (Mercury, Venus, Mars, Jupiter, Saturn, etc.), "
-        "planet IDs (2-9 for Mercury-Pluto), or fixed star names "
+        "integer planet IDs (2-9 for Mercury-Pluto), or fixed star names "
         "(Sirius, Regulus, Aldebaran, etc.)."
     )
 
@@ -4112,7 +4195,7 @@ def vis_limit_mag(
                 temperature,
                 (star_lon, star_lat, 1.0),
             )
-            obj_az = hor_result[0]
+            obj_az = (hor_result[0] + 180.0) % 360.0
             obj_alt = hor_result[1]
 
         except ValueError:

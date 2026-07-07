@@ -582,18 +582,43 @@ class TestSweHeliacalUt:
         assert isinstance(result, tuple)
         assert len(result) == 3
 
-    def test_swe_heliacal_ut_with_planet_id_string(self):
-        """Test heliacal_ut with planet ID as string."""
+    def test_swe_heliacal_ut_with_integer_planet_id(self):
+        """Test heliacal_ut with an integer planet ID."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Venus is planet ID 3
-        result = heliacal_ut(jd_start, geopos, datm, dobs, "3", HELIACAL_RISING)
+        result = heliacal_ut(jd_start, geopos, datm, dobs, 3, HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
+
+    def test_swe_heliacal_ut_numeric_string_not_planet_id(self):
+        """Numeric object names are not planet IDs on this API surface."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        with pytest.raises(ValueError):
+            heliacal_ut(jd_start, geopos, datm, dobs, "3", HELIACAL_RISING)
+
+    def test_swe_heliacal_ut_visibility_window_ordering(self):
+        """Detailed heliacal windows keep start <= optimum <= end."""
+        jd_start = julday(2024, 1, 1, 0)
+        geopos = (12.4964, 41.9028, 0.0)
+        datm = (1013.25, 15.0, 40.0, 0.0)
+        dobs = (36.0, 1.0, 0, 0, 0, 0)
+
+        jd1, jd2, jd3 = heliacal_ut(
+            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
+        )
+
+        assert jd1 > jd_start
+        assert jd1 <= jd2 <= jd3
+        assert jd3 > jd1
 
 
 class TestHeliacalDateValidation:
