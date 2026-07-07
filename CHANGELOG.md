@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Numeric strings are no longer treated as planet IDs in heliacal object names.**
   Integer body IDs remain accepted, while string names follow the reference API
   object-name surface and resolve as names/stars.
+- **Evening-first search no longer skips an entire apparition when the body starts
+  near inferior conjunction.** When the solar elongation at the search start is
+  below the conjunction-gap threshold, the search accepts the first visible evening
+  directly instead of waiting for a prior invisibility streak that never comes.
+- **Heliacal rising search uses extended lookback to avoid false-positive
+  apparition jumps.** When the initial 6-day lookback finds no prior visibility and
+  the minimum elongation exceeds the conjunction-gap threshold, the search extends
+  the lookback to 30 days to correctly distinguish a pre-window conjunction from a
+  mid-apparition visibility flicker.
 
 ### Validation
 

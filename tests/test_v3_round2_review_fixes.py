@@ -183,5 +183,67 @@ class TestHeliacalMetRange:
         assert hazy > clear + 1.0
 
 
+class TestHeliacalSearchGates:
+    """Regression tests for the conjunction-aware event-search gates."""
+
+    GEOPOS = (31.0, 30.0, 0.0)  # Cairo
+    ATMO = (1013.25, 15.0, 40.0, 0.0)
+    DOBS = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    @pytest.mark.slow
+    def test_evening_first_from_inside_conjunction_does_not_skip_apparition(
+        self,
+    ) -> None:
+        """Starting the evening-first search while Venus is deep inside the
+        2024 superior-conjunction gap (elongation ~5 deg, invisible) must
+        return the imminent evening-first event, not the one a full synodic
+        period (~584 days) later."""
+        jd0 = le.julday(2024, 6, 21, 0.0)  # elong ~5.6 deg, invisible
+        jd1, _, _ = le.heliacal_ut(
+            jd0, self.GEOPOS, self.ATMO, self.DOBS, "Venus", le.EVENING_FIRST
+        )
+        assert jd1 > jd0
+        assert jd1 - jd0 < 60.0  # the imminent apparition, not +584 d
+
+    @pytest.mark.slow
+    def test_evening_first_mid_apparition_returns_next_event(self) -> None:
+        """Starting the search AFTER Venus is already visible as an evening
+        star (ongoing apparition, low but climbing elongation) must return the
+        NEXT evening-first — after the coming conjunction — not an ordinary
+        visibility day of the current apparition."""
+        # First resolve the current apparition's evening-first from inside
+        # the conjunction gap, then start a few days after it.
+        jd_gap = le.julday(2024, 6, 21, 0.0)
+        ef, _, _ = le.heliacal_ut(
+            jd_gap, self.GEOPOS, self.ATMO, self.DOBS, "Venus", le.EVENING_FIRST
+        )
+        assert ef > 0
+        jd_mid = ef + 4.0  # visible evening star, elongation still < 10 deg
+        nxt, _, _ = le.heliacal_ut(
+            jd_mid, self.GEOPOS, self.ATMO, self.DOBS, "Venus", le.EVENING_FIRST
+        )
+        # The next true evening-first is a synodic period away (> 300 days),
+        # never a re-report of the ongoing apparition (< 60 days).
+        assert nxt - jd_mid > 300.0
+
+    @pytest.mark.slow
+    def test_rising_extended_lookback_blocks_wrong_apparition(self) -> None:
+        """Mercury heliacal rising searched from 2024-01-01 Rome: the body is
+        invisible at dawn with elongation ~18 deg. The extended lookback must
+        keep the pre-window-gap clause from accepting a wrong apparition
+        months out; the result must be the nearby one."""
+        jd0 = le.julday(2024, 1, 1, 0.0)
+        jd1, _, _ = le.heliacal_ut(
+            jd0,
+            (12.5, 41.9, 0.0),  # Rome
+            self.ATMO,
+            self.DOBS,
+            "Mercury",
+            le.HELIACAL_RISING,
+        )
+        assert jd1 > 0
+        assert jd1 - jd0 < 90.0  # not the +243 d apparition
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

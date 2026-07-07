@@ -1262,6 +1262,14 @@ def _heliacal_ut_leb(
             else:
                 seen_visible = True
                 break
+        if not seen_visible and min_elong > ELONG_GAP:
+            extended_jds = [jd_start_inner - i for i in range(7, 31)]
+            extended_vis = _batch_check_twilight_visibility(extended_jds, morning=True)
+            for jd_lb, (vis, _) in zip(extended_jds, extended_vis):
+                if vis:
+                    seen_visible = True
+                    break
+                min_elong = min(min_elong, _get_elongation(jd_lb))
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
             jd_days = [jd_start_inner + d for d in range(batch_start, batch_end)]
@@ -1311,6 +1319,32 @@ def _heliacal_ut_leb(
         ELONG_GAP = 10.0
         ELONG_START_GAP = 30.0
         max_days = 800
+
+        # Fast-path only when the body is near conjunction (elongation below the
+        # gap) AND invisible both this evening and on the 6 preceding evenings:
+        # that is a genuine conjunction the search starts inside, so the next
+        # evening visibility IS the evening-first event. If the body is visible
+        # tonight (ongoing apparition) or was visible on a recent evening (a
+        # marginal-conditions flicker inside the current apparition), this is
+        # not a conjunction gap and we must fall through to the normal search
+        # for the NEXT event after the coming superior conjunction.
+        if not is_star and _get_elongation(jd_start_inner) <= ELONG_GAP:
+            gate_jds = [jd_start_inner - i for i in range(0, 7)]
+            gate_vis = _batch_check_twilight_visibility(gate_jds, morning=False)
+            if not any(vis for vis, _ in gate_vis):
+                for batch_start in range(1, max_days, _HELIACAL_BATCH):
+                    batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+                    jd_days = [
+                        jd_start_inner + d for d in range(batch_start, batch_end)
+                    ]
+                    vis_results = _batch_check_twilight_visibility(
+                        jd_days, morning=False
+                    )
+                    for vis, jd_vis in vis_results:
+                        if vis:
+                            return _refine_heliacal_time(jd_vis, is_morning=False)
+                return 0.0
+
         lookback_jds = [jd_start_inner - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=False)
         consecutive_invisible = 0
@@ -2738,6 +2772,14 @@ def _heliacal_ut_pythonic(
             else:
                 seen_visible = True
                 break
+        if not seen_visible and min_elong > ELONG_GAP:
+            extended_jds = [jd_start - i for i in range(7, 31)]
+            extended_vis = _batch_check_twilight_visibility(extended_jds, morning=True)
+            for jd_lb, (vis, _) in zip(extended_jds, extended_vis):
+                if vis:
+                    seen_visible = True
+                    break
+                min_elong = min(min_elong, _get_elongation(jd_lb))
 
         for batch_start in range(0, max_days, _HELIACAL_BATCH):
             batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
@@ -2797,6 +2839,30 @@ def _heliacal_ut_pythonic(
         ELONG_GAP = 10.0
         ELONG_START_GAP = 30.0
         max_days = 800
+
+        # Fast-path only when the body is near conjunction (elongation below the
+        # gap) AND invisible both this evening and on the 6 preceding evenings:
+        # that is a genuine conjunction the search starts inside, so the next
+        # evening visibility IS the evening-first event. If the body is visible
+        # tonight (ongoing apparition) or was visible on a recent evening (a
+        # marginal-conditions flicker inside the current apparition), this is
+        # not a conjunction gap and we must fall through to the normal search
+        # for the NEXT event after the coming superior conjunction.
+        if not is_star and _get_elongation(jd_start) <= ELONG_GAP:
+            gate_jds = [jd_start - i for i in range(0, 7)]
+            gate_vis = _batch_check_twilight_visibility(gate_jds, morning=False)
+            if not any(vis for vis, _ in gate_vis):
+                for batch_start in range(1, max_days, _HELIACAL_BATCH):
+                    batch_end = min(batch_start + _HELIACAL_BATCH, max_days)
+                    jd_days = [jd_start + d for d in range(batch_start, batch_end)]
+                    vis_results = _batch_check_twilight_visibility(
+                        jd_days, morning=False
+                    )
+                    for vis, jd_vis in vis_results:
+                        if vis:
+                            return _refine_heliacal_time(jd_vis, is_morning=False)
+                return 0.0
+
         lookback_jds = [jd_start - i for i in range(1, 7)]
         lookback_vis = _batch_check_twilight_visibility(lookback_jds, morning=False)
         consecutive_invisible = 0

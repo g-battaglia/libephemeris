@@ -427,14 +427,17 @@ always has these bodies via SPK.
 ### 13. Heliacal events
 
 `heliacal_ut` is expensive for some configurations and depends on an empirical
-atmospheric-extinction / arcus-visionis model. The v3 closure fixed two concrete
-implementation defects: detailed visibility windows no longer collapse their end
-time onto the event time, and fixed-star azimuth in the visibility-limit payload
-uses the same south-to-north convention as planet azimuth. Remaining event-timing
-residuals are model-calibration differences (including scotopic/limiting-magnitude
-thresholds and some first/last-visibility sentinel fields); no independent
-sub-day oracle exists, so these remain recorded model differences for future
-physical-model work.
+atmospheric-extinction / arcus-visionis model. The v3 closure fixed three
+categories of implementation defects: detailed visibility windows no longer
+collapse their end time onto the event time (jd3 == jd1), fixed-star azimuth
+in the visibility-limit payload uses the same south-to-north convention as
+planet azimuth, and the evening-first search no longer skips an entire
+apparition when the body starts near inferior conjunction (elongation below
+the conjunction-gap threshold). Remaining event-timing residuals (typically
+3-14 days) are model-calibration differences: visibility-margin thresholds,
+scotopic/limiting-magnitude model parameters, integer-day search granularity,
+and observer-parameter sensitivity. These remain recorded model differences
+for future physical-model work (planned as a unified visibility engine).
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements;
