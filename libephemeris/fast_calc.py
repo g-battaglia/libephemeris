@@ -809,9 +809,8 @@ def _set_active_reader(reader: "LEBReaderLike") -> None:
 
 
 def _active_has_nutation() -> bool:
-    return (
-        getattr(_active_local, "gen", -1) == _active_generation
-        and getattr(_active_local, "has_nutation", False)
+    return getattr(_active_local, "gen", -1) == _active_generation and getattr(
+        _active_local, "has_nutation", False
     )
 
 
@@ -1084,7 +1083,9 @@ def _topocentric_offset(
     xyz_itrf_m = erfa.gd2gc(1, lon_rad, lat_rad, alt_m)  # 1 = WGS84
 
     # Celestial-to-terrestrial matrix (polar motion xp=yp=0)
-    c2t = erfa.c2t06a(2451545.0, jd_tt - 2451545.0, 2451545.0, jd_ut1 - 2451545.0, 0.0, 0.0)
+    c2t = erfa.c2t06a(
+        2451545.0, jd_tt - 2451545.0, 2451545.0, jd_ut1 - 2451545.0, 0.0, 0.0
+    )
 
     # Terrestrial → celestial (transpose)
     t2c_0 = (float(c2t[0][0]), float(c2t[1][0]), float(c2t[2][0]))
@@ -1109,9 +1110,15 @@ def _topocentric_offset(
     vz_itrf = 0.0
 
     vel_au_day = (
-        (t2c_0[0] * vx_itrf + t2c_0[1] * vy_itrf + t2c_0[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
-        (t2c_1[0] * vx_itrf + t2c_1[1] * vy_itrf + t2c_1[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
-        (t2c_2[0] * vx_itrf + t2c_2[1] * vy_itrf + t2c_2[2] * vz_itrf) * _SEC_PER_DAY / _AU_M,
+        (t2c_0[0] * vx_itrf + t2c_0[1] * vy_itrf + t2c_0[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
+        (t2c_1[0] * vx_itrf + t2c_1[1] * vy_itrf + t2c_1[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
+        (t2c_2[0] * vx_itrf + t2c_2[1] * vy_itrf + t2c_2[2] * vz_itrf)
+        * _SEC_PER_DAY
+        / _AU_M,
     )
 
     return pos_au, vel_au_day
@@ -1260,7 +1267,9 @@ def _pipeline_icrs(
     iflag: int,
     want_velocity: bool = False,
     is_system_bary: bool = False,
-    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    topo_offset: Optional[
+        Tuple[Tuple[float, float, float], Tuple[float, float, float]]
+    ] = None,
     want_xyz: bool = False,
     topo_offset_fn: Optional[
         Callable[[float], Tuple[Tuple[float, float, float], Tuple[float, float, float]]]
@@ -1631,65 +1640,97 @@ def _pipeline_ecliptic(
     Returns:
         (lon, lat, dist, dlon, dlat, ddist)
     """
-    (lon, lat, dist), (dlon, dlat, ddist) = reader.eval_body(ipl, jd_tt)
-
-    # Override distance/latitude for lunar analytical bodies.
-    # LEB stores pre-computed Chebyshev coefficients that may use older
-    # models.  These overrides compute values analytically at runtime
-    # for better match with the reference ephemeris.
-    if ipl == MEAN_NODE:
-        # LEB stores 0 for dist; the reference ephemeris returns mean distance constant.
-        dist = _MOON_MEAN_DIST_AU
-    elif ipl == TRUE_NODE:
-        # The LEB-stored value is an h_mag proxy (~0.0015 AU), NOT the
-        # osculating node radius the reference ephemeris and the Skyfield
-        # backend return (~0.0024 AU). Reconstruct the geocentric lunar
-        # state from the LEB Moon channel (position plus Chebyshev
-        # derivatives) and evaluate the osculating-ellipse radius at the
-        # ascending node.
-        try:
-            dist = _osculating_node_radius(reader, jd_tt)
-        except (KeyError, ValueError, ArithmeticError):
-            pass  # keep the stored proxy if the Moon channel is missing
-    elif ipl == MEAN_APOG:
-        # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
-        # Override with 3-harmonic model fitted to the reference ephemeris output:
-        #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
-        # where ω = (apogee_lon - node_lon).
-        # Max residual vs the reference ephemeris: ~1.3", RMS: ~0.7".
-        from .lunar import calc_mean_lunar_node
-
-        node_lon = calc_mean_lunar_node(jd_tt)
-        omega_rad = math.radians((lon - node_lon) % 360.0)
-        lat = 5.1490449082 * math.sin(omega_rad) + 0.0034412113 * math.sin(
-            3.0 * omega_rad
-        )
-        dist = _MOON_MEAN_APOG_DIST_AU
-
-    # Nutation in longitude (dpsi) handling.
-    # When SIDEREAL+EQUATORIAL: the reference ephemeris outputs mean ecliptic (no nutation)
-    # Nutation handling for ecliptic-direct bodies.
-    # Mean bodies are stored without nutation; true bodies include it.
-    # FLG_NONUT: output on mean ecliptic (no nutation).
-    # FLG_J2000: output is the mean ecliptic precessed to J2000, so it is
-    # nutation-free as well (matching the reference behavior).
-    # Velocity is NOT corrected — the Skyfield path also computes
-    # velocity from the un-nutated polynomial.
+    # When SIDEREAL+EQUATORIAL, or J2000/NONUT, the reference outputs the
+    # mean (nutation-free) ecliptic; otherwise the true ecliptic of date.
     _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
     _want_nonut_b = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
 
-    if ipl in (MEAN_NODE, MEAN_APOG):
-        # Mean bodies stored without nutation. Add dpsi for true ecliptic,
-        # UNLESS the output frame is nutation-free (see above).
-        if not _want_nonut_b:
-            _, dpsi_rad, _, _ = _frame_data(jd_tt)
-            lon = (lon + math.degrees(dpsi_rad)) % 360.0
-    elif ipl in (TRUE_NODE, OSCU_APOG, INTP_APOG, INTP_PERG):
-        # True/osculating bodies include nutation. Strip dpsi when the
-        # output frame is nutation-free (see above).
-        if _want_nonut_b:
-            _, dpsi_rad, _, _ = _frame_data(jd_tt)
-            lon = (lon - math.degrees(dpsi_rad)) % 360.0
+    def _ofdate_pos(jd: float) -> Tuple[float, float, float]:
+        """Reported of-date (lon, lat, dist) for an ecliptic-direct body.
+
+        Reproduces the reference-matching distance/latitude overrides and the
+        nutation-in-longitude handling in a single place, so the reported
+        velocity below is the exact central difference of the reported
+        position — the same construction the Skyfield backend uses.
+
+        LEB stores pre-computed Chebyshev coefficients that may use older
+        models; the overrides compute the distance/latitude analytically at
+        runtime for a better match with the reference ephemeris.
+        """
+        (lo, la, di), _ = reader.eval_body(ipl, jd)
+
+        if ipl == MEAN_NODE:
+            # LEB stores 0 for dist; the reference returns the mean distance.
+            di = _MOON_MEAN_DIST_AU
+        elif ipl == TRUE_NODE:
+            # The LEB-stored value is an h_mag proxy (~0.0015 AU), NOT the
+            # osculating node radius the reference ephemeris and the Skyfield
+            # backend return (~0.0024 AU). Reconstruct the geocentric lunar
+            # state from the LEB Moon channel and evaluate the osculating-
+            # ellipse radius at the ascending node.
+            try:
+                di = _osculating_node_radius(reader, jd)
+            except (KeyError, ValueError, ArithmeticError):
+                pass  # keep the stored proxy if the Moon channel is missing
+        elif ipl == MEAN_APOG:
+            # LEB stores old 5.145°·sin(ω) latitude model (max error ~20").
+            # Override with 3-harmonic model fitted to the reference output:
+            #   lat = 5.1490449082·sin(ω) + 0.0034412113·sin(3ω)
+            # where ω = (apogee_lon - node_lon). Max residual ~1.3", RMS ~0.7".
+            from .lunar import calc_mean_lunar_node
+
+            node_lon = calc_mean_lunar_node(jd)
+            omega_rad = math.radians((lo - node_lon) % 360.0)
+            la = 5.1490449082 * math.sin(omega_rad) + 0.0034412113 * math.sin(
+                3.0 * omega_rad
+            )
+            di = _MOON_MEAN_APOG_DIST_AU
+
+        # Nutation in longitude (Δψ) handling. Mean bodies are stored on the
+        # mean ecliptic (add Δψ for the true ecliptic of date); true/osculating
+        # bodies include it (strip Δψ for a nutation-free frame). FLG_NONUT,
+        # FLG_J2000 and SIDEREAL+EQUATORIAL select the nutation-free frame.
+        if ipl in (MEAN_NODE, MEAN_APOG):
+            if not _want_nonut_b:
+                _, dpsi_rad, _, _ = _frame_data(jd)
+                lo = (lo + math.degrees(dpsi_rad)) % 360.0
+        elif ipl in (TRUE_NODE, OSCU_APOG, INTP_APOG, INTP_PERG):
+            if _want_nonut_b:
+                _, dpsi_rad, _, _ = _frame_data(jd)
+                lo = (lo - math.degrees(dpsi_rad)) % 360.0
+
+        return lo, la, di
+
+    lon, lat, dist = _ofdate_pos(jd_tt)
+
+    # Velocity: the reported speed is the central difference of the reported
+    # of-date position, over the SAME window the Skyfield backend uses, so the
+    # two backends agree per body:
+    #   * OscuApog's osculating curve oscillates sub-daily -> tight 0.05 d window
+    #   * every other ecliptic-direct point -> 0.5 d
+    # Because _ofdate_pos already carries the distance/latitude overrides and
+    # Δψ, dlon/dlat/ddist are automatically the true derivatives of the
+    # reported position — including the nutation rate (matching the ±Δψ on the
+    # position) and the osculating-node/3-harmonic-latitude motion (fixing the
+    # previously stale ddist/dlat that were left as the retired channel's
+    # Chebyshev derivative). At an ephemeris edge the ±dt samples may fall out
+    # of range; return zero speed there, matching the Skyfield boundary path.
+    dlon = dlat = ddist = 0.0
+    if iflag & FLG_SPEED:
+        _dt = 0.05 if ipl == OSCU_APOG else 0.5
+        try:
+            lo_m, la_m, di_m = _ofdate_pos(jd_tt - _dt)
+            lo_p, la_p, di_p = _ofdate_pos(jd_tt + _dt)
+            _dl = lo_p - lo_m
+            if _dl > 180.0:
+                _dl -= 360.0
+            elif _dl < -180.0:
+                _dl += 360.0
+            dlon = _dl / (2.0 * _dt)
+            dlat = (la_p - la_m) / (2.0 * _dt)
+            ddist = (di_p - di_m) / (2.0 * _dt)
+        except (KeyError, ValueError, ArithmeticError):
+            pass
 
     # Coordinate transforms for ecliptic-direct bodies.
     # Input coords are always ecliptic of date.
@@ -1707,15 +1748,21 @@ def _pipeline_ecliptic(
         # then rotate J2000 ecliptic -> J2000 equatorial.
         eps = OBLIQUITY_J2000_DEG
 
-        def _ecl_date_to_eq_j2000(lo: float, la: float) -> tuple[float, float]:
-            lo_j, la_j = _precess_ecliptic(lo, la, jd_tt, J2000)
+        def _ecl_date_to_eq_j2000(
+            lo: float, la: float, src_epoch: float
+        ) -> tuple[float, float]:
+            # The source of-date epoch varies between the two velocity samples
+            # so the precession captures the ~50.29"/yr equinox drift; the
+            # reported J2000 speed is then the true derivative of the reported
+            # J2000 position (matching the reference API and the Skyfield path).
+            lo_j, la_j = _precess_ecliptic(lo, la, src_epoch, J2000)
             return _cotrans(lo_j, la_j, -eps)
 
         # Velocity via finite difference on original ecliptic coords
         dt_step = 0.001  # days
-        eq_now_lon, eq_now_lat = _ecl_date_to_eq_j2000(lon, lat)
+        eq_now_lon, eq_now_lat = _ecl_date_to_eq_j2000(lon, lat, jd_tt)
         eq_fwd_lon, eq_fwd_lat = _ecl_date_to_eq_j2000(
-            lon + dlon * dt_step, lat + dlat * dt_step
+            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step
         )
         d_eq_lon = eq_fwd_lon - eq_now_lon
         if d_eq_lon > 180.0:
@@ -1729,6 +1776,7 @@ def _pipeline_ecliptic(
 
     elif iflag & FLG_EQUATORIAL:
         # Equatorial of date: rotate ecliptic-of-date → equatorial-of-date.
+        # A fixed-obliquity rotation (no equinox drift to capture here).
         # Sidereal/NONUT modes use mean obliquity (no nutation).
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = vondrak_mean_obliquity_deg(jd_tt)
@@ -1754,12 +1802,15 @@ def _pipeline_ecliptic(
         lat = eq_now_lat
 
     elif _effective_j2000:
-        # J2000 ecliptic: precess from ecliptic of date to J2000
-        # Velocity must also be transformed via finite difference
+        # J2000 ecliptic: precess from ecliptic of date to J2000. The source
+        # of-date epoch varies between the two velocity samples so the reported
+        # J2000 speed is the true derivative of the reported J2000 position —
+        # it differs from the of-date speed by the general-precession rate
+        # (~0.14"/day), matching the reference API.
         dt_step = 0.001  # days
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
         j_fwd_lon, j_fwd_lat = _precess_ecliptic(
-            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt, J2000
+            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step, J2000
         )
         d_j_lon = j_fwd_lon - j_now_lon
         if d_j_lon > 180.0:
@@ -1863,16 +1914,38 @@ def _pipeline_helio(
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
     # Position is now J2000 ecliptic (helio or geo).
-    # The Skyfield backend precesses J2000 → ecliptic of date ONLY when the
-    # J2000 flag is NOT set.  For EQ+J2000, both backends rotate the J2000
-    # ecliptic to the equator with the J2000 obliquity — a consistent J2000
-    # equatorial frame, same as every other body class.  (The reference API
-    # instead uses the obliquity of date here, a frame-mixed output ~3" off in
-    # 2023 — an intentional, certified divergence; see
-    # docs/comparison/intentional-divergences.md.)
     is_j2000 = bool(iflag & FLG_J2000)
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
 
+    # For any of-date output (J2000 flag not set), precess the J2000 position
+    # AND velocity to the ecliptic of date. Carrying the velocity through the
+    # SAME (epoch-varying) precession — instead of leaving it frozen in the
+    # J2000 frame — makes the of-date speed the true time derivative of the
+    # of-date position: it picks up the ~50.29"/yr general-precession rate,
+    # matching the Skyfield backend (_precess_ecliptic_state) and the reference
+    # API. Without this the of-date speed was off by the precession rate
+    # (~0.14"/day) on default / helctr / equatorial / sidereal output.
+    if not is_j2000:
+        dt_step = 0.001  # days
+        now_lon, now_lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+        fwd_lon, fwd_lat = _precess_ecliptic(
+            lon + dlon * dt_step, lat + dlat * dt_step, J2000, jd_tt + dt_step
+        )
+        d_lon = fwd_lon - now_lon
+        if d_lon > 180.0:
+            d_lon -= 360.0
+        elif d_lon < -180.0:
+            d_lon += 360.0
+        dlon = d_lon / dt_step
+        dlat = (fwd_lat - now_lat) / dt_step
+        lon = now_lon
+        lat = now_lat
+
+    # For EQ+J2000, both backends rotate the J2000 ecliptic to the equator with
+    # the J2000 obliquity — a consistent J2000 equatorial frame, same as every
+    # other body class. (The reference API instead uses the obliquity of date
+    # here, a frame-mixed output ~3" off in 2023 — an intentional, certified
+    # divergence; see docs/comparison/intentional-divergences.md.)
     if is_equatorial and is_j2000:
         # EQ+J2000: J2000 ecliptic → J2000 equatorial (fixed J2000 obliquity).
         eps = OBLIQUITY_J2000_DEG
@@ -1893,9 +1966,10 @@ def _pipeline_helio(
         lat = eq_now_lat
 
     elif is_equatorial:
-        # Equatorial of date: precess J2000 → date, then ecliptic → equatorial.
-        # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris.
-        lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+        # Equatorial of date: coords (position and velocity) are now on the
+        # ecliptic of date (precessed above); rotate ecliptic-of-date →
+        # equatorial-of-date with the of-date obliquity (a fixed-obliquity
+        # rotation). Sidereal/NONUT modes use mean obliquity (no nutation).
         if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
             eps = vondrak_mean_obliquity_deg(jd_tt)
         else:
@@ -1918,13 +1992,8 @@ def _pipeline_helio(
         lon = eq_now_lon
         lat = eq_now_lat
 
-    elif is_j2000:
-        # J2000 ecliptic: already in J2000, no transform needed
-        pass
-
-    else:
-        # Default: ecliptic of date
-        lon, lat = _precess_ecliptic(lon, lat, J2000, jd_tt)
+    # else: J2000 ecliptic (already in frame) or of-date ecliptic (precessed
+    # above) — position and velocity are final.
 
     return lon, lat, dist, dlon, dlat, ddist
 
@@ -2087,7 +2156,21 @@ def fast_calc_tt(
         sid_t0 = _SIDEREAL_T0
         sid_ayan_t0 = _SIDEREAL_AYAN_T0
 
-    tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
+    # TT -> UT via the canonical deltat(), NOT the ΔT table baked into the LEB
+    # file (which can be stale by several seconds at historical dates, e.g.
+    # ~9 s near 1719 in the medium tier). Using the same deltat() as
+    # fast_calc_ut() keeps the two entry points coherent (a TT jd and its
+    # UT partner give the same topocentric / sidereal result). deltat() takes
+    # UT; invert with one fixed-point step (ΔT varies slowly, so it converges
+    # to well under a millisecond). Fall back to the file table only if the
+    # canonical deltat() is unavailable.
+    from .time_utils import deltat
+
+    try:
+        _dt_days = deltat(tjd_tt)
+        tjd_ut = tjd_tt - deltat(tjd_tt - _dt_days)
+    except (KeyError, ValueError):
+        tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
 
     topo_offset_fn = None
     if iflag & FLG_TOPOCTR:
@@ -2125,7 +2208,9 @@ def _fast_calc_core(
     sid_mode: Optional[int] = None,
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
-    topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    topo_offset: Optional[
+        Tuple[Tuple[float, float, float], Tuple[float, float, float]]
+    ] = None,
     topo_offset_fn: Optional[
         Callable[[float], Tuple[Tuple[float, float, float], Tuple[float, float, float]]]
     ] = None,
@@ -2163,6 +2248,7 @@ def _fast_calc_core(
     _deferred_sid_j2k = False
 
     _pipeline_a = False
+    _pipeline_c = False
 
     # Dispatch to appropriate pipeline based on coordinate type.
     # When XYZ+SIDEREAL, force Pipeline A to return spherical so the
@@ -2185,7 +2271,11 @@ def _fast_calc_core(
             )
         else:
             lon, lat, dist = _pipeline_icrs(
-                reader, jd_tt, ipl, _pipe_iflag, topo_offset=topo_offset,
+                reader,
+                jd_tt,
+                ipl,
+                _pipe_iflag,
+                topo_offset=topo_offset,
             )
             dlon, dlat, ddist = 0.0, 0.0, 0.0
 
@@ -2240,9 +2330,7 @@ def _fast_calc_core(
         # Skyfield path), and the deferred _precess_ecliptic below is a
         # pure precession rotation that cannot remove a nutation offset
         # baked into the of-date longitude.
-        _pipe_flags = (
-            (iflag & ~FLG_J2000) | FLG_NONUT if _deferred_sid_j2k else iflag
-        )
+        _pipe_flags = (iflag & ~FLG_J2000) | FLG_NONUT if _deferred_sid_j2k else iflag
         lon, lat, dist, dlon, dlat, ddist = _pipeline_ecliptic(
             reader, jd_tt, ipl, _pipe_flags
         )
@@ -2253,6 +2341,7 @@ def _fast_calc_core(
         if iflag & FLG_TOPOCTR:
             raise KeyError("FLG_TOPOCTR not supported for heliocentric bodies")
         # Pipeline C: heliocentric
+        _pipeline_c = True
         lon, lat, dist, dlon, dlat, ddist = _pipeline_helio(reader, jd_tt, ipl, iflag)
         if not (iflag & FLG_SPEED):
             dlon, dlat, ddist = 0.0, 0.0, 0.0
@@ -2352,6 +2441,7 @@ def _fast_calc_core(
                 or not (iflag & FLG_J2000)
                 or _pipeline_a
                 or _xyz_sid_pipea
+                or _pipeline_c
             ):
                 dlon -= _general_precession_rate_deg_day(jd_tt)
 
@@ -2359,10 +2449,12 @@ def _fast_calc_core(
                 # its rate must also drop the nutation-in-longitude rate dΔψ/dt
                 # (~0.05"/day) on top of the precession term above. The mean
                 # ayanamsha (J2000/NONUT) carries no nutation, so it is excluded.
-                # Scoped to Pipeline-A bodies whose speed is now the exact
-                # derivative of the reported position; the deferred
-                # ecliptic-direct bodies keep their existing (intentional) drift.
-                if (_pipeline_a or _xyz_sid_pipea) and not _eff_mean_aya:
+                # Scoped to Pipeline-A and Pipeline-C bodies whose speed is now
+                # the exact derivative of the reported of-date tropical position
+                # (Pipeline-C precesses its velocity to the of-date frame); the
+                # deferred ecliptic-direct bodies keep their existing
+                # (intentional) drift.
+                if (_pipeline_a or _xyz_sid_pipea or _pipeline_c) and not _eff_mean_aya:
                     try:
                         _, _dpsi_m, _, _ = _frame_data(jd_tt - _VEL_H)
                         _, _dpsi_p, _, _ = _frame_data(jd_tt + _VEL_H)

@@ -1908,6 +1908,116 @@ def _precess_ecliptic_state(
     return lon2, lat2, d / (2.0 * dt), (la_p - la_m) / (2.0 * dt)
 
 
+def _apply_hypothetical_topocentric(
+    result: tuple, jd_tt: float, iflag: int, result_is_j2000: bool, planets_dict
+) -> tuple:
+    """Apply the observer's geocentric parallax to a hypothetical body.
+
+    The Uranian / Transpluto / Vulcan / Waldemath / predicted-planet paths
+    build a geocentric ecliptic position by hand and previously ignored
+    FLG_TOPOCTR entirely — silently returning the geocentric place labelled as
+    topocentric. The parallax is real (~0.4° for the close Waldemath Moon,
+    ~166" for the White Moon), so subtract the observer's geocentric offset
+    (Earth centre -> topocentre), position and velocity, in the same ecliptic
+    frame the ``result`` is currently expressed in.
+
+    No-op for heliocentric / barycentric requests (parallax is undefined
+    there). Raises when FLG_TOPOCTR is set but no observer location was
+    configured, matching the reference-API behaviour on the planets.
+
+    Args:
+        result: (lon, lat, dist, dlon, dlat, ddist) geocentric ecliptic.
+        jd_tt: Julian Day (TT).
+        iflag: Calculation flags.
+        result_is_j2000: True if ``result`` is J2000 ecliptic; False if it is
+            the ecliptic of date (the frame governs how the observer offset is
+            oriented before the subtraction).
+        planets_dict: Skyfield planets dict (for the Earth vector).
+
+    Returns:
+        The topocentric (lon, lat, dist, dlon, dlat, ddist), or ``result``
+        unchanged when FLG_TOPOCTR is not requested / not applicable.
+    """
+    if not (iflag & FLG_TOPOCTR):
+        return result
+    if iflag & (FLG_HELCTR | FLG_BARYCTR):
+        return result
+
+    observer_topo = get_topo()
+    if observer_topo is None:
+        from .exceptions import ConfigurationError
+
+        raise ConfigurationError(
+            "FLG_TOPOCTR requires a geographic position: call "
+            "set_topo(lon, lat, alt) first",
+            missing_config="observer_location",
+            suggestion="Call set_topo(lon, lat, alt) first",
+        )
+
+    from .rebound_integration import _icrs_to_ecliptic_j2000
+    from .astrometry import _precess_ecliptic
+
+    # Observer geocentric offset (topocentre - geocentre) in equatorial ICRS,
+    # position (AU) and velocity (AU/day, i.e. Earth's diurnal rotation).
+    t = get_timescale().tt_jd(jd_tt)
+    earth = planets_dict["earth"]
+    obs = (earth + observer_topo).at(t)
+    geo = earth.at(t)
+    op = obs.position.au - geo.position.au
+    ov = obs.velocity.au_per_d - geo.velocity.au_per_d
+    ox, oy, oz = _icrs_to_ecliptic_j2000(float(op[0]), float(op[1]), float(op[2]))
+    ovx, ovy, ovz = _icrs_to_ecliptic_j2000(float(ov[0]), float(ov[1]), float(ov[2]))
+
+    def _rotate_to_of_date(vx: float, vy: float, vz: float) -> tuple:
+        """Rotate an ecliptic-J2000 vector to the ecliptic of date, preserving
+        its magnitude (exact for the direction; the offset is ~1 Earth radius,
+        so any residual is negligible)."""
+        mag = math.sqrt(vx * vx + vy * vy + vz * vz)
+        if mag == 0.0:
+            return (0.0, 0.0, 0.0)
+        lon_v = math.degrees(math.atan2(vy, vx))
+        lat_v = math.degrees(math.asin(max(-1.0, min(1.0, vz / mag))))
+        lon_d, lat_d = _precess_ecliptic(lon_v, lat_v, 2451545.0, jd_tt)
+        lr, br = math.radians(lon_d), math.radians(lat_d)
+        cl = math.cos(br)
+        return (mag * cl * math.cos(lr), mag * cl * math.sin(lr), mag * math.sin(br))
+
+    if not result_is_j2000:
+        ox, oy, oz = _rotate_to_of_date(ox, oy, oz)
+        ovx, ovy, ovz = _rotate_to_of_date(ovx, ovy, ovz)
+
+    lon, lat, dist, dlon, dlat, ddist = result
+    lr, br = math.radians(lon), math.radians(lat)
+    dlr, dbr = math.radians(dlon), math.radians(dlat)
+    cl, sl = math.cos(lr), math.sin(lr)
+    cb, sb = math.cos(br), math.sin(br)
+
+    # Geocentric body state -> Cartesian (ecliptic of the result frame).
+    bx = dist * cb * cl
+    by = dist * cb * sl
+    bz = dist * sb
+    bvx = ddist * cb * cl - dist * sb * dbr * cl - dist * cb * sl * dlr
+    bvy = ddist * cb * sl - dist * sb * dbr * sl + dist * cb * cl * dlr
+    bvz = ddist * sb + dist * cb * dbr
+
+    # Topocentric = geocentric - observer offset (position and velocity).
+    tx, ty, tz = bx - ox, by - oy, bz - oz
+    tvx, tvy, tvz = bvx - ovx, bvy - ovy, bvz - ovz
+
+    # Cartesian -> spherical state.
+    r_xy2 = tx * tx + ty * ty
+    r = math.sqrt(r_xy2 + tz * tz)
+    if r == 0.0:
+        return result
+    r_xy = math.sqrt(r_xy2)
+    lon_t = math.degrees(math.atan2(ty, tx)) % 360.0
+    lat_t = math.degrees(math.asin(max(-1.0, min(1.0, tz / r))))
+    ddist_t = (tx * tvx + ty * tvy + tz * tvz) / r
+    dlon_t = math.degrees((tx * tvy - ty * tvx) / r_xy2) if r_xy2 > 0 else 0.0
+    dlat_t = math.degrees((tvz - (tz / r) * ddist_t) / r_xy) if r_xy > 0 else 0.0
+    return (lon_t, lat_t, r, dlon_t, dlat_t, ddist_t)
+
+
 def _maybe_equatorial_convert(
     result: tuple, jd_tt: float, iflag: int, *, already_j2000: bool = False
 ) -> tuple:
@@ -2105,8 +2215,25 @@ def _assist_position_from_state(
         # heliocentric follows the same contract. Returning the raw J2000
         # longitude froze it at the J2000 equinox and drifted from every other
         # path by the accumulated general precession (~7 deg / 25000" by 2500).
-        from .astrometry import precess_from_j2000
+        from .astrometry import precess_from_j2000, C_LIGHT_AU_DAY
         from .cache import get_cached_nutation
+
+        # Light-time retardation (body -> Sun), matching the SPK heliocentric
+        # path (get_vector retards the target by dist/c for HELCTR). Without it
+        # the ASSIST heliocentric place is the *geometric* position and steps by
+        # ~1-2" against the retarded SPK place at the SPK/ASSIST coverage
+        # boundary. Skipped for FLG_TRUEPOS (geometric position requested).
+        px, py, pz = result.x, result.y, result.z
+        if not (iflag & FLG_TRUEPOS):
+            vx, vy, vz = result.vx, result.vy, result.vz
+            lt = 0.0
+            for _ in range(2):
+                rx, ry, rz = px - vx * lt, py - vy * lt, pz - vz * lt
+                lt = math.sqrt(rx * rx + ry * ry + rz * rz) / C_LIGHT_AU_DAY
+            px, py, pz = px - vx * lt, py - vy * lt, pz - vz * lt
+            r_hel = math.sqrt(px * px + py * py + pz * pz)
+            lon_hel = math.degrees(math.atan2(py, px)) % 360.0
+            lat_hel = math.degrees(math.asin(pz / r_hel)) if r_hel > 0 else 0.0
 
         lon_od, lat_od = precess_from_j2000(lon_hel, lat_hel, jd_tt)
         _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
@@ -2705,6 +2832,14 @@ def _calc_body(
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
+        # Topocentric parallax first (tropical of-date / J2000), so the
+        # sidereal ayanamsha rotation below acts on the topocentric longitude.
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _apply_hypothetical_topocentric(
+            result, jd_tt, iflag, is_j2000, planets
+        )
+        lon, lat, dist, dlon, dlat, ddist = result
+
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
 
@@ -2802,6 +2937,14 @@ def _calc_body(
                 from .astrometry import _precess_ecliptic
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        # Topocentric parallax first (tropical of-date / J2000), so the
+        # sidereal ayanamsha rotation below acts on the topocentric longitude.
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _apply_hypothetical_topocentric(
+            result, jd_tt, iflag, bool(iflag & FLG_J2000), planets
+        )
+        lon, lat, dist, dlon, dlat, ddist = result
 
         # Apply sidereal correction if requested (not for equatorial output)
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
@@ -2907,7 +3050,11 @@ def _calc_body(
                     pos = (h_lon, h_lat, pos[2], h_dlon, pos[4], pos[5])
             else:
                 g_lon, g_lat, g_dist = _geo_of_date(jd_tt)
-                dt_v = 0.1
+                # Vulcan's ~18.6-day orbit makes it move ~3 deg/day
+                # geocentrically, so a 0.1-day central difference over-smooths
+                # its speed by ~1"/day; use a tighter step for it. The slow
+                # predicted planets / Proserpina stay at 0.1 day.
+                dt_v = 0.01 if ipl == VULCAN else 0.1
                 prev = _geo_of_date(jd_tt - dt_v)
                 nxt = _geo_of_date(jd_tt + dt_v)
                 g_dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
@@ -2934,6 +3081,19 @@ def _calc_body(
 
             dpsi_rad, _ = get_cached_nutation(jd_tt)
             lon = (lon + math.degrees(dpsi_rad)) % 360.0
+            # The true-ecliptic longitude carries Δψ, so its speed carries the
+            # nutation-in-longitude rate dΔψ/dt (~0.05-0.17"/day). Add it, the
+            # same way the MEAN_NODE / Uranian paths do, so the reported dlon is
+            # the true derivative of the reported (nutated) longitude.
+            if iflag & FLG_SPEED:
+                dlon += _nutation_rate_deg_per_day(jd_tt)
+
+        # Topocentric parallax is applied to the tropical of-date place first,
+        # so any sidereal ayanamsha rotation below acts on the topocentric
+        # longitude (keeping the observer offset in the correct frame).
+        result = (lon, lat, dist, dlon, dlat, ddist)
+        result = _apply_hypothetical_topocentric(result, jd_tt, iflag, False, planets)
+        lon, lat, dist, dlon, dlat, ddist = result
 
         if is_sidereal and not (iflag & FLG_EQUATORIAL):
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -5706,7 +5866,9 @@ def _calc_nod_aps(
             # fabricate a spurious node longitude — mirror the J2000 guard.
             if g[2] == 0.0:
                 return g
-            return ((g[0] - aya) % 360.0, g[1], g[2])
+            # float() guards against a numpy.float64 ayanamsha leaking into the
+            # output tuple (the library contract is native Python floats).
+            return (float((g[0] - aya) % 360.0), g[1], g[2])
 
         geo_asc = _to_sidereal(geo_asc)
         geo_dsc = _to_sidereal(geo_dsc)
@@ -6865,7 +7027,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
             - [0]: Phase angle (Earth-planet-Sun) in degrees
             - [1]: Phase (illuminated fraction of disc, 0.0 to 1.0)
             - [2]: Elongation of planet from Sun in degrees
-            - [3]: Apparent diameter of disc in arcseconds
+            - [3]: Apparent diameter of disc in degrees
             - [4]: Apparent visual magnitude
             - [5-19]: Reserved (0.0)
 
@@ -6880,7 +7042,7 @@ def pheno_ut(tjdut: float, planet: int, flags: int = FLG_SWIEPH) -> Tuple[float,
         >>> print(f"Phase angle: {attr[0]:.2f}°")
         >>> print(f"Illumination: {attr[1]*100:.1f}%")
         >>> print(f"Elongation: {attr[2]:.2f}°")
-        >>> print(f"Diameter: {attr[3]:.2f} arcsec")
+        >>> print(f"Diameter: {attr[3]:.4f} deg")
         >>> print(f"Magnitude: {attr[4]:.2f}")
     """
     # --- LEB fast path ---

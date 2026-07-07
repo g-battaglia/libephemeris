@@ -353,12 +353,15 @@ differs by ~0.13–0.25" (True Lilith) — i.e. the residual is pyswisseph's
 convention, not a libephemeris error. (The ~±30° month-scale libration of True
 Lilith is the real physical swing of the instantaneous osculating apse.)
 
-**True Node *distance* in LEB mode (backend limitation).** The True Node's
-longitude and latitude are correct in every mode (0.000" across backends and vs
-pyswisseph). Its **distance** (and `FLG_XYZ` output) is correct only on the
-**Skyfield/default** backend; the **LEB backend** returns a stored proxy
-(~0.0015 AU vs the correct ~0.0024 AU) rather than recomputing the osculating node
-radius. Use the default/Skyfield mode if you need the True Node distance.
+**True Node *distance* in LEB mode.** The True Node's longitude and latitude are
+correct in every mode (0.000" across backends and vs the reference). Both
+backends now agree on its **distance** as well: the LEB backend reconstructs the
+geocentric lunar state from its Moon/Earth channels and evaluates the osculating
+node radius at runtime (~0.0024 AU), matching the Skyfield/default backend to
+~1e-11 AU. The reported distance rate (`ddist`) and `FLG_XYZ` output are the true
+derivative of that reconstructed distance (a central difference over the same
+±0.5 d window the reference smooths over), so speed and Cartesian output are
+consistent across backends too.
 
 **Minor bodies not yet supported (raises).** `nod_aps_ut`/`nod_aps` compute
 nodes/apsides only for the Sun, Moon and the eight planets in this version. For
