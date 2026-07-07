@@ -860,23 +860,44 @@ def set_precision_tier(tier: str) -> None:
         >>> get_precision_tier()
         'extended'
     """
-    global _PRECISION_TIER, _PLANETS, _EPHEMERIS_FILE_EXPLICIT
+    global _PRECISION_TIER, _PLANETS, _LEB_READER, _EPHEMERIS_FILE_EXPLICIT
     if tier not in TIERS:
         raise ValueError(
             f"Invalid tier: {tier!r}. Must be one of: {list(TIERS.keys())}"
         )
-    _PRECISION_TIER = tier
-    _EPHEMERIS_FILE_EXPLICIT = False
-    # Close old kernel and clear caches before reloading
-    if _PLANETS is not None:
-        try:
-            _PLANETS.close()
-        except (AttributeError, OSError, ValueError):
-            pass
-    _PLANETS = None
-    from .cache import clear_caches
+    with _STATE_LOCK:
+        _PRECISION_TIER = tier
+        _EPHEMERIS_FILE_EXPLICIT = False
+        # Close old kernel and clear caches before reloading
+        if _PLANETS is not None:
+            try:
+                _PLANETS.close()
+            except (AttributeError, OSError, ValueError):
+                pass
+        _PLANETS = None
 
-    clear_caches()
+        # Invalidate the LEB reader so the new tier's ephemeris is used on the
+        # next access. Mirrors set_leb_file()/_close_inner(): the auto-discovered
+        # .leb file is ephemeris_{tier}.leb, so a tier change points at a
+        # different file; a retained reader would keep serving the previous
+        # tier's data (e.g. medium's 1550-2650 range answering a base query
+        # that should raise EphemerisRangeError). _LEB_FILE is deliberately
+        # preserved, so an explicitly pinned file re-opens unchanged while only
+        # an auto-discovered path re-resolves to the new tier.
+        if _LEB_READER is not None:
+            try:
+                _LEB_READER.close()
+            except (AttributeError, OSError):
+                get_logger().debug("Failed to close LEB reader: %s", _LEB_FILE)
+        _LEB_READER = None
+        from . import fast_calc as _fast_calc
+
+        _fast_calc._reset_active_reader()
+        _fast_calc._leb_frame_cache.clear()
+
+        from .cache import clear_caches
+
+        clear_caches()
 
 
 def list_tiers() -> List[PrecisionTier]:

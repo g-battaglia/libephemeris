@@ -137,6 +137,104 @@ class TestGetSetPrecisionTier:
 
 
 # =============================================================================
+# TIER CHANGE INVALIDATES THE LEB READER (regression)
+# =============================================================================
+
+
+def _local_leb_for_tier(tier: str):
+    """Return a locally-present .leb path for the tier, or None.
+
+    Mirrors the local-file portion of state._discover_leb_file() WITHOUT the
+    network auto-download fallback, so tests never touch the network.
+    """
+    leb_dir = os.path.join(state._get_data_dir(), "leb")
+    for name in (f"{tier}_core.leb2", f"{tier}_core.leb", f"ephemeris_{tier}.leb"):
+        candidate = os.path.join(leb_dir, name)
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+class _FakeLebReader:
+    """Minimal stand-in for a LEB reader that records close()."""
+
+    def __init__(self):
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class TestSetPrecisionTierInvalidatesLebReader:
+    """set_precision_tier() must drop the stale LEB reader (docstring promise:
+    'Changing the tier clears cached ephemeris data to force a reload')."""
+
+    def test_set_closes_and_clears_leb_reader(self):
+        """A tier change closes the reader, nulls it, and clears fast-path state."""
+        from libephemeris import fast_calc
+
+        fake = _FakeLebReader()
+        state._LEB_READER = fake
+        fast_calc._leb_frame_cache[(0, 0.0)] = ("sentinel",)
+        gen_before = fast_calc._active_generation
+
+        set_precision_tier("base")
+
+        assert fake.closed is True
+        assert state._LEB_READER is None  # forces re-resolution on next access
+        assert fast_calc._leb_frame_cache == {}
+        assert fast_calc._active_generation > gen_before
+
+    def test_set_preserves_explicit_leb_file(self):
+        """An explicitly pinned _LEB_FILE survives a tier change (not clobbered
+        by auto-discovery); only the reader is dropped so the same path re-opens."""
+        state._LEB_FILE = "/some/explicit/path.leb"
+        state._LEB_READER = _FakeLebReader()
+
+        set_precision_tier("base")
+
+        assert state._LEB_FILE == "/some/explicit/path.leb"
+        assert state._LEB_READER is None
+
+    def test_reader_reload_serves_new_tier_range(self):
+        """End-to-end: after switching medium->base the reader re-resolves to the
+        base file, so a date inside medium's range but outside base's now raises;
+        the round trip back to medium is bit-identical (no state corruption).
+
+        Gated on both tier files being present locally (no network)."""
+        from libephemeris import calc_ut
+        from libephemeris.constants import SUN
+        from libephemeris.exceptions import EphemerisRangeError
+        from libephemeris.time_utils import julday
+
+        if _local_leb_for_tier("medium") is None or _local_leb_for_tier("base") is None:
+            pytest.skip("requires local base and medium .leb files")
+
+        jd_1700 = julday(1700, 1, 1, 0.0)  # in medium (1550-2650), not base
+        old_mode = state.get_calc_mode()
+        try:
+            state.set_calc_mode("leb")
+
+            set_precision_tier("medium")
+            pos_medium, _ = calc_ut(jd_1700, SUN, 0)
+            reader_medium = state.get_leb_reader()
+            assert reader_medium is not None
+
+            set_precision_tier("base")
+            reader_base = state.get_leb_reader()
+            assert reader_base is not None
+            assert reader_base is not reader_medium  # not the stale medium reader
+            with pytest.raises(EphemerisRangeError):
+                calc_ut(jd_1700, SUN, 0)
+
+            set_precision_tier("medium")
+            pos_medium_again, _ = calc_ut(jd_1700, SUN, 0)
+            assert pos_medium_again == pos_medium  # bit-identical round trip
+        finally:
+            state.set_calc_mode(old_mode)
+
+
+# =============================================================================
 # list_tiers()
 # =============================================================================
 
