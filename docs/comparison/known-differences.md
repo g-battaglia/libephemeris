@@ -233,9 +233,14 @@ semi-analytical ELP2000-82B perturbation theory, implemented independently from
 published coefficients; results can differ by several arcseconds. Classified as a
 known divergence in all tests.
 
-**1.3 Pholus (body 16) historical dates.** Pholus SPK coverage starts around
-1600 CE; earlier queries raise "Invalid Time to evaluate" while pyswisseph may use
-an internal Keplerian fallback. Affects dates before ~1850.
+**1.3 Pholus (body 16) historical dates.** The SPK auto-download path requests
+padding around the selected tier and verifies cached-kernel coverage before reuse,
+so Pholus at 1900-01-01 is now served from a Horizons SPK kernel instead of a
+fallback orbit. Against Horizons geocentric observed ecliptic coordinates, the
+library is within ~0.25" in longitude and ~0.05" in latitude at JD 2415021.0
+(`validation/verify/verify_pholus_horizons.py`, online verifier). The reference
+API remains ~28" away at that date, apparently from a different historical orbit
+solution; that residual is certified rather than copied.
 
 ### 2. House system differences
 
@@ -269,13 +274,16 @@ compounding ΔT and Sun-RA model differences.
 **4.1 Positions.** Ecliptic longitude/latitude agree within 0.01" for the 116 compared
 stars (same FK5/Hipparcos proper motions).
 
-**4.2 Distances.** Match exactly at J2000.0; up to ~0.1% at other dates from
-different radial-velocity models.
+**4.2 Distances.** Match exactly at J2000.0 for many catalog entries; away from
+J2000 some entries differ because the reference API uses a different
+radial-distance convention. The libephemeris distance channel is certified
+against Astropy/SkyCoord; see
+[Intentional divergences §7](intentional-divergences.md#7-fixed-star-distance-and-distance-speed-channels).
 
-**4.3 Speed in distance (`speed_dist`).** Diverges 20–90% because libephemeris uses
-a central finite difference on the full apparent distance (including annual
-parallax oscillation) while pyswisseph separates the radial-velocity component
-differently.
+**4.3 Speed in distance (`speed_dist`).** Diverges 20–90% on some stars because
+libephemeris uses a central finite difference on the full apparent geocentric
+distance, while the reference API separates the radial-velocity component
+differently. This is a certified semantic difference, not a copied convention.
 
 **4.4 Magnitudes.** Agree within 0.5 mag (different catalog versions).
 
@@ -355,9 +363,9 @@ radius. Use the default/Skyfield mode if you need the True Node distance.
 **Minor bodies not yet supported (raises).** `nod_aps_ut`/`nod_aps` compute
 nodes/apsides only for the Sun, Moon and the eight planets in this version. For
 asteroids and centaurs (Chiron, Pholus, Ceres, Pallas, Juno, Vesta and any
-numbered asteroid) the reference computes real values, whereas this version
+numbered asteroid) the reference API computes real values, whereas this version
 **raises `Error`** rather than returning a plausible-looking zero (which would
-read as a node at 0° Aries). Planned for a future release; see `NEXT.md`.
+read as a node at 0° Aries). Planned for a future release.
 
 ### 8. Phenomena (`pheno_ut`)
 
@@ -401,7 +409,7 @@ is exact.
 ≥ 256) select alternative ecliptic/equinox projections that this version does not
 implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping the
 base ayanamsha mode — rather than the composite value silently falling back to
-Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release; see `NEXT.md`.
+Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release.
 
 ### 11. Crossing functions
 
@@ -418,11 +426,15 @@ always has these bodies via SPK.
 
 ### 13. Heliacal events
 
-`heliacal_ut` is expensive (>90 s per call for some configurations). Timing
-divergence up to ~2–3 days for heliacal rising/setting (Venus rising ≈2 d, setting
-≈3 d) from different atmospheric-extinction and arcus-visionis models. No
-independent sub-day oracle exists, so this is a recorded model divergence, not
-adjudicated.
+`heliacal_ut` is expensive for some configurations and depends on an empirical
+atmospheric-extinction / arcus-visionis model. The v3 closure fixed two concrete
+implementation defects: detailed visibility windows no longer collapse their end
+time onto the event time, and fixed-star azimuth in the visibility-limit payload
+uses the same south-to-north convention as planet azimuth. Remaining event-timing
+residuals are model-calibration differences (including scotopic/limiting-magnitude
+thresholds and some first/last-visibility sentinel fields); no independent
+sub-day oracle exists, so these remain recorded model differences for future
+physical-model work.
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements;

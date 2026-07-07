@@ -48,6 +48,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the requested range is already cached.** The previous behaviour re-downloaded the
   whole multi-century tier range, frequently timed out against JPL Horizons, and
   dropped the body; the generator now reuses any cached kernel that covers the range.
+- **SPK auto-download now pads requested coverage and rejects too-narrow cached
+  kernels.** Historical edge dates such as Pholus at 1900-01-01 now stay on the
+  Horizons SPK path instead of silently falling back because a cache file ended at
+  the nominal tier boundary.
+- **ASSIST fallback speed calculations now reuse one propagated state.** Minor-body
+  speed output derives the +/-1 second asteroid state by Taylor-shifting the single
+  integrated heliocentric state and still samples the real Earth state at both
+  endpoints; repeated ASSIST propagations are memoized and cleared by
+  `reset_assist_data_cache()`.
+- **Heliacal detailed visibility windows keep a real start/event/end ordering.**
+  The end crossing no longer collapses to the event Julian day when the scan window
+  is still visible at its outer edge.
+- **Fixed-star heliacal azimuth uses the same convention as planet azimuth.** The
+  star visibility-limit payload now converts the horizontal azimuth into the
+  south-to-north convention used by the rest of the compatible API surface.
+- **Numeric strings are no longer treated as planet IDs in heliacal object names.**
+  Integer body IDs remain accepted, while string names follow the reference API
+  object-name surface and resolve as names/stars.
+
+### Validation
+
+- Added a CERTIFIED verdict to the validation harness. Default validation accepts
+  documented, bounded scientific divergences while `--optional` exposes the same
+  cases as strict reference-API failures.
+- Added independent verifiers for planetary MEAN apside speed derivatives,
+  fixed-star distance channels, and the online Pholus@1900 Horizons check.
 
 ## [3.0.0rc2] - 2026-06-29
 

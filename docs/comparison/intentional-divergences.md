@@ -185,7 +185,7 @@ mean obliquity is taken from ERFA's Vondrák long-term routines
 
 ---
 
-## 4. `nod_aps` MEAN latitude-speed slot
+## 4. `nod_aps` MEAN speed slots
 
 For the MEAN node/apsis method the reference engine fills the latitude-speed
 slot (`xperi[4]` / `xaphe[4]`) with the **latitude evaluated one day later**,
@@ -202,11 +202,17 @@ true forward-difference **rate** for the latitude speed — a value like
 a convention. Consumers of the reference's MEAN `lat_spd` are reading a
 position, so no astrological result can depend on it being reproduced.
 
-Note: for the MEAN apsides of the *planets* the reference longitude/distance
-speeds follow yet another (not yet identified) convention that differs from
-both a one-day forward difference and a near-instantaneous rate by up to
-~0.15°/day (Mercury/Venus); this residual is under investigation and only
-affects the speed channels, not the positions.
+For the MEAN apsides of the *planets*, libephemeris also keeps the true
+derivative semantics for the longitude and distance speed channels. This was
+checked independently by deriving perihelion/aphelion positions with
+`FLG_SPEED` disabled and applying central step halving plus Richardson
+extrapolation (`validation/verify/verify_nodaps_mean_speed_derivative.py`):
+Mercury, Venus and Mars at 1950, J2000 and 2025 agree with the numerical
+derivative to <3e-7°/day for longitude speed and <4e-9 AU/day for distance
+speed. The reference engine differs by up to ~0.15°/day on those channels.
+
+The certified divergence therefore applies only to MEAN speed channels. The
+node/apside positions themselves are not covered by this certification.
 
 ## 5. `deltat_ex` has no side effect on `get_tid_acc`
 
@@ -232,3 +238,23 @@ are exactly antipodal at all times and agree with the reference to ≤0.03"
 outside those spike days. The spikes are not reproduced. Validation
 comparisons of node positions should either use `FLG_TRUEPOS` or tolerate
 the reference's p99 (~0.5").
+
+## 7. Fixed-star distance and distance-speed channels
+
+For fixed stars, libephemeris returns `dist` as the apparent geocentric distance
+of the same star state used for the angular coordinates, and `dist_spd` as the
+central finite-difference derivative of that distance with a half-day step. This
+keeps the fixed-star channel semantics consistent with the planetary API: a
+speed slot is the derivative of the corresponding position slot.
+
+The reference engine uses a different radial-distance convention for some
+catalog entries. Reproducing that convention would make the same `dist_spd`
+channel mean one thing for planets and another for fixed stars, so it is not
+copied.
+
+Independent verification (`validation/verify/verify_star_distance_astropy.py`)
+uses Astropy/SkyCoord space motion plus the geocentric Earth vector as the
+oracle. Across Spica, Sirius, Regulus, Aldebaran, Vega, Arcturus, Rigil Kent,
+Altair, Antares and one zero-parallax catalog entry at 1950, J2000 and 2025,
+libephemeris agrees with the Astropy distance to <1.3e-7 relative and with the
+distance-speed derivative to <1.7e-5 AU/day.
