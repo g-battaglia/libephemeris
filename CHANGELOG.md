@@ -44,6 +44,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Heliacal lunar crescent width now follows Yallop's geometry on both backends.**
+  The crescent width fed to the Yallop q-test was computed with an inverted
+  formula and a hardcoded 15' semi-diameter; it now uses
+  W = SD·(1 − cos ARCL) with the Moon's true semi-diameter and arc of light,
+  on both the LEB and Skyfield paths. The LEB visibility path also stopped
+  discarding the meteorological range and sub-unity extinction totals that the
+  Skyfield path already honoured, and the magnitude interpolation step was
+  halved to remove a one-day flip at appearance boundaries.
+- **Local eclipse searches starting mid-eclipse now find the ongoing eclipse.**
+  Both solar and lunar local searches open an epoch window around the start
+  date and gate on the *locally visible* contact window (for lunar events the
+  penumbral contacts are clamped to moonrise/moonset), so an eclipse already
+  over for the observer is skipped and forward/backward sequential iteration
+  stays monotonic. The global solar CENTRAL/NONCENTRAL classification now
+  delegates to the ellipsoidal shadow-axis intersection instead of a spherical
+  approximation.
+- **Sidereal node/apsis output no longer subtracts the ayanamsha from empty
+  slots.** Zero-sentinel slots (e.g. the Sun's node) stay zero instead of
+  becoming a fabricated `-ayanamsha` longitude, sidereal+J2000 requests use the
+  true ayanamsha (consistent with body positions), an unknown sidereal mode now
+  warns loudly before falling back, and the context API replicates the same
+  SIDBIT guard as the module-level API.
+- **Sripati house positions no longer collapse house 12 into house 1**, and
+  Gauquelin/Topocentric `house_pos` values outside the domain are wrapped back
+  into range instead of returning sector numbers like 37.
+- **Julian-calendar leap-second dates convert correctly in `utc_to_jd`**, the
+  refraction ray-tracer and `calc_dip` return 0 instead of dividing by zero at
+  or below absolute zero, the barometric altitude term is clamped for
+  observers above ~44 km (both in `azalt` and in the rise/set pressure branch),
+  Gauquelin sectors handle a degenerate zero obliquity, and the twilight sky
+  brightness model ramps the zodiacal-light term continuously so the limiting
+  magnitude stays monotonic as the sky darkens.
 - **SPK generation no longer forces a doomed wide re-download when a kernel covering
   the requested range is already cached.** The previous behaviour re-downloaded the
   whole multi-century tier range, frequently timed out against JPL Horizons, and
