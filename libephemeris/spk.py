@@ -534,6 +534,27 @@ def download_spk(
     )  # pragma: no cover - retry loop always returns or raises
 
 
+def _date_to_jd(date_s: str) -> float:
+    """Convert a YYYY-MM-DD date to a Julian day at 00:00 UT."""
+    from .time_utils import julday
+
+    year_s, month_s, day_s = date_s.split("-")
+    return julday(int(year_s), int(month_s), int(day_s), 0.0)
+
+
+def _spk_covers_dates(spk_path: str, start: str, end: str) -> bool:
+    """Return True when an SPK file covers the requested calendar interval."""
+    coverage = get_spk_coverage(spk_path)
+    if coverage is None:
+        return True
+
+    start_jd, end_jd = _date_to_jd(start), _date_to_jd(end)
+    cov_start, cov_end = coverage
+    # Horizons kernels can report coverage at sub-day precision; allow a
+    # small tolerance around midnight request boundaries.
+    return cov_start <= start_jd + 0.5 and cov_end >= end_jd - 0.5
+
+
 # =============================================================================
 # SPK REGISTRATION
 # =============================================================================
@@ -1326,6 +1347,22 @@ def download_and_register_spk(
         overwrite=overwrite,
         timeout=timeout,
     )
+    if not overwrite and not _spk_covers_dates(spk_path, start, end):
+        get_logger().warning(
+            "Cached SPK file %s does not cover %s..%s, re-downloading",
+            spk_path,
+            start,
+            end,
+        )
+        spk_path = download_spk(
+            body=body,
+            start=start,
+            end=end,
+            path=path,
+            center=center,
+            overwrite=True,
+            timeout=timeout,
+        )
 
     # Deduce NAIF ID if not provided
     if naif_id is None:

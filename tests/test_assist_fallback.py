@@ -121,8 +121,8 @@ class TestAssistFallbackLogic:
 
                 assert pos[0] != 0.0
 
-    def test_assist_velocities_via_central_difference(self):
-        """ASSIST velocities should be computed via central difference."""
+    def test_assist_velocities_from_single_propagation(self):
+        """ASSIST velocities should reuse a single propagated state."""
         eph.set_strict_precision(False)
         eph.set_auto_spk_download(False)
 
@@ -159,7 +159,7 @@ class TestAssistFallbackLogic:
             ):
                 pos, _ = eph.calc_ut(2451545.0, SEDNA, FLG_SPEED)
 
-                assert call_count[0] == 3
+                assert call_count[0] == 1
                 assert pos[3] != 0.0
                 assert pos[4] != 0.0
                 assert pos[5] != 0.0

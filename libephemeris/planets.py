@@ -996,6 +996,8 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         from .state import get_spk_date_range_for_tier
 
         start_date, end_date = get_spk_date_range_for_tier()
+        request_start = _pad_iso_date(start_date, -45)
+        request_end = _pad_iso_date(end_date, 45)
 
         body_name = spk._get_body_name(ipl) or horizons_id
         logger.info("Auto-downloading SPK for %s from JPL Horizons...", body_name)
@@ -1007,8 +1009,8 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         spk.download_and_register_spk(
             body=horizons_id,
             ipl=ipl,
-            start=start_date,
-            end=end_date,
+            start=request_start,
+            end=request_end,
         )
 
         # Now try to calculate using the newly registered SPK
@@ -1022,6 +1024,14 @@ def _try_auto_spk_download(t, ipl: int, iflag: int):
         # fall back to the Keplerian path like any other SPK miss.
         logger.warning("Auto SPK coverage miss for body %d: %s", ipl, e)
         return None
+
+
+def _pad_iso_date(date_s: str, days: int) -> str:
+    """Return ``date_s`` shifted by ``days`` days (YYYY-MM-DD)."""
+    from datetime import datetime, timedelta
+
+    dt = datetime.strptime(date_s, "%Y-%m-%d").date()
+    return (dt + timedelta(days=days)).isoformat()
 
 
 def calc_ut(
@@ -2024,35 +2034,36 @@ def _keplerian_position_at(
     return lon, lat, r_geo
 
 
-def _assist_position_at(
-    jd_tt: float, ipl: int, iflag: int, planets_dict
-) -> Tuple[float, float, float]:
-    """Compute ecliptic position of a minor body via ASSIST N-body integration.
-
-    Returns (lon, lat, dist) in ecliptic coordinates, either heliocentric
-    or geocentric depending on iflag.
-
-    Args:
-        jd_tt: Julian Day in Terrestrial Time.
-        ipl: Minor body ID (CHIRON, CERES, etc.).
-        iflag: Calculation flags (FLG_HELCTR checked).
-        planets_dict: Skyfield planets dict from get_planets().
-
-    Returns:
-        Tuple of (longitude_deg, latitude_deg, distance_au).
-
-    Raises:
-        ImportError: If ASSIST/REBOUND not installed.
-        FileNotFoundError: If ephemeris data files not found.
-    """
+def _assist_state_at(jd_tt: float, ipl: int):
+    """Propagate a minor body with ASSIST and return its heliocentric state."""
     from . import minor_bodies
     from .rebound_integration import propagate_orbit_assist
-    from .state import get_timescale
 
     elements = minor_bodies.MINOR_BODY_ELEMENTS[ipl]
-    jd_start = elements.epoch
+    return propagate_orbit_assist(elements, elements.epoch, jd_tt)
 
-    result = propagate_orbit_assist(elements, jd_start, jd_tt)
+
+def _assist_shift_state(result, jd_tt: float):
+    """Taylor-shift an ASSIST state over a short interval in days."""
+    from .rebound_integration import PropagationResult
+
+    dt = jd_tt - result.jd_tt
+    return PropagationResult(
+        x=result.x + result.vx * dt,
+        y=result.y + result.vy * dt,
+        z=result.z + result.vz * dt,
+        vx=result.vx,
+        vy=result.vy,
+        vz=result.vz,
+        jd_tt=jd_tt,
+    )
+
+
+def _assist_position_from_state(
+    result, jd_tt: float, iflag: int, planets_dict
+) -> Tuple[float, float, float]:
+    """Convert an ASSIST heliocentric state to the requested ecliptic position."""
+    from .state import get_timescale
 
     lon_hel = result.ecliptic_lon
     lat_hel = result.ecliptic_lat
@@ -2144,6 +2155,18 @@ def _assist_position_at(
         lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
+
+
+def _assist_position_at(
+    jd_tt: float, ipl: int, iflag: int, planets_dict
+) -> Tuple[float, float, float]:
+    """Compute ecliptic position of a minor body via ASSIST N-body integration.
+
+    Returns (lon, lat, dist) in ecliptic coordinates, either heliocentric
+    or geocentric depending on iflag.
+    """
+    result = _assist_state_at(jd_tt, ipl)
+    return _assist_position_from_state(result, jd_tt, iflag, planets_dict)
 
 
 def _apply_sidereal_correction(
@@ -2942,18 +2965,23 @@ def _calc_body(
                 if ipl in minor_bodies.MINOR_BODY_ELEMENTS and (
                     check_assist_data_available()
                 ):
-                    lon, lat, dist = _assist_position_at(jd_tt, ipl, iflag, planets)
+                    assist_state = _assist_state_at(jd_tt, ipl)
+                    lon, lat, dist = _assist_position_from_state(
+                        assist_state, jd_tt, iflag, planets
+                    )
 
                     speed_lon = 0.0
                     speed_lat = 0.0
                     speed_dist = 0.0
                     if iflag & FLG_SPEED:
                         dt = 1.0 / 86400.0
-                        lon_prev, lat_prev, dist_prev = _assist_position_at(
-                            jd_tt - dt, ipl, iflag, planets
+                        prev_state = _assist_shift_state(assist_state, jd_tt - dt)
+                        next_state = _assist_shift_state(assist_state, jd_tt + dt)
+                        lon_prev, lat_prev, dist_prev = _assist_position_from_state(
+                            prev_state, jd_tt - dt, iflag, planets
                         )
-                        lon_next, lat_next, dist_next = _assist_position_at(
-                            jd_tt + dt, ipl, iflag, planets
+                        lon_next, lat_next, dist_next = _assist_position_from_state(
+                            next_state, jd_tt + dt, iflag, planets
                         )
                         speed_lon = (lon_next - lon_prev) / (2.0 * dt)
                         speed_lat = (lat_next - lat_prev) / (2.0 * dt)
@@ -3109,6 +3137,10 @@ def _calc_body(
     # Handle standard planets (and type21 asteroids routed through planet pipeline)
     if _spk_type21_target is not None:
         # Type21 asteroid: use the VectorFunction wrapper for Skyfield pipeline
+        from .logging_config import get_logger
+
+        get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
+        _record(ipl, "SPK")
         target = _spk_type21_target
     elif ipl in _PLANET_MAP:
         target_name = _PLANET_MAP[ipl]

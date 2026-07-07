@@ -63,9 +63,11 @@ from __future__ import annotations
 
 import math
 import os
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, Optional, Tuple, List
 
 if TYPE_CHECKING:
@@ -624,6 +626,27 @@ def check_assist_available() -> bool:
 # Cached result of ASSIST data file availability check.
 # None = not checked yet, True/False = cached result.
 _assist_data_available: Optional[bool] = None
+_ASSIST_PROPAGATION_CACHE_MAX = 256
+_assist_propagation_cache: OrderedDict[tuple, "PropagationResult"] = OrderedDict()
+_assist_propagation_cache_lock = RLock()
+_ASSIST_ASTEROID_PERTURBER_NAMES = {
+    "camilla",
+    "ceres",
+    "cybele",
+    "davida",
+    "eunomia",
+    "euphrosyne",
+    "europa",
+    "hygiea",
+    "interamnia",
+    "iris",
+    "juno",
+    "pallas",
+    "psyche",
+    "sylvia",
+    "thisbe",
+    "vesta",
+}
 
 
 def check_assist_data_available() -> bool:
@@ -663,6 +686,8 @@ def reset_assist_data_cache() -> None:
     """
     global _assist_data_available
     _assist_data_available = None
+    with _assist_propagation_cache_lock:
+        _assist_propagation_cache.clear()
 
 
 def get_rebound_version() -> Optional[str]:
@@ -946,6 +971,22 @@ def propagate_orbit_assist(
             "See also: https://assist.readthedocs.io/"
         )
 
+    cache_key = None
+    if (
+        ephem_config is None
+        and not include_non_gravitational
+        and A1 == 0.0
+        and A2 == 0.0
+        and A3 == 0.0
+        and elements.name.lower() not in _ASSIST_ASTEROID_PERTURBER_NAMES
+    ):
+        cache_key = (elements.name, float(jd_start), round(float(jd_end) * 86400.0))
+        with _assist_propagation_cache_lock:
+            cached = _assist_propagation_cache.get(cache_key)
+            if cached is not None:
+                _assist_propagation_cache.move_to_end(cache_key)
+                return cached
+
     # Configure ephemeris paths
     if ephem_config is None:
         ephem_config = AssistEphemConfig()
@@ -1037,7 +1078,7 @@ def propagate_orbit_assist(
         p.vx - sun1.vx, p.vy - sun1.vy, p.vz - sun1.vz
     )
 
-    return PropagationResult(
+    result = PropagationResult(
         x=xh,
         y=yh,
         z=zh,
@@ -1046,6 +1087,13 @@ def propagate_orbit_assist(
         vz=vzh,
         jd_tt=jd_end,
     )
+    if cache_key is not None:
+        with _assist_propagation_cache_lock:
+            _assist_propagation_cache[cache_key] = result
+            _assist_propagation_cache.move_to_end(cache_key)
+            while len(_assist_propagation_cache) > _ASSIST_PROPAGATION_CACHE_MAX:
+                _assist_propagation_cache.popitem(last=False)
+    return result
 
 
 def propagate_trajectory(

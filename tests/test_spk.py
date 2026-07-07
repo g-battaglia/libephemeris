@@ -142,6 +142,59 @@ class TestBuildHorizonsUrl:
         assert "CENTER='@sun'" in url
 
 
+class TestSpkCoverageReuse:
+    """Test cached SPK coverage checks."""
+
+    def test_auto_spk_date_padding_crosses_year_boundary(self):
+        from libephemeris.planets import _pad_iso_date
+
+        assert _pad_iso_date("1900-01-01", -45) == "1899-11-17"
+        assert _pad_iso_date("2100-01-01", 45) == "2100-02-15"
+
+    def test_spk_covers_dates_accepts_covering_kernel(self, monkeypatch):
+        start_jd = spk._date_to_jd("1900-01-01")
+        end_jd = spk._date_to_jd("2100-01-01")
+        monkeypatch.setattr(
+            spk, "get_spk_coverage", lambda _path: (start_jd - 1.0, end_jd + 1.0)
+        )
+
+        assert spk._spk_covers_dates("cached.bsp", "1900-01-01", "2100-01-01")
+
+    def test_spk_covers_dates_rejects_narrow_kernel(self, monkeypatch):
+        start_jd = spk._date_to_jd("1900-01-01")
+        end_jd = spk._date_to_jd("2100-01-01")
+        monkeypatch.setattr(
+            spk, "get_spk_coverage", lambda _path: (start_jd + 2.0, end_jd + 1.0)
+        )
+
+        assert not spk._spk_covers_dates("cached.bsp", "1900-01-01", "2100-01-01")
+
+    def test_download_and_register_redownloads_narrow_cache(self, tmp_path):
+        cached = str(tmp_path / "cached.bsp")
+        overwrites = []
+
+        def fake_download(**kwargs):
+            overwrites.append(kwargs["overwrite"])
+            return cached
+
+        with (
+            patch("libephemeris.spk.download_spk", side_effect=fake_download),
+            patch("libephemeris.spk._spk_covers_dates", return_value=False),
+            patch("libephemeris.spk.register_spk_body") as register,
+        ):
+            out = spk.download_and_register_spk(
+                "2060",
+                CHIRON,
+                "1900-01-01",
+                "2100-01-01",
+                naif_id=NAIF_CHIRON,
+            )
+
+        assert out == cached
+        assert overwrites == [False, True]
+        register.assert_called_once_with(CHIRON, cached, NAIF_CHIRON)
+
+
 class TestSanitizeFilename:
     """Test filename sanitization."""
 

@@ -523,14 +523,18 @@ class TestAssistDataAvailability:
 
     def test_reset_clears_cache(self):
         """reset_assist_data_cache() should allow re-probing."""
+        from libephemeris import rebound_integration
+
         # Prime the cache
         check_assist_data_available()
+        rebound_integration._assist_propagation_cache[("dummy", 0.0, 0)] = None
         # Reset
         reset_assist_data_cache()
         # The next call re-probes (should still return the same value,
         # but the important thing is it doesn't crash)
         result = check_assist_data_available()
         assert isinstance(result, bool)
+        assert rebound_integration._assist_propagation_cache == {}
 
     def test_no_assist_import_returns_false(self):
         """If ASSIST is not importable, should return False."""
