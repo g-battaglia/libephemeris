@@ -317,6 +317,16 @@ own `swe_fixstar` and `swe_fixstar2` likewise disagree. **`fixstar2` is the
 reliable path** (e.g. `29Psc` → 29 Piscium). Proper names and Bayer designations
 resolve identically in both (0.0"). Prefer `fixstar2` for Flamsteed lookups.
 
+**4.7 Numeric star lookups (certified extension).** In `fixstar2`/`fixstar2_ut`/
+`fixstar2_mag`, an all-digit search string (`"21421"`, `"HIP 21421"`, `",21421"`)
+resolves by **Hipparcos number**; the reference API instead treats digits as a
+sequential catalog index (the behaviour the legacy `fixstar` path keeps).
+The HIP lookup is a deliberate extension: Hipparcos identifiers are stable
+across catalog re-orderings while sequential indices are file-order-dependent.
+Callers needing the reference's sequential-index semantics should use the
+legacy `fixstar`. Comma-prefixed nomenclature (`",alTau"`) and every
+non-numeric form resolve identically on both paths.
+
 ### 5. Refraction and horizontal coordinates
 
 **5.1 Atmospheric refraction (`refrac`).** Up to 15" near the horizon; both use
