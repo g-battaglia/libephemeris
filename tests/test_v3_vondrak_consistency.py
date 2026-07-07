@@ -110,7 +110,8 @@ def test_azalt_obliquity_is_vondrak_not_iau2006_at_deep_time():
     """Deep-time: azalt's mean obliquity is Vondrák, several arcsec off obl06."""
     jd_tt = _jd_tt(_jd_deep_bce())
     d_arcsec = (vondrak_mean_obliquity_deg(jd_tt) - _obl06_deg(jd_tt)) * 3600.0
-    # Measured ~5.72"; the pre-fix code would have used the obl06 value here.
+    # Measured ~12.2" at -3000 (Vondrák pole-angle obliquity vs the obl06
+    # extrapolation); the pre-fix code would have used the obl06 value here.
     assert abs(d_arcsec) > 3.0
 
 

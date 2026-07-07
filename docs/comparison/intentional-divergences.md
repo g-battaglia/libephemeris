@@ -159,17 +159,33 @@ no-eclipse instant the obscuration is **0.0** from every entry point
 
 ## 3. Of-date mean obliquity at deep-BCE epochs
 
-For the of-date mean obliquity, libephemeris uses the true angle between the
-Vondrák-2011 of-date equator and ecliptic poles (valid ±200,000 years), rather than
-the IAU 2006 obliquity polynomial (valid only a few centuries from J2000). At
-deep-BCE epochs Swiss Ephemeris reports an obliquity that matches neither model
-exactly — it sits between the rigorous Vondrák pole angle and the IAU 2006
-extrapolation. libephemeris keeps the physically-consistent Vondrák value rather
-than reproducing Swiss's value bit-for-bit. The deviation is bounded and benign,
-and — because obliquity does not affect ecliptic longitude — confined to ecliptic
-latitude:
+For the of-date mean obliquity libephemeris uses the **angle between the Vondrák
+2011 of-date ecliptic pole and equator pole** — the *same two poles* that build
+the precession matrix (`erfa.ltp`/`ltpb`; `sidereal_longterm.precession_matrix`).
+Deriving the obliquity from those poles makes the precession and the
+equator-of-date → ecliptic-of-date rotation **one self-consistent frame**: a
+direction lying in the mean ecliptic of date (the Sun, by definition) reduces to
+~0 ecliptic latitude.
 
-| Year | Swiss obliquity | Vondrák − Swiss | IAU 2006 − Swiss | Sun latitude (lib − Swiss) |
+The reference engine instead reports Vondrák's **direct `ε_A` obliquity series**
+(the published `p_A`/`ε_A` polynomial+periodic terms). That series is a genuine,
+high-quality Vondrák fit — it tracks the IAU 2006 obliquity to < 1 mas near J2000,
+better than the pole angle — but it is a *separate* fit from the pole series, so
+it is not the angle between the pole vectors that define the of-date ecliptic.
+Pairing the direct series with the pole-based precession (which both this library
+and the reference use) tilts the of-date ecliptic away from the pole-defined
+ecliptic by up to ~6.5″ at −3000, which surfaces as a **spurious ecliptic latitude
+on the Sun** of the same size. libephemeris avoids that by taking the obliquity
+from the poles; the reference does not, so its Sun sits ~6″ off its own of-date
+ecliptic at −3000. (The direct series is still available in libephemeris, for
+reference parity and provenance, as `sidereal_longterm.mean_obliquity_series_rad`;
+it is simply not used for any equator↔ecliptic transform.)
+
+The trade is therefore *physical correctness for bit-parity of a non-physical
+value*, and the divergence is bounded, latitude-only, and identically zero in the
+modern era:
+
+| Year | Reference obliquity (`ε_A` series) | pole-angle − `ε_A` | IAU 2006 − `ε_A` | Sun latitude (lib − reference) |
 |------|-----------------|-----------------|------------------|-----------------------------|
 | −3000 | 24.021270° | −6.475″ | +5.718″ | −5.999″ |
 | −1000 | 23.814592° | −1.040″ | +0.285″ | −1.048″ |
@@ -177,11 +193,22 @@ latitude:
 | 2000 | 23.439279° | 0.000″ | 0.000″ | 0.000″ |
 | 3000 | 23.309726° | +0.048″ | +0.010″ | −0.008″ |
 
-The deviation is identically zero in the modern era, sub-arcsecond within recorded
-history, and at −3000 (≤ ~6″ in latitude) already well below the
-ephemeris-generation floor on the planets (e.g. Mars ≈ 600″ at −3000). The of-date
-mean obliquity is taken from ERFA's Vondrák long-term routines
-(`erfa.ltpequ` / `erfa.ltpecl`).
+The pole-angle and the direct series agree to < 0.001″ across 1900–2100
+(identically 0 at J2000), so modern obliquity, positions and house cusps are
+unchanged. Ecliptic **longitude** is essentially unaffected (< 0.03 mas modern; the
+of-date-sidereal-time / ARMC readout shifts ≤ 0.03″ at −3000), and the whole
+deviation is confined to ecliptic latitude. Independently verified with
+pyerfa + astropy: reducing the DE441 Sun through `erfa.ltpb` + the pole angle
+gives |lat| < 1.4″ at every epoch 2000 → −4000 in both backends (vs a ramp to
+~+9″ at −4000 with the direct series); astropy's DE-kernel Sun latitude at J2000
+matches to 0.0001″. At −3000 the ≤ ~6″ latitude divergence is already far below
+the ephemeris-generation floor on the planets (e.g. Mars ≈ 600″ at −3000).
+
+Implementation: `sidereal_longterm.mean_obliquity_rad` returns the angle between
+its own Vondrák `_ecliptic_pole`/`_equator_pole` vectors (identical to
+`erfa.ltpecl`/`erfa.ltpequ` to < 1e-4 mas); `precession_vondrak` and every
+equator↔ecliptic-of-date path (both backends, plus the house cusps) share this one
+realization.
 
 ---
 

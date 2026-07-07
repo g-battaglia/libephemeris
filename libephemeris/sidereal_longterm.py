@@ -40,11 +40,24 @@ while agreeing with IAU 2006 to sub-milliarcsecond near J2000.0. Adopting it:
   blow-up), and
 * leaves modern results **unchanged** (sub-mas agreement near J2000.0).
 
-The of-date mean obliquity is taken directly from the Vondrák obliquity series
-(``PEPOL``/``PEPER`` below); the precession rotation is built from the Vondrák
-ecliptic-pole and equator-pole series (``PQ*`` and ``XY*``). This is the same
-realization used for the planetary positions, so cusps and bodies in one chart
-share a single, self-consistent precession/obliquity frame.
+The precession rotation is built from the Vondrák ecliptic-pole and equator-pole
+series (``PQ*`` and ``XY*``), and the of-date mean obliquity is the **angle
+between those same two poles**, so precession and obliquity are one
+self-consistent realization: a direction lying in the mean ecliptic of date
+(e.g. the Sun) reduces to zero mean-ecliptic latitude, and cusps and bodies in
+one chart share a single frame. See :func:`mean_obliquity_rad`.
+
+Vondrák 2011 also publishes a *direct* obliquity series (the ``p_A``/``ε_A``
+polynomial+periodic terms, transcribed in ``_PEPOL``/``_PEPER`` below and
+evaluated by :func:`mean_obliquity_series_rad`). That direct series is a very
+good obliquity fit on its own (it tracks the IAU 2006 polynomial to < 1 mas near
+J2000, better than the pole angle) and is the of-date obliquity the reference
+engine reports. It is **not** used for the of-date ecliptic rotation, because it
+is a *separate* fit from the pole series: pairing it with the pole-based
+precession matrix tilts the of-date ecliptic away from the pole-defined ecliptic
+by up to ~6.5″ at −3000 (~17.6″ at −5000), which shows up as a spurious ecliptic
+latitude on the Sun. The pole-angle obliquity removes that inconsistency; the
+two realizations agree to < 0.001″ across 1900-2100 (identically 0 at J2000).
 
 How sidereal time is computed (the geometric method)
 ----------------------------------------------------
@@ -206,18 +219,26 @@ _XYPER = (
 # Vondrák series evaluators
 # --------------------------------------------------------------------------
 @lru_cache(maxsize=4096)
-def mean_obliquity_rad(jd_tt: float) -> float:
-    """Of-date mean obliquity of the ecliptic in radians (Vondrák 2011).
+def mean_obliquity_series_rad(jd_tt: float) -> float:
+    """Direct Vondrák 2011 obliquity series (``p_A``/``ε_A``) in radians.
 
-    Long-term-valid replacement for the IAU 2006 obliquity polynomial; this is
-    the single obliquity realization used by both the houses path and the
-    position pipeline.
+    Evaluates the published ``_PEPOL``/``_PEPER`` obliquity polynomial+periodic
+    terms directly. This is an independent Vondrák-2011 fit of the of-date mean
+    obliquity, and it is the value the reference engine reports for the of-date
+    obliquity (it also tracks the IAU 2006 obliquity to < 1 mas near J2000).
+
+    It is retained for provenance and reference-parity comparisons, but is NOT
+    used for the of-date ecliptic rotation: because it is a separate fit from the
+    equator/ecliptic pole series that build the precession matrix, pairing it
+    with that matrix is frame-inconsistent and puts a spurious latitude on the
+    Sun at remote epochs. Use :func:`mean_obliquity_rad` (the pole angle) for any
+    equator↔ecliptic-of-date transform.
 
     Args:
         jd_tt: Julian Date in TT.
 
     Returns:
-        The of-date mean obliquity in radians.
+        The of-date mean obliquity in radians (direct series).
     """
     t = (jd_tt - _J2000) / 36525.0
     q = 0.0
@@ -230,6 +251,43 @@ def mean_obliquity_rad(jd_tt: float) -> float:
         q += poly[1] * w
         w *= t
     return q * _AS2R
+
+
+@lru_cache(maxsize=4096)
+def mean_obliquity_rad(jd_tt: float) -> float:
+    """Of-date mean obliquity of the ecliptic in radians (Vondrák 2011).
+
+    Long-term-valid replacement for the IAU 2006 obliquity polynomial; this is
+    the single obliquity realization used by both the houses path and the
+    position pipeline.
+
+    It is the **angle between the of-date ecliptic pole and equator pole**
+    (:func:`_ecliptic_pole`, :func:`_equator_pole`) — the same two Vondrák pole
+    vectors that build :func:`precession_matrix` (and ``erfa.ltp``/``ltpb`` on the
+    position pipeline). Deriving the obliquity from those poles guarantees the
+    equator-of-date → ecliptic-of-date rotation is frame-consistent with the
+    precession: a direction lying in the mean ecliptic of date reduces to zero
+    mean-ecliptic latitude. Using the independently-fitted direct series
+    (:func:`mean_obliquity_series_rad`) here instead would tilt the of-date
+    ecliptic by up to ~6.5″ at −3000 and put a spurious latitude on the Sun.
+
+    Near J2000 the pole angle and the direct series agree to < 0.001″ (identically
+    0 at J2000), so modern obliquity/positions/houses are unchanged.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        The of-date mean obliquity in radians (pole angle).
+    """
+    ex, ey, ez = _ecliptic_pole(jd_tt)
+    qx, qy, qz = _equator_pole(jd_tt)
+    d = ex * qx + ey * qy + ez * qz
+    if d > 1.0:
+        d = 1.0
+    elif d < -1.0:
+        d = -1.0
+    return math.acos(d)
 
 
 def mean_obliquity_deg(jd_tt: float) -> float:
