@@ -1553,7 +1553,10 @@ def set_delta_t_userdef(acc: Optional[float]) -> None:
     Args:
         acc: Delta T value in days (TT - UT1), or None to clear and resume
              using computed values. The value should be in the same units
-             as returned by deltat() (days, not seconds).
+             as returned by deltat() (days, not seconds). The sentinel
+             DELTAT_AUTOMATIC also clears the override and resumes computed
+             values, mirroring the reference API where passing the sentinel
+             restores automatic Delta T.
 
     Note:
         - To convert from seconds to days, divide by 86400
@@ -1574,8 +1577,16 @@ def set_delta_t_userdef(acc: Optional[float]) -> None:
         >>> get_delta_t_userdef() is None
         True
     """
+    from .constants import DELTAT_AUTOMATIC
+
     global _DELTA_T_USERDEF
-    _DELTA_T_USERDEF = acc
+    # Both None and the DELTAT_AUTOMATIC sentinel request a reset to computed
+    # Delta T. Storing the sentinel literally would pin Delta T to ~0 (its raw
+    # value is a tiny negative number), so treat it as "clear the override".
+    if acc is None or acc == DELTAT_AUTOMATIC:
+        _DELTA_T_USERDEF = None
+    else:
+        _DELTA_T_USERDEF = acc
 
 
 def get_delta_t_userdef() -> Optional[float]:

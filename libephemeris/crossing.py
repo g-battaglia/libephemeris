@@ -349,6 +349,49 @@ def _forward_first_crossing(
     return _brent_find_crossing(get_position_func, x2cross, jd_a, jd_b, tolerance, 100)
 
 
+def _nearest_past_helio_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    tjd: float,
+    jd_newton: float,
+    period_days: float,
+    tolerance: float,
+) -> float:
+    """Nearest strictly-past heliocentric crossing, validating Newton's result.
+
+    Newton-Raphson sized from a single linear guess can converge into the basin
+    of a crossing a whole revolution too far back: near aphelion the instantaneous
+    speed runs well below the mean, so ``diff / speed`` overshoots into the wrong
+    period. Validate ``jd_newton`` by scanning the *interior* of ``(jd_newton,
+    tjd)`` — both endpoints guarded by a small ``margin`` so that a body sitting
+    *at* the target at ``tjd`` (which must resolve a full cycle back) and a
+    just-passed crossing (seconds ago) are both preserved — for a genuine crossing
+    nearer to ``tjd``. If one exists, return it; otherwise keep ``jd_newton``.
+    """
+    margin = max(1.0, 0.01 * period_days)
+    lo = min(jd_newton, tjd) + margin
+    hi = tjd - margin
+    if hi - lo >= margin:
+        try:
+            num_samples = max(40, int((hi - lo) / 15.0))
+            jd_a, jd_b = _find_bracket_for_crossing(
+                get_position_func,
+                x2cross,
+                lo,
+                hi,
+                num_samples=num_samples,
+                # Nearest past crossing: scan from the tjd end and take the first
+                # (most recent) sign change.
+                from_end=True,
+            )
+            return _brent_find_crossing(
+                get_position_func, x2cross, jd_a, jd_b, tolerance, 100
+            )
+        except (Error, RuntimeError):
+            pass
+    return jd_newton
+
+
 def _cross_max_range(planet: int, speed_default: float) -> float:
     """Forward search horizon (days) for a planet's longitude crossing, sized to
     cover at least one orbital period so a target lying behind a slow planet is
@@ -1132,6 +1175,23 @@ def cross_ut(
     }
     speed_default = typical_speeds.get(planet, 0.5)
 
+    # Bodies outside the typical-speed table (e.g. Mean Node ~0.053°/day
+    # retrograde with an ~18.6 yr period, Mean Apogee ~0.111°/day with an
+    # ~8.85 yr period) would otherwise inherit the generic 0.5°/day fallback,
+    # whose implied ~800 day search horizon is far shorter than their real
+    # period — genuine crossings thousands of days out then look like
+    # divergence. For a genuinely slow off-table body, derive a representative
+    # speed and a search horizon (~1.2 periods) from the actual instantaneous
+    # rate at tjdut. Table bodies are left exactly as before, and faster
+    # off-table bodies (whose real period already fits the generic horizon) are
+    # untouched. Sign is handled downstream: the forward scan below tracks the
+    # wrapped longitude regardless of direction, so perpetually-retrograde
+    # bodies work without special-casing.
+    off_table_horizon: float | None = None
+    if planet not in typical_speeds and 1e-6 < abs(speed) < 0.45:
+        speed_default = abs(speed)
+        off_table_horizon = min(1.2 * 360.0 / speed_default, 40000.0)
+
     # Calculate initial guess
     # For forward-only search, always calculate forward angular distance
     diff = (x2cross - lon_start) % 360.0
@@ -1177,6 +1237,12 @@ def cross_ut(
     diff_back = (lon_start - x2cross) % 360.0
     if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(planet, 22.0):
         scan_window = _SYNODIC.get(planet, 800.0) * 1.2
+        if off_table_horizon is not None:
+            # A slow off-table body (e.g. the perpetually-retrograde Mean Node)
+            # can reach the target only after a large fraction of its long
+            # period; widen the forward scan to cover it. The scan early-exits
+            # on the first crossing, so this stays cheap when one lies near.
+            scan_window = max(scan_window, off_table_horizon)
 
         def _delta(jd_time: float) -> float:
             lon_t = calc_ut(jd_time, planet, flags)[0][0]
@@ -1260,6 +1326,10 @@ def cross_ut(
     jd = jd_guess
     station_fallback_triggered = False
     max_range = _cross_max_range(planet, speed_default)
+    if off_table_horizon is not None:
+        # Give the divergence guard and the forward-scan catch-all enough room to
+        # reach a slow off-table body's genuine (far) crossing.
+        max_range = max(max_range, off_table_horizon)
 
     for iteration in range(max_iter):
         try:
@@ -1455,9 +1525,15 @@ def helio_cross_ut(
             diff -= 360.0
         elif diff > -1e-5:
             diff -= 360.0
-        if abs(speed) < 0.0001:
-            speed = speed_default
-        dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
+        # Size the backward guess with the MEAN heliocentric rate, not the
+        # instantaneous speed. Near aphelion the instantaneous speed can run
+        # ~30% below the mean (Mercury ~2.75 vs ~4.09 °/day), which places the
+        # guess a half-revolution too far back and lets Newton converge into the
+        # wrong basin — the crossing a whole revolution earlier. A post-
+        # convergence check (_nearest_past_helio_crossing) still guards the
+        # result, but the mean-rate guess keeps Newton in the right basin.
+        guess_speed = speed_default if speed_default > 1e-9 else 1.0
+        dt_guess = diff / guess_speed  # diff <= 0, guess_speed > 0 -> negative dt
     else:
         # No forward dead-band: a body a hair before (or exactly at) the target
         # legitimately crosses now, and the reference returns that imminent
@@ -1529,6 +1605,17 @@ def helio_cross_ut(
 
         # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
+            if backwards:
+                # Guarantee the nearest strictly-past crossing (Newton may have
+                # landed a whole revolution too far back near aphelion).
+                return _nearest_past_helio_crossing(
+                    get_helio_position,
+                    x2cross,
+                    tjdut,
+                    jd,
+                    360.0 / speed_default if speed_default > 1e-9 else 720.0,
+                    NR_TOLERANCE,
+                )
             return jd
 
         # Update max_iter based on current speed (may change during iteration)
@@ -1639,9 +1726,12 @@ def helio_cross(
             diff -= 360.0
         elif diff > -1e-5:
             diff -= 360.0
-        if abs(speed) < 0.0001:
-            speed = speed_default
-        dt_guess = diff / speed  # diff is negative, speed positive -> negative dt
+        # Size the backward guess with the MEAN heliocentric rate, not the
+        # instantaneous speed (which near aphelion runs well below the mean and
+        # would place the guess a half-revolution too far back). See the UT twin
+        # helio_cross_ut for the full rationale.
+        guess_speed = speed_default if speed_default > 1e-9 else 1.0
+        dt_guess = diff / guess_speed  # diff <= 0, guess_speed > 0 -> negative dt
     else:
         # No forward dead-band: a body a hair before (or exactly at) the target
         # legitimately crosses now, and the reference returns that imminent
@@ -1712,6 +1802,17 @@ def helio_cross(
 
         # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
+            if backwards:
+                # Guarantee the nearest strictly-past crossing (Newton may have
+                # landed a whole revolution too far back near aphelion).
+                return _nearest_past_helio_crossing(
+                    get_helio_position_tt,
+                    x2cross,
+                    tjdet,
+                    jd,
+                    360.0 / speed_default if speed_default > 1e-9 else 720.0,
+                    NR_TOLERANCE,
+                )
             return jd
 
         # Update max_iter based on current speed (may change during iteration)

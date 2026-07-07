@@ -115,6 +115,53 @@ class TestDeltatWithUserdef:
         assert ephem.deltat(jd) == 0.0
 
 
+class TestDeltatUserdefAutomaticResets:
+    """DELTAT_AUTOMATIC must clear the override and resume computed Delta T.
+
+    The sentinel value mirrors the reference API, where passing it restores
+    automatic Delta T. Storing it literally would pin Delta T to its raw value
+    (a tiny negative number, ~-1e-10 days).
+    """
+
+    @pytest.fixture(autouse=True)
+    def reset_delta_t(self):
+        ephem.set_delta_t_userdef(None)
+        yield
+        ephem.set_delta_t_userdef(None)
+
+    @pytest.mark.unit
+    def test_automatic_clears_userdef(self):
+        ephem.set_delta_t_userdef(0.001)
+        assert ephem.get_delta_t_userdef() == 0.001
+        ephem.set_delta_t_userdef(ephem.DELTAT_AUTOMATIC)
+        assert ephem.get_delta_t_userdef() is None
+
+    @pytest.mark.unit
+    def test_deltat_resumes_computed_after_automatic(self):
+        jd = 2451545.0  # J2000
+        computed = ephem.deltat(jd)
+        assert computed == pytest.approx(0.000739, abs=1e-4)
+
+        # Pin a fixed value, then reset via the sentinel.
+        ephem.set_delta_t_userdef(0.005)
+        assert ephem.deltat(jd) == 0.005
+
+        ephem.set_delta_t_userdef(ephem.DELTAT_AUTOMATIC)
+        # Must recover the computed value, NOT the raw sentinel (~-1e-10).
+        assert ephem.deltat(jd) == computed
+        assert ephem.deltat(jd) > 1e-6
+
+    @pytest.mark.unit
+    def test_deltat_ex_resumes_computed_after_automatic(self):
+        jd = 2451545.0
+        computed = ephem.deltat_ex(jd, ephem.FLG_SWIEPH)
+        ephem.set_delta_t_userdef(0.005)
+        assert ephem.deltat_ex(jd, ephem.FLG_SWIEPH) == 0.005
+        ephem.set_delta_t_userdef(ephem.DELTAT_AUTOMATIC)
+        assert ephem.deltat_ex(jd, ephem.FLG_SWIEPH) == computed
+        assert ephem.deltat_ex(jd, ephem.FLG_SWIEPH) > 1e-6
+
+
 class TestDeltatExWithUserdef:
     """Test deltat_ex when user-defined value is set."""
 
