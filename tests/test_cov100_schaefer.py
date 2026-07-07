@@ -251,7 +251,12 @@ def test_calc_zodiacal_brightness_latitude_factor() -> None:
 
 
 def test_calc_total_sky_brightness_with_zodiacal() -> None:
-    """Sun < -12 includes the zodiacal contribution."""
+    """Sun < -12 ramps the zodiacal contribution in (half strength at -15).
+
+    The zodiacal term ramps linearly from 0 at -12 to full at -18 (a step at
+    -12 used to add it all at once, making the sky jump brighter as the Sun
+    sank), so at -15 exactly half the zodiacal brightness is included.
+    """
     b = schaefer.calc_total_sky_brightness(
         sun_altitude_deg=-15.0,
         moon_altitude_deg=-90.0,
@@ -264,7 +269,7 @@ def test_calc_total_sky_brightness_with_zodiacal() -> None:
         schaefer.calc_twilight_brightness(-15.0)
         + 0.0
         + schaefer.calc_airglow_brightness()
-        + schaefer.calc_zodiacal_brightness(0.0, 45.0)
+        + 0.5 * schaefer.calc_zodiacal_brightness(0.0, 45.0)
     )
     assert b == pytest.approx(expected)
 

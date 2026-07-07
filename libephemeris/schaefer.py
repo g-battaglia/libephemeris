@@ -540,11 +540,21 @@ def calc_total_sky_brightness(
     # Airglow (always present, minimum brightness)
     b_airglow = calc_airglow_brightness()
 
-    # Zodiacal light (only visible during astronomical twilight/night)
-    if sun_altitude_deg < -12:
-        b_zodiacal = calc_zodiacal_brightness(ecliptic_latitude_deg, sun_elongation_deg)
+    # Zodiacal light (only visible during astronomical twilight/night). Ramp it
+    # in linearly across astronomical twilight instead of switching on abruptly
+    # at -12: a step there added the full zodiacal term (~100+ nL) at once, so
+    # the total brightness jumped UP as the Sun sank past -12 and the limiting
+    # magnitude briefly decreased in a darkening sky. The contribution is 0 at
+    # the nautical/astronomical boundary (-12) and reaches full strength by -18.
+    if sun_altitude_deg <= -18:
+        zodiacal_fraction = 1.0
+    elif sun_altitude_deg < -12:
+        zodiacal_fraction = (-12.0 - sun_altitude_deg) / 6.0
     else:
-        b_zodiacal = 0.0
+        zodiacal_fraction = 0.0
+    b_zodiacal = zodiacal_fraction * calc_zodiacal_brightness(
+        ecliptic_latitude_deg, sun_elongation_deg
+    )
 
     # Total brightness (sum of all sources)
     return b_twilight + b_moon + b_airglow + b_zodiacal

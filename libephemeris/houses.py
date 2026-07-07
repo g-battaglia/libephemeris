@@ -3580,14 +3580,21 @@ def _gauquelin_cusp_for_sector(
     Returns:
         Ecliptic longitude of the sector cusp (degrees, 0-360).
     """
+    # Intermediate RAMC for this sector
+    intermediate_ramc = (base_ramc + ramc_sign * (90.0 / 9.0) * sector_offset) % 360.0
+
+    # Degenerate obliquity (eps -> 0): the ecliptic coincides with the equator,
+    # so every sector cusp lies on the equator at the intermediate RAMC — the
+    # same value the equatorial-declination branch below returns. Guard the
+    # division by tan(eps) that would otherwise raise ZeroDivisionError.
+    if abs(tan_obliquity) < near_zero:
+        return intermediate_ramc
+
     # Initial pole height: latitude of the great circle pole for this sector fraction
     arc_fraction_deg = ascensional_diff * sector_offset / 9.0
     initial_pole_height = math.degrees(
         math.atan(math.sin(math.radians(arc_fraction_deg)) / tan_obliquity)
     )
-
-    # Intermediate RAMC for this sector
-    intermediate_ramc = (base_ramc + ramc_sign * (90.0 / 9.0) * sector_offset) % 360.0
 
     # Seed estimate: ecliptic point rising at the intermediate RAMC with the initial pole
     cusp = _calc_ascendant(intermediate_ramc, eps, lat, initial_pole_height)

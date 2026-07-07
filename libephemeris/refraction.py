@@ -667,6 +667,11 @@ def calc_dip(
     # with the standard atmosphere used elsewhere in this module.
     krefr = (0.0342 + lapse_rate) / (0.154 * 0.0238)
     t_kelvin = 273.16 + attemp
+    # Non-physical temperature at or below absolute zero (attemp <= -273.16 C):
+    # there is no meaningful atmosphere, and t_kelvin**2 would divide by zero.
+    # Return zero dip, consistent with the obs_T_K <= 0 guard in the ray tracer.
+    if t_kelvin <= 0.0:
+        return 0.0
     d = 1.0 - 1.8480 * krefr * atpress / (t_kelvin * t_kelvin)
     if d < 0.0:
         d = 0.0
