@@ -951,6 +951,47 @@ def _nutation_rate_deg_per_day(jd_tt: float, dt: float = 0.5) -> float:
     return math.degrees(dpsi_next - dpsi_prev) / (2.0 * dt)
 
 
+def _add_of_date_nutation(
+    lon: float, dlon: float, jd_tt: float, iflag: int
+) -> Tuple[float, float]:
+    """Rotate a mean-ecliptic-of-date longitude onto the true ecliptic of date.
+
+    Adds nutation in longitude (Δψ) to ``lon`` and, when FLG_SPEED is set, the
+    nutation-in-longitude rate dΔψ/dt to ``dlon`` -- the same treatment the
+    lunar-node/apse and predicted-planet paths use so every of-date body is
+    reported on the true ecliptic, matching the reference API (which applies Δψ
+    to all bodies uniformly).
+
+    The rotation is skipped -- leaving the mean ecliptic -- for the
+    nutation-free frames: FLG_NONUT, FLG_J2000 (the J2000 ecliptic carries no
+    nutation), and SIDEREAL+EQUATORIAL (rotated to the equator with the mean
+    obliquity, so the longitude must stay mean too). For plain SIDEREAL the Δψ
+    is added here and the true ayanamsha (mean + Δψ) is subtracted downstream,
+    leaving the intrinsic sidereal longitude.
+
+    Args:
+        lon: Ecliptic longitude in degrees (mean ecliptic of date).
+        dlon: Longitude speed in degrees/day.
+        jd_tt: Julian Day in Terrestrial Time.
+        iflag: Calculation flags bitmask.
+
+    Returns:
+        ``(lon, dlon)`` on the true ecliptic of date, or unchanged in a
+        nutation-free frame.
+    """
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    if bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq:
+        return lon, dlon
+
+    from .cache import get_cached_nutation
+
+    dpsi_rad, _ = get_cached_nutation(jd_tt)
+    lon = (lon + math.degrees(dpsi_rad)) % 360.0
+    if iflag & FLG_SPEED:
+        dlon += _nutation_rate_deg_per_day(jd_tt)
+    return lon, dlon
+
+
 def _strict_source_better_than_keplerian(ipl: int) -> bool:
     """Return True if a better-than-Keplerian source is available for ``ipl``.
 
@@ -2891,6 +2932,11 @@ def _calc_body(
                     from .astrometry import _precess_ecliptic
 
                     lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            # Add nutation in longitude (Δψ) to reach the true ecliptic of date,
+            # so the sidereal ayanamsha (mean + Δψ) subtracted below lands on the
+            # intrinsic sidereal longitude and default/EQ output matches the
+            # reference. No-op for J2000 / NONUT / SIDEREAL+EQUATORIAL frames.
+            lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -2956,6 +3002,12 @@ def _calc_body(
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
+        # Add nutation in longitude (Δψ) so the of-date place is on the true
+        # ecliptic (matching the reference API's uniform Δψ), before topocentric
+        # parallax and the sidereal ayanamsha rotation. No-op for J2000 / NONUT /
+        # SIDEREAL+EQUATORIAL frames.
+        lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
+
         # Topocentric parallax first (tropical of-date / J2000), so the
         # sidereal ayanamsha rotation below acts on the topocentric longitude.
         result = (lon, lat, dist, dlon, dlat, ddist)
@@ -2999,6 +3051,10 @@ def _calc_body(
                     from .astrometry import _precess_ecliptic
 
                     lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            # Add nutation in longitude (Δψ) to reach the true ecliptic of date
+            # (see the Uranian heliocentric branch). No-op for J2000 / NONUT /
+            # SIDEREAL+EQUATORIAL frames.
+            lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
             # Apply sidereal correction if requested (not for equatorial output)
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
@@ -3061,6 +3117,12 @@ def _calc_body(
                 from .astrometry import _precess_ecliptic
 
                 lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+        # Add nutation in longitude (Δψ) so the of-date place is on the true
+        # ecliptic (see the Uranian geocentric branch), before topocentric
+        # parallax and the sidereal ayanamsha rotation. No-op for J2000 / NONUT /
+        # SIDEREAL+EQUATORIAL frames.
+        lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
 
         # Topocentric parallax first (tropical of-date / J2000), so the
         # sidereal ayanamsha rotation below acts on the topocentric longitude.

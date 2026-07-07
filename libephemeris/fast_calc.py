@@ -1215,6 +1215,20 @@ def _apparent_icrs_cartesian(
 _VEL_H = 0.0005
 
 
+def _nutation_rate_deg_day(jd_tt: float) -> float:
+    """Central-difference rate of nutation in longitude dΔψ/dt (deg/day).
+
+    Reads the nutation from ``_frame_data`` (the active LEB reader's stored
+    IAU 2006/2000A series, or Skyfield's own model as fallback) so the rate is
+    consistent with the Δψ this backend adds to positions. Shares the ``_VEL_H``
+    step with the sidereal ayanamsha-rate correction in ``_fast_calc_core`` so
+    the two dΔψ/dt terms cancel to the intrinsic rate exactly.
+    """
+    _, dpsi_m, _, _ = _frame_data(jd_tt - _VEL_H)
+    _, dpsi_p, _, _ = _frame_data(jd_tt + _VEL_H)
+    return math.degrees(dpsi_p - dpsi_m) / (2.0 * _VEL_H)
+
+
 def _frame_transform(
     geo: Tuple[float, float, float],
     jd_tt: float,
@@ -1974,6 +1988,25 @@ def _pipeline_helio(
         lon = now_lon
         lat = now_lat
 
+    # Rotate the mean ecliptic of date onto the TRUE ecliptic of date by adding
+    # nutation in longitude (Δψ), so these bodies are reported on the true
+    # ecliptic like every other of-date body and like the reference API (which
+    # applies Δψ uniformly). The velocity picks up the nutation-in-longitude
+    # rate dΔψ/dt so the reported speed stays the exact derivative of the
+    # reported longitude. Skipped for the nutation-free frames: FLG_J2000 (the
+    # J2000 ecliptic carries no nutation), FLG_NONUT (mean ecliptic), and
+    # SIDEREAL+EQUATORIAL (rotated to the equator with the mean obliquity below,
+    # so the longitude must stay mean too). For plain SIDEREAL the true ayanamsha
+    # (mean + Δψ) is subtracted downstream in _fast_calc_core, which then also
+    # removes dΔψ/dt from the speed — the Δψ added here is what makes that
+    # cancellation land on the intrinsic sidereal rate.
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and is_equatorial
+    if not is_j2000 and not (iflag & FLG_NONUT) and not _sid_eq:
+        _, dpsi_rad, _, _ = _frame_data(jd_tt)
+        lon = (lon + math.degrees(dpsi_rad)) % 360.0
+        if iflag & FLG_SPEED:
+            dlon += _nutation_rate_deg_day(jd_tt)
+
     # For EQ+J2000, both backends rotate the J2000 ecliptic to the equator with
     # the J2000 obliquity — a consistent J2000 equatorial frame, same as every
     # other body class. (The reference API instead uses the obliquity of date
@@ -2489,9 +2522,7 @@ def _fast_calc_core(
                 # (intentional) drift.
                 if (_pipeline_a or _xyz_sid_pipea or _pipeline_c) and not _eff_mean_aya:
                     try:
-                        _, _dpsi_m, _, _ = _frame_data(jd_tt - _VEL_H)
-                        _, _dpsi_p, _, _ = _frame_data(jd_tt + _VEL_H)
-                        dlon -= math.degrees(_dpsi_p - _dpsi_m) / (2.0 * _VEL_H)
+                        dlon -= _nutation_rate_deg_day(jd_tt)
                     except (KeyError, ValueError):
                         pass
 

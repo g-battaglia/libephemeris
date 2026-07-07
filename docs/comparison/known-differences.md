@@ -452,10 +452,20 @@ and observer-parameter sensitivity. These remain recorded model differences
 for future physical-model work (planned as a unified visibility engine).
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
-Transpluto are propagated from published Hamburg-School Keplerian elements;
-libephemeris vs pyswisseph differ by up to ~33" (Cupido; most < 25"). There is no
-independent astronomical reference for these fictitious bodies, so neither is
-"truth".
+Transpluto are propagated from published Hamburg-School Keplerian elements. Both
+engines place them on the **true ecliptic of date** — nutation in longitude (Δψ)
+is applied uniformly, exactly as for every other body — so the remaining residual
+is purely the difference in orbital-element sets, not a frame mismatch.
+libephemeris vs the reference API now differ by up to ~25" in longitude
+(most < 20"); Transpluto additionally carries up to ~25" in latitude from its
+inclination/node elements. There is no independent astronomical reference for
+these fictitious bodies, so neither is "truth".
+
+Earlier libephemeris releases left bodies 40–48 on the *mean* ecliptic of date
+(Δψ omitted), a ±17" split against the reference API's uniform nutation
+treatment; that has been corrected in both backends (Skyfield path in
+`planets.py`, LEB fast path in `fast_calc.py` Pipeline C), removing the whole
+nutation term from this residual.
 
 **13.2 Hypothetical bodies with `EQUATORIAL | J2000` (intentional).** For these
 bodies the reference API rotates the J2000 ecliptic to the equator with the

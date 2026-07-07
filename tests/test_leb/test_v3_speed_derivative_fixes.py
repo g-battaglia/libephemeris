@@ -196,6 +196,71 @@ def test_uranian_ofdate_speed_is_derivative_of_position(reader):
 
 
 # ---------------------------------------------------------------------------
+# H1b — Uranian / Transpluto (40-48) carry nutation in longitude (Δψ).
+#
+# Regression against the former class-split: bodies 40-48 were reported on the
+# MEAN ecliptic of date (Δψ omitted, so lon(default) == lon(NONUT)), while every
+# other of-date body — and the reference API, which applies Δψ uniformly — puts
+# them on the TRUE ecliptic. Both backends must now add Δψ to the position and
+# d(Δψ)/dt to the speed.
+# ---------------------------------------------------------------------------
+
+
+def _dpsi_deg(jd_tt: float) -> float:
+    """Nutation in longitude Δψ at ``jd_tt``, in degrees."""
+    from libephemeris.cache import get_cached_nutation
+
+    dpsi_rad, _ = get_cached_nutation(jd_tt)
+    return math.degrees(dpsi_rad)
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("ipl", [C.CUPIDO, C.ISIS])
+def test_uranian_default_minus_nonut_is_nutation(reader, skyfield_backend, ipl):
+    """lon(default) - lon(NONUT) == Δψ for CUPIDO and ISIS on both backends."""
+    for jd in (JD_1900, JD_2000, JD_2008):
+        expected = _dpsi_deg(jd)  # degrees; ~ ±0.005 deg = ±17"
+        for name, get in (
+            ("leb", lambda j, f: _leb(reader, j, ipl, f)),
+            ("sky", lambda j, f: _sky(j, ipl, f)),
+        ):
+            lon_def = get(jd, C.FLG_SPEED)[0]
+            lon_non = get(jd, C.FLG_SPEED | C.FLG_NONUT)[0]
+            dpsi = _wrap180(lon_def - lon_non)
+            # The geo/precession reduction is identical for the two flag sets,
+            # so their difference is exactly the added Δψ (to the nutation-model
+            # agreement between the backends, <0.001").
+            assert abs((dpsi - expected) * 3600.0) < 0.01, (
+                f"{name} ipl={ipl} jd={jd}: default-NONUT="
+                f"{dpsi * 3600.0:.4f}\" vs Δψ={expected * 3600.0:.4f}\""
+            )
+    # And Δψ is a real, non-trivial term at JD_1900 (~17"), not the former ~0.
+    assert abs(_dpsi_deg(JD_1900) * 3600.0) > 5.0
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("ipl", [C.CUPIDO, C.ISIS])
+def test_uranian_default_speed_carries_nutation_rate(reader, skyfield_backend, ipl):
+    """The of-date speed carries d(Δψ)/dt: default vs NONUT dlon differ by the
+    nutation-in-longitude rate, and the two backends agree on it."""
+    jd = JD_1900
+    for get in (
+        lambda j, f: _leb(reader, j, ipl, f),
+        lambda j, f: _sky(j, ipl, f),
+    ):
+        dlon_def = get(jd, C.FLG_SPEED)[3]
+        dlon_non = get(jd, C.FLG_SPEED | C.FLG_NONUT)[3]
+        # d(Δψ)/dt is ~0.05-0.17"/day; the default speed carries it, NONUT does
+        # not, so the difference is a real, non-zero nutation rate.
+        rate = abs(_wrap180(dlon_def - dlon_non)) * 3600.0
+        assert rate > 0.02
+    # Cross-backend agreement on the default of-date speed (< 0.01"/day).
+    a = _leb(reader, jd, ipl, C.FLG_SPEED)[3]
+    s = _sky(jd, ipl, C.FLG_SPEED)[3]
+    assert abs(_wrap180(a - s) * 3600.0) < 0.01
+
+
+# ---------------------------------------------------------------------------
 # H2/H3 — fictitious bodies (49-58) speeds are the derivative of position.
 # ---------------------------------------------------------------------------
 
