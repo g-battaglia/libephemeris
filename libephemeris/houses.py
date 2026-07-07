@@ -5102,8 +5102,9 @@ def _house_pos_pythonic(
             pos_deg = (pos_deg + CUSP_BOUNDARY_OFFSET) % 360.0
 
         if hsys_char == "G":
-            # Gauquelin sectors run clockwise
-            pos_deg = 360.0 - pos_deg
+            # Gauquelin sectors run clockwise. Wrap after reversing so a
+            # pos_deg of 0 gives sector 1.0 instead of 37.0 (out of domain).
+            pos_deg = (360.0 - pos_deg) % 360.0
             hpos = pos_deg / 10.0 + 1.0
         else:
             hpos = pos_deg / 30.0 + 1.0
@@ -5410,7 +5411,12 @@ def _house_pos_pythonic(
             pos_deg = (-pos_deg) % 360.0
         if not is_above_hor:
             pos_deg = (pos_deg + 180.0) % 360.0
-        hpos = ((pos_deg - 90.0) % 360.0) / 30.0 + 1.0
+        pos_deg = (pos_deg - 90.0) % 360.0
+        # Guard the float modulo: a tiny negative argument can round up to
+        # exactly 360.0, which would yield house 13.0 (out of domain).
+        if pos_deg >= 360.0:
+            pos_deg -= 360.0
+        hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "B":
@@ -5591,8 +5597,12 @@ def _house_pos_pythonic(
         else:
             hpos += 3.0 + (pos_arc - 180.0 + acmc) * 3.0 / acmc
         hpos += 0.5
-        if hpos > 12.0:
-            hpos = 1.0
+        # Sripati shifts Porphyry forward by half a house, so hpos lands in
+        # [1.5, 13.5). Wrap only the true overflow (>= 13) back to [1, 1.5),
+        # preserving the fraction; the old `> 12 -> 1.0` collapsed all of
+        # house 12 and the first half of house 1 onto 1.0.
+        if hpos >= 13.0:
+            hpos -= 12.0
         return hpos
 
     elif hsys_char in ("I", "i", "Y"):
