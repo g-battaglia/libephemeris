@@ -222,3 +222,73 @@ class TestInvalidInputHandling:
                 pass
         except (ValueError, TypeError, Exception):
             pass
+
+
+@pytest.mark.unit
+class TestCalcPctrSpeed3Regression:
+    """calc_pctr must honor FLG_SPEED3 (ADV-1).
+
+    calc()/calc_ut() remap FLG_SPEED3 -> FLG_SPEED before computing, but
+    calc_pctr() preserves FLG_SPEED3 in the echoed retflag to match the
+    reference. Previously the velocity block only checked FLG_SPEED, so a
+    FLG_SPEED3 request echoed the speed bit yet returned a zero velocity.
+    """
+
+    def test_speed3_matches_speed_velocity(self):
+        from libephemeris.constants import FLG_SPEED3
+
+        pos3, ret3 = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED3)
+        pos_s, _ = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED)
+        # Velocity slots must be identical to the FLG_SPEED result...
+        assert pos3[3:] == pos_s[3:]
+        # ...and no longer trivially zero.
+        assert any(v != 0.0 for v in pos3[3:])
+
+    def test_speed3_retflag_preserved(self):
+        from libephemeris.constants import FLG_SPEED3
+
+        _, ret3 = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED3)
+        # FLG_SPEED3 (128) is preserved in the retflag, not remapped to
+        # FLG_SPEED (256); the default SWIEPH bit (2) is echoed too.
+        assert ret3 & FLG_SPEED3
+        assert not (ret3 & FLG_SPEED)
+
+    def test_speed3_native_floats(self):
+        from libephemeris.constants import FLG_SPEED3
+
+        pos3, _ = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED3)
+        assert all(type(v) is float for v in pos3)
+
+
+@pytest.mark.unit
+class TestCalcPctrNonFiniteRegression:
+    """calc_pctr must reject non-finite Julian Days (ADV-2).
+
+    A NaN slips through validate_jd_range's ``jd < start`` / ``jd > end``
+    comparisons (all NaN comparisons are False), so calc_pctr() previously
+    returned garbage ``(nan, 0.0, nan, ...)`` instead of raising like
+    calc()/calc_ut(). All non-finite inputs now raise EphemerisRangeError.
+    """
+
+    def test_calc_pctr_nan_raises(self):
+        from libephemeris.exceptions import EphemerisRangeError
+
+        with pytest.raises(EphemerisRangeError):
+            swe.calc_pctr(float("nan"), MOON, MARS, FLG_SPEED)
+
+    def test_calc_pctr_inf_raises(self):
+        from libephemeris.exceptions import EphemerisRangeError
+
+        for jd in (float("inf"), float("-inf")):
+            with pytest.raises(EphemerisRangeError):
+                swe.calc_pctr(jd, MOON, MARS, FLG_SPEED)
+
+    def test_calc_ut_nan_symmetry(self):
+        # calc_ut / calc share validate_jd_range, so they raise the same
+        # EphemerisRangeError for a NaN Julian Day.
+        from libephemeris.exceptions import EphemerisRangeError
+
+        with pytest.raises(EphemerisRangeError):
+            swe.calc_ut(float("nan"), SUN, FLG_SPEED)
+        with pytest.raises(EphemerisRangeError):
+            swe.calc(float("nan"), SUN, FLG_SPEED)

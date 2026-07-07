@@ -914,8 +914,35 @@ def validate_jd_range(
         >>> validate_jd_range(2451545.0)  # J2000.0 - OK for DE440
         >>> validate_jd_range(3000000.0)  # Year ~3501 - raises EphemerisRangeError
     """
+    import math
+
     from . import state
     from .planets import get_planet_name
+
+    # Reject non-finite Julian Days up front. A NaN slips through every
+    # ``jd < start`` / ``jd > end`` comparison below (all comparisons with NaN
+    # are False), so without this guard it would sail past range validation and
+    # surface as garbage output (e.g. calc_pctr) or an opaque "cannot convert
+    # float NaN/infinity to integer" deep in the pipeline. Raise the same
+    # EphemerisRangeError the out-of-range branch uses so callers see one
+    # consistent, informative failure for every non-finite input.
+    if not math.isfinite(jd):
+        body_name = get_planet_name(body_id) if body_id is not None else None
+        prefix = f"{func_name}: " if func_name else ""
+        who = (
+            f"{body_name} (ID {body_id})"
+            if body_name and body_id is not None
+            else "the requested body"
+        )
+        raise EphemerisRangeError(
+            message=(
+                f"{prefix}Cannot calculate {who} for JD {jd}: "
+                f"Julian Day must be a finite number."
+            ),
+            requested_jd=jd,
+            body_id=body_id,
+            body_name=body_name,
+        )
 
     # Ensure ephemeris is loaded so we can get range information
     state.get_planets()

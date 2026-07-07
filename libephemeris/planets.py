@@ -1790,7 +1790,13 @@ def _calc_body_pctr(
     # ~-0.4"/day bias on the Moon's planet-centric speed).
     dt = 7e-5 if ipl == MOON else 1.0 / 86400.0
 
-    if iflag & FLG_SPEED:
+    # Gate the velocity block on either speed bit: calc()/calc_ut() remap
+    # FLG_SPEED3 -> FLG_SPEED in _normalize_calc_flags, but calc_pctr()'s
+    # _plaus_ephemeris_flags deliberately preserves FLG_SPEED3 in the echoed
+    # retflag (to match the reference), so the numerical differentiation must
+    # honor FLG_SPEED3 here too -- otherwise a FLG_SPEED3 request echoed the
+    # speed bit yet returned zero velocity.
+    if iflag & (FLG_SPEED | FLG_SPEED3):
         ts_inner = get_timescale()
         t_prev = ts_inner.tt_jd(t.tt, -dt)
         t_next = ts_inner.tt_jd(t.tt, dt)
@@ -1800,7 +1806,7 @@ def _calc_body_pctr(
         # applied to dlon below). For EQUATORIAL sidereal keep FLG_SIDEREAL so
         # the samples differentiate the reported (mean-equator) position — the
         # certified true-rate convention, matching _calc_body and the LEB path.
-        sample_flags = iflag & ~FLG_SPEED
+        sample_flags = iflag & ~(FLG_SPEED | FLG_SPEED3)
         if not is_equatorial:
             sample_flags &= ~FLG_SIDEREAL
         result_prev, _ = _calc_body_pctr(t_prev, ipl, iplctr, sample_flags)
@@ -1828,7 +1834,7 @@ def _calc_body_pctr(
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
-        if iflag & FLG_SPEED:
+        if iflag & (FLG_SPEED | FLG_SPEED3):
             ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
             ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
             da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
@@ -2459,6 +2465,33 @@ def _apply_sidereal_correction(
     return lon, dlon
 
 
+def _degenerate_origin_result(
+    t, iflag: int
+) -> Tuple[float, float, float, float, float, float]:
+    """Position tuple for a body that sits at its own observation origin.
+
+    Earth observed geocentrically and the Sun observed heliocentrically are
+    both trivially the zero vector, so latitude, distance and every speed are
+    zero and the longitude direction is physically meaningless. For a sidereal
+    ecliptic request the LEB backend (and the reference ephemeris) nevertheless
+    subtract the ayanamsha from the zero longitude, yielding ``(-ayanamsha) %
+    360`` rather than 0. Mirror that here so the Skyfield path agrees with LEB
+    at the origin instead of short-circuiting to a bare zero longitude.
+    Non-sidereal and equatorial requests keep the plain zero vector.
+
+    Args:
+        t: Skyfield Time object (used for ``t.ut1`` when applying the ayanamsha).
+        iflag: Calculation flags (FLG_SIDEREAL / FLG_EQUATORIAL / FLG_SPEED*).
+
+    Returns:
+        The 6-tuple ``(lon, lat, dist, dlon, dlat, ddist)``.
+    """
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+        lon, dlon = _apply_sidereal_correction(0.0, 0.0, t.ut1, iflag)
+        return (lon, 0.0, 0.0, dlon, 0.0, 0.0)
+    return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+
 def _calc_body(
     t, ipl: int, iflag: int
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
@@ -2514,9 +2547,11 @@ def _calc_body(
 
     planets = get_planets()
 
-    # Sun heliocentric = Sun from Sun = trivially (0,0,0)
+    # Sun heliocentric = Sun from Sun = trivially (0,0,0). A sidereal ecliptic
+    # request still subtracts the ayanamsha (see _degenerate_origin_result) so
+    # this Skyfield path agrees with the LEB backend at the origin.
     if ipl == SUN and (iflag & FLG_HELCTR):
-        return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
+        return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
 
     # Remap AST_OFFSET + N to dedicated body IDs for built-in asteroids
     # (idempotent safety net; calc/calc_ut already remap pre-dispatch).
@@ -3494,9 +3529,11 @@ def _calc_body(
 
     # Earth geocentric is trivially (0,0,0,0,0,0) regardless of frame flags.
     # Return early to avoid division-by-zero in J2000/ICRS coordinate transforms
-    # where dist=0 would cause NaN from asin(ze/dist).
+    # where dist=0 would cause NaN from asin(ze/dist). A sidereal ecliptic
+    # request still subtracts the ayanamsha (see _degenerate_origin_result) so
+    # this Skyfield path agrees with the LEB backend at the origin.
     if ipl == EARTH and not (iflag & FLG_HELCTR) and not is_barycentric:
-        return _to_native_floats((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), iflag
+        return _to_native_floats(_degenerate_origin_result(t, iflag)), iflag
 
     if iflag & FLG_HELCTR:
         # Heliocentric
