@@ -5066,19 +5066,18 @@ def _lun_eclipse_when_loc_pythonic(
         )
         tret = list(tret_t)
 
-        # Epoch gate on the geocentric phase extent (lunar phase times are
-        # the same for every observer; only visibility is local). Keep an
-        # eclipse still unfolding at the search epoch (in progress or future)
-        # and skip only one already wholly past (forward) or wholly future
-        # (backward). tret[6]/tret[7] are the outer (penumbral) contacts;
-        # fall back to the maximum when a contact is unresolved.
-        first_contact = tret[6] if tret[6] != 0.0 else tret[0]
-        last_contact = tret[7] if tret[7] != 0.0 else tret[0]
-        if (not backwards and last_contact <= jd_start + 1e-4) or (
-            backwards and first_contact >= jd_start - 1e-4
-        ):
-            search_jd = tret[0] + (-25.0 if backwards else 25.0)
-            continue
+        # Local visible-window bounds for the epoch gate applied after the
+        # rise/set clamping below. Lunar phase times are the same for every
+        # observer, but visibility is local, so the gate must reason about what
+        # is actually observable here - not the geocentric extent. Default to
+        # the geocentric penumbral contacts (used verbatim when the Moon never
+        # crosses the horizon during the eclipse, e.g. a circumpolar Moon);
+        # they are narrowed to moonrise/moonset when the Moon rises or sets
+        # mid-eclipse. Captured now, before the clamping step zeroes the
+        # contacts. Fall back to the maximum when an outer contact is
+        # unresolved.
+        first_visible = tret[6] if tret[6] != 0.0 else tret[0]
+        last_visible = tret[7] if tret[7] != 0.0 else tret[0]
 
         # Visibility bits: a phase counts as visible when the Moon's
         # apparent altitude is positive at its time.
@@ -5133,6 +5132,7 @@ def _lun_eclipse_when_loc_pythonic(
                     if tjdr > tret[i]:
                         tret[i] = 0.0
                 tret[8] = tjdr
+                first_visible = tjdr
                 if tjdr > tret[0]:
                     tjd_max = tjdr
             if tret[6] < tjds < tret[7]:
@@ -5143,8 +5143,23 @@ def _lun_eclipse_when_loc_pythonic(
                     if tjds < tret[i]:
                         tret[i] = 0.0
                 tret[9] = tjds
+                last_visible = tjds
                 if tjds < tret[0]:
                     tjd_max = tjds
+
+        # Epoch gate on the LOCAL visible window (mirrors the solar side, which
+        # gates on the local contacts). Skip this lunation only when its
+        # observable portion is wholly before the epoch (forward) or wholly
+        # after it (backward). Gating on the geocentric contacts instead would
+        # retain an eclipse whose visible part already ended at moonset (or has
+        # not yet begun at moonrise), wedging the sequential search on an
+        # already-finished eclipse. tret[0] is still the geocentric maximum
+        # here, so the search advance matches the other skips.
+        if (not backwards and last_visible <= jd_start + 1e-4) or (
+            backwards and first_visible >= jd_start - 1e-4
+        ):
+            search_jd = tret[0] + (-25.0 if backwards else 25.0)
+            continue
 
         tret[0] = tjd_max
         rc_final, attr_final = _lun_eclipse_how_impl(
@@ -6820,7 +6835,11 @@ def _rise_trans_true_hor_impl(
     # reference's barometric expression; attemp is used verbatim (0 means
     # 0 degrees C, as in the reference - no implicit 15 C default).
     if pressure == 0.0:
-        pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.0) ** 5.255
+        # The base goes negative above ~44.3 km, where a fractional power would
+        # yield a complex number; clamp it to 0 so extreme altitudes give
+        # pressure ~0 (refraction ~0) instead of crashing.
+        base = 1.0 - 0.0065 * altitude / 288.0
+        pressure = 1013.25 * (max(base, 0.0) ** 5.255)
 
     # horizon_altitude is used verbatim (negative values are legitimate:
     # an observer above the surrounding terrain sees below the geometric
@@ -7470,398 +7489,6 @@ def heliacal_ut(
 # Note: heliacal_ut is defined in heliacal.py with the reference-API-compatible
 # API signature (returns 3-tuple). The internal heliacal_ut here returns
 # (jd_event, retflag) and is used by heliacal_ut internally.
-
-
-def heliacal_pheno_ut(
-    jd: float,
-    lat: float,
-    lon: float,
-    altitude: float = 0.0,
-    pressure: float = 1013.25,
-    temperature: float = 15.0,
-    humidity: float = 0.5,
-    body: int = SUN,
-    event_type: int = 1,
-    flags: int = FLG_SWIEPH,
-) -> Tuple[Tuple[float, ...], int]:
-    """
-    Provides data relevant for the calculation of heliacal risings and settings.
-
-    This function calculates detailed phenomena associated with heliacal events,
-    including altitudes, azimuths, arcus visionis, magnitude, visibility times,
-    and other parameters used in heliacal visibility calculations.
-
-    Args:
-        jd: Julian Day (UT) for the calculation
-        lat: Observer latitude in degrees (positive = North, negative = South)
-        lon: Observer longitude in degrees (positive = East, negative = West)
-        altitude: Observer altitude in meters above sea level (default 0)
-        pressure: Atmospheric pressure in mbar/hPa for refraction (default 1013.25)
-        temperature: Temperature in Celsius for refraction (default 15)
-        humidity: Relative humidity 0.0-1.0 for atmospheric extinction (default 0.5)
-        body: Planet/body ID (MERCURY, VENUS, MARS, JUPITER, SATURN, etc.)
-        event_type: Type of heliacal event:
-            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
-            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
-            - EVENING_FIRST (3): First evening visibility (after superior conjunction)
-            - MORNING_LAST (4): Last morning visibility (before superior conjunction)
-        flags: Calculation flags (FLG_SWIEPH, etc.)
-
-    Returns:
-        Tuple containing:
-            - dret: Tuple of 50 floats with heliacal phenomena data:
-                - 0: AltO [deg] topocentric altitude of object (unrefracted)
-                - 1: AppAltO [deg] apparent altitude of object (refracted)
-                - 2: GeoAltO [deg] geocentric altitude of object
-                - 3: AziO [deg] azimuth of object
-                - 4: AltS [deg] topocentric altitude of Sun
-                - 5: AziS [deg] azimuth of Sun
-                - 6: TAVact [deg] actual topocentric arcus visionis
-                - 7: ARCVact [deg] actual (geocentric) arcus visionis
-                - 8: DAZact [deg] actual difference between object's and sun's azimuth
-                - 9: ARCLact [deg] actual longitude difference between object and sun
-                - 10: kact [-] extinction coefficient
-                - 11: minTAV [deg] smallest topocentric arcus visionis
-                - 12: TfirstVR [JDN] first time object is visible, according to VR
-                - 13: TbVR [JDN] optimum time the object is visible, according to VR
-                - 14: TlastVR [JDN] last time object is visible, according to VR
-                - 15: TbYallop [JDN] best time the object is visible, according to Yallop
-                - 16: WMoon [deg] crescent width of Moon
-                - 17: qYal [-] q-test value of Yallop
-                - 18: qCrit [-] q-test criterion of Yallop
-                - 19: ParO [deg] parallax of object
-                - 20: Magn [-] magnitude of object
-                - 21: RiseO [JDN] rise/set time of object
-                - 22: RiseS [JDN] rise/set time of Sun
-                - 23: Lag [JDN] rise/set time of object minus rise/set time of Sun
-                - 24: TvisVR [JDN] visibility duration
-                - 25: LMoon [deg] crescent length of Moon
-                - 26-49: Reserved for future use
-            - retflag: Return flag (flags on success, negative on error)
-
-    Raises:
-        ValueError: If invalid body ID or event_type
-
-    Example:
-        >>> from libephemeris import julday, heliacal_pheno_ut, VENUS, HELIACAL_RISING
-        >>> jd = julday(2024, 1, 1, 0)
-        >>> # Get heliacal phenomena for Venus at Rome
-        >>> dret, flag = heliacal_pheno_ut(jd, 41.9, 12.5, body=VENUS,
-        ...                                 event_type=HELIACAL_RISING)
-        >>> print(f"Object altitude: {dret[0]:.2f}°, Sun altitude: {dret[4]:.2f}°")
-
-    References:
-        - Reference API: heliacal_pheno_ut()
-        - Schoch "Planets in Mesopotamian Astral Science"
-    """
-    import math
-
-    from .constants import (
-        HELIACAL_RISING,
-        HELIACAL_SETTING,
-        EVENING_FIRST,
-        MORNING_LAST,
-    )
-    from .planets import _PLANET_MAP, get_planet_target, pheno_ut
-    from .state import get_planets, get_timescale
-    from skyfield.api import wgs84
-
-    # Validate event type
-    if event_type not in (
-        HELIACAL_RISING,
-        HELIACAL_SETTING,
-        EVENING_FIRST,
-        MORNING_LAST,
-    ):
-        raise ValueError(
-            f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
-            "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
-        )
-
-    # Validate body
-    if body not in _PLANET_MAP:
-        raise ValueError(f"illegal planet number {body}.")
-
-    # Get ephemeris and timescale
-    eph = get_planets()
-    ts = get_timescale()
-
-    # Get celestial bodies
-    target_name = _PLANET_MAP[body]
-    target = get_planet_target(eph, target_name)
-    sun = eph["sun"]
-    earth = eph["earth"]
-
-    # Create observer location
-    observer = wgs84.latlon(lat, lon, altitude)
-
-    # Initialize result array with 50 zeros
-    dret = [0.0] * 50
-
-    # Calculate positions at the given time
-    t = ts.ut1_jd(jd)
-    observer_at = earth + observer
-
-    # Calculate Sun position
-    sun_app = observer_at.at(t).observe(sun).apparent()
-    sun_alt_topo, sun_az, _ = sun_app.altaz()
-    sun_alt_deg = sun_alt_topo.degrees
-    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-    sun_az_deg = (sun_az.degrees + 180.0) % 360.0
-
-    # Calculate body position
-    body_app = observer_at.at(t).observe(target).apparent()
-    body_alt_topo, body_az, body_dist = body_app.altaz()
-    body_alt_deg = body_alt_topo.degrees
-    # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-    body_az_deg = (body_az.degrees + 180.0) % 360.0
-
-    # Get geocentric altitude (without refraction or topocentric correction)
-    body_geo = earth.at(t).observe(target).apparent()
-    body_geo_ra, body_geo_dec, body_geo_dist = body_geo.radec()
-
-    # Calculate geocentric altitude using hour angle
-    # First get the local sidereal time
-    gast = t.gast
-    lst = gast + lon / 15.0  # Local sidereal time in hours
-    ra_hours = body_geo_ra.hours
-    ha = (lst - ra_hours) * 15.0  # Hour angle in degrees
-
-    # Geocentric altitude calculation
-    dec_rad = math.radians(body_geo_dec.degrees)
-    lat_rad = math.radians(lat)
-    ha_rad = math.radians(ha)
-
-    sin_alt = math.sin(lat_rad) * math.sin(dec_rad) + math.cos(lat_rad) * math.cos(
-        dec_rad
-    ) * math.cos(ha_rad)
-    sin_alt = max(-1.0, min(1.0, sin_alt))
-    geo_alt_deg = math.degrees(math.asin(sin_alt))
-
-    # Atmospheric refraction from true altitude, in arcminutes:
-    # R = 1.02 / tan(h + 10.3/(h + 5.11)).  Sæmundsson, Þ. (1986),
-    # "Astronomical Refraction", Sky & Telescope 72, 70; as given in
-    # Meeus (1998), Astronomical Algorithms 2nd ed., ch. 16, eq. 16.4.
-    if body_alt_deg > -1:
-        refraction = 1.02 / math.tan(
-            math.radians(body_alt_deg + 10.3 / (body_alt_deg + 5.11))
-        )
-        refraction /= 60.0  # Convert arcminutes to degrees
-    else:
-        refraction = 0.5  # Near horizon approximation
-
-    # Apparent altitude (with refraction)
-    app_alt_deg = body_alt_deg + refraction
-
-    # Calculate arcus visionis (altitude difference between body and Sun)
-    # Topocentric arcus visionis
-    tav_act = body_alt_deg - sun_alt_deg
-
-    # Geocentric arcus visionis
-    arcv_act = geo_alt_deg - sun_alt_deg
-
-    # Azimuth difference
-    daz_act = body_az_deg - sun_az_deg
-    # Normalize to -180 to +180
-    while daz_act > 180:
-        daz_act -= 360
-    while daz_act < -180:
-        daz_act += 360
-
-    # Get elongation (longitude difference) from Sun using pheno
-    try:
-        pheno = pheno_ut(jd, body, flags)
-        elongation = pheno[2]  # Elongation
-        magnitude = pheno[4]  # Visual magnitude
-        phase_angle = pheno[1]  # Phase angle
-    except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
-        _reraise_if_leb_range_error(_exc)
-        # Calculate elongation manually
-        sun_geo = earth.at(t).observe(sun).apparent()
-        elongation = body_geo.separation_from(sun_geo).degrees
-        magnitude = 0.0
-        phase_angle = 0.0
-
-    # Calculate extinction coefficient (simplified Schaefer model)
-    # k = k_rayleigh + k_aerosol + k_ozone
-    # Simplified: k increases with humidity and decreases with altitude
-    # Typical values: 0.2 (excellent) to 0.5 (poor)
-    pressure_factor = pressure / 1013.25
-    humidity_factor = 1.0 + 0.5 * humidity
-    altitude_factor = math.exp(-altitude / 8500.0)  # Scale height ~8.5 km
-    k_act = 0.25 * pressure_factor * humidity_factor * altitude_factor
-
-    # Minimum topocentric arcus visionis (simplified)
-    # Depends on magnitude and atmospheric conditions
-    # Brighter objects need less arcus visionis
-    if magnitude < 0:
-        min_tav = 5.0 + 0.5 * magnitude  # Bright objects
-    elif magnitude < 2:
-        min_tav = 6.0 + magnitude * 0.5
-    else:
-        min_tav = 7.0 + magnitude * 0.7
-
-    # Parallax of object (in degrees)
-    # Parallax = arcsin(Earth_radius / distance)
-    # Earth radius ~ 6371 km, distance in AU (1 AU ~ 149,597,870.7 km)
-    earth_radius_au = 6371.0 / 149597870.7
-    if body_geo_dist.au > 0:
-        parallax = math.degrees(math.asin(earth_radius_au / body_geo_dist.au))
-    else:
-        parallax = 0.0
-
-    # Calculate rise/set times for object and Sun
-    # For morning events, we look for rise times; for evening, set times
-    is_morning = event_type in (HELIACAL_RISING, MORNING_LAST)
-
-    # Use a simple estimate for rise/set time based on altitude
-    # Rise/set occurs when altitude crosses 0 (corrected for refraction)
-    # Time rate: approximately 1 degree of altitude per 4 minutes (at mid-latitudes)
-    rise_set_correction = -0.833  # Standard refraction + semidiameter for Sun
-
-    # Estimate object rise/set time
-    if body_alt_deg != 0:
-        # Rough estimate: time to rise/set based on altitude rate
-        # Altitude rate ~ 15° cos(lat) per hour at the horizon
-        alt_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-        if alt_rate > 0:
-            if is_morning:
-                # Object rising: how long until it crosses horizon
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd - time_to_horizon / 24.0
-            else:
-                # Object setting
-                time_to_horizon = (
-                    body_alt_deg - rise_set_correction
-                ) / alt_rate  # hours
-                rise_o = jd + time_to_horizon / 24.0
-        else:
-            rise_o = jd
-    else:
-        rise_o = jd
-
-    # Estimate Sun rise/set time
-    if sun_alt_deg != 0:
-        alt_rate = 15.0 * math.cos(lat_rad)
-        if alt_rate > 0:
-            if is_morning:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd - time_to_horizon / 24.0
-            else:
-                time_to_horizon = (sun_alt_deg - rise_set_correction) / alt_rate
-                rise_s = jd + time_to_horizon / 24.0
-        else:
-            rise_s = jd
-    else:
-        rise_s = jd
-
-    # Lag time (object rise - Sun rise)
-    lag = rise_o - rise_s
-
-    # Visibility duration estimate (simplified)
-    # Based on how long the object is above horizon while Sun is below
-    if sun_alt_deg < -6 and body_alt_deg > 0:
-        # Object visible during civil twilight or darker
-        # Estimate visibility window
-        tvis_vr = abs(sun_alt_deg + 6) / 15.0 / 24.0  # days
-    else:
-        tvis_vr = 0.0
-
-    # For Moon-specific calculations
-    w_moon = 0.0  # Crescent width
-    l_moon = 0.0  # Crescent length
-    illumination = 0.0
-
-    if body == MOON:
-        # Calculate Moon phase and crescent geometry
-        try:
-            moon_pheno = pheno_ut(jd, MOON, flags)
-            phase = moon_pheno[0]  # Phase 0-1
-            illumination = phase * 100.0  # Percentage
-
-            # Crescent width approximation (Danjon's formula)
-            # W = 15 * (1 - cos(phase_angle/2)) arcminutes (approximate)
-            if len(moon_pheno) > 1:
-                pa_rad = math.radians(moon_pheno[1])  # Phase angle in radians
-                w_moon = 15.0 * (1 - math.cos(pa_rad / 2)) / 60.0  # In degrees
-
-            # Crescent length (semicircle approximation)
-            # L ≈ pi * D / 2 where D is diameter
-            moon_diameter = 0.5  # Approximately 0.5 degrees
-            l_moon = math.pi * moon_diameter / 2
-        except (KeyError, ValueError, ArithmeticError, IndexError) as _exc:
-            _reraise_if_leb_range_error(_exc)
-            pass
-
-    # Yallop q-test (for lunar crescent visibility)
-    # q = (ARCV - (11.8371 - 6.3226*W + 0.7319*W^2 - 0.1018*W^3)) / 10
-    # Simplified version
-    if body == MOON:
-        w = w_moon * 60.0  # Convert to arcminutes for formula
-        q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
-        q_yallop = (arcv_act - q_criterion) / 10.0
-        q_crit = q_criterion
-    else:
-        q_yallop = 0.0
-        q_crit = 0.0
-
-    # First, best, and last visibility times (VR = visibility rule)
-    # Simplified: based on Sun altitude thresholds
-    # First visibility: Sun at about -10°
-    # Best visibility: Sun at about -8°
-    # Last visibility: Sun at about -6°
-    sun_rate = 15.0 * math.cos(lat_rad)  # degrees per hour
-    if sun_rate > 0:
-        if is_morning:
-            t_first_vr = jd + (sun_alt_deg + 10) / sun_rate / 24.0
-            t_best_vr = jd + (sun_alt_deg + 8) / sun_rate / 24.0
-            t_last_vr = jd + (sun_alt_deg + 6) / sun_rate / 24.0
-        else:
-            t_first_vr = jd + (-6 - sun_alt_deg) / sun_rate / 24.0
-            t_best_vr = jd + (-8 - sun_alt_deg) / sun_rate / 24.0
-            t_last_vr = jd + (-10 - sun_alt_deg) / sun_rate / 24.0
-    else:
-        t_first_vr = jd
-        t_best_vr = jd
-        t_last_vr = jd
-
-    # Best time according to Yallop (for Moon)
-    t_b_yallop = t_best_vr  # Use same as best VR for simplicity
-
-    # Fill in the result array
-    dret[0] = body_alt_deg  # AltO - topocentric altitude (unrefracted)
-    dret[1] = app_alt_deg  # AppAltO - apparent altitude (refracted)
-    dret[2] = geo_alt_deg  # GeoAltO - geocentric altitude
-    dret[3] = body_az_deg  # AziO - azimuth of object
-    dret[4] = sun_alt_deg  # AltS - topocentric altitude of Sun
-    dret[5] = sun_az_deg  # AziS - azimuth of Sun
-    dret[6] = tav_act  # TAVact - topocentric arcus visionis
-    dret[7] = arcv_act  # ARCVact - geocentric arcus visionis
-    dret[8] = daz_act  # DAZact - azimuth difference
-    dret[9] = elongation  # ARCLact - elongation from Sun
-    dret[10] = k_act  # kact - extinction coefficient
-    dret[11] = min_tav  # minTAV - minimum topocentric arcus visionis
-    dret[12] = t_first_vr  # TfirstVR - first visibility time
-    dret[13] = t_best_vr  # TbVR - best visibility time
-    dret[14] = t_last_vr  # TlastVR - last visibility time
-    dret[15] = t_b_yallop  # TbYallop - best time according to Yallop
-    dret[16] = w_moon  # WMoon - crescent width
-    dret[17] = q_yallop  # qYal - Yallop q-test value
-    dret[18] = q_crit  # qCrit - Yallop criterion
-    dret[19] = parallax  # ParO - parallax of object
-    dret[20] = magnitude  # Magn - magnitude
-    dret[21] = rise_o  # RiseO - rise/set time of object
-    dret[22] = rise_s  # RiseS - rise/set time of Sun
-    dret[23] = lag  # Lag - time difference
-    dret[24] = tvis_vr  # TvisVR - visibility duration
-    dret[25] = l_moon  # LMoon - crescent length
-    dret[26] = phase_angle  # CVAact (using phase angle)
-    dret[27] = illumination  # Illum - illumination percentage
-    # dret[28] onwards are reserved, already 0.0
-
-    return tuple(dret), flags
 
 
 # =============================================================================
