@@ -722,43 +722,50 @@ def houses(
         math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
         + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
     )
-    asc_rad = math.atan2(num, den)
-    asc = math.degrees(asc_rad)
-    asc = asc % 360.0
+    if abs(num) < 1e-12 and abs(den) < 1e-12:
+        # Ecliptic exactly tangent to the horizon (|lat| == 90 - eps with the
+        # equinoctial colure on the meridian): the rising point degenerates and
+        # atan2(0, 0) is float noise. The reference API pins the ascendant to
+        # the east point, ARMC + 90.
+        asc = (armc_deg + 90.0) % 360.0
+    else:
+        asc_rad = math.atan2(num, den)
+        asc = math.degrees(asc_rad)
+        asc = asc % 360.0
 
-    # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
-    # We check Azimuth relative to the TRUE ARMC (armc_deg)
+        # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
+        # We check Azimuth relative to the TRUE ARMC (armc_deg)
 
-    asc_r = math.radians(asc)
-    eps_r = math.radians(eps)
+        asc_r = math.radians(asc)
+        eps_r = math.radians(eps)
 
-    # RA
-    y = math.cos(eps_r) * math.sin(asc_r)
-    x = math.cos(asc_r)
-    ra_r = math.atan2(y, x)
-    ra = math.degrees(ra_r) % 360.0
+        # RA
+        y = math.cos(eps_r) * math.sin(asc_r)
+        x = math.cos(asc_r)
+        ra_r = math.atan2(y, x)
+        ra = math.degrees(ra_r) % 360.0
 
-    # Dec
-    dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
+        # Dec
+        dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
 
-    # Hour Angle using TRUE ARMC
-    h_deg = (armc_deg - ra + 360.0) % 360.0
-    h_r = math.radians(h_deg)
+        # Hour Angle using TRUE ARMC
+        h_deg = (armc_deg - ra + 360.0) % 360.0
+        h_r = math.radians(h_deg)
 
-    # Azimuth
-    # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
-    lat_r = math.radians(lat)
+        # Azimuth
+        # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
+        lat_r = math.radians(lat)
 
-    num_az = math.sin(h_r)
-    den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
-    az_r = math.atan2(num_az, den_az)
-    az = math.degrees(az_r)
-    az = (az + 180.0) % 360.0
+        num_az = math.sin(h_r)
+        den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
+        az_r = math.atan2(num_az, den_az)
+        az = math.degrees(az_r)
+        az = (az + 180.0) % 360.0
 
-    # Check if H is West (0-180). If so, Asc is Setting (Descendant).
-    # We want Rising.
-    if 0.0 < h_deg < 180.0:
-        asc = (asc + 180.0) % 360.0
+        # Check if H is West (0-180). If so, Asc is Setting (Descendant).
+        # We want Rising.
+        if 0.0 < h_deg < 180.0:
+            asc = (asc + 180.0) % 360.0
 
     # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
     if asc >= 360.0 or (360.0 - asc) < 1e-10:
@@ -1297,42 +1304,49 @@ def houses_armc(
         math.sin(math.radians(armc_deg)) * math.cos(math.radians(eps))
         + math.tan(math.radians(lat)) * math.sin(math.radians(eps))
     )
-    asc_rad = math.atan2(num, den)
-    asc = math.degrees(asc_rad)
-    asc = asc % 360.0
+    if abs(num) < 1e-12 and abs(den) < 1e-12:
+        # Ecliptic exactly tangent to the horizon (|lat| == 90 - eps with the
+        # equinoctial colure on the meridian): the rising point degenerates and
+        # atan2(0, 0) is float noise. The reference API pins the ascendant to
+        # the east point, ARMC + 90.
+        asc = (armc_deg + 90.0) % 360.0
+    else:
+        asc_rad = math.atan2(num, den)
+        asc = math.degrees(asc_rad)
+        asc = asc % 360.0
 
-    # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
-    # We check Azimuth relative to the TRUE ARMC (armc_deg)
-    asc_r = math.radians(asc)
-    eps_r = math.radians(eps)
+        # Ensure Ascendant is on the Eastern Horizon (Azimuth in [0, 180])
+        # We check Azimuth relative to the TRUE ARMC (armc_deg)
+        asc_r = math.radians(asc)
+        eps_r = math.radians(eps)
 
-    # RA
-    y = math.cos(eps_r) * math.sin(asc_r)
-    x = math.cos(asc_r)
-    ra_r = math.atan2(y, x)
-    ra = math.degrees(ra_r) % 360.0
+        # RA
+        y = math.cos(eps_r) * math.sin(asc_r)
+        x = math.cos(asc_r)
+        ra_r = math.atan2(y, x)
+        ra = math.degrees(ra_r) % 360.0
 
-    # Dec
-    dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
+        # Dec
+        dec_r = math.asin(math.sin(eps_r) * math.sin(asc_r))
 
-    # Hour Angle using TRUE ARMC
-    h_deg = (armc_deg - ra + 360.0) % 360.0
-    h_r = math.radians(h_deg)
+        # Hour Angle using TRUE ARMC
+        h_deg = (armc_deg - ra + 360.0) % 360.0
+        h_r = math.radians(h_deg)
 
-    # Azimuth
-    # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
-    lat_r = math.radians(lat)
+        # Azimuth
+        # tan(Az) = sin(H) / (sin(lat)cos(H) - cos(lat)tan(Dec))
+        lat_r = math.radians(lat)
 
-    num_az = math.sin(h_r)
-    den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
-    az_r = math.atan2(num_az, den_az)
-    az = math.degrees(az_r)
-    az = (az + 180.0) % 360.0
+        num_az = math.sin(h_r)
+        den_az = math.sin(lat_r) * math.cos(h_r) - math.cos(lat_r) * math.tan(dec_r)
+        az_r = math.atan2(num_az, den_az)
+        az = math.degrees(az_r)
+        az = (az + 180.0) % 360.0
 
-    # Check if H is West (0-180). If so, Asc is Setting (Descendant).
-    # We want Rising.
-    if 0.0 < h_deg < 180.0:
-        asc = (asc + 180.0) % 360.0
+        # Check if H is West (0-180). If so, Asc is Setting (Descendant).
+        # We want Rising.
+        if 0.0 < h_deg < 180.0:
+            asc = (asc + 180.0) % 360.0
 
     # Ensure ASC is in [0, 360) range (handle floating-point near-360 values)
     if asc >= 360.0 or (360.0 - asc) < 1e-10:
