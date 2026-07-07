@@ -25,6 +25,8 @@ from libephemeris.constants import (
     MEAN_NODE,
     FLG_SWIEPH,
     FLG_SPEED,
+    FLG_HELCTR,
+    FLG_BARYCTR,
 )
 
 
@@ -172,6 +174,55 @@ class TestSpeedConsistencyDistance:
         tol = 1e-4
         assert returned_speed == pytest.approx(num_speed, abs=tol), (
             f"Body {body}: dist speed returned {returned_speed}, numerical {num_speed}"
+        )
+
+
+class TestHelioBarySpeedIsExactDerivative:
+    """Heliocentric/barycentric longitude speed must be the true derivative
+    of the reported heliocentric/barycentric longitude.
+
+    Regression for the light-time retarded-epoch quantization bug: the
+    Skyfield backend built the retarded epoch as ``tdb_jd(t.tdb - light_time)``,
+    collapsing whole+fraction into one float64 (~5.5e-10 d ULP at JD ~2.46e6).
+    The velocity central difference re-evaluates that block at t ± 1 s, so the
+    per-sample quantization divided by 2·dt surfaced as a spurious HELCTR/
+    BARYCTR speed bias that grew with the body's motion — up to ~0.28"/day for
+    Mercury near perihelion (2024). The geocentric path (Skyfield's own
+    ``.apparent()`` light-time, two-part time preserved) was never affected.
+    The tolerance here (0.02"/day) is ~14x tighter than the pre-fix error and
+    would have failed on the buggy code; the reported speed now agrees with a
+    coarse (h=0.02 d) central difference of the reported position, matching the
+    LEB backend.
+    """
+
+    # Fast movers where the bug was largest, at the two reference epochs.
+    BODIES = [MERCURY, VENUS, MARS]
+    DATES = [2451545.0, 2460310.5]  # 2000-01-01.5, 2024-06-29.0
+    H = 0.02  # days — coarse, well-conditioned central-difference step
+    TOL_ARCSEC = 0.02  # arcsec/day
+
+    def _reported_lon_deriv(self, body, jd, frame):
+        pos, _ = swe.calc_ut(jd, body, frame | FLG_SPEED)
+        reported = pos[3]
+        lon_p, _ = swe.calc_ut(jd + self.H, body, frame)
+        lon_m, _ = swe.calc_ut(jd - self.H, body, frame)
+        diff = (lon_p[0] - lon_m[0]) % 360.0
+        if diff > 180.0:
+            diff -= 360.0
+        numerical = diff / (2 * self.H)
+        return reported, numerical
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body", BODIES)
+    @pytest.mark.parametrize("jd", DATES)
+    @pytest.mark.parametrize("frame", [FLG_HELCTR, FLG_BARYCTR])
+    def test_speed_matches_position_derivative(self, body, jd, frame):
+        reported, numerical = self._reported_lon_deriv(body, jd, frame)
+        err_arcsec = abs(reported - numerical) * 3600.0
+        assert err_arcsec < self.TOL_ARCSEC, (
+            f"body={body} jd={jd} frame={frame:#x}: reported speed "
+            f"{reported} deg/day differs from position derivative "
+            f"{numerical} deg/day by {err_arcsec:.4f}\"/day"
         )
 
 

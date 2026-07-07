@@ -3587,7 +3587,21 @@ def _calc_body(
                 dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
                 light_time = dist / C_AU_PER_DAY
                 ts_lt = get_timescale()
-                _tgt_ret = target.at(ts_lt.tdb_jd(t.tdb - light_time))
+                # Retarded epoch as a two-part JD: subtract the light time from
+                # the fractional part and keep t.whole intact. Collapsing
+                # t.tdb - light_time into a single float64 quantizes the retarded
+                # instant to the JD ULP (~5.5e-10 d at JD ~2.46e6). The velocity
+                # central difference re-evaluates this block at t ± dt (dt = 1 s),
+                # so that per-sample quantization is divided by 2·dt and shows up
+                # as a spurious HELCTR/BARYCTR speed bias that grows with the
+                # body's motion (up to ~0.28"/day for Mercury near perihelion).
+                # The two-part form preserves the exact ±dt spacing so the
+                # reported speed is the true derivative of the reported position,
+                # matching the LEB backend. (Same ULP hazard the sample-time
+                # construction above guards against for t ± dt.)
+                _tgt_ret = target.at(
+                    ts_lt.tdb_jd(t.whole, t.tdb_fraction - light_time)
+                )
                 p = _tgt_ret.position.au - _obs_pos_lt
                 v = _tgt_ret.velocity.au_per_d - _obs_vel_lt
 
