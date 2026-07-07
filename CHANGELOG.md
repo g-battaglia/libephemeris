@@ -113,6 +113,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LEB readers raise clean errors** on a closed reader and on corrupted LEB2
   segment metadata, so the LEB→Skyfield fallback degrades gracefully instead of
   crashing.
+- **The of-date obliquity is the Vondrák pole-angle**, consistent with the
+  precession the pipeline already uses, so the Sun's of-date ecliptic latitude
+  is physical (<1.4") at all epochs instead of drifting to +6" at −3000 (a
+  certified divergence from the reference API at deep-BCE dates; modern output
+  is bit-identical). See `docs/comparison/intentional-divergences.md` §3.
+- **`calc_pctr` honours `FLG_SPEED3`**, rejects a non-finite Julian Day with
+  `EphemerisRangeError` instead of returning NaN, and origin-point bodies
+  (geocentric Earth, heliocentric Sun) under `FLG_SIDEREAL` agree across
+  backends.
+- **Heliocentric/barycentric positions agree across backends to <0.00001"**
+  for all planets: the LEB path applied the barycentre→centre offset at the
+  observation epoch instead of the light-time retarded epoch, disagreeing with
+  the Skyfield path by ~0.009" for Pluto.
 - **Gravitational deflection is skipped when the observer sits at the
   deflecting body itself.** The far-field deflection formula is singular for
   an observer inside the deflector: `calc_pctr` positions observed from
