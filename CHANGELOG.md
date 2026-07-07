@@ -59,6 +59,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ULP-safe two-part time step (the Moon's speed carried a −0.4"/day float64
   quantisation bias). Residual |reported speed − derivative of reported
   position| is now ≤0.001"/day geocentric, ≤0.03"/day topocentric.
+- **Node, apsis and hypothetical-body speeds are the true derivative of the
+  reported position on the LEB fast path.** True-node/osculating-apogee speeds
+  now use the same per-body smoothing window as the Skyfield path (was up to
+  3.4"/day apart); J2000 speeds include the equinox drift; of-date speeds
+  include the nutation rate; the true-node distance-speed derives from the
+  osculating radius actually reported (was 17% of the true value, contaminating
+  XYZ velocity); the mean-apogee latitude-speed follows the reported
+  3-harmonic model. Hypothetical bodies precess their velocity with the
+  position and pick up the ayanamsha-drift and nutation-rate terms; Vulcan and
+  Waldemath no longer truncate their speed sampling (38–58"/day heliocentric
+  error); `FLG_TOPOCTR` on hypothetical bodies applies real parallax instead of
+  being silently ignored.
+- **Heliocentric and barycentric velocities are the true derivative of the
+  reported position.** `calc_pctr`/`FLG_HELCTR`/`FLG_BARYCTR` built the
+  light-time retarded epoch from a collapsed one-part time, quantising it to
+  the Julian-Date ULP and biasing the speed in proportion to the body's motion
+  (up to −0.28"/day for Mercury near perihelion); the retarded epoch is now
+  two-part. Deflectors are also evaluated at each velocity sample epoch, so
+  slow targets within ~2° of the Sun no longer carry a ~0.2"/day frozen-
+  deflector bias.
+- **The Horizons backend uses the same speed conventions as the analytic
+  model** (no spurious general-precession subtraction in J2000, no double
+  subtraction under sidereal+J2000, and the of-date equinox motion the
+  instantaneous-matrix rotation had been dropping entirely).
+- **`set_precision_tier()` invalidates the LEB reader**, so switching tier at
+  runtime no longer keeps serving the previous tier's file (a base-tier config
+  had returned out-of-range historical dates from stale medium data).
+- **The strict-precision gate consults local ASSIST directly** instead of only
+  reaching it as a side effect of a network download attempt; an out-of-coverage
+  epoch for a registered kernel with ASSIST available is now served (and the
+  error message, when it does fire, names the kernel's coverage instead of
+  telling you to register an already-registered SPK).
+- **Backward heliocentric crossings no longer skip a whole revolution** near a
+  planet's aphelion, `set_delta_t_userdef(DELTAT_AUTOMATIC)` restores the
+  computed ΔT instead of pinning it to ~0, and `cross_ut` finds crossings for
+  slow off-table bodies (Mean Node, Mean Apogee) instead of reporting search
+  divergence.
+- **The pre-1972 TAI-UTC table had two misdated rows** (the 1965-07 and 1965-09
+  steps), which over-counted ΔT by 0.1 s across mid-1965; TAI-UTC now matches
+  the canonical IERS/ERFA table to 0 s across 1961–1971.
+- **Fixed-star name resolution, speed frames and deflection.** `fixstar2`
+  resolves the canonical `,nomenclature` form; star speeds include the
+  frame-rotation rate under `FLG_EQUATORIAL`/`FLG_NONUT` (was off by up to
+  1.3"/day); `batch_fixstars_ut` resolves the same star with and without
+  `FLG_TOPOCTR`; `FLG_NOABERR` alone no longer also drops gravitational
+  deflection.
+- **Minor-body Keplerian fallback is continuous across epoch seams** (the
+  curated base entry now joins the cross-fade instead of stepping ~400"),
+  provisional and cometary designations are no longer parsed as asteroid
+  numbers, and SPK cache lookups use the same filename sanitiser as the
+  downloader (ending redundant re-downloads).
+- **LEB readers raise clean errors** on a closed reader and on corrupted LEB2
+  segment metadata, so the LEB→Skyfield fallback degrades gracefully instead of
+  crashing.
 - **Gravitational deflection is skipped when the observer sits at the
   deflecting body itself.** The far-field deflection formula is singular for
   an observer inside the deflector: `calc_pctr` positions observed from
