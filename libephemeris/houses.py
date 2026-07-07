@@ -4820,7 +4820,7 @@ def _fix_asc_polar(asc: float, armc: float, eps: float, geolat: float) -> float:
     Beyond the polar circle the ecliptic-longitude formula for the
     ascendant can land on the western half of the horizon (a 180 deg / six
     house error). The reference corrects this with a simple meridian-altitude
-    test; this is a 1:1 port of ``fix_asc_polar`` in the reference API.
+    test; this reproduces that correction's behaviour.
 
     Args:
         asc: Raw ascendant longitude in degrees.
@@ -4843,8 +4843,9 @@ def _fix_asc_polar(asc: float, armc: float, eps: float, geolat: float) -> float:
 def _cotrans_lonlat(lon: float, lat: float, eps_deg: float) -> Tuple[float, float]:
     """Rotate spherical coordinates about the x-axis by ``eps_deg`` degrees.
 
-    Faithful port of the reference ``swe_cotrans``: converts between two
-    reference planes (e.g. ecliptic <-> equator, or equator <-> horizon).
+    Matches the reference API's coordinate-rotation behaviour: converts
+    between two reference planes (e.g. ecliptic <-> equator, or equator
+    <-> horizon).
 
     Args:
         lon: Longitude in degrees.
@@ -5362,13 +5363,13 @@ def _house_pos_pythonic(
         # from 0 (on the meridian) to the full geographic latitude (on the
         # horizon). The body's house line is found by a binary search that
         # adjusts the pole height until the body lies on the resulting
-        # position circle. 1:1 port of the reference API's 'T' branch.
+        # position circle. Behaviour matches the reference API's 'T' branch.
         fh = geolat
         if fh > 89.999:
             fh = 89.999
         if fh < -89.999:
             fh = -89.999
-        mdd = md_upper % 360.0
+        merid_dist = md_upper % 360.0
         de = dec
         if de > 90.0 - _NEAR_ZERO:
             de = 90.0 - _NEAR_ZERO
@@ -5376,17 +5377,17 @@ def _house_pos_pythonic(
             de = -90.0 + _NEAR_ZERO
         sinad = _tand(de) * _tand(fh)
         sinad = max(-1.0, min(1.0, sinad))
-        a = sinad + _cosd(mdd)
+        a = sinad + _cosd(merid_dist)
         is_above_hor = a >= 0
         ra_t = ra
         # Mirror everything below the horizon to its opposite point above.
         if not is_above_hor:
             ra_t = (ra_t + 180.0) % 360.0
             de = -de
-            mdd = (mdd + 180.0) % 360.0
+            merid_dist = (merid_dist + 180.0) % 360.0
         # Mirror the western hemisphere to the eastern one.
-        if mdd > 180.0:
-            ra_t = (armc - mdd) % 360.0
+        if merid_dist > 180.0:
+            ra_t = (armc - merid_dist) % 360.0
         tanfi = _tand(fh)
         ra0 = (armc + 90.0) % 360.0
         xp1 = 1.0
@@ -5399,13 +5400,13 @@ def _house_pos_pythonic(
             else:
                 fh = _atand(_tand(fh) + tanfi / fac)
                 ra0 += 90.0 / fac
-            xeq0 = (ra_t - ra0) % 360.0
-            _, xp1 = _cotrans_lonlat(xeq0, de, 90.0 - fh)
+            eq_lon = (ra_t - ra0) % 360.0
+            _, xp1 = _cotrans_lonlat(eq_lon, de, 90.0 - fh)
             fac *= 2.0
             nloop += 1
         pos_deg = (ra0 - armc) % 360.0
         # Mirror back to the west, then back to below the horizon.
-        if mdd > 180.0:
+        if merid_dist > 180.0:
             pos_deg = (-pos_deg) % 360.0
         if not is_above_hor:
             pos_deg = (pos_deg + 180.0) % 360.0
@@ -5450,7 +5451,7 @@ def _house_pos_pythonic(
         # The house is measured along the horizon by azimuth, so the body
         # must be placed by its true horizon position (not by ecliptic
         # longitude): rotate its equatorial coordinates onto the horizon
-        # frame (pole height 90 - geolat). 1:1 port of the reference 'H'.
+        # frame (pole height 90 - geolat). Behaviour matches the reference 'H'.
         lon_out, _ = _cotrans_lonlat((md_upper - 90.0) % 360.0, dec, 90.0 - geolat)
         pos_deg = (lon_out + CUSP_BOUNDARY_OFFSET) % 360.0
         hpos = pos_deg / 30.0 + 1.0
@@ -5459,7 +5460,7 @@ def _house_pos_pythonic(
     elif hsys_char == "F":
         # Carter poli-equatorial house position.
         # Equal 30 deg divisions of the celestial equator, measured in right
-        # ascension from the RA of the ascendant. 1:1 port of the reference.
+        # ascension from the RA of the ascendant. Behaviour matches the reference.
         asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
         asc = _fix_asc_polar(asc, armc, eps, geolat)
         asc_ra, _ = _cotrans_lonlat(asc, 0.0, -eps)
@@ -5470,26 +5471,26 @@ def _house_pos_pythonic(
     elif hsys_char == "U":
         # Krusinski-Pisa-Goelzer house position.
         # Find where the body's declination circle cuts the great circle
-        # through the ascendant and the zenith. 1:1 port of the reference.
+        # through the ascendant and the zenith. Behaviour matches the reference.
         gl = geolat
         if abs(gl) < _NEAR_ZERO:
             gl = _NEAR_ZERO if gl >= 0 else -_NEAR_ZERO
         asc = _calc_ascendant((armc + 90.0) % 360.0, eps, gl, gl)
         asc = _fix_asc_polar(asc, armc, eps, gl)
         # Ia. intersection of the asc-zenith house plane with the equator
-        xh0, xh1 = _cotrans_lonlat(asc, 0.0, -eps)
+        hpl_lon, hpl_lat = _cotrans_lonlat(asc, 0.0, -eps)
         raep = (armc + 90.0) % 360.0
-        xh0 = (raep - xh0) % 360.0
-        xh0, xh1 = _cotrans_lonlat(xh0, xh1, -(90.0 - gl))
-        tanx = _tand(xh0)
+        hpl_lon = (raep - hpl_lon) % 360.0
+        hpl_lon, hpl_lat = _cotrans_lonlat(hpl_lon, hpl_lat, -(90.0 - gl))
+        tanx = _tand(hpl_lon)
         if gl == 0.0:
             xtemp = 90.0 if tanx >= 0 else -90.0
         else:
             xtemp = _atand(tanx / _cosd(90.0 - gl))
-        if 90.0 < xh0 <= 270.0:
+        if 90.0 < hpl_lon <= 270.0:
             xtemp = (xtemp + 180.0) % 360.0
-        xh0 = xtemp % 360.0
-        raaz = (raep - xh0) % 360.0
+        hpl_lon = xtemp % 360.0
+        raaz = (raep - hpl_lon) % 360.0
         # Ib. obliquity of the asc-zenith house plane to the equator
         xb0 = (raep - raaz) % 360.0
         xb0, xb1 = _cotrans_lonlat(xb0, 0.0, -(90.0 - gl))
@@ -5504,44 +5505,44 @@ def _house_pos_pythonic(
             xtemp = (xtemp + 180.0) % 360.0
         xa0 = xtemp % 360.0
         # IIb. body projected onto the house plane
-        xp0 = (ra - raaz) % 360.0
-        xtemp = _atand(_tand(xp0) / _cosd(oblaz))
-        if 90.0 < xp0 <= 270.0:
+        pos_arc = (ra - raaz) % 360.0
+        xtemp = _atand(_tand(pos_arc) / _cosd(oblaz))
+        if 90.0 < pos_arc <= 270.0:
             xtemp = (xtemp + 180.0) % 360.0
-        xp0 = xtemp % 360.0
-        xp0 = (xp0 - xa0) % 360.0
-        pos_deg = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+        pos_arc = xtemp % 360.0
+        pos_arc = (pos_arc - xa0) % 360.0
+        pos_deg = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
         hpos = pos_deg / 30.0 + 1.0
         return hpos
 
     elif hsys_char == "J":
         # Savard-A house position.
         # Prime-vertical division with cusps at trisected latitude arcs;
-        # the body is placed by its prime-vertical position. 1:1 port of
-        # the reference 'J' branch.
+        # the body is placed by its prime-vertical position. Behaviour
+        # matches the reference 'J' branch.
         sinfi = _sind(geolat)
         if abs(geolat) < _NEAR_ZERO:
-            xs2 = 1.0 / 3.0
-            xs1 = 2.0 / 3.0
+            arc_lat_third = 1.0 / 3.0
+            arc_lat_two_thirds = 2.0 / 3.0
         else:
-            xs2 = _sind(geolat / 3.0) / sinfi
-            xs1 = _sind(2.0 * geolat / 3.0) / sinfi
-        xs2 = _asind(xs2)
-        xs1 = _asind(xs1)
+            arc_lat_third = _sind(geolat / 3.0) / sinfi
+            arc_lat_two_thirds = _sind(2.0 * geolat / 3.0) / sinfi
+        arc_lat_third = _asind(arc_lat_third)
+        arc_lat_two_thirds = _asind(arc_lat_two_thirds)
         hc = [
             0.0,
             0.0,
-            xs2,
-            xs1,
+            arc_lat_third,
+            arc_lat_two_thirds,
             90.0,
-            180.0 - xs1,
-            180.0 - xs2,
+            180.0 - arc_lat_two_thirds,
+            180.0 - arc_lat_third,
             180.0,
-            180.0 + xs2,
-            180.0 + xs1,
+            180.0 + arc_lat_third,
+            180.0 + arc_lat_two_thirds,
             270.0,
-            360.0 - xs1,
-            360.0 - xs2,
+            360.0 - arc_lat_two_thirds,
+            360.0 - arc_lat_third,
         ]
         a_pv, _ = _cotrans_lonlat((md_upper - 90.0) % 360.0, dec, -geolat)
         a = a_pv
@@ -5572,23 +5573,23 @@ def _house_pos_pythonic(
 
     elif hsys_char == "S":
         # Sripati house position.
-        # Porphyry placement shifted forward by half a house. 1:1 port of
-        # the reference 'O'/'S' branch (the S variant adds 0.5).
+        # Porphyry placement shifted forward by half a house. Behaviour
+        # matches the reference 'O'/'S' branch (the S variant adds 0.5).
         asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
         mc = _armc_to_mc(armc, eps)
         asc = _fix_asc_polar(asc, armc, eps, geolat)
-        xp0 = (lon - asc) % 360.0
-        xp0 = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
-        if xp0 < 180.0:
+        pos_arc = (lon - asc) % 360.0
+        pos_arc = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
+        if pos_arc < 180.0:
             hpos = 1.0
         else:
             hpos = 7.0
-            xp0 -= 180.0
+            pos_arc -= 180.0
         acmc = difdeg2n(asc, mc)
-        if xp0 < 180.0 - acmc:
-            hpos += xp0 * 3.0 / (180.0 - acmc)
+        if pos_arc < 180.0 - acmc:
+            hpos += pos_arc * 3.0 / (180.0 - acmc)
         else:
-            hpos += 3.0 + (xp0 - 180.0 + acmc) * 3.0 / acmc
+            hpos += 3.0 + (pos_arc - 180.0 + acmc) * 3.0 / acmc
         hpos += 0.5
         if hpos > 12.0:
             hpos = 1.0
@@ -5602,7 +5603,7 @@ def _house_pos_pythonic(
         #            so dsun = 0 (matching the reference, which falls back to
         #            0 when no Sun declination is supplied).
         #   Y     -> declination of the ascendant.
-        # 1:1 port of the reference 'I'/'i'/'Y' branch.
+        # Behaviour matches the reference 'I'/'i'/'Y' branch.
         gl = geolat
         if gl > 90.0 - CUSP_BOUNDARY_OFFSET:
             gl = 90.0 - CUSP_BOUNDARY_OFFSET
@@ -5617,20 +5618,20 @@ def _house_pos_pythonic(
         de = dec
         if 90.0 - abs(de) < _NEAR_ZERO:
             de = 90.0 - _NEAR_ZERO if de > 0 else -90.0 + _NEAR_ZERO
-        mdd = md_upper
-        smdd = _sind(mdd)
-        if smdd == 0.0:
-            smdd = 1e-300
-        a = _tand(gl) * _tand(de) + _cosd(mdd)
-        xp0 = _atand(-a / smdd) % 360.0
-        if mdd < 0:
-            xp0 += 180.0
-        xp0 = xp0 % 360.0  # Regiomontanus position
+        merid_dist = md_upper
+        sin_merid_dist = _sind(merid_dist)
+        if sin_merid_dist == 0.0:
+            sin_merid_dist = 1e-300
+        a = _tand(gl) * _tand(de) + _cosd(merid_dist)
+        pos_arc = _atand(-a / sin_merid_dist) % 360.0
+        if merid_dist < 0:
+            pos_arc += 180.0
+        pos_arc = pos_arc % 360.0  # Regiomontanus position
         sinad = _tand(de) * _tand(gl)
-        a = sinad + _cosd(mdd)
+        a = sinad + _cosd(merid_dist)
         is_above_hor = a >= 0
         harmc = 90.0 - gl if gl >= 0 else 90.0 + gl
-        darmc = (xp0 - 270.0) % 360.0
+        darmc = (pos_arc - 270.0) % 360.0
         is_western_half = False
         if darmc > 180.0:
             is_western_half = True
@@ -5645,9 +5646,9 @@ def _house_pos_pythonic(
         sad = 90.0 + ad
         san = 90.0 - ad
         if sad == 0 and is_above_hor:
-            xp0 = 270.0
+            pos_arc = 270.0
         elif san == 0 and not is_above_hor:
-            xp0 = 90.0
+            pos_arc = 90.0
         else:
             sa = sad
             dsun_l = dsun
@@ -5675,12 +5676,12 @@ def _house_pos_pythonic(
                 d = -d
             darmc += d
             if is_western_half:
-                xp0 = 270.0 - (darmc / sa) * 90.0
+                pos_arc = 270.0 - (darmc / sa) * 90.0
             else:
-                xp0 = 270.0 + (darmc / sa) * 90.0
+                pos_arc = 270.0 + (darmc / sa) * 90.0
             if not is_above_hor:
-                xp0 = (xp0 + 180.0) % 360.0
-        pos_deg = (xp0 + CUSP_BOUNDARY_OFFSET) % 360.0
+                pos_arc = (pos_arc + 180.0) % 360.0
+        pos_deg = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
         hpos = pos_deg / 30.0 + 1.0
         return hpos
 

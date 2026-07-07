@@ -61,13 +61,25 @@ from .precession_vondrak import (
 )
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Protocol, Union
 
     from .leb2_reader import LEB2Reader
     from .leb_composite import CompositeLEBReader
     from .leb_reader import LEBReader
 
     LEBReaderLike = Union[LEBReader, LEB2Reader, CompositeLEBReader]
+
+    class _DeflectorSource(Protocol):
+        """Structural type for anything that can supply deflector states.
+
+        Only ``eval_body`` is required. The parameter is positional-only so
+        both the LEB readers (``jd``) and the Skyfield adapter (``jd_tt``)
+        satisfy it regardless of their keyword name.
+        """
+
+        def eval_body(
+            self, body_id: int, jd: float, /
+        ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]: ...
 
 # =============================================================================
 # CONSTANTS
@@ -428,7 +440,7 @@ def _apply_gravitational_deflection(
     earth_bary: Tuple[float, float, float],
     jd_tt: float,
     light_time: float,
-    reader: "LEBReaderLike",
+    reader: "_DeflectorSource",
 ) -> Tuple[float, float, float]:
     """Apply PPN gravitational light deflection by Sun, Jupiter, Saturn.
 

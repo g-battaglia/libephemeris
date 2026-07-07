@@ -594,10 +594,10 @@ def _plaus_ephemeris_flags(flags: int) -> int:
     """Force exactly one ephemeris bit, like the reference plaus_iflag().
 
     Used by calc_pctr(), whose upstream counterpart normalizes flags via
-    plaus_iflag() only: the ephemeris bits become mutually exclusive with
-    FLG_SWIEPH as the default. plaus_iflag() in sweph.c uses sequential
-    overwrites where the LAST assignment wins, giving priority
-    JPLEPH > SWIEPH > MOSEPH (verified vs pyswisseph 2.10.03:
+    the flag-plausibility step only: the ephemeris bits become mutually
+    exclusive with FLG_SWIEPH as the default. That normalization applies the
+    ephemeris bits as sequential overwrites where the LAST assignment wins,
+    giving priority JPLEPH > SWIEPH > MOSEPH (verified behaviourally:
     FLG_JPLEPH|FLG_MOSEPH echoes retflag=FLG_JPLEPH). Unlike
     calc()/calc_ut(), FLG_MOSEPH is NOT stripped and FLG_SPEED3 is NOT
     remapped here, so retflag matches the reference.
@@ -4899,7 +4899,7 @@ def _apply_deflection_only(astrometric, t, icrf_center, planets_kernel):
         obs_t,
         t.tt,
         lt,
-        source,  # type: ignore[arg-type]
+        source,
     )
     return ICRF(
         (deflected[0], deflected[1], deflected[2]),

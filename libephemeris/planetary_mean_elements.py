@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Mean orbital elements of the major planets (mean equinox of date).
 
 Polynomial expressions from Meeus, "Astronomical Algorithms" (2nd ed.,
