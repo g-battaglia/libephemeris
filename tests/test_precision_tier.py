@@ -212,8 +212,13 @@ class TestSetPrecisionTierInvalidatesLebReader:
 
         jd_1700 = julday(1700, 1, 1, 0.0)  # in medium (1550-2650), not base
         old_mode = state.get_calc_mode()
+        # Exercise per-tier auto-discovery, so neither an explicit _LEB_FILE nor
+        # the LIBEPHEMERIS_LEB env var (both of which pin one file across every
+        # tier by design, e.g. the leb-backend test runner) may be active.
+        saved_env = os.environ.pop("LIBEPHEMERIS_LEB", None)
         try:
             state.set_calc_mode("leb")
+            state.set_leb_file(None)
 
             set_precision_tier("medium")
             pos_medium, _ = calc_ut(jd_1700, SUN, 0)
@@ -232,6 +237,8 @@ class TestSetPrecisionTierInvalidatesLebReader:
             assert pos_medium_again == pos_medium  # bit-identical round trip
         finally:
             state.set_calc_mode(old_mode)
+            if saved_env is not None:
+                os.environ["LIBEPHEMERIS_LEB"] = saved_env
 
 
 # =============================================================================
