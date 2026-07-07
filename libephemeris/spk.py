@@ -683,21 +683,23 @@ def register_spk_body(
         # Validate that naif_id exists in kernel
         kernel = state._SPK_KERNELS.get(spk_file)
         if kernel is not None:
-            # Check if target exists in kernel
+            # Check if target exists in kernel. Skyfield raises KeyError for
+            # unknown integer keys but ValueError ("unknown SPICE target") for
+            # e.g. Sun-centered type-2 kernels, so catch both.
             try:
                 _ = kernel[naif_id]
-            except KeyError:
+            except (KeyError, ValueError):
                 # Try with string name
                 try:
                     _ = kernel[str(naif_id)]
-                except KeyError:
+                except (KeyError, ValueError):
                     available = []
                     if hasattr(kernel, "names"):
                         available = list(kernel.names())[:10]
                     raise ValueError(
                         f"NAIF ID {naif_id} not found in SPK kernel {spk_file}. "
                         f"Available targets (first 10): {available}"
-                    )
+                    ) from None
 
     # Register mapping (include SPK type for later use)
     state._SPK_BODY_MAP[ipl] = (spk_file, naif_id)

@@ -1109,7 +1109,9 @@ def _jd_to_iso_date(jd: float) -> str:
     # corrupting the SPK request window and cache filenames.
     jd = jd + 0.5
     z = int(jd)
-    jd - z
+    # The sub-day fraction (jd - z) is intentionally discarded: coverage
+    # windows and cache filenames are day-granular, so the result is the
+    # civil date containing the instant.
 
     alpha = int((z - 1867216.25) / 36524.25)
     a = z + 1 + alpha - int(alpha / 4)
