@@ -159,9 +159,12 @@ def test_calc_twilight_brightness_civil() -> None:
 
 
 def test_calc_twilight_brightness_nautical() -> None:
-    """Nautical twilight (6 < h <= 12) uses the moderate exponential."""
+    """Nautical twilight (6 < h <= 12) log-linearly bridges the -6/-12 anchors."""
     b = schaefer.calc_twilight_brightness(-9.0)
-    assert b == pytest.approx(5e4 * math.exp(-3.0 * 0.6))
+    b_civil_at_6 = 1e8 * math.exp(-6 * 1.5)
+    b_astro_at_12 = 1e3
+    frac = (9.0 - 6) / 6.0
+    assert b == pytest.approx(b_civil_at_6 * (b_astro_at_12 / b_civil_at_6) ** frac)
 
 
 def test_calc_twilight_brightness_astronomical() -> None:

@@ -357,28 +357,33 @@ def calc_twilight_brightness(sun_altitude_deg: float) -> float:
 
     h = -sun_altitude_deg  # Sun depression below horizon (positive)
 
-    # Three-phase twilight model:
+    # Three-phase twilight model, continuous and monotonic across both
+    # breakpoints (the branches share their anchor values at -6 and -12):
     # Civil twilight (0 to -6): rapid brightness change
     # Nautical twilight (-6 to -12): moderate change
     # Astronomical twilight (-12 to -18): slow change
+    #
+    # The nautical branch log-linearly bridges the civil value at -6 to the
+    # astronomical value at -12. An earlier revision anchored it at 5e4 nL at
+    # -6 while the civil branch reached only ~1.2e4 nL there, so the sky
+    # brightness jumped up (~1.2e4 -> 5e4 nL) as the Sun sank past -6,
+    # inverting the limiting magnitude at the civil/nautical boundary.
+    b_civil_at_6 = 1e8 * math.exp(-6 * 1.5)  # ~1.23e4 nL, civil value at h=6
+    b_astro_at_12 = 1e3  # nL, astronomical value at h=12
 
     if h <= 6:
-        # Civil twilight - exponential decrease
-        # At Sun = 0: very bright (~1e8 nL)
-        # At Sun = -6: bright twilight (~5e4 nL)
+        # Civil twilight - steep exponential decrease from ~1e8 nL at h=0.
         b = 1e8 * math.exp(-h * 1.5)
     elif h <= 12:
-        # Nautical twilight
-        # At Sun = -6: ~5e4 nL
-        # At Sun = -12: ~1e3 nL
-        h_eff = h - 6
-        b = 5e4 * math.exp(-h_eff * 0.6)
+        # Nautical twilight - log-linear bridge between the -6 and -12 anchors.
+        frac = (h - 6) / 6.0
+        b = b_civil_at_6 * (b_astro_at_12 / b_civil_at_6) ** frac
     else:
         # Astronomical twilight
         # At Sun = -12: ~1e3 nL
         # At Sun = -18: ~100 nL (approaching airglow)
         h_eff = h - 12
-        b = 1e3 * math.exp(-h_eff * 0.4)
+        b = b_astro_at_12 * math.exp(-h_eff * 0.4)
 
     return b
 

@@ -1654,7 +1654,7 @@ def _heliacal_pheno_ut_leb(
             pressure,
             temperature,
             humidity * 100.0 if humidity <= 1.0 else humidity,
-            0.0,
+            met_range,
         ),
         (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
         flags,
@@ -1670,14 +1670,19 @@ def _heliacal_pheno_ut_leb(
     if body == MOON:
         try:
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
-            phase_angle_deg = moon_pheno[0]
             illumination = moon_pheno[1] * 100.0  # [1] is illuminated fraction 0-1
-            if phase_angle_deg > 0:
-                pa_rad = math.radians(phase_angle_deg)
-                w_moon = 15.0 * (1 - math.cos(pa_rad / 2)) / 60.0
             moon_diameter = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
+            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
+            # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
+            # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
+            # W -> 0; near full moon ARCL -> 180 deg so W -> the disc diameter.
+            arcl_deg = moon_pheno[2]
+            sd_arcmin = moon_diameter / 2.0 * 60.0
+            w_arcmin = sd_arcmin * (1.0 - math.cos(math.radians(arcl_deg)))
+            w_moon = w_arcmin / 60.0  # stored in degrees (dret[16])
             l_moon = math.pi * moon_diameter / 2
         except (ValueError, TypeError, ArithmeticError):
             pass
@@ -2677,15 +2682,18 @@ def _heliacal_ut_pythonic(
         elongations = np.degrees(np.arccos(_cos_elong))
 
         # -- Phase 4: body magnitude --
-        # For planets pheno_ut is expensive (~5ms). Sample every 10 days
-        # and interpolate; magnitude changes by <0.1 mag over 10 days for
-        # most planets, well within the Schaefer detection margin.
+        # For planets pheno_ut is expensive (~1.3ms). Sample every few days
+        # and interpolate. A 10-day step introduces up to ~0.14 mag of
+        # curvature error near Mercury's fast light-curve turns, enough to
+        # flip a razor-thin (~0.03 mag) twilight-visibility margin by a day
+        # relative to the exact-magnitude LEB path; a 5-day step cuts that
+        # error ~3x (<0.01 mag at the transition) for a small extra cost.
         day_mags: dict[int, float] = {}
         if is_star:
             for idx in valid_indices:
                 day_mags[int(idx)] = star_magnitude
         else:
-            _mag_step = 10
+            _mag_step = 5
             _sample_idx = list(range(0, n_days, _mag_step))
             if _sample_idx[-1] != n_days - 1:
                 _sample_idx.append(n_days - 1)
@@ -3450,7 +3458,10 @@ def _pheno_rise_window(
         pressure=atmo4[0],
         temperature=atmo4[1],
         humidity=atmo4[2],
-        met_range=atmo4[3] if atmo4[3] >= 1.0 else 0.0,
+        # Use the full met_range (including a 0<ktot<1 override) so this
+        # model's extinction term matches the k that vis_limit_mag applies to
+        # the limiting magnitude in _margin, mirroring _heliacal_visibility_window.
+        met_range=atmo4[3],
         altitude=geopos3[2],
         observer_age=obs6[0],
         snellen=obs6[1],
@@ -3884,22 +3895,24 @@ def _heliacal_pheno_ut_pythonic(
         # Calculate Moon phase and crescent geometry
         try:
             moon_pheno = pheno_ut(jd, MOON, _heliacal_eph_flags(flags))
-            phase_angle_deg = moon_pheno[0]  # [0] = phase angle in degrees
             illumination = moon_pheno[1] * 100.0  # [1] = illuminated fraction 0-1
 
-            # Crescent width approximation (Danjon's formula)
-            # W = 15 * (1 - cos(phase_angle/2)) arcminutes (approximate)
-            if phase_angle_deg > 0:
-                pa_rad = math.radians(phase_angle_deg)
-                w_moon = 15.0 * (1 - math.cos(pa_rad / 2)) / 60.0  # In degrees
-
-            # Crescent length (semicircle approximation)
-            # L = pi * D / 2 where D is diameter
-            # Use actual distance-based apparent diameter from pheno_ut
-            # (varies 0.49° at apogee to 0.56° at perigee)
+            # Crescent width (Yallop/Bruin): W = SD * (1 - cos ARCL), where
+            # ARCL is the arc of light (Sun-Moon elongation, moon_pheno[2]) and
+            # SD is the Moon's apparent semidiameter in arcmin (moon_pheno[3]
+            # is the apparent diameter in degrees). Near new moon ARCL -> 0 so
+            # W -> 0; near full moon ARCL -> 180 deg so W -> the disc diameter.
+            #
+            # Crescent length uses the actual distance-based apparent diameter
+            # from pheno_ut (varies 0.49° at apogee to 0.56° at perigee):
+            # L = pi * D / 2 (semicircle approximation).
             moon_diameter = (
                 moon_pheno[3] if len(moon_pheno) > 3 and moon_pheno[3] > 0 else 0.5
             )
+            arcl_deg = moon_pheno[2]
+            sd_arcmin = moon_diameter / 2.0 * 60.0
+            w_arcmin = sd_arcmin * (1.0 - math.cos(math.radians(arcl_deg)))
+            w_moon = w_arcmin / 60.0  # stored in degrees (dret[16])
             l_moon = math.pi * moon_diameter / 2
         except (ValueError, TypeError, ArithmeticError):
             pass
