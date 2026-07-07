@@ -414,6 +414,15 @@ implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping t
 base ayanamsha mode — rather than the composite value silently falling back to
 Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release.
 
+**10.4 `SIDEREAL | EQUATORIAL` speed frame (intentional).** Both engines report
+the SID|EQ *position* on the mean equator of date, but the reference API
+computes the accompanying RA/Dec *speed* in the true-equator frame — a rate
+that does not differentiate its own reported position (~0.8"/day RA, ~1.8"/day
+Dec for the Moon). libephemeris computes the speed in the mean-equator frame of
+the reported position, in both backends, keeping every speed slot the exact
+derivative of its position slot. Certified divergence; see
+`intentional-divergences.md` §9.
+
 ### 11. Crossing functions
 
 `solcross_ut`, `mooncross_ut`: typically < 1 s. `mooncross_node_ut`: up to ~69 s

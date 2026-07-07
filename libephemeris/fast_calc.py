@@ -1535,19 +1535,33 @@ def _pipeline_icrs(
                 # Sun target: the Sun is its own dominant "deflector", so the
                 # PPN geometry is degenerate (q ~ the Sun's barycentric motion
                 # over lt, a ~1e-7 AU vector). Re-evaluating it on the
-                # extrapolated vector with frozen deflectors produces a huge
-                # spurious rate (~8"/day); physically the term is essentially
-                # constant over ±_VEL_H, so freeze the position-path delta.
+                # extrapolated vector produces a huge spurious rate (~8"/day);
+                # physically the term is essentially constant over ±_VEL_H, so
+                # freeze the position-path delta. (The degenerate case is
+                # handled here on its own — the non-degenerate deflectors below
+                # are NOT frozen.)
                 g = (
                     g[0] + _defl_delta[0],
                     g[1] + _defl_delta[1],
                     g[2] + _defl_delta[2],
                 )
             else:
-                # Deflectors frozen at jd_tt: the dominant rate is from the
-                # target direction changing (captured by g), not the deflectors
-                # moving.
-                g = _apply_gravitational_deflection(g, observer, jd_tt, lt_s, reader)
+                # Deflectors AND observer evaluated at the sample epoch. Near
+                # solar conjunction the impact-parameter rate is dominated by
+                # the Sun's apparent motion (~0.96 deg/day), not by the
+                # target's: freezing the deflectors at jd_tt biased slow
+                # targets by ~0.2-0.3"/day at elongation < 2 deg (and ~20"/day
+                # through a limb transit). The observer is extrapolated
+                # linearly — ample for the smooth pe = observer - deflector
+                # geometry over ±_VEL_H.
+                obs_s = (
+                    observer[0] + observer_vel[0] * s,
+                    observer[1] + observer_vel[1] * s,
+                    observer[2] + observer_vel[2] * s,
+                )
+                g = _apply_gravitational_deflection(
+                    g, obs_s, jd_tt + s, lt_s, reader
+                )
         if _do_aber:
             g = _apply_aberration(g, ev_s, lt_s)
         return g

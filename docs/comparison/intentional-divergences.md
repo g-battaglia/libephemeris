@@ -285,3 +285,34 @@ RA/Dec to <0.001" for Cupido, Isis, Mars, White Moon and True Node alike
 (scratch check `uranian_eqj2000.py`, JD 2460000.5, both backends). Only the
 combination `FLG_EQUATORIAL | FLG_J2000` on hypothetical bodies is affected;
 of-date equatorial, ecliptic and J2000-ecliptic outputs are unchanged.
+
+## 9. `SIDEREAL | EQUATORIAL` speed frame (mean equator)
+
+**Status:** intentional divergence since the v3 speed/frame round.
+
+For `FLG_SIDEREAL | FLG_EQUATORIAL`, both the reference API and libephemeris
+report the **position** on the *mean* equator of date (precession only, no
+nutation), with no ayanamsha subtraction from RA. The reference API, however,
+computes the accompanying RA/Dec **speed** in the *true*-equator (plain
+equatorial) frame — the same rate it returns without `FLG_SIDEREAL`. The
+result is a speed that does not differentiate the reported position: for the
+Moon the reference's SID|EQ rate differs from the derivative of its own
+SID|EQ position by ~0.8"/day in RA and ~1.8"/day in Dec (the mean-vs-true
+equator rate gap; smaller for slower bodies).
+
+libephemeris computes the SID|EQ speed in the **mean-equator frame of the
+reported position**, in both backends: the LEB fast path differentiates the
+apparent place through the same mean-equator (P-matrix) transform used for
+the position, and the Skyfield path keeps `FLG_SIDEREAL` set on its
+central-difference samples so they are taken in the reported frame. This is
+the project's certified true-rate convention — every speed slot is the exact
+time-derivative of the corresponding position slot.
+
+Numerical evidence (Moon, JD 2460000.5, Lahiri): reported dRA/dDec vs the
+central derivative of the reported RA/Dec agree to 0.016"/day (LEB) and
+0.034"/day (Skyfield backend), while re-computing the speed in the
+true-equator frame — the reference convention — would be off by −0.760"/day
+in RA and +1.843"/day in Dec from that derivative. Only the speed slots of
+the `FLG_SIDEREAL | FLG_EQUATORIAL` combination are affected; positions are
+identical to the reference convention, and plain-equatorial output (true
+equator, no sidereal flag) is unchanged.

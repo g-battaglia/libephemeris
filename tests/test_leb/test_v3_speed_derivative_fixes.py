@@ -283,3 +283,68 @@ def test_sidereal_nod_aps_returns_native_floats(skyfield_backend):
             assert type(aphe[0]) is float
     finally:
         le.set_sid_mode(C.SIDM_FAGAN_BRADLEY)
+
+
+# ---------------------------------------------------------------------------
+# RR1 — deflection rate through solar conjunction.
+#
+# The Pipeline-A velocity central-differences the apparent place on an
+# analytically-extrapolated state; the gravitational-deflection term must be
+# re-evaluated with the DEFLECTORS (and observer) at the sample epochs. With
+# the deflectors frozen at jd_tt, slow targets near solar conjunction were
+# biased by the Sun's apparent motion (~0.96 deg/day): Mars -0.34"/day at
+# elongation 0.9 deg and +21.7"/day through the limb transit; Saturn
+# +0.16"/day at conjunction. The reported speed must stay the derivative of
+# the reported position (<= 0.01"/day) even there. The degenerate Sun-target
+# case keeps its frozen delta (its own deflector geometry is singular).
+# ---------------------------------------------------------------------------
+
+# Solar-conjunction epochs (TT), elongations 0.004-0.91 deg, base tier.
+JD_MARS_CONJ = 2460266.75  # elong 0.004 deg (limb transit)
+JD_MARS_NEAR = 2460263.75  # elong 0.90 deg
+JD_SATURN_CONJ = 2460369.40  # elong 0.006 deg
+
+
+def _deriv5_lon(fn, jd, h=0.01):
+    """5-point derivative of the reported longitude, wrap-aware."""
+    l0 = fn(jd)[0]
+
+    def rel(j):
+        return _wrap180(fn(j)[0] - l0)
+
+    return (
+        -rel(jd + 2 * h) + 8 * rel(jd + h) - 8 * rel(jd - h) + rel(jd - 2 * h)
+    ) / (12 * h)
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize(
+    "ipl, jd",
+    [
+        (C.MARS, JD_MARS_CONJ),
+        (C.MARS, JD_MARS_NEAR),
+        (C.SATURN, JD_SATURN_CONJ),
+    ],
+)
+def test_conjunction_speed_is_derivative_leb(reader, ipl, jd):
+    rep = _leb(reader, jd, ipl, C.FLG_SPEED)[3]
+    num = _deriv5_lon(lambda j: _leb(reader, j, ipl, C.FLG_SPEED), jd)
+    err_arcsec = abs(rep - num) * 3600.0
+    assert err_arcsec < 0.01, (
+        f"body {ipl} at JD {jd} (solar conjunction): reported dlon differs "
+        f'from the derivative of the reported lon by {err_arcsec:.4f}"/day'
+    )
+
+
+@pytest.mark.parametrize(
+    "ipl, jd",
+    [(C.MARS, JD_MARS_CONJ), (C.SATURN, JD_SATURN_CONJ)],
+)
+def test_conjunction_speed_is_derivative_skyfield(skyfield_backend, ipl, jd):
+    rep = _sky(jd, ipl, C.FLG_SPEED)[3]
+    num = _deriv5_lon(lambda j: _sky(j, ipl, C.FLG_SPEED), jd)
+    err_arcsec = abs(rep - num) * 3600.0
+    assert err_arcsec < 0.01, (
+        f"body {ipl} at JD {jd} (solar conjunction): reported dlon differs "
+        f'from the derivative of the reported lon by {err_arcsec:.4f}"/day'
+    )
