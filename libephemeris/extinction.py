@@ -1283,12 +1283,20 @@ def calc_contrast_threshold(
     observer_skill: int = OBSERVER_SKILL_AVERAGE,
 ) -> float:
     """
-    Calculate the minimum contrast required for object detection.
+    Calculate the point-source detection threshold as a star-to-sky flux ratio.
 
-    The contrast threshold represents the minimum brightness difference
-    (expressed as a ratio) that an observer can detect between an object
-    and the background sky. This threshold depends on the observer's
-    eye adaptation state, background brightness, and experience.
+    Inverts the model limiting magnitude for the given eye-adaptation state
+    and observer skill into a dimensionless flux-ratio threshold::
+
+        threshold = 10 ** ((sky_brightness - limiting_mag) / 2.5)
+
+    i.e. the ratio between the sky surface brightness (per arcsec^2, expressed
+    as a magnitude) and the faintest detectable point source. Brighter skies
+    and less-adapted eyes give LARGER thresholds (detection is harder). This
+    is the inverse of :func:`calc_visibility_threshold`'s limiting-magnitude
+    logic, not the classical Blackwell contrast *fraction* (which is of order
+    0.01-0.1); typical return values here span ~10^2 (daylight) to ~10^6
+    (dark sky).
 
     Args:
         sky_brightness: Sky surface brightness in mag/arcsec^2.
@@ -1301,37 +1309,32 @@ def calc_contrast_threshold(
             - 4 (OBSERVER_SKILL_EXPERT): Expert observer
 
     Returns:
-        Contrast threshold (dimensionless ratio). Lower values mean the
-        observer can detect fainter contrasts.
+        Flux-ratio detection threshold (dimensionless, clamped to
+        [1e-8, 1e10]). Lower values mean fainter sources are detectable
+        relative to the sky.
 
     Algorithm:
-        The contrast threshold follows the Blackwell-Schaefer model:
-
-        For dark-adapted vision (scotopic):
-            C_threshold = 0.017 * (1 + sqrt(B_sky / 10^5))
-
-        For mesopic vision:
-            C_threshold = 0.025 * (1 + B_sky^0.4 / 100)
-
-        For photopic vision:
-            C_threshold = 0.05 * (1 + B_sky^0.3 / 10)
-
-        where B_sky is the sky brightness in nanoLamberts.
-
-        The threshold is then adjusted for observer experience.
+        1. Pick the limiting magnitude for the adaptation regime (piecewise
+           linear in sky brightness: dark-adapted anchored at m_lim ~6.0 for
+           B=21.5; mesopic at m_lim = 3.4 + (B-16)*0.5, continuous with the
+           photopic branch at B=16; photopic descending to m_lim ~ -4 in
+           daylight).
+        2. Add the observer-experience adjustment (up to +0.9 mag for expert).
+        3. Convert to a flux ratio: 10 ** ((B - m_lim) / 2.5).
 
     Example:
-        >>> # Dark sky, average observer
-        >>> calc_contrast_threshold(21.5)
-        0.018...
-        >>> # Twilight, experienced observer
-        >>> calc_contrast_threshold(15.0, observer_skill=OBSERVER_SKILL_EXPERIENCED)
-        0.04...
+        >>> # Dark sky, average observer: 10**((21.5-6.0)/2.5) ~ 1.6e6
+        >>> round(calc_contrast_threshold(21.5))
+        1584893
+        >>> # Nautical twilight, experienced observer
+        >>> round(calc_contrast_threshold(15.0, observer_skill=3))
+        41687
 
     References:
-        - Blackwell, H.R. (1946) "Contrast thresholds of the human eye"
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Crumey, A. (2014) "Human contrast threshold and astronomical visibility"
+        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes" (the
+          limiting-magnitude framing this function inverts)
+        - Blackwell, H.R. (1946); Crumey, A. (2014) for the classical
+          contrast-fraction formulation (NOT what this function returns)
     """
     # Determine eye adaptation state if not provided
     if eye_adaptation is None:
