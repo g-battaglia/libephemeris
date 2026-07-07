@@ -2070,7 +2070,25 @@ def _assist_position_from_state(
     r_hel = result.distance
 
     if iflag & FLG_HELCTR:
-        return lon_hel, lat_hel, r_hel
+        # result.ecliptic_lon/lat are heliocentric ecliptic J2000 (rebound_
+        # integration rotates ICRS->ecliptic with the fixed J2000 obliquity).
+        # Every other body branch hands the caller an of-date true-ecliptic
+        # longitude (which _maybe_equatorial_convert then reframes to J2000 /
+        # equatorial per the flags); the geocentric branch below does the same.
+        # Precess to the ecliptic of date and add nutation in longitude under
+        # the identical NONUT / J2000 / SIDEREAL+EQUATORIAL rules, so
+        # heliocentric follows the same contract. Returning the raw J2000
+        # longitude froze it at the J2000 equinox and drifted from every other
+        # path by the accumulated general precession (~7 deg / 25000" by 2500).
+        from .astrometry import precess_from_j2000
+        from .cache import get_cached_nutation
+
+        lon_od, lat_od = precess_from_j2000(lon_hel, lat_hel, jd_tt)
+        _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+        if not (iflag & FLG_NONUT) and not (iflag & FLG_J2000) and not _sid_eq:
+            dpsi_rad, _ = get_cached_nutation(jd_tt)
+            lon_od = (lon_od + math.degrees(dpsi_rad)) % 360.0
+        return lon_od, lat_od, r_hel
 
     ts = get_timescale()
     t = ts.tt_jd(jd_tt)

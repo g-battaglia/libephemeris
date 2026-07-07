@@ -245,5 +245,67 @@ class TestHeliacalSearchGates:
         assert jd1 - jd0 < 90.0  # not the +243 d apparition
 
 
+class TestAssistHeliocentricFrame:
+    """Regression: the ASSIST minor-body heliocentric branch must return an
+    of-date ecliptic longitude, not one frozen at the J2000 equinox.
+
+    Beyond SPK and LEB coverage a minor body is propagated with ASSIST, whose
+    state is heliocentric ecliptic J2000. Every other body path (and the
+    geocentric branch of the same helper) precesses that to the ecliptic of
+    date; the heliocentric branch used to return the raw J2000 longitude,
+    drifting from every other path by the accumulated general precession
+    (~7 deg by year 2500). Uses a public-API, reference-free invariant.
+    """
+
+    @staticmethod
+    def _sph2cart(lon: float, lat: float, r: float) -> tuple[float, float, float]:
+        import math
+
+        lo, la = math.radians(lon), math.radians(lat)
+        return (
+            r * math.cos(la) * math.cos(lo),
+            r * math.cos(la) * math.sin(lo),
+            r * math.sin(la),
+        )
+
+    @pytest.mark.slow
+    def test_chiron_heliocentric_is_of_date_beyond_coverage(self) -> None:
+        """Year 2500 is past Chiron's SPK/LEB coverage, so it is propagated by
+        ASSIST (or the Keplerian fallback). The of-date heliocentric longitude
+        must differ from the J2000 one by the real precession since J2000
+        (~7 deg), never be equal to it (equal == frozen-at-J2000 defect)."""
+        from libephemeris import CHIRON, FLG_HELCTR, FLG_J2000
+
+        jd = le.julday(2500, 1, 1, 0.0)
+        of_date, _ = le.calc_ut(jd, CHIRON, FLG_HELCTR)
+        j2000, _ = le.calc_ut(jd, CHIRON, FLG_HELCTR | FLG_J2000)
+        precession = abs((of_date[0] - j2000[0] + 180.0) % 360.0 - 180.0)
+        # Precession over 500 years is ~7 deg; the frozen bug gave ~0.
+        assert precession > 5.0
+
+    @pytest.mark.slow
+    def test_chiron_heliocentric_reconstructs_geocentric(self) -> None:
+        """Reference-free coherence: the geometric geocentric longitude must be
+        reconstructable from the heliocentric position plus Earth's
+        heliocentric position (Earth_helio = -Sun_geo), all of-date ecliptic.
+        Before the fix this failed by ~7 deg in the ASSIST region."""
+        import math
+
+        from libephemeris import CHIRON, SUN, FLG_HELCTR, FLG_TRUEPOS
+
+        jd = le.julday(2500, 1, 1, 0.0)
+        hel, _ = le.calc_ut(jd, CHIRON, FLG_HELCTR)  # of-date ecliptic
+        geo, _ = le.calc_ut(jd, CHIRON, FLG_TRUEPOS)  # geometric geocentric
+        sun, _ = le.calc_ut(jd, SUN, FLG_TRUEPOS)  # Sun geocentric = -Earth_helio
+        ah = self._sph2cart(hel[0], hel[1], hel[2])
+        sg = self._sph2cart(sun[0], sun[1], sun[2])
+        recon = [ah[i] + sg[i] for i in range(3)]  # geo = ast_helio + Sun_geo
+        recon_lon = math.degrees(math.atan2(recon[1], recon[0])) % 360.0
+        dlon = abs((recon_lon - geo[0] + 180.0) % 360.0 - 180.0)
+        # Exact when both sources are geometric (ASSIST region); the frozen bug
+        # produced ~7 deg. A generous bound stays robust across environments.
+        assert dlon < 0.05
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -75,6 +75,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the minimum elongation exceeds the conjunction-gap threshold, the search extends
   the lookback to 30 days to correctly distinguish a pre-window conjunction from a
   mid-apparition visibility flicker.
+- **Minor-body heliocentric positions beyond SPK/LEB coverage are of-date, not
+  frozen at J2000.** When an asteroid or centaur is propagated by ASSIST past its
+  ephemeris coverage, the heliocentric (`FLG_HELCTR`) branch now precesses the
+  J2000 state to the ecliptic of date and adds nutation, under the same
+  `FLG_NONUT`/`FLG_J2000`/sidereal rules as the geocentric branch. Previously it
+  returned the raw J2000 longitude, so heliocentric drifted from the (correct)
+  geocentric and every other body path by the accumulated general precession —
+  about 7° (≈25000″) for Chiron at year 2500.
+
+### Changed
+
+- **Shipped-tree provenance hygiene for the Apache-2.0 release.** Internal
+  `house_pos` variables were renamed away from the reference engine's own names,
+  a missing SPDX header was added, and a few derivation-flavoured comments were
+  reworded to behavioural-parity language. Behaviour is unchanged (the full house
+  suite passes) and the provenance sweep is now zero-hit.
 
 ### Validation
 
