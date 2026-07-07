@@ -82,15 +82,26 @@ class TestAutoDownloadInStrictMode:
                 assert pos[2] == pytest.approx(15.0)
 
     def test_no_auto_download_when_disabled(self):
-        """Auto-download should not be attempted when disabled."""
+        """Auto-download should not be attempted when disabled.
+
+        With no SPK registered and no ASSIST data, strict mode must raise
+        rather than silently downgrading to Keplerian. ASSIST is disabled
+        here so the "no source at all" raise is exercised deterministically.
+        """
         eph.set_strict_precision(True)
         eph.set_auto_spk_download(False)
 
-        with patch("libephemeris.spk.download_and_register_spk") as mock_download:
-            with pytest.raises(eph.SPKRequiredError):
-                eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
+        with patch(
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=False,
+        ):
+            with patch(
+                "libephemeris.spk.download_and_register_spk"
+            ) as mock_download:
+                with pytest.raises(eph.SPKRequiredError):
+                    eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 
-            mock_download.assert_not_called()
+                mock_download.assert_not_called()
 
     def test_auto_download_logs_warning_on_failure(self):
         """Failed auto-download should produce a warning log."""

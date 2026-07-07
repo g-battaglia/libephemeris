@@ -109,7 +109,22 @@ class TestStrictPrecisionEnvVar:
 
 
 class TestSPKRequiredError:
-    """Test SPKRequiredError exception."""
+    """Test SPKRequiredError exception.
+
+    Strict mode refuses the Keplerian fallback only when NO better source
+    exists. ASSIST (local N-body data) is such a source, so these tests
+    disable it to exercise the genuine "no source at all" raise path
+    deterministically -- independent of whether ASSIST data happens to be
+    installed on the machine running the suite.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_assist(self):
+        with patch(
+            "libephemeris.rebound_integration.check_assist_data_available",
+            return_value=False,
+        ):
+            yield
 
     def test_error_raised_for_chiron_without_spk(self):
         """Chiron without SPK should raise SPKRequiredError in strict mode."""

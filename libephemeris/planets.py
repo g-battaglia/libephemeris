@@ -951,6 +951,95 @@ def _nutation_rate_deg_per_day(jd_tt: float, dt: float = 0.5) -> float:
     return math.degrees(dpsi_next - dpsi_prev) / (2.0 * dt)
 
 
+def _strict_source_better_than_keplerian(ipl: int) -> bool:
+    """Return True if a better-than-Keplerian source is available for ``ipl``.
+
+    Used by the strict-precision gate to decide whether to refuse the Keplerian
+    fallback.  The only fallback consulted here is ASSIST (local N-body data):
+    by the time the gate is reached the registered SPK kernel has already
+    declined to serve the epoch.  Availability is a purely local filesystem /
+    import probe -- it never touches the network and never depends on whether
+    an (irrelevant) auto-download was attempted.
+
+    Args:
+        ipl: libephemeris body ID.
+
+    Returns:
+        True if ASSIST can integrate this body (curated elements present and
+        the ASSIST package + data files are installed), False otherwise.
+    """
+    from . import minor_bodies
+
+    if ipl not in minor_bodies.MINOR_BODY_ELEMENTS:
+        return False
+    try:
+        from .rebound_integration import check_assist_data_available
+
+        return bool(check_assist_data_available())
+    except (ImportError, RuntimeError, ValueError, FileNotFoundError):
+        return False
+
+
+def _spk_out_of_coverage_error(ipl: int, spk_info, jd_tt: float):
+    """Build the strict-mode error for a registered kernel that excludes ``jd_tt``.
+
+    Unlike :meth:`SPKRequiredError.for_body` -- which instructs the caller to
+    *register* an SPK -- this variant is raised when a kernel IS registered for
+    the body but this epoch falls outside its coverage window and no other
+    high-precision source (ASSIST) is available.  The message names the
+    registered kernel and its coverage so the remedy is obvious: widen the
+    coverage, not register a kernel from scratch.
+
+    Args:
+        ipl: libephemeris body ID.
+        spk_info: ``(spk_file, naif_id)`` for the registered kernel.
+        jd_tt: The requested epoch (JD TT) that fell outside coverage.
+
+    Returns:
+        SPKRequiredError with an accurate, coverage-citing message.
+    """
+    import os
+
+    from . import spk
+    from .exceptions import SPKRequiredError
+
+    spk_file = spk_info[0]
+    body_name = spk._get_body_name(ipl) or str(ipl)
+    try:
+        coverage = spk.get_spk_coverage(spk_file)
+    except (OSError, ValueError, KeyError, RuntimeError):
+        coverage = None
+
+    lines = [
+        f"SPK kernel for {body_name} does not cover JD {jd_tt:.1f} TT "
+        "(strict precision mode is enabled).",
+        "",
+        f"A kernel is already registered ({os.path.basename(spk_file)}),",
+    ]
+    if coverage is not None:
+        lines.append(
+            f"but its coverage is [{coverage[0]:.1f}, {coverage[1]:.1f}] TT, "
+            "which excludes this epoch."
+        )
+    else:
+        lines.append("but its coverage does not include this epoch.")
+    lines += [
+        "",
+        "The Keplerian fallback for this body can have errors of 1-10 degrees.",
+        "For accurate calculations at this epoch, you must either:",
+        "",
+        "1. Register a kernel whose coverage includes this epoch,",
+        "2. Enable automatic SPK download:",
+        "   >>> eph.set_auto_spk_download(True)",
+        "3. Install ASSIST N-body data for a high-precision fallback, or",
+        "4. Disable strict precision mode (not recommended):",
+        "   >>> eph.set_strict_precision(False)",
+    ]
+    return SPKRequiredError(
+        message="\n".join(lines), body_id=ipl, body_name=body_name
+    )
+
+
 def _try_auto_spk_download(t, ipl: int, iflag: int):
     """
     Try to automatically download and use SPK for a minor body.
@@ -3151,19 +3240,45 @@ def _calc_body(
                 spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
                 return _to_native_floats(spk_result), iflag
 
-            # In strict precision mode, require SPK for all downloadable bodies.
-            # Bodies blocked from auto-download are exempt (no SPK obtainable).
-            # Also exempt bodies whose auto-download was attempted but failed
-            # (e.g. due to third-party library incompatibility) — allow
-            # Keplerian fallback rather than blocking the calculation entirely.
+            # In strict precision mode, require an SPK-grade source for all
+            # downloadable bodies. Bodies blocked from auto-download are exempt
+            # (no SPK obtainable). Bodies whose auto-download was attempted but
+            # failed are also exempt (the attempt is honoured, Keplerian is
+            # allowed rather than blocking the calculation entirely).
+            #
+            # The remaining decision keys off whether a source BETTER than the
+            # Keplerian fallback actually exists for this epoch -- never off the
+            # irrelevant network attempt. If a kernel is already registered but
+            # simply does not cover this epoch (including the light-time-retarded
+            # coverage edges), and ASSIST can integrate the body from local data,
+            # prefer ASSIST silently; otherwise refuse with a message that tells
+            # the truth about why (kernel registered but out of coverage, vs no
+            # kernel registered at all).
             if get_strict_precision() and ipl in SPK_BODY_NAME_MAP:
                 if (
                     ipl not in SPK_AUTO_DOWNLOAD_BLOCKED
                     and not _auto_download_attempted
                 ):
-                    horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
-                    body_name = spk._get_body_name(ipl) or str(ipl)
-                    raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
+                    spk_info = spk.get_spk_body_info(ipl)
+                    if _strict_source_better_than_keplerian(ipl):
+                        # A high-precision N-body fallback (ASSIST) is available
+                        # locally -- fall through to it below, no network needed.
+                        pass
+                    elif spk_info is not None:
+                        # A kernel is registered but does not cover this epoch,
+                        # and no ASSIST data is present: refuse, and say so
+                        # accurately (do not tell the user to register an SPK
+                        # that is already registered).
+                        raise _spk_out_of_coverage_error(ipl, spk_info, t.tt)
+                    else:
+                        # No kernel registered at all and no ASSIST: the original
+                        # strict-mode contract -- register an SPK (or enable
+                        # auto-download).
+                        horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
+                        body_name = spk._get_body_name(ipl) or str(ipl)
+                        raise SPKRequiredError.for_body(
+                            ipl, body_name, horizons_id
+                        )
 
             jd_tt = t.tt
 
