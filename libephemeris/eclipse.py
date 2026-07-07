@@ -152,6 +152,19 @@ SHALLOW_ECLIPSE_MAG_THRESHOLD = 0.01  # Minimum magnitude for reliable contact t
 NEAR_MISS_GAMMA_MARGIN = 0.02  # Margin from gamma limit for edge case handling
 MINIMUM_SEPARATION_FOR_LENS = 1e-10  # Minimum separation to avoid division by zero
 
+# Location-based eclipse searches (sol_/lun_eclipse_when_loc) anchor their
+# candidate lunations on the GEOCENTRIC maximum, but the observer's LOCAL
+# phases can still be unfolding after that instant (or the Moon may only
+# rise into the eclipse later). When the search epoch falls between the
+# geocentric maximum and the local phases, the lunation must still be
+# offered as a candidate; the local-contact epoch gate then keeps or skips
+# it. Anchor the candidate generator this far (days) before/after the epoch
+# so such an in-progress lunation is not dropped upstream. The value
+# comfortably exceeds the half-duration of the widest local/penumbral phase
+# window (< ~5 h) yet never reaches an adjacent lunation (eclipses are
+# >= ~1 synodic month apart).
+_WHEN_LOC_EPOCH_WINDOW = 0.35  # days (~8.4 h)
+
 # 1 AU in km (IAU 2012 definition)
 _AU_KM = 149597870.7
 
@@ -1686,11 +1699,16 @@ def _calculate_eclipse_phases_besselian(
         _reraise_if_leb_range_error(_exc)
         t_noon = 0.0
 
-    # tret[6]/[7]: center-line begin/end — the shadow AXIS touches the
-    # fundamental-plane disc while gamma < 1.
+    # tret[6]/[7]: center-line begin/end — only when the eclipse is
+    # ellipsoidally CENTRAL (the shadow axis actually pierces the flattened
+    # Earth). Gating on the ECL_CENTRAL bit (set from sol_eclipse_where's
+    # geometry) instead of a spherical gamma_max < 1.0 test keeps the
+    # center-line times consistent with the CEN/NONCEN classification: a
+    # non-central annular/total eclipse (|gamma| just under 1 near the
+    # poles) has no central line.
     t_cl_begin = 0.0
     t_cl_end = 0.0
-    if has_umbral_contact and gamma_max < 1.0:
+    if has_umbral_contact and (eclipse_type & ECL_CENTRAL):
         t_cl_begin = _find_contact_time_besselian(
             jd_max, 1.0, search_before=True, search_range=0.10
         )
@@ -1877,25 +1895,36 @@ def _calculate_eclipse_type_and_magnitude(
     # along the central path. _is_hybrid_solar_eclipse() applies the
     # physical criterion (sign change between the umbral contacts) and is
     # only evaluated once the umbra/antumbra is known to touch Earth.
-    if abs(gamma) <= 1.0:
-        # Central: the shadow axis intersects Earth.
-        # l2 < 0: umbra (total); l2 > 0: antumbra (annular).
-        if _is_hybrid_solar_eclipse(jd, l2):
-            eclipse_type = ECL_ANNULAR_TOTAL | ECL_CENTRAL
-        elif l2 < 0:
-            eclipse_type = ECL_TOTAL | ECL_CENTRAL
+    if abs(gamma) <= 1.0 + abs(l2) and abs(l2) > 0:
+        # The umbra/antumbra reaches Earth. Whether the eclipse is CENTRAL
+        # (the shadow axis pierces the surface) or merely NONCENTRAL is
+        # decided by the SAME ellipsoidal shadow-axis geometry that
+        # sol_eclipse_where uses - not a spherical |gamma| <= 1 test. Near
+        # the poles a |gamma| just under 1 can still miss the flattened
+        # Earth, giving a non-central annular/total eclipse; the spherical
+        # test would wrongly report CENTRAL (contradicting sol_eclipse_where
+        # at the same instant) and fabricate center-line times (tret[6]/[7])
+        # for an eclipse that has no central line.
+        where_retc = _eclipse_where_core(jd)[0]
+        if where_retc & ECL_CENTRAL:
+            central_bit = ECL_CENTRAL
+        elif (where_retc & ECL_NONCENTRAL) and not (where_retc & ECL_PARTIAL):
+            central_bit = ECL_NONCENTRAL
         else:
-            eclipse_type = ECL_ANNULAR | ECL_CENTRAL
-    elif abs(gamma) <= 1.0 + abs(l2) and abs(l2) > 0:
-        # Noncentral total/annular (~1% of eclipses): the umbra/antumbra
-        # touches Earth but the shadow axis misses it. The reference
-        # classifies these as TOTAL|NONCENTRAL / ANNULAR|NONCENTRAL.
-        if _is_hybrid_solar_eclipse(jd, l2):
-            eclipse_type = ECL_ANNULAR_TOTAL | ECL_NONCENTRAL
-        elif l2 < 0:
-            eclipse_type = ECL_TOTAL | ECL_NONCENTRAL
-        else:
-            eclipse_type = ECL_ANNULAR | ECL_NONCENTRAL
+            # The core shadow does not actually reach the ellipsoid at
+            # maximum: a penumbra-only partial eclipse (keep the default
+            # ECL_PARTIAL | ECL_NONCENTRAL classification).
+            central_bit = 0
+
+        if central_bit:
+            # l2 < 0: umbra (total); l2 > 0: antumbra (annular). The hybrid
+            # (annular-total) test uses the physical core-shadow sign change.
+            if _is_hybrid_solar_eclipse(jd, l2):
+                eclipse_type = ECL_ANNULAR_TOTAL | central_bit
+            elif l2 < 0:
+                eclipse_type = ECL_TOTAL | central_bit
+            else:
+                eclipse_type = ECL_ANNULAR | central_bit
 
     return eclipse_type, magnitude, gamma, moon_sun_ratio
 
@@ -3217,14 +3246,20 @@ def _sol_eclipse_when_loc_impl(
                 # We use a simpler approach: search forward from an earlier date
                 # and find eclipses until we get one before tjdut
                 earlier_jd = jd - 400  # About 1 year before
+                # Extend the collection horizon just past the epoch so a
+                # lunation whose geocentric maximum lies slightly AFTER the
+                # epoch - while the observer's local phases have already begun
+                # - is still gathered. The local-contact gate below drops any
+                # candidate whose first local contact has not yet occurred.
+                horizon = jd + _WHEN_LOC_EPOCH_WINDOW
                 eclipses_found = []
                 temp_jd = earlier_jd
-                while temp_jd < jd:
+                while temp_jd < horizon:
                     try:
                         global_type, global_times = _sol_eclipse_when_glob_pythonic(
                             temp_jd, flags
                         )
-                        if global_times[0] < jd:
+                        if global_times[0] < horizon:
                             eclipses_found.append((global_type, global_times))
                         temp_jd = global_times[0] + 25
                     except (Error, RuntimeError):
@@ -3235,7 +3270,15 @@ def _sol_eclipse_when_loc_impl(
                 # Take the most recent eclipse before jd
                 global_type, global_times = eclipses_found[-1]
             else:
-                global_type, global_times = _sol_eclipse_when_glob_pythonic(jd, flags)
+                # Offer the current lunation as a candidate even when its
+                # geocentric maximum has just slipped behind the epoch: the
+                # observer's LOCAL phases may still be to come. The
+                # local-contact gate below keeps or skips it. Only the first
+                # iteration is affected; later iterations start well past the
+                # previous maximum, so no eclipse is returned twice.
+                global_type, global_times = _sol_eclipse_when_glob_pythonic(
+                    jd - _WHEN_LOC_EPOCH_WINDOW, flags
+                )
         except (Error, RuntimeError):
             raise Error(
                 f"No solar eclipse visible from lon={lon}, lat={lat} "
@@ -3251,16 +3294,6 @@ def _sol_eclipse_when_loc_impl(
 
         # No overlap at the local maximum: nothing to see from here.
         if min_separation > rsun + rmoon:
-            if backwards:
-                jd = jd_max_global - 1
-            else:
-                jd = jd_max_global + 25
-            continue
-
-        # The local maximum must lie strictly beyond the search epoch.
-        if (not backwards and jd_local_max <= tjdut + 1e-4) or (
-            backwards and jd_local_max >= tjdut - 1e-4
-        ):
             if backwards:
                 jd = jd_max_global - 1
             else:
@@ -3298,6 +3331,25 @@ def _sol_eclipse_when_loc_impl(
             jd_fourth = _root_bisect(
                 _f_outer, jd_local_max, jd_local_max + 2.0 * two_hours
             )
+
+        # Epoch gate on the LOCAL contacts (not the geocentric maximum):
+        # keep an eclipse whose local phases are still unfolding at the
+        # search epoch (in progress or future) and skip only one already
+        # wholly past locally (forward) or wholly future locally (backward).
+        # The geocentric maximum can precede the epoch while local
+        # totality/partiality is still to come, so anchoring the gate on the
+        # first/last local contact - not jd_local_max - is what stops an
+        # in-progress eclipse from being skipped to the next lunation.
+        first_contact = jd_first if jd_first != 0.0 else jd_local_max
+        last_contact = jd_fourth if jd_fourth != 0.0 else jd_local_max
+        if (not backwards and last_contact <= tjdut + 1e-4) or (
+            backwards and first_contact >= tjdut - 1e-4
+        ):
+            if backwards:
+                jd = jd_max_global - 1
+            else:
+                jd = jd_max_global + 25
+            continue
 
         jd_second = 0.0
         jd_third = 0.0
@@ -4999,8 +5051,34 @@ def _lun_eclipse_when_loc_pythonic(
 
     search_jd = jd_start
     for _ in range(250):  # ~20 years of lunar eclipses
-        _rc_when, tret_t = _lun_eclipse_when_pythonic(search_jd, flags, 0, backwards)
+        # Offer the current lunation as a candidate even when its geocentric
+        # maximum has just slipped past the epoch: the eclipse may still be
+        # unfolding, or the Moon may only rise into it later. Anchor the
+        # search a little before/after the epoch and let the epoch gate below
+        # keep or skip the candidate. Only the first iteration is affected;
+        # later iterations start well past the previous maximum.
+        _rc_when, tret_t = _lun_eclipse_when_pythonic(
+            search_jd
+            + (_WHEN_LOC_EPOCH_WINDOW if backwards else -_WHEN_LOC_EPOCH_WINDOW),
+            flags,
+            0,
+            backwards,
+        )
         tret = list(tret_t)
+
+        # Epoch gate on the geocentric phase extent (lunar phase times are
+        # the same for every observer; only visibility is local). Keep an
+        # eclipse still unfolding at the search epoch (in progress or future)
+        # and skip only one already wholly past (forward) or wholly future
+        # (backward). tret[6]/tret[7] are the outer (penumbral) contacts;
+        # fall back to the maximum when a contact is unresolved.
+        first_contact = tret[6] if tret[6] != 0.0 else tret[0]
+        last_contact = tret[7] if tret[7] != 0.0 else tret[0]
+        if (not backwards and last_contact <= jd_start + 1e-4) or (
+            backwards and first_contact >= jd_start - 1e-4
+        ):
+            search_jd = tret[0] + (-25.0 if backwards else 25.0)
+            continue
 
         # Visibility bits: a phase counts as visible when the Moon's
         # apparent altitude is positive at its time.
