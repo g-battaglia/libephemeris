@@ -464,6 +464,39 @@ class TestHelioBaryCentric:
         pos_sf, _ = _run_skyfield(calc_ut, JD_TEST, MARS, FLG_BARYCTR | FLG_SPEED)
         assert _arcsec(abs(pos_leb[0] - pos_sf[0])) < 0.01
 
+    # Outer planets are stored as SYSTEM barycentres; the LEB adds the
+    # center-of-body (COB) offset at runtime. For an apparent HELCTR/BARYCTR
+    # place the offset must be evaluated at the RETARDED epoch (t - light_time),
+    # matching Skyfield's target.at(t - lt). Evaluating it at the observation
+    # epoch instead biased Pluto's apparent latitude by up to ~0.016" (the
+    # largest COB / most distant body). Guard lon AND lat AND distance at two
+    # epochs against the Skyfield backend, tightly (<0.001", the planet target).
+    @pytest.mark.parametrize(
+        "body,name",
+        [(5, "Jupiter"), (6, "Saturn"), (7, "Uranus"),
+         (8, "Neptune"), (9, "Pluto")],
+    )
+    @pytest.mark.parametrize("jd", [JD_TEST, julday(1861, 3, 20, 0.0)])
+    def test_outer_planet_cob_light_time_parity(self, body, name, jd):
+        from libephemeris.constants import FLG_BARYCTR, FLG_HELCTR
+
+        for centre_flag, centre in (
+            (FLG_HELCTR, "helio"),
+            (FLG_BARYCTR, "bary"),
+        ):
+            flags = centre_flag | FLG_SPEED
+            pos_leb, _ = _run_leb(calc_ut, jd, body, flags)
+            pos_sf, _ = _run_skyfield(calc_ut, jd, body, flags)
+            dlon = abs(pos_leb[0] - pos_sf[0])
+            if dlon > 180.0:
+                dlon = 360.0 - dlon
+            dlon = _arcsec(dlon)
+            dlat = _arcsec(abs(pos_leb[1] - pos_sf[1]))
+            ddist = abs(pos_leb[2] - pos_sf[2])
+            assert dlon < 0.001, f"{name} {centre} lon diff {dlon:.5f}\" jd={jd}"
+            assert dlat < 0.001, f"{name} {centre} lat diff {dlat:.5f}\" jd={jd}"
+            assert ddist < 1e-7, f"{name} {centre} dist diff {ddist:.2e}AU jd={jd}"
+
 
 # =========================================================================
 # 11. TOPOCTR Multiple Bodies

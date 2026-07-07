@@ -1373,14 +1373,25 @@ def _pipeline_icrs(
             retarded_pos, retarded_vel = reader.eval_body(ipl, jd_tt - lt)
             geo = _vec3_sub(retarded_pos, observer)
 
-        # Apply COB correction at OBSERVER time (jd_tt), matching Skyfield's
-        # _SpkCenterTarget._observe_from_bcrs() which evaluates the center
-        # segment at observer.t, not at the retarded time.
+        # Center-of-body (system barycentre -> planet centre) offset epoch.
+        # The two Skyfield-backend paths use DIFFERENT conventions, and each
+        # LEB path must mirror its counterpart for cross-backend parity:
+        #   * Geocentric observe(): _SpkCenterTarget._observe_from_bcrs()
+        #     light-time-iterates the barycentre and adds the centre offset at
+        #     t = observer.t (the OBSERVATION epoch).
+        #   * HELCTR/BARYCTR custom loop (planets.py): evaluates
+        #     target.at(retarded_time), i.e. the centre offset at the RETARDED
+        #     epoch t - lt (physically correct: light left the centre then).
+        # Evaluating COB at jd_tt for the helio/bary path biased the outer
+        # planets by up to ~0.016" (Pluto) — the whole cross-backend gap here.
         if is_system_bary and lt > 0.0:
+            _cob_epoch = (
+                jd_tt - lt if (iflag & (FLG_HELCTR | FLG_BARYCTR)) else jd_tt
+            )
             retarded_pos_cob = _apply_cob_correction(
                 (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
                 ipl,
-                jd_tt,
+                _cob_epoch,
             )
             geo = _vec3_sub(retarded_pos_cob, observer)
 
@@ -1419,10 +1430,18 @@ def _pipeline_icrs(
         # For bodies whose satellite is a substantial fraction of the primary
         # (Pluto–Charon, ~0.07"/day) omitting the COB velocity biases the speed.
         # Add d(COB)/dt analytically (the offset is smooth; ~6.4 d for Pluto).
+        # Central-difference at the SAME epoch the position COB used (retarded
+        # for HELCTR/BARYCTR, observer time otherwise) so the reported speed
+        # stays the exact derivative of the reported position.
         if is_system_bary:
+            _cob_vt = (
+                jd_tt - lt
+                if (iflag & (FLG_HELCTR | FLG_BARYCTR)) and lt > 0.0
+                else jd_tt
+            )
             _z = (0.0, 0.0, 0.0)
-            _cob_m = _apply_cob_correction(_z, ipl, jd_tt - _VEL_H)
-            _cob_p = _apply_cob_correction(_z, ipl, jd_tt + _VEL_H)
+            _cob_m = _apply_cob_correction(_z, ipl, _cob_vt - _VEL_H)
+            _cob_p = _apply_cob_correction(_z, ipl, _cob_vt + _VEL_H)
             _inv = 1.0 / (2.0 * _VEL_H)
             geo_vel = (
                 geo_vel[0] + (_cob_p[0] - _cob_m[0]) * _inv,
