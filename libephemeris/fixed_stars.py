@@ -193,7 +193,7 @@ from .constants import (
     J2000,
     DAYS_PER_JULIAN_YEAR,
 )
-from .utils import cotrans_sp
+from .utils import cotrans
 from .cache import get_true_obliquity, get_mean_obliquity
 from .exceptions import Error
 from .planets import _wrap_ephemeris_range_error
@@ -2138,26 +2138,45 @@ def _calc_star_position_from_observer(
     # Calculate position
     astrometric = earth_at_t.observe(star)
 
-    if noaberr:
-        pos = astrometric
-    elif nogdefl:
-        # Aberration without gravitational deflection:
-        # Pass empty deflectors tuple to skip deflection while keeping aberration.
-        pos = astrometric.apparent(deflectors=())
-    else:
-        pos = astrometric.apparent()
-
     # Transform to ecliptic coordinates
     frame = ecliptic_J2000_frame if j2000_frame else ecliptic_frame
-    ecl = pos.frame_latlon(frame)
 
-    # ecl returns (latitude, longitude, distance) as Skyfield Angle/Distance objects
-    lat = ecl[0].degrees
-    lon = ecl[1].degrees % 360.0
-    # Distance from parallax (AU). Stars without measured parallax use
-    # the reference's default of 0.0001249 arcsec (the Star object below
-    # already received it), so the distance stays finite and consistent.
-    dist = ecl[2].au
+    def _ecl(position) -> Tuple[float, float, float]:
+        # frame_latlon returns (latitude, longitude, distance) as Skyfield
+        # Angle/Distance objects. Distance from parallax (AU): stars without a
+        # measured parallax already received the reference default of
+        # 0.0001249 arcsec, so it stays finite and consistent.
+        e = position.frame_latlon(frame)
+        return e[1].degrees % 360.0, e[0].degrees, e[2].au
+
+    # noaberr/nogdefl are the two independent corrections. TRUEPOS maps to
+    # (noaberr and nogdefl) at the call sites, so the geometric place is the
+    # (noaberr and nogdefl) branch and NOABERR alone still keeps deflection.
+    if noaberr and nogdefl:
+        # Geometric astrometric place: no gravitational deflection, no
+        # aberration (FLG_TRUEPOS, or FLG_NOABERR|FLG_NOGDEFL together).
+        lon, lat, dist = _ecl(astrometric)
+    elif nogdefl:
+        # Aberration without gravitational deflection: pass empty deflectors
+        # to skip deflection while keeping aberration.
+        lon, lat, dist = _ecl(astrometric.apparent(deflectors=()))
+    elif noaberr:
+        # Gravitational deflection without aberration. Skyfield's apparent()
+        # applies deflection then aberration and exposes no deflection-only
+        # path, so recover the deflection contribution as the difference
+        # (apparent − apparent-without-deflectors) and add it to the geometric
+        # place. The dropped cross term (aberration acting on the ≤0.02"
+        # deflection) is < 1e-5", far below the pipeline floor.
+        g_lon, g_lat, g_dist = _ecl(astrometric)
+        a_lon, a_lat, _a = _ecl(astrometric.apparent())
+        b_lon, b_lat, _b = _ecl(astrometric.apparent(deflectors=()))
+        d_lon = (a_lon - b_lon + 180.0) % 360.0 - 180.0
+        lon = (g_lon + d_lon) % 360.0
+        lat = g_lat + (a_lat - b_lat)
+        dist = g_dist
+    else:
+        # Full apparent place: deflection + aberration (default).
+        lon, lat, dist = _ecl(astrometric.apparent())
 
     return lon, lat, dist
 
@@ -2270,8 +2289,11 @@ def _calc_star_position_leb(
     geo_dist = _vec3_dist(geo)
     lt = geo_dist / C_LIGHT_AU_DAY if geo_dist > 0 else 0.0
 
-    # 6. Gravitational deflection (skip if noaberr or nogdefl)
-    if not noaberr and not nogdefl:
+    # 6. Gravitational deflection (skip only if nogdefl). Deflection and
+    #    aberration are independent: FLG_NOABERR alone keeps deflection, and
+    #    FLG_TRUEPOS maps to (noaberr and nogdefl) at the call sites so it still
+    #    drops both. This keeps the LEB path in step with the Skyfield path.
+    if not nogdefl:
         geo = _apply_gravitational_deflection(geo, earth_pos, jd_tt, lt, reader)
 
     # 7. Aberration (skip if noaberr)
@@ -2721,83 +2743,111 @@ def _apply_fixstar_flags(
     """
     import math
 
-    lon, lat, dist, speed_lon, speed_lat, speed_dist = result
+    raw_lon, raw_lat, raw_dist, raw_slon, raw_slat, raw_sdist = result
 
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
+    want_speed = bool(iflag & FLG_SPEED)
 
-    # ---- 1. Frame selection ----
-    # J2000: precess from ecliptic-of-date back to J2000 ecliptic
-    # NONUT: remove nutation from ecliptic longitude (mean ecliptic of date)
-    # These apply regardless of equatorial output (adjust ecliptic first).
-    if iflag & FLG_J2000:
-        if not j2000_native:
-            from .astrometry import _precess_ecliptic
+    def _positional_transform(
+        plon: float, plat: float, pdist: float, jd: float
+    ) -> "tuple[float, float, float]":
+        """Reduce a single-epoch position through the frame/coordinate flags.
 
-            lon, lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
-        # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
-    elif iflag & FLG_NONUT:
-        # Skyfield returns positions on the true ecliptic of date (with nutation).
-        # NONUT means output on the mean ecliptic of date, so subtract dpsi
-        # (nutation in longitude) from the ecliptic longitude.
-        from .cache import get_cached_nutation
-
-        dpsi_rad, _ = get_cached_nutation(jd_tt)
-        lon = (lon - math.degrees(dpsi_rad)) % 360.0
-
-    # ---- 2. Equatorial coordinate transformation ----
-    if is_equatorial:
+        Applies (in order) J2000 or NONUT frame selection, the EQUATORIAL
+        rotation and the SIDEREAL ayanamsha subtraction to one position at
+        ``jd``. Velocities are obtained by central-differencing this function
+        at t±h (below) rather than rotating a single-epoch velocity with a
+        frozen obliquity. Differencing the *reported* position is what keeps
+        every time-dependent frame term in the speed: d(eps_true)/dt for the
+        EQUATORIAL rotation, d(Δψ)/dt for NONUT and d(ayanamsha)/dt for
+        SIDEREAL — all of which the frozen-frame rotation dropped.
+        """
+        # ---- 1. Frame selection ----
+        # J2000: precess from ecliptic-of-date back to J2000 ecliptic
+        # NONUT: remove nutation from ecliptic longitude (mean ecliptic of date)
+        # These apply regardless of equatorial output (adjust ecliptic first).
         if iflag & FLG_J2000:
-            # J2000 obliquity for J2000 equatorial frame.
-            # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
-            # Kept to match the planet J2000-equatorial path (planets.py) so
-            # star and planet declinations share one J2000 frame; the strict
-            # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
-            eps = 23.4392911
+            if not j2000_native:
+                from .astrometry import _precess_ecliptic
+
+                plon, plat = _precess_ecliptic(plon, plat, jd, J2000)
+            # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
         elif iflag & FLG_NONUT:
-            # Mean equator of date: use mean obliquity (no nutation)
-            eps = get_mean_obliquity(jd_tt)
-        else:
-            # True equator of date: use true obliquity
-            eps = get_true_obliquity(jd_tt)
+            # Skyfield returns positions on the true ecliptic of date (with
+            # nutation). NONUT means output on the mean ecliptic of date, so
+            # subtract dpsi (nutation in longitude) from the ecliptic longitude.
+            from .cache import get_cached_nutation
 
-        result_sp = cotrans_sp((lon, lat, dist, speed_lon, speed_lat, speed_dist), -eps)
-        lon, lat, dist = result_sp[0], result_sp[1], result_sp[2]
-        speed_lon, speed_lat, speed_dist = result_sp[3], result_sp[4], result_sp[5]
+            dpsi_rad, _ = get_cached_nutation(jd)
+            plon = (plon - math.degrees(dpsi_rad)) % 360.0
 
-    # ---- 3. Sidereal mode (ayanamsha subtraction) ----
-    # For fixed stars, SE subtracts ayanamsha from the first coordinate
-    # (ecliptic longitude or RA) AFTER equatorial conversion. This differs
-    # from planets where SE ignores sidereal for equatorial output entirely.
-    if iflag & FLG_SIDEREAL:
-        from .state import get_timescale
+        # ---- 2. Equatorial coordinate transformation ----
+        if is_equatorial:
+            if iflag & FLG_J2000:
+                # J2000 obliquity for J2000 equatorial frame.
+                # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
+                # Kept to match the planet J2000-equatorial path (planets.py) so
+                # star and planet declinations share one J2000 frame; the strict
+                # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
+                eps = 23.4392911
+            elif iflag & FLG_NONUT:
+                # Mean equator of date: use mean obliquity (no nutation)
+                eps = get_mean_obliquity(jd)
+            else:
+                # True equator of date: use true obliquity
+                eps = get_true_obliquity(jd)
 
-        ts = get_timescale()
-        t = ts.tt_jd(jd_tt)
-        tjd_ut = t.ut1
+            plon, plat, pdist = cotrans((plon, plat, pdist), -eps)
 
-        from .planets import get_ayanamsa_ut
+        # ---- 3. Sidereal mode (ayanamsha subtraction) ----
+        # For fixed stars, SE subtracts ayanamsha from the first coordinate
+        # (ecliptic longitude or RA) AFTER equatorial conversion. This differs
+        # from planets where SE ignores sidereal for equatorial output entirely.
+        if iflag & FLG_SIDEREAL:
+            from .state import get_timescale
 
-        ayanamsa = get_ayanamsa_ut(tjd_ut)
-        lon = (lon - ayanamsa) % 360.0
+            tjd_ut = get_timescale().tt_jd(jd).ut1
 
-        # Correct the first-coordinate speed for the ayanamsha drift rate
-        # (~50"/yr), mirroring the planet path (planets.py): the speed was
-        # built on the tropical frame, so the of-date ayanamsa motion must be
-        # removed for sidereal SPEED output. Without this, a star's sidereal
-        # speed_lon is returned identical to its tropical value.
-        if iflag & FLG_SPEED:
-            dt_day = 0.5
-            ayan_prev = get_ayanamsa_ut(tjd_ut - dt_day)
-            ayan_next = get_ayanamsa_ut(tjd_ut + dt_day)
-            # get_ayanamsa_ut returns a normalised [0, 360) angle, so wrap the
-            # finite-difference delta to the shortest arc before dividing; an
-            # unwrapped 0/360 crossing would inject a spurious ~360 deg/day jump.
-            ayan_delta = ayan_next - ayan_prev
-            if ayan_delta > 180.0:
-                ayan_delta -= 360.0
-            elif ayan_delta < -180.0:
-                ayan_delta += 360.0
-            speed_lon -= ayan_delta / (2.0 * dt_day)
+            from .planets import get_ayanamsa_ut
+
+            plon = (plon - get_ayanamsa_ut(tjd_ut)) % 360.0
+
+        return plon, plat, pdist
+
+    # Reported position at the request epoch.
+    lon, lat, dist = _positional_transform(raw_lon, raw_lat, raw_dist, jd_tt)
+
+    # Reported speeds: central-difference the reported position so the frame
+    # transforms above are differentiated *after* conversion. The raw speed
+    # channels are per-day central differences (raw(t+h) − raw(t-h)), so the
+    # raw endpoints are reconstructed as midpoint ± raw_speed·h and each is
+    # reduced at its own epoch (t±h) before differencing. This captures the
+    # obliquity/nutation/ayanamsha drift rates that a single-epoch velocity
+    # rotation with a frozen obliquity omitted.
+    if want_speed:
+        h = 0.5
+        p_lon, p_lat, p_dist = _positional_transform(
+            raw_lon + raw_slon * h,
+            raw_lat + raw_slat * h,
+            raw_dist + raw_sdist * h,
+            jd_tt + h,
+        )
+        m_lon, m_lat, m_dist = _positional_transform(
+            raw_lon - raw_slon * h,
+            raw_lat - raw_slat * h,
+            raw_dist - raw_sdist * h,
+            jd_tt - h,
+        )
+        # Wrap the first-coordinate delta to the shortest arc before dividing
+        # (lon/RA can straddle the 0/360 boundary).
+        d_lon = (p_lon - m_lon + 180.0) % 360.0 - 180.0
+        speed_lon = d_lon / (2.0 * h)
+        speed_lat = (p_lat - m_lat) / (2.0 * h)
+        speed_dist = (p_dist - m_dist) / (2.0 * h)
+    else:
+        speed_lon = 0.0
+        speed_lat = 0.0
+        speed_dist = 0.0
 
     # ---- 4. Output format conversion ----
     # Cast to native Python floats (upstream Skyfield/numpy ops can leak
@@ -2892,7 +2942,7 @@ def _fixstar_ut_by_id(
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
-        nogdefl = bool(flags & FLG_NOGDEFL)
+        nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         # Compute natively in J2000 ecliptic frame when requested.
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
@@ -2936,20 +2986,26 @@ def batch_fixstars_ut(
     Note:
         The fast geocentric batch path does not support ``FLG_TOPOCTR``. When
         that flag is set the function transparently delegates to the
-        topocentric single-star path (``fixstar2_ut``) per star, so batch and
+        topocentric single-star path (``fixstar_ut``) per star, so batch and
         single-star output agree (the diurnal *aberration* that ``FLG_TOPOCTR``
         adds is ~0.2"); only the per-star fast path is bypassed.
+
+        The delegate is ``fixstar_ut`` (not ``fixstar2_ut``) so the topocentric
+        path resolves names with the same ``_resolve_star_id`` semantics as the
+        geocentric batch path below — otherwise a name like "29Psc" would
+        resolve to a different star with and without ``FLG_TOPOCTR``.
     """
     # FLG_TOPOCTR is unsupported by the geocentric LEB/Skyfield batch paths
     # below; rather than silently return geocentric positions that disagree
-    # with fixstar2_ut, delegate per star to the topocentric single-star path.
+    # with the single-star path, delegate per star to the topocentric
+    # single-star path (fixstar_ut — same resolver as the geocentric branch).
     if flags & FLG_TOPOCTR:
         topo_results: list[
             Tuple[Tuple[float, float, float, float, float, float], str, int] | None
         ] = []
         for star_name in stars:
             try:
-                topo_results.append(fixstar2_ut(star_name, tjdut, flags))
+                topo_results.append(fixstar_ut(star_name, tjdut, flags))
             except Error:
                 if skip_errors:
                     topo_results.append(None)
@@ -2978,7 +3034,7 @@ def batch_fixstars_ut(
     from .state import get_leb_reader, get_timescale
 
     noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
-    nogdefl = bool(flags & FLG_NOGDEFL)
+    nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
     use_j2000 = bool(flags & FLG_J2000)
     want_speed = bool(flags & FLG_SPEED)
 
@@ -3132,7 +3188,7 @@ def fixstar(
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
-        nogdefl = bool(flags & FLG_NOGDEFL)
+        nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
@@ -3225,9 +3281,25 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
                     return entry, None
             return None, f"could not find star name HIP {hip_number}"
 
-    # Handle comma-separated format (e.g., "Regulus,alLeo")
+    # Handle comma-separated format (e.g., "Regulus,alLeo").
     if "," in search:
-        search = search.split(",")[0].strip()
+        head, _sep, tail = search.partition(",")
+        if not head.strip():
+            # Leading-comma form ",nomenclature": the reference keys purely on
+            # the Bayer/Flamsteed nomenclature after the comma, matched exactly
+            # and case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not
+            # found). Mirror the v1 _resolve_star_se semantics here instead of
+            # letting an empty name part prefix-match every catalog entry.
+            key = "".join(tail.split())
+            if not key:
+                return None, f"could not find star name {star_name}"
+            for entry in STAR_CATALOG:
+                if "".join(entry.nomenclature.split()) == key:
+                    return entry, None
+            return None, f"could not find star name ,{key}"
+        # "name,nomenclature": key on the traditional-name part (existing
+        # flexible tiers below), discarding the nomenclature suffix.
+        search = head.strip()
 
     search_upper = search.upper()
 
@@ -3366,7 +3438,7 @@ def fixstar2_ut(
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
-        nogdefl = bool(flags & FLG_NOGDEFL)
+        nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
@@ -3441,7 +3513,7 @@ def fixstar2(
 
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
-        nogdefl = bool(flags & FLG_NOGDEFL)
+        nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
