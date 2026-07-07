@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import threading
+import warnings
 from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union, overload
 
 from .constants import MEAN_NODE, TRUE_NODE
@@ -299,6 +300,25 @@ class EphemerisContext:
             Affects all position calculations when FLG_SIDEREAL is set.
             Default is Fagan/Bradley (SIDM_FAGAN_BRADLEY = 0) if never set.
         """
+        # Apply the same SIDBIT guard as the global setter (state.set_sid_mode):
+        # strip the SIDBIT_* projection flags (>= 256: ECL_T0, SSY_PLANE,
+        # USER_UT, ECL_DATE, NO_PREC_OFFSET, PREC_ORIG), which select
+        # alternative ecliptic/equinox projections not implemented here.
+        # Keeping only the base ayanamsha mode avoids the silent wrong
+        # fallback the composite value would otherwise trigger downstream
+        # (and the LEB fast-path miss it causes). Warn so the caller knows
+        # the projection was dropped rather than applied.
+        sidbits = mode & ~0xFF
+        if sidbits:
+            warnings.warn(
+                f"SIDBIT projection flags 0x{sidbits:04X} are not supported in "
+                f"this version and were ignored; using base ayanamsha mode "
+                f"{mode & 0xFF}.",
+                UserWarning,
+                stacklevel=2,
+            )
+            mode = mode & 0xFF
+
         self.sidereal_mode = mode
         self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0
         self.sidereal_ayan_t0 = ayan_t0

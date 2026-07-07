@@ -49,6 +49,7 @@ from contextlib import contextmanager as _contextmanager
 from functools import lru_cache
 
 import math
+import warnings
 from typing import Tuple, TYPE_CHECKING
 
 from .tracing import _record
@@ -4498,7 +4499,15 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
         return ayanamsa % 360.0
 
     if sid_mode not in ayanamsha_data:
-        # Default to Lahiri if unknown mode
+        # Unknown/out-of-range base mode: fall back to Lahiri, but warn
+        # loudly rather than silently — consistent with the SIDBIT guard,
+        # which announces even when the result stays correct.
+        warnings.warn(
+            f"Unknown sidereal mode {sid_mode} is not recognized; "
+            f"falling back to Lahiri (mode {SIDM_LAHIRI}).",
+            UserWarning,
+            stacklevel=2,
+        )
         sid_mode = SIDM_LAHIRI
 
     aya_j2000, precession = ayanamsha_data[sid_mode]
@@ -5633,12 +5642,27 @@ def _calc_nod_aps(
     # Sidereal output: subtract the ayanamsha from the longitudes,
     # consistent with calc_ut (issue #29: the flag was silently ignored
     # for planetary nodes/apsides).
+    #
+    # FLG_J2000 is stripped before selecting the ayanamsha: nod_aps J2000
+    # output keeps nutation in the coordinate (see _nodaps_to_j2000), so
+    # the TRUE ayanamsha (mean + Δψ) is the consistent subtraction here —
+    # matching the Moon branch and calc_ut. (Under FLG_NONUT the of-date
+    # frame carries no nutation, so the mean ayanamsha is still used.)
     if iflag & FLG_SIDEREAL:
-        aya = _get_ayanamsa_for_flags(t.ut1, iflag)
-        geo_asc = ((geo_asc[0] - aya) % 360.0, geo_asc[1], geo_asc[2])
-        geo_dsc = ((geo_dsc[0] - aya) % 360.0, geo_dsc[1], geo_dsc[2])
-        geo_peri = ((geo_peri[0] - aya) % 360.0, geo_peri[1], geo_peri[2])
-        geo_aphe = ((geo_aphe[0] - aya) % 360.0, geo_aphe[1], geo_aphe[2])
+        aya = _get_ayanamsa_for_flags(t.ut1, iflag & ~FLG_J2000)
+
+        def _to_sidereal(g):
+            # Skip the zero sentinel (e.g. the Sun's node slots, which the
+            # reference returns as zeros): subtracting the ayanamsha would
+            # fabricate a spurious node longitude — mirror the J2000 guard.
+            if g[2] == 0.0:
+                return g
+            return ((g[0] - aya) % 360.0, g[1], g[2])
+
+        geo_asc = _to_sidereal(geo_asc)
+        geo_dsc = _to_sidereal(geo_dsc)
+        geo_peri = _to_sidereal(geo_peri)
+        geo_aphe = _to_sidereal(geo_aphe)
 
     # Build output tuples (lon, lat, dist, speed_lon, speed_lat, speed_dist)
     xnasc: PosTuple = (geo_asc[0], geo_asc[1], geo_asc[2], 0.0, 0.0, 0.0)
