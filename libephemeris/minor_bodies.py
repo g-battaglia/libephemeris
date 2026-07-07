@@ -2038,6 +2038,47 @@ def _get_closest_epoch_elements(body_id: int, jd_tt: float) -> OrbitalElements:
 # epochs (each propagated up to ~5 years two-body) does not step.
 _EPOCH_BLEND_HALF_DAYS: float = 182.625  # half a Julian year
 
+# Two element epochs closer than this (days) are treated as the same node
+# when merging the curated base entry into the multi-epoch table, avoiding
+# a degenerate zero-width blend interval.
+_EPOCH_MERGE_TOL_DAYS: float = 1.0
+
+# Cache of the merged (base + multi-epoch) node list per body, in ascending
+# epoch order.  The inputs are immutable module data, so this is built once.
+_MERGED_EPOCH_ENTRIES: dict[int, list[OrbitalElements]] = {}
+
+
+def _merged_epoch_entries(body_id: int) -> Optional[list[OrbitalElements]]:
+    """Return base + multi-epoch element nodes for a body, ascending by epoch.
+
+    The curated single-epoch :data:`MINOR_BODY_ELEMENTS` entry is woven into
+    the dense :data:`MINOR_BODY_ELEMENTS_MULTI` table as just another node so
+    it participates in the same midpoint cross-fade as its neighbours.  Its
+    epoch typically falls inside the table span and is the closest osculating
+    fit to the present decade, so it must not be dropped (that loses ~300" of
+    accuracy near now) nor selected as a no-blend nearest node (that steps the
+    position where its no-blend region meets the cross-faded table).
+
+    Returns ``None`` when the body has no multi-epoch table.
+    """
+    cached = _MERGED_EPOCH_ENTRIES.get(body_id)
+    if cached is not None:
+        return cached
+
+    table = MINOR_BODY_ELEMENTS_MULTI.get(body_id)
+    if not table:
+        return None
+
+    base = MINOR_BODY_ELEMENTS[body_id]
+    merged = list(table)
+    # Insert the base node unless a table node already sits at its epoch.
+    if all(abs(base.epoch - e.epoch) > _EPOCH_MERGE_TOL_DAYS for e in table):
+        merged.append(base)
+        merged.sort(key=lambda e: e.epoch)
+
+    _MERGED_EPOCH_ENTRIES[body_id] = merged
+    return merged
+
 
 def _get_epoch_elements_blend(
     body_id: int, jd_tt: float
@@ -2049,19 +2090,18 @@ def _get_epoch_elements_blend(
     between two adjacent epochs, ``secondary`` is the other bracketing
     epoch and ``weight`` (0..0.5] is the secondary's linear blend
     fraction; otherwise ``secondary`` is None and ``weight`` is 0.0.
+
+    The curated base entry is merged into the multi-epoch nodes (see
+    :func:`_merged_epoch_entries`) so it is cross-faded like any other node
+    rather than switched to abruptly.
     """
-    base = MINOR_BODY_ELEMENTS[body_id]
-    entries = MINOR_BODY_ELEMENTS_MULTI.get(body_id)
+    entries = _merged_epoch_entries(body_id)
     if not entries:
-        return base, None, 0.0
+        return MINOR_BODY_ELEMENTS[body_id], None, 0.0
 
-    # Multi-epoch entries are generated in ascending epoch order; the
-    # single-epoch base participates as a fallback only when it is
-    # nearer than every table entry (e.g. outside the table range).
+    # Nodes are in ascending epoch order; pick the nearest and its bracketing
+    # neighbour, then cross-fade within a window around their midpoint.
     nearest = min(entries, key=lambda e: abs(jd_tt - e.epoch))
-    if abs(jd_tt - base.epoch) < abs(jd_tt - nearest.epoch):
-        return base, None, 0.0
-
     idx = entries.index(nearest)
     if jd_tt >= nearest.epoch and idx + 1 < len(entries):
         other = entries[idx + 1]
@@ -2729,9 +2769,7 @@ def calc_minor_body_heliocentric(
     elements, blend_elements, blend_w = _get_epoch_elements_blend(body_id, jd_tt)
     x, y, z = calc_minor_body_position(elements, jd_tt, body_id=body_id)
     if blend_elements is not None and blend_w > 0.0:
-        xb, yb, zb = calc_minor_body_position(
-            blend_elements, jd_tt, body_id=body_id
-        )
+        xb, yb, zb = calc_minor_body_position(blend_elements, jd_tt, body_id=body_id)
         x = x * (1.0 - blend_w) + xb * blend_w
         y = y * (1.0 - blend_w) + yb * blend_w
         z = z * (1.0 - blend_w) + zb * blend_w

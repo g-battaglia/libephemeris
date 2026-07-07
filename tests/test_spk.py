@@ -115,6 +115,29 @@ class TestNaifIdDeduction:
         assert spk._extract_asteroid_number("Chiron") is None
         assert spk._extract_asteroid_number("Eris") is None
 
+    def test_extract_number_rejects_provisional_designations(self):
+        """Provisional designations (year + survey code) are NOT catalog numbers.
+
+        Regression: the leading discovery year was mistaken for an asteroid
+        number ("2003 UB313" -> 2003), fabricating a NAIF ID absent from the
+        downloaded kernel.
+        """
+        assert spk._extract_asteroid_number("2003 UB313") is None
+        assert spk._extract_asteroid_number("1998 KY26") is None
+        assert spk._extract_asteroid_number("2014 MU69") is None
+
+    def test_extract_number_rejects_cometary_designations(self):
+        """Cometary designations (orbit-type letter + slash) are not numbers."""
+        assert spk._extract_asteroid_number("1P/Halley") is None
+        assert spk._extract_asteroid_number("C/1995 O1") is None
+        assert spk._extract_asteroid_number("2P/Encke") is None
+
+    def test_extract_number_year_named_asteroid_still_works(self):
+        """A real numbered asteroid whose number reads like a year (2003
+        Harding) is still extracted -- the trailing token is a proper name,
+        not a two-letter survey code."""
+        assert spk._extract_asteroid_number("2003 Harding") == 2003
+
     def test_deduce_naif_id(self):
         """Deduce NAIF ID from body identifier."""
         assert spk._deduce_naif_id("2060") == 2060 + NAIF_ASTEROID_OFFSET

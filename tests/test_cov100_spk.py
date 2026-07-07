@@ -28,6 +28,7 @@ import pytest
 from libephemeris import spk, state
 from libephemeris.constants import (
     CHIRON,
+    ERIS,
     FLG_HELCTR,
     FLG_J2000,
     FLG_NOABERR,
@@ -1075,6 +1076,52 @@ class TestDownloadAndRegister:
                 spk.download_and_register_spk(
                     "SomeName", CHIRON, "2020-01-01", "2025-01-01"
                 )
+
+    def test_provisional_designation_uses_file_target(self, tmp_path):
+        """Provisional designation registers the kernel's own target, not a
+        fabricated year-based NAIF ID.
+
+        Regression: "2003 UB313" was read as asteroid 2003, and the legacy
+        name deduction returned 2002003 (absent from the kernel), bypassing
+        the single-target scan so the body never resolved and silently fell
+        back to Keplerian. The download path must trust the file first.
+        """
+        with (
+            patch(
+                "libephemeris.spk.download_spk",
+                return_value=str(tmp_path / "f.bsp"),
+            ),
+            patch("libephemeris.spk._spk_covers_dates", return_value=True),
+            patch(
+                "libephemeris.spk._get_spk_targets",
+                return_value=[0, 10, 20136199],
+            ),
+            patch("libephemeris.spk.register_spk_body") as reg,
+        ):
+            spk.download_and_register_spk(
+                "2003 UB313", ERIS, "2000-01-01", "2100-01-01"
+            )
+        assert reg.call_args[0][2] == 20136199
+
+    def test_cometary_designation_uses_file_target(self, tmp_path):
+        """Cometary designation ("1P/Halley") registers the kernel target
+        rather than a fabricated 2000000+1 NAIF ID."""
+        with (
+            patch(
+                "libephemeris.spk.download_spk",
+                return_value=str(tmp_path / "f.bsp"),
+            ),
+            patch("libephemeris.spk._spk_covers_dates", return_value=True),
+            patch(
+                "libephemeris.spk._get_spk_targets",
+                return_value=[0, 10, 1000036],
+            ),
+            patch("libephemeris.spk.register_spk_body") as reg,
+        ):
+            spk.download_and_register_spk(
+                "1P/Halley", CHIRON, "2000-01-01", "2100-01-01"
+            )
+        assert reg.call_args[0][2] == 1000036
 
 
 # ---------------------------------------------------------------------------

@@ -649,3 +649,103 @@ class TestJPLDataSourcePrecision:
             assert significant >= 5, (
                 f"{elements.name}: mean motion {elements.n} has insufficient precision"
             )
+
+
+@pytest.mark.unit
+class TestEpochBlendContinuity:
+    """Keplerian fallback must not step across the curated base epoch.
+
+    Regression: the single-epoch base entry (epoch 2461000.5) sits inside the
+    multi-epoch table span and was selected nearest-epoch with no blend, so the
+    fallback longitude jumped ~400" (Ceres) / ~96" (Chiron) and the heliocentric
+    distance jumped ~1e-2 AU where the base's no-blend region met the
+    cross-faded table entries. The base is now woven into the same midpoint
+    cross-fade as its neighbours.
+    """
+
+    @staticmethod
+    def _worst_discontinuity(body_id, jd_lo, jd_hi, step):
+        """Return (max longitude jerk in arcsec, max distance jerk in AU).
+
+        The "jerk" is the change between consecutive per-step increments; a
+        smooth trajectory has a small jerk while a switch discontinuity spikes
+        it. Sampling at 0.25 d isolates the discontinuity from real motion.
+        """
+        from libephemeris.minor_bodies import calc_minor_body_heliocentric
+
+        jds = []
+        jd = jd_lo
+        while jd <= jd_hi + 1e-6:
+            jds.append(jd)
+            jd += step
+        lons = []
+        dists = []
+        for j in jds:
+            lon, _lat, dist = calc_minor_body_heliocentric(body_id, j, use_spk=False)
+            lons.append(lon)
+            dists.append(dist)
+
+        def unwrap(a, b):
+            d = b - a
+            while d > 180.0:
+                d -= 360.0
+            while d < -180.0:
+                d += 360.0
+            return d
+
+        lon_diffs = [unwrap(lons[i - 1], lons[i]) for i in range(1, len(lons))]
+        dist_diffs = [dists[i] - dists[i - 1] for i in range(1, len(dists))]
+        worst_lon = max(
+            (
+                abs(lon_diffs[i] - lon_diffs[i - 1]) * 3600.0
+                for i in range(1, len(lon_diffs))
+            ),
+            default=0.0,
+        )
+        worst_dist = max(
+            (abs(dist_diffs[i] - dist_diffs[i - 1]) for i in range(1, len(dist_diffs))),
+            default=0.0,
+        )
+        return worst_lon, worst_dist
+
+    def test_ceres_no_base_epoch_step(self):
+        """Ceres fallback is continuous through the base-epoch window."""
+        # Window brackets the base epoch 2461000.5 and both crossover midpoints.
+        worst_lon, worst_dist = self._worst_discontinuity(
+            CERES, 2459000.0, 2463000.0, 0.25
+        )
+        # Pre-fix: ~404" and ~1.1e-2 AU. Ordinary table<->table blend residual
+        # at this sampling is well under 1"; keep a comfortable margin.
+        assert worst_lon < 5.0, f'Ceres longitude step {worst_lon:.2f}" too large'
+        assert worst_dist < 1e-4, f"Ceres distance step {worst_dist:.2e} AU too large"
+
+    def test_chiron_no_base_epoch_step(self):
+        """Chiron fallback is continuous through the base-epoch window."""
+        worst_lon, worst_dist = self._worst_discontinuity(
+            CHIRON, 2459000.0, 2463000.0, 0.25
+        )
+        # Pre-fix: ~96" and ~2.6e-3 AU.
+        assert worst_lon < 2.0, f'Chiron longitude step {worst_lon:.2f}" too large'
+        assert worst_dist < 1e-4, f"Chiron distance step {worst_dist:.2e} AU too large"
+
+    def test_base_epoch_preserves_near_epoch_accuracy(self):
+        """Weaving (not dropping) the base keeps the accurate 2026 fit.
+
+        Dropping the base inside the table span would degrade the near-present
+        Keplerian longitude by ~300" versus the SPK/DE-grade position; weaving
+        it into the blend keeps it well inside that.
+        """
+        import math
+        import libephemeris as swe
+        from libephemeris.constants import FLG_HELCTR, FLG_TRUEPOS
+        from libephemeris.minor_bodies import calc_minor_body_heliocentric
+
+        jd = 2461204.5  # 2026-06-13, inside the base-epoch window
+        lon_k, lat_k, _ = calc_minor_body_heliocentric(CERES, jd, use_spk=False)
+        pos_ref, _ = swe.calc_ut(jd - 69.0 / 86400.0, CERES, FLG_HELCTR | FLG_TRUEPOS)
+        dlon = (
+            abs((pos_ref[0] - lon_k + 180) % 360 - 180)
+            * 3600
+            * math.cos(math.radians(lat_k))
+        )
+        assert dlon < 250.0, f"near-epoch accuracy regressed: dlon={dlon:.1f} arcsec"

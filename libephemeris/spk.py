@@ -112,6 +112,15 @@ def _extract_asteroid_number(body: str) -> Optional[int]:
     Args:
         body: Body identifier (e.g., "Chiron", "2060", "2060 Chiron", "(2060)")
 
+    Only a permanent catalog number is returned: a bare number, a
+    parenthesized number, or a number followed by a proper name.  A
+    provisional designation ("2003 UB313", "1998 KY26") begins with a
+    discovery *year*, and a cometary designation ("1P/Halley", "C/1995 O1")
+    carries an orbit-type letter and slash; neither leading token is a
+    catalog number, so both return None.  Treating the year/comet prefix
+    as a catalog number would fabricate a NAIF ID that is absent from the
+    downloaded kernel and never resolves.
+
     Returns:
         Asteroid number if found, None otherwise.
 
@@ -124,10 +133,30 @@ def _extract_asteroid_number(body: str) -> Optional[int]:
         136199
         >>> _extract_asteroid_number("Chiron")
         None
+        >>> _extract_asteroid_number("2003 UB313") is None
+        True
+        >>> _extract_asteroid_number("1P/Halley") is None
+        True
     """
-    # Try to find a number at the start or in parentheses
-    # Pattern: optional parentheses, digits, optional name
-    match = re.match(r"^\(?(\d+)\)?", body.strip())
+    text = body.strip()
+
+    # Cometary designations ("1P/Halley", "C/1995 O1", "2P/Encke") carry a
+    # slash separating the orbit-type letter from the name/designation and
+    # never denote a numbered-asteroid catalog number.
+    if "/" in text:
+        return None
+
+    # Provisional designations ("2003 UB313", "1998 KY26", "2014 MU69"):
+    # a four-digit discovery year followed by a packed survey code of one
+    # or two uppercase letters plus an optional cycle count.  The leading
+    # year is not a catalog number.  A genuine "number name" pair such as
+    # "2003 Harding" is NOT matched here because the name continues with
+    # lowercase letters rather than terminating after the uppercase code.
+    if re.match(r"^\(?\d{4}\)?\s+[A-Z]{1,2}\d*\b", text):
+        return None
+
+    # Numbered asteroid: bare number, "(number)", or "number name".
+    match = re.match(r"^\(?(\d+)\)?", text)
     if match:
         return int(match.group(1))
     return None
@@ -314,18 +343,27 @@ def _build_horizons_url(
     return f"{HORIZONS_API_URL}?{query}"
 
 
-def _sanitize_filename(body: str) -> str:
+def _sanitize_filename(body: Union[int, str]) -> str:
     """
-    Create a safe filename from body name.
+    Create a safe filename stem from a body identifier.
+
+    This is the canonical sanitizer shared by the SPK writer
+    (:func:`download_spk`) and every cache-lookup path in
+    :mod:`libephemeris.spk_auto` (``get_cache_path``, ``is_spk_cached``,
+    ``_find_covering_spk``, ``_generate_spk_cache_filename``).  All of
+    them must agree byte-for-byte so that a file written for ``"Ceres;"``
+    (stem ``"ceres"``) is found again on lookup; a divergent sanitizer
+    previously left trailing underscores (``"ceres_"``) and produced
+    permanent cache misses plus redundant re-downloads.
 
     Args:
-        body: Body name/identifier
+        body: Body name or numeric identifier (int or str).
 
     Returns:
-        Sanitized string safe for use in filenames.
+        Sanitized lowercase string safe for use in filenames.
     """
     # Remove/replace unsafe characters
-    safe = re.sub(r"[^\w\-]", "_", body.lower())
+    safe = re.sub(r"[^\w\-]", "_", str(body).lower())
     # Collapse multiple underscores
     safe = re.sub(r"_+", "_", safe)
     # Remove leading/trailing underscores
@@ -1364,27 +1402,41 @@ def download_and_register_spk(
             timeout=timeout,
         )
 
-    # Deduce NAIF ID if not provided
+    # Deduce NAIF ID if not provided.  The downloaded kernel's own target
+    # IDs are authoritative, so resolve from the file first and use the
+    # name only as a confirmation/fallback -- mirroring the already-correct
+    # spk_auto._register_spk_after_download path.  A name-based deduction
+    # can otherwise return a fabricated-but-non-None ID (e.g. 2000000+year
+    # for a provisional designation like "2003 UB313" or a cometary
+    # "1P/Halley"), which would bypass the single-target scan and register
+    # a body whose NAIF ID is absent from the kernel, silently falling back
+    # to the Keplerian approximation.
     if naif_id is None:
-        # Try to get asteroid number
+        # A permanent catalog number lets us match the exact convention the
+        # kernel uses (20000000+N vs 2000000+N).
         asteroid_number = _extract_asteroid_number(body)
         if asteroid_number is not None:
-            # Try to find the NAIF ID in the SPK file (handles both conventions)
             naif_id = _find_naif_id_for_asteroid(spk_path, asteroid_number)
 
         if naif_id is None:
-            # Fall back to legacy convention
-            naif_id = _deduce_naif_id(body)
+            # Trust the file: a lone small-body target (NAIF > 1e6) is the
+            # object we just downloaded.  This handles name-syntax bodies
+            # like "Ceres;" and provisional/cometary designations where no
+            # catalog number can be extracted from the name.
+            targets = _get_spk_targets(spk_path)
+            small_bodies = {t for t in targets if t > 1_000_000}
+            if len(small_bodies) == 1:
+                naif_id = small_bodies.pop()
+            else:
+                # Broader single-target scan excluding common centers
+                # (Sun=10, SSB=0) for kernels using non-small-body numbering.
+                unique_targets = {t for t in targets if t not in (0, 10)}
+                if len(unique_targets) == 1:
+                    naif_id = unique_targets.pop()
 
         if naif_id is None:
-            # Last resort: scan SPK file for target IDs.
-            # If there's exactly one unique target (excluding common centers like
-            # Sun=10, SSB=0), use it. This handles name-syntax bodies like "Ceres;"
-            # where we can't extract an asteroid number from the name.
-            targets = _get_spk_targets(spk_path)
-            unique_targets = set(t for t in targets if t not in (0, 10))
-            if len(unique_targets) == 1:
-                naif_id = unique_targets.pop()
+            # Last resort: legacy name-based deduction.
+            naif_id = _deduce_naif_id(body)
 
         if naif_id is None:
             raise ValueError(

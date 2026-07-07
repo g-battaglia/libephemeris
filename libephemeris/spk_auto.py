@@ -166,9 +166,10 @@ def get_cache_path(body_id: Union[int, str], cache_dir: Optional[str] = None) ->
     else:
         dir_path = DEFAULT_AUTO_SPK_DIR
 
-    # Sanitize body_id for filename
-    body_str = str(body_id).lower()
-    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+    # Sanitize body_id for filename (shared writer/reader sanitizer)
+    from .spk import _sanitize_filename
+
+    safe_body_id = _sanitize_filename(body_id)
 
     filename = f"{safe_body_id}.bsp"
     return os.path.join(dir_path, filename)
@@ -1191,9 +1192,10 @@ def _generate_spk_cache_filename(
     Returns:
         str: Filename like "2060_2458849_2462502.bsp"
     """
-    # Sanitize body_id for filename
-    body_str = str(body_id).lower()
-    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+    # Sanitize body_id for filename (shared writer/reader sanitizer)
+    from .spk import _sanitize_filename
+
+    safe_body_id = _sanitize_filename(body_id)
 
     # Truncate JD to integer for filename (sufficient precision for cache lookup)
     jd_start_int = int(jd_start)
@@ -1226,9 +1228,10 @@ def _find_covering_spk(
     if not os.path.exists(cache_dir):
         return None
 
-    # Sanitize body_id to match filename pattern
-    body_str = str(body_id).lower()
-    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+    # Sanitize body_id to match filename pattern (shared writer/reader sanitizer)
+    from .spk import _sanitize_filename
+
+    safe_body_id = _sanitize_filename(body_id)
 
     # Read the ACTUAL coverage from each candidate kernel's segment metadata
     # rather than parsing the filename. Cached files appear under several naming
@@ -1317,12 +1320,10 @@ def is_spk_cached(
     if not os.path.exists(cache_dir):
         return False
 
-    # Sanitize body_id to match filename pattern
-    body_str = str(body_id).lower()
-    safe_body_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in body_str)
+    # Sanitize body_id to match filename pattern (shared writer/reader sanitizer)
+    from .spk import _sanitize_filename, get_spk_coverage
 
-    # Import get_spk_coverage here to avoid circular imports
-    from .spk import get_spk_coverage
+    safe_body_id = _sanitize_filename(body_id)
 
     # Look for files matching this body
     for filename in os.listdir(cache_dir):

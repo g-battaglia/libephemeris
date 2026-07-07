@@ -979,6 +979,56 @@ class TestIsSpkCachedWithMockedCoverage:
             assert result is False
 
 
+class TestIsSpkCachedSanitizerParity:
+    """The cache lookup must find files named by the download-side sanitizer.
+
+    Regression: ``download_spk`` strips trailing underscores when sanitizing
+    ("Ceres;" -> "ceres", written as "ceres_<range>.bsp"), but the lookup
+    sanitizer left them ("Ceres;" -> "ceres_", searching the "ceres__" prefix),
+    so name-syntax kernels were never matched and were redundantly
+    re-downloaded (the "davida__*.bsp" fossils in user caches are evidence).
+    Both sides now share one sanitizer.
+    """
+
+    def test_name_syntax_body_matches_writer_named_file(self, tmp_path):
+        """is_spk_cached('Ceres;') finds a writer-named 'ceres_*.bsp'."""
+        # File named exactly as download_spk would write it for "Ceres;".
+        spk_file = tmp_path / "ceres_190001_210001.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        with patch(
+            "libephemeris.spk.get_spk_coverage",
+            return_value=(2415020.5, 2488069.5),
+        ):
+            assert (
+                spk_auto.is_spk_cached("Ceres;", 2451545.0, 2451545.0, str(tmp_path))
+                is True
+            )
+            # A plain "Ceres" must resolve to the same stem/file.
+            assert (
+                spk_auto.is_spk_cached("Ceres", 2451545.0, 2451545.0, str(tmp_path))
+                is True
+            )
+
+    def test_find_covering_spk_matches_writer_named_file(self, tmp_path):
+        """_find_covering_spk resolves the writer-named kernel for 'Davida;'."""
+        spk_file = tmp_path / "davida_190001_210001.bsp"
+        spk_file.write_bytes(b"dummy SPK")
+
+        with (
+            patch(
+                "libephemeris.spk.get_spk_coverage",
+                return_value=(2415020.5, 2488069.5),
+            ),
+            patch("libephemeris.spk_auto._is_valid_bsp", return_value=True),
+        ):
+            result = spk_auto._find_covering_spk(
+                "Davida;", 2451545.0, 2451545.0, str(tmp_path)
+            )
+            assert result is not None
+            assert result.endswith("davida_190001_210001.bsp")
+
+
 class TestIsSpkCachedModuleExport:
     """Test that is_spk_cached is properly exported."""
 
