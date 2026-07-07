@@ -445,6 +445,14 @@ libephemeris vs pyswisseph differ by up to ~33" (Cupido; most < 25"). There is n
 independent astronomical reference for these fictitious bodies, so neither is
 "truth".
 
+**13.2 Hypothetical bodies with `EQUATORIAL | J2000` (intentional).** For these
+bodies the reference API rotates the J2000 ecliptic to the equator with the
+true obliquity **of date**, producing a frame-mixed RA/Dec (~3" from a
+consistent J2000 frame in 2023, growing with distance from J2000). libephemeris
+uses the J2000 obliquity — the same convention as every other body class — in
+both backends, so `EQ|J2000` is a self-consistent J2000 equatorial frame.
+Certified divergence; see `intentional-divergences.md` §8.
+
 ### 14. Constants and API
 
 **14.1 Version string** intentionally differs (libephemeris reports its own

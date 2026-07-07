@@ -258,3 +258,30 @@ oracle. Across Spica, Sirius, Regulus, Aldebaran, Vega, Arcturus, Rigil Kent,
 Altair, Antares and one zero-parallax catalog entry at 1950, J2000 and 2025,
 libephemeris agrees with the Astropy distance to <1.3e-7 relative and with the
 distance-speed derivative to <1.7e-5 AU/day.
+
+## 8. `EQUATORIAL | J2000` for hypothetical bodies (Uranians, Transpluto)
+
+**Status:** intentional divergence since the v3 speed/frame round.
+
+For the hypothetical orbital bodies (Cupido…Poseidon, Transpluto/Isis), the
+reference API computes `FLG_EQUATORIAL | FLG_J2000` by rotating the body's
+J2000 *ecliptic* coordinates to the equator with the **true obliquity of
+date** — a frame-mixed output (J2000 ecliptic longitude zero-point, of-date
+equator tilt) that is ~3" away from a consistent J2000 equatorial frame in
+2023 (Cupido 3.1", Transpluto 1.4"; the offset grows with distance from
+J2000). Every other body class (planets, nodes, apsides, Lilith, White Moon,
+fixed stars) already gets a consistent J2000 frame: ecliptic → equator with
+the J2000 obliquity.
+
+libephemeris rotates these bodies with the **J2000 obliquity** as well, in
+both backends (Skyfield path in `planets.py`, LEB fast path in
+`fast_calc.py` Pipeline C), so `EQ|J2000` means the same frame for every
+body. RA/Dec speeds are carried through the same fixed rotation, so the
+reported speed remains the derivative of the reported position.
+
+Verification: rotating the body's own `FLG_J2000` ecliptic output to the
+equator with eps_J2000 = 23.4392911° reproduces the returned `EQ|J2000`
+RA/Dec to <0.001" for Cupido, Isis, Mars, White Moon and True Node alike
+(scratch check `uranian_eqj2000.py`, JD 2460000.5, both backends). Only the
+combination `FLG_EQUATORIAL | FLG_J2000` on hypothetical bodies is affected;
+of-date equatorial, ecliptic and J2000-ecliptic outputs are unchanged.

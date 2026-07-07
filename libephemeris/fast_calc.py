@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 import threading
 from functools import lru_cache
-from typing import TYPE_CHECKING, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple
 
 from .constants import (
     EARTH,
@@ -509,7 +509,17 @@ def _apply_gravitational_deflection(
         qmag = math.sqrt(pq[0] ** 2 + pq[1] ** 2 + pq[2] ** 2)
         emag = math.sqrt(pe[0] ** 2 + pe[1] ** 2 + pe[2] ** 2)
 
-        if qmag == 0.0 or emag == 0.0:
+        # Skip a deflector the observer is inside of or grazing (emag below
+        # ~2 solar radii). This happens for planet-centric observers at the
+        # deflecting body itself (e.g. calc_pctr from Jupiter/Saturn, where
+        # pe is just the centre-vs-system-barycentre offset, ~1e-6 AU, well
+        # inside the planet). The far-field PPN formula is singular as
+        # emag -> 0 and produced a spurious ~10" "deflection" of Mars seen
+        # from Jupiter — physically, the deflection of light arriving at the
+        # deflector's own centre vanishes. The threshold cannot affect any
+        # supported geocentric/heliocentric observer (Earth is >= 0.98 AU
+        # from the Sun and >= 4 AU from Jupiter/Saturn).
+        if qmag == 0.0 or emag < 0.01:
             continue
 
         qhat = (pq[0] / qmag, pq[1] / qmag, pq[2] / qmag)
@@ -1181,6 +1191,67 @@ def _apparent_icrs_cartesian(
 # PIPELINE A: ICRS BARYCENTRIC BODIES
 # =============================================================================
 
+# Central-difference half-step (days) for the Pipeline-A velocity. The velocity
+# is built analytically from the exact Chebyshev derivative for the body's
+# geometric motion (no float64-jd quantization), then the aberration,
+# deflection and frame-rotation contributions are recovered by differencing
+# those smooth corrections over ±_VEL_H on analytically-extrapolated inputs.
+# Because the body's geometric vector is extrapolated analytically (not by
+# re-evaluating the body ephemeris at jd±h), _VEL_H does NOT suffer the ULP
+# quantization that a naive position central difference would. It can therefore
+# be kept small to bound the O(h**2) truncation of the fast-moving Moon's terms
+# — dominated by the topocentric diurnal parallax rate — while leaving the
+# planets exact. The lower bound is set by the smooth position-level inputs that
+# ARE re-evaluated (frame matrices, COB and topocentric offsets): their ULP
+# noise is amplified by 1/(2h), so it re-emerges below ~1e-4 d. 5e-4 sits in the
+# sweet spot (Moon terms < 0.03"/day, planets < 0.001"/day).
+_VEL_H = 0.0005
+
+
+def _frame_transform(
+    geo: Tuple[float, float, float],
+    jd_tt: float,
+    iflag: int,
+    want_xyz: bool,
+) -> Tuple[float, float, float]:
+    """Rotate an apparent ICRS vector into the requested output frame.
+
+    Shared by the Pipeline-A position and velocity paths so that the reported
+    speed is the exact derivative of the reported position (the frame rotation
+    is evaluated at the sample epoch, capturing the precession/nutation
+    equinox motion). Returns spherical (lon_deg, lat_deg, dist_au) unless
+    *want_xyz*, in which case the Cartesian components of the rotated vector
+    are returned.
+    """
+    if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
+        # ICRS J2000 equatorial -- geo is already in this frame.
+        v = geo
+    elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
+        # SID+EQ: mean equator of date (P matrix, no nutation).
+        v = _mat3_vec3(_prec_matrix(jd_tt), geo)
+    elif iflag & FLG_EQUATORIAL:
+        # NONUT: mean equator (P matrix); else true equator (PNM).
+        if iflag & FLG_NONUT:
+            _eq_mat = _prec_matrix(jd_tt)
+        else:
+            _eq_mat, _, _, _ = _frame_data(jd_tt)
+        v = _mat3_vec3(_eq_mat, geo)
+    elif iflag & FLG_J2000:
+        v = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
+    else:
+        # TRUE ECLIPTIC OF DATE (default). FLG_NONUT: mean ecliptic (no nutation).
+        if iflag & FLG_NONUT:
+            _rot_mat = _prec_matrix(jd_tt)
+            eps_rad = math.radians(vondrak_mean_obliquity_deg(jd_tt))
+        else:
+            _rot_mat, _, _, eps_rad = _frame_data(jd_tt)
+        geo_eq = _mat3_vec3(_rot_mat, geo)
+        v = _rotate_equatorial_to_ecliptic(geo_eq[0], geo_eq[1], geo_eq[2], eps_rad)
+
+    if want_xyz:
+        return v[0], v[1], v[2]
+    return _cartesian_to_spherical(v[0], v[1], v[2])
+
 
 def _pipeline_icrs(
     reader: "LEBReaderLike",
@@ -1191,6 +1262,9 @@ def _pipeline_icrs(
     is_system_bary: bool = False,
     topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
     want_xyz: bool = False,
+    topo_offset_fn: Optional[
+        Callable[[float], Tuple[Tuple[float, float, float], Tuple[float, float, float]]]
+    ] = None,
 ) -> Tuple[float, ...]:
     """Pipeline A: compute ecliptic coordinates for ICRS barycentric bodies.
 
@@ -1302,7 +1376,50 @@ def _pipeline_icrs(
             geo = _vec3_sub(retarded_pos_cob, observer)
 
     if want_velocity:
+        # Exact geometric velocity of the light-time-corrected vector, from the
+        # Chebyshev derivative (no float64-jd quantization). The aberration,
+        # deflection and frame-rotation contributions are added below.
         geo_vel = _vec3_sub(retarded_vel, observer_vel)
+        geo_geom = geo  # pre-deflection, pre-aberration apparent vector at jd_tt
+
+        # Light-time retardation rate: the apparent place is target(t - lt(t)),
+        # whose exact derivative carries a factor (1 - d(lt)/dt) on the target's
+        # retarded velocity. Omitting it biases planet longitude speeds by up to
+        # ~0.1"/day (Mars). d(lt)/dt has the closed form
+        #   lt' = p̂·(r' - o') / (c + p̂·r')
+        # from differentiating |target(t-lt) - observer(t)| = c·lt.
+        if not (iflag & FLG_TRUEPOS) and lt > 0.0:
+            _dg = _vec3_dist(geo_geom)
+            if _dg > 0.0:
+                _px, _py, _pz = geo_geom[0] / _dg, geo_geom[1] / _dg, geo_geom[2] / _dg
+                _pr = (
+                    _px * retarded_vel[0]
+                    + _py * retarded_vel[1]
+                    + _pz * retarded_vel[2]
+                )
+                _pv = _px * geo_vel[0] + _py * geo_vel[1] + _pz * geo_vel[2]
+                _ltdot = _pv / (C_LIGHT_AU_DAY + _pr)
+                geo_vel = (
+                    retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
+                    retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
+                    retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
+                )
+
+        # Center-of-body motion: geo_geom carries the COB offset (planet centre
+        # vs system barycentre) but retarded_vel is the barycentre velocity.
+        # For bodies whose satellite is a substantial fraction of the primary
+        # (Pluto–Charon, ~0.07"/day) omitting the COB velocity biases the speed.
+        # Add d(COB)/dt analytically (the offset is smooth; ~6.4 d for Pluto).
+        if is_system_bary:
+            _z = (0.0, 0.0, 0.0)
+            _cob_m = _apply_cob_correction(_z, ipl, jd_tt - _VEL_H)
+            _cob_p = _apply_cob_correction(_z, ipl, jd_tt + _VEL_H)
+            _inv = 1.0 / (2.0 * _VEL_H)
+            geo_vel = (
+                geo_vel[0] + (_cob_p[0] - _cob_m[0]) * _inv,
+                geo_vel[1] + (_cob_p[1] - _cob_m[1]) * _inv,
+                geo_vel[2] + (_cob_p[2] - _cob_m[2]) * _inv,
+            )
 
     # 5. Gravitational deflection by Sun, Jupiter, Saturn (PPN formula).
     #    Dominant correction: up to ~4" for Saturn near the Sun's limb.
@@ -1310,141 +1427,142 @@ def _pipeline_icrs(
     #    ~0.0026 AU, deflection < 0.000001"). NOABERR deliberately does NOT
     #    skip deflection: the reference API disables only aberration with it
     #    (FLG_ASTROMETRIC = NOABERR|NOGDEFL).
-    if not (iflag & (FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)):
-        if ipl != MOON and lt > 0.0:
-            geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
+    _do_defl = not (iflag & (FLG_NOGDEFL | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS))
+    _do_defl = _do_defl and ipl != MOON and lt > 0.0
+    _defl_delta: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    if _do_defl:
+        _pre_defl = geo
+        geo = _apply_gravitational_deflection(geo, observer, jd_tt, lt, reader)
+        if want_velocity:
+            _defl_delta = _vec3_sub(geo, _pre_defl)
 
     # 6. Aberration (full special-relativistic, matching Skyfield).
-    #    For velocity: the aberration correction depends on Earth's velocity
-    #    which changes slowly (~0.017 deg/day²). The velocity component of
-    #    aberration is ~1e-8 deg/day — negligible. We skip it.
-    if not (iflag & (FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS)):
+    _do_aber = not (iflag & (FLG_NOABERR | FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS))
+    if _do_aber:
         geo = _apply_aberration(geo, earth_vel, lt)
 
-    # 6. Coordinate transform — apply the same transform to velocity
+    # 6. Coordinate transform (position).
     #
     # Sidereal handling for Pipeline A (ICRS bodies):
     #   SID+EQ: use mean equator (P matrix, no nutation) — NO ayanamsha subtraction
     #   SID+EQ+J2K: same as non-sidereal EQ+J2K (ICRS ≡ J2000 equatorial)
     #   SID only: output ecliptic-of-date, ayanamsha subtracted in _fast_calc_core
     #   SID+J2K: output J2000 ecliptic, ayanamsha subtracted in _fast_calc_core
-    _is_sidereal = bool(iflag & FLG_SIDEREAL)
-    _want_nonut = bool(iflag & FLG_NONUT)
-
     _want_xyz = want_xyz or bool(iflag & FLG_XYZ)
 
-    if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
-        # ICRS J2000 equatorial -- geo is already in this frame
-        if _want_xyz:
-            lon_deg, lat_deg, dist = geo[0], geo[1], geo[2]
-        else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(geo[0], geo[1], geo[2])
-        if want_velocity:
-            if _want_xyz:
-                dlon, dlat, ddist = geo_vel[0], geo_vel[1], geo_vel[2]
-            else:
-                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo[0], geo[1], geo[2],
-                    geo_vel[0], geo_vel[1], geo_vel[2],
-                )
+    lon_deg, lat_deg, dist = _frame_transform(geo, jd_tt, iflag, _want_xyz)
 
-    elif (iflag & FLG_EQUATORIAL) and _is_sidereal:
-        p_mat = _prec_matrix(jd_tt)
-        geo_eq = _mat3_vec3(p_mat, geo)
-        if _want_xyz:
-            lon_deg, lat_deg, dist = geo_eq[0], geo_eq[1], geo_eq[2]
-        else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(
-                geo_eq[0], geo_eq[1], geo_eq[2]
-            )
-        if want_velocity:
-            vel_eq = _mat3_vec3(p_mat, geo_vel)
-            if _want_xyz:
-                dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
-            else:
-                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo_eq[0], geo_eq[1], geo_eq[2],
-                    vel_eq[0], vel_eq[1], vel_eq[2],
-                )
+    if not want_velocity:
+        return lon_deg, lat_deg, dist
 
-    elif iflag & FLG_EQUATORIAL:
-        # NONUT: use P matrix (mean equator), else PNM (true equator)
-        if _want_nonut:
-            _eq_mat = _prec_matrix(jd_tt)
-        else:
-            _eq_mat, _, _, _ = _frame_data(jd_tt)
-        geo_eq = _mat3_vec3(_eq_mat, geo)
-        if _want_xyz:
-            lon_deg, lat_deg, dist = geo_eq[0], geo_eq[1], geo_eq[2]
-        else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(
-                geo_eq[0], geo_eq[1], geo_eq[2]
-            )
-        if want_velocity:
-            vel_eq = _mat3_vec3(_eq_mat, geo_vel)
-            if _want_xyz:
-                dlon, dlat, ddist = vel_eq[0], vel_eq[1], vel_eq[2]
-            else:
-                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    geo_eq[0], geo_eq[1], geo_eq[2],
-                    vel_eq[0], vel_eq[1], vel_eq[2],
-                )
+    # 7. Velocity: the reported speed must be the exact time-derivative of the
+    #    reported position. The analytic geometric velocity (geo_vel) omits the
+    #    time-derivatives of the aberration/deflection corrections (up to
+    #    ~4"/day for the Moon) and of the of-date frame rotation
+    #    (precession + nutation of the equinox, ~0.09"/day). Recover the full
+    #    derivative by central-differencing the apparent place through the same
+    #    frame transform at jd_tt ± _VEL_H, extrapolating the body's geometric
+    #    vector analytically (so no ephemeris re-evaluation at jd±h and hence no
+    #    ULP quantization) while re-forming the smooth aberration/deflection/
+    #    frame terms at each sample epoch. This mirrors the Skyfield backend,
+    #    which central-differences its full apparent-place pipeline.
+    #
+    # Topocentric observer at the sample epochs. Linear extrapolation of the
+    # observer (via geo_vel, which carries observer_vel) misses the diurnal
+    # Earth-rotation curvature of the topocentre; recompute the true offset at
+    # jd_tt ± _VEL_H so the parallax and diurnal-aberration rates are exact.
+    _tofs_m: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = (
+        None
+    )
+    _tofs_p: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = (
+        None
+    )
+    if topo_offset is not None and topo_offset_fn is not None:
+        _tofs_m = topo_offset_fn(jd_tt - _VEL_H)
+        _tofs_p = topo_offset_fn(jd_tt + _VEL_H)
 
-    elif iflag & FLG_J2000:
-        ecl = _rotate_icrs_to_ecliptic_j2000(geo[0], geo[1], geo[2])
-        if _want_xyz:
-            lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
+    ev_m: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    ev_p: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    if _do_aber:
+        # Observer (Earth [+ topocentre]) velocity at the sample epochs drives
+        # the annual (and diurnal, for topocentric) aberration rate.
+        _, _evm = reader.eval_body(EARTH, jd_tt - _VEL_H)
+        _, _evp = reader.eval_body(EARTH, jd_tt + _VEL_H)
+        if topo_offset is not None:
+            _tvm = _tofs_m[1] if _tofs_m is not None else topo_offset[1]
+            _tvp = _tofs_p[1] if _tofs_p is not None else topo_offset[1]
+            ev_m = (_evm[0] + _tvm[0], _evm[1] + _tvm[1], _evm[2] + _tvm[2])
+            ev_p = (_evp[0] + _tvp[0], _evp[1] + _tvp[1], _evp[2] + _tvp[2])
         else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(ecl[0], ecl[1], ecl[2])
-        if want_velocity:
-            vel_ecl = _rotate_icrs_to_ecliptic_j2000(
-                geo_vel[0], geo_vel[1], geo_vel[2]
-            )
-            if _want_xyz:
-                dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
-            else:
-                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    ecl[0], ecl[1], ecl[2],
-                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
-                )
+            ev_m, ev_p = _evm, _evp
 
-    else:
-        # TRUE ECLIPTIC OF DATE (default) -- most common path
-        # FLG_NONUT: mean ecliptic (P matrix only, no nutation)
-        if _want_nonut:
-            _rot_mat = _prec_matrix(jd_tt)
-            eps_rad = math.radians(vondrak_mean_obliquity_deg(jd_tt))
-        else:
-            _rot_mat, _, _, eps_rad = _frame_data(jd_tt)
-
-        geo_eq = _mat3_vec3(_rot_mat, geo)
-
-        ecl = _rotate_equatorial_to_ecliptic(
-            geo_eq[0], geo_eq[1], geo_eq[2], eps_rad
+    def _apparent_at(
+        s: float,
+        ev_s: Tuple[float, float, float],
+        tofs_s: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]],
+    ) -> Tuple[float, float, float]:
+        g = (
+            geo_geom[0] + geo_vel[0] * s,
+            geo_geom[1] + geo_vel[1] * s,
+            geo_geom[2] + geo_vel[2] * s,
         )
-        if _want_xyz:
-            lon_deg, lat_deg, dist = ecl[0], ecl[1], ecl[2]
-        else:
-            lon_deg, lat_deg, dist = _cartesian_to_spherical(
-                ecl[0], ecl[1], ecl[2]
+        if tofs_s is not None and topo_offset is not None:
+            # Replace the linearly-extrapolated topocentre with the true one:
+            # subtract (topo(t+s) - topo(t) - topo_vel·s), the diurnal curvature.
+            _tp = tofs_s[0]
+            _t0 = topo_offset[0]
+            _tv = topo_offset[1]
+            g = (
+                g[0] - (_tp[0] - _t0[0] - _tv[0] * s),
+                g[1] - (_tp[1] - _t0[1] - _tv[1] * s),
+                g[2] - (_tp[2] - _t0[2] - _tv[2] * s),
             )
-
-        if want_velocity:
-            vel_eq = _mat3_vec3(_rot_mat, geo_vel)
-            vel_ecl = _rotate_equatorial_to_ecliptic(
-                vel_eq[0], vel_eq[1], vel_eq[2], eps_rad
-            )
-            if _want_xyz:
-                dlon, dlat, ddist = vel_ecl[0], vel_ecl[1], vel_ecl[2]
-            else:
-                dlon, dlat, ddist = _cartesian_velocity_to_spherical(
-                    ecl[0], ecl[1], ecl[2],
-                    vel_ecl[0], vel_ecl[1], vel_ecl[2],
+        # Light-time to the target at the sample epoch (the extrapolated
+        # geometric vector has magnitude c·lt_s). The aberration formula
+        # normalises by this distance, so a frozen lt would bias it.
+        lt_s = _vec3_dist(g) / C_LIGHT_AU_DAY
+        if _do_defl:
+            if ipl == SUN:
+                # Sun target: the Sun is its own dominant "deflector", so the
+                # PPN geometry is degenerate (q ~ the Sun's barycentric motion
+                # over lt, a ~1e-7 AU vector). Re-evaluating it on the
+                # extrapolated vector with frozen deflectors produces a huge
+                # spurious rate (~8"/day); physically the term is essentially
+                # constant over ±_VEL_H, so freeze the position-path delta.
+                g = (
+                    g[0] + _defl_delta[0],
+                    g[1] + _defl_delta[1],
+                    g[2] + _defl_delta[2],
                 )
+            else:
+                # Deflectors frozen at jd_tt: the dominant rate is from the
+                # target direction changing (captured by g), not the deflectors
+                # moving.
+                g = _apply_gravitational_deflection(g, observer, jd_tt, lt_s, reader)
+        if _do_aber:
+            g = _apply_aberration(g, ev_s, lt_s)
+        return g
 
-    if want_velocity:
-        return lon_deg, lat_deg, dist, dlon, dlat, ddist
-    return lon_deg, lat_deg, dist
+    w_m = _frame_transform(
+        _apparent_at(-_VEL_H, ev_m, _tofs_m), jd_tt - _VEL_H, iflag, _want_xyz
+    )
+    w_p = _frame_transform(
+        _apparent_at(_VEL_H, ev_p, _tofs_p), jd_tt + _VEL_H, iflag, _want_xyz
+    )
+    inv2h = 1.0 / (2.0 * _VEL_H)
+    if _want_xyz:
+        dlon = (w_p[0] - w_m[0]) * inv2h
+        dlat = (w_p[1] - w_m[1]) * inv2h
+        ddist = (w_p[2] - w_m[2]) * inv2h
+    else:
+        _dl = (w_p[0] - w_m[0]) % 360.0
+        if _dl > 180.0:
+            _dl -= 360.0
+        dlon = _dl * inv2h
+        dlat = (w_p[1] - w_m[1]) * inv2h
+        ddist = (w_p[2] - w_m[2]) * inv2h
+
+    return lon_deg, lat_deg, dist, dlon, dlat, ddist
 
 
 # =============================================================================
@@ -1745,22 +1863,19 @@ def _pipeline_helio(
         ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
 
     # Position is now J2000 ecliptic (helio or geo).
-    # The Skyfield reference path precesses J2000 → ecliptic of date ONLY when
-    # the J2000 flag is NOT set.  For EQ+J2000, it converts J2000 ecliptic to
-    # equatorial using obliquity of date (not J2000).  We must match this.
+    # The Skyfield backend precesses J2000 → ecliptic of date ONLY when the
+    # J2000 flag is NOT set.  For EQ+J2000, both backends rotate the J2000
+    # ecliptic to the equator with the J2000 obliquity — a consistent J2000
+    # equatorial frame, same as every other body class.  (The reference API
+    # instead uses the obliquity of date here, a frame-mixed output ~3" off in
+    # 2023 — an intentional, certified divergence; see
+    # docs/comparison/intentional-divergences.md.)
     is_j2000 = bool(iflag & FLG_J2000)
     is_equatorial = bool(iflag & FLG_EQUATORIAL)
 
     if is_equatorial and is_j2000:
-        # EQ+J2000: Skyfield strips J2000 before _maybe_equatorial_convert,
-        # so it uses true obliquity of date on J2000 ecliptic coords.
-        # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris.
-        if (iflag & FLG_SIDEREAL) or (iflag & FLG_NONUT):
-            eps = vondrak_mean_obliquity_deg(jd_tt)
-        else:
-            _, _, deps, _ = _frame_data(jd_tt)
-            eps_mean = vondrak_mean_obliquity_deg(jd_tt)
-            eps = eps_mean + math.degrees(deps)
+        # EQ+J2000: J2000 ecliptic → J2000 equatorial (fixed J2000 obliquity).
+        eps = OBLIQUITY_J2000_DEG
 
         dt_step = 0.001
         eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)
@@ -1887,8 +2002,17 @@ def fast_calc_ut(
     delta_t = deltat(tjd_ut)
     jd_tt = tjd_ut + delta_t
 
+    topo_offset_fn = None
     if iflag & FLG_TOPOCTR:
-        topo_offset = _topocentric_offset(topo_geopos, jd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
+        _tgp = topo_geopos  # type: ignore[possibly-undefined]
+        topo_offset = _topocentric_offset(_tgp, jd_tt, tjd_ut, reader)
+        if iflag & FLG_SPEED:
+            # Provider used by the velocity central difference to recover the
+            # observer's diurnal (Earth-rotation) motion at jd_tt ± _VEL_H.
+            def topo_offset_fn(
+                jd_sample: float, _dt: float = jd_tt - tjd_ut
+            ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+                return _topocentric_offset(_tgp, jd_sample, jd_sample - _dt, reader)
 
     return _fast_calc_core(
         reader,
@@ -1900,6 +2024,7 @@ def fast_calc_ut(
         sid_t0=sid_t0,
         sid_ayan_t0=sid_ayan_t0,
         topo_offset=topo_offset,
+        topo_offset_fn=topo_offset_fn,
     )
 
 
@@ -1964,8 +2089,17 @@ def fast_calc_tt(
 
     tjd_ut = tjd_tt - reader.delta_t(tjd_tt)
 
+    topo_offset_fn = None
     if iflag & FLG_TOPOCTR:
-        topo_offset = _topocentric_offset(topo_geopos, tjd_tt, tjd_ut, reader)  # type: ignore[possibly-undefined]
+        _tgp = topo_geopos  # type: ignore[possibly-undefined]
+        topo_offset = _topocentric_offset(_tgp, tjd_tt, tjd_ut, reader)
+        if iflag & FLG_SPEED:
+            # Provider used by the velocity central difference to recover the
+            # observer's diurnal (Earth-rotation) motion at jd_tt ± _VEL_H.
+            def topo_offset_fn(
+                jd_sample: float, _dt: float = tjd_tt - tjd_ut
+            ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
+                return _topocentric_offset(_tgp, jd_sample, jd_sample - _dt, reader)
 
     return _fast_calc_core(
         reader,
@@ -1977,6 +2111,7 @@ def fast_calc_tt(
         sid_t0=sid_t0,
         sid_ayan_t0=sid_ayan_t0,
         topo_offset=topo_offset,
+        topo_offset_fn=topo_offset_fn,
     )
 
 
@@ -1991,6 +2126,9 @@ def _fast_calc_core(
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
     topo_offset: Optional[Tuple[Tuple[float, float, float], Tuple[float, float, float]]] = None,
+    topo_offset_fn: Optional[
+        Callable[[float], Tuple[Tuple[float, float, float], Tuple[float, float, float]]]
+    ] = None,
 ) -> Tuple[Tuple[float, float, float, float, float, float], int]:
     """Core fast calculation logic shared by fast_calc_ut and fast_calc_tt.
 
@@ -2037,8 +2175,13 @@ def _fast_calc_core(
         _pipeline_a = not _xyz_sid
         if iflag & FLG_SPEED:
             lon, lat, dist, dlon, dlat, ddist = _pipeline_icrs(
-                reader, jd_tt, ipl, _pipe_iflag, want_velocity=True,
+                reader,
+                jd_tt,
+                ipl,
+                _pipe_iflag,
+                want_velocity=True,
                 topo_offset=topo_offset,
+                topo_offset_fn=topo_offset_fn,
             )
         else:
             lon, lat, dist = _pipeline_icrs(
@@ -2057,6 +2200,7 @@ def _fast_calc_core(
                 want_velocity=True,
                 is_system_bary=True,
                 topo_offset=topo_offset,
+                topo_offset_fn=topo_offset_fn,
             )
         else:
             lon, lat, dist = _pipeline_icrs(
@@ -2190,15 +2334,19 @@ def _fast_calc_core(
             # arcsec/century: dP/dT = c0 + 2*c1*T + ...; convert to deg/day with
             # / 3600 / 36525.
             #
-            # Fires for every sidereal SPEED request — including FLG_J2000, where
-            # the drift is still present (the ayanamsa offset is constant in the
-            # J2000 frame, but the of-date longitude this dlon was built from
-            # still carries it). It is the FLG_SPEED-absent case that must be
-            # excluded: dlon was zeroed above and must stay 0.0.
-            # The deferred ecliptic-direct bodies (nodes/apogees) keep this
+            # Fires for every sidereal SPEED request — including FLG_J2000. The
+            # velocity coming out of the pipeline is the true derivative of the
+            # tropical position in the output frame (of-date ecliptic, or J2000
+            # ecliptic under FLG_J2000). The sidereal longitude subtracts the
+            # ayanamsha, so its rate subtracts the ayanamsha drift (~ the general
+            # precession rate) in BOTH frames: in the of-date frame the tropical
+            # rate carries precession which is (partly) cancelled; in the J2000
+            # frame the tropical rate has no equinox motion but the mean
+            # ayanamsha still drifts, so the term is the full ~p. The
+            # FLG_SPEED-absent case must be excluded: dlon was zeroed and stays
+            # 0.0. The deferred ecliptic-direct bodies (nodes/apogees) keep this
             # of-date drift; their _deferred_sid_j2k rebuild below re-precesses
-            # the POSITION (not the rate) to J2000. Pipeline-A bodies get the
-            # J2000 frame term applied separately, just after this block.
+            # the POSITION (not the rate) to J2000.
             if (iflag & FLG_SPEED) and (
                 _deferred_sid_j2k
                 or not (iflag & FLG_J2000)
@@ -2207,32 +2355,32 @@ def _fast_calc_core(
             ):
                 dlon -= _general_precession_rate_deg_day(jd_tt)
 
+                # Of-date sidereal subtracts the TRUE ayanamsha (mean + Δψ), so
+                # its rate must also drop the nutation-in-longitude rate dΔψ/dt
+                # (~0.05"/day) on top of the precession term above. The mean
+                # ayanamsha (J2000/NONUT) carries no nutation, so it is excluded.
+                # Scoped to Pipeline-A bodies whose speed is now the exact
+                # derivative of the reported position; the deferred
+                # ecliptic-direct bodies keep their existing (intentional) drift.
+                if (_pipeline_a or _xyz_sid_pipea) and not _eff_mean_aya:
+                    try:
+                        _, _dpsi_m, _, _ = _frame_data(jd_tt - _VEL_H)
+                        _, _dpsi_p, _, _ = _frame_data(jd_tt + _VEL_H)
+                        dlon -= math.degrees(_dpsi_p - _dpsi_m) / (2.0 * _VEL_H)
+                    except (KeyError, ValueError):
+                        pass
+
         except KeyError:
             # Star-based sidereal mode, fall back
             raise
 
-    # J2000 longitude-speed frame conversion (Pipeline A, spherical output only).
-    # _pipeline_icrs rotates the velocity into the J2000 ecliptic with a fixed
-    # (instantaneous) matrix, which omits the time-derivative of that rotation —
-    # the of-date→J2000 equinox motion. That motion removes the general-
-    # precession rate from the longitude speed, so apply the subtraction here.
-    # It runs for BOTH tropical and sidereal J2000 ecliptic output (for sidereal
-    # it is the second ~p term, on top of the ayanamsa drift above). Excluded:
-    # the deferred ecliptic-direct bodies (handled by the rebuild below;
-    # _pipeline_a is False for them), equatorial output (its own frame), and XYZ
-    # output (dlon then holds a Cartesian velocity component, not a longitude
-    # rate — Pipeline-A XYZ returns the vectors straight from _pipeline_icrs).
-    # The `not XYZ` guard keeps Pipeline-A tropical-XYZ (Cartesian straight from
-    # _pipeline_icrs) out; _xyz_sid_pipea adds back the XYZ+SIDEREAL case, whose
-    # dlon is still a spherical longitude rate here (Cartesian conversion is
-    # deferred to the FLG_XYZ post-processing below).
-    if (
-        (iflag & FLG_SPEED)
-        and (iflag & FLG_J2000)
-        and not (iflag & FLG_EQUATORIAL)
-        and ((_pipeline_a and not (iflag & FLG_XYZ)) or _xyz_sid_pipea)
-    ):
-        dlon -= _general_precession_rate_deg_day(jd_tt)
+    # NOTE: Pipeline-A J2000 spherical output needs NO extra precession-rate
+    # subtraction here. _pipeline_icrs now central-differences the apparent
+    # place through the J2000 frame transform, so the reported dlon is already
+    # the exact derivative of the reported J2000 longitude (the J2000 frame is
+    # fixed, so there is no equinox motion to remove). The former subtraction
+    # here double-counted it against XYZ output and, together with the sidereal
+    # drift above, against SID+J2000.
 
     # Deferred J2000 precession for Pipeline B bodies with SID+J2K.
     # The pipeline was run without FLG_J2000 so ayanamsha could be

@@ -44,6 +44,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reported speeds are now the true derivative of the reported position across
+  the whole flag matrix, on both backends.** The LEB fast path derives the
+  velocity analytically (exact Chebyshev derivative + light-time rate +
+  barycenter-correction rate) and carries the apparent corrections
+  (aberration, deflection, frame rotation) through the derivative instead of
+  dropping them — the Moon's geocentric speed was off by ~4"/day, topocentric
+  by a further ~1.7"/day. A spurious general-precession subtraction made J2000
+  spherical speeds inconsistent with J2000 Cartesian speeds (0.13"/day) and
+  was applied twice under sidereal+J2000; sidereal of-date speeds now include
+  the true-ayanamsha rate. Sidereal+equatorial speeds use the mean equator in
+  both backends (the Skyfield path used the true equator while its own
+  position used the mean one). Planetocentric speeds (`calc_pctr`) use an
+  ULP-safe two-part time step (the Moon's speed carried a −0.4"/day float64
+  quantisation bias). Residual |reported speed − derivative of reported
+  position| is now ≤0.001"/day geocentric, ≤0.03"/day topocentric.
+- **Gravitational deflection is skipped when the observer sits at the
+  deflecting body itself.** The far-field deflection formula is singular for
+  an observer inside the deflector: `calc_pctr` positions observed from
+  Jupiter/Saturn carried a spurious ~3-10" "deflection". Geocentric and
+  heliocentric outputs are unaffected (bit-identical).
+- **`EQUATORIAL | J2000` on hypothetical bodies now uses the J2000 obliquity**
+  instead of the true obliquity of date, making the J2000 equatorial frame
+  consistent with every other body class (certified divergence from the
+  reference API, ~3" on Cupido; see
+  `docs/comparison/intentional-divergences.md` §8).
 - **Heliacal lunar crescent width now follows Yallop's geometry on both backends.**
   The crescent width fed to the Yallop q-test was computed with an inverted
   formula and a hardcoded 15' semi-diameter; it now uses

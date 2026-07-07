@@ -531,12 +531,19 @@ class TestExplicitSiderealParams:
             sid_t0=2451545.0,
             sid_ayan_t0=0.0,
         )
-        # Precession rate ~50.3"/yr = 5028.8"/century
-        # = 5028.8 / 3600 / 36525 ≈ 0.0000382 deg/day
+        # The of-date sidereal longitude subtracts the TRUE ayanamsha
+        # (mean + nutation-in-longitude), so the tropical-minus-sidereal speed
+        # difference is the true-ayanamsha rate: the general precession rate
+        # (~50.3"/yr = 5028.8"/cy ≈ 0.0000382 deg/day) plus dΔψ/dt, which
+        # oscillates within ~±0.000017 deg/day (±0.06"/day) over the 18.6-year
+        # nutation cycle. (The previous bound 0.00003–0.00005 pinned an older
+        # behaviour where only the mean precession rate was subtracted; the
+        # speed is now the exact derivative of the reported sidereal position,
+        # verified reference-free by central-differencing the position.)
         speed_diff = trop[3] - sid[3]
-        assert 0.00003 < speed_diff < 0.00005, (
+        assert 0.000015 < speed_diff < 0.00006, (
             f"Sidereal speed correction = {speed_diff:.7f} deg/day "
-            f"(expected ~0.0000382)"
+            f"(expected 0.0000382 ± nutation-rate ~0.000017)"
         )
 
 

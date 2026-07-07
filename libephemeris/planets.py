@@ -1456,8 +1456,12 @@ def _calc_body_pctr(
     observer = get_planet_target(planets, observer_name)
 
     # Use a fresh Time object to avoid Skyfield reify descriptor corruption
-    # when the same Time is shared across multiple callers
-    t_fresh = get_timescale().tt_jd(float(t.tt))
+    # when the same Time is shared across multiple callers. Preserve the
+    # (whole, fraction) split: collapsing to a single float64 (tt_jd(float(t.tt)))
+    # quantizes the epoch to the JD ULP (~4.6e-10 d), which destroys the exact
+    # ±dt spacing of the FLG_SPEED central-difference samples and biased the
+    # Moon's planet-centric speed by ~-0.4"/day.
+    t_fresh = get_timescale().tt_jd(float(t.whole), float(t.tt_fraction))
 
     # Helper function to get position vector at time t_
     # NOTE: We do NOT use get_cached_observer_at here because the cache
@@ -1496,8 +1500,16 @@ def _calc_body_pctr(
             dist_au = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
             light_time = dist_au / C_AU_PER_DAY
             ts_lt = get_timescale()
-            # Retard only the target, keep observer at current time
-            tgt_ret = target.at(ts_lt.tdb_jd(t_fresh.tdb - light_time))
+            # Retard only the target, keep observer at current time. Keep the
+            # (whole, fraction) split here too: collapsing tdb - light_time to
+            # one float64 re-quantizes the retarded epoch (ULP noise that the
+            # speed central difference amplifies by 1/(2*dt)).
+            tgt_ret = target.at(
+                ts_lt.tdb_jd(
+                    float(t_fresh.whole),
+                    float(t_fresh.tdb_fraction) - light_time,
+                )
+            )
             p = tgt_ret.position.au - obs_pos
             v = tgt_ret.velocity.au_per_d - obs_vel
 
@@ -1678,27 +1690,32 @@ def _calc_body_pctr(
 
     # Calculate speed using central difference numerical differentiation if requested
     # Central difference: f'(x) ≈ [f(x+h) - f(x-h)] / (2h) - error O(h²)
-    dt = 1.0 / 86400.0  # 1 second timestep
+    #
+    # Match _calc_body's step: the Moon uses 7e-5 d (~6 s), the planets 1 s.
+    # The sample epochs use the two-argument tt_jd(whole, fraction) form:
+    # collapsing t.tt ± dt into a single float64 quantizes the step to the JD
+    # ULP (~4.6e-10 d at JD ~2.46e6), destroying the exact ±dt spacing that a
+    # 6-second step needs. Keeping dt in the fraction slot preserves it through
+    # Skyfield's extended-precision time arithmetic (together with the
+    # (whole, fraction)-preserving t_fresh above, this removed a systematic
+    # ~-0.4"/day bias on the Moon's planet-centric speed).
+    dt = 7e-5 if ipl == MOON else 1.0 / 86400.0
 
     if iflag & FLG_SPEED:
         ts_inner = get_timescale()
-        t_prev = ts_inner.tt_jd(t.tt - dt)
-        t_next = ts_inner.tt_jd(t.tt + dt)
+        t_prev = ts_inner.tt_jd(t.tt, -dt)
+        t_next = ts_inner.tt_jd(t.tt, dt)
 
-        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
-        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
-        # the tropical (true-equator) frame -- the same as the plain equatorial
-        # speed -- even though the sidereal POSITION uses the mean equator.
-        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
-        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
-        # ecliptic output the ayanamsha rate is applied to the velocity below.
-        flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
-        result_prev, _ = _calc_body_pctr(
-            t_prev, ipl, iplctr, flags_no_speed_no_sidereal
-        )
-        result_next, _ = _calc_body_pctr(
-            t_next, ipl, iplctr, flags_no_speed_no_sidereal
-        )
+        # Sample flags: strip FLG_SPEED always; for ECLIPTIC sidereal strip
+        # FLG_SIDEREAL so both samples are tropical (the ayanamsha drift is
+        # applied to dlon below). For EQUATORIAL sidereal keep FLG_SIDEREAL so
+        # the samples differentiate the reported (mean-equator) position — the
+        # certified true-rate convention, matching _calc_body and the LEB path.
+        sample_flags = iflag & ~FLG_SPEED
+        if not is_equatorial:
+            sample_flags &= ~FLG_SIDEREAL
+        result_prev, _ = _calc_body_pctr(t_prev, ipl, iplctr, sample_flags)
+        result_next, _ = _calc_body_pctr(t_next, ipl, iplctr, sample_flags)
         p1_prev, p2_prev, p3_prev = result_prev[0], result_prev[1], result_prev[2]
         p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
 
@@ -1891,7 +1908,9 @@ def _precess_ecliptic_state(
     return lon2, lat2, d / (2.0 * dt), (la_p - la_m) / (2.0 * dt)
 
 
-def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
+def _maybe_equatorial_convert(
+    result: tuple, jd_tt: float, iflag: int, *, already_j2000: bool = False
+) -> tuple:
     """Convert ecliptic coordinates to equatorial if FLG_EQUATORIAL is set.
 
     For bodies computed in ecliptic coordinates (lunar nodes, Lilith, etc.),
@@ -1905,6 +1924,11 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
         result: 6-tuple of (lon, lat, dist, dlon, dlat, ddist) in ecliptic coords
         jd_tt: Julian Day in Terrestrial Time (for obliquity calculation)
         iflag: Calculation flags bitmask
+        already_j2000: The input coordinates are already J2000 ecliptic
+            (natural frame of the hypothetical-body orbits): skip the
+            date→J2000 precession step but keep the J2000 obliquity for the
+            equatorial rotation, so EQ+J2000 output is a consistent J2000
+            frame rather than a J2000-ecliptic/of-date-equator mix.
 
     Returns:
         If FLG_EQUATORIAL is set: transformed (RA, Dec, dist, dRA, dDec, ddist)
@@ -1919,7 +1943,7 @@ def _maybe_equatorial_convert(result: tuple, jd_tt: float, iflag: int) -> tuple:
     # differs from the of-date speed by the general-precession rate. When the
     # equatorial conversion below runs, it then rotates a J2000-frame velocity
     # (not a frame-mixed one) through the J2000 obliquity.
-    if iflag & FLG_J2000:
+    if (iflag & FLG_J2000) and not already_j2000:
         J2000 = 2451545.0
         if iflag & FLG_SPEED:
             lon, lat, dlon, dlat = _precess_ecliptic_state(
@@ -2620,8 +2644,10 @@ def _calc_body(
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
-            # Strip J2000 flag since we already handled precession
-            result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+            # Coordinates are already J2000 ecliptic when is_j2000 (precession
+            # handled above): skip the precession inside but keep the J2000
+            # obliquity for EQ+J2000 (consistent frame, like all other bodies).
+            result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
             return _to_native_floats(result), iflag
 
         # Geocentric: convert heliocentric Keplerian orbit to geocentric
@@ -2683,7 +2709,9 @@ def _calc_body(
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
 
         result = (lon, lat, dist, dlon, dlat, ddist)
-        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+        # Already J2000 ecliptic when is_j2000 (see the heliocentric branch):
+        # keep the J2000 obliquity for EQ+J2000, skip the internal precession.
+        result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
         return _to_native_floats(result), iflag
 
     # Handle Transpluto (Isis) — ISIS = 48
@@ -2716,7 +2744,9 @@ def _calc_body(
             if is_sidereal and not (iflag & FLG_EQUATORIAL):
                 lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
             result = (lon, lat, dist, dlon, dlat, ddist)
-            result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+            # Already J2000 ecliptic when is_j2000 (see the Uranian branch):
+            # keep the J2000 obliquity for EQ+J2000, skip the internal precession.
+            result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
             return _to_native_floats(result), iflag
 
         # Geocentric conversion
@@ -2778,7 +2808,9 @@ def _calc_body(
             lon, dlon = _apply_sidereal_correction(lon, dlon, t.ut1, iflag)
 
         result = (lon, lat, dist, dlon, dlat, ddist)
-        result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+        # Already J2000 ecliptic when is_j2000 (see the Uranian branch):
+        # keep the J2000 obliquity for EQ+J2000, skip the internal precession.
+        result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
         return _to_native_floats(result), iflag
 
     # Handle White Moon (Selena), Vulcan, Proserpina, Waldemath — fictitious bodies (IDs 55-58)
@@ -3474,32 +3506,49 @@ def _calc_body(
     dp1, dp2, dp3 = 0.0, 0.0, 0.0
 
     if iflag & FLG_SPEED:
-        # Get positions at t - dt and t + dt for central difference
+        # Get positions at t - dt and t + dt for central difference.
+        # Two-argument tt_jd(whole, fraction): collapsing t.tt ± dt into a
+        # single float64 quantizes the step to the JD ULP (~4.6e-10 d at
+        # JD ~2.46e6), which biases the central difference by up to ~0.08"/day
+        # for the Moon (dt=7e-5) and ~0.02"/day for the Sun (dt=1s). Keeping dt
+        # in the fraction slot preserves the exact ±dt spacing through
+        # Skyfield's extended-precision time arithmetic.
         ts_inner = get_timescale()
-        t_prev = ts_inner.tt_jd(t.tt - dt)
-        t_next = ts_inner.tt_jd(t.tt + dt)
+        t_prev = ts_inner.tt_jd(t.tt, -dt)
+        t_next = ts_inner.tt_jd(t.tt, dt)
 
-        # Strip FLG_SIDEREAL from the sample calls (both samples tropical before
-        # the difference). The reference ephemeris computes the sidereal+equatorial SPEED in
-        # the tropical (true-equator) frame -- the same as the plain equatorial
-        # speed -- even though the sidereal POSITION uses the mean equator.
-        # (Verified vs the reference ephemeris: the Moon's SID|EQ RA speed matches the
-        # true-equator speed to ~0.03"/day, not the mean-equator speed.) For
-        # ecliptic output the ayanamsha rate is applied to the velocity below.
-        flags_no_speed_no_sidereal = (iflag & ~FLG_SPEED) & ~FLG_SIDEREAL
+        # Sample flags for the central difference. Strip FLG_SPEED always.
+        #
+        # For ECLIPTIC sidereal output, strip FLG_SIDEREAL too so both samples
+        # are tropical of-date; the ayanamsha drift is then applied to dlon
+        # analytically below.
+        #
+        # For EQUATORIAL sidereal output, KEEP FLG_SIDEREAL so the samples are
+        # computed in the very frame of the reported position — the *mean*
+        # equator of date. The reported speed must be the exact derivative of
+        # the reported position (the project's certified true-rate divergence);
+        # the SID|EQ position uses the mean equator, so its RA/Dec speed is the
+        # mean-equator rate, NOT the true-equator (plain-EQ) rate. Stripping
+        # FLG_SIDEREAL here would have produced a true-equator speed that does
+        # not differentiate the reported mean-equator position (a ~0.8"/day RA,
+        # ~1.8"/day Dec inconsistency for the Moon), and disagreed with the LEB
+        # backend, which differentiates the reported position directly.
+        sample_flags = iflag & ~FLG_SPEED
+        if not is_equatorial:
+            sample_flags &= ~FLG_SIDEREAL
         try:
-            result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
-            result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
+            result_prev, _ = _calc_body(t_prev, ipl, sample_flags)
+            result_next, _ = _calc_body(t_next, ipl, sample_flags)
         except TypeError:
             # Skyfield Time reify descriptor corruption: clear cache and retry
             # with fresh Time objects (see Skyfield #xxx)
             from .cache import clear_observer_cache
 
             clear_observer_cache()
-            t_prev = ts_inner.tt_jd(float(t.tt - dt))
-            t_next = ts_inner.tt_jd(float(t.tt + dt))
-            result_prev, _ = _calc_body(t_prev, ipl, flags_no_speed_no_sidereal)
-            result_next, _ = _calc_body(t_next, ipl, flags_no_speed_no_sidereal)
+            t_prev = ts_inner.tt_jd(float(t.tt), -dt)
+            t_next = ts_inner.tt_jd(float(t.tt), dt)
+            result_prev, _ = _calc_body(t_prev, ipl, sample_flags)
+            result_next, _ = _calc_body(t_next, ipl, sample_flags)
         p1_prev, p2_prev, p3_prev = result_prev[0], result_prev[1], result_prev[2]
         p1_next, p2_next, p3_next = result_next[0], result_next[1], result_next[2]
 
