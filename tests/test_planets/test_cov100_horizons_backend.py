@@ -569,6 +569,82 @@ class TestToEclipticOutput:
 
 
 # ===========================================================================
+# _to_ecliptic_output — frame-speed conventions (reference-free)
+# ===========================================================================
+
+
+class TestToEclipticOutputSpeedConventions:
+    """The reported speed must be the exact derivative of the reported position.
+
+    Reference-free invariant (no network, no ephemeris files): feed a synthetic
+    ICRS state, re-run _to_ecliptic_output at jd ± h with the analytically
+    extrapolated state, and central-difference the reported longitude. This
+    pins the post-rework frame-speed conventions and would fail with any of:
+      (a) the former spurious general-precession subtraction from J2000
+          spherical speeds (error = exactly -0.1377"/day at this epoch);
+      (b) the double subtraction under SIDEREAL|J2000;
+      (c) the missing nutation-rate term dΔψ/dt for of-date sidereal
+          (error ~0.05"/day).
+    """
+
+    POS = (1.2, -1.0, 0.4)
+    VEL = (0.005, 0.006, 0.001)
+    JD_T = 2465712.625
+    H = 0.01
+    SID_MODE = 1  # Lahiri
+
+    def _out(self, jd, pos, vel, iflag):
+        (out, _) = _to_ecliptic_output(pos, vel, jd, jd, iflag, self.SID_MODE)
+        return out
+
+    def _invariant_err_arcsec(self, iflag):
+        jd, h = self.JD_T, self.H
+        rep = self._out(jd, self.POS, self.VEL, iflag)[3]
+        pm = tuple(self.POS[i] - self.VEL[i] * h for i in range(3))
+        pp = tuple(self.POS[i] + self.VEL[i] * h for i in range(3))
+        lon_m = self._out(jd - h, pm, self.VEL, iflag)[0]
+        lon_p = self._out(jd + h, pp, self.VEL, iflag)[0]
+        dl = (lon_p - lon_m) % 360.0
+        if dl > 180.0:
+            dl -= 360.0
+        return (rep - dl / (2.0 * h)) * 3600.0
+
+    @pytest.mark.parametrize(
+        "label, iflag",
+        [
+            ("tropical_of_date", FLG_SPEED),
+            ("j2000", FLG_SPEED | FLG_J2000),
+            ("sidereal_of_date", FLG_SPEED | FLG_SIDEREAL),
+            ("sidereal_j2000", FLG_SPEED | FLG_SIDEREAL | FLG_J2000),
+            ("equatorial_of_date", FLG_SPEED | FLG_EQUATORIAL),
+            ("sidereal_equatorial", FLG_SPEED | FLG_SIDEREAL | FLG_EQUATORIAL),
+            ("equatorial_j2000", FLG_SPEED | FLG_EQUATORIAL | FLG_J2000),
+        ],
+    )
+    def test_speed_is_derivative_of_reported_position(self, label, iflag):
+        err = self._invariant_err_arcsec(iflag)
+        assert abs(err) < 0.005, (
+            f"{label}: reported dlon differs from the derivative of the "
+            f'reported lon by {err:+.4f}"/day'
+        )
+
+    def test_sid_j2000_single_ayanamsa_drift(self):
+        """SID|J2000 dlon = J2000 dlon − general precession rate, exactly once."""
+        from libephemeris.fast_calc import _general_precession_rate_deg_day
+
+        d_j2000 = self._out(self.JD_T, self.POS, self.VEL, FLG_SPEED | FLG_J2000)[3]
+        d_sid = self._out(
+            self.JD_T, self.POS, self.VEL, FLG_SPEED | FLG_SIDEREAL | FLG_J2000
+        )[3]
+        p = _general_precession_rate_deg_day(self.JD_T)
+        assert abs((d_j2000 - d_sid) - p) * 3600.0 < 1e-6, (
+            "SID|J2000 must subtract the ayanamsa drift exactly once "
+            f"(got {(d_j2000 - d_sid) * 3600.0:.6f} arcsec/day vs p = "
+            f"{p * 3600.0:.6f})"
+        )
+
+
+# ===========================================================================
 # _HorizonsDeflectorSource (lines 616-627) + _apply_deflection_horizons
 # (lines 647-656)
 # ===========================================================================

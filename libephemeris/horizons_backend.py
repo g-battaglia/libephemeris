@@ -724,6 +724,7 @@ def _to_ecliptic_output(
         FLG_ICRS,
     )
     from .fast_calc import (
+        _VEL_H,
         _cartesian_to_spherical,
         _cartesian_velocity_to_spherical,
         _rotate_equatorial_to_ecliptic,
@@ -736,46 +737,87 @@ def _to_ecliptic_output(
     )
     import math
 
-    pos = pos_icrs
-    vel = vel_icrs
-
-    if iflag & FLG_ICRS:
-        # Output in ICRS — no rotation
-        pass
-    elif iflag & FLG_J2000:
-        if iflag & FLG_EQUATORIAL:
-            # Equatorial J2000: ICRS vectors as-is (frame bias ~0.02",
-            # same convention as the LEB pipeline)
-            pass
-        else:
+    def _rot(p: Tuple[float, float, float], jd: float) -> Tuple[float, float, float]:
+        """Rotate an ICRS vector into the requested output frame at epoch jd."""
+        if iflag & FLG_ICRS:
+            # Output in ICRS — no rotation
+            return p
+        if iflag & FLG_J2000:
+            if iflag & FLG_EQUATORIAL:
+                # Equatorial J2000: ICRS vectors as-is (frame bias ~0.02",
+                # same convention as the LEB pipeline)
+                return p
             # J2000 ecliptic
-            pos = _rotate_icrs_to_ecliptic_j2000(*pos)
-            vel = _rotate_icrs_to_ecliptic_j2000(*vel)
-    elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
-        # Sidereal + equatorial: mean equator of date (precession only, no
-        # nutation) and NO ayanamsa, mirroring the Skyfield/LEB path in
-        # fast_calc (the ayanamsa is applied to ecliptic longitude only).
-        p_mat = _prec_matrix(jd_tt)
-        pos = _mat3_vec3(p_mat, pos)
-        vel = _mat3_vec3(p_mat, vel)
-    elif iflag & FLG_EQUATORIAL:
-        # True equatorial of date — apply precession-nutation matrix
-        pn_mat, dpsi, deps, eps_true = _get_skyfield_frame_data(jd_tt)
-        pos = _mat3_vec3(pn_mat, pos)
-        vel = _mat3_vec3(pn_mat, vel)
-    else:
+            return _rotate_icrs_to_ecliptic_j2000(*p)
+        if (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
+            # Sidereal + equatorial: mean equator of date (precession only, no
+            # nutation) and NO ayanamsa, mirroring the Skyfield/LEB path in
+            # fast_calc (the ayanamsa is applied to ecliptic longitude only).
+            return _mat3_vec3(_prec_matrix(jd), p)
+        if iflag & FLG_EQUATORIAL:
+            # True equatorial of date — apply precession-nutation matrix
+            pn_mat, _, _, _ = _get_skyfield_frame_data(jd)
+            return _mat3_vec3(pn_mat, p)
         # Default: ecliptic of date
-        pn_mat, dpsi, deps, eps_true = _get_skyfield_frame_data(jd_tt)
-        # ICRS -> equatorial of date
-        pos = _mat3_vec3(pn_mat, pos)
-        vel = _mat3_vec3(pn_mat, vel)
+        pn_mat, _, _, eps_true = _get_skyfield_frame_data(jd)
+        q = _mat3_vec3(pn_mat, p)
         # Equatorial -> ecliptic (eps_true is in radians)
-        pos = _rotate_equatorial_to_ecliptic(*pos, eps_true)
-        vel = _rotate_equatorial_to_ecliptic(*vel, eps_true)
+        return _rotate_equatorial_to_ecliptic(*q, eps_true)
 
-    # Convert to spherical
+    # ICRS / J2000 output frames are fixed in time; the of-date frames
+    # (ecliptic/equator of date, mean equator for SID+EQ) rotate with the
+    # equinox, so their reported speed must include the frame-rotation rate.
+    _fixed_frame = bool(iflag & (FLG_ICRS | FLG_J2000))
+
+    pos = _rot(pos_icrs, jd_tt)
     lon, lat, dist = _cartesian_to_spherical(*pos)
-    dlon, dlat, ddist = _cartesian_velocity_to_spherical(*pos, *vel)
+
+    if _fixed_frame or not (iflag & FLG_SPEED):
+        # Fixed frame: rotating the ICRS velocity with the (constant) matrix
+        # gives the exact derivative of the reported position — no correction.
+        # (Same convention as fast_calc post-rework: NO general-precession
+        # subtraction for J2000 spherical output; the former subtraction here
+        # made the J2000 dlon differ from the derivative of the J2000
+        # longitude by exactly the precession rate.)
+        # Without FLG_SPEED the callers pass a zero velocity that must stay 0.
+        vel = _rot(vel_icrs, jd_tt)
+        dlon, dlat, ddist = _cartesian_velocity_to_spherical(*pos, *vel)
+    else:
+        # Of-date frame with FLG_SPEED: central-difference the reported place
+        # through the frame at jd_tt ± _VEL_H, extrapolating the ICRS state
+        # analytically — mirroring fast_calc._pipeline_icrs, so the reported
+        # speed is the exact derivative of the reported position (captures the
+        # precession/nutation equinox motion, ~0.09"/day in longitude).
+        vel = _rot(vel_icrs, jd_tt)  # for the XYZ (Cartesian) output below
+        _wm = _rot(
+            (
+                pos_icrs[0] - vel_icrs[0] * _VEL_H,
+                pos_icrs[1] - vel_icrs[1] * _VEL_H,
+                pos_icrs[2] - vel_icrs[2] * _VEL_H,
+            ),
+            jd_tt - _VEL_H,
+        )
+        _wp = _rot(
+            (
+                pos_icrs[0] + vel_icrs[0] * _VEL_H,
+                pos_icrs[1] + vel_icrs[1] * _VEL_H,
+                pos_icrs[2] + vel_icrs[2] * _VEL_H,
+            ),
+            jd_tt + _VEL_H,
+        )
+        _sm = _cartesian_to_spherical(*_wm)
+        _sp = _cartesian_to_spherical(*_wp)
+        _inv2h = 1.0 / (2.0 * _VEL_H)
+        _dl = (_sp[0] - _sm[0]) % 360.0
+        if _dl > 180.0:
+            _dl -= 360.0
+        dlon = _dl * _inv2h
+        dlat = (_sp[1] - _sm[1]) * _inv2h
+        ddist = (_sp[2] - _sm[2]) * _inv2h
+        if iflag & FLG_XYZ:
+            # Cartesian velocity in the of-date frame: same central difference
+            # on the Cartesian components (fast_calc's XYZ convention).
+            vel = tuple((_wp[i] - _wm[i]) * _inv2h for i in range(3))  # type: ignore[assignment]
 
     # Sidereal correction (ecliptic longitude only; equatorial sidereal output
     # uses the mean-equator-of-date frame handled above, with no ayanamsa — the
@@ -802,36 +844,33 @@ def _to_ecliptic_output(
         ayan = _get_ayanamsa_for_flags(jd_ut, iflag, sid_mode)
         lon = (lon - ayan) % 360.0
 
-        # Sidereal speed correction (ayanamsa drift): the ayanamsa drifts
-        # ~50"/yr, so its time-derivative is removed from the longitude speed for
-        # sidereal SPEED output (mirroring fast_calc). Done here so BOTH the
-        # spherical return below and the XYZ rebuild use the sidereal rate.
-        # Fires for every sidereal SPEED request, including FLG_J2000 — the J2000
-        # frame term is applied separately just below. Skipped only when
-        # FLG_SPEED is absent (dlon is then 0.0 and must stay 0.0).
+        # Sidereal speed correction (ayanamsa drift): the sidereal longitude
+        # subtracts the ayanamsa, so its rate subtracts the ayanamsa drift
+        # (mirroring fast_calc post-rework). Done here so BOTH the spherical
+        # return below and the XYZ rebuild use the sidereal rate. Fires for
+        # every sidereal SPEED request:
+        #   - of-date: the position subtracted the TRUE ayanamsa (mean + Δψ),
+        #     so the rate drops the general-precession rate PLUS the
+        #     nutation-in-longitude rate dΔψ/dt (~0.05"/day);
+        #   - J2000: the mean ayanamsa still drifts in the fixed frame, so the
+        #     rate drops the general-precession rate only (no nutation, and no
+        #     second frame term — the former "J2000 frame conversion" block
+        #     below double-counted it).
+        # Skipped only when FLG_SPEED is absent (dlon is 0.0 and must stay 0.0).
         if iflag & FLG_SPEED:
             dlon -= _general_precession_rate_deg_day(jd_tt)
+            if not (iflag & FLG_J2000):
+                _, _dpsi_m, _, _ = _get_skyfield_frame_data(jd_tt - _VEL_H)
+                _, _dpsi_p, _, _ = _get_skyfield_frame_data(jd_tt + _VEL_H)
+                dlon -= math.degrees(_dpsi_p - _dpsi_m) / (2.0 * _VEL_H)
 
-    # J2000 longitude-speed frame conversion. The velocity was rotated into the
-    # J2000 ecliptic with a fixed matrix (_rotate_icrs_to_ecliptic_j2000), which
-    # omits the of-date→J2000 equinox motion; that motion removes the general-
-    # precession rate from the longitude speed, so apply it here. Runs for BOTH
-    # tropical and sidereal J2000 ecliptic SPEED output (mirroring fast_calc's
-    # Pipeline-A frame term). Equatorial output (own frame) is excluded.
-    #
-    # XYZ: tropical XYZ returns the raw Cartesian vel below (pos+vel), so dlon is
-    # unused and the term is moot; but the XYZ+SIDEREAL branch REBUILDS the
-    # Cartesian vectors from dlon (a still-spherical longitude rate), so the term
-    # must apply there too — otherwise the XYZ sidereal-J2000 velocity is missing
-    # the frame term its spherical counterpart applies (and disagrees with the
-    # LEB/Skyfield backend). So exclude XYZ only when NOT sidereal.
-    if (
-        (iflag & FLG_SPEED)
-        and (iflag & FLG_J2000)
-        and not (iflag & FLG_EQUATORIAL)
-        and (not (iflag & FLG_XYZ) or (iflag & FLG_SIDEREAL))
-    ):
-        dlon -= _general_precession_rate_deg_day(jd_tt)
+    # NOTE: J2000 spherical output needs NO precession-rate subtraction here.
+    # The J2000 frame is fixed, so the fixed-matrix rotation of the ICRS
+    # velocity already yields the exact derivative of the reported J2000
+    # longitude (same convention as fast_calc post-rework). The former
+    # subtraction here made the J2000 dlon differ from that derivative by
+    # exactly the general-precession rate, and double-counted the term for
+    # SID|J2000 on top of the ayanamsa drift above.
 
     # XYZ output
     if iflag & FLG_XYZ:
