@@ -675,12 +675,24 @@ def utc_to_jd(
     if second >= 60.0:
         from .exceptions import Error
 
+        # The leap-second table holds Gregorian dates, so a Julian calendar
+        # input must be mapped to its Gregorian date before the lookup: e.g.
+        # Julian 2016-12-18 is the real Gregorian 2016-12-31 leap second,
+        # while Julian 2016-12-31 (Gregorian 2017-01-13) is not. The calendar
+        # shift only relabels the date, never the clock time, so converting at
+        # noon yields the right date for any time within the day.
+        if calendar == JUL_CAL:
+            greg_jd = julday(year, month, day, 12.0, JUL_CAL)
+            check_year, check_month, check_day, _ = revjul(greg_jd, GREG_CAL)
+        else:
+            check_year, check_month, check_day = year, month, day
+
         if hour != 23 or minute != 59:
             raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
             )
-        if not _is_leap_second_date(year, month, day):
+        if not _is_leap_second_date(check_year, check_month, check_day):
             raise Error(
                 f"invalid time (no leap second!): "
                 f"{hour:02d}:{minute:02d}:{second:05.2f}"
@@ -700,17 +712,15 @@ def utc_to_jd(
     ts = get_timescale()
 
     if calendar == JUL_CAL:
-        # Convert Julian calendar date to Gregorian for Skyfield
-        # Skyfield's utc() expects proleptic Gregorian calendar
-        decimal_hour = hour + minute / 60.0 + second / 3600.0
-        jd = julday(year, month, day, decimal_hour, JUL_CAL)
-        g_year, g_month, g_day, g_hour = revjul(jd, GREG_CAL)
-        # Extract hour, minute, second from decimal hour
-        g_minute_frac = (g_hour % 1) * 60
-        g_second = (g_minute_frac % 1) * 60
-        g_hour_int = int(g_hour)
-        g_minute_int = int(g_minute_frac)
-        t = ts.utc(g_year, g_month, g_day, g_hour_int, g_minute_int, g_second)
+        # Convert only the Julian calendar date to Gregorian for Skyfield
+        # (which expects the proleptic Gregorian calendar). The calendar shift
+        # relabels the date, not the clock, so hour/minute/second — including a
+        # :60 leap second — pass straight through. Folding them into a decimal
+        # hour instead would push 23:59:60 into the next midnight and drop the
+        # leap second entirely.
+        greg_jd = julday(year, month, day, 12.0, JUL_CAL)
+        g_year, g_month, g_day, _ = revjul(greg_jd, GREG_CAL)
+        t = ts.utc(g_year, g_month, g_day, hour, minute, second)
     else:
         # Gregorian calendar - use directly with Skyfield
         t = ts.utc(year, month, day, hour, minute, second)

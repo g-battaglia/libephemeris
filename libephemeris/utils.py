@@ -330,7 +330,12 @@ def azalt(
     # the pressure from the observer's altitude" using the standard
     # atmosphere, then apply refraction.
     if pressure <= 0:
-        pressure = 1013.25 * (1.0 - 0.0065 * altitude / 288.0) ** 5.255
+        # Standard-atmosphere barometric formula. The base goes negative above
+        # ~44.3 km, where a fractional power would yield a complex number; clamp
+        # it to 0 so extreme altitudes give pressure ~0 (refraction ~0) instead
+        # of crashing.
+        base = 1.0 - 0.0065 * altitude / 288.0
+        pressure = 1013.25 * (max(base, 0.0) ** 5.255)
 
     # Calculate atmospheric refraction via ICAO ray-tracing
     alt_apparent, _ = refrac_extended(

@@ -488,6 +488,13 @@ def _trace_ray(
 
     obs_T_K = obs_temperature_C + 273.15
 
+    # Non-physical temperature: at or below absolute zero (attemp <= -273.15 C)
+    # there is no meaningful atmosphere. Report zero refraction, consistent with
+    # the pressure<=0 guard above, rather than dividing by a zero absolute
+    # temperature (ZeroDivisionError) or silently propagating a negative one.
+    if obs_T_K <= 0.0:
+        return 0.0
+
     # Linear extrapolation for objects below the geometric horizon
     if true_zenith_deg > 91.0:
         r_91 = _trace_ray(91.0, obs_alt, obs_pressure, obs_temperature_C, lapse_rate)
