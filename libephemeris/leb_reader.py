@@ -311,7 +311,13 @@ class LEBReader:
         Args:
             jd_start: Start of the Julian Day range to pre-fault.
             jd_end: End of the Julian Day range to pre-fault.
+
+        Raises:
+            ValueError: If the reader has been closed.
         """
+        if self._mm is None:
+            raise ValueError("LEB reader is closed")
+
         ranges: list[tuple[int, int]] = []
         for entry in self._bodies.values():
             if entry.jd_end < jd_start or entry.jd_start > jd_end:
@@ -363,8 +369,16 @@ class LEBReader:
 
         Raises:
             KeyError: If body_id is not in this .leb file.
-            ValueError: If jd is outside the body's coverage range.
+            ValueError: If jd is outside the body's coverage range, or if the
+                reader has been closed.
         """
+        # A close()-vs-eval race leaves ``_mm`` as None; without this guard
+        # the ``len(self._mm)`` bounds check below raises TypeError, which the
+        # callers' LEB->Skyfield fallback (catching ValueError/KeyError) would
+        # not absorb, crashing instead of degrading.
+        if self._mm is None:
+            raise ValueError("LEB reader is closed")
+
         # Check instance-level eval cache first.  During a multi-body chart
         # calculation at the same jd_tt the observer (Earth) and gravitational
         # deflectors (Sun, Jupiter, Saturn) are re-evaluated for every planet.
@@ -472,8 +486,12 @@ class LEBReader:
             (dpsi, deps) in radians (IAU 2006/2000A).
 
         Raises:
-            ValueError: If nutation data is not available or JD out of range.
+            ValueError: If nutation data is not available, JD out of range, or
+                the reader has been closed.
         """
+        if self._mm is None:
+            raise ValueError("LEB reader is closed")
+
         if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
 

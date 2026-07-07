@@ -168,6 +168,24 @@ class TestComputeMantissaBitsEdge:
         bits = compute_mantissa_bits(coeffs, target_precision=1.0)
         assert bits == [1]
 
+    def test_nan_coefficient_raises_explicit_error(self):
+        # A NaN coefficient previously crashed with an opaque
+        # "cannot convert float NaN to integer"; it must now surface as an
+        # explicit, non-finite-coefficient error naming the coefficient order.
+        coeffs = np.zeros((4, 3, 3))
+        coeffs[:, :, 0] = 1.0
+        coeffs[1, 2, 1] = np.nan
+        with pytest.raises(ValueError, match="Non-finite Chebyshev coefficient"):
+            compute_mantissa_bits(coeffs)
+
+    def test_inf_coefficient_raises_explicit_error(self):
+        # +Inf would otherwise raise OverflowError deep in the bit count.
+        coeffs = np.zeros((4, 3, 2))
+        coeffs[:, :, 0] = 1.0
+        coeffs[0, 0, 1] = np.inf
+        with pytest.raises(ValueError, match="Non-finite Chebyshev coefficient"):
+            compute_mantissa_bits(coeffs)
+
 
 class TestCompressBodyChunked:
     def test_chunked_round_trip(self):

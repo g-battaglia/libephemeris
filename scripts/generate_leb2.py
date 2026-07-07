@@ -51,6 +51,7 @@ from libephemeris.leb_format import (
     HEADER_SIZE,
     LEB2_MAGIC,
     LEB2_VERSION,
+    LEB2_VERSION_V1,
     MAGIC,
     SECTION_BODY_INDEX,
     SECTION_COMPRESSED_CHEBYSHEV,
@@ -193,7 +194,13 @@ def write_leb2(
     generation_epoch: float,
     verbose: bool = True,
 ) -> None:
-    """Write a LEB2 file from compressed body data and auxiliary sections."""
+    """Write a LEB2 v1 (monolithic) file from compressed body data.
+
+    Each body is stored as a single compressed blob (no per-body chunk
+    index).  The header is stamped with ``LEB2_VERSION_V1`` so ``open_leb``
+    routes reads through the v1 monolithic decode path.  ``write_leb2_chunked``
+    produces the v2 chunked format used by the current conversion pipeline.
+    """
 
     n_bodies = len(body_entries)
 
@@ -233,10 +240,13 @@ def write_leb2(
     # Allocate buffer
     buf = bytearray(total_size)
 
-    # Write header
+    # Write header. This monolithic layout stores one compressed blob per
+    # body (no chunk index), which is the LEB2 v1 format — the reader keys
+    # off the version to pick the v1 (monolithic) vs v2 (chunked) decode
+    # path, so stamping v2 here would make the file unreadable.
     file_hdr = FileHeader(
         magic=LEB2_MAGIC,
-        version=LEB2_VERSION,
+        version=LEB2_VERSION_V1,
         section_count=n_sections,
         body_count=n_bodies,
         jd_start=jd_start,

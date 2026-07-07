@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from libephemeris.exceptions import LEBCorruptionError
 from libephemeris.leb_compression import compress_body
 from libephemeris.leb_format import (
     CHUNK_ENTRY_SIZE,
@@ -669,12 +670,31 @@ class TestEvalBodyChunked:
 
     @pytest.mark.unit
     def test_corrupted_interval_guard(self, tmp_path):
-        """Zero interval -> corrupted-header ValueError (line 336)."""
+        """Zero interval -> corrupted-header LEBCorruptionError.
+
+        The guard raises ``LEBCorruptionError`` (a ``ValueError`` subclass)
+        to match its twin in ``LEBReader.eval_body``, so ``log_leb_fallback``
+        reports genuine corruption at WARNING rather than DEBUG.
+        """
         path = _build_v2_file(tmp_path / "corr.leb2")
         reader = LEB2Reader(path)
         try:
             reader._bodies[SUN].interval_days = 0.0
-            with pytest.raises(ValueError, match="Corrupted LEB2 body entry"):
+            with pytest.raises(LEBCorruptionError, match="Corrupted LEB2 body entry"):
+                reader.eval_body(SUN, JD0 + 5.0)
+            # Still a ValueError so the LEB->Skyfield fallback keeps catching it.
+            assert issubclass(LEBCorruptionError, ValueError)
+        finally:
+            reader.close()
+
+    @pytest.mark.unit
+    def test_corrupted_segment_count_guard(self, tmp_path):
+        """Non-positive segment_count -> corrupted-header LEBCorruptionError."""
+        path = _build_v2_file(tmp_path / "corrseg.leb2")
+        reader = LEB2Reader(path)
+        try:
+            reader._bodies[SUN].segment_count = 0
+            with pytest.raises(LEBCorruptionError, match="Corrupted LEB2 body entry"):
                 reader.eval_body(SUN, JD0 + 5.0)
         finally:
             reader.close()
@@ -1112,3 +1132,124 @@ class TestCloseSwallowsErrors:
         reader.close()  # second close: both None -> guard-false arcs
         assert reader._mm is None
         assert reader._file is None
+
+
+# =============================================================================
+# closed-reader guards (B1): a close()-vs-eval race must degrade cleanly
+# =============================================================================
+
+
+class TestClosedReaderGuards:
+    """After close(), eval/warm raise a clean ValueError, never TypeError.
+
+    close() nulls ``_mm`` and clears ``_chunk_index``; the callers' LEB->
+    Skyfield fallback catches ValueError/KeyError, so a race must surface a
+    ValueError rather than a ``TypeError: object of type 'NoneType'...``.
+    """
+
+    @pytest.mark.unit
+    def test_closed_v2_eval_body_raises_value_error(self, tmp_path):
+        """v2 chunked: eval_body on a closed reader -> ValueError, not KeyError."""
+        path = _build_v2_file(tmp_path / "closed_v2.leb2")
+        reader = LEB2Reader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB2 reader is closed"):
+            reader.eval_body(SUN, JD0 + 5.0)
+
+    @pytest.mark.unit
+    def test_closed_v1_eval_body_raises_value_error(self, tmp_path):
+        """v1 monolithic: eval_body on a closed reader -> ValueError, not TypeError."""
+        path = _build_v1_file(tmp_path / "closed_v1.leb2")
+        reader = LEB2Reader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB2 reader is closed"):
+            reader.eval_body(SUN, JD0 + 5.0)
+
+    @pytest.mark.unit
+    def test_closed_eval_nutation_raises_value_error(self, tmp_path):
+        """eval_nutation on a closed reader -> ValueError, not TypeError."""
+        path = _build_v2_file(tmp_path / "closed_nut.leb2", with_nutation=True)
+        reader = LEB2Reader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB2 reader is closed"):
+            reader.eval_nutation(JD0 + 5.0)
+
+    @pytest.mark.unit
+    def test_closed_warm_raises_value_error(self, tmp_path):
+        """warm on a closed reader -> ValueError, not TypeError."""
+        path = _build_v2_file(tmp_path / "closed_warm.leb2")
+        reader = LEB2Reader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB2 reader is closed"):
+            reader.warm(JD0, JD0 + 100.0)
+
+
+# =============================================================================
+# write_leb2 monolithic writer (B3): version must round-trip through open_leb
+# =============================================================================
+
+
+class TestWriteLeb2MonolithicRoundtrip:
+    """The monolithic ``write_leb2`` must stamp v1 so the file re-reads.
+
+    Regression: it previously stamped ``LEB2_VERSION`` (v2) while writing a
+    v1 monolithic layout, so the reader mis-parsed the body blob as a chunk
+    index and the file was unreadable.
+    """
+
+    @pytest.mark.unit
+    def test_write_leb2_roundtrip(self, tmp_path):
+        """write_leb2 -> open_leb -> eval_body returns the written coefficients."""
+        from libephemeris.leb_format import BodyEntry
+        from libephemeris.leb_reader import open_leb
+        from scripts.generate_leb2 import write_leb2
+
+        n_seg = 5
+        deg1 = DEGREE + 1
+        seg_bytes = COMPONENTS * deg1 * 8
+        raw = _raw_segments(n_seg)
+        blob = _compress(raw, n_seg)
+
+        entry = BodyEntry(
+            body_id=SUN,
+            coord_type=COORD_ICRS_BARY,
+            segment_count=n_seg,
+            jd_start=JD0,
+            jd_end=JD0 + n_seg * INTERVAL,
+            interval_days=INTERVAL,
+            degree=DEGREE,
+            components=COMPONENTS,
+            data_offset=0,
+        )
+        out = str(tmp_path / "mono.leb2")
+        write_leb2(
+            output=out,
+            body_entries=[(entry, blob, n_seg * seg_bytes)],
+            nutation_data=None,
+            delta_t_data=None,
+            star_data=None,
+            jd_start=JD0,
+            jd_end=JD0 + n_seg * INTERVAL,
+            generation_epoch=0.0,
+            verbose=False,
+        )
+
+        # Header must carry the v1 version so open_leb routes to the
+        # monolithic decode path (v2 would misread the blob as a chunk index).
+        with open(out, "rb") as f:
+            head = f.read(HEADER_SIZE)
+        version = struct.unpack_from("<I", head, 4)[0]
+        assert version == LEB2_VERSION_V1
+
+        reader = open_leb(out)
+        try:
+            assert isinstance(reader, LEB2Reader)
+            # seg 0 tau=-1: value = c0 - c1 = (s+c+1) - 0.5 for each component.
+            pos, vel = reader.eval_body(SUN, JD0)
+            assert pos == pytest.approx((0.5, 1.5, 2.5))
+            assert len(vel) == 3
+            # A mid-file sample must also decode and match LEB1 semantics.
+            pos2, _ = reader.eval_body(SUN, JD0 + 2.5 * INTERVAL)
+            assert len(pos2) == 3
+        finally:
+            reader.close()

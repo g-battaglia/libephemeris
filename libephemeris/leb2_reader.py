@@ -376,7 +376,13 @@ class LEB2Reader:
         Args:
             jd_start: Start of the Julian Day range to pre-fault.
             jd_end: End of the Julian Day range to pre-fault.
+
+        Raises:
+            ValueError: If the reader has been closed.
         """
+        if self._mm is None:
+            raise ValueError("LEB2 reader is closed")
+
         ranges: list[tuple[int, int]] = []
         if self._chunked:
             for chunks in self._chunk_index.values():
@@ -409,7 +415,20 @@ class LEB2Reader:
     def eval_body(
         self, body_id: int, jd: float
     ) -> Tuple[Tuple[float, float, float], Tuple[float, float, float]]:
-        """Evaluate a body's position and velocity at a given Julian Day."""
+        """Evaluate a body's position and velocity at a given Julian Day.
+
+        Raises:
+            KeyError: If body_id is not in this .leb2 file.
+            ValueError: If jd is outside the body's coverage range, or if the
+                reader has been closed.
+        """
+        # A close()-vs-eval race clears ``_chunk_index`` and nulls ``_mm``;
+        # without this guard the v2 path raises KeyError and the v1 path raises
+        # TypeError, neither of which the callers' LEB->Skyfield fallback
+        # (catching ValueError/KeyError) treats as a clean, expected failure.
+        if self._mm is None:
+            raise ValueError("LEB2 reader is closed")
+
         # Check eval cache
         _cache_key = (body_id, jd)
         cached = self._eval_cache.get(_cache_key)
@@ -427,9 +446,12 @@ class LEB2Reader:
                 f"for body {body_id}"
             )
 
-        # Corrupted-header guard (zero interval / empty segment table)
+        # Corrupted-header guard (zero interval / empty segment table).
+        # Mirrors LEBReader.eval_body: LEBCorruptionError (a ValueError
+        # subclass) so log_leb_fallback reports genuine corruption at WARNING
+        # while routine out-of-range fallbacks stay at DEBUG.
         if body.interval_days <= 0.0 or body.segment_count <= 0:
-            raise ValueError(
+            raise LEBCorruptionError(
                 f"Corrupted LEB2 body entry {body_id}: interval_days="
                 f"{body.interval_days}, segment_count={body.segment_count}"
             )
@@ -532,6 +554,9 @@ class LEB2Reader:
 
     def eval_nutation(self, jd_tt: float) -> Tuple[float, float]:
         """Evaluate nutation angles. Same as LEBReader.eval_nutation()."""
+        if self._mm is None:
+            raise ValueError("LEB2 reader is closed")
+
         if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
 

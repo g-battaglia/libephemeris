@@ -74,6 +74,13 @@ def compute_mantissa_bits(
     bits = []
     for k in range(deg1):
         mx = float(np.max(np.abs(coeffs[:, :, k])))
+        # A NaN/Inf coefficient makes the log2 bit count non-representable and
+        # would crash with an opaque "cannot convert float NaN to integer"
+        # (or OverflowError) below; surface it as an explicit data error.
+        if not np.isfinite(mx):
+            raise ValueError(
+                f"Non-finite Chebyshev coefficient (NaN or Inf) at order {k}"
+            )
         if mx < target_precision or mx < 1e-30:
             bits.append(0)
         else:

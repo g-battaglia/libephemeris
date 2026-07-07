@@ -501,3 +501,45 @@ class TestCloseSwallowsErrors:
 
         assert reader._mm is None
         assert reader._file is None
+
+
+# =============================================================================
+# closed-reader guards (B1): a close()-vs-eval race must degrade cleanly
+# =============================================================================
+
+
+class TestClosedReaderGuards:
+    """After close(), eval/warm raise a clean ValueError, never TypeError.
+
+    close() nulls ``_mm``; without the guards the ``len(self._mm)`` bounds
+    checks in eval_body/eval_nutation (and ``_madvise_ranges`` in warm) raise
+    ``TypeError: object of type 'NoneType' has no len()``, which the callers'
+    LEB->Skyfield fallback (catching ValueError/KeyError) would not absorb.
+    """
+
+    @pytest.mark.unit
+    def test_closed_eval_body_raises_value_error(self, tmp_path):
+        """eval_body on a closed reader -> ValueError, not TypeError."""
+        path = _build_single_body(tmp_path / "closed.leb")
+        reader = LEBReader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB reader is closed"):
+            reader.eval_body(SUN, JD0 + 5.0)
+
+    @pytest.mark.unit
+    def test_closed_eval_nutation_raises_value_error(self, tmp_path):
+        """eval_nutation on a closed reader -> ValueError, not TypeError."""
+        path = _build_single_body(tmp_path / "closed_nut.leb", with_nutation=True)
+        reader = LEBReader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB reader is closed"):
+            reader.eval_nutation(JD0 + 5.0)
+
+    @pytest.mark.unit
+    def test_closed_warm_raises_value_error(self, tmp_path):
+        """warm on a closed reader -> ValueError, not TypeError."""
+        path = _build_single_body(tmp_path / "closed_warm.leb")
+        reader = LEBReader(path)
+        reader.close()
+        with pytest.raises(ValueError, match="LEB reader is closed"):
+            reader.warm(JD0, JD0 + 100.0)
