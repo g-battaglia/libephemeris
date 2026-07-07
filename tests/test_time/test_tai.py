@@ -84,6 +84,46 @@ class TestGetTaiUtcForJd:
         assert isinstance(tai_utc, float)
 
 
+class TestPre1972TaiUtcModel:
+    """The pre-1972 rate-based TAI-UTC model must match the canonical
+    IERS/ERFA 1961-1971 table across its whole range."""
+
+    @pytest.mark.unit
+    def test_mid_1965_step_dates(self):
+        """The 1965-07 and 1965-09 steps take effect on the correct MJDs.
+
+        A transcription error placed the 1965-07-01 step at MJD 38881
+        (~1965-05-01) and the 1965-09-01 step at MJD 38939 (~1965-06-30),
+        giving a 0.1 s TAI-UTC error across the May-September 1965 window.
+        """
+        # 1965-08-01 is after the real 1965-07 step (MJD 38942) but the buggy
+        # table had already stepped at MJD 38881, over-counting by 0.1 s.
+        jd = ephem.julday(1965, 8, 1, 0.0)
+        tai_utc = ephem.get_tai_utc_for_jd(jd)
+        assert tai_utc == pytest.approx(4.014882, abs=1e-6)
+
+    @pytest.mark.unit
+    def test_matches_erfa_across_pre_1972_range(self):
+        """TAI-UTC agrees with erfa.dat() at 0 s across 1961-1971."""
+        erfa = pytest.importorskip("erfa")
+        for y, m, d in [
+            (1961, 3, 1),
+            (1962, 6, 1),
+            (1963, 12, 1),
+            (1964, 5, 1),
+            (1965, 5, 15),
+            (1965, 7, 15),
+            (1965, 9, 15),
+            (1966, 6, 1),
+            (1968, 6, 1),
+            (1971, 6, 1),
+        ]:
+            jd = ephem.julday(y, m, d, 0.0)
+            ours = ephem.get_tai_utc_for_jd(jd)
+            ref = erfa.dat(y, m, d, 0.0)
+            assert ours == pytest.approx(ref, abs=1e-6), f"{y}-{m:02d}-{d:02d}"
+
+
 class TestUtcToTaiJd:
     """Test UTC to TAI Julian Day conversion."""
 
