@@ -63,6 +63,7 @@ from .leb_format import (
     COORD_ICRS_BARY_SYSTEM,
 )
 from .precession_vondrak import (
+    method_b_accumulated_precession,
     vondrak_mean_obliquity_deg,
     vondrak_pn_matrix,
     vondrak_precession_matrix,
@@ -985,6 +986,47 @@ _AYANAMSHA_J2000: Dict[int, float] = {
     41: 25.000019,  # SIDM_GALEQU_FIORENZA
 }
 
+# Method-B defining epochs t0 (Julian Date, used directly as TT) per formula
+# mode. Mirrors planets._AYANAMSHA_T0_TT (kept in sync). Mode 18 (SIDM_J2000)
+# has t0 = J2000, so its J2000 reference term is 0 and the formula branch below
+# yields the raw accumulation from J2000. Modes without an entry fall back to
+# the IAU 2006 polynomial.
+_AYANAMSHA_T0_TT: Dict[int, float] = {
+    0: 2432193.0409043552,  # FAGAN_BRADLEY
+    1: 2434481.759385544,  # LAHIRI
+    2: 1720306.8061153414,  # DELUCE
+    3: 2413789.398077771,  # RAMAN
+    4: 2413789.398077771,  # USHASHASHI
+    5: 2413789.398077771,  # KRISHNAMURTI
+    6: 2413789.398077771,  # DJWHAL_KHUL
+    7: 2413789.398077771,  # YUKTESHWAR
+    8: 2413789.398077771,  # JN_BHASIN
+    9: 1683792.0979864676,  # BABYL_KUGLER1
+    10: 1683792.0979864676,  # BABYL_KUGLER2
+    11: 1683792.0979864676,  # BABYL_KUGLER3
+    12: 1683792.0979864676,  # BABYL_HUBER
+    13: 1673202.5873079798,  # BABYL_ETPSC
+    14: 1683792.0979864676,  # ALDEBARAN_15TAU
+    15: 1673745.3888470717,  # HIPPARCHOS
+    16: 1926175.087777195,  # SASSANIAN
+    18: 2451545.0,  # J2000 (defining epoch)
+    19: 2413789.187449649,  # J1900
+    20: 2432193.09822503,  # B1950
+    21: 1902475.546567922,  # SURYASIDDHANTA
+    22: 1902475.546567922,  # SURYASIDDHANTA_MSUN
+    23: 1902475.546567922,  # ARYABHATA
+    24: 1902475.546567922,  # ARYABHATA_MSUN
+    25: 1902475.546567922,  # SS_REVATI
+    26: 1902475.581422878,  # SS_CITRA
+    37: 1910863.024354484,  # ARYABHATA_522
+    38: 1720306.8061153414,  # BABYL_BRITTON
+    41: 2450596.38393074,  # GALEQU_FIORENZA
+    43: 2413789.398077771,  # LAHIRI_1940
+    44: 1824413.565387254,  # LAHIRI_VP285
+    45: 1826600.9089528238,  # KRISHNAMURTI_VP291
+    46: 2434481.759385544,  # LAHIRI_ICRC
+}
+
 # Star-based modes that cannot be computed without Skyfield
 _STAR_BASED_MODES = frozenset({17, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 39, 40, 42})
 
@@ -1051,20 +1093,29 @@ def _calc_ayanamsa_from_leb(
         return _calc_ayanamsa(jd_ut, mode)
 
     if mode == 255:
-        # SIDM_USER: custom user-defined ayanamsha
+        # SIDM_USER: sidereal zero point fixed on the mean ecliptic of t0.
+        # ayanamsha(t) = ayan_t0 + accumP_B(t; t0), Method-B long-term
+        # precession (Vondrák ecliptic frame). t0 is used directly as TT (no
+        # J2000 sentinel). Mirrors planets._calc_ayanamsa's SIDM_USER branch.
         ayan_t0 = sid_ayan_t0 if sid_ayan_t0 is not None else 0.0
         t0 = sid_t0 if sid_t0 is not None else J2000
-        T0 = (t0 - J2000) / 36525.0
-
-        # Delta precession from user epoch to current epoch
-        def _prec(Tc: float) -> float:
-            return sum(c * Tc ** (i + 1) for i, c in enumerate(_PREC_COEFFS))
-
-        delta_prec = _prec(T) - _prec(T0)
-        mean_aya = ayan_t0 + delta_prec / 3600.0
+        mean_aya = ayan_t0 + method_b_accumulated_precession(jd_tt, t0)
     elif mode in _AYANAMSHA_J2000:
         aya_j2000 = _AYANAMSHA_J2000[mode]
-        mean_aya = aya_j2000 + precession_arcsec / 3600.0
+        t0_tt = _AYANAMSHA_T0_TT.get(mode)
+        if t0_tt is not None:
+            # Method-B propagation on the mode's defining ecliptic, referenced at
+            # TT J2000 (2451545.0) so the J2000 value reproduces the previous
+            # aya_j2000 + p(T) to <1e-12 deg and matches the Skyfield backend.
+            # Mode 18 (SIDM_J2000, t0 = J2000) is handled uniformly here: its
+            # reference term accumP_B(J2000; J2000) is 0, leaving the raw
+            # accumulation from J2000 (aya_j2000 is 0).
+            mean_aya = aya_j2000 + (
+                method_b_accumulated_precession(jd_tt, t0_tt)
+                - method_b_accumulated_precession(J2000, t0_tt)
+            )
+        else:
+            mean_aya = aya_j2000 + precession_arcsec / 3600.0
     else:
         raise KeyError(f"Unknown sidereal mode {mode}")
 
