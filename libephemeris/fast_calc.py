@@ -24,12 +24,20 @@ from .constants import (
     EARTH,
     INTP_APOG,
     INTP_PERG,
+    JUPITER,
+    MARS,
     MEAN_APOG,
     MEAN_NODE,
+    MERCURY,
     MOON,
+    NEPTUNE,
     OSCU_APOG,
+    PLUTO,
+    SATURN,
     SUN,
     TRUE_NODE,
+    URANUS,
+    VENUS,
     FLG_BARYCTR,
     FLG_EQUATORIAL,
     FLG_HELCTR,
@@ -87,6 +95,19 @@ if TYPE_CHECKING:
 
 C_LIGHT_AU_DAY = 173.1446326846693  # Speed of light in AU/day
 J2000 = 2451545.0  # J2000.0 epoch in JD
+
+# Bodies whose HELCTR light-time is measured over the BARYCENTRIC distance
+# |body - SSB|/c (the reference's bary-frame light path), reported as the
+# planet-system barycentre. This is Mercury..Pluto EXCEPT Earth. Excluded
+# (all keep the heliocentric-distance light-time, matching the reference to
+# <0.003"): the Sun (heliocentric place is the origin), the Moon (Earth-based
+# light path; barycentric-LT biases it ~0.03") and the Earth itself (already
+# matched the reference before this change; barycentric-LT biases it ~0.1").
+# Asteroids/uranians are also excluded (no reference oracle to validate a
+# change, and they use other code paths).
+_HELCTR_BARY_LT_BODIES = frozenset(
+    {MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
+)
 OBLIQUITY_J2000_DEG = 23.4392911  # Mean obliquity at J2000 (degrees)
 OBLIQUITY_J2000_RAD = math.radians(OBLIQUITY_J2000_DEG)
 
@@ -1325,11 +1346,21 @@ def _pipeline_icrs(
     # 1. Get body position (and velocity if needed)
     target_pos, target_vel = reader.eval_body(ipl, jd_tt)
 
+    # Heliocentric output of a major planet is reported as its system
+    # BARYCENTRE, with the light-time measured over the barycentric distance
+    # |body - SSB|/c. This single flag gates every HELCTR-specific branch below
+    # (light-time distance, COB skip, velocity light-time rate and COB rate) so
+    # the position and its derivative stay mutually consistent. The Sun (origin)
+    # and Moon (Earth-based light path) are excluded — see _HELCTR_BARY_LT_BODIES.
+    helctr_bary_lt = bool(iflag & FLG_HELCTR) and ipl in _HELCTR_BARY_LT_BODIES
+
     # 1b. For system barycenters, apply COB only for TRUEPOS (no light-time).
     #     For normal path, COB is deferred until after light-time iteration
     #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
     #     iterate light-time on barycenter, apply COB once at retarded time.
-    if is_system_bary and (iflag & FLG_TRUEPOS):
+    #     HELCTR is excluded for the major planets: heliocentric output reports
+    #     the system barycentre (no COB) — see the post-light-time COB block.
+    if is_system_bary and (iflag & FLG_TRUEPOS) and not helctr_bary_lt:
         target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
 
     # Pre-initialize velocity variables to satisfy type checker.
@@ -1382,8 +1413,15 @@ def _pipeline_icrs(
     retarded_vel = target_vel
     lt = 0.0
     if not (iflag & FLG_TRUEPOS):
+        # Heliocentric output retards light by the BARYCENTRIC distance
+        # |planet - SSB|/c (matching the reference's bary-frame light path),
+        # not the heliocentric |planet - Sun|/c. The final geo offset stays
+        # planet(retarded) - Sun(t), so barycentric/geocentric paths — which
+        # use |geo| — are untouched. This removes the ~0.5" HELCTR longitude
+        # error (and the matching speed bias, e.g. ~0.55"/day for Mercury).
+        retarded_pos = target_pos
         for _ in range(3):  # Fixed-point iterations
-            dist = _vec3_dist(geo)
+            dist = _vec3_dist(retarded_pos) if helctr_bary_lt else _vec3_dist(geo)
             if dist == 0.0:
                 break
             lt = dist / C_LIGHT_AU_DAY
@@ -1396,13 +1434,16 @@ def _pipeline_icrs(
         #   * Geocentric observe(): _SpkCenterTarget._observe_from_bcrs()
         #     light-time-iterates the barycentre and adds the centre offset at
         #     t = observer.t (the OBSERVATION epoch).
-        #   * HELCTR/BARYCTR custom loop (planets.py): evaluates
+        #   * BARYCTR custom loop (planets.py): evaluates
         #     target.at(retarded_time), i.e. the centre offset at the RETARDED
         #     epoch t - lt (physically correct: light left the centre then).
-        # Evaluating COB at jd_tt for the helio/bary path biased the outer
-        # planets by up to ~0.016" (Pluto) — the whole cross-backend gap here.
-        if is_system_bary and lt > 0.0:
-            _cob_epoch = jd_tt - lt if (iflag & (FLG_HELCTR | FLG_BARYCTR)) else jd_tt
+        # Major-planet HELCTR is excluded: the reference reports the
+        # planet-system BARYCENTRE for heliocentric output (no COB), so the
+        # barycentre position from the light-time loop is returned as-is.
+        # Applying the centre offset there biased the outer planets by up to
+        # ~0.05" (Pluto).
+        if is_system_bary and lt > 0.0 and not helctr_bary_lt:
+            _cob_epoch = jd_tt - lt if (iflag & FLG_BARYCTR) else jd_tt
             retarded_pos_cob = _apply_cob_correction(
                 (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
                 ipl,
@@ -1422,23 +1463,52 @@ def _pipeline_icrs(
         # retarded velocity. Omitting it biases planet longitude speeds by up to
         # ~0.1"/day (Mars). d(lt)/dt has the closed form
         #   lt' = p̂·(r' - o') / (c + p̂·r')
-        # from differentiating |target(t-lt) - observer(t)| = c·lt.
+        # from differentiating |target(t-lt) - observer(t)| = c·lt, where p̂ is
+        # the unit vector along the distance the light-time is measured over.
+        # For HELCTR that distance is the BARYCENTRIC one |B(t-lt)| (see the
+        # light-time loop), so lt' derives from the barycentre direction and
+        # velocity, β = B̂·B'(t-lt), giving lt' = β/(c+β); using the
+        # heliocentric geo direction there leaves a ~0.55"/day Mercury bias.
         if not (iflag & FLG_TRUEPOS) and lt > 0.0:
-            _dg = _vec3_dist(geo_geom)
-            if _dg > 0.0:
-                _px, _py, _pz = geo_geom[0] / _dg, geo_geom[1] / _dg, geo_geom[2] / _dg
-                _pr = (
-                    _px * retarded_vel[0]
-                    + _py * retarded_vel[1]
-                    + _pz * retarded_vel[2]
-                )
-                _pv = _px * geo_vel[0] + _py * geo_vel[1] + _pz * geo_vel[2]
-                _ltdot = _pv / (C_LIGHT_AU_DAY + _pr)
-                geo_vel = (
-                    retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
-                    retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
-                    retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
-                )
+            if helctr_bary_lt:
+                _bdist = _vec3_dist(retarded_pos)
+                if _bdist > 0.0:
+                    _bx, _by, _bz = (
+                        retarded_pos[0] / _bdist,
+                        retarded_pos[1] / _bdist,
+                        retarded_pos[2] / _bdist,
+                    )
+                    _beta = (
+                        _bx * retarded_vel[0]
+                        + _by * retarded_vel[1]
+                        + _bz * retarded_vel[2]
+                    )
+                    _ltdot = _beta / (C_LIGHT_AU_DAY + _beta)
+                    geo_vel = (
+                        retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
+                        retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
+                        retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
+                    )
+            else:
+                _dg = _vec3_dist(geo_geom)
+                if _dg > 0.0:
+                    _px, _py, _pz = (
+                        geo_geom[0] / _dg,
+                        geo_geom[1] / _dg,
+                        geo_geom[2] / _dg,
+                    )
+                    _pr = (
+                        _px * retarded_vel[0]
+                        + _py * retarded_vel[1]
+                        + _pz * retarded_vel[2]
+                    )
+                    _pv = _px * geo_vel[0] + _py * geo_vel[1] + _pz * geo_vel[2]
+                    _ltdot = _pv / (C_LIGHT_AU_DAY + _pr)
+                    geo_vel = (
+                        retarded_vel[0] * (1.0 - _ltdot) - observer_vel[0],
+                        retarded_vel[1] * (1.0 - _ltdot) - observer_vel[1],
+                        retarded_vel[2] * (1.0 - _ltdot) - observer_vel[2],
+                    )
 
         # Center-of-body motion: geo_geom carries the COB offset (planet centre
         # vs system barycentre) but retarded_vel is the barycentre velocity.
@@ -1446,12 +1516,13 @@ def _pipeline_icrs(
         # (Pluto–Charon, ~0.07"/day) omitting the COB velocity biases the speed.
         # Add d(COB)/dt analytically (the offset is smooth; ~6.4 d for Pluto).
         # Central-difference at the SAME epoch the position COB used (retarded
-        # for HELCTR/BARYCTR, observer time otherwise) so the reported speed
-        # stays the exact derivative of the reported position.
-        if is_system_bary:
+        # for BARYCTR, observer time otherwise) so the reported speed stays the
+        # exact derivative of the reported position. Major-planet HELCTR is
+        # excluded: its position is the barycentre (no COB), no COB speed rate.
+        if is_system_bary and not helctr_bary_lt:
             _cob_vt = (
                 jd_tt - lt
-                if (iflag & (FLG_HELCTR | FLG_BARYCTR)) and lt > 0.0
+                if (iflag & FLG_BARYCTR) and lt > 0.0
                 else jd_tt
             )
             _z = (0.0, 0.0, 0.0)

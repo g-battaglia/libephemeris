@@ -3755,6 +3755,29 @@ def _calc_body(
             # Get initial geometric position
             p, v = get_vector(t)
 
+            # Heliocentric output reports the planet-system BARYCENTRE (no COB)
+            # and retards light by the BARYCENTRIC distance |planet - SSB|/c
+            # (the reference's bary-frame light path), not the heliocentric
+            # |planet - Sun|/c. So the light-time target for HELCTR is the raw
+            # barycentre, not the COB-corrected centre from get_planet_target().
+            # Barycentric output (observer is None) keeps the existing
+            # COB-corrected target (unchanged). Mirrors the LEB pipeline
+            # (_pipeline_icrs) so both backends agree.
+            # Major planets only (same guard/body set as the LEB pipeline): the
+            # Sun's heliocentric place is the origin and the Moon uses an
+            # Earth-based light path, so both keep heliocentric-distance
+            # light-time and the COB-corrected centre target.
+            from .fast_calc import _HELCTR_BARY_LT_BODIES
+
+            helctr_bary_lt = bool(iflag & FLG_HELCTR) and ipl in _HELCTR_BARY_LT_BODIES
+            if helctr_bary_lt:
+                _bary_name = _PLANET_FALLBACK.get(target_name)
+                lt_target = planets[_bary_name] if _bary_name else target
+                _tgt_bary = lt_target.at(t).position.au
+            else:
+                lt_target = target
+                _tgt_bary = None
+
             # Light-time iteration: retard only the target; the observer
             # (Sun or SSB) stays at the observation time. Retarding both
             # shifts the result by the observer's barycentric motion over
@@ -3769,7 +3792,12 @@ def _calc_body(
                 _obs_vel_lt = np.zeros(3)
 
             for _ in range(3):
-                dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
+                if _tgt_bary is not None:
+                    dist = np.sqrt(
+                        _tgt_bary[0] ** 2 + _tgt_bary[1] ** 2 + _tgt_bary[2] ** 2
+                    )
+                else:
+                    dist = np.sqrt(p[0] ** 2 + p[1] ** 2 + p[2] ** 2)
                 light_time = dist / C_AU_PER_DAY
                 ts_lt = get_timescale()
                 # Retarded epoch as a two-part JD: subtract the light time from
@@ -3784,9 +3812,12 @@ def _calc_body(
                 # reported speed is the true derivative of the reported position,
                 # matching the LEB backend. (Same ULP hazard the sample-time
                 # construction above guards against for t ± dt.)
-                _tgt_ret = target.at(
+                _tgt_ret = lt_target.at(
                     ts_lt.tdb_jd(t.whole, t.tdb_fraction - light_time)
                 )
+                if _tgt_bary is not None:
+                    # Refresh the barycentric distance from the retarded epoch.
+                    _tgt_bary = _tgt_ret.position.au
                 p = _tgt_ret.position.au - _obs_pos_lt
                 v = _tgt_ret.velocity.au_per_d - _obs_vel_lt
 
