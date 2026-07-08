@@ -573,9 +573,11 @@ def _normalize_calc_flags(flags: int) -> int:
       caller passing FLG_JPLEPH|FLG_SWIEPH must get a single-bit retflag
       (JPLEPH wins, matching the reference's sequential-overwrite priority
       JPLEPH > SWIEPH). FLG_SWIEPH is echoed when the caller passed none.
-    - FLG_SPEED3 maps to FLG_SPEED: 3-position numerical differentiation
-      is already the only speed method used (matching SE behavior where
-      SPEED takes priority if both are set).
+    - FLG_SPEED3 maps to FLG_SPEED for the computation: 3-position numerical
+      differentiation is already the only speed method used. The reference
+      *echoes* SPEED3 when SPEED3 alone was requested (SPEED wins if both are
+      set); that echo correction is applied from the raw request by
+      _echo_speed_bit at the entry points, not here.
     """
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
@@ -589,6 +591,22 @@ def _normalize_calc_flags(flags: int) -> int:
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
     return flags
+
+
+def _echo_speed_bit(retflag: int, raw_flags: int) -> int:
+    """Echo the speed bit the reference API reports, from the raw request.
+
+    _normalize_calc_flags remaps FLG_SPEED3 -> FLG_SPEED for the (identical)
+    computation, which would make retflag always echo SPEED. The reference
+    echoes SPEED3 when SPEED3 alone was requested and SPEED when SPEED is
+    present (SPEED wins if both are set). This corrects the echoed speed bit
+    from the caller's original flags, touching nothing in the computation.
+    Verified against the reference oracle: SPEED3 -> SPEED3, SPEED -> SPEED,
+    SPEED|SPEED3 -> SPEED.
+    """
+    if (raw_flags & FLG_SPEED3) and not (raw_flags & FLG_SPEED):
+        return (retflag & ~FLG_SPEED) | FLG_SPEED3
+    return retflag
 
 
 def _implied_retflag_bits(flags: int) -> int:
@@ -1261,6 +1279,7 @@ def calc_ut(
         pos_nut, rf_nut = _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
         return pos_nut, rf_nut | _implied_retflag_bits(flags)
 
+    raw_flags = flags
     flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
@@ -1280,7 +1299,9 @@ def calc_ut(
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
         north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        return _south_node_from_north(north_result, flags), retflag
+        return _south_node_from_north(north_result, flags), _echo_speed_bit(
+            retflag, raw_flags
+        )
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1294,7 +1315,7 @@ def calc_ut(
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             _record(planet, "LEB")
-            return result[0], result[1] | _implied_retflag_bits(flags)
+            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1313,7 +1334,7 @@ def calc_ut(
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
             _record(planet, "Horizons")
-            return result[0], result[1] | _implied_retflag_bits(flags)
+            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1354,7 +1375,8 @@ def calc_ut(
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdut)
             _record(planet, "Skyfield")
         # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
-        return _finalize_output_flags(pos, retflag, flags)
+        pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
+        return pos_out, _echo_speed_bit(rf_out, raw_flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
     except ValueError as e:
@@ -1410,6 +1432,7 @@ def calc(
         )
         return pos_nut, rf_nut | _implied_retflag_bits(flags)
 
+    raw_flags = flags
     flags = _normalize_calc_flags(flags)
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
@@ -1421,7 +1444,9 @@ def calc(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_result, retflag = calc(tjdet, abs(planet), flags)
-        return _south_node_from_north(north_result, flags), retflag
+        return _south_node_from_north(north_result, flags), _echo_speed_bit(
+            retflag, raw_flags
+        )
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
     from .state import get_leb_reader
@@ -1435,7 +1460,7 @@ def calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             _record(planet, "LEB")
-            return result[0], result[1] | _implied_retflag_bits(flags)
+            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1459,7 +1484,7 @@ def calc(
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
             _record(planet, "Horizons")
-            return result[0], result[1] | _implied_retflag_bits(flags)
+            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1497,7 +1522,8 @@ def calc(
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
             _record(planet, "Skyfield")
         # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
-        return _finalize_output_flags(pos, retflag, flags)
+        pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
+        return pos_out, _echo_speed_bit(rf_out, raw_flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:

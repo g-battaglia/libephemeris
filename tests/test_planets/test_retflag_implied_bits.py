@@ -28,6 +28,7 @@ from libephemeris.constants import (
     FLG_SIDEREAL,
     FLG_TRUEPOS,
     MARS,
+    MEAN_NODE,
 )
 
 JD = 2451545.0
@@ -65,6 +66,36 @@ class TestImpliedRetflagBits:
             assert not (retflag & FLG_NOABERR)
             if not req & FLG_NONUT:
                 assert not (retflag & FLG_NONUT)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "req,expect_speed,expect_speed3",
+        [
+            (le.FLG_SPEED3, False, True),
+            (le.FLG_SPEED, True, False),
+            (le.FLG_SPEED | le.FLG_SPEED3, True, False),  # SPEED wins
+            (le.FLG_SIDEREAL | le.FLG_SPEED3, False, True),
+        ],
+    )
+    def test_speed3_echo(self, req, expect_speed, expect_speed3) -> None:
+        """The reference echoes SPEED3 when SPEED3 alone was requested and
+        SPEED when SPEED is present (SPEED wins); the computed values are the
+        same either way (identical 3-position differentiation)."""
+        from libephemeris.constants import FLG_SPEED, FLG_SPEED3
+
+        for fn in (le.calc_ut, le.calc):
+            _, rf = fn(JD, MARS, req)
+            assert bool(rf & FLG_SPEED) is expect_speed
+            assert bool(rf & FLG_SPEED3) is expect_speed3
+        # South node, context and the LEB backend echo the same.
+        _, rf = le.calc_ut(JD, -MEAN_NODE, req)
+        assert bool(rf & FLG_SPEED3) is expect_speed3
+        _, rf = le.EphemerisContext().calc_ut(JD, MARS, req)
+        assert bool(rf & FLG_SPEED3) is expect_speed3
+        # Values identical to the plain-SPEED request.
+        pos3, _ = le.calc_ut(JD, MARS, req)
+        pos_s, _ = le.calc_ut(JD, MARS, (req & ~FLG_SPEED3) | FLG_SPEED)
+        assert pos3 == pos_s
 
     @pytest.mark.unit
     def test_ecl_nut_echoes_implied_bits(self) -> None:

@@ -595,6 +595,7 @@ class EphemerisContext:
         # so the context entry points stay 1:1 with the reference API
         # (FLG_MOSEPH strip, ephemeris-bit echo, FLG_SPEED3 mapping) on
         # every path, including the LEB fast path.
+        raw_iflag = iflag
         iflag = _normalize_calc_flags(iflag)
 
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
@@ -646,9 +647,11 @@ class EphemerisContext:
 
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
                 _record(ipl, "LEB")
-                from .planets import _implied_retflag_bits
+                from .planets import _implied_retflag_bits, _echo_speed_bit
 
-                return result[0], result[1] | _implied_retflag_bits(iflag)
+                return result[0], _echo_speed_bit(
+                    result[1] | _implied_retflag_bits(iflag), raw_iflag
+                )
             except (KeyError, ValueError) as _leb_err:
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback
@@ -692,9 +695,11 @@ class EphemerisContext:
                     "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
                 )
                 _record(ipl, "Horizons")
-                from .planets import _implied_retflag_bits
+                from .planets import _implied_retflag_bits, _echo_speed_bit
 
-                return result[0], result[1] | _implied_retflag_bits(iflag)
+                return result[0], _echo_speed_bit(
+                    result[1] | _implied_retflag_bits(iflag), raw_iflag
+                )
             except KeyError as _hz_err:
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons->fallback (context) reason=%s",
@@ -752,7 +757,10 @@ class EphemerisContext:
         # the module-level entry points (the context LEB/Horizons paths call
         # _record; the Skyfield fallback must too for telemetry parity).
         _record(ipl, "Skyfield")
-        return _finalize_output_flags(pos, retflag, iflag)
+        from .planets import _echo_speed_bit
+
+        pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
+        return pos_out, _echo_speed_bit(rf_out, raw_iflag)
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int
