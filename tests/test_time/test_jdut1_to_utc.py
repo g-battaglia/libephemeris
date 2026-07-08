@@ -322,6 +322,23 @@ class TestJdut1ToUtcEdgeCases:
         assert abs(second) < 1.0
 
     @pytest.mark.unit
+    def test_utc_epoch_1972_boundary_roundtrip(self):
+        """UTC 1972-01-01 00:00:00.0 must round-trip, not fall back to 1971."""
+        _, jd_ut1 = ephem.utc_to_jd(1972, 1, 1, 0, 0, 0.0)
+        year, month, day, hour, minute, second = ephem.jdut1_to_utc(jd_ut1)
+        assert (year, month, day, hour, minute) == (1972, 1, 1, 0, 0)
+        assert second == pytest.approx(0.0, abs=0.001)
+
+    @pytest.mark.unit
+    def test_utc_epoch_1972_sweep_no_day_flip(self):
+        """Sweep the first second of 1972 UTC: no day/year flip on round-trip."""
+        for i in range(0, 100):
+            sec = i * 0.01
+            _, jd_ut1 = ephem.utc_to_jd(1972, 1, 1, 0, 0, sec)
+            y, mo, d, h, mi, s = ephem.jdut1_to_utc(jd_ut1)
+            assert (y, mo, d) == (1972, 1, 1), f"sec={sec}: {(y, mo, d)}"
+
+    @pytest.mark.unit
     def test_historical_date(self):
         """Test historical date (before UTC was defined)."""
         jd_tt, jd_ut1 = ephem.utc_to_jd(1800, 6, 15, 12, 0, 0.0)

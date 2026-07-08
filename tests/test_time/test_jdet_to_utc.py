@@ -311,6 +311,28 @@ class TestJdetToUtcEdgeCases:
         assert second == pytest.approx(0.0, abs=0.001)
 
     @pytest.mark.unit
+    def test_utc_epoch_1972_boundary_roundtrip(self):
+        """The 1972-01-01 UTC epoch must not misroute to 1971-12-31.
+
+        UTC 1972-01-01 00:00:00.0 has a UT1 instant ~0.045 s earlier (year
+        1971); classifying on that UT1 year returned 1971-12-31 23:59:59.95.
+        The round-trip must land back on 1972-01-01 00:00:00 (to ~1 ms).
+        """
+        jd_tt, _ = ephem.utc_to_jd(1972, 1, 1, 0, 0, 0.0)
+        year, month, day, hour, minute, second = ephem.jdet_to_utc(jd_tt)
+        assert (year, month, day, hour, minute) == (1972, 1, 1, 0, 0)
+        assert second == pytest.approx(0.0, abs=0.001)
+
+    @pytest.mark.unit
+    def test_utc_epoch_1972_sweep_no_day_flip(self):
+        """Sweep the first second of 1972 UTC: no day/year flip on round-trip."""
+        for i in range(0, 100):
+            sec = i * 0.01
+            jd_tt, _ = ephem.utc_to_jd(1972, 1, 1, 0, 0, sec)
+            y, mo, d, h, mi, s = ephem.jdet_to_utc(jd_tt)
+            assert (y, mo, d) == (1972, 1, 1), f"sec={sec}: {(y, mo, d)}"
+
+    @pytest.mark.unit
     def test_historical_date(self):
         """Test historical date (before UTC was defined)."""
         # 1800-06-15 12:00:00 (treated as UT1 approximation)

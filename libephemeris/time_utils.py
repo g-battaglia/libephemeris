@@ -54,6 +54,15 @@ _TID_ACC_EPOCH_JD = 2435109.0875
 # [-26.5, -22.0] and years -3000..+3000.
 _TID_ACC_COEF = -0.9100373728
 
+# --- UTC epoch boundary (jd*_to_utc classification) ------------------------
+# JD of 1972-01-01 00:00:00, the start of leap-second UTC. Before this instant
+# there is no UTC and the reference API returns the UT1 calendar date directly.
+# Instants within a guard band of this epoch are ambiguous when classified by
+# the UT1 year alone (UT1 leads/lags UTC by up to ~0.9 s), so they are routed
+# through Skyfield's UTC to be classified on the reconstructed UTC year.
+_UTC_EPOCH_JD = 2441317.5
+_UTC_EPOCH_BAND = 2.0 / 86400.0  # ~2 s window treated as "at the UTC epoch"
+
 
 def _validate_calendar(cal: int, func_name: str) -> None:
     """Reject calendar flags other than GREG_CAL/JUL_CAL.
@@ -785,18 +794,31 @@ def jdet_to_utc(
     # date directly (jd_ut1 = jd_et - Delta T, fixed-point refined).
     jd_ut1_est = jd_et - deltat(jd_et)
     jd_ut1_est = jd_et - deltat(jd_ut1_est)
-    if revjul(jd_ut1_est, GREG_CAL)[0] < 1972:
+    # Fast path only when the instant is clearly before the UTC epoch. Within a
+    # ~2 s band of 1972-01-01 the UT1 year is unreliable (UT1 leads/lags UTC by
+    # up to 0.9 s), so defer to Skyfield's UTC below and classify on the
+    # reconstructed UTC year — this keeps the UTC->JD->UTC round-trip exact
+    # across the boundary (UTC 1972-01-01 00:00:00.0 has UT1 in year 1971).
+    near_utc_epoch = abs(jd_ut1_est - _UTC_EPOCH_JD) < _UTC_EPOCH_BAND
+    if revjul(jd_ut1_est, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1_est, calendar)
 
     ts = get_timescale()
 
-    # Create a Skyfield Time object from TT Julian Day
-    t = ts.tt_jd(jd_et)
+    # Create a Skyfield Time object from the Julian Day. In the boundary band
+    # reconstruct from the library-consistent UT1 estimate: Skyfield's UT1->UTC
+    # lands on the correct side of the epoch, whereas the TT->UTC chain can
+    # underflow it by a sub-microsecond and flip the calendar day back to 1971.
+    t = ts.ut1_jd(jd_ut1_est) if near_utc_epoch else ts.tt_jd(jd_et)
 
     # Get UTC components from Skyfield (handles leap seconds automatically)
     # The .utc attribute returns a tuple: (year, month, day, hour, minute, second)
     # We cast to Any to work around Skyfield's reify decorator type annotation issues
     utc_data: Any = t.utc
+    # Guard-band instants that Skyfield still resolves before 1972 have no UTC:
+    # return the UT1 calendar date directly like the reference API.
+    if int(utc_data[0]) < 1972:
+        return _jd_to_calendar_tuple(jd_ut1_est, calendar)
     g_year = int(utc_data[0])
     g_month = int(utc_data[1])
     g_day = int(utc_data[2])
@@ -863,8 +885,13 @@ def jdut1_to_utc(
 
     ts = get_timescale()
 
-    # Pre-1972 there is no UTC: return the UT1 calendar date directly.
-    if revjul(jd_ut1, GREG_CAL)[0] < 1972:
+    # Pre-1972 there is no UTC: return the UT1 calendar date directly. Within a
+    # ~2 s band of 1972-01-01 the UT1 year is unreliable (UT1 leads/lags UTC by
+    # up to 0.9 s), so defer to Skyfield's UTC below and classify on the
+    # reconstructed UTC year — this keeps the UTC->JD->UTC round-trip exact
+    # across the boundary (UTC 1972-01-01 00:00:00.0 has UT1 in year 1971).
+    near_utc_epoch = abs(jd_ut1 - _UTC_EPOCH_JD) < _UTC_EPOCH_BAND
+    if revjul(jd_ut1, GREG_CAL)[0] < 1972 and not near_utc_epoch:
         return _jd_to_calendar_tuple(jd_ut1, calendar)
 
     # Create a Skyfield Time object from UT1 Julian Day
@@ -874,6 +901,10 @@ def jdut1_to_utc(
     # The .utc attribute returns a tuple: (year, month, day, hour, minute, second)
     # We cast to Any to work around Skyfield's reify decorator type annotation issues
     utc_data: Any = t.utc
+    # Guard-band instants that Skyfield still resolves before 1972 have no UTC:
+    # return the UT1 calendar date directly like the reference API.
+    if int(utc_data[0]) < 1972:
+        return _jd_to_calendar_tuple(jd_ut1, calendar)
     g_year = int(utc_data[0])
     g_month = int(utc_data[1])
     g_day = int(utc_data[2])
