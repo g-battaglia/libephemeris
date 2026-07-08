@@ -419,6 +419,19 @@ for a fixed-target mode such as Galactic Centre 0° Sagittarius. Verified agains
 the reference oracle to < 0.001″/day across stars, ayanamshas and epochs.
 Positions are identical on both families; only this speed channel differs.
 
+**4.9 Latitude/declination speed (`speed_lat`) — reference defect.** In the
+tropical (of-date) frame the reference API injects a spurious nutation-rate
+term into the fixed-star latitude/declination speed channel, so its reported
+`speed_lat` is *not* the time-derivative of its own reported latitude — the two
+disagree by up to ~0.04″/day, largest on high-declination stars near the
+ecliptic pole (e.g. Polaris). Referring the output to a mean equinox
+(`FLG_SIDEREAL` or `FLG_NONUT`) removes the nutation and shrinks the
+inconsistency to ~0.0013″/day. libephemeris instead reports the exact central
+finite-difference derivative of its own latitude, so its `speed_lat` is
+self-consistent with its position in every frame; the residual vs the reference
+is that spurious term. Longitude speed is unaffected (see §4.8); only the
+latitude/declination speed channel differs.
+
 ### 5. Refraction and horizontal coordinates
 
 **5.1 Atmospheric refraction (`refrac`).** Up to 15" near the horizon; both use
