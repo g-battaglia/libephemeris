@@ -1181,9 +1181,10 @@ def _heliacal_ut_leb(
         # The first/last days of an apparition are visible only in a narrow
         # window near the optimal Sun depression, where the margin peaks at a
         # few tenths of a magnitude. Locate that peak by scanning the
-        # productive twilight band (Sun ~ -2 to -14 deg) at ~2.5-min
-        # resolution and take the maximum margin; a coarser grid steps over
-        # the marginal peak and shifts the reported day by +/-1.
+        # productive twilight band (Sun ~ -5 deg morning / -2 deg evening down
+        # to -18 deg — see sun_upper below) at 3-min resolution and take the
+        # maximum margin; a coarser grid steps over the marginal peak and
+        # shifts the reported day by +/-1.
         # Magnitude and Sun-object elongation vary only slowly within a day
         # (and pheno_ut is by far the most expensive call), so evaluate them
         # once at the twilight centre and reuse across the fine scan.
