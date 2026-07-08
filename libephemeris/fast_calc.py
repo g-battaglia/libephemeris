@@ -994,11 +994,14 @@ def _calc_ayanamsa_from_leb(
         KeyError: If the active sidereal mode requires Skyfield.
     """
     if sid_mode is None:
-        from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
+        # Read via the locked getter so a concurrent EphemerisContext swap
+        # (which installs its sidereal config into these globals under
+        # _CONTEXT_SWAP_LOCK for the whole calc) cannot leak into a
+        # module-level sidereal request. Reading the globals directly here
+        # bypassed the lock and could return another context's ayanamsha.
+        from .state import get_sid_mode
 
-        sid_mode = _SIDEREAL_MODE
-        sid_t0 = _SIDEREAL_T0
-        sid_ayan_t0 = _SIDEREAL_AYAN_T0
+        sid_mode, sid_t0, sid_ayan_t0 = get_sid_mode(full=True)
 
     T = (jd_tt - J2000) / 36525.0
 
@@ -2125,11 +2128,14 @@ def fast_calc_ut(
 
     # Snapshot sidereal state once at entry (thread-safe)
     if sid_mode is None and (iflag & FLG_SIDEREAL):
-        from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
+        # Read via the locked getter so a concurrent EphemerisContext swap
+        # (which installs its sidereal config into these globals under
+        # _CONTEXT_SWAP_LOCK for the whole calc) cannot leak into a
+        # module-level sidereal request. Reading the globals directly here
+        # bypassed the lock and could return another context's ayanamsha.
+        from .state import get_sid_mode
 
-        sid_mode = _SIDEREAL_MODE
-        sid_t0 = _SIDEREAL_T0
-        sid_ayan_t0 = _SIDEREAL_AYAN_T0
+        sid_mode, sid_t0, sid_ayan_t0 = get_sid_mode(full=True)
 
     # Delta-T conversion: UT -> TT
     from .time_utils import deltat
@@ -2216,11 +2222,14 @@ def fast_calc_tt(
             )
 
     if sid_mode is None and (iflag & FLG_SIDEREAL):
-        from .state import _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
+        # Read via the locked getter so a concurrent EphemerisContext swap
+        # (which installs its sidereal config into these globals under
+        # _CONTEXT_SWAP_LOCK for the whole calc) cannot leak into a
+        # module-level sidereal request. Reading the globals directly here
+        # bypassed the lock and could return another context's ayanamsha.
+        from .state import get_sid_mode
 
-        sid_mode = _SIDEREAL_MODE
-        sid_t0 = _SIDEREAL_T0
-        sid_ayan_t0 = _SIDEREAL_AYAN_T0
+        sid_mode, sid_t0, sid_ayan_t0 = get_sid_mode(full=True)
 
     # TT -> UT via the canonical deltat(), NOT the ΔT table baked into the LEB
     # file (which can be stale by several seconds at historical dates, e.g.

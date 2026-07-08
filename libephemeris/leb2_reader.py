@@ -255,7 +255,14 @@ class LEB2Reader:
         Raises:
             LEBCorruptionError: If fewer than `size` bytes are available.
         """
-        blob = self._mm[offset : offset + size]
+        # Snapshot against a concurrent close() (see LEBReader.eval_body):
+        # self._mm[...] on a None would raise TypeError, which the callers'
+        # LEB->Skyfield fallback does not catch; reading a closed mmap through
+        # this local raises ValueError (caught) instead.
+        mm = self._mm
+        if mm is None:
+            raise ValueError("LEB2 reader is closed")
+        blob = mm[offset : offset + size]
         if len(blob) < size:
             raise LEBCorruptionError(
                 f"Truncated LEB2 file: {what} needs {size} bytes at "
@@ -556,6 +563,8 @@ class LEB2Reader:
         """Evaluate nutation angles. Same as LEBReader.eval_nutation()."""
         if self._mm is None:
             raise ValueError("LEB2 reader is closed")
+        # Snapshot against a concurrent close() (see LEBReader.eval_body).
+        mm = self._mm
 
         if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
@@ -586,13 +595,13 @@ class LEB2Reader:
         # Same corrupted-entry guard as eval_body: struct.unpack_from would
         # raise struct.error (NOT a ValueError) on a truncated nutation
         # section and bypass the callers' LEB->Skyfield fallback.
-        if byte_offset < 0 or byte_offset + seg_size > len(self._mm):
+        if byte_offset < 0 or byte_offset + seg_size > len(mm):
             raise LEBCorruptionError(
                 f"Corrupted LEB2 nutation entry: coefficient data at offset "
                 f"{byte_offset} (+{seg_size} bytes) is outside the file "
-                f"(size {len(self._mm)})"
+                f"(size {len(mm)})"
             )
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
+        coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
 
         dpsi = _clenshaw(coeffs[0:deg1], tau)
         deps = _clenshaw(coeffs[deg1: 2 * deg1], tau)

@@ -378,6 +378,11 @@ class LEBReader:
         # not absorb, crashing instead of degrading.
         if self._mm is None:
             raise ValueError("LEB reader is closed")
+        # Snapshot the mmap so a concurrent close() between here and the reads
+        # below cannot turn ``self._mm`` into None mid-eval: len(None) would
+        # raise TypeError (not caught by the LEB->Skyfield fallback), whereas
+        # reading a closed mmap through this local raises ValueError (caught).
+        mm = self._mm
 
         # Check instance-level eval cache first.  During a multi-body chart
         # calculation at the same jd_tt the observer (Earth) and gravitational
@@ -430,13 +435,13 @@ class LEBReader:
         # Corrupted-entry guard: a garbage data_offset would make
         # struct.unpack_from raise struct.error, which is NOT a ValueError
         # and would bypass the callers' LEB->Skyfield fallback handling.
-        if byte_offset < 0 or byte_offset + n_coeffs * 8 > len(self._mm):
+        if byte_offset < 0 or byte_offset + n_coeffs * 8 > len(mm):
             raise LEBCorruptionError(
                 f"Corrupted LEB body entry {body_id}: coefficient data at "
                 f"offset {byte_offset} (+{n_coeffs * 8} bytes) is outside "
-                f"the file (size {len(self._mm)})"
+                f"the file (size {len(mm)})"
             )
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
+        coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
 
         # Evaluate each component via Clenshaw
         pos = []
@@ -491,6 +496,8 @@ class LEBReader:
         """
         if self._mm is None:
             raise ValueError("LEB reader is closed")
+        # Snapshot the mmap against a concurrent close() (see eval_body).
+        mm = self._mm
 
         if self._nutation is None or self._nutation.segment_count <= 0:
             raise ValueError("No nutation data in this LEB file")
@@ -526,13 +533,13 @@ class LEBReader:
         # Same corrupted-entry guard as eval_body: struct.unpack_from would
         # raise struct.error (NOT a ValueError) on a truncated nutation
         # section and bypass the callers' LEB->Skyfield fallback.
-        if byte_offset < 0 or byte_offset + seg_size > len(self._mm):
+        if byte_offset < 0 or byte_offset + seg_size > len(mm):
             raise LEBCorruptionError(
                 f"Corrupted LEB nutation entry: coefficient data at offset "
                 f"{byte_offset} (+{seg_size} bytes) is outside the file "
-                f"(size {len(self._mm)})"
+                f"(size {len(mm)})"
             )
-        coeffs = struct.unpack_from(f"<{n_coeffs}d", self._mm, byte_offset)
+        coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
 
         # Evaluate dpsi and deps
         dpsi = _clenshaw(coeffs[0:deg1], tau)

@@ -1303,9 +1303,14 @@ def get_angles_cache() -> dict[str, float]:
 
     Note:
         Used by Arabic parts calculations which require pre-calculated
-        planetary positions and angles.
+        planetary positions and angles. The read takes _STATE_LOCK so it
+        serializes behind an EphemerisContext state swap (which replaces
+        _ANGLES_CACHE under the same lock for the duration of a context
+        calc), and a module-level Arabic-parts calc never observes a
+        context's cache.
     """
-    return _ANGLES_CACHE
+    with _STATE_LOCK:
+        return _ANGLES_CACHE
 
 
 def set_angles_cache(angles: dict[str, float]) -> None:
