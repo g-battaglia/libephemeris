@@ -392,6 +392,177 @@ def _nearest_past_helio_crossing(
     return jd_newton
 
 
+# Retrograde-loop arc (deg) each planet sweeps: a target within this arc of the
+# planet is reachable via an imminent retrograde dip rather than a full orbit
+# ahead. Also reused as the "fine scan band" of the forward first-crossing guard.
+_RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0, 7: 6.0, 8: 5.0, 9: 4.0}
+# Synodic period (days) — the spacing between successive retrograde loops.
+_SYNODIC = {
+    2: 116.0,
+    3: 584.0,
+    4: 780.0,
+    5: 399.0,
+    6: 378.0,
+    7: 370.0,
+    8: 367.0,
+    9: 367.0,
+}
+
+# Slow on-table planets whose long synodic period lets a single linear Newton
+# seed converge into a crossing basin one or more retrograde loops PAST the first
+# true crossing. For these the converged result is re-validated against an
+# earlier crossing (see ``_guarded_first_crossing``). Mercury/Venus/Mars move
+# fast enough that the existing forward-scan window already spans their first
+# crossing, so they are intentionally excluded (leaving them untouched).
+_SLOW_GUARD_PLANETS = (5, 6, 7, 8, 9)  # Jupiter..Pluto
+# Safe UPPER bound on each body's peak geocentric daily motion (deg/day; measured
+# peaks Jup 0.242, Sat 0.130, Ura 0.061, Nep/Plu 0.039, padded ~25%). Used to
+# size a forward-scan step that provably cannot step over a crossing: while the
+# body is more than ``_RETRO_ARC`` degrees from the target, a step of
+# (gap - arc) / max_rate advances it by at most (gap - arc) degrees, so it cannot
+# reach the target mid-step.
+_SLOW_MAX_RATE = {5: 0.30, 6: 0.16, 7: 0.08, 8: 0.05, 9: 0.05}
+
+
+def _first_forward_crossing_adaptive(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    x2cross: float,
+    jd_lo: float,
+    jd_hi: float,
+    max_rate: float,
+    band: float,
+    fine_step: float = 2.0,
+    coarse_cap: float = 300.0,
+) -> float | None:
+    """Earliest longitude crossing of ``x2cross`` in ``[jd_lo, jd_hi]``, or None.
+
+    Adaptive step, cheap yet provably skip-free:
+
+    * While the planet is more than ``band`` degrees from the target, the step
+      covers at most the time to close that gap at ``max_rate`` (a safe upper
+      bound on the body's peak daily motion), so the target cannot be reached
+      mid-step and no crossing is jumped.
+    * Within ``band`` — the neighbourhood of every crossing, including a
+      retrograde triple-crossing clustered around a station — the step drops to
+      ``fine_step``. Since d(delta)/dt equals the planet's speed away from the
+      antipodal wrap (guaranteed in-band, because band << 180), delta is
+      monotone between fine samples unless the speed changes sign there: a
+      plain sign change thus brackets exactly one crossing. The only crossings
+      a fixed grid could still miss are *grazing pairs* around a station where
+      delta pokes past zero and back between two samples (arbitrarily narrow —
+      e.g. a 0.1-arcsec, half-day graze at a station landing on the target).
+      Those are caught exactly: when the speed flips sign between fine samples,
+      the station (delta's extremum) is refined by bisection on the speed and
+      the extremum's sign decides whether the pair exists.
+
+    Returns the FIRST crossing, refined by bisection.
+    """
+
+    def _sample(jd_time: float) -> Tuple[float, float]:
+        lon, spd = get_position_func(jd_time)
+        return (lon - x2cross + 180.0) % 360.0 - 180.0, spd
+
+    def _delta(jd_time: float) -> float:
+        return _sample(jd_time)[0]
+
+    def _bisect(lo: float, hi: float, f_lo: float) -> float:
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            f_mid = _delta(mid)
+            if f_lo * f_mid <= 0:
+                hi = mid
+            else:
+                lo, f_lo = mid, f_mid
+        return 0.5 * (lo + hi)
+
+    d_prev, v_prev = _sample(jd_lo)
+    t_prev = jd_lo
+    t = jd_lo
+    while t < jd_hi:
+        gap = abs(d_prev)
+        in_band = gap <= band
+        if in_band:
+            step = fine_step
+        else:
+            step = min(coarse_cap, max(fine_step, (gap - band) / max_rate))
+        t = min(t + step, jd_hi)
+        d_cur, v_cur = _sample(t)
+        if d_prev * d_cur < 0 and abs(d_cur - d_prev) < 180.0:
+            return _bisect(t_prev, t, d_prev)
+        if in_band and v_prev * v_cur < 0:
+            # A station lies inside this fine interval, so delta has an
+            # extremum here that may graze past the target and back between
+            # the two samples (a hidden double crossing). Refine the station
+            # by bisection on the speed, then let the extremum's sign decide.
+            s_lo, s_hi, sv_lo = t_prev, t, v_prev
+            for _ in range(50):
+                s_mid = 0.5 * (s_lo + s_hi)
+                v_mid = _sample(s_mid)[1]
+                if sv_lo * v_mid <= 0:
+                    s_hi = s_mid
+                else:
+                    s_lo, sv_lo = s_mid, v_mid
+            t_station = 0.5 * (s_lo + s_hi)
+            d_station = _delta(t_station)
+            if d_station == 0.0:
+                return t_station
+            if d_prev * d_station < 0:
+                # The extremum overshoots the target: the first of the
+                # grazing pair lies in [t_prev, t_station].
+                return _bisect(t_prev, t_station, d_prev)
+        t_prev, d_prev, v_prev = t, d_cur, v_cur
+    return None
+
+
+def _guarded_first_crossing(
+    get_position_func: Callable[[float], Tuple[float, float]],
+    planet: int,
+    x2cross: float,
+    tjdut: float,
+    jd_candidate: float,
+) -> float:
+    """Return the earliest crossing at or after ``tjdut``, re-validating a slow
+    planet's far Newton result against an earlier crossing it may have skipped.
+
+    The contract of ``cross_ut`` is the FIRST crossing for ``t >= tjdut``. Newton
+    seeded from a single linear estimate ``diff / speed`` can land in the wrong
+    retrograde loop for a slow outer planet with a distant target — the net
+    progress is retarded by the retrograde loops, so the seed under-/over-shoots,
+    and Newton then converges on a later crossing (or the 2nd/3rd of a retrograde
+    triple), silently violating "first". The post-Newton guards only checked
+    ">= tjdut" and "within max_range", never "earliest".
+
+    This guard engages only for the slow on-table planets (Mercury..Mars move
+    fast enough that the existing forward-scan window already spans their first
+    crossing). A near-start retrograde triple-crossing can place the skipped
+    first crossing only a few hundred days before the candidate, so — unlike a
+    fixed synodic gate, which let those slip through — the guard runs whenever the
+    candidate is more than a few days ahead, scanning ``[tjdut, jd_candidate)``
+    for a genuinely earlier crossing. The scan is cheap (a coarse skip-free
+    approach plus a short fine pass near the target that early-exits on the first
+    crossing), so re-validating even the common single-crossing case is
+    inexpensive; a more precise Newton value is kept when no earlier crossing
+    exists.
+    """
+    if planet not in _SLOW_GUARD_PLANETS:
+        return jd_candidate
+    # Degenerate/trivial window: Newton is unambiguous for an imminent crossing,
+    # and a zero-width scan would be meaningless.
+    if jd_candidate - tjdut <= 5.0:
+        return jd_candidate
+    earlier = _first_forward_crossing_adaptive(
+        get_position_func,
+        x2cross,
+        tjdut,
+        jd_candidate - 0.5,  # exclude the candidate crossing itself
+        _SLOW_MAX_RATE.get(planet, 0.16),
+        _RETRO_ARC.get(planet, 9.0),
+    )
+    if earlier is not None and tjdut - 1e-6 <= earlier < jd_candidate - 1.0:
+        return earlier
+    return jd_candidate
+
+
 def _cross_max_range(planet: int, speed_default: float) -> float:
     """Forward search horizon (days) for a planet's longitude crossing, sized to
     cover at least one orbital period so a target lying behind a slow planet is
@@ -1223,17 +1394,7 @@ def cross_ut(
     # refine. The scan is forward-only by construction and early-exits on the
     # first crossing, so it is cheap whenever one exists soon. The fast common
     # case (prograde, target ahead, away from a station) skips it and uses NR.
-    _RETRO_ARC = {2: 16.0, 3: 18.0, 4: 22.0, 5: 12.0, 6: 9.0, 7: 6.0, 8: 5.0, 9: 4.0}
-    _SYNODIC = {
-        2: 116.0,
-        3: 584.0,
-        4: 780.0,
-        5: 399.0,
-        6: 378.0,
-        7: 370.0,
-        8: 367.0,
-        9: 367.0,
-    }
+    # (``_RETRO_ARC`` / ``_SYNODIC`` are module-level constants.)
     diff_back = (lon_start - x2cross) % 360.0
     if speed < 0 or _is_near_station(speed) or diff_back < _RETRO_ARC.get(planet, 22.0):
         scan_window = _SYNODIC.get(planet, 800.0) * 1.2
@@ -1282,6 +1443,13 @@ def cross_ut(
         pos_result, _ = calc_ut(jd_time, planet, flags | FLG_SPEED)
         return pos_result[0], pos_result[3]
 
+    # "First crossing" guard: any computed crossing is re-validated (for the slow
+    # on-table planets, and only when it lies far ahead) against an earlier
+    # crossing that Newton or a too-narrow bracket scan may have skipped. A near
+    # result is returned untouched, so the fast common path is unaffected.
+    def _first(jd_result: float) -> float:
+        return _guarded_first_crossing(get_position, planet, x2cross, tjdut, jd_result)
+
     # Check if we're near a retrograde station - use Brent's method for robustness
     if _is_near_station(speed):
         # Near station: Newton-Raphson may fail due to division by near-zero speed
@@ -1315,8 +1483,10 @@ def cross_ut(
             )
 
             # Use Brent's method to find the exact crossing
-            return _brent_find_crossing(
-                get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
+            return _first(
+                _brent_find_crossing(
+                    get_position, x2cross, jd_a, jd_b, NR_TOLERANCE, max_iter
+                )
             )
         except (Error, RuntimeError):
             # If Brent's method fails, fall through to Newton-Raphson as last resort
@@ -1348,14 +1518,16 @@ def cross_ut(
         # Check convergence (< 0.001 arcsecond)
         if abs(diff) < NR_TOLERANCE:
             if jd >= tjdut - 1e-6:
-                return jd
+                return _first(jd)
             # Newton converged to a PAST crossing — the wrapped step diff/speed
             # walked backward (e.g. a target far behind a prograde planet, whose
             # first forward crossing is a whole orbit ahead). Forward-only is a
             # hard contract: return the first crossing at or after tjdut instead.
             try:
-                return _forward_first_crossing(
-                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                return _first(
+                    _forward_first_crossing(
+                        get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                    )
                 )
             except (Error, RuntimeError):
                 raise Error("Planet crossing search diverged")
@@ -1386,13 +1558,15 @@ def cross_ut(
                     tjdut + bracket_window,
                     num_samples=bracket_samples,
                 )
-                return _brent_find_crossing(
-                    get_position,
-                    x2cross,
-                    jd_a,
-                    jd_b,
-                    NR_TOLERANCE,
-                    max_iter - iteration,
+                return _first(
+                    _brent_find_crossing(
+                        get_position,
+                        x2cross,
+                        jd_a,
+                        jd_b,
+                        NR_TOLERANCE,
+                        max_iter - iteration,
+                    )
                 )
             except (Error, RuntimeError):
                 # If Brent fails, continue with Newton-Raphson
@@ -1412,8 +1586,10 @@ def cross_ut(
         # exists at or after tjdut within max_range. Forward-only by construction.
         if abs(jd - tjdut) > max_range:
             try:
-                return _forward_first_crossing(
-                    get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                return _first(
+                    _forward_first_crossing(
+                        get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                    )
                 )
             except (Error, RuntimeError):
                 raise Error("Planet crossing search diverged")
@@ -1423,8 +1599,10 @@ def cross_ut(
     # max_range (so neither the divergence nor the backward guard fired). The
     # forward bracket scan is the robust catch-all.
     try:
-        return _forward_first_crossing(
-            get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+        return _first(
+            _forward_first_crossing(
+                get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+            )
         )
     except (Error, RuntimeError):
         raise Error("Maximum iterations reached in planet crossing calculation")
