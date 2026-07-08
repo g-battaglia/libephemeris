@@ -62,14 +62,15 @@ References
 
 Deviation from the reference implementation
 -------------------------------------------
-The reference ephemeris computes refraction
-from empirical curve fits: Sinclair's formula (quoted in Bennett 1982)
-inside its azimuth/altitude and extended-refraction paths and the
-Saemundsson/Bennett pair in its plain refraction path. This module
-deliberately keeps the ray-traced model instead
+The reference ephemeris computes refraction from empirical curve fits:
+Sinclair's formula (quoted in Bennett 1982) inside its azimuth/altitude
+and extended-refraction paths and the Saemundsson/Bennett pair in its
+plain refraction path.
+
+Plain ``refrac()`` deliberately keeps the ray-traced model above
 (owner decision, 2026-06): it is physically grounded and at least as
-accurate against rigorous benchmarks. Measured envelope of the
-difference vs. the reference's fits at p=1013.25 hPa, T=10 C:
+accurate against rigorous benchmarks. Measured envelope of the plain
+``refrac()`` difference vs. the reference's fits at p=1013.25 hPa, T=10 C:
 
 - above ~15 deg altitude:           < 0.1 arcsec
 - 5 .. 15 deg:                      < 1 arcsec
@@ -78,14 +79,20 @@ difference vs. the reference's fits at p=1013.25 hPa, T=10 C:
                                     extrapolations there; neither model
                                     is observationally constrained)
 
-Consequences: apparent altitudes from utils.azalt/refrac/refrac_extended
-can differ from the reference by the envelope above, which can flip
-near-horizon visibility bits (eclipse/occultation *_VISIBLE flags)
-within a few seconds of an event's horizon crossing. Rise/set times are
-NOT affected: eclipse.rise_trans and everything built on it use the
-reference's own Sinclair model (see eclipse._rise_true_to_apparent) so
-that rise/set, twilight and eclipse timing agree with the reference to
-fractions of a second.
+``refrac_extended()`` and ``azalt()`` must instead be 1:1 with the
+reference, so they use the reference-matched analytic model further down
+(see calc_refraction_ref_app_to_true / calc_refraction_ref_true_to_app),
+which reproduces the reference to < 30" across observer elevation,
+pressure and temperature -- both above and below the dip.
+
+Consequences: apparent altitudes from plain ``refrac()`` can differ from
+the reference by the envelope above, which can flip near-horizon
+visibility bits (eclipse/occultation *_VISIBLE flags) within a few
+seconds of an event's horizon crossing. Rise/set times are NOT affected:
+eclipse.rise_trans and everything built on it use the reference's own
+Sinclair model (see eclipse._rise_true_to_apparent) so that rise/set,
+twilight and eclipse timing agree with the reference to fractions of a
+second.
 """
 
 from __future__ import annotations
@@ -151,7 +158,9 @@ def _gauss_legendre_nodes(n: int) -> Tuple[list, list]:
         x = math.cos(theta)
 
         dp = 1.0  # will be overwritten in the loop
-        for _ in range(50):  # pragma: no branch - Newton iteration always converges in <50 steps
+        for _ in range(
+            50
+        ):  # pragma: no branch - Newton iteration always converges in <50 steps
             p0 = 1.0
             p1 = x
             for j in range(2, n + 1):
@@ -325,9 +334,9 @@ def _dn_dr_at_height(
 # ---------------------------------------------------------------------------
 
 # Single-slot profile cache: (key, profile) stored atomically as one tuple
-_refr_cache_entry: tuple[tuple[float, float, float, float], _AtmosphereProfile] | None = (
-    None
-)
+_refr_cache_entry: (
+    tuple[tuple[float, float, float, float], _AtmosphereProfile] | None
+) = None
 
 
 class _AtmosphereProfile:
@@ -616,81 +625,181 @@ def calc_refraction_app_to_true(
 # Reference-matched analytic refraction (used by refrac_extended / azalt only)
 # ---------------------------------------------------------------------------
 #
-# The ray-traced model above is the library's default refraction (see
-# calc_refraction_true_to_app). refrac_extended() and azalt(), however, are
-# required to be 1:1 with the reference API, whose refrac_extended returns a
-# smooth analytic curve that keeps growing below the geometric horizon (the
-# ray tracer turns over there). The functions below reproduce that reference
-# curve at standard conditions to within ~7 arcsec across -3..+90 deg:
+# The ray-traced model above is the library's default refraction (plain
+# refrac(), via calc_refraction_true_to_app). refrac_extended() and azalt(),
+# however, must be 1:1 with the reference API. Black-box probing of the
+# reference's refrac_extended over a dense grid (input altitude x observer
+# elevation x pressure x temperature) establishes its behaviour exactly:
 #
-#   above the horizon (h >= 0):  a Saemundsson-family fit
-#       R[arcmin] = a / tan(h + b/(h + c))
-#   below the horizon (h < 0):   a cubic continuation in x = -h [deg],
-#       anchored at R(0) for continuity
+#   * Refraction is a pure function of the *input* altitude, pressure and
+#     temperature; it does NOT depend on the observer's elevation (that only
+#     enters through the horizon dip -- see calc_dip below).
+#   * The *apparent* altitude is the natural argument. As a function of the
+#     apparent altitude the pressure scaling is separable and exactly linear at
+#     every temperature: gP(P) = (P - 80) / 933.25. The app->true refraction is
+#     therefore taken as the primitive here, and true->app is obtained by
+#     inverting it. (The reference's own true->app and app->true agree to
+#     <0.2" wherever its internal iteration is well-conditioned; below roughly
+#     3 deg under the dipped horizon at strong cold that iteration diverges and
+#     the reference returns non-physical values -- we return the physically
+#     sensible clamped input there instead.)
+#   * Base curve R0(app) at 1013.25 mbar, 15 C: a Bennett-family fit above the
+#     horizon with a small rational correction, and a quartic continuation
+#     below it (with a bounded linear tail past -2.3 deg). Matches the
+#     reference to <2" over app in [-2.3, 90] deg.
+#   * Temperature enters as (288.15 / (273.15 + T)) ** q(app, T). The exponent
+#     q rises from ~0.88 at the zenith to ~1.75 at the horizon and ~2.9 a
+#     couple of degrees below it -- an altitude-dependent sensitivity that no
+#     single fixed exponent can capture (the previous model used a constant
+#     1.31, correct only near the horizon). q is fit as a low-order polynomial
+#     in the compressed altitude variable 1/(app + 5), quadratic in T.
 #
-# The fit constants were obtained by black-box probing of the reference
-# refrac_extended over a fine altitude grid at P=1013.25 mbar, T=15 C.
-_REFR_ABOVE_A: float = 0.982965
-_REFR_ABOVE_B: float = 8.729399
-_REFR_ABOVE_C: float = 4.378080
-# R(0) in arcmin, = a / tan(b/c); the below-horizon polynomial anchors here.
-_REFR_R0_ARCMIN: float = _REFR_ABOVE_A / math.tan(
-    math.radians(_REFR_ABOVE_B / _REFR_ABOVE_C)
+# Measured agreement of refrac_extended vs the reference across observer
+# elevation {0, 1000, 3000, 4000} m, T {-30 .. 35} C, P {900 .. 1100} mbar and
+# input altitude from 4 deg below the dip to 1 deg above it: <30" everywhere
+# (median <0.001"), excluding the divergent deep-below-horizon cold sliver
+# noted above. See docs/comparison/known-differences.md section 13.
+#
+# All constants below were obtained purely by black-box probing (no reference
+# source was consulted).
+
+# Pressure scaling of the app->true refraction: exactly linear and separable.
+_REFR_P_OFFSET: float = 80.0
+_REFR_P_SPAN: float = 933.25  # = 1013.25 - 80
+
+# Base curve R0(app) at 1013.25 mbar, 15 C, in degrees.
+# Above the horizon: Bennett-family a/tan(app + b/(app+c)) plus a rational
+# correction in w = 1/(app + 4) that pulls the fit under ~2".
+_REFR_A: float = 0.9816287048243229
+_REFR_B: float = 7.14
+_REFR_C: float = 4.259
+_REFR_CORR: tuple[float, float, float, float, float] = (
+    0.007823842467183916,
+    -1.3476822600397333,
+    23.536935131196312,
+    -134.2730344731844,
+    245.7190217075024,
 )
-_REFR_BELOW_P1: float = 8.17175
-_REFR_BELOW_P2: float = 2.29036
-_REFR_BELOW_P3: float = -0.07978
+# Below the horizon: quartic in x = -app anchored at R0(0) for continuity,
+# with a bounded linear tail past _REFR_APP_FLOOR.
+_REFR_R0: float = 0.5599364492656921  # R0(app=0), degrees
+_REFR_BELOW: tuple[float, float, float, float] = (
+    0.22587654986933237,
+    0.003876311801010285,
+    0.07344146759158594,
+    -0.021829746046986398,
+)
+_REFR_APP_FLOOR: float = -2.3
+
+# Temperature exponent q(app, T): poly (deg 4) in v = 1/(app + _REFR_Q_K),
+# quadratic in (T - 15).
+_REFR_Q_K: float = 5.0
+_REFR_Q0: tuple[float, float, float, float, float] = (
+    0.863680955334398,
+    2.2469424220791145,
+    -10.346282707448633,
+    146.4522078339461,
+    -266.5962203788882,
+)
+_REFR_Q1: tuple[float, float, float, float] = (
+    0.00022751617874395972,
+    -0.003480924267185901,
+    0.012420640141742743,
+    -0.2297500939232252,
+)
+_REFR_Q2: tuple[float, float, float] = (
+    2.343191507573941e-06,
+    -0.00011627105492982002,
+    0.0008754665131731234,
+)
 
 
-def _refr_pt_scale(pressure: float, temp_C: float) -> float:
-    """Pressure/temperature scaling of astronomical refraction relative to the
-    standard atmosphere (1013.25 mbar, 15 C), matching the reference's measured
-    dependence (d ln R / d ln P ~ 0.945, d ln R / d ln T_K ~ -1.31)."""
-    return (pressure / 1013.25) ** 0.945 * (288.15 / (273.15 + temp_C)) ** 1.31
+def _refr_base_curve(app: float) -> float:
+    """Base app->true refraction R0(app) at 1013.25 mbar, 15 C, in degrees."""
+    if app >= 0.0:
+        w = 1.0 / (app + 4.0)
+        r = _REFR_A / math.tan(math.radians(app + _REFR_B / (app + _REFR_C))) / 60.0
+        c = _REFR_CORR
+        return r + w * (c[0] + w * (c[1] + w * (c[2] + w * (c[3] + w * c[4]))))
+    # below the horizon: quartic in x = -app, anchored at R0(0)
+    p = _REFR_BELOW
+
+    def _below(x: float) -> float:
+        return _REFR_R0 + x * (p[0] + x * (p[1] + x * (p[2] + x * p[3])))
+
+    if app >= _REFR_APP_FLOOR:
+        return _below(-app)
+    # bounded linear tail so the fit never blows up far below the horizon
+    xf = -_REFR_APP_FLOOR
+    val = _below(xf)
+    slope = p[0] + xf * (2.0 * p[1] + xf * (3.0 * p[2] + xf * 4.0 * p[3]))
+    return val + slope * (-app - xf)
 
 
-def calc_refraction_ref_true_to_app(
-    true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
-) -> float:
-    """Reference-matched refraction (degrees) for a true altitude, valid above
-    and below the geometric horizon. Used by refrac_extended()/azalt()."""
-    if pressure <= 0:
-        return 0.0
-    if true_alt >= 0.0:
-        r_arcmin = _REFR_ABOVE_A / math.tan(
-            math.radians(true_alt + _REFR_ABOVE_B / (true_alt + _REFR_ABOVE_C))
-        )
-    else:
-        x = -true_alt
-        r_arcmin = (
-            _REFR_R0_ARCMIN
-            + _REFR_BELOW_P1 * x
-            + _REFR_BELOW_P2 * x * x
-            + _REFR_BELOW_P3 * x * x * x
-        )
-    return (r_arcmin / 60.0) * _refr_pt_scale(pressure, temperature_C)
+def _refr_temp_exponent(app: float, temp_C: float) -> float:
+    """Temperature exponent q(app, T) for the (288.15/(273.15+T))**q scaling."""
+    v = 1.0 / (max(app, _REFR_APP_FLOOR) + _REFR_Q_K)
+    s = temp_C - 15.0
+    a = _REFR_Q0
+    q0 = a[0] + v * (a[1] + v * (a[2] + v * (a[3] + v * a[4])))
+    b = _REFR_Q1
+    q1 = b[0] + v * (b[1] + v * (b[2] + v * b[3]))
+    d = _REFR_Q2
+    q2 = d[0] + v * (d[1] + v * d[2])
+    return q0 + s * q1 + s * s * q2
 
 
 def calc_refraction_ref_app_to_true(
     apparent_alt: float, pressure: float = _P0, temperature_C: float = 15.0
 ) -> float:
-    """Reference-matched refraction (degrees) for an apparent altitude. Inverts
-    calc_refraction_ref_true_to_app via Newton-Raphson (true + R(true) = app)."""
-    if pressure <= 0:
+    """Reference-matched refraction (degrees) for an apparent altitude.
+
+    This is the primitive of the reference-matched pair: as a function of the
+    *apparent* altitude the pressure/temperature dependence is separable
+    (see the module notes above). Valid above and below the geometric horizon.
+    Used by refrac_extended()/azalt().
+    """
+    if pressure <= 0 or 273.15 + temperature_C <= 0:
         return 0.0
-    true_est = apparent_alt
-    for _ in range(20):
-        r = calc_refraction_ref_true_to_app(true_est, pressure, temperature_C)
-        residual = true_est + r - apparent_alt
-        if abs(residual) < 1e-11:
+    scale_p = (pressure - _REFR_P_OFFSET) / _REFR_P_SPAN
+    ratio_t = 288.15 / (273.15 + temperature_C)
+    r = (
+        scale_p
+        * _refr_base_curve(apparent_alt)
+        * ratio_t ** _refr_temp_exponent(apparent_alt, temperature_C)
+    )
+    return max(0.0, r)
+
+
+def calc_refraction_ref_true_to_app(
+    true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+) -> float:
+    """Reference-matched refraction (degrees) for a true altitude.
+
+    Inverts calc_refraction_ref_app_to_true: finds the apparent altitude *app*
+    with ``app - R_app_to_true(app) == true_alt`` and returns ``app - true_alt``.
+    The mapping ``app - R(app)`` is strictly increasing, so a bracketed
+    bisection on ``[true_alt, true_alt + 8]`` converges to the unique root.
+    Valid above and below the geometric horizon; used by refrac_extended().
+    """
+    if pressure <= 0 or 273.15 + temperature_C <= 0:
+        return 0.0
+    lo = true_alt
+    hi = true_alt + 8.0
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        f = (
+            mid
+            - calc_refraction_ref_app_to_true(mid, pressure, temperature_C)
+            - true_alt
+        )
+        if f < 0.0:
+            lo = mid
+        else:
+            hi = mid
+        if hi - lo < 1e-12:
             break
-        dt = 1e-4
-        r_plus = calc_refraction_ref_true_to_app(true_est + dt, pressure, temperature_C)
-        dapp_dtrue = 1.0 + (r_plus - r) / dt
-        if abs(dapp_dtrue) < 1e-12:
-            break
-        true_est -= residual / dapp_dtrue
-    return apparent_alt - true_est
+    return 0.5 * (lo + hi) - true_alt
 
 
 def calc_dip(
