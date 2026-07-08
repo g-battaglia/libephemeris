@@ -6461,14 +6461,21 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         return zero_elements
 
     target_name = _PLANET_MAP[ipl]
-    # Try planet center first, fall back to barycenter if not available
-    try:
-        target = planets[target_name]
-    except KeyError:
-        if target_name in _PLANET_FALLBACK:
-            target = planets[_PLANET_FALLBACK[target_name]]
-        else:
-            raise
+    # For Earth, the reference derives the heliocentric orbit from the
+    # Earth-Moon barycenter (mirroring _calc_nod_aps): the Earth-alone
+    # osculating elements wobble by ~1e-5 AU in a/Q from the Moon's monthly
+    # pull. Use the EMB as the target.
+    if ipl == EARTH:
+        target = planets["earth barycenter"]
+    else:
+        # Try planet center first, fall back to barycenter if not available
+        try:
+            target = planets[target_name]
+        except KeyError:
+            if target_name in _PLANET_FALLBACK:
+                target = planets[_PLANET_FALLBACK[target_name]]
+            else:
+                raise
 
     # For Moon, use geocentric orbit (around Earth)
     if ipl == MOON:
@@ -6479,8 +6486,11 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         GM = 0.01720209895**2 / 328900.5596
     else:
         center = planets["sun"]
-        # GM_sun in AU^3/day^2
-        GM = 0.01720209895**2
+        # Two-body mu = G(M_sun + M_planet_system). The planet mass cannot be
+        # neglected: it shifts a/Q by up to ~1e-5 AU for the giants (mirrors
+        # _calc_nod_aps, which uses the same _SUN_MASS_RATIOS table).
+        mass_ratio = _SUN_MASS_RATIOS.get(ipl)
+        GM = _GM_SUN * (1.0 + 1.0 / mass_ratio) if mass_ratio else _GM_SUN
 
     # Get heliocentric (or geocentric for Moon) position and velocity
     center_pos = center.at(t)
