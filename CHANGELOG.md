@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc4] - 2026-07-08
+
+This RC closes the 2026-07-08 adversarial wave — Round J plus the advanced
+Round-K slices and a full three-area re-review: ~27 confirmed defects fixed
+across orbit geometry, center flags, fixed stars, refraction, heliacal
+visibility, crossings, houses, ayanamsha, time, eclipses, barycentric places
+and osculating elements, plus newly documented reference-side artifacts.
+
+### Fixed
+
+- **`orbit_max_min_true_distance` solves the true 3D two-ellipse geometry.**
+  The maximum/minimum true distance between two osculating orbits is now found
+  from the actual three-dimensional ellipses instead of a coplanar
+  approximation, so inclined, eccentric pairs agree with the reference API at
+  their orbital extremes.
+
+- **Center-flag priority is `TOPOCTR > BARYCTR > HELCTR`, with position and
+  retflag resolved together.** When center flags are combined, the reference
+  precedence now governs both the returned position and the echoed retflag
+  bits; the legacy fixed-star sidereal *speed* convention is restored on the
+  same path.
+
+- **Refraction below the horizon dip is reference-matched.** The
+  `refrac_extended` curve below the dip — and the `azalt` path that runs
+  through it — no longer diverges: worst-case error drops from 10286" to 28".
+
+- **The heliacal visibility model is rebuilt on the published Schaefer
+  VISLIMIT family.** The limiting magnitude improves from 2.6–5.8 mag off to
+  ~0.1–0.3 mag and event dates converge to the documented ±1-day floor (±2 for
+  the shallowest events). The reference acceptance matrix, the twilight-only
+  observing window, star illumination and the `vislim` retflag now follow the
+  reference API, daytime-sky and refinement-margin handling are corrected, and
+  the LEB heliacal search was sped up.
+
+- **Moon-node crossings use a scan-first search, and the `cross_ut`
+  first-crossing guard now covers the inner planets.** `mooncross_node_ut`
+  no longer skips or crashes on crossings; inner-planet longitude crossings
+  return the first crossing after the start epoch; and an out-of-ephemeris
+  target falls back cleanly instead of reporting search divergence.
+
+- **House conventions replicated.** Gauquelin *star* sectors 2–5, whole-sign
+  (W-)sidereal cusp speeds, and the polar-error raise now match the reference
+  API; the LEB Gauquelin compare harness geopos order was corrected.
+
+- **Long-term ayanamsha uses Method B on both backends.** A shared Method-B
+  long-term precession helper is applied on the Skyfield and LEB fast paths:
+  formula modes agree to <0.005", `SIDM_USER` at an extreme t0 improves from
+  35" to 0.03", `GALCENT` from 3.4" to 0.008" and `MULA_WILHELM` from 125" to
+  0.005". `get_ayanamsa_ex` no longer sets `NONUT` in the retflag for
+  calculated modes, and out-of-range fixed-star lookups raise a typed range
+  error.
+
+- **`jd_et_to_utc`/`jd_ut1_to_utc` stay exact across the 1972-01-01 UTC epoch
+  boundary.**
+
+- **Eclipse search is refine-first with a graze discriminator.** Solar and
+  lunar eclipse gates refine before classifying and gate graze-boundary
+  partials on the sign of the where-magnitude, so the eclipse chains match the
+  reference API event-for-event across sampled centuries. The `ifltype`
+  geometry-bit semantics are verified, the Saros reference tables are extended
+  to the full 1200–2999 coverage, and searches cap to the ephemeris boundary.
+
+- **Heliocentric and barycentric places.** Heliocentric/barycentric fixed-star
+  positions agree with the reference API from 13.4" to 0.003"; planetary
+  heliocentric places carry barycentric light-time; and `FLG_BARYCTR` reports
+  the giant planets' *system* barycentre.
+
+- **Osculating elements use the full two-body GM and the Earth–Moon barycentre
+  target**, so `get_orbital_elements` matches the reference two-body reduction.
+
+### Documented
+
+- **Newly documented reference-side artifacts and known differences**
+  (`docs/comparison/known-differences.md`): the reference API's `FLG_HELCTR`
+  longitude-speed behaviour (§1.4), the fixed-star latitude-speed convention
+  (§4.9), the node-crossing ET frame used by `mooncross_node_ut` (§11), the
+  graze-eclipse `tret` slot layout for the 1928/1935 ultra-shallow partials
+  (§6.1), the ±1-day (±2 shallowest) heliacal model floor, the Pluto
+  far-target crossing skip and its ~375 s offset, refreshed refraction
+  accuracy figures, and a scoped `vis_limit_mag` accuracy claim.
+
 ## [3.0.0rc3] - 2026-07-08
 
 ### Added
