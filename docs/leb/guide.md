@@ -622,19 +622,36 @@ Juno, Vesta (11 bodies)
    - **J2000 equatorial** (`FLG_EQUATORIAL | FLG_J2000`):
      - ICRS is already ~J2000 equatorial, just convert to spherical
 
-**Velocity** is computed via the **analytical Chebyshev derivative**,
-transformed through the same rotation matrices as position:
+**Velocity** is the exact time-derivative of the *reported apparent* position
+in the requested frame, so every speed slot differentiates its own position
+slot. It is built as a central difference of the analytically-extrapolated
+apparent place, which keeps the geometry exact while capturing all the rate
+terms a raw Chebyshev-derivative rotation would drop:
 
-1. Geocentric velocity = target_vel - observer_vel (from `eval_body()`)
-2. Light-time correction: use velocity at retarded time `jd_tt - lt`
-3. Apply precession-nutation matrix to velocity vector
-4. Rotate equatorial -> ecliptic using true obliquity
-5. Convert Cartesian velocity to spherical: `_cartesian_velocity_to_spherical()`
+1. Geometric velocity from the exact Chebyshev derivative (`eval_body()`),
+   minus the observer velocity, with the light-time *rate* factor
+   `1 + d(lt)/dt` applied (not just the velocity at the retarded time).
+2. The barycenter-to-centre offset rate `d(COB)/dt` for the outer planets
+   (evaluated at the light-time retarded epoch for heliocentric/barycentric
+   output, matching the position).
+3. The apparent corrections — annual aberration, gravitational deflection
+   and the precession-nutation frame rotation — carried through by a central
+   difference of the apparent vector at `jd_tt +/- h`, with the geometric
+   state extrapolated analytically (so no Chebyshev-fit error leaks into the
+   difference) and the deflectors evaluated at each sample epoch. A deflector
+   is skipped when the observer sits at that body (the far-field formula is
+   singular there).
+4. Frame handling matches the position: J2000/sidereal speeds pick up the
+   equinox-drift and nutation-rate terms; sidereal-of-date adds the true
+   ayanamsha rate.
 
-This replaces the previous central-difference approach (which required 2
-extra pipeline evaluations per body and amplified Chebyshev fitting errors
-into velocity errors). The analytical derivative is both faster (1 pipeline
-run instead of 3) and more precise.
+An earlier revision computed velocity as a plain analytical Chebyshev
+derivative rotated like the position, dropping the aberration, deflection,
+light-time and frame-rotation *rates*; that biased the geocentric Moon speed
+by ~4"/day and heliocentric/planetocentric speeds by up to a few tenths of an
+arcsec/day. The current scheme keeps the analytic geometry (no extra full
+pipeline runs for the geometric part) while making the reported speed the
+true derivative of the reported position (residual <= 0.001"/day geocentric).
 
 ### 5.3.1 Pipeline A': ICRS System Barycenter Bodies (Runtime COB)
 
