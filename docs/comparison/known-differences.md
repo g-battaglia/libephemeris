@@ -242,6 +242,20 @@ library is within ~0.25" in longitude and ~0.05" in latitude at JD 2415021.0
 API remains ~28" away at that date, apparently from a different historical orbit
 solution; that residual is certified rather than copied.
 
+**1.4 Heliocentric longitude speed near perihelion (`FLG_HELCTR`) — reference
+defect.** Under `FLG_HELCTR` the reference API's reported longitude *speed* for
+Mercury disagrees with the finite-difference derivative of its *own* reported
+heliocentric longitudes by up to ~0.63″/day near perihelion (measured across
+JD 2451545.0-class epochs; e.g. 0.628″/day at JD 2451601.0, 2000-02-26). Its
+reported `speed_lon` is therefore not the time-derivative of its reported
+position there. libephemeris instead returns the exact derivative of the
+position it reports (the barycentric light-time rate carries through to the
+velocity), so its heliocentric longitude speed is self-consistent with its
+longitude to ≤0.003″/day in both backends at the same epochs. This is the same
+class of reference-side velocity artifact as the fixed-star latitude-speed
+defect (§4.9): the position channels agree to <0.001″; only the reference's
+reported speed is internally inconsistent.
+
 ### 2. House system differences
 
 **2.1 House cusps.** Typically agree within 0.01"; the small divergence comes from
