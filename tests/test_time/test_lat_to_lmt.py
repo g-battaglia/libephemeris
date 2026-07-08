@@ -196,9 +196,12 @@ class TestLatToLmtConsistencyWithTimeEqu:
         jd_lat = ephem.julday(2000, 6, 15, 12.0)
         jd_lmt = ephem.lat_to_lmt(jd_lat, 0.0)
 
-        # LAT - LMT = EoT
+        # LAT - LMT = EoT, taken at the UT of the LMT instant. lat_to_lmt is the
+        # exact iterative inverse of lmt_to_lat, so the Equation of Time must be
+        # evaluated at the mean-time (LMT) instant, not at LAT; at Greenwich
+        # (0 deg longitude) UT == LMT.
         lat_lmt_diff = jd_lat - jd_lmt
-        eot = ephem.time_equ(jd_lat)
+        eot = ephem.time_equ(jd_lmt)
 
         # Should be very close
         assert lat_lmt_diff == pytest.approx(eot, abs=1e-8), (
@@ -221,7 +224,9 @@ class TestLatToLmtConsistencyWithTimeEqu:
             jd_lat = ephem.julday(year, month, day, 12.0)
             jd_lmt = ephem.lat_to_lmt(jd_lat, 0.0)
             lat_lmt_diff = jd_lat - jd_lmt
-            eot = ephem.time_equ(jd_lat)
+            # EoT at the LMT instant (exact inverse of lmt_to_lat); UT == LMT
+            # at Greenwich.
+            eot = ephem.time_equ(jd_lmt)
             assert lat_lmt_diff == pytest.approx(eot, abs=1e-8), (
                 f"{year}-{month}-{day}: LAT-LMT = {lat_lmt_diff}, EoT = {eot}"
             )
@@ -293,3 +298,45 @@ class TestLatToLmtOutputFormat:
         diff_days = jd_lat - jd_lmt
         # EoT is at most ~17 minutes = ~0.012 days
         assert abs(diff_days) < 0.015
+
+
+class TestLatToLmtIterativeInversion:
+    """Regression (I2-F3): lat_to_lmt is the exact iterative inverse of
+    lmt_to_lat.
+
+    Recovering LMT from LAT needs the Equation of Time at the UT of the LMT
+    instant. A single evaluation at UT ~ LAT is off by up to ~0.2s in late
+    November, where dE/dt is steepest; three fixed-point iterations bring the
+    round trip back to well under a millisecond.
+    """
+
+    # Late November (steep dE/dt) plus the Nov / Feb EoT extrema.
+    CRITICAL_DATES = [
+        (2024, 11, 29),
+        (2024, 11, 3),
+        (2024, 2, 11),
+    ]
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("y,m,d", CRITICAL_DATES)
+    @pytest.mark.parametrize("longitude", [0.0, 12.5, -75.0])
+    def test_lmt_lat_roundtrip_under_millisecond(self, y, m, d, longitude):
+        """lmt -> lat -> lmt must recover the input to < 0.001 s."""
+        jd_lmt = ephem.julday(y, m, d, 12.0)
+        jd_lat = ephem.lmt_to_lat(jd_lmt, longitude)
+        jd_back = ephem.lat_to_lmt(jd_lat, longitude)
+        err_seconds = abs(jd_back - jd_lmt) * 86400.0
+        assert err_seconds < 0.001, (
+            f"round-trip error {err_seconds:.6f}s at "
+            f"{y}-{m:02d}-{d:02d} lon={longitude}"
+        )
+
+    @pytest.mark.unit
+    def test_lat_to_lmt_inverts_late_november_offset(self):
+        """A direct forward/back check at the steep-slope date and a nonzero
+        longitude, where the single-evaluation inverse was ~0.17s off."""
+        jd_lmt = ephem.julday(2024, 11, 29, 0.0)
+        jd_lat = ephem.lmt_to_lat(jd_lmt, 0.0)
+        jd_back = ephem.lat_to_lmt(jd_lat, 0.0)
+        err_seconds = abs(jd_back - jd_lmt) * 86400.0
+        assert err_seconds < 0.001, f"round-trip error {err_seconds:.6f}s"

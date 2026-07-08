@@ -1031,16 +1031,22 @@ def lat_to_lmt(jd_lat: float, longitude: float) -> float:
     # Positive longitude (East) means local time is ahead of UT
     longitude_offset_days = longitude / 360.0
 
-    # Convert from local time to UT for EoT calculation
-    # LAT (local) = UT + longitude_offset + EoT
-    # So UT ≈ LAT - longitude_offset (approximate, for EoT lookup)
-    jd_ut_approx = jd_lat - longitude_offset_days
+    # lat_to_lmt is the exact inverse of lmt_to_lat, which maps
+    #     LAT = LMT + E(UT),   with   UT = LMT - longitude_offset
+    # Recovering LMT from LAT therefore needs the Equation of Time E evaluated
+    # at the UT of the (unknown) LMT instant, not at the UT of LAT. A single
+    # evaluation at UT ≈ LAT - offset is off by up to ~0.2s in late November,
+    # where dE/dt is steepest. Refine the UT estimate with three fixed-point
+    # iterations (E drifts <30s/day, so this converges to well under a
+    # millisecond); this mirrors the reference API's inversion loop.
+    ut_est = jd_lat - longitude_offset_days
+    eot = 0.0
+    for _ in range(3):
+        eot = time_equ(ut_est)
+        ut_est = jd_lat - longitude_offset_days - eot
 
-    # Calculate the Equation of Time at this UT
-    eot = time_equ(jd_ut_approx)
-
-    # LMT = LAT - EoT
-    # (When sundial is ahead, EoT is positive, so LMT is less than LAT)
+    # LMT = LAT - EoT, with EoT taken at the converged UT of the LMT instant.
+    # (When the sundial is ahead, EoT is positive, so LMT is less than LAT.)
     jd_lmt = jd_lat - eot
 
     return jd_lmt

@@ -44,6 +44,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Fixed-star sidereal output is now referred to the mean equinox of date
+  with the mean ayanamsha, matching the reference API and the planet path.**
+  The star pipeline subtracted the mean ayanamsha from the true-of-date
+  longitude, leaving a systematic Δψ offset (nutation in longitude, up to
+  ~17.5", −13.93" at J2000) on every star under `FLG_SIDEREAL` — for both
+  `fixstar`/`fixstar_ut` and `fixstar2`/`fixstar2_ut`, in ecliptic and
+  equatorial output. Sidereal star positions now agree with the reference
+  API to < 0.01" (previously ~17.6") and sidereal star speeds to
+  < 0.001"/day (previously ~0.16"/day); `SIDEREAL | EQUATORIAL` output sits
+  on the mean equator of date with RA reduced by the mean ayanamsha,
+  matching the reference API to 6 decimals. Tropical output is bit-identical
+  to before.
+
+- **`fixstar*_ut` retflags now echo the implied flag bits** (`NONUT` for
+  J2000/sidereal requests; `NOGDEFL | NOABERR` for heliocentric,
+  barycentric and true-position requests), exactly like `calc_ut` — all 31
+  tested flag combinations now match the reference API (previously e.g.
+  J2000 returned 34 instead of 98).
+
+- **`lat_to_lmt` now inverts the equation of time iteratively** (3
+  fixed-point refinements, like the reference API), making it the exact
+  inverse of `lmt_to_lat`: round-trip error drops from ~0.17 s (at steep
+  equation-of-time dates) to < 0.001 s.
+
 - **`get_orbital_elements` and `orbit_max_min_true_distance` return real
   osculating elements for asteroids.** The curated minor bodies
   (Chiron–Vesta) and numbered asteroids (`AST_OFFSET + n`) previously fell

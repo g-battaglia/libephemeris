@@ -2679,17 +2679,33 @@ def _preprocess_flags(iflag: int) -> int:
     return iflag
 
 
-def _fixstar_ret_flags(flags_in: int) -> int:
+def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     """Return flags echoed to the caller (reference convention).
 
     The input flags come back verbatim, with FLG_SWIEPH added when no
     ephemeris-selection bit was given (MOSEPH echoes as given).
+
+    The UT entry points (fixstar_ut / fixstar2_ut / batch_fixstars_ut) also
+    echo the bits the reference API's flag-plausibility step derives from the
+    request: FLG_NONUT for J2000/SIDEREAL output (referred to a mean equinox)
+    and FLG_NOGDEFL | FLG_NOABERR for heliocentric/barycentric/true-position
+    output. Pass implied=True there. These bits ride only on the ECHOED flags
+    — the computation flags are untouched. The TT entry points (fixstar /
+    fixstar2) echo the request as-is apart from the SWIEPH default, so they
+    leave implied=False. Verified behaviourally against the reference oracle
+    (e.g. J2000 -> +NONUT, SIDEREAL -> +NONUT, HELCTR/TRUEPOS ->
+    +NOGDEFL|NOABERR, composing for combinations).
     """
     from .constants import FLG_JPLEPH
 
+    ret = flags_in
     if not (flags_in & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
-        return flags_in | FLG_SWIEPH
-    return flags_in
+        ret |= FLG_SWIEPH
+    if implied:
+        from .planets import _implied_retflag_bits
+
+        ret |= _implied_retflag_bits(flags_in)
+    return ret
 
 
 def _fixstar_topo() -> tuple:
@@ -2727,9 +2743,10 @@ def _apply_fixstar_flags(
     3. SIDEREAL ayanamsha subtraction (from lon or RA)
     4. XYZ / RADIANS output format conversion
 
-    Note: For fixed stars, SE applies sidereal correction AFTER equatorial
-    conversion — subtracting ayanamsha from RA. This differs from planets
-    where SE ignores sidereal for equatorial output entirely.
+    Note: For fixed stars, the sidereal correction is applied AFTER the
+    equatorial conversion — the mean ayanamsha is subtracted from the
+    mean-equator right ascension. This differs from planets, where the
+    reference API drops sidereal for equatorial output entirely.
 
     Args:
         result: 6-tuple (lon, lat, dist, speed_lon, speed_lat, speed_dist)
@@ -2772,10 +2789,16 @@ def _apply_fixstar_flags(
 
                 plon, plat = _precess_ecliptic(plon, plat, jd, J2000)
             # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
-        elif iflag & FLG_NONUT:
-            # Skyfield returns positions on the true ecliptic of date (with
-            # nutation). NONUT means output on the mean ecliptic of date, so
-            # subtract dpsi (nutation in longitude) from the ecliptic longitude.
+        elif iflag & (FLG_NONUT | FLG_SIDEREAL):
+            # Mean ecliptic of date. Skyfield returns positions on the true
+            # ecliptic of date (with nutation); subtracting dpsi (nutation in
+            # longitude) yields the mean ecliptic longitude. NONUT requests this
+            # frame directly. SIDEREAL also lands here: sidereal longitude is
+            # referred to the mean equinox of date, so nutation is removed now
+            # and the (mean) ayanamsha is subtracted in step 3. The two
+            # decompositions mean_lon - mean_ayan and true_lon - true_ayan are
+            # algebraically identical because the dpsi terms cancel. J2000 is
+            # handled above and takes precedence over this branch.
             from .cache import get_cached_nutation
 
             dpsi_rad, _ = get_cached_nutation(jd)
@@ -2790,8 +2813,11 @@ def _apply_fixstar_flags(
                 # star and planet declinations share one J2000 frame; the strict
                 # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
                 eps = 23.4392911
-            elif iflag & FLG_NONUT:
-                # Mean equator of date: use mean obliquity (no nutation)
+            elif iflag & (FLG_NONUT | FLG_SIDEREAL):
+                # Mean equator of date: use mean obliquity (no nutation).
+                # SIDEREAL equatorial output is likewise referred to the mean
+                # equinox — right ascension is measured on the mean equator and
+                # the mean ayanamsha is subtracted from it in step 3.
                 eps = get_mean_obliquity(jd)
             else:
                 # True equator of date: use true obliquity
@@ -2799,10 +2825,16 @@ def _apply_fixstar_flags(
 
             plon, plat, pdist = cotrans((plon, plat, pdist), -eps)
 
-        # ---- 3. Sidereal mode (ayanamsha subtraction) ----
-        # For fixed stars, SE subtracts ayanamsha from the first coordinate
-        # (ecliptic longitude or RA) AFTER equatorial conversion. This differs
-        # from planets where SE ignores sidereal for equatorial output entirely.
+        # ---- 3. Sidereal mode (mean-ayanamsha subtraction) ----
+        # The reference API subtracts the ayanamsha from the first coordinate —
+        # ecliptic longitude, or right ascension after the equatorial rotation
+        # above. (Planets differ: the reference API drops sidereal entirely for
+        # their equatorial output.) The frame is the mean equinox of date:
+        # steps 1-2 already reduced the position onto the mean ecliptic / mean
+        # equator, so the value removed here is the MEAN ayanamsha
+        # (get_ayanamsa_ut reports the mean value). This reproduces the
+        # reference to <0.001": sidereal = mean_position - mean_ayanamsha,
+        # equivalently true_position - (mean + dpsi) ayanamsha.
         if iflag & FLG_SIDEREAL:
             from .state import get_timescale
 
@@ -2932,7 +2964,7 @@ def _fixstar_ut_by_id(
     with digits, e.g. "29Psc", resolve as sequential catalog numbers and
     returned the wrong star for 289 of the 1447 catalog entries).
     """
-    ret_flags = _fixstar_ret_flags(flags)
+    ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
 
     # Convert UT to TT using timescale (applies Delta T)
@@ -3013,7 +3045,7 @@ def batch_fixstars_ut(
                 raise
         return tuple(topo_results)
 
-    ret_flags = _fixstar_ret_flags(flags)
+    ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
 
     results: list[
@@ -3424,7 +3456,7 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
-    ret_flags = _fixstar_ret_flags(flags)
+    ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
 
     entry, error = _resolve_star2(star)
