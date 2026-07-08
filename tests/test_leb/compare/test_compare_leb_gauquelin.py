@@ -59,7 +59,8 @@ class TestGauquelinSector:
         method_name: str,
     ):
         """Gauquelin sector matches within tolerance."""
-        geopos = (lat, lon, alt)
+        # gauquelin_sector expects geopos as (lon, lat, alt), not (lat, lon, alt).
+        geopos = (lon, lat, alt)
         ref_sector = compare.skyfield(
             ephem.gauquelin_sector, jd, body_id, method, geopos
         )
