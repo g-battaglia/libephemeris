@@ -22,8 +22,19 @@ from libephemeris.constants import (
     URANUS,
     NEPTUNE,
     PLUTO,
+    CHIRON,
+    PHOLUS,
+    CERES,
+    PALLAS,
+    JUNO,
+    VESTA,
+    AST_OFFSET,
     FLG_HELCTR,
+    FLG_J2000,
+    FLG_TRUEPOS,
+    FLG_SPEED,
 )
+from libephemeris.exceptions import Error
 
 
 # Known approximate orbital elements (heliocentric, J2000)
@@ -304,3 +315,137 @@ class TestOrbitalElementsMoon:
         assert 0.01 < e < 0.1, f"Moon e = {e}"
         # Moon inclination to ecliptic ~5.15°
         assert 3 < i < 8, f"Moon i = {i}°"
+
+
+# Known heliocentric osculating ranges for the curated minor bodies, valid
+# across 1950-2050 and independent of the active backend (LEB/SPK/Skyfield).
+# (body_id, name, a_lo, a_hi, e_lo, e_hi, i_lo, i_hi)
+ASTEROID_RANGES = [
+    (CERES, "Ceres", 2.75, 2.78, 0.07, 0.09, 10.4, 10.7),
+    (CHIRON, "Chiron", 13.5, 13.8, 0.37, 0.39, 6.8, 7.1),
+    (PHOLUS, "Pholus", 20.0, 20.5, 0.55, 0.59, 24.4, 25.0),
+    (PALLAS, "Pallas", 2.76, 2.79, 0.22, 0.24, 34.6, 35.1),
+    (JUNO, "Juno", 2.65, 2.68, 0.25, 0.27, 12.9, 13.1),
+    (VESTA, "Vesta", 2.35, 2.37, 0.08, 0.10, 7.0, 7.2),
+]
+
+
+class TestOrbitalElementsAsteroids:
+    """Osculating orbital elements for the curated minor bodies.
+
+    Regression for finding I3-B: get_orbital_elements/orbit_max_min_true_distance
+    used to return a silent all-zeros tuple for asteroids (reading as a real
+    orbit at 0 AU). They now return the body's real osculating elements,
+    computed from the same heliocentric state the position pipeline serves.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
+    def test_asteroid_elements_nonzero(self, body_id: int, name: str):
+        """Curated asteroids return non-zero elements (pre-fix: all zeros)."""
+        jd = 2451545.0
+        result = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        assert result[0] != 0.0, f"{name}: semi-major axis silently zero"
+        assert result[1] != 0.0, f"{name}: eccentricity silently zero"
+        assert result[2] != 0.0, f"{name}: inclination silently zero"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "body_id,name,a_lo,a_hi,e_lo,e_hi,i_lo,i_hi", ASTEROID_RANGES
+    )
+    def test_asteroid_elements_physical_ranges(
+        self,
+        body_id: int,
+        name: str,
+        a_lo: float,
+        a_hi: float,
+        e_lo: float,
+        e_hi: float,
+        i_lo: float,
+        i_hi: float,
+    ):
+        """Semi-major axis, eccentricity, inclination match known values."""
+        jd = 2451545.0
+        r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        assert a_lo < r[0] < a_hi, f"{name}: a = {r[0]:.4f} AU"
+        assert e_lo < r[1] < e_hi, f"{name}: e = {r[1]:.4f}"
+        assert i_lo < r[2] < i_hi, f"{name}: i = {r[2]:.4f} deg"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
+    def test_asteroid_elements_native_floats_finite(self, body_id: int, name: str):
+        """All 50 slots are native Python floats and finite (no NaN/inf)."""
+        jd = 2451545.0
+        result = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        assert len(result) == 50
+        for idx, val in enumerate(result):
+            assert type(val) is float, f"{name}[{idx}] is {type(val).__name__}"
+            assert math.isfinite(val), f"{name}[{idx}] = {val}"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
+    def test_asteroid_perihelion_aphelion_consistency(self, body_id: int, name: str):
+        """q = a(1-e) and Q = a(1+e), with q < a < Q."""
+        jd = 2451545.0
+        r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        a, e, q, Q = r[0], r[1], r[15], r[16]
+        assert q < a < Q, f"{name}: not q < a < Q ({q}, {a}, {Q})"
+        assert abs(q - a * (1 - e)) < 1e-6, f"{name}: q != a(1-e)"
+        assert abs(Q - a * (1 + e)) < 1e-6, f"{name}: Q != a(1+e)"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
+    def test_asteroid_internal_coherence(self, body_id: int, name: str):
+        """Reconstructing r from the reported elements at the epoch matches the
+        heliocentric distance the position pipeline reports to < 1e-4 AU."""
+        jd = 2451545.0
+        r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        a, e, M = r[0], r[1], math.radians(r[6])
+        # Solve Kepler's equation for the eccentric anomaly.
+        E = M
+        for _ in range(60):
+            E -= (E - e * math.sin(E) - M) / (1 - e * math.cos(E))
+        r_recon = a * (1 - e * math.cos(E))
+        pos, _ = swe.calc(jd, body_id, FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED)
+        assert abs(r_recon - pos[2]) < 1e-4, (
+            f"{name}: r_recon={r_recon:.8f} vs r_calc={pos[2]:.8f}"
+        )
+
+    @pytest.mark.unit
+    def test_numbered_asteroid_elements(self):
+        """A numbered asteroid (Hygiea, AST_OFFSET+10) yields real elements."""
+        jd = 2451545.0
+        try:
+            r = swe.get_orbital_elements(jd, AST_OFFSET + 10, FLG_HELCTR)
+        except Error as exc:  # pragma: no cover - only if no state source
+            pytest.skip(f"Hygiea heliocentric state unavailable here: {exc}")
+        # Hygiea: a ~ 3.14 AU, e ~ 0.10-0.13, i ~ 3.8 deg.
+        assert 3.10 < r[0] < 3.20, f"Hygiea a = {r[0]:.4f} AU"
+        assert 0.09 < r[1] < 0.14, f"Hygiea e = {r[1]:.4f}"
+        assert 3.5 < r[2] < 4.1, f"Hygiea i = {r[2]:.4f} deg"
+        assert all(type(v) is float and math.isfinite(v) for v in r)
+
+
+class TestOrbitMaxMinTrueDistanceAsteroids:
+    """orbit_max_min_true_distance now inherits the real asteroid elements."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
+    def test_asteroid_max_min_nonzero_and_coherent(self, body_id: int, name: str):
+        """Max/min are non-zero and consistent with a(1±e) ± Earth's orbit."""
+        jd = 2451545.0
+        max_d, min_d, true_d = swe.orbit_max_min_true_distance(jd, body_id, 0)
+        assert max_d > 0.0, f"{name}: max distance silently zero"
+        assert min_d > 0.0, f"{name}: min distance silently zero"
+        assert min_d < max_d, f"{name}: min {min_d} >= max {max_d}"
+        assert true_d > 0.0, f"{name}: true distance not positive"
+
+        # Same planet-style geocentric bracket used for the major planets:
+        # outer bodies span |a(1-e) - a_earth(1+e)| .. a(1+e) + a_earth(1+e).
+        r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+        a, e = r[0], r[1]
+        a_earth, e_earth = 1.00000261, 0.01671123
+        exp_max = a * (1 + e) + a_earth * (1 + e_earth)
+        exp_min = abs(a * (1 - e) - a_earth * (1 + e_earth))
+        assert abs(max_d - exp_max) < 1e-6, f"{name}: max {max_d} != {exp_max}"
+        assert abs(min_d - exp_min) < 1e-6, f"{name}: min {min_d} != {exp_min}"

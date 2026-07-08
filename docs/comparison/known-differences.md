@@ -450,11 +450,32 @@ numbered asteroid) the reference API computes real values, whereas this version
 **raises `Error`** rather than returning a plausible-looking zero (which would
 read as a node at 0° Aries). Planned for a future release.
 
+**Sidereal `nod_aps` — uniform true-ayanamsha reduction (deliberate, ≤ ~17.5").**
+For of-date sidereal output libephemeris subtracts the **true** ayanamsha
+(mean + Δψ) uniformly, in `calc`/`calc_ut` AND in `nod_aps`/`nod_aps_ut` — the
+two surfaces agree exactly (e.g. `nod_aps(MOON, MEAN)` node ≡
+`calc(MEAN_NODE)` to 0.000" under `FLG_SIDEREAL`). The reference API is
+internally inconsistent here: its `calc` subtracts the true ayanamsha
+(measured shift 23.853203° at J2000, Lahiri) while its `nod_aps` subtracts
+the **mean** ayanamsha (23.857073° — same date, same mode, all methods and
+bodies). Sidereal `nod_aps` longitudes therefore differ from the reference by
+exactly Δψ (nutation in longitude, ≤ ~17.5", −13.93" at J2000); tropical
+`nod_aps` matches to < 0.01". libephemeris keeps the uniform reduction rather
+than reproducing the reference's internal inconsistency.
+
 ### 8. Phenomena (`pheno_ut`)
 
 Phase angle: inner planets < 1"; outer planets up to ~18" (position differences
 amplified). Phase, elongation, apparent diameter and magnitude generally agree
 < 1".
+
+**By-number asteroids (limitation).** `pheno`/`pheno_ut` return real values for
+the planets, the Moon, the Sun and the six curated minor bodies
+(Chiron–Vesta). For other numbered asteroids (`AST_OFFSET + n`) and the exotic
+LEB bodies this version returns zeros, whereas the reference API computes
+phase/elongation (geometry) and magnitude (from its asteroid H/G data).
+Universal H/G-based phenomena are planned for a future release (SBDB-sourced
+photometric parameters).
 
 ### 9. Orbital elements (`get_orbital_elements`)
 
@@ -469,8 +490,21 @@ truth| reaches **1.12°**. The lib-vs-SE difference is entirely Swiss Ephemeris'
 pipeline convention (state source / light-time / constants). Both engines use the
 planet *barycenter* for the giants (the standard convention); using the planet
 *center* instead would shift `varpi` by up to ~1.6° (Neptune) — the inherent
-center-vs-barycenter ambiguity, not a defect in either engine. Fictitious bodies
-(IntpApog=15, IntpPerg=16) have meaningless orbital elements.
+center-vs-barycenter ambiguity, not a defect in either engine. The lunar
+nodes/apsides (10–14, 21–22) and the hypothetical bodies (40+) return zero
+elements (no meaningful heliocentric orbit).
+
+**Minor bodies.** The curated asteroids (Chiron, Pholus, Ceres, Pallas, Juno,
+Vesta) and numbered asteroids (`AST_OFFSET + n`) return real osculating
+elements derived from the same heliocentric state that serves their reported
+positions (measured vs the reference API: Ceres/Vesta agree to ~1e-6 AU in
+`a` and ~4e-5° in `M` at modern dates; centaurs within ~2e-4 AU, dominated by
+the different orbit source). When no state source can serve the body, the
+call raises a typed `Error` instead of returning silent zeros.
+`orbit_max_min_true_distance` uses the same `a(1±e) ± a_Earth` approximation
+for asteroids as for planets (internally uniform); the reference API computes
+minor-body max/min slightly differently (~1%, e.g. 0.04 AU on Ceres), while
+the "true" distance matches to ~1e-4 AU.
 
 ### 10. Sidereal calculations
 

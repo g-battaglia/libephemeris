@@ -44,6 +44,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`get_orbital_elements` and `orbit_max_min_true_distance` return real
+  osculating elements for asteroids.** The curated minor bodies
+  (Chiron–Vesta) and numbered asteroids (`AST_OFFSET + n`) previously fell
+  through to silent zeros (`a = e = 0`, a physically impossible orbit,
+  returned with a success status). They now derive elements from the same
+  heliocentric state that serves their reported positions, through the same
+  state→elements conversion as the planets (planets bit-identical before and
+  after). Measured against the reference API: Ceres/Vesta agree to ~1e-6 AU
+  in `a` at modern dates; internal consistency (element-reconstructed radius
+  vs reported heliocentric distance) at machine precision. Bodies with no
+  available state source now raise a typed `Error` instead of returning
+  zeros. Documented in known-differences §9 (including the ~1% minor-body
+  max/min approximation difference).
+
 - **LEB sidereal speeds of the lunar nodes/apsides now carry the full
   ayanamsha rate.** The of-date sidereal speed of the ecliptic-direct bodies
   (Mean/True Node, Mean/Oscu/Intp Apogee, Intp Perigee) omitted the

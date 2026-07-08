@@ -6269,6 +6269,70 @@ def get_orbital_elements_ut(tjd_ut: float, ipl: int, iflag: int) -> Tuple[float,
     return _calc_orbital_elements(t, ipl, iflag)
 
 
+def _calc_orbital_elements_minor(t, ipl: int) -> Tuple[float, ...]:
+    """Osculating orbital elements for a minor body (asteroid/centaur/TNO).
+
+    The heliocentric state is taken from the same position pipeline that
+    serves calc/calc_ut for this body (SPK, LEB, or the documented Keplerian
+    fallback), requested as a *geometric* place (FLG_TRUEPOS: no light-time,
+    aberration, or deflection) in the J2000 ecliptic (FLG_HELCTR | FLG_J2000).
+    The resulting elements are therefore consistent with the positions the
+    library reports for the body, whatever backend is active. The state is
+    then reduced by the same state->elements math used for the planets.
+
+    Raises:
+        Error: If no usable heliocentric state can be obtained for the body
+            (e.g. outside SPK coverage with no fallback, or an unknown
+            asteroid number). Never returns a silent zero-element tuple.
+    """
+    from .exceptions import Error
+
+    GM = 0.01720209895**2  # GM_sun in AU^3/day^2
+    tt_jd = float(t.tt)
+
+    # Geometric heliocentric J2000-ecliptic state (position + velocity). The
+    # position pipeline raises a typed Error subclass (UnknownBodyError,
+    # EphemerisRangeError, SPKRequiredError, ...) when it cannot serve the
+    # body; let that clear message propagate rather than masking it.
+    flags = FLG_HELCTR | FLG_J2000 | FLG_TRUEPOS | FLG_SPEED
+    pos, _ = calc(tt_jd, ipl, flags)
+    lon, lat, r, dlon, dlat, ddist = pos
+
+    if not (r > 0.0) or not math.isfinite(r):
+        raise Error(
+            f"orbital elements unavailable for body {ipl}: the position "
+            f"pipeline returned a degenerate heliocentric state "
+            f"(distance {r} AU) at JD {tt_jd}."
+        )
+
+    # Ecliptic spherical (degrees, degrees/day) -> Cartesian state (AU, AU/day).
+    lam = math.radians(lon)
+    bet = math.radians(lat)
+    dlam = math.radians(dlon)
+    dbet = math.radians(dlat)
+    cos_lam = math.cos(lam)
+    sin_lam = math.sin(lam)
+    cos_bet = math.cos(bet)
+    sin_bet = math.sin(bet)
+
+    x = r * cos_bet * cos_lam
+    y = r * cos_bet * sin_lam
+    z = r * sin_bet
+    vx = (
+        ddist * cos_bet * cos_lam
+        - r * sin_bet * cos_lam * dbet
+        - r * cos_bet * sin_lam * dlam
+    )
+    vy = (
+        ddist * cos_bet * sin_lam
+        - r * sin_bet * sin_lam * dbet
+        + r * cos_bet * cos_lam * dlam
+    )
+    vz = ddist * sin_bet + r * cos_bet * dbet
+
+    return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, ipl, tt_jd)
+
+
 def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     """
     Internal function to calculate orbital elements.
@@ -6290,6 +6354,14 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # Sun and Earth don't have heliocentric orbital elements
     if ipl == SUN:
         return zero_elements
+
+    # Minor bodies (curated asteroids/centaurs 15-20 and numbered asteroids
+    # AST_OFFSET+n): compute real osculating elements from the geometric
+    # heliocentric state served by the position pipeline. Same membership
+    # test as _calc_nod_aps so the two paths stay in lockstep, and never a
+    # silent zero-element tuple, which would read as a real orbit at 0 AU.
+    if ipl in _MINOR_BODY_NODAPS or (AST_OFFSET < ipl < FIXSTAR_OFFSET):
+        return _calc_orbital_elements_minor(t, ipl)
 
     # Get target and center bodies
     if ipl not in _PLANET_MAP:
@@ -6341,6 +6413,41 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     vy = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
     vz = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
 
+    # Convert the ecliptic heliocentric (Moon: geocentric) state to the
+    # 50-slot osculating-element tuple via the shared reducer.
+    return _orbital_elements_from_ecliptic_state(
+        x, y, z, vx, vy, vz, GM, ipl, float(t.tt)
+    )
+
+
+def _orbital_elements_from_ecliptic_state(
+    x: float,
+    y: float,
+    z: float,
+    vx: float,
+    vy: float,
+    vz: float,
+    GM: float,
+    ipl: int,
+    tt_jd: float,
+) -> Tuple[float, ...]:
+    """Reduce an ecliptic state vector to the 50-slot orbital-element tuple.
+
+    Shared by the planet/Moon path (heliocentric or, for the Moon, geocentric
+    ICRS state rotated to the J2000 ecliptic) and the minor-body path
+    (geometric heliocentric J2000 ecliptic state from the position pipeline),
+    so both produce identical state->elements math.
+
+    Args:
+        x, y, z: Ecliptic position components (AU).
+        vx, vy, vz: Ecliptic velocity components (AU/day).
+        GM: Gravitational parameter of the central body (AU^3/day^2).
+        ipl: Body ID (used only for the Earth special-case in the synodic slot).
+        tt_jd: Epoch (JD TT) for the time-of-perihelion-passage slot.
+
+    Returns:
+        Flat tuple of 50 floats with orbital elements (padded with 0.0).
+    """
     # Calculate orbital elements from state vectors
     r_mag = math.sqrt(x**2 + y**2 + z**2)
     v_mag = math.sqrt(vx**2 + vy**2 + vz**2)
@@ -6496,7 +6603,7 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     # Time of perihelion passage (T)
     # T = t - M/n where M is in radians and n is radians/day
     if n > 0:
-        T_jd = float(t.tt) - M / n
+        T_jd = tt_jd - M / n
     else:
         T_jd = 0.0
 
