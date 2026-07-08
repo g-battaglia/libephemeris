@@ -61,6 +61,7 @@ from dataclasses import dataclass
 import erfa
 
 from .precession_vondrak import (
+    method_b_accumulated_precession,
     vondrak_mean_obliquity_deg,
     vondrak_mean_obliquity_rad,
     vondrak_pn_matrix,
@@ -4419,7 +4420,20 @@ STARS = {
     "GAL_CENTER": StarData(
         ra_j2000=266.41683708,  # 17h 45m 40.0409s (Reid & Brunthaler 2004)
         dec_j2000=-29.00781056,  # -29° 00' 28.118" (Reid & Brunthaler 2004)
-        pm_ra=-0.003151,  # -3.151 mas/yr -> arcsec/yr (Reid & Brunthaler 2004)
+        # pm_ra must be the great-circle rate mu_alpha* (= d(alpha)/dt * cos dec),
+        # because both StarData.pm_ra and Skyfield's ``ra_mas_per_year`` expect
+        # the on-sky angular rate (Skyfield divides it back by cos dec to get the
+        # coordinate rate internally). Reid & Brunthaler's tabulated -3.151 mas/yr
+        # for Sgr A* is the RA-*coordinate* rate d(alpha)/dt (no cos dec), so the
+        # great-circle rate is
+        #   mu_alpha* = -3.151 * cos(-29.00781 deg) = -3.151 * 0.874554 = -2.7557 mas/yr.
+        # Feeding the raw -3.151 as if it were mu_alpha* over-states the GC's
+        # apparent RA motion and drifts the GC ayanamsha up to +3.4" at year 1200.
+        # -2.7557 mas/yr reproduces the reference GC drift to <0.008" over
+        # -3000..+5000 (also consistent with the Wikipedia mu_alpha* ~ -2.70).
+        # This cos(dec) correction is needed for GAL_CENTER only: the other stars
+        # store Hipparcos/Gaia mu_alpha* values that already include cos dec.
+        pm_ra=-0.0027557,  # -2.7557 mas/yr -> arcsec/yr (great-circle mu_alpha*)
         pm_dec=-0.005547,  # -5.547 mas/yr -> arcsec/yr (Reid & Brunthaler 2004)
     ),
     # Galactic North Pole (J2000)
@@ -4430,6 +4444,154 @@ STARS = {
         pm_dec=0.0,
     ),
 }
+
+
+# =============================================================================
+# Method-B ayanamsha defining epochs
+# =============================================================================
+# Per-mode reference epoch t0 (Julian Date, used *directly as TT*) for the
+# Method-B long-term precession propagation (see
+# ``precession_vondrak.method_b_accumulated_precession``). Each formula-based
+# ayanamsha fixes its sidereal zero point on the mean ecliptic of a defining
+# epoch; propagating precession on that fixed ecliptic (rather than with the
+# additive IAU-2006 polynomial) matches the reference to <0.005" over
+# 1200-2900 CE, including modes with ancient defining epochs where the additive
+# form drifted up to ~0.7". Values are the black-box-fitted epochs, which land
+# on the published defining epochs (year noted).
+#
+# NOTE: kept in sync with ``fast_calc._AYANAMSHA_T0_TT`` (LEB fast path).
+_AYANAMSHA_T0_TT: dict[int, float] = {
+    0: 2432193.0409043552,  # FAGAN_BRADLEY        ~1947.0
+    1: 2434481.759385544,  # LAHIRI               ~1953.3
+    2: 1720306.8061153414,  # DELUCE               ~ -2.0
+    3: 2413789.398077771,  # RAMAN                ~1896.6
+    4: 2413789.398077771,  # USHASHASHI           ~1896.6
+    5: 2413789.398077771,  # KRISHNAMURTI         ~1896.6
+    6: 2413789.398077771,  # DJWHAL_KHUL          ~1896.6
+    7: 2413789.398077771,  # YUKTESHWAR           ~1896.6
+    8: 2413789.398077771,  # JN_BHASIN            ~1896.6
+    9: 1683792.0979864676,  # BABYL_KUGLER1        ~ -102.0
+    10: 1683792.0979864676,  # BABYL_KUGLER2        ~ -102.0
+    11: 1683792.0979864676,  # BABYL_KUGLER3        ~ -102.0
+    12: 1683792.0979864676,  # BABYL_HUBER          ~ -102.0
+    13: 1673202.5873079798,  # BABYL_ETPSC          ~ -131.0
+    14: 1683792.0979864676,  # ALDEBARAN_15TAU      ~ -102.0
+    15: 1673745.3888470717,  # HIPPARCHOS           ~ -129.5
+    16: 1926175.087777195,  # SASSANIAN            ~ 561.6
+    18: 2451545.0,  # J2000                J2000.0 (defining epoch)
+    19: 2413789.187449649,  # J1900                ~1896.6
+    20: 2432193.09822503,  # B1950                ~1947.0
+    21: 1902475.546567922,  # SURYASIDDHANTA       ~ 496.7
+    22: 1902475.546567922,  # SURYASIDDHANTA_MSUN  ~ 496.7
+    23: 1902475.546567922,  # ARYABHATA            ~ 496.7
+    24: 1902475.546567922,  # ARYABHATA_MSUN       ~ 496.7
+    25: 1902475.546567922,  # SS_REVATI            ~ 496.7
+    26: 1902475.581422878,  # SS_CITRA             ~ 496.7
+    37: 1910863.024354484,  # ARYABHATA_522        ~ 519.7
+    38: 1720306.8061153414,  # BABYL_BRITTON        ~ -2.0
+    41: 2450596.38393074,  # GALEQU_FIORENZA      ~1997.4
+    43: 2413789.398077771,  # LAHIRI_1940          ~1896.6
+    44: 1824413.565387254,  # LAHIRI_VP285         ~ 283.0
+    45: 1826600.9089528238,  # KRISHNAMURTI_VP291   ~ 289.0
+    46: 2434481.759385544,  # LAHIRI_ICRC          ~1953.3
+}
+
+# VALENS_MOON (mode 42): user-style epoch formula. ayan_t0 = -2.9422 deg at
+# t0 = JD 1775845.5 counted in UT; the TT defining epoch is t0 + Delta T(t0).
+_VALENS_MOON_T0_UT = 1775845.5
+_VALENS_MOON_AYAN_T0 = -2.9422
+
+# Galactic-Center-anchored ayanamsha J2000 pins (degrees, mean/NONUT). The GC
+# star pipeline carries a shared ~0.08" constant offset from the reference's
+# GC origin; pinning each mode's J2000 value (subtracting the pipeline's J2000
+# longitude and adding the reference J2000 ayanamsha) calibrates that constant
+# out while keeping the corrected precession/proper-motion drift. Values are
+# the reference mean ayanamsha at J2000.
+_GALCENT_PIN_J2000: dict[int, float] = {
+    SIDM_GALCENT_0SAG: 26.846047762704416,  # 17: Galactic Center at 0 Sag
+    SIDM_GALCENT_RGILBRAND: 22.469106745704416,  # 30: Gil Brand
+    SIDM_GALCENT_COCHRANE: 356.8460477627044,  # 40: Cochrane (0 Capricorn)
+}
+_MULA_WILHELM_PIN_J2000 = 20.039235161585907  # 36: GC at middle of Mula (Wilhelm)
+
+
+@lru_cache(maxsize=1)
+def _ayanamsha_j2000_tt() -> float:
+    """TT Julian Date corresponding to the J2000.0 UT epoch (cached).
+
+    Used by the Galactic-Center-anchored pins (GALCENT trio, Mula-Wilhelm),
+    whose J2000 anchor is the reference's ayanamsha at the J2000 *UT* epoch:
+    subtracting the pipeline longitude at this same TT makes the J2000 value
+    land exactly on that anchor. (The formula modes instead reference TT J2000
+    directly, to keep their J2000-pinned goldens unchanged.)
+    """
+    return get_timescale().ut1_jd(2451545.0).tt
+
+
+@lru_cache(maxsize=1)
+def _galcent_longitude_j2000() -> float:
+    """Apparent GC ecliptic longitude at the J2000 reference epoch (cached)."""
+    return _get_star_position_ecliptic(
+        STARS["GAL_CENTER"], _ayanamsha_j2000_tt(), 0.0, nonut=True
+    )
+
+
+def _galcent_ayanamsha(tjd_tt: float, pin_j2000: float) -> float:
+    """Galactic-Center-anchored ayanamsha (deg), pinned to ``pin_j2000`` at J2000.
+
+    The apparent GC ecliptic longitude of date (proper motion + aberration,
+    mean ecliptic of date) supplies the long-term precession/proper-motion
+    drift; subtracting the pipeline's own J2000 longitude and adding the
+    reference J2000 anchor removes the shared ~0.08" GC-origin constant so the
+    J2000 value matches the reference while the drift tracks it to <0.01".
+    """
+    lam = _get_star_position_ecliptic(STARS["GAL_CENTER"], tjd_tt, 0.0, nonut=True)
+    return (lam - _galcent_longitude_j2000() + pin_j2000) % 360.0
+
+
+def _galcent_ra_of_date(tjd_tt: float) -> float:
+    """Apparent RA of the Galactic Center on the MEAN equator of date (radians).
+
+    Same astrometric pipeline as the GC ecliptic longitude (proper motion +
+    aberration), but stops at the mean equator of date (Vondrák precession, no
+    nutation) instead of rotating on to the ecliptic. Used for Wilhelm's
+    hour-circle (dhruva) projection of the Mula galactic-center ayanamsha.
+    """
+    import numpy as np
+
+    gc = STARS["GAL_CENTER"]
+    star = Star(
+        ra_hours=gc.ra_j2000 / 15.0,
+        dec_degrees=gc.dec_j2000,
+        ra_mas_per_year=gc.pm_ra * 1000.0,
+        dec_mas_per_year=gc.pm_dec * 1000.0,
+    )
+    t = get_timescale().tt_jd(tjd_tt)
+    v = np.array(get_planets()["earth"].at(t).observe(star).apparent().position.au)
+    x, y, _z = np.array(vondrak_precession_matrix(tjd_tt)) @ v
+    return math.atan2(float(y), float(x))
+
+
+def _mula_wilhelm_longitude(tjd_tt: float) -> float:
+    """Wilhelm hour-circle projection of the GC onto the ecliptic (deg, 0-360).
+
+    Projects the GC's apparent RA of date through the pole onto the ecliptic
+    (tan(lambda) = tan(alpha) / cos(eps)), using the Vondrák mean obliquity of
+    date. This "dhruva" projection is what the Wilhelm Mula ayanamsha uses in
+    place of the ordinary ecliptic longitude.
+    """
+    alpha = _galcent_ra_of_date(tjd_tt)
+    eps = vondrak_mean_obliquity_rad(tjd_tt)
+    return (
+        math.degrees(math.atan2(math.sin(alpha), math.cos(alpha) * math.cos(eps)))
+        % 360.0
+    )
+
+
+@lru_cache(maxsize=1)
+def _mula_wilhelm_longitude_j2000() -> float:
+    """Wilhelm-projected GC longitude at the J2000 reference epoch (cached)."""
+    return _mula_wilhelm_longitude(_ayanamsha_j2000_tt())
 
 
 def _get_star_position_ecliptic(
@@ -4893,31 +5055,20 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
             )
             val = star_lon - 240.0
 
-        elif sid_mode == SIDM_GALCENT_0SAG:
-            # Galactic Center at 0° Sagittarius (240° ecliptic longitude).
-            # Full IAU 2006 general-precession polynomial, same as mode 34.
-            ayan_t0_galcent_0sag = 26.84604585
-            prec_arcsec = (
-                _PREC_C1 * T
-                + _PREC_C2 * T**2
-                + _PREC_C3 * T**3
-                + _PREC_C4 * T**4
-                + _PREC_C5 * T**5
-            )
-            val = ayan_t0_galcent_0sag + prec_arcsec / 3600.0
-
-        elif sid_mode == SIDM_GALCENT_RGILBRAND:
-            # Gil Brand: Galactic Center at golden section between Scorpio and Aquarius.
-            # Full IAU 2006 general-precession polynomial.
-            ayan_t0_rgilbrand = 22.46910483
-            prec_arcsec = (
-                _PREC_C1 * T
-                + _PREC_C2 * T**2
-                + _PREC_C3 * T**3
-                + _PREC_C4 * T**4
-                + _PREC_C5 * T**5
-            )
-            val = ayan_t0_rgilbrand + prec_arcsec / 3600.0
+        elif sid_mode in (
+            SIDM_GALCENT_0SAG,
+            SIDM_GALCENT_RGILBRAND,
+            SIDM_GALCENT_COCHRANE,
+        ):
+            # Galactic Center anchored at a fixed sidereal point:
+            #   0 Sag (0SAG), Gil Brand's golden section (RGILBRAND),
+            #   or 0 Capricorn (COCHRANE).
+            # The apparent GC ecliptic longitude of date drives the drift (star
+            # pipeline: proper motion + aberration, mean ecliptic of date); each
+            # mode is pinned so its J2000 value equals the reference anchor,
+            # matching the reference to <0.01" over -3000..+5000 (was +3.4"@1200
+            # with the old J2000-anchored IAU 2006 polynomial).
+            val = _galcent_ayanamsha(tjd_tt, _GALCENT_PIN_J2000[sid_mode])
 
         elif sid_mode == SIDM_GALEQU_IAU1958:
             # Galactic Equator (IAU 1958 definition).
@@ -4982,93 +5133,55 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
         elif sid_mode == SIDM_GALCENT_MULA_WILHELM:
             # Galactic Center at Middle of Mula nakshatra (Ernst Wilhelm).
-            # Uses polar projection (dhruva) through the celestial north pole.
-            # Target sidereal position: 6°40' Sagittarius = 246.6667°.
-            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
-            # Reference epoch value 20.03923316° at J2000.
-            # Rate 1.45857980°/century (52.5089"/year) differs from standard IAU precession
-            # because the polar projection geometry changes as the pole precesses.
-            ayan_t0_mula_wilhelm = 20.03923316
-            prec_rate = 1.45857980  # degrees per century (specific to polar projection)
-            val = ayan_t0_mula_wilhelm + prec_rate * T
-
-        elif sid_mode == SIDM_GALCENT_COCHRANE:
-            # Galactic Center at 0° Capricorn (David Cochrane).
-            # Same as GALCENT_0SAG shifted by 30°. Full IAU 2006 polynomial.
-            ayan_t0_cochrane = 356.84604585
-            prec_arcsec = (
-                _PREC_C1 * T
-                + _PREC_C2 * T**2
-                + _PREC_C3 * T**3
-                + _PREC_C4 * T**4
-                + _PREC_C5 * T**5
-            )
-            val = ayan_t0_cochrane + prec_arcsec / 3600.0
+            # Uses Wilhelm's polar/hour-circle projection (dhruva): the GC's
+            # apparent RA of date is projected onto the ecliptic via
+            # tan(lambda) = tan(alpha)/cos(eps) with the Vondrák mean obliquity,
+            # rather than the ordinary ecliptic longitude. Target sidereal
+            # position 6°40' Sagittarius = 246°40'. Pinned so the J2000 value
+            # equals the reference anchor; tracks the reference to <0.01" (was
+            # 125"@1200 with the old linear rate).
+            val = (
+                _mula_wilhelm_longitude(tjd_tt)
+                - _mula_wilhelm_longitude_j2000()
+                + _MULA_WILHELM_PIN_J2000
+            ) % 360.0
 
         elif sid_mode == SIDM_J2000:
-            # J2000 Ayanamsha
-            # This represents precession from J2000.0 epoch:
-            # - Negative before J2000.0 (backward precession)
-            # - Zero at J2000.0
-            # - Positive after J2000.0 (forward precession)
-            # Apply modulo 360 to normalize to [0, 360) range
-            val = (
-                _PREC_C1 * T
-                + _PREC_C2 * T**2
-                + _PREC_C3 * T**3
-                + _PREC_C4 * T**4
-                + _PREC_C5 * T**5
-            ) / 3600.0
+            # J2000 Ayanamsha: precession in longitude accumulated since J2000.0
+            # (negative before, zero at, positive after J2000). Propagated with
+            # Method-B on the fixed mean ecliptic of J2000 (long-term valid, and
+            # <0.001" vs the reference; the old IAU 2006 polynomial drifted
+            # ~0.05" at year 1200).
+            val = method_b_accumulated_precession(tjd_tt, _AYANAMSHA_T0_TT[SIDM_J2000])
             return val % 360.0
 
         elif sid_mode == SIDM_VALENS_MOON:
             # Vettius Valens (Moon): NOT star-anchored at runtime — the
             # reference computes it as a user-style epoch formula with
-            # ayan_t0 = -2.9422° at t0 = JD 1775845.5 counted in UT
-            # (verified black-box to 0.000000001": insensitive to
-            # TRUEPOS/NOABERR, exact with the UT epoch semantics).
+            # ayan_t0 = -2.9422° at t0 = JD 1775845.5 counted in UT (the TT
+            # defining epoch is t0 + Delta T(t0)). Method-B on the mean ecliptic
+            # of that epoch matches the reference to <0.002" (the old additive
+            # IAU 2006 polynomial drifted ~0.35").
             from .time_utils import deltat
 
-            t0_tt = 1775845.5 + deltat(1775845.5)
-            T0_val = (t0_tt - J2000) / 36525.0
-
-            def _prec_poly_valens(Tc: float) -> float:
-                return (
-                    _PREC_C1 * Tc
-                    + _PREC_C2 * Tc**2
-                    + _PREC_C3 * Tc**3
-                    + _PREC_C4 * Tc**4
-                    + _PREC_C5 * Tc**5
-                )
-
-            val = -2.9422 + (_prec_poly_valens(T) - _prec_poly_valens(T0_val)) / 3600.0
+            t0_tt = _VALENS_MOON_T0_UT + deltat(_VALENS_MOON_T0_UT)
+            val = _VALENS_MOON_AYAN_T0 + method_b_accumulated_precession(tjd_tt, t0_tt)
 
         return val % 360.0
 
-    # Handle SIDM_USER (255): User-defined ayanamsha
-    # User provides: t0 (reference epoch JD), ayan_t0 (ayanamsha at t0 in degrees)
-    # Ayanamsha = ayan_t0 + [p(T) - p(T0)]  where p is the precession polynomial
-    # and T, T0 are Julian centuries from J2000.0.
-    # NOTE: We must compute p(T) - p(T0), NOT p(T-T0), because the polynomial
-    # has nonlinear terms (T², T³...) and p(T-T0) ≠ p(T) - p(T0) when T0 ≠ 0.
+    # Handle SIDM_USER (255): User-defined ayanamsha.
+    # User provides: t0 (reference epoch JD, used directly as TT) and ayan_t0
+    # (ayanamsha at t0, degrees). The sidereal zero point is fixed on the mean
+    # ecliptic of t0; the ayanamsha at t is
+    #   ayanamsha(t) = ayan_t0 + accumP_B(t; t0)
+    # where accumP_B is the Method-B long-term precession (Vondrák ecliptic
+    # frame). This is non-additive in t0 and stays within 0.05" of the
+    # reference even for extreme t0 (JD 0, JD 100000); the old additive
+    # p(T)-p(T0) form drifted ~35" at remote epochs. t0 is used literally (no
+    # J2000 sentinel — see a59b98a: JD 0.0 is a valid ~4713 BCE epoch).
     if sid_mode == SIDM_USER:
         _, t0, ayan_t0 = get_sid_mode(full=True)
-        # Julian centuries from J2000 for both epochs
-        T0_user = (t0 - J2000) / 36525.0
-        T_now = (tjd_tt - J2000) / 36525.0
-
-        # IAU 2006 general precession: delta = p(T_now) - p(T0_user)
-        def _prec_poly(Tc: float) -> float:
-            return (
-                _PREC_C1 * Tc
-                + _PREC_C2 * Tc**2
-                + _PREC_C3 * Tc**3
-                + _PREC_C4 * Tc**4
-                + _PREC_C5 * Tc**5
-            )
-
-        delta_prec_arcsec = _prec_poly(T_now) - _prec_poly(T0_user)
-        ayanamsa = ayan_t0 + delta_prec_arcsec / 3600.0
+        ayanamsa = ayan_t0 + method_b_accumulated_precession(tjd_tt, t0)
         return ayanamsa % 360.0
 
     if sid_mode not in ayanamsha_data:
@@ -5085,14 +5198,30 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
     aya_j2000, precession = ayanamsha_data[sid_mode]
 
-    # Calculate Mean Ayanamsa using IAU 2006 general precession in longitude
-    # Full polynomial p_A = c1*T + c2*T^2 + c3*T^3 + c4*T^4 + c5*T^5 (arcsec)
-    # Capitaine et al. 2003, A&A 412
-    #
-    # Note: get_ayanamsa_ut() returns MEAN ayanamsha (without nutation).
-    # For sidereal planet positions, use _get_true_ayanamsa() which includes nutation.
-    if precession > 0:
-        # Apply full IAU 2006 precession polynomial for formula-based ayanamshas
+    # Formula-based ayanamsha: keep the calibrated J2000 anchor and propagate
+    # precession with Method-B on the mode's defining ecliptic (t0), i.e.
+    #   ayanamsha(t) = aya_j2000 + [accumP_B(t; t0) - accumP_B(J2000; t0)]
+    # where accumP_B is the Method-B long-term precession (Vondrák ecliptic
+    # frame) and t0 is the mode's defining epoch (_AYANAMSHA_T0_TT, used as TT).
+    # Subtracting the J2000 reference keeps the J2000 value exactly aya_j2000.
+    # This matches the reference to <0.005" over 1200-2900 CE; the old additive
+    # IAU 2006 polynomial (aya_j2000 + p(T)) drifted up to ~0.74" at remote
+    # epochs for modes with ancient defining epochs (Babylonian, Suryasiddhanta).
+    # Note: get_ayanamsa_ut() returns MEAN ayanamsha (no nutation);
+    # _get_true_ayanamsa() adds nutation for sidereal planet positions.
+    t0_mode = _AYANAMSHA_T0_TT.get(sid_mode)
+    if t0_mode is not None:
+        # Reference the accumulation at J2000 (TT) exactly, so the J2000 value
+        # stays aya_j2000 + accumP_B(J2000_query; t0) - accumP_B(J2000; t0),
+        # i.e. reproduces the previous aya_j2000 + p(T_J2000) to <1e-12 deg (the
+        # Delta T offset of the J2000 UT query survives identically). This keeps
+        # the J2000-pinned goldens (Lahiri/Fagan-Bradley) unchanged.
+        ayanamsa = aya_j2000 + (
+            method_b_accumulated_precession(tjd_tt, t0_mode)
+            - method_b_accumulated_precession(J2000, t0_mode)
+        )
+    elif precession > 0:
+        # No fitted defining epoch: fall back to the IAU 2006 polynomial.
         precession_arcsec = (
             _PREC_C1 * T
             + _PREC_C2 * T**2
@@ -5166,138 +5295,6 @@ def _get_ayanamsa_for_flags(
         assert isinstance(sid_mode, int)
         return _calc_ayanamsa(tjd_ut, sid_mode)
     return _get_true_ayanamsa(tjd_ut, sid_mode)
-
-
-def _calc_star_based_ayanamsha(tjd_ut: float, sid_mode: int) -> float:
-    """
-    Calculate ayanamsha based on actual stellar positions ("True" modes).
-
-    Unlike formula-based ayanamshas that use fixed epoch values and precession
-    rates, True ayanamshas align sidereal 0° with actual star positions at the
-    observation date. This accounts for proper motion, precession, and nutation.
-
-    Supported True modes:
-        - True Citra (SIDM_TRUE_CITRA): Spica at 0° Libra (180°)
-        - True Revati (SIDM_TRUE_REVATI): Zeta Piscium at 29°50' Pisces
-        - True Pushya (SIDM_TRUE_PUSHYA): Delta Cancri at 16° Cancer (106°)
-        - True Mula (SIDM_TRUE_MULA): Lambda Scorpii at 0° Sagittarius (240°)
-        - Galactic Center modes: Sgr A* at specified ecliptic longitude
-        - Galactic Equator modes: Galactic pole alignments
-        - True Sheoran: Zeta Piscium variant
-
-    Algorithm:
-        1. Calculate true obliquity (mean + nutation) for coordinate transformation
-        2. Get actual ecliptic longitude of reference star/point at date
-        3. Calculate offset: ayanamsha = star_lon - target_sidereal_lon
-
-    Args:
-        tjd_ut: Julian Day in Universal Time (UT1)
-        sid_mode: Sidereal mode constant (SIDM_TRUE_*)
-
-    Returns:
-        Ayanamsha value in degrees based on star's current position
-
-    References:
-        - Star positions from STARS catalog (Hipparcos J2000.0 + proper motion)
-        - Galactic Center: Sgr A* radio position (Reid & Brunthaler 2004)
-        - IAU Galactic coordinate system (1958)
-    """
-    planets = get_planets()
-    ts = get_timescale()
-    t = ts.ut1_jd(tjd_ut)
-    earth = planets["earth"]
-
-    # Define star coordinates (J2000 ICRS)
-    # RA in hours, Dec in degrees
-    star_definitions = {
-        SIDM_TRUE_CITRA: ("Spica", 13.419883, -11.161319, 180.0),  # Spica at 180°
-        SIDM_TRUE_REVATI: (
-            "Zeta Piscium",
-            1.137,
-            7.575,
-            359.83333 - 1.268158,
-        ),  # Zeta Psc adjusted
-        SIDM_TRUE_PUSHYA: (
-            "Delta Cancri",
-            8.7447497792,  # 08h 44m 41.0991810454s (Gaia DR3)
-            18.1543080691,  # +18° 09' 15.509048595" (Gaia DR3)
-            106.0,
-        ),  # Delta Cnc at 106°
-        SIDM_TRUE_MULA: (
-            "Lambda Scorpii",
-            17.560111,
-            -37.103889,
-            240.0,
-        ),  # Lambda Sco at 240°
-        SIDM_TRUE_SHEORAN: (
-            "Spica",
-            13.419883,
-            -11.161319,
-            180.0 - 1.398307,
-        ),  # Spica at ~178.6°
-    }
-
-    # Galactic Center modes
-    if sid_mode in [
-        SIDM_GALCENT_0SAG,
-        SIDM_GALCENT_RGILBRAND,
-        SIDM_GALCENT_MULA_WILHELM,
-        SIDM_GALCENT_COCHRANE,
-    ]:
-        # Galactic Center: RA ~17h45m, Dec ~-29°
-        # Position varies by definition
-        if sid_mode == SIDM_GALCENT_0SAG:
-            target_lon = 240.0  # Galactic Center at 0° Sagittarius (240°)
-        elif sid_mode == SIDM_GALCENT_COCHRANE:
-            target_lon = 270.0  # Galactic Center at 0° Capricorn
-        elif sid_mode == SIDM_GALCENT_RGILBRAND:
-            target_lon = 244.371482  # Gil Brand definition
-        elif sid_mode == SIDM_GALCENT_MULA_WILHELM:
-            target_lon = 246.801354  # Wilhelm definition
-        else:
-            target_lon = 0.0
-
-        # Galactic Center J2000: RA 17h 45m 40.04s, Dec -29° 00' 28.1"
-        galcenter = Star(ra_hours=17.761, dec_degrees=-29.00781)
-        pos = earth.at(t).observe(galcenter).apparent()
-        lat, lon, dist = pos.frame_latlon(ecliptic_frame)
-        return (lon.degrees - target_lon) % 360.0
-
-    # Galactic Equator modes
-    if sid_mode in [
-        SIDM_GALEQU_IAU1958,
-        SIDM_GALEQU_TRUE,
-        SIDM_GALEQU_MULA,
-        SIDM_GALALIGN_MARDYKS,
-        SIDM_GALEQU_FIORENZA,
-    ]:
-        # These are based on the galactic equator node
-        # Approximation: use galactic north pole alignment
-        # For simplicity, return a calculated value based on precession
-        # These modes typically result in ayanamsa ~25-30°
-        J2000 = 2451545.0
-        T = (tjd_ut - J2000) / 36525.0
-        if sid_mode == SIDM_GALEQU_IAU1958:
-            return (30.0 + 50.2388194 * T / 3600.0) % 360.0
-        elif sid_mode == SIDM_GALEQU_TRUE:
-            return (30.1 + 50.2388194 * T / 3600.0) % 360.0
-        elif sid_mode == SIDM_GALALIGN_MARDYKS:
-            return (30.0 + 50.2388194 * T / 3600.0) % 360.0
-        else:  # GALEQU_MULA
-            return (23.4 + 50.2388194 * T / 3600.0) % 360.0
-
-    # Star-based modes
-    if sid_mode in star_definitions:
-        star_name, ra_h, dec_d, target_lon = star_definitions[sid_mode]
-        star = Star(ra_hours=ra_h, dec_degrees=dec_d)
-        pos = earth.at(t).observe(star).apparent()
-        lat, lon, dist = pos.frame_latlon(ecliptic_frame)
-        tropical_lon = lon.degrees
-        ayanamsa = (tropical_lon - target_lon) % 360.0
-        return ayanamsa
-
-    # Fallback to Lahiri
-    return _calc_ayanamsa(tjd_ut, SIDM_LAHIRI)
 
 
 def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0):
