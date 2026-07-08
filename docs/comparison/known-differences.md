@@ -451,9 +451,12 @@ latitude/declination speed channel differs.
 **5.1 Atmospheric refraction (`refrac`).** Up to 15" near the horizon; both use
 Bennett's formula with slightly different coefficients and boundary handling.
 
-**5.2 Azimuth/altitude (`azalt`).** Above-horizon < 1"; below-horizon up to ~1654"
-(~27') from fundamentally different refraction extrapolation for negative apparent
-altitudes (physically meaningless region).
+**5.2 Azimuth/altitude (`azalt`).** `azalt` routes its apparent altitude through
+`refrac_extended`, which now reproduces the reference's analytic refraction curve
+and dip clamp to < 30" across the full observer-elevation / pressure / temperature
+grid, both above and below the horizon (see §13). The former ~1654" below-horizon
+gap is closed; only the reference's own divergent deep-cold iteration (§13) still
+differs.
 
 ### 6. Eclipse and occultation functions
 
@@ -675,8 +678,13 @@ verified against it:
 - **Visibility-window ordering** (`jd1 ≤ jd2 ≤ jd3`) is guaranteed by
   construction; a failed crossing search clamps to the optimum or the search
   edge rather than an unrelated instant.
-- **`refrac_extended` / `azalt`** reproduce the reference's below-horizon
-  refraction curve and dip clamp (≤ ~10" over −3…+1° true altitude); see §refraction.
+- **`refrac_extended` / `azalt`** reproduce the reference's refraction curve and
+  dip clamp across observer elevation (0–4000 m), pressure (900–1100 mbar) and
+  temperature (−30…+35 °C): **< 30"** everywhere from 4° below the dipped horizon
+  to 1° above it (median < 0.001"). The one exception is a narrow deep-cold
+  sliver (≳ 3° below the dip at ≈ −30 °C) where the reference's own true→app
+  iteration diverges to non-physical values that fail to round-trip; there
+  libephemeris returns the sensible clamped input instead. See §refraction.
 
 **The visibility model is now Schaefer's VISLIMIT.** The former library-specific
 empirical model has been replaced by a faithful implementation of Bradley
