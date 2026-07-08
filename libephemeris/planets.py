@@ -1315,7 +1315,9 @@ def calc_ut(
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             _record(planet, "LEB")
-            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
+            return _to_native_floats(result[0]), _echo_speed_bit(
+                result[1] | _implied_retflag_bits(flags), raw_flags
+            )
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1334,7 +1336,9 @@ def calc_ut(
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
             _record(planet, "Horizons")
-            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
+            return _to_native_floats(result[0]), _echo_speed_bit(
+                result[1] | _implied_retflag_bits(flags), raw_flags
+            )
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1460,7 +1464,9 @@ def calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             _record(planet, "LEB")
-            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
+            return _to_native_floats(result[0]), _echo_speed_bit(
+                result[1] | _implied_retflag_bits(flags), raw_flags
+            )
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1484,7 +1490,9 @@ def calc(
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
             _record(planet, "Horizons")
-            return result[0], _echo_speed_bit(result[1] | _implied_retflag_bits(flags), raw_flags)
+            return _to_native_floats(result[0]), _echo_speed_bit(
+                result[1] | _implied_retflag_bits(flags), raw_flags
+            )
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",

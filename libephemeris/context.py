@@ -649,7 +649,9 @@ class EphemerisContext:
                 _record(ipl, "LEB")
                 from .planets import _implied_retflag_bits, _echo_speed_bit
 
-                return result[0], _echo_speed_bit(
+                from .planets import _to_native_floats
+
+                return _to_native_floats(result[0]), _echo_speed_bit(
                     result[1] | _implied_retflag_bits(iflag), raw_iflag
                 )
             except (KeyError, ValueError) as _leb_err:
@@ -697,7 +699,9 @@ class EphemerisContext:
                 _record(ipl, "Horizons")
                 from .planets import _implied_retflag_bits, _echo_speed_bit
 
-                return result[0], _echo_speed_bit(
+                from .planets import _to_native_floats
+
+                return _to_native_floats(result[0]), _echo_speed_bit(
                     result[1] | _implied_retflag_bits(iflag), raw_iflag
                 )
             except KeyError as _hz_err:

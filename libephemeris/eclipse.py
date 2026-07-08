@@ -6381,8 +6381,12 @@ def _make_tret(jd_event: float = 0.0) -> Tuple[float, ...]:
 
     The reference ephemeris returns a 10-element tuple where only index 0 is meaningful
     (the Julian Day of the event). Remaining elements are always 0.0.
+
+    jd_event is coerced to a native float: the transit path derives it from a
+    numpy hour-angle expression, so without this rise_trans would leak a
+    numpy.float64 in tret[0] for MTRANSIT/ITRANSIT (rise/set feed a native jd).
     """
-    return (jd_event, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    return (float(jd_event), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 
 def _calculate_transit_leb(
