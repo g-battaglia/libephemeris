@@ -1182,6 +1182,15 @@ def _heliacal_ut_leb(
         return best_ut
 
     def _check_twilight_visibility(jd_day: float, morning: bool):
+        # Anchor the scan grid to 0h UT of jd_day's civil day. The search
+        # loops pass jd_start + k, carrying jd_start's arbitrary time-of-day
+        # into every scanned day, so the 15-min sampling grid shifted with
+        # the requested start time and a few minutes' difference in jd_start
+        # could flip a marginal detection (the first days of an apparition
+        # are visible only for minutes), flipping in turn the apparition
+        # classification of the whole search. A fixed per-day anchor makes
+        # each day's verdict a function of the day alone.
+        jd_day = math.floor(jd_day + 0.5) - 0.5
         center_ut = _find_twilight_center(jd_day, morning)
         if center_ut < 0:
             return False, 0.0
@@ -1412,15 +1421,32 @@ def _heliacal_ut_leb(
 
     # --- main dispatch ---
     if event_type == HELIACAL_RISING:
-        jd_event = _search_heliacal_rising(jd_start)
+        _search = _search_heliacal_rising
     elif event_type == HELIACAL_SETTING:
-        jd_event = _search_heliacal_setting(jd_start)
+        _search = _search_heliacal_setting
     elif event_type == EVENING_FIRST:
-        jd_event = _search_evening_first(jd_start)
+        _search = _search_evening_first
     elif event_type == MORNING_LAST:
-        jd_event = _search_morning_last(jd_start)
+        _search = _search_morning_last
     else:
-        jd_event = 0.0
+        _search = None
+
+    jd_event = 0.0
+    if _search is not None:
+        jd_event = _search(jd_start)
+        # Contract gate: the returned event must be >= jd_start. Day 0 of
+        # the search is the civil day containing jd_start and its twilight
+        # scan covers that whole day, so when jd_start falls later in the
+        # day than the visibility optimum, the streak gate can classify the
+        # already-past optimum as the event and the refinement converges
+        # before jd_start. Restarting one day later moves that day into the
+        # lookback, where its visibility marks the apparition as ongoing --
+        # the same branch a search started the following day takes -- and
+        # the search skips to the next apparition. The retry cannot violate
+        # the contract again: every instant it scans lies on civil days
+        # strictly after jd_start's.
+        if 0.0 < jd_event < jd_start - 1e-6:
+            jd_event = _search(jd_start + 1.0)
 
     if jd_event > 0:
         return jd_event, event_type
@@ -2527,6 +2553,9 @@ def _heliacal_ut_pythonic(
             (visible, jd_best): whether body was found visible, and
             the JD of the first visibility moment found.
         """
+        # Anchor the scan grid to 0h UT of jd_day's civil day (see the
+        # batched variant below for the rationale).
+        jd_day = math.floor(jd_day + 0.5) - 0.5
         center_ut = _find_twilight_center(jd_day, morning)
         if center_ut < 0:
             return False, 0.0
@@ -2600,6 +2629,15 @@ def _heliacal_ut_pythonic(
             return []
 
         jd_days_arr = np.asarray(jd_days_list, dtype=np.float64)
+        # Anchor the scan grid to 0h UT of each day's civil day. The search
+        # loops pass jd_start + k, carrying jd_start's arbitrary time-of-day
+        # into every scanned day, so the 15-min sampling grid shifted with
+        # the requested start time and a few minutes' difference in jd_start
+        # could flip a marginal detection (the first days of an apparition
+        # are visible only for minutes), flipping in turn the apparition
+        # classification of the whole search. A fixed per-day anchor makes
+        # each day's verdict a function of the day alone.
+        jd_days_arr = np.floor(jd_days_arr + 0.5) - 0.5
         sun_upper = -5.0 if morning else -2.0
         observer_at = earth + observer
 
@@ -2982,15 +3020,32 @@ def _heliacal_ut_pythonic(
 
     # Main search logic based on event type
     if event_type == HELIACAL_RISING:
-        jd_event = _search_heliacal_rising(jd_start)
+        _search = _search_heliacal_rising
     elif event_type == HELIACAL_SETTING:
-        jd_event = _search_heliacal_setting(jd_start)
+        _search = _search_heliacal_setting
     elif event_type == EVENING_FIRST:
-        jd_event = _search_evening_first(jd_start)
+        _search = _search_evening_first
     elif event_type == MORNING_LAST:
-        jd_event = _search_morning_last(jd_start)
+        _search = _search_morning_last
     else:
-        jd_event = 0.0
+        _search = None
+
+    jd_event = 0.0
+    if _search is not None:
+        jd_event = _search(jd_start)
+        # Contract gate: the returned event must be >= jd_start. Day 0 of
+        # the search is the civil day containing jd_start and its twilight
+        # scan covers that whole day, so when jd_start falls later in the
+        # day than the visibility optimum, the streak gate can classify the
+        # already-past optimum as the event and the refinement converges
+        # before jd_start. Restarting one day later moves that day into the
+        # lookback, where its visibility marks the apparition as ongoing --
+        # the same branch a search started the following day takes -- and
+        # the search skips to the next apparition. The retry cannot violate
+        # the contract again: every instant it scans lies on civil days
+        # strictly after jd_start's.
+        if 0.0 < jd_event < jd_start - 1e-6:
+            jd_event = _search(jd_start + 1.0)
 
     if jd_event > 0:
         return jd_event, event_type
