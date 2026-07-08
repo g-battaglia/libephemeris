@@ -436,6 +436,21 @@ typically < 1°; type flags may differ for borderline cases. Total-eclipse
 reference-compatible entry points; a former clamp to 1.0 was removed — see
 [Intentional divergences §2](intentional-divergences.md#2-total-eclipse-obscuration).
 
+*Ultra-shallow partial `tret` slot layout (isolated degeneracies).* Two
+partial-eclipse `sol_eclipse_when_glob` results differ from the reference only
+in which internal `tret` slots carry the times, never in the retflag or in
+`tret[0]` (the maximum): (a) the 1928-06-17 shallow partial — the reference
+collapses `tret[1]` onto `tret[0]` (local-apparent-noon point coincident with
+maximum), whereas the library computes a genuine noon point ~1156 s later; 155
+other partials over 1900–2100 agree to a 0.17 s median. (b) the 1935-02-03
+ultra-shallow partial — the reference reports the maximum instant in the
+totality slots `tret[4]`/`tret[5]` and zeroes the eclipse-begin/end slots
+`tret[2]`/`tret[3]`, whereas the library's shadow model resolves genuine
+penumbral contacts and fills `tret[2]`/`tret[3]` instead. Both are numerical
+artifacts of the reference's contact solver at the graze limit (no clean
+physical threshold separates them from ordinary shallow partials), so they are
+documented rather than chased in code.
+
 **6.2 Lunar eclipses.** Timing within ~10 s for most events.
 
 **6.3 Lunar occultations.** Timing within ~0.001 day (~86 s) for most events.
