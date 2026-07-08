@@ -429,12 +429,11 @@ class SchaeferModel:
         b = bn
 
         one_minus = 1.0 - 10.0 ** (-0.4 * K * X)
-        # Twilight
         rs = max(sun_obj_angle, 1.0)
-        bt = 10.0 ** (-0.4 * (_VL_MS - _VL_MOI + 32.5 - sun_alt - (Z / (360.0 * K))))
-        bt *= (100.0 / rs) * one_minus
         if sun_alt > 0.0:
-            # Daylight scattering (only when the Sun is above the horizon)
+            # Daylight scattering (Sun above the horizon). The twilight term
+            # BT is only valid for a Sun below the horizon (its -HS factor
+            # diverges for HS > 0), so daylight uses BD alone.
             xs = _vl_airmass(sun_alt)
             c4 = 10.0 ** (-0.4 * K * xs)
             fs = (
@@ -442,14 +441,17 @@ class SchaeferModel:
                 + 10.0 ** (6.15 - rs / 40.0)
                 + (10.0**5.36) * (1.06 + (math.cos(rs * _RD)) ** 2)
             )
-            bd = (
+            b += (
                 10.0 ** (-0.4 * (_VL_MS - _VL_MOI + 43.27))
                 * one_minus
                 * (fs * c4 + 440000.0 * (1.0 - c4))
             )
-            b += bd if bd > bt else bt
         else:
-            b += bt
+            # Twilight brightness (Sun below the horizon).
+            bt = 10.0 ** (
+                -0.4 * (_VL_MS - _VL_MOI + 32.5 - sun_alt - (Z / (360.0 * K)))
+            )
+            b += bt * (100.0 / rs) * one_minus
 
         # Moonlight
         if moon_alt > 0.0:
@@ -1119,6 +1121,7 @@ def _heliacal_ut_leb(
             moon_alt=moon_alt,
             moon_phase=moon_phase,
             moon_obj_angle=moon_body_sep,
+            margin=_HELIACAL_VIS_MARGIN,
         )
         return visible, sun_alt, body_alt, elongation
 
@@ -2400,6 +2403,7 @@ def _heliacal_ut_pythonic(
             moon_alt=moon_alt,
             moon_phase=moon_phase,
             moon_obj_angle=moon_body_sep,
+            margin=_HELIACAL_VIS_MARGIN,
         )
 
         return is_visible, sun_alt, body_alt, elongation
@@ -3264,19 +3268,38 @@ def _heliacal_visibility_window(
         # dret[0] is the limiting (catalog) magnitude at the object, with
         # atmospheric extinction already folded in, so the visibility
         # margin is simply limiting mag minus the body's catalog magnitude.
+        # A heliacal event is a *twilight* phenomenon: reject a Sun above
+        # the horizon so the optimum/window search cannot climb into the
+        # daytime sky (a very bright object such as Venus can otherwise
+        # register a secondary daylight visibility maximum).
         retval, dret = vis_limit_mag(jd, geopos, atmo, observer, objname, flags)
-        if retval < 0:
+        if retval < 0 or dret[3] >= 0.0:
             return -99.0
         return dret[0] - dret[7]
 
-    # Optimum: maximum margin within ~3 hours of the event.
+    # Optimum: the maximum margin within ~3 hours of the event. The margin
+    # is a narrow twilight peak flanked by flat -99 plateaus (the body below
+    # the horizon before dawn / after dusk, and the daytime sky); a unimodal
+    # golden-section search is not robust to that shape, so scan the window on
+    # a ~2.5-min grid and take the maximum, then refine locally.
     win = 0.12
+    n_steps = 144
+    jd_opt = jd_event
+    best = _margin(jd_event)
+    for i in range(n_steps + 1):
+        t = jd_event - win + (2.0 * win) * i / n_steps
+        m = _margin(t)
+        if m > best:
+            best = m
+            jd_opt = t
+    # Golden-section refine within +/- one grid step of the scan maximum.
+    step = (2.0 * win) / n_steps
     phi = (1.0 + math.sqrt(5.0)) / 2.0
-    lo, hi = jd_event - win, jd_event + win
+    lo, hi = jd_opt - step, jd_opt + step
     a = hi - (hi - lo) / phi
     b = lo + (hi - lo) / phi
     fa, fb = _margin(a), _margin(b)
-    for _ in range(25):
+    for _ in range(20):
         if fa > fb:
             hi, b, fb = b, a, fa
             a = hi - (hi - lo) / phi
@@ -3287,7 +3310,8 @@ def _heliacal_visibility_window(
             fb = _margin(b)
         if hi - lo < 2e-5:
             break
-    jd_opt = 0.5 * (lo + hi)
+    if _margin(0.5 * (lo + hi)) > best:
+        jd_opt = 0.5 * (lo + hi)
 
     def _crossing(t_in: float, t_out: float) -> float:
         # t_in is always the optimum (visible, margin > 0); t_out is the far
@@ -3500,8 +3524,10 @@ def _pheno_rise_window(
     def _margin(t: float) -> float:
         # dret[0] already includes extinction to the object (reference
         # convention), so the margin is limiting mag minus catalog mag.
+        # Reject a Sun above the horizon: the visibility window is a
+        # twilight phenomenon and must not follow a daytime maximum.
         retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
-        if retval < 0:
+        if retval < 0 or dret_v[3] >= 0.0:
             return -99.0
         return dret_v[0] - dret_v[7]
 
