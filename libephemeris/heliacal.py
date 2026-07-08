@@ -999,16 +999,18 @@ def _heliacal_ut_leb(
                 "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
                 "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
             )
-        if not is_inner_planet(body):
+        if not is_inner_planet(body) and body != MOON:
             raise ValueError(
                 "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus). For outer planets, use HELIACAL_RISING or "
-                "HELIACAL_SETTING."
+                "(Mercury, Venus) and the Moon. For outer planets, use "
+                "HELIACAL_RISING or HELIACAL_SETTING."
             )
     if body == SUN:
         raise ValueError("SUN is not valid for heliacal calculations")
-    if body == MOON:
-        raise ValueError("MOON is not valid for heliacal calculations")
+    if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
+        raise ValueError(
+            "the Moon has no heliacal rising or setting (event types 1, 2)"
+        )
 
     is_star = is_fixed_star(body)
     if not is_star and body not in _PLANET_MAP:
@@ -1686,7 +1688,11 @@ def _heliacal_pheno_ut_leb(
         flags,
     )
 
-    if not is_star and phase_angle > 0:
+    if is_star:
+        # Fixed stars are unresolved point sources; the reference reports full
+        # illumination (pheno element 27 = 100.0) for them, not zero.
+        illumination = 100.0
+    elif phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
     else:
         illumination = 0.0
@@ -1786,12 +1792,10 @@ def _vislim_scotopic_flag(
         is_scotopic = False
     if flags & HELFLAG_VISLIM_SCOTOPIC:
         is_scotopic = True
-    flag = HELFLAG_SCOTOPIC if is_scotopic else HELFLAG_PHOTOPIC
-    bnight = 1479.0
-    bnight_factor = 1645.0 / bnight
-    if bnight * bnight_factor > bsk_nl > bnight / bnight_factor:
-        flag |= 2
-    return flag
+    # The reference returns only photopic (0) or scotopic (1) on the observable
+    # set (plus -2 below the horizon, handled by the caller); it never emits a
+    # separate "mixed" bit. Mirror that binary encoding.
+    return HELFLAG_SCOTOPIC if is_scotopic else HELFLAG_PHOTOPIC
 
 
 def _vis_limit_mag_leb(
@@ -1876,6 +1880,10 @@ def _vis_limit_mag_leb(
             body_id = planet_names[name_upper]
         else:
             is_star_flag = True
+
+    # The Sun has no meaningful limiting magnitude; the reference rejects it.
+    if not is_star_flag and body_id == SUN:
+        raise ValueError("it makes no sense to call vis_limit_mag() for the Sun")
 
     obj_alt = 0.0
     obj_az = 0.0
@@ -2175,18 +2183,20 @@ def _heliacal_ut_pythonic(
                 "EVENING_FIRST and MORNING_LAST are not valid for fixed stars. "
                 "For fixed stars, use HELIACAL_RISING or HELIACAL_SETTING."
             )
-        if not is_inner_planet(body):
+        if not is_inner_planet(body) and body != MOON:
             raise ValueError(
                 "EVENING_FIRST and MORNING_LAST are only valid for inner planets "
-                "(Mercury, Venus). For outer planets, use HELIACAL_RISING or "
-                "HELIACAL_SETTING."
+                "(Mercury, Venus) and the Moon. For outer planets, use "
+                "HELIACAL_RISING or HELIACAL_SETTING."
             )
 
     # Sun and Moon are not valid for heliacal events
     if body == SUN:
         raise ValueError("SUN is not valid for heliacal calculations")
-    if body == MOON:
-        raise ValueError("MOON is not valid for heliacal calculations")
+    if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
+        raise ValueError(
+            "the Moon has no heliacal rising or setting (event types 1, 2)"
+        )
 
     # Check if this is a fixed star
     is_star = is_fixed_star(body)
@@ -3213,8 +3223,20 @@ def heliacal_ut(
     # convert to the 0-1 range used internally.
     humidity = humidity_pct / 100.0
 
-    # Parse objname to get body ID
-    body_id = _parse_object_name(objname)
+    # Parse objname to get body ID. The Moon is a valid heliacal body for the
+    # evening-first / morning-last events (crescent visibility) but not for the
+    # rising/setting events, matching the reference's acceptance matrix.
+    from .constants import MOON
+
+    body_id = _parse_object_name(objname, allow_moon=True)
+    if body_id == MOON and eventtype in (HELIACAL_RISING, HELIACAL_SETTING):
+        ev_name = {
+            HELIACAL_RISING: "morning first",
+            HELIACAL_SETTING: "evening last",
+        }[eventtype]
+        raise ValueError(
+            f"{ev_name} (event type {eventtype}) does not exist for the Moon"
+        )
 
     # Call the internal _heliacal_ut_pythonic function
     jd_event, retflag = _heliacal_ut_pythonic(
@@ -3314,11 +3336,20 @@ def _heliacal_visibility_window(
     jd_opt = 0.5 * (lo + hi)
 
     def _crossing(t_in: float, t_out: float) -> float:
+        # t_in is always the optimum (visible, margin > 0); t_out is the far
+        # edge of the search bracket on one side of it. The return value is
+        # bracketed strictly between t_out and t_in, so start <= opt <= end is
+        # guaranteed by construction: on a failed bracket we clamp to the
+        # optimum (degenerate window) or to the search edge, never to an
+        # unrelated instant outside the interval.
         f_in = _margin(t_in)
         f_out = _margin(t_out)
         if f_in <= 0.0:
-            return jd_event
+            # Optimum itself is not visible: report a degenerate window at it.
+            return t_in
         if f_out > 0.0:
+            # Still visible at the search edge: the crossing is beyond it, so
+            # report the edge (keeps ordering; widths saturate at the bracket).
             return t_out
         for _ in range(25):
             mid = 0.5 * (t_in + t_out)
@@ -3332,7 +3363,10 @@ def _heliacal_visibility_window(
 
     jd_start_vis = _crossing(jd_opt, jd_opt - win)
     jd_end_vis = _crossing(jd_opt, jd_opt + win)
-    return jd_start_vis, jd_opt, jd_end_vis
+    # Guard against any residual ordering inversion from a degenerate search.
+    lo_vis = min(jd_start_vis, jd_opt)
+    hi_vis = max(jd_end_vis, jd_opt)
+    return lo_vis, jd_opt, hi_vis
 
 
 def _parse_object_name(object_name: str, allow_moon: bool = False) -> int:
@@ -3937,7 +3971,11 @@ def _heliacal_pheno_ut_pythonic(
 
     # Illumination percentage for all bodies
     # For planets: (1 + cos(phase_angle)) / 2 * 100
-    if not is_star and phase_angle > 0:
+    if is_star:
+        # Fixed stars are unresolved point sources; the reference reports full
+        # illumination (pheno element 27 = 100.0) for them, not zero.
+        illumination = 100.0
+    elif phase_angle > 0:
         illumination = (1.0 + math.cos(math.radians(phase_angle))) / 2.0 * 100.0
     else:
         illumination = 0.0
@@ -4292,6 +4330,10 @@ def vis_limit_mag(
         else:
             # Assume it's a fixed star
             is_fixed_star = True
+
+    # The Sun has no meaningful limiting magnitude; the reference rejects it.
+    if not is_fixed_star and body_id == SUN:
+        raise ValueError("it makes no sense to call vis_limit_mag() for the Sun")
 
     # Calculate object position and magnitude
     obj_alt = 0.0
