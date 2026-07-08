@@ -492,7 +492,12 @@ version). **14.2 `contrib` attribute** is not exposed by libephemeris. **14.3 `d
 with negative values** differs due to unsigned-integer overflow in the C
 implementation vs Python integers. **14.4 `FLG_MOSEPH`** is accepted for API
 compatibility but ignored — every calculation uses JPL DE440/DE441 via Skyfield,
-with no Moshier fallback. **14.5 `split_deg` with `SPLIT_DEG_NAKSHATRA |
+with no Moshier fallback. **14.6 `cotrans_sp` speed for a non-physical `|lat| > 90°`** may differ from the
+reference: the position (longitude/latitude) now matches for all inputs, and
+the speed is exact for every physical `|lat| <= 90°`, but above 90° the two
+engines reparametrise the (non-physical) point differently, so the returned
+`lon`/`lat` speeds diverge. No real ecliptic/equatorial input reaches this
+region. **14.5 `split_deg` with `SPLIT_DEG_NAKSHATRA |
 SPLIT_DEG_ROUND_MIN`** returns the seconds field one arcsecond low (29 vs 30)
 at a mathematically-exact nakshatra boundary (multiples of 13°20′: 40°, 160°,
 200°…): the nakshatra width 360/27 is irrational in IEEE-754, so re-reducing

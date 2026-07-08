@@ -107,11 +107,11 @@ def cotrans_sp(
     new_lat_rad = math.asin(sin_new_lat)
     cos_new_lat = math.cos(new_lat_rad)
 
-    # Calculate the new longitude (RA for ecl->eq, lambda for eq->ecl)
-    # tan(new_lon) = (sin(lon) * cos(eps) - tan(lat) * sin(eps)) / cos(lon)
-    tan_lat = math.tan(lat_rad)
-    y = sin_lon * cos_eps - tan_lat * sin_eps
-    x = cos_lon
+    # Calculate the new longitude (RA for ecl->eq, lambda for eq->ecl) from the
+    # full 3D rotation (see cotrans): using cos_lat-scaled components rather
+    # than dividing by cos_lat keeps it correct for |lat| > 90°.
+    y = cos_lat * sin_lon * cos_eps - sin_lat * sin_eps
+    x = cos_lat * cos_lon
 
     new_lon_rad = math.atan2(y, x)
 
@@ -146,22 +146,17 @@ def cotrans_sp(
         # At poles, latitude speed is undefined; use 0
         new_lat_speed_rad = 0.0
 
-    # Derivative of new longitude:
-    # new_lon = atan2(y, x) where y = sin(lon)*cos(eps) - tan(lat)*sin(eps), x = cos(lon)
-    # d(new_lon)/dt = (x * dy/dt - y * dx/dt) / (x^2 + y^2)
-    #
-    # dx/dt = -sin(lon) * d(lon)/dt
-    # dy/dt = cos(lon)*cos(eps)*d(lon)/dt - sec^2(lat)*sin(eps)*d(lat)/dt
-    #       = cos(lon)*cos(eps)*d(lon)/dt - sin(eps)/(cos^2(lat))*d(lat)/dt
-    dx_dt = -sin_lon * lon_speed_rad
-    cos_lat_sq = cos_lat * cos_lat
-    if abs(cos_lat_sq) > 1e-10:
-        dy_dt = (
-            cos_lon * cos_eps * lon_speed_rad - (sin_eps / cos_lat_sq) * lat_speed_rad
-        )
-    else:
-        # At poles of input coordinates
-        dy_dt = cos_lon * cos_eps * lon_speed_rad
+    # Derivative of new longitude, using the SAME full-3D components as the
+    # position above (x = cos_lat*cos_lon, y = cos_lat*sin_lon*cos_eps -
+    # sin_lat*sin_eps): d(new_lon)/dt = (x*dy/dt - y*dx/dt) / (x^2 + y^2).
+    # These derivatives match the cos_lat-scaled x,y (no 1/cos_lat term), so
+    # the speed stays correct for |lat| > 90° and is unchanged for |lat| <= 90°.
+    dx_dt = -sin_lat * cos_lon * lat_speed_rad - cos_lat * sin_lon * lon_speed_rad
+    dy_dt = (
+        -cos_eps * sin_lat * sin_lon * lat_speed_rad
+        + cos_eps * cos_lat * cos_lon * lon_speed_rad
+        - cos_lat * sin_eps * lat_speed_rad
+    )
 
     denom = x * x + y * y
     if abs(denom) > 1e-10:
@@ -737,11 +732,15 @@ def cotrans(
     sin_new_lat = max(-1.0, min(1.0, sin_new_lat))
     new_lat_rad = math.asin(sin_new_lat)
 
-    # Calculate the new longitude (RA for ecl→eq, λ for eq→ecl)
-    # tan(new_lon) = (sin(lon) * cos(eps) - tan(lat) * sin(eps)) / cos(lon)
-    tan_lat = math.tan(lat_rad)
-    y = sin_lon * cos_eps - tan_lat * sin_eps
-    x = cos_lon
+    # Calculate the new longitude (RA for ecl→eq, λ for eq→ecl) from the full
+    # 3D rotation about the x-axis. Using the true cartesian components
+    # y' = cos_lat·sin_lon·cos_eps - sin_lat·sin_eps, x' = cos_lat·cos_lon
+    # (rather than dividing them by cos_lat, i.e. tan_lat) keeps the result
+    # correct when |lat| > 90°, where cos_lat < 0 would otherwise flip both
+    # signs and rotate the longitude by 180°. Identical to the naive-trig form
+    # for every |lat| <= 90°.
+    y = cos_lat * sin_lon * cos_eps - sin_lat * sin_eps
+    x = cos_lat * cos_lon
 
     new_lon_rad = math.atan2(y, x)
 
