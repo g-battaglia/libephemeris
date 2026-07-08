@@ -3534,7 +3534,7 @@ def _sol_eclipse_when_loc_impl(
         clamped = False
         circumpolar = False
         rc_rise, tret_rise = rise_trans(
-            jd_first - 0.001,
+            first_contact - 0.001,
             SUN,
             CALC_RISE | BIT_DISC_BOTTOM,
             _geopos3,
@@ -3543,7 +3543,7 @@ def _sol_eclipse_when_loc_impl(
             eph_flags,
         )
         rc_set, tret_set = rise_trans(
-            jd_first - 0.001,
+            first_contact - 0.001,
             SUN,
             CALC_SET | BIT_DISC_BOTTOM,
             _geopos3,
@@ -5470,7 +5470,8 @@ def _lun_eclipse_how_pythonic(
         moon_az_val, moon_alt_true, moon_alt_app = azalt(
             jd, ECL2HOR, _gp, 0, 0, moon_topo[:3]
         )
-        moon_altitude = moon_alt_true
+        moon_altitude_true = moon_alt_true
+        moon_altitude_app = moon_alt_app
         moon_azimuth = moon_az_val
     else:
         from skyfield.api import wgs84
@@ -5502,11 +5503,16 @@ def _lun_eclipse_how_pythonic(
             # If calculation fails, return zeros (20 elements)
             return 0, tuple([0.0] * 20)
 
-        # Get Moon altitude and azimuth
-        moon_alt, moon_az, _ = moon_app.altaz()
-        moon_altitude = moon_alt.degrees
+        # Get Moon altitude and azimuth. Skyfield's altaz() returns the
+        # UN-refracted (true) altitude by default; passing temperature_C='standard'
+        # (10 C) applies its refraction model for the apparent altitude. attr[5]
+        # is the true altitude and attr[6] the apparent altitude, so the two must
+        # be distinct (formerly both carried the same true value here).
+        moon_app_altaz = moon_app.altaz()
+        moon_altitude_true = moon_app_altaz[0].degrees
+        moon_altitude_app = moon_app.altaz(temperature_C="standard")[0].degrees
         # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
-        moon_azimuth = (moon_az.degrees + 180.0) % 360.0
+        moon_azimuth = (moon_app_altaz[1].degrees + 180.0) % 360.0
 
     # Eclipse circumstances from the canonical selenocentric shadow model
     # (_lun_how_core) -- the same core that backs lun_eclipse_how()/
@@ -5527,8 +5533,8 @@ def _lun_eclipse_how_pythonic(
             0.0,  # [2] reserved
             0.0,  # [3] reserved
             moon_azimuth,  # [4] Moon azimuth
-            moon_altitude,  # [5] true altitude
-            moon_altitude,  # [6] apparent altitude
+            moon_altitude_true,  # [5] true altitude
+            moon_altitude_app,  # [6] apparent altitude
             0.0,  # [7] distance from opposition
             0.0,  # [8] eclipse magnitude
             0.0,  # [9] Saros series number
@@ -5547,8 +5553,9 @@ def _lun_eclipse_how_pythonic(
     # There is an eclipse - start from the canonical type flag
     eclipse_type = retc_core
 
-    # Check if Moon is above horizon
-    if moon_altitude > -1.0:  # Allow for refraction near horizon
+    # Check if Moon is above horizon (use the apparent altitude, which lets
+    # refraction lift a horizon-grazing Moon into view, matching _lun_eclipse_how_impl).
+    if moon_altitude_app > -1.0:
         eclipse_type |= ECL_VISIBLE
         eclipse_type |= ECL_MAX_VISIBLE
 
@@ -5559,8 +5566,8 @@ def _lun_eclipse_how_pythonic(
         0.0,  # [2] Reserved
         0.0,  # [3] Reserved
         moon_azimuth,  # [4] Azimuth of Moon
-        moon_altitude,  # [5] True altitude of Moon
-        moon_altitude,  # [6] Apparent altitude (approx)
+        moon_altitude_true,  # [5] True altitude of Moon
+        moon_altitude_app,  # [6] Apparent altitude
         attr_core[7],  # [7] Distance from opposition (degrees)
         max(0.0, umbral_mag),  # [8] Eclipse magnitude (equals [0])
         *_get_saros_info(jd, "lunar"),  # [9] Saros, [10] member
@@ -11544,10 +11551,13 @@ def calc_eclipse_central_line(
         # This function uses iterative refinement to find the exact central line position
         retflag, geopos, attr = sol_eclipse_where(jd, flags)
 
-        # Check if we have a valid central eclipse point
-        # retflag > 0 indicates an eclipse is happening
+        # Check if we have a valid central eclipse point. Only a *central*
+        # eclipse (ECL_CENTRAL bit set: total/annular/annular-total) defines a
+        # central line; a partial-only eclipse has retflag = ECL_PARTIAL |
+        # ECL_NONCENTRAL (> 0) but no central line, and must contribute no
+        # points (the function contract returns an empty tuple for partials).
         # geopos[0] and geopos[1] contain the central line coordinates
-        if retflag > 0:
+        if retflag & ECL_CENTRAL:
             lon = geopos[0]
             lat = geopos[1]
 
@@ -11742,9 +11752,17 @@ def calc_eclipse_northern_limit(
                 # The longitude of the northern limit point
                 lon = -mu + lon_offset
 
-                # Apply correction for Earth's oblateness
-                lat_geodetic = lat * (
-                    1.0 + EARTH_FLATTENING * math.sin(math.radians(lat)) ** 2
+                # Convert geocentric latitude (from the Besselian shadow
+                # geometry) to geodetic latitude. The exact surface-point
+                # relation is tan(phi_geod) = tan(phi_geoc) / (1 - f)^2
+                # (= 1/(1 - e^2)); the former lat*(1 + f*sin^2(lat)) was a
+                # linear approximation that under-corrected at low/mid
+                # latitudes, over-corrected at high latitudes, and exceeded
+                # 90 deg at the pole.
+                lat_geodetic = math.degrees(
+                    math.atan(
+                        math.tan(math.radians(lat)) / (1.0 - EARTH_FLATTENING) ** 2
+                    )
                 )
 
                 # Normalize longitude to -180 to +180
@@ -11935,9 +11953,17 @@ def calc_eclipse_southern_limit(
                 # The longitude of the southern limit point
                 lon = -mu + lon_offset
 
-                # Apply correction for Earth's oblateness
-                lat_geodetic = lat * (
-                    1.0 + EARTH_FLATTENING * math.sin(math.radians(lat)) ** 2
+                # Convert geocentric latitude (from the Besselian shadow
+                # geometry) to geodetic latitude. The exact surface-point
+                # relation is tan(phi_geod) = tan(phi_geoc) / (1 - f)^2
+                # (= 1/(1 - e^2)); the former lat*(1 + f*sin^2(lat)) was a
+                # linear approximation that under-corrected at low/mid
+                # latitudes, over-corrected at high latitudes, and exceeded
+                # 90 deg at the pole.
+                lat_geodetic = math.degrees(
+                    math.atan(
+                        math.tan(math.radians(lat)) / (1.0 - EARTH_FLATTENING) ** 2
+                    )
                 )
 
                 # Normalize longitude to -180 to +180
