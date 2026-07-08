@@ -394,6 +394,13 @@ _SYSTEM_BARY_NAMES: Dict[int, str] = {
     9: "pluto barycenter",
 }
 
+# Bodies stored as a system barycentre (COORD_ICRS_BARY_SYSTEM): the giant
+# planets that carry a runtime COB offset (barycentre -> planet centre). Under
+# FLG_BARYCTR the reference reports the raw system barycentre (no COB) for
+# these, mirroring the FLG_HELCTR barycentre report. The planets.py Skyfield
+# backend imports this so both backends gate on the same body set.
+_SYSTEM_BARY_BODIES = frozenset(_SYSTEM_BARY_NAMES)
+
 
 def _apply_cob_correction(
     pos: Tuple[float, float, float],
@@ -1405,13 +1412,29 @@ def _pipeline_icrs(
     # and Moon (Earth-based light path) are excluded — see _HELCTR_BARY_LT_BODIES.
     helctr_bary_lt = bool(iflag & FLG_HELCTR) and ipl in _HELCTR_BARY_LT_BODIES
 
+    # Barycentric output of a giant is likewise reported as its raw system
+    # BARYCENTRE (no COB): the reference gives the planet-system barycentre for
+    # FLG_BARYCTR too, leaving up to ~0.09" (Pluto) when the COB is applied.
+    # The BARYCTR light-time already runs on the barycentric distance |body|/c
+    # (observer is the SSB), so — unlike HELCTR — only the COB is skipped; the
+    # light-time distance and velocity light-time rate are unchanged. This flag
+    # gates every COB branch below so the position and its derivative stay
+    # mutually consistent (is_system_bary is exactly the giants Jupiter..Pluto,
+    # so inner planets/Sun/Moon/Earth are untouched).
+    barctr_bary = bool(iflag & FLG_BARYCTR) and is_system_bary
+
     # 1b. For system barycenters, apply COB only for TRUEPOS (no light-time).
     #     For normal path, COB is deferred until after light-time iteration
     #     to match Skyfield's _SpkCenterTarget._observe_from_bcrs() behavior:
     #     iterate light-time on barycenter, apply COB once at retarded time.
-    #     HELCTR is excluded for the major planets: heliocentric output reports
-    #     the system barycentre (no COB) — see the post-light-time COB block.
-    if is_system_bary and (iflag & FLG_TRUEPOS) and not helctr_bary_lt:
+    #     HELCTR/BARYCTR are excluded for the major planets: helio/bary output
+    #     reports the system barycentre (no COB) — see the post-light-time block.
+    if (
+        is_system_bary
+        and (iflag & FLG_TRUEPOS)
+        and not helctr_bary_lt
+        and not barctr_bary
+    ):
         target_pos = _apply_cob_correction(target_pos, ipl, jd_tt)
 
     # Pre-initialize velocity variables to satisfy type checker.
@@ -1488,12 +1511,12 @@ def _pipeline_icrs(
         #   * BARYCTR custom loop (planets.py): evaluates
         #     target.at(retarded_time), i.e. the centre offset at the RETARDED
         #     epoch t - lt (physically correct: light left the centre then).
-        # Major-planet HELCTR is excluded: the reference reports the
-        # planet-system BARYCENTRE for heliocentric output (no COB), so the
+        # Major-planet HELCTR/BARYCTR are excluded: the reference reports the
+        # planet-system BARYCENTRE for helio/bary output (no COB), so the
         # barycentre position from the light-time loop is returned as-is.
         # Applying the centre offset there biased the outer planets by up to
-        # ~0.05" (Pluto).
-        if is_system_bary and lt > 0.0 and not helctr_bary_lt:
+        # ~0.05" (HELCTR Pluto) / ~0.09" (BARYCTR Pluto).
+        if is_system_bary and lt > 0.0 and not helctr_bary_lt and not barctr_bary:
             _cob_epoch = jd_tt - lt if (iflag & FLG_BARYCTR) else jd_tt
             retarded_pos_cob = _apply_cob_correction(
                 (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
@@ -1568,14 +1591,11 @@ def _pipeline_icrs(
         # Add d(COB)/dt analytically (the offset is smooth; ~6.4 d for Pluto).
         # Central-difference at the SAME epoch the position COB used (retarded
         # for BARYCTR, observer time otherwise) so the reported speed stays the
-        # exact derivative of the reported position. Major-planet HELCTR is
-        # excluded: its position is the barycentre (no COB), no COB speed rate.
-        if is_system_bary and not helctr_bary_lt:
-            _cob_vt = (
-                jd_tt - lt
-                if (iflag & FLG_BARYCTR) and lt > 0.0
-                else jd_tt
-            )
+        # exact derivative of the reported position. Major-planet HELCTR/BARYCTR
+        # are excluded: the position is the barycentre (no COB), no COB speed
+        # rate.
+        if is_system_bary and not helctr_bary_lt and not barctr_bary:
+            _cob_vt = jd_tt - lt if (iflag & FLG_BARYCTR) and lt > 0.0 else jd_tt
             _z = (0.0, 0.0, 0.0)
             _cob_m = _apply_cob_correction(_z, ipl, _cob_vt - _VEL_H)
             _cob_p = _apply_cob_correction(_z, ipl, _cob_vt + _VEL_H)

@@ -3716,10 +3716,26 @@ def _calc_body(
     # 3. Compute Position
     from .cache import get_cached_observer_at
 
+    # Under FLG_BARYCTR the reference reports the giant planets as their raw
+    # system BARYCENTRE (no centre-of-body offset) — mirroring the FLG_HELCTR
+    # barycentre report (see fast_calc._pipeline_icrs). Retarget the output
+    # (both the TRUEPOS geometric place and the light-time loop below) to the
+    # raw barycentre for these bodies so no COB is applied. is_system_bary is
+    # exactly the giants Jupiter..Pluto, so every other body/flag — including
+    # geocentric and heliocentric — keeps the COB-corrected centre unchanged.
+    from .fast_calc import _SYSTEM_BARY_BODIES
+
+    barctr_bary = is_barycentric and ipl in _SYSTEM_BARY_BODIES
+    if barctr_bary:
+        _bary_name = _PLANET_FALLBACK.get(target_name)
+        out_target = planets[_bary_name] if _bary_name else target
+    else:
+        out_target = target
+
     # Helper to get vector at time t
     def get_vector(t_):
         # Target position relative to SSB
-        tgt = target.at(t_)
+        tgt = out_target.at(t_)
         tgt_pos = tgt.position.au
         tgt_vel = tgt.velocity.au_per_d
 
@@ -3776,7 +3792,10 @@ def _calc_body(
                 lt_target = planets[_bary_name] if _bary_name else target
                 _tgt_bary = lt_target.at(t).position.au
             else:
-                lt_target = target
+                # For BARYCTR giants out_target is already the raw barycentre
+                # (no COB); the light-time distance stays the barycentric |body|
+                # (observer is the SSB), so only the target is swapped.
+                lt_target = out_target
                 _tgt_bary = None
 
             # Light-time iteration: retard only the target; the observer
