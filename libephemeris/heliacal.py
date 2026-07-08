@@ -1011,6 +1011,18 @@ def _heliacal_ut_leb(
         )
         return sun_alt, body_alt, az
 
+    def _get_sun_alt(jd: float) -> float:
+        """Sun altitude only (avoids the body position for twilight scans)."""
+        _, sun_alt, _ = _leb_body_altaz(
+            reader,
+            jd,
+            SUN,
+            geopos,
+            pressure,
+            temperature,
+        )
+        return sun_alt
+
     def _get_elongation(jd: float) -> float:
         if not is_star:
             try:
@@ -1131,12 +1143,13 @@ def _heliacal_ut_leb(
     def _find_twilight_center(jd_day: float, morning: bool) -> float:
         best_ut = -1.0
         best_score = -999.0
+        # Precompute the 25 hourly Sun altitudes once (Sun only: the body
+        # position is not needed to locate the twilight centre).
+        sun_hourly = [_get_sun_alt(jd_day + h / 24.0) for h in range(25)]
         for h in range(24):
-            jd_check = jd_day + h / 24.0
-            sun_alt, _, _ = _get_altitudes(jd_check)
+            sun_alt = sun_hourly[h]
             if -22.0 < sun_alt < 2.0:
-                jd_next = jd_day + (h + 1) / 24.0
-                sun_next, _, _ = _get_altitudes(jd_next)
+                sun_next = sun_hourly[h + 1]
                 if morning and sun_next > sun_alt:
                     score = -abs(sun_alt + 8.0)
                     if best_ut < 0 or score > best_score:
@@ -1168,6 +1181,13 @@ def _heliacal_ut_leb(
         # productive twilight band (Sun ~ -2 to -14 deg) at ~2.5-min
         # resolution and take the maximum margin; a coarser grid steps over
         # the marginal peak and shifts the reported day by +/-1.
+        # Magnitude and Sun-object elongation vary only slowly within a day
+        # (and pheno_ut is by far the most expensive call), so evaluate them
+        # once at the twilight centre and reuse across the fine scan.
+        jd_center = jd_day + center_ut / 24.0
+        body_mag = _get_body_magnitude(jd_center)
+        elong = _get_elongation(jd_center)
+        schaefer.update_season(jd_center)
         best_m = -999.0
         best_jd = 0.0
         for dt_step in range(-15, 16):
@@ -1176,9 +1196,6 @@ def _heliacal_ut_leb(
             sun_alt, body_alt, _ = _get_altitudes(jd_check)
             if not (-18.0 < sun_alt < -1.0 and body_alt > 0.5):
                 continue
-            body_mag = _get_body_magnitude(jd_check)
-            elong = _get_elongation(jd_check)
-            schaefer.update_season(jd_check)
             m = (
                 schaefer.limiting_magnitude(
                     sun_alt, -90.0, 0.0, body_alt, elong, 180.0
