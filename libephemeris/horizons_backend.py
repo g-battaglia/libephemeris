@@ -858,11 +858,25 @@ def _to_ecliptic_output(
         #     below double-counted it).
         # Skipped only when FLG_SPEED is absent (dlon is 0.0 and must stay 0.0).
         if iflag & FLG_SPEED:
-            dlon -= _general_precession_rate_deg_day(jd_tt)
-            if not (iflag & FLG_J2000):
-                _, _dpsi_m, _, _ = _get_skyfield_frame_data(jd_tt - _VEL_H)
-                _, _dpsi_p, _, _ = _get_skyfield_frame_data(jd_tt + _VEL_H)
-                dlon -= math.degrees(_dpsi_p - _dpsi_m) / (2.0 * _VEL_H)
+            from .fast_calc import _STAR_BASED_MODES
+
+            if sid_mode in _STAR_BASED_MODES:
+                # Star-anchored modes: the ayanamsa drift is the anchor star's
+                # apparent-longitude drift (annual-aberration-dominated), not the
+                # IAU 2006 precession polynomial. Central-difference the actual
+                # ayanamsa (_get_ayanamsa_for_flags returns mean for FLG_J2000/
+                # FLG_NONUT and true otherwise), matching the Skyfield and LEB
+                # backends (see fast_calc's sidereal speed correction).
+                _dt_aya = 1.0 / 86400.0
+                _aya_p = _get_ayanamsa_for_flags(jd_ut + _dt_aya, iflag, sid_mode)
+                _aya_m = _get_ayanamsa_for_flags(jd_ut - _dt_aya, iflag, sid_mode)
+                dlon -= (_aya_p - _aya_m) / (2.0 * _dt_aya)
+            else:
+                dlon -= _general_precession_rate_deg_day(jd_tt)
+                if not (iflag & FLG_J2000):
+                    _, _dpsi_m, _, _ = _get_skyfield_frame_data(jd_tt - _VEL_H)
+                    _, _dpsi_p, _, _ = _get_skyfield_frame_data(jd_tt + _VEL_H)
+                    dlon -= math.degrees(_dpsi_p - _dpsi_m) / (2.0 * _VEL_H)
 
     # NOTE: J2000 spherical output needs NO precession-rate subtraction here.
     # The J2000 frame is fixed, so the fixed-matrix rotation of the ICRS

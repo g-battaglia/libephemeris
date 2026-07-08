@@ -2658,25 +2658,58 @@ def _fast_calc_core(
                 or _xyz_sid_pipea
                 or _pipeline_c
             ):
-                dlon -= _general_precession_rate_deg_day(jd_tt)
+                if sid_mode in _STAR_BASED_MODES:
+                    # Star-anchored modes: ayanamsha = anchor-star apparent
+                    # longitude − C, so its drift is the anchor star's
+                    # apparent-longitude drift (dominated by the annual-aberration
+                    # derivative), NOT the IAU 2006 precession polynomial. The
+                    # position correction already delegates the ayanamsha value
+                    # to Skyfield for these modes; do the same for the rate by
+                    # central-differencing the actual ayanamsha (mean or true per
+                    # the active flags), exactly as the Skyfield path's
+                    # _apply_sidereal_correction does. Using the precession
+                    # polynomial here left the sidereal speed ~0.36"/day off the
+                    # reference (and off the Skyfield backend) for these modes.
+                    def _aya_of(_jd: float) -> float:
+                        _m = _calc_ayanamsa_from_leb(
+                            reader,
+                            _jd,
+                            sid_mode=sid_mode,
+                            sid_t0=sid_t0,
+                            sid_ayan_t0=sid_ayan_t0,
+                        )
+                        if _eff_mean_aya:
+                            return _m
+                        try:
+                            _, _dpsi, _, _ = _frame_data(_jd)
+                            return _m + math.degrees(_dpsi)
+                        except (KeyError, ValueError):
+                            return _m
 
-                # Of-date sidereal subtracts the TRUE ayanamsha (mean + Δψ), so
-                # its rate must also drop the nutation-in-longitude rate dΔψ/dt
-                # (~0.05"/day, peaks ~0.23"/day) on top of the precession term
-                # above. The mean ayanamsha (J2000/NONUT) carries no nutation,
-                # so it is excluded via _eff_mean_aya. This mirrors the
-                # position correction, which applies the true ayanamsha to ALL
-                # bodies uniformly — including the Pipeline-B ecliptic-direct
-                # bodies (nodes/apogees), whose of-date tropical speed carries
-                # dΔψ/dt just like every other body. Gating this per-pipeline
-                # left the Pipeline-B sidereal speed off by the nutation rate
-                # (not the derivative of the reported position, and diverging
-                # from both the Skyfield backend and the reference API).
-                if not _eff_mean_aya:
-                    try:
-                        dlon -= _nutation_rate_deg_day(jd_tt)
-                    except (KeyError, ValueError):
-                        pass
+                    _dt_aya = 1.0 / 86400.0
+                    dlon -= (
+                        _aya_of(jd_tt + _dt_aya) - _aya_of(jd_tt - _dt_aya)
+                    ) / (2.0 * _dt_aya)
+                else:
+                    dlon -= _general_precession_rate_deg_day(jd_tt)
+
+                    # Of-date sidereal subtracts the TRUE ayanamsha (mean + Δψ), so
+                    # its rate must also drop the nutation-in-longitude rate dΔψ/dt
+                    # (~0.05"/day, peaks ~0.23"/day) on top of the precession term
+                    # above. The mean ayanamsha (J2000/NONUT) carries no nutation,
+                    # so it is excluded via _eff_mean_aya. This mirrors the
+                    # position correction, which applies the true ayanamsha to ALL
+                    # bodies uniformly — including the Pipeline-B ecliptic-direct
+                    # bodies (nodes/apogees), whose of-date tropical speed carries
+                    # dΔψ/dt just like every other body. Gating this per-pipeline
+                    # left the Pipeline-B sidereal speed off by the nutation rate
+                    # (not the derivative of the reported position, and diverging
+                    # from both the Skyfield backend and the reference API).
+                    if not _eff_mean_aya:
+                        try:
+                            dlon -= _nutation_rate_deg_day(jd_tt)
+                        except (KeyError, ValueError):
+                            pass
 
         except KeyError:
             # Star-based sidereal mode, fall back

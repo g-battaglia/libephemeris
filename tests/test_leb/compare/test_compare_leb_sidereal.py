@@ -135,5 +135,13 @@ class TestStarBasedFallback:
             leb, _ = compare.leb(ephem.calc_ut, jd, body_id, flags)
 
             assert ref[0] == pytest.approx(leb[0], rel=1e-10), (
-                f"{body_name} star-based mode {sid_mode} differs at JD {jd}"
+                f"{body_name} star-based mode {sid_mode} position differs at JD {jd}"
+            )
+            # Speed slot [3]: the sidereal longitude speed must subtract the
+            # TRUE ayanamsa drift (the anchor star's apparent-longitude drift,
+            # annual-aberration-dominated), not the precession-polynomial rate.
+            # The LEB path once used the polynomial here and was ~0.36"/day off
+            # the Skyfield backend for these modes; this assertion guards it.
+            assert ref[3] == pytest.approx(leb[3], abs=1e-6), (
+                f"{body_name} star-based mode {sid_mode} speed differs at JD {jd}"
             )
