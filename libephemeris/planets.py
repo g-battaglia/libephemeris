@@ -2748,7 +2748,7 @@ def _calc_body(
             # smooths these speeds comparably.
             dlon, dlat, ddist = 0.0, 0.0, 0.0
             if iflag & FLG_SPEED:
-                dt = 0.5  # 0.5 days for perturbation-corrected velocity
+                dt = 0.05
                 try:
                     lon_prev, lat_prev, dist_prev = lunar.calc_true_lunar_node(
                         jd_tt - dt

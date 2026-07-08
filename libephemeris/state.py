@@ -1261,7 +1261,7 @@ def set_sid_mode(mode: int, t0: float = 0.0, ayan_t0: float = 0.0) -> None:
     global _SIDEREAL_MODE, _SIDEREAL_T0, _SIDEREAL_AYAN_T0
     with _STATE_LOCK:
         _SIDEREAL_MODE = mode
-        _SIDEREAL_T0 = t0 if t0 != 0.0 else 2451545.0
+        _SIDEREAL_T0 = t0
         _SIDEREAL_AYAN_T0 = ayan_t0
 
 

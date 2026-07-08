@@ -1767,7 +1767,7 @@ def _pipeline_ecliptic(
     # of range; return zero speed there, matching the Skyfield boundary path.
     dlon = dlat = ddist = 0.0
     if iflag & FLG_SPEED:
-        _dt = 0.05 if ipl == OSCU_APOG else 0.5
+        _dt = 0.05 if ipl in (OSCU_APOG, TRUE_NODE) else 0.5
         try:
             lo_m, la_m, di_m = _ofdate_pos(jd_tt - _dt)
             lo_p, la_p, di_p = _ofdate_pos(jd_tt + _dt)
