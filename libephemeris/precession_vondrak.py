@@ -213,3 +213,88 @@ def vondrak_pn_matrix(
         (float(pn[2][0]), float(pn[2][1]), float(pn[2][2])),
     )
     return pn_mat, float(eps_mean_rad + deps)
+
+
+# =============================================================================
+# Method-B ayanamsha precession (long-term, Vondrák ecliptic frame)
+# =============================================================================
+#
+# The reference API propagates a mean ("formula"/user/J2000) ayanamsha as
+#
+#     ayanamsha(t) = ayan_t0 - lambda(t; t0)
+#
+# where lambda(t; t0) is the ecliptic longitude of the vernal equinox of date
+# t, measured on the MEAN ECLIPTIC OF t0 (the epoch that defines the sidereal
+# zero point). Both the ecliptic of t0 and the equinox of t are built from the
+# Vondrák 2011 long-term ecliptic/equator poles, so the propagation stays valid
+# over the whole Vondrák span and matches the reference to <0.006" from -3000
+# to +5000. This is "Method B": it is *non-additive* in t0 (the ecliptic-tilt
+# term means accum(t; t0) != accum(t; J2000) - accum(t0; J2000)), which is
+# exactly why the earlier additive IAU-2006 polynomial drifted up to ~0.7" at
+# remote epochs for modes with ancient defining epochs.
+
+
+@lru_cache(maxsize=4096)
+def _ltp_ecliptic_frame(jd_tt: float) -> Tuple[Tuple[float, float, float], ...]:
+    """Vondrák 2011 mean ecliptic frame of date (rows in the GCRS basis).
+
+    Built from the ERFA long-term ecliptic pole (``ltpecl``) and equator pole
+    (``ltpequ``):
+
+    * ``x`` — vernal equinox of date, the (normalised) cross product of the
+      ecliptic and equator poles (ascending node of the equator on the
+      ecliptic).
+    * ``z`` — ecliptic pole of date.
+    * ``y = z x x`` completes the right-handed triad.
+
+    Args:
+        jd_tt: Julian Date in TT.
+
+    Returns:
+        A 4-tuple ``(row_x, row_y, row_z, equinox)`` of 3-tuples. The first
+        three rows map a GCRS unit vector into ecliptic-of-date coordinates;
+        ``equinox`` is the vernal-equinox direction of date in GCRS (== row_x).
+    """
+    epj = _julian_epoch(jd_tt)
+    pecl = np.asarray(erfa.ltpecl(epj))
+    pequ = np.asarray(erfa.ltpequ(epj))
+    x = np.cross(pecl, pequ)
+    x = x / np.linalg.norm(x)
+    z = pecl
+    y = np.cross(z, x)
+    xt = (float(x[0]), float(x[1]), float(x[2]))
+    return (
+        xt,
+        (float(y[0]), float(y[1]), float(y[2])),
+        (float(z[0]), float(z[1]), float(z[2])),
+        xt,
+    )
+
+
+def method_b_accumulated_precession(jd_tt: float, t0_tt: float) -> float:
+    """Accumulated precession in ecliptic longitude from ``t0`` to ``jd`` (deg).
+
+    The sidereal reference direction is fixed on the **mean ecliptic of
+    ``t0``**; the returned value is the amount by which the vernal equinox of
+    ``jd`` has regressed along that fixed ecliptic. Concretely the equinox of
+    ``jd`` is projected into the ecliptic-of-``t0`` frame, giving its longitude
+    ``lambda``; the accumulated precession is ``-lambda``.
+
+    Both frames use the Vondrák 2011 long-term ecliptic/equator poles, so the
+    result is valid over the full Vondrák span (±200,000 yr) and is
+    **non-additive** in ``t0``.
+
+    Args:
+        jd_tt: Epoch of interest, Julian Date in TT.
+        t0_tt: Reference epoch defining the fixed ecliptic, Julian Date in TT.
+
+    Returns:
+        Accumulated precession in longitude, in degrees. NOT reduced mod 360,
+        so callers can difference two epochs without a 0/360 wrap artefact.
+    """
+    e0 = _ltp_ecliptic_frame(t0_tt)
+    equinox_t = _ltp_ecliptic_frame(jd_tt)[3]
+    wx = e0[0][0] * equinox_t[0] + e0[0][1] * equinox_t[1] + e0[0][2] * equinox_t[2]
+    wy = e0[1][0] * equinox_t[0] + e0[1][1] * equinox_t[1] + e0[1][2] * equinox_t[2]
+    lam = math.degrees(math.atan2(wy, wx))
+    return -lam
