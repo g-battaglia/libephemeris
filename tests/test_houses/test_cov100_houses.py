@@ -1079,10 +1079,22 @@ def test_gauquelin_sector_rise_set_methods():
         assert 1.0 <= sector < 37.0
 
 
-def test_gauquelin_sector_rise_set_star_not_implemented():
-    """A star with methods 2-5 raises NotImplementedError (5582-5585)."""
-    with pytest.raises(NotImplementedError):
-        ephem.gauquelin_sector(JD, "Regulus", 2, (ROME_LON, ROME_LAT, 0.0))
+def test_gauquelin_sector_rise_set_star():
+    """A fixed star with methods 2-5 now computes real rise/set sectors.
+
+    rise_trans accepts star names, so _gauquelin_sector_from_rise_set handles
+    them like planets (previously this raised NotImplementedError).
+    """
+    for method in (2, 3, 4, 5):
+        sector = ephem.gauquelin_sector(
+            JD, "Regulus", method, (ROME_LON, ROME_LAT, 0.0)
+        )
+        assert 1.0 <= sector < 37.0
+    # Methods 2/4 (no refraction) and 3/5 (with refraction) agree within their
+    # respective refraction bands, and 2==4, 3==5.
+    m2 = ephem.gauquelin_sector(JD, "Regulus", 2, (ROME_LON, ROME_LAT, 0.0))
+    m4 = ephem.gauquelin_sector(JD, "Regulus", 4, (ROME_LON, ROME_LAT, 0.0))
+    assert abs(m2 - m4) < 1e-6
 
 
 def test_gauquelin_sector_default_pressure_temp():
@@ -1093,10 +1105,12 @@ def test_gauquelin_sector_default_pressure_temp():
     assert 1.0 <= sector < 37.0
 
 
-def test_gauquelin_sector_rise_set_circumpolar_fallback():
-    """A circumpolar planet at high latitude falls back to method 0."""
-    # Very high latitude makes the body circumpolar -> rise_trans returns -2.
-    sector = ephem.gauquelin_sector(
-        JD, ephem.MARS, 2, (ROME_LON, 89.0, 0.0)
-    )
-    assert 1.0 <= sector < 37.0
+def test_gauquelin_sector_rise_set_circumpolar_raises():
+    """A circumpolar planet at high latitude raises for methods 2-5.
+
+    Very high latitude makes the body circumpolar (rise_trans returns -2).
+    Matching the reference API, methods 2-5 then raise "rise or set not found"
+    rather than silently falling back to method 0.
+    """
+    with pytest.raises(ephem.Error, match="rise or set not found"):
+        ephem.gauquelin_sector(JD, ephem.MARS, 2, (ROME_LON, 89.0, 0.0))

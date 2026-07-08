@@ -90,7 +90,7 @@ from .constants import (
 )
 from .planets import calc_ut
 from .cache import get_cached_nutation
-from .exceptions import PolarCircleError, validate_coordinates
+from .exceptions import Error, PolarCircleError, validate_coordinates
 from .utils import difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
@@ -1902,12 +1902,20 @@ def houses_ex2(
     # time-derivative computed above, which by construction integrates to the
     # cusp's actual motion.
     if _hsys_code(hsys) in (ord("W"), ord("N"), ord("U")):
-        cs = [0.0] * len(cusps)
-        cs[0] = ascmc_speed[0]  # cusp 1  = Asc
-        cs[3] = ascmc_speed[1]  # cusp 4  = IC  -> MC rate
-        cs[6] = ascmc_speed[0]  # cusp 7  = Desc
-        cs[9] = ascmc_speed[1]  # cusp 10 = MC
-        cusps_speed = tuple(cs)
+        if _hsys_code(hsys) == ord("W") and (flags & FLG_SIDEREAL):
+            # Whole Sign in SIDEREAL mode is a special case in the reference:
+            # every cusp speed is reported as the Ascendant rate (not the
+            # angle-driven pattern below). Tropical W and systems N/U are
+            # unchanged. This mirrors the reference family-wide (verified
+            # against W tropical and N/E/D, which keep their own patterns).
+            cusps_speed = tuple(ascmc_speed[0] for _ in range(len(cusps)))
+        else:
+            cs = [0.0] * len(cusps)
+            cs[0] = ascmc_speed[0]  # cusp 1  = Asc
+            cs[3] = ascmc_speed[1]  # cusp 4  = IC  -> MC rate
+            cs[6] = ascmc_speed[0]  # cusp 7  = Desc
+            cs[9] = ascmc_speed[1]  # cusp 10 = MC
+            cusps_speed = tuple(cs)
     elif _hsys_code(hsys) == ord("O"):
         # Porphyry: the reference derives the intermediate cusp speeds from the
         # angle rates as v = v_mc + k*(v_asc - v_mc)/3 with k = 3,2,1,0 for cusps
@@ -5860,7 +5868,7 @@ def house_pos(
 
 def _gauquelin_sector_from_rise_set(
     jd: float,
-    planet: int,
+    planet: "int | str",
     lat: float,
     lon: float,
     altitude: float,
@@ -5877,7 +5885,8 @@ def _gauquelin_sector_from_rise_set(
 
     Args:
         jd: Julian Day in UT
-        planet: Planet ID
+        planet: Planet ID (int) or fixed-star name (str); rise_trans accepts
+            both.
         lat, lon: Observer location
         altitude, pressure, temperature: Atmospheric parameters
         flags: Calculation flags
@@ -5886,6 +5895,10 @@ def _gauquelin_sector_from_rise_set(
 
     Returns:
         Sector position in range [1, 37)
+
+    Raises:
+        Error: If the body never rises or sets at the given latitude
+            (circumpolar), matching the reference "rise or set not found".
     """
     from .eclipse import rise_trans
     from .constants import (
@@ -5895,11 +5908,16 @@ def _gauquelin_sector_from_rise_set(
         BIT_NO_REFRACTION,
     )
 
-    def fallback() -> float:
-        """Fall back to method 0 (hour angle approximation)."""
-        return _gauquelin_sector_pythonic(
-            jd, planet, lat, lon, altitude, pressure, temperature, flags, 0
-        )
+    def _rise_set_not_found() -> Error:
+        """No rise/set event exists (circumpolar / never-rises body).
+
+        Methods 2-5 are defined only from real rise/set times, so — matching
+        the reference API, which reports "rise or set not found" here rather
+        than silently substituting a different method — signal the caller with
+        a compatible error instead of falling back to the method-0 hour-angle
+        approximation.
+        """
+        return Error(f"gauquelin_sector: rise or set not found for planet {planet}")
 
     # Determine rise_trans flags based on method
     rsmi_flags = 0
@@ -5928,7 +5946,7 @@ def _gauquelin_sector_from_rise_set(
             flags,
         )
         if retflag == -2:
-            return fallback()  # Circumpolar
+            raise _rise_set_not_found()  # Circumpolar
         jd_next_rise = tret[0]
 
         # Find next set after jd
@@ -5942,7 +5960,7 @@ def _gauquelin_sector_from_rise_set(
             flags,
         )
         if retflag == -2:
-            return fallback()  # Circumpolar
+            raise _rise_set_not_found()  # Circumpolar
         jd_next_set = tret[0]
 
         # Find previous rise before jd by searching before the next rise
@@ -5958,7 +5976,7 @@ def _gauquelin_sector_from_rise_set(
             flags,
         )
         if retflag == -2:
-            return fallback()
+            raise _rise_set_not_found()
         jd_prev_rise = tret[0]
         # Verify this rise is actually before jd
         if jd_prev_rise >= jd:
@@ -5974,7 +5992,7 @@ def _gauquelin_sector_from_rise_set(
             )
             jd_prev_rise = tret[0]
             if retflag == -2 or jd_prev_rise >= jd:
-                return fallback()
+                raise _rise_set_not_found()
 
         # Find previous set before jd by searching before the next set
         retflag, tret = rise_trans(
@@ -5987,7 +6005,7 @@ def _gauquelin_sector_from_rise_set(
             flags,
         )
         if retflag == -2:
-            return fallback()
+            raise _rise_set_not_found()
         jd_prev_set = tret[0]
         # Verify this set is actually before jd
         if jd_prev_set >= jd:
@@ -6003,10 +6021,10 @@ def _gauquelin_sector_from_rise_set(
             )
             jd_prev_set = tret[0]
             if retflag == -2 or jd_prev_set >= jd:
-                return fallback()
+                raise _rise_set_not_found()
 
     except (IndexError, TypeError, ValueError, ArithmeticError):
-        return fallback()
+        raise _rise_set_not_found()
 
     # Determine if planet is above or below horizon:
     # If the most recent event before jd was a rise, planet is above horizon.
@@ -6016,7 +6034,7 @@ def _gauquelin_sector_from_rise_set(
         # Diurnal arc runs from jd_prev_rise to jd_next_set
         diurnal_arc = jd_next_set - jd_prev_rise
         if diurnal_arc <= 0:
-            return fallback()
+            raise _rise_set_not_found()
 
         elapsed = jd - jd_prev_rise
         fraction = elapsed / diurnal_arc
@@ -6030,7 +6048,7 @@ def _gauquelin_sector_from_rise_set(
         # Nocturnal arc runs from jd_prev_set to jd_next_rise
         nocturnal_arc = jd_next_rise - jd_prev_set
         if nocturnal_arc <= 0:
-            return fallback()
+            raise _rise_set_not_found()
 
         elapsed = jd - jd_prev_set
         fraction = elapsed / nocturnal_arc
@@ -6099,21 +6117,22 @@ def _gauquelin_sector_pythonic(
     Note:
         Methods 2-5 use actual rise/set times calculated via rise_trans().
         These methods may be slower than methods 0-1 but provide more
-        accurate sector positions based on real rise/set events.
+        accurate sector positions based on real rise/set events. A star name
+        (str) is accepted for these methods as well as a planet id.
 
         For circumpolar objects (that never rise or set at the given
-        latitude), methods 2-5 fall back to method 0.
+        latitude), methods 2-5 raise an Error ("rise or set not found"),
+        matching the reference API, rather than silently falling back to
+        method 0.
 
     Example:
         >>> sector = _gauquelin_sector_pythonic(2451545.0, MARS, 48.85, 2.35)
         >>> print(f"Mars is in sector {int(sector)}")
     """
-    # Methods 2-5: Use actual rise/set times
+    # Methods 2-5: Use actual rise/set times. rise_trans accepts a star name
+    # (str) as well as a planet id, so _gauquelin_sector_from_rise_set handles
+    # both — no need to special-case stars here.
     if method in (2, 3, 4, 5):
-        if isinstance(planet, str):
-            raise NotImplementedError(
-                "Star names are not supported with methods 2-5 for _gauquelin_sector_pythonic"
-            )
         return _gauquelin_sector_from_rise_set(
             jd, planet, lat, lon, altitude, pressure, temperature, flags, method
         )
