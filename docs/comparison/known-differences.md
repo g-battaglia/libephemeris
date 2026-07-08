@@ -571,7 +571,27 @@ measurement disproved it. See `intentional-divergences.md` §9 (resolved).
 ### 11. Crossing functions
 
 `solcross_ut`, `mooncross_ut`: typically < 1 s. `mooncross_node_ut`: up to ~69 s
-from different lunar-node calculation methods.
+from different lunar-node calculation methods (libephemeris solves ecliptic
+latitude == 0; the reference solves Moon-longitude == node-longitude).
+
+**Far-target heliocentric Pluto crossings — reference can skip a full period.**
+For distant heliocentric-longitude targets of Pluto, the reference occasionally
+returns a crossing one full orbital period (~248 yr) *later* than the true
+nearest crossing, apparently seeding its search past the first crossing.
+libephemeris returns the true nearest crossing. Measured on a 10 080-case
+heliocentric sweep, this affected 20 cases. Example: `helio_cross_ut(PLUTO,
+29.999°, JD 2501718.0)` — libephemeris returns JD 2576051.8 (year 2341, the
+nearest crossing), while the reference returns JD 2665412.6 (year 2585, one
+period late). Both endpoints are genuine crossings (heliocentric longitude =
+29.999° at each, confirmed by both engines); they simply differ in *which*
+crossing is reported. libephemeris's `cross_ut`/`helio_cross_ut` honour the
+documented "first crossing at or after the start" contract.
+
+**Pluto crossing time offset.** Independently of the above, Pluto crossing
+*instants* carry a residual offset of up to ~375 s versus the reference. This is
+the ephemeris-source floor (DE440/DE441 vs the reference's `.se1`/DE431 Pluto),
+not a solver difference — it reflects the small underlying position difference
+propagated through the crossing's shallow longitude rate.
 
 ### 12. Asteroid pipeline (`AST_OFFSET`)
 
