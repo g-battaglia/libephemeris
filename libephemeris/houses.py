@@ -1885,6 +1885,14 @@ def houses_ex2(
             d -= 360.0
         elif d < -180.0:
             d += 360.0
+        # A change larger than 90 deg across the ±2 s window cannot be smooth
+        # motion (it would be a rate above ~3.9e6 deg/day); it is a genuine
+        # jump of the angle -- e.g. the Vertex flipping between the equinoxes
+        # at lat 0 when the ARMC crosses 0/180 deg. No derivative exists there
+        # and the reference API reports 0.0 for such angles. Mirrors fd_speed
+        # in houses_armc_ex2 (see its docstring).
+        if abs(d) > 90.0:
+            return 0.0
         return d / (2.0 * _DT_DAYS)
 
     cusps_speed = tuple(_rate(cusps_plus[i], cusps_minus[i]) for i in range(len(cusps)))
