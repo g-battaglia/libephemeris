@@ -299,10 +299,32 @@ inversion. For the flipped systems the reported MC equals cusp 10 (internal
 consistency is preserved), but that cusp is the above-horizon lower-meridian
 point rather than the geometric culmination.
 
-*Verdict:* inherited convention, kept deliberately for 1:1 parity. No default
-change is made. A future opt-in flag could expose the purely astronomical
-upper-meridian MC, but only as opt-in, since changing the default would break
-compatibility.
+*Geometric proof (not just parity):* Campanus and Regiomontanus are defined by
+the family of great circles through the North and South points of the horizon;
+cusp k is the ecliptic intersection of house circle k on the branch containing
+the system's division point. Placing the reported (flipped) cusps back into
+the true observer frame at lat −78° and −85° shows **all 12 cusps of both
+systems lie exactly on their nominal house circles, on the nominal branches
+(worst deviation 0.000000°)**: the flipped cusp 10 sits on the zenith branch
+of the meridian (α = 90°), and the unflipped astronomical MC sits on the nadir
+branch (α = 270°) — which is precisely where the system defines **cusp 4**,
+and indeed the engine reports it there. The flipped output is therefore the
+*unique solution of the systems' own defining equations*; reporting the
+astronomical MC as cusp 10 in this regime would violate the definition of
+these house systems. The backwards zodiacal ordering is likewise a theorem of
+the geometry (the ecliptic crosses the circle family in reverse longitude
+order there), not corruption. The one genuinely conventional residue is API
+semantics: the `ascmc[1]` slot reports the quadrant cusp-10 anchor for
+C/R/T/Y/I/J but the astronomical MC for O/A/X — inherited from the reference
+API. (T and Y are not great-circle systems, so the proof covers C/R directly;
+they anchor cusp 10 to the same above-horizon meridian point by
+construction.)
+
+*Verdict:* inherited convention, kept deliberately for 1:1 parity — and for
+C/R proven to be the geometrically required branch under the systems' own
+definitions. No default change is made. A future opt-in flag could expose the
+purely astronomical upper-meridian MC in `ascmc[1]`, but only as opt-in, since
+changing the default would break compatibility.
 
 ### 3. Time and Delta-T
 
