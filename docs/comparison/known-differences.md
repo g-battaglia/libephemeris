@@ -257,6 +257,53 @@ from a C `tan(90°)` artifact while the mathematical limit is 180°.
 **Alcabitius (B)**, **Koch (K)**, **Topocentric (T)** from different cusp
 interpolation algorithms.
 
+**2.4 MC "flip" for quadrant house systems inside the polar circle (parity
+behavior, not a divergence).** At latitudes inside the polar circle where the
+culminating point of the ecliptic is below the horizon, the quadrant house
+systems **Regiomontanus (R), Campanus (C), Polich-Page/Topocentric (T), APC
+(Y), Sunshine (I)** and **Savard-A (J)** return an MC that is 180° away from
+the classical astronomical Midheaven, together with cusps whose consecutive
+gaps run backwards (they sum to 3960° instead of 360°). The
+ecliptic-proportional systems **Porphyry (O), Equal-from-MC (A), Meridian (X)**
+do NOT flip and return the raw upper-meridian MC; **Placidus (P)** and **Koch
+(K)** are undefined inside the polar circle and raise an error. All of this
+exactly matches the reference API (0 mismatches over an 800-case
+ARMC × latitude × system grid; every value in GitHub issue #46's reproduction
+is reproduced by the reference API to the 6th decimal, including the onset
+between −66.5° and −67°, the T-system gap sum of 1080° at the −66° boundary,
+and the Sunshine `I` cusp collapse under a circumpolar Sun in *both*
+hemispheres while its sibling `i` raises).
+
+*Why:* the astronomical MC is the intersection of the ecliptic with the
+*upper* meridian, i.e. the ecliptic point whose right ascension equals the
+ARMC (`MC = atan2(tan(ARMC), cos(ε))`, upper-meridian branch). Inside the
+polar circle that point can be circumpolar-below: its upper-transit altitude
+`90° − |lat − δ_MC|` is negative (with `δ_MC = atan(sin(ARMC)·tan(ε))`). For
+quadrant systems the reference API adopts the convention that the MC must be
+the meridian∩ecliptic intersection *above the horizon*; when the upper-meridian
+point is below it, the convention switches to the opposite branch
+(`RA = ARMC + 180°`), which is geometrically the **IC** (lower-meridian,
+anti-culmination point) but is the one above the horizon. Worked example at
+lat = −85°, ARMC = 45°, ε = 23.44°:
+
+| point               | ecliptic lon | RA   | δ       | meridian | altitude |
+|---------------------|--------------|------|---------|----------|----------|
+| raw MC (O/A/X)      | 47.464°      | 45°  | +17.04° | upper    | −12.04°  |
+| flipped (C/R/T/Y/I) | 227.464°     | 225° | −17.04° | lower    | +12.04°  |
+
+The two are exactly 180° apart. The flip touches the MC and cusp 10 only; the
+Ascendant is computed independently from the unflipped ARMC and
+hemisphere-corrected to the eastern horizon, so it is identical across all
+house systems and unaffected by the flip — there is no associated ASC/DSC
+inversion. For the flipped systems the reported MC equals cusp 10 (internal
+consistency is preserved), but that cusp is the above-horizon lower-meridian
+point rather than the geometric culmination.
+
+*Verdict:* inherited convention, kept deliberately for 1:1 parity. No default
+change is made. A future opt-in flag could expose the purely astronomical
+upper-meridian MC, but only as opt-in, since changing the default would break
+compatibility.
+
 ### 3. Time and Delta-T
 
 **3.1 ΔT model.** See [Part A §2.3](#23-delta-t). Modern dates < 0.001 s;
