@@ -639,7 +639,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.0.0rc2"
+__version__ = "3.0.0rc3"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "Apache-2.0"

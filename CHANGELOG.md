@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc3] - 2026-07-08
+
 ### Added
 
 - **Exotic minor bodies precomputed into the LEB binary ephemeris.** ~31 centaurs,
@@ -1949,11 +1951,6 @@ precomputed ephemeris data directly inside the PyPI wheel (~10.6 MB for core bod
 ### Fixed
 
 - Updated `test_degree_range` test to accept degree 7 (Uranian optimized params)
-
-## [Unreleased]
-
-### Fixed
-
 - Fixed Asellus Borealis HIP number in `STAR_NAME_TO_HIP` dict (43103=Iota Cnc → 42806=Gamma Cnc)
 - Fixed `test_strict_precision.py` fixture to disable LEB fast path and SPK auto-download so `SPKRequiredError` is properly raised
 - Fixed `test_spk.py` download logging tests to patch `_is_valid_bsp` for mock SPK data validation
