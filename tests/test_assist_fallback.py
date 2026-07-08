@@ -50,17 +50,26 @@ class MockPropagationResult:
 
 @pytest.fixture(autouse=True)
 def cleanup():
-    """Reset state before and after each test."""
+    """Reset state before and after each test.
+
+    These tests exercise the SPK -> ASSIST -> Keplerian fallback chain in
+    the Skyfield calc path. The exotic bodies (Sedna included) are now
+    served by the precomputed LEB ephemeris in "leb"/"auto" mode, which
+    bypasses that chain entirely — so force the Skyfield path for the
+    duration of each test.
+    """
     from libephemeris.rebound_integration import reset_assist_data_cache
 
     state._SPK_BODY_MAP.clear()
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
+    eph.set_calc_mode("skyfield")
     reset_assist_data_cache()
     yield
     state._SPK_BODY_MAP.clear()
     eph.set_strict_precision(None)
     eph.set_auto_spk_download(None)
+    eph.set_calc_mode(None)
     reset_assist_data_cache()
 
 

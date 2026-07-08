@@ -45,6 +45,36 @@ def entries_by_type(entries: list[dict], entry_type: str) -> list[dict]:
     return [e for e in entries if e["type"] == entry_type]
 
 
+@pytest.fixture
+def production_leb_source(monkeypatch):
+    """Pin the production-default LEB source for 1e-8-tight comparisons.
+
+    The golden file is generated against the auto-discovered LEB source (the
+    LEB2 set a default install uses). Equivalent-but-distinct sources — e.g.
+    the merged LEB1 file the LEB test runner pins via LIBEPHEMERIS_LEB — are
+    only guaranteed to agree within the LEB2 error budget (<0.001"), which
+    exceeds the 1e-8 deg golden tolerance. So force auto-discovery here,
+    regardless of the runner's environment:
+
+    - drop the LIBEPHEMERIS_LEB pin (monkeypatch restores it afterwards);
+    - clear the cached reader/file so discovery re-resolves;
+    - set_calc_mode("auto") programmatically because
+      test_cross_validation_astropy.py poisons LIBEPHEMERIS_MODE at
+      module-import time (before xdist forks workers).
+    """
+    from libephemeris import state
+
+    monkeypatch.delenv("LIBEPHEMERIS_LEB", raising=False)
+    state.set_calc_mode("auto")
+    state._LEB_FILE = None
+    state._LEB_READER = None
+    yield
+    # Force re-resolution from the (restored) environment for later tests
+    # on this xdist worker.
+    state._LEB_FILE = None
+    state._LEB_READER = None
+
+
 class TestGoldenCalcUt:
     """§7.1 Golden file regression for calc_ut results."""
 
@@ -55,21 +85,10 @@ class TestGoldenCalcUt:
             f"Expected >=96 calc_ut entries, got {len(calc_entries)}"
         )
 
-    def test_calc_ut_positions_match(self, golden_entries: list[dict]) -> None:
+    def test_calc_ut_positions_match(
+        self, golden_entries: list[dict], production_leb_source
+    ) -> None:
         """All calc_ut positions must match golden values within tolerance."""
-        # Ensure LEB mode is active — golden values were generated with the
-        # LEB engine.  A preceding test on this xdist worker may have called
-        # close() or popped env vars, causing fallback to Skyfield which
-        # produces slightly different speeds (~3e-5 diff, exceeding 1e-8 tol).
-        #
-        # Note: os.environ["LIBEPHEMERIS_MODE"] is poisoned to "skyfield" by
-        # test_cross_validation_astropy.py at module-level import time (before
-        # xdist forks workers), so we must use the programmatic API which
-        # takes priority over the env var in get_calc_mode().
-        from libephemeris import state
-
-        state.set_calc_mode("auto")  # programmatic override; ignores env var
-        state._LEB_READER = None  # force reader re-creation from env/discovery
 
         calc_entries = entries_by_type(golden_entries, "calc_ut")
         mismatches = []
@@ -142,14 +161,10 @@ class TestGoldenHouses:
 class TestGoldenSidereal:
     """§7.1 Golden file regression for sidereal calculations."""
 
-    def test_sidereal_match(self, golden_entries: list[dict]) -> None:
+    def test_sidereal_match(
+        self, golden_entries: list[dict], production_leb_source
+    ) -> None:
         """Sidereal positions must match golden values."""
-        # Ensure LEB mode is active — golden values were generated with the
-        # LEB engine.  See test_calc_ut_positions_match for full rationale.
-        from libephemeris import state
-
-        state.set_calc_mode("auto")  # programmatic override; ignores env var
-        state._LEB_READER = None  # force reader re-creation from env/discovery
 
         sid_entries = entries_by_type(golden_entries, "sidereal")
         mismatches = []
