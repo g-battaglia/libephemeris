@@ -612,9 +612,21 @@ measurement disproved it. See `intentional-divergences.md` §9 (resolved).
 
 ### 11. Crossing functions
 
-`solcross_ut`, `mooncross_ut`: typically < 1 s. `mooncross_node_ut`: up to ~69 s
-from different lunar-node calculation methods (libephemeris solves ecliptic
-latitude == 0; the reference solves Moon-longitude == node-longitude).
+`solcross_ut`, `mooncross_ut`: typically < 1 s.
+
+**`mooncross_node_ut` — a reference-side return-frame artifact, not a node-method
+difference.** The gap versus the reference equals ΔT and grows with epoch:
+~64.7 s @2005, ~292 s @1500, ~1421 s @2559 (measured, forward search). It is
+*not* two different node definitions (ecliptic latitude == 0 vs. Moon-longitude
+== node-longitude): both engines solve the *same* node crossing. Read the
+reference's returned instant as ET/TT and the Moon sits exactly on the node
+(ecliptic latitude ≈ 0.0″); read that *same* instant as UT and the Moon is ΔT of
+time away from the node (latitude ≈ −3.2″ @2005, −16.8″ @1500, −49.4″ @2559). In
+other words the reference enters the search in UT, solves the crossing, then
+returns the ET/TT instant of that crossing rather than converting back to UT.
+libephemeris returns the true UT instant of the same crossing and is
+self-consistent: `calc_ut` at the returned JD gives ecliptic latitude ≈ 0. The
+two results therefore differ by exactly ΔT at the crossing epoch.
 
 **Far-target heliocentric Pluto crossings — reference can skip a full period.**
 For distant heliocentric-longitude targets of Pluto, the reference occasionally
@@ -622,7 +634,7 @@ returns a crossing one full orbital period (~248 yr) *later* than the true
 nearest crossing, apparently seeding its search past the first crossing.
 libephemeris returns the true nearest crossing. Measured on a 10 080-case
 heliocentric sweep, this affected 20 cases. Example: `helio_cross_ut(PLUTO,
-29.999°, JD 2501718.0)` — libephemeris returns JD 2576051.8 (year 2341, the
+29.999°, JD 2501718.0)` — libephemeris returns JD 2576051.8 (year 2340, the
 nearest crossing), while the reference returns JD 2665412.6 (year 2585, one
 period late). Both endpoints are genuine crossings (heliocentric longitude =
 29.999° at each, confirmed by both engines); they simply differ in *which*
