@@ -492,7 +492,14 @@ version). **14.2 `contrib` attribute** is not exposed by libephemeris. **14.3 `d
 with negative values** differs due to unsigned-integer overflow in the C
 implementation vs Python integers. **14.4 `FLG_MOSEPH`** is accepted for API
 compatibility but ignored — every calculation uses JPL DE440/DE441 via Skyfield,
-with no Moshier fallback.
+with no Moshier fallback. **14.5 `split_deg` with `SPLIT_DEG_NAKSHATRA |
+SPLIT_DEG_ROUND_MIN`** returns the seconds field one arcsecond low (29 vs 30)
+at a mathematically-exact nakshatra boundary (multiples of 13°20′: 40°, 160°,
+200°…): the nakshatra width 360/27 is irrational in IEEE-754, so re-reducing
+the rounded value reintroduces a sub-ULP deficit that truncates 29.9999″ to
+29″. It is cosmetic (the minute/degree/nakshatra fields and the carry are all
+correct) and unreachable with real ecliptic longitudes; the code keeps the
+reduction that protects the far more common `90° + ROUND_MIN` case instead.
 
 ### 15. Gauquelin sectors
 
