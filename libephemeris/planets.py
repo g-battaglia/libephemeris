@@ -4840,22 +4840,29 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
         elif sid_mode == SIDM_GALCENT_0SAG:
             # Galactic Center at 0° Sagittarius (240° ecliptic longitude).
-            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
-            # Reference epoch value 26.84604585° and precession rate 1.39684523°/century
-            # correspond to IAU precession (50.2864"/year) anchored at J2000.
+            # Full IAU 2006 general-precession polynomial, same as mode 34.
             ayan_t0_galcent_0sag = 26.84604585
-            prec_rate = 1.39684523  # degrees per century
-            val = ayan_t0_galcent_0sag + prec_rate * T
+            prec_arcsec = (
+                _PREC_C1 * T
+                + _PREC_C2 * T**2
+                + _PREC_C3 * T**3
+                + _PREC_C4 * T**4
+                + _PREC_C5 * T**5
+            )
+            val = ayan_t0_galcent_0sag + prec_arcsec / 3600.0
 
         elif sid_mode == SIDM_GALCENT_RGILBRAND:
             # Gil Brand: Galactic Center at golden section between Scorpio and Aquarius.
-            # Target sidereal position: 4°22'16.7" Sagittarius = 244.371297°
-            # (Golden section: 90° × 0.618034 = 55.623° from 0° Leo = 210.377° from 0° Aries)
-            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
-            # Reference epoch value 22.46910483° at J2000; standard IAU precession rate.
+            # Full IAU 2006 general-precession polynomial.
             ayan_t0_rgilbrand = 22.46910483
-            prec_rate = 1.39684523  # degrees per century
-            val = ayan_t0_rgilbrand + prec_rate * T
+            prec_arcsec = (
+                _PREC_C1 * T
+                + _PREC_C2 * T**2
+                + _PREC_C3 * T**3
+                + _PREC_C4 * T**4
+                + _PREC_C5 * T**5
+            )
+            val = ayan_t0_rgilbrand + prec_arcsec / 3600.0
 
         elif sid_mode == SIDM_GALEQU_IAU1958:
             # Galactic Equator (IAU 1958 definition).
@@ -4932,11 +4939,16 @@ def _calc_ayanamsa(tjd_ut: float, sid_mode: int) -> float:
 
         elif sid_mode == SIDM_GALCENT_COCHRANE:
             # Galactic Center at 0° Capricorn (David Cochrane).
-            # Same as GALCENT_0SAG shifted by 30°: ayan_t0 = 26.846° - 30° ≡ 356.846° (mod 360).
-            # Linear formula: ayan = ayan_t0 + rate * T, T in Julian centuries from J2000.
+            # Same as GALCENT_0SAG shifted by 30°. Full IAU 2006 polynomial.
             ayan_t0_cochrane = 356.84604585
-            prec_rate = 1.39684523  # degrees per century
-            val = ayan_t0_cochrane + prec_rate * T
+            prec_arcsec = (
+                _PREC_C1 * T
+                + _PREC_C2 * T**2
+                + _PREC_C3 * T**3
+                + _PREC_C4 * T**4
+                + _PREC_C5 * T**5
+            )
+            val = ayan_t0_cochrane + prec_arcsec / 3600.0
 
         elif sid_mode == SIDM_J2000:
             # J2000 Ayanamsha

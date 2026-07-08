@@ -11410,12 +11410,11 @@ def calc_eclipse_northern_limit(
                 lat = math.degrees(math.asin(sin_lat))
 
                 # For longitude, use the hour angle and x displacement
-                if abs(cos_d) > 0.001:
-                    cos_lat = math.cos(math.radians(lat))
-                    if cos_lat > 0.001:
-                        lon_offset = math.degrees(math.atan2(x, z_factor * cos_d))
-                    else:
-                        lon_offset = 0.0
+                cos_lat = math.cos(math.radians(lat))
+                if cos_lat > 0.001:
+                    lon_offset = math.degrees(
+                        math.atan2(x, z_factor * cos_d - y_north * sin_d)
+                    )
                 else:
                     lon_offset = 0.0
 
@@ -11604,12 +11603,11 @@ def calc_eclipse_southern_limit(
                 lat = math.degrees(math.asin(sin_lat))
 
                 # For longitude, use the hour angle and x displacement
-                if abs(cos_d) > 0.001:
-                    cos_lat = math.cos(math.radians(lat))
-                    if cos_lat > 0.001:
-                        lon_offset = math.degrees(math.atan2(x, z_factor * cos_d))
-                    else:
-                        lon_offset = 0.0
+                cos_lat = math.cos(math.radians(lat))
+                if cos_lat > 0.001:
+                    lon_offset = math.degrees(
+                        math.atan2(x, z_factor * cos_d - y_south * sin_d)
+                    )
                 else:
                     lon_offset = 0.0
 

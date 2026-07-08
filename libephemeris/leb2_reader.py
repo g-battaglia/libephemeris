@@ -387,7 +387,8 @@ class LEB2Reader:
         Raises:
             ValueError: If the reader has been closed.
         """
-        if self._mm is None:
+        mm = self._mm
+        if mm is None:
             raise ValueError("LEB2 reader is closed")
 
         ranges: list[tuple[int, int]] = []
@@ -398,15 +399,12 @@ class LEB2Reader:
                         continue
                     ranges.append((chunk.blob_offset, chunk.compressed_size))
         else:
-            # v1 non-chunked: the body data is a single compressed blob,
-            # so we cannot target individual segments within it.  Warm the
-            # entire blob if the body's JD range overlaps.
             for entry in self._bodies.values():
                 if entry.jd_end < jd_start or entry.jd_start > jd_end:
                     continue
                 ranges.append((entry.data_offset, entry.compressed_size))
 
-        _madvise_ranges(self._mm, ranges)
+        _madvise_ranges(mm, ranges)
 
     def cool(self) -> None:
         """Advise the kernel that mmap pages can be reclaimed.

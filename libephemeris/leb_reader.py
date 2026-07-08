@@ -315,7 +315,8 @@ class LEBReader:
         Raises:
             ValueError: If the reader has been closed.
         """
-        if self._mm is None:
+        mm = self._mm
+        if mm is None:
             raise ValueError("LEB reader is closed")
 
         ranges: list[tuple[int, int]] = []
@@ -334,7 +335,7 @@ class LEBReader:
             size = (last_seg - first_seg + 1) * seg_bytes
             ranges.append((offset, size))
 
-        _madvise_ranges(self._mm, ranges)
+        _madvise_ranges(mm, ranges)
 
     def cool(self) -> None:
         """Advise the kernel that mmap pages can be reclaimed.
