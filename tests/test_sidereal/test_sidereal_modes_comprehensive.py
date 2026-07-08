@@ -361,3 +361,97 @@ class TestAyanamshaExUt:
         assert abs(ayan_simple - ayan_ex_nonut) < 1e-10, (
             f"{name}: simple {ayan_simple} vs ex(NONUT) {ayan_ex_nonut}"
         )
+
+
+# The 12 star/galactic "calculated" modes for which the reference API drops
+# FLG_NONUT from the echoed return flag of get_ayanamsa_ex[_ut].
+_CALC_MODES_DROP_NONUT = [
+    SIDM_GALCENT_0SAG,
+    SIDM_TRUE_CITRA,
+    SIDM_TRUE_REVATI,
+    SIDM_TRUE_PUSHYA,
+    SIDM_GALCENT_RGILBRAND,
+    SIDM_GALEQU_IAU1958,
+    SIDM_GALEQU_TRUE,
+    SIDM_GALEQU_MULA,
+    SIDM_TRUE_MULA,
+    SIDM_GALCENT_MULA_WILHELM,
+    SIDM_TRUE_SHEORAN,
+    SIDM_GALCENT_COCHRANE,
+]
+
+
+class TestAyanamsaExRetflagNonut:
+    """get_ayanamsa_ex[_ut] retflag echoes FLG_NONUT per the reference API.
+
+    Formula-based modes echo the input FLG_NONUT bit (0 -> 2, NONUT -> 66),
+    while the star/galactic "calculated" modes drop it (NONUT -> 2). The
+    ayanamsha value is identical either way; only the return flag differs.
+    """
+
+    _JD = 2451545.0
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", _CALC_MODES_DROP_NONUT)
+    def test_calculated_modes_drop_nonut(self, mode: int):
+        swe.set_sid_mode(mode)
+        rf_et, v_et = swe.get_ayanamsa_ex(self._JD, swe.FLG_NONUT)
+        rf_ut, v_ut = swe.get_ayanamsa_ex_ut(self._JD, swe.FLG_NONUT)
+        # NONUT input, but the retflag reports FLG_SWIEPH only (2).
+        assert rf_et == swe.FLG_SWIEPH, f"mode {mode}: ET retflag {rf_et} != 2"
+        assert rf_ut == swe.FLG_SWIEPH, f"mode {mode}: UT retflag {rf_ut} != 2"
+        # Value is unaffected: identical to the plain-NONUT flag path value.
+        assert math.isfinite(v_et) and math.isfinite(v_ut)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "mode",
+        [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_GALALIGN_MARDYKS, SIDM_VALENS_MOON],
+    )
+    def test_formula_modes_keep_nonut(self, mode: int):
+        swe.set_sid_mode(mode)
+        rf_et, _ = swe.get_ayanamsa_ex(self._JD, swe.FLG_NONUT)
+        rf_ut, _ = swe.get_ayanamsa_ex_ut(self._JD, swe.FLG_NONUT)
+        expected = swe.FLG_NONUT | swe.FLG_SWIEPH  # 66
+        assert rf_et == expected, f"mode {mode}: ET retflag {rf_et} != {expected}"
+        assert rf_ut == expected, f"mode {mode}: UT retflag {rf_ut} != {expected}"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", _CALC_MODES_DROP_NONUT)
+    def test_zero_flag_retflag_is_swieph(self, mode: int):
+        # Without NONUT input, every mode reports FLG_SWIEPH (2).
+        swe.set_sid_mode(mode)
+        assert swe.get_ayanamsa_ex(self._JD, 0)[0] == swe.FLG_SWIEPH
+        assert swe.get_ayanamsa_ex_ut(self._JD, 0)[0] == swe.FLG_SWIEPH
+
+
+class TestAyanamsaStarModeOutOfRange:
+    """Star/galactic ayanamsha modes raise the typed EphemerisRangeError.
+
+    Out-of-tier epochs must surface libephemeris.exceptions.EphemerisRangeError
+    (as calc_ut/fixstar do), not the raw skyfield.errors.EphemerisRangeError.
+    """
+
+    # Star-anchored calculated modes reach the Skyfield star pipeline; the
+    # formula-only calculated modes (17/30/36/40) never touch the ephemeris.
+    _STAR_MODES = [
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_GALEQU_IAU1958,
+        SIDM_GALEQU_TRUE,
+        SIDM_GALEQU_MULA,
+        SIDM_TRUE_MULA,
+        SIDM_TRUE_SHEORAN,
+    ]
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("mode", _STAR_MODES)
+    @pytest.mark.parametrize("year", [1200, 2900])
+    def test_out_of_range_raises_typed_error(self, mode: int, year: int):
+        from libephemeris.exceptions import EphemerisRangeError
+
+        swe.set_sid_mode(mode)
+        jd = swe.julday(year, 1, 1, 0.0)
+        with pytest.raises(EphemerisRangeError):
+            swe.get_ayanamsa_ut(jd)

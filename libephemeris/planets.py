@@ -4439,7 +4439,14 @@ def _get_star_position_ecliptic(
             geometric,
         )
 
-    y0, y1, y2 = _node(base), _node(base + h), _node(base + 2.0 * h)
+    try:
+        y0, y1, y2 = _node(base), _node(base + h), _node(base + 2.0 * h)
+    except _RANGE_ERRORS as e:
+        # The Skyfield star pipeline (earth.at().observe()) raises the raw
+        # skyfield range error when the epoch is outside the active tier.
+        # Translate to our typed EphemerisRangeError so the star/galactic
+        # ayanamsha modes surface the same exception as calc_ut/fixstar.
+        raise _wrap_ephemeris_range_error(e, tjd_tt) from e
     # Unwrap around y1 so the quadratic never crosses the 0/360 seam
     y0 += (y1 - y0 + 180.0) % 360.0 - 180.0 - (y1 - y0)
     y2 += (y1 - y2 + 180.0) % 360.0 - 180.0 - (y1 - y2)
@@ -5318,6 +5325,42 @@ def get_ayanamsa(tjdet: float) -> float:
     return get_ayanamsa_ut(tjd_ut)
 
 
+# Sidereal modes the reference API treats as "calculated" (star/galactic
+# anchored). For these, get_ayanamsa_ex[_ut] DROPS FLG_NONUT from the echoed
+# return flag (returns FLG_SWIEPH only), whereas the formula-based modes echo
+# the input FLG_NONUT bit. Only the retflag is affected; the ayanamsha VALUE
+# is identical either way.
+_AYANAMSA_EX_NONUT_DROP_MODES = frozenset(
+    {
+        SIDM_GALCENT_0SAG,
+        SIDM_TRUE_CITRA,
+        SIDM_TRUE_REVATI,
+        SIDM_TRUE_PUSHYA,
+        SIDM_GALCENT_RGILBRAND,
+        SIDM_GALEQU_IAU1958,
+        SIDM_GALEQU_TRUE,
+        SIDM_GALEQU_MULA,
+        SIDM_TRUE_MULA,
+        SIDM_GALCENT_MULA_WILHELM,
+        SIDM_TRUE_SHEORAN,
+        SIDM_GALCENT_COCHRANE,
+    }
+)
+
+
+def _ayanamsa_ex_retflag(flags: int, sid_mode: int) -> int:
+    """Echoed return flag for get_ayanamsa_ex[_ut].
+
+    Adds FLG_SWIEPH (reference default), then strips FLG_NONUT for the
+    star/galactic "calculated" modes to match the reference API, which does
+    not report FLG_NONUT for those modes.
+    """
+    retflag = flags | FLG_SWIEPH
+    if sid_mode in _AYANAMSA_EX_NONUT_DROP_MODES:
+        retflag &= ~FLG_NONUT
+    return retflag
+
+
 def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     """
     Calculate ayanamsa with extended flags for Ephemeris Time.
@@ -5347,8 +5390,9 @@ def get_ayanamsa_ex(tjdet: float, flags: int = 0) -> Tuple[int, float]:
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjdet, sid_mode, flags)
     # retflag echoes the input flags with FLG_SWIEPH added (reference
-    # behaviour: 0 -> 2, FLG_NONUT -> 66).
-    return (flags | FLG_SWIEPH, float(ayanamsa))
+    # behaviour: 0 -> 2, FLG_NONUT -> 66), except the star/galactic
+    # "calculated" modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2).
+    return (_ayanamsa_ex_retflag(flags, sid_mode), float(ayanamsa))
 
 
 def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
@@ -5383,8 +5427,9 @@ def get_ayanamsa_ex_ut(tjdut: float, flags: int = 0) -> Tuple[int, float]:
     assert isinstance(sid_mode, int)
     ayanamsa = _calc_ayanamsa_ex_value(tjd_tt, sid_mode, flags)
     # retflag echoes the input flags with FLG_SWIEPH added (reference
-    # behaviour: 0 -> 2, FLG_NONUT -> 66).
-    return (flags | FLG_SWIEPH, float(ayanamsa))
+    # behaviour: 0 -> 2, FLG_NONUT -> 66), except the star/galactic
+    # "calculated" modes drop FLG_NONUT (0 -> 2, FLG_NONUT -> 2).
+    return (_ayanamsa_ex_retflag(flags, sid_mode), float(ayanamsa))
 
 
 def _calc_ayanamsa_ex_value(tjd_tt: float, sid_mode: int, flags: int = 0) -> float:
