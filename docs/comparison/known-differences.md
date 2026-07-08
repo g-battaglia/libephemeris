@@ -584,17 +584,36 @@ always has these bodies via SPK.
 ### 13. Heliacal events
 
 `heliacal_ut` is expensive for some configurations and depends on an empirical
-atmospheric-extinction / arcus-visionis model. The v3 closure fixed three
-categories of implementation defects: detailed visibility windows no longer
-collapse their end time onto the event time (jd3 == jd1), fixed-star azimuth
-in the visibility-limit payload uses the same south-to-north convention as
-planet azimuth, and the evening-first search no longer skips an entire
-apparition when the body starts near inferior conjunction (elongation below
-the conjunction-gap threshold). Remaining event-timing residuals (typically
-3-14 days) are model-calibration differences: visibility-margin thresholds,
-scotopic/limiting-magnitude model parameters, integer-day search granularity,
-and observer-parameter sensitivity. These remain recorded model differences
-for future physical-model work (planned as a unified visibility engine).
+atmospheric-extinction / arcus-visionis model.
+
+The following **API-level behaviours now match the reference exactly** and are
+verified against it:
+
+- **Body/event acceptance matrix.** The Sun is rejected for every event; the
+  Moon is accepted only for evening-first / morning-last (event types 3, 4) and
+  rejected for rising/setting; Mercury and Venus accept all four events; the
+  outer planets and fixed stars accept only rising/setting (1, 2). `vis_limit_mag`
+  rejects the Sun and accepts every other body.
+- **`heliacal_pheno_ut` illumination (element 27)** is 100.0 for fixed stars
+  (point sources), not zero.
+- **`vis_limit_mag` return flag** is the reference's binary encoding: −2 below
+  the horizon, 0 photopic, 1 scotopic (never a separate "mixed" value).
+- **Visibility-window ordering** (`jd1 ≤ jd2 ≤ jd3`) is guaranteed by
+  construction; a failed crossing search clamps to the optimum or the search
+  edge rather than an unrelated instant.
+- **`refrac_extended` / `azalt`** reproduce the reference's below-horizon
+  refraction curve and dip clamp (≤ ~10" over −3…+1° true altitude); see §refraction.
+
+**Still divergent — the visibility magnitude model.** The sky-brightness,
+limiting-magnitude, extinction (`kact`) and arcus-visionis (`minTAV`) model is a
+library-specific empirical model, not the reference's Schaefer/Reijs pipeline.
+Consequently the event *dates* (typically off by 1–27 days; e.g. Sirius heliacal
+rising at Cairo 2024 returns 4 Aug vs the reference's 6 Aug), the visibility
+*window widths* (often degenerate rather than the reference's few-minute spans),
+the reported `kact`/`minTAV`, and `vis_limit_mag`'s limiting magnitude do **not**
+match the reference. These remain recorded model differences for future
+physical-model work (planned as a unified visibility engine reproducing the
+Schaefer 1993 / Reijs extinction and threshold equations).
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements. Both

@@ -383,13 +383,13 @@ Levata eliacale di Sirio al Cairo: 4/8/2024
 
 I quattro tipi di evento eliacale sono:
 
-- `HELIACAL_RISING` (1) — **levata eliacale**: la prima apparizione mattutina. L'oggetto diventa visibile all'alba dopo il periodo di invisibilità vicino al Sole. Valido per tutti i corpi.
+- `HELIACAL_RISING` (1) — **levata eliacale**: la prima apparizione mattutina. L'oggetto diventa visibile all'alba dopo il periodo di invisibilità vicino al Sole. Valido per pianeti e stelle fisse (non per Sole o Luna).
 
-- `HELIACAL_SETTING` (2) — **tramonto eliaco**: l'ultima apparizione serale. L'oggetto scompare nel bagliore del Sole al tramonto. Valido per tutti i corpi.
+- `HELIACAL_SETTING` (2) — **tramonto eliaco**: l'ultima apparizione serale. L'oggetto scompare nel bagliore del Sole al tramonto. Valido per pianeti e stelle fisse (non per Sole o Luna).
 
-- `EVENING_FIRST` (3) — **prima apparizione serale**: per i pianeti interni (Mercurio, Venere), il primo giorno in cui diventano visibili la sera dopo la congiunzione superiore. Solo per pianeti interni.
+- `EVENING_FIRST` (3) — **prima apparizione serale**: il primo giorno in cui il corpo diventa visibile la sera dopo la congiunzione superiore. Valido per i pianeti interni (Mercurio, Venere) e la Luna.
 
-- `MORNING_LAST` (4) — **ultima apparizione mattutina**: per i pianeti interni, l'ultimo giorno di visibilità al mattino prima della congiunzione inferiore. Solo per pianeti interni.
+- `MORNING_LAST` (4) — **ultima apparizione mattutina**: l'ultimo giorno di visibilità al mattino prima della congiunzione inferiore. Valido per i pianeti interni (Mercurio, Venere) e la Luna.
 
 ### L'API compatibile con l'efemeride di riferimento
 

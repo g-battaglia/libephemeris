@@ -383,13 +383,13 @@ Heliacal rising of Sirius in Cairo: 4/8/2024
 
 The four types of heliacal events are:
 
-- `HELIACAL_RISING` (1) — **heliacal rising**: the first morning appearance. The object becomes visible at dawn after the period of invisibility near the Sun. Valid for all bodies.
+- `HELIACAL_RISING` (1) — **heliacal rising**: the first morning appearance. The object becomes visible at dawn after the period of invisibility near the Sun. Valid for planets and fixed stars (not the Sun or Moon).
 
-- `HELIACAL_SETTING` (2) — **heliacal setting**: the last evening appearance. The object disappears into the Sun's glare at sunset. Valid for all bodies.
+- `HELIACAL_SETTING` (2) — **heliacal setting**: the last evening appearance. The object disappears into the Sun's glare at sunset. Valid for planets and fixed stars (not the Sun or Moon).
 
-- `EVENING_FIRST` (3) — **evening first appearance**: for inner planets (Mercury, Venus), the first day they become visible in the evening after superior conjunction. Only for inner planets.
+- `EVENING_FIRST` (3) — **evening first appearance**: the first day the body becomes visible in the evening after superior conjunction. Valid for the inner planets (Mercury, Venus) and the Moon.
 
-- `MORNING_LAST` (4) — **morning last appearance**: for inner planets, the last day of visibility in the morning before inferior conjunction. Only for inner planets.
+- `MORNING_LAST` (4) — **morning last appearance**: the last day of visibility in the morning before inferior conjunction. Valid for the inner planets (Mercury, Venus) and the Moon.
 
 ### The reference-ephemeris-compatible API
 

@@ -23,8 +23,14 @@ Developers migrating from pyswisseph should be aware of these.
 
 | Function | pyswisseph signature | libephemeris signature |
 |----------|---------------------|----------------------|
-| `heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | same |
+| `heliacal_ut` | `(jd, geopos, datm, dobs, name, event, flags)` → `(jd1, jd2, jd3)` | same signature |
 | `lun_occult_when_loc` | body can be `int` or `str` | same |
+
+> `heliacal_ut` / `heliacal_pheno_ut` share the reference's signature, return
+> shape, body/event acceptance rules and output encodings, but their numerical
+> visibility results (event dates, window widths, `kact`/`minTAV`, limiting
+> magnitude) still diverge from the reference — see
+> [Known differences §13](known-differences.md#13-heliacal-events).
 
 ### Structural differences
 
