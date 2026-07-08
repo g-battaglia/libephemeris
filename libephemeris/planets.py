@@ -3726,7 +3726,15 @@ def _calc_body(
     from .fast_calc import _SYSTEM_BARY_BODIES
 
     barctr_bary = is_barycentric and ipl in _SYSTEM_BARY_BODIES
-    if barctr_bary:
+    # FLG_HELCTR on the giants likewise reports the system BARYCENTRE (no COB),
+    # mirroring FLG_BARYCTR and the LEB fast path. The apparent light-time
+    # branch below already iterates on the raw barycentre (lt_target) and
+    # discards the initial out_target vector, so this retarget only reaches the
+    # FLG_TRUEPOS geometric branch, which reads out_target directly: without it,
+    # adding FLG_TRUEPOS would flip the reported centre (COB vs barycentre) and
+    # diverge from both the LEB backend and the apparent result.
+    helctr_bary = bool(iflag & FLG_HELCTR) and ipl in _SYSTEM_BARY_BODIES
+    if barctr_bary or helctr_bary:
         _bary_name = _PLANET_FALLBACK.get(target_name)
         out_target = planets[_bary_name] if _bary_name else target
     else:
