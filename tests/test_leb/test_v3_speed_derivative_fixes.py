@@ -99,7 +99,9 @@ def _deriv(fn, jd, idx, h):
 def test_true_node_ddist_is_derivative_of_reported_distance(reader):
     F = C.FLG_SPEED
     ddist_rep = _leb(reader, JD_1987, C.TRUE_NODE, F)[5]
-    ddist_num = _deriv(lambda j: _leb(reader, j, C.TRUE_NODE, F), JD_1987, 2, 0.5)
+    # Stencil matched to the TrueNode speed window (0.05 d): the finer window
+    # resolves sub-daily osculating wiggles that a 0.5 d stencil averages out.
+    ddist_num = _deriv(lambda j: _leb(reader, j, C.TRUE_NODE, F), JD_1987, 2, 0.05)
     # Was ~1.7e-5 reported vs ~3e-6 stale; now the reported rate matches.
     assert abs(ddist_rep - ddist_num) < 5e-9
     # The distance itself is the osculating node radius (~0.0024-0.0026 AU),
@@ -232,7 +234,7 @@ def test_uranian_default_minus_nonut_is_nutation(reader, skyfield_backend, ipl):
             # agreement between the backends, <0.001").
             assert abs((dpsi - expected) * 3600.0) < 0.01, (
                 f"{name} ipl={ipl} jd={jd}: default-NONUT="
-                f"{dpsi * 3600.0:.4f}\" vs Δψ={expected * 3600.0:.4f}\""
+                f'{dpsi * 3600.0:.4f}" vs Δψ={expected * 3600.0:.4f}"'
             )
     # And Δψ is a real, non-trivial term at JD_1900 (~17"), not the former ~0.
     assert abs(_dpsi_deg(JD_1900) * 3600.0) > 5.0
@@ -377,9 +379,9 @@ def _deriv5_lon(fn, jd, h=0.01):
     def rel(j):
         return _wrap180(fn(j)[0] - l0)
 
-    return (
-        -rel(jd + 2 * h) + 8 * rel(jd + h) - 8 * rel(jd - h) + rel(jd - 2 * h)
-    ) / (12 * h)
+    return (-rel(jd + 2 * h) + 8 * rel(jd + h) - 8 * rel(jd - h) + rel(jd - 2 * h)) / (
+        12 * h
+    )
 
 
 @SKIP_NO_LEB
@@ -413,3 +415,96 @@ def test_conjunction_speed_is_derivative_skyfield(skyfield_backend, ipl, jd):
         f"body {ipl} at JD {jd} (solar conjunction): reported dlon differs "
         f'from the derivative of the reported lon by {err_arcsec:.4f}"/day'
     )
+
+
+# ---------------------------------------------------------------------------
+# H1-F1 (zero-bug Round H) — of-date SIDEREAL speed of the ecliptic-direct
+# bodies (Pipeline B: nodes/apogees) drops the nutation-in-longitude rate
+# dΔψ/dt, mirroring the position correction (true ayanamsha = mean + Δψ is
+# applied to ALL bodies). Pre-fix the LEB speed was off by up to ~0.23"/day
+# (the nutation rate), diverging from both the reported-position derivative
+# and the Skyfield backend.
+# ---------------------------------------------------------------------------
+
+# Dates near nutation-rate extrema (|dΔψ/dt| ~0.15-0.23"/day) so a regression
+# cannot hide in a small-rate epoch.
+JD_NUT_PEAK = 2452997.0
+JD_2010 = 2455197.0
+
+_SID_LAHIRI = {"sid_mode": C.SIDM_LAHIRI, "sid_t0": 0.0, "sid_ayan_t0": 0.0}
+
+_ECLIPTIC_DIRECT = [
+    C.MEAN_NODE,
+    C.TRUE_NODE,
+    C.MEAN_APOG,
+    C.OSCU_APOG,
+    C.INTP_APOG,
+    C.INTP_PERG,
+]
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("jd", [JD_NUT_PEAK, JD_2010])
+@pytest.mark.parametrize("ipl", _ECLIPTIC_DIRECT)
+def test_ecliptic_direct_sidereal_speed_is_derivative(reader, ipl, jd):
+    if not reader.has_body(ipl):
+        pytest.skip(f"body {ipl} not in the base LEB test file")
+    F = C.FLG_SPEED | C.FLG_SIDEREAL
+    rep = fast_calc_tt(reader, jd, ipl, F, **_SID_LAHIRI)[0][3]
+    num = _deriv(
+        lambda j: fast_calc_tt(reader, j, ipl, C.FLG_SIDEREAL, **_SID_LAHIRI)[0],
+        jd,
+        0,
+        0.05,
+    )
+    sid_err = (rep - num) * 3600.0
+    # The interpolated apsides carry a small pre-existing smoothing residual
+    # in their speed channel that is identical in the tropical frame (and in
+    # the Skyfield backend). Measure the tropical baseline and assert the
+    # SIDEREAL path adds no extra drift on top of it — the nutation-rate bug
+    # showed up precisely as that extra drift (up to ~0.23"/day).
+    rep_t = fast_calc_tt(reader, jd, ipl, C.FLG_SPEED)[0][3]
+    num_t = _deriv(lambda j: fast_calc_tt(reader, j, ipl, 0)[0], jd, 0, 0.05)
+    trop_err = (rep_t - num_t) * 3600.0
+    assert abs(sid_err - trop_err) < 0.02, (
+        f'body {ipl} at JD {jd}: sidereal self-error {sid_err:+.4f}"/day vs '
+        f'tropical baseline {trop_err:+.4f}"/day - extra sidereal drift'
+    )
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("extra", [0, C.FLG_J2000])
+@pytest.mark.parametrize("ipl", [C.MEAN_NODE, C.TRUE_NODE, C.MEAN_APOG, C.OSCU_APOG])
+def test_ecliptic_direct_sidereal_speed_leb_matches_skyfield(
+    reader, skyfield_backend, ipl, extra
+):
+    # extra=J2000 exercises the deferred rebuild: its forward velocity sample
+    # must precess from its own epoch, or the LEB speed lands off by exactly
+    # the general-precession rate (~0.1377"/day) versus Skyfield.
+    F = C.FLG_SPEED | C.FLG_SIDEREAL | extra
+    a = fast_calc_tt(reader, JD_NUT_PEAK, ipl, F, **_SID_LAHIRI)[0]
+    le.set_sid_mode(C.SIDM_LAHIRI)
+    try:
+        s = le.calc(JD_NUT_PEAK, ipl, F)[0]
+    finally:
+        le.set_sid_mode(C.SIDM_FAGAN_BRADLEY)
+    assert abs(_wrap180(a[3] - s[3]) * 3600.0) < 0.02
+
+
+@SKIP_NO_LEB
+@pytest.mark.parametrize("extra", [C.FLG_J2000, C.FLG_NONUT])
+def test_mean_ayanamsha_sidereal_speed_has_no_nutation_term(reader, extra):
+    """J2000/NONUT sidereal uses the MEAN ayanamsha (no Δψ), so the fix must
+    NOT leak dΔψ/dt into those speeds: they stay the derivative of the
+    reported position."""
+    F = C.FLG_SPEED | C.FLG_SIDEREAL | extra
+    rep = fast_calc_tt(reader, JD_NUT_PEAK, C.MEAN_NODE, F, **_SID_LAHIRI)[0][3]
+    num = _deriv(
+        lambda j: fast_calc_tt(
+            reader, j, C.MEAN_NODE, C.FLG_SIDEREAL | extra, **_SID_LAHIRI
+        )[0],
+        JD_NUT_PEAK,
+        0,
+        0.05,
+    )
+    assert abs(rep - num) * 3600.0 < 0.02

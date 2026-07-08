@@ -99,9 +99,7 @@ class TestLEB2ReaderWarm:
     @pytest.fixture
     def leb2_file(self):
         """Find an available LEB2 file for testing."""
-        data_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "leb2"
-        )
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb2")
         for name in ("base_core.leb2", "medium_core.leb2", "extended_core.leb2"):
             path = os.path.join(data_dir, name)
             if os.path.exists(path):
@@ -138,6 +136,43 @@ class TestLEB2ReaderWarm:
         source = inspect.getsource(mod.LEB2Reader.__init__)
         assert "MADV_WILLNEED" not in source
 
+    def test_warm_snapshot_survives_concurrent_clear(self, leb2_file):
+        """Regression (zero-bug Round H, H3-F1): warm() must iterate a
+        snapshot of ``_chunk_index``.
+
+        ``close()`` clears the live dict under ``_decomp_lock``; before the
+        snapshot fix a clear() landing between two outer-loop steps surfaced
+        as ``RuntimeError: dictionary changed size during iteration`` instead
+        of the documented ``ValueError``. Simulate the interleaving
+        deterministically: the first chunk's attribute access empties the
+        live dict, exactly like a concurrent close().
+        """
+        from libephemeris.leb2_reader import LEB2Reader
+
+        reader = LEB2Reader(leb2_file)
+        try:
+            if not reader._chunked:
+                pytest.skip("chunked (v2) LEB2 file required")
+
+            live_index: dict = {}
+
+            class _ClearingChunk:
+                @property
+                def jd_end(self):
+                    live_index.clear()
+                    return -1.0e18  # non-overlapping -> loop just continues
+
+            real_items = list(reader._chunk_index.items())[:2]
+            live_index[-1] = [_ClearingChunk()]
+            live_index.update(real_items)
+            reader._chunk_index = live_index
+
+            jd_start, jd_end = reader.jd_range
+            # Must complete without RuntimeError (ValueError only if closed).
+            reader.warm(jd_start, jd_end)
+        finally:
+            reader.close()
+
 
 # ---------------------------------------------------------------------------
 # CompositeLEBReader.warm()
@@ -147,9 +182,7 @@ class TestLEB2ReaderWarm:
 class TestCompositeLEBReaderWarm:
     @pytest.fixture
     def composite_reader(self):
-        data_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "leb2"
-        )
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb2")
         core = os.path.join(data_dir, "base_core.leb2")
         if not os.path.exists(core):
             for name in ("medium_core.leb2", "extended_core.leb2"):
@@ -229,9 +262,7 @@ class TestLEBReaderCool:
 class TestLEB2ReaderCool:
     @pytest.fixture
     def leb2_file(self):
-        data_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "leb2"
-        )
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb2")
         for name in ("base_core.leb2", "medium_core.leb2", "extended_core.leb2"):
             path = os.path.join(data_dir, name)
             if os.path.exists(path):
@@ -265,19 +296,21 @@ class TestLEB2ReaderCool:
         mid = (jd_start + jd_end) / 2
         for body_id in list(leb2_reader._bodies.keys())[:1]:
             leb2_reader.eval_body(body_id, mid)
-        has_cache = len(leb2_reader._chunk_cache) > 0 or len(leb2_reader._eval_cache) > 0
+        has_cache = (
+            len(leb2_reader._chunk_cache) > 0 or len(leb2_reader._eval_cache) > 0
+        )
         assert has_cache
         leb2_reader.cool()
-        has_cache_after = len(leb2_reader._chunk_cache) > 0 or len(leb2_reader._eval_cache) > 0
+        has_cache_after = (
+            len(leb2_reader._chunk_cache) > 0 or len(leb2_reader._eval_cache) > 0
+        )
         assert has_cache_after
 
 
 class TestCompositeLEBReaderCool:
     @pytest.fixture
     def composite_reader(self):
-        data_dir = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "leb2"
-        )
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "leb2")
         for name in ("base_core.leb2", "medium_core.leb2", "extended_core.leb2"):
             core = os.path.join(data_dir, name)
             if os.path.exists(core):

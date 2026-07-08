@@ -44,6 +44,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **LEB sidereal speeds of the lunar nodes/apsides now carry the full
+  ayanamsha rate.** The of-date sidereal speed of the ecliptic-direct bodies
+  (Mean/True Node, Mean/Oscu/Intp Apogee, Intp Perigee) omitted the
+  nutation-in-longitude rate dΔψ/dt on the LEB fast path (up to ~0.23"/day of
+  drift versus the derivative of the reported position, the Skyfield backend
+  and the reference API); the correction now mirrors the position handling,
+  which applies the true ayanamsha to all bodies uniformly. For the same
+  bodies under `SIDEREAL | J2000`, the deferred precession rebuild now
+  differentiates the frame rotation itself (the forward velocity sample
+  precesses from its own epoch), removing an exact general-precession-rate
+  (~0.1377"/day) self-inconsistency. Regression-tested against both backends
+  at nutation-rate extrema.
+
+- **`LEB2Reader.warm()` is close-safe.** `warm()` now iterates a snapshot of
+  the chunk index; a concurrent `close()` could previously surface as
+  `RuntimeError: dictionary changed size during iteration` instead of the
+  documented `ValueError` (and escape the state-layer error handling).
+
 - **Reported speeds are now the true derivative of the reported position across
   the whole flag matrix, on both backends.** The LEB fast path derives the
   velocity analytically (exact Chebyshev derivative + light-time rate +

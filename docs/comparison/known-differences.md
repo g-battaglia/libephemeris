@@ -480,12 +480,23 @@ the ayanamsha correction interacts with nutation differently in the two engines.
 
 **10.2 Ayanamsha values.** Standard modes (Lahiri, Fagan-Bradley, Raman,
 Krishnamurti, and the other fixed-epoch table systems) agree **exactly** (0.00" at
-J2000 and ±100y). Exotic/experimental modes diverge and the divergence grows with
-distance from J2000: ~0" at J2000 for star-anchored "True" modes rising to ~40" at
-±100y, up to ~145" for galactic/calculated modes at the extremes — inherited from
-small fixed-star proper-motion / galactic-frame-definition differences (§4). This is
-a definitional difference in those niche modes, not an error: every fixed-epoch mode
-is exact.
+J2000, < 0.005" at ±100y). Exotic/experimental modes diverge and the divergence
+grows with distance from J2000: ~0" at J2000 for star-anchored "True" modes rising
+to ~40" at ±100y, up to ~145" for galactic/calculated modes at the extremes —
+inherited from small fixed-star proper-motion / galactic-frame-definition
+differences (§4). This is a definitional difference in those niche modes, not an
+error: every fixed-epoch mode is exact.
+
+A second, smaller family effect: libephemeris applies the same modern 5-term
+IAU 2006 precession-rate polynomial to **all** formula-based ayanamsha modes,
+while the reference API uses a different (older) accumulation model for a
+group of classic/historical modes (De Luce, Suryasiddhanta variants, Aryabhata
+variants, Kugler 1–3, Huber, Eta Piscium, Britton, Aldebaran-15Tau, J2000,
+J1900, B1950, Lahiri-VP285, Krishnamurti-VP291). The residual is zero at
+J2000, ~0.03–0.04" at ±100y, and reaches ~0.31" by 2500; its shape is
+identical across the group (a pure precession-rate difference). Both
+libephemeris backends agree with each other; the uniform modern model is
+deliberate.
 
 **10.3 SIDBIT projection flags (not yet supported).** The `SIDBIT_*` flags
 (`ECL_T0`, `SSY_PLANE`, `USER_UT`, `ECL_DATE`, `NO_PREC_OFFSET`, `PREC_ORIG`; all

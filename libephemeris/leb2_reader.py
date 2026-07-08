@@ -91,14 +91,18 @@ class LEB2Reader:
             self._file.close()
             raise
         self._cache: Dict[int, bytes] = {}  # v1: body_id -> full decompressed data
-        self._chunk_cache: Dict[Tuple[int, int], bytes] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
+        self._chunk_cache: Dict[
+            Tuple[int, int], bytes
+        ] = {}  # v2: (body_id, chunk_idx) -> decompressed chunk
         # Guards _cache/_chunk_cache and serializes decompression: chunks
         # decompress in ~0.05 ms, so a plain double-checked lock is adequate
         # and concurrent requests for the same chunk never redo the zstd
         # work. (_eval_cache stays lock-free: a tiny memo of result tuples
         # whose dict get/set are atomic under the GIL.)
         self._decomp_lock = threading.Lock()
-        self._chunk_index: Dict[int, List[ChunkEntry]] = {}  # v2: body_id -> list of ChunkEntry
+        self._chunk_index: Dict[
+            int, List[ChunkEntry]
+        ] = {}  # v2: body_id -> list of ChunkEntry
         self._chunked: bool = False  # True for v2 chunked format
         self._eval_cache: Dict[
             Tuple[int, float],
@@ -393,7 +397,15 @@ class LEB2Reader:
 
         ranges: list[tuple[int, int]] = []
         if self._chunked:
-            for chunks in self._chunk_index.values():
+            # Snapshot the dict values: close() clears _chunk_index under
+            # _decomp_lock, and iterating the live dict during a concurrent
+            # close() raises RuntimeError instead of the documented
+            # ValueError. dict.clear() drops the references but does not
+            # mutate the inner lists, so iterating the snapshot is safe (a
+            # concurrently closed mmap surfaces as ValueError from madvise,
+            # which is the documented class). Same idiom as the _mm snapshot
+            # above.
+            for chunks in list(self._chunk_index.values()):
                 for chunk in chunks:
                     if chunk.jd_end < jd_start or chunk.jd_start > jd_end:
                         continue
@@ -530,7 +542,7 @@ class LEB2Reader:
         scale = 2.0 / body.interval_days
 
         for c in range(body.components):
-            comp_coeffs = coeffs[c * deg1: (c + 1) * deg1]
+            comp_coeffs = coeffs[c * deg1 : (c + 1) * deg1]
             val, deriv = _clenshaw_with_derivative(comp_coeffs, tau)
             pos.append(val)
             vel.append(deriv * scale)
@@ -602,7 +614,7 @@ class LEB2Reader:
         coeffs = struct.unpack_from(f"<{n_coeffs}d", mm, byte_offset)
 
         dpsi = _clenshaw(coeffs[0:deg1], tau)
-        deps = _clenshaw(coeffs[deg1: 2 * deg1], tau)
+        deps = _clenshaw(coeffs[deg1 : 2 * deg1], tau)
         return dpsi, deps
 
     def delta_t(self, jd: float) -> float:
@@ -623,7 +635,9 @@ class LEB2Reader:
         idx = max(0, min(idx, n - 2))
 
         span = jds[idx + 1] - jds[idx]
-        if span == 0.0:  # pragma: no cover - sorted Delta-T table has no duplicate adjacent JDs
+        if (
+            span == 0.0
+        ):  # pragma: no cover - sorted Delta-T table has no duplicate adjacent JDs
             return vals[idx]
         t = (jd - jds[idx]) / span
         return vals[idx] + t * (vals[idx + 1] - vals[idx])

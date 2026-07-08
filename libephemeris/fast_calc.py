@@ -1402,9 +1402,7 @@ def _pipeline_icrs(
         # Evaluating COB at jd_tt for the helio/bary path biased the outer
         # planets by up to ~0.016" (Pluto) — the whole cross-backend gap here.
         if is_system_bary and lt > 0.0:
-            _cob_epoch = (
-                jd_tt - lt if (iflag & (FLG_HELCTR | FLG_BARYCTR)) else jd_tt
-            )
+            _cob_epoch = jd_tt - lt if (iflag & (FLG_HELCTR | FLG_BARYCTR)) else jd_tt
             retarded_pos_cob = _apply_cob_correction(
                 (geo[0] + observer[0], geo[1] + observer[1], geo[2] + observer[2]),
                 ipl,
@@ -1595,9 +1593,7 @@ def _pipeline_icrs(
                     observer[1] + observer_vel[1] * s,
                     observer[2] + observer_vel[2] * s,
                 )
-                g = _apply_gravitational_deflection(
-                    g, obs_s, jd_tt + s, lt_s, reader
-                )
+                g = _apply_gravitational_deflection(g, obs_s, jd_tt + s, lt_s, reader)
         if _do_aber:
             g = _apply_aberration(g, ev_s, lt_s)
         return g
@@ -2508,9 +2504,11 @@ def _fast_calc_core(
             # frame the tropical rate has no equinox motion but the mean
             # ayanamsha still drifts, so the term is the full ~p. The
             # FLG_SPEED-absent case must be excluded: dlon was zeroed and stays
-            # 0.0. The deferred ecliptic-direct bodies (nodes/apogees) keep this
-            # of-date drift; their _deferred_sid_j2k rebuild below re-precesses
-            # the POSITION (not the rate) to J2000.
+            # 0.0. For the deferred ecliptic-direct bodies (nodes/apogees)
+            # this subtraction is the ayanamsha-drift term; the frame term
+            # (dP/dt of the precession rotation) is picked up by the
+            # _deferred_sid_j2k rebuild below, which precesses the forward
+            # velocity sample from its own epoch.
             if (iflag & FLG_SPEED) and (
                 _deferred_sid_j2k
                 or not (iflag & FLG_J2000)
@@ -2522,14 +2520,17 @@ def _fast_calc_core(
 
                 # Of-date sidereal subtracts the TRUE ayanamsha (mean + Δψ), so
                 # its rate must also drop the nutation-in-longitude rate dΔψ/dt
-                # (~0.05"/day) on top of the precession term above. The mean
-                # ayanamsha (J2000/NONUT) carries no nutation, so it is excluded.
-                # Scoped to Pipeline-A and Pipeline-C bodies whose speed is now
-                # the exact derivative of the reported of-date tropical position
-                # (Pipeline-C precesses its velocity to the of-date frame); the
-                # deferred ecliptic-direct bodies keep their existing
-                # (intentional) drift.
-                if (_pipeline_a or _xyz_sid_pipea or _pipeline_c) and not _eff_mean_aya:
+                # (~0.05"/day, peaks ~0.23"/day) on top of the precession term
+                # above. The mean ayanamsha (J2000/NONUT) carries no nutation,
+                # so it is excluded via _eff_mean_aya. This mirrors the
+                # position correction, which applies the true ayanamsha to ALL
+                # bodies uniformly — including the Pipeline-B ecliptic-direct
+                # bodies (nodes/apogees), whose of-date tropical speed carries
+                # dΔψ/dt just like every other body. Gating this per-pipeline
+                # left the Pipeline-B sidereal speed off by the nutation rate
+                # (not the derivative of the reported position, and diverging
+                # from both the Skyfield backend and the reference API).
+                if not _eff_mean_aya:
                     try:
                         dlon -= _nutation_rate_deg_day(jd_tt)
                     except (KeyError, ValueError):
@@ -2556,8 +2557,15 @@ def _fast_calc_core(
     if _deferred_sid_j2k:
         dt_step = 0.001  # days
         j_now_lon, j_now_lat = _precess_ecliptic(lon, lat, jd_tt, J2000)
+        # The forward sample precesses from ITS OWN epoch (jd_tt + dt_step):
+        # the derivative of P(t -> J2000)[pos(t)] carries both the rotated
+        # velocity AND the dP/dt drift of the rotation itself (~ -p, the
+        # general-precession rate). Precessing both samples from the same
+        # epoch dropped the dP/dt term, leaving the reported speed off by
+        # exactly +p versus the derivative of the reported position (and
+        # versus the Skyfield backend and the reference API).
         j_fwd_lon, j_fwd_lat = _precess_ecliptic(
-            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt, J2000
+            lon + dlon * dt_step, lat + dlat * dt_step, jd_tt + dt_step, J2000
         )
         d_j_lon = j_fwd_lon - j_now_lon
         if d_j_lon > 180.0:
