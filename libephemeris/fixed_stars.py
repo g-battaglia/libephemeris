@@ -190,6 +190,8 @@ from .constants import (
     FLG_RADIANS,
     FLG_TRUEPOS,
     FLG_TOPOCTR,
+    FLG_HELCTR,
+    FLG_BARYCTR,
     J2000,
     DAYS_PER_JULIAN_YEAR,
 )
@@ -2108,6 +2110,22 @@ def get_canonical_star_name(star_id: int) -> str | None:
     return _STAR_ID_TO_NAME.get(star_id)
 
 
+def _ssb_observer_at(t):
+    """A Skyfield observer at the solar-system barycentre (origin).
+
+    ``planets["solar system barycenter"]`` is an empty ``VectorSum`` whose
+    ``.at(t).observe(star)`` raises (Skyfield's frame logic indexes an empty
+    vector-function chain). A ``Barycentric`` position at the origin with
+    ``center = 0`` observes correctly, giving the barycentric astrometric place.
+    """
+    import numpy as np
+    from skyfield.positionlib import Barycentric
+
+    obs = Barycentric(np.zeros(3), np.zeros(3), t=t)
+    obs.center = 0
+    return obs
+
+
 def _calc_star_position_from_observer(
     star_id: int,
     earth_at_t,
@@ -2187,8 +2205,14 @@ def _calc_star_position_leb(
     noaberr: bool = False,
     nogdefl: bool = False,
     j2000_frame: bool = False,
+    center: int = 0,
 ) -> Tuple[float, float, float]:
     """Calculate fixed star position using LEB data (no Skyfield DE kernel).
+
+    ``center`` is the effective observation center (0 = geocentric,
+    ``FLG_HELCTR`` = Sun, ``FLG_BARYCTR`` = SSB), as resolved by
+    ``_fixstar_observation_center``. Helio/bary places are always requested
+    with ``noaberr=nogdefl=True`` by the callers.
 
     Same interface as _calc_star_position_skyfield but uses the LEB reader
     for Earth position/velocity instead of loading the full DE kernel.
@@ -2221,10 +2245,19 @@ def _calc_star_position_leb(
         raise ValueError(f"could not find star name {star_id}")
 
     star_data = FIXED_STARS[star_id]
-    from .constants import EARTH
+    from .constants import EARTH, SUN
 
-    # 1. Earth position and velocity from LEB (ICRS barycentric)
-    earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
+    # 1. Observer position and velocity from LEB (ICRS barycentric). Stars are
+    #    normally observed from the Earth; heliocentric/barycentric requests
+    #    (center != 0) observe from the Sun or the SSB instead, with no
+    #    aberration or deflection (the callers force noaberr=nogdefl=True).
+    if center == FLG_HELCTR:
+        earth_pos, earth_vel = reader.eval_body(SUN, jd_tt)
+    elif center == FLG_BARYCTR:
+        earth_pos = (0.0, 0.0, 0.0)
+        earth_vel = (0.0, 0.0, 0.0)
+    else:
+        earth_pos, earth_vel = reader.eval_body(EARTH, jd_tt)
 
     # 2. Star ICRS position via rigorous 3D space motion.
     #    Mirrors Skyfield's Star._compute_vectors (the reference used by
@@ -2340,6 +2373,7 @@ def _calc_star_position_skyfield(
     nogdefl: bool = False,
     j2000_frame: bool = False,
     topo: "tuple | None" = None,
+    center: int = 0,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position using Skyfield Star class with proper aberration.
@@ -2370,14 +2404,23 @@ def _calc_star_position_skyfield(
     from .state import get_planets, get_timescale
 
     t = get_timescale().tt_jd(jd_tt)
-    earth = get_planets()["earth"]
-    if topo is not None:
-        from skyfield.api import wgs84
-
-        observer = earth + wgs84.latlon(topo[1], topo[0], topo[2])
-        earth_at_t = observer.at(t)
+    planets = get_planets()
+    if center == FLG_HELCTR:
+        # Heliocentric: observe from the Sun (no aberration/deflection —
+        # the caller forces noaberr=nogdefl=True, so the geometric branch runs).
+        earth_at_t = planets["sun"].at(t)
+    elif center == FLG_BARYCTR:
+        # Barycentric: observe from the solar-system barycenter (origin).
+        earth_at_t = _ssb_observer_at(t)
     else:
-        earth_at_t = earth.at(t)
+        earth = planets["earth"]
+        if topo is not None:
+            from skyfield.api import wgs84
+
+            observer = earth + wgs84.latlon(topo[1], topo[0], topo[2])
+            earth_at_t = observer.at(t)
+        else:
+            earth_at_t = earth.at(t)
     return _calc_star_position_from_observer(
         star_id, earth_at_t, noaberr, nogdefl, j2000_frame
     )
@@ -2390,6 +2433,7 @@ def calc_fixed_star_position(
     nogdefl: bool = False,
     j2000_frame: bool = False,
     topo: "tuple | None" = None,
+    center: int = 0,
 ) -> Tuple[float, float, float]:
     """
     Calculate ecliptic position of a fixed star at given date.
@@ -2431,7 +2475,7 @@ def calc_fixed_star_position(
     if topo is None and get_leb_reader() is not None:
         try:
             return _calc_star_position_leb(
-                star_id, jd_tt, noaberr, nogdefl, j2000_frame
+                star_id, jd_tt, noaberr, nogdefl, j2000_frame, center
             )
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
@@ -2442,7 +2486,7 @@ def calc_fixed_star_position(
             log_leb_fallback("star", _leb_err)
     try:
         return _calc_star_position_skyfield(
-            star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
+            star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
         )
     except SkyfieldRangeError as e:
         # Wrap once here: every star entry point (fixstar_ut, fixstar,
@@ -2459,6 +2503,7 @@ def calc_fixed_star_velocity(
     nogdefl: bool = False,
     j2000_frame: bool = False,
     topo: "tuple | None" = None,
+    center: int = 0,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Calculate ecliptic position and velocity of a fixed star at given date.
@@ -2497,15 +2542,15 @@ def calc_fixed_star_velocity(
 
     # Calculate position at current time (for return value)
     lon, lat, dist = calc_fixed_star_position(
-        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo
+        star_id, jd_tt, noaberr, nogdefl, j2000_frame, topo=topo, center=center
     )
 
     # Calculate positions at t-0.5 and t+0.5 for central difference
     lon_prev, lat_prev, dist_prev = calc_fixed_star_position(
-        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo
+        star_id, jd_tt - h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
     )
     lon_next, lat_next, dist_next = calc_fixed_star_position(
-        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo
+        star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
     )
 
     # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
@@ -2734,6 +2779,30 @@ def _fixstar_topo() -> tuple:
         topo.latitude.degrees,
         topo.elevation.m,
     )
+
+
+def _fixstar_observation_center(flags: int) -> int:
+    """Effective observation center for a fixed-star request.
+
+    Resolves the reference's center priority (TOPOCTR > BARYCTR > HELCTR >
+    geocentric) and returns the *heliocentric/barycentric* center that wins,
+    i.e. ``FLG_HELCTR`` or ``FLG_BARYCTR``. Returns 0 for geocentric and for
+    topocentric requests: TOPOCTR keeps the observer on/near the Earth (the
+    diurnal offset is handled by the existing topocentric path), so it is not
+    a helio/bary re-centering.
+
+    A helio/bary star place is observed from the Sun (HELCTR) or the SSB
+    (BARYCTR) with no annual aberration and no gravitational deflection — the
+    reference echoes NOGDEFL|NOABERR for it (see _implied_retflag_bits), and
+    the caller forces those two corrections off when this returns non-zero.
+    """
+    if flags & FLG_TOPOCTR:
+        return 0
+    if flags & FLG_BARYCTR:
+        return FLG_BARYCTR
+    if flags & FLG_HELCTR:
+        return FLG_HELCTR
+    return 0
 
 
 def _apply_fixstar_flags(
@@ -3012,6 +3081,14 @@ def _fixstar_ut_by_id(
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
+        # Heliocentric/barycentric places are observed from the Sun/SSB with
+        # no aberration and no deflection (the reference echoes NOGDEFL|NOABERR
+        # for them); TOPOCTR keeps the Earth-based observer (center priority
+        # TOPOCTR > BARYCTR > HELCTR).
+        center = _fixstar_observation_center(flags)
+        if center:
+            noaberr = True
+            nogdefl = True
         # Compute natively in J2000 ecliptic frame when requested.
         # This avoids the ~5" error from precessing Skyfield's ecliptic-of-date
         # back to J2000 with a different precession model.
@@ -3020,12 +3097,14 @@ def _fixstar_ut_by_id(
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -3106,6 +3185,12 @@ def batch_fixstars_ut(
 
     noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
     nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
+    # Heliocentric/barycentric places observe from the Sun/SSB with no
+    # aberration/deflection (TOPOCTR was already routed away above).
+    center = _fixstar_observation_center(flags)
+    if center:
+        noaberr = True
+        nogdefl = True
     use_j2000 = bool(flags & FLG_J2000)
     want_speed = bool(flags & FLG_SPEED)
 
@@ -3119,14 +3204,14 @@ def batch_fixstars_ut(
         try:
             for index, star_id, canonical_name in resolved:
                 lon, lat, dist = _calc_star_position_leb(
-                    star_id, jd_tt, noaberr, nogdefl, use_j2000
+                    star_id, jd_tt, noaberr, nogdefl, use_j2000, center
                 )
                 if want_speed:
                     lon_prev, lat_prev, dist_prev = _calc_star_position_leb(
-                        star_id, jd_tt - 0.5, noaberr, nogdefl, use_j2000
+                        star_id, jd_tt - 0.5, noaberr, nogdefl, use_j2000, center
                     )
                     lon_next, lat_next, dist_next = _calc_star_position_leb(
-                        star_id, jd_tt + 0.5, noaberr, nogdefl, use_j2000
+                        star_id, jd_tt + 0.5, noaberr, nogdefl, use_j2000, center
                     )
                     speed_lon = lon_next - lon_prev
                     if speed_lon > 180.0:
@@ -3160,18 +3245,26 @@ def batch_fixstars_ut(
     if _leb_ok:
         return tuple(results)
 
-    # Skyfield fallback path
+    # Skyfield fallback path. Heliocentric/barycentric requests observe from
+    # the Sun/SSB instead of the Earth (center resolved above); the forced
+    # noaberr=nogdefl=True then selects the geometric branch.
     from .state import get_planets
 
-    earth = get_planets()["earth"]
+    _planets = get_planets()
+    if center == FLG_HELCTR:
+        _obs_at = _planets["sun"].at
+    elif center == FLG_BARYCTR:
+        _obs_at = _ssb_observer_at
+    else:
+        _obs_at = _planets["earth"].at
     try:
-        earth_at_t = earth.at(t)
+        earth_at_t = _obs_at(t)
 
         if want_speed:
             t_prev = ts.tt_jd(jd_tt - 0.5)
             t_next = ts.tt_jd(jd_tt + 0.5)
-            earth_at_prev = earth.at(t_prev)
-            earth_at_next = earth.at(t_next)
+            earth_at_prev = _obs_at(t_prev)
+            earth_at_next = _obs_at(t_next)
         else:
             earth_at_prev = None
             earth_at_next = None
@@ -3266,17 +3359,25 @@ def fixstar(
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
+        # Heliocentric/barycentric: observe from Sun/SSB with no
+        # aberration/deflection (TOPOCTR wins over BARY/HELCTR).
+        center = _fixstar_observation_center(flags)
+        if center:
+            noaberr = True
+            nogdefl = True
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -3518,17 +3619,25 @@ def fixstar2_ut(
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
+        # Heliocentric/barycentric: observe from Sun/SSB with no
+        # aberration/deflection (TOPOCTR wins over BARY/HELCTR).
+        center = _fixstar_observation_center(flags)
+        if center:
+            noaberr = True
+            nogdefl = True
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
@@ -3593,17 +3702,25 @@ def fixstar2(
     try:
         noaberr = bool(flags & FLG_NOABERR) or bool(flags & FLG_TRUEPOS)
         nogdefl = bool(flags & FLG_NOGDEFL) or bool(flags & FLG_TRUEPOS)
+        # Heliocentric/barycentric: observe from Sun/SSB with no
+        # aberration/deflection (TOPOCTR wins over BARY/HELCTR).
+        center = _fixstar_observation_center(flags)
+        if center:
+            noaberr = True
+            nogdefl = True
         use_j2000 = bool(flags & FLG_J2000)
         topo = _fixstar_topo() if flags & FLG_TOPOCTR else None
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo
+                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
