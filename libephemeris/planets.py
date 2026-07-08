@@ -590,6 +590,23 @@ def _normalize_calc_flags(flags: int) -> int:
         flags |= FLG_SWIEPH
     if flags & FLG_SPEED3:
         flags = (flags & ~FLG_SPEED3) | FLG_SPEED
+    return _resolve_center_flags(flags)
+
+
+def _resolve_center_flags(flags: int) -> int:
+    """Resolve conflicting observation-center flags to the reference's priority.
+
+    When more than one center is requested the reference keeps exactly one,
+    with priority TOPOCTR > BARYCTR > HELCTR > geocentric, and strips the
+    losing bits from both the computation path and the echoed retflag (so, for
+    example, HELCTR|BARYCTR computes and echoes barycentric, and anything with
+    TOPOCTR computes and echoes topocentric). Verified behaviourally against
+    the reference oracle for calc/calc_ut and the UT fixed-star entry points.
+    """
+    if flags & FLG_TOPOCTR:
+        flags &= ~(FLG_HELCTR | FLG_BARYCTR)
+    elif flags & FLG_BARYCTR:
+        flags &= ~FLG_HELCTR
     return flags
 
 

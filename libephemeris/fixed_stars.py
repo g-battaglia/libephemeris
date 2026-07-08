@@ -2699,12 +2699,19 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     from .constants import FLG_JPLEPH
 
     ret = flags_in
-    if not (flags_in & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
+    if implied:
+        # UT entry points resolve conflicting center flags to the reference's
+        # priority (TOPOCTR > BARYCTR > HELCTR) and strip the losing bits from
+        # the echoed flags; the TT entry points echo the request as given.
+        from .planets import _resolve_center_flags
+
+        ret = _resolve_center_flags(ret)
+    if not (ret & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
         ret |= FLG_SWIEPH
     if implied:
         from .planets import _implied_retflag_bits
 
-        ret |= _implied_retflag_bits(flags_in)
+        ret |= _implied_retflag_bits(ret)
     return ret
 
 
@@ -2730,12 +2737,27 @@ def _fixstar_topo() -> tuple:
 
 
 def _apply_fixstar_flags(
-    result: tuple, jd_tt: float, iflag: int, j2000_native: bool = False
+    result: tuple,
+    jd_tt: float,
+    iflag: int,
+    j2000_native: bool = False,
+    *,
+    legacy_sidereal: bool = False,
 ) -> tuple:
     """Apply post-calculation flag transformations to fixed star results.
 
     Handles frame transformations (J2000, NONUT, ICRS), coordinate system
     changes (EQUATORIAL, SIDEREAL), and output format conversions (XYZ, RADIANS).
+
+    ``legacy_sidereal`` selects the legacy fixed-star sidereal speed convention
+    used by the fixstar/fixstar_ut entry points: the ayanamsha drift rate
+    d(ayanamsha)/dt is NOT removed from the first-coordinate speed (ecliptic
+    longitude, or right ascension under FLG_EQUATORIAL). The modern
+    fixstar2/fixstar2_ut entry points leave it False and report the true
+    sidereal derivative (ayanamsha rate removed). Verified against the
+    reference oracle across stars/ayanamshas/epochs: the offset rides on the
+    first coordinate only and equals the (epoch- and ayanamsha-dependent)
+    ayanamsha rate.
 
     Applied in order:
     1. J2000 / NONUT frame selection (ecliptic longitude adjustment)
@@ -2876,6 +2898,21 @@ def _apply_fixstar_flags(
         speed_lon = d_lon / (2.0 * h)
         speed_lat = (p_lat - m_lat) / (2.0 * h)
         speed_dist = (p_dist - m_dist) / (2.0 * h)
+
+        # Legacy sidereal speed convention (fixstar / fixstar_ut): the
+        # ayanamsha drift removed by the differenced position above is added
+        # back to the first-coordinate speed, so the legacy speed carries the
+        # full mean-equinox motion (ayanamsha-rate-independent). Uses the same
+        # UT epochs and ayanamsha source the transform differenced, so the two
+        # cancel exactly. speed_lat / speed_dist are untouched.
+        if legacy_sidereal and (iflag & FLG_SIDEREAL):
+            from .state import get_timescale
+            from .planets import get_ayanamsa_ut
+
+            ts_ayan = get_timescale()
+            ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
+            ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
+            speed_lon += (ayan_p - ayan_m) / (2.0 * h)
     else:
         speed_lon = 0.0
         speed_lat = 0.0
@@ -2992,7 +3029,9 @@ def _fixstar_ut_by_id(
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, t.tt, flags, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(
+            result, t.tt, flags, j2000_native=use_j2000, legacy_sidereal=True
+        )
 
         return (result, canonical_name or "", ret_flags)
     except Error:
@@ -3103,7 +3142,11 @@ def batch_fixstars_ut(
 
                 result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
                 result = _apply_fixstar_flags(
-                    result, jd_tt, flags, j2000_native=use_j2000
+                    result,
+                    jd_tt,
+                    flags,
+                    j2000_native=use_j2000,
+                    legacy_sidereal=True,
                 )
                 results[index] = (result, canonical_name, ret_flags)
             _leb_ok = True
@@ -3162,7 +3205,9 @@ def batch_fixstars_ut(
                 speed_dist = 0.0
 
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
-            result = _apply_fixstar_flags(result, jd_tt, flags, j2000_native=use_j2000)
+            result = _apply_fixstar_flags(
+                result, jd_tt, flags, j2000_native=use_j2000, legacy_sidereal=True
+            )
             results[index] = (result, canonical_name, ret_flags)
         except Error:
             if skip_errors:
@@ -3235,7 +3280,9 @@ def fixstar(
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
 
-        result = _apply_fixstar_flags(result, tjdet, flags, j2000_native=use_j2000)
+        result = _apply_fixstar_flags(
+            result, tjdet, flags, j2000_native=use_j2000, legacy_sidereal=True
+        )
 
         return (result, canonical_name or "", ret_flags)
     except Error:

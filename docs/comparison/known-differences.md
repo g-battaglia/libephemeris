@@ -397,6 +397,28 @@ Callers needing the reference's sequential-index semantics should use the
 legacy `fixstar`. Comma-prefixed nomenclature (`",alTau"`) and every
 non-numeric form resolve identically on both paths.
 
+**4.8 Sidereal speed convention: legacy vs modern family (parity, per entry
+point).** With `FLG_SIDEREAL | FLG_SPEED` the reference reports a *different*
+first-coordinate speed on its two fixed-star families, and libephemeris now
+mirrors each per entry point:
+
+- **Modern** (`fixstar2` / `fixstar2_ut`): the true sidereal derivative — the
+  ayanamsha drift rate d(ayanamsha)/dt is removed, so the reported longitude
+  (or RA under `FLG_EQUATORIAL`) speed is the star's motion relative to the
+  sidereal frame.
+- **Legacy** (`fixstar` / `fixstar_ut`): the ayanamsha drift is **not** removed
+  from the first-coordinate speed; the legacy speed carries the full
+  mean-equinox motion and is therefore independent of the chosen ayanamsha.
+
+Legacy speed = modern speed + d(ayanamsha)/dt, applied to the first coordinate
+only (latitude/declination and distance speeds are identical on both families).
+The offset is the *actual* ayanamsha rate at the epoch — ≈ the mean general
+precession rate (~50.29″/yr at J2000) for precession-based modes such as
+Fagan/Bradley and Lahiri, but the mode-specific rate (e.g. ~80.5″/yr at J2000)
+for a fixed-target mode such as Galactic Centre 0° Sagittarius. Verified against
+the reference oracle to < 0.001″/day across stars, ayanamshas and epochs.
+Positions are identical on both families; only this speed channel differs.
+
 ### 5. Refraction and horizontal coordinates
 
 **5.1 Atmospheric refraction (`refrac`).** Up to 15" near the horizon; both use
