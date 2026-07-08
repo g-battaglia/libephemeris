@@ -646,7 +646,9 @@ class EphemerisContext:
 
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
                 _record(ipl, "LEB")
-                return result
+                from .planets import _implied_retflag_bits
+
+                return result[0], result[1] | _implied_retflag_bits(iflag)
             except (KeyError, ValueError) as _leb_err:
                 # missing body / out-of-range -> DEBUG, corruption -> WARNING
                 from .leb_reader import log_leb_fallback
@@ -690,7 +692,9 @@ class EphemerisContext:
                     "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
                 )
                 _record(ipl, "Horizons")
-                return result
+                from .planets import _implied_retflag_bits
+
+                return result[0], result[1] | _implied_retflag_bits(iflag)
             except KeyError as _hz_err:
                 get_logger().debug(
                     "body=%d jd=%.1f source=Horizons->fallback (context) reason=%s",

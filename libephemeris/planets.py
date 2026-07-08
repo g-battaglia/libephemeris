@@ -591,6 +591,30 @@ def _normalize_calc_flags(flags: int) -> int:
     return flags
 
 
+def _implied_retflag_bits(flags: int) -> int:
+    """Retflag bits the reference API's flag-plausibility step implies.
+
+    Beyond echoing the caller's bits, the reference switches on internally
+    (and echoes) the flags its plausibility step derives from the request:
+    J2000 and SIDEREAL output is referred to a mean equinox, so FLG_NONUT is
+    echoed; heliocentric, barycentric and true-position output skips light
+    deflection and annual aberration, so FLG_NOGDEFL | FLG_NOABERR are echoed.
+    Verified behaviourally against the reference oracle (J2000 -> +NONUT,
+    SIDEREAL -> +NONUT, HELCTR/TRUEPOS -> +NOGDEFL|NOABERR, composing for
+    combinations, including the ECL_NUT pseudo-body).
+
+    Only the ECHOED retflag carries these bits — the computation flags must
+    stay untouched (adding NONUT to a sidereal request would switch the
+    ayanamsha realization used by the calculation).
+    """
+    extra = 0
+    if flags & (FLG_J2000 | FLG_SIDEREAL):
+        extra |= FLG_NONUT
+    if flags & (FLG_HELCTR | FLG_BARYCTR | FLG_TRUEPOS):
+        extra |= FLG_NOGDEFL | FLG_NOABERR
+    return extra
+
+
 def _plaus_ephemeris_flags(flags: int) -> int:
     """Force exactly one ephemeris bit, like the reference plaus_iflag().
 
@@ -631,8 +655,15 @@ def _strip_output_flags(flags: int) -> int:
 def _finalize_output_flags(
     pos: PositionResult, retflag: int, flags: int
 ) -> Tuple[PositionResult, int]:
-    """Apply output-format flags to a result and echo them in retflag."""
-    return _apply_output_flags(pos, flags), retflag | (flags & (FLG_XYZ | FLG_RADIANS))
+    """Apply output-format flags to a result and echo them in retflag.
+
+    Also echoes the flag bits the reference's plausibility step implies
+    (see _implied_retflag_bits) so retflag stays 1:1 with the reference.
+    """
+    return (
+        _apply_output_flags(pos, flags),
+        retflag | (flags & (FLG_XYZ | FLG_RADIANS)) | _implied_retflag_bits(flags),
+    )
 
 
 def _run_pctr_pipeline(calc_fn, flags: int) -> Tuple[PositionResult, int]:
@@ -1227,7 +1258,8 @@ def calc_ut(
     # flags=0 -> 2) — so it must run on the raw flags, before
     # _normalize_calc_flags strips MOSEPH.
     if planet == ECL_NUT:
-        return _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
+        pos_nut, rf_nut = _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
+        return pos_nut, rf_nut | _implied_retflag_bits(flags)
 
     flags = _normalize_calc_flags(flags)
 
@@ -1262,7 +1294,7 @@ def calc_ut(
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             _record(planet, "LEB")
-            return result
+            return result[0], result[1] | _implied_retflag_bits(flags)
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1281,7 +1313,7 @@ def calc_ut(
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
             _record(planet, "Horizons")
-            return result
+            return result[0], result[1] | _implied_retflag_bits(flags)
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
@@ -1373,7 +1405,10 @@ def calc(
     # missing here and ECL_NUT fell through to UnknownBodyError).
     # plaus_iflag-style flag handling on the raw flags (see calc_ut).
     if planet == ECL_NUT:
-        return _calc_nutation_obliquity_tt(tjdet, _plaus_ephemeris_flags(flags))
+        pos_nut, rf_nut = _calc_nutation_obliquity_tt(
+            tjdet, _plaus_ephemeris_flags(flags)
+        )
+        return pos_nut, rf_nut | _implied_retflag_bits(flags)
 
     flags = _normalize_calc_flags(flags)
 
@@ -1400,7 +1435,7 @@ def calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             _record(planet, "LEB")
-            return result
+            return result[0], result[1] | _implied_retflag_bits(flags)
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
             from .leb_reader import log_leb_fallback
@@ -1424,7 +1459,7 @@ def calc(
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
             _record(planet, "Horizons")
-            return result
+            return result[0], result[1] | _implied_retflag_bits(flags)
         except KeyError as _hz_err:
             get_logger().debug(
                 "body=%d jd=%.1f source=Horizons->fallback reason=%s",
