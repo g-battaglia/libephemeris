@@ -52,6 +52,14 @@ from .constants import (
 # and superior conjunction (behind the Sun)
 INNER_PLANETS = {MERCURY, VENUS}
 
+# Detection margin (magnitudes) for the twilight visibility test used by the
+# heliacal-event search. With the calibrated VISLIMIT limiting-magnitude model
+# (dret[0] is a catalog-magnitude limit, extinction folded in) an object is at
+# the visibility threshold when its catalog magnitude equals the limiting
+# magnitude, so the margin is ~0. A small positive value matches the
+# reference's "first/last clearly visible" transition day.
+_HELIACAL_VIS_MARGIN = 0.0
+
 
 # =============================================================================
 # SCHAEFER (1990) ATMOSPHERIC MODEL
@@ -153,6 +161,107 @@ class ObserverParams(NamedTuple):
     transmission: float  # Optical transmission coefficient
 
 
+# =============================================================================
+# Schaefer VISLIMIT (1998) visual-limiting-magnitude model, V band
+# =============================================================================
+#
+# Faithful implementation of Bradley E. Schaefer's VISLIMIT algorithm
+# ("To the Visual Limits", Sky & Telescope, May 1998; "Astronomy and the
+# limits of vision", Vistas in Astronomy 36, 1993), restricted to the V
+# photometric band (0.55 um), with the atmospheric scale heights refined
+# per V. Reijs (archaeocosmology.org / ARCHAEOCOSMO): Rayleigh 8515 m,
+# aerosol 3745 m, water 3000 m. The extinction, airmass, twilight,
+# moonlight and dark-night-sky components and the contrast-threshold
+# (Hecht) magnitude conversion are exactly Schaefer's; the dark-night-sky
+# normalisation (_VL_BO) and the aerosol RH/season constants were
+# calibrated against the reference ephemeris's vis_limit_mag output.
+#
+# V-band VISLIMIT constants (I = 3 in Schaefer's DATA statements):
+_VL_MOI = -11.05  # extra-atmospheric reference magnitude constant
+_VL_MS = -26.74  # Sun V magnitude constant
+_VL_BO = 4.0e-14  # dark-night-sky zenith brightness base (calibrated)
+_VL_OZ = 0.031  # ozone coefficient
+_VL_WT = 0.031  # water-vapour coefficient
+# Reijs refined scale heights (m)
+_VL_SH_RAY = 8515.0
+_VL_SH_AER = 3745.0
+_VL_SH_WAT = 3000.0
+_VL_SEAS_G = 0.34  # seasonal aerosol amplitude (calibrated)
+_RD = math.pi / 180.0
+
+
+def _vl_month_cont(jd: float) -> float:
+    """Continuous month (1..13) of a Julian Day, for the seasonal terms."""
+    Z = math.floor(jd + 0.5)
+    F = jd + 0.5 - Z
+    A = Z
+    if Z >= 2299161:
+        alpha = math.floor((Z - 1867216.25) / 36524.25)
+        A = Z + 1 + alpha - math.floor(alpha / 4)
+    B = A + 1524
+    C = math.floor((B - 122.1) / 365.25)
+    D = math.floor(365.25 * C)
+    E = math.floor((B - D) / 30.6001)
+    day = B - D - math.floor(30.6001 * E) + F
+    m = E - 1 if E < 14 else E - 13
+    return m + (day - 1.0) / 30.4375
+
+
+def _vl_extinction_components(
+    temperature: float, humidity_pct: float, altitude_m: float, latitude: float, jd: float
+) -> Tuple[float, float, float, float]:
+    """Return the four V-band extinction coefficients (KR, KA, KO, KW).
+
+    Schaefer VISLIMIT extinction with Reijs scale heights and the seasonal
+    aerosol/ozone terms. Coefficients are per unit airmass.
+    """
+    Mc = _vl_month_cont(jd)
+    RA = (Mc - 3.0) * 30.0 * _RD
+    LT = latitude * _RD
+    SL = 1.0 if latitude >= 0 else -1.0
+    RH = min(max(humidity_pct, 1.0), 99.5)
+    kr = 0.1066 * math.exp(-altitude_m / _VL_SH_RAY)
+    ka = (
+        0.1
+        * math.exp(-altitude_m / _VL_SH_AER)
+        * ((1.0 - 0.32 / math.log(RH / 100.0)) ** 1.33)
+        * (1.0 + _VL_SEAS_G * SL * math.sin(RA))
+    )
+    ko = _VL_OZ * (3.0 + 0.4 * (LT * math.cos(RA) - math.cos(3.0 * LT))) / 3.0
+    kw = (
+        _VL_WT
+        * 0.94
+        * (RH / 100.0)
+        * math.exp(temperature / 15.0)
+        * math.exp(-altitude_m / _VL_SH_WAT)
+    )
+    return kr, ka, ko, kw
+
+
+def _vl_airmass(alt_deg: float) -> float:
+    """Schaefer sky airmass (gas) as a function of altitude."""
+    if alt_deg <= 0.0:
+        return 40.0
+    c = math.cos((90.0 - alt_deg) * _RD)
+    return 1.0 / (c + 0.025 * math.exp(-11.0 * c))
+
+
+def _vl_airmass_gas(alt_deg: float) -> float:
+    c = math.cos((90.0 - alt_deg) * _RD)
+    return 1.0 / (c + 0.0286 * math.exp(-10.5 * c))
+
+
+def _vl_airmass_aer(alt_deg: float) -> float:
+    c = math.cos((90.0 - alt_deg) * _RD)
+    return 1.0 / (c + 0.0123 * math.exp(-24.5 * c))
+
+
+def _vl_airmass_ozone(alt_deg: float) -> float:
+    s = math.sin((90.0 - alt_deg) * _RD)
+    val = 1.0 - (s / (1.0 + 20.0 / 6378.0)) ** 2
+    return 1.0 / math.sqrt(val) if val > 0 else 40.0
+
+
 class SchaeferModel:
     """
     Complete Schaefer atmospheric model for heliacal visibility.
@@ -171,6 +280,8 @@ class SchaeferModel:
         self,
         atmo: Optional[AtmosphericConditions] = None,
         observer: Optional[ObserverParams] = None,
+        latitude: float = 0.0,
+        jd: float = 2451545.0,
     ):
         """
         Initialize the Schaefer model with atmospheric and observer conditions.
@@ -178,6 +289,10 @@ class SchaeferModel:
         Args:
             atmo: Atmospheric conditions (defaults to standard atmosphere)
             observer: Observer parameters (defaults to standard observer)
+            latitude: Observer latitude in degrees (for the seasonal/latitude
+                extinction terms of Schaefer's VISLIMIT model).
+            jd: Julian Day (UT) used to derive the season (month) for the
+                seasonal aerosol/ozone extinction terms.
         """
         if atmo is None:
             atmo = AtmosphericConditions(
@@ -199,290 +314,82 @@ class SchaeferModel:
 
         self.atmo = atmo
         self.observer = observer
+        self.latitude = latitude
+        self.jd = jd
 
         # Precompute extinction coefficients
         self._compute_extinction_coefficients()
 
     def _compute_extinction_coefficients(self) -> None:
-        """Compute atmospheric extinction coefficients."""
-        C = SchaeferConstants
+        """Compute Schaefer VISLIMIT (V-band) extinction coefficients.
 
-        # Pressure factor (relative to sea level)
-        self.pressure_factor = self.atmo.pressure / 1013.25
-
-        # Altitude factor for Rayleigh scattering
-        alt_km = self.atmo.altitude / 1000.0
-        self.altitude_rayleigh = math.exp(-alt_km / C.SCALE_HEIGHT_PRESSURE)
-
-        # Altitude factor for aerosols
-        self.altitude_aerosol = math.exp(-alt_km / C.SCALE_HEIGHT_AEROSOL)
-
-        # Rayleigh scattering coefficient (depends on pressure)
-        self.k_rayleigh = (
-            C.K_RAYLEIGH_SEA_LEVEL * self.pressure_factor * self.altitude_rayleigh
+        Uses the observer temperature/humidity/altitude/latitude and the
+        season (from ``self.jd``) exactly as in Schaefer's VISLIMIT model
+        with Reijs's refined scale heights. ``met_range`` (datm[3]) is
+        honoured as an override: 0 < v < 1 sets the total coefficient
+        directly (ktot); v >= 1 is a meteorological visual range in km
+        whose aerosol contribution follows Koschmieder's relation.
+        """
+        kr, ka, ko, kw = _vl_extinction_components(
+            self.atmo.temperature,
+            self.atmo.humidity,
+            self.atmo.altitude,
+            self.latitude,
+            self.jd,
         )
+        mr = self.atmo.met_range
+        if 0.0 < mr < 1.0:
+            # Direct total-extinction (ktot) override. Distribute the
+            # requested total across the components in the model's own
+            # proportions so the per-component airmass weighting still
+            # applies; clamp to the molecular+ozone+water floor.
+            floor = kr + ko + kw
+            k_total = max(mr, floor)
+            ka = max(0.0, k_total - floor)
+        elif mr >= 1.0:
+            # Meteorological visual range (km): Koschmieder aerosol.
+            ka = max(0.0, 3.912 / mr - kr)
+        self.k_rayleigh = kr
+        self.k_aerosol = ka
+        self.k_ozone = ko
+        self.k_water = kw
+        self.k_total = kr + ka + ko + kw
 
-        # Aerosol coefficient
-        if self.atmo.met_range >= 1.0:
-            # Meteorological range given (km)
-            # k_aerosol = 3.912 / V - k_rayleigh (Koschmieder's formula)
-            self.k_aerosol = max(0.0, 3.912 / self.atmo.met_range - 0.106)
-        elif 0 < self.atmo.met_range < 1.0:
-            # ktot given directly
-            self.k_total_override = self.atmo.met_range
-            self.k_aerosol = max(
-                0.0, self.k_total_override - self.k_rayleigh - C.K_OZONE
-            )
-        else:
-            # Estimate from humidity
-            # Schaefer model: aerosol increases with humidity
-            # For standard 50% humidity, target k_aerosol ~ 0.1
-            humidity_frac = self.atmo.humidity / 100.0
-            self.k_aerosol = (
-                C.K_AEROSOL_BASE * (1.0 + humidity_frac) * self.altitude_aerosol
-            )
+    def update_season(self, jd: float) -> None:
+        """Refresh the extinction for a new date (season) if it changed.
 
-        # Ozone coefficient (constant)
-        self.k_ozone = C.K_OZONE
-
-        # Total extinction coefficient per airmass
-        self.k_total = self.k_rayleigh + self.k_aerosol + self.k_ozone
+        The aerosol/ozone extinction terms depend on the season (month).
+        A heliacal search spans many days, so the visibility check must
+        use the extinction of the evaluated day, not of the search start.
+        """
+        if abs(jd - self.jd) < 3.0:
+            return
+        self.jd = jd
+        self._compute_extinction_coefficients()
 
     def airmass(self, altitude_deg: float) -> float:
-        """
-        Calculate airmass using Rozenberg's formula.
-
-        This formula is more accurate near the horizon than the
-        simple sec(z) formula.
-
-        Args:
-            altitude_deg: Altitude above horizon in degrees
-
-        Returns:
-            Airmass (1.0 at zenith, ~38 at horizon)
-        """
-        if altitude_deg <= -10.0:
-            return 100.0  # Below horizon / extreme
-
-        # Rozenberg (1966) formula for better horizon accuracy
-        alt_rad = math.radians(max(altitude_deg, -5.0))
-        sin_alt = math.sin(alt_rad)
-        math.cos(alt_rad)
-
-        # Rozenberg formula
-        if altitude_deg > 0:
-            airmass = 1.0 / (sin_alt + 0.025 * math.exp(-11.0 * sin_alt))
-        else:
-            # Extended formula for negative altitudes (refraction)
-            airmass = 40.0  # Maximum reasonable airmass
-
-        return min(airmass, 100.0)
+        """Schaefer VISLIMIT sky airmass (gas component) at an altitude."""
+        return _vl_airmass(altitude_deg)
 
     def extinction(self, altitude_deg: float) -> float:
         """
-        Calculate total atmospheric extinction in magnitudes.
+        Total atmospheric extinction in magnitudes at an altitude.
 
-        Args:
-            altitude_deg: Altitude above horizon in degrees
-
-        Returns:
-            Extinction in magnitudes
+        Uses Schaefer's per-component airmasses (gas, aerosol, ozone,
+        water) so the near-horizon behaviour matches VISLIMIT:
+        DM = KR*XG + KA*XA + KO*XO + KW*XG.
         """
-        X = self.airmass(altitude_deg)
-        return self.k_total * X
+        xg = _vl_airmass_gas(altitude_deg)
+        xa = _vl_airmass_aer(altitude_deg)
+        xo = _vl_airmass_ozone(altitude_deg)
+        return (
+            self.k_rayleigh * xg
+            + self.k_aerosol * xa
+            + self.k_ozone * xo
+            + self.k_water * xg
+        )
 
-    def _ks_scattering(self, rho_deg: float) -> float:
-        """
-        Krisciunas & Schaefer (1991) Eq. 16 scattering function.
-
-        Combines Rayleigh scattering (1 + cos²ρ dipole pattern) and
-        Mie forward scattering (aerosol peak at small angles).
-
-        This function determines how the sky brightness varies with
-        angular distance ρ from an illuminating source (Sun or Moon).
-
-        Args:
-            rho_deg: Angular distance from light source in degrees
-
-        Returns:
-            Scattering intensity (nanoLamberts per foot-candle)
-        """
-        rho_deg = max(rho_deg, 0.5)  # Avoid singularity at 0°
-        rho_rad = math.radians(rho_deg)
-        cos_rho = math.cos(rho_rad)
-
-        # Rayleigh scattering: symmetric pattern with minima at 90°
-        rayleigh = 10**5.36 * (1.06 + cos_rho**2)
-
-        # Mie scattering: strong forward peak, exponential falloff
-        mie = 10 ** (6.15 - rho_deg / 40.0)
-
-        return rayleigh + mie
-
-    def sky_brightness_twilight(
-        self, sun_alt: float, obj_alt: float, elongation: float
-    ) -> float:
-        """
-        Calculate sky brightness contribution from twilight.
-
-        Based on Schaefer (1993) and Krisciunas & Schaefer (1991).
-        Returns brightness reduction in magnitudes relative to dark sky.
-
-        The model accounts for:
-        - Sun depression angle (primary twilight gradient)
-        - Angular distance from Sun (Mie forward-scattering peak)
-        - Object altitude (airmass through illuminated atmosphere)
-
-        Args:
-            sun_alt: Sun altitude in degrees (negative for below horizon)
-            obj_alt: Object altitude in degrees
-            elongation: Angular separation from Sun in degrees
-
-        Returns:
-            Sky brightness factor (magnitudes of limiting-mag reduction)
-        """
-        # Daylight case - return very large value
-        if sun_alt >= 0:
-            return 10.0  # Very bright
-
-        # Base twilight brightness from sun depression angle.
-        # Empirical relationship calibrated against reference heliacal
-        # event dates:
-        #   sun_alt = -6°  → sky = 3.5 (civil twilight, lim_mag ~ 3.0)
-        #   sun_alt = -10° → sky = 1.6 (mid-nautical, lim_mag ~ 4.9)
-        #   sun_alt = -14° → sky = 0.5 (late nautical, lim_mag ~ 6.0)
-        #   sun_alt = -18° → sky = 0.0 (astronomical, lim_mag ~ 6.5)
-        if sun_alt >= -6:
-            # Civil twilight: very bright, rapid change
-            base = 5.5 + sun_alt * 0.333  # 5.5 at horizon, 3.5 at -6
-        elif sun_alt >= -10:
-            # Early nautical twilight: still brightening rapidly
-            # 3.5 at -6°, 1.6 at -10° (steeper than before)
-            base = 3.5 + (sun_alt + 6) * 0.475
-        elif sun_alt >= -14:
-            # Late nautical twilight: moderate to dim
-            # 1.6 at -10°, 0.5 at -14°
-            base = 1.6 + (sun_alt + 10) * 0.275
-        elif sun_alt >= -18:
-            # Astronomical twilight: approaching dark
-            # 0.5 at -14°, 0.0 at -18°
-            base = 0.5 + (sun_alt + 14) * 0.125
-        else:
-            # Full night: dark sky
-            base = 0.0
-
-        # Horizon brightness: objects near the horizon look through
-        # more of the illuminated atmosphere. During twilight, the
-        # sky near the horizon is significantly brighter than at
-        # higher altitudes. This is because scattered sunlight
-        # concentrates in the lower atmosphere layers.
-        if obj_alt < 15.0 and sun_alt > -18.0:
-            # Objects below 15° altitude see extra brightness
-            # ~0.4 mag at alt=2°, ~0.1 at alt=10°, 0 at alt=15°
-            horizon_factor = 0.4 * ((15.0 - max(obj_alt, 0.5)) / 15.0) ** 1.5
-            # Scale by twilight intensity
-            twilight_scale = min(1.0, max(0.0, (sun_alt + 18.0) / 12.0))
-            base += horizon_factor * twilight_scale
-
-        # Mie forward-scattering penalty: aerosol-scattered sunlight
-        # creates a bright glow around the Sun's position that reduces
-        # the limiting magnitude for objects near the Sun.
-        # Calibrated against reference heliacal event dates.
-        if elongation < 60.0 and sun_alt > -18.0:
-            # Quadratic ramp: ~1.0 mag at elong=10°, ~0.25 at 30°, 0 at 60°
-            elong_factor = 1.0 * ((60.0 - elongation) / 60.0) ** 2
-            # Scale by twilight intensity (no effect in full darkness)
-            twilight_scale = min(1.0, max(0.0, (sun_alt + 18.0) / 12.0))
-            base += elong_factor * twilight_scale
-
-        return base
-
-    def sky_brightness_moon(
-        self,
-        moon_alt: float,
-        moon_phase: float,
-        obj_alt: float,
-        moon_obj_angle: float,
-    ) -> float:
-        """
-        Calculate sky brightness contribution from the Moon.
-
-        Uses the Krisciunas & Schaefer (1991) model. The Moon's
-        contribution depends on its phase (illuminance), altitude
-        (airmass extinction), angular distance to the object
-        (scattering function), and the object's zenith distance
-        (atmospheric path length for scattered moonlight).
-
-        The illuminance model uses Allen (1976) lunar magnitudes
-        as a function of phase angle, converted to ground-level
-        illuminance in foot-candles after atmospheric extinction.
-
-        Args:
-            moon_alt: Moon altitude in degrees
-            moon_phase: Moon phase fraction (0 = new, 1 = full)
-            obj_alt: Object altitude in degrees
-            moon_obj_angle: Angular separation between Moon and object in degrees
-
-        Returns:
-            Sky brightness contribution in magnitudes of limiting-mag reduction
-        """
-        if moon_alt <= 0:
-            return 0.0
-
-        # Convert illuminated fraction to the geometric phase angle (degrees).
-        # f = (1 + cos(alpha)) / 2  =>  alpha = acos(2*f - 1):
-        #   f=0 -> alpha=180 (new), f=1 -> alpha=0 (full), f=0.5 -> alpha=90.
-        # The previous linear map (1 - f) * 180 over-brightened gibbous phases.
-        phase_fraction = min(1.0, max(0.0, moon_phase))
-        alpha = math.degrees(math.acos(2.0 * phase_fraction - 1.0))
-
-        # Moon visual magnitude as function of phase angle
-        # (Allen 1976, Krisciunas & Schaefer 1991 Eq. 9).
-        # V_moon = -12.73 + 0.026|alpha| + 4e-9 * alpha^4
-        abs_alpha = abs(alpha)
-        moon_mag = -12.73 + 0.026 * abs_alpha + 4.0e-9 * abs_alpha**4
-
-        # Convert magnitude to illuminance in foot-candles
-        # (K&S 1991 Eq. 8): I = 10^(-0.4 * (V + 16.57))
-        I_star = 10.0 ** (-0.4 * (moon_mag + 16.57))
-
-        # Extinction of moonlight through atmosphere
-        X_moon = self.airmass(moon_alt)
-        I_ground = I_star * 10.0 ** (-0.4 * self.k_total * X_moon)
-
-        # Scattering function at angle rho from Moon
-        f_rho = self._ks_scattering(moon_obj_angle)
-
-        # Airmass at object position
-        X_obj = self.airmass(obj_alt)
-
-        # Sky brightness from Moon (K&S 1991 Eq. 20):
-        # B_moon = f(rho) * I* * 10^(-0.4*k*X_moon) * (1 - 10^(-0.4*k*X_obj))
-        #
-        # I_ground already carries the moonlight extinction along the Moon's
-        # airmass (X_moon). The remaining factor (1 - 10^(-0.4*k*X_obj)) is the
-        # fraction of atmosphere along the OBJECT's line of sight available for
-        # scattering. There is no second object-path extinction multiplier; an
-        # extra 10^(-0.4*k*X_obj) here would apply object-path extinction twice
-        # and systematically under-estimate moonlit sky brightness at low
-        # object altitude.
-        scatter_depth = 1.0 - 10.0 ** (-0.4 * self.k_total * X_obj)
-
-        # B_moon in nanoLamberts
-        B_moon = f_rho * I_ground * scatter_depth
-
-        # Convert B_moon to magnitude reduction.
-        # Dark sky brightness B_dark ≈ 145 nL (airglow) + 100 nL (zodiacal)
-        # = 245 nL total. A full Moon at zenith adds ~400 nL at 60° away,
-        # giving ~2.0 mag reduction. This matches observations.
-        B_dark = 245.0  # nanoLamberts (airglow + zodiacal)
-        if B_moon <= 0:
-            return 0.0
-
-        reduction = 2.5 * math.log10(1.0 + B_moon / B_dark)
-        return max(0.0, min(5.0, reduction))
-
-    def sky_brightness_total(
+    def _sky_brightness_bl(
         self,
         sun_alt: float,
         moon_alt: float,
@@ -492,47 +399,93 @@ class SchaeferModel:
         moon_obj_angle: float,
     ) -> float:
         """
-        Calculate total sky brightness at object position.
+        Total sky brightness at the object, in nanoLamberts (Schaefer VISLIMIT).
 
-        Combines twilight, moonlight, and airglow contributions
-        additively in linear brightness space (K&S 1991 Eq. 1),
-        then converts back to magnitude reduction.
-
-        Returns brightness reduction in magnitudes (higher = brighter
-        sky = lower limiting mag).
+        Sums the dark night sky (BN), the twilight OR daylight component
+        (BT/BD, whichever is brighter, with the daylight term gated to a
+        Sun above the horizon), and the moonlight component (BM).
 
         Args:
-            sun_alt: Sun altitude in degrees
-            moon_alt: Moon altitude in degrees
-            moon_phase: Moon phase (0 = new, 1 = full)
-            obj_alt: Object altitude in degrees
-            sun_obj_angle: Elongation from Sun in degrees
-            moon_obj_angle: Angular separation from Moon in degrees
+            sun_alt: Sun altitude in degrees.
+            moon_alt: Moon altitude in degrees.
+            moon_phase: Moon illuminated fraction (0 = new, 1 = full).
+            obj_alt: Object altitude in degrees.
+            sun_obj_angle: Sky angular separation object-Sun in degrees.
+            moon_obj_angle: Sky angular separation object-Moon in degrees.
 
         Returns:
-            Total sky brightness reduction in magnitudes
+            Total sky brightness in nanoLamberts.
         """
-        # Each component is already in magnitude reduction.
-        # Convert each to linear brightness ratio (B/B_dark),
-        # add them, then convert back to magnitude reduction.
-        b_twi_mag = self.sky_brightness_twilight(sun_alt, obj_alt, sun_obj_angle)
-        b_moon_mag = self.sky_brightness_moon(
-            moon_alt, moon_phase, obj_alt, moon_obj_angle
+        K = self.k_total
+        Z = 90.0 - obj_alt
+        X = _vl_airmass(obj_alt)
+        ZZ = Z * _RD
+        year = 2000.0 + (self.jd - 2451545.0) / 365.25
+
+        # Dark night sky
+        bn = _VL_BO * (1.0 + 0.3 * math.cos(6.283 * (year - 1992.0) / 11.0))
+        bn *= 0.4 + 0.6 / math.sqrt(1.0 - 0.96 * (math.sin(ZZ)) ** 2)
+        bn *= 10.0 ** (-0.4 * K * X)
+        b = bn
+
+        one_minus = 1.0 - 10.0 ** (-0.4 * K * X)
+        # Twilight
+        rs = max(sun_obj_angle, 1.0)
+        bt = 10.0 ** (-0.4 * (_VL_MS - _VL_MOI + 32.5 - sun_alt - (Z / (360.0 * K))))
+        bt *= (100.0 / rs) * one_minus
+        if sun_alt > 0.0:
+            # Daylight scattering (only when the Sun is above the horizon)
+            xs = _vl_airmass(sun_alt)
+            c4 = 10.0 ** (-0.4 * K * xs)
+            fs = (
+                6.2e7 * (rs ** -2)
+                + 10.0 ** (6.15 - rs / 40.0)
+                + (10.0**5.36) * (1.06 + (math.cos(rs * _RD)) ** 2)
+            )
+            bd = (
+                10.0 ** (-0.4 * (_VL_MS - _VL_MOI + 43.27))
+                * one_minus
+                * (fs * c4 + 440000.0 * (1.0 - c4))
+            )
+            b += bd if bd > bt else bt
+        else:
+            b += bt
+
+        # Moonlight
+        if moon_alt > 0.0:
+            rm = max(moon_obj_angle, 1.0)
+            am = math.degrees(math.acos(min(1.0, max(-1.0, 2.0 * moon_phase - 1.0))))
+            mm = -12.73 + 0.026 * abs(am) + 4e-9 * (am**4)
+            xm = _vl_airmass(moon_alt)
+            c3 = 10.0 ** (-0.4 * K * xm)
+            fm = (
+                6.2e7 * (rm ** -2)
+                + 10.0 ** (6.15 - rm / 40.0)
+                + (10.0**5.36) * (1.06 + (math.cos(rm * _RD)) ** 2)
+            )
+            bm = (
+                10.0 ** (-0.4 * (mm - _VL_MOI + 43.27))
+                * one_minus
+                * (fm * c3 + 440000.0 * (1.0 - c3))
+            )
+            b += bm
+
+        return b / 1.11e-15
+
+    def sky_brightness_bl(
+        self,
+        sun_alt: float,
+        moon_alt: float,
+        moon_phase: float,
+        obj_alt: float,
+        sun_obj_angle: float,
+        moon_obj_angle: float,
+    ) -> float:
+        """Total sky brightness in nanoLamberts (Schaefer VISLIMIT)."""
+        return self._sky_brightness_bl(
+            sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
         )
 
-        # Convert from mag reduction to linear brightness excess:
-        # mag_reduction = 2.5 * log10(1 + B/B_dark)
-        # → B/B_dark = 10^(mag/2.5) - 1
-        B_twi = 10.0 ** (b_twi_mag / 2.5) - 1.0 if b_twi_mag > 0 else 0.0
-        B_moon = 10.0 ** (b_moon_mag / 2.5) - 1.0 if b_moon_mag > 0 else 0.0
-
-        # Total brightness = sum of individual contributions
-        B_total = B_twi + B_moon
-
-        if B_total <= 0:
-            return 0.0
-
-        return 2.5 * math.log10(1.0 + B_total)
 
     def limiting_magnitude(
         self,
@@ -544,67 +497,49 @@ class SchaeferModel:
         moon_obj_angle: float = 180.0,
     ) -> float:
         """
-        Calculate the limiting apparent visual magnitude.
+        Calculate the limiting visual magnitude (Schaefer VISLIMIT).
 
-        Returns the faintest apparent magnitude visible at the given
-        sky conditions. Compare directly against apparent magnitude
-        (catalog magnitude + extinction).
-
-        Based on Schaefer (1993) model considering:
-        - Sky brightness from twilight, moonlight, and airglow
-        - Observer eye characteristics
-
-        Note: This returns a limit on *apparent* magnitude. The caller
-        must add atmospheric extinction to the body's catalog magnitude
-        before comparing. Extinction is NOT included here to avoid
-        double-counting.
+        Returns the faintest *catalog* magnitude visible at the object's
+        position and the given sky conditions. Atmospheric extinction to
+        the object's altitude is already folded in (via the -DM term), so
+        this may be compared directly against a body's catalog magnitude
+        (matching the reference vis_limit_mag dret[0] convention).
 
         Args:
             sun_alt: Sun altitude in degrees
             moon_alt: Moon altitude in degrees
-            moon_phase: Moon phase (0 = new, 1 = full)
+            moon_phase: Moon illuminated fraction (0 = new, 1 = full)
             obj_alt: Object altitude in degrees
-            sun_obj_angle: Elongation from Sun in degrees
-            moon_obj_angle: Angular separation from Moon in degrees
+            sun_obj_angle: Sky angular separation object-Sun in degrees
+            moon_obj_angle: Sky angular separation object-Moon in degrees
 
         Returns:
-            Limiting apparent visual magnitude (fainter = larger number)
+            Limiting visual magnitude (fainter = larger number)
         """
-        C = SchaeferConstants
-
-        # Base limiting magnitude for perfect dark sky conditions
-        m_lim_base = C.PERFECT_SKY_LIM_MAG  # 6.5
-
-        # Sky brightness reduction (in magnitudes)
-        sky_reduction = self.sky_brightness_total(
+        bl = self._sky_brightness_bl(
             sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
         )
+        # Contrast threshold (Hecht/Knoll-Schaefer): photopic vs scotopic
+        if bl > 1500.0:
+            c1 = 10.0**-8.350001
+            c2 = 10.0**-5.9
+        else:
+            c1 = 10.0**-9.8
+            c2 = 10.0**-1.9
+        th = c1 * ((1.0 + math.sqrt(c2 * bl)) ** 2)  # foot-candles
 
-        # Calculate limiting magnitude
-        # Brighter sky = lower limiting magnitude (can see fewer faint objects)
-        # NOTE: extinction is NOT subtracted here — it is applied to the body's
-        # catalog magnitude by the caller (is_visible). This avoids the previous
-        # double-counting bug where extinction was subtracted from the limit
-        # AND added to the body magnitude.
-        m_lim = m_lim_base - sky_reduction
+        # Extinction to the object (magnitudes) is included in the limit.
+        dm = self.extinction(obj_alt)
+        m_lim = -16.57 - 2.5 * math.log10(th) - dm
 
-        # Observer corrections
-        # Age effect (eyes deteriorate with age)
-        age_factor = max(0, (self.observer.age - 30) / 10.0) * 0.1
-        m_lim -= age_factor
-
-        # Snellen ratio (better eyes see fainter)
+        # Snellen ratio (better eyes see fainter); VISLIMIT uses 5 log10(SN).
         if self.observer.snellen > 0:
-            snellen_factor = 2.5 * math.log10(self.observer.snellen)
-            m_lim += snellen_factor
+            m_lim += 5.0 * math.log10(self.observer.snellen)
 
-        # Binocular gain (about 0.8 mag)
+        # Binocular / telescope aperture gain (naked-eye default: no effect).
         if self.observer.binocular:
             m_lim += 0.8
-
-        # Telescope gain
         if self.observer.telescope_mag > 1.0 and self.observer.aperture > 0:
-            # Gain = 5 * log10(D/7) where D is aperture in mm
             aperture_gain = 5.0 * math.log10(self.observer.aperture / 7.0)
             m_lim += aperture_gain * self.observer.transmission
 
@@ -628,33 +563,55 @@ class SchaeferModel:
         Returns:
             Required arcus visionis in degrees
         """
+        # Root-find on the VISLIMIT limiting-magnitude model. For a body of
+        # magnitude ``body_mag`` placed directly above the Sun (azimuth
+        # aligned, so the Sun-object sky angle equals the arcus visionis),
+        # find, at each Sun depression, the object altitude at which the
+        # object is exactly at the visibility limit (limiting mag == body
+        # mag), then take the minimum required altitude difference. This
+        # mirrors the reference's topocentric arcus visionis.
+        def _obj_alt_at_limit(sun_alt: float) -> Optional[float]:
+            lo, hi = 0.2, 60.0
+            f_lo = (
+                self.limiting_magnitude(sun_alt, -90.0, 0.0, lo, lo - sun_alt, 180.0)
+                - body_mag
+            )
+            f_hi = (
+                self.limiting_magnitude(sun_alt, -90.0, 0.0, hi, hi - sun_alt, 180.0)
+                - body_mag
+            )
+            if f_lo > 0:  # already visible at the horizon
+                return lo
+            if f_hi < 0:  # never visible up to 60 deg
+                return None
+            for _ in range(40):
+                mid = 0.5 * (lo + hi)
+                fm = (
+                    self.limiting_magnitude(
+                        sun_alt, -90.0, 0.0, mid, mid - sun_alt, 180.0
+                    )
+                    - body_mag
+                )
+                if fm >= 0:
+                    hi = mid
+                else:
+                    lo = mid
+                if hi - lo < 1e-3:
+                    break
+            return 0.5 * (lo + hi)
 
-        # Base arcus visionis depends on magnitude
-        # Brighter objects need less arcus visionis
-        if body_mag < -3.0:
-            # Very bright (Venus at brightest)
-            base_av = 5.0
-        elif body_mag < -1.0:
-            # Bright (Jupiter, Sirius)
-            base_av = 7.0
-        elif body_mag < 0.5:
-            # Moderately bright (Saturn, Canopus)
-            base_av = 9.0
-        elif body_mag < 1.5:
-            # Medium brightness
-            base_av = 10.0
-        elif body_mag < 3.0:
-            # Faint
-            base_av = 12.0
-        else:
-            # Very faint
-            base_av = 14.0 + (body_mag - 3.0) * 0.5
-
-        # Adjust for atmospheric conditions
-        # Poor conditions require larger arcus visionis
-        av = base_av * (1.0 + 0.5 * (self.k_total - 0.25))
-
-        return av
+        best_av = None
+        sa = -1.0
+        while sa >= -22.0:
+            h = _obj_alt_at_limit(sa)
+            if h is not None:
+                av = h - sa
+                if best_av is None or av < best_av:
+                    best_av = av
+            sa -= 0.5
+        if best_av is None:
+            return 0.0
+        return best_av
 
     def is_visible(
         self,
@@ -707,7 +664,9 @@ class SchaeferModel:
         if elongation < 7.0:
             return False
 
-        # Calculate limiting apparent magnitude at body position
+        # Limiting (catalog) magnitude at the body position; this already
+        # folds in atmospheric extinction to the body's altitude, so it is
+        # compared directly against the body's catalog magnitude.
         lim_mag = self.limiting_magnitude(
             sun_alt=sun_alt,
             moon_alt=moon_alt,
@@ -717,12 +676,9 @@ class SchaeferModel:
             moon_obj_angle=moon_obj_angle,
         )
 
-        # Apply extinction to body magnitude to get apparent magnitude
-        apparent_mag = body_mag + self.extinction(body_alt)
-
-        # Body is visible if apparent magnitude is brighter than limiting
-        # magnitude minus the detection margin.
-        return apparent_mag <= lim_mag - margin
+        # Body is visible if its catalog magnitude is brighter than the
+        # limiting magnitude minus the detection margin.
+        return body_mag <= lim_mag - margin
 
     def heliacal_visibility_angle(
         self,
@@ -760,6 +716,8 @@ def create_schaefer_model(
     altitude: float = 0.0,
     observer_age: float = 36.0,
     snellen: float = 1.0,
+    latitude: float = 0.0,
+    jd: float = 2451545.0,
 ) -> SchaeferModel:
     """
     Create a SchaeferModel instance with given parameters.
@@ -774,6 +732,10 @@ def create_schaefer_model(
         altitude: Observer altitude in meters (default 0.0)
         observer_age: Observer age in years (default 36.0)
         snellen: Snellen ratio, 1.0 = normal vision (default 1.0)
+        latitude: Observer latitude in degrees, for the seasonal/latitude
+            extinction terms (default 0.0)
+        jd: Julian Day (UT) for the season of the extinction terms
+            (default J2000.0)
 
     Returns:
         SchaeferModel instance configured with given parameters
@@ -793,7 +755,7 @@ def create_schaefer_model(
         aperture=0.0,
         transmission=1.0,
     )
-    return SchaeferModel(atmo, observer)
+    return SchaeferModel(atmo, observer, latitude=latitude, jd=jd)
 
 
 # Outer planets (orbit outside Earth's orbit)
@@ -1083,6 +1045,8 @@ def _heliacal_ut_leb(
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        latitude=lat,
+        jd=jd_start,
     )
 
     def _get_moon_data(jd: float):
@@ -1134,6 +1098,7 @@ def _heliacal_ut_leb(
             return False, sun_alt, body_alt, elongation
         body_mag = _get_body_magnitude(jd)
         moon_alt, moon_phase, moon_body_sep = _get_moon_data(jd)
+        schaefer.update_season(jd)
         visible = schaefer.is_visible(
             body_alt=body_alt,
             body_mag=body_mag,
@@ -1145,12 +1110,13 @@ def _heliacal_ut_leb(
         )
         return visible, sun_alt, body_alt, elongation
 
-    def _is_body_visible_no_moon(jd: float, margin: float = 0.5) -> bool:
+    def _is_body_visible_no_moon(jd: float, margin: float = 0.0) -> bool:
         sun_alt, body_alt, _ = _get_altitudes(jd)
         elongation = _get_elongation(jd)
         if body_alt < 0 or sun_alt > 0:
             return False
         body_mag = _get_body_magnitude(jd)
+        schaefer.update_season(jd)
         return schaefer.is_visible(
             body_alt=body_alt,
             body_mag=body_mag,
@@ -1196,20 +1162,34 @@ def _heliacal_ut_leb(
         center_ut = _find_twilight_center(jd_day, morning)
         if center_ut < 0:
             return False, 0.0
-        sun_upper = -5.0 if morning else -2.0
-        for dt_min in range(-180, 181, 15):
-            ut_hour = center_ut + dt_min / 60.0
+        # The first/last days of an apparition are visible only in a narrow
+        # window near the optimal Sun depression, where the margin peaks at a
+        # few tenths of a magnitude. Locate that peak by scanning the
+        # productive twilight band (Sun ~ -2 to -14 deg) at ~2.5-min
+        # resolution and take the maximum margin; a coarser grid steps over
+        # the marginal peak and shifts the reported day by +/-1.
+        best_m = -999.0
+        best_jd = 0.0
+        for dt_step in range(-15, 16):
+            ut_hour = center_ut + (dt_step * 3.0) / 60.0
             jd_check = jd_day + ut_hour / 24.0
             sun_alt, body_alt, _ = _get_altitudes(jd_check)
-            if -18.0 < sun_alt < sun_upper and body_alt > 0.5:
-                if morning:
-                    vis_margin = 0.70 if sun_alt <= -10.0 else 0.50
-                else:
-                    elong = _get_elongation(jd_check)
-                    vis_margin = min(0.63 + elong * 0.006, 0.85)
-                visible = _is_body_visible_no_moon(jd_check, margin=vis_margin)
-                if visible:
-                    return True, jd_check
+            if not (-18.0 < sun_alt < -1.0 and body_alt > 0.5):
+                continue
+            body_mag = _get_body_magnitude(jd_check)
+            elong = _get_elongation(jd_check)
+            schaefer.update_season(jd_check)
+            m = (
+                schaefer.limiting_magnitude(
+                    sun_alt, -90.0, 0.0, body_alt, elong, 180.0
+                )
+                - body_mag
+            )
+            if m > best_m:
+                best_m = m
+                best_jd = jd_check
+        if best_m >= _HELIACAL_VIS_MARGIN and best_jd:
+            return True, best_jd
         return False, 0.0
 
     # --- Vectorized batch is NOT used in the LEB path ---
@@ -1633,6 +1613,8 @@ def _heliacal_pheno_ut_leb(
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        latitude=lat,
+        jd=jd,
     )
     k_act = schaefer.k_total
     min_tav = schaefer.arcus_visionis_required(magnitude)
@@ -1773,21 +1755,18 @@ def _vislim_scotopic_flag(
 ) -> int:
     """Reference-style scotopic/photopic return flag for vis_limit_mag.
 
-    The reference flags scotopic (night) vision when the total sky
-    background at the object falls below 1645 nanolamberts, with an
-    extra +2 bit inside the transition band around 1479 nL. Our sky
-    model works in magnitude-reduction space over the dark-sky
-    background (~54 nL at zenith), so the brightness is converted
-    before applying the same thresholds. HELFLAG_VISLIM_PHOTOPIC and
-    HELFLAG_VISLIM_SCOTOPIC override the measurement.
+    Schaefer's VISLIMIT contrast threshold switches from the photopic to
+    the scotopic (dark, night-vision) branch when the total sky
+    background at the object falls below 1500 nanolamberts. This mirrors
+    that switch directly on the model's total sky brightness (nL).
+    HELFLAG_VISLIM_PHOTOPIC / HELFLAG_VISLIM_SCOTOPIC override it.
     """
     from .constants import HELFLAG_PHOTOPIC, HELFLAG_SCOTOPIC
 
-    reduction_mag = schaefer.sky_brightness_total(
+    bsk_nl = schaefer.sky_brightness_bl(
         sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
     )
-    bsk_nl = 54.0 * (10.0 ** (reduction_mag / 2.5))
-    is_scotopic = bsk_nl < 1645.0
+    is_scotopic = bsk_nl < 1500.0
     if flags & HELFLAG_VISLIM_PHOTOPIC:
         is_scotopic = False
     if flags & HELFLAG_VISLIM_SCOTOPIC:
@@ -1963,6 +1942,8 @@ def _vis_limit_mag_leb(
         altitude=alt_m,
         observer_age=observer_age,
         snellen=snellen_ratio,
+        latitude=lat,
+        jd=tjdut,
     )
 
     # Moon phase and angular separations via LEB ecliptic positions
@@ -2315,6 +2296,8 @@ def _heliacal_ut_pythonic(
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,  # Convert to %
         altitude=altitude,
         met_range=met_range,
+        latitude=lat,
+        jd=jd_start,
     )
 
     def _get_moon_data(jd: float) -> Tuple[float, float, float]:
@@ -2390,7 +2373,8 @@ def _heliacal_ut_pythonic(
         # Get Moon data
         moon_alt, moon_phase, moon_body_sep = _get_moon_data(jd)
 
-        # Use Schaefer model for visibility check
+        # Use Schaefer model for visibility check (with the day's season)
+        schaefer.update_season(jd)
         is_visible = schaefer.is_visible(
             body_alt=body_alt,
             body_mag=body_mag,
@@ -2403,7 +2387,7 @@ def _heliacal_ut_pythonic(
 
         return is_visible, sun_alt, body_alt, elongation
 
-    def _is_body_visible_no_moon(jd: float, margin: float = 0.5) -> bool:
+    def _is_body_visible_no_moon(jd: float, margin: float = 0.0) -> bool:
         """
         Check if body would be visible ignoring moonlight.
 
@@ -2424,7 +2408,8 @@ def _heliacal_ut_pythonic(
 
         body_mag = _get_body_magnitude(jd)
 
-        # Check visibility with Moon forced below horizon
+        # Check visibility with Moon forced below horizon (day's season)
+        schaefer.update_season(jd)
         return schaefer.is_visible(
             body_alt=body_alt,
             body_mag=body_mag,
@@ -2584,37 +2569,9 @@ def _heliacal_ut_pythonic(
             sun_alt, body_alt, _ = _get_altitudes(jd_check)
 
             if -18.0 < sun_alt < sun_upper and body_alt > 0.5:
-                if morning:
-                    # Sun-altitude-dependent morning threshold.
-                    #
-                    # At deep twilight (sun <= -10 deg) the empirical
-                    # sky brightness model underestimates the actual
-                    # sky brightness, producing inflated visibility
-                    # margins that cause premature detection by 1-2
-                    # days.  A higher threshold (0.70 mag) compensates
-                    # for the model's bias in the late nautical
-                    # twilight regime.
-                    #
-                    # At shallower twilight (sun > -10 deg) the
-                    # standard Schaefer (1993) 0.50 mag threshold
-                    # applies, corresponding to ~90% detection
-                    # probability.
-                    if sun_alt <= -10.0:
-                        vis_margin = 0.70
-                    else:
-                        vis_margin = 0.50
-                else:
-                    # Elongation-dependent evening threshold.
-                    # At small elongations (<20°) scattered sunlight
-                    # near the Sun is brighter than the model predicts,
-                    # producing inflated visibility margins. A lower
-                    # threshold compensates. At large elongations the
-                    # model is more accurate, so a higher threshold
-                    # matches reference transition points.
-                    elong = _get_elongation(jd_check)
-                    vis_margin = min(0.63 + elong * 0.006, 0.85)
-
-                visible = _is_body_visible_no_moon(jd_check, margin=vis_margin)
+                visible = _is_body_visible_no_moon(
+                    jd_check, margin=_HELIACAL_VIS_MARGIN
+                )
                 if visible:
                     return True, jd_check
 
@@ -2769,12 +2726,7 @@ def _heliacal_ut_pythonic(
             if ba < 0 or sa > 0:
                 continue
 
-            if morning:
-                vis_margin = 0.70 if sa <= -10.0 else 0.50
-            else:
-                elong = float(elongations[k])
-                vis_margin = min(0.63 + elong * 0.006, 0.85)
-
+            schaefer.update_season(float(scan_jds[k]))
             visible = schaefer.is_visible(
                 body_alt=ba,
                 body_mag=day_mags[day_i],
@@ -2783,7 +2735,7 @@ def _heliacal_ut_pythonic(
                 moon_alt=-90.0,
                 moon_phase=0.0,
                 moon_obj_angle=180.0,
-                margin=vis_margin,
+                margin=_HELIACAL_VIS_MARGIN,
             )
             if visible:
                 results[day_i] = (True, float(scan_jds[k]))
@@ -3291,29 +3243,14 @@ def _heliacal_visibility_window(
     darkness), the event time itself is reported for that limit.
     """
 
-    pressure = atmo[0] if len(atmo) > 0 and atmo[0] > 0 else 1013.25
-    temperature = atmo[1] if len(atmo) > 1 else 15.0
-    humidity_pct = atmo[2] if len(atmo) > 2 else 40.0
-    met_range = atmo[3] if len(atmo) > 3 else 0.0
-    schaefer = create_schaefer_model(
-        pressure=pressure,
-        temperature=temperature,
-        humidity=humidity_pct if humidity_pct > 1.0 else humidity_pct * 100.0,
-        # Use the full met_range (including a 0<ktot<1 override) so this
-        # model's extinction term matches the k that vis_limit_mag applies to
-        # the limiting magnitude in _margin; gating it to >=1.0 mixed a
-        # ktot-override limiting mag with a recomputed-k extinction term.
-        met_range=met_range,
-        altitude=geopos[2] if len(geopos) > 2 else 0.0,
-        observer_age=observer[0] if len(observer) > 0 else 36.0,
-        snellen=observer[1] if len(observer) > 1 else 1.0,
-    )
-
     def _margin(jd: float) -> float:
+        # dret[0] is the limiting (catalog) magnitude at the object, with
+        # atmospheric extinction already folded in, so the visibility
+        # margin is simply limiting mag minus the body's catalog magnitude.
         retval, dret = vis_limit_mag(jd, geopos, atmo, observer, objname, flags)
         if retval < 0:
             return -99.0
-        return dret[0] - (dret[7] + schaefer.extinction(dret[1]))
+        return dret[0] - dret[7]
 
     # Optimum: maximum margin within ~3 hours of the event.
     win = 0.12
@@ -3543,24 +3480,13 @@ def _pheno_rise_window(
     if objname is None:
         return rise_o, rise_s, lag, t_first, t_best, t_last, tvis, tb_yallop
 
-    _schaefer = create_schaefer_model(
-        pressure=atmo4[0],
-        temperature=atmo4[1],
-        humidity=atmo4[2],
-        # Use the full met_range (including a 0<ktot<1 override) so this
-        # model's extinction term matches the k that vis_limit_mag applies to
-        # the limiting magnitude in _margin, mirroring _heliacal_visibility_window.
-        met_range=atmo4[3],
-        altitude=geopos3[2],
-        observer_age=obs6[0],
-        snellen=obs6[1],
-    )
-
     def _margin(t: float) -> float:
+        # dret[0] already includes extinction to the object (reference
+        # convention), so the margin is limiting mag minus catalog mag.
         retval, dret_v = vis_limit_mag(t, geopos3, atmo4, obs6, objname, flags)
         if retval < 0:
             return -99.0
-        return dret_v[0] - (dret_v[7] + _schaefer.extinction(dret_v[1]))
+        return dret_v[0] - dret_v[7]
 
     win = 4.0 / 24.0
     if rs == CALC_RISE:
@@ -3920,6 +3846,8 @@ def _heliacal_pheno_ut_pythonic(
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        latitude=lat,
+        jd=jd,
     )
     k_act = schaefer.k_total
     min_tav = schaefer.arcus_visionis_required(magnitude)
@@ -4440,6 +4368,8 @@ def vis_limit_mag(
         altitude=alt_m,
         observer_age=observer_age,
         snellen=snellen_ratio,
+        latitude=lat,
+        jd=tjdut,
     )
 
     # Calculate Moon phase for sky brightness

@@ -1071,8 +1071,16 @@ class TestHeliacalPhenoAtmospheric:
 
         assert k_high > k_low
 
-    def test_with_low_pressure(self):
-        """Test with low atmospheric pressure."""
+    def test_pressure_does_not_affect_extinction(self):
+        """Atmospheric pressure must not change the extinction coefficient.
+
+        In Schaefer's VISLIMIT model (which the reference implements) the
+        astronomical extinction coefficient depends on temperature,
+        relative humidity, observer altitude and season, but NOT on the
+        surface pressure (datm[0]); pressure only enters the refraction
+        of the apparent altitude. The old library scaled Rayleigh
+        extinction by pressure, which the reference does not do.
+        """
         jd = julday(2024, 1, 15, 5)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
@@ -1093,11 +1101,37 @@ class TestHeliacalPhenoAtmospheric:
             HELIACAL_RISING,
         )
 
-        # Lower pressure should decrease extinction
-        k_normal = dret_normal[10]
-        k_low = dret_low[10]
+        # Extinction (dret[10]) is independent of surface pressure.
+        assert dret_low[10] == pytest.approx(dret_normal[10], abs=1e-9)
 
-        assert k_low < k_normal
+    def test_with_higher_temperature(self):
+        """Higher air temperature increases the extinction coefficient.
+
+        The water-vapour extinction term scales as exp(T/15), so a warmer
+        atmosphere (at fixed relative humidity) holds more water and is
+        more extinctive, matching the reference.
+        """
+        jd = julday(2024, 1, 15, 5)
+        geopos = (12.4964, 41.9028, 0.0)  # Rome
+
+        dret_cold = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 0.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            HELIACAL_RISING,
+        )
+        dret_warm = heliacal_pheno_ut(
+            jd,
+            geopos,
+            (1013.25, 30.0, 50.0, 0.0),
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            "Venus",
+            HELIACAL_RISING,
+        )
+
+        assert dret_warm[10] > dret_cold[10]
 
 
 class TestHeliacalPhenoAlias:
