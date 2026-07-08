@@ -9,6 +9,7 @@ RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 LOG_FILE="$LOG_DIR/leb-regeneration-$RUN_ID.log"
 LOCK_DIR=".leb-regeneration.lock"
 LOCK_WAIT_SECONDS="${LOCK_WAIT_SECONDS:-60}"
+LOCK_ACQUIRED=0
 
 TIER="all"
 GROUP_SPEC="all"
@@ -269,7 +270,11 @@ parse_args() {
 }
 
 cleanup() {
-  rm -rf "$LOCK_DIR"
+  # Only remove the lock this process actually acquired. Interrupting while
+  # still waiting for another holder's lock must not delete that holder's lock.
+  if ((LOCK_ACQUIRED)); then
+    rm -rf "$LOCK_DIR"
+  fi
 }
 
 run() {
@@ -856,6 +861,23 @@ convert_leb2_tier() {
   source="$(main_leb1_path "$tier")"
   if ! ((DRY_RUN)); then
     [[ -f "$source" ]] || die "cannot convert LEB2: missing LEB1 source: $source"
+
+    # Freshness guard: LEB2 is converted from the merged main LEB1. If any
+    # partial LEB1 group file for this tier is newer than the main (e.g. a
+    # --no-merge run regenerated groups without updating the main), the LEB2
+    # output would be built from stale data. Fail loudly rather than ship it.
+    local newest_partial="" partial
+    for partial in data/leb/ephemeris_"$tier"_*.leb; do
+      [[ -e "$partial" ]] || continue
+      if [[ -z "$newest_partial" || "$partial" -nt "$newest_partial" ]]; then
+        newest_partial="$partial"
+      fi
+    done
+    if [[ -n "$newest_partial" && "$newest_partial" -nt "$source" ]]; then
+      die "cannot convert LEB2: main LEB1 '$source' is older than partial" \
+        "group file '$newest_partial'; merge the LEB1 groups first (drop" \
+        "--no-merge) so LEB2 is not built from a stale main."
+    fi
   fi
 
   while IFS= read -r group; do
@@ -979,6 +1001,8 @@ main() {
     echo "Waiting ${LOCK_WAIT_SECONDS}s before retrying."
     sleep "$LOCK_WAIT_SECONDS"
   done
+  # Lock is now held by this process; the EXIT trap may remove it.
+  LOCK_ACQUIRED=1
 
   select_python
   print_configuration
