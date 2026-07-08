@@ -328,3 +328,31 @@ the reference's reported SID|EQ Moon speed (dRA 45197.42, dDec 19297.82
 "/day at JD 2460000.5, Lahiri) sits on the derivative-of-reported-position
 side and matches libephemeris to **0.05"/day** — not the true-equator rate.
 The two engines agree; nothing is intentionally divergent here.
+
+## 10. Sripati `house_pos` in the house-12 wrap region
+
+**Status:** intentional divergence (documented after the v3 review round).
+
+`house_pos` with the Sripati system (`hsys = 'S'`) places each body between
+1.0 and 13.0 by shifting the Porphyry result forward by half a house, so a body
+deep in house 12 lands in `[12.0, 13.0)` before the wrap back to `[1.0, 1.5)`.
+libephemeris wraps only the true overflow (`if hpos >= 13.0: hpos -= 12.0`),
+**preserving the fraction** so the house-12 region reports values like 12.03,
+12.27, … (internally consistent with the engine's own Sripati cusps, which put
+those longitudes in house 12).
+
+The reference API instead collapses the whole house-12 wrap region onto house 1:
+for ~43 of 360 body longitudes (the entire Sripati house-12 region plus the
+first half of house 1) it returns exactly `1.0`, dropping the fraction. This is
+internally inconsistent with the reference's *own* Sripati cusps — the same
+longitudes fall between its cusp 12 and cusp 1, yet its `house_pos` reports
+house 1. Verified by direct differential measurement at armc 100°, lat 51.5°
+(`lib house_pos = 12.03` vs `reference = 1.00` at bodylon 144°; the pattern
+reproduces at every lat/armc tested).
+
+libephemeris keeps the geometrically-consistent, fraction-preserving value
+because the reference's collapse loses information (a body in house 12 is
+reported as house 1) and contradicts the cusps it returns for the same chart.
+Consumers that need bit-parity with the reference's collapse for the house-12
+region should apply `1.0 if hpos > 12.0 else hpos` to the result. Every other
+house region agrees exactly; only the Sripati house-12 wrap region differs.
