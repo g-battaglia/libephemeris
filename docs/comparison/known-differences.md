@@ -651,9 +651,11 @@ reference ephemeris.
 
 Measured agreement (calibrated and held-out probes against the reference):
 
-- **`vis_limit_mag` limiting magnitude (`dret[0]`)** now matches to ≈0.1–0.26 mag
-  at heliacal optima (was 2.6–5.8 mag off), with the photopic/scotopic return
-  flag matching. The scotopic branch switches at the VISLIMIT 1500 nL threshold.
+- **`vis_limit_mag` limiting magnitude (`dret[0]`)** now matches to ≈0.1–0.3 mag
+  (median ≈0.15, max ≈0.33 across the 17-case matrix optima and their twilight
+  bands, at the 3–9° object altitudes where heliacal events are decided; was
+  2.6–5.8 mag off), with the photopic/scotopic return flag matching. The scotopic
+  branch switches at the VISLIMIT 1500 nL threshold.
 - **Extinction `kact`** reproduces the reference's temperature-, humidity-,
   altitude- and season-dependent (and pressure-*independent*) coefficient to
   machine precision at fixed season, and to ≈0.02–0.03 across seasons/latitudes
@@ -663,13 +665,34 @@ Measured agreement (calibrated and held-out probes against the reference):
   model and agrees to ≈0.5–1° for most objects (was a crude ~4°-off step table).
 - **Visibility-window widths** are now the reference's few-to-tens-of-minutes
   spans (previously often degenerate or far too wide).
-- **Event *dates*.** 9 of the 17 reference matrix cases land on the exact same
-  calendar day; the remainder differ by ±1 day (one by 2). At the razor-thin
-  first/last-visibility transition the day flips on a residual of a few tenths of
-  a magnitude, and because that residual varies in sign with object altitude and
-  Sun depression no single offset removes it (e.g. Sirius heliacal rising at Cairo
-  2024 returns 5 Aug vs the reference's 6 Aug — one day early). This ±1-day floor
-  is the remaining known difference.
+- **Event *dates*.** Most cases land on the same calendar day (9 of the 17
+  reference matrix cases exact); the remainder differ by **±1 day** at the
+  first/last-visibility transition, and by **±2 days** for the shallowest-slope
+  inner-planet evening-first / morning-last events. This is a *model floor*, not
+  a search bug: near the transition the visibility margin moves only ≈0.1–0.5
+  mag/day (as little as ≈0.09 mag/day for Venus evening-first), while the two
+  engines' limiting-magnitude models differ by ≈0.1–0.3 mag at the 3–9° object
+  altitudes where the event is decided. Because that residual varies in sign with
+  object altitude and Sun depression, no single offset removes it, and the exact
+  low-altitude sky-brightness / extinction variant the reference uses inside its
+  heliacal detection is not reproducible black-box (its detection threshold is
+  measurably stricter than its own published `vis_limit_mag`: e.g. at Tromsø the
+  reference's own `vis_limit_mag` margin turns positive four days before the day
+  `heliacal_ut` reports, and no `heliacal_pheno_ut` element changes character at
+  the reported day). Example: Sirius heliacal rising at Cairo 2024 returns 5 Aug
+  vs the reference's 6 Aug (one day early).
+- **High-latitude / perpetually-shallow-twilight geometries** are a *separate,
+  larger* floor. Where the Sun never sinks far below the horizon (high summer at
+  polar-adjacent sites), the reference's `heliacal_ut` switches to an internal
+  geometric / arcus-visionis criterion **decoupled from photometric visibility**:
+  the day it returns can carry a `vis_limit_mag` margin anywhere from ≈+0.5 down
+  to ≈−4.5 mag, and the two engines can select **different apparitions entirely**
+  (measured divergences from a few days up to a full year, e.g. Sirius/Tromsø,
+  Venus/Tromsø across 2000–2006). libephemeris keeps a single photometric
+  detection rule at all latitudes; matching the reference's geometric high-latitude
+  fallback would require reproducing unpublished internals and is deliberately not
+  attempted. Bright objects that *are* photometrically detected there (e.g.
+  Venus/Tromsø 2000) still land within the ±1–2-day photometric floor above.
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements. Both
