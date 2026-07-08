@@ -286,60 +286,45 @@ Altair, Antares and one zero-parallax catalog entry at 1950, J2000 and 2025,
 libephemeris agrees with the Astropy distance to <1.3e-7 relative and with the
 distance-speed derivative to <1.7e-5 AU/day.
 
-## 8. `EQUATORIAL | J2000` for hypothetical bodies (Uranians, Transpluto)
+## 8. `EQUATORIAL | J2000` for hypothetical bodies (RESOLVED — parity, not a divergence)
 
-**Status:** intentional divergence since the v3 speed/frame round.
+**Status:** resolved during the v3 speed/frame round; verified parity.
 
-For the hypothetical orbital bodies (Cupido…Poseidon, Transpluto/Isis), the
-reference API computes `FLG_EQUATORIAL | FLG_J2000` by rotating the body's
-J2000 *ecliptic* coordinates to the equator with the **true obliquity of
-date** — a frame-mixed output (J2000 ecliptic longitude zero-point, of-date
-equator tilt) that is ~3" away from a consistent J2000 equatorial frame in
-2023 (Cupido 3.1", Transpluto 1.4"; the offset grows with distance from
-J2000). Every other body class (planets, nodes, apsides, Lilith, White Moon,
-fixed stars) already gets a consistent J2000 frame: ecliptic → equator with
-the J2000 obliquity.
+Before v3, libephemeris rotated the hypothetical orbital bodies
+(Cupido…Poseidon, Transpluto/Isis) from J2000 ecliptic to the equator with
+the **true obliquity of date** under `FLG_EQUATORIAL | FLG_J2000` — a
+frame-mixed output ~3" away from a consistent J2000 equatorial frame in
+2023 (growing with distance from J2000), and inconsistent with every other
+body class. The v3 round fixed this to use the **J2000 obliquity**, like
+all other bodies, in both backends.
 
-libephemeris rotates these bodies with the **J2000 obliquity** as well, in
-both backends (Skyfield path in `planets.py`, LEB fast path in
-`fast_calc.py` Pipeline C), so `EQ|J2000` means the same frame for every
-body. RA/Dec speeds are carried through the same fixed rotation, so the
-reported speed remains the derivative of the reported position.
+An earlier revision of this section certified the fix as a divergence,
+attributing the frame-mixed rotation to the reference API. Direct
+measurement against the reference oracle later disproved that attribution:
+the reference's reported `EQ|J2000` equals rotating its own J2000-ecliptic
+output with the **J2000 obliquity** for all bodies including the
+hypotheticals (Cupido 0.006", Isis 0.008" from the eps_J2000 rotation at
+2005, vs 0.6–0.9" from the of-date one; the gap grows to >100" by 2300).
+The pre-v3 mixed frame was therefore a plain libephemeris bug, and the fix
+**restored** parity. `EQ|J2000` output now matches the reference for every
+body class; nothing is intentionally divergent here.
 
-Verification: rotating the body's own `FLG_J2000` ecliptic output to the
-equator with eps_J2000 = 23.4392911° reproduces the returned `EQ|J2000`
-RA/Dec to <0.001" for Cupido, Isis, Mars, White Moon and True Node alike
-(scratch check `uranian_eqj2000.py`, JD 2460000.5, both backends). Only the
-combination `FLG_EQUATORIAL | FLG_J2000` on hypothetical bodies is affected;
-of-date equatorial, ecliptic and J2000-ecliptic outputs are unchanged.
+## 9. `SIDEREAL | EQUATORIAL` speed frame (RESOLVED — parity, not a divergence)
 
-## 9. `SIDEREAL | EQUATORIAL` speed frame (mean equator)
+**Status:** resolved during the v3 speed/frame round; verified parity.
 
-**Status:** intentional divergence since the v3 speed/frame round.
+For `FLG_SIDEREAL | FLG_EQUATORIAL`, both engines report the **position** on
+the *mean* equator of date (precession only, no nutation), with no ayanamsha
+subtraction from RA. libephemeris computes the accompanying RA/Dec **speed**
+in the mean-equator frame of the reported position, in both backends, so
+every speed slot is the exact time-derivative of the corresponding position
+slot (residual ≤0.034"/day vs a central derivative for the Moon).
 
-For `FLG_SIDEREAL | FLG_EQUATORIAL`, both the reference API and libephemeris
-report the **position** on the *mean* equator of date (precession only, no
-nutation), with no ayanamsha subtraction from RA. The reference API, however,
-computes the accompanying RA/Dec **speed** in the *true*-equator (plain
-equatorial) frame — the same rate it returns without `FLG_SIDEREAL`. The
-result is a speed that does not differentiate the reported position: for the
-Moon the reference's SID|EQ rate differs from the derivative of its own
-SID|EQ position by ~0.8"/day in RA and ~1.8"/day in Dec (the mean-vs-true
-equator rate gap; smaller for slower bodies).
-
-libephemeris computes the SID|EQ speed in the **mean-equator frame of the
-reported position**, in both backends: the LEB fast path differentiates the
-apparent place through the same mean-equator (P-matrix) transform used for
-the position, and the Skyfield path keeps `FLG_SIDEREAL` set on its
-central-difference samples so they are taken in the reported frame. This is
-the project's certified true-rate convention — every speed slot is the exact
-time-derivative of the corresponding position slot.
-
-Numerical evidence (Moon, JD 2460000.5, Lahiri): reported dRA/dDec vs the
-central derivative of the reported RA/Dec agree to 0.016"/day (LEB) and
-0.034"/day (Skyfield backend), while re-computing the speed in the
-true-equator frame — the reference convention — would be off by −0.760"/day
-in RA and +1.843"/day in Dec from that derivative. Only the speed slots of
-the `FLG_SIDEREAL | FLG_EQUATORIAL` combination are affected; positions are
-identical to the reference convention, and plain-equatorial output (true
-equator, no sidereal flag) is unchanged.
+An earlier revision of this section certified this as a divergence, citing
+an old in-code note that the reference returned the *true*-equator rate
+(~0.8"/day RA / ~1.8"/day Dec away from the derivative for the Moon).
+Direct measurement against the reference oracle later disproved that note:
+the reference's reported SID|EQ Moon speed (dRA 45197.42, dDec 19297.82
+"/day at JD 2460000.5, Lahiri) sits on the derivative-of-reported-position
+side and matches libephemeris to **0.05"/day** — not the true-equator rate.
+The two engines agree; nothing is intentionally divergent here.

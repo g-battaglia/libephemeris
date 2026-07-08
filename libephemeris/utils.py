@@ -503,12 +503,12 @@ def refrac(
 
     Atmospheric refraction makes celestial objects appear higher than their
     true (geometric) position. The effect is strongest near the horizon
-    (about 34 arcminutes at 0 degrees) and negligible at high altitudes.
+    and negligible at high altitudes.
 
     This function converts between true (geometric) altitude and apparent
     (observed) altitude by adding or removing the refraction correction.
 
-    Compatible with the reference swe.refrac() API.
+    Compatible with the reference API's refraction function.
 
     Args:
         alt: Altitude in degrees. For TRUE_TO_APP, this is the true
@@ -529,8 +529,11 @@ def refrac(
         - For APP_TO_TRUE: true altitude (= apparent altitude - refraction)
 
     Notes:
-        - At the horizon (0 degrees), refraction is approximately 34 arcminutes
-          (0.567 degrees) under standard atmospheric conditions.
+        - At TRUE altitude 0 this function returns ~28.5 arcminutes of
+          refraction under standard conditions (matching the reference API);
+          the textbook "~34 arcminutes at the horizon" figure refers to
+          APPARENT altitude 0. In the APP_TO_TRUE direction the correction
+          at 0 degrees is clamped to 0 (again matching the reference API).
         - Refraction is ray-traced through the ICAO Standard Atmosphere (see
           ``libephemeris/refraction.py`` for the model and References), not
           an empirical curve fit; it agrees with the Bennett 1982 /

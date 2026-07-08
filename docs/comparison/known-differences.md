@@ -204,7 +204,7 @@ pyswisseph 2.10.03 (4400+ comparison rounds across 29 API sections).
 | Fixed star positions | <0.01" | <0.01" | Proper-motion catalog differences |
 | Fixed star distances | <0.01% at J2000 | ~0.1% at ±50y | Radial velocity models |
 | Ayanamsha values | <0.1" | ~40" (exotic modes) | Reference-star position differences |
-| Delta-T | <0.001s (modern) | ~43s (year 1900) | Different ΔT extrapolation |
+| Delta-T | <0.001s (modern) | ~1s (1900-1950), ~232s (extremes) | Different ΔT extrapolation |
 | Refraction | <1" | ~15" | Different atmospheric models |
 | Phase angles | <1" (inner) | ~18" (outer planets) | Position errors amplified |
 | Orbital elements | <1" (inner) | ~1° (giant `varpi`) | Convention; lib matches exact two-body to 0.000000° (see §9) |
@@ -260,8 +260,9 @@ interpolation algorithms.
 ### 3. Time and Delta-T
 
 **3.1 ΔT model.** See [Part A §2.3](#23-delta-t). Modern dates < 0.001 s;
-1900–1950 ~1 s (max ~43 s); >2050 depends on extrapolation. Affects all UT↔ET/TT
-conversions (`deltat`, `deltat_ex`, `utc_to_jd`, `jdet_to_utc`, `jdut1_to_utc`).
+1900–1950 ≤ ~1 s (measured max 0.98 s); >2050 depends on extrapolation (up to
+~232 s at the extremes). Affects all UT↔ET/TT conversions (`deltat`,
+`deltat_ex`, `utc_to_jd`, `jdet_to_utc`, `jdut1_to_utc`).
 
 **3.2 Sidereal time (`sidtime`).** Modern < 0.001 s; >2050 up to ~0.05 s from ΔT
 propagation into GMST.
@@ -424,14 +425,12 @@ implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping t
 base ayanamsha mode — rather than the composite value silently falling back to
 Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release.
 
-**10.4 `SIDEREAL | EQUATORIAL` speed frame (intentional).** Both engines report
-the SID|EQ *position* on the mean equator of date, but the reference API
-computes the accompanying RA/Dec *speed* in the true-equator frame — a rate
-that does not differentiate its own reported position (~0.8"/day RA, ~1.8"/day
-Dec for the Moon). libephemeris computes the speed in the mean-equator frame of
-the reported position, in both backends, keeping every speed slot the exact
-derivative of its position slot. Certified divergence; see
-`intentional-divergences.md` §9.
+**10.4 `SIDEREAL | EQUATORIAL` speed frame (parity).** Both engines report
+the SID|EQ *position* on the mean equator of date and the accompanying
+RA/Dec *speed* as the derivative of that reported position: measured against
+the reference oracle, the Moon's SID|EQ speed agrees to 0.05"/day. An earlier
+revision certified a divergence here based on a stale in-code note; direct
+measurement disproved it. See `intentional-divergences.md` §9 (resolved).
 
 ### 11. Crossing functions
 
@@ -477,13 +476,14 @@ treatment; that has been corrected in both backends (Skyfield path in
 `planets.py`, LEB fast path in `fast_calc.py` Pipeline C), removing the whole
 nutation term from this residual.
 
-**13.2 Hypothetical bodies with `EQUATORIAL | J2000` (intentional).** For these
-bodies the reference API rotates the J2000 ecliptic to the equator with the
-true obliquity **of date**, producing a frame-mixed RA/Dec (~3" from a
-consistent J2000 frame in 2023, growing with distance from J2000). libephemeris
-uses the J2000 obliquity — the same convention as every other body class — in
-both backends, so `EQ|J2000` is a self-consistent J2000 equatorial frame.
-Certified divergence; see `intentional-divergences.md` §8.
+**13.2 Hypothetical bodies with `EQUATORIAL | J2000` (parity).** Both engines
+rotate the J2000 ecliptic to the equator with the **J2000 obliquity** for
+every body class including the hypotheticals (measured: the reference's
+`EQ|J2000` matches its own eps_J2000 rotation to <0.01", vs 0.6-0.9" for an
+of-date rotation at 2005). libephemeris briefly used a frame-mixed of-date
+rotation for bodies 40-48 before v3 — that was a plain bug, fixed; an earlier
+revision of this section mis-attributed the mixed frame to the reference.
+See `intentional-divergences.md` §8 (resolved).
 
 ### 14. Constants and API
 

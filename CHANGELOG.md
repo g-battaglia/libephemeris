@@ -133,9 +133,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heliocentric outputs are unaffected (bit-identical).
 - **`EQUATORIAL | J2000` on hypothetical bodies now uses the J2000 obliquity**
   instead of the true obliquity of date, making the J2000 equatorial frame
-  consistent with every other body class (certified divergence from the
-  reference API, ~3" on Cupido; see
-  `docs/comparison/intentional-divergences.md` §8).
+  consistent with every other body class. Later measurement against the
+  reference oracle showed the reference uses the J2000 obliquity here too,
+  so this fix restored parity (~3" on Cupido) rather than diverging; see
+  `docs/comparison/intentional-divergences.md` §8 (resolved).
 - **Heliacal lunar crescent width now follows Yallop's geometry on both backends.**
   The crescent width fed to the Yallop q-test was computed with an inverted
   formula and a hardcoded 15' semi-diameter; it now uses
