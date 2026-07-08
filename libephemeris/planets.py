@@ -6704,107 +6704,223 @@ def orbit_max_min_true_distance(
     return _calc_orbit_max_min_true_distance(t, planet, flags, tjdet)
 
 
+def _emb_osculating_ecliptic_elements(t, jd_tt: float) -> Tuple[float, ...]:
+    """Osculating heliocentric ecliptic elements of the Earth-Moon barycenter.
+
+    For a geocentric extreme-distance query the observer is the Earth, whose
+    osculating orbit about the Sun is (to the precision this function targets)
+    the EMB ellipse. So the EMB provides the second ellipse for every
+    geocentric two-body distance extremum, and its own perihelion/aphelion for
+    the Sun and Earth special cases.
+
+    Args:
+        t: Skyfield Time object at the osculating epoch.
+        jd_tt: Epoch (JD TT); only feeds the (unused) perihelion-passage slot.
+
+    Returns:
+        The shared 50-slot osculating-element tuple for the EMB.
+    """
+    planets = get_planets()
+    sun = planets["sun"]
+    emb = planets["earth barycenter"]
+
+    sun_pos = sun.at(t)
+    emb_pos = emb.at(t)
+    r_icrs = emb_pos.position.au - sun_pos.position.au
+    v_icrs = emb_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
+
+    eps_rad = math.radians(23.4392911)
+    cos_eps = math.cos(eps_rad)
+    sin_eps = math.sin(eps_rad)
+    x = r_icrs[0]
+    y = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
+    z = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
+    vx = v_icrs[0]
+    vy = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
+    vz = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+
+    GM = 0.01720209895**2
+    return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, EARTH, jd_tt)
+
+
+def _ellipse_positions(elements: Tuple[float, float, float, float, float], anom):
+    """Ecliptic Cartesian positions (AU) sampled along an osculating ellipse.
+
+    Args:
+        elements: ``(a, e, inc_rad, node_rad, argperi_rad)``.
+        anom: numpy array of eccentric anomalies (radians).
+
+    Returns:
+        ``(N, 3)`` numpy array of ecliptic positions, one per eccentric anomaly.
+    """
+    import numpy as np
+
+    a, e, inc, node, argp = elements
+    cos_e = np.cos(anom)
+    sin_e = np.sin(anom)
+    # Perifocal plane (focus at the Sun).
+    x_pf = a * (cos_e - e)
+    y_pf = a * math.sqrt(max(0.0, 1.0 - e * e)) * sin_e
+    # Rotate by argument of perihelion about the orbit normal.
+    cos_w = math.cos(argp)
+    sin_w = math.sin(argp)
+    x1 = x_pf * cos_w - y_pf * sin_w
+    y1 = x_pf * sin_w + y_pf * cos_w
+    # Incline about the node line, then rotate by the ascending node.
+    cos_i = math.cos(inc)
+    sin_i = math.sin(inc)
+    y2 = y1 * cos_i
+    z2 = y1 * sin_i
+    cos_o = math.cos(node)
+    sin_o = math.sin(node)
+    x = x1 * cos_o - y2 * sin_o
+    y = x1 * sin_o + y2 * cos_o
+    return np.stack([x, y, z2], axis=-1)
+
+
+def _two_ellipse_min_max(
+    el1: Tuple[float, float, float, float, float],
+    el2: Tuple[float, float, float, float, float],
+    n_coarse: int = 1440,
+    refine_iters: int = 25,
+) -> Tuple[float, float]:
+    """True 3D minimum and maximum distance between two osculating ellipses.
+
+    Independent numerical search of ``|P1(E1) - P2(E2)|`` over both eccentric
+    anomalies: a coarse anomaly grid locates the global extremum cells, then a
+    local shrinking-window grid refines each to well under 1e-8 AU. The result
+    is a geometric property of the two ellipses, independent of the search
+    method.
+
+    Args:
+        el1: ``(a, e, inc_rad, node_rad, argperi_rad)`` of the first ellipse.
+        el2: Elements of the second ellipse (same layout).
+        n_coarse: Samples per anomaly on the coarse grid.
+        refine_iters: Local-refinement zoom iterations.
+
+    Returns:
+        ``(max_distance, min_distance)`` in AU.
+    """
+    import numpy as np
+
+    two_pi = 2.0 * math.pi
+    grid = np.linspace(0.0, two_pi, n_coarse, endpoint=False)
+    pa = _ellipse_positions(el1, grid)
+    pb = _ellipse_positions(el2, grid)
+    a_sq = np.sum(pa * pa, axis=1)
+    b_sq = np.sum(pb * pb, axis=1)
+    d_sq = a_sq[:, None] + b_sq[None, :] - 2.0 * (pa @ pb.T)
+    np.maximum(d_sq, 0.0, out=d_sq)
+    i_min = np.unravel_index(int(np.argmin(d_sq)), d_sq.shape)
+    i_max = np.unravel_index(int(np.argmax(d_sq)), d_sq.shape)
+
+    def _refine(c1: float, c2: float, want_max: bool) -> float:
+        half = two_pi / n_coarse
+        best = 0.0
+        for _ in range(refine_iters):
+            g1 = np.linspace(c1 - half, c1 + half, 9)
+            g2 = np.linspace(c2 - half, c2 + half, 9)
+            qa = _ellipse_positions(el1, g1)
+            qb = _ellipse_positions(el2, g2)
+            qa_sq = np.sum(qa * qa, axis=1)
+            qb_sq = np.sum(qb * qb, axis=1)
+            dd = qa_sq[:, None] + qb_sq[None, :] - 2.0 * (qa @ qb.T)
+            np.maximum(dd, 0.0, out=dd)
+            j = np.unravel_index(
+                int(np.argmax(dd) if want_max else np.argmin(dd)), dd.shape
+            )
+            c1 = float(g1[j[0]])
+            c2 = float(g2[j[1]])
+            best = float(dd[j])
+            half *= 0.25
+        return math.sqrt(best)
+
+    d_max = _refine(float(grid[i_max[0]]), float(grid[i_max[1]]), True)
+    d_min = _refine(float(grid[i_min[0]]), float(grid[i_min[1]]), False)
+    return d_max, d_min
+
+
 def _calc_orbit_max_min_true_distance(
-    t, ipl: int, iflag: int, tjd_ut: float = 0.0
+    t, ipl: int, iflag: int, tjd_et: float = 0.0
 ) -> Tuple[float, float, float]:
     """
     Internal function to calculate max/min/true geocentric distances.
 
-    For planets, this computes the theoretical minimum and maximum distances
-    from Earth during the orbital cycle, plus the current true distance.
+    The extremes are the true 3D minimum and maximum distance between two
+    osculating heliocentric ellipses at the epoch ``t``:
 
-    Algorithm:
-        For outer planets (Mars-Pluto):
-            - min_distance ≈ a_planet - a_earth (at opposition, both at same side)
-            - max_distance ≈ a_planet + a_earth (at conjunction, opposite sides)
-
-        For inner planets (Mercury, Venus):
-            - min_distance ≈ a_earth - a_planet (at inferior conjunction)
-            - max_distance ≈ a_earth + a_planet (at superior conjunction)
-
-        Corrections are applied for eccentricity of both orbits.
+        * geocentric planet/asteroid: the body's ellipse vs the Earth-Moon
+          barycenter's ellipse, solved numerically (see
+          :func:`_two_ellipse_min_max`);
+        * geocentric Sun: distance from the Sun (a point) to the EMB ellipse,
+          i.e. the EMB perihelion/aphelion;
+        * geocentric Earth: the observer against its own orbit, so minimum 0
+          (coincident) and maximum the orbit diameter (2a);
+        * geocentric Moon: the geocentric lunar osculating perigee/apogee;
+        * heliocentric (``FLG_HELCTR``): the body's own perihelion/aphelion.
 
     Args:
-        t: Skyfield Time object
-        ipl: Planet ID
-        iflag: Calculation flags
-        tjd_ut: Julian Day UT for true distance calculation
+        t: Skyfield Time object at the osculating epoch.
+        ipl: Body ID.
+        iflag: Calculation flags (``FLG_HELCTR`` selects the heliocentric case).
+        tjd_et: Julian Day TT/ET for the current true distance.
 
     Returns:
-        Tuple of (max_distance, min_distance, true_distance) in AU
+        Tuple of (max_distance, min_distance, true_distance) in AU.
     """
-    # Get current true distance from calc_ut
+    # Current true distance at the requested ephemeris time (ET/TT input).
     true_dist = 0.0
-    if tjd_ut > 0:
+    if tjd_et > 0:
         try:
-            pos, _ = calc_ut(tjd_ut, ipl, iflag)
+            pos, _ = calc(tjd_et, ipl, iflag)
             true_dist = float(pos[2])
         except (IndexError, TypeError, ValueError):
             pass
 
-    # Sun: geocentric distance = Earth-Sun distance, varies with Earth's orbit
+    def _ellipse_from_elements(
+        el: Tuple[float, ...],
+    ) -> Tuple[float, float, float, float, float]:
+        return (
+            el[0],
+            el[1],
+            math.radians(el[2]),
+            math.radians(el[3]),
+            math.radians(el[4]),
+        )
+
+    # Heliocentric: extremes are simply the body's own perihelion/aphelion.
+    if iflag & FLG_HELCTR:
+        el = _calc_orbital_elements(t, ipl, iflag)
+        if el[0] <= 0.0:
+            return (0.0, 0.0, true_dist)
+        return (el[16], el[15], true_dist)
+
+    # Geocentric Sun: distance from the Sun to the EMB ellipse.
     if ipl == SUN:
-        # Earth's orbital parameters
-        a_earth = 1.00000261  # Semi-major axis in AU
-        e_earth = 0.01671123  # Eccentricity
-        min_dist = a_earth * (1 - e_earth)  # Perihelion (closest to Sun)
-        max_dist = a_earth * (1 + e_earth)  # Aphelion (farthest from Sun)
-        return (max_dist, min_dist, true_dist)
+        emb = _emb_osculating_ecliptic_elements(t, tjd_et)
+        return (emb[16], emb[15], true_dist)
 
-    # Earth has no geocentric distance (it's the observer)
+    # Earth is the observer: coincident minimum (0) and orbit-diameter maximum.
     if ipl == EARTH:
-        return (0.0, 0.0, 0.0)
+        emb = _emb_osculating_ecliptic_elements(t, tjd_et)
+        return (2.0 * emb[0], 0.0, true_dist)
 
-    # Moon - use geocentric orbit parameters
+    # Geocentric Moon: the geocentric lunar osculating perigee/apogee.
     if ipl == MOON:
-        # Moon's mean distance and eccentricity
-        # Semi-major axis: ~384,400 km = 0.00257 AU
-        # Eccentricity: ~0.0549
-        a_moon = 0.00256955529  # AU (same as in MEAN_ELEMENTS)
-        e_moon = 0.0549
-        min_dist = a_moon * (1 - e_moon)  # Perigee
-        max_dist = a_moon * (1 + e_moon)  # Apogee
-        return (max_dist, min_dist, true_dist)
+        el = _calc_orbital_elements(t, ipl, iflag)
+        if el[0] <= 0.0:
+            return (0.0, 0.0, true_dist)
+        return (el[16], el[15], true_dist)
 
-    # For planets, we need orbital elements
-    # Get orbital elements from the existing function
-    elements = _calc_orbital_elements(t, ipl, iflag)
-
-    if elements[0] == 0.0:  # Invalid planet
+    # Geocentric planet/asteroid: true 3D extremum between the body's ellipse
+    # and the EMB's.
+    el = _calc_orbital_elements(t, ipl, iflag)
+    if el[0] <= 0.0 or el[1] >= 1.0:  # invalid or non-elliptical osculating orbit
         return (0.0, 0.0, true_dist)
-
-    # Extract planet's semi-major axis and eccentricity
-    a_planet = elements[0]  # Semi-major axis in AU
-    e_planet = elements[1]  # Eccentricity
-
-    # Earth's orbital parameters (mean values)
-    a_earth = 1.00000261  # Semi-major axis in AU
-    e_earth = 0.01671123  # Eccentricity
-
-    # Perihelion and aphelion distances
-    r_planet_min = a_planet * (1 - e_planet)  # Planet perihelion
-    r_planet_max = a_planet * (1 + e_planet)  # Planet aphelion
-    r_earth_min = a_earth * (1 - e_earth)  # Earth perihelion
-    r_earth_max = a_earth * (1 + e_earth)  # Earth aphelion
-
-    # Determine if inner or outer planet
-    if a_planet < a_earth:
-        # Inner planet (Mercury, Venus)
-        # Minimum distance: at inferior conjunction when planet is at aphelion
-        # and Earth is at perihelion (closest possible approach)
-        # Actually, minimum occurs when planet is between Earth and Sun
-        # min ≈ r_earth - r_planet (when aligned, planet between)
-        # max ≈ r_earth + r_planet (when aligned, Sun between)
-        min_dist = abs(r_earth_min - r_planet_max)
-        max_dist = r_earth_max + r_planet_max
-    else:
-        # Outer planet (Mars, Jupiter, etc.)
-        # Minimum distance: at opposition when both are aligned on same side of Sun
-        # max ≈ r_planet + r_earth (at conjunction, Sun between)
-        # min ≈ r_planet - r_earth (at opposition, same side)
-        min_dist = abs(r_planet_min - r_earth_max)
-        max_dist = r_planet_max + r_earth_max
-
+    emb = _emb_osculating_ecliptic_elements(t, tjd_et)
+    max_dist, min_dist = _two_ellipse_min_max(
+        _ellipse_from_elements(el), _ellipse_from_elements(emb)
+    )
     return (max_dist, min_dist, true_dist)
 
 

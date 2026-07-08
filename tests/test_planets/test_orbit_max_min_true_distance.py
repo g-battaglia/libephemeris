@@ -62,13 +62,14 @@ class TestOrbitMaxMinTrueDistanceBasic:
         assert 0.98 < true_dist < 1.02
 
     @pytest.mark.unit
-    def test_earth_returns_zeros_for_max_min(self):
-        """Earth should return 0.0 for max/min as it is the observer."""
+    def test_earth_min_zero_max_orbit_diameter(self):
+        """Earth is the observer: distance to its own orbit is 0 at minimum
+        (coincident) and the orbit diameter (~2 AU) at maximum."""
         jd = 2451545.0
-        result = ephem.orbit_max_min_true_distance(jd, EARTH, 0)
+        max_dist, min_dist, _ = ephem.orbit_max_min_true_distance(jd, EARTH, 0)
 
-        assert result[0] == 0.0  # max
-        assert result[1] == 0.0  # min
+        assert min_dist == 0.0  # coincident point on the same orbit
+        assert 1.99 < max_dist < 2.01  # ~2 * semi-major axis of the EMB orbit
 
 
 class TestOrbitMaxMinTrueDistanceMoon:

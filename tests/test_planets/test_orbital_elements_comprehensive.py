@@ -427,25 +427,49 @@ class TestOrbitalElementsAsteroids:
 
 
 class TestOrbitMaxMinTrueDistanceAsteroids:
-    """orbit_max_min_true_distance now inherits the real asteroid elements."""
+    """orbit_max_min_true_distance is a true 3D two-ellipse extremum.
+
+    The geocentric max/min are the maximum and minimum distance between the
+    body's osculating ellipse and the Earth-Moon barycenter's, so the current
+    geocentric distance must fall inside the [min, max] bracket, and both
+    extremes must respect the aphelion/perihelion bounds of the two orbits.
+    """
+
+    # EMB osculating perihelion/aphelion (AU); stable to a few 1e-4 over the era.
+    _EMB_Q = 1.0167
+    _EMB_q = 0.9833
 
     @pytest.mark.unit
     @pytest.mark.parametrize("body_id,name", [(b, n) for b, n, *_ in ASTEROID_RANGES])
-    def test_asteroid_max_min_nonzero_and_coherent(self, body_id: int, name: str):
-        """Max/min are non-zero and consistent with a(1±e) ± Earth's orbit."""
-        jd = 2451545.0
-        max_d, min_d, true_d = swe.orbit_max_min_true_distance(jd, body_id, 0)
-        assert max_d > 0.0, f"{name}: max distance silently zero"
-        assert min_d > 0.0, f"{name}: min distance silently zero"
-        assert min_d < max_d, f"{name}: min {min_d} >= max {max_d}"
-        assert true_d > 0.0, f"{name}: true distance not positive"
+    def test_asteroid_max_min_brackets_true_distance(self, body_id: int, name: str):
+        """Min/max form a valid 3D bracket around the true distance."""
+        # Asteroid SPK safe range is ~1920-2080 CE; sample 1950/2000/2050.
+        for jd in (2433282.5, 2451545.0, 2469807.5):
+            max_d, min_d, true_d = swe.orbit_max_min_true_distance(jd, body_id, 0)
+            assert all(
+                type(v) is float and math.isfinite(v)
+                for v in (max_d, min_d, true_d)
+            ), f"{name}: non-float/non-finite result"
+            assert min_d >= 0.0, f"{name}: min distance {min_d} < 0"
+            assert min_d < max_d, f"{name}: min {min_d} >= max {max_d}"
+            assert true_d > 0.0, f"{name}: true distance not positive"
+            # The instantaneous geocentric distance lies inside the bracket
+            # (small tolerance for the Earth-vs-EMB offset).
+            assert min_d - 1e-3 <= true_d <= max_d + 1e-3, (
+                f"{name}@{jd}: true {true_d} outside [{min_d}, {max_d}]"
+            )
 
-        # Same planet-style geocentric bracket used for the major planets:
-        # outer bodies span |a(1-e) - a_earth(1+e)| .. a(1+e) + a_earth(1+e).
-        r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
-        a, e = r[0], r[1]
-        a_earth, e_earth = 1.00000261, 0.01671123
-        exp_max = a * (1 + e) + a_earth * (1 + e_earth)
-        exp_min = abs(a * (1 - e) - a_earth * (1 + e_earth))
-        assert abs(max_d - exp_max) < 1e-6, f"{name}: max {max_d} != {exp_max}"
-        assert abs(min_d - exp_min) < 1e-6, f"{name}: min {min_d} != {exp_min}"
+            # Physical bounds from the body's own osculating aphelion/perihelion.
+            r = swe.get_orbital_elements(jd, body_id, FLG_HELCTR)
+            a, e = r[0], r[1]
+            q_body, big_q_body = a * (1 - e), a * (1 + e)
+            # Max distance never exceeds aphelion-to-aphelion, never below the
+            # body's aphelion minus Earth's perihelion.
+            assert big_q_body - self._EMB_q - 1e-6 <= max_d <= big_q_body + self._EMB_Q + 1e-6, (
+                f"{name}@{jd}: max {max_d} outside aphelion bounds"
+            )
+            # Min distance never below perihelion-difference, never above the
+            # body's perihelion plus Earth's aphelion.
+            assert min_d <= q_body + self._EMB_Q + 1e-6, (
+                f"{name}@{jd}: min {min_d} above perihelion+EMB aphelion"
+            )
