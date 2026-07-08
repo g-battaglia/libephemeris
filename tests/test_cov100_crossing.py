@@ -633,17 +633,31 @@ class TestMooncrossNode:
         assert abs(lat) < 1e-4
 
     def test_iteration_calc_failure(self, monkeypatch):
+        # All-positive latitude -> the bracket scan finds no sign change and
+        # falls back to the half-nodal-month Newton seed (tjdet + 13.6). The
+        # first Newton-loop calc (at that seed) then fails -> "during iteration".
+        def fake(jd, body, flags):
+            if abs(jd - (J2000 + 13.6)) < 1e-9:
+                raise CalculationError("iter boom")
+            return ([0.0, 2.0, 1.0, 0.0, -1.0], None)
+
+        _patch_calc(monkeypatch, fake)
+        with pytest.raises(Error, match="during iteration"):
+            mooncross_node(J2000)
+
+    def test_scan_calc_failure(self, monkeypatch):
+        # A calc failure during the bracket scan (after the initial position)
+        # surfaces as "Failed to calculate Moon position".
         calls = {"n": 0}
 
         def fake(jd, body, flags):
             calls["n"] += 1
             if calls["n"] == 1:
-                # Triggers a straightforward linear guess (not scan, not at-node).
                 return ([0.0, 2.0, 1.0, 0.0, -1.0], None)
-            raise CalculationError("iter boom")  # lines 939-940
+            raise CalculationError("scan boom")
 
         _patch_calc(monkeypatch, fake)
-        with pytest.raises(Error, match="during iteration"):
+        with pytest.raises(Error, match="Failed to calculate Moon position"):
             mooncross_node(J2000)
 
     def test_converge_wrong_side_then_nudge(self, monkeypatch):
@@ -722,11 +736,12 @@ class TestMooncrossNode:
             mooncross_node(J2000)
 
     def test_max_iterations(self, monkeypatch):
-        # Never converges, stays within 30 days, forward -> line 974 max iter.
+        # Latitude never reaches zero (const 0.5, so the bracket scan finds no
+        # sign change and falls back to the +13.6 seed) and the tiny Newton step
+        # (huge speed) keeps jd well inside the 30-day divergence bound, so NR
+        # exhausts its iteration budget -> "Maximum iterations".
         def fake(jd, body, flags):
-            # Oscillating lat that never reaches 0, small steps within range.
-            lat = 1.0 + 0.5 * math.sin(jd)
-            return ([0.0, lat, 1.0, 0.0, -2.0], None)
+            return ([0.0, 0.5, 1.0, 0.0, -1000.0], None)
 
         _patch_calc(monkeypatch, fake)
         with pytest.raises(Error, match="Maximum iterations"):

@@ -408,20 +408,24 @@ _SYNODIC = {
     9: 367.0,
 }
 
-# Slow on-table planets whose long synodic period lets a single linear Newton
-# seed converge into a crossing basin one or more retrograde loops PAST the first
-# true crossing. For these the converged result is re-validated against an
-# earlier crossing (see ``_guarded_first_crossing``). Mercury/Venus/Mars move
-# fast enough that the existing forward-scan window already spans their first
-# crossing, so they are intentionally excluded (leaving them untouched).
-_SLOW_GUARD_PLANETS = (5, 6, 7, 8, 9)  # Jupiter..Pluto
+# Planets whose Newton seed (a single linear estimate diff/speed) can converge
+# into a crossing basin PAST the first true crossing, so the converged result is
+# re-validated against an earlier crossing (see ``_guarded_first_crossing``).
+# Slow outer planets (Jupiter..Pluto) skip whole retrograde loops. Mercury, Venus
+# and Mars were previously excluded on the assumption that the forward-scan
+# window already spanned their first crossing, but a momentarily slow (pre-
+# station) inner planet still lets Newton overshoot diff/speed into the NEXT
+# synodic cycle's crossing (measured skips of tens-to-hundreds of days). The
+# guard's forward re-validation is cheap (it early-exits on the first crossing),
+# so it is applied to them too.
+_SLOW_GUARD_PLANETS = (2, 3, 4, 5, 6, 7, 8, 9)  # Mercury..Pluto
 # Safe UPPER bound on each body's peak geocentric daily motion (deg/day; measured
-# peaks Jup 0.242, Sat 0.130, Ura 0.061, Nep/Plu 0.039, padded ~25%). Used to
-# size a forward-scan step that provably cannot step over a crossing: while the
-# body is more than ``_RETRO_ARC`` degrees from the target, a step of
-# (gap - arc) / max_rate advances it by at most (gap - arc) degrees, so it cannot
-# reach the target mid-step.
-_SLOW_MAX_RATE = {5: 0.30, 6: 0.16, 7: 0.08, 8: 0.05, 9: 0.05}
+# peaks Mer 2.202, Ven 1.259, Mars 0.776, Jup 0.242, Sat 0.130, Ura 0.061,
+# Nep/Plu 0.039, padded ~10-25%). Used to size a forward-scan step that provably
+# cannot step over a crossing: while the body is more than ``_RETRO_ARC`` degrees
+# from the target, a step of (gap - arc) / max_rate advances it by at most
+# (gap - arc) degrees, so it cannot reach the target mid-step.
+_SLOW_MAX_RATE = {2: 2.5, 3: 1.35, 4: 0.85, 5: 0.30, 6: 0.16, 7: 0.08, 8: 0.05, 9: 0.05}
 
 
 def _first_forward_crossing_adaptive(
@@ -1197,16 +1201,8 @@ def mooncross_node(
     try:
         pos, _ = calc(tjdet, MOON, flags | FLG_SPEED)
         lat = pos[1]  # ecliptic latitude
-        lat_speed = pos[4]  # latitude velocity in degrees/day
     except (EphemerisRangeError, CalculationError, ValueError) as e:
         raise Error(f"Failed to calculate Moon position: {e}") from e
-
-    # If latitude velocity is zero or very small, use average value
-    if abs(lat_speed) < 0.1:
-        lat_speed = 1.0 if lat >= 0 else -1.0
-
-    # Initial time estimate to reach latitude = 0
-    dt_guess = -lat / lat_speed
 
     # If starting essentially at a node crossing, the linear estimate is
     # dominated by FP noise and NR would converge on the start point
@@ -1215,36 +1211,56 @@ def mooncross_node(
     if abs(lat) < 10 * NR_TOLERANCE_MOON:
         jd_guess = tjdet + HALF_NODAL_MONTH * direction
     else:
-        # For forward search, dt_guess should be in (0, HALF_NODAL_MONTH].
-        # For backward search, dt_guess should be in [-HALF_NODAL_MONTH, 0).
-        # Scan only when the linear estimate points the wrong way or past
-        # one half-cycle. Small-magnitude guesses (caller is seconds after
-        # a crossing) still land on the correct nearby event.
-        if backwards:
-            needs_scan = dt_guess >= 0.0 or dt_guess < -HALF_NODAL_MONTH
-        else:
-            needs_scan = dt_guess <= 0.0 or dt_guess > HALF_NODAL_MONTH
+        # Locate the FIRST latitude sign change in the requested direction with
+        # a bracket scan whose step provably cannot skip a root: successive Moon
+        # node crossings are >= ~6.8 days apart, so a <= 3-day step samples
+        # every interval and no root is jumped. A linear seed (-lat/lat_speed)
+        # plus a coarse "needs_scan" gate could instead land Newton in the
+        # *second* root's basin — skipping the first crossing by ~13 days — or
+        # diverge outright; scanning from tjdet itself avoids both. Once
+        # bracketed, the Newton/bisection loop below refines to full precision
+        # and applies the strict-direction epsilon.
+        SCAN_STEP = 2.0  # days; below the min root spacing, so no root is skipped
+        SCAN_SPAN = HALF_NODAL_MONTH + 4.0  # first crossing lies within a half-cycle
+        step_days = SCAN_STEP * direction
+        lat_prev = lat
+        t_prev = tjdet
+        # Default seed if the scan finds no sign change within a half-cycle
+        # (should not happen for the Moon): fall back to a half-nodal-month step.
+        jd_guess = tjdet + HALF_NODAL_MONTH * direction
+        n_steps = int(SCAN_SPAN / SCAN_STEP) + 1
 
-        if needs_scan:
-            jd_search_start = tjdet + 0.5 * direction
+        def _moon_lat(t: float) -> float:
+            try:
+                pos_t, _ = calc(t, MOON, flags | FLG_SPEED)
+            except (EphemerisRangeError, CalculationError, ValueError) as exc:
+                raise Error(f"Failed to calculate Moon position: {exc}") from exc
+            return pos_t[1]
 
-            pos_start, _ = calc(jd_search_start, MOON, flags | FLG_SPEED)
-            lat_sign = 1 if pos_start[1] >= 0 else -1
-
-            for step in range(8):  # Up to 16 days in the requested direction
-                jd_check = jd_search_start + step * 2.0 * direction
-                pos_check, _ = calc(jd_check, MOON, flags | FLG_SPEED)
-                current_sign = 1 if pos_check[1] >= 0 else -1
-
-                if current_sign != lat_sign:
-                    # Crossing between jd_check - 2*direction and jd_check —
-                    # take midpoint as the Newton starting guess.
-                    jd_guess = jd_check - 1.0 * direction
-                    break
-            else:
-                jd_guess = tjdet + HALF_NODAL_MONTH * direction
-        else:
-            jd_guess = tjdet + dt_guess
+        for i in range(1, n_steps + 1):
+            t_cur = tjdet + i * step_days
+            lat_cur = _moon_lat(t_cur)
+            if lat_prev * lat_cur < 0.0:
+                # First sign change brackets the first crossing in
+                # [t_prev, t_cur] (ordered by the search direction). Bisect the
+                # bracket to the root before seeding Newton: a bare bracket
+                # midpoint can land Newton on the far side of a crossing that
+                # sits at the bracket edge, whose step then walks past tjdet and
+                # the direction clamp bounces it into an adjacent latitude
+                # extremum (division by a near-zero rate) and it never
+                # converges. A root-refined seed keeps the Newton loop below on
+                # this (first) crossing.
+                lo, hi, f_lo = t_prev, t_cur, lat_prev
+                for _ in range(60):
+                    mid = 0.5 * (lo + hi)
+                    f_mid = _moon_lat(mid)
+                    if f_lo * f_mid <= 0.0:
+                        hi = mid
+                    else:
+                        lo, f_lo = mid, f_mid
+                jd_guess = 0.5 * (lo + hi)
+                break
+            t_prev, lat_prev = t_cur, lat_cur
 
     jd = jd_guess
     for iteration in range(NR_MAX_ITER_MOON):
@@ -1506,7 +1522,28 @@ def cross_ut(
             pos, _ = calc_ut(jd, planet, flags | FLG_SPEED)
             lon = pos[0]
             speed = pos[3]
-        except (EphemerisRangeError, CalculationError, ValueError) as e:
+        except EphemerisRangeError as range_err:
+            # Newton wandered outside the ephemeris coverage before any in-range
+            # guard could fire. For a very slow outer planet ``max_range`` can
+            # exceed the ephemeris span, so the ``|jd - tjdut| > max_range`` guard
+            # never trips and Newton can step off the covered interval (e.g.
+            # backward past the lower edge) mid-iteration. A genuine first
+            # crossing may still lie in range ahead of tjdut, so fall back to the
+            # forward bracket scan, which samples only [tjdut, tjdut+max_range]
+            # and returns the earliest crossing. If no in-range crossing exists
+            # (the scan itself runs off coverage), re-raise the ephemeris-range
+            # error rather than masking it as a generic divergence.
+            try:
+                return _first(
+                    _forward_first_crossing(
+                        get_position, x2cross, tjdut, max_range, NR_TOLERANCE
+                    )
+                )
+            except EphemerisRangeError:
+                raise
+            except (Error, RuntimeError):
+                raise range_err
+        except (CalculationError, ValueError) as e:
             raise Error(
                 f"Failed to calculate planet position during iteration: {e}"
             ) from e
@@ -1529,6 +1566,11 @@ def cross_ut(
                         get_position, x2cross, tjdut, max_range, NR_TOLERANCE
                     )
                 )
+            except EphemerisRangeError:
+                # The forward scan ran off the ephemeris: no in-range crossing
+                # exists, so surface the ephemeris-range condition rather than
+                # masking it as a generic divergence.
+                raise
             except (Error, RuntimeError):
                 raise Error("Planet crossing search diverged")
 
@@ -1591,6 +1633,8 @@ def cross_ut(
                         get_position, x2cross, tjdut, max_range, NR_TOLERANCE
                     )
                 )
+            except EphemerisRangeError:
+                raise
             except (Error, RuntimeError):
                 raise Error("Planet crossing search diverged")
 
@@ -1604,6 +1648,8 @@ def cross_ut(
                 get_position, x2cross, tjdut, max_range, NR_TOLERANCE
             )
         )
+    except EphemerisRangeError:
+        raise
     except (Error, RuntimeError):
         raise Error("Maximum iterations reached in planet crossing calculation")
 
