@@ -378,8 +378,15 @@ if jd_evento > 0:
 ```
 
 ```
-Levata eliacale di Sirio al Cairo: 4/8/2024
+Levata eliacale di Sirio al Cairo: 5/8/2024
 ```
+
+> La data proviene dal modello di visibilità VISLIMIT di Schaefer.
+> L'effemeride di riferimento colloca questo evento un giorno dopo
+> (6 ago 2024): alla transizione della prima mattina, sottilissima, un
+> residuo di qualche decimo di magnitudine nel modello della magnitudine
+> limite può spostare il giorno riportato di ±1 (vedi le note sulla
+> precisione eliacale nella documentazione di compatibilità).
 
 I quattro tipi di evento eliacale sono:
 
@@ -421,7 +428,7 @@ if jd_inizio > 0:
 ```
 
 ```
-Levata eliacale: 4/8/2024
+Levata eliacale: 5/8/2024
 ```
 
 La tupla `datm` (condizioni atmosferiche):

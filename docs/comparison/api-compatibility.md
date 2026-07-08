@@ -27,9 +27,11 @@ Developers migrating from pyswisseph should be aware of these.
 | `lun_occult_when_loc` | body can be `int` or `str` | same |
 
 > `heliacal_ut` / `heliacal_pheno_ut` share the reference's signature, return
-> shape, body/event acceptance rules and output encodings, but their numerical
-> visibility results (event dates, window widths, `kact`/`minTAV`, limiting
-> magnitude) still diverge from the reference — see
+> shape, body/event acceptance rules and output encodings. The visibility model
+> is now Schaefer's VISLIMIT: `vis_limit_mag` limiting magnitude matches to
+> ≈0.1–0.26 mag, `kact`/`minTAV` and window widths track the reference, and 9 of
+> 17 reference matrix event dates match exactly (the rest ±1 day at the marginal
+> visibility transition) — see
 > [Known differences §13](known-differences.md#13-heliacal-events).
 
 ### Structural differences

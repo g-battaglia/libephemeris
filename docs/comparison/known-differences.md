@@ -603,8 +603,8 @@ always has these bodies via SPK.
 
 ### 13. Heliacal events
 
-`heliacal_ut` is expensive for some configurations and depends on an empirical
-atmospheric-extinction / arcus-visionis model.
+`heliacal_ut` depends on Schaefer's VISLIMIT visibility model (extinction, sky
+brightness and the contrast-threshold limiting magnitude).
 
 The following **API-level behaviours now match the reference exactly** and are
 verified against it:
@@ -624,16 +624,37 @@ verified against it:
 - **`refrac_extended` / `azalt`** reproduce the reference's below-horizon
   refraction curve and dip clamp (≤ ~10" over −3…+1° true altitude); see §refraction.
 
-**Still divergent — the visibility magnitude model.** The sky-brightness,
-limiting-magnitude, extinction (`kact`) and arcus-visionis (`minTAV`) model is a
-library-specific empirical model, not the reference's Schaefer/Reijs pipeline.
-Consequently the event *dates* (typically off by 1–27 days; e.g. Sirius heliacal
-rising at Cairo 2024 returns 4 Aug vs the reference's 6 Aug), the visibility
-*window widths* (often degenerate rather than the reference's few-minute spans),
-the reported `kact`/`minTAV`, and `vis_limit_mag`'s limiting magnitude do **not**
-match the reference. These remain recorded model differences for future
-physical-model work (planned as a unified visibility engine reproducing the
-Schaefer 1993 / Reijs extinction and threshold equations).
+**The visibility model is now Schaefer's VISLIMIT.** The former library-specific
+empirical model has been replaced by a faithful implementation of Bradley
+Schaefer's VISLIMIT algorithm (V band; *Sky & Telescope*, May 1998; *Astronomy
+and the limits of vision*, Vistas in Astronomy 36, 1993) with V. Reijs's refined
+atmospheric scale heights (Rayleigh 8515 m, aerosol 3745 m, water 3000 m). The
+extinction, airmass, twilight/moonlight/dark-sky brightness components and the
+Hecht contrast-threshold magnitude conversion are Schaefer's; the dark-sky
+normalisation and the aerosol season amplitude were calibrated against the
+reference ephemeris.
+
+Measured agreement (calibrated and held-out probes against the reference):
+
+- **`vis_limit_mag` limiting magnitude (`dret[0]`)** now matches to ≈0.1–0.26 mag
+  at heliacal optima (was 2.6–5.8 mag off), with the photopic/scotopic return
+  flag matching. The scotopic branch switches at the VISLIMIT 1500 nL threshold.
+- **Extinction `kact`** reproduces the reference's temperature-, humidity-,
+  altitude- and season-dependent (and pressure-*independent*) coefficient to
+  machine precision at fixed season, and to ≈0.02–0.03 across seasons/latitudes
+  (`heliacal_pheno_ut` internally snaps `kact` to a nearby event date, a small
+  residual source).
+- **Arcus visionis `minTAV`** is now derived by inverting the limiting-magnitude
+  model and agrees to ≈0.5–1° for most objects (was a crude ~4°-off step table).
+- **Visibility-window widths** are now the reference's few-to-tens-of-minutes
+  spans (previously often degenerate or far too wide).
+- **Event *dates*.** 9 of the 17 reference matrix cases land on the exact same
+  calendar day; the remainder differ by ±1 day (one by 2). At the razor-thin
+  first/last-visibility transition the day flips on a residual of a few tenths of
+  a magnitude, and because that residual varies in sign with object altitude and
+  Sun depression no single offset removes it (e.g. Sirius heliacal rising at Cairo
+  2024 returns 5 Aug vs the reference's 6 Aug — one day early). This ±1-day floor
+  is the remaining known difference.
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements. Both
