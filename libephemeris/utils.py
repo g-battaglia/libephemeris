@@ -332,7 +332,10 @@ def azalt(
         base = 1.0 - 0.0065 * altitude / 288.0
         pressure = 1013.25 * (max(base, 0.0) ** 5.255)
 
-    # Calculate atmospheric refraction via ICAO ray-tracing
+    # Apparent altitude via refrac_extended: the reference's azalt apparent
+    # altitude is identical to its refrac_extended output (including the
+    # below-horizon dip clamp), so route through the same function and do not
+    # re-clamp here.
     alt_apparent, _ = refrac_extended(
         alt_true,
         altitude,
@@ -340,13 +343,6 @@ def azalt(
         temperature,
         flag=TRUE_TO_APP,
     )
-
-    # Reference API convention (and refrac()'s): if refraction cannot lift the
-    # object above the horizon, report the true altitude — no refraction is
-    # applied below the horizon. refrac_extended() omits this clamp, so apply it
-    # here to keep azalt's apparent altitude 1:1 with swe.azalt below 0°.
-    if alt_apparent < 0.0:
-        alt_apparent = alt_true
 
     return (azimuth, alt_true, alt_apparent)
 
@@ -645,8 +641,8 @@ def refrac_extended(
     """
     from .state import get_lapse_rate
     from .refraction import (
-        calc_refraction_true_to_app,
-        calc_refraction_app_to_true,
+        calc_refraction_ref_true_to_app,
+        calc_refraction_ref_app_to_true,
         calc_dip,
     )
 
@@ -654,28 +650,30 @@ def refrac_extended(
     if lapserate is None:
         lapserate = get_lapse_rate()
 
-    # Compute refraction via ICAO ray-tracing (observer altitude aware)
-    if flag == TRUE_TO_APP:
-        true_alt = alt
-        refraction = calc_refraction_true_to_app(
-            alt, atpress, attemp, geoalt, lapserate
-        )
-        apparent_alt = true_alt + refraction
-    else:
-        apparent_alt = alt
-        refraction = calc_refraction_app_to_true(
-            alt, atpress, attemp, geoalt, lapserate
-        )
-        true_alt = apparent_alt - refraction
-
-    # Dip of the horizon for elevated observers (pressure/temperature
-    # scale the refraction part of the dip — up to ~190" at 1000 m)
+    # Dip of the horizon for elevated observers (pressure/temperature scale the
+    # refraction part of the dip — up to ~190" at 1000 m). The reference API
+    # clamps below the (dipped) horizon: if refraction cannot lift the object
+    # above the local horizon the input altitude is returned untouched.
     dip = calc_dip(geoalt, lapserate, atpress, attemp)
 
-    # Return the converted altitude and detail tuple
+    # Reference-matched analytic refraction (see refraction.py). Unlike the
+    # ray-traced model used by plain refrac(), this reproduces the reference's
+    # refrac_extended curve, which keeps growing below the geometric horizon.
     if flag == TRUE_TO_APP:
+        true_alt = alt
+        refraction = calc_refraction_ref_true_to_app(alt, atpress, attemp)
+        apparent_alt = true_alt + refraction
+        # Below the (dipped) horizon: report the input unchanged.
+        if apparent_alt < dip:
+            return (true_alt, (true_alt, true_alt, 0.0, dip))
         return (apparent_alt, (true_alt, apparent_alt, refraction, dip))
     else:
+        apparent_alt = alt
+        # Apparent altitude below the (dipped) horizon: no refraction removed.
+        if apparent_alt < dip:
+            return (apparent_alt, (apparent_alt, apparent_alt, 0.0, dip))
+        refraction = calc_refraction_ref_app_to_true(alt, atpress, attemp)
+        true_alt = apparent_alt - refraction
         return (true_alt, (true_alt, apparent_alt, refraction, dip))
 
 

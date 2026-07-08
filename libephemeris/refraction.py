@@ -612,6 +612,87 @@ def calc_refraction_app_to_true(
     return max(0.0, apparent_alt - true_est)
 
 
+# ---------------------------------------------------------------------------
+# Reference-matched analytic refraction (used by refrac_extended / azalt only)
+# ---------------------------------------------------------------------------
+#
+# The ray-traced model above is the library's default refraction (see
+# calc_refraction_true_to_app). refrac_extended() and azalt(), however, are
+# required to be 1:1 with the reference API, whose refrac_extended returns a
+# smooth analytic curve that keeps growing below the geometric horizon (the
+# ray tracer turns over there). The functions below reproduce that reference
+# curve at standard conditions to within ~7 arcsec across -3..+90 deg:
+#
+#   above the horizon (h >= 0):  a Saemundsson-family fit
+#       R[arcmin] = a / tan(h + b/(h + c))
+#   below the horizon (h < 0):   a cubic continuation in x = -h [deg],
+#       anchored at R(0) for continuity
+#
+# The fit constants were obtained by black-box probing of the reference
+# refrac_extended over a fine altitude grid at P=1013.25 mbar, T=15 C.
+_REFR_ABOVE_A: float = 0.982965
+_REFR_ABOVE_B: float = 8.729399
+_REFR_ABOVE_C: float = 4.378080
+# R(0) in arcmin, = a / tan(b/c); the below-horizon polynomial anchors here.
+_REFR_R0_ARCMIN: float = _REFR_ABOVE_A / math.tan(
+    math.radians(_REFR_ABOVE_B / _REFR_ABOVE_C)
+)
+_REFR_BELOW_P1: float = 8.17175
+_REFR_BELOW_P2: float = 2.29036
+_REFR_BELOW_P3: float = -0.07978
+
+
+def _refr_pt_scale(pressure: float, temp_C: float) -> float:
+    """Pressure/temperature scaling of astronomical refraction relative to the
+    standard atmosphere (1013.25 mbar, 15 C), matching the reference's measured
+    dependence (d ln R / d ln P ~ 0.945, d ln R / d ln T_K ~ -1.31)."""
+    return (pressure / 1013.25) ** 0.945 * (288.15 / (273.15 + temp_C)) ** 1.31
+
+
+def calc_refraction_ref_true_to_app(
+    true_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+) -> float:
+    """Reference-matched refraction (degrees) for a true altitude, valid above
+    and below the geometric horizon. Used by refrac_extended()/azalt()."""
+    if pressure <= 0:
+        return 0.0
+    if true_alt >= 0.0:
+        r_arcmin = _REFR_ABOVE_A / math.tan(
+            math.radians(true_alt + _REFR_ABOVE_B / (true_alt + _REFR_ABOVE_C))
+        )
+    else:
+        x = -true_alt
+        r_arcmin = (
+            _REFR_R0_ARCMIN
+            + _REFR_BELOW_P1 * x
+            + _REFR_BELOW_P2 * x * x
+            + _REFR_BELOW_P3 * x * x * x
+        )
+    return (r_arcmin / 60.0) * _refr_pt_scale(pressure, temperature_C)
+
+
+def calc_refraction_ref_app_to_true(
+    apparent_alt: float, pressure: float = _P0, temperature_C: float = 15.0
+) -> float:
+    """Reference-matched refraction (degrees) for an apparent altitude. Inverts
+    calc_refraction_ref_true_to_app via Newton-Raphson (true + R(true) = app)."""
+    if pressure <= 0:
+        return 0.0
+    true_est = apparent_alt
+    for _ in range(20):
+        r = calc_refraction_ref_true_to_app(true_est, pressure, temperature_C)
+        residual = true_est + r - apparent_alt
+        if abs(residual) < 1e-11:
+            break
+        dt = 1e-4
+        r_plus = calc_refraction_ref_true_to_app(true_est + dt, pressure, temperature_C)
+        dapp_dtrue = 1.0 + (r_plus - r) / dt
+        if abs(dapp_dtrue) < 1e-12:
+            break
+        true_est -= residual / dapp_dtrue
+    return apparent_alt - true_est
+
+
 def calc_dip(
     obs_alt: float,
     lapse_rate: float = 0.0065,
