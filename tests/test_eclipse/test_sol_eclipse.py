@@ -130,11 +130,17 @@ class TestSolEclipseWhenGlob:
         assert 13 <= day <= 15
 
     def test_central_eclipse_has_second_third_contact(self):
-        """Central eclipses should have second and third contact times."""
+        """Central eclipses should have second and third contact times.
+
+        Request a *central* total/annular eclipse. A geometry-less
+        ``ECL_TOTAL | ECL_ANNULAR`` mask (two type bits, no centrality bit)
+        matches no eclipse under the reference ifltype semantics and errors
+        at the ephemeris boundary, so the centrality bit is included here.
+        """
         jd_start = julday(2024, 1, 1, 0)
 
         ecl_type, times = sol_eclipse_when_glob(
-            jd_start, ecltype=ECL_TOTAL | ECL_ANNULAR
+            jd_start, ecltype=ECL_CENTRAL | ECL_TOTAL | ECL_ANNULAR
         )
 
         if ecl_type & ECL_CENTRAL:

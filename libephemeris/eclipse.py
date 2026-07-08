@@ -63,7 +63,6 @@ from .constants import (
     ECL_ANNULAR_TOTAL,
     ECL_CENTRAL,
     ECL_NONCENTRAL,
-    ECL_ALLTYPES_SOLAR,
     ECL_ALLTYPES_LUNAR,
     ECL_PENUMBRAL,
     ECL_VISIBLE,
@@ -140,10 +139,97 @@ def _reraise_if_leb_range_error(exc: BaseException) -> None:
         raise exc
 
 
+def _is_ephemeris_boundary(exc: BaseException) -> bool:
+    """Return True when ``exc`` signals the end of ephemeris coverage.
+
+    An eclipse/occultation search that finds no matching event walks
+    forward (or backward) until it steps off the active ephemeris. Both
+    the DE (Skyfield) path (:class:`EphemerisRangeError`) and the LEB path
+    (a ``ValueError`` whose message contains "outside") mark that boundary;
+    the search converts either into a typed no-event error rather than
+    looping or fabricating a result.
+    """
+    from .exceptions import EphemerisRangeError
+
+    return isinstance(exc, EphemerisRangeError) or _is_leb_out_of_range(exc)
+
+
+def _sol_glob_accepts(mask: int, retflag: int) -> bool:
+    """Reference ``ifltype`` acceptance test for ``sol_eclipse_when_glob``.
+
+    Decides whether an eclipse whose classified type is ``retflag`` (one
+    geometry bit ECL_CENTRAL/ECL_NONCENTRAL plus one type bit
+    ECL_TOTAL/ECL_ANNULAR/ECL_PARTIAL/ECL_ANNULAR_TOTAL) satisfies the
+    caller's ``mask`` filter, matching the reference semantics verified
+    against the oracle across all 64 masks:
+
+    * ``mask == 0`` accepts any eclipse.
+    * A geometry-only mask (no type bits) never matches.
+    * The eclipse must carry one of the requested type bits.
+    * With no geometry bit requested, only a *single*-type mask matches
+      (any centrality); a geometry-only-plus-multiple-types mask never
+      matches and the search runs to the ephemeris boundary.
+    * With a geometry bit requested, the eclipse's centrality must match.
+    """
+    if mask == 0:
+        return True
+    geom = mask & (ECL_CENTRAL | ECL_NONCENTRAL)
+    types = mask & (ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL | ECL_ANNULAR_TOTAL)
+    if types == 0:
+        return False
+    if not (retflag & types):
+        return False
+    if geom == 0:
+        return bin(types).count("1") == 1
+    return bool(retflag & geom)
+
+
+def _sol_glob_reject_impossible(mask: int) -> None:
+    """Raise for ``sol_eclipse_when_glob`` type masks with no realisable event.
+
+    Two masks describe eclipse geometries that cannot occur and the
+    reference rejects them up front rather than searching:
+
+    * ECL_CENTRAL | ECL_PARTIAL - a partial eclipse is never central.
+    * ECL_NONCENTRAL | ECL_ANNULAR_TOTAL - a hybrid (annular-total)
+      eclipse always has a central line, so it is never non-central.
+    """
+    valid = ECL_CENTRAL | ECL_NONCENTRAL | ECL_TOTAL | ECL_ANNULAR | ECL_PARTIAL
+    valid |= ECL_ANNULAR_TOTAL
+    m = mask & valid
+    if m == (ECL_CENTRAL | ECL_PARTIAL):
+        raise Error("central partial eclipses do not exist")
+    if m == (ECL_NONCENTRAL | ECL_ANNULAR_TOTAL):
+        raise Error("non-central hybrid (annular-total) eclipses do not exist")
+
+
 # Constants for eclipse calculations
+# Finite safety backstop (in years) for the eclipse/occultation "when"
+# searches. These searches primarily stop at the active ephemeris boundary
+# (see _is_ephemeris_boundary); this horizon only bounds a never-matching
+# filter on the ~30 000-year extended ephemeris so it cannot loop forever.
+# It is generous enough to reach the base/medium tier boundaries and to
+# span the deep saros chains, yet finite.
+_ECLIPSE_SEARCH_HORIZON_YEARS = 2000
+
+# Occultation "when" searches step conjunction-by-conjunction (the Moon laps
+# the target roughly once per sidereal month, ~13.4 conjunctions/year). The
+# old fixed cap of 1200 conjunctions (~90 years) truncated valid searches
+# well inside the ephemeris (e.g. the next partial occultation of Venus lies
+# ~260 years out). Size the backstop to the search horizon; the search still
+# stops earlier at the ephemeris boundary.
+_OCCULT_MAX_CONJUNCTIONS = int(_ECLIPSE_SEARCH_HORIZON_YEARS * 13.5)
+
 SYNODIC_MONTH = 29.530588853  # Mean synodic month in days
 LUNAR_NODE_PERIOD = 6798.38  # Lunar node regression period in days
 ECLIPSE_LIMIT_SOLAR = 18.5  # Maximum elongation from node for solar eclipse (degrees)
+# The New-Moon node-distance gate is only a coarse PRE-FILTER: the real
+# eclipse test is the classification at the REFINED maximum. Keep the
+# pre-filter a few tenths of a degree wider than the physical limit so an
+# ultra-shallow partial (whose gamma dips below the eclipse threshold only
+# at the refined maximum, a little away from the conjunction instant) is
+# never dropped before it can be classified.
+_SOLAR_NODE_PREFILTER = 19.0
 EARTH_RADIUS_KM = 6378.137  # Earth equatorial radius in km (WGS84)
 
 # Edge case thresholds for eclipse calculations
@@ -1716,6 +1802,21 @@ def _calculate_eclipse_phases_besselian(
             jd_max, 1.0, search_before=False, search_range=0.10
         )
 
+    # Reference degenerate layout for an ultra-shallow partial: when the
+    # penumbra only grazes Earth at the instant of maximum, the P1/P4
+    # "eclipse begin/end" contacts (tret[2]/[3]) do not resolve. The
+    # reference then leaves those two zero and collapses the maximum
+    # instant into the totality slots tret[4]/[5] (both equal to jd_max).
+    # Mirror that exactly so the slot population matches for these events.
+    if (
+        (eclipse_type & ECL_PARTIAL)
+        and not has_umbral_contact
+        and not t_first_contact
+        and not t_fourth_contact
+    ):
+        t_second_contact = jd_max
+        t_third_contact = jd_max
+
     return (
         jd_max,  # [0] Time of maximum eclipse
         t_noon,  # [1] Eclipse at local apparent noon
@@ -2297,7 +2398,13 @@ def _sol_eclipse_when_glob_pythonic(
         - Reference API: sol_eclipse_when_glob()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    MAX_SEARCH_YEARS = 20  # Maximum search range
+    # The search walks lunation-by-lunation until it either finds a
+    # matching eclipse or steps off the active ephemeris (the natural
+    # tier boundary). MAX_NEW_MOONS is only a finite safety backstop so a
+    # never-matching filter cannot loop forever on the ~30 000-year
+    # extended ephemeris; on the base/medium tiers the ephemeris boundary
+    # is reached first and converts to a typed no-event error.
+    MAX_SEARCH_YEARS = _ECLIPSE_SEARCH_HORIZON_YEARS
     MAX_NEW_MOONS = int(MAX_SEARCH_YEARS * 12.4)  # ~12.4 lunations per year
     BIDIRECTIONAL_WINDOW = 15.0  # Days to check backward in bidirectional mode
 
@@ -2308,9 +2415,16 @@ def _sol_eclipse_when_glob_pythonic(
             f"search_direction must be one of {valid_directions}, got '{search_direction}'"
         )
 
-    # If eclipse_type is 0, accept any type
-    if eclipse_type == 0:
-        eclipse_type = ECL_ALLTYPES_SOLAR
+    # Reject type masks that describe geometries which cannot occur
+    # (central partial; non-central hybrid) before any search - the
+    # reference raises for these rather than searching (matches oracle).
+    _sol_glob_reject_impossible(eclipse_type)
+
+    # Keep the raw mask (0 == "any type") for the acceptance test; do NOT
+    # expand 0 -> ECL_ALLTYPES_SOLAR here. _sol_glob_accepts() treats 0 as
+    # "accept any" and applies the full geometry/type semantics for the
+    # remaining 63 masks.
+    mask = eclipse_type
 
     def _check_new_moon_for_eclipse(
         jd_new_moon: float,
@@ -2320,46 +2434,26 @@ def _sol_eclipse_when_glob_pythonic(
         moon_pos, _ = calc_ut(jd_new_moon, MOON, flags | FLG_SPEED)
         moon_lon = moon_pos[0]
 
-        # Check if close enough to ecliptic for eclipse
+        # Check if close enough to ecliptic for eclipse. This is only a
+        # coarse PRE-FILTER at the (approximate) conjunction instant; the
+        # true eclipse test is the classification at the REFINED maximum.
         node_dist = _get_moon_node_distance(jd_new_moon, moon_lon)
 
-        if node_dist < ECLIPSE_LIMIT_SOLAR:
-            # Possible eclipse - check magnitude
+        if node_dist < _SOLAR_NODE_PREFILTER:
+            # Refine the eclipse maximum FIRST (Besselian elements), then
+            # classify and gate at the refined instant. Classifying at the
+            # New Moon and gating on it (as before) dropped ultra-shallow
+            # partials whose gamma is above the eclipse threshold at the
+            # conjunction but dips below it at the true maximum.
+            jd_max_refined = _refine_solar_eclipse_maximum(jd_new_moon)
             ecl_type, magnitude, gamma, ratio = _calculate_eclipse_type_and_magnitude(
-                jd_new_moon
+                jd_max_refined
             )
 
-            if ecl_type != 0:
-                # Refine eclipse maximum using Besselian elements
-                jd_max_refined = _refine_solar_eclipse_maximum(jd_new_moon)
-
-                # Re-classify at the refined maximum time for accurate gamma.
-                # The preliminary classification at New Moon can differ from the
-                # refined one because gamma changes between the approximate New
-                # Moon instant and the true eclipse maximum (e.g. an eclipse
-                # classified as PARTIAL at New Moon may actually be central at
-                # the refined maximum when gamma drops below 1.0).
-                ecl_type_refined, mag_refined, gamma_refined, ratio_refined = (
-                    _calculate_eclipse_type_and_magnitude(jd_max_refined)
-                )
-                if ecl_type_refined != 0:
-                    ecl_type = ecl_type_refined
-
-                # Check if matches filter
-                type_matches = (
-                    (eclipse_type & ECL_TOTAL and ecl_type & ECL_TOTAL)
-                    or (eclipse_type & ECL_ANNULAR and ecl_type & ECL_ANNULAR)
-                    or (eclipse_type & ECL_PARTIAL and ecl_type & ECL_PARTIAL)
-                    or (
-                        eclipse_type & ECL_ANNULAR_TOTAL
-                        and ecl_type & ECL_ANNULAR_TOTAL
-                    )
-                )
-
-                if type_matches:
-                    # Calculate phase times using high-precision Besselian method
-                    times = _calculate_eclipse_phases(jd_max_refined, ecl_type)
-                    return ecl_type, times
+            if ecl_type != 0 and _sol_glob_accepts(mask, ecl_type):
+                # Calculate phase times using high-precision Besselian method
+                times = _calculate_eclipse_phases(jd_max_refined, ecl_type)
+                return ecl_type, times
 
         return None
 
@@ -2397,8 +2491,15 @@ def _sol_eclipse_when_glob_pythonic(
 
         jd = jd_start
         for _ in range(MAX_NEW_MOONS):
-            jd_prev_new_moon = _find_previous_new_moon(jd)
-            result = _check_new_moon_for_eclipse(jd_prev_new_moon)
+            try:
+                jd_prev_new_moon = _find_previous_new_moon(jd)
+                result = _check_new_moon_for_eclipse(jd_prev_new_moon)
+            except Exception as _exc:
+                if _is_ephemeris_boundary(_exc):
+                    # Walked off the start of the ephemeris: no earlier
+                    # matching eclipse exists within coverage.
+                    break
+                raise
             if result is not None:
                 # Direction invariant: a backward search must return an
                 # eclipse whose maximum precedes jd_start (refinement can
@@ -2409,7 +2510,8 @@ def _sol_eclipse_when_glob_pythonic(
             jd = jd_prev_new_moon - 1
 
         raise Error(
-            f"No matching solar eclipse found within {MAX_SEARCH_YEARS} years before JD {jd_start}"
+            "No matching solar eclipse found before the ephemeris boundary "
+            f"searching back from JD {jd_start}"
         )
 
     # Forward search (default behavior for "forward" and "bidirectional")
@@ -2417,9 +2519,15 @@ def _sol_eclipse_when_glob_pythonic(
 
     for _ in range(MAX_NEW_MOONS):
         # Find next New Moon
-        jd_new_moon = _find_next_new_moon(jd)
-
-        result = _check_new_moon_for_eclipse(jd_new_moon)
+        try:
+            jd_new_moon = _find_next_new_moon(jd)
+            result = _check_new_moon_for_eclipse(jd_new_moon)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                # Walked off the end of the ephemeris: no later matching
+                # eclipse exists within coverage (the tier boundary).
+                break
+            raise
         if result is not None and result[1][0] <= jd_start:
             # Direction invariant: a forward search must return an eclipse
             # whose maximum follows jd_start. The conjunction-anchored
@@ -2446,7 +2554,8 @@ def _sol_eclipse_when_glob_pythonic(
         jd = jd_new_moon + 25  # Skip ahead ~25 days to ensure we find next New Moon
 
     raise Error(
-        f"No matching solar eclipse found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+        "No matching solar eclipse found before the ephemeris boundary "
+        f"searching from JD {jd_start}"
     )
 
 
@@ -4312,6 +4421,12 @@ def _sol_eclipse_how_details_pythonic(
 ECLIPSE_LIMIT_LUNAR = 18.5  # Maximum elongation from node for lunar eclipse (degrees)
 # Note: penumbral eclipses can occur up to ~18° from a node (observed max 18.02°).
 # The previous value of 12.0° was too restrictive and missed shallow penumbral eclipses.
+# The Full-Moon node distance is only a coarse PRE-FILTER: the true test is the
+# shadow-geometry classification at the REFINED maximum (_lun_how_core). node
+# distance is NOT a clean discriminator near the limit (band non-events reach
+# ~16.8° while a real penumbral - e.g. 1958-04-04 - sits above 18.5°), so the
+# pre-filter is opened to 20° and the classification makes the decision.
+_LUNAR_NODE_PREFILTER = 20.0
 
 
 def _find_next_full_moon(jd_start: float) -> float:
@@ -4892,7 +5007,11 @@ def _lun_eclipse_when_pythonic(
         - Reference API: lun_eclipse_when()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
-    MAX_SEARCH_YEARS = 20  # Maximum search range
+    # The search walks lunation-by-lunation until it finds a matching
+    # eclipse or steps off the active ephemeris (the tier boundary).
+    # MAX_FULL_MOONS is only a finite safety backstop (see the solar
+    # search for the rationale).
+    MAX_SEARCH_YEARS = _ECLIPSE_SEARCH_HORIZON_YEARS
     MAX_FULL_MOONS = int(MAX_SEARCH_YEARS * 12.4)  # ~12.4 lunations per year
 
     # Central/noncentral bits are meaningless for lunar eclipses and are
@@ -4916,21 +5035,29 @@ def _lun_eclipse_when_pythonic(
 
     for _ in range(MAX_FULL_MOONS):
         # Find next (or previous) Full Moon
-        if backwards:
-            jd_full_moon = _find_previous_full_moon(jd)
-        else:
-            jd_full_moon = _find_next_full_moon(jd)
+        try:
+            if backwards:
+                jd_full_moon = _find_previous_full_moon(jd)
+            else:
+                jd_full_moon = _find_next_full_moon(jd)
 
-        # Get Moon position at Full Moon
-        moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+            # Get Moon position at Full Moon
+            moon_pos, _ = calc_ut(jd_full_moon, MOON, flags | FLG_SPEED)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                # Walked off the ephemeris: no matching eclipse within coverage.
+                break
+            raise
         moon_lon = moon_pos[0]
         moon_pos[1]
 
-        # Check if close enough to ecliptic for eclipse
-        # Lunar eclipse possible if Moon is near a node
+        # Check if close enough to ecliptic for eclipse. This is only a
+        # coarse PRE-FILTER (widened well past the physical limit); the
+        # true test is the shadow-geometry classification at the refined
+        # maximum below (node distance is not a clean discriminator here).
         node_dist = _get_moon_node_distance(jd_full_moon, moon_lon)
 
-        if node_dist < ECLIPSE_LIMIT_LUNAR:
+        if node_dist < _LUNAR_NODE_PREFILTER:
             # Refine the time of maximum eclipse: deepest immersion of
             # the Moon in the Earth's shadow.
             jd_max = _lun_eclipse_max_time(jd_full_moon, flags)
@@ -4963,7 +5090,8 @@ def _lun_eclipse_when_pythonic(
         jd = jd_full_moon + (-25 if backwards else 25)
 
     raise Error(
-        f"No matching lunar eclipse found within {MAX_SEARCH_YEARS} years of JD {jd_start}"
+        "No matching lunar eclipse found before the ephemeris boundary "
+        f"searching from JD {jd_start}"
     )
 
 
@@ -5657,8 +5785,15 @@ def lun_occult_when_glob(
     tret = [0.0] * 10
     t = float(tjdut)
 
-    for _attempt in range(1200):
-        blon, blat = _geo_lonlat(t)
+    for _attempt in range(_OCCULT_MAX_CONJUNCTIONS):
+        try:
+            blon, blat = _geo_lonlat(t)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                # Stepped off the active ephemeris: no matching occultation
+                # exists within coverage (the tier boundary).
+                break
+            raise
         if is_star and abs(blat) > 7.0:
             raise Error(
                 f"occultation never occurs: star {body} has ecl. lat. {blat:.1f}"
@@ -5889,8 +6024,15 @@ def _lun_occult_when_loc_pythonic(
         return 0, tuple(tret_m), zero_attr
 
     t = float(jd_start)
-    for _attempt in range(1200):
-        blon, blat = _geo_lonlat(t)
+    for _attempt in range(_OCCULT_MAX_CONJUNCTIONS):
+        try:
+            blon, blat = _geo_lonlat(t)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                # Stepped off the active ephemeris: no matching occultation
+                # exists within coverage (the tier boundary).
+                break
+            raise
         if is_star and abs(blat) > 7.0:
             raise Error(
                 f"occultation never occurs: star {body} has ecl. lat. {blat:.1f}"
