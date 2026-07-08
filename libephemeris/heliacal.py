@@ -1193,11 +1193,20 @@ def _heliacal_ut_leb(
         schaefer.update_season(jd_center)
         best_m = -999.0
         best_jd = 0.0
+        # Same morning/evening upper bound as the Skyfield _check_twilight_visibility
+        # twin (and its batched variant): gate at -5 deg in the morning to prevent
+        # false detections during civil twilight where the sky-brightness model is
+        # unreliable, and at -2 deg in the evening where setting bodies are only
+        # briefly visible at shallow Sun depressions. (The LEB path formerly used
+        # a flat -1 deg for both and never consulted ``morning``, which let it
+        # scan a band the Skyfield path rejects and produce backend-dependent
+        # heliacal dates.)
+        sun_upper = -5.0 if morning else -2.0
         for dt_step in range(-15, 16):
             ut_hour = center_ut + (dt_step * 3.0) / 60.0
             jd_check = jd_day + ut_hour / 24.0
             sun_alt, body_alt, _ = _get_altitudes(jd_check)
-            if not (-18.0 < sun_alt < -1.0 and body_alt > 0.5):
+            if not (-18.0 < sun_alt < sun_upper and body_alt > 0.5):
                 continue
             m = (
                 schaefer.limiting_magnitude(
