@@ -1890,6 +1890,26 @@ def _is_hybrid_solar_eclipse(jd_max: float, l2: float) -> bool:
     return bool(widths) and min(widths) < 0.0 < max(widths)
 
 
+def _where_eclipse_magnitude(jd: float, flags: int = FLG_SWIEPH) -> float:
+    """Topocentric eclipse magnitude at the shadow-center ground point.
+
+    Returns ``attr[0]`` of :func:`sol_eclipse_where` at ``jd`` — the
+    magnitude (solar-diameter fraction) seen at the point where the
+    shadow axis comes closest to the Earth. Positive when the discs
+    actually overlap somewhere on Earth's surface, negative when even the
+    point of deepest approach sees no overlap. Used as the graze-boundary
+    admission gate so ``sol_eclipse_when_glob`` and ``sol_eclipse_where``
+    agree on whether a near-limit event is a real eclipse.
+    """
+
+    def _impl(*, reader):
+        _rc, wlon, wlat, _dcore = _eclipse_where_core(jd, flags)
+        _rc_how, attr = _sol_how_core(jd, (wlon, wlat, 0.0), flags, reader)
+        return attr[0]
+
+    return _call_with_leb_skyfield_fallback(_impl)
+
+
 def _calculate_eclipse_type_and_magnitude(
     jd: float,
 ) -> Tuple[int, float, float, float]:
@@ -1983,6 +2003,17 @@ def _calculate_eclipse_type_and_magnitude(
     # partials; the non-reference ECL_GRAZING bit is no longer leaked
     # into any public retflag.
     if _is_near_miss_eclipse(gamma, gamma_limit_partial):
+        # Graze-boundary gate: the approximate spherical fundamental-plane
+        # test (gamma <= 1 + l1) admits penumbral grazes that neither the
+        # reference nor our own sol_eclipse_where report as eclipses (they
+        # return retflag 0 with a NEGATIVE where-magnitude — the discs do not
+        # overlap anywhere on Earth). Admit a near-limit event only when the
+        # authoritative ellipsoidal where-geometry sees the discs actually
+        # overlap (positive where-magnitude), so when_glob and where agree.
+        # The sign — not the where-retflag — is the discriminator: a genuine
+        # shallow partial can have where-retflag 0 yet a positive magnitude.
+        if _where_eclipse_magnitude(jd) <= 0.0:
+            return 0, 0.0, gamma, moon_sun_ratio
         eclipse_type = ECL_PARTIAL | ECL_NONCENTRAL
         magnitude = _calculate_magnitude_safe(
             gamma, moon_sun_ratio, gamma_limit_partial
