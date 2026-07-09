@@ -210,7 +210,11 @@ def _vl_month_cont(jd: float) -> float:
 
 
 def _vl_extinction_components(
-    temperature: float, humidity_pct: float, altitude_m: float, latitude: float, jd: float
+    temperature: float,
+    humidity_pct: float,
+    altitude_m: float,
+    latitude: float,
+    jd: float,
 ) -> Tuple[float, float, float, float]:
     """Return the four V-band extinction coefficients (KR, KA, KO, KW).
 
@@ -439,7 +443,7 @@ class SchaeferModel:
             xs = _vl_airmass(sun_alt)
             c4 = 10.0 ** (-0.4 * K * xs)
             fs = (
-                6.2e7 * (rs ** -2)
+                6.2e7 * (rs**-2)
                 + 10.0 ** (6.15 - rs / 40.0)
                 + (10.0**5.36) * (1.06 + (math.cos(rs * _RD)) ** 2)
             )
@@ -463,7 +467,7 @@ class SchaeferModel:
             xm = _vl_airmass(moon_alt)
             c3 = 10.0 ** (-0.4 * K * xm)
             fm = (
-                6.2e7 * (rm ** -2)
+                6.2e7 * (rm**-2)
                 + 10.0 ** (6.15 - rm / 40.0)
                 + (10.0**5.36) * (1.06 + (math.cos(rm * _RD)) ** 2)
             )
@@ -489,7 +493,6 @@ class SchaeferModel:
         return self._sky_brightness_bl(
             sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
         )
-
 
     def limiting_magnitude(
         self,
@@ -567,6 +570,7 @@ class SchaeferModel:
         Returns:
             Required arcus visionis in degrees
         """
+
         # Root-find on the VISLIMIT limiting-magnitude model. For a body of
         # magnitude ``body_mag`` placed directly above the Sun (azimuth
         # aligned, so the Sun-object sky angle equals the arcus visionis),
@@ -974,9 +978,7 @@ def _heliacal_ut_leb(
     if body == SUN:
         raise Error("SUN is not valid for heliacal calculations")
     if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
-        raise Error(
-            "the Moon has no heliacal rising or setting (event types 1, 2)"
-        )
+        raise Error("the Moon has no heliacal rising or setting (event types 1, 2)")
 
     is_star = is_fixed_star(body)
     if not is_star and body not in _PLANET_MAP:
@@ -1180,48 +1182,66 @@ def _heliacal_ut_leb(
         center_ut = _find_twilight_center(jd_day, morning)
         if center_ut < 0:
             return False, 0.0
-        # The first/last days of an apparition are visible only in a narrow
-        # window near the optimal Sun depression, where the margin peaks at a
-        # few tenths of a magnitude. Locate that peak by scanning the
-        # productive twilight band (Sun ~ -5 deg morning / -2 deg evening down
-        # to -18 deg — see sun_upper below) at 3-min resolution and take the
-        # maximum margin; a coarser grid steps over the marginal peak and
-        # shifts the reported day by +/-1.
-        # Magnitude and Sun-object elongation vary only slowly within a day
-        # (and pheno_ut is by far the most expensive call), so evaluate them
-        # once at the twilight centre and reuse across the fine scan.
-        jd_center = jd_day + center_ut / 24.0
-        body_mag = _get_body_magnitude(jd_center)
-        elong = _get_elongation(jd_center)
-        schaefer.update_season(jd_center)
-        best_m = -999.0
-        best_jd = 0.0
-        # Same morning/evening upper bound as the Skyfield _check_twilight_visibility
-        # twin (and its batched variant): gate at -5 deg in the morning to prevent
-        # false detections during civil twilight where the sky-brightness model is
-        # unreliable, and at -2 deg in the evening where setting bodies are only
-        # briefly visible at shallow Sun depressions. (The LEB path formerly used
-        # a flat -1 deg for both and never consulted ``morning``, which let it
-        # scan a band the Skyfield path rejects and produce backend-dependent
-        # heliacal dates.)
+        # STRUCTURAL MIRROR of the Skyfield batched detector: same scan grid
+        # (centre ±3 h at 15-min steps), same gates, same accept rule (FIRST
+        # visible sample), same per-day magnitude epoch (0h UT of the civil
+        # day) and the same alt/az-derived Sun-body elongation per scan
+        # point. Any structural difference here yields backend-dependent
+        # heliacal dates: a former ±45-min/3-min max-margin variant with a
+        # centre-evaluated elongation systematically reported days the
+        # Skyfield grid stepped over (~1-day drift on a third of cases and a
+        # whole spurious Mercury apparition). Do not "improve" one twin
+        # without changing the other identically.
+        body_mag = _get_body_magnitude(jd_day)
+        # Same morning/evening upper bound as the Skyfield twins: gate at
+        # -5 deg in the morning to prevent false detections during civil
+        # twilight where the sky-brightness model is unreliable, and at
+        # -2 deg in the evening where setting bodies are only briefly
+        # visible at shallow Sun depressions.
         sun_upper = -5.0 if morning else -2.0
-        for dt_step in range(-15, 16):
-            ut_hour = center_ut + (dt_step * 3.0) / 60.0
+        for dt_min in range(-180, 181, 15):
+            ut_hour = center_ut + dt_min / 60.0
             jd_check = jd_day + ut_hour / 24.0
-            sun_alt, body_alt, _ = _get_altitudes(jd_check)
+            sun_az, sun_alt, _sun_app = _leb_body_altaz(
+                reader, jd_check, SUN, geopos, pressure, temperature
+            )
+            body_az, body_alt, _body_app = _leb_body_altaz(
+                reader,
+                jd_check,
+                body,
+                geopos,
+                pressure,
+                temperature,
+                is_star=is_star,
+                star_name=star_name,
+            )
             if not (-18.0 < sun_alt < sun_upper and body_alt > 0.5):
                 continue
-            m = (
-                schaefer.limiting_magnitude(
-                    sun_alt, -90.0, 0.0, body_alt, elong, 180.0
-                )
-                - body_mag
+            if body_alt < 0 or sun_alt > 0:
+                continue
+            # Elongation from topocentric alt/az, exactly like the Skyfield
+            # batched detector (which derives it from the same coordinates
+            # instead of a geocentric pheno call).
+            _sa_r = math.radians(sun_alt)
+            _ba_r = math.radians(body_alt)
+            _daz_r = math.radians(sun_az - body_az)
+            _cos_elong = math.sin(_sa_r) * math.sin(_ba_r) + math.cos(_sa_r) * math.cos(
+                _ba_r
+            ) * math.cos(_daz_r)
+            elong = math.degrees(math.acos(max(-1.0, min(1.0, _cos_elong))))
+            schaefer.update_season(jd_check)
+            visible = schaefer.is_visible(
+                body_alt=body_alt,
+                body_mag=body_mag,
+                sun_alt=sun_alt,
+                elongation=elong,
+                moon_alt=-90.0,
+                moon_phase=0.0,
+                moon_obj_angle=180.0,
+                margin=_HELIACAL_VIS_MARGIN,
             )
-            if m > best_m:
-                best_m = m
-                best_jd = jd_check
-        if best_m >= _HELIACAL_VIS_MARGIN and best_jd:
-            return True, best_jd
+            if visible:
+                return True, jd_check
         return False, 0.0
 
     # --- Vectorized batch is NOT used in the LEB path ---
@@ -1574,9 +1594,7 @@ def _heliacal_pheno_ut_leb(
         from .fixed_stars import fixstar_ut
 
         assert star_name is not None
-        _eq_pos, _, _ = fixstar_ut(
-            star_name, jd, FLG_EQUATORIAL | FLG_SPEED
-        )
+        _eq_pos, _, _ = fixstar_ut(star_name, jd, FLG_EQUATORIAL | FLG_SPEED)
         _body_ra_deg, _body_dec_deg = _eq_pos[0], _eq_pos[1]
     else:
         from .planets import calc_ut as _scu_hp
@@ -2207,9 +2225,7 @@ def _heliacal_ut_pythonic(
     if body == SUN:
         raise Error("SUN is not valid for heliacal calculations")
     if body == MOON and event_type in (HELIACAL_RISING, HELIACAL_SETTING):
-        raise Error(
-            "the Moon has no heliacal rising or setting (event types 1, 2)"
-        )
+        raise Error("the Moon has no heliacal rising or setting (event types 1, 2)")
 
     # Check if this is a fixed star
     is_star = is_fixed_star(body)
@@ -2581,34 +2597,14 @@ def _heliacal_ut_pythonic(
             (visible, jd_best): whether body was found visible, and
             the JD of the first visibility moment found.
         """
-        # Anchor the scan grid to 0h UT of jd_day's civil day (see the
-        # batched variant below for the rationale).
-        jd_day = math.floor(jd_day + 0.5) - 0.5
-        center_ut = _find_twilight_center(jd_day, morning)
-        if center_ut < 0:
-            return False, 0.0
-
-        # Scan ±3 hours around center in 15-minute steps.
-        # Use different sun altitude upper bounds for morning vs evening:
-        # - Morning (rising): gate at -5° to prevent false detections during
-        #   civil twilight where the sky brightness model is unreliable
-        # - Evening (setting): gate at -2° because setting bodies are only
-        #   visible briefly after sunset at shallow sun depressions
-        sun_upper = -5.0 if morning else -2.0
-
-        for dt_min in range(-180, 181, 15):
-            ut_hour = center_ut + dt_min / 60.0
-            jd_check = jd_day + ut_hour / 24.0
-            sun_alt, body_alt, _ = _get_altitudes(jd_check)
-
-            if -18.0 < sun_alt < sun_upper and body_alt > 0.5:
-                visible = _is_body_visible_no_moon(
-                    jd_check, margin=_HELIACAL_VIS_MARGIN
-                )
-                if visible:
-                    return True, jd_check
-
-        return False, 0.0
+        # Delegate to the batched detector so there is exactly ONE decision
+        # function per backend (and the batch twin mirrors the LEB detector
+        # sample-for-sample). A former hand-rolled loop here evaluated the
+        # magnitude per scan point instead of per day and used the
+        # geocentric pheno elongation instead of the alt/az-derived one,
+        # which made this variant disagree with the batch twin on razor-thin
+        # margins.
+        return _batch_check_twilight_visibility([jd_day], morning)[0]
 
     # --- Vectorized batch visibility computation (~30-40x speedup) ---
     # Instead of calling Skyfield once per time-point in a Python loop,
@@ -2720,27 +2716,21 @@ def _heliacal_ut_pythonic(
         elongations = np.degrees(np.arccos(_cos_elong))
 
         # -- Phase 4: body magnitude --
-        # For planets pheno_ut is expensive (~1.3ms). Sample every few days
-        # and interpolate. A 10-day step introduces up to ~0.14 mag of
-        # curvature error near Mercury's fast light-curve turns, enough to
-        # flip a razor-thin (~0.03 mag) twilight-visibility margin by a day
-        # relative to the exact-magnitude LEB path; a 5-day step cuts that
-        # error ~3x (<0.01 mag at the transition) for a small extra cost.
+        # EXACT per-day magnitude at 0h UT of each civil day, matching the
+        # LEB detector twin sample-for-sample. An earlier 5-day
+        # interpolation saved ~1 ms/day of pheno_ut but introduced up to
+        # ~0.01 mag of curvature error near Mercury's fast light-curve
+        # turns — enough to flip a razor-thin (~0.03 mag) twilight
+        # visibility margin by a day RELATIVE TO THE LEB BACKEND, i.e.
+        # backend-dependent heliacal dates. Magnitudes are only computed
+        # for days with a valid twilight centre.
         day_mags: dict[int, float] = {}
         if is_star:
             for idx in valid_indices:
                 day_mags[int(idx)] = star_magnitude
         else:
-            _mag_step = 5
-            _sample_idx = list(range(0, n_days, _mag_step))
-            if _sample_idx[-1] != n_days - 1:
-                _sample_idx.append(n_days - 1)
-            _sample_mags = np.array(
-                [_get_body_magnitude(float(jd_days_arr[i])) for i in _sample_idx]
-            )
-            _all_mags = np.interp(np.arange(n_days), _sample_idx, _sample_mags)
             for idx in valid_indices:
-                day_mags[int(idx)] = float(_all_mags[int(idx)])
+                day_mags[int(idx)] = _get_body_magnitude(float(jd_days_arr[int(idx)]))
 
         # -- Phase 5: check Schaefer visibility per scan point --
         results: list[tuple[bool, float]] = [(False, 0.0)] * n_days
@@ -3219,9 +3209,7 @@ def heliacal_ut(
             HELIACAL_RISING: "morning first",
             HELIACAL_SETTING: "evening last",
         }[eventtype]
-        raise Error(
-            f"{ev_name} (event type {eventtype}) does not exist for the Moon"
-        )
+        raise Error(f"{ev_name} (event type {eventtype}) does not exist for the Moon")
 
     # Call the internal _heliacal_ut_pythonic function
     jd_event, retflag = _heliacal_ut_pythonic(
