@@ -91,7 +91,7 @@ from .constants import (
 from .planets import calc_ut
 from .cache import get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
-from .utils import difdeg2n
+from .utils import degnorm, difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
@@ -956,10 +956,13 @@ def houses(
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
     # Return cusps array (reference API compatible: no padding at index 0)
-    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
+    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses.
+    # degnorm snaps the bare-%360 artifact (a tiny-negative angle wrapping to
+    # exactly 360.0) back to 0.0, keeping every output in [0, 360) like the
+    # reference API.
     if hsys_char == "G":
-        return tuple(cusps[1:37]), tuple(ascmc)
-    return tuple(cusps[1:13]), tuple(ascmc)
+        return tuple(degnorm(c) for c in cusps[1:37]), tuple(degnorm(a) for a in ascmc)
+    return tuple(degnorm(c) for c in cusps[1:13]), tuple(degnorm(a) for a in ascmc)
 
 
 def houses_with_fallback(
@@ -1519,10 +1522,13 @@ def houses_armc(
         cusps = _houses_placidus(armc_active, lat, eps, asc, mc)
 
     # Return cusps array (reference API compatible: no padding at index 0)
-    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses
+    # For Gauquelin ('G'), return 36 sectors; otherwise return 12 houses.
+    # degnorm snaps the bare-%360 artifact (a tiny-negative angle wrapping to
+    # exactly 360.0) back to 0.0, keeping every output in [0, 360) like the
+    # reference API.
     if hsys_char == "G":
-        return tuple(cusps[1:37]), tuple(ascmc)
-    return tuple(cusps[1:13]), tuple(ascmc)
+        return tuple(degnorm(c) for c in cusps[1:37]), tuple(degnorm(a) for a in ascmc)
+    return tuple(degnorm(c) for c in cusps[1:13]), tuple(degnorm(a) for a in ascmc)
 
 
 def houses_armc_ex2(
@@ -1700,7 +1706,14 @@ def houses_armc_ex2(
     # model for those systems.  We deliberately keep the true derivative
     # here.
 
-    return cusps, ascmc, cusps_speed, ascmc_speed
+    # degnorm on the angle outputs (not the speeds) snaps the bare-%360
+    # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.
+    return (
+        tuple(degnorm(c) for c in cusps),
+        tuple(degnorm(a) for a in ascmc),
+        cusps_speed,
+        ascmc_speed,
+    )
 
 
 def houses_ex(
@@ -1824,7 +1837,9 @@ def houses_ex(
             # For other systems, just subtract ayanamsa from tropical cusps
             cusps = tuple([(c - ayanamsa) % 360.0 for c in cusps])
 
-    return cusps, ascmc
+    # degnorm snaps the bare-%360 artifact (exactly 360.0 from a
+    # tiny-negative angle, e.g. after the ayanamsha subtraction) to 0.0.
+    return tuple(degnorm(c) for c in cusps), tuple(degnorm(a) for a in ascmc)
 
 
 def houses_ex2(
@@ -1951,7 +1966,14 @@ def houses_ex2(
         ks = [3, 2, 1, 0, 4, 5]
         cusps_speed = tuple(v_mc + ks[i % 6] * step for i in range(len(cusps)))
 
-    return cusps, ascmc, cusps_speed, ascmc_speed
+    # degnorm on the angle outputs (not the speeds) snaps the bare-%360
+    # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.
+    return (
+        tuple(degnorm(c) for c in cusps),
+        tuple(degnorm(a) for a in ascmc),
+        cusps_speed,
+        ascmc_speed,
+    )
 
 
 def _houses_with_context(
