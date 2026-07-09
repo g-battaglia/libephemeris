@@ -21,6 +21,7 @@ from libephemeris import (
     FLG_SWIEPH,
     ECL_TOTAL,
     ECL_ANNULAR,
+    ECL_PARTIAL,
 )
 
 
@@ -184,6 +185,30 @@ class TestEclipseCentralLineAnnularEclipse:
                 assert -90.0 <= lat <= 90.0
             for lon in lons:
                 assert -180.0 <= lon <= 180.0
+
+
+class TestEclipseCentralLinePartialEclipse:
+    """A partial-only eclipse defines no central line."""
+
+    def test_partial_eclipse_returns_no_points(self):
+        """2022-10-25 partial solar eclipse: no central phase anywhere on Earth.
+
+        sol_eclipse_where reports retflag = ECL_PARTIAL | ECL_NONCENTRAL (> 0)
+        throughout, so the central-line sampler must contribute no points; the
+        former `retflag > 0` gate filled the tuples with the closest-approach
+        shadow-axis track instead.
+        """
+        jd_start = julday(2022, 10, 1, 0.0)
+        ecl_type, times_ecl = sol_eclipse_when_glob(jd_start, ecltype=ECL_PARTIAL)
+        assert ecl_type & ECL_PARTIAL, "Should find the 2022-10-25 partial eclipse"
+
+        jd_c1 = times_ecl[2]
+        jd_c4 = times_ecl[3]
+
+        times, lats, lons = calc_eclipse_central_line(jd_c1, jd_c4, step_minutes=10.0)
+        assert times == ()
+        assert lats == ()
+        assert lons == ()
 
 
 class TestEclipseCentralLineStepSize:
