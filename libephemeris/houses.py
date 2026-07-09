@@ -814,7 +814,14 @@ def houses(
     # handling lands on the negative-side limit 0.0 (verified per
     # system against the reference ephemeris at armc 0/90/180/270).
     if abs(lat) < 1e-10:
-        co_asc = 0.0 if hsys_char == "H" else 180.0
+        # Sign-aware clamp: the reference preserves the one-sided limits
+        # (non-H: lat->0+ = 180, lat->0- = 0; reversed for H) rather than
+        # collapsing both sides of zero. Exact lat == 0 still gives 180 for
+        # non-H and 0 for H (the `>= 0.0`).
+        if hsys_char == "H":
+            co_asc = 0.0 if lat >= 0.0 else 180.0
+        else:
+            co_asc = 180.0 if lat >= 0.0 else 0.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
@@ -1389,7 +1396,14 @@ def houses_armc(
     # handling lands on the negative-side limit 0.0 (verified per
     # system against the reference ephemeris at armc 0/90/180/270).
     if abs(lat) < 1e-10:
-        co_asc = 0.0 if hsys_char == "H" else 180.0
+        # Sign-aware clamp: the reference preserves the one-sided limits
+        # (non-H: lat->0+ = 180, lat->0- = 0; reversed for H) rather than
+        # collapsing both sides of zero. Exact lat == 0 still gives 180 for
+        # non-H and 0 for H (the `>= 0.0`).
+        if hsys_char == "H":
+            co_asc = 0.0 if lat >= 0.0 else 180.0
+        else:
+            co_asc = 180.0 if lat >= 0.0 else 0.0
     else:
         coasc2_armc = (armc_deg + 90.0) % 360.0
         if lat >= 0:
