@@ -1961,12 +1961,15 @@ def _calc_body_pctr(
         ayanamsa = _get_ayanamsa_for_flags(t.ut1, iflag)
         p1 = (p1 - ayanamsa) % 360.0
 
-        # Correct velocity for ayanamsha rate if speed was calculated
+        # Correct velocity for ayanamsha rate if speed was calculated.
+        # Shortest-arc delta: the ayanamsha is mod 360 and the two samples
+        # can straddle the 0/360 wrap (star-anchored modes cross 0 on
+        # supported dates), which would spike the speed by ~360/(2*dt).
         if iflag & (FLG_SPEED | FLG_SPEED3):
             ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
             ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
-            da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
-            dp1 -= da
+            da = (ayanamsa_next - ayanamsa_prev + 180.0) % 360.0 - 180.0
+            dp1 -= da / (2.0 * dt)
 
     return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 
@@ -2588,8 +2591,12 @@ def _apply_sidereal_correction(
         dt_aya = 1.0 / 86400.0
         ayanamsa_prev = _get_ayanamsa_for_flags(ut1 - dt_aya, iflag, sid_mode)
         ayanamsa_next = _get_ayanamsa_for_flags(ut1 + dt_aya, iflag, sid_mode)
-        da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt_aya)
-        dlon -= da
+        # Unwrap the delta into (-180, 180]: the ayanamsha is mod 360, and the
+        # two samples can straddle the 0/360 wrap (e.g. SIDM_GALCENT_COCHRANE
+        # near JD 2533810), which would turn the raw -360 difference into a
+        # ~1.6e7 deg/day speed spike.
+        d_aya = (ayanamsa_next - ayanamsa_prev + 180.0) % 360.0 - 180.0
+        dlon -= d_aya / (2.0 * dt_aya)
     return lon, dlon
 
 
@@ -4108,12 +4115,15 @@ def _calc_body(
         p1 = (p1 - ayanamsa) % 360.0
 
         # Correct velocity for ayanamsha rate if speed was calculated
-        # Central difference: (f(t+h) - f(t-h)) / (2h) for O(h²) precision
+        # Central difference: (f(t+h) - f(t-h)) / (2h) for O(h²) precision.
+        # Shortest-arc delta: the ayanamsha is mod 360 and the two samples
+        # can straddle the 0/360 wrap (star-anchored modes cross 0 on
+        # supported dates), which would spike the speed by ~360/(2*dt).
         if iflag & FLG_SPEED:
             ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
             ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
-            da = (ayanamsa_next - ayanamsa_prev) / (2.0 * dt)
-            dp1 -= da
+            da = (ayanamsa_next - ayanamsa_prev + 180.0) % 360.0 - 180.0
+            dp1 -= da / (2.0 * dt)
 
     return _to_native_floats((p1, p2, p3, dp1, dp2, dp3)), iflag
 

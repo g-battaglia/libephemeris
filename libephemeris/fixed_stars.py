@@ -2981,7 +2981,10 @@ def _apply_fixstar_flags(
             ts_ayan = get_timescale()
             ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
             ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
-            speed_lon += (ayan_p - ayan_m) / (2.0 * h)
+            # Shortest-arc delta: the ayanamsha is mod 360 and can straddle
+            # the 0/360 wrap (star-anchored modes cross 0 on supported dates).
+            d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
+            speed_lon += d_ayan / (2.0 * h)
     else:
         speed_lon = 0.0
         speed_lat = 0.0

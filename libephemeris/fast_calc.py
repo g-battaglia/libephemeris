@@ -1045,10 +1045,13 @@ def _calc_ayanamsa_from_leb(
     sid_t0: Optional[float] = None,
     sid_ayan_t0: Optional[float] = None,
 ) -> float:
-    """Compute ayanamsa using only .leb data (no Skyfield).
+    """Compute ayanamsa for the LEB fast path.
 
-    For formula-based ayanamsha modes only. Star-based and galactic modes
-    require Skyfield and will raise KeyError (triggering fallback).
+    Formula-based modes are evaluated directly from the polynomial /
+    Method-B propagation (no Skyfield). Star-based and galactic modes
+    delegate the (memoized) anchor-star longitude to the Skyfield
+    ``_calc_ayanamsa`` pipeline — the planet itself stays on the LEB path.
+    Unknown modes raise KeyError (triggering fallback).
 
     Args:
         reader: Open LEBReader instance.
@@ -1061,7 +1064,7 @@ def _calc_ayanamsa_from_leb(
         Ayanamsa in degrees.
 
     Raises:
-        KeyError: If the active sidereal mode requires Skyfield.
+        KeyError: If the sidereal mode is unknown.
     """
     if sid_mode is None:
         # Read via the locked getter so a concurrent EphemerisContext swap
@@ -2686,10 +2689,16 @@ def _fast_calc_core(
                         except (KeyError, ValueError):
                             return _m
 
+                    # The ayanamsha is reported mod 360, so the two samples can
+                    # straddle the 0/360 wrap (e.g. SIDM_GALCENT_COCHRANE near
+                    # JD 2533810 crosses 0 inside the medium tier); unwrap the
+                    # delta into (-180, 180] before dividing or the raw -360
+                    # difference reports a ~1.6e7 deg/day speed spike.
                     _dt_aya = 1.0 / 86400.0
-                    dlon -= (
-                        _aya_of(jd_tt + _dt_aya) - _aya_of(jd_tt - _dt_aya)
-                    ) / (2.0 * _dt_aya)
+                    _d_aya = (
+                        _aya_of(jd_tt + _dt_aya) - _aya_of(jd_tt - _dt_aya) + 180.0
+                    ) % 360.0 - 180.0
+                    dlon -= _d_aya / (2.0 * _dt_aya)
                 else:
                     dlon -= _general_precession_rate_deg_day(jd_tt)
 

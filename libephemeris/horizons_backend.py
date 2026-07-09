@@ -867,10 +867,15 @@ def _to_ecliptic_output(
                 # ayanamsa (_get_ayanamsa_for_flags returns mean for FLG_J2000/
                 # FLG_NONUT and true otherwise), matching the Skyfield and LEB
                 # backends (see fast_calc's sidereal speed correction).
+                # Unwrap the delta into (-180, 180]: the ayanamsha is mod 360,
+                # and the two samples can straddle the 0/360 wrap (e.g.
+                # SIDM_GALCENT_COCHRANE near JD 2533810), which would turn the
+                # raw -360 difference into a ~1.6e7 deg/day speed spike.
                 _dt_aya = 1.0 / 86400.0
                 _aya_p = _get_ayanamsa_for_flags(jd_ut + _dt_aya, iflag, sid_mode)
                 _aya_m = _get_ayanamsa_for_flags(jd_ut - _dt_aya, iflag, sid_mode)
-                dlon -= (_aya_p - _aya_m) / (2.0 * _dt_aya)
+                _d_aya = (_aya_p - _aya_m + 180.0) % 360.0 - 180.0
+                dlon -= _d_aya / (2.0 * _dt_aya)
             else:
                 dlon -= _general_precession_rate_deg_day(jd_tt)
                 if not (iflag & FLG_J2000):

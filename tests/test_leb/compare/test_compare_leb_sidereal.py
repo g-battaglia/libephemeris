@@ -14,8 +14,10 @@ from libephemeris.constants import (
     MOON,
     MARS,
     JUPITER,
+    VENUS,
     FLG_SPEED,
     FLG_SIDEREAL,
+    SIDM_GALCENT_COCHRANE,
 )
 
 from .conftest import (
@@ -145,3 +147,39 @@ class TestStarBasedFallback:
             assert ref[3] == pytest.approx(leb[3], abs=1e-6), (
                 f"{body_name} star-based mode {sid_mode} speed differs at JD {jd}"
             )
+
+    @pytest.mark.leb_compare
+    def test_star_based_speed_no_spike_at_ayanamsha_wrap(
+        self, compare: CompareHelper
+    ):
+        """No speed spike where the star-anchored ayanamsha wraps at 0/360.
+
+        SIDM_GALCENT_COCHRANE's ayanamsha crosses 0 deg inside the medium
+        tier (~year 2225). The speed correction central-differences the
+        mod-360 ayanamsha at +/-1 s, so for ~2 s around each crossing the
+        two samples straddle the wrap: without shortest-arc unwrapping the
+        raw -360 deg delta reported ~1.6e7 deg/day (360 deg / 2 s). The two
+        backends wrap at different instants (the LEB fast path wraps the
+        Skyfield-delegated anchor value BEFORE adding nutation; the Skyfield
+        path wraps the final true ayanamsha), so both crossings are scanned
+        on both backends. Crossing JDs bisected to sub-second precision
+        against each path's own ayanamsha curve.
+        """
+        flags = FLG_SPEED | FLG_SIDEREAL
+        wrap_jds = (2533810.013278473, 2533851.698196034)  # LEB, Skyfield
+        step = 0.5 / 86400.0
+        ephem.set_sid_mode(SIDM_GALCENT_COCHRANE, 2451545.0, 0.0)
+        for anchor in wrap_jds:
+            for k in range(-6, 7):
+                jd = anchor + k * step
+                ref, _ = compare.skyfield(ephem.calc_ut, jd, VENUS, flags)
+                leb, _ = compare.leb(ephem.calc_ut, jd, VENUS, flags)
+                assert abs(ref[3]) < 10.0, (
+                    f"Skyfield speed spike {ref[3]:+.1f} deg/day at JD {jd:.8f}"
+                )
+                assert abs(leb[3]) < 10.0, (
+                    f"LEB speed spike {leb[3]:+.1f} deg/day at JD {jd:.8f}"
+                )
+                assert ref[3] == pytest.approx(leb[3], abs=1e-6), (
+                    f"backend speed mismatch at JD {jd:.8f}"
+                )
