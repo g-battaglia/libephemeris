@@ -18,6 +18,7 @@ from libephemeris import (
     revjul,
     heliacal_ut,
     heliacal_pheno_ut,
+    Error,
     MERCURY,
     VENUS,
     MARS,
@@ -194,7 +195,7 @@ class TestHeliacalValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="Sun"):
+        with pytest.raises(Error, match="Sun"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -209,7 +210,7 @@ class TestHeliacalValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="Moon"):
+        with pytest.raises(Error, match="Moon"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -224,7 +225,7 @@ class TestHeliacalValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="Invalid event_type"):
+        with pytest.raises(Error, match="Invalid event_type"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -481,7 +482,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="Sun"):
+        with pytest.raises(Error, match="Sun"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Sun", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_moon_raises_error(self):
@@ -491,7 +492,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="Moon"):
+        with pytest.raises(Error, match="Moon"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Moon", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_invalid_event_type(self):
@@ -501,7 +502,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="Invalid event_type"):
+        with pytest.raises(Error, match="Invalid event_type"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Venus", 99)
 
     def test_swe_heliacal_ut_invalid_object_name(self):
@@ -511,7 +512,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="not recognized"):
+        with pytest.raises(Error, match="not recognized"):
             heliacal_ut(
                 jd_start, geopos, datm, dobs, "InvalidPlanet", HELIACAL_RISING
             )
@@ -602,7 +603,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(Error):
             heliacal_ut(jd_start, geopos, datm, dobs, "3", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_visibility_window_ordering(self):
@@ -931,7 +932,7 @@ class TestHeliacalPhenoValidation:
         jd = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="not recognized"):
+        with pytest.raises(Error, match="not recognized"):
             heliacal_pheno_ut(
                 jd,
                 geopos,
@@ -946,7 +947,7 @@ class TestHeliacalPhenoValidation:
         jd = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
 
-        with pytest.raises(ValueError, match="Invalid event_type"):
+        with pytest.raises(Error, match="Invalid event_type"):
             heliacal_pheno_ut(
                 jd,
                 geopos,
@@ -1237,7 +1238,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1252,7 +1253,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1267,7 +1268,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1282,7 +1283,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1297,7 +1298,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1312,7 +1313,7 @@ class TestHeliacalOuterPlanetValidation:
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -1549,7 +1550,7 @@ class TestSweHeliacalUtOuterPlanetValidation:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Mars", EVENING_FIRST)
 
     def test_jupiter_morning_last_via_swe_api_raises_error(self):
@@ -1559,7 +1560,7 @@ class TestSweHeliacalUtOuterPlanetValidation:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Jupiter", MORNING_LAST)
 
     def test_saturn_evening_first_via_swe_api_raises_error(self):
@@ -1569,7 +1570,7 @@ class TestSweHeliacalUtOuterPlanetValidation:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="inner planets"):
+        with pytest.raises(Error, match="inner planets"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Saturn", EVENING_FIRST)
 
     def test_mercury_evening_first_via_swe_api_works(self):
