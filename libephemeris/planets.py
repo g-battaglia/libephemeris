@@ -1143,9 +1143,7 @@ def _spk_out_of_coverage_error(ipl: int, spk_info, jd_tt: float):
         "4. Disable strict precision mode (not recommended):",
         "   >>> eph.set_strict_precision(False)",
     ]
-    return SPKRequiredError(
-        message="\n".join(lines), body_id=ipl, body_name=body_name
-    )
+    return SPKRequiredError(message="\n".join(lines), body_id=ipl, body_name=body_name)
 
 
 def _try_auto_spk_download(t, ipl: int, iflag: int):
@@ -3013,6 +3011,12 @@ def _calc_body(
             pos = hypothetical.calc_uranian_planet(ipl, jd_tt)
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
+            # Zero the speed slots when FLG_SPEED is absent so callers never
+            # receive unrequested velocity data (the reference API returns
+            # zeros); the Δψ-rate and sidereal speed terms below are
+            # themselves gated on FLG_SPEED, so the zeros survive.
+            if not (iflag & FLG_SPEED):
+                dlon = dlat = ddist = 0.0
             if not is_j2000:
                 # Precess J2000 -> ecliptic of date. Carry the velocity
                 # through the same precession (do not leave it in the J2000
@@ -3066,22 +3070,29 @@ def _calc_body(
 
         lon, lat, dist = _get_uranian_geo_j2000(jd_tt, ipl)
 
-        dt_v = 1.0
-        prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
-        nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
-        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360), so a
-        # crossing is a ~360 deg jump in the raw difference; after dividing by
-        # 2*dt_v the threshold and correction carry the same 1/(2*dt_v) factor.
-        # Valid only because these bodies are slow (<<90 deg/day at dt_v=1): a
-        # real speed above 180/(2*dt_v) cannot occur, so it can only be a wrap.
-        # Do NOT reuse this for fast bodies -- it would misread real motion.
-        if dlon > 180.0 / (2.0 * dt_v):
-            dlon -= 360.0 / (2.0 * dt_v)
-        elif dlon < -180.0 / (2.0 * dt_v):
-            dlon += 360.0 / (2.0 * dt_v)
-        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
-        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+        # The central-difference stencil runs only when speeds are requested:
+        # without FLG_SPEED the reference API returns zeroed speed slots, and
+        # skipping the stencil saves two extra Earth-position evaluations.
+        if iflag & FLG_SPEED:
+            dt_v = 1.0
+            prev = _get_uranian_geo_j2000(jd_tt - dt_v, ipl)
+            nxt = _get_uranian_geo_j2000(jd_tt + dt_v, ipl)
+            dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+            # Unwrap a 0/360 boundary crossing. The longitudes are in [0, 360),
+            # so a crossing is a ~360 deg jump in the raw difference; after
+            # dividing by 2*dt_v the threshold and correction carry the same
+            # 1/(2*dt_v) factor. Valid only because these bodies are slow
+            # (<<90 deg/day at dt_v=1): a real speed above 180/(2*dt_v) cannot
+            # occur, so it can only be a wrap. Do NOT reuse this for fast
+            # bodies -- it would misread real motion.
+            if dlon > 180.0 / (2.0 * dt_v):
+                dlon -= 360.0 / (2.0 * dt_v)
+            elif dlon < -180.0 / (2.0 * dt_v):
+                dlon += 360.0 / (2.0 * dt_v)
+            dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+            ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+        else:
+            dlon = dlat = ddist = 0.0
 
         if not is_j2000:
             # Precess J2000 -> ecliptic of date, carrying the velocity so the
@@ -3133,6 +3144,10 @@ def _calc_body(
             pos = hypothetical.calc_transpluto(jd_tt)
             lon, lat, dist = pos[0], pos[1], pos[2]
             dlon, dlat, ddist = pos[3], pos[4], pos[5]
+            # Zero the speed slots when FLG_SPEED is absent (reference API
+            # contract — see the Uranian heliocentric branch above).
+            if not (iflag & FLG_SPEED):
+                dlon = dlat = ddist = 0.0
             if not is_j2000:
                 # Precess J2000 -> ecliptic of date, carrying the velocity so
                 # the of-date speed is the derivative of the of-date position
@@ -3185,19 +3200,25 @@ def _calc_body(
 
         lon, lat, dist = _get_transpluto_geo_j2000(jd_tt)
 
-        dt_v = 1.0
-        prev = _get_transpluto_geo_j2000(jd_tt - dt_v)
-        nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
-        dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
-        # Unwrap a 0/360 boundary crossing (see the Uranian path above): the
-        # threshold and correction must carry the 1/(2*dt_v) factor. Valid only
-        # for slow bodies (<<90 deg/day at dt_v=1); do NOT reuse for fast ones.
-        if dlon > 180.0 / (2.0 * dt_v):
-            dlon -= 360.0 / (2.0 * dt_v)
-        elif dlon < -180.0 / (2.0 * dt_v):
-            dlon += 360.0 / (2.0 * dt_v)
-        dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
-        ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+        # Stencil only when speeds are requested (reference API returns zeroed
+        # speed slots without FLG_SPEED — see the Uranian geocentric branch).
+        if iflag & FLG_SPEED:
+            dt_v = 1.0
+            prev = _get_transpluto_geo_j2000(jd_tt - dt_v)
+            nxt = _get_transpluto_geo_j2000(jd_tt + dt_v)
+            dlon = (nxt[0] - prev[0]) / (2.0 * dt_v)
+            # Unwrap a 0/360 boundary crossing (see the Uranian path above):
+            # the threshold and correction must carry the 1/(2*dt_v) factor.
+            # Valid only for slow bodies (<<90 deg/day at dt_v=1); do NOT
+            # reuse for fast ones.
+            if dlon > 180.0 / (2.0 * dt_v):
+                dlon -= 360.0 / (2.0 * dt_v)
+            elif dlon < -180.0 / (2.0 * dt_v):
+                dlon += 360.0 / (2.0 * dt_v)
+            dlat = (nxt[1] - prev[1]) / (2.0 * dt_v)
+            ddist = (nxt[2] - prev[2]) / (2.0 * dt_v)
+        else:
+            dlon = dlat = ddist = 0.0
 
         if not is_j2000:
             # Precess J2000 -> ecliptic of date, carrying the velocity so the
@@ -3428,7 +3449,19 @@ def _calc_body(
             if spk_result is not None:
                 get_logger().debug("body=%d jd=%.1f source=SPK", ipl, t.tt)
                 _record(ipl, "SPK")
-                spk_result = _maybe_equatorial_convert(spk_result, t.tt, iflag)
+                # _calc_type21_position performs the full frame reduction
+                # internally (precession/nutation per FLG_J2000/FLG_NONUT),
+                # so a type-21 result under FLG_J2000 is ALREADY J2000
+                # ecliptic: pass already_j2000=True or the converter would
+                # precess it date->J2000 a second time. Type-2/3 results are
+                # of-date and must be precessed exactly once here.
+                _spk_info = spk.get_spk_body_info(ipl)
+                _already_j2000 = (
+                    _spk_info is not None and spk._detect_spk_type(_spk_info[0]) == 21
+                )
+                spk_result = _maybe_equatorial_convert(
+                    spk_result, t.tt, iflag, already_j2000=_already_j2000
+                )
                 return _to_native_floats(spk_result), iflag
 
             # In strict precision mode, require an SPK-grade source for all
@@ -3467,9 +3500,7 @@ def _calc_body(
                         # auto-download).
                         horizons_id, _ = SPK_BODY_NAME_MAP[ipl]
                         body_name = spk._get_body_name(ipl) or str(ipl)
-                        raise SPKRequiredError.for_body(
-                            ipl, body_name, horizons_id
-                        )
+                        raise SPKRequiredError.for_body(ipl, body_name, horizons_id)
 
             jd_tt = t.tt
 
