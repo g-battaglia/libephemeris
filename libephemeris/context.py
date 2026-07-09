@@ -320,7 +320,11 @@ class EphemerisContext:
             mode = mode & 0xFF
 
         self.sidereal_mode = mode
-        self.sidereal_t0 = t0 if t0 != 0.0 else 2451545.0
+        # t0 is stored literally (no J2000 sentinel — JD 0.0 is a valid
+        # ~4713 BCE epoch), matching state.set_sid_mode and the downstream
+        # SIDM_USER consumers (planets._calc_ayanamsa, fast_calc), which all
+        # use the raw t0 with method_b_accumulated_precession.
+        self.sidereal_t0 = t0
         self.sidereal_ayan_t0 = ayan_t0
 
     @overload
