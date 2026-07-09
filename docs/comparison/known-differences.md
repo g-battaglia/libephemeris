@@ -517,6 +517,16 @@ numbered asteroid) the reference API computes real values, whereas this version
 **raises `Error`** rather than returning a plausible-looking zero (which would
 read as a node at 0° Aries). Planned for a future release.
 
+**Date range bound to DE440 (extended-tier limitation).** `nod_aps_ut`/`nod_aps`
+and `get_orbital_elements` acquire the Sun/Earth/target state vectors directly
+from the DE440 kernel (the medium tier, ≈ 1550–2650), not through the LEB
+reader, so they raise `EphemerisRangeError` on dates outside that range even
+when the extended LEB tier is loaded and `calc_ut` succeeds for the same date
+(e.g. year −2000 or +3000 with the extended tier). Modern-era and full
+medium-tier dates are unaffected. Routing the state-vector acquisition through
+the calc/LEB dispatch (as `calc_ut` already does) is planned so these surfaces
+reach the extended range too.
+
 **Sidereal `nod_aps` — uniform true-ayanamsha reduction (deliberate, ≤ ~17.5").**
 For of-date sidereal output libephemeris subtracts the **true** ayanamsha
 (mean + Δψ) uniformly, in `calc`/`calc_ut` AND in `nod_aps`/`nod_aps_ut` — the
@@ -740,6 +750,21 @@ Measured agreement (calibrated and held-out probes against the reference):
   fallback would require reproducing unpublished internals and is deliberately not
   attempted. Bright objects that *are* photometrically detected there (e.g.
   Venus/Tromsø 2000) still land within the ±1–2-day photometric floor above.
+
+**`heliacal_pheno_ut` diagnostic slots (`dret[1]` AppAltO, `dret[9]` ARCLact).**
+These two reported slots use simple inline models that diverge from the
+reference outside the heliacal-relevant regime; they do not feed the visibility
+detection (which uses the Schaefer VISLIMIT model and the topocentric altitude):
+- *AppAltO (`dret[1]`)* applies the Sæmundsson refraction above the horizon and a
+  flat 0.5° fallback below −1°, where the reference continues the refraction
+  curve further below the horizon and zero-refracts when the object is well
+  down. Above the horizon (where heliacal events are decided) the two agree to
+  ~0.01°.
+- *ARCLact (`dret[9]`)* uses the flat Schaefer relation `sqrt(arcv²+daz²)`. This
+  matches the reference for the small Sun-body separations of a heliacal event
+  (e.g. Venus ±0.03°) but can exceed 180° for large, out-of-domain separations
+  (a body near opposition, far from any heliacal context) where the function is
+  not meaningful. `GeoAltO`/`ARCVact`/`ARCLact`'s vertical component are exact.
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements. Both
