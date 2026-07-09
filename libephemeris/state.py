@@ -785,6 +785,59 @@ def _reset_timescale() -> None:
         _TS = None
 
 
+def _close_kernel_resources() -> None:
+    """Close the loaded ephemeris handles without touching user configuration.
+
+    Releases the DE kernel, the planet-centers kernel, the LEB reader and the
+    cached loader so the next calculation reloads them from the CURRENT
+    configuration. Unlike close(), every user-facing setting (ephe path/file,
+    topo, sidereal mode, tidal acceleration, SPK registrations, calc mode,
+    LEB file) is preserved. This is the narrow release used by
+    EphemerisContext.close(), whose contract is to free file handles and pick
+    up a new ephemeris file — not to reset the module configuration.
+
+    Uses _INIT_LOCK, the same lock that guards the lazy loading of these
+    resources (and the one EphemerisContext.close() is documented to take
+    after _SHARED_LOCK).
+    """
+    global _LOADER, _PLANETS, _PLANET_CENTERS, _LEB_READER
+
+    with _INIT_LOCK:
+        if _LEB_READER is not None:
+            try:
+                _LEB_READER.close()
+            except (AttributeError, OSError):
+                pass
+            _LEB_READER = None
+        # Clear fast_calc's cached reference to the closed LEB reader (see
+        # _close_inner): stale dispatch through a closed mmap otherwise.
+        from . import fast_calc as _fast_calc
+
+        _fast_calc._reset_active_reader()
+
+        if _PLANETS is not None:
+            try:
+                _PLANETS.close()
+            except (AttributeError, OSError, ValueError):
+                # SpiceKernel may not have close() in all versions,
+                # or may already be closed
+                pass
+            _PLANETS = None
+        if _PLANET_CENTERS is not None:
+            try:
+                _PLANET_CENTERS.close()
+            except (AttributeError, OSError, ValueError):
+                pass
+            _PLANET_CENTERS = None
+        _PLANET_CENTER_MISSING.clear()
+        _LOADER = None
+
+        # Kernel-derived computation caches must not outlive the kernel.
+        from .cache import clear_caches
+
+        clear_caches()
+
+
 # =============================================================================
 # PRECISION TIER ACCESSORS
 # =============================================================================

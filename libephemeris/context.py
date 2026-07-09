@@ -903,13 +903,22 @@ class EphemerisContext:
             _SHARED_EPHE_PATH = None
             _SHARED_EPHE_FILE = "de440.bsp"
 
+            # Context calculations route through the MODULE-level kernel
+            # (state.get_planets() via _calc_body), not _SHARED_PLANETS —
+            # which is only loaded by an explicit ctx.get_planets() call.
+            # Honoring the documented contract (free file handles, pick up a
+            # new ephemeris file on the next calculation) therefore requires
+            # releasing the state-level kernel resources too. The narrow
+            # helper closes only kernel handles/loader/caches and preserves
+            # every user-facing setting. Lock order _SHARED_LOCK ->
+            # state._INIT_LOCK matches get_timescale() above; state never
+            # takes locks in the reverse order.
+            from .state import _close_kernel_resources, _reset_timescale
+
+            _close_kernel_resources()
+
             # _SHARED_TS caches the singleton built by state.get_timescale();
             # clearing the reference alone would re-cache the same live
             # object on the next call. Reset the state-level cache too so
             # time data (IERS table, leap seconds) is actually rebuilt.
-            # Lock order _SHARED_LOCK -> state._INIT_LOCK matches
-            # get_timescale() above; state never takes locks in the
-            # reverse order.
-            from .state import _reset_timescale
-
             _reset_timescale()
