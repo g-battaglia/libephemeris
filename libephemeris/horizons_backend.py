@@ -480,9 +480,7 @@ def horizons_calc_ut(
                 dist = _math.sqrt(rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2)
                 if dist > 0.0:
                     lt = dist / c_au_day
-                    tgt_lt = client.fetch_state_vector(
-                        command, jd_tt - lt, "@0", "TDB"
-                    )
+                    tgt_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
                     rel_pos = (
                         tgt_lt.x - sun_sv.x,
                         tgt_lt.y - sun_sv.y,
@@ -696,7 +694,11 @@ def _apply_deflection_horizons(
     source = _HorizonsDeflectorSource(batch, client, jd_tt)
     try:
         return _apply_gravitational_deflection(
-            geo, earth_bary, jd_tt, light_time, source  # type: ignore[arg-type]
+            geo,
+            earth_bary,
+            jd_tt,
+            light_time,
+            source,  # type: ignore[arg-type]
         )
     except ConnectionError:
         logger.warning(
@@ -1033,15 +1035,26 @@ def _calc_uranian(
         dlon = dlat = ddist = 0.0
 
     # calc_uranian_planet / calc_transpluto return a J2000-frame ecliptic
-    # longitude. Precess it to the ecliptic OF DATE unless FLG_J2000 is set,
-    # then apply the sidereal correction — mirroring the canonical
-    # heliocentric Uranian path in planets._calc_body so both backends agree.
-    # The old code skipped the precession (a >1° error away from J2000) and
-    # used the MEAN ayanamsa instead of the TRUE one.
+    # longitude. Precess it to the ecliptic OF DATE unless FLG_J2000 is set
+    # (carrying the velocity when FLG_SPEED so the of-date speed is the true
+    # derivative of the of-date position), add the of-date nutation Δψ, then
+    # apply the sidereal correction — mirroring the canonical heliocentric
+    # Uranian path in planets._calc_body so both backends agree.
     if not (iflag & FLG_J2000):
-        from .astrometry import _precess_ecliptic
+        if iflag & FLG_SPEED:
+            from .planets import _precess_ecliptic_state
 
-        lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+            lon, lat, dlon, dlat = _precess_ecliptic_state(
+                lon, lat, dlon, dlat, jd_tt, to_j2000=False
+            )
+        else:
+            from .astrometry import _precess_ecliptic
+
+            lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+    from .planets import _add_of_date_nutation
+
+    lon, dlon = _add_of_date_nutation(lon, dlon, jd_tt, iflag)
 
     if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import _apply_sidereal_correction
@@ -1049,17 +1062,18 @@ def _calc_uranian(
         lon, dlon = _apply_sidereal_correction(lon, dlon, jd_ut, iflag, sid_mode)
 
     # Equatorial conversion and output-representation flags, mirroring the
-    # canonical heliocentric Uranian path (planets._calc_body lines ~2446-2451,
-    # ~2472-2476). The bare return above produced ecliptic spherical DEGREES for
-    # every request, so FLG_EQUATORIAL / FLG_XYZ / FLG_RADIANS were silently
-    # ignored — a tens-of-degrees / wrong-representation divergence from the
-    # LEB/Skyfield backend. _maybe_equatorial_convert is masked with ~FLG_J2000
-    # because the J2000 framing was already handled by the precession gate above
-    # (the canonical path masks it for the same reason). Both helpers are pure
+    # canonical heliocentric Uranian path in planets._calc_body. The bare
+    # return above produced ecliptic spherical DEGREES for every request, so
+    # FLG_EQUATORIAL / FLG_XYZ / FLG_RADIANS were silently ignored — a
+    # tens-of-degrees / wrong-representation divergence from the LEB/Skyfield
+    # backend. already_j2000=True because the J2000 framing was handled by the
+    # precession gate above: the converter must skip its internal date→J2000
+    # precession but still pick the J2000 obliquity for EQ+J2000 output (the
+    # canonical path passes the same combination). Both helpers are pure
     # analytical math (obliquity/nutation via erfa), so no DE440/HTTP is needed.
     from .planets import _apply_output_flags, _maybe_equatorial_convert
 
     result = (lon, lat, dist, dlon, dlat, ddist)
-    result = _maybe_equatorial_convert(result, jd_tt, iflag & ~FLG_J2000)
+    result = _maybe_equatorial_convert(result, jd_tt, iflag, already_j2000=True)
     result = _apply_output_flags(result, iflag)
     return (result, iflag)
