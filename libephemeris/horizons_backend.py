@@ -938,7 +938,13 @@ def _calc_analytical(
     import math
 
     from .time_utils import deltat
-    from .constants import FLG_SIDEREAL, FLG_NONUT, FLG_EQUATORIAL, FLG_SPEED
+    from .constants import (
+        FLG_SIDEREAL,
+        FLG_NONUT,
+        FLG_J2000,
+        FLG_EQUATORIAL,
+        FLG_SPEED,
+    )
     from .constants import _MOON_MEAN_DIST_AU, _MOON_MEAN_APOG_DIST_AU
     from .planets import (
         _apply_output_flags,
@@ -951,9 +957,12 @@ def _calc_analytical(
     jd_tt = jd_ut + deltat(jd_ut)
     is_sidereal = bool(iflag & FLG_SIDEREAL)
     # SIDEREAL+EQUATORIAL output is on the mean ecliptic (no nutation), so Δψ is
-    # neither added to the position nor its rate to the speed.
+    # neither added to the position nor its rate to the speed. The J2000
+    # ecliptic is nutation-free too (like FLG_NONUT), matching the canonical
+    # _add_of_date_nutation gate in planets.py — adding Δψ here would leak
+    # ~14 arcsec of of-date nutation into the J2000 frame.
     _sid_eq = is_sidereal and bool(iflag & FLG_EQUATORIAL)
-    add_nutation = not (iflag & FLG_NONUT) and not _sid_eq
+    add_nutation = not (iflag & (FLG_NONUT | FLG_J2000)) and not _sid_eq
 
     if body_id == 10:  # Mean Node
         from .lunar import calc_mean_lunar_node
