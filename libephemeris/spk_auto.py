@@ -1107,21 +1107,27 @@ def _jd_to_iso_date(jd: float) -> str:
     # b = 2 - a + a//4). A z < 2299161 Julian branch would drift these two
     # apart by ~10 days for pre-1582 dates (e.g. medium/extended tier starts),
     # corrupting the SPK request window and cache filenames.
+    # Meeus's INT() is a FLOOR: int() truncates toward zero, which breaks
+    # every negative intermediate (JD < 0, i.e. years before -4712) and
+    # silently returned dates hundreds of days off there. math.floor keeps
+    # this the exact inverse of _iso_to_jd over the whole range.
+    import math
+
     jd = jd + 0.5
-    z = int(jd)
+    z = math.floor(jd)
     # The sub-day fraction (jd - z) is intentionally discarded: coverage
     # windows and cache filenames are day-granular, so the result is the
     # civil date containing the instant.
 
-    alpha = int((z - 1867216.25) / 36524.25)
-    a = z + 1 + alpha - int(alpha / 4)
+    alpha = math.floor((z - 1867216.25) / 36524.25)
+    a = z + 1 + alpha - math.floor(alpha / 4)
 
     b = a + 1524
-    c = int((b - 122.1) / 365.25)
-    d = int(365.25 * c)
-    e = int((b - d) / 30.6001)
+    c = math.floor((b - 122.1) / 365.25)
+    d = math.floor(365.25 * c)
+    e = math.floor((b - d) / 30.6001)
 
-    day = b - d - int(30.6001 * e)
+    day = b - d - math.floor(30.6001 * e)
 
     if e < 14:
         month = e - 1
@@ -1165,15 +1171,27 @@ def _iso_to_jd(date_str: str) -> float:
     if neg_year:
         year = -year
 
-    # Algorithm from Meeus, Astronomical Algorithms
+    # Algorithm from Meeus, Astronomical Algorithms. Meeus's INT() is a
+    # FLOOR, not a truncation: Python's int() rounds toward zero, which for
+    # negative intermediates (BCE years, and year < -4716 in the 365.25
+    # term) yields a JD one day too large. math.floor matches erfa.cal2jd
+    # across the whole proleptic-Gregorian range.
+    import math
+
     if month <= 2:
         year -= 1
         month += 12
 
-    a = int(year / 100)
-    b = 2 - a + int(a / 4)
+    a = math.floor(year / 100)
+    b = 2 - a + math.floor(a / 4)
 
-    jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
+    jd = (
+        math.floor(365.25 * (year + 4716))
+        + math.floor(30.6001 * (month + 1))
+        + day
+        + b
+        - 1524.5
+    )
     return jd
 
 
