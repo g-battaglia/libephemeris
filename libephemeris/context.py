@@ -611,10 +611,16 @@ class EphemerisContext:
         # no antipode branch), and the antipode is representation-dependent
         # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         if ipl in (-MEAN_NODE, -TRUE_NODE):
-            from .planets import _south_node_from_north
+            from .planets import _echo_speed_bit, _south_node_from_north
 
             north_result, retflag = self._calc_impl(tjd, abs(ipl), iflag, ut=ut)
-            return _south_node_from_north(north_result, iflag), retflag
+            # The recursion sees the already-normalized iflag (SPEED3 mapped
+            # to SPEED), so its echoed retflag loses the caller's original
+            # speed bit — re-echo against raw_iflag exactly like the
+            # module-level south-node branch (planets.py _calc_body_south).
+            return _south_node_from_north(north_result, iflag), _echo_speed_bit(
+                retflag, raw_iflag
+            )
 
         # --- LEB fast path: try binary ephemeris first ---
         reader = self.get_leb_reader()
