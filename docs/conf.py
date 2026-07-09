@@ -5,6 +5,7 @@
 
 import os
 import sys
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 # Add the project root to the path so autodoc can find the modules
 sys.path.insert(0, os.path.abspath(".."))
@@ -13,12 +14,11 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "libephemeris"
 copyright = "2024-2026, Giacomo Battaglia"
 author = "Giacomo Battaglia"
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 try:
     release = _pkg_version("libephemeris")
 except PackageNotFoundError:  # editable/source checkout without metadata
-    release = "3.0.0rc2"
+    release = "3.0.0rc4"
 version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------

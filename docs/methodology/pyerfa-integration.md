@@ -135,7 +135,6 @@ LibEphemeris exposes the following PyERFA-based functions:
 |----------|-------------|
 | `has_erfa()` | Check if PyERFA is available |
 | `get_erfa_nutation_nut00a(jd)` | IAU 2000A nutation (dpsi, deps in radians) |
-| `get_erfa_nutation_nut00b(jd)` | IAU 2000B nutation (truncated, faster) |
 | `get_erfa_nutation_nut06a(jd)` | IAU 2006/2000A combined nutation |
 | `get_erfa_obliquity_iau2006(jd)` | Mean obliquity using IAU 2006 model |
 | `get_erfa_pnm06a_matrix(jd)` | Precession-nutation matrix |

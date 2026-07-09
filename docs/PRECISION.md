@@ -62,7 +62,7 @@ astrologically meaningful daily motion of the chart frame.
 
 ## House Cusps
 
-< 0.02" for all 24 supported house systems, tested at 11 global locations.
+< 0.02" for all 25 supported house systems, tested at 11 global locations.
 Iterative systems (Placidus, Koch) use 10⁻⁷° convergence threshold.
 
 **Long-term range.** House cusps are

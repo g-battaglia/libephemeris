@@ -369,22 +369,23 @@ leph leb generate extended groups
 Each command runs in sequence:
 1. `planets` — Sun-Pluto, Earth (11 bodies)
 2. `asteroids` — Chiron, Ceres, Pallas, Juno, Vesta (5 bodies)
-3. `analytical` — Nodes, Lilith, Uranians (15 bodies)
-4. `merge` — Merges the 3 partial files + verification
+3. `exotics` — Centaurs, TNOs, NEAs (31 bodies)
+4. `analytical` — Nodes, Lilith, Uranians (15 bodies)
+5. `merge` — Merges the 4 partial files + verification
 
 ### Single-body generation (lowest memory)
 
-If group generation still uses too much memory, use single-body mode. Each of the 31 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
+If group generation still uses too much memory, use single-body mode. Each of the 62 bodies is generated in its own subprocess (one at a time), then all partial files are merged:
 
 ```bash
 # Base tier (direct CLI)
-python scripts/generate_leb.py --tier base --single-body
+python scripts/generate_leb.py --tier base --single
 
 # Medium tier
-python scripts/generate_leb.py --tier medium --single-body
+python scripts/generate_leb.py --tier medium --single
 
 # Extended tier
-python scripts/generate_leb.py --tier extended --single-body
+python scripts/generate_leb.py --tier extended --single
 ```
 
 This is slower than group mode but uses minimal memory (~1 body in memory at a time).

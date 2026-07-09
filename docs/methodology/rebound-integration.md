@@ -89,23 +89,37 @@ LibEphemeris exposes the following REBOUND-related functions and classes:
 | `check_assist_available()` | Returns True if ASSIST is installed |
 | `get_rebound_version()` | Returns REBOUND version string |
 | `get_assist_version()` | Returns ASSIST version string |
-| `ReboundIntegrator` | Main class for N-body integration |
+| `propagate_orbit_rebound()` | Propagate an orbit with REBOUND (2-body, Sun only) |
+| `propagate_orbit_assist()` | Propagate an orbit with ASSIST (ephemeris-quality N-body) |
+| `propagate_trajectory()` | Propagate an orbit to positions at multiple times |
+| `ReboundIntegrator` | Enum selecting the REBOUND integrator (IAS15, WHFAST, MERCURIUS, TRACE, LEAPFROG) |
 | `AssistEphemConfig` | Configuration for ASSIST ephemeris |
 | `PropagationResult` | Result container for propagated orbits |
 | `elements_to_rebound_orbit()` | Convert orbital elements to REBOUND orbit |
 
-### Using ReboundIntegrator
+### Propagating an Orbit
 
 ```python
-from libephemeris.rebound_integration import ReboundIntegrator, AssistEphemConfig
+from libephemeris.minor_bodies import MINOR_BODY_ELEMENTS, CERES
+from libephemeris.rebound_integration import (
+    propagate_orbit_assist,
+    propagate_orbit_rebound,
+    ReboundIntegrator,
+)
 
-# Create integrator with ASSIST configuration
-integrator = ReboundIntegrator(AssistEphemConfig())
+elements = MINOR_BODY_ELEMENTS[CERES]
+jd_start = 2460000.5   # starting epoch (TT)
+jd_end = 2460365.5     # one year later
 
-# Propagate a minor body
-result = integrator.propagate(elements, jd_start, jd_end)
-print(f"Position: {result.position}")
-print(f"Velocity: {result.velocity}")
+# Ephemeris-quality N-body propagation (Sun, planets, Moon, major asteroids)
+result = propagate_orbit_assist(elements, jd_start, jd_end)
+print(f"Ceres: lon={result.ecliptic_lon:.6f} deg, dist={result.distance:.6f} AU")
+
+# 2-body REBOUND propagation with an explicit integrator selection
+result = propagate_orbit_rebound(
+    elements, jd_start, jd_end, integrator=ReboundIntegrator.IAS15
+)
+x, y, z, vx, vy, vz = result.to_tuple()
 ```
 
 ## Precision and Validation
@@ -159,7 +173,7 @@ pip install rebound assist
 Or with LibEphemeris extras:
 
 ```bash
-pip install libephemeris[precision]
+pip install libephemeris[nbody]
 ```
 
 To verify availability:

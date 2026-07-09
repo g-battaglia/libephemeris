@@ -831,8 +831,10 @@ Elongation, diameter and magnitude agree to reference precision.
 
 ### Hyper-validation results
 
-The hyper-validation script (`scripts/hyper_validate.py`) runs 4400+ comparison
-rounds across 29 sections:
+The hyper-validation script (`validation/verify/hyper_validate.py`) runs 4400+
+comparison rounds across 29 sections. Note that the `validation/` tree is a
+separate, non-shipped repository (not part of a clean checkout of this library),
+so this script requires that checkout to run:
 
 | Metric | Count | Percentage |
 |--------|-------|------------|
@@ -846,5 +848,5 @@ differences between the two computation engines. The 12 SKIP results are missing
 `.se1` asteroid files in the pyswisseph configuration.
 
 ```bash
-.venv/bin/python3 scripts/hyper_validate.py --json report.json
+.venv/bin/python3 validation/verify/hyper_validate.py --json report.json
 ```

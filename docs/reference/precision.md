@@ -116,20 +116,22 @@ Nutation in longitude (Δψ) directly shifts ecliptic longitudes. The maximum am
 
 ## 3. Precession Model
 
-### IAU 2006 (Capitaine et al. 2003)
+### Vondrák 2011 long-term precession
 
-LibEphemeris uses the **IAU 2006 precession** model via `erfa.pmat06()`, implementing the Fukushima-Williams four-angle formulation with polynomial terms up to T^5.
+LibEphemeris uses the **Vondrák 2011** long-term precession model (Vondrák, Capitaine & Wallace 2011) via pyerfa's reference routines `erfa.ltp()` / `erfa.ltpb()` (see `libephemeris/precession_vondrak.py`). Unlike the IAU 2006 polynomial (Capitaine et al. 2003) — valid only a few centuries from J2000 and diverging at remote epochs (~36" for the Sun's longitude at year −3000) — the Vondrák model is fitted to a numerical integration and stays accurate over ±200,000 years. Near J2000 it agrees with IAU 2006 to better than 1 milliarcsecond, so modern results are unchanged.
 
 | Property | Value |
 |----------|-------|
-| Polynomial order | 5th degree in T (centuries from J2000) |
-| Rate precision | ~0.08 mas/century |
+| Model | Vondrák, Capitaine & Wallace (2011) long-term precession |
+| Implementation | pyerfa `erfa.ltp()` / `erfa.ltpb()` |
+| Valid range | ±200,000 years around J2000.0 |
+| Agreement near J2000 | < 1 mas vs IAU 2006 (Capitaine et al. 2003) |
 | J2000 obliquity | 84381.406 arcseconds (23°26'21.406") |
-| Standard | IERS Conventions 2010, ch. 5 |
+| Reference | Vondrák et al. (2011), A&A 534, A22 |
 
 ### Frame bias (ICRS to J2000)
 
-The rotation from the International Celestial Reference System (ICRS) to the mean equator and equinox of J2000.0 is applied via the combined bias-precession-nutation matrix from `erfa.pnm06a()`. This matrix incorporates the frame bias angles (dα₀ = −14.6 mas, ξ₀ = −16.617 mas, η₀ = −6.819 mas) defined in the IERS Conventions.
+The frame bias from the International Celestial Reference System (ICRS) to the mean equator and equinox is folded directly into the Vondrák precession matrix: `erfa.ltpb()` maps ICRS → mean equator/equinox of date **with** the ICRS frame bias included, while `erfa.ltp()` gives the same rotation without the bias (used on the ICRS-frame paths). The bias incorporates the frame bias angles (dα₀ = −14.6 mas, ξ₀ = −16.617 mas, η₀ = −6.819 mas) defined in the IERS Conventions.
 
 ---
 
@@ -322,13 +324,13 @@ The full pipeline from JPL ephemeris to ecliptic longitude:
 2. **Light-time correction** (iterative, typically 3 Newton iterations)
 3. **COB correction** (barycenter → planet center, Tier 1/2/3)
 4. **Apparent position** via Skyfield: annual aberration + gravitational deflection
-5. **Ecliptic of date** via `frame_latlon(ecliptic_frame)`: applies combined IAU 2006 precession + IAU 2006/2000A nutation matrix (`erfa.pnm06a()`) to rotate from ICRS to true ecliptic of date
+5. **Ecliptic of date**: rotate from ICRS to the true ecliptic of date by applying the Vondrák 2011 precession matrix combined with IAU 2006/2000A nutation (`precession_vondrak.vondrak_pn_matrix()`, built from `erfa.ltpb()`/`erfa.ltp()` and `erfa.nut06a()` via `erfa.numat()`)
 
 For J2000 ecliptic (`FLG_J2000`), step 5 uses a fixed rotation by the J2000 obliquity (23°26'21.406") without precession or nutation.
 
 ### Mean obliquity of the ecliptic
 
-IAU 2006 polynomial (Capitaine et al. 2003):
+The of-date mean obliquity uses the **Vondrák 2011** long-term obliquity series (evaluated in `libephemeris/sidereal_longterm.py`, exposed via `precession_vondrak.vondrak_mean_obliquity_rad()`) — the same long-term model as the precession above, valid over ±200,000 years. Near J2000 it matches the IAU 2006 polynomial (Capitaine et al. 2003) to sub-milliarcsecond precision:
 
 ```
 ε₀ = 84381.406" − 46.836769"·T − 0.0001831"·T² + 0.00200340"·T³
@@ -354,7 +356,7 @@ Precision: ~0.001 seconds of time (~0.015 arcseconds in hour angle).
 
 ### True obliquity
 
-Houses use the true obliquity (mean obliquity + nutation in obliquity) from `erfa.obl06()` + `erfa.nut06a()`. This is the same IAU 2006/2000A model used for planet calculations.
+Houses use the true obliquity (mean obliquity + nutation in obliquity): the Vondrák 2011 of-date mean obliquity (`sidereal_longterm.mean_obliquity_deg()`) plus IAU 2006/2000A nutation (`erfa.nut06a()`). This is the same shared obliquity realization and nutation model used for planet calculations, keeping a chart's bodies and angles in one self-consistent frame.
 
 ### ARMC
 
@@ -400,7 +402,7 @@ The True Node is where the Moon's **instantaneous orbital plane** intersects the
 2. Compute angular momentum vector: **h** = **r** × **v**
 3. This vector is perpendicular to the instantaneous orbital plane
 4. Find intersection with the ecliptic: Ω = atan2(h_x, −h_y)
-5. Apply IAU 2006 precession (J2000 → date)
+5. Apply Vondrák 2011 precession (J2000 → date)
 6. Apply IAU 2006/2000A nutation (1365 terms)
 
 This computes **exactly** what the True Node is by definition: the intersection of the orbital plane with the ecliptic. Deriving the node directly from the state vectors avoids the approximation errors inherent in analytical series — the geometric construction is exact by definition.
@@ -540,7 +542,7 @@ Precision: <0.01 arcsec over ±100 years; <1 arcsec over ±500 years.
 1. Proper motion propagation (J2000 → date)
 2. Create Skyfield `Star` object with propagated RA/Dec
 3. Apparent position via `observer.at(t).observe(star).apparent()` (aberration + gravitational deflection)
-4. Ecliptic coordinates via `frame_latlon(ecliptic_frame)` (IAU 2006 precession + IAU 2006/2000A nutation)
+4. Ecliptic coordinates via the Vondrák 2011 precession matrix + IAU 2006/2000A nutation (`precession_vondrak.vondrak_pn_matrix()` with `erfa.nut06a()`)
 
 ### Supported flags
 
@@ -575,7 +577,7 @@ Star-based ayanamshas anchor the sidereal zodiac to a specific fixed star. The s
 | True Mula | <0.006° |
 | Galactic Center variants | <0.001° |
 
-The IAU 2006 precession model (used by LibEphemeris) is more accurate than the older Lieske (1977) model for computing the precession of the equinox, which directly affects ayanamsha values.
+The Vondrák 2011 long-term precession model (used by LibEphemeris) is more accurate than the older Lieske (1977) model for computing the precession of the equinox, which directly affects ayanamsha values.
 
 ---
 

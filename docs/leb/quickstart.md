@@ -22,7 +22,7 @@ during generation if `LIBEPHEMERIS_AUTO_SPK=1`).
 
 ```bash
 # Group workflow (recommended — avoids macOS deadlocks, allows partial regen)
-leph leb generate base groups       # 3 groups + merge → ephemeris_base.leb
+leph leb generate base groups       # 4 groups + merge → ephemeris_base.leb
 leph leb generate medium groups     # same for medium tier
 leph leb generate extended groups   # same for extended tier
 ```
@@ -33,12 +33,14 @@ leph leb generate extended groups   # same for extended tier
 # 1. Generate each group separately (via direct CLI)
 python scripts/generate_leb.py --tier base --group planets      # → ephemeris_base_planets.leb    (~1s)
 python scripts/generate_leb.py --tier base --group asteroids    # → ephemeris_base_asteroids.leb   (~15-60s)
+python scripts/generate_leb.py --tier base --group exotics      # → ephemeris_base_exotics.leb     (~2-5min)
 python scripts/generate_leb.py --tier base --group analytical   # → ephemeris_base_analytical.leb (~2-3min)
 
 # 2. Merge + verify
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -52,8 +54,9 @@ python scripts/generate_leb.py --tier base --group asteroids    # regenerate ast
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
-  --verify                                                      # re-merge all 3 partial files
+  --verify                                                      # re-merge all 4 partial files
 ```
 
 ### Direct CLI
@@ -71,10 +74,12 @@ python scripts/generate_leb.py --output test.leb --start 2000 --end 2030 --bodie
 # Single group + manual merge
 python scripts/generate_leb.py --tier base --group planets
 python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --group exotics
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -93,7 +98,10 @@ python scripts/generate_leb.py --tier base --merge \
 |-------|--------|--------|-------------|
 | `planets` | Sun-Pluto, Earth (11) | Vectorized Skyfield | ~1s |
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | spktype21 scalar | ~15-60s |
+| `exotics` | Centaurs, TNOs, NEAs (31) | spktype21 scalar | ~2-5min |
 | `analytical` | Nodes, Lilith, Uranians, Apogees (15) | Scalar Python | ~2-3min |
+
+The four groups total 62 bodies.
 
 ---
 
@@ -105,8 +113,8 @@ python scripts/generate_leb.py --tier base --merge \
 ### Via leph
 
 ```bash
-# All 4 groups for a tier
-leph leb2 convert base              # → data/leb2/base_{core,asteroids,apogee,uranians}.leb2
+# All 5 groups for a tier
+leph leb2 convert base              # → data/leb2/base_{core,asteroids,exotics,apogee,uranians}.leb2
 
 # Medium / Extended
 leph leb2 convert medium
@@ -140,9 +148,10 @@ python scripts/generate_leb2.py generate --tier base --group core \
 |-------|------|------|--------|
 | core | `data/leb2/base_core.leb2` | 10.6 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
 | asteroids | `data/leb2/base_asteroids.leb2` | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
+| exotics | `data/leb2/base_exotics.leb2` | 59.0 MB | Centaurs, TNOs, NEAs (31) |
 | apogee | `data/leb2/base_apogee.leb2` | 11.4 MB | OscuApog, IntpApog, IntpPerig (3) |
 | uranians | `data/leb2/base_uranians.leb2` | 2.1 MB | Cupido-Transpluto (9) |
-| **Total** | | **32.7 MB** | **31 bodies** |
+| **Total** | | **91.7 MB** | **62 bodies** |
 
 ### LEB2 groups vs LEB1 groups
 
@@ -152,6 +161,7 @@ LEB2 groups differ from LEB1 groups:
 |------|------|------------|
 | `planets` (11) | `core` (14) | Core also includes Mean/True Node and Mean Apogee |
 | `asteroids` (5) | `asteroids` (5) | Identical |
+| `exotics` (31) | `exotics` (31) | Identical |
 | `analytical` (15) | `apogee` (3) + `uranians` (9) | Analytical split into 2 groups |
 
 ---

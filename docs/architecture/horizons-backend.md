@@ -171,8 +171,10 @@ leph test horizons precision-quick    # 50 dates, ~15s
 # Horizons vs LEB2 cross-validation
 leph test horizons vs-leb             # 100 dates, ~30s
 
-# Cross-validate vs reference (needs pyswisseph + internet)
-leph test compare horizons-backend
+# Equivalent poe task shortcuts
+poe test:horizons:core                # precision-quick (50 dates, ~15s)
+poe test:horizons:fast                # precision (200 dates, ~45s)
+poe test:horizons:full                # vs-leb (LEB2 cross-validation)
 ```
 
 ## Error Handling

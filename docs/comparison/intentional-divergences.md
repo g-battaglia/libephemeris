@@ -116,11 +116,12 @@ ecliptic-direct bodies. `libephemeris/planets.py` (Skyfield path): removed the
 `_eff_flags = iflag & ~FLG_J2000` suppression from the TrueNode, OscuApog and
 IntpApog/IntpPerg handlers so they use `iflag` directly.
 
-**Test coverage.** `tests/test_sidereal/test_se_bug_j2k_nodes.py` (J2000 applied,
-physical sanity, LEB-vs-Skyfield consistency, documented SE divergence magnitude);
-`compare_scripts/tests/test_compare_sidereal_regression.py` and
-`tests/test_leb/compare/extended/test_extended_sidereal.py` (updated to verify the
-intentional divergence / LEB-vs-Skyfield agreement).
+**Test coverage.** `validation/compare_scripts/tests/test_sidereal/test_se_bug_j2k_nodes.py`
+(J2000 applied, physical sanity, LEB-vs-Skyfield consistency, documented SE divergence
+magnitude) and `validation/compare_scripts/tests/test_compare_sidereal_regression.py`
+— both in the separate, non-shipped `validation/` repository (not part of a clean
+checkout of this library) — and `tests/test_leb/compare/extended/test_extended_sidereal.py`
+(updated to verify the intentional divergence / LEB-vs-Skyfield agreement).
 
 ### Methodology note
 

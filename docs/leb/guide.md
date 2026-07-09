@@ -1,7 +1,7 @@
 # LEB (LibEphemeris Binary) — Complete Technical Guide
 
 > **Version:** 2.2 — March 2026
-> **Status:** Production-ready (LEB1 and LEB2 formats), **all 31 bodies <0.001" precision**
+> **Status:** Production-ready (LEB1 and LEB2 formats), **31 core bodies <0.001" precision (+ 31 exotic minor bodies)**
 > **Source of truth:** This document. See also [Algorithms & Theory](algorithms.md) for detailed mathematical foundations.
 > **Quick reference:** [Generation Quickstart](quickstart.md) — step-by-step commands for generating LEB1 and LEB2 files.
 > LEB2 compressed format details: see `proposals/leb2-implementation-plan.md` and `release-notes/v1.0.0.md`.
@@ -997,8 +997,8 @@ Lightweight `ProgressBar` class (stdlib only, line 38):
 Phase 1: ICRS planets (11 bodies)
   Sequential, vectorized Skyfield -> very fast (~seconds for 300yr)
 
-Phase 2: ICRS asteroids (5 bodies)
-  Sequential, spktype21 scalar loop -> moderate (~tens of seconds)
+Phase 2: ICRS asteroids + exotics (5 classic + 31 exotic)
+  Sequential, spktype21 scalar loop -> tens of seconds (classic) + minutes (exotics)
 
 Phase 3: Analytical bodies (15 bodies)
   Sequential, per-body progress bars -> ~2-3 min for 300yr
@@ -1026,10 +1026,11 @@ The `assemble_leb()` function (line 1328):
 
 ### 6.15 Group Generation & Merge
 
-Generating all 31 bodies in a single process can be slow. The **group workflow**
-splits generation into three independent runs — one per body group — then merges
-the partial files into a single `.leb`. This allows regenerating only the group
-that changed (e.g. after updating asteroid SPK files).
+Generating all 62 bodies in a single process can be slow. The **group workflow**
+splits generation into four independent runs — one per body group (planets,
+asteroids, exotics, analytical) — then merges the partial files into a single
+`.leb`. This allows regenerating only the group that changed (e.g. after
+updating asteroid SPK files).
 
 #### Body Groups
 
@@ -1037,12 +1038,16 @@ The `BODY_GROUPS` dict in `generate_leb.py` maps group names to body ID lists:
 
 ```python
 BODY_GROUPS: dict[str, List[int]] = {
-    "planets":    sorted(_PLANET_MAP.keys()),     # 11 ICRS bodies (vectorized Skyfield)
-    "asteroids":  sorted(_ASTEROID_NAIF.keys()),  # 5 ICRS asteroids (spktype21)
-    "analytical": sorted(                         # 15 ecliptic/helio analytical bodies
-        bid for bid in BODY_PARAMS
+    "planets": sorted(_PLANET_MAP.keys()),  # 11 planets (ICRS_BARY, vectorized)
+    # Classic asteroids = SPK bodies minus the exotic registry (stays correct if
+    # a 6th classic is ever added to _ASTEROID_NAIF without touching EXOTIC_IDS).
+    "asteroids": sorted(set(_ASTEROID_NAIF) - set(EXOTIC_IDS)),
+    "exotics": list(EXOTIC_IDS),  # centaurs/TNOs/NEAs (ICRS_BARY, spktype21)
+    "analytical": sorted(
+        bid
+        for bid in BODY_PARAMS
         if bid not in _PLANET_MAP and bid not in _ASTEROID_NAIF
-    ),
+    ),  # ecliptic/helio analytical bodies
 }
 ```
 
@@ -1050,6 +1055,7 @@ BODY_GROUPS: dict[str, List[int]] = {
 |---|---|---|---|
 | `planets` | Sun, Moon, Mercury–Pluto, Earth | Vectorized Skyfield | ~1 s |
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta | spktype21 (scalar) | ~15–60 s |
+| `exotics` | 31 centaurs / TNOs / main-belt / NEAs (Pholus, Eris, Chariklo, Apophis, …) | spktype21 (scalar) | ~several min |
 | `analytical` | Mean/true nodes, mean/true Lilith, 8 Uranians, mean apogee/perigee, osc. apogee | Sequential (scalar) | ~2–3 min |
 
 #### CLI: `--group`
@@ -1076,10 +1082,11 @@ is generated in every group run; stars likewise).
 #### CLI: `--merge`
 
 ```bash
-# Merge three partial files into one complete file
+# Merge the four partial files into one complete file
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1104,10 +1111,12 @@ The recommended workflow for regenerating a tier:
 # Step by step
 python scripts/generate_leb.py --tier base --group planets
 python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --group exotics
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1125,6 +1134,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 ```
@@ -1153,11 +1163,11 @@ _LEB_FILE: Optional[str] = None      # Path to .leb file
 _LEB_READER: Optional["LEBReader"] = None  # Cached reader instance
 _CALC_MODE: Optional[str] = None     # None = check env var
 _CALC_MODE_ENV_VAR = "LIBEPHEMERIS_MODE"
-_VALID_CALC_MODES = ("auto", "skyfield", "leb")
+_VALID_CALC_MODES = ("auto", "skyfield", "leb", "horizons")
 ```
 
 **`set_calc_mode(mode)`** (line 170):
-- Sets the calculation mode (`"auto"`, `"skyfield"`, `"leb"`, or `None`)
+- Sets the calculation mode (`"auto"`, `"skyfield"`, `"leb"`, `"horizons"`, or `None`)
 - `None` resets to environment variable / default
 
 **`get_calc_mode()`** (line 209):
@@ -1326,7 +1336,10 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
 | 47 | Poseidon | 32 | 13 | HELIO_ECL | 3 |
 | 48 | Transpluto | 32 | 13 | HELIO_ECL | 3 |
 
-**Total: 31 bodies.**
+**Total: 31 core bodies** (listed above). `BODY_PARAMS` additionally
+registers **31 exotic minor bodies** (`EXOTIC_IDS`, see §9.3) — Pholus
+(id 16), the TNOs, and extra centaur / main-belt / NEA asteroids (ids
+10010–235088) — for **62 bodies** in all.
 
 Bodies marked **bold** differ from the original design document:
 - **Jupiter-Pluto (5-9):** Use `COORD_ICRS_BARY_SYSTEM` (4) instead of
@@ -1374,52 +1387,77 @@ orbital motion due to Earth's own motion and parallax effects.
 
 ### 9.3 Bodies NOT in LEB (Skyfield Fallback)
 
-When LEB is active and a body is **not** in `BODY_PARAMS`, the library
-raises `KeyError` internally, which is caught by `calc_ut()` /
-`calc()`, and the request falls through to the full Skyfield pipeline.
-This is completely transparent to the caller.
+When LEB is active and a body is **not** present in the loaded `.leb`
+file, the library raises `KeyError`/`ValueError` internally, which is
+caught by `calc_ut()` / `calc()`, and the request falls through to the
+full Skyfield pipeline. This is completely transparent to the caller.
 
 The same fallback is triggered by:
 
 - **Unsupported flags:** `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`,
   `FLG_NONUT`
-- **JD out of range:** Julian Day outside the LEB file's coverage
+- **JD out of range:** Julian Day outside the body's coverage in the file
 - **Star-based sidereal modes:** e.g., `SIDM_TRUE_REVATI` (requires
   fixed star position not available in LEB fast path)
 
+#### Exotic minor bodies (served from LEB when present)
+
+The LEB catalog is **not** limited to the 31 core bodies. `BODY_PARAMS`
+also registers **31 exotic minor bodies** (`EXOTIC_IDS` in
+`libephemeris/exotic_bodies.py`) — centaurs, trans-Neptunian objects,
+large main-belt asteroids, and near-Earth asteroids — generated into the
+LEB `exotics` group (`ephemeris_{tier}_exotics.leb` for LEB1,
+`{tier}_exotics.leb2` for LEB2):
+
+| Class | Bodies | Count |
+|-------|--------|-------|
+| TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | 9 |
+| Centaurs | Pholus (id 16), Nessus, Asbolus, Chariklo, Hidalgo | 5 |
+| Main-belt | Hygiea, Interamnia, Davida, Europa, Sylvia, Psyche, Sappho, Pandora, Lilith-ast | 9 |
+| NEAs | Eros, Amor, Apophis, Itokawa, Ryugu, Toro, Toutatis, Icarus | 8 |
+
+When the loaded LEB file contains the `exotics` group these bodies are
+served **directly from LEB** (SPK-derived Chebyshev coefficients over
+each object's JPL SPK coverage window). They fall back to the
+SPK → Skyfield pipeline **only** when the loaded file lacks the body —
+e.g. the exotics group was not generated/downloaded, the requested JD is
+outside the object's SPK window, or on the extended tier, where the 8
+chaotic NEAs are intentionally excluded from generation
+(`EXOTIC_EXTENDED_IDS` keeps the 23 regular exotics only).
+
 #### Bodies that always fall back to Skyfield
+
+These are never stored as LEB Chebyshev data:
 
 | Category | Bodies | IDs | Count | How computed |
 |----------|--------|-----|-------|--------------|
-| Centaur | Pholus | 16 | 1 | SPK → ASSIST → Keplerian |
 | Additional hypotheticals | Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 51–58 | 8 | Keplerian from `hypothetical.py` |
-| TNOs | Eris, Sedna, Haumea, Makemake, Quaoar, Orcus, Ixion, Gonggong, Varuna | AST_OFFSET + n | 9 | SPK → ASSIST → Keplerian |
-| Additional asteroids | Nessus, Asbolus, Chariklo, Apophis, Hygiea, Interamnia, Davida, Europa (ast), Sylvia, Psyche, Eros, Amor, Icarus, Toro, Sappho, Pandora, Lilith (ast), Hidalgo, Toutatis, Itokawa, Bennu, Ryugu | AST_OFFSET + n | 22 | SPK → ASSIST → Keplerian |
 | Fixed stars | 102 stars (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 102 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
 | Arabic parts | Pars Fortunae, Pars Spiritus, Pars Amoris, Pars Fidei | 9100–9103 | 4 | `arabic_parts.py` (derived) |
 | Nutation/obliquity | ECL_NUT | -1 | 1 | LEB nutation section (§9.4) |
 
-**Total bodies NOT in LEB Chebyshev data:** ~174 (1 centaur + 8 hypotheticals
-\+ 31 minor bodies/TNOs + 102 stars + 21 moons + 10 angles/parts + 1 nutation).
+Any minor body outside the `exotics` registry (e.g. Bennu) likewise falls
+back to the SPK → Skyfield pipeline.
 
-**Why these bodies are excluded:** The 31-body LEB catalog covers the bodies
-most commonly used in astrological chart calculations. Adding TNOs, additional
-asteroids, and planetary moons would increase file size and generation time
-substantially while benefiting a small fraction of users. The Skyfield
-fallback provides identical accuracy for these bodies at the cost of ~120 µs
-per evaluation (vs ~8 µs for LEB bodies).
+**Total bodies NOT in LEB Chebyshev data:** ~142 (8 hypotheticals + 102
+stars + 21 moons + 10 angles/parts + 1 nutation).
 
-**Note on Pholus (ID 16):** Pholus is the only "gap" in the otherwise
-contiguous planet/asteroid range (IDs 0–22). It was excluded because it
-requires SPK Type 21 data like the other asteroids, and adding a 6th
-asteroid to LEB was not justified by usage frequency. It falls back
-seamlessly to the SPK → Skyfield pipeline.
+**Why the core/exotics split:** the 31 **core** bodies are used in nearly
+every chart; their compressed LEB2 `core` group is small enough (~10.6 MB)
+to bundle with the wheel. The 31 **exotic** bodies are SPK-derived and much
+larger on disk (the base `exotics` group is ~59 MB compressed), so they ship
+as a separate optional group served from LEB once downloaded. Fixed stars,
+planetary moons, and chart angles/parts stay on the Skyfield pipeline — they
+are cheap to compute analytically or vary with observer/house settings, so
+precomputing them would add size with little benefit. The Skyfield fallback
+provides identical accuracy at the cost of ~120 µs per evaluation (vs ~8 µs
+for LEB bodies).
 
 ### 9.4 Auxiliary LEB Sections (Non-Chebyshev Data)
 
-In addition to Chebyshev polynomial coefficients for the 31 bodies, each
+In addition to the Chebyshev polynomial coefficients for its bodies, each
 `.leb` file contains three auxiliary data sections that accelerate other
 parts of the calculation pipeline:
 
@@ -1493,10 +1531,12 @@ Typical generation-time errors:
 ### 10.2 End-to-End Precision (vs Skyfield Reference)
 
 The compare test suite (`tests/test_leb/compare/`) validates LEB output
-against Skyfield for all 31 bodies across hundreds of dates per tier.
+against Skyfield for all 31 core bodies across hundreds of dates per tier.
 
-**All 31 bodies achieve <0.001 arcsecond geocentric position precision**
-on all three tiers (base, medium, and extended). This was accomplished through:
+**All 31 core bodies achieve <0.001 arcsecond geocentric position precision**
+on all three tiers (base, medium, and extended). (The 31 exotic minor bodies
+of §9.3 are SPK-derived and best-effort; NEAs in particular use looser
+targets.) This was accomplished through:
 
 1. `COORD_ICRS_BARY_SYSTEM` storage for outer planets (eliminates COB
    oscillation fitting errors)
@@ -1638,7 +1678,7 @@ generating. Use `_spk_covers_range()` to verify.
 
 ```bash
 # Group generation (recommended — avoids fork-deadlock, allows partial regen)
-leph leb generate base groups      # All three groups + merge in one command
+leph leb generate base groups      # All four groups + merge in one command
 leph leb generate medium groups    # Medium tier
 leph leb generate extended groups  # Extended tier
 
@@ -1696,10 +1736,12 @@ python scripts/generate_leb.py \
 # Group generation (recommended for base tier)
 python scripts/generate_leb.py --tier base --group planets
 python scripts/generate_leb.py --tier base --group asteroids
+python scripts/generate_leb.py --tier base --group exotics
 python scripts/generate_leb.py --tier base --group analytical
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1708,6 +1750,7 @@ python scripts/generate_leb.py --tier base --group asteroids
 python scripts/generate_leb.py --tier base --merge \
   data/leb/ephemeris_base_planets.leb \
   data/leb/ephemeris_base_asteroids.leb \
+  data/leb/ephemeris_base_exotics.leb \
   data/leb/ephemeris_base_analytical.leb \
   --verify
 
@@ -1954,8 +1997,13 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 |-------|--------|-----------|-------------|
 | `core` | 14 | 10.6 MB | Sun-Pluto, Earth, Mean/True Node, Mean Apogee |
 | `asteroids` | 5 | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta |
+| `exotics` | 31 | 59.0 MB | Centaurs, TNOs, main-belt & NEA minor bodies (Pholus, Eris, …) |
 | `apogee` | 3 | 11.4 MB | Oscu Apogee, Interp Apogee/Perigee |
 | `uranians` | 9 | 2.1 MB | Cupido-Transpluto |
+
+The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
+the largest and ships as a separate optional download; the pip wheel bundles
+only the `core` group.
 
 **File naming convention:** `{tier}_{group}.leb2` (e.g. `base_core.leb2`,
 `medium_asteroids.leb2`).
@@ -2050,7 +2098,7 @@ applies the compression pipeline (§13.4) to each body's raw coefficients.
 # Step 1: Generate LEB1 (if not already present)
 leph leb generate base groups
 
-# Step 2: Convert LEB1 → LEB2 (all 4 groups)
+# Step 2: Convert LEB1 → LEB2 (all 5 groups)
 leph leb2 convert base
 
 # Step 3: Verify LEB2 against LEB1 reference
@@ -2073,7 +2121,7 @@ python scripts/generate_leb2.py generate --tier base --group core -o data/leb2/b
 
 ```bash
 # Convert LEB1 → LEB2 (all groups for a tier)
-leph leb2 convert base              # Base tier → data/leb2/base_{core,asteroids,apogee,uranians}.leb2
+leph leb2 convert base              # Base tier → data/leb2/base_{core,asteroids,exotics,apogee,uranians}.leb2
 leph leb2 convert medium            # Medium tier
 leph leb2 convert extended          # Extended tier
 
@@ -2116,7 +2164,9 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 | Asteroids | 5 | 22.5 MB | 8.7 MB | 3.4x |
 | Apogee | 3 | 30.8 MB | 11.4 MB | 3.3x |
 | Uranians | 9 | 0.7 MB | 2.1 MB | 6.2x |
-| **Total** | **31** | **101.8 MB** | **32.7 MB** | **3.1x** |
+| **Core-set subtotal** | **31** | **101.8 MB** | **32.7 MB** | **3.1x** |
+| Exotics | 31 | 201.7 MB | 59.0 MB | 3.4x |
+| **All groups** | **62** | **~303 MB** | **~92 MB** | **3.3x** |
 
 ---
 
@@ -2124,7 +2174,7 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 
 ### 14.1 "Body X not in LEB file"
 
-The body is not one of the 31 bodies in `BODY_PARAMS`. LEB silently falls
+The body is not one of the 62 bodies in `BODY_PARAMS`. LEB silently falls
 back to Skyfield. This is expected behavior, not an error.
 
 ### 14.2 "JD outside range"

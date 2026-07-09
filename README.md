@@ -4,7 +4,7 @@
     <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/badge/pypi-v3.0.0rc2-blue" alt="PyPI Version">
+    <img src="https://img.shields.io/badge/pypi-v3.0.0rc4-blue" alt="PyPI Version">
     <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
@@ -175,7 +175,7 @@ git clone https://github.com/g-battaglia/libephemeris.git
 cd libephemeris && uv pip install -e ".[dev]"
 poe lint                           # Ruff lint + auto-fix
 poe test:leb:fast                  # Recommended fast unit suite
-poe test:compare:skyfield          # Cross-validate vs pyswisseph
+poe test:skyfield:fast             # Skyfield backend unit suite
 ```
 
 ---

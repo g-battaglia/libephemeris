@@ -21,7 +21,7 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 
 | Metric                      | Value                                  |
 |-----------------------------|----------------------------------------|
-| Package version             | 3.0.0rc2                               |
+| Package version             | 3.0.0rc4                               |
 | Python support              | 3.12 - 3.14                            |
 | Library source files        | 70+ `.py` files in `libephemeris/`     |
 | Total library LOC           | ~100,000 lines                         |
@@ -376,7 +376,7 @@ calculation function, as found in the source code analysis:
 
 ### A.4 Ayanamsha Systems (47)
 
-All 43 systems are implemented in `planets.py::_calc_ayanamsa()` (~375 lines).
+All 47 systems are implemented in `planets.py::_calc_ayanamsa()` (~375 lines).
 They use the IAU 2006 general precession polynomial (5th degree) as the
 precession backbone, with system-specific reference epochs and offsets.
 

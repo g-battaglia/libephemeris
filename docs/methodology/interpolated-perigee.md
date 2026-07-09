@@ -212,10 +212,12 @@ difference) is in the [Swiss Ephemeris Comparison](../comparison/known-differenc
 
 ## Calibration Reproducibility
 
-The calibration can be reproduced using:
+The calibration/generation tooling lives in the separate `validation/` repo
+(a gitignored sibling checkout, not shipped with the library). With that
+checkout in place, the calibration can be reproduced using:
 
 ```bash
-LIBEPHEMERIS_EPHEMERIS=de441.bsp python scripts/calibrate_perigee_perturbations.py \
+LIBEPHEMERIS_EPHEMERIS=de441.bsp python validation/calibrate/calibrate_perigee_perturbations.py \
     --start-year 1500 --end-year 2500 --output /tmp/perigee_v22_full.json
 ```
 
