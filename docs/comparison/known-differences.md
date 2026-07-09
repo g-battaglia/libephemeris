@@ -797,7 +797,10 @@ See `intentional-divergences.md` §8 (resolved).
 ### 14. Constants and API
 
 **14.1 Version string** intentionally differs (libephemeris reports its own
-version). **14.2 `contrib` attribute** is not exposed by libephemeris. **14.3 `d2l`
+version). **14.2 `contrib` attribute**: libephemeris ships a compatible
+`libephemeris.contrib` submodule (zodiac/nakshatra constants, aspect helpers,
+JD/coordinate utilities); only the atlas/database/timezone functions remain
+`NotImplementedError` stubs. **14.3 `d2l`
 with negative values** differs due to unsigned-integer overflow in the C
 implementation vs Python integers. **14.4 `FLG_MOSEPH`** is accepted for API
 compatibility but ignored — every calculation uses JPL DE440/DE441 via Skyfield,

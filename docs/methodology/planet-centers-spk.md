@@ -68,7 +68,7 @@ The current approach uses analytical moon theories to compute the Center of Body
 - **Saturn**: TASS 1.7 (Titan-dominated)
 - **Neptune**: Triton Keplerian elements
 - **Pluto**: Charon two-body solution
-- **Uranus**: NOT IMPLEMENTED (returns 0)
+- **Uranus**: Keplerian elements for the 5 major moons (Titania/Oberon dominate)
 
 This approach requires no extra files but has limited precision (~0.02-0.15 arcsec).
 

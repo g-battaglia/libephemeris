@@ -126,6 +126,7 @@ LEB2 uses error-bounded lossy compression (mantissa truncation + coeff-major reo
 | `asteroids` | Chiron, Ceres, Pallas, Juno, Vesta (5) | ~8.7 MB |
 | `apogee` | OscuApog, IntpApog, IntpPerig (3) | ~11.4 MB |
 | `uranians` | Cupido-Transpluto (9) | ~2.1 MB |
+| `exotics` | Centaurs, TNOs, NEAs (31) | ~59.0 MB |
 
 ### Per-body Precision Targets (`BODY_TARGET_AU` in `leb_compression.py`)
 
@@ -134,7 +135,7 @@ Moon/Earth use 1e-12 AU (not default 5e-9) because small geocentric distance amp
 ### Key Commands
 
 ```bash
-poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 4 groups)
+poe leb2:convert:base              # Convert LEB1 -> LEB2 (all 5 groups)
 leph leb2 convert base-core        # Core group only (~10.6 MB)
 poe leb2:verify:base               # Verify against LEB1
 leph test leb2-format all          # Unit tests (compression + reader)
