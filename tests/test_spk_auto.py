@@ -1239,6 +1239,10 @@ class TestAutoGetSpkWithRegistration:
 
         state._SPK_BODY_MAP.clear()
         state._SPK_KERNELS.clear()
+        # auto_get_spk reads the GLOBAL date padding: a non-zero value left
+        # behind by another test in the same worker shifts the cache
+        # filenames and breaks the exact-range assertions below.
+        state.set_spk_date_padding(0)
 
     def teardown_method(self):
         """Clear SPK and registry state after each test."""
@@ -1357,6 +1361,9 @@ class TestDownloadSpkFromHorizonsWithRegistration:
 
         state._SPK_BODY_MAP.clear()
         state._SPK_KERNELS.clear()
+        # See TestAutoGetSpkWithRegistration.setup_method: the global date
+        # padding must be at its default or cache filenames shift.
+        state.set_spk_date_padding(0)
 
     def teardown_method(self):
         """Clear SPK state after each test."""

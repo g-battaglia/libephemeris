@@ -5,6 +5,7 @@ for the same quantity is itself a bug. They cover the frame/flag conversions
 (XYZ, radians, equatorial, helio/geo, south node, sidereal, ET/UT) where a sign
 or convention slip would otherwise pass silently.
 """
+
 from __future__ import annotations
 
 import math
@@ -13,9 +14,24 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MERCURY, MARS, JUPITER, PLUTO, MEAN_NODE, TRUE_NODE, OSCU_APOG,
-    ECL_NUT, FLG_SWIEPH, FLG_SPEED, FLG_EQUATORIAL, FLG_XYZ, FLG_RADIANS,
-    FLG_HELCTR, FLG_J2000, FLG_TRUEPOS,
+    SUN,
+    MOON,
+    MERCURY,
+    MARS,
+    JUPITER,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    OSCU_APOG,
+    ECL_NUT,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_XYZ,
+    FLG_RADIANS,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_TRUEPOS,
 )
 
 _BODIES = [SUN, MOON, MERCURY, MARS, JUPITER, PLUTO, MEAN_NODE, TRUE_NODE, OSCU_APOG]
@@ -71,8 +87,16 @@ def test_south_node_is_north_plus_180(body):
         assert abs((-n[1]) - s[1]) < 1e-6
 
 
-@pytest.mark.parametrize("body", [MERCURY, MARS, JUPITER, PLUTO])
-def test_helio_plus_sun_equals_geo(body):
+# For the giants, HELCTR reports the planet-SYSTEM BARYCENTRE (reference API
+# convention) while the geocentric path reports the planet CENTER, so the
+# identity only holds to the physical center-vs-barycentre offset: ~1.4e-6 AU
+# for Jupiter (Galilean moons) and ~1.4e-5 AU for Pluto (Charon). Rocky
+# planets have no such offset and keep the tight bound.
+@pytest.mark.parametrize(
+    "body,tol",
+    [(MERCURY, 1e-6), (MARS, 1e-6), (JUPITER, 5e-6), (PLUTO, 5e-5)],
+)
+def test_helio_plus_sun_equals_geo(body, tol):
     """geocentric = heliocentric + (geocentric Sun), geometrically (FLG_TRUEPOS)."""
     base = FLG_SWIEPH | FLG_J2000 | FLG_XYZ | FLG_TRUEPOS
     for jd in _DATES:
@@ -80,7 +104,7 @@ def test_helio_plus_sun_equals_geo(body):
         geo = L.calc(jd, body, base)[0]
         sun = L.calc(jd, SUN, base)[0]
         for i in range(3):
-            assert abs((helio[i] + sun[i]) - geo[i]) < 1e-6
+            assert abs((helio[i] + sun[i]) - geo[i]) < tol
 
 
 @pytest.mark.parametrize("body", _BODIES)
@@ -91,11 +115,12 @@ def test_equatorial_equals_rotated_ecliptic(body):
         eps = math.radians(L.calc(jd, ECL_NUT, FLG_SWIEPH)[0][0])  # true obliquity
         lam, bet = math.radians(ecl[0]), math.radians(ecl[1])
         ra = math.atan2(
-            math.sin(lam) * math.cos(eps) - math.tan(bet) * math.sin(eps),
-            math.cos(lam))
+            math.sin(lam) * math.cos(eps) - math.tan(bet) * math.sin(eps), math.cos(lam)
+        )
         dec = math.asin(
             math.sin(bet) * math.cos(eps)
-            + math.cos(bet) * math.sin(eps) * math.sin(lam))
+            + math.cos(bet) * math.sin(eps) * math.sin(lam)
+        )
         assert _wrap(math.degrees(ra) % 360.0, equ[0]) * 3600.0 < 0.05
         assert abs(math.degrees(dec) - equ[1]) * 3600.0 < 0.05
 

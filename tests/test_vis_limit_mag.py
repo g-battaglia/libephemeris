@@ -12,6 +12,7 @@ The function determines whether a celestial body will be visible based on:
 
 import pytest
 
+from libephemeris.exceptions import Error
 from libephemeris import (
     julday,
     vis_limit_mag,
@@ -349,13 +350,13 @@ class TestVisLimitMagEdgeCases:
     """Test edge cases and error handling."""
 
     def test_empty_objname_raises_error(self):
-        """Test that empty object name raises ValueError."""
+        """Test that empty object name raises Error (reference API parity)."""
         jd = julday(2024, 8, 15, 22.0)
         geopos = (12.5, 42.0, 0)
         atmo = (1013.25, 15.0, 50.0, 0.0)
         observer = (36, 1.0)
 
-        with pytest.raises(ValueError, match="objname cannot be empty"):
+        with pytest.raises(Error, match="objname cannot be empty"):
             vis_limit_mag(jd, geopos, atmo, observer, "")
 
     def test_invalid_planet_raises_error(self):
