@@ -7289,20 +7289,20 @@ def heliacal_ut(
         EVENING_FIRST,
         MORNING_LAST,
     ):
-        raise ValueError(
+        raise Error(
             f"Invalid event_type: {event_type}. Use HELIACAL_RISING, "
             "HELIACAL_SETTING, EVENING_FIRST, or MORNING_LAST."
         )
 
     # Sun and Moon are not valid for heliacal events
     if body == SUN:
-        raise ValueError("SUN is not valid for heliacal calculations")
+        raise Error("SUN is not valid for heliacal calculations")
     if body == MOON:
-        raise ValueError("MOON is not valid for heliacal calculations")
+        raise Error("MOON is not valid for heliacal calculations")
 
     # Validate body
     if body not in _PLANET_MAP:
-        raise ValueError(f"illegal planet number {body}.")
+        raise Error(f"illegal planet number {body}.")
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -7801,7 +7801,7 @@ def vis_limit_mag(
     from skyfield.api import wgs84
 
     if not objname:
-        raise ValueError("objname cannot be empty")
+        raise Error("objname cannot be empty")
 
     # Parse geographic position
     lon = geopos[0] if len(geopos) > 0 else 0.0
@@ -7911,13 +7911,13 @@ def vis_limit_mag(
 
         except ValueError:
             raise
-        except (ValueError, ArithmeticError, IndexError) as e:
+        except (ArithmeticError, IndexError) as e:
             # Star not found or other error
-            raise ValueError(f"could not find star name {objname.lower()}: {e}")
+            raise Error(f"could not find star name {objname.lower()}: {e}") from e
     else:
         # Planet calculation
         if body_id is None:
-            raise ValueError(f"Unknown object: {objname}")
+            raise Error(f"Unknown object: {objname}")
 
         # Get planet name from _PLANET_MAP
         if body_id in _PLANET_MAP:
@@ -7938,7 +7938,7 @@ def vis_limit_mag(
                 _reraise_if_leb_range_error(_exc)
                 obj_mag = 0.0  # Default bright
         else:
-            raise ValueError(f"illegal planet number {body_id}.")
+            raise Error(f"illegal planet number {body_id}.")
 
     # Check if object is below horizon
     if obj_alt < 0:
