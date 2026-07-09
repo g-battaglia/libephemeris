@@ -5467,8 +5467,11 @@ def _lun_eclipse_how_pythonic(
             _reraise_if_leb_range_error(_exc)
             return 0, tuple([0.0] * 20)
 
+        # atpress/attemp match _lun_eclipse_how_impl (0.0, 10.0) and the Skyfield
+        # branch's temperature_C="standard" (10 C), so the apparent altitude and
+        # the visibility gate agree across the two backends and the canonical path.
         moon_az_val, moon_alt_true, moon_alt_app = azalt(
-            jd, ECL2HOR, _gp, 0, 0, moon_topo[:3]
+            jd, ECL2HOR, _gp, 0.0, 10.0, moon_topo[:3]
         )
         moon_altitude_true = moon_alt_true
         moon_altitude_app = moon_alt_app
