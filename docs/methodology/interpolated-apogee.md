@@ -91,26 +91,39 @@ The interpolated apsides represent the "natural" position of the apsidal line �
 
 ### Implementation
 
-LibEphemeris uses two complementary methods for computing the interpolated apsides:
+LibEphemeris computes both interpolated apsides the same way — an
+ELP2000-82B-derived perturbation series on top of the mean apsidal
+position, plus a precomputed residual correction table:
 
-1. **Moshier Analytical Method (Apogee)**: Uses ~50 harmonic terms from Moshier's lunar ephemeris to compute the smoothed apogee position directly. This approach extracts the dominant periodic terms that affect the apsidal line orientation while filtering out the spurious oscillations.
+1. **ELP2000-82B Perturbation Series (Apogee)**: Adds ~50 periodic
+   perturbation terms derived from ELP2000-82B theory to the mean apogee
+   (evection harmonics up to k=10, solar-anomaly coupling, latitude
+   coupling, and cross-coupling terms).
 
-2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation corrections to the mean perigee position using calibrated coefficients fitted to JPL DE440 reference positions.
+2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation
+   corrections to the mean perigee position using calibrated coefficients
+   fitted to JPL DE440 reference positions (see
+   [interpolated-perigee.md](interpolated-perigee.md)).
 
-**Interpolated Apogee (Moshier Method):**
+Both variants then apply a **precomputed residual correction table**
+(linear interpolation, tapered to zero within a year of the table edges)
+that absorbs the remaining error inside the table's date range.
+
+**Interpolated Apogee (ELP2000-82B series):**
 
 ```
 1. Calculate Mean Lilith (mean lunar apogee) longitude
 2. Calculate Julian centuries from J2000.0
 3. Compute fundamental lunar arguments (D, M, M', F, Ω)
-4. Apply Moshier harmonic series (~50 terms):
+4. Apply the ELP2000-82B perturbation series (~50 terms):
    - Dominant term: +4.53° × sin(2D - 2M')
    - Second-order terms from lunar theory
    - Long-period terms for secular evolution
-5. Normalize result to [0°, 360°)
+5. Add the residual correction from the precomputed table
+6. Normalize result to [0°, 360°)
 ```
 
-**Interpolated Perigee (ELP2000-82B):**
+**Interpolated Perigee (ELP2000-82B series):**
 
 ```
 1. Calculate Mean Lilith + 180° (mean perigee longitude)
@@ -118,8 +131,9 @@ LibEphemeris uses two complementary methods for computing the interpolated apsid
 3. Compute fundamental lunar arguments (D, M, M', F)
 4. Apply calibrated perigee perturbation series:
    - Dominant term: -22.2° × sin(2D - 2M')  (opposite sign to apogee!)
-   - ~15 additional terms calibrated to JPL DE440 reference positions
-5. Normalize result to [0°, 360°)
+   - Additional terms calibrated to JPL DE440 reference positions
+5. Add the residual correction from the precomputed table
+6. Normalize result to [0°, 360°)
 ```
 
 ### Asymmetric Perturbations
@@ -313,14 +327,19 @@ When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 
 ### Precision (measured)
 
-| Variant | Mean Error | Max Error |
-|---------|------------|-----------|
+| Variant | RMS Error | Max Error |
+|---------|-----------|-----------|
 | Mean Lilith | ~0.003° (~12") | ~0.005° (~18") |
 | True Lilith | ~0.02° (~72") | ~0.07° (~252") |
-| Interpolated Apogee | ~0.10° (~360") | ~0.36° (~1296") |
-| Interpolated Perigee | ~0.46° (~1656") | ~2.6° (~9360") |
+| Interpolated Apogee (within table, 1549–2651) | ~6" | ~40" |
+| Interpolated Apogee (outside table) | ~171" (~0.048°) | — |
+| Interpolated Perigee (within table) | ~11" | ~100" |
 
-**Note on Interpolated Apogee improvement:** The Moshier analytical method provides a significant precision improvement over the previous ELP2000-82B series approach. The ~50 harmonic terms capture the dominant periodic variations in the apsidal line more accurately than a smaller calibrated coefficient set.
+**Note on the residual correction table:** the ELP2000-82B series alone
+leaves arcminute-level residuals; the precomputed correction table (see
+above) absorbs them inside its date range, which is where the ~6"/~11"
+RMS figures come from. Outside the range the correction tapers to zero
+within a year and only the series precision remains.
 
 **Note on True Lilith differences:** The ~5 degree mean differences arise because:
 1. LibEphemeris computes osculating elements from JPL DE state vectors
@@ -328,9 +347,9 @@ When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
 **Note on Interpolated differences:** The remaining differences arise from:
-1. The Moshier method uses ~50 harmonic terms vs. a full analytical lunar theory
-2. Perigee coefficient calibration was performed on a finite sample of dates
-3. Apogee and perigee use different methods optimized for their respective perturbation amplitudes
+1. The perturbation series uses ~50 harmonic terms vs. a full analytical lunar theory
+2. Coefficient calibration and the residual tables were fitted on a finite sample of dates
+3. The apogee and perigee series are calibrated separately, each for its own perturbation amplitude
 
 ### Smoothness Comparison
 

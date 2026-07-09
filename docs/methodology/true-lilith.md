@@ -110,7 +110,7 @@ Precision is measured via 500-date random sampling for the osculating apogee
 |--------|-----------------|----------------|----------------|
 | **True Lilith** (LibEphemeris) | ~52 arcsec (~0.015 deg) | ~235 arcsec (~0.065 deg) | ~60 arcsec (~0.017 deg) |
 | **Mean Lilith** | ~12 arcsec (~0.003 deg) | ~18 arcsec (~0.005 deg) | smooth / stable |
-| Interpolated Apogee | ~1.1 deg | ~3.3 deg | Different algorithm |
+| Interpolated Apogee | ~6 arcsec RMS (within correction table, 1549–2651) | ~40 arcsec | see [interpolated-apogee.md](interpolated-apogee.md) |
 
 For further precision benchmarks across all bodies, see [Precision Reference](../reference/precision.md).
 
@@ -120,7 +120,7 @@ For further precision benchmarks across all bodies, see [Precision Reference](..
 |----------|-------------------|----------------------|
 | Osculating lunar apogee (`OSCU_APOG`) | **True Lilith** | ~0.015 deg mean |
 | Smooth, predictable motion (`MEAN_APOG`) | **Mean Lilith** | ~0.003 deg mean |
-| Physical apogee passages (`INTP_APOG`) | Interpolated Apogee | ~1.1 deg (different algorithm) |
+| Physical apogee passages (`INTP_APOG`) | Interpolated Apogee | ~6" RMS within the correction table (1549–2651) |
 
 For applications requiring the osculating (instantaneous) lunar apogee, **True Lilith** (`calc_true_lilith`) is recommended. Its sub-arcminute precision makes it suitable for all practical astrological applications.
 

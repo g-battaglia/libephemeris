@@ -263,9 +263,12 @@ slightly different obliquity and nutation models in the intermediate calculation
 
 **2.2 Vertex at the equator.** At latitude 0° the Vertex has a 1/tan(lat)
 singularity; libephemeris clamps latitude to a tiny epsilon to evaluate the
-limiting value, matching pyswisseph. The only remaining divergence is `ascmc[6]`
-(CoAsc Munkasey) for the Horizon (H) system at lat 0, where pyswisseph returns 0°
-from a C `tan(90°)` artifact while the mathematical limit is 180°.
+limiting value, matching pyswisseph. This includes `ascmc[6]` (CoAsc
+Munkasey): the one-sided limits (180° for lat→0⁺, 0° for lat→0⁻) are
+preserved for every system, and the Horizon (H) system's exact-lat-0 value
+of 0° (a C `tan(90°)` artifact upstream, where the mathematical limit is
+180°) is replicated too — verified black-box across the whole |lat| < 1e-10
+clamp band, so there is no remaining divergence here.
 
 **2.3 House position (`house_pos`).** < 0.01" for most systems; up to ~46" for
 **Alcabitius (B)**, **Koch (K)**, **Topocentric (T)** from different cusp

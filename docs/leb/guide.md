@@ -1317,7 +1317,7 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
 | 6 | Saturn | 32 | 13 | **ICRS_BARY_SYSTEM** | 3 |
 | 7 | Uranus | 64 | 13 | **ICRS_BARY_SYSTEM** | 3 |
 | 8 | Neptune | 64 | 13 | **ICRS_BARY_SYSTEM** | 3 |
-| 9 | Pluto | 32 | 13 | **ICRS_BARY_SYSTEM** | 3 |
+| 9 | Pluto | 64 | 11 | **ICRS_BARY_SYSTEM** | 3 |
 | 10 | Mean Node | 8 | 13 | ECLIPTIC | 3 |
 | 11 | True Node | 8 | 13 | ECLIPTIC | 3 |
 | 12 | Mean Apogee | 8 | 13 | ECLIPTIC | 3 |
@@ -1328,17 +1328,17 @@ BODY_PARAMS: dict[int, tuple[float, int, int, int]] = {
 | 18 | Pallas | 8 | 13 | ICRS_BARY | 3 |
 | 19 | Juno | 8 | 13 | ICRS_BARY | 3 |
 | 20 | Vesta | 8 | 13 | ICRS_BARY | 3 |
-| 21 | Interp Apogee | **4** | **15** | ECLIPTIC | 3 |
-| 22 | Interp Perigee | **4** | **15** | ECLIPTIC | 3 |
-| 40 | Cupido | 32 | 13 | HELIO_ECL | 3 |
-| 41 | Hades | 32 | 13 | HELIO_ECL | 3 |
-| 42 | Zeus | 32 | 13 | HELIO_ECL | 3 |
-| 43 | Kronos | 32 | 13 | HELIO_ECL | 3 |
-| 44 | Apollon | 32 | 13 | HELIO_ECL | 3 |
-| 45 | Admetos | 32 | 13 | HELIO_ECL | 3 |
-| 46 | Vulkanus | 32 | 13 | HELIO_ECL | 3 |
-| 47 | Poseidon | 32 | 13 | HELIO_ECL | 3 |
-| 48 | Transpluto | 32 | 13 | HELIO_ECL | 3 |
+| 21 | Interp Apogee | **1** | **17** | ECLIPTIC | 3 |
+| 22 | Interp Perigee | **1** | **17** | ECLIPTIC | 3 |
+| 40 | Cupido | 256 | 7 | HELIO_ECL | 3 |
+| 41 | Hades | 256 | 7 | HELIO_ECL | 3 |
+| 42 | Zeus | 256 | 7 | HELIO_ECL | 3 |
+| 43 | Kronos | 256 | 7 | HELIO_ECL | 3 |
+| 44 | Apollon | 256 | 7 | HELIO_ECL | 3 |
+| 45 | Admetos | 256 | 7 | HELIO_ECL | 3 |
+| 46 | Vulkanus | 256 | 7 | HELIO_ECL | 3 |
+| 47 | Poseidon | 256 | 7 | HELIO_ECL | 3 |
+| 48 | Transpluto | 256 | 7 | HELIO_ECL | 3 |
 
 **Total: 31 core bodies** (listed above). `BODY_PARAMS` additionally
 registers **31 exotic minor bodies** (`EXOTIC_IDS`, see §9.3) — Pholus
@@ -1375,16 +1375,19 @@ orbital motion due to Earth's own motion and parallax effects.
   moon oscillation fitting problem that previously caused 3.95" errors.
 - **Uranus, Neptune (interval=64, degree=13):** Also use `COORD_ICRS_BARY_SYSTEM`.
   Halved from 128 days and degree increased from 9 to 13.
-- **Pluto (interval=32, degree=13):** Uses `COORD_ICRS_BARY_SYSTEM`. Halved
-  from 64 days for better distance velocity precision.
+- **Pluto (interval=64, degree=11):** Uses `COORD_ICRS_BARY_SYSTEM`. The
+  long, slow orbit fits well at 64-day intervals (0.0005" fit error).
 - **Asteroids (interval=8, degree=13):** Reduced from 32 days. Eccentric
   and perturbed orbits need short intervals for sub-arcsecond accuracy.
-- **Hypotheticals (interval=32, degree=13):** Reduced from 64 days and
-  degree increased from 11. Previous parameters produced bogus verification
-  errors (136-766") due to a tau bug in the generator (now fixed).
-- **OscuApogee, InterpApogee, InterpPerigee (interval=4, degree=15):**
-  Tightened from interval=8, degree=13 to achieve <0.001" precision on
-  these high-frequency analytical bodies.
+- **Hypotheticals (interval=256, degree=7):** Pure analytical Keplerian
+  orbits (no perturbations), so very long intervals with a low degree fit
+  to ~0" error while keeping the segment count small.
+- **OscuApogee (interval=4, degree=15):** Tightened from interval=8,
+  degree=13 to achieve <0.001" precision on this high-frequency
+  analytical body.
+- **InterpApogee, InterpPerigee (interval=1, degree=17):** 1-day
+  intervals — the interpolated apsides oscillate too rapidly for longer
+  segments.
 - **Other ecliptic bodies (interval=8, degree=13):** Unchanged -- already tight.
 - **Nutation (interval=16, degree=16):** Halved from 32 days to reduce
   obliquity error, which affects latitude of all bodies.
@@ -1398,8 +1401,9 @@ full Skyfield pipeline. This is completely transparent to the caller.
 
 The same fallback is triggered by:
 
-- **Unsupported flags:** `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`,
-  `FLG_NONUT`
+- **Unsupported flags:** `FLG_ICRS` (the only flag that always falls
+  back; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are
+  handled on the LEB path — see §5.2)
 - **JD out of range:** Julian Day outside the body's coverage in the file
 - **Star-based sidereal modes:** e.g., `SIDM_TRUE_REVATI` (requires
   fixed star position not available in LEB fast path)
