@@ -1400,6 +1400,7 @@ __all__ = [
     "TIDAL_DE422",
     "TIDAL_DE430",
     "TIDAL_DE431",
+    "TIDAL_DE440",
     "TIDAL_DE441",
     "TIDAL_DEFAULT",
     "TIDAL_JPLEPH",
