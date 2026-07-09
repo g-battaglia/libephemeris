@@ -343,8 +343,8 @@ calculation function, as found in the source code analysis:
 | Gauquelin iteration        | `houses.py`                           | max 100 iter, tol 1e-8   |
 | Pullen SR Newton-Raphson   | `houses.py`                           | max 20 iter, tol 1e-10   |
 | Kepler equation            | `minor_bodies.py`, `hypothetical.py`  | Elliptic, hyperbolic, parabolic |
-| IAU 2006 precession        | `astrometry.py`, `planets.py`         | 5th degree polynomial     |
-| IAU 2006/2000A nutation    | `cache.py` -> `erfa.nut06a()`         | 1365 lunisolar + 687 planetary terms |
+| Vondrák 2011 precession    | `precession_vondrak.py` (`erfa.ltp`/`ltpb`) | valid ±200,000 yr (IAU 2006 polynomial kept as no-erfa fallback) |
+| IAU 2006/2000A nutation    | `cache.py` -> `erfa.nut06a()`         | 678 lunisolar + 687 planetary terms (1365 total) |
 
 ### A.3 House Systems Implemented (25)
 

@@ -134,13 +134,18 @@ leph generate planet-centers-all       # All three tiers
 
 ### Output
 
-The script generates:
+The script generates one tier-specific file in `~/.libephemeris/` (the
+default output directory):
 
 ```
-libephemeris/data/planet_centers.bsp
+~/.libephemeris/planet_centers_base.bsp
+~/.libephemeris/planet_centers_medium.bsp
+~/.libephemeris/planet_centers_extended.bsp
 ```
 
-This file contains 5 segments:
+At runtime the loader looks for `planet_centers_{tier}.bsp` matching the
+active precision tier, falling back to the legacy single-file name
+`planet_centers.bsp`. Each file contains 5 segments:
 
 | Center | Target | Description |
 |--------|--------|-------------|

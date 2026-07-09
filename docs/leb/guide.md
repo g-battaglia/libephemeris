@@ -297,7 +297,7 @@ segment_byte_size(degree, components) = components * (degree + 1) * 8
 struct NutationHeader {
     float64  jd_start;
     float64  jd_end;
-    float64  interval_days;   // 32.0 days
+    float64  interval_days;   // 16.0 days
     uint32_t degree;          // 16
     uint32_t components;      // 2 (dpsi, deps in radians)
     uint32_t segment_count;
@@ -565,10 +565,7 @@ Both functions:
 
 | Flag | Reason |
 |------|--------|
-| `FLG_TOPOCTR` | Requires geographic coordinates not stored in LEB |
-| `FLG_XYZ` | Cartesian output not yet implemented |
-| `FLG_RADIANS` | Radian output not yet implemented |
-| `FLG_NONUT` | No-nutation mode not yet implemented |
+| `FLG_ICRS` | ICRS output frame not implemented on the LEB path |
 
 **Flags handled natively by LEB:**
 
@@ -582,7 +579,14 @@ Both functions:
 | `FLG_EQUATORIAL` | Output in equatorial coordinates instead of ecliptic |
 | `FLG_J2000` | Output in J2000 frame instead of of-date |
 | `FLG_SIDEREAL` | Apply ayanamsa correction |
+| `FLG_TOPOCTR` | Topocentric offset from `set_topo()` / context topo |
+| `FLG_XYZ` | Cartesian output |
+| `FLG_RADIANS` | Radian output |
+| `FLG_NONUT` | No-nutation frame (mean ecliptic/equator of date) |
 | `FLG_MOSEPH` | Silently stripped (always uses JPL data) |
+
+Individual body classes may still fall back per body when the loaded
+file lacks the data they need.
 
 ### 5.3 Pipeline A: ICRS Barycentric Bodies (Planet Centers)
 
@@ -981,7 +985,7 @@ jd1 = np.full_like(all_jds, 2451545.0)  # J2000 epoch
 jd2 = all_jds - 2451545.0               # offset
 dpsi, deps = erfa.nut06a(jd1, jd2)      # radians, vectorized
 ```
-Parameters: interval=32 days, degree=16, 2 components.
+Parameters: interval=16 days, degree=16, 2 components.
 
 ### 6.12 Progress Bars
 
@@ -2205,8 +2209,9 @@ leph leb generate base groups
 - Ensure `set_leb_file()` is called before any `calc_ut()` calls
 - Check that `get_leb_reader()` returns a non-None value
 - Verify the body you're computing is in the LEB file
-- If using `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS`, or `FLG_NONUT`,
-  LEB always falls back to Skyfield
+- If using `FLG_ICRS`, LEB always falls back to Skyfield
+  (`FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are handled
+  on the LEB path)
 
 ---
 

@@ -41,7 +41,7 @@ poe test:leb:fast            # LEB unit tests ~5890, ~1 min (parallel, no @slow)
 poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
 
 # Feature-specific suites (via leph CLI)
-leph test lunar              # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
+leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
 leph test lunar perigee      # Perigee tests only
 leph test lunar apogee       # Apogee tests only
 leph test lunar lilith       # Lilith tests only (8 files)
@@ -86,7 +86,7 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 
 ## Binary Ephemeris Mode (LEB)
 
-Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags — notably `FLG_TOPOCTR` (raises/falls back per body class), `FLG_XYZ`, `FLG_RADIANS`; `FLG_NONUT` is handled on the LEB path for most bodies.
+Precomputed `.leb` files with Chebyshev polynomial approximations (~14x speedup). Automatic fallback to Skyfield for unsupported bodies/flags — the only flag that always falls back is `FLG_ICRS`; `FLG_TOPOCTR`, `FLG_XYZ`, `FLG_RADIANS` and `FLG_NONUT` are handled on the LEB path (some body classes may still fall back per body).
 
 ```python
 from libephemeris import set_leb_file

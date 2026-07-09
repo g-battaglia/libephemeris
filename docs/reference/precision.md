@@ -176,7 +176,7 @@ LibEphemeris corrects barycenters to body centers **automatically** using a thre
 
 #### Tier 1: SPK-based planet centers (<0.001 arcsec)
 
-A bundled `planet_centers.bsp` file (~25 MB) contains precise center-of-body segments for NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899 (Neptune), and 999 (Pluto). These segments are extracted from JPL satellite ephemerides:
+An auto-downloaded planet-centers kernel (~25 MB, `planet_centers_{tier}.bsp` per precision tier, legacy name `planet_centers.bsp`; not shipped in the wheel) contains precise center-of-body segments for NAIF IDs 599 (Jupiter), 699 (Saturn), 799 (Uranus), 899 (Neptune), and 999 (Pluto). These segments are extracted from JPL satellite ephemerides:
 
 | NAIF ID | Source SPK | Coverage |
 |---------|-----------|----------|

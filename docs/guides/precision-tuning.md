@@ -293,15 +293,19 @@ The tidal acceleration affects Delta T calculations for dates far from the prese
 
 ```python
 from libephemeris import set_tid_acc, get_tid_acc
-from libephemeris.constants import TIDAL_DE440
+from libephemeris.constants import TIDAL_AUTOMATIC, TIDAL_DE440
 
 # Match tidal acceleration to ephemeris file
 set_tid_acc(TIDAL_DE440)  # When using de440.bsp (default)
 print(f"Tidal acceleration: {get_tid_acc()}")
 
-# Use default (DE440-based)
-set_tid_acc(0.0)  # TIDAL_AUTOMATIC
+# Restore the automatic default (DE440-based, -25.936)
+set_tid_acc(TIDAL_AUTOMATIC)
 ```
+
+Note: `set_tid_acc(0.0)` sets a literal tidal acceleration of zero — use
+the `TIDAL_AUTOMATIC` sentinel (999999) to return to the automatic
+default.
 
 ---
 

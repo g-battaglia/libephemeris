@@ -117,7 +117,7 @@ After the 61-term perturbation series, residual errors are absorbed by a precomp
 |-----------|-------|
 | Step size | 2 years |
 | Start | -13199 CE |
-| End | 17190 CE |
+| End | 17189 CE |
 | Entry count | 15,195 |
 | Interpolation | Linear |
 
