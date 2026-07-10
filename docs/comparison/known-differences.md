@@ -788,6 +788,17 @@ detection (which uses the Schaefer VISLIMIT model and the topocentric altitude):
   (e.g. Venus ±0.03°) but can exceed 180° for large, out-of-domain separations
   (a body near opposition, far from any heliacal context) where the function is
   not meaningful. `GeoAltO`/`ARCVact`/`ARCLact`'s vertical component are exact.
+- *LMoon (`dret[25]`, Moon crescent length)* is reported as the disc semi-arc
+  `π·D/2` (~0.85°), while the reference computes a phase-dependent topocentric
+  quantity (~0.05–0.51°, negative near new moon). The reference's value was
+  probed black-box over ~2000 instants: it is independent of the Moon's
+  apparent diameter and driven by the topocentric arc of light PLUS a second
+  altitude/parallactic-angle variable (multivalued at fixed elongation, with a
+  distinct drop near the zenith), so it is not reproducible as a closed form
+  of the locally available quantities. Divergence ~0.45° mean / ~2° max; the
+  slot is diagnostic only and does not feed the visibility detection.
+  (`qYal`/`qCrit` `dret[17]`/`dret[18]` — the Yallop q-test value and its
+  1..6 visibility class code — DO match the reference.)
 
 **13.1 Fictitious / Uranian bodies (Hamburg School, 40–48).** Cupido…Poseidon and
 Transpluto are propagated from published Hamburg-School Keplerian elements. Both
@@ -815,6 +826,16 @@ revision of this section mis-attributed the mixed frame to the reference.
 See `intentional-divergences.md` §8 (resolved).
 
 ### 14. Constants and API
+
+**14.0 Fixed-star `%` prefix wildcard (fixstar2 family).** The trailing-`%`
+prefix search is supported on the v2 family only (the v1
+`fixstar`/`fixstar_ut`/`fixstar_mag` reject it, matching the reference).
+Named prefixes resolve identically (`Spica%`, `Sir%`, `Aldeb%`), but an
+ambiguous short prefix may pick a DIFFERENT star than the reference: the
+tie-break follows the reference's star-file order, which is not fully
+replicable, and libephemeris's star catalog is a subset of the reference
+file (e.g. `Reg%` → Regulus here vs Regor upstream, which is absent from
+our catalog).
 
 **14.1 Version string** intentionally differs (libephemeris reports its own
 version). **14.2 `contrib` attribute**: libephemeris ships a compatible

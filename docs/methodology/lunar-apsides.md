@@ -18,7 +18,7 @@ LibEphemeris constructs the interpolated apsides from the physical geometry of t
 
 2. **Spline interpolation.** A cubic spline is fitted through the passage longitudes (with angle unwrapping) to produce a smooth, continuous perigee longitude function at arbitrary times.
 
-3. **Harmonic series calibration.** A 61-term trigonometric perturbation series, constructed from the standard Delaunay arguments (D, M, M', F), is fitted to the spline via least squares. Terms with amplitudes below 0.001 degrees are discarded.
+3. **Harmonic series calibration.** A 66-term trigonometric perturbation series, constructed from the standard Delaunay arguments (D, M, M', F), is fitted to the spline via least squares. Terms with amplitudes below 0.001 degrees are discarded.
 
 4. **Residual correction.** A precomputed correction table (~15,000 entries) absorbs the remaining difference between the harmonic model and the JPL ground truth.
 

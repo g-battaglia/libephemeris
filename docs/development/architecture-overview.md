@@ -85,7 +85,7 @@ kernels via **jplephem**). The library provides:
 | `time_utils.py`     | 1,323  | Julian day, Delta-T, calendar           |
 | `spk.py`            | 1,304  | SPK kernel support                      |
 | `iers_data.py`      | 1,286  | IERS Delta-T data                       |
-| `__init__.py`       | 1,142  | Public API surface (519 exports)        |
+| `__init__.py`       | 1,142  | Public API surface (~690 exports)       |
 | `constants.py`      | 1,071  | All body IDs, FLG_*, SIDM_*, etc. constants     |
 | `exceptions.py`     | 962    | Exception hierarchy                     |
 | `context.py`        | 547    | Thread-safe EphemerisContext             |

@@ -85,7 +85,7 @@ physical geometry of the JPL DE440/DE441 ephemeris:
    position unambiguously.
 3. Cubic spline interpolation through these passage points produces a smooth,
    continuous apsidal longitude function.
-4. A 61-term harmonic perturbation series is fitted to this function via least
+4. A 66-term harmonic perturbation series is fitted to this function via least
    squares.
 5. A residual correction table absorbs remaining model error.
 

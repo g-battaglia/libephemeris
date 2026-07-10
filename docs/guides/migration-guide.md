@@ -181,11 +181,12 @@ Affected functions:
 
 ### Fixed Star Velocities
 
-Fixed star velocity calculations return 0:
+Fixed star velocities ARE computed (proper motion, precession and frame
+rates) and match the reference API. Note the 3-tuple return shape:
 
 ```python
-pos, _ = ephem.fixstar_ut("Aldebaran", jd, FLG_SPEED)
-# pos[3], pos[4], pos[5] are 0.0 (velocities not implemented)
+xx, star_name, retflag = ephem.fixstar_ut("Aldebaran", jd, FLG_SPEED)
+# xx[3], xx[4], xx[5] carry the longitude/latitude/distance rates
 ```
 
 ### Date Range Limitations

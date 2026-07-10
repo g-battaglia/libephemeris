@@ -1,6 +1,6 @@
 # Interpolated Perigee Methodology
 
-LibEphemeris computes the interpolated lunar perigee using a three-layer architecture — mean position, 61-term harmonic perturbation series, and residual correction table — calibrated against JPL DE441 ephemeris via passage-interpolated harmonic fitting.
+LibEphemeris computes the interpolated lunar perigee using a three-layer architecture — mean position, 66-term harmonic perturbation series, and residual correction table — calibrated against JPL DE441 ephemeris via passage-interpolated harmonic fitting.
 
 ## Table of Contents
 
@@ -8,7 +8,7 @@ LibEphemeris computes the interpolated lunar perigee using a three-layer archite
 - [Method](#method)
   - [Three-Layer Architecture](#three-layer-architecture)
   - [Passage-Interpolated Harmonic Fitting (v2.2)](#passage-interpolated-harmonic-fitting-v22)
-  - [Perturbation Series (61 Terms)](#perturbation-series-61-terms)
+  - [Perturbation Series (66 Terms)](#perturbation-series-66-terms)
   - [Residual Correction Table](#residual-correction-table)
 - [Failed Approaches](#failed-approaches)
   - [Gaussian Smoothing (v0)](#gaussian-smoothing-v0)
@@ -47,7 +47,7 @@ interpolated_perigee = mean_perigee(t) + perturbation_series(t) + residual_corre
 | Layer | What it captures | Precision | Complexity |
 |-------|-----------------|-----------|------------|
 | Mean perigee | Secular apsidal precession | ~25 deg error | O(1) — polynomial |
-| Perturbation series | Periodic oscillations (14–400 days) | ~0.5–2 deg residual | O(1) — 61 trig terms |
+| Perturbation series | Periodic oscillations (14–400 days) | ~0.5–2 deg residual | O(1) — 66 trig terms |
 | Correction table | Secular drift + missing harmonics | < 0.1 deg final | O(1) — linear interpolation |
 
 Note: the first layer (mean perigee) includes its own JPL correction table (`MEAN_APSE_CORRECTIONS`).
@@ -62,9 +62,9 @@ The mean perigee position uses a standard polynomial in Julian centuries T from 
 
 This captures the secular apsidal precession (~40.7° per year). The mean perigee is 180° from the mean apogee (Mean Lilith).
 
-**Layer 2: Perturbation Series (61 terms)**
+**Layer 2: Perturbation Series (66 terms)**
 
-The perturbation series `_calc_elp2000_perigee_perturbations()` adds periodic corrections organized by physical origin. See [Perturbation Series (61 Terms)](#perturbation-series-61-terms) below.
+The perturbation series `_calc_elp2000_perigee_perturbations()` adds periodic corrections organized by physical origin. See [Perturbation Series (66 Terms)](#perturbation-series-66-terms) below.
 
 **Layer 3: Residual Correction Table**
 
@@ -85,7 +85,7 @@ The v2.2 method combines the strengths of earlier approaches while avoiding thei
 
 3. **Daily resampling** — Sample the spline at daily intervals to produce ~365K clean data points with full coverage of all Delaunay argument combinations (unlike passage-only data where M' ≈ 0 always).
 
-4. **Harmonic least-squares fit** — Construct a 120-term design matrix of candidate trigonometric terms from lunar theory and fit via ordinary least squares. Terms with |coefficient| < 0.001 degrees are discarded, yielding the final 61-term series.
+4. **Harmonic least-squares fit** — Construct a 120-term design matrix of candidate trigonometric terms from lunar theory and fit via ordinary least squares. Terms with |coefficient| < 0.001 degrees are discarded, yielding the final series (the shipping revision carries 66 terms).
 
 The spline interpolation acts as a physically motivated smoothing: it passes exactly through the ground-truth passage points while providing well-conditioned data at arbitrary intermediate times. The daily samples have full M' coverage (unlike passages) and no correlated osculating noise (unlike raw data).
 
@@ -104,7 +104,7 @@ described that retired version.)
 
 ### Residual Correction Table
 
-After the 61-term perturbation series, residual errors are absorbed by a precomputed correction table with the following parameters:
+After the 66-term perturbation series, residual errors are absorbed by a precomputed correction table with the following parameters:
 
 | Parameter | Value |
 |-----------|-------|
@@ -114,7 +114,7 @@ After the 61-term perturbation series, residual errors are absorbed by a precomp
 | Entry count | 15,195 |
 | Interpolation | Linear |
 
-The residual captures secular drift of the perturbation coefficients and harmonics not included in the 61-term series. At dates outside the DE441 range, the system falls back to the perturbation series alone (gradual degradation, not failure).
+The residual captures secular drift of the perturbation coefficients and harmonics not included in the 66-term series. At dates outside the DE441 range, the system falls back to the perturbation series alone (gradual degradation, not failure).
 
 ## Failed Approaches
 
