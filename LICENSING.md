@@ -44,9 +44,14 @@ agreement is required.
 ## Relationship to Swiss Ephemeris
 
 LibEphemeris is an **independent implementation** with an API that is
-signature-compatible with pyswisseph; it does not contain Swiss Ephemeris
-code and has no license relationship with Astrodienst AG (details and
-provenance record: [NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product
+signature-compatible with pyswisseph; independence from Swiss Ephemeris
+code is the project's working standard, enforced by provenance sweeps and
+remediated whenever a finding surfaces (details, disclosures and the
+current remediation record: [NOTICE.md](NOTICE.md) and
+docs/methodology/independence-remediation-2026-07.md). While that record
+lists open items (repository history, output-calibrated data sets), this
+document does not assert a categorical absence of obligations toward
+Astrodienst AG. "Swiss Ephemeris" is a product
 of Astrodienst AG; the name is used here nominatively only.
 pyswisseph is used only as a black-box test oracle in the separate
 validation tooling; it is not declared among this package's dependencies

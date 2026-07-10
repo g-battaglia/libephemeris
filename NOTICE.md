@@ -162,5 +162,13 @@ LibEphemeris is licensed under the **Apache License, Version 2.0**
 `Apache-2.0`; vendored/adapted modules keep their own identifiers (all
 permissive — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
 
-This project has no license dependency on, and no license obligation toward,
-the Swiss Ephemeris or Astrodienst AG.
+The project's goal and working standard is full independence from the Swiss
+Ephemeris: no SE source code is used, the runtime has no SE dependency, and
+provenance findings are remediated as they surface (see the July 2026
+remediation record in
+[docs/methodology/independence-remediation-2026-07.md](docs/methodology/independence-remediation-2026-07.md),
+which also lists the items still under review — notably repository history
+and the output-calibrated data sets disclosed above). Pending completion of
+that review, this NOTICE intentionally does not assert a categorical
+absence of obligations; it documents the facts so that downstream users can
+make their own assessment.
