@@ -1,6 +1,6 @@
 # True Lilith (Osculating Lunar Apogee) Calculation
 
-LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving instantaneous Keplerian orbital elements from the Moon's geocentric state vectors obtained via JPL DE440/DE441, with calibrated perturbation corrections applied to achieve sub-arcminute precision.
+LibEphemeris computes the osculating lunar apogee (True Lilith) directly from the Moon's geocentric state vectors obtained via JPL DE440/DE441: the eccentricity vector of the instantaneous two-body orbit points toward perigee, and the apogee is taken 180° opposite. No analytical perturbation series is applied — the perturbations are already contained in the numerical ephemeris state vectors.
 
 ## Table of Contents
 
@@ -8,7 +8,6 @@ LibEphemeris computes the osculating lunar apogee (True Lilith) by deriving inst
 - [Method](#method)
   - [Eccentricity Vector Method](#1-eccentricity-vector-method)
   - [Orbital Elements Method](#2-orbital-elements-method)
-  - [Perturbation Corrections](#perturbation-corrections)
 - [Precision and Validation](#precision-and-validation)
   - [Measured Precision](#measured-precision)
   - [Lilith Method Selection Guide](#lilith-method-selection-guide)
@@ -40,64 +39,34 @@ This is a well-understood artifact of the osculating-elements formalism, documen
 
 ## Method
 
-LibEphemeris implements two equivalent approaches in `lunar.py`:
-
 ### 1. Eccentricity Vector Method
 
-The primary method (`calc_true_lilith`) computes the apogee direction from the eccentricity vector:
+The implementation (`calc_true_lilith`) computes the apogee direction from the eccentricity vector:
 
 ```
 Algorithm:
-1. Get Moon's geocentric position (r) and velocity (v) from JPL DE ephemeris
+1. Get Moon's geocentric position (r) and velocity (v) from JPL DE ephemeris,
+   directly in the true ecliptic frame of date (precession and nutation
+   included by the frame)
 2. Compute angular momentum: h = r x v
 3. Compute eccentricity vector: e = (v x h)/mu - r/|r| (points toward perigee)
-4. Apply solar gravitational perturbation to eccentricity vector direction
-5. Apogee direction = -e (opposite to perigee)
-6. Transform to ecliptic coordinates with precession and nutation
-7. Apply perturbation corrections (evection, variation, annual equation, etc.)
+4. Apogee direction = -e (opposite to perigee)
+5. Convert from Cartesian to spherical (ecliptic longitude, latitude);
+   apogee distance = p/(1 - e) from the osculating conic
 ```
+
+No analytical correction series (evection, variation, annual equation, etc.) is
+applied on top of this: those perturbations are already present in the DE440/DE441
+state vectors, and the osculating apogee is *defined* as the two-body apogee of
+the instantaneous orbit. (Analytical perturbation series of that kind are used
+elsewhere, for the mean-node/mean-apse ELP2000-style models — not here.)
 
 ### 2. Orbital Elements Method
 
-The alternative method (`calc_true_lilith_orbital_elements`) derives the apogee from classical orbital elements:
-
-```
-Algorithm:
-1. Get Moon's geocentric state vectors from JPL DE ephemeris
-2. Compute angular momentum vector h = r x v
-3. Compute node vector n = k x h (perpendicular to orbital plane)
-4. Compute eccentricity vector e = (v x h)/mu - r/|r|
-5. Derive orbital elements: Omega (node), omega (argument of perigee), i (inclination)
-6. Apogee longitude = Omega + omega + 180 degrees
-7. Apply coordinate transformations and perturbation corrections
-```
-
-### Perturbation Corrections
-
-LibEphemeris applies seven corrections to improve accuracy:
-
-1. **Solar Gravitational Perturbation on Eccentricity Vector**: Direct rotation of the eccentricity vector based on solar tidal quadrupole (amplitude ~0.01148)
-
-2. **Evection Correction**: period ~31.8 days, amplitude ~1.274 degrees
-   Argument: 2D - M' (twice mean elongation minus Moon's mean anomaly)
-
-3. **Evection-Related Secondary Terms**: From Meeus Table 47.B
-   - M' - 2D: amplitude -0.2136 degrees
-   - M' + 2D: amplitude +0.1058 degrees
-   - 2M': amplitude -0.2037 degrees
-   - 2M' - 2D: amplitude +0.1027 degrees
-
-4. **Variation Correction**: period ~14.77 days, amplitude ~0.658 degrees
-   Argument: 2D (twice mean elongation)
-
-5. **Annual Equation Correction**: period ~1 year, amplitude ~0.186 degrees
-   Argument: M (Sun's mean anomaly)
-
-6. **Parallactic Inequality**: period ~29.53 days, amplitude ~0.125 degrees
-   Argument: D (mean elongation)
-
-7. **Reduction to Ecliptic**: period ~4.5 years, amplitude ~0.116 degrees
-   Accounts for projection from inclined lunar orbital plane to ecliptic
+`calc_true_lilith_orbital_elements` is retained for backward compatibility as an
+alias of `calc_true_lilith`: deriving the apogee longitude from the classical
+elements (Omega + omega + 180°) is mathematically equivalent to the eccentricity
+vector method, so both entry points share the single implementation above.
 
 ## Precision and Validation
 

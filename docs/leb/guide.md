@@ -71,13 +71,13 @@ The default `auto` mode uses the LEB path when available (including auto-downloa
 
 ```
 libephemeris/
-  leb_format.py    Format constants, struct layouts, dataclasses, serialization helpers (372 lines)
-  leb_reader.py    LEBReader class: mmap, Clenshaw evaluation, delta-T, star catalog (460 lines)
+  leb_format.py    Format constants, struct layouts, dataclasses, serialization helpers
+  leb_reader.py    LEBReader class: mmap, Clenshaw evaluation, delta-T, star catalog
   fast_calc.py     Four calculation pipelines (A/A'/B/C), flag dispatch, sidereal/ayanamsa,
-                   gravitational deflection, COB corrections (1237 lines)
+                   gravitational deflection, COB corrections
 
 scripts/
-  generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly (3668 lines)
+  generate_leb.py  CLI generator: Chebyshev fitting, vectorized evaluation, binary assembly
 
 data/leb/
   ephemeris_base.leb      Base tier (de440s, 1850-2150, ~53 MB)
@@ -193,7 +193,7 @@ that every body is in it).
 
 ## 3. Binary File Format
 
-**Source file:** `libephemeris/leb_format.py` (372 lines)
+**Source file:** `libephemeris/leb_format.py`
 
 ### Magic and Version
 
@@ -371,7 +371,7 @@ corrections as fallback (<0.01"). See [Algorithms & Theory](algorithms.md) for d
 
 ## 4. Reader
 
-**Source file:** `libephemeris/leb_reader.py` (460 lines)
+**Source file:** `libephemeris/leb_reader.py`
 
 ### 4.1 LEBReader Class
 
@@ -535,7 +535,7 @@ on 2 components (dpsi, deps). Returns values in **radians**.
 
 ## 5. Calculation Pipelines
 
-**Source file:** `libephemeris/fast_calc.py` (1237 lines)
+**Source file:** `libephemeris/fast_calc.py`
 
 ### 5.1 Entry Points
 
@@ -770,7 +770,7 @@ dlon -= prec_rate
 
 ## 6. Generator
 
-**Source file:** `scripts/generate_leb.py` (3668 lines)
+**Source file:** `scripts/generate_leb.py`
 
 ### 6.1 Overview
 
@@ -1851,9 +1851,11 @@ compression to reduce file sizes by 4-10x while maintaining <0.001" precision.
 The compression is transparent: `open_leb()` auto-detects the format via magic
 bytes (`LEB1` vs `LEB2`), and the runtime API is identical.
 
-**Motivation:** LEB1 files exceed PyPI's 100 MB limit (base tier = 101.8 MB).
-LEB2 compresses the core body set to ~10.6 MB, enabling `pip install libephemeris`
-to include precomputed ephemeris with zero additional downloads.
+**Motivation:** LEB1 files are too large to bundle in a wheel: the base-tier
+core set totals ~102 MB across the separate group files (over PyPI's 100 MB
+limit), and even the merged base-tier file is ~53 MB. LEB2 compresses the core
+body set to ~10.6 MB, enabling `pip install libephemeris` to include precomputed
+ephemeris with zero additional downloads.
 
 **Dependency:** `zstandard` (required, ~200 KB wheel).
 
