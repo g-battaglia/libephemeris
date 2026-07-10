@@ -68,7 +68,8 @@ own licenses; they are not part of LibEphemeris's license grant.
 
 ## Optional `nbody` extra — GPL-3.0 (not bundled)
 
-The opt-in `libephemeris[nbody]` (and `libephemeris[all]`) extra installs two
+The opt-in `libephemeris[nbody]` extra (deliberately NOT part of
+`libephemeris[all]`, which stays permissive-only) installs two
 **GPL-3.0-or-later** packages used by the shipped `rebound_integration.py`
 module for ephemeris-quality n-body propagation of minor bodies:
 

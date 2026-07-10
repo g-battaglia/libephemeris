@@ -76,8 +76,10 @@ For Jupiter this transparently eliminates up to 0.6 arcseconds of systematic err
 
 The interpolated (or "natural") lunar perigee and apogee represent smoothed
 apsidal positions, removing the ~30° oscillations inherent in the osculating
-(instantaneous) elements. LibEphemeris grounds the interpolated apsides in the
-physical geometry of the JPL DE440/DE441 ephemeris:
+(instantaneous) elements. LibEphemeris derives the interpolated apsides from passage geometry on the
+JPL DE440/DE441 ephemeris, with the fitted coefficients and the live
+residual table calibrated against reference-API output (black-box oracle;
+NOTICE.md, Calibration Data Disclosure):
 
 1. Identify all perigee and apogee passages (local distance extrema) from JPL
    state vectors over a 1000-year span.

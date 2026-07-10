@@ -68,7 +68,7 @@ def _validate_calendar(cal: int, func_name: str) -> None:
     """Reject calendar flags other than GREG_CAL/JUL_CAL.
 
     The reference binding validates the calendar flag in every calendar
-    conversion function (e.g. ``swisseph.julday: invalid calendar (99)``);
+    conversion function (e.g. ``julday: invalid calendar (99)``);
     all five libephemeris counterparts share this guard.
 
     Raises:
@@ -1069,7 +1069,7 @@ def lat_to_lmt(jd_lat: float, longitude: float) -> float:
     # evaluation at UT ≈ LAT - offset is off by up to ~0.2s in late November,
     # where dE/dt is steepest. Refine the UT estimate with three fixed-point
     # iterations (E drifts <30s/day, so this converges to well under a
-    # millisecond); this mirrors the reference API's inversion loop.
+    # millisecond); the results agree with reference-API output to sub-millisecond.
     ut_est = jd_lat - longitude_offset_days
     eot = 0.0
     for _ in range(3):

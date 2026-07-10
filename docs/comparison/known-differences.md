@@ -229,8 +229,9 @@ lunar secular model. For historical/archaeo-astronomy work this makes libephemer
 the closer match to JPL's latest long-range integration.
 
 **1.2 Interpolated apogee/perigee (bodies 21, 22).** IntpApog/IntpPerg use
-semi-analytical ELP2000-82B perturbation theory, implemented independently from
-published coefficients. In **longitude** the results differ from the reference
+an ELP2000-style harmonic series whose coefficients and residual table are
+least-squares fits against reference-API output (black-box oracle,
+disclosed in NOTICE.md), on passage geometry from DE440/DE441. In **longitude** the results differ from the reference
 by a few arcseconds within the residual-table range (see
 `docs/methodology/interpolated-apogee.md`). The **latitude** channel is a
 different model class: libephemeris reconstructs it as i·sin(lon − node) from

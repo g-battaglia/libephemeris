@@ -1,6 +1,6 @@
 """Regression: retflag echoes the flag bits the reference API implies.
 
-The reference's flag-plausibility step switches on (and echoes) flags the
+The reference's flag normalization switches on (and echoes) flags the
 request implies: J2000 and SIDEREAL output is referred to a mean equinox, so
 FLG_NONUT is echoed; heliocentric/barycentric/true-position output skips
 light deflection and annual aberration, so FLG_NOGDEFL | FLG_NOABERR are

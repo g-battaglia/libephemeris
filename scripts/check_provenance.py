@@ -34,10 +34,11 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCAN_DIRS = ("libephemeris", "scripts", "docs")
+SCAN_DIRS = ("libephemeris", "scripts", "docs", "release-notes")
 # Root-level files that legally represent the package (long_description,
 # notices) are scanned individually in addition to the directories.
 ROOT_FILES = (
+    "pyproject.toml",
     "README.md",
     "NOTICE.md",
     "LICENSING.md",
@@ -134,7 +135,7 @@ CLASSES = (
 # in API-compat constants and provenance docs are legitimate; the files
 # themselves are not), plus a content scan of the shipped data directory.
 FOREIGN_DATA_NAME_RE = re.compile(
-    r"^(seorbel|sefstars|seleapsec|sedeltat)(\.|$)|\.se1$",
+    r"(seorbel|sefstars|seleapsec|sedeltat|seasnam)|\.se1(\.|$)",
     re.IGNORECASE,
 )
 DATA_DIR = "libephemeris/data"
@@ -149,16 +150,29 @@ def main() -> int:
     # under such a name is a hard failure).
     import subprocess
 
-    tracked = subprocess.run(
+    ls = subprocess.run(
         ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
         capture_output=True,
         text=True,
         check=False,
-    ).stdout.split("\0")
+    )
+    if ls.returncode != 0 or not ls.stdout:
+        print(
+            "provenance sweep: FATAL — `git ls-files` unavailable, the "
+            "filename gate cannot run (not a git work tree?)",
+            file=sys.stderr,
+        )
+        return 2
+    tracked = ls.stdout.split("\0")
     for rel in tracked:
         if not rel:
             continue
         name = rel.rsplit("/", 1)[-1]
+        # Source and doc files may legitimately carry these tokens in their
+        # names (e.g. the parser's test module); the gate targets the data
+        # files themselves.
+        if name.endswith((".py", ".md", ".rst")):
+            continue
         if FOREIGN_DATA_NAME_RE.search(name):
             hits.append((REPO_ROOT / rel, 0, "foreign-data-file", name))
 
@@ -193,14 +207,20 @@ def main() -> int:
         for lineno, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
-            # An explicit inline waiver for individually-reviewed lines
-            # (e.g. install docs that must name an optional extra's GPL
-            # license). Never valid inside libephemeris/.
-            if "provenance-ok" in line and not path.is_relative_to(
+            # An explicit inline waiver for individually-reviewed lines.
+            # It applies ONLY to the license-naming classes (copyleft/agpl
+            # — install docs must be able to name an optional extra's GPL
+            # license) and never inside libephemeris/.
+            waived = "provenance-ok" in line and not path.is_relative_to(
                 REPO_ROOT / "libephemeris"
-            ):
-                continue
+            )
+            # Historical release notes legitimately record the project's own
+            # past licensing (AGPL/dual era); the license-naming classes are
+            # therefore expected there. All other classes still apply.
+            in_release_notes = path.is_relative_to(REPO_ROOT / "release-notes")
             for label, pattern in CLASSES:
+                if label in ("copyleft", "agpl") and (waived or in_release_notes):
+                    continue
                 if pattern.search(line):
                     hits.append((path, lineno, label, line.strip()))
 

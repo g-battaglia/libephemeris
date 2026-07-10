@@ -117,6 +117,25 @@ reviewed-line waivers) and re-verified at zero together with the SPDX
 gate; `uv.lock` regenerated so the `all` extra resolves without GPL
 packages.
 
+### Round 2
+
+A second, fresh 24-agent audit over the WS2-H tree confirmed 20 further
+residuals (down from 42), all remediated: the remaining internal-mechanism
+docstring language in the flag-normalization helpers replaced with
+measured-output claims (including the tests that quoted the internal
+routine name); the mean-ellipse apsis constants re-framed as textbook
+values observable in output; the last product-name-and-version comment
+and every ``swe.``-qualified name swept from shipped code; the
+JPL-only calibration story in the lunar-apsides methodology docs, the
+manuals (EN/IT), the methodology hub and known-differences §1.2 aligned
+with the NOTICE oracle-calibration disclosure (the generated table's own
+header states the black-box oracle); the unshipped v3.0.0 draft notes and
+THIRD_PARTY_NOTICES `[all]` wording corrected; the provenance gate
+further hardened (pyproject.toml and release-notes/ in scope with the
+license-history classes expected in historical notes, waiver restricted
+to the license-naming classes, foreign-data regex widened with data-file
+targeting, `git ls-files` failure now fatal).
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the

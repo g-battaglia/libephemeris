@@ -931,7 +931,7 @@ __all__ = [
     "azalt_rev",
     "refrac",
     "refrac_extended",
-    # swe_ prefixed utility aliases (reference-API compatibility)
+    # Utility functions shared with the reference API surface
     "get_planet_name",
     "version",
     "ECL2HOR",

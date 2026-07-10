@@ -247,7 +247,7 @@ Interpolated perigee: 4.1030°
 Distance: 358786 km
 ```
 
-The accuracy of the interpolated perigee in LibEphemeris has been improved through a calibration process against high-precision JPL ephemerides. The technical details of this process are described in the project's development documentation.
+The accuracy of the interpolated perigee in LibEphemeris has been improved through a calibration process: passage geometry from high-precision JPL ephemerides, with the fitted series and residual table calibrated against the reference API's output used as a black-box oracle (see NOTICE.md and the methodology documentation).
 
 ---
 

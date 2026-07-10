@@ -137,7 +137,7 @@ class TestReaderResourceSafety:
 class TestCalcFlags:
     def test_ephemeris_bits_are_mutually_exclusive(self) -> None:
         """calc_ut never echoes two ephemeris bits at once. The reference
-        plaus_iflag() makes them mutually exclusive (JPLEPH > SWIEPH), so
+        the reference makes them mutually exclusive (JPLEPH > SWIEPH), so
         FLG_JPLEPH|FLG_SWIEPH must collapse to a single-bit retflag."""
         from libephemeris.constants import FLG_JPLEPH, FLG_MOSEPH, FLG_SWIEPH
 
@@ -150,7 +150,7 @@ class TestCalcFlags:
             assert not (retflag & FLG_JPLEPH and retflag & FLG_SWIEPH), (
                 f"retflag {retflag} has both ephemeris bits set"
             )
-            # JPLEPH wins the priority, matching the reference overwrite order.
+            # JPLEPH wins the priority, matching the reference's measured retflags.
             assert retflag & FLG_JPLEPH and not (retflag & FLG_SWIEPH)
 
         # A lone ephemeris bit (or none) is preserved / defaulted as before.

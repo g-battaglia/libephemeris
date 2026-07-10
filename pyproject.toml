@@ -64,7 +64,7 @@ stars = [
     "astropy>=5.0.0",
 ]
 # N-body integration for asteroid orbit propagation.
-# NOTE: rebound and assist are GPL-3.0-or-later. Installing this extra
+# NOTE: rebound and assist are GPL-3.0-or-later (provenance-ok). Installing this extra
 # brings copyleft-licensed components into the environment; the core
 # package and every other extra stay permissive-only. Opt in explicitly
 # with `libephemeris[nbody]`.
@@ -73,7 +73,7 @@ nbody = [
     "assist>=1.1.0",
 ]
 # All permissive-licensed optional runtime features. Deliberately does NOT
-# include the GPL-licensed N-body extra (rebound/assist): install
+# include the GPL-licensed N-body extra (rebound/assist) (provenance-ok): install
 # `libephemeris[all,nbody]` if you also want that and accept its license.
 all = [
     "astropy>=5.0.0",
@@ -195,7 +195,7 @@ coverage = {cmd = "python -m libephemeris.dev_cli test coverage run", help = "Te
 
 # --- Licensing / provenance gates (local poe tasks only; no CI) ---
 "license:check" = {cmd = "python scripts/check_spdx_headers.py --check", help = "Verify SPDX headers on all shipped source files"}
-"provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Swiss Ephemeris / PyMeeus fingerprint sweep over libephemeris/ (zero-hit gate)"}
+"provenance:sweep" = {cmd = "python scripts/check_provenance.py", help = "Third-party-source fingerprint sweep over libephemeris/ (zero-hit gate)"}
 "provenance:hypothetical" = {cmd = "python scripts/check_hypothetical_provenance.py", help = "Verify Uranian/Transpluto elements trace to published sources (zero-mismatch gate)"}
 "wheel:audit" = {cmd = "python scripts/check_wheel_contents.py", help = "Build the wheel and verify packaged contents"}
 

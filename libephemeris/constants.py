@@ -1040,8 +1040,8 @@ NAIF_CHARON: int = 901
 # BARE ALIASES FOR SE_* CONSTANTS (reference-API compatibility)
 # =============================================================================
 # These provide the same constants without the SE_ prefix, matching the names
-# that the reference ephemeris exposes as module-level attributes (e.g. swe.ECL_NUT,
-# swe.MEAN_NODE, swe.CHIRON, etc.).
+# that the reference ephemeris exposes as module-level attributes (e.g. ECL_NUT,
+# MEAN_NODE, CHIRON, etc.).
 
 # Special values
 

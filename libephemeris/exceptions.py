@@ -50,8 +50,8 @@ class Error(Exception):
     - Fixed star not found
     - Calculation failures
 
-    This class is designed to be compatible with swe.Error from the reference API, allowing client code
-    that catches swe.Error to work
+    This class is designed to be compatible with the reference API's Error type, allowing client code
+    that catches it to work
     unchanged with libephemeris.Error.
 
     Example:

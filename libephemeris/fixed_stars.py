@@ -2616,9 +2616,10 @@ _SE_SORTED_CATALOG: "list | None" = None
 def _se_sorted_catalog():
     """Catalog entries sorted by their reference search key.
 
-    Sequential star numbers ("1", "2", ...) index this order, mirroring
-    the reference's sorted in-memory star list (its v2 behavior; the
-    sequence is specific to the catalog shipped with this library).
+    Sequential star numbers ("1", "2", ...) index this order — measured on
+    reference-API output, its v2 sequential numbering follows the sorted
+    catalog order (the sequence here is specific to the catalog shipped
+    with this library).
     """
     global _SE_SORTED_CATALOG
     if _SE_SORTED_CATALOG is None:
@@ -2763,7 +2764,7 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     The UT entry points (fixstar_ut / fixstar2_ut / batch_fixstars_ut) echo
     the input flags with FLG_SWIEPH added when no ephemeris-selection bit was
     given (MOSEPH echoes as given), plus the bits the reference API's
-    flag-plausibility step derives from the request: FLG_NONUT for
+    flag normalization derives from the request: FLG_NONUT for
     J2000/SIDEREAL output (referred to a mean equinox) and
     FLG_NOGDEFL | FLG_NOABERR for heliocentric/barycentric/true-position
     output. Pass implied=True there. These bits ride only on the ECHOED flags

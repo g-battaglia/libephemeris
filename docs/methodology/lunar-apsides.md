@@ -1,6 +1,6 @@
 # Lunar Apsides: Computational Methodology
 
-LibEphemeris computes the interpolated lunar apsides (perigee and apogee) using a passage-interpolated harmonic fitting method anchored to JPL DE440/DE441 numerical integrations, rather than the classic analytical term-selection approach.
+LibEphemeris computes the interpolated lunar apsides (perigee and apogee) using a passage-interpolated harmonic fitting method: passage geometry from the JPL DE440/DE441 numerical integrations, with the fitted coefficients and residual table calibrated against reference-API output used as a black-box oracle (NOTICE.md, Calibration Data Disclosure) — rather than the classic analytical term-selection approach.
 
 ## Background
 
@@ -20,7 +20,7 @@ LibEphemeris constructs the interpolated apsides from the physical geometry of t
 
 3. **Harmonic series calibration.** A 66-term trigonometric perturbation series, constructed from the standard Delaunay arguments (D, M, M', F), is fitted to the spline via least squares. Terms with amplitudes below 0.001 degrees are discarded.
 
-4. **Residual correction.** A precomputed correction table (`PERIGEE_CORRECTIONS`, 201,249 entries at a 2-day step over 1549–2650) absorbs the remaining difference between the harmonic model and the JPL ground truth.
+4. **Residual correction.** A precomputed correction table (`PERIGEE_CORRECTIONS`, 201,249 entries at a 2-day step over 1549–2650) absorbs the remaining difference between the harmonic model and the calibration target (reference-API output; black-box oracle, disclosed in NOTICE.md).
 
 The result is a smooth apsidal curve anchored to the physical distance extrema of the Moon as computed by modern numerical integration.
 
@@ -35,7 +35,8 @@ perturbation amplitudes are smaller, the two philosophies converge.
 
 | Property                      | LibEphemeris                            |
 | ----------------------------- | --------------------------------------- |
-| Ground truth                  | JPL DE440/DE441 numerical integration   |
+| Passage geometry              | JPL DE440/DE441 numerical integration   |
+| Calibration target            | Reference-API output (black-box oracle) |
 | Smoothing method              | Physical passage interpolation          |
 | Perigee oscillation amplitude | ~25 deg from mean                       |
 | Apogee oscillation amplitude  | ~5 deg from mean                        |

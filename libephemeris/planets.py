@@ -572,7 +572,7 @@ def _normalize_calc_flags(flags: int) -> int:
     - Exactly one ephemeris bit is echoed, never two: the reference
       normalization makes the ephemeris bits mutually exclusive, so a
       caller passing FLG_JPLEPH|FLG_SWIEPH must get a single-bit retflag
-      (JPLEPH wins, matching the reference's sequential-overwrite priority
+      (JPLEPH wins, matching the reference's measured priority
       JPLEPH > SWIEPH). FLG_SWIEPH is echoed when the caller passed none.
     - FLG_SPEED3 maps to FLG_SPEED for the computation: 3-position numerical
       differentiation is already the only speed method used. The reference
@@ -628,10 +628,10 @@ def _echo_speed_bit(retflag: int, raw_flags: int) -> int:
 
 
 def _implied_retflag_bits(flags: int) -> int:
-    """Retflag bits the reference API's flag-plausibility step implies.
+    """Retflag bits the reference API's flag normalization implies.
 
     Beyond echoing the caller's bits, the reference switches on internally
-    (and echoes) the flags its plausibility step derives from the request:
+    (and echoes) the flags its normalization derives from the request:
     J2000 and SIDEREAL output is referred to a mean equinox, so FLG_NONUT is
     echoed; heliocentric, barycentric and true-position output skips light
     deflection and annual aberration, so FLG_NOGDEFL | FLG_NOABERR are echoed.
@@ -658,11 +658,9 @@ def _exclusive_ephemeris_bit(flags: int) -> int:
     exactly one ephemeris-selection bit, with priority JPLEPH > SWIEPH >
     MOSEPH when several are requested.
 
-    Used by calc_pctr(), whose upstream counterpart normalizes flags via
-    the flag-plausibility step only: the ephemeris bits become mutually
-    exclusive with FLG_SWIEPH as the default. That normalization applies the
-    ephemeris bits as sequential overwrites where the LAST assignment wins,
-    giving priority JPLEPH > SWIEPH > MOSEPH (verified behaviourally:
+    Used by calc_pctr(): measured on reference-API output, its retflag
+    makes the ephemeris bits mutually exclusive with FLG_SWIEPH as the
+    default and priority JPLEPH > SWIEPH > MOSEPH (probe:
     FLG_JPLEPH|FLG_MOSEPH echoes retflag=FLG_JPLEPH). Unlike
     calc()/calc_ut(), FLG_MOSEPH is NOT stripped and FLG_SPEED3 is NOT
     remapped here, so retflag matches the reference.
@@ -697,7 +695,7 @@ def _finalize_output_flags(
 ) -> Tuple[PositionResult, int]:
     """Apply output-format flags to a result and echo them in retflag.
 
-    Also echoes the flag bits the reference's plausibility step implies
+    Also echoes the flag bits the reference's flag normalization implies
     (see _implied_retflag_bits) so retflag stays 1:1 with the reference.
     """
     return (
@@ -1292,7 +1290,7 @@ def calc_ut(
     # Handle ECL_NUT (-1) - returns nutation and obliquity.
     # The reference normalizes ECL_NUT flags to exactly one
     # ephemeris bit, but FLG_MOSEPH is KEPT and FLG_SPEED3 is NOT remapped
-    # (verified vs pyswisseph 2.10.03: MOSEPH -> 4, MOSEPH|SPEED3 -> 132,
+    # (verified black-box against the reference binding: MOSEPH -> 4, MOSEPH|SPEED3 -> 132,
     # flags=0 -> 2) — so it must run on the raw flags, before
     # _normalize_calc_flags strips MOSEPH.
     if planet == ECL_NUT:
@@ -2398,7 +2396,7 @@ def _maybe_equatorial_convert(
     else:
         eps = get_true_obliquity(jd_tt)
 
-    # Negative obliquity = ecliptic → equatorial (swe.cotrans convention)
+    # Negative obliquity = ecliptic → equatorial (the reference cotrans convention)
     result = cotrans_sp((lon, lat, dist, dlon, dlat, ddist), -eps)
     return (
         result[0],
@@ -4402,7 +4400,7 @@ def get_ayanamsa_ut(tjdut: float) -> float:
 def get_ayanamsa_name(sidmode: int) -> str:
     """
     Get the name of a sidereal mode.
-    Compatible with swe.get_ayanamsa_name().
+    Compatible with the reference get_ayanamsa_name().
     """
     names = {
         SIDM_FAGAN_BRADLEY: "Fagan/Bradley",
@@ -6090,13 +6088,16 @@ def _calc_nod_aps(
 
             peri_dist = calc_osculating_perigee(jd_tt)[2]
         else:
-            # Mean ellipse identity: r_peri = 2a − r_apog with the
-            # reference constants a = 0.002569555, r_apog = 0.002710625 AU.
+            # Mean ellipse identity: r_peri = 2a − r_apog with the textbook
+            # mean lunar distance a = 0.002569555 AU (384,400 km) — both a
+            # and the apogee distance are also directly observable in the
+            # reference API's constant apsis distance channels.
             peri_dist = 2.0 * 0.002569555 - apog_dist
 
         # Node distances from the orbit ellipse: evaluate
-        # r = a(1−e²)/(1+e·cos ν) at the node's true anomaly, like the
-        # reference (the node bodies' own distance channel is not used).
+        # r = a(1−e²)/(1+e·cos ν) at the node's true anomaly — the standard
+        # conic-section radius; matches reference-API output (the node
+        # bodies' own distance channel is not used).
         a_orb = 0.5 * (peri_dist + apog_dist)
         e_orb = (apog_dist - peri_dist) / (apog_dist + peri_dist)
         p_orb = a_orb * (1.0 - e_orb * e_orb)

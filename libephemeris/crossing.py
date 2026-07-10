@@ -686,7 +686,7 @@ def solcross_ut(
         # just-passed target to ~360 (next cycle), while a body exactly
         # at or seconds before the target legitimately crosses now —
         # the reference returns the immediate crossing (verified:
-        # swe.solcross_ut from the exact crossing instant returns that
+        # the reference solcross_ut from the exact crossing instant returns that
         # instant, not one cycle later).
 
     dt_guess = diff / speed
@@ -810,7 +810,7 @@ def solcross(
         # just-passed target to ~360 (next cycle), while a body exactly
         # at or seconds before the target legitimately crosses now —
         # the reference returns the immediate crossing (verified:
-        # swe.solcross_ut from the exact crossing instant returns that
+        # the reference solcross_ut from the exact crossing instant returns that
         # instant, not one cycle later).
 
     dt_guess = diff / speed
@@ -921,7 +921,7 @@ def mooncross_ut(
         # just-passed target to ~360 (next cycle), while a body exactly
         # at or seconds before the target legitimately crosses now —
         # the reference returns the immediate crossing (verified:
-        # swe.solcross_ut from the exact crossing instant returns that
+        # the reference solcross_ut from the exact crossing instant returns that
         # instant, not one cycle later).
 
     dt_guess = diff / speed
@@ -1046,7 +1046,7 @@ def mooncross(
         # just-passed target to ~360 (next cycle), while a body exactly
         # at or seconds before the target legitimately crosses now —
         # the reference returns the immediate crossing (verified:
-        # swe.solcross_ut from the exact crossing instant returns that
+        # the reference solcross_ut from the exact crossing instant returns that
         # instant, not one cycle later).
 
     dt_guess = diff / speed

@@ -247,7 +247,7 @@ Perigeo interpolato: 4.1030°
 Distanza: 358786 km
 ```
 
-La precisione del perigeo interpolato in LibEphemeris è stata migliorata attraverso un processo di calibrazione contro le effemeridi JPL ad alta precisione. I dettagli tecnici di questo processo sono descritti nella documentazione di sviluppo del progetto.
+La precisione del perigeo interpolato in LibEphemeris è stata migliorata attraverso un processo di calibrazione: geometria dei passaggi dalle effemeridi JPL ad alta precisione, con la serie e la tabella dei residui calibrate sull'output dell'API di riferimento usata come oracolo black-box (si vedano NOTICE.md e la documentazione metodologica).
 
 ---
 

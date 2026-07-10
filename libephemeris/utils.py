@@ -188,7 +188,7 @@ def azalt(
     (azimuth and altitude) for a given observer location and time.
     It accounts for atmospheric refraction.
 
-    Compatible with the reference swe.azalt() API.
+    Compatible with the reference azalt() API.
 
     Args:
         tjdut: Julian Day in Universal Time (UT1)
@@ -361,7 +361,7 @@ def azalt_rev(
     (azimuth and true altitude) to celestial coordinates (equatorial or ecliptic)
     for a given observer location and time.
 
-    Compatible with the reference swe.azalt_rev() API.
+    Compatible with the reference azalt_rev() API.
 
     Note: This function is not precisely the reverse of azalt(). If only an
     apparent altitude is available, the true altitude must first be computed
@@ -588,7 +588,7 @@ def refrac_extended(
     - Atmospheric lapse rate (temperature variation with altitude)
     - Dip of the horizon calculation
 
-    Compatible with the reference swe.refrac_extended() API.
+    Compatible with the reference refrac_extended() API.
 
     Args:
         alt: Altitude of object above geometric horizon in degrees.
@@ -683,7 +683,7 @@ def cotrans(
     """
     Transform coordinates between ecliptic and equatorial systems.
 
-    Compatible with the reference swe.cotrans() API.
+    Compatible with the reference cotrans() API.
 
     The direction of transformation depends on the sign of obliquity:
     - Negative obliquity: ecliptic (lon, lat) → equatorial (RA, Dec)
@@ -756,7 +756,7 @@ def degnorm(x: float) -> float:
     """
     Normalize an angle to the range [0, 360).
 
-    Compatible with the reference swe.degnorm() API.
+    Compatible with the reference degnorm() API.
     Equivalent to `angle % 360` but correctly handles negative numbers.
 
     Args:
@@ -795,7 +795,7 @@ def radnorm(x: float) -> float:
     """
     Normalize an angle to the range [0, 2*pi).
 
-    Compatible with the reference swe.radnorm() API.
+    Compatible with the reference radnorm() API.
     Equivalent to `angle % (2*pi)` but correctly handles negative numbers.
 
     Args:
@@ -831,7 +831,7 @@ def difdeg2n(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [-180;180].
 
-    Compatible with the reference swe.difdeg2n() API.
+    Compatible with the reference difdeg2n() API.
     Computes the signed angular difference, handling 360° wrapping.
 
     Args:
@@ -861,7 +861,7 @@ def difdegn(p1: float, p2: float) -> float:
     """
     Calculate distance in degrees p1 - p2 normalized to [0, 360).
 
-    Compatible with the reference swe.difdegn() API.
+    Compatible with the reference difdegn() API.
     Computes the difference between two angles, always returning a positive
     value in the range [0, 360). Unlike difdeg2n() which returns [-180, 180],
     this function always returns a positive value.
@@ -934,7 +934,7 @@ def difcs2n(p1: int, p2: int) -> int:
     expressed in centiseconds (1/100 of an arcsecond), handling 360° wrapping.
     The result is normalized to the equivalent of [-180°, +180°] in centiseconds.
 
-    Compatible with the reference swe.difcs2n() API.
+    Compatible with the reference difcs2n() API.
 
     Args:
         p1: First angle in centiseconds
@@ -975,7 +975,7 @@ def difcsn(p1: int, p2: int) -> int:
     The result is normalized to the equivalent of [0, 360°) in centiseconds,
     always returning a non-negative value.
 
-    Compatible with the reference swe.difcsn() API.
+    Compatible with the reference difcsn() API.
 
     Args:
         p1: First angle in centiseconds
@@ -1012,7 +1012,7 @@ def csnorm(cs: int) -> int:
     arcsecond) to the equivalent of [0°, 360°) in centiseconds, i.e., the range
     [0, 129600000). Correctly handles negative numbers.
 
-    Compatible with the reference swe.csnorm() API.
+    Compatible with the reference csnorm() API.
 
     Args:
         cs: Angle in centiseconds (any value)
@@ -1052,7 +1052,7 @@ def csroundsec(cs: int) -> int:
     returning the result still in centiseconds (i.e., rounded to the
     nearest multiple of 100).
 
-    Compatible with the reference swe.csroundsec() API.
+    Compatible with the reference csroundsec() API.
 
     Args:
         cs: Angle in centiseconds (1/100 arcsecond)
@@ -1119,7 +1119,7 @@ def cs2degstr(cs: int) -> str:
     degrees, M is arcminutes, S is arcseconds, and ss is centiseconds (hundredths
     of arcsecond).
 
-    Compatible with the reference swe.cs2degstr() API.
+    Compatible with the reference cs2degstr() API.
 
     Args:
         cs: Angle in centiseconds (any integer value)
@@ -1178,7 +1178,7 @@ def cs2lonlatstr(cs: int, plus: "str | bytes", minus: "str | bytes") -> str:
     This function converts an angular measurement in centiseconds (1/100 of an
     arcsecond) to a human-readable string with a directional character.
 
-    Compatible with the reference swe.cs2lonlatstr() API.
+    Compatible with the reference cs2lonlatstr() API.
 
     Args:
         cs: Angle in centiseconds (any integer value)
@@ -1252,7 +1252,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
     to a human-readable string in the format "HH:MM:SS" where HH is hours, MM is
     minutes, and SS is seconds.
 
-    Compatible with the reference swe.cs2timestr() API.
+    Compatible with the reference cs2timestr() API.
 
     Args:
         cs: Time in centiseconds (any integer value)
@@ -1428,7 +1428,7 @@ def d2l(d: float) -> int:
     "round half away from zero" semantics (also known as commercial rounding).
     This is standard practice in astronomical computation software.
 
-    Compatible with the reference swe.d2l() API.
+    Compatible with the reference d2l() API.
 
     Args:
         d: A floating-point number to convert.
