@@ -139,7 +139,7 @@ libephemeris download medium       # 1550-2650, ~200 MB (recommended)
 libephemeris download extended     # -13200 to +17191 CE, full range
 ```
 
-**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration, `[all]` for everything. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
+**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
 
 ---
 

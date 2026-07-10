@@ -63,15 +63,19 @@ dependencies = [
 stars = [
     "astropy>=5.0.0",
 ]
-# N-body integration for asteroid orbit propagation
+# N-body integration for asteroid orbit propagation.
+# NOTE: rebound and assist are GPL-3.0-or-later. Installing this extra
+# brings copyleft-licensed components into the environment; the core
+# package and every other extra stay permissive-only. Opt in explicitly
+# with `libephemeris[nbody]`.
 nbody = [
     "rebound>=4.0.0",
     "assist>=1.1.0",
 ]
-# All optional runtime features (nbody + stars)
+# All permissive-licensed optional runtime features. Deliberately does NOT
+# include the GPL-licensed N-body extra (rebound/assist): install
+# `libephemeris[all,nbody]` if you also want that and accept its license.
 all = [
-    "rebound>=4.0.0",
-    "assist>=1.1.0",
     "astropy>=5.0.0",
 ]
 dev = [

@@ -139,10 +139,10 @@ Installs [Astropy](https://www.astropy.org/) for building and querying
 star catalogs. Required for fixed star calculations beyond the built-in
 named stars.
 
-### `all` -- Everything
+### `all` -- All permissive-licensed extras
 
 ```bash
-pip install libephemeris[all]
+pip install libephemeris[all]        # permissive-only; add ,nbody for the GPL extra
 ```
 
 Installs all optional runtime dependencies (`nbody` + `stars`).
