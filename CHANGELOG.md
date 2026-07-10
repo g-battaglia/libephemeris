@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.0rc4] - 2026-07-10
+## [3.0.0rc5] - 2026-07-10
 
 This RC closes the 2026-07-08 adversarial wave — Round J plus the advanced
 Round-K slices and a full three-area re-review: ~27 confirmed defects fixed
