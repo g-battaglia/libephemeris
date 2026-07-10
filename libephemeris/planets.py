@@ -2734,6 +2734,15 @@ def _calc_body(
             f"call register_moon_spk() with e.g. jup365.bsp/sat441.bsp"
         )
 
+    # Moon-derived abstract points under HELCTR/BARYCTR: the reference
+    # returns an all-zero position tuple (a node/apse has no heliocentric or
+    # barycentric place) while echoing the normal retflag — measured
+    # black-box for all six bodies with both center flags at several epochs.
+    if ipl in (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG) and (
+        iflag & (FLG_HELCTR | FLG_BARYCTR)
+    ):
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+
     # Handle lunar nodes (Mean/True North/South)
     if ipl in [MEAN_NODE, TRUE_NODE]:
         jd_tt = t.tt

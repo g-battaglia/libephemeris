@@ -2454,6 +2454,14 @@ def _fast_calc_core(
     if not reader.has_body(ipl):
         raise KeyError(f"Body {ipl} not in LEB file")
 
+    # Moon-derived abstract points under HELCTR/BARYCTR: the reference
+    # returns an all-zero position tuple while echoing the normal retflag
+    # (mirrors the Skyfield-path guard in planets._calc_body).
+    if ipl in (MEAN_NODE, TRUE_NODE, MEAN_APOG, OSCU_APOG, INTP_APOG, INTP_PERG) and (
+        iflag & (FLG_HELCTR | FLG_BARYCTR)
+    ):
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0), iflag
+
     body = reader._bodies[ipl]
 
     # Flag for deferred J2000 precession — set True by Pipeline B for any
