@@ -469,8 +469,9 @@ def calc_moon_position(
 
     Geocentric output is apparent: light-time iteration on the satellite
     (unless FLG_TRUEPOS) and annual aberration (unless FLG_NOABERR).
-    Heliocentric and barycentric output stays geometric, matching the
-    library's other helio/bary paths.
+    Heliocentric and barycentric output is light-time retarded too
+    (aberration excluded — it is an observer-velocity effect), exactly
+    like every other helio/bary body class (planets, SPK minor bodies).
 
     Args:
         t: Skyfield Time object
@@ -550,9 +551,12 @@ def calc_moon_position(
     from .astrometry import apply_aberration_to_position
 
     C_AU_DAY = 173.144632674240
-    apply_light_time = (
-        not (iflag & FLG_TRUEPOS) and not is_heliocentric and not is_barycentric
-    )
+    # Light-time retardation applies to EVERY observation center unless
+    # FLG_TRUEPOS — the planet and SPK paths retard helio/bary positions
+    # (measured: Jupiter HELCTR apparent vs TRUEPOS differs ~8.7" in both
+    # this library and the reference); a former helio/bary exemption here
+    # left moon positions geometric, ~10-25" off that convention.
+    apply_light_time = not (iflag & FLG_TRUEPOS)
     apply_aberr = (
         not (iflag & FLG_TRUEPOS)
         and not (iflag & FLG_NOABERR)
