@@ -268,9 +268,20 @@ def get_calc_mode() -> str:
         >>> get_calc_mode()  # Default
         'auto'
     """
-    with _STATE_LOCK:
-        if _CALC_MODE is not None:
-            return _CALC_MODE
+    # Deliberately LOCK-FREE. This getter is called from paths that already
+    # hold _INIT_LOCK (LEB discovery in _get_leb_reader_locked, the LEB-mode
+    # branch of get_planets), while the context calculation path acquires
+    # the same two locks in the opposite order (_CONTEXT_SWAP_LOCK ==
+    # _STATE_LOCK via _swapped_context_state, then _INIT_LOCK inside
+    # get_planets) — taking _STATE_LOCK here completes an ABBA inversion
+    # that deadlocks two concurrent first-use calculations (reproduced).
+    # Reading the module global without the lock is safe: the read is
+    # atomic under the GIL and writers (set_calc_mode/close) still
+    # serialize on _STATE_LOCK; a marginally stale value during a
+    # concurrent set_calc_mode() is indistinguishable from calling a
+    # moment earlier.
+    if _CALC_MODE is not None:
+        return _CALC_MODE
     env_value = os.environ.get(_CALC_MODE_ENV_VAR, "").lower().strip()
     if env_value in _VALID_CALC_MODES:
         return env_value
