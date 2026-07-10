@@ -1584,7 +1584,11 @@ def calc_pctr(
         EphemerisRangeError: If the date is outside the ephemeris coverage
 
     Note:
-        - FLG_HELCTR and FLG_BARYCTR flags are ignored (observer is always center)
+        - FLG_HELCTR / FLG_BARYCTR do not change the observer (always the
+          center body) but, like the reference API, they imply an
+          astrometric place: stellar aberration and gravitational light
+          deflection are skipped (retflag echoes NOABERR|NOGDEFL and the
+          center bit itself is stripped, matching the reference)
         - FLG_TOPOCTR is ignored (no topocentric correction on other planets)
         - Distance is the distance from center to planet in AU
 
@@ -1595,6 +1599,15 @@ def calc_pctr(
     """
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
+
+    # HELCTR/BARYCTR on calc_pctr: the reference computes the astrometric
+    # place (no aberration, no deflection — light-time still applied) and
+    # strips the center bit from the echoed retflag. Map the bits onto the
+    # explicit NOABERR|NOGDEFL flags so the computation gates and the
+    # retflag echo both follow (measured black-box: HELCTR/BARYCTR results
+    # equal the NOABERR|NOGDEFL results, retflag identical for both).
+    if flags & (FLG_HELCTR | FLG_BARYCTR):
+        flags = (flags | FLG_NOABERR | FLG_NOGDEFL) & ~(FLG_HELCTR | FLG_BARYCTR)
 
     # Validate JD range for bodies that use the JPL ephemeris
     if _body_uses_jpl_ephemeris(planet) or _body_uses_jpl_ephemeris(center):
