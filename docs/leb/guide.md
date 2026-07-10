@@ -2187,15 +2187,22 @@ python scripts/generate_leb2.py verify data/leb2/base_core.leb2 \
 
 ### 13.12 Measured Compression Results (Base Tier)
 
-| Group | Bodies | LEB1 | LEB2 | Ratio |
-|-------|--------|------|------|-------|
-| Core | 14 | 43.5 MB | 10.6 MB | 5.1x |
-| Asteroids | 5 | 22.5 MB | 8.7 MB | 3.4x |
-| Apogee | 3 | 30.8 MB | 11.4 MB | 3.3x |
-| Uranians | 9 | 0.7 MB | 2.1 MB | 6.2x |
-| **Core-set subtotal** | **31** | **101.8 MB** | **32.7 MB** | **3.1x** |
-| Exotics | 31 | 201.7 MB | 59.0 MB | 3.4x |
-| **All groups** | **62** | **~303 MB** | **~92 MB** | **3.3x** |
+Measured from the shipped `data/leb2/base_*.leb2` files (chunk-index sums).
+"Payload" is the Chebyshev coefficient data alone; the compression ratio is
+payload-to-payload. Each on-disk group file additionally carries ~1.9 MB of
+*uncompressed* auxiliary sections (nutation series, star catalog, ΔT table),
+which is why a tiny group like Uranians produces a 2.1 MB file from a
+0.7 MB payload: the auxiliary sections dominate.
+
+| Group | Bodies | Payload (raw) | Payload (compressed) | Ratio | File on disk |
+|-------|--------|---------------|----------------------|-------|--------------|
+| Core | 14 | 44.5 MB | 8.7 MB | 5.1x | 10.6 MB |
+| Asteroids | 5 | 23.0 MB | 6.7 MB | 3.4x | 8.7 MB |
+| Apogee | 3 | 31.6 MB | 9.5 MB | 3.3x | 11.4 MB |
+| Uranians | 9 | 0.7 MB | 0.1 MB | 6.2x | 2.1 MB |
+| **Core-set subtotal** | **31** | **99.8 MB** | **25.0 MB** | **4.0x** | **32.8 MB** |
+| Exotics | 31 | 199.7 MB | 56.9 MB | 3.5x | 59.0 MB |
+| **All groups** | **62** | **299.5 MB** | **81.9 MB** | **3.7x** | **91.8 MB** |
 
 ---
 

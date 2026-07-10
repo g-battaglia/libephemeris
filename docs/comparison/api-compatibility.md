@@ -16,8 +16,11 @@ Developers migrating from pyswisseph should be aware of these.
 | Function | pyswisseph returns | libephemeris returns |
 |----------|-------------------|---------------------|
 | `get_ayanamsa_ex_ut` | `(flags, ayanamsa)` | `(retflag, ayanamsa)` |
-| `deltat_ex` | `(float, str)` | `float` — ΔT in days |
 | `orbit_max_min_true_distance` | `(max, min, true)` | `(max, min, true)` |
+
+(`deltat_ex` returns a plain `float` — ΔT in days — in **both** engines;
+an earlier revision of this table wrongly listed a `(float, str)` tuple
+for the reference binding.)
 
 ### Parameter differences
 
