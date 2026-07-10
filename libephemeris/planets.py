@@ -1292,8 +1292,18 @@ def calc_ut(
     # flags=0 -> 2) — so it must run on the raw flags, before
     # _normalize_calc_flags strips MOSEPH.
     if planet == ECL_NUT:
-        pos_nut, rf_nut = _calc_nutation_obliquity(tjdut, _plaus_ephemeris_flags(flags))
-        return pos_nut, rf_nut | _implied_retflag_bits(flags)
+        # The reference also resolves conflicting center bits (TOPOCTR >
+        # BARYCTR > HELCTR, losers stripped before the implied-bits
+        # derivation) and drops SPEED3 when SPEED is present (SPEED3 alone
+        # is kept) — measured black-box: BARYCTR|TOPOCTR -> 32770,
+        # HELCTR|BARYCTR -> 17922, SPEED|SPEED3 -> 258, MOSEPH|SPEED3 -> 132.
+        res_flags = _resolve_center_flags(flags)
+        if res_flags & FLG_SPEED:
+            res_flags &= ~FLG_SPEED3
+        pos_nut, rf_nut = _calc_nutation_obliquity(
+            tjdut, _plaus_ephemeris_flags(res_flags)
+        )
+        return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
@@ -1447,10 +1457,15 @@ def calc(
     # missing here and ECL_NUT fell through to UnknownBodyError).
     # plaus_iflag-style flag handling on the raw flags (see calc_ut).
     if planet == ECL_NUT:
+        # Same center-priority resolution and SPEED3 collapse as the calc_ut
+        # ECL_NUT branch (see there for the measured reference retflags).
+        res_flags = _resolve_center_flags(flags)
+        if res_flags & FLG_SPEED:
+            res_flags &= ~FLG_SPEED3
         pos_nut, rf_nut = _calc_nutation_obliquity_tt(
-            tjdet, _plaus_ephemeris_flags(flags)
+            tjdet, _plaus_ephemeris_flags(res_flags)
         )
-        return pos_nut, rf_nut | _implied_retflag_bits(flags)
+        return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
