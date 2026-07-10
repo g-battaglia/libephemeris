@@ -1109,11 +1109,12 @@ def mooncross_node_ut(
         Moon crosses each node approximately every 13.6 days (half the nodal
         month of ~27.2 days).
 
-        This routine solves for libephemeris's own ecliptic-latitude-zero
-        crossing, which differs from the reference ephemeris's node-crossing
-        definition (the reference solves Moon-longitude == node-longitude).
-        The two definitions can disagree by up to ~80 seconds of time. This
-        is a known, deliberate deviation from the reference.
+        Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
+        crossing (measured black-box: identical instants). The only
+        divergence is the time frame of the *_ut return value: the reference
+        reports the TT/ET instant unconverted, while libephemeris reports
+        the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
+        growing at extreme epochs). See known-differences.md §11.
 
     Example:
         >>> # Find next lunar node crossing
@@ -1180,11 +1181,12 @@ def mooncross_node(
         which varies from ~32 seconds (year 2000) to minutes (historical times).
         For most astrological applications, use mooncross_node_ut() instead.
 
-        This routine solves for libephemeris's own ecliptic-latitude-zero
-        crossing, which differs from the reference ephemeris's node-crossing
-        definition (the reference solves Moon-longitude == node-longitude).
-        The two definitions can disagree by up to ~80 seconds of time. This
-        is a known, deliberate deviation from the reference.
+        Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
+        crossing (measured black-box: identical instants). The only
+        divergence is the time frame of the *_ut return value: the reference
+        reports the TT/ET instant unconverted, while libephemeris reports
+        the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
+        growing at extreme epochs). See known-differences.md §11.
 
     Example:
         >>> # Find next lunar node crossing using TT
