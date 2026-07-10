@@ -1590,3 +1590,25 @@ class TestPhenoParallaxInAltitude:
         assert abs(dret[19] - 0.920914) < 5e-4
         # Internal consistency: slot 19 == GeoAlt - AltO by construction.
         assert abs(dret[19] - (dret[2] - dret[0])) < 1e-9
+
+
+class TestPhenoWindowObserver:
+    """The visibility-window slots respect the caller's observer (round-W fix).
+
+    Both pheno paths previously hardcoded the naked observer into the
+    rise-window computation, so dret[12..14]/dret[24] never moved with the
+    observer tuple. Structural assertion: an old presbyopic observer and a
+    sharp young one get different windows for the same event (the absolute
+    values carry the documented VISLIMIT model floor, so no oracle freeze).
+    """
+
+    def test_window_slots_vary_with_observer(self):
+        jd = 2460539.6522778766
+        args = ((12.5, 41.9, 0.0), (1013.25, 15.0, 50.0, 0.0))
+        r_young = heliacal_pheno_ut(
+            jd, args[0], args[1], (20.0, 1.5, 0.0, 0.0, 0.0, 0.0), "Sirius", 1
+        )
+        r_old = heliacal_pheno_ut(
+            jd, args[0], args[1], (75.0, 0.7, 0.0, 0.0, 0.0, 0.0), "Sirius", 1
+        )
+        assert any(abs(r_young[i] - r_old[i]) > 1e-6 for i in (11, 12, 13, 14, 24))

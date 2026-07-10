@@ -1927,7 +1927,11 @@ def _heliacal_pheno_ut_leb(
             humidity * 100.0 if humidity <= 1.0 else humidity,
             met_range,
         ),
-        (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+        # Caller's observer: the window slots depend on it (see the
+        # Skyfield-path twin).
+        tuple(observer[:6])
+        if observer is not None
+        else (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
         flags,
     )
 
@@ -4041,6 +4045,10 @@ def _heliacal_pheno_ut_pythonic(
         _obs_aper,
         _obs_trans,
     ) = _parse_observer_optics(observer, flags)
+    # Keep the raw tuple too: the rise-window computation below needs it
+    # after ``observer`` is rebound.
+    _obs_raw = tuple(float(v) for v in tuple(observer)[:6])
+    _obs_tuple6 = _obs_raw + (0.0,) * (6 - len(_obs_raw))
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
@@ -4200,7 +4208,10 @@ def _heliacal_pheno_ut_pythonic(
         humidity * 100.0 if humidity <= 1.0 else humidity,
         met_range,
     )
-    _obs6 = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+    # The visibility-window slots (TfirstVR/TbVR/TlastVR/TvisVR) depend on
+    # the caller's observer (age/Snellen/optics), like minTAV — measured:
+    # the reference's window shifts with the observer tuple.
+    _obs6 = _obs_tuple6
     (
         rise_o,
         rise_s,
