@@ -486,10 +486,31 @@ def horizons_calc_ut(
                 tgt_sv.vz - sun_sv.vz,
             )
             if not (iflag & FLG_TRUEPOS):
-                dist = _math.sqrt(rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2)
+                # Light-time baseline parity with the LEB/Skyfield backend:
+                # for the major planets (Mercury..Pluto) the HELCTR light
+                # time is measured over the BARYCENTRIC distance
+                # |target - SSB| / c, iterated once on the retarded
+                # barycentric position (fast_calc._HELCTR_BARY_LT_BODIES);
+                # other bodies keep the heliocentric baseline.
+                _bary_lt = body_id in {2, 3, 4, 5, 6, 7, 8, 9}
+                if _bary_lt:
+                    dist = _math.sqrt(tgt_sv.x**2 + tgt_sv.y**2 + tgt_sv.z**2)
+                else:
+                    dist = _math.sqrt(
+                        rel_pos[0] ** 2 + rel_pos[1] ** 2 + rel_pos[2] ** 2
+                    )
                 if dist > 0.0:
                     lt = dist / c_au_day
                     tgt_lt = client.fetch_state_vector(command, jd_tt - lt, "@0", "TDB")
+                    if _bary_lt:
+                        # One refinement pass on the retarded barycentric
+                        # distance (the fast_calc loop converges here too).
+                        dist2 = _math.sqrt(tgt_lt.x**2 + tgt_lt.y**2 + tgt_lt.z**2)
+                        if dist2 > 0.0:
+                            lt = dist2 / c_au_day
+                            tgt_lt = client.fetch_state_vector(
+                                command, jd_tt - lt, "@0", "TDB"
+                            )
                     rel_pos = (
                         tgt_lt.x - sun_sv.x,
                         tgt_lt.y - sun_sv.y,
