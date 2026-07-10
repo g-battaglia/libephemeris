@@ -797,15 +797,24 @@ def _reset_timescale() -> None:
 
 
 def _close_kernel_resources() -> None:
-    """Close the loaded ephemeris handles without touching user configuration.
+    """Release the loaded ephemeris handles without touching user configuration.
 
-    Releases the DE kernel, the planet-centers kernel, the LEB reader and the
+    Drops the DE kernel, the planet-centers kernel, the LEB reader and the
     cached loader so the next calculation reloads them from the CURRENT
     configuration. Unlike close(), every user-facing setting (ephe path/file,
     topo, sidereal mode, tidal acceleration, SPK registrations, calc mode,
     LEB file) is preserved. This is the narrow release used by
     EphemerisContext.close(), whose contract is to free file handles and pick
     up a new ephemeris file — not to reset the module configuration.
+
+    The references are DROPPED rather than hard-closed: CPython's reference
+    counting closes the underlying files as soon as the last in-flight user
+    releases them. A hard close() here made concurrent calculations that had
+    already fetched the kernel die mid-read with "seek of closed file"
+    (ValueError from a closed mmap/file object) — the intermittent
+    thread-safety failure. Handles are still freed promptly: new calls can
+    no longer reach the old objects, and threads holding them release their
+    locals when the calculation returns.
 
     Uses _INIT_LOCK, the same lock that guards the lazy loading of these
     resources (and the one EphemerisContext.close() is documented to take
@@ -814,32 +823,15 @@ def _close_kernel_resources() -> None:
     global _LOADER, _PLANETS, _PLANET_CENTERS, _LEB_READER
 
     with _INIT_LOCK:
-        if _LEB_READER is not None:
-            try:
-                _LEB_READER.close()
-            except (AttributeError, OSError):
-                pass
-            _LEB_READER = None
-        # Clear fast_calc's cached reference to the closed LEB reader (see
-        # _close_inner): stale dispatch through a closed mmap otherwise.
+        _LEB_READER = None
+        # Clear fast_calc's cached reference to the dropped LEB reader (see
+        # _close_inner): stale dispatch through the old mmap otherwise.
         from . import fast_calc as _fast_calc
 
         _fast_calc._reset_active_reader()
 
-        if _PLANETS is not None:
-            try:
-                _PLANETS.close()
-            except (AttributeError, OSError, ValueError):
-                # SpiceKernel may not have close() in all versions,
-                # or may already be closed
-                pass
-            _PLANETS = None
-        if _PLANET_CENTERS is not None:
-            try:
-                _PLANET_CENTERS.close()
-            except (AttributeError, OSError, ValueError):
-                pass
-            _PLANET_CENTERS = None
+        _PLANETS = None
+        _PLANET_CENTERS = None
         _PLANET_CENTER_MISSING.clear()
         _LOADER = None
 
