@@ -6973,20 +6973,21 @@ def _rise_trans_true_hor_impl(
     horizon_altitude = horhgt
     is_fixed_star = isinstance(body, str)
 
-    # Extract event type from rsmi (lower bits)
-    event_type = rsmi & 0x0F  # First 4 bits for event type
-
-    # Validate event type
-    if event_type not in (
-        CALC_RISE,
-        CALC_SET,
-        CALC_MTRANSIT,
-        CALC_ITRANSIT,
-    ):
-        raise ValueError(
-            "Invalid event type in rsmi: %d. Use CALC_RISE, CALC_SET, CALC_MTRANSIT, or CALC_ITRANSIT"
-            % rsmi
-        )
+    # Extract the event type from rsmi's low bits with the reference's
+    # tolerance and precedence (measured black-box): SET > RISE > ITRANSIT >
+    # MTRANSIT when several bits are set, and a missing event type (e.g. a
+    # bare BIT_CIVIL_TWILIGHT/BIT_DISC_CENTER/BIT_NO_REFRACTION modifier, or
+    # rsmi=0) defaults to RISE — the reference never raises here.
+    if rsmi & CALC_SET:
+        event_type = CALC_SET
+    elif rsmi & CALC_RISE:
+        event_type = CALC_RISE
+    elif rsmi & CALC_ITRANSIT:
+        event_type = CALC_ITRANSIT
+    elif rsmi & CALC_MTRANSIT:
+        event_type = CALC_MTRANSIT
+    else:
+        event_type = CALC_RISE
 
     # reader is provided by the caller (None forces Skyfield path)
     _reader_rt = reader
