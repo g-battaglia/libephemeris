@@ -105,8 +105,11 @@ LICENSE_NAMING_OK = frozenset(
 )
 
 # A single tracked file that legitimately carries a foreign-data NAME in its
-# own filename: the parser's test module. (It is a .py test, content-scanned
-# like any other, so nothing hides behind the name.)
+# own filename: the seorbel-format parser's own test module. It is this
+# project's reviewed Python test (it exercises the parser on a user-provided
+# file; it bundles no reference data), so the name is expected. Note tests/
+# is not in SCAN_DIRS, so this exception is a name allowance only — it is not
+# separately content-scanned by this gate.
 FOREIGN_DATA_NAME_EXCEPTIONS = frozenset({"tests/test_parse_seorbel.py"})
 
 SOURCE_FILE_RE = re.compile(

@@ -37,7 +37,8 @@ All astronomical computations are based on:
   - Park, R.S. et al. — "The JPL Planetary and Lunar Ephemerides
     DE440 and DE441", AJ 161, 105 (2021)
 - **Primary historical sources** for hypothetical bodies:
-  - Witte, A. & Sieggrun, F. — *Regelwerk fur Planetenbilder* (1928)
+  - Witte, A. & Lefeldt, H. — *Regelwerk für Planetenbilder* (1928)
+    (Sieggrün later added four of the Uranian bodies)
   - Neely, J. — refined orbital elements (1988)
   - Makransky, B. — *Primary Directions* (1988), for the Sunshine house system
 
@@ -90,7 +91,7 @@ before any stable release:
   in production; the interpolated lunar apsides do use an analytical
   perturbation series, disclosed below)
 - `seorbel.txt`: removed from the tree and replaced with
-  `data/fictitious_orbits.csv`. Most rows cite primary published sources
+  `libephemeris/data/fictitious_orbits.csv`. Most rows cite primary published sources
   (Witte/Sieggrun 1928, Neely 1988, Strubell 1952, Hoyt 1980, Weston,
   peer-reviewed papers); the rows without a known publication (Nibiru,
   Proserpina, Selena digits, the Waldemath reconstruction) are carried as
@@ -141,7 +142,7 @@ the reference API, so 1:1 behavioral parity requires fitting to reference
 output. This is disclosed for transparency.
 
 Second, four **fictitious-body element rows** in
-`data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena digits and
+`libephemeris/data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena digits and
 the Waldemath reconstruction) have no known public publication and are
 carried as interoperability values demonstrably recoverable by black-box
 Keplerian fits against reference-API output — procedure and residuals in

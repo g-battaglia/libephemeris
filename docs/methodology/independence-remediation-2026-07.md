@@ -160,6 +160,22 @@ are exempt from the license classes ONLY (still scanned for SE
 identifiers/PyMeeus), while the legal/notice docs that record
 implementation-level history keep the full exemption.
 
+### Round 4
+
+A fourth audit confirmed 5 residuals (42 → 20 → 13 → 5), all low-severity
+documentation defects, all remediated: two more dead `scripts/` pointers to
+tooling that moved to the gitignored `validation/` repo (the WS1
+houses-verification harness in provenance-sweep-2026-06.md and the apse
+generator in CLEAN.md); a book-authorship citation corrected (Witte &
+Lefeldt 1928, not Witte & Sieggrün — Sieggrün added Uranian bodies later);
+the CSV path normalized to `libephemeris/data/...` in NOTICE; and a
+misleading comment on the gate's filename-exception (it is a name allowance
+for the parser's own reviewed test module, not a content-scan guarantee).
+No code taint in this round. The audit series has converged: the remaining
+findings are documentation-hygiene only, with no residual source-knowledge
+language, reference-internal identifiers, or false provenance in shipped
+code.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the

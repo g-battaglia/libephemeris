@@ -55,7 +55,8 @@ to `_NEAR_ZERO` (class-B hygiene).
 
 ## Verification
 
-`scripts/verify_houses_clean_room.py` (26 house systems × ~91,000 grid
+`verify_houses_clean_room.py` (now in the separate, gitignored `validation/`
+repo at `validation/verify/`; 26 house systems × ~91,000 grid
 cases of `houses_armc` + `house_pos`, including polar latitudes, southern
 hemisphere, cardinal ARMC, nonzero body latitudes):
 
@@ -79,5 +80,5 @@ To re-run:
 ```bash
 grep -rniE "swehouse|swecl\.c|sweph\.c|swemmoon|swemplan|swedate\.c" libephemeris/ --include="*.py"
 grep -rnE "\bswed\b|\bdgsect\b|\bxs1\b|\bxh1\b|\bfh1\b|\bmdd\b|\bmdn\b|\badp\b|\badmc\b|\bsamc\b|\bdfac\b|apc_sector|\bxeq0\b|\bxp0\b" libephemeris/ --include="*.py"
-.venv/bin/python scripts/verify_houses_clean_room.py --check tasks/results/houses_baseline.json
+.venv/bin/python validation/verify/verify_houses_clean_room.py --check tasks/results/houses_baseline.json
 ```
