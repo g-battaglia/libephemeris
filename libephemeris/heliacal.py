@@ -30,7 +30,7 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Tuple, NamedTuple, Optional
+from typing import Tuple, NamedTuple, Optional, Sequence
 
 import numpy as np
 
@@ -266,6 +266,109 @@ def _vl_airmass_ozone(alt_deg: float) -> float:
     s = math.sin((90.0 - alt_deg) * _RD)
     val = 1.0 - (s / (1.0 + 20.0 / 6378.0)) ** 2
     return 1.0 / math.sqrt(val) if val > 0 else 40.0
+
+
+def _vl_hecht_threshold(bl: float) -> float:
+    """Hecht/Knoll-Schaefer contrast threshold (foot-candles) for sky ``bl``.
+
+    Two photoreceptor regimes (photopic above / scotopic below 1500 nL), exactly
+    as in Schaefer's VISLIMIT: ``TH = C1 * (1 + sqrt(C2 * BL))**2``.
+    """
+    if bl > 1500.0:
+        c1 = 10.0**-8.350001
+        c2 = 10.0**-5.9
+    else:
+        c1 = 10.0**-9.8
+        c2 = 10.0**-1.9
+    return c1 * ((1.0 + math.sqrt(c2 * bl)) ** 2)
+
+
+# =============================================================================
+# Observer-dependent corrections (eye age + optical instrument)
+# =============================================================================
+#
+# The reference vis_limit_mag applies two observer corrections on top of the
+# VISLIMIT naked-eye limiting magnitude: the observer's age (via the eye's
+# dark-adapted pupil) and, when HELFLAG_OPTICAL_PARAMS is set, the optical aid
+# (binocular/telescope). Both are implemented here as DELTAS that are exactly
+# zero for the naked-eye default (age 36, Snellen 1, no instrument), so the
+# calibrated naked-eye behaviour is bit-identical.
+#
+# Eye dark-adapted pupil diameter vs age (mm), from Schaefer's VISLIMIT
+# telescopic program (Sky & Telescope, Nov 1989 / May 1998; the Bogan/Fisher
+# JavaScript ports): DE = 7 * exp(-age**2 / 20000). The pupil is capped at its
+# age-23 value (younger observers do not gain further dark-adapted diameter),
+# matching the oracle's clamp.
+_VL_PUPIL_D0 = 7.0
+_VL_PUPIL_K = 20000.0
+_VL_PUPIL_AGE_MIN = 23.0
+_VL_PUPIL_REF_AGE = 36.0
+
+
+def _vl_eye_pupil(age: float) -> float:
+    """Dark-adapted eye pupil diameter (mm) for an observer age (Schaefer)."""
+    a = age if age > _VL_PUPIL_AGE_MIN else _VL_PUPIL_AGE_MIN
+    return _VL_PUPIL_D0 * math.exp(-(a * a) / _VL_PUPIL_K)
+
+
+# Reference pupil at age 36 (~6.56079 mm); the corrections are relative to it.
+_VL_PUPIL_REF = _vl_eye_pupil(_VL_PUPIL_REF_AGE)
+
+# Age-correction constants, fit to the reference vis_limit_mag oracle. The pupil
+# ratio drives a light-gathering gain [A*log10(r)] plus a coupled shift of the
+# Hecht threshold [C*log10(TH(BL*r**b)/TH(BL))], so the age effect grows with
+# sky brightness (as the oracle does). Reproduces the oracle age curve to
+# <~0.08 mag over the calibration scenes (see tests/test_vis_limit_optics.py).
+_VL_AGE_A = 5.40181
+_VL_AGE_C = 3.40184
+_VL_AGE_B = 0.70000
+
+# Optical-instrument constants, fit to the reference oracle. The aperture gives
+# a light-gathering gain [KA*log10(D/eye)], transmission and the binocular flag
+# enter both the collected source [AT*log10(t), CB] and the effective sky
+# background, and the magnification/exit-pupil (DP = D/MG) couples through the
+# background threshold [(eye/DP)**BG]. The reference's optical-aid model is a
+# bespoke, sky-coupled formula; this reproduces it to ~0.4 mag typical and
+# ~1.3 mag worst case (see the module/test notes and the task report).
+_VL_OPT_KA = 5.61306
+_VL_OPT_AT = 7.79956
+_VL_OPT_CB = 0.02331
+_VL_OPT_BG = 1.49594
+_VL_OPT_WT = 2.54028
+_VL_OPT_FBB = 0.23542
+
+
+_NAKED_OBSERVER: Tuple[float, ...] = (36.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+
+
+def _parse_observer_optics(
+    observer: Sequence[float], flags: int
+) -> Tuple[float, float, bool, float, float, float]:
+    """Parse an observer tuple into Schaefer-model parameters.
+
+    Age (``observer[0]``) and Snellen ratio (``observer[1]``) are always read.
+    The optical-instrument parameters (``observer[2..5]``: binocular flag,
+    magnification, aperture in mm, transmission) are read ONLY when
+    ``HELFLAG_OPTICAL_PARAMS`` is set in ``flags``; otherwise they are left at
+    their naked-eye no-op defaults, matching the reference API.
+
+    Returns:
+        (age, snellen, binocular, telescope_mag, aperture, transmission)
+    """
+    from .constants import HELFLAG_OPTICAL_PARAMS
+
+    age = float(observer[0]) if len(observer) > 0 else 36.0
+    snellen = float(observer[1]) if len(observer) > 1 else 1.0
+    binocular = False
+    telescope_mag = 0.0
+    aperture = 0.0
+    transmission = 1.0
+    if flags & HELFLAG_OPTICAL_PARAMS:
+        binocular = bool(observer[2]) if len(observer) > 2 else False
+        telescope_mag = float(observer[3]) if len(observer) > 3 else 0.0
+        aperture = float(observer[4]) if len(observer) > 4 else 0.0
+        transmission = float(observer[5]) if len(observer) > 5 else 1.0
+    return age, snellen, binocular, telescope_mag, aperture, transmission
 
 
 class SchaeferModel:
@@ -526,31 +629,68 @@ class SchaeferModel:
         bl = self._sky_brightness_bl(
             sun_alt, moon_alt, moon_phase, obj_alt, sun_obj_angle, moon_obj_angle
         )
-        # Contrast threshold (Hecht/Knoll-Schaefer): photopic vs scotopic
-        if bl > 1500.0:
-            c1 = 10.0**-8.350001
-            c2 = 10.0**-5.9
-        else:
-            c1 = 10.0**-9.8
-            c2 = 10.0**-1.9
-        th = c1 * ((1.0 + math.sqrt(c2 * bl)) ** 2)  # foot-candles
+        # Contrast threshold (Hecht/Knoll-Schaefer): photopic vs scotopic.
+        th = _vl_hecht_threshold(bl)  # foot-candles
 
         # Extinction to the object (magnitudes) is included in the limit.
         dm = self.extinction(obj_alt)
         m_lim = -16.57 - 2.5 * math.log10(th) - dm
 
         # Snellen ratio (better eyes see fainter); VISLIMIT uses 5 log10(SN).
+        # Always applied and exactly zero at SN = 1 (naked-eye default).
         if self.observer.snellen > 0:
             m_lim += 5.0 * math.log10(self.observer.snellen)
 
-        # Binocular / telescope aperture gain (naked-eye default: no effect).
-        if self.observer.binocular:
-            m_lim += 0.8
-        if self.observer.telescope_mag > 1.0 and self.observer.aperture > 0:
-            aperture_gain = 5.0 * math.log10(self.observer.aperture / 7.0)
-            m_lim += aperture_gain * self.observer.transmission
+        # Observer age / optical-aid correction. Both are deltas that are
+        # exactly zero for the naked-eye default (age 36, no instrument), so the
+        # calibrated naked-eye limit is unchanged.
+        m_lim += self._observer_correction(bl)
 
         return m_lim
+
+    def _observer_correction(self, bl: float) -> float:
+        """Observer age OR optical-instrument delta (magnitudes) at sky ``bl``.
+
+        Matches the reference vis_limit_mag: when an optical instrument is used
+        (magnification > 1 and aperture > 0) the optical-aid gain replaces the
+        age term (the reference does not combine them); otherwise the age term
+        applies. The Snellen term is handled separately and is additive to both.
+        """
+        obs = self.observer
+        if obs.telescope_mag > 1.0 and obs.aperture > 0.0:
+            return self._optics_delta(bl)
+        return self._age_delta(bl)
+
+    def _age_delta(self, bl: float) -> float:
+        """Limiting-magnitude delta from the observer's age (zero at age 36)."""
+        r = _vl_eye_pupil(self.observer.age) / _VL_PUPIL_REF
+        if r == 1.0:
+            return 0.0
+        th0 = _vl_hecht_threshold(bl)
+        thr = _vl_hecht_threshold(bl * (r**_VL_AGE_B))
+        return _VL_AGE_A * math.log10(r) + _VL_AGE_C * math.log10(thr / th0)
+
+    def _optics_delta(self, bl: float) -> float:
+        """Limiting-magnitude delta from an optical instrument (zero for none).
+
+        Reconstructs the reference's sky-coupled optical-aid gain: an aperture
+        light-gathering term, transmission and binocular terms on the collected
+        source, and a magnification/exit-pupil coupling through the effective
+        sky background (Hecht threshold). See the module constants for the fit.
+        """
+        obs = self.observer
+        d = obs.aperture
+        mg = obs.telescope_mag
+        t = obs.transmission if obs.transmission > 0.0 else 1.0
+        dp = d / mg  # exit pupil (mm)
+        r_bg = ((_VL_PUPIL_REF / dp) ** _VL_OPT_BG) * (t**_VL_OPT_WT)
+        src = _VL_OPT_KA * math.log10(d / _VL_PUPIL_REF) + _VL_OPT_AT * math.log10(t)
+        if obs.binocular:
+            r_bg *= _VL_OPT_FBB
+            src += _VL_OPT_CB
+        th0 = _vl_hecht_threshold(bl)
+        thr = _vl_hecht_threshold(bl * r_bg)
+        return src - 2.5 * math.log10(thr / th0)
 
     def arcus_visionis_required(
         self, body_mag: float, body_type: str = "planet"
@@ -724,6 +864,10 @@ def create_schaefer_model(
     altitude: float = 0.0,
     observer_age: float = 36.0,
     snellen: float = 1.0,
+    binocular: bool = False,
+    telescope_mag: float = 0.0,
+    aperture: float = 0.0,
+    transmission: float = 1.0,
     latitude: float = 0.0,
     jd: float = 2451545.0,
 ) -> SchaeferModel:
@@ -740,6 +884,11 @@ def create_schaefer_model(
         altitude: Observer altitude in meters (default 0.0)
         observer_age: Observer age in years (default 36.0)
         snellen: Snellen ratio, 1.0 = normal vision (default 1.0)
+        binocular: True for binocular (two-eyed) viewing through the instrument
+            (default False). No-op unless an instrument is given.
+        telescope_mag: Optical magnification (0 = naked eye, default 0.0).
+        aperture: Optical aperture / objective diameter in mm (default 0.0).
+        transmission: Optical transmission coefficient, 0-1 (default 1.0).
         latitude: Observer latitude in degrees, for the seasonal/latitude
             extinction terms (default 0.0)
         jd: Julian Day (UT) for the season of the extinction terms
@@ -758,10 +907,10 @@ def create_schaefer_model(
     observer = ObserverParams(
         age=observer_age,
         snellen=snellen,
-        binocular=False,
-        telescope_mag=0.0,
-        aperture=0.0,
-        transmission=1.0,
+        binocular=binocular,
+        telescope_mag=telescope_mag,
+        aperture=aperture,
+        transmission=transmission,
     )
     return SchaeferModel(atmo, observer, latitude=latitude, jd=jd)
 
@@ -937,6 +1086,7 @@ def _heliacal_ut_leb(
     event_type: int,
     flags: int,
     met_range: float = 0.0,
+    observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> tuple:
     """LEB-backed implementation of _heliacal_ut_pythonic().
 
@@ -1057,12 +1207,26 @@ def _heliacal_ut_leb(
         except (ValueError, TypeError, ArithmeticError):
             return 0.0
 
+    (
+        _obs_age,
+        _obs_snellen,
+        _obs_bino,
+        _obs_mag,
+        _obs_aper,
+        _obs_trans,
+    ) = _parse_observer_optics(observer, flags)
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        observer_age=_obs_age,
+        snellen=_obs_snellen,
+        binocular=_obs_bino,
+        telescope_mag=_obs_mag,
+        aperture=_obs_aper,
+        transmission=_obs_trans,
         latitude=lat,
         jd=jd_start,
     )
@@ -1501,6 +1665,7 @@ def _heliacal_pheno_ut_leb(
     event_type: int,
     flags: int,
     met_range: float = 0.0,
+    observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> tuple:
     """LEB-backed implementation of _heliacal_pheno_ut_pythonic()."""
     from .constants import (
@@ -1657,12 +1822,26 @@ def _heliacal_pheno_ut_leb(
 
     arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
 
+    (
+        _obs_age,
+        _obs_snellen,
+        _obs_bino,
+        _obs_mag,
+        _obs_aper,
+        _obs_trans,
+    ) = _parse_observer_optics(observer, flags)
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        observer_age=_obs_age,
+        snellen=_obs_snellen,
+        binocular=_obs_bino,
+        telescope_mag=_obs_mag,
+        aperture=_obs_aper,
+        transmission=_obs_trans,
         latitude=lat,
         jd=jd,
     )
@@ -1860,8 +2039,14 @@ def _vis_limit_mag_leb(
     humidity_pct = atmo[2] if len(atmo) > 2 else 50.0
     met_range = atmo[3] if len(atmo) > 3 else 0.0
 
-    observer_age = observer_tup[0] if len(observer_tup) > 0 else 36.0
-    snellen_ratio = observer_tup[1] if len(observer_tup) > 1 else 1.0
+    (
+        observer_age,
+        snellen_ratio,
+        obs_binocular,
+        obs_telescope_mag,
+        obs_aperture,
+        obs_transmission,
+    ) = _parse_observer_optics(observer_tup, flags)
 
     geopos_ll = (lon, lat, alt_m)
 
@@ -1992,6 +2177,10 @@ def _vis_limit_mag_leb(
         altitude=alt_m,
         observer_age=observer_age,
         snellen=snellen_ratio,
+        binocular=obs_binocular,
+        telescope_mag=obs_telescope_mag,
+        aperture=obs_aperture,
+        transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
     )
@@ -2081,6 +2270,7 @@ def _heliacal_ut_pythonic(
     event_type: int = 1,
     flags: int = FLG_SWIEPH,
     met_range: float = 0.0,
+    observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> Tuple[float, int]:
     """
     Calculate heliacal rising or setting time for a celestial body.
@@ -2172,6 +2362,7 @@ def _heliacal_ut_pythonic(
                 event_type,
                 flags,
                 met_range,
+                observer,
             )
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
@@ -2283,6 +2474,18 @@ def _heliacal_ut_pythonic(
             else:
                 raise
 
+    # Parse the observer tuple BEFORE the name is rebound to the Skyfield
+    # GeographicPosition below (the tuple parameter and the Skyfield
+    # observer share the name in this function).
+    (
+        _obs_age,
+        _obs_snellen,
+        _obs_bino,
+        _obs_mag,
+        _obs_aper,
+        _obs_trans,
+    ) = _parse_observer_optics(observer, flags)
+
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
 
@@ -2337,13 +2540,20 @@ def _heliacal_ut_pythonic(
         except (ValueError, TypeError, ArithmeticError):
             return 0.0  # Default to bright magnitude
 
-    # Create Schaefer model for visibility calculations
+    # Create Schaefer model for visibility calculations (observer tuple
+    # already parsed above, before the name was rebound).
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,  # Convert to %
         altitude=altitude,
         met_range=met_range,
+        observer_age=_obs_age,
+        snellen=_obs_snellen,
+        binocular=_obs_bino,
+        telescope_mag=_obs_mag,
+        aperture=_obs_aper,
+        transmission=_obs_trans,
         latitude=lat,
         jd=jd_start,
     )
@@ -3224,6 +3434,7 @@ def heliacal_ut(
         event_type=eventtype,
         flags=flags,
         met_range=met_range,
+        observer=observer,
     )
 
     # Build the result as 3 floats matching the reference API
@@ -3605,6 +3816,7 @@ def _heliacal_pheno_ut_pythonic(
     event_type: int = 1,
     flags: int = FLG_SWIEPH,
     met_range: float = 0.0,
+    observer: Sequence[float] = _NAKED_OBSERVER,
 ) -> Tuple[Tuple[float, ...], int]:
     """
     Provides data relevant for the calculation of heliacal risings and settings.
@@ -3695,6 +3907,7 @@ def _heliacal_pheno_ut_pythonic(
                 event_type,
                 flags,
                 met_range,
+                observer,
             )
         except (KeyError, ValueError) as _leb_err:
             # Fall back to Skyfield for missing bodies, out-of-range dates
@@ -3782,6 +3995,18 @@ def _heliacal_pheno_ut_pythonic(
                 target = eph[_PLANET_FALLBACK[target_name]]
             else:
                 raise
+
+    # Parse the observer tuple BEFORE the name is rebound to the Skyfield
+    # GeographicPosition below (the tuple parameter and the Skyfield
+    # observer share the name in this function).
+    (
+        _obs_age,
+        _obs_snellen,
+        _obs_bino,
+        _obs_mag,
+        _obs_aper,
+        _obs_trans,
+    ) = _parse_observer_optics(observer, flags)
 
     # Create observer location
     observer = wgs84.latlon(lat, lon, altitude)
@@ -3893,13 +4118,20 @@ def _heliacal_pheno_ut_pythonic(
     # Computed as great-circle distance: sqrt(ARCV² + DAZ²)
     arcl_act = math.sqrt(arcv_act**2 + daz_act**2)
 
-    # Use Schaefer model for extinction and arcus visionis
+    # Use Schaefer model for extinction and arcus visionis (observer tuple
+    # already parsed above, before the name was rebound).
     schaefer = create_schaefer_model(
         pressure=pressure,
         temperature=temperature,
         humidity=humidity * 100.0 if humidity <= 1.0 else humidity,
         altitude=altitude,
         met_range=met_range,
+        observer_age=_obs_age,
+        snellen=_obs_snellen,
+        binocular=_obs_bino,
+        telescope_mag=_obs_mag,
+        aperture=_obs_aper,
+        transmission=_obs_trans,
         latitude=lat,
         jd=jd,
     )
@@ -4101,6 +4333,7 @@ def heliacal_pheno_ut(
         event_type=eventtype,
         flags=flags,
         met_range=met_range,
+        observer=observer,
     )
 
     # Return flat 50-tuple (matching reference API)
@@ -4258,9 +4491,15 @@ def vis_limit_mag(
     humidity_pct = atmo[2] if len(atmo) > 2 else 50.0
     met_range = atmo[3] if len(atmo) > 3 else 0.0
 
-    # Parse observer data
-    observer_age = observer[0] if len(observer) > 0 else 36.0
-    snellen_ratio = observer[1] if len(observer) > 1 else 1.0
+    # Parse observer data (optical params only when HELFLAG_OPTICAL_PARAMS set).
+    (
+        observer_age,
+        snellen_ratio,
+        obs_binocular,
+        obs_telescope_mag,
+        obs_aperture,
+        obs_transmission,
+    ) = _parse_observer_optics(observer, flags)
 
     # Get ephemeris and timescale
     eph = get_planets()
@@ -4424,6 +4663,10 @@ def vis_limit_mag(
         altitude=alt_m,
         observer_age=observer_age,
         snellen=snellen_ratio,
+        binocular=obs_binocular,
+        telescope_mag=obs_telescope_mag,
+        aperture=obs_aperture,
+        transmission=obs_transmission,
         latitude=lat,
         jd=tjdut,
     )
