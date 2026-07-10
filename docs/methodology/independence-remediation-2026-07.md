@@ -97,10 +97,17 @@ items.
 * **Repository history.** The repository history still contains: the
   upstream `seorbel.txt` data file added by ca32b36 (removed from the
   tree later, blob still reachable); pre-WS1 versions of `houses.py`;
-  the pre-clean-room Galilean module. A history rewrite
-  (`git filter-repo`) is prepared as WS2-G; executing it rewrites all
-  commit ids and requires a coordinated force-push of the public
-  repository, so it is gated on the maintainer's go-ahead.
+  the pre-clean-room Galilean module. WS2-G prepared the remedy: a full
+  pre-purge backup bundle, and a `git filter-repo` rewrite (executed on
+  a local clone, verified: zero `seorbel.txt` blobs remain at either
+  historical path, 1289 commits preserved with rewritten ids). Two
+  further options are documented for the derived historical *versions*
+  of `houses.py`/`eclipse.py`/the Galilean module: selective blob
+  tombstoning, or a fresh-root squash. Executing any of these on the
+  public repository rewrites published commit ids and requires a
+  coordinated force-push (note: the hosting platform may keep
+  previously-pushed objects reachable by hash until support removes
+  them), so execution is gated on the maintainer's go-ahead.
 * **Output-calibrated data sets.** The lunar apse residual tables and
   perturbation coefficients (NOTICE.md "Calibration Data Disclosure")
   remain output-calibrated: the INTP_* bodies are constructs defined by
