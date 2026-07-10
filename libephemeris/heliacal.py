@@ -54,6 +54,43 @@ from .exceptions import Error
 # and superior conjunction (behind the Sun)
 INNER_PLANETS = {MERCURY, VENUS}
 
+
+def _yallop_visibility_code(q: float) -> float:
+    """Map a Yallop q-test value to its new-crescent visibility class code.
+
+    Yallop (1997), NAO Technical Note No. 69, classifies first-visibility of
+    the new lunar crescent into six bands from the q-test value
+    ``q = (ARCV - criterion) / 10``:
+
+        A: ``q > +0.216``            -> 1  (easily visible)
+        B: ``+0.216 >= q > -0.014``  -> 2  (visible under perfect conditions)
+        C: ``-0.014 >= q > -0.160``  -> 3  (may need optical aid to find)
+        D: ``-0.160 >= q > -0.232``  -> 4  (will need optical aid to find)
+        E: ``-0.232 >= q > -0.293``  -> 5  (not visible with a telescope)
+        F: ``q <= -0.293``           -> 6  (not visible, below Danjon limit)
+
+    The reference API reports this discrete band code (not the raw arcus-visionis
+    criterion polynomial) in ``heliacal_pheno_ut`` element 18 (qCrit).
+
+    Args:
+        q: Yallop q-test value (``heliacal_pheno_ut`` element 17, qYal).
+
+    Returns:
+        Visibility class code 1..6, returned as a float to match the dret slot.
+    """
+    if q > 0.216:
+        return 1.0
+    if q > -0.014:
+        return 2.0
+    if q > -0.160:
+        return 3.0
+    if q > -0.232:
+        return 4.0
+    if q > -0.293:
+        return 5.0
+    return 6.0
+
+
 # Detection margin (magnitudes) for the twilight visibility test used by the
 # heliacal-event search. With the calibrated VISLIMIT limiting-magnitude model
 # (dret[0] is a catalog-magnitude limit, extinction folded in) an object is at
@@ -1934,7 +1971,9 @@ def _heliacal_pheno_ut_leb(
         w = w_moon * 60.0
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
-        q_crit = q_criterion
+        # dret[18] (qCrit) is the Yallop visibility CLASS code (1..6), not the
+        # raw arcus-visionis criterion polynomial (which stays internal above).
+        q_crit = _yallop_visibility_code(q_yallop)
     else:
         q_yallop = 0.0
         q_crit = 0.0
@@ -3862,7 +3901,7 @@ def _heliacal_pheno_ut_pythonic(
                 - 15: TbYallop [JDN] best time the object is visible, according to Yallop
                 - 16: WMoon [deg] crescent width of Moon
                 - 17: qYal [-] q-test value of Yallop
-                - 18: qCrit [-] q-test criterion of Yallop
+                - 18: qCrit [-] Yallop visibility class code (1..6; A..F)
                 - 19: ParO [deg] parallax of object
                 - 20: Magn [-] magnitude of object
                 - 21: RiseO [JDN] rise/set time of object
@@ -4231,7 +4270,9 @@ def _heliacal_pheno_ut_pythonic(
         w = w_moon * 60.0  # Convert to arcminutes for formula
         q_criterion = 11.8371 - 6.3226 * w + 0.7319 * w**2 - 0.1018 * w**3
         q_yallop = (arcv_act - q_criterion) / 10.0
-        q_crit = q_criterion
+        # dret[18] (qCrit) is the Yallop visibility CLASS code (1..6), not the
+        # raw arcus-visionis criterion polynomial (which stays internal above).
+        q_crit = _yallop_visibility_code(q_yallop)
     else:
         q_yallop = 0.0
         q_crit = 0.0
@@ -4255,7 +4296,7 @@ def _heliacal_pheno_ut_pythonic(
     dret[15] = t_b_yallop  # TbYallop - best time according to Yallop
     dret[16] = w_moon  # WMoon - crescent width
     dret[17] = q_yallop  # qYal - Yallop q-test value
-    dret[18] = q_crit  # qCrit - Yallop criterion
+    dret[18] = q_crit  # qCrit - Yallop visibility class code (1..6)
     dret[19] = parallax  # ParO - parallax of object
     dret[20] = magnitude  # Magn - magnitude
     dret[21] = rise_o  # RiseO - rise/set time of object
