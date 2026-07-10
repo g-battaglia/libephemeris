@@ -12737,9 +12737,11 @@ def _lun_eclipse_gamma_pythonic(
     the Moon. A gamma of 0 means the Moon passes exactly through the center of
     Earth's shadow.
 
-    The sign of gamma indicates which side of the shadow axis the Moon passes:
-        - Positive gamma: Moon passes north of shadow axis
-        - Negative gamma: Moon passes south of shadow axis
+    The returned gamma is NON-NEGATIVE: it is the radial distance of the
+    Moon's center from the shadow axis, matching the reference API's
+    unsigned lunar-eclipse channel (attr[7]); the north/south side of the
+    passage is NOT encoded in the sign (unlike solar-eclipse gamma).
+    See tests/test_lun_eclipse_gamma.py for the parity contract.
 
     Args:
         jd: Julian Day (UT) of the time to calculate
