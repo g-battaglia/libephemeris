@@ -291,9 +291,9 @@ Examples:
         print("ERROR: No LEB files found to upload.")
         print()
         print("Generate them first with:")
-        print("  poe leb:generate:base:groups")
-        print("  poe leb:generate:medium:groups")
-        print("  poe leb:generate:extended:groups")
+        print("  poe leb:generate:base")
+        print("  poe leb:generate:medium")
+        print("  poe leb:generate:extended")
         return 1
 
     # Compute hashes and sizes

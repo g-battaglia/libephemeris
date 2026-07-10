@@ -16,8 +16,8 @@ Each test generates a tier-specific .leb file as a session fixture, then
 compares hundreds of sample dates against the Skyfield reference pipeline.
 
 Run with:
-    poe test:leb:precision              # all tiers (requires de440s, de440, de441)
-    poe test:leb:precision:quick        # medium tier only
+    leph test leb-format precision        # all tiers (requires de440s, de440, de441)
+    leph test leb-format precision-quick  # medium tier only
     pytest tests/test_leb/test_leb_precision.py -v -k "medium"
 """
 

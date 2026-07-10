@@ -565,13 +565,13 @@ pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
 | `cmd_manual.py` | 8 | Manual build (EPUB/PDF, pandoc/ebooklib) |
 | `cmd_completion.py` | 3 | Shell completion scripts (zsh, bash, fish) |
 
-### Production CLI source: `libephemeris/cli.py`
+### Production CLI source: `libephemeris/cli/__init__.py`
 
 Click-based CLI with `download` subgroup (tier data, LEB1, LEB2, ASSIST),
 comprehensive `status` command (with `--json`), and `config` reference guide.
 Backward compatible with old colon-separated syntax via alias rewriting.
 
-### Shared: `libephemeris/cli_shared.py`
+### Shared: `libephemeris/cli/shared.py`
 
 Tier metadata (`TIER_INFO`), download help text generators — single source of
 truth reused by both CLIs.

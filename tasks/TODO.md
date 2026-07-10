@@ -43,7 +43,7 @@ Last updated: 2026-03-27
 ### Issue 3: LEB stale InterpApogee/InterpPerigee (~60 failures)
 - **Files**: All `test_leb/compare/` dirs for bodies 21 (InterpApogee), 22 (InterpPerigee)
 - **Error**: Chebyshev polynomials encode pre-BUG-001 values; errors 500-10000+ arcseconds
-- **Fix**: Regenerate LEB files: `poe leb:generate:base:groups`, `poe leb:generate:medium:groups`, `poe leb:generate:extended:groups`
+- **Fix**: Regenerate LEB files: `poe leb:generate:base`, `poe leb:generate:medium`, `poe leb:generate:extended`
 - **Note**: Data regeneration, not a code bug
 
 ### Issue 4: Extended asteroids date range (~40 failures)
