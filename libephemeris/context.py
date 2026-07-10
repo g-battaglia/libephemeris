@@ -602,6 +602,32 @@ class EphemerisContext:
         raw_iflag = iflag
         iflag = _normalize_calc_flags(iflag)
 
+        # --- Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950): frame
+        # requests, not ayanamsha offsets — mirror the module-level
+        # calc_ut()/calc() interception using this context's sidereal mode
+        # (see sidereal_epoch.py).
+        from .constants import FLG_SIDEREAL
+
+        if iflag & FLG_SIDEREAL:
+            from .planets import _echo_speed_bit
+            from .sidereal_epoch import (
+                fixed_epoch_request_flags,
+                fixed_epoch_retflag,
+                is_fixed_epoch_request,
+                transform_fixed_epoch_result,
+            )
+
+            if is_fixed_epoch_request(iflag, self.sidereal_mode):
+                sub_xx, sub_rf = self._calc_impl(
+                    tjd, ipl, fixed_epoch_request_flags(iflag), ut=ut
+                )
+                xx_t0 = transform_fixed_epoch_result(sub_xx, iflag, self.sidereal_mode)
+                from .planets import _to_native_floats
+
+                return _to_native_floats(xx_t0), _echo_speed_bit(
+                    fixed_epoch_retflag(sub_rf, iflag), raw_iflag
+                )
+
         # Built-in asteroids by AST_OFFSET number (see module calc_ut)
         ipl = _remap_ast_offset(ipl)
 
@@ -756,9 +782,19 @@ class EphemerisContext:
         # Output-format flags (FLG_XYZ / FLG_RADIANS) are handled here, like
         # the module-level entry points; _calc_body does not apply them.
         try:
-            pos, retflag = _calc_body_with_context(
-                t, ipl, _strip_output_flags(iflag), self
-            )
+            try:
+                pos, retflag = _calc_body_with_context(
+                    t, ipl, _strip_output_flags(iflag), self
+                )
+            except ValueError as _closed_err:
+                # A concurrent EphemerisContext.close() released the kernel
+                # file mid-read ("seek of closed file"); resources reload
+                # lazily, so one retry resolves the race.
+                if "closed file" not in str(_closed_err):
+                    raise
+                pos, retflag = _calc_body_with_context(
+                    t, ipl, _strip_output_flags(iflag), self
+                )
         except SkyfieldRangeError as e:
             raise _wrap_ephemeris_range_error(e, tjd, ipl) from e
         except ValueError as e:

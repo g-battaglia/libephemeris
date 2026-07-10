@@ -1734,6 +1734,112 @@ def houses_armc_ex2(
     )
 
 
+def _houses_fixed_epoch_sidereal(
+    tjdut: float,
+    lat: float,
+    hsys_char: str,
+    trop_cusps: tuple,
+    trop_ascmc: tuple,
+    flags: int,
+    sid_mode: int,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Sidereal houses for the fixed-epoch modes (SIDM_J2000/J1900/B1950).
+
+    The reference computes these on the mean ecliptic of the mode's epoch t0
+    (measured black-box, oracle-exact for every house system): the house
+    engine runs against the ascending node of the mean ecliptic of t0 on the
+    true equator of date — the ARMC is re-based to that node and the
+    obliquity becomes the inclination between the two planes — and the
+    resulting cusp arcs are measured from the mean equinox of t0 along the
+    t0 ecliptic.
+
+    Two measured reference quirks are reproduced:
+
+    - Near t0, when the mean and true ayanamshas have opposite signs (|true
+      ayanamsha| < ~17", a window of roughly ±4 months around t0), the
+      reference shifts every ecliptic output by -2x the (unwrapped) true
+      ayanamsha.
+    - The Sunshine pair collapses: sidereal 'i' (Makransky) is computed
+      identically to 'I' (Treindl), as on the general sidereal path.
+
+    The reported ARMC slot keeps the tropical ARMC: the reference's own
+    ARMC drifts from it by <~15" over five centuries with no clean
+    geometric model (documented micro-divergence). 'N' (Aries) cusps stay
+    anchored at 0deg Aries, unshifted, like the general sidereal path.
+    """
+    import numpy as np
+
+    from .planets import get_ayanamsa_ex_ut
+    from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
+    from .sidereal_epoch import FIXED_EPOCH_T0
+
+    import erfa
+
+    def _rx(a: float) -> "np.ndarray":
+        c, s = math.cos(a), math.sin(a)
+        return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
+
+    t0 = FIXED_EPOCH_T0[sid_mode]
+    jd_tt = tjdut + _deltat(tjdut)
+    dpsi, deps = get_cached_nutation(jd_tt)
+    pn_tuples, _eps_true = vondrak_pn_matrix(jd_tt, dpsi, deps)
+    pn = np.array(pn_tuples)
+    v_t0 = np.array(vondrak_precession_matrix(t0))
+    eps_t0 = erfa.obl06(t0, 0.0)
+
+    # M maps mean-ecliptic-of-t0 coordinates onto the true equator of date.
+    m = pn @ v_t0.T @ _rx(-eps_t0)
+    z = m.T @ np.array([0.0, 0.0, 1.0])
+    eps_p = math.degrees(math.acos(max(-1.0, min(1.0, float(z[2])))))
+    n_t0 = np.cross(z, [0.0, 0.0, 1.0])
+    n_t0 /= np.linalg.norm(n_t0)
+    lon_node = math.degrees(math.atan2(float(n_t0[1]), float(n_t0[0]))) % 360.0
+    n_eq = m @ n_t0
+    ang_n = math.degrees(math.atan2(float(n_eq[1]), float(n_eq[0]))) % 360.0
+    armc_p = (trop_ascmc[2] - ang_n) % 360.0
+
+    # Near-t0 sign quirk: fires when the mean and true ayanamshas have
+    # opposite signs (both unwrapped). The mean ayanamsha of a fixed-epoch
+    # mode is the precession accumulated since t0, so its sign is exactly
+    # sign(jd_tt - t0) — used directly because our mean value at t0 can sit
+    # a fraction of a milliarcsecond on the wrong side of zero (B1950).
+    aya_true = (
+        (get_ayanamsa_ex_ut(tjdut, flags & (FLG_JPLEPH | FLG_SWIEPH))[1] + 180.0)
+        % 360.0
+    ) - 180.0
+    corr = 0.0
+    if (jd_tt >= t0) != (aya_true > 0.0):
+        corr = 2.0 * aya_true
+
+    # Sun declination of date for the Sunshine systems; sidereal 'i'
+    # collapses onto 'I' (see docstring).
+    engine_hsys = "I" if hsys_char == "i" else hsys_char
+    ascmc9 = 0.0
+    if engine_hsys == "I":
+        try:
+            eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
+            sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
+            ascmc9 = sun_pos[1]
+        except (IndexError, TypeError, ValueError):
+            ascmc9 = 0.0
+
+    eng_cusps, eng_ascmc = houses_armc(
+        armc_p, lat, eps_p, ord(engine_hsys), ascmc9=ascmc9
+    )
+
+    if hsys_char == "N":
+        # Aries houses stay anchored at 0 deg of the zodiac in use.
+        cusps = tuple(float(i * 30) for i in range(12))
+    else:
+        cusps = tuple((lon_node + c + corr) % 360.0 for c in eng_cusps)
+
+    ascmc_list = list(trop_ascmc)
+    for i in (0, 1, 3, 4, 5, 6, 7):
+        ascmc_list[i] = (lon_node + eng_ascmc[i] + corr) % 360.0
+    # ascmc[2] (ARMC) keeps the tropical value (see docstring).
+    return cusps, tuple(ascmc_list)
+
+
 def houses_ex(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), flags: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -1769,6 +1875,30 @@ def houses_ex(
     cusps, ascmc = houses(tjdut, lat, lon, hsys, flags)
 
     if flags & FLG_SIDEREAL:
+        # Fixed-epoch modes (SIDM_J2000/J1900/B1950) are frame requests:
+        # houses are computed on the mean ecliptic of the mode's epoch t0,
+        # not by an ayanamsha shift (see _houses_fixed_epoch_sidereal).
+        from .state import get_sid_mode as _get_sid_mode_hx
+        from .sidereal_epoch import FIXED_EPOCH_T0
+
+        _sidm_hx = _get_sid_mode_hx()
+        if _sidm_hx in FIXED_EPOCH_T0:
+            if isinstance(hsys, int):
+                _hch = chr(hsys)
+            elif isinstance(hsys, bytes):
+                _hch = hsys.decode("utf-8")
+            else:
+                _hch = str(hsys)
+            cusps, ascmc = _houses_fixed_epoch_sidereal(
+                tjdut, lat, _hch, cusps, ascmc, flags, _sidm_hx
+            )
+            cusps = tuple(degnorm(c) for c in cusps)
+            ascmc = tuple(degnorm(a) for a in ascmc)
+            if flags & FLG_RADIANS:
+                cusps = tuple(math.radians(c) for c in cusps)
+                ascmc = tuple(math.radians(a) for a in ascmc)
+            return cusps, ascmc
+
         # Sidereal house cusps use the MEAN-equinox ayanamsha (no nutation
         # term — houses are geometric ARMC-frame quantities): cusps differ
         # from tropical by get_ayanamsa_ex(jd, 0), which is 13.9" away from
@@ -1818,7 +1948,6 @@ def houses_ex(
             cusps = tuple([(start + i * 30.0) % 360.0 for i in range(12)])
         elif hsys_char in ("I", "i"):
             # Sunshine: Recalculate using sidereal Asc/MC
-            # 'I' = Treindl algorithm, 'i' = Makransky algorithm
             try:
                 eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
                 sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
@@ -1827,14 +1956,13 @@ def houses_ex(
                 sun_dec = 0.0
             _, eps = _house_armc_obliquity(tjdut)
             armc = ascmc[2]
-            if hsys_char == "I":
-                sunshine_cusps = _houses_sunshine(
-                    armc, lat, eps, sid_asc, sid_mc, sun_dec
-                )
-            else:
-                sunshine_cusps = _houses_sunshine_makransky(
-                    armc, lat, eps, sid_asc, sid_mc, sun_dec
-                )
+            # In sidereal mode the reference API computes 'i' (Makransky)
+            # identically to 'I' (Treindl): sid 'i' == sid 'I' byte-for-byte
+            # at every latitude/date/ayanamsha probed, even where the
+            # tropical variants differ by tens of degrees (|lat| >~ 58).
+            # Both letters therefore route to the Treindl algorithm here;
+            # they differ only on the tropical path.
+            sunshine_cusps = _houses_sunshine(armc, lat, eps, sid_asc, sid_mc, sun_dec)
             # Angular cusps (1, 4, 7, 10) are already correct with sid_asc/sid_mc
             # Intermediate cusps (2, 3, 5, 6, 8, 9, 11, 12) are calculated
             # geometrically and need to be converted to sidereal

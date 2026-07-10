@@ -1308,6 +1308,27 @@ def calc_ut(
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
 
+    # --- Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950) ---
+    # These modes are frame requests, not ayanamsha offsets: the reference
+    # returns the FLG_J2000|FLG_NONUT position (precessed to t0 for
+    # J1900/B1950) for every representation. Rewrite the request and map
+    # the result back (see sidereal_epoch.py).
+    if flags & FLG_SIDEREAL:
+        from .sidereal_epoch import (
+            fixed_epoch_request_flags,
+            fixed_epoch_retflag,
+            is_fixed_epoch_request,
+            transform_fixed_epoch_result,
+        )
+
+        _sidm = get_sid_mode()
+        if is_fixed_epoch_request(flags, _sidm):
+            sub_xx, sub_rf = calc_ut(tjdut, planet, fixed_epoch_request_flags(flags))
+            xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
+            return _to_native_floats(xx_t0), _echo_speed_bit(
+                fixed_epoch_retflag(sub_rf, flags), raw_flags
+            )
+
     # Built-in asteroids by AST_OFFSET number: remap before LEB/Horizons
     # dispatch so both id forms are served by the same backend.
     planet = _remap_ast_offset(planet)
@@ -1398,7 +1419,15 @@ def calc_ut(
 
     t = get_cached_time_ut1(tjdut)
     try:
-        pos, retflag = _calc_body(t, planet, calc_iflag)
+        try:
+            pos, retflag = _calc_body(t, planet, calc_iflag)
+        except ValueError as _closed_err:
+            # A concurrent EphemerisContext.close() released the kernel file
+            # mid-read ("seek of closed file"); resources reload lazily, so
+            # one retry resolves the race.
+            if "closed file" not in str(_closed_err):
+                raise
+            pos, retflag = _calc_body(t, planet, calc_iflag)
         # _calc_body logs the specific source (SPK, ASSIST, Keplerian)
         # for minor bodies; for standard planets it's always Skyfield
         if planet in _PLANET_MAP:
@@ -1469,6 +1498,23 @@ def calc(
 
     raw_flags = flags
     flags = _normalize_calc_flags(flags)
+
+    # --- Fixed-epoch sidereal modes: frame requests, see calc_ut ---
+    if flags & FLG_SIDEREAL:
+        from .sidereal_epoch import (
+            fixed_epoch_request_flags,
+            fixed_epoch_retflag,
+            is_fixed_epoch_request,
+            transform_fixed_epoch_result,
+        )
+
+        _sidm = get_sid_mode()
+        if is_fixed_epoch_request(flags, _sidm):
+            sub_xx, sub_rf = calc(tjdet, planet, fixed_epoch_request_flags(flags))
+            xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
+            return _to_native_floats(xx_t0), _echo_speed_bit(
+                fixed_epoch_retflag(sub_rf, flags), raw_flags
+            )
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
     planet = _remap_ast_offset(planet)
@@ -1556,7 +1602,13 @@ def calc(
 
     t = get_cached_time_tt(tjdet)
     try:
-        pos, retflag = _calc_body(t, planet, calc_iflag)
+        try:
+            pos, retflag = _calc_body(t, planet, calc_iflag)
+        except ValueError as _closed_err:
+            # Concurrent EphemerisContext.close() mid-read; see calc_ut.
+            if "closed file" not in str(_closed_err):
+                raise
+            pos, retflag = _calc_body(t, planet, calc_iflag)
         if planet in _PLANET_MAP:
             get_logger().debug("body=%d jd=%.1f source=Skyfield", planet, tjdet)
             _record(planet, "Skyfield")

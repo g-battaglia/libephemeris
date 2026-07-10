@@ -2981,25 +2981,22 @@ def _apply_fixstar_flags(
         # full mean-equinox motion (ayanamsha-rate-independent). Uses the same
         # UT epochs and ayanamsha source the transform differenced, so the two
         # cancel exactly. speed_lat / speed_dist are untouched.
-        # EXEMPT the fixed-epoch frame modes (SIDM_J2000/J1900/B1950): there
-        # the reference projects onto a fixed reference ecliptic and reports
-        # the frame derivative on BOTH star families — no ayanamsha-rate
-        # add-back (measured black-box: legacy == modern == oracle for the
-        # three epoch modes; every other mode keeps the add-back).
+        # (The fixed-epoch frame modes SIDM_J2000/J1900/B1950 never reach
+        # this branch: they are rewritten to a FLG_J2000|FLG_NONUT request
+        # at the top of this function, and in a fixed frame the reference
+        # reports the frame derivative on BOTH star families.)
         if legacy_sidereal and (iflag & FLG_SIDEREAL):
-            from .constants import SIDM_B1950, SIDM_J1900, SIDM_J2000
-            from .state import get_sid_mode, get_timescale
+            from .state import get_timescale
             from .planets import get_ayanamsa_ut
 
-            if get_sid_mode() not in (SIDM_J2000, SIDM_J1900, SIDM_B1950):
-                ts_ayan = get_timescale()
-                ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
-                ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
-                # Shortest-arc delta: the ayanamsha is mod 360 and can
-                # straddle the 0/360 wrap (star-anchored modes cross 0 on
-                # supported dates).
-                d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
-                speed_lon += d_ayan / (2.0 * h)
+            ts_ayan = get_timescale()
+            ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
+            ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
+            # Shortest-arc delta: the ayanamsha is mod 360 and can
+            # straddle the 0/360 wrap (star-anchored modes cross 0 on
+            # supported dates).
+            d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
+            speed_lon += d_ayan / (2.0 * h)
     else:
         speed_lon = 0.0
         speed_lat = 0.0
@@ -3037,6 +3034,44 @@ def _apply_fixstar_flags(
     return result
 
 
+def _fixed_epoch_star_call(entry_fn, star, tjd, flags):
+    """Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950) for stars.
+
+    These modes are frame requests, not ayanamsha offsets: the reference
+    projects the star onto the mean ecliptic/equator of the mode's reference
+    epoch t0 — bit-identical to its FLG_J2000|FLG_NONUT reduction, precessed
+    to t0 for J1900/B1950 (measured black-box; see sidereal_epoch.py). The
+    rewrite must happen at the entry level so the pipeline computes the
+    J2000-native position (the of-date raw position still carries nutation,
+    which the mean-frame back-precession would not remove). In a fixed frame
+    the legacy speed convention collapses onto the modern one, so the same
+    rewrite serves both star families.
+
+    Returns the (xx, name, retflag) result, or None when this is not a
+    fixed-epoch sidereal request.
+    """
+    if not flags & FLG_SIDEREAL:
+        return None
+    from .sidereal_epoch import (
+        fixed_epoch_request_flags,
+        fixed_epoch_retflag,
+        is_fixed_epoch_request,
+        transform_fixed_epoch_result,
+    )
+    from .state import get_sid_mode
+
+    sidm = get_sid_mode()
+    if not is_fixed_epoch_request(flags, sidm):
+        return None
+    xx, name, rf = entry_fn(star, tjd, fixed_epoch_request_flags(flags))
+    xx_t0 = transform_fixed_epoch_result(xx, flags, sidm)
+    return (
+        tuple(float(v) for v in xx_t0),
+        name,
+        fixed_epoch_retflag(rf, flags),
+    )
+
+
 def fixstar_ut(
     star: str, tjdut: float, flags: int = FLG_SWIEPH
 ) -> Tuple[Tuple[float, float, float, float, float, float], str, int]:
@@ -3068,6 +3103,10 @@ def fixstar_ut(
         >>> pos, name, retflag = fixstar_ut("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    _fe = _fixed_epoch_star_call(fixstar_ut, star, tjdut, flags)
+    if _fe is not None:
+        return _fe
+
     star_id, error, canonical_name = _resolve_star_id(star)
     if error:
         raise Error(error)
@@ -3377,6 +3416,10 @@ def fixstar(
         >>> pos, name, retflag = fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
+    _fe = _fixed_epoch_star_call(fixstar, star, tjdet, flags)
+    if _fe is not None:
+        return _fe
+
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
@@ -3657,6 +3700,10 @@ def fixstar2_ut(
         >>> pos, name, retflag = fixstar2_ut("49669", 2451545.0, 0)
         >>> print(name)  # "Regulus,alLeo" (looked up by HIP number)
     """
+    _fe = _fixed_epoch_star_call(fixstar2_ut, star, tjdut, flags)
+    if _fe is not None:
+        return _fe
+
     ret_flags = _fixstar_ret_flags(flags, implied=True)
     flags = _preprocess_flags(flags)
 
@@ -3755,6 +3802,10 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
+    _fe = _fixed_epoch_star_call(fixstar2, star, tjdet, flags)
+    if _fe is not None:
+        return _fe
+
     ret_flags = _fixstar_ret_flags(flags)
     flags = _preprocess_flags(flags)
 
