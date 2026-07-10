@@ -334,11 +334,18 @@ def test_resolve_star_se_empty():
     assert error == "star name empty"
 
 
-def test_resolve_star_se_comma_empty_key():
-    """Trailing comma with empty nomenclature key errors (2529)."""
+def test_resolve_star_se_comma_forms():
+    """Comma-form semantics measured on the reference's v1 family:
+    'name,' and 'name,nomen' key on the NAME (nomenclature ignored);
+    ',nomen' keys on the nomenclature; ',' alone errors."""
     star_id, error, name = fs._resolve_star_se("Regulus,")
+    assert error is None and name.startswith("Regulus")
+    star_id, error, name = fs._resolve_star_se("Regulus,zzZzz")
+    assert error is None and name.startswith("Regulus")
+    star_id, error, _ = fs._resolve_star_se("Nosuch,alTau")
     assert star_id == -1
-    assert error is not None
+    star_id, error, _ = fs._resolve_star_se(",")
+    assert star_id == -1 and error is not None
 
 
 def test_resolve_star_se_digit_then_nondigit():

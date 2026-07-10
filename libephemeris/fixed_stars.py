@@ -2631,15 +2631,25 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
     def _found(entry) -> tuple[int, None, str]:
         return entry.id, None, f"{entry.name},{entry.nomenclature}"
 
-    # ",nomenclature" or "name,nomenclature": nomenclature key search.
+    # Comma forms (measured black-box on the v1 family):
+    # - "name,nomenclature": keys on the NAME before the comma; the
+    #   nomenclature part is ignored entirely ('Regulus,zzZzz' resolves to
+    #   Regulus, 'Nosuch,alTau' fails).
+    # - "name," (empty nomenclature): keys on the name too.
+    # - ",nomenclature" (empty name): exact nomenclature key search.
+    # (The v2 family is the mirror image: it keys on the nomenclature —
+    # see _resolve_star2.)
     if "," in sstar:
-        key = sstar[sstar.index(",") + 1 :]
-        if not key:
-            return -1, f"could not find star name {sstar}", None
-        for entry in STAR_CATALOG:
-            if "".join(entry.nomenclature.split()) == key:
-                return _found(entry)
-        return -1, f"could not find star name ,{key}", None
+        name_part, _, key = sstar.partition(",")
+        if name_part:
+            sstar = name_part  # fall through to exact traditional-name match
+        else:
+            if not key:
+                return -1, f"could not find star name {sstar}", None
+            for entry in STAR_CATALOG:
+                if "".join(entry.nomenclature.split()) == key:
+                    return _found(entry)
+            return -1, f"could not find star name ,{key}", None
 
     # Sequential star number.
     if sstar[0].isdigit():
@@ -3507,24 +3517,22 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
             return None, f"could not find star name HIP {hip_number}"
 
     # Handle comma-separated format (e.g., "Regulus,alLeo").
+    # The v2 family keys EVERY comma form on the Bayer/Flamsteed
+    # nomenclature after the comma (measured black-box: 'Nosuch,alTau'
+    # resolves to Aldebaran, 'Regulus,zzZzz' fails, 'Aldebaran,' fails) —
+    # the name part is ignored entirely. Matched exactly and
+    # case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not found).
+    # (The v1 family is the mirror image: it keys on the name — see
+    # _resolve_star_se.)
     if "," in search:
-        head, _sep, tail = search.partition(",")
-        if not head.strip():
-            # Leading-comma form ",nomenclature": the reference keys purely on
-            # the Bayer/Flamsteed nomenclature after the comma, matched exactly
-            # and case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not
-            # found). Mirror the v1 _resolve_star_se semantics here instead of
-            # letting an empty name part prefix-match every catalog entry.
-            key = "".join(tail.split())
-            if not key:
-                return None, f"could not find star name {star_name}"
-            for entry in STAR_CATALOG:
-                if "".join(entry.nomenclature.split()) == key:
-                    return entry, None
-            return None, f"could not find star name ,{key}"
-        # "name,nomenclature": key on the traditional-name part (existing
-        # flexible tiers below), discarding the nomenclature suffix.
-        search = head.strip()
+        _head, _sep, tail = search.partition(",")
+        key = "".join(tail.split())
+        if not key:
+            return None, f"could not find star name {star_name}"
+        for entry in STAR_CATALOG:
+            if "".join(entry.nomenclature.split()) == key:
+                return entry, None
+        return None, f"could not find star name {star_name}"
 
     search_upper = search.upper()
 
