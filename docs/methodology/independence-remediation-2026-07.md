@@ -207,6 +207,20 @@ the tree are legitimate: precession_vondrak.py openly documents its
 ERFA/pyerfa delegation, and the historical changelog framing is
 allowlisted. Audit series: 42 → 20 → 13 → 5 → 2 → 3 → 2.
 
+### Round 8
+
+Round 8 confirmed 3 residuals, all one dead-reference class: the retired
+in-repo path `scripts/generate_lunar_apse_corrections.py` (the generator
+moved to the separate `validation/` repo) still surfaced in a phantom
+`apse-corrections` line of the `leph generate` help, in
+`scripts/generate_lunar_corrections.py`'s docstring, and in the
+auto-generated header of `lunar_apse_corrections.py`. All three repointed
+to `validation/calibrate/generate_lunar_apse_corrections.py`; the phantom
+CLI help line was dropped (the command never existed). Caveat: the header
+is written by the validation-repo generator, which should be updated there
+so a future regeneration keeps the corrected path. Audit series:
+42 → 20 → 13 → 5 → 2 → 3 → 2 → 3.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the

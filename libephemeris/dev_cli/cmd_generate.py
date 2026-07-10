@@ -27,7 +27,6 @@ def _python(args: list[str]) -> None:
     "the library at runtime. Most developers never need to run these unless\n"
     "they are updating the underlying data or adding new bodies.\n\n"
     "  planet-centers   COB-corrected SPKs for sub-arcsecond gas giant positions\n"
-    "  apse-corrections   Interpolated apogee/perigee residual tables (live)\n"
     "  lunar-corrections  [legacy] Mean lunar element correction tables\n"
     "  keplerian-elements Multi-epoch orbital elements for Keplerian fallback",
 )
