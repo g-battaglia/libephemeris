@@ -2742,19 +2742,21 @@ def _preprocess_flags(iflag: int) -> int:
 def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
     """Return flags echoed to the caller (reference convention).
 
-    The input flags come back verbatim, with FLG_SWIEPH added when no
-    ephemeris-selection bit was given (MOSEPH echoes as given).
-
-    The UT entry points (fixstar_ut / fixstar2_ut / batch_fixstars_ut) also
-    echo the bits the reference API's flag-plausibility step derives from the
-    request: FLG_NONUT for J2000/SIDEREAL output (referred to a mean equinox)
-    and FLG_NOGDEFL | FLG_NOABERR for heliocentric/barycentric/true-position
+    The UT entry points (fixstar_ut / fixstar2_ut / batch_fixstars_ut) echo
+    the input flags with FLG_SWIEPH added when no ephemeris-selection bit was
+    given (MOSEPH echoes as given), plus the bits the reference API's
+    flag-plausibility step derives from the request: FLG_NONUT for
+    J2000/SIDEREAL output (referred to a mean equinox) and
+    FLG_NOGDEFL | FLG_NOABERR for heliocentric/barycentric/true-position
     output. Pass implied=True there. These bits ride only on the ECHOED flags
-    — the computation flags are untouched. The TT entry points (fixstar /
-    fixstar2) echo the request as-is apart from the SWIEPH default, so they
-    leave implied=False. Verified behaviourally against the reference oracle
-    (e.g. J2000 -> +NONUT, SIDEREAL -> +NONUT, HELCTR/TRUEPOS ->
-    +NOGDEFL|NOABERR, composing for combinations).
+    — the computation flags are untouched.
+
+    The TT entry points (fixstar / fixstar2) echo the request VERBATIM —
+    including the missing-ephemeris-bit case: the reference's ET calls return
+    0 for flags=0, 32 for FLG_J2000, 256 for FLG_SPEED, with no SWIEPH
+    auto-add. They leave implied=False. Verified behaviourally against the
+    reference oracle (UT: 0 -> 2, 32 -> 98, 256 -> 258; ET: 0 -> 0,
+    32 -> 32, 256 -> 256, 8 -> 8, 16 -> 16, 65536 -> 65536).
     """
     from .constants import FLG_JPLEPH
 
@@ -2763,14 +2765,11 @@ def _fixstar_ret_flags(flags_in: int, *, implied: bool = False) -> int:
         # UT entry points resolve conflicting center flags to the reference's
         # priority (TOPOCTR > BARYCTR > HELCTR) and strip the losing bits from
         # the echoed flags; the TT entry points echo the request as given.
-        from .planets import _resolve_center_flags
+        from .planets import _implied_retflag_bits, _resolve_center_flags
 
         ret = _resolve_center_flags(ret)
-    if not (ret & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
-        ret |= FLG_SWIEPH
-    if implied:
-        from .planets import _implied_retflag_bits
-
+        if not (ret & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
+            ret |= FLG_SWIEPH
         ret |= _implied_retflag_bits(ret)
     return ret
 
@@ -3042,7 +3041,7 @@ def _apply_fixstar_flags(
     return result
 
 
-def _fixed_epoch_star_call(entry_fn, star, tjd, flags):
+def _fixed_epoch_star_call(entry_fn, star, tjd, flags, *, verbatim_echo=False):
     """Fixed-epoch sidereal modes (SIDM_J2000/J1900/B1950) for stars.
 
     These modes are frame requests, not ayanamsha offsets: the reference
@@ -3054,6 +3053,11 @@ def _fixed_epoch_star_call(entry_fn, star, tjd, flags):
     which the mean-frame back-precession would not remove). In a fixed frame
     the legacy speed convention collapses onto the modern one, so the same
     rewrite serves both star families.
+
+    The UT entry points echo the fixed-epoch flags (input | FLG_NONUT, no
+    internal FLG_J2000); the TT entry points echo the input verbatim, like
+    every other TT star call (measured: ET SIDEREAL mode-18 echoes 65536,
+    UT echoes 65602) — pass verbatim_echo=True there.
 
     Returns the (xx, name, retflag) result, or None when this is not a
     fixed-epoch sidereal request.
@@ -3076,7 +3080,7 @@ def _fixed_epoch_star_call(entry_fn, star, tjd, flags):
     return (
         tuple(float(v) for v in xx_t0),
         name,
-        fixed_epoch_retflag(rf, flags),
+        flags if verbatim_echo else fixed_epoch_retflag(rf, flags),
     )
 
 
@@ -3424,7 +3428,7 @@ def fixstar(
         >>> pos, name, retflag = fixstar("Regulus", 2451545.0, 0)
         >>> lon, lat, dist = pos[0], pos[1], pos[2]
     """
-    _fe = _fixed_epoch_star_call(fixstar, star, tjdet, flags)
+    _fe = _fixed_epoch_star_call(fixstar, star, tjdet, flags, verbatim_echo=True)
     if _fe is not None:
         return _fe
 
@@ -3810,7 +3814,7 @@ def fixstar2(
         >>> pos, name, retflag = fixstar2("65474", 2451545.0, 0)
         >>> print(name)  # "Spica,alVir" (looked up by HIP number)
     """
-    _fe = _fixed_epoch_star_call(fixstar2, star, tjdet, flags)
+    _fe = _fixed_epoch_star_call(fixstar2, star, tjdet, flags, verbatim_echo=True)
     if _fe is not None:
         return _fe
 

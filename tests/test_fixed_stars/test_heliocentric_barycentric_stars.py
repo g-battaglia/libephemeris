@@ -149,3 +149,32 @@ class TestTopocentricStarSpeeds:
             lib.set_topo(0.0, 0.0, 0.0)
         # Diurnal term flips the longitude-speed sign at this epoch/site.
         assert geo[3] > 0 and topo[3] < 0
+
+
+class TestEtRetflagVerbatim:
+    """The TT (ET) star entry points echo the input flags verbatim.
+
+    Measured against the reference oracle: ET fixstar/fixstar2 return the
+    request unchanged (0->0, 32->32, 256->256, 65536->65536 — no SWIEPH
+    auto-add, no implied bits, even for the fixed-epoch sidereal modes);
+    only the *_ut entry points add SWIEPH and the implied bits.
+    """
+
+    def test_et_entries_echo_flags_verbatim(self):
+        for fl in (0, 32, 256, 8, 16, 2, 4):
+            assert lib.fixstar("Regulus", 2451545.0, fl)[2] == fl
+            assert lib.fixstar2("Regulus", 2451545.0, fl)[2] == fl
+
+    def test_et_sidereal_fixed_epoch_echoes_verbatim(self):
+        lib.set_sid_mode(18, 0, 0)
+        try:
+            assert lib.fixstar("Regulus", 2451545.0, lib.FLG_SIDEREAL)[2] == (
+                lib.FLG_SIDEREAL
+            )
+        finally:
+            lib.set_sid_mode(0, 0, 0)
+
+    def test_ut_entries_still_add_swieph_and_implied(self):
+        assert lib.fixstar_ut("Regulus", 2451545.0, 0)[2] == 2
+        assert lib.fixstar_ut("Regulus", 2451545.0, 32)[2] == 98
+        assert lib.fixstar2_ut("Regulus", 2451545.0, 256)[2] == 258
