@@ -688,6 +688,17 @@ measurement disproved it. See `intentional-divergences.md` §9 (resolved).
 
 `solcross_ut`, `mooncross_ut`: typically < 1 s.
 
+**`FLG_RADIANS` targets.** All crossing functions interpret `x2cross` in
+radians when `FLG_RADIANS` is set, matching the reference for
+`solcross`/`mooncross` (measured: its `solcross_ut(radians(90), ...,
+FLG_RADIANS)` equals the plain 90-degree call). The reference's
+`helio_cross`/`helio_cross_ut` instead mishandle the flag (measured: Mars
+`radians(120)` with `FLG_RADIANS` returns a crossing +32510 days out —
+neither the radians nor the degrees answer — and some inputs abort with a
+range error; the internal search mixes a degree target with radian
+positions). libephemeris keeps the coherent radians interpretation for the
+helio family too rather than reproducing that divergent-search artifact.
+
 **`mooncross_node_ut` — a reference-side return-frame artifact, not a node-method
 difference.** The gap versus the reference equals ΔT and grows with epoch:
 ~64.7 s @2005, ~292 s @1500, ~1421 s @2559 (measured, forward search). It is

@@ -36,13 +36,31 @@ References:
 
 from __future__ import annotations
 
+import math
 from typing import Callable, Tuple
 
 from .exceptions import Error
-from .constants import FLG_SWIEPH, FLG_SPEED, FLG_HELCTR, SUN, MOON
+from .constants import FLG_SWIEPH, FLG_SPEED, FLG_HELCTR, FLG_RADIANS, SUN, MOON
 from .eclipse import _coerce_backwards
 from .exceptions import EphemerisRangeError, CalculationError
 from .planets import calc_ut, calc
+
+
+def _normalize_cross_target(x2cross: float, flags: int) -> Tuple[float, int]:
+    """Resolve ``FLG_RADIANS`` on a crossing target longitude.
+
+    The reference interprets ``x2cross`` in radians when ``FLG_RADIANS`` is
+    set (measured: ``solcross_ut(radians(90), ..., FLG_RADIANS)`` returns the
+    same instant as the plain 90-degree call). The crossing math here is
+    degree-based, so the target is converted up front and the flag stripped
+    from the flags handed to calc()/calc_ut() — otherwise the returned
+    longitude would come back in radians and corrupt the Newton/wrap steps.
+    """
+    if flags & FLG_RADIANS:
+        x2cross = math.degrees(x2cross)
+        flags &= ~FLG_RADIANS
+    return x2cross % 360.0, flags
+
 
 # Station detection threshold: speed below this indicates proximity to retrograde station
 # At stations, Newton-Raphson can fail due to near-zero derivative (speed)
@@ -626,7 +644,7 @@ def solcross_ut(
         >>> jd_prev = solcross_ut(0.0, jd_now, backwards=True)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     try:
         pos, _ = calc_ut(tjdut, SUN, flags | FLG_SPEED)
@@ -760,7 +778,7 @@ def solcross(
         >>> jd_prev_tt = solcross(0.0, jd_tt_now, backwards=True)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     try:
         pos, _ = calc(tjdet, SUN, flags | FLG_SPEED)
@@ -872,7 +890,7 @@ def mooncross_ut(
         >>> jd_prev = mooncross_ut(0.0, jd_now, backwards=True)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     try:
         pos, _ = calc_ut(tjdut, MOON, flags | FLG_SPEED)
@@ -997,7 +1015,7 @@ def mooncross(
         >>> jd_prev_tt = mooncross(0.0, jd_tt_now, backwards=True)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     try:
         pos, _ = calc(tjdet, MOON, flags | FLG_SPEED)
@@ -1339,7 +1357,7 @@ def cross_ut(
         >>> # Mars ingress into Aries
         >>> jd_mars_aries = cross_ut(MARS, 0.0, jd_now)
     """
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     try:
         pos, _ = calc_ut(tjdut, planet, flags | FLG_SPEED)
@@ -1710,7 +1728,7 @@ def helio_cross_ut(
         >>> jd_earth_cross = helio_cross_ut(EARTH, 90.0, jd_now)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     # Always add FLG_HELCTR for heliocentric calculations
     helio_flag = flags | FLG_HELCTR | FLG_SPEED
@@ -1914,7 +1932,7 @@ def helio_cross(
         >>> jd_cross_tt = helio_cross(MARS, 0.0, jd_tt_now)
     """
     backwards = _coerce_backwards(backwards)
-    x2cross = x2cross % 360.0
+    x2cross, flags = _normalize_cross_target(x2cross, flags)
 
     # Always add FLG_HELCTR for heliocentric calculations
     helio_flag = flags | FLG_HELCTR | FLG_SPEED
