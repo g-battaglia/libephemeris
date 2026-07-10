@@ -92,7 +92,7 @@ before any stable release:
   perturbation series, disclosed below)
 - `seorbel.txt`: removed from the tree and replaced with
   `libephemeris/data/fictitious_orbits.csv`. Most rows cite primary published sources
-  (Witte/Sieggrun 1928, Neely 1988, Strubell 1952, Hoyt 1980, Weston,
+  (Witte & Lefeldt 1928, Neely 1988, Strubell 1952, Hoyt 1980, Weston,
   peer-reviewed papers); the rows without a known publication (Nibiru,
   Proserpina, Selena digits, the Waldemath reconstruction) are carried as
   disclosed interoperability values recovered by black-box output fits —

@@ -99,7 +99,7 @@ remain fully permissive, and the shipped wheel contains no copyleft code.
   fetched at runtime.
 - `libephemeris/data/fictitious_orbits.csv`: this project's own compilation
   of hypothetical-body orbital elements. Most rows cite primary historical
-  publications (Witte & Sieggrün 1928, Neely 1988, Strubell 1952, Hoyt
+  publications (Witte & Lefeldt 1928, Neely 1988, Strubell 1952, Hoyt
   1980, Weston, peer-reviewed papers); a few rows without a known
   publication are disclosed interoperability values recovered by black-box
   fits against reference-API output (NOTICE.md, Calibration Data
