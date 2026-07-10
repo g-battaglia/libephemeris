@@ -622,11 +622,14 @@ Juno, Vesta (11 bodies)
        see `precession_vondrak.py`)
      - Rotate equatorial -> ecliptic using true obliquity (mean + nutation deps)
    - **J2000 ecliptic** (`FLG_J2000`):
-     - Rotate ICRS -> ecliptic J2000 using J2000 obliquity (23.4392911 deg)
+     - Rotate ICRS -> the reference J2000 ecliptic frame: frame bias, then
+       the IAU 2006 J2000 obliquity 84381.406"
+       (`_rotate_icrs_to_ecliptic_j2000`)
    - **True equatorial of date** (`FLG_EQUATORIAL`):
      - Precess ICRS -> equatorial of date via precession-nutation matrix
    - **J2000 equatorial** (`FLG_EQUATORIAL | FLG_J2000`):
-     - ICRS is already ~J2000 equatorial, just convert to spherical
+     - Rotate ICRS -> mean equator/equinox of J2000 (frame bias only),
+       then convert to spherical
 
 **Velocity** is the exact time-derivative of the *reported apparent* position
 in the requested frame, so every speed slot differentiates its own position
