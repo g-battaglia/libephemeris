@@ -294,6 +294,122 @@ _ECL_RMOON_AU = 1738.15 / _ECL_AU_KM
 _ECL_REARTH_AU = 6378.140 / _ECL_AU_KM
 _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 
+# Earth equatorial radius in km (IAU 1976 system, Astronomical Almanac),
+# used directly by the occultation shadow-geometry phase equations.
+_EARTH_EQ_RADIUS_KM = 6378.140
+
+# --- Lunar-occultation search parameters (derived, not tuned) ---------------
+# Mean lunar sidereal motion is ~13.18 deg/day, so gap/13 is a safe
+# first-order Newton step toward the next Moon-body conjunction in ecliptic
+# longitude (slightly underestimating the rate keeps the iteration from
+# overshooting for retrograde-moving targets).
+_OCC_MOON_RATE_DEG_DAY = 13.0
+# Conjunction convergence: 0.1 deg of longitude is ~11 minutes of lunar
+# motion, well inside the +/-1 day refinement window used afterwards.
+_OCC_CONJ_TOL_DEG = 0.1
+# Conjunctions with a fixed direction repeat every sidereal month
+# (~27.32 d): a 20-day hop from the current conjunction always lands
+# before the next one, so no candidate is ever skipped.
+_OCC_CONJUNCTION_HOP_DAYS = 20.0
+# The Moon's ecliptic latitude stays within ~5.3 deg; adding its maximum
+# horizontal parallax (~1.0 deg), its semidiameter (~0.27 deg) and margin,
+# a star more than 7 deg from the ecliptic can never be occulted.
+_OCC_STAR_LAT_LIMIT_DEG = 7.0
+# At conjunction an occultation is only possible somewhere on Earth when
+# the geocentric Moon-body latitude gap is below ~2 deg (semidiameter +
+# parallax + body offset).
+_OCC_LAT_GATE_DEG = 2.0
+
+
+class _OccSearchOffEphemeris(Exception):
+    """Conjunction seek stepped outside the active ephemeris range."""
+
+
+def _normalize_occultation_filter(ecltype: int, body: "int | str", is_sun: bool) -> int:
+    """Expand an occultation-type filter into its full bit set.
+
+    The public ``ecltype`` argument names the wanted classes; internally the
+    search tests individual class bits, so the shorthand values must be
+    expanded: an empty filter means "everything possible for this body",
+    umbral classes imply both the central and non-central variants, and a
+    partial occultation is by construction never central. Annular classes
+    exist only when the occulted body is the Sun (only the Sun's disc can
+    exceed the Moon's); asking for them with another body is an error, and
+    a combined filter simply loses those bits.
+
+    Raises:
+        Error: for the two impossible requests (central partial;
+            annular-only for a non-solar body).
+    """
+    from .exceptions import Error
+
+    wanted = ecltype
+    if wanted == (ECL_PARTIAL | ECL_CENTRAL):
+        raise Error("central partial eclipses do not exist")
+    if not is_sun:
+        base_classes = wanted & ~(ECL_NONCENTRAL | ECL_CENTRAL)
+        if base_classes == ECL_ANNULAR or wanted == ECL_ANNULAR_TOTAL:
+            raise Error(f"annular occultations do not exist for object {body}")
+        if wanted & (ECL_ANNULAR | ECL_ANNULAR_TOTAL):
+            wanted &= ~(ECL_ANNULAR | ECL_ANNULAR_TOTAL)
+    if wanted == 0:
+        wanted = ECL_TOTAL | ECL_PARTIAL | ECL_NONCENTRAL | ECL_CENTRAL
+        if is_sun:
+            wanted |= ECL_ANNULAR | ECL_ANNULAR_TOTAL
+    if wanted & (ECL_TOTAL | ECL_ANNULAR | ECL_ANNULAR_TOTAL):
+        wanted |= ECL_NONCENTRAL | ECL_CENTRAL
+    if wanted & ECL_PARTIAL:
+        wanted |= ECL_NONCENTRAL
+    return wanted
+
+
+def _seek_moon_conjunction(
+    t: float,
+    direction: int,
+    geo_lonlat,
+    eph_flags: int,
+    star_guard: "str | None",
+) -> Tuple[float, float, float]:
+    """Advance ``t`` to the Moon-body conjunction in ecliptic longitude.
+
+    First-order Newton iteration on the longitude gap with the mean lunar
+    rate (see the derivation of the module constants above). The first
+    body evaluation doubles as the never-occultable star gate; an
+    ephemeris-range failure on that first evaluation raises
+    :class:`_OccSearchOffEphemeris` so the caller can end the search at the
+    tier boundary, while failures during the iteration itself propagate
+    unchanged (matching the long-standing public behaviour).
+
+    Returns:
+        (t_conj, body_ecl_lat, moon_ecl_lat) at the converged instant.
+    """
+    from .exceptions import Error
+
+    try:
+        blon, blat = geo_lonlat(t)
+    except Exception as _exc:
+        if _is_ephemeris_boundary(_exc):
+            raise _OccSearchOffEphemeris() from _exc
+        raise
+    if star_guard is not None and abs(blat) > _OCC_STAR_LAT_LIMIT_DEG:
+        raise Error(
+            f"occultation never occurs: star {star_guard} has ecl. lat. {blat:.1f}"
+        )
+    mpos, _ = calc_ut(t, MOON, eph_flags)
+    gap = (blon - mpos[0]) % 360.0
+    if direction < 0:
+        gap -= 360.0
+    steps = 0
+    while abs(gap) > _OCC_CONJ_TOL_DEG and steps < 300:
+        t += gap / _OCC_MOON_RATE_DEG_DAY
+        blon, blat = geo_lonlat(t)
+        mpos, _ = calc_ut(t, MOON, eph_flags)
+        gap = (blon - mpos[0]) % 360.0
+        if gap > 180.0:
+            gap -= 360.0
+        steps += 1
+    return t, blat, mpos[1]
+
 
 def _ecl_eph_flags(flags: int) -> int:
     """Reduce ``flags`` to its ephemeris-selection bits."""
@@ -5784,25 +5900,8 @@ def lun_occult_when_glob(
     eph_flags = _ecl_eph_flags(flags)
     is_star = isinstance(body, str)
     is_sun = (not is_star) and body == SUN
-    de_km = 6378.140
-
-    ifltype = ecltype
-    if ifltype == (ECL_PARTIAL | ECL_CENTRAL):
-        raise Error("central partial eclipses do not exist")
-    if not is_sun:
-        ifltype2 = ifltype & ~(ECL_NONCENTRAL | ECL_CENTRAL)
-        if ifltype2 == ECL_ANNULAR or ifltype == ECL_ANNULAR_TOTAL:
-            raise Error(f"annular occultations do not exist for object {body}")
-        if ifltype & (ECL_ANNULAR | ECL_ANNULAR_TOTAL):
-            ifltype &= ~(ECL_ANNULAR | ECL_ANNULAR_TOTAL)
-    if ifltype == 0:
-        ifltype = ECL_TOTAL | ECL_PARTIAL | ECL_NONCENTRAL | ECL_CENTRAL
-        if is_sun:
-            ifltype |= ECL_ANNULAR | ECL_ANNULAR_TOTAL
-    if ifltype & (ECL_TOTAL | ECL_ANNULAR | ECL_ANNULAR_TOTAL):
-        ifltype |= ECL_NONCENTRAL | ECL_CENTRAL
-    if ifltype & ECL_PARTIAL:
-        ifltype |= ECL_NONCENTRAL
+    de_km = _EARTH_EQ_RADIUS_KM
+    ifltype = _normalize_occultation_filter(ecltype, body, is_sun)
 
     from .constants import FLG_XYZ
 
@@ -5850,38 +5949,25 @@ def lun_occult_when_glob(
 
     for _attempt in range(_OCCULT_MAX_CONJUNCTIONS):
         try:
-            blon, blat = _geo_lonlat(t)
-        except Exception as _exc:
-            if _is_ephemeris_boundary(_exc):
-                # Stepped off the active ephemeris: no matching occultation
-                # exists within coverage (the tier boundary).
-                break
-            raise
-        if is_star and abs(blat) > 7.0:
-            raise Error(
-                f"occultation never occurs: star {body} has ecl. lat. {blat:.1f}"
+            t, blat, moon_lat = _seek_moon_conjunction(
+                t,
+                direction,
+                _geo_lonlat,
+                eph_flags,
+                cast(str, body) if is_star else None,
             )
-        mpos, _ = calc_ut(t, MOON, eph_flags)
-        dl = (blon - mpos[0]) % 360.0
-        if direction < 0:
-            dl -= 360.0
-        guard = 0
-        while abs(dl) > 0.1 and guard < 300:
-            t += dl / 13.0
-            blon, blat = _geo_lonlat(t)
-            mpos, _ = calc_ut(t, MOON, eph_flags)
-            dl = (blon - mpos[0]) % 360.0
-            if dl > 180.0:
-                dl -= 360.0
-            guard += 1
+        except _OccSearchOffEphemeris:
+            # Stepped off the active ephemeris: no matching occultation
+            # exists within coverage (the tier boundary).
+            break
         tjd = t
 
         # Latitude gate: no occultation possible this conjunction.
-        if abs(blat - mpos[1]) > 2.0:
+        if abs(blat - moon_lat) > _OCC_LAT_GATE_DEG:
             if one_try:
                 tret[0] = t + direction
                 return 0, tuple(tret)
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         # Time of maximum: deepest limb overlap (geocentric).
@@ -5892,7 +5978,7 @@ def lun_occult_when_glob(
             if one_try:
                 tret[0] = tjd
                 return 0, tuple(tret)
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         tret = [0.0] * 10
@@ -5900,7 +5986,7 @@ def lun_occult_when_glob(
         if (backward and tret[0] >= tjdut - 1e-4) or (
             not backward and tret[0] <= tjdut + 1e-4
         ):
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         retflag = rc_where
@@ -5919,7 +6005,7 @@ def lun_occult_when_glob(
             if one_try:
                 tret[0] = tjd
                 return 0, tuple(tret)
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         # Phase times from the shadow geometry: occultation begin/end,
@@ -5978,7 +6064,7 @@ def lun_occult_when_glob(
             if one_try:
                 tret[0] = tjd
                 return 0, tuple(tret)
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         # tret[1]: does the occultation happen at local apparent noon
@@ -6089,37 +6175,24 @@ def _lun_occult_when_loc_pythonic(
     t = float(jd_start)
     for _attempt in range(_OCCULT_MAX_CONJUNCTIONS):
         try:
-            blon, blat = _geo_lonlat(t)
-        except Exception as _exc:
-            if _is_ephemeris_boundary(_exc):
-                # Stepped off the active ephemeris: no matching occultation
-                # exists within coverage (the tier boundary).
-                break
-            raise
-        if is_star and abs(blat) > 7.0:
-            raise Error(
-                f"occultation never occurs: star {body} has ecl. lat. {blat:.1f}"
+            t, blat, moon_lat = _seek_moon_conjunction(
+                t,
+                direction,
+                _geo_lonlat,
+                eph_flags,
+                cast(str, body) if is_star else None,
             )
-        mpos, _ = calc_ut(t, MOON, eph_flags)
-        dl = (blon - mpos[0]) % 360.0
-        if direction < 0:
-            dl -= 360.0
-        guard = 0
-        while abs(dl) > 0.1 and guard < 300:
-            t += dl / 13.0
-            blon, blat = _geo_lonlat(t)
-            mpos, _ = calc_ut(t, MOON, eph_flags)
-            dl = (blon - mpos[0]) % 360.0
-            if dl > 180.0:
-                dl -= 360.0
-            guard += 1
+        except _OccSearchOffEphemeris:
+            # Stepped off the active ephemeris: no matching occultation
+            # exists within coverage (the tier boundary).
+            break
         tjd = t
 
         # Geocentric latitude gate for this conjunction.
-        if abs(blat - mpos[1]) > 2.0:
+        if abs(blat - moon_lat) > _OCC_LAT_GATE_DEG:
             if one_try:
                 return _one_try_miss(t + direction)
-            t = tjd + direction * 20.0
+            t = tjd + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         # Topocentric maximum: deepest limb overlap seen from the place.
@@ -6129,7 +6202,7 @@ def _lun_occult_when_loc_pythonic(
         if min_sep > rbody + rmoon:
             if one_try:
                 return _one_try_miss(jd_max + direction)
-            t = jd_max + direction * 20.0
+            t = jd_max + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         if (backward and jd_max >= jd_start - 1e-4) or (
@@ -6137,7 +6210,7 @@ def _lun_occult_when_loc_pythonic(
         ):
             if one_try:
                 return _one_try_miss(jd_max + direction)
-            t = jd_max + direction * 20.0
+            t = jd_max + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         if min_sep < rbody - rmoon:
@@ -6196,7 +6269,7 @@ def _lun_occult_when_loc_pythonic(
         if not (retflag & ECL_VISIBLE):
             if one_try:
                 return _one_try_miss(jd_max + direction)
-            t = jd_max + direction * 20.0
+            t = jd_max + direction * _OCC_CONJUNCTION_HOP_DAYS
             continue
 
         # Rise and set of the occulted body during the occultation.
