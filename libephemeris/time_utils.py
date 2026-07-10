@@ -347,11 +347,12 @@ def _deltat_with_tid_acc(tjdut: float, tid_acc: float) -> float:
                 "IERS Delta T lookup failed (%s); falling back to Skyfield.", exc
             )
 
-    # Selected Delta T model (after userdef / IERS). Default is Skyfield's
-    # SMH-2016; ``espenak_meeus`` uses the classic NASA polynomials. (Exact
-    # parity with the reference ephemeris, when needed for validation, is
-    # injected externally via set_delta_t_userdef() — libephemeris never imports
-    # any third-party ephemeris library, to stay license-independent.)
+    # Selected Delta T model (after userdef / IERS). Default is SMH-2016,
+    # obtained from Skyfield (an MIT dependency); ``espenak_meeus`` is a native
+    # reimplementation of the classic NASA polynomials. Neither derives from
+    # the reference (copyleft) ephemeris. Exact parity with the reference,
+    # when needed for validation, is injected externally via
+    # set_delta_t_userdef().
     if get_delta_t_model() == "espenak_meeus":
         year, month, _day, _hour = revjul(tjdut)
         decimal_year = year + (month - 0.5) / 12.0

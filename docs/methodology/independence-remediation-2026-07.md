@@ -176,6 +176,23 @@ findings are documentation-hygiene only, with no residual source-knowledge
 language, reference-internal identifiers, or false provenance in shipped
 code.
 
+### Rounds 5-6
+
+Round 5 confirmed 2 residuals (missed copies from earlier rounds: the
+retired `leph test compare` commands still shown in two release notes; the
+"Witte & Sieggrün 1928" citation in NOTICE:95 and THIRD_PARTY_NOTICES:102).
+Round 6 confirmed 3 more — a genuine over-broad independence claim not
+about the reference at all: shipped comments (state.py, time_utils.py) and
+two docs asserted libephemeris "NEVER imports any third-party ephemeris
+library" / "imports no third-party ephemeris engine at runtime", which is
+false (Skyfield, MIT, is the core ephemeris dependency, and the default
+ΔT model is obtained from it). Corrected to scope the independence claim to
+the reference (copyleft) Swiss Ephemeris and to state accurately that
+`smh2016` ΔT comes from Skyfield while only `espenak_meeus` is a native
+reimplementation. Audit series: 42 → 20 → 13 → 5 → 2 → 3, the tail being
+documentation/claims accuracy with no reference-source taint remaining in
+shipped code.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the

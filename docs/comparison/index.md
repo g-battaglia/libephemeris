@@ -43,6 +43,6 @@ expect.
   differences, the validation methodology, and validation results.
 
 > All measurements here were taken with `pyswisseph` used purely as a black-box
-> oracle. independence from Swiss Ephemeris code is libephemeris's enforced working standard (see NOTICE.md for disclosures); the library imports no third-party
-> ephemeris engine at runtime (see
+> oracle. independence from Swiss Ephemeris code is libephemeris's enforced working standard (see NOTICE.md for disclosures); it depends only on
+> permissively-licensed ephemeris tooling (Skyfield/pyerfa), not the copyleft reference engine (see
 > [NOTICE.md](https://github.com/g-battaglia/libephemeris/blob/main/NOTICE.md)).

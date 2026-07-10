@@ -107,9 +107,12 @@ specifically expect them; the default `smh2016` is the recommended choice.
 
 ## 4. Independence
 
-libephemeris is an independent implementation and imports no third-party ephemeris
-engine at runtime; both ΔT models above are clean-room (published coefficients
-only). When exact parity with another engine's ΔT is required for a controlled
+libephemeris is independent of the reference (copyleft) Swiss Ephemeris; it
+depends only on permissively-licensed tooling (Skyfield/pyerfa, both MIT/BSD).
+Of the two ΔT models above, ``espenak_meeus`` is a native reimplementation
+from published coefficients, while the default ``smh2016`` is obtained from
+Skyfield's own implementation. When exact parity with another engine's ΔT is
+required for a controlled
 comparison, that engine's ΔT can be injected from the *outside* via
 `set_delta_t_userdef`, isolating the pure ephemeris-model difference from the ΔT
 choice.

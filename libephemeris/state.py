@@ -2429,13 +2429,15 @@ def get_iers_delta_t_enabled() -> bool:
 
 # Selects which Delta T model is used (after the user-defined and IERS-observed
 # priorities):
-#   - ``smh2016`` (default): Skyfield's Stephenson-Morrison-Hohenkerk (2016)
-#     model — the modern scientific standard, used by libephemeris natively.
-#   - ``espenak_meeus``: the classic Espenak & Meeus (2006) NASA polynomial set.
-# Both are clean-room implementations; libephemeris NEVER imports any third-party
-# ephemeris library, to stay license-independent. Exact parity with the reference
-# ephemeris (for validation only) is injected externally via set_delta_t_userdef()
-# in the validation harness.
+#   - ``smh2016`` (default): the Stephenson-Morrison-Hohenkerk (2016) model,
+#     the modern scientific standard, obtained from Skyfield (an MIT-licensed
+#     dependency; see THIRD_PARTY_NOTICES.md).
+#   - ``espenak_meeus``: a native reimplementation of the classic Espenak &
+#     Meeus (2006) NASA polynomial set (published coefficients).
+# Neither derives from the reference (copyleft) Swiss Ephemeris; the project
+# depends only on permissively-licensed ephemeris tooling (Skyfield/pyerfa).
+# Exact parity with the reference ephemeris (for validation only) is injected
+# externally via set_delta_t_userdef() in the validation harness.
 # The models only differ outside the IERS-observed range (chiefly ancient and
 # far-future dates); within the well-observed range they agree closely.
 #
