@@ -264,6 +264,22 @@ class of reference-side velocity artifact as the fixed-star latitude-speed
 defect (§4.9): the position channels agree to <0.001″; only the reference's
 reported speed is internally inconsistent.
 
+**1.5 `FLG_TOPOCTR` speed of TrueNode/OscuApog — reference artifact.** With a
+topocentric observer set, both engines report node/apsis *positions* identical
+to the geocentric ones (measured: 0.0000″ topo-vs-geo in each engine for
+bodies 10–13, 21, 22). The reference nevertheless reports a *different
+longitude speed* under `FLG_TOPOCTR` for the true/osculating variants
+(TrueNode ~2.3%, OscuApog ~2.5% at J2000; the interpolated apsides show a
+smaller ~1e-4 deg/day version; the mean variants are unaffected). Measured
+black-box, this topocentric speed is **independent of the observer site**
+(identical at Rome, Sydney and the equator) and equals the *geocentric* speed
+evaluated ~0.1 day later — i.e. a forward-difference-with-large-step artifact
+of the reference's topocentric code path, not topocentric geometry. It is
+also, therefore, not the time-derivative of the reference's own reported
+topocentric positions. libephemeris keeps speed == the exact derivative of
+the reported (geocentric-identical) position, as in §1.4; the reference's
+sampling scheme is not reproduced.
+
 ### 2. House system differences
 
 **2.1 House cusps.** Typically agree within 0.01"; the small divergence comes from

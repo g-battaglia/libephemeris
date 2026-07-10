@@ -298,9 +298,9 @@ jd_tt = 2460676.5  # 2025-01-01 (TT)
 mean_lon = lunar.calc_mean_lilith(jd_tt)
 print(f"Mean Lilith: {mean_lon:.4f} deg")
 
-# True Lilith (returns longitude, latitude, eccentricity)
-oscu_lon, oscu_lat, oscu_ecc = lunar.calc_true_lilith(jd_tt)
-print(f"True Lilith: {oscu_lon:.4f} deg, lat: {oscu_lat:.4f} deg, ecc: {oscu_ecc:.5f}")
+# True Lilith (returns longitude, latitude, distance in AU)
+oscu_lon, oscu_lat, oscu_dist = lunar.calc_true_lilith(jd_tt)
+print(f"True Lilith: {oscu_lon:.4f} deg, lat: {oscu_lat:.4f} deg, dist: {oscu_dist:.5f} AU")
 
 # Interpolated Apogee
 intp_lon, intp_lat, intp_ecc = lunar.calc_interpolated_apogee(jd_tt)
