@@ -1163,7 +1163,11 @@ def _calc_type21_position(
     # rest of the library retard heliocentric positions. Aberration, however,
     # is a geocentric-observer effect and is excluded from heliocentric output.
     apply_light_time = not (iflag & FLG_TRUEPOS)
-    apply_aberration = not (iflag & FLG_NOABERR) and not is_heliocentric
+    # FLG_TRUEPOS requests the geometric place: it suppresses aberration too,
+    # exactly like the Keplerian path (planets.py) and planetary_moons.py.
+    apply_aberration = (
+        not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR) and not is_heliocentric
+    )
     apply_precession = not (iflag & FLG_J2000)
     apply_nutation = not (iflag & FLG_NONUT) and apply_precession
 
@@ -1569,7 +1573,11 @@ def calc_spk_body_position(
 
     C_AU_DAY = 173.144632674240
     apply_light_time = not (iflag & FLG_TRUEPOS)
-    apply_aberr = not (iflag & FLG_NOABERR) and not is_heliocentric
+    # FLG_TRUEPOS requests the geometric place: it suppresses aberration too,
+    # exactly like the Keplerian path (planets.py) and planetary_moons.py.
+    apply_aberr = (
+        not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR) and not is_heliocentric
+    )
     ts = get_timescale()
 
     def _rel_at(t_obs):
