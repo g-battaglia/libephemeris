@@ -10,6 +10,8 @@ Reference: Historical astronomical records and Meeus, Astronomical Algorithms.
 
 import pytest
 
+from libephemeris.exceptions import Error
+
 pytestmark = pytest.mark.slow
 
 from libephemeris import (
@@ -218,11 +220,11 @@ class TestStarHeliacalValidation:
     """Test input validation for star heliacal calculations."""
 
     def test_star_evening_first_raises_error(self):
-        """Test that EVENING_FIRST raises ValueError for fixed stars."""
+        """Test that EVENING_FIRST raises Error for fixed stars."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="fixed stars"):
+        with pytest.raises(Error, match="fixed stars"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -233,11 +235,11 @@ class TestStarHeliacalValidation:
             )
 
     def test_star_morning_last_raises_error(self):
-        """Test that MORNING_LAST raises ValueError for fixed stars."""
+        """Test that MORNING_LAST raises Error for fixed stars."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)  # Rome
 
-        with pytest.raises(ValueError, match="fixed stars"):
+        with pytest.raises(Error, match="fixed stars"):
             heliacal_ut(
                 jd_start,
                 geopos,
@@ -258,9 +260,7 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -274,9 +274,7 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Regulus", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Regulus", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -288,9 +286,7 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Aldebaran", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Aldebaran", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -302,9 +298,7 @@ class TestSweHeliacalUtStars:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Vega", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Vega", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -317,29 +311,23 @@ class TestSweHeliacalUtStars:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Lowercase
-        result1 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "sirius", HELIACAL_RISING
-        )
+        result1 = heliacal_ut(jd_start, geopos, datm, dobs, "sirius", HELIACAL_RISING)
         # Uppercase
-        result2 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "SIRIUS", HELIACAL_RISING
-        )
+        result2 = heliacal_ut(jd_start, geopos, datm, dobs, "SIRIUS", HELIACAL_RISING)
         # Mixed case
-        result3 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING
-        )
+        result3 = heliacal_ut(jd_start, geopos, datm, dobs, "Sirius", HELIACAL_RISING)
 
         # All should return same result
         assert result1[0] == result2[0] == result3[0]
 
     def test_star_evening_first_by_name_raises_error(self):
-        """Test that EVENING_FIRST raises ValueError for stars via swe API."""
+        """Test that EVENING_FIRST raises Error for stars via the legacy API."""
         jd_start = julday(2024, 1, 1, 0)
         geopos = (12.4964, 41.9028, 0.0)
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        with pytest.raises(ValueError, match="fixed stars"):
+        with pytest.raises(Error, match="fixed stars"):
             heliacal_ut(jd_start, geopos, datm, dobs, "Sirius", EVENING_FIRST)
 
 

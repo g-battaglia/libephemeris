@@ -360,9 +360,7 @@ class TestSweHeliacalUt:
         # Observer: age, Snellen ratio, and optical params
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         # Should return a tuple of 3 floats (jd1, jd2, jd3)
         assert isinstance(result, tuple)
@@ -380,9 +378,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Mercury", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -398,9 +394,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mars", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Mars", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -412,9 +406,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Jupiter", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Jupiter", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -426,9 +418,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Saturn", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Saturn", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -440,9 +430,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_SETTING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_SETTING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -454,9 +442,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", EVENING_FIRST
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", EVENING_FIRST)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -468,9 +454,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", MORNING_LAST
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Mercury", MORNING_LAST)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -513,9 +497,7 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         with pytest.raises(Error, match="not recognized"):
-            heliacal_ut(
-                jd_start, geopos, datm, dobs, "InvalidPlanet", HELIACAL_RISING
-            )
+            heliacal_ut(jd_start, geopos, datm, dobs, "InvalidPlanet", HELIACAL_RISING)
 
     def test_swe_heliacal_ut_case_insensitive(self):
         """Test that planet name matching is case insensitive."""
@@ -525,17 +507,11 @@ class TestSweHeliacalUt:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should work with lowercase
-        result1 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "venus", HELIACAL_RISING
-        )
+        result1 = heliacal_ut(jd_start, geopos, datm, dobs, "venus", HELIACAL_RISING)
         # Should work with uppercase
-        result2 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "VENUS", HELIACAL_RISING
-        )
+        result2 = heliacal_ut(jd_start, geopos, datm, dobs, "VENUS", HELIACAL_RISING)
         # Should work with mixed case
-        result3 = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result3 = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         # All should return same result
         assert result1[0] == result2[0] == result3[0]
@@ -548,9 +524,7 @@ class TestSweHeliacalUt:
         datm = (0, 0, 0, 0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -562,9 +536,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 15.0, 40.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -576,9 +548,7 @@ class TestSweHeliacalUt:
         datm = (1013.25, 25.0, 60.0, 0.0)
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -1147,9 +1117,7 @@ class TestHeliacalPhenoAlias:
 
         result1 = heliacal_pheno_ut(jd, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
-        result2 = heliacal_pheno_ut(
-            jd, geopos, datm, dobs, "Venus", HELIACAL_RISING
-        )
+        result2 = heliacal_pheno_ut(jd, geopos, datm, dobs, "Venus", HELIACAL_RISING)
 
         # Both should return 50-element tuples with matching key fields
         assert len(result1) == 50
@@ -1581,9 +1549,7 @@ class TestSweHeliacalUtOuterPlanetValidation:
         dobs = (36.0, 1.0, 0, 0, 0, 0)
 
         # Should not raise an error
-        result = heliacal_ut(
-            jd_start, geopos, datm, dobs, "Mercury", EVENING_FIRST
-        )
+        result = heliacal_ut(jd_start, geopos, datm, dobs, "Mercury", EVENING_FIRST)
 
         assert isinstance(result, tuple)
         assert len(result) == 3
@@ -1600,3 +1566,27 @@ class TestSweHeliacalUtOuterPlanetValidation:
 
         assert isinstance(result, tuple)
         assert len(result) == 3
+
+
+class TestPhenoParallaxInAltitude:
+    """dret[19] (ParO) is the parallax in altitude, not the horizontal parallax.
+
+    Measured black-box: the reference's dret[19] equals dret[2] - dret[0]
+    (GeoAlt - AltO) on every body/instant probed — i.e. ~HP*cos(alt), which
+    only coincides with the horizontal parallax at the horizon. Frozen
+    oracle value for the Moon at appreciable altitude (~26 deg): 0.920914.
+    """
+
+    def test_moon_parallax_in_altitude(self):
+        jd = julday(2023, 3, 23, 16.5)
+        dret = heliacal_pheno_ut(
+            jd,
+            (31.2, 29.9, 0.0),
+            (1013.25, 15.0, 40.0, 0.0),
+            (36.0, 1.0, 0.0, 0.0, 0.0, 0.0),
+            "Moon",
+            3,
+        )
+        assert abs(dret[19] - 0.920914) < 5e-4
+        # Internal consistency: slot 19 == GeoAlt - AltO by construction.
+        assert abs(dret[19] - (dret[2] - dret[0])) < 1e-9

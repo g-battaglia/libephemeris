@@ -1889,16 +1889,11 @@ def _heliacal_pheno_ut_leb(
     if is_star:
         parallax = 0.0
     else:
-        earth_radius_au = 6371.0 / 149597870.7
-        # Use geocentric distance (not topocentric) for parallax, matching Skyfield
-        from .planets import calc_ut as _scu_par
-
-        _geo_pos, _ = _scu_par(jd, body, FLG_SPEED)
-        dist_au = _geo_pos[2]
-        if dist_au > 0:
-            parallax = math.degrees(math.asin(earth_radius_au / dist_au))
-        else:
-            parallax = 0.0
+        # ParO is the parallax IN ALTITUDE (~HP*cos(alt)), not the horizontal
+        # parallax: the reference reports exactly GeoAlt - AltO (measured
+        # dret[19] == dret[2] - dret[0] on every body/instant probed), which
+        # both altitudes here already reproduce to ~2e-5 deg.
+        parallax = geo_alt_deg - body_alt_deg
 
     # Rise/set of the disc centers and the visibility window via the
     # shared reference-scheme helper (sentinel 99999999.0 for instants
@@ -4182,13 +4177,10 @@ def _heliacal_pheno_ut_pythonic(
     if is_star:
         parallax = 0.0
     else:
-        # Parallax = arcsin(Earth_radius / distance)
-        # Earth radius ~ 6371 km, distance in AU (1 AU ~ 149,597,870.7 km)
-        earth_radius_au = 6371.0 / 149597870.7
-        if body_geo_dist.au > 0:
-            parallax = math.degrees(math.asin(earth_radius_au / body_geo_dist.au))
-        else:
-            parallax = 0.0
+        # ParO is the parallax IN ALTITUDE (~HP*cos(alt)), not the horizontal
+        # parallax: the reference reports exactly GeoAlt - AltO (measured
+        # dret[19] == dret[2] - dret[0] on every body/instant probed).
+        parallax = geo_alt_deg - body_alt_deg
 
     # Rise/set of the disc centers and the visibility window, the
     # reference way (rise_trans searches from 4 hours before jd; the
