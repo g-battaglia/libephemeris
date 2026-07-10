@@ -80,6 +80,7 @@ import math
 from typing import Any, List, Optional, Tuple, Union, overload
 from .constants import *
 from .constants import (
+    FLG_RADIANS,
     FLG_SIDEREAL,
     FLG_SPEED,
     FLG_EQUATORIAL,
@@ -1841,7 +1842,16 @@ def houses_ex(
 
     # degnorm snaps the bare-%360 artifact (exactly 360.0 from a
     # tiny-negative angle, e.g. after the ayanamsha subtraction) to 0.0.
-    return tuple(degnorm(c) for c in cusps), tuple(degnorm(a) for a in ascmc)
+    cusps = tuple(degnorm(c) for c in cusps)
+    ascmc = tuple(degnorm(a) for a in ascmc)
+    # FLG_RADIANS converts every position output — all cusps (including the
+    # 36 Gauquelin sectors) and all 8 ascmc slots, even the equatorial ARMC —
+    # exactly like the reference API (verified black-box, incl. the
+    # SIDEREAL+RADIANS combination).
+    if flags & FLG_RADIANS:
+        cusps = tuple(math.radians(c) for c in cusps)
+        ascmc = tuple(math.radians(a) for a in ascmc)
+    return cusps, ascmc
 
 
 def houses_ex2(
@@ -1885,7 +1895,12 @@ def houses_ex2(
         >>> # cusps_speed[0] is the velocity of the 1st house cusp (ASC)
     """
     # Calculate positions at current time
-    cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, flags)
+    # Work in degrees internally: FLG_RADIANS is stripped here and applied
+    # once to the final position tuples below, so the finite-difference
+    # speed stencil stays in degrees (the reference API keeps the speed
+    # tuples in deg/day even under FLG_RADIANS).
+    _flags_deg = flags & ~FLG_RADIANS
+    cusps, ascmc = houses_ex(tjdut, lat, lon, hsys, _flags_deg)
 
     # Velocities (daily motion). A cusp longitude is a function of time through
     # the sidereal time (ARMC), the obliquity of the ecliptic and (via the
@@ -1907,8 +1922,8 @@ def houses_ex2(
     # reproduces the cusp motion, which an analytic speed approximation of those
     # systems does not.
     _DT_DAYS = 2.0 / 86400.0
-    cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, flags)
-    cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, flags)
+    cusps_minus, ascmc_minus = houses_ex(tjdut - _DT_DAYS, lat, lon, hsys, _flags_deg)
+    cusps_plus, ascmc_plus = houses_ex(tjdut + _DT_DAYS, lat, lon, hsys, _flags_deg)
 
     def _rate(after: float, before: float) -> float:
         d = after - before
@@ -1970,12 +1985,15 @@ def houses_ex2(
 
     # degnorm on the angle outputs (not the speeds) snaps the bare-%360
     # artifact (exactly 360.0 from a tiny-negative angle) back to 0.0.
-    return (
-        tuple(degnorm(c) for c in cusps),
-        tuple(degnorm(a) for a in ascmc),
-        cusps_speed,
-        ascmc_speed,
-    )
+    cusps = tuple(degnorm(c) for c in cusps)
+    ascmc = tuple(degnorm(a) for a in ascmc)
+    # FLG_RADIANS converts the two POSITION tuples only — the reference API
+    # keeps the speed tuples in deg/day even under FLG_RADIANS (verified
+    # black-box).
+    if flags & FLG_RADIANS:
+        cusps = tuple(math.radians(c) for c in cusps)
+        ascmc = tuple(math.radians(a) for a in ascmc)
+    return (cusps, ascmc, cusps_speed, ascmc_speed)
 
 
 def _houses_with_context(
