@@ -106,12 +106,12 @@ L.set_delta_t_userdef(None)             # restore the native model
 ### 2.4 House cusp speeds — numerical vs analytical derivatives
 
 `houses_ex2` / `houses_armc_ex2` compute cusp velocities by centered finite
-differences when `FLG_SPEED` is set; the maximum difference from pyswisseph is
+differences; the maximum difference from pyswisseph is
 ~0.7°/day (~0.2% relative). pyswisseph differentiates the cusp formulas
 analytically. Both approaches are valid; the numerical method has a truncation
 error ∝ dt² that at a 1-minute step is < 1°/day against the analytical result, i.e.
-< 0.3% of the ~280–340°/day cusp speeds. (Cusp speeds are returned only when
-`FLG_SPEED` is passed.)
+< 0.3% of the ~280–340°/day cusp speeds. (Both implementations compute and
+return the speed arrays unconditionally — no `FLG_SPEED` gate.)
 
 ### 2.5 Asteroids — Keplerian approximation vs integrated ephemerides
 
@@ -753,6 +753,20 @@ Measured agreement (calibrated and held-out probes against the reference):
   fallback would require reproducing unpublished internals and is deliberately not
   attempted. Bright objects that *are* photometrically detected there (e.g.
   Venus/Tromsø 2000) still land within the ±1–2-day photometric floor above.
+- **Observer corrections in `vis_limit_mag` (age and `HELFLAG_OPTICAL_PARAMS`
+  optics).** The Snellen term is exact (`5·log10(SN)`) and the naked-eye
+  (36, 1) baseline is untouched. The observer-age term (dark-adapted pupil,
+  `7·exp(−age²/20000)` mm clamped at 23, coupled through the VISLIMIT
+  threshold) matches the reference to ≤0.07 mag over ages 23–80 (~0.15 mag at
+  the extrapolated age 90). The telescopic/binocular gain under
+  `HELFLAG_OPTICAL_PARAMS` is an empirical fit with a residual up to ~1.3 mag
+  (median ~0.5): the reference's optical-aid model is a bespoke, undocumented
+  variant whose magnification trend is *opposite* to Schaefer's published 1990
+  telescopic formula and whose aperture dependence (~D^3.5) exceeds the
+  physical D² light grasp, so it is not reproducible black-box from published
+  material. Flag gating is exact (optics ignored without the flag; age ignored
+  when optics are active, matching the reference), and the LEB and Skyfield
+  backends agree exactly.
 
 **`heliacal_pheno_ut` diagnostic slots (`dret[1]` AppAltO, `dret[9]` ARCLact).**
 These two reported slots use simple inline models that diverge from the

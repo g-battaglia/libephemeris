@@ -88,14 +88,16 @@ LibEphemeris uses the **same constant names** as pyswisseph — no prefix change
 
 ### House Cusp Array Indexing
 
-Both libraries return 12 house cusps, but indexing may differ:
+Both libraries return the same shape: a 12-element cusp tuple, 0-indexed
+(cusp 1 at index 0), plus an 8-element `ascmc` tuple. No index shifting is
+needed when migrating:
 
 ```python
-# pyswisseph returns 13 elements (index 0 is unused, cusps are 1-12)
+# pyswisseph: 12 elements, 0-indexed
 cusps_swe, ascmc_swe = swe.houses(jd, lat, lon, b'P')
-cusp1_swe = cusps_swe[1]
+cusp1_swe = cusps_swe[0]
 
-# libephemeris returns 12 elements (0-indexed)
+# libephemeris: identical
 cusps, ascmc = ephem.houses(jd, lat, lon, b'P')
 cusp1 = cusps[0]  # First house cusp
 ```

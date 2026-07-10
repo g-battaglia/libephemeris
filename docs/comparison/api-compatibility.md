@@ -41,9 +41,9 @@ Developers migrating from pyswisseph should be aware of these.
 
 | Function | pyswisseph | libephemeris |
 |----------|-----------|-------------|
-| `get_orbital_elements` | Returns flat tuple | May return nested tuple — access via `result[0][i]` |
+| `get_orbital_elements` | Returns flat tuple (50 floats) | Returns flat tuple (50 floats) — identical shape |
 | `houses_armc` | `ascmc[3]` = obliquity | `ascmc[3]` = Vertex (not obliquity) |
-| `houses_ex2` | Returns cusp speeds (analytical) | Returns cusp speeds (numerical, requires `FLG_SPEED`) |
+| `houses_ex2` | Returns cusp speeds (analytical for some systems) | Returns cusp speeds (numerical true derivative, always computed) |
 
 ### libephemeris-only extensions
 
