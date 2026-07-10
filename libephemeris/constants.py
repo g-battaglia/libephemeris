@@ -910,10 +910,13 @@ TIDAL_DE430: float = -25.82  # DE430
 TIDAL_DE431: float = -25.80  # DE431
 TIDAL_DE440: float = -25.936  # DE440 (current default)
 TIDAL_DE441: float = -25.936  # DE441 (latest, same as DE440)
-# Default tidal acceleration: the DE440/DE441 value, matching both this
-# library's ephemeris and the reference API's own default (verified
-# black-box: its get_tid_acc() returns -25.936 out of the box).
-TIDAL_DEFAULT: float = TIDAL_DE440
+# Named-constant parity: the reference API's TIDAL_DEFAULT constant aliases
+# its DE431 value (-25.80) — measured black-box on the binding. This is a
+# COMPILE-TIME name only: the library's runtime automatic default (what
+# get_tid_acc() returns out of the box) stays the DE440/DE441 value
+# -25.936, matching both our ephemeris and the reference's own runtime
+# behavior with modern data.
+TIDAL_DEFAULT: float = TIDAL_DE431
 TIDAL_AUTOMATIC: int = 999999  # Let library choose based on ephemeris file
 
 # reference API-compatible aliases (without SE_ prefix)

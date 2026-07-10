@@ -126,14 +126,15 @@ class TestTidAccConstants:
         assert ephem.TIDAL_AUTOMATIC == 999999
 
     @pytest.mark.unit
-    def test_tidal_default_is_de440(self):
-        """TIDAL_DEFAULT is the DE440 value (-25.936).
+    def test_tidal_default_is_de431(self):
+        """TIDAL_DEFAULT (the named constant) is the DE431 value (-25.80).
 
-        The reference API's runtime default is -25.936 as well (verified
-        black-box via its get_tid_acc()), so aligning the named constant
-        with the effective default is both self-consistent and compatible.
+        Measured black-box: the reference API's TIDAL_DEFAULT constant is
+        -25.8 while its runtime get_tid_acc() returns -25.936 with modern
+        data — the two are decoupled there and here alike (our runtime
+        automatic default stays -25.936, see get_tid_acc tests).
         """
-        assert ephem.TIDAL_DEFAULT == ephem.TIDAL_DE440 == -25.936
+        assert ephem.TIDAL_DEFAULT == ephem.TIDAL_DE431 == -25.80
 
 
 class TestTidAccFunctionAliases:

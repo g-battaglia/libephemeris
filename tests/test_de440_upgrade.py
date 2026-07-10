@@ -31,15 +31,18 @@ class TestDE440Default:
 
         assert _EPHEMERIS_FILE == "de440.bsp"
 
-    def test_tidal_default_is_de440(self):
+    def test_tidal_default_is_de431(self):
         """Verify tidal acceleration constants.
 
-        TIDAL_DEFAULT is the DE440/DE441 value (-25.936), matching both
-        this library's ephemeris and the reference API's runtime default
-        (its get_tid_acc() returns -25.936 out of the box, despite its
-        own -25.8 named constant).
+        The named constant TIDAL_DEFAULT aliases the DE431 value (-25.80)
+        for 1:1 parity with the reference API's same-named constant
+        (measured black-box). The runtime automatic default is separate:
+        get_tid_acc() returns the DE440/DE441 value -25.936 out of the
+        box, matching the reference's runtime behavior.
         """
-        assert TIDAL_DEFAULT == TIDAL_DE440
+        from libephemeris import TIDAL_DE431
+
+        assert TIDAL_DEFAULT == TIDAL_DE431 == -25.80
         assert TIDAL_DE440 == -25.936
         assert TIDAL_DE441 == -25.936  # DE441 uses same value
 
