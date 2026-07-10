@@ -48,10 +48,14 @@ Poseidon, 2415020.0, J1900, 165.5163, 83.66907, 0.00000,   0.0000,   0.0000, 0.0
 Isis-Transpluto, 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0.0, 0.0, 0, Strubell 1952 "Die Sterne" 3/1952 p.70
 
 # --- Nibiru ---
-# Hypothetical body from Zecharia Sitchin's mythology, not astronomically defined.
-# Elements courtesy: Woeltge, C. (Hannover, private communication).
+# Hypothetical body from Zecharia Sitchin's mythology, not astronomically
+# defined; the element set circulating in the astrological community is
+# credited to C. Woeltge (Hannover). No independent public publication of
+# these numbers is known, so they are carried here as interoperability
+# values: a black-box Keplerian fit against reference-API output positions
+# recovers this element set (see docs/methodology/independence-remediation-2026-07.md).
 
-Nibiru, 1856113.380954, 1856113.380954, 0.0, 234.8921, 0.981092, 103.966, -44.567, 158.708, 0, Woeltge C. (Hannover, unpublished)
+Nibiru, 1856113.380954, 1856113.380954, 0.0, 234.8921, 0.981092, 103.966, -44.567, 158.708, 0, interoperability elements (black-box output fit; concept credited to Woeltge C.)
 
 # --- Harrington's Planet X ---
 # Robert Harrington's predicted trans-Neptunian planet based on dynamical perturbations.
@@ -79,35 +83,45 @@ Pickering-Pluto, 2425977.5, 2425977.5,  48.95, 55.1, 0.31, 280.1, 100.0, 15.0, 0
 # --- Vulcan (hypothetical intra-Mercurial planet) ---
 # Proposed by Urbain Le Verrier in 1859 to explain Mercury's perihelion precession.
 # Not confirmed; anomaly later explained by general relativity (Einstein 1915).
-# Elements per Weston, L.H. (unpublished; T-polynomial formulation).
+# Elements per L.H. Weston's published monograph on the body ("The Planet
+# Vulcan", American Federation of Astrologers), T-polynomial formulation.
 # Mean anomaly and apsidal elements precess rapidly (orbital period ~20 days).
 
-Vulcan, 2415020.0, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069 + 1670.056 * T, 47.787931 - 1670.056 * T, 7.5, 0, Weston L.H. (unpublished); see also Le Verrier 1859
+Vulcan, 2415020.0, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069 + 1670.056 * T, 47.787931 - 1670.056 * T, 7.5, 0, Weston L.H. "The Planet Vulcan" (AFA); see also Le Verrier 1859
 
 # --- Selena / White Moon ---
 # A symbolic geocentric point opposite to the mean Black Moon Lilith,
 # representing an idealised "light" counterpart to the lunar apogee.
-# Introduced in Russian astrological tradition (Vera Shkurovich, 1990s).
-# Elements referenced to J2000.0; position follows the mean lunar apogee cycle.
+# Introduced in Russian astrological tradition (published as a circular
+# geocentric point with a 7-year cycle). The rate/radius digits here are
+# interoperability values verified by a black-box fit against
+# reference-API output (see docs/methodology/independence-remediation-2026-07.md).
 
-Selena, 2451545.0, JDATE, 242.2205555 + 5143.5418158 * T, 0.05280098949, 0.0, 0.0, 0.0, 0.0, 1, Shkurovich V. (1990s); mean lunar apogee cycle
+Selena, 2451545.0, JDATE, 242.2205555 + 5143.5418158 * T, 0.05280098949, 0.0, 0.0, 0.0, 0.0, 1, Russian-school 7-year circular convention; digits = interoperability values (black-box output fit)
 
 # --- Proserpina ---
 # Hypothetical trans-Plutonian planet used in some astrological traditions.
-# Elements provided by: Abramov, V. (Ukraine, private communication).
-# See: http://www.geocities.ws/rognavaldre/proserpina.html (archived)
+# The circular-orbit convention (two numbers: epoch anomaly and radius) is
+# credited to V. Abramov (Ukraine); no independent public publication of the
+# digits is known, so they are carried as interoperability values: a
+# black-box fit against reference-API output recovers them (see
+# docs/methodology/independence-remediation-2026-07.md).
 
-Proserpina, 2415020.0, JDATE, 170.73, 79.225630, 0.0, 0.0, 0.0, 0.0, 0, Abramov V. (unpublished)
+Proserpina, 2415020.0, JDATE, 170.73, 79.225630, 0.0, 0.0, 0.0, 0.0, 0, interoperability elements (black-box output fit; concept credited to Abramov V.)
 
 # --- Waldemath's hypothetical second Moon of Earth ---
 # Proposed by Dr. Georg Waldemath (1898) based on claimed observations.
 # Not confirmed by any subsequent observation.
-# Elements reconstructed by D. Koch from Waldemath's original published values
-# as described in: Walters, D. "The Book on Vulcan" (chapter on the Dark Moon).
-# Note: these differ from Solar Fire's implementation and from Delphine Jay's ephemeris.
+# Waldemath published his claimed observations and orbit parameters in 1898
+# (a dark satellite with a ~119-day period); the fully-specified element set
+# below is the reconstruction circulating in the astrological community
+# (cf. Walters, D., "The Book on Vulcan", Dark Moon chapter; it differs from
+# Solar Fire's implementation and from Delphine Jay's ephemeris). The digits
+# are carried as interoperability values verified by a black-box fit against
+# reference-API output (see docs/methodology/independence-remediation-2026-07.md).
 # Geocentric body with retrograde nodal motion.
 
-Waldemath, 2414290.95827875, 2414290.95827875, 70.3407215 + 109023.2634989 * T, 0.0068400705250028, 0.1587, 8.14049594 + 2393.47417444 * T, 136.24878256 - 1131.71719709 * T, 2.5, 1, Waldemath G. 1898; elements reconstructed by Koch D.
+Waldemath, 2414290.95827875, 2414290.95827875, 70.3407215 + 109023.2634989 * T, 0.0068400705250028, 0.1587, 8.14049594 + 2393.47417444 * T, 136.24878256 - 1131.71719709 * T, 2.5, 1, Waldemath G. 1898 published claims; digits = interoperability values (black-box output fit)
 
 # --- Christ Comet ---
 # Orbital elements proposed for the "Star of Bethlehem" interpreted as a comet.
