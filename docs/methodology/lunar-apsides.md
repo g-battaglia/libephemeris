@@ -20,7 +20,7 @@ LibEphemeris constructs the interpolated apsides from the physical geometry of t
 
 3. **Harmonic series calibration.** A 66-term trigonometric perturbation series, constructed from the standard Delaunay arguments (D, M, M', F), is fitted to the spline via least squares. Terms with amplitudes below 0.001 degrees are discarded.
 
-4. **Residual correction.** A precomputed correction table (~15,000 entries) absorbs the remaining difference between the harmonic model and the JPL ground truth.
+4. **Residual correction.** A precomputed correction table (`PERIGEE_CORRECTIONS`, 201,249 entries at a 2-day step over 1549–2650) absorbs the remaining difference between the harmonic model and the JPL ground truth.
 
 The result is a smooth apsidal curve anchored to the physical distance extrema of the Moon as computed by modern numerical integration.
 

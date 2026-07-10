@@ -1863,8 +1863,21 @@ to include precomputed ephemeris with zero additional downloads.
 
 ```
 Magic:   b"LEB2" (4 bytes)
-Version: 1 (uint32)
+Version: 2 (uint32)   — current chunked format (LEB2_VERSION)
+         1            — legacy monolithic format, still readable (LEB2_VERSION_V1)
 ```
+
+**Format versions.** The current conversion pipeline writes **v2
+(chunked)**: each body's coefficient stream is split into ~10-year
+temporal chunks, each compressed independently, with a per-body chunk
+index; the reader decompresses only the chunk containing the requested
+JD (lazy, per-chunk cache), instead of the whole body. **v1
+(monolithic)** stored each body as a single compressed blob;
+`LEB2Reader` keys off the header version and still reads v1 files
+through the monolithic decode path. Sections 13.3–13.8 below describe
+the shared per-body compression primitives (mantissa truncation,
+coeff-major reorder, byte shuffle, zstd), which apply to each v2 chunk
+exactly as they applied to a whole v1 body.
 
 **Overall layout:**
 
