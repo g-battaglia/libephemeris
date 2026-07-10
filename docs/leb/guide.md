@@ -719,12 +719,15 @@ Earth-relative analytical quantities).
 **Bodies:** Cupido, Hades, Zeus, Kronos, Apollon, Admetos, Vulkanus,
 Poseidon, Transpluto (9 bodies)
 
-**Stored as:** (lon, lat, dist) in degrees/degrees/AU, heliocentric ecliptic
+**Stored as:** (lon, lat, dist) in degrees/degrees/AU, heliocentric J2000
+ecliptic
 
-**Algorithm:** Delegates entirely to Pipeline B (`_pipeline_ecliptic`).
-The coordinate type distinction only matters at generation time; at
-evaluation time, the same Chebyshev read + optional coordinate transforms
-apply.
+**Algorithm:** `_pipeline_helio()`, a distinct pipeline. For `FLG_HELCTR`
+requests the stored heliocentric coordinates are evaluated directly; for the
+default geocentric output the pipeline performs a real heliocentric ->
+geocentric conversion — it subtracts the Earth's position (with the
+light-time correction, matching the Skyfield path) and then applies the
+same of-date frame transforms as Pipeline B.
 
 ### 5.6 Sidereal Correction
 
