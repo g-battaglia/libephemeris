@@ -182,7 +182,7 @@ in this order: `de441.bsp`, `de440.bsp`, `linux_m13000p17000.441`,
 After implementation, run the tier diagnostics to verify:
 
 ```bash
-poe diag:extended
+leph diag extended
 ```
 
 Expected results:

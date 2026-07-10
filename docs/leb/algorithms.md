@@ -633,14 +633,17 @@ The combined effect is encoded in a 3x3 rotation matrix that transforms
 vectors from ICRS to the equatorial frame of a given date:
 
 ```python
-# Primary method: PyERFA (IAU 2006 precession + IAU 2000A nutation)
-import erfa
-pn_matrix = erfa.pnm06a(2451545.0, jd_tt - 2451545.0)
+# Vondrák 2011 long-term precession (via pyerfa's ltp/ltpb) combined with
+# the nutation angles — valid +/-200,000 years, matching the apparent-place
+# reduction used everywhere else in the library.
+from libephemeris.precession_vondrak import vondrak_pn_matrix
 
-# Fallback: libephemeris internal implementation
-from astrometry import _precession_nutation_matrix as _pnm
-pn_matrix = _pnm(jd_tt)
+pn_matrix, eps_true = vondrak_pn_matrix(jd_tt, dpsi, deps)
 ```
+
+On the LEB path the nutation angles (dpsi, deps) come from the LEB-stored
+Chebyshev coefficients; on the Skyfield path they come from Skyfield's
+IAU 2000A model. Both paths share the single Vondrák matrix source.
 
 The matrix is applied to both position and velocity vectors.
 

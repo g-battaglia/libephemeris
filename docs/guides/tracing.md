@@ -162,5 +162,5 @@ for the full list of log-level source tags.
   or CI test runs. More verbose (includes Julian Day per call), but requires
   log parsing to extract structured data.
 
-Both mechanisms track the same 11 dispatch points in `planets.py` (9) and
-`context.py` (2).
+Both mechanisms track the same dispatch points (`_record()` call sites in
+`planets.py` and `context.py`).

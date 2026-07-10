@@ -307,7 +307,7 @@ intp_lon, intp_lat, intp_ecc = lunar.calc_interpolated_apogee(jd_tt)
 print(f"Interpolated Apogee: {intp_lon:.4f} deg")
 
 # Interpolated Perigee
-perg_lon, perg_lat, perg_ecc = lunar.calc_interpolated_perigee(jd_tt)
+perg_lon, perg_lat, perg_dist = lunar.calc_interpolated_perigee(jd_tt)
 print(f"Interpolated Perigee: {perg_lon:.4f} deg")
 ```
 
@@ -316,12 +316,13 @@ print(f"Interpolated Perigee: {perg_lon:.4f} deg")
 All lunar apside functions return:
 - **Longitude**: Ecliptic longitude in degrees [0, 360)
 - **Latitude**: Ecliptic latitude in degrees (typically small, < 5 degrees)
-- **Eccentricity/Distance**: Orbital eccentricity (~0.055 for Moon)
+- **Distance**: Earth-to-apside distance in AU (~0.00242 at perigee,
+  ~0.00271 at apogee)
 
 When using `calc_ut` with `FLG_SPEED`, velocity is also calculated:
 - **Speed (longitude)**: Daily motion in degrees/day
 - **Speed (latitude)**: Daily change in latitude
-- **Speed (distance)**: Daily change in eccentricity
+- **Speed (distance)**: Daily change in distance (AU/day)
 
 ## Precision and Validation
 

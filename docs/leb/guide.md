@@ -617,7 +617,9 @@ Juno, Vesta (11 bodies)
    - `u' = u + v/c - u*(u.v/c)`, renormalize
 7. **Coordinate transform** (one of four paths):
    - **True ecliptic of date** (default, most common):
-     - Precess ICRS -> equatorial of date via `erfa.pnm06a()` matrix
+     - Precess ICRS -> true equatorial of date via the Vondrák 2011
+       long-term precession + LEB-stored nutation (`vondrak_pn_matrix`,
+       see `precession_vondrak.py`)
      - Rotate equatorial -> ecliptic using true obliquity (mean + nutation deps)
    - **J2000 ecliptic** (`FLG_J2000`):
      - Rotate ICRS -> ecliptic J2000 using J2000 obliquity (23.4392911 deg)
@@ -758,7 +760,7 @@ dlon -= prec_rate
 | `_rotate_equatorial_to_ecliptic(x, y, z, eps)` | Frame rotation | line 110 |
 | `_rotate_icrs_to_ecliptic_j2000(x, y, z)` | ICRS -> ecliptic J2000 | line 131 |
 | `_apply_aberration(geo, earth_vel)` | Classical aberration formula | line 138 |
-| `_precession_nutation_matrix(jd_tt)` | erfa.pnm06a() with fallback | line 186 |
+| `_get_leb_frame_data(reader, jd_tt)` | Vondrák 2011 PN matrix + LEB nutation | fast_calc.py |
 | `_mat3_vec3(mat, vec)` | 3x3 matrix * 3-vector | line 221 |
 | `_cotrans(lon, lat, eps)` | Ecliptic <-> equatorial spherical | line 233 |
 | `_precess_ecliptic(lon, lat, from_jd, to_jd)` | Ecliptic precession | line 270 |
@@ -2305,21 +2307,19 @@ The generator reads this to find the SPK file for each asteroid.
 
 ### 15.5 Precession-Nutation Matrix
 
-`fast_calc.py` uses `erfa.pnm06a()` for the precession-nutation matrix,
-with a fallback to `astrometry._precession_nutation_matrix()`. The matrix
-is a 3x3 rotation from ICRS to equatorial of date. It incorporates both
-IAU 2006 precession and IAU 2000A nutation.
+`fast_calc.py` builds the ICRS -> true-equator-of-date rotation from the
+**Vondrák 2011 long-term precession** combined with the nutation angles via
+`vondrak_pn_matrix()` (`precession_vondrak.py`; valid ±200,000 years, unlike
+the few-century IAU 2006 polynomials it replaced). The nutation angles come
+from the LEB-stored Chebyshev coefficients on the pure-LEB path
+(`_get_leb_frame_data`) and from Skyfield's IAU 2000A model on the Skyfield
+path (`_get_skyfield_frame_data`) — both feed the same single Vondrák
+matrix source, so the two backends cannot diverge at remote epochs.
 
 ```python
-# fast_calc.py:186-218
-def _precession_nutation_matrix(jd_tt):
-    try:
-        import erfa
-        mat = erfa.pnm06a(J2000, jd_tt - J2000)
-        return ((mat[0][0], ...), (mat[1][0], ...), (mat[2][0], ...))
-    except ImportError:
-        from .astrometry import _precession_nutation_matrix as _pnm
-        return _pnm(jd_tt)
+# fast_calc.py (LEB path)
+dpsi, deps = <nutation from LEB Chebyshev coefficients>
+pn_mat, eps_true_rad = vondrak_pn_matrix(jd_tt, dpsi, deps)
 ```
 
 ### 15.6 IAU 2006 General Precession (for Sidereal)
@@ -2327,7 +2327,7 @@ def _precession_nutation_matrix(jd_tt):
 Used in both `_calc_ayanamsa_from_leb()` and the speed correction:
 
 ```python
-# fast_calc.py:294
+# fast_calc.py
 _PREC_COEFFS = (5028.796195, 1.1054348, 0.00007964, -0.000023857, -0.0000000383)
 # arcsec/century polynomial: P(T) = sum(c_i * T^(i+1))
 ```

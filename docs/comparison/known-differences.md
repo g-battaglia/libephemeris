@@ -230,8 +230,16 @@ the closer match to JPL's latest long-range integration.
 
 **1.2 Interpolated apogee/perigee (bodies 21, 22).** IntpApog/IntpPerg use
 semi-analytical ELP2000-82B perturbation theory, implemented independently from
-published coefficients; results can differ by several arcseconds. Classified as a
-known divergence in all tests.
+published coefficients. In **longitude** the results differ from the reference
+by a few arcseconds within the residual-table range (see
+`docs/methodology/interpolated-apogee.md`). The **latitude** channel is a
+different model class: libephemeris reconstructs it as i·sin(lon − node) from
+the mean inclination and mean node, which differs from the reference's
+latitude by up to ~0.16° (~570") at all epochs — measured e.g. IntpApog
+−566" at JD 2452340, IntpPerig +535" at JD 2453082, while MEAN_APOG/OSCU_APOG
+latitudes at the same dates agree to <1". Both channels are classified as a
+known divergence in all tests (the LEB compare suite deliberately allows a
+wide latitude tolerance for these two bodies).
 
 **1.3 Pholus (body 16) historical dates.** The SPK auto-download path requests
 padding around the selected tier and verifies cached-kernel coverage before reuse,
@@ -605,7 +613,9 @@ grows with distance from J2000: ~0" at J2000 for star-anchored "True" modes risi
 to ~40" at ±100y, up to ~145" for galactic/calculated modes at the extremes —
 inherited from small fixed-star proper-motion / galactic-frame-definition
 differences (§4). This is a definitional difference in those niche modes, not an
-error: every fixed-epoch mode is exact.
+error: every fixed-epoch mode's ayanamsha value is exact. (For the *positions*
+returned under the fixed-epoch modes 18/19/20 — which the reference computes as
+a frame transformation, not an ayanamsha subtraction — see §10.2b.)
 
 A second, smaller family effect: libephemeris applies the same modern 5-term
 IAU 2006 precession-rate polynomial to **all** formula-based ayanamsha modes,
@@ -618,12 +628,33 @@ identical across the group (a pure precession-rate difference). Both
 libephemeris backends agree with each other; the uniform modern model is
 deliberate.
 
+**10.2b Fixed-epoch modes are frame requests (implemented, two micro-residuals).**
+For `SIDM_J2000`/`SIDM_J1900`/`SIDM_B1950` the reference does not subtract an
+ayanamsha at all: it returns the position expressed on the **mean ecliptic and
+equinox of the mode's epoch t0** (measured black-box — `SIDM_J2000` output is
+bit-identical to a `FLG_J2000 | FLG_NONUT` request for every representation:
+ecliptic, equatorial, XYZ, speeds). libephemeris implements the same frame
+transformation for planets, both fixed-star families, and houses (houses run
+the cusp engine against the node of the t0 ecliptic on the true equator of
+date, including the reference's measured near-t0 sign quirk: within the
+window where the mean and true ayanamshas have opposite signs, roughly ±4
+months around t0, every ecliptic output is shifted by 2× the unwrapped true
+ayanamsha). Agreement is ≲0.05" for planets/stars and ≲0.05" for house cusps
+across 1900–2035. Two micro-residuals remain: (1) the reported house
+`ascmc[2]` (ARMC) keeps the tropical ARMC, while the reference's drifts from
+it by ≲15" over five centuries with no clean geometric model; (2) the
+near-t0 quirk window boundary depends on sub-milliarcsecond ayanamsha
+zero-crossings, so within ~1 second of time around the exact t0 instant the
+branch decision can differ.
+
 **10.3 SIDBIT projection flags (not yet supported).** The `SIDBIT_*` flags
 (`ECL_T0`, `SSY_PLANE`, `USER_UT`, `ECL_DATE`, `NO_PREC_OFFSET`, `PREC_ORIG`; all
 ≥ 256) select alternative ecliptic/equinox projections that this version does not
 implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping the
 base ayanamsha mode — rather than the composite value silently falling back to
-Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release.
+Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release. (The
+*implicit* ecliptic-of-t0 projection that the reference applies to the plain
+fixed-epoch modes 18/19/20 is implemented — see §10.2b.)
 
 **10.4 `SIDEREAL | EQUATORIAL` speed frame (parity).** Both engines report
 the SID|EQ *position* on the mean equator of date and the accompanying
