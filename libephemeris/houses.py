@@ -486,10 +486,14 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     eps_rad = math.radians(eps)
 
     # At equator (lat=0), the Vertex formula has a 1/tan(lat) singularity.
-    # Clamp to a tiny positive latitude so the formula evaluates to the
-    # correct limiting value (matches the reference behavior).
+    # Clamp to a tiny latitude so the formula evaluates to the correct
+    # limiting value, PRESERVING the sign: the reference gives tiny nonzero
+    # latitudes their own one-sided limit (measured: lat=-1e-11 -> the
+    # lat->0- Vertex, 180 deg away from the lat->0+ one). Exact 0.0 lands
+    # on the positive side (the reference's lat==0 behavior for every
+    # system except 'H', which is special-cased by the callers).
     if abs(lat) < 1e-10:
-        lat = 1e-10
+        lat = -1e-10 if lat < 0.0 else 1e-10
 
     # Standard formula: Vertex is where Prime Vertical intersects ecliptic in West
     armc_rad = math.radians(armc_deg)
@@ -791,8 +795,10 @@ def houses(
     # The horizontal system computes its equator-degenerate angles on
     # the negative-latitude side (reference behavior — its vertex and
     # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
-    # lat -> 0+ limits).
-    _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
+    # lat -> 0+ limits). Only EXACT lat==0.0 is special: tiny nonzero
+    # latitudes keep their own sign through the _calc_vertex clamp
+    # (measured black-box on 'H' at lat=+1e-11 -> the lat->0+ limit).
+    _vtx_lat = -1e-9 if (hsys_char == "H" and lat == 0.0) else lat
     vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
 
     # Equatorial Ascendant (East Point)
@@ -1383,8 +1389,10 @@ def houses_armc(
     # The horizontal system computes its equator-degenerate angles on
     # the negative-latitude side (reference behavior — its vertex and
     # coasc2 at lat 0 equal the lat -> 0- limits, other systems the
-    # lat -> 0+ limits).
-    _vtx_lat = -1e-9 if (hsys_char == "H" and abs(lat) < 1e-10) else lat
+    # lat -> 0+ limits). Only EXACT lat==0.0 is special: tiny nonzero
+    # latitudes keep their own sign through the _calc_vertex clamp
+    # (measured black-box on 'H' at lat=+1e-11 -> the lat->0+ limit).
+    _vtx_lat = -1e-9 if (hsys_char == "H" and lat == 0.0) else lat
     vertex = _calc_vertex(armc_deg, eps, _vtx_lat)
 
     # Equatorial Ascendant (East Point)
