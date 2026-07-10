@@ -92,7 +92,7 @@ from .constants import (
 from .planets import calc_ut
 from .cache import get_cached_nutation
 from .exceptions import Error, PolarCircleError, validate_coordinates
-from .utils import degnorm, difdeg2n
+from .utils import cotrans, degnorm, difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
 
@@ -5029,92 +5029,534 @@ def _houses_apc(
     return cusps
 
 
-# --- Degree-based trig helpers (mirror the reference sind/cosd/... macros) ---
-# These keep the ported house_pos placement code readable and 1:1 comparable
-# with the reference implementation, which works entirely in degrees.
+# Shared placement constants: the epsilon guard for degenerate spherical
+# arguments, and the cusp-boundary nudge (1/1000 arcsec) that pushes a body
+# sitting exactly on a cusp into the following house — the documented
+# convention of the reference API for house_pos().
+_NEAR_ZERO = 1e-10
+CUSP_BOUNDARY_OFFSET = 1.0 / 3600000.0
 
 
-def _sind(x: float) -> float:
+# --- Degree-argument trigonometry ------------------------------------------
+# Spherical-astronomy formulas for house placement are stated in degrees in
+# every published source (semi-arcs, meridian distances, poles). These
+# one-line wrappers keep the formulas below readable in the same units the
+# literature uses; the inverse functions clamp their argument to the
+# principal domain, the standard guard against |x| creeping past 1 by a few
+# ULPs in intermediate float arithmetic.
+
+
+def _sin_deg(x: float) -> float:
     return math.sin(math.radians(x))
 
 
-def _cosd(x: float) -> float:
+def _cos_deg(x: float) -> float:
     return math.cos(math.radians(x))
 
 
-def _tand(x: float) -> float:
+def _tan_deg(x: float) -> float:
     return math.tan(math.radians(x))
 
 
-def _atand(x: float) -> float:
+def _atan_deg(x: float) -> float:
     return math.degrees(math.atan(x))
 
 
-def _asind(x: float) -> float:
+def _asin_deg(x: float) -> float:
     return math.degrees(math.asin(max(-1.0, min(1.0, x))))
 
 
-def _acosd(x: float) -> float:
+def _acos_deg(x: float) -> float:
     return math.degrees(math.acos(max(-1.0, min(1.0, x))))
 
 
-def _fix_asc_polar(asc: float, armc: float, eps: float, geolat: float) -> float:
-    """Keep the ascendant on the eastern (rising) half of the horizon.
+def _rotate_frame(lon: float, lat: float, tilt_deg: float) -> Tuple[float, float]:
+    """Tilt a spherical position into a frame rotated about the x-axis.
 
-    Beyond the polar circle the ecliptic-longitude formula for the
-    ascendant can land on the western half of the horizon (a 180 deg / six
-    house error). The reference corrects this with a simple meridian-altitude
-    test; this reproduces that correction's behaviour.
-
-    Args:
-        asc: Raw ascendant longitude in degrees.
-        armc: Right Ascension of the Medium Coeli in degrees.
-        eps: True obliquity of the ecliptic in degrees.
-        geolat: Geographic latitude in degrees.
+    Thin wrapper over :func:`libephemeris.utils.cotrans` (this project's
+    public coordinate-rotation primitive) for callers that carry no radial
+    component. A positive ``tilt_deg`` rotates by the textbook x-axis
+    rotation used throughout spherical astronomy for plane changes —
+    ecliptic/equator, equator/horizon, equator/prime-vertical (Meeus,
+    'Astronomical Algorithms', 2nd ed., Ch. 13; Montenbruck & Pfleger,
+    'Astronomy on the Personal Computer', par. 1.3).
 
     Returns:
-        The ascendant longitude, flipped by 180 deg when it fell on the
-        western horizon.
+        ``(lon_out, lat_out)`` in degrees, longitude normalized to
+        ``[0, 360)``.
     """
-    demc = _atand(_sind(armc) * _tand(eps))
-    if geolat >= 0 and 90.0 - geolat + demc < 0.0:
+    lon_out, lat_out, _ = cotrans((lon, lat, 1.0), tilt_deg)
+    return lon_out, lat_out
+
+
+def _ascendant_on_eastern_horizon(
+    asc: float, armc: float, eps: float, geolat: float
+) -> float:
+    """Return the ascendant longitude anchored to the rising intersection.
+
+    The horizon and the ecliptic intersect in two opposite points; the
+    ascendant is by definition the *eastern* (rising) one. The closed-form
+    ecliptic-longitude expression for the ascendant silently picks the
+    intersection nearer the meridian, which inside the polar circles can be
+    the setting point — a six-house (180 deg) error for every equal-style
+    system anchored to the ascendant.
+
+    Geometric test: the MC degree of the ecliptic has declination
+    ``delta_mc = atan(sin ARMC * tan eps)`` (the standard declination of an
+    ecliptic point expressed through its right ascension). Its meridian
+    altitude is ``90 - phi + delta_mc`` in the northern hemisphere and
+    ``-(-90 - phi + delta_mc)`` in the southern one; when that altitude
+    goes negative the MC has sunk below the horizon and the two
+    horizon-ecliptic intersections have swapped roles, so the raw
+    ascendant must be flipped to the opposite point.
+
+    Args:
+        asc: Ascendant longitude from the closed-form expression (degrees).
+        armc: Right ascension of the MC (degrees).
+        eps: True obliquity of the ecliptic (degrees).
+        geolat: Geographic latitude (degrees).
+
+    Returns:
+        The ascendant longitude on the eastern horizon (degrees).
+    """
+    delta_mc = _atan_deg(_sin_deg(armc) * _tan_deg(eps))
+    if geolat >= 0 and 90.0 - geolat + delta_mc < 0.0:
         asc = (asc + 180.0) % 360.0
-    if geolat < 0 and -90.0 - geolat + demc > 0.0:
+    if geolat < 0 and -90.0 - geolat + delta_mc > 0.0:
         asc = (asc + 180.0) % 360.0
     return asc
 
 
-def _cotrans_lonlat(lon: float, lat: float, eps_deg: float) -> Tuple[float, float]:
-    """Rotate spherical coordinates about the x-axis by ``eps_deg`` degrees.
+def _above_horizon_test(dec: float, geolat: float, merid_dist: float) -> float:
+    """Signed above-horizon indicator for a body at hour-angle distance.
 
-    Matches the reference API's coordinate-rotation behaviour: converts
-    between two reference planes (e.g. ecliptic <-> equator, or equator
-    <-> horizon).
-
-    Args:
-        lon: Longitude in degrees.
-        lat: Latitude in degrees.
-        eps_deg: Rotation angle in degrees.
-
-    Returns:
-        Tuple ``(lon_out, lat_out)`` in degrees, with longitude normalized
-        to ``[0, 360)``.
+    From the standard altitude formula ``sin h = sin(phi) sin(delta) +
+    cos(phi) cos(delta) cos(H)``: dividing through by ``cos(phi) cos(delta)``
+    (positive for |phi|, |delta| < 90) leaves the sign of the altitude in
+    ``tan(phi) tan(delta) + cos(H)``. Non-negative means the body sits on or
+    above the horizon.
     """
-    lon_r = math.radians(lon)
-    lat_r = math.radians(lat)
-    e = math.radians(eps_deg)
-    x0 = math.cos(lat_r) * math.cos(lon_r)
-    x1 = math.cos(lat_r) * math.sin(lon_r)
-    x2 = math.sin(lat_r)
-    y1 = x1 * math.cos(e) + x2 * math.sin(e)
-    y2 = -x1 * math.sin(e) + x2 * math.cos(e)
-    rxy = math.hypot(x0, y1)
-    lon_out = math.degrees(math.atan2(y1, x0)) % 360.0
-    if rxy == 0.0:
-        lat_out = 90.0 if x2 >= 0 else -90.0
+    return _tan_deg(dec) * _tan_deg(geolat) + _cos_deg(merid_dist)
+
+
+def _asc_diff_saturated(dec: float, geolat: float) -> float:
+    """Ascensional difference, saturated at the circumpolar limit.
+
+    ``AD = asin(tan(phi) tan(delta))`` (the classic rising-time correction,
+    Meeus Ch. 15). Where the argument exceeds unit magnitude the body never
+    crosses the horizon at this latitude; the difference saturates at
+    +/-90 deg, which turns the corresponding semi-arc into 180 or 0 deg.
+    """
+    s = _tan_deg(dec) * _tan_deg(geolat)
+    if s >= 1.0:
+        return 90.0
+    if s <= -1.0:
+        return -90.0
+    return _asin_deg(s)
+
+
+def _hpos_topocentric(
+    armc: float, geolat: float, ra: float, dec: float, md_upper: float
+) -> float:
+    """Topocentric (Polich-Page) house position.
+
+    Every topocentric house circle is a position circle whose pole height
+    varies continuously across the quadrant: the *tangent* of the pole is a
+    linear share of the tangent of the geographic latitude (Polich & Page,
+    "The Topocentric System of Houses", Spica, 1964). Placement inverts
+    that one-parameter family: find the circle of the family that passes
+    through the body.
+
+    The inversion is a binary subdivision walk. Step ``k`` moves the trial
+    circle by ``90/2^k`` degrees of right ascension inside the quadrant
+    while re-anchoring the trial pole so its tangent keeps the linear share
+    ``tan(phi)/2^k`` — i.e. the trial always stays on the topocentric
+    family. The signed latitude of the body in the trial circle's frame
+    (obtained with the same x-axis rotation used for every plane change in
+    this module) steers each step; the walk stops once that latitude
+    vanishes to 1e-6 deg.
+
+    Quadrant symmetry reduces the search to the eastern half above the
+    horizon: a body below the horizon is replaced by its antipode, a
+    western body is mirrored through the meridian, and the found angle is
+    mapped back through the same mirrors at the end.
+    """
+    trial_pole = geolat
+    if trial_pole > 89.999:
+        trial_pole = 89.999
+    if trial_pole < -89.999:
+        trial_pole = -89.999
+    upper_md = md_upper % 360.0
+
+    dec_t = dec
+    if dec_t > 90.0 - _NEAR_ZERO:
+        dec_t = 90.0 - _NEAR_ZERO
+    if dec_t < -90.0 + _NEAR_ZERO:
+        dec_t = -90.0 + _NEAR_ZERO
+
+    horizon_sign = _tan_deg(dec_t) * _tan_deg(trial_pole)
+    horizon_sign = max(-1.0, min(1.0, horizon_sign))
+    is_above_horizon = horizon_sign + _cos_deg(upper_md) >= 0
+
+    ra_search = ra
+    if not is_above_horizon:
+        # Antipodal mirror: solve for the opposite point above the horizon.
+        ra_search = (ra_search + 180.0) % 360.0
+        dec_t = -dec_t
+        upper_md = (upper_md + 180.0) % 360.0
+    if upper_md > 180.0:
+        # Western half: mirror through the meridian into the eastern half.
+        ra_search = (armc - upper_md) % 360.0
+
+    tan_lat_full = _tan_deg(trial_pole)
+    trial_ra = (armc + 90.0) % 360.0
+    frame_lat = 1.0
+    subdiv = 2.0
+    steps = 0
+    while abs(frame_lat) > 0.000001 and steps < 1000:
+        if frame_lat > 0:
+            trial_pole = _atan_deg(_tan_deg(trial_pole) - tan_lat_full / subdiv)
+            trial_ra -= 90.0 / subdiv
+        else:
+            trial_pole = _atan_deg(_tan_deg(trial_pole) + tan_lat_full / subdiv)
+            trial_ra += 90.0 / subdiv
+        lon_in_circle = (ra_search - trial_ra) % 360.0
+        _, frame_lat = _rotate_frame(lon_in_circle, dec_t, 90.0 - trial_pole)
+        subdiv *= 2.0
+        steps += 1
+
+    pos_deg = (trial_ra - armc) % 360.0
+    # Undo the meridian mirror, then the antipodal mirror.
+    if upper_md > 180.0:
+        pos_deg = (-pos_deg) % 360.0
+    if not is_above_horizon:
+        pos_deg = (pos_deg + 180.0) % 360.0
+    pos_deg = (pos_deg - 90.0) % 360.0
+    # Guard the float modulo: a tiny negative argument can round up to
+    # exactly 360.0, which would yield house 13.0 (out of domain).
+    if pos_deg >= 360.0:
+        pos_deg -= 360.0
+    return pos_deg / 30.0 + 1.0
+
+
+def _hpos_horizon(md_upper: float, dec: float, geolat: float) -> float:
+    """Horizon / azimuthal house position.
+
+    The azimuthal system divides the horizon itself into twelve 30-degree
+    houses, so a body is placed by its true azimuth, not by any ecliptic
+    coordinate. Tilting the equatorial position (hour angle measured from
+    the east point, declination) onto the horizon plane by the observer's
+    co-latitude yields that azimuthal longitude directly — the same plane
+    change as every other frame rotation in this module.
+    """
+    az_lon, _ = _rotate_frame((md_upper - 90.0) % 360.0, dec, 90.0 - geolat)
+    pos_deg = (az_lon + CUSP_BOUNDARY_OFFSET) % 360.0
+    return pos_deg / 30.0 + 1.0
+
+
+def _hpos_carter(ra: float, armc: float, eps: float, geolat: float) -> float:
+    """Carter "Poli-Equatorial" house position.
+
+    Carter's system divides the celestial equator into twelve equal arcs of
+    right ascension anchored at the right ascension of the ascendant
+    (C.E.O. Carter, "Essays on the Foundations of Astrology"). The body's
+    placement is simply its RA distance from the ascendant's RA.
+    """
+    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+    asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
+    asc_ra, _ = _rotate_frame(asc, 0.0, -eps)
+    pos_deg = (ra - asc_ra) % 360.0
+    return pos_deg / 30.0 + 1.0
+
+
+def _hpos_krusinski(ra: float, armc: float, eps: float, geolat: float) -> float:
+    """Krusinski-Pisa-Goelzer house position.
+
+    The house plane is the great circle through the ascendant and the
+    zenith (Krusinski 1995; equivalently Pisa 1997 and Goelzer 1995, who
+    published the same construction independently). Houses divide that
+    circle into twelve equal arcs starting at the ascendant, and a body is
+    carried onto the plane along its declination circle.
+
+    Steps, all plain plane changes and in-plane projections:
+      1. Locate the house plane: its ascending node on the equator and its
+         inclination to the equator, found by tilting the ascendant into
+         the horizon frame and reading the node/obliquity back out.
+      2. Project the ascendant onto the plane along the equator's
+         declination circles (an atan-stretch by the plane's obliquity),
+         fixing the zero point of the house scale.
+      3. Project the body the same way and take its in-plane arc from the
+         ascendant.
+    """
+    gl = geolat
+    if abs(gl) < _NEAR_ZERO:
+        gl = _NEAR_ZERO if gl >= 0 else -_NEAR_ZERO
+    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, gl, gl)
+    asc = _ascendant_on_eastern_horizon(asc, armc, eps, gl)
+
+    # 1a. Node of the house plane on the equator.
+    node_lon, node_lat = _rotate_frame(asc, 0.0, -eps)
+    ra_east_point = (armc + 90.0) % 360.0
+    node_lon = (ra_east_point - node_lon) % 360.0
+    node_lon, node_lat = _rotate_frame(node_lon, node_lat, -(90.0 - gl))
+    tan_node = _tan_deg(node_lon)
+    if gl == 0.0:
+        stretched = 90.0 if tan_node >= 0 else -90.0
     else:
-        lat_out = math.degrees(math.atan(y2 / rxy))
-    return lon_out, lat_out
+        stretched = _atan_deg(tan_node / _cos_deg(90.0 - gl))
+    if 90.0 < node_lon <= 270.0:
+        stretched = (stretched + 180.0) % 360.0
+    node_lon = stretched % 360.0
+    ra_node = (ra_east_point - node_lon) % 360.0
+
+    # 1b. Inclination of the house plane to the equator: tilt the point
+    # 90 deg up from the node through the horizon frame and read its
+    # latitude.
+    incl_lon = (ra_east_point - ra_node) % 360.0
+    incl_lon, incl_lat = _rotate_frame(incl_lon, 0.0, -(90.0 - gl))
+    incl_lat = incl_lat + 90.0
+    incl_lon, incl_lat = _rotate_frame(incl_lon, incl_lat, 90.0 - gl)
+    plane_obliquity = incl_lat
+
+    # 2. Ascendant projected onto the house plane (zero of the scale).
+    asc_ra, _ = _rotate_frame(asc, 0.0, -eps)
+    asc_arc = (asc_ra - ra_node) % 360.0
+    stretched = _atan_deg(_tan_deg(asc_arc) / _cos_deg(plane_obliquity))
+    if 90.0 < asc_arc <= 270.0:
+        stretched = (stretched + 180.0) % 360.0
+    asc_arc = stretched % 360.0
+
+    # 3. Body projected onto the house plane, measured from the ascendant.
+    body_arc = (ra - ra_node) % 360.0
+    stretched = _atan_deg(_tan_deg(body_arc) / _cos_deg(plane_obliquity))
+    if 90.0 < body_arc <= 270.0:
+        stretched = (stretched + 180.0) % 360.0
+    body_arc = stretched % 360.0
+    body_arc = (body_arc - asc_arc) % 360.0
+
+    pos_deg = (body_arc + CUSP_BOUNDARY_OFFSET) % 360.0
+    return pos_deg / 30.0 + 1.0
+
+
+def _hpos_savard(md_upper: float, dec: float, geolat: float) -> float:
+    """Savard-A house position.
+
+    Savard's system lives on the prime vertical: the cusps sit at fixed
+    prime-vertical longitudes obtained by trisecting the latitude arc
+    (``asin(sin(phi k/3) / sin(phi))`` for k = 1, 2 — J.F. Savard's
+    published construction; the equator limit of the ratio is k/3), and a
+    body is placed by its own prime-vertical longitude. Because the cusp
+    sequence can run backwards (retrograde house order at some latitudes),
+    the placement scans the cusp list in its own running direction and
+    interpolates inside the containing house.
+    """
+    sin_lat = _sin_deg(geolat)
+    if abs(geolat) < _NEAR_ZERO:
+        third_ratio = 1.0 / 3.0
+        two_thirds_ratio = 2.0 / 3.0
+    else:
+        third_ratio = _sin_deg(geolat / 3.0) / sin_lat
+        two_thirds_ratio = _sin_deg(2.0 * geolat / 3.0) / sin_lat
+    arc_third = _asin_deg(third_ratio)
+    arc_two_thirds = _asin_deg(two_thirds_ratio)
+
+    cusp_pv = [
+        0.0,
+        0.0,
+        arc_third,
+        arc_two_thirds,
+        90.0,
+        180.0 - arc_two_thirds,
+        180.0 - arc_third,
+        180.0,
+        180.0 + arc_third,
+        180.0 + arc_two_thirds,
+        270.0,
+        360.0 - arc_two_thirds,
+        360.0 - arc_third,
+    ]
+
+    body_pv, _ = _rotate_frame((md_upper - 90.0) % 360.0, dec, -geolat)
+
+    house_idx = 1
+    span_end = 360.0
+    if difdeg2n(cusp_pv[6], cusp_pv[1]) > 0:
+        # Direct house order.
+        travelled = (body_pv - cusp_pv[1]) % 360.0
+        for house_idx in range(1, 13):
+            nxt = house_idx + 1
+            span_end = 360.0 if nxt > 12 else (cusp_pv[nxt] - cusp_pv[1]) % 360.0
+            if travelled < span_end:
+                break
+        span_start = (cusp_pv[house_idx] - cusp_pv[1]) % 360.0
+    else:
+        # Retrograde house order.
+        travelled = (cusp_pv[1] - body_pv) % 360.0
+        for house_idx in range(1, 13):
+            nxt = house_idx + 1
+            span_end = 360.0 if nxt > 12 else (cusp_pv[1] - cusp_pv[nxt]) % 360.0
+            if travelled < span_end:
+                break
+        span_start = (cusp_pv[1] - cusp_pv[house_idx]) % 360.0
+
+    span = span_end - span_start
+    if span == 0:
+        return float(house_idx)
+    return house_idx + (travelled - span_start) / span
+
+
+def _hpos_sripati(lon: float, armc: float, eps: float, geolat: float) -> float:
+    """Sripati house position.
+
+    Sripati houses are the classical Porphyry trisection of the ecliptic
+    quadrants with every cusp pulled back so it lies at the *midpoint* of
+    the Porphyry house — equivalently, the Porphyry placement advanced by
+    half a house (standard Hindu-astrology construction; see e.g.
+    B.V. Raman, "A Manual of Hindu Astrology").
+    """
+    asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+    mc = _armc_to_mc(armc, eps)
+    asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
+
+    arc_from_asc = (lon - asc) % 360.0
+    arc_from_asc = (arc_from_asc + CUSP_BOUNDARY_OFFSET) % 360.0
+    if arc_from_asc < 180.0:
+        hpos = 1.0
+    else:
+        hpos = 7.0
+        arc_from_asc -= 180.0
+    quadrant = difdeg2n(asc, mc)
+    if arc_from_asc < 180.0 - quadrant:
+        hpos += arc_from_asc * 3.0 / (180.0 - quadrant)
+    else:
+        hpos += 3.0 + (arc_from_asc - 180.0 + quadrant) * 3.0 / quadrant
+    hpos += 0.5
+    # The half-house shift lands hpos in [1.5, 13.5). Wrap only the true
+    # overflow (>= 13) back to [1, 1.5), preserving the fraction; collapsing
+    # everything > 12 onto 1.0 would swallow house 12 and half of house 1.
+    if hpos >= 13.0:
+        hpos -= 12.0
+    return hpos
+
+
+def _hpos_sunshine_apc(
+    hsys_char: str,
+    armc: float,
+    geolat: float,
+    dec: float,
+    md_upper: float,
+    eps: float,
+) -> float:
+    """Sunshine ('I'/'i') and APC ('Y') house positions.
+
+    Both systems divide the diurnal and nocturnal arcs of a *reference
+    declination* into six equal parts along the equator and place the body
+    by proportional membership of those arcs:
+
+      * Sunshine (Makransky, "Primary Directions"): the reference
+        declination is the Sun's. ``house_pos()`` receives no Sun context,
+        so the reference declination falls back to 0 — matching the
+        behaviour of the reference API for the same call.
+      * APC (Knegt): the reference declination is the ascendant's.
+
+    Construction: start from the body's Regiomontanus position (the pole
+    of its position circle on the celestial equator), split the sphere at
+    the horizon of the reference declination, and rescale the arc between
+    meridian and horizon by the reference semi-arc (diurnal above the
+    horizon, nocturnal below). The spherical triangle between the meridian,
+    the position circle and the reference-declination parallel supplies
+    the offset that maps the body's position-circle angle onto the
+    reference parallel before rescaling.
+    """
+    gl = geolat
+    if gl > 90.0 - CUSP_BOUNDARY_OFFSET:
+        gl = 90.0 - CUSP_BOUNDARY_OFFSET
+    if gl < -90.0 + CUSP_BOUNDARY_OFFSET:
+        gl = -90.0 + CUSP_BOUNDARY_OFFSET
+
+    if hsys_char == "Y":
+        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
+        asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
+        _, ref_dec = _rotate_frame(asc, 0.0, -eps)
+    else:
+        ref_dec = 0.0
+
+    dec_b = dec
+    if 90.0 - abs(dec_b) < _NEAR_ZERO:
+        dec_b = 90.0 - _NEAR_ZERO if dec_b > 0 else -90.0 + _NEAR_ZERO
+
+    merid_dist = md_upper
+    sin_md = _sin_deg(merid_dist)
+    if sin_md == 0.0:
+        sin_md = 1e-300
+
+    # Regiomontanus position of the body (pole of its position circle).
+    alt_sign = _tan_deg(gl) * _tan_deg(dec_b) + _cos_deg(merid_dist)
+    circle_arc = _atan_deg(-alt_sign / sin_md) % 360.0
+    if merid_dist < 0:
+        circle_arc += 180.0
+    circle_arc = circle_arc % 360.0
+
+    is_above_horizon = _above_horizon_test(dec_b, gl, merid_dist) >= 0
+
+    # Angle between the celestial pole and the horizon along the meridian,
+    # then the body's position-circle angle from the lower meridian.
+    pole_arc = 90.0 - gl if gl >= 0 else 90.0 + gl
+    from_lower_meridian = (circle_arc - 270.0) % 360.0
+    is_western_half = False
+    if from_lower_meridian > 180.0:
+        is_western_half = True
+        from_lower_meridian = 360.0 - from_lower_meridian
+
+    # Semi-arcs of the reference declination.
+    ref_ad = _asc_diff_saturated(ref_dec, gl)
+    diurnal_arc = 90.0 + ref_ad
+    nocturnal_arc = 90.0 - ref_ad
+
+    if diurnal_arc == 0 and is_above_horizon:
+        circle_arc = 270.0
+    elif nocturnal_arc == 0 and not is_above_horizon:
+        circle_arc = 90.0
+    else:
+        semi_arc = diurnal_arc
+        ref_dec_side = ref_dec
+        if not is_above_horizon:
+            # Nocturnal side: mirror the reference parallel and the angle.
+            ref_dec_side = -ref_dec_side
+            semi_arc = nocturnal_arc
+            from_lower_meridian = 180.0 - from_lower_meridian
+            is_western_half = not is_western_half
+        # Spherical triangle meridian / position circle / reference
+        # parallel: side between pole and body direction, angle at the
+        # body, and the offset carrying the position-circle angle onto the
+        # reference parallel.
+        side_a = _acos_deg(_cos_deg(pole_arc) * _cos_deg(from_lower_meridian))
+        if side_a < _NEAR_ZERO:
+            side_a = _NEAR_ZERO
+        sin_psi = _sin_deg(pole_arc) / _sin_deg(side_a)
+        sin_psi = max(-1.0, min(1.0, sin_psi))
+        ratio = _sin_deg(ref_dec_side) / sin_psi
+        if ratio > 1:
+            ratio = 90.0 - _NEAR_ZERO
+        elif ratio < -1:
+            ratio = -(90.0 - _NEAR_ZERO)
+        else:
+            ratio = _asin_deg(ratio)
+        offset = _acos_deg(_cos_deg(ratio) / _cos_deg(ref_dec_side))
+        if ref_dec_side < 0:
+            offset = -offset
+        if gl < 0:
+            offset = -offset
+        from_lower_meridian += offset
+        if is_western_half:
+            circle_arc = 270.0 - (from_lower_meridian / semi_arc) * 90.0
+        else:
+            circle_arc = 270.0 + (from_lower_meridian / semi_arc) * 90.0
+        if not is_above_horizon:
+            circle_arc = (circle_arc + 180.0) % 360.0
+
+    pos_deg = (circle_arc + CUSP_BOUNDARY_OFFSET) % 360.0
+    return pos_deg / 30.0 + 1.0
 
 
 @overload
@@ -5454,7 +5896,7 @@ def _house_pos_pythonic(
         # Keep the ascendant on the eastern horizon. Without this correction
         # the raw ecliptic-longitude ascendant lands on the western half
         # beyond the polar circle, giving a six-house error for E/A/W/V.
-        asc = _fix_asc_polar(asc, armc, eps, geolat)
+        asc = _ascendant_on_eastern_horizon(asc, armc, eps, geolat)
 
         if hsys_char == "D":
             pos_deg = (lon - mc - 90.0) % 360.0
@@ -5603,65 +6045,7 @@ def _house_pos_pythonic(
             return hpos
 
     elif hsys_char == "T":
-        # Topocentric (Polich-Page) house position.
-        # Unlike Placidus, Topocentric bends the pole height continuously
-        # from 0 (on the meridian) to the full geographic latitude (on the
-        # horizon). The body's house line is found by a binary search that
-        # adjusts the pole height until the body lies on the resulting
-        # position circle. Behaviour matches the reference API's 'T' branch.
-        fh = geolat
-        if fh > 89.999:
-            fh = 89.999
-        if fh < -89.999:
-            fh = -89.999
-        merid_dist = md_upper % 360.0
-        de = dec
-        if de > 90.0 - _NEAR_ZERO:
-            de = 90.0 - _NEAR_ZERO
-        if de < -90.0 + _NEAR_ZERO:
-            de = -90.0 + _NEAR_ZERO
-        sinad = _tand(de) * _tand(fh)
-        sinad = max(-1.0, min(1.0, sinad))
-        a = sinad + _cosd(merid_dist)
-        is_above_hor = a >= 0
-        ra_t = ra
-        # Mirror everything below the horizon to its opposite point above.
-        if not is_above_hor:
-            ra_t = (ra_t + 180.0) % 360.0
-            de = -de
-            merid_dist = (merid_dist + 180.0) % 360.0
-        # Mirror the western hemisphere to the eastern one.
-        if merid_dist > 180.0:
-            ra_t = (armc - merid_dist) % 360.0
-        tanfi = _tand(fh)
-        ra0 = (armc + 90.0) % 360.0
-        xp1 = 1.0
-        fac = 2.0
-        nloop = 0
-        while abs(xp1) > 0.000001 and nloop < 1000:
-            if xp1 > 0:
-                fh = _atand(_tand(fh) - tanfi / fac)
-                ra0 -= 90.0 / fac
-            else:
-                fh = _atand(_tand(fh) + tanfi / fac)
-                ra0 += 90.0 / fac
-            eq_lon = (ra_t - ra0) % 360.0
-            _, xp1 = _cotrans_lonlat(eq_lon, de, 90.0 - fh)
-            fac *= 2.0
-            nloop += 1
-        pos_deg = (ra0 - armc) % 360.0
-        # Mirror back to the west, then back to below the horizon.
-        if merid_dist > 180.0:
-            pos_deg = (-pos_deg) % 360.0
-        if not is_above_hor:
-            pos_deg = (pos_deg + 180.0) % 360.0
-        pos_deg = (pos_deg - 90.0) % 360.0
-        # Guard the float modulo: a tiny negative argument can round up to
-        # exactly 360.0, which would yield house 13.0 (out of domain).
-        if pos_deg >= 360.0:
-            pos_deg -= 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
+        return _hpos_topocentric(armc, geolat, ra, dec, md_upper)
 
     elif hsys_char == "B":
         # Alcabitius house position.
@@ -5697,247 +6081,22 @@ def _house_pos_pythonic(
         return 1.0
 
     elif hsys_char == "H":
-        # Horizon / azimuth house position.
-        # The house is measured along the horizon by azimuth, so the body
-        # must be placed by its true horizon position (not by ecliptic
-        # longitude): rotate its equatorial coordinates onto the horizon
-        # frame (pole height 90 - geolat). Behaviour matches the reference 'H'.
-        lon_out, _ = _cotrans_lonlat((md_upper - 90.0) % 360.0, dec, 90.0 - geolat)
-        pos_deg = (lon_out + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
+        return _hpos_horizon(md_upper, dec, geolat)
 
     elif hsys_char == "F":
-        # Carter poli-equatorial house position.
-        # Equal 30 deg divisions of the celestial equator, measured in right
-        # ascension from the RA of the ascendant. Behaviour matches the reference.
-        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-        asc = _fix_asc_polar(asc, armc, eps, geolat)
-        asc_ra, _ = _cotrans_lonlat(asc, 0.0, -eps)
-        pos_deg = (ra - asc_ra) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
+        return _hpos_carter(ra, armc, eps, geolat)
 
     elif hsys_char == "U":
-        # Krusinski-Pisa-Goelzer house position.
-        # Find where the body's declination circle cuts the great circle
-        # through the ascendant and the zenith. Behaviour matches the reference.
-        gl = geolat
-        if abs(gl) < _NEAR_ZERO:
-            gl = _NEAR_ZERO if gl >= 0 else -_NEAR_ZERO
-        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, gl, gl)
-        asc = _fix_asc_polar(asc, armc, eps, gl)
-        # Ia. intersection of the asc-zenith house plane with the equator
-        hpl_lon, hpl_lat = _cotrans_lonlat(asc, 0.0, -eps)
-        raep = (armc + 90.0) % 360.0
-        hpl_lon = (raep - hpl_lon) % 360.0
-        hpl_lon, hpl_lat = _cotrans_lonlat(hpl_lon, hpl_lat, -(90.0 - gl))
-        tanx = _tand(hpl_lon)
-        if gl == 0.0:
-            xtemp = 90.0 if tanx >= 0 else -90.0
-        else:
-            xtemp = _atand(tanx / _cosd(90.0 - gl))
-        if 90.0 < hpl_lon <= 270.0:
-            xtemp = (xtemp + 180.0) % 360.0
-        hpl_lon = xtemp % 360.0
-        raaz = (raep - hpl_lon) % 360.0
-        # Ib. obliquity of the asc-zenith house plane to the equator
-        xb0 = (raep - raaz) % 360.0
-        xb0, xb1 = _cotrans_lonlat(xb0, 0.0, -(90.0 - gl))
-        xb1 = xb1 + 90.0
-        xb0, xb1 = _cotrans_lonlat(xb0, xb1, 90.0 - gl)
-        oblaz = xb1
-        # IIa. ascendant projected onto the house plane
-        xa0, _xa1 = _cotrans_lonlat(asc, 0.0, -eps)
-        xa0 = (xa0 - raaz) % 360.0
-        xtemp = _atand(_tand(xa0) / _cosd(oblaz))
-        if 90.0 < xa0 <= 270.0:
-            xtemp = (xtemp + 180.0) % 360.0
-        xa0 = xtemp % 360.0
-        # IIb. body projected onto the house plane
-        pos_arc = (ra - raaz) % 360.0
-        xtemp = _atand(_tand(pos_arc) / _cosd(oblaz))
-        if 90.0 < pos_arc <= 270.0:
-            xtemp = (xtemp + 180.0) % 360.0
-        pos_arc = xtemp % 360.0
-        pos_arc = (pos_arc - xa0) % 360.0
-        pos_deg = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
+        return _hpos_krusinski(ra, armc, eps, geolat)
 
     elif hsys_char == "J":
-        # Savard-A house position.
-        # Prime-vertical division with cusps at trisected latitude arcs;
-        # the body is placed by its prime-vertical position. Behaviour
-        # matches the reference 'J' branch.
-        sinfi = _sind(geolat)
-        if abs(geolat) < _NEAR_ZERO:
-            arc_lat_third = 1.0 / 3.0
-            arc_lat_two_thirds = 2.0 / 3.0
-        else:
-            arc_lat_third = _sind(geolat / 3.0) / sinfi
-            arc_lat_two_thirds = _sind(2.0 * geolat / 3.0) / sinfi
-        arc_lat_third = _asind(arc_lat_third)
-        arc_lat_two_thirds = _asind(arc_lat_two_thirds)
-        hc = [
-            0.0,
-            0.0,
-            arc_lat_third,
-            arc_lat_two_thirds,
-            90.0,
-            180.0 - arc_lat_two_thirds,
-            180.0 - arc_lat_third,
-            180.0,
-            180.0 + arc_lat_third,
-            180.0 + arc_lat_two_thirds,
-            270.0,
-            360.0 - arc_lat_two_thirds,
-            360.0 - arc_lat_third,
-        ]
-        a_pv, _ = _cotrans_lonlat((md_upper - 90.0) % 360.0, dec, -geolat)
-        a = a_pv
-        i = 1
-        c2 = 360.0
-        if difdeg2n(hc[6], hc[1]) > 0:
-            d = (a - hc[1]) % 360.0
-            for i in range(1, 13):
-                j = i + 1
-                c2 = 360.0 if j > 12 else (hc[j] - hc[1]) % 360.0
-                if d < c2:
-                    break
-            c1 = (hc[i] - hc[1]) % 360.0
-        else:  # houses retrograde
-            d = (hc[1] - a) % 360.0
-            for i in range(1, 13):
-                j = i + 1
-                c2 = 360.0 if j > 12 else (hc[1] - hc[j]) % 360.0
-                if d < c2:
-                    break
-            c1 = (hc[1] - hc[i]) % 360.0
-        hsize = c2 - c1
-        if hsize == 0:
-            hpos = float(i)
-        else:
-            hpos = i + (d - c1) / hsize
-        return hpos
+        return _hpos_savard(md_upper, dec, geolat)
 
     elif hsys_char == "S":
-        # Sripati house position.
-        # Porphyry placement shifted forward by half a house. Behaviour
-        # matches the reference 'O'/'S' branch (the S variant adds 0.5).
-        asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-        mc = _armc_to_mc(armc, eps)
-        asc = _fix_asc_polar(asc, armc, eps, geolat)
-        pos_arc = (lon - asc) % 360.0
-        pos_arc = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
-        if pos_arc < 180.0:
-            hpos = 1.0
-        else:
-            hpos = 7.0
-            pos_arc -= 180.0
-        acmc = difdeg2n(asc, mc)
-        if pos_arc < 180.0 - acmc:
-            hpos += pos_arc * 3.0 / (180.0 - acmc)
-        else:
-            hpos += 3.0 + (pos_arc - 180.0 + acmc) * 3.0 / acmc
-        hpos += 0.5
-        # Sripati shifts Porphyry forward by half a house, so hpos lands in
-        # [1.5, 13.5). Wrap only the true overflow (>= 13) back to [1, 1.5),
-        # preserving the fraction; the old `> 12 -> 1.0` collapsed all of
-        # house 12 and the first half of house 1 onto 1.0.
-        if hpos >= 13.0:
-            hpos -= 12.0
-        return hpos
+        return _hpos_sripati(lon, armc, eps, geolat)
 
     elif hsys_char in ("I", "i", "Y"):
-        # Sunshine (Makransky) 'I'/'i' and APC (Knegt) 'Y' house positions.
-        # Both share the same placement math and differ only in the
-        # reference declination `dsun`:
-        #   I / i -> declination of the Sun. house_pos() has no Sun context,
-        #            so dsun = 0 (matching the reference, which falls back to
-        #            0 when no Sun declination is supplied).
-        #   Y     -> declination of the ascendant.
-        # Behaviour matches the reference 'I'/'i'/'Y' branch.
-        gl = geolat
-        if gl > 90.0 - CUSP_BOUNDARY_OFFSET:
-            gl = 90.0 - CUSP_BOUNDARY_OFFSET
-        if gl < -90.0 + CUSP_BOUNDARY_OFFSET:
-            gl = -90.0 + CUSP_BOUNDARY_OFFSET
-        if hsys_char == "Y":
-            asc = _calc_ascendant((armc + 90.0) % 360.0, eps, geolat, geolat)
-            asc = _fix_asc_polar(asc, armc, eps, geolat)
-            _, dsun = _cotrans_lonlat(asc, 0.0, -eps)
-        else:
-            dsun = 0.0
-        de = dec
-        if 90.0 - abs(de) < _NEAR_ZERO:
-            de = 90.0 - _NEAR_ZERO if de > 0 else -90.0 + _NEAR_ZERO
-        merid_dist = md_upper
-        sin_merid_dist = _sind(merid_dist)
-        if sin_merid_dist == 0.0:
-            sin_merid_dist = 1e-300
-        a = _tand(gl) * _tand(de) + _cosd(merid_dist)
-        pos_arc = _atand(-a / sin_merid_dist) % 360.0
-        if merid_dist < 0:
-            pos_arc += 180.0
-        pos_arc = pos_arc % 360.0  # Regiomontanus position
-        sinad = _tand(de) * _tand(gl)
-        a = sinad + _cosd(merid_dist)
-        is_above_hor = a >= 0
-        harmc = 90.0 - gl if gl >= 0 else 90.0 + gl
-        darmc = (pos_arc - 270.0) % 360.0
-        is_western_half = False
-        if darmc > 180.0:
-            is_western_half = True
-            darmc = 360.0 - darmc
-        sinad = _tand(dsun) * _tand(gl)
-        if sinad >= 1:
-            ad = 90.0
-        elif sinad <= -1:
-            ad = -90.0
-        else:
-            ad = _asind(sinad)
-        sad = 90.0 + ad
-        san = 90.0 - ad
-        if sad == 0 and is_above_hor:
-            pos_arc = 270.0
-        elif san == 0 and not is_above_hor:
-            pos_arc = 90.0
-        else:
-            sa = sad
-            dsun_l = dsun
-            if not is_above_hor:
-                dsun_l = -dsun_l
-                sa = san
-                darmc = 180.0 - darmc
-                is_western_half = not is_western_half
-            a = _acosd(_cosd(harmc) * _cosd(darmc))
-            if a < _NEAR_ZERO:
-                a = _NEAR_ZERO
-            sinpsi = _sind(harmc) / _sind(a)
-            sinpsi = max(-1.0, min(1.0, sinpsi))
-            y = _sind(dsun_l) / sinpsi
-            if y > 1:
-                y = 90.0 - _NEAR_ZERO
-            elif y < -1:
-                y = -(90.0 - _NEAR_ZERO)
-            else:
-                y = _asind(y)
-            d = _acosd(_cosd(y) / _cosd(dsun_l))
-            if dsun_l < 0:
-                d = -d
-            if gl < 0:
-                d = -d
-            darmc += d
-            if is_western_half:
-                pos_arc = 270.0 - (darmc / sa) * 90.0
-            else:
-                pos_arc = 270.0 + (darmc / sa) * 90.0
-            if not is_above_hor:
-                pos_arc = (pos_arc + 180.0) % 360.0
-        pos_deg = (pos_arc + CUSP_BOUNDARY_OFFSET) % 360.0
-        hpos = pos_deg / 30.0 + 1.0
-        return hpos
+        return _hpos_sunshine_apc(hsys_char, armc, geolat, dec, md_upper, eps)
 
     # Default fallback: use cusp-based method (ecliptic longitude interpolation)
     # This applies to O, L, Q, and any other system whose reference house
