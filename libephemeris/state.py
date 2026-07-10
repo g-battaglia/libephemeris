@@ -796,6 +796,50 @@ def _reset_timescale() -> None:
         _TS = None
 
 
+def _close_handles_quietly(handles: tuple) -> None:
+    """Close raw file/mmap handles, ignoring already-closed errors."""
+    for h in handles:
+        try:
+            h.close()
+        except (OSError, ValueError):
+            pass
+
+
+def _release_when_unused(obj: object) -> None:
+    """Close the object's raw file handles once it is garbage-collected.
+
+    Companion to the drop-references close strategy below: the handles are
+    closed EXPLICITLY from a ``weakref.finalize`` callback that fires when
+    the last in-flight user releases the object, so no ResourceWarning is
+    emitted at collection time (a bare drop would leave the io objects to
+    warn from their own ``__del__``). The callback holds the raw handles,
+    not the object, so it cannot keep the object alive.
+    """
+    import weakref
+
+    handles: list = []
+    # Skyfield SpiceKernel: kernel.spk.daf.file (BufferedReader).
+    daf = getattr(getattr(obj, "spk", None), "daf", None)
+    f = getattr(daf, "file", None)
+    if f is not None:
+        handles.append(f)
+    # LEBReader / LEB2Reader: mmap first, then the backing file.
+    for attr in ("_mm", "_file"):
+        h = getattr(obj, attr, None)
+        if h is not None:
+            handles.append(h)
+    # CompositeLEBReader: collect from each wrapped reader.
+    sub = getattr(obj, "_readers", None)
+    if isinstance(sub, (list, tuple)):
+        for r in sub:
+            for attr in ("_mm", "_file"):
+                h = getattr(r, attr, None)
+                if h is not None:
+                    handles.append(h)
+    if handles:
+        weakref.finalize(obj, _close_handles_quietly, tuple(handles))
+
+
 def _close_kernel_resources() -> None:
     """Release the loaded ephemeris handles without touching user configuration.
 
@@ -823,6 +867,8 @@ def _close_kernel_resources() -> None:
     global _LOADER, _PLANETS, _PLANET_CENTERS, _LEB_READER
 
     with _INIT_LOCK:
+        if _LEB_READER is not None:
+            _release_when_unused(_LEB_READER)
         _LEB_READER = None
         # Clear fast_calc's cached reference to the dropped LEB reader (see
         # _close_inner): stale dispatch through the old mmap otherwise.
@@ -830,7 +876,11 @@ def _close_kernel_resources() -> None:
 
         _fast_calc._reset_active_reader()
 
+        if _PLANETS is not None:
+            _release_when_unused(_PLANETS)
         _PLANETS = None
+        if _PLANET_CENTERS is not None:
+            _release_when_unused(_PLANET_CENTERS)
         _PLANET_CENTERS = None
         _PLANET_CENTER_MISSING.clear()
         _LOADER = None
