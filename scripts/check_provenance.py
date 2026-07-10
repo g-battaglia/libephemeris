@@ -35,7 +35,21 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCAN_DIRS = ("libephemeris", "scripts", "docs")
-SCAN_SUFFIXES = (".py", ".md")
+# Every text format that ships or documents the package: code, docs, data
+# tables, packaging and tool configuration. Binary blobs (.bsp/.leb/.leb2)
+# are covered by the dedicated data-artifact class below.
+SCAN_SUFFIXES = (
+    ".py",
+    ".md",
+    ".csv",
+    ".toml",
+    ".cfg",
+    ".ini",
+    ".txt",
+    ".json",
+    ".yaml",
+    ".yml",
+)
 
 # Files that legitimately record the retired SE / PyMeeus / LGPL history
 # (the gate itself and the provenance evidence docs). Never includes any
@@ -46,6 +60,7 @@ ALLOWLIST = frozenset(
         "docs/methodology/provenance-sweep-2026-06.md",
         "docs/methodology/galilean-clean-room-2026-06.md",
         "docs/methodology/galilean-e5-spec.md",
+        "docs/methodology/independence-remediation-2026-07.md",
     }
 )
 
@@ -81,16 +96,53 @@ COPYLEFT_RE = re.compile(
     r"|\bGNU\s+general\s+public\b",
     re.IGNORECASE,
 )
+# AGPL is its own class: the reference implementation's license. It must
+# never appear in shipped code or data; docs may name it only in the
+# allowlisted provenance/remediation records.
+AGPL_RE = re.compile(r"\bAGPL\b|\bGNU\s+Affero\b", re.IGNORECASE)
 CLASSES = (
     ("source-file-ref", SOURCE_FILE_RE),
     ("identifier", IDENTIFIER_RE),
     ("pymeeus", PYMEEUS_RE),
     ("copyleft", COPYLEFT_RE),
+    ("agpl", AGPL_RE),
 )
+# Data artifacts that must never (re-)enter the tree: the reference
+# distribution's ephemeris/orbital-element/star files. This is a
+# *filename* gate over the whole repository (text mentions of these names
+# in API-compat constants and provenance docs are legitimate; the files
+# themselves are not), plus a content scan of the shipped data directory.
+FOREIGN_DATA_NAME_RE = re.compile(
+    r"^(seorbel|sefstars|seleapsec|sedeltat)(\.|$)|\.se1$",
+    re.IGNORECASE,
+)
+DATA_DIR = "libephemeris/data"
 
 
 def main() -> int:
     hits: list[tuple[Path, int, str, str]] = []
+
+    # Filename gate: no reference-distribution data file anywhere in the
+    # scanned tree (and none at the repo root either).
+    for d in (*SCAN_DIRS, "."):
+        base = REPO_ROOT / d
+        for p in base.rglob("*") if d != "." else base.glob("*"):
+            if p.is_file() and FOREIGN_DATA_NAME_RE.search(p.name):
+                hits.append((p, 0, "foreign-data-file", p.name))
+
+    # Content scan of the shipped data directory (any text file).
+    data_dir = REPO_ROOT / DATA_DIR
+    if data_dir.exists():
+        for p in sorted(data_dir.rglob("*")):
+            if not p.is_file() or p.suffix in (".bsp", ".leb", ".leb2"):
+                continue
+            try:
+                text = p.read_text(encoding="utf-8", errors="strict")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                if AGPL_RE.search(line) or COPYLEFT_RE.search(line):
+                    hits.append((p, lineno, "data-license-marker", line.strip()))
     files = sorted(
         p
         for d in SCAN_DIRS

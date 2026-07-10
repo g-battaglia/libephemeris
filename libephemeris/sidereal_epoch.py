@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2025-2026 Giacomo Battaglia
 """Fixed-epoch sidereal modes (SIDM_J2000 / SIDM_J1900 / SIDM_B1950).
 
 The reference API implements these three ayanamsha modes as *frame*
