@@ -498,6 +498,14 @@ def _calc_vertex(armc_deg: float, eps: float, lat: float) -> float:
     num = -math.cos(armc_rad)
     den = math.sin(armc_rad) * math.cos(eps_rad) - math.sin(eps_rad) / math.tan(lat_rad)
 
+    # 0/0 singularity at |lat| == eps with armc 90/270 (den collapses to
+    # cos(eps) - cos(eps)): atan2 of the rounding noise is meaningless.
+    # The reference resolves it to the cardinal (armc + 270) % 360 —
+    # 0 at armc 90, 180 at armc 270 (measured black-box for both
+    # latitude signs); pin the same value.
+    if abs(num) < 1e-12 and abs(den) < 1e-12:
+        return (armc_deg + 270.0) % 360.0
+
     vtx_rad = math.atan2(num, den)
     vtx = math.degrees(vtx_rad) % 360.0
 
@@ -566,6 +574,13 @@ def _ra_to_ecliptic_longitude(
     # Standard spherical trigonometry formula
     numerator = sin_ra
     denominator = cos_obliquity * cos_ra - sin_obliquity * tan_pole
+
+    # 0/0 singularity (e.g. the CoAsc Munkasey path at |lat| == eps with
+    # ra == 180): atan2 of the rounding noise is meaningless. The reference
+    # resolves it to the right ascension itself (measured black-box:
+    # 180 at armc 90, 0 at armc 270); pin the same limit.
+    if abs(numerator) < 1e-12 and abs(denominator) < 1e-12:
+        return ra_deg % 360.0
 
     # atan2 handles all quadrants correctly
     longitude = math.degrees(math.atan2(numerator, denominator)) % 360.0
