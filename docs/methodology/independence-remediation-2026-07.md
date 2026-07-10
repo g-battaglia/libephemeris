@@ -238,6 +238,18 @@ strong-copyleft in a default install remain. (Rounds 8-9 surfaced only
 generic doc-rot — stale poe tasks, refactored paths — unrelated to
 independence; those were fixed for hygiene but are not independence defects.)
 
+### Certification result
+
+The scoped independence certification (three finders limited to
+Swiss-Ephemeris/copyleft, excluding generic doc-rot) returned **zero
+in-scope defects** at HEAD 2787f48 after the last copyleft-claim copy
+(README) was aligned with LICENSING/THIRD_PARTY_NOTICES. Independence is
+certified for the working tree: no Swiss-Ephemeris source taint,
+reference-internal identifiers, tracked Swiss data files, false provenance,
+or strong-copyleft (GPL/LGPL/AGPL) in a default install. The remaining
+weak-copyleft dependency (certifi, MPL-2.0) is disclosed and imposes no
+obligation on LibEphemeris code.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the
