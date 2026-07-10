@@ -202,7 +202,8 @@ preservation of copyright, license, and attribution notices. See
 > **Note:** the optional `libephemeris[nbody]` extra pulls in `rebound` and
 > `assist` (GPL-3.0-or-later), which are not part of the core install and are
 > never bundled. Installing that extra makes your combined installation subject
-> to the GPL; the core library and its required dependencies are permissive.
+> to the GPL; the core library has no strong-copyleft (GPL/LGPL/AGPL) runtime
+> dependency (all required deps are permissive except certifi's weak MPL-2.0).
 > See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 LibEphemeris is an independent, API-compatible implementation; independence
