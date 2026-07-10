@@ -410,6 +410,7 @@ def horizons_calc_ut(
     from .constants import (
         FLG_HELCTR,
         FLG_BARYCTR,
+        FLG_ICRS,
         FLG_NOABERR,
         FLG_NOGDEFL,
         FLG_SPEED,
@@ -421,6 +422,14 @@ def horizons_calc_ut(
     # Unsupported flags → fallback to Skyfield
     if iflag & FLG_TOPOCTR:
         raise KeyError("FLG_TOPOCTR not supported by Horizons backend")
+    if iflag & FLG_ICRS:
+        # The Skyfield path defines FLG_ICRS as the frame-bias-free ecliptic
+        # of date (Vondrák PN with frame_bias=False); the state-vector
+        # pipeline below has no such rotation, and a former "no rotation"
+        # shortcut returned raw ICRS equatorial coordinates — a whole-frame
+        # divergence from the Skyfield backend. Defer to Skyfield (same
+        # policy as the LEB backend).
+        raise KeyError("FLG_ICRS not supported by Horizons backend")
     # Analytical bodies — no HTTP needed. _calc_analytical is FLG_NONUT-aware
     # (it conditionally omits Δψ), so it must be dispatched BEFORE the generic
     # FLG_NONUT rejection below, otherwise that handling is unreachable.
@@ -723,7 +732,6 @@ def _to_ecliptic_output(
         FLG_SPEED,
         FLG_XYZ,
         FLG_RADIANS,
-        FLG_ICRS,
     )
     from .fast_calc import (
         _VEL_H,
@@ -740,10 +748,12 @@ def _to_ecliptic_output(
     import math
 
     def _rot(p: Tuple[float, float, float], jd: float) -> Tuple[float, float, float]:
-        """Rotate an ICRS vector into the requested output frame at epoch jd."""
-        if iflag & FLG_ICRS:
-            # Output in ICRS — no rotation
-            return p
+        """Rotate an ICRS vector into the requested output frame at epoch jd.
+
+        FLG_ICRS never reaches this path: horizons_calc_ut rejects it up
+        front (Skyfield fallback), because the Skyfield definition of that
+        flag (frame-bias-free ecliptic of date) has no equivalent here.
+        """
         if iflag & FLG_J2000:
             if iflag & FLG_EQUATORIAL:
                 # Equatorial J2000: ICRS vectors as-is (frame bias ~0.02",
@@ -766,10 +776,11 @@ def _to_ecliptic_output(
         # Equatorial -> ecliptic (eps_true is in radians)
         return _rotate_equatorial_to_ecliptic(*q, eps_true)
 
-    # ICRS / J2000 output frames are fixed in time; the of-date frames
+    # The J2000 output frames are fixed in time; the of-date frames
     # (ecliptic/equator of date, mean equator for SID+EQ) rotate with the
     # equinox, so their reported speed must include the frame-rotation rate.
-    _fixed_frame = bool(iflag & (FLG_ICRS | FLG_J2000))
+    # (FLG_ICRS is rejected up front — see horizons_calc_ut.)
+    _fixed_frame = bool(iflag & FLG_J2000)
 
     pos = _rot(pos_icrs, jd_tt)
     lon, lat, dist = _cartesian_to_spherical(*pos)
