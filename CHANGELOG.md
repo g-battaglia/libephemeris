@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc6] - 2026-07-10
+
+Provenance/independence release. Following an external license audit of
+`3.0.0rc5`, this RC remediates every finding that placed the project's declared
+Apache-2.0 independence from the Swiss Ephemeris ahead of the evidence, then
+certifies the result. No public API or numeric behaviour changes: both test
+backends remain green at 16024 tests each; the house-system and occultation
+re-derivations were verified bit-identical to the pre-rewrite code.
+
+### Changed
+
+- **House-system placement re-derived as independent expression.** The
+  `house_pos` branches previously described as "1:1 ports" (Topocentric,
+  Horizon, Carter, Krusinski, Savard-A, Sripati, Sunshine/APC) and their
+  degree-trig / polar-ascendant / coordinate-rotation helpers were rewritten
+  from the published system definitions (Polich & Page 1964; Carter;
+  Krusinski/Pisa/Goelzer; Savard; Raman; Makransky; Knegt), delegating the
+  coordinate rotation to this project's own `utils.cotrans`. Output verified
+  bit-identical over a 9,000-sample grid.
+- **Lunar-occultation search re-derived.** The global/local occultation search
+  skeleton was restructured into documented shared helpers with every search
+  parameter given its physical derivation.
+- **`libephemeris[all]` is permissive-only.** The GPL-3.0 `rebound`/`assist`
+  N-body packages are no longer pulled by `[all]`; they remain available behind
+  the explicit opt-in `[nbody]` extra.
+
+### Fixed
+
+- **Honest data provenance.** Fictitious-body element rows without a public
+  source (Nibiru, Proserpina, the Selena digits, the Waldemath reconstruction)
+  are reclassified as disclosed interoperability values recoverable by
+  black-box fits against reference-API output; published rows now cite the real
+  publication. Numeric values are unchanged.
+- **Accurate independence/provenance claims.** Categorical "no license
+  obligation" / "contains no derived code" statements were replaced with the
+  working standard and disclosures; the interpolated-apse calibration is now
+  described accurately (passage geometry from DE440/DE441, coefficients and
+  residual table fitted against reference-API output as a black-box oracle);
+  the ΔT-model and dependency-licensing claims were corrected (`smh2016` ΔT is
+  obtained from Skyfield/MIT; the core carries no strong-copyleft dependency,
+  certifi's weak MPL-2.0 excepted and disclosed).
+
+### Added
+
+- **Provenance enforcement.** `scripts/check_provenance.py` gained an AGPL
+  class, a tracked-file filename gate against reference-distribution data
+  files, and a shipped-data license scan; SPDX headers are complete across the
+  package. `docs/methodology/independence-remediation-2026-07.md` records the
+  full remediation and the scoped independence certification (zero in-scope
+  defects).
+
 ## [3.0.0rc5] - 2026-07-10
 
 This RC closes the 2026-07-08 adversarial wave — Round J plus the advanced
