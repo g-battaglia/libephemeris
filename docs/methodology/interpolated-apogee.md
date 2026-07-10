@@ -161,25 +161,27 @@ The perturbation series uses fundamental lunar arguments:
 **Apogee perturbation (excerpt):**
 
 ```python
-# Dominant term (2D - 2M' argument)
-delta = 4.5306 * sin(2*D - 2*M')  # degrees
+# Dominant evection term (2D - 2M' argument)
+delta = 4.528899 * sin(2*D - 2*M')  # degrees
 
-# Additional terms
-delta += 0.4193 * sin(2*D - M')
-delta += 0.1320 * sin(2*M')
-# ... ~10 more terms
+# Evection harmonics sin(k*D - k*M') plus small mixed terms
+delta += 0.828318 * sin(4*D - 4*M')
+delta += 0.250542 * sin(D - M')
+# (full series: _calc_elp2000_apogee_perturbations in lunar.py)
 ```
 
 **Perigee perturbation (calibrated to JPL DE440):**
 
 ```python
-# Dominant term (opposite sign!)
-delta = -22.2018 * sin(2*D - 2*M')  # degrees
+# Dominant evection term (opposite sign, ~5x the apogee coefficient)
+delta = -22.247860 * sin(2*D - 2*M')  # degrees
 
-# Additional terms fitted to JPL DE440 data
-delta += 1.5335 * E * sin(2*D - M)
-delta += 1.1813 * sin(4*D - 2*M')
-# ... ~15 more terms
+# Slowly-converging evection harmonics sin(k*D - k*M'), extended to k=30
+delta += 6.651642 * sin(4*D - 4*M')
+delta += -2.906333 * sin(6*D - 6*M')
+# ... plus E-weighted solar-anomaly coupling terms, e.g.
+delta += -0.979771 * E * sin(2*D - 2*M' - M)
+# (full series: _calc_elp2000_perigee_perturbations in lunar.py)
 ```
 
 ### Coefficient Calibration
