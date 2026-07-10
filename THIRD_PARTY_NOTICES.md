@@ -85,7 +85,10 @@ LibEphemeris source itself is Apache-2.0. Because Apache-2.0 is one-way
 compatible with the GPL, a user who chooses to install `libephemeris[nbody]`
 forms a combined runtime work that is, **for that user**, governed by the
 GPLv3. The default/core library and all of its required runtime dependencies
-remain fully permissive, and the shipped wheel contains no copyleft code.
+are permissively licensed, with the sole exception of certifi's MPL-2.0 (a
+file-level weak copyleft that imposes no obligation on LibEphemeris code and
+is not modified); the shipped wheel contains no copyleft code and no
+strong-copyleft (GPL/LGPL/AGPL) dependency.
 
 ## Data sources
 

@@ -30,7 +30,7 @@ texts, and the runtime/dev dependency licenses are in
 `rebound` and `assist`, which are licensed **GPL-3.0-or-later**. They are not
 part of the core install and are never bundled in any LibEphemeris artifact;
 installing the extra forms a combined work that is, for that user, governed by
-the GPL. The core library and all required runtime dependencies are permissive.
+the GPL. The core library carries no strong-copyleft (GPL/LGPL/AGPL) runtime dependency; all required runtime dependencies are permissively licensed except certifi's weak MPL-2.0 (file-level copyleft, unmodified, no obligation on LibEphemeris code).
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for details.
 
 ## Contributions

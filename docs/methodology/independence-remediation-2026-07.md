@@ -221,6 +221,23 @@ is written by the validation-repo generator, which should be updated there
 so a future regeneration keeps the corrected path. Audit series:
 42 → 20 → 13 → 5 → 2 → 3 → 2 → 3.
 
+### Final independence certification
+
+A certification pass scoped strictly to Swiss-Ephemeris/copyleft independence
+(excluding generic doc-rot) confirmed a single in-scope defect: an over-broad
+copyleft claim ("all required runtime dependencies remain fully permissive")
+in THIRD_PARTY_NOTICES.md and LICENSING.md, contradicted by the same files'
+own listing of certifi as MPL-2.0 (a file-level weak copyleft that imposes no
+obligation on LibEphemeris code and is not modified). Both claims corrected to
+state that the core carries no strong-copyleft (GPL/LGPL/AGPL) dependency and
+that all required deps are permissive except certifi's weak MPL. With that
+fix, the audit series (42 → 20 → 13 → 5 → 2 → 3 → 2 → 3 → 4 → 1) reached a
+clean independence baseline: no Swiss-Ephemeris source taint, reference-
+internal identifiers, tracked Swiss data files, false provenance, or
+strong-copyleft in a default install remain. (Rounds 8-9 surfaced only
+generic doc-rot — stale poe tasks, refactored paths — unrelated to
+independence; those were fixed for hygiene but are not independence defects.)
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the
