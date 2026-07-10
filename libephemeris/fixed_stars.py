@@ -52,12 +52,13 @@ References:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 from skyfield.api import Star
 from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
-from skyfield.framelib import ecliptic_frame, ecliptic_J2000_frame
+from skyfield.framelib import ecliptic_frame
 
 from .constants import (
     REGULUS,
@@ -2157,14 +2158,31 @@ def _calc_star_position_from_observer(
     astrometric = earth_at_t.observe(star)
 
     # Transform to ecliptic coordinates
-    frame = ecliptic_J2000_frame if j2000_frame else ecliptic_frame
-
     def _ecl(position) -> Tuple[float, float, float]:
         # frame_latlon returns (latitude, longitude, distance) as Skyfield
         # Angle/Distance objects. Distance from parallax (AU): stars without a
         # measured parallax already received the reference default of
         # 0.0001249 arcsec, so it stays finite and consistent.
-        e = position.frame_latlon(frame)
+        if j2000_frame:
+            # Reference J2000 ecliptic: ICRS rotated by the IAU 2006 J2000
+            # obliquity (84381.406"), no frame bias — measured convention of
+            # the reference API and identical to the LEB star path
+            # (_rotate_icrs_to_ecliptic_j2000). Skyfield's ecliptic_J2000_frame
+            # (SPICE ECLIPJ2000) instead uses the IAU 1976 value 84381.448"
+            # plus frame bias, ~0.04" off in latitude.
+            from .fast_calc import _rotate_icrs_to_ecliptic_j2000
+
+            x, y, z = (float(v) for v in position.position.au)
+            xe, ye, ze = _rotate_icrs_to_ecliptic_j2000(x, y, z)
+            dist_au = math.sqrt(xe * xe + ye * ye + ze * ze)
+            lon_deg = math.degrees(math.atan2(ye, xe)) % 360.0
+            lat_deg = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_au))))
+                if dist_au > 0.0
+                else 0.0
+            )
+            return lon_deg, lat_deg, dist_au
+        e = position.frame_latlon(ecliptic_frame)
         return e[1].degrees % 360.0, e[0].degrees, e[2].au
 
     # noaberr/nogdefl are the two independent corrections. TRUEPOS maps to
@@ -2893,7 +2911,8 @@ def _apply_fixstar_flags(
                 from .astrometry import _precess_ecliptic
 
                 plon, plat = _precess_ecliptic(plon, plat, jd, J2000)
-            # else: already in J2000 frame from Skyfield's ecliptic_J2000_frame
+            # else: already in the reference J2000 ecliptic frame
+            # (ICRS rotated by the IAU 2006 obliquity, see _ecl above)
         elif iflag & (FLG_NONUT | FLG_SIDEREAL):
             # Mean ecliptic of date. Skyfield returns positions on the true
             # ecliptic of date (with nutation); subtracting dpsi (nutation in
@@ -2912,12 +2931,12 @@ def _apply_fixstar_flags(
         # ---- 2. Equatorial coordinate transformation ----
         if is_equatorial:
             if iflag & FLG_J2000:
-                # J2000 obliquity for J2000 equatorial frame.
-                # Mean obliquity at J2000.0 = 84381.448" (IAU 1976/1980 value).
-                # Kept to match the planet J2000-equatorial path (planets.py) so
-                # star and planet declinations share one J2000 frame; the strict
-                # IAU 2006 value is 84381.406" (23.4392794°), ~0.04" smaller.
-                eps = 23.4392911
+                # J2000 obliquity for J2000 equatorial frame: IAU 2006 value
+                # 84381.406", the reference's measured J2000 ecliptic plane.
+                # Exactly inverts the J2000-ecliptic rotation above, so the
+                # equatorial J2000 output stays on the ICRS equator, matching
+                # the planet J2000-equatorial path (planets.py).
+                eps = 84381.406 / 3600.0
             elif iflag & (FLG_NONUT | FLG_SIDEREAL):
                 # Mean equator of date: use mean obliquity (no nutation).
                 # SIDEREAL equatorial output is likewise referred to the mean

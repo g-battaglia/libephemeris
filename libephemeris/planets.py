@@ -1859,7 +1859,22 @@ def _calc_body_pctr(
     if is_equatorial:
         # Equatorial coordinates (RA/Dec)
         if iflag & FLG_J2000:
-            ra, dec, dist = pos.radec()
+            # Mean equator/equinox of J2000: ICRS rotated by the frame bias
+            # (the reference's measured J2000 equatorial frame).
+            from .fast_calc import _rotate_icrs_to_j2000_mean_equator
+
+            x, y, z = pos.position.au
+            xe, ye, ze = _rotate_icrs_to_j2000_mean_equator(
+                float(x), float(y), float(z)
+            )
+            dist_val = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist_val))))
+                if dist_val > 0
+                else 0.0
+            )
+            p3 = dist_val
         elif is_icrs:
             # ICRS equator of date (no frame bias): Vondrák 2011 precession,
             # with Skyfield nutation unless the mean equator is requested.
@@ -1903,23 +1918,14 @@ def _calc_body_pctr(
                 else 0.0
             )
             p3 = dist_val
-        if iflag & FLG_J2000:
-            p1 = ra.degrees
-            p2 = dec.degrees
-            p3 = dist.au
     else:
         # Ecliptic coordinates (default)
         if iflag & FLG_J2000:
-            # J2000 ecliptic frame
-            eps_j2000 = 23.4392911  # Mean obliquity at J2000.0
-            x, y, z = pos.position.au
-            eps_rad = math.radians(eps_j2000)
-            ce = math.cos(eps_rad)
-            se = math.sin(eps_rad)
+            # Reference J2000 ecliptic frame (frame bias + IAU 2006 obliquity)
+            from .fast_calc import _rotate_icrs_to_ecliptic_j2000
 
-            xe = x
-            ye = y * ce + z * se
-            ze = -y * se + z * ce
+            x, y, z = pos.position.au
+            xe, ye, ze = _rotate_icrs_to_ecliptic_j2000(float(x), float(y), float(z))
 
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
             lon = math.degrees(math.atan2(ye, xe)) % 360.0
@@ -1996,13 +2002,12 @@ def _calc_body_pctr(
     # ~-0.4"/day bias on the Moon's planet-centric speed).
     dt = 7e-5 if ipl == MOON else 1.0 / 86400.0
 
-    # Gate the velocity block on either speed bit: calc()/calc_ut() remap
-    # FLG_SPEED3 -> FLG_SPEED in _normalize_calc_flags, but calc_pctr()'s
-    # _plaus_ephemeris_flags deliberately preserves FLG_SPEED3 in the echoed
-    # retflag (to match the reference), so the numerical differentiation must
-    # honor FLG_SPEED3 here too -- otherwise a FLG_SPEED3 request echoed the
-    # speed bit yet returned zero velocity.
-    if iflag & (FLG_SPEED | FLG_SPEED3):
+    # Gate the velocity block on FLG_SPEED only. Measured against the
+    # reference: calc_pctr() with FLG_SPEED3 alone echoes the bit in the
+    # retflag but returns zero velocity slots; only FLG_SPEED (with or
+    # without FLG_SPEED3) triggers the pctr speed computation. This differs
+    # from calc()/calc_ut(), which do compute speed for SPEED3-alone.
+    if iflag & FLG_SPEED:
         ts_inner = get_timescale()
         t_prev = ts_inner.tt_jd(t.tt, -dt)
         t_next = ts_inner.tt_jd(t.tt, dt)
@@ -2043,7 +2048,7 @@ def _calc_body_pctr(
         # Shortest-arc delta: the ayanamsha is mod 360 and the two samples
         # can straddle the 0/360 wrap (star-anchored modes cross 0 on
         # supported dates), which would spike the speed by ~360/(2*dt).
-        if iflag & (FLG_SPEED | FLG_SPEED3):
+        if iflag & FLG_SPEED:
             ayanamsa_prev = _get_ayanamsa_for_flags(t.ut1 - dt, iflag)
             ayanamsa_next = _get_ayanamsa_for_flags(t.ut1 + dt, iflag)
             da = (ayanamsa_next - ayanamsa_prev + 180.0) % 360.0 - 180.0
@@ -2378,7 +2383,9 @@ def _maybe_equatorial_convert(
     # Sidereal mode uses mean obliquity (no nutation), matching the reference ephemeris
     # which converts to equatorial using the precession-only frame.
     if iflag & FLG_J2000:
-        eps = 23.4392911  # Mean obliquity at J2000.0
+        # IAU 2006 J2000 obliquity — the reference's measured J2000 ecliptic
+        # plane (see fast_calc.OBLIQUITY_J2000_REF_DEG).
+        eps = 84381.406 / 3600.0
     elif (iflag & FLG_NONUT) or (iflag & FLG_SIDEREAL):
         # NONUT / SIDEREAL: use mean obliquity (no nutation correction)
         from .cache import get_mean_obliquity
@@ -4022,12 +4029,22 @@ def _calc_body(
         # Frame options: ICRS (J2000) or True Equator of Date
 
         if iflag & FLG_J2000:
-            # ICRS J2000 equatorial coordinates
-            # radec() returns J2000 RA/Dec by default for ICRS/GCRS positions
-            ra, dec, dist = pos.radec()
-            p1 = ra.hours * 15.0
-            p2 = dec.degrees
-            p3 = dist.au
+            # Mean equator/equinox of J2000: ICRS rotated by the frame bias
+            # (the reference's measured J2000 equatorial frame).
+            from .fast_calc import _rotate_icrs_to_j2000_mean_equator
+
+            _xi, _yi, _zi = pos.position.au
+            xe, ye, ze = _rotate_icrs_to_j2000_mean_equator(
+                float(_xi), float(_yi), float(_zi)
+            )
+            dist = math.sqrt(xe * xe + ye * ye + ze * ze)
+            p1 = math.degrees(math.atan2(ye, xe)) % 360.0
+            p2 = (
+                math.degrees(math.asin(max(-1.0, min(1.0, ze / dist))))
+                if dist > 0
+                else 0.0
+            )
+            p3 = dist
             # Speeds are computed once in the generic central-difference
             # block below (section 4); an in-branch duplicate previously
             # ran two extra full pipeline evaluations whose results were
@@ -4093,22 +4110,12 @@ def _calc_body(
     else:
         # Ecliptic (Long/Lat)
         if iflag & FLG_J2000:
-            # Ecliptic J2000.0 coordinates
-            # Manual rotation from ICRS (equatorial) to ecliptic using obliquity
-            # Transformation: rotation around X-axis by mean obliquity of J2000.0
-            # x_ecl = x_eq
-            # y_ecl = y_eq * cos(eps) + z_eq * sin(eps)
-            # z_ecl = -y_eq * sin(eps) + z_eq * cos(eps)
+            # Ecliptic J2000.0 coordinates: the reference J2000 ecliptic
+            # frame (frame bias + IAU 2006 obliquity, measured convention).
+            from .fast_calc import _rotate_icrs_to_ecliptic_j2000
 
-            eps_j2000 = 23.4392911  # Mean obliquity at J2000.0 (IAU 1976)
             x, y, z = pos.position.au
-            eps_rad = math.radians(eps_j2000)
-            ce = math.cos(eps_rad)
-            se = math.sin(eps_rad)
-
-            xe = x
-            ye = y * ce + z * se
-            ze = -y * se + z * ce
+            xe, ye, ze = _rotate_icrs_to_ecliptic_j2000(float(x), float(y), float(z))
 
             # Convert to spherical
             dist = math.sqrt(xe * xe + ye * ye + ze * ze)
@@ -6654,21 +6661,16 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
     r_icrs = target_pos.position.au - center_pos.position.au
     v_icrs = target_pos.velocity.au_per_d - center_pos.velocity.au_per_d
 
-    # Convert from ICRS (equatorial) to ecliptic coordinates
-    eps = 23.4392911  # Mean obliquity at J2000.0
-    eps_rad = math.radians(eps)
-    cos_eps = math.cos(eps_rad)
-    sin_eps = math.sin(eps_rad)
+    # Convert from ICRS (equatorial) to the reference J2000 ecliptic frame
+    # (frame bias + IAU 2006 obliquity, measured convention)
+    from .fast_calc import _rotate_icrs_to_ecliptic_j2000
 
-    # Rotate position to ecliptic
-    x = r_icrs[0]
-    y = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
-    z = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
-
-    # Rotate velocity to ecliptic
-    vx = v_icrs[0]
-    vy = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
-    vz = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+    x, y, z = _rotate_icrs_to_ecliptic_j2000(
+        float(r_icrs[0]), float(r_icrs[1]), float(r_icrs[2])
+    )
+    vx, vy, vz = _rotate_icrs_to_ecliptic_j2000(
+        float(v_icrs[0]), float(v_icrs[1]), float(v_icrs[2])
+    )
 
     # Convert the ecliptic heliocentric (Moon: geocentric) state to the
     # 50-slot osculating-element tuple via the shared reducer.
@@ -6986,15 +6988,14 @@ def _emb_osculating_ecliptic_elements(t, jd_tt: float) -> Tuple[float, ...]:
     r_icrs = emb_pos.position.au - sun_pos.position.au
     v_icrs = emb_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
 
-    eps_rad = math.radians(23.4392911)
-    cos_eps = math.cos(eps_rad)
-    sin_eps = math.sin(eps_rad)
-    x = r_icrs[0]
-    y = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
-    z = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
-    vx = v_icrs[0]
-    vy = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
-    vz = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+    from .fast_calc import _rotate_icrs_to_ecliptic_j2000
+
+    x, y, z = _rotate_icrs_to_ecliptic_j2000(
+        float(r_icrs[0]), float(r_icrs[1]), float(r_icrs[2])
+    )
+    vx, vy, vz = _rotate_icrs_to_ecliptic_j2000(
+        float(v_icrs[0]), float(v_icrs[1]), float(v_icrs[2])
+    )
 
     GM = 0.01720209895**2
     return _orbital_elements_from_ecliptic_state(x, y, z, vx, vy, vz, GM, EARTH, jd_tt)
@@ -7216,20 +7217,16 @@ def _calc_nod_aps_osculating(
     r_icrs = target_pos.position.au - sun_pos.position.au
     v_icrs = target_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
 
-    # Convert from ICRS (equatorial) to ecliptic coordinates
-    eps = 23.4392911  # Mean obliquity at J2000.0
-    eps_rad = math.radians(eps)
-    cos_eps = math.cos(eps_rad)
-    sin_eps = math.sin(eps_rad)
+    # Convert from ICRS (equatorial) to the reference J2000 ecliptic frame
+    # (frame bias + IAU 2006 obliquity, measured convention)
+    from .fast_calc import _rotate_icrs_to_ecliptic_j2000
 
-    # Rotate to ecliptic
-    x_ecl = r_icrs[0]
-    y_ecl = r_icrs[1] * cos_eps + r_icrs[2] * sin_eps
-    z_ecl = -r_icrs[1] * sin_eps + r_icrs[2] * cos_eps
-
-    vx_ecl = v_icrs[0]
-    vy_ecl = v_icrs[1] * cos_eps + v_icrs[2] * sin_eps
-    vz_ecl = -v_icrs[1] * sin_eps + v_icrs[2] * cos_eps
+    x_ecl, y_ecl, z_ecl = _rotate_icrs_to_ecliptic_j2000(
+        float(r_icrs[0]), float(r_icrs[1]), float(r_icrs[2])
+    )
+    vx_ecl, vy_ecl, vz_ecl = _rotate_icrs_to_ecliptic_j2000(
+        float(v_icrs[0]), float(v_icrs[1]), float(v_icrs[2])
+    )
 
     # GM_sun in AU^3/day^2
     GM_sun = 0.01720209895**2

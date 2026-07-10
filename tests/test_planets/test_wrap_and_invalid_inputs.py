@@ -226,23 +226,33 @@ class TestInvalidInputHandling:
 
 @pytest.mark.unit
 class TestCalcPctrSpeed3Regression:
-    """calc_pctr must honor FLG_SPEED3 (ADV-1).
+    """calc_pctr FLG_SPEED3 semantics (measured against the reference).
 
     calc()/calc_ut() remap FLG_SPEED3 -> FLG_SPEED before computing, but
-    calc_pctr() preserves FLG_SPEED3 in the echoed retflag to match the
-    reference. Previously the velocity block only checked FLG_SPEED, so a
-    FLG_SPEED3 request echoed the speed bit yet returned a zero velocity.
+    calc_pctr() preserves FLG_SPEED3 in the echoed retflag. The reference
+    computes the pctr velocity only when FLG_SPEED is set: FLG_SPEED3
+    alone echoes the bit yet returns zero velocity slots, while
+    FLG_SPEED|FLG_SPEED3 returns the FLG_SPEED velocity.
     """
 
-    def test_speed3_matches_speed_velocity(self):
+    def test_speed3_alone_zero_velocity(self):
         from libephemeris.constants import FLG_SPEED3
 
         pos3, ret3 = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED3)
+        # The reference returns zero velocity for SPEED3-alone (the bit is
+        # echoed in the retflag, but only FLG_SPEED triggers computation).
+        assert pos3[3:] == (0.0, 0.0, 0.0)
+        assert ret3 & FLG_SPEED3
+
+    def test_speed_with_speed3_matches_speed_velocity(self):
+        from libephemeris.constants import FLG_SPEED3
+
+        pos_both, ret_both = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED | FLG_SPEED3)
         pos_s, _ = swe.calc_pctr(JD_J2000, MOON, MARS, FLG_SPEED)
-        # Velocity slots must be identical to the FLG_SPEED result...
-        assert pos3[3:] == pos_s[3:]
-        # ...and no longer trivially zero.
-        assert any(v != 0.0 for v in pos3[3:])
+        assert pos_both[3:] == pos_s[3:]
+        assert any(v != 0.0 for v in pos_both[3:])
+        assert ret_both & FLG_SPEED
+        assert ret_both & FLG_SPEED3
 
     def test_speed3_retflag_preserved(self):
         from libephemeris.constants import FLG_SPEED3

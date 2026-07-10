@@ -760,6 +760,7 @@ def _to_ecliptic_output(
         _cartesian_velocity_to_spherical,
         _rotate_equatorial_to_ecliptic,
         _rotate_icrs_to_ecliptic_j2000,
+        _rotate_icrs_to_j2000_mean_equator,
         _get_skyfield_frame_data,
         _mat3_vec3,
         _prec_matrix,
@@ -777,9 +778,10 @@ def _to_ecliptic_output(
         """
         if iflag & FLG_J2000:
             if iflag & FLG_EQUATORIAL:
-                # Equatorial J2000: ICRS vectors as-is (frame bias ~0.02",
+                # Mean equator/equinox of J2000: ICRS rotated by the frame
+                # bias (the reference's measured J2000 equatorial frame,
                 # same convention as the LEB pipeline)
-                return p
+                return _rotate_icrs_to_j2000_mean_equator(*p)
             # J2000 ecliptic
             return _rotate_icrs_to_ecliptic_j2000(*p)
         if (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):

@@ -109,8 +109,50 @@ J2000 = 2451545.0  # J2000.0 epoch in JD
 _HELCTR_BARY_LT_BODIES = frozenset(
     {MERCURY, VENUS, MARS, JUPITER, SATURN, URANUS, NEPTUNE, PLUTO}
 )
-OBLIQUITY_J2000_DEG = 23.4392911  # Mean obliquity at J2000 (degrees)
+# SPICE/ECLIPJ2000 obliquity (IAU 1976, 84381.448"). Used ONLY as the
+# internal bridge frame for the analytical heliocentric theories (uranians,
+# Transpluto): the stored/native theory frame and the Earth-vector rotation
+# must share one convention on both backends, so this value is frozen.
+OBLIQUITY_J2000_DEG = 23.4392911
 OBLIQUITY_J2000_RAD = math.radians(OBLIQUITY_J2000_DEG)
+
+# The reference API's J2000 ecliptic plane (IAU 2006, 84381.406"), measured:
+# its ecliptic-J2000 output equals its equatorial-J2000 output rotated by
+# exactly this obliquity. All user-visible J2000 ecliptic/equatorial frame
+# conversions use this value.
+OBLIQUITY_J2000_REF_DEG = 84381.406 / 3600.0
+OBLIQUITY_J2000_REF_RAD = math.radians(OBLIQUITY_J2000_REF_DEG)
+
+
+def _build_icrs_to_j2000_frames() -> Tuple[
+    Tuple[Tuple[float, float, float], ...], Tuple[Tuple[float, float, float], ...]
+]:
+    """Build the ICRS -> reference-J2000 frame matrices.
+
+    Measured convention of the reference API (star fit exact to 0.0003"):
+    its equatorial J2000 frame is the mean equator/equinox of J2000, i.e.
+    ICRS rotated by the frame bias, and its ecliptic J2000 frame is that
+    equatorial frame rotated by the IAU 2006 J2000 obliquity (84381.406").
+    """
+    import erfa
+
+    rb = erfa.bp06(2451545.0, 0.0)[0]
+    bias = tuple((float(row[0]), float(row[1]), float(row[2])) for row in rb)
+    ce = math.cos(OBLIQUITY_J2000_REF_RAD)
+    se = math.sin(OBLIQUITY_J2000_REF_RAD)
+    rx = ((1.0, 0.0, 0.0), (0.0, ce, se), (0.0, -se, ce))
+    ecl = tuple(
+        (
+            sum(rx[i][k] * bias[k][0] for k in range(3)),
+            sum(rx[i][k] * bias[k][1] for k in range(3)),
+            sum(rx[i][k] * bias[k][2] for k in range(3)),
+        )
+        for i in range(3)
+    )
+    return bias, ecl
+
+
+_FRAME_BIAS_J2000, _ICRS_TO_ECL_J2000_REF = _build_icrs_to_j2000_frames()
 
 # IAU 2006 mean obliquity polynomial coefficients (arcseconds)
 # eps = 84381.406 - 46.836769*T - 0.0001831*T^2 + 0.00200340*T^3 ...
@@ -289,8 +331,25 @@ def _rotate_equatorial_to_ecliptic(
 def _rotate_icrs_to_ecliptic_j2000(
     x: float, y: float, z: float
 ) -> Tuple[float, float, float]:
-    """Rotate ICRS (≈equatorial J2000) to ecliptic J2000."""
-    return _rotate_equatorial_to_ecliptic(x, y, z, OBLIQUITY_J2000_RAD)
+    """Rotate ICRS to the reference's ecliptic J2000 (frame bias + IAU 2006)."""
+    m = _ICRS_TO_ECL_J2000_REF
+    return (
+        m[0][0] * x + m[0][1] * y + m[0][2] * z,
+        m[1][0] * x + m[1][1] * y + m[1][2] * z,
+        m[2][0] * x + m[2][1] * y + m[2][2] * z,
+    )
+
+
+def _rotate_icrs_to_j2000_mean_equator(
+    x: float, y: float, z: float
+) -> Tuple[float, float, float]:
+    """Rotate ICRS to the mean equator/equinox of J2000 (frame bias only)."""
+    m = _FRAME_BIAS_J2000
+    return (
+        m[0][0] * x + m[0][1] * y + m[0][2] * z,
+        m[1][0] * x + m[1][1] * y + m[1][2] * z,
+        m[2][0] * x + m[2][1] * y + m[2][2] * z,
+    )
 
 
 def _apply_aberration(
@@ -1330,8 +1389,9 @@ def _frame_transform(
     are returned.
     """
     if (iflag & FLG_EQUATORIAL) and (iflag & FLG_J2000):
-        # ICRS J2000 equatorial -- geo is already in this frame.
-        v = geo
+        # Mean equator/equinox of J2000: ICRS rotated by the frame bias
+        # (the reference's measured J2000 equatorial frame).
+        v = _rotate_icrs_to_j2000_mean_equator(geo[0], geo[1], geo[2])
     elif (iflag & FLG_EQUATORIAL) and (iflag & FLG_SIDEREAL):
         # SID+EQ: mean equator of date (P matrix, no nutation).
         v = _mat3_vec3(_prec_matrix(jd_tt), geo)
@@ -1937,7 +1997,7 @@ def _pipeline_ecliptic(
     if (iflag & FLG_EQUATORIAL) and _effective_j2000:
         # J2000 equatorial: precess ecliptic-of-date -> J2000 ecliptic,
         # then rotate J2000 ecliptic -> J2000 equatorial.
-        eps = OBLIQUITY_J2000_DEG
+        eps = OBLIQUITY_J2000_REF_DEG
 
         def _ecl_date_to_eq_j2000(
             lo: float, la: float, src_epoch: float
@@ -2153,12 +2213,11 @@ def _pipeline_helio(
 
     # For EQ+J2000, both backends rotate the J2000 ecliptic to the equator with
     # the J2000 obliquity — a consistent J2000 equatorial frame, same as every
-    # other body class. (The reference API instead uses the obliquity of date
-    # here, a frame-mixed output ~3" off in 2023 — an intentional, certified
-    # divergence; see docs/comparison/intentional-divergences.md.)
+    # other body class and the reference's measured convention (see
+    # docs/comparison/intentional-divergences.md §8, resolved).
     if is_equatorial and is_j2000:
         # EQ+J2000: J2000 ecliptic → J2000 equatorial (fixed J2000 obliquity).
-        eps = OBLIQUITY_J2000_DEG
+        eps = OBLIQUITY_J2000_REF_DEG
 
         dt_step = 0.001
         eq_now_lon, eq_now_lat = _cotrans(lon, lat, -eps)

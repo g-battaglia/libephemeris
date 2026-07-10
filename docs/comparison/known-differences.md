@@ -594,9 +594,12 @@ diverge by 100–2000" in angular elements, because osculating elements derived 
 instantaneous state vectors are highly sensitive for nearly circular orbits.
 
 Adjudicated against an independent two-body extraction on the *same* DE441 state
-(jplephem, library obliquity 23.4392911, GM = k²): across 1970–2020,
+(jplephem, the library's J2000 ecliptic frame, GM = k²): across 1970–2020,
 max |lib − independent two-body truth| = **0.000000°**, while max |SE − the same
-truth| reaches **1.12°**. The lib-vs-SE difference is entirely Swiss Ephemeris's own
+truth| reaches **1.12°**. (The J2000 ecliptic frame is frame bias + the IAU 2006
+obliquity 84381.406", the reference's measured convention; an earlier revision
+used 84381.448" without bias, which held the osculating inclination a constant
+0.042" off and the ascending node ~0.5" off versus the reference.) The lib-vs-SE difference is entirely Swiss Ephemeris's own
 pipeline convention (state source / light-time / constants). Both engines use the
 planet *barycenter* for the giants (the standard convention); using the planet
 *center* instead would shift `varpi` by up to ~1.6° (Neptune) — the inherent
@@ -655,8 +658,10 @@ the cusp engine against the node of the t0 ecliptic on the true equator of
 date, including the reference's measured near-t0 sign quirk: within the
 window where the mean and true ayanamshas have opposite signs, roughly ±4
 months around t0, every ecliptic output is shifted by 2× the unwrapped true
-ayanamsha). Agreement is ≲0.05" for planets/stars and ≲0.05" for house cusps
-across 1900–2035. Two micro-residuals remain: (1) the reported house
+ayanamsha). Agreement is ≲0.005" for stars, ≲0.01" on the planet latitude
+channel (longitudes are limited by the underlying-ephemeris floor, ≲0.1"
+through 2038), and ≲0.05" for house cusps across 1900–2035. Two
+micro-residuals remain: (1) the reported house
 `ascmc[2]` (ARMC) keeps the tropical ARMC, while the reference's drifts from
 it by ≲15" over five centuries with no clean geometric model; (2) the
 near-t0 quirk window boundary depends on sub-milliarcsecond ayanamsha
