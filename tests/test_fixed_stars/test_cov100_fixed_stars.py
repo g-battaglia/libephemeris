@@ -355,28 +355,39 @@ def test_resolve_star_se_sequential_out_of_range():
     assert "sequential" in error
 
 
-def test_resolve_star_se_wildcard_invalid():
-    """A '%' that is not a sole trailing char is invalid (2555-2556)."""
-    star_id, error, _ = fs._resolve_star_se("Reg%ul")
-    assert star_id == -1
-    assert "invalid search string" in error
-    star_id2, error2, _ = fs._resolve_star_se("Reg%%")
-    assert star_id2 == -1
-    assert "invalid search string" in error2
+def test_resolve_star_se_rejects_wildcard():
+    """The v1 family treats '%' strings as plain unmatched names (the
+    reference API rejects wildcards on fixstar/fixstar_ut/fixstar_mag;
+    the prefix search belongs to the fixstar2 family only)."""
+    for q in ("Reg%", "Sir%", "Reg%ul", "Reg%%", "Zzzzq%"):
+        star_id, error, _ = fs._resolve_star_se(q)
+        assert star_id == -1
+        assert "could not find star name" in error
 
 
-def test_resolve_star_se_wildcard_prefix():
-    """Trailing '%' wildcard matches a prefix (2557-2560)."""
-    star_id, error, name = fs._resolve_star_se("Reg%")
-    assert star_id != -1
-    assert name is not None
+def test_resolve_star2_wildcard_prefix():
+    """Trailing '%' prefix wildcard resolves on the v2 family (measured
+    black-box against the reference API)."""
+    for q, expected in (
+        ("Spica%", "Spica"),
+        ("Sir%", "Sirius"),
+        ("Aldeb%", "Aldebaran"),
+    ):
+        entry, error = fs._resolve_star2(q)
+        assert error is None
+        assert entry is not None and entry.name == expected
 
 
-def test_resolve_star_se_wildcard_no_match():
-    """Trailing '%' wildcard with no match errors (2561)."""
-    star_id, error, _ = fs._resolve_star_se("Zzzzq%")
-    assert star_id == -1
-    assert "did not match" in error
+def test_resolve_star2_wildcard_invalid_and_no_match():
+    """A '%' anywhere but as the sole trailing char is invalid; an
+    unmatched prefix errors."""
+    for q in ("%Spica", "Sir%%", "Re%g"):
+        entry, error = fs._resolve_star2(q)
+        assert entry is None
+        assert "invalid search string" in error
+    entry, error = fs._resolve_star2("Zzzzq%")
+    assert entry is None
+    assert "could not find star name" in error
 
 
 def test_resolve_star_se_alias_id_without_entry(monkeypatch):

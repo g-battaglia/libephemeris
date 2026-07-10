@@ -2609,10 +2609,11 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
     - "name,nomenclature": the traditional-name part is ignored and the
       nomenclature key decides;
     - leading digit: 1-based sequential number in the sorted catalog;
-    - trailing '%' on a traditional name: prefix wildcard (a '%'
-      anywhere else is an error);
     - otherwise: exact traditional-name match (whitespace removed,
-      case-insensitive).
+      case-insensitive). A '%' is NOT special here: the reference's v1
+      family (fixstar/fixstar_ut/fixstar_mag) rejects wildcard strings
+      as unknown star names — the trailing-'%' prefix wildcard belongs
+      to the v2 family only (see _resolve_star2).
 
     No fuzzy matching, Bayer-word parsing or prefix guessing happens
     here - those remain available in the library's own search helpers
@@ -2658,15 +2659,11 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
             )
         return _found(ordered[star_nr - 1])
 
-    # Trailing '%' wildcard on the traditional name.
-    if "%" in sstar:
-        if not sstar.endswith("%") or sstar.count("%") != 1:
-            return -1, f"invalid search string {sstar}", None
-        prefix = sstar[:-1]
-        for entry in _se_sorted_catalog():
-            if _se_star_key(entry.name).startswith(prefix):
-                return _found(entry)
-        return -1, f"star search string {sstar} did not match", None
+    # No wildcard handling: the reference's v1 family treats '%' strings
+    # as plain (unmatched) names — they fall through to the exact-match
+    # loop below and fail with "could not find star name". The prefix
+    # wildcard is a v2-only feature (measured black-box: v1 rejects
+    # 'Sir%', v2 resolves it).
 
     # Exact traditional-name match. The alias table plays the role of
     # the reference catalog's additional name lines per star, so exact
@@ -3100,13 +3097,23 @@ def _fixstar_ut_by_id(
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                star_id,
+                t.tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                star_id,
+                t.tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
@@ -3373,13 +3380,23 @@ def fixstar(
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                star_id,
+                tjdet,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                star_id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                star_id,
+                tjdet,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
@@ -3442,6 +3459,23 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
     if not search:
         return None, "Empty star name"
+
+    # Trailing-'%' prefix wildcard on the traditional name — a v2-family
+    # feature of the reference API (its v1 family rejects wildcards; see
+    # _resolve_star_se). A '%' anywhere else is an invalid search string.
+    # Ambiguous prefixes resolve to the first match in the library's
+    # sorted catalog, which can differ from the reference's star-file
+    # order for very short prefixes (documented in known-differences).
+    if "%" in search:
+        skey = _se_star_key(search)
+        if not skey.endswith("%") or skey.count("%") != 1:
+            return None, f"invalid search string {search}"
+        prefix = skey[:-1]
+        if prefix:
+            for entry in _se_sorted_catalog():
+                if _se_star_key(entry.name).startswith(prefix):
+                    return entry, None
+        return None, f"could not find star name {search}"
 
     # Check if it's a catalog number (numeric string, possibly with leading comma)
     number_search = search.lstrip(",").strip()
@@ -3633,13 +3667,23 @@ def fixstar2_ut(
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                entry.id,
+                t.tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, t.tt, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                entry.id,
+                t.tt,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
@@ -3716,13 +3760,23 @@ def fixstar2(
 
         if flags & FLG_SPEED:
             lon, lat, dist, speed_lon, speed_lat, speed_dist = calc_fixed_star_velocity(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                entry.id,
+                tjdet,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, speed_lon, speed_lat, speed_dist)
         else:
             lon, lat, dist = calc_fixed_star_position(
-                entry.id, tjdet, noaberr, nogdefl, j2000_frame=use_j2000, topo=topo,
+                entry.id,
+                tjdet,
+                noaberr,
+                nogdefl,
+                j2000_frame=use_j2000,
+                topo=topo,
                 center=center,
             )
             result = (lon, lat, dist, 0.0, 0.0, 0.0)
