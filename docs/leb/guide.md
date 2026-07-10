@@ -409,7 +409,7 @@ regardless of file size.
 the page-aligned byte ranges of segments/chunks overlapping the given
 Julian Day range.  This allows pre-faulting only the date ranges that
 will be needed (e.g. 1800-2200 CE ≈ 11 MB for extended tier) without
-loading the entire file (~855 MB).  `CompositeLEBReader.warm()` delegates
+loading the entire file (~1.6 GB for the extended tier).  `CompositeLEBReader.warm()` delegates
 to all constituent readers.
 
 Automatic preloading can be enabled via TOML configuration:
