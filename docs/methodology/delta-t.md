@@ -86,8 +86,10 @@ eph.get_delta_t_model()                   # -> "espenak_meeus"
 # or, by environment:  LIBEPHEMERIS_DELTAT_MODEL=espenak_meeus
 ```
 
-Both models are **clean-room**: every coefficient comes from published sources (the
-SMH-2016 / Skyfield implementation, and the NASA Espenak-Meeus polynomials). They
+Of the two, `espenak_meeus` is a **native** reimplementation from published NASA
+coefficients; `smh2016` (the default) is obtained from Skyfield's own SMH-2016
+implementation (Skyfield is a permissively-licensed MIT dependency). Neither
+derives from the reference (copyleft) Swiss Ephemeris. They
 agree closely in the well-observed range and differ mainly at the extremes (deep
 past / far future), where ΔT is itself uncertain. The `espenak_meeus` model
 reproduces the classic NASA polynomials and exists for users and tools that

@@ -509,8 +509,8 @@ final **with no further code changes** if it proves clean.
   and the `deltat_model` TOML key choose the ΔT model used after the
   user-defined / IERS-observed priorities: `smh2016` (default,
   Stephenson-Morrison-Hohenkerk 2016) or `espenak_meeus` (a self-contained
-  clean-room implementation of the NASA Espenak & Meeus 2006 polynomials). Both
-  are clean-room.
+  native reimplementation of the NASA Espenak & Meeus 2006 polynomials). smh2016
+  is obtained from Skyfield; neither derives from the reference ephemeris.
 - **Long-term sidereal-time house cusps** (`libephemeris/sidereal_longterm.py`)
   that stay correct across the full supported date range, plus **true
   time-derivative cusp/angle speeds** in `houses_ex2` (centered finite
@@ -714,9 +714,10 @@ final **with no further code changes** if it proves clean.
   `LIBEPHEMERIS_DELTAT_MODEL` environment variable (and `deltat_model` TOML key)
   select the ΔT model used after the user-defined / IERS-observed priorities:
   `smh2016` (default, Stephenson-Morrison-Hohenkerk 2016 via Skyfield) or
-  `espenak_meeus` (a self-contained, clean-room implementation of the classic NASA
-  Espenak & Meeus 2006 polynomials). Both are clean-room; **libephemeris never
-  imports pyswisseph.** See `docs/methodology/delta-t.md`.
+  `espenak_meeus` (a self-contained, native reimplementation of the classic NASA
+  Espenak & Meeus 2006 polynomials). smh2016 is obtained from Skyfield; neither
+  derives from the reference ephemeris and **libephemeris never imports
+  pyswisseph.** See `docs/methodology/delta-t.md`.
 
 ### Documentation
 

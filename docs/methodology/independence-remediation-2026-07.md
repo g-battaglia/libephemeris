@@ -193,6 +193,20 @@ reimplementation. Audit series: 42 → 20 → 13 → 5 → 2 → 3, the tail bei
 documentation/claims accuracy with no reference-source taint remaining in
 shipped code.
 
+### Round 7
+
+Round 7 confirmed 2 more stragglers of the round-6 "clean-room / no
+third-party ephemeris" claim (delta-t.md §3 and release-notes/v3.0.0rc1.md
+still called both ΔT models clean-room and asserted the library imports no
+third-party ephemeris). This time the entire phrase class was swept: the
+same loose wording in CHANGELOG.md was corrected too. All ΔT-model claims
+now state accurately that `smh2016` comes from Skyfield (MIT) and only
+`espenak_meeus` is a native reimplementation, with independence scoped to
+the reference (copyleft) ephemeris. The remaining "clean-room" mentions in
+the tree are legitimate: precession_vondrak.py openly documents its
+ERFA/pyerfa delegation, and the historical changelog framing is
+allowlisted. Audit series: 42 → 20 → 13 → 5 → 2 → 3 → 2.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the
