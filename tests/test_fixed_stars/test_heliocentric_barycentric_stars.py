@@ -62,9 +62,13 @@ def test_center_priority_topoctr_over_bary_over_helctr() -> None:
     lib.set_topo(12.5, 41.9, 100.0)
     # TOPOCTR wins over both BARYCTR and HELCTR (position + retflag).
     p_all, _n, r_all = lib.fixstar_ut(
-        "Regulus", jd, lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_BARYCTR | lib.FLG_HELCTR
+        "Regulus",
+        jd,
+        lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_BARYCTR | lib.FLG_HELCTR,
     )
-    p_topo, _n2, r_topo = lib.fixstar_ut("Regulus", jd, lib.FLG_SWIEPH | lib.FLG_TOPOCTR)
+    p_topo, _n2, r_topo = lib.fixstar_ut(
+        "Regulus", jd, lib.FLG_SWIEPH | lib.FLG_TOPOCTR
+    )
     assert r_all == r_topo
     assert p_all[0] == pytest.approx(p_topo[0], abs=1e-9)
     # BARYCTR wins over HELCTR.
@@ -103,3 +107,45 @@ def test_batch_and_fixstar2_match_single(center) -> None:
         # fixstar2_ut resolves the same star and honours the same center.
         two = lib.fixstar2_ut(star, jd, flags)
         assert two[0][0] == pytest.approx(single[0][0], rel=1e-12, abs=1e-9)
+
+
+class TestTopocentricStarSpeeds:
+    """Topocentric star speeds carry the diurnal term (round-V parity fix).
+
+    The reference reports the instantaneous diurnal-inclusive derivative:
+    with the observer set, the lon/lat speed channels flip sign and change
+    magnitude versus the geocentric speeds. A half-day central-difference
+    step aliases the ~0.997-day diurnal period out of the difference, which
+    reproduced the geocentric speed instead. Expected values frozen from the
+    black-box reference oracle (pyswisseph 2.10.3.2, bundled ephemeris).
+    """
+
+    def test_regulus_topocentric_speed_matches_reference(self):
+        lib.set_topo(12.5, 41.9, 100.0)
+        try:
+            xx, _name, _rf = lib.fixstar2_ut(
+                "Regulus",
+                2451545.0,
+                lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_SPEED,
+            )
+        finally:
+            lib.set_topo(0.0, 0.0, 0.0)
+        # Oracle: speed_lon=-0.00010577, speed_lat=-0.00015783 deg/day.
+        assert abs(xx[3] - (-0.00010577)) < 2e-6
+        assert abs(xx[4] - (-0.00015783)) < 2e-5
+
+    def test_topocentric_speed_differs_from_geocentric(self):
+        geo, _n, _r = lib.fixstar2_ut(
+            "Regulus", 2451545.0, lib.FLG_SWIEPH | lib.FLG_SPEED
+        )
+        lib.set_topo(12.5, 41.9, 100.0)
+        try:
+            topo, _n2, _r2 = lib.fixstar2_ut(
+                "Regulus",
+                2451545.0,
+                lib.FLG_SWIEPH | lib.FLG_TOPOCTR | lib.FLG_SPEED,
+            )
+        finally:
+            lib.set_topo(0.0, 0.0, 0.0)
+        # Diurnal term flips the longitude-speed sign at this epoch/site.
+        assert geo[3] > 0 and topo[3] < 0

@@ -2537,8 +2537,15 @@ def calc_fixed_star_velocity(
     if star_id not in FIXED_STARS:
         raise ValueError(f"could not find star name {star_id}")
 
-    # Half-day step for central difference
-    h = 0.5
+    # Half-day step for central difference. Topocentric requests need a much
+    # smaller step: the observer's diurnal motion has a ~0.997-day period, so
+    # sampling at t±0.5 day lands on nearly the same rotational phase and the
+    # diurnal term cancels out of the difference — while the reference
+    # reports the instantaneous diurnal-inclusive derivative (sign and
+    # magnitude differ). h=0.005 is converged (halving it again changes dlon
+    # by <1e-7 deg/day); the geocentric step stays 0.5, its oracle-verified
+    # value.
+    h = 0.005 if topo is not None else 0.5
 
     # Calculate position at current time (for return value)
     lon, lat, dist = calc_fixed_star_position(
@@ -2553,7 +2560,7 @@ def calc_fixed_star_velocity(
         star_id, jd_tt + h, noaberr, nogdefl, j2000_frame, topo=topo, center=center
     )
 
-    # Central difference: (f(t+h) - f(t-h)) / (2h) where 2h = 1.0 day
+    # Central difference: (f(t+h) - f(t-h)) / (2h)
     speed_lon = lon_next - lon_prev
 
     # Handle wraparound at 360° (e.g., 359° -> 1° should give +2°, not -358°)
@@ -2561,13 +2568,14 @@ def calc_fixed_star_velocity(
         speed_lon -= 360.0
     elif speed_lon < -180.0:
         speed_lon += 360.0
+    speed_lon /= 2.0 * h
 
     # Latitude speed: pure finite difference (no wraparound needed for latitude)
-    speed_lat = lat_next - lat_prev
+    speed_lat = (lat_next - lat_prev) / (2.0 * h)
 
     # Distance speed: radial motion (the star's radial velocity plus the
     # Earth's orbital radial component) - the reference reports it.
-    speed_dist = dist_next - dist_prev
+    speed_dist = (dist_next - dist_prev) / (2.0 * h)
 
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
