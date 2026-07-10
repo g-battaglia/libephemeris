@@ -1730,10 +1730,10 @@ def _mean_obliquity_radians(jd_tt: float) -> float:
 class MeeusPolynomialWarning(UserWarning):
     """Warning issued when Meeus polynomial is used outside its optimal range.
 
-    Severity levels based on distance from J2000.0:
-        - Beyond ±200 years (MEEUS_OPTIMAL_CENTURIES): precision degrades from <0.001° to ~0.01°
-        - Beyond ±1000 years (MEEUS_VALID_CENTURIES): error may be 0.1-1°
-        - Beyond ±2000 years (MEEUS_MAX_CENTURIES): raises MeeusRangeError exception
+    Severity levels based on distance from J2000.0 (warnings only — no
+    range ever raises, matching the reference API which computes any date):
+        - Beyond ±1000 years: precision degraded but still usable
+        - Beyond ±2000 years: error may exceed 1 degree; use with caution
     """
 
     pass
@@ -2588,9 +2588,9 @@ def calc_interpolated_apogee(jd_tt: float) -> Tuple[float, float, float]:
     1. **Mean Apogee Position:** Calculate the mean lunar apogee (Mean Lilith)
        using polynomial formula for the mean argument of perigee + 180 degrees.
 
-    2. **Perturbation Series:** Add ~50 periodic perturbation terms
+    2. **Perturbation Series:** Add 25 periodic perturbation terms
        derived from ELP2000-82B theory, capturing:
-       - Primary evection harmonics (kD - kM') up to k=10
+       - Primary evection harmonics (kD - kM') up to k=14
        - Solar anomaly coupling (M-dependent terms)
        - Latitude coupling (F-dependent terms)
        - Cross-coupling terms for D, M, M', F interactions
