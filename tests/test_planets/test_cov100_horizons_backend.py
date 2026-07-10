@@ -165,9 +165,7 @@ class TestSSLContext:
         fake_ssl.create_default_context.return_value = sentinel
         fake_certifi = mock.MagicMock()
         fake_certifi.where.return_value = "/fake/ca.pem"
-        with mock.patch.dict(
-            "sys.modules", {"ssl": fake_ssl, "certifi": fake_certifi}
-        ):
+        with mock.patch.dict("sys.modules", {"ssl": fake_ssl, "certifi": fake_certifi}):
             ctx1 = _get_ssl_context()
             assert ctx1 is sentinel
             # Second call returns the cached object without rebuilding.
@@ -204,9 +202,12 @@ class TestSSLContext:
 class TestFetchStateVector:
     def test_fetch_parses_and_caches(self):
         client = HorizonsClient(max_cache_size=4)
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
-        ) as op, mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+            ) as op,
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             sv1 = client.fetch_state_vector("499", JD, "@0", "TDB")
             assert sv1.x == 1.2 and sv1.vz == 0.001
             # Second identical call hits the cache (no new urlopen).
@@ -216,9 +217,12 @@ class TestFetchStateVector:
 
     def test_cache_lru_eviction(self):
         client = HorizonsClient(max_cache_size=1)
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+            ),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             client.fetch_state_vector("499", JD, "@0", "TDB")
             client.fetch_state_vector("499", JD + 1.0, "@0", "TDB")
         # max_cache_size=1 forced eviction of the first entry.
@@ -233,22 +237,26 @@ class TestFetchStateVector:
 class TestFetchBatch:
     def test_batch_cache_hit_and_parallel_fetch(self):
         client = HorizonsClient(max_workers=2)
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+            ),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             # Prime the cache with one entry.
             client.fetch_state_vector("499", JD, "@0", "TDB")
-            res = client.fetch_batch(
-                [("499", JD, "@0"), ("10", JD, "@0")]
-            )
+            res = client.fetch_batch([("499", JD, "@0"), ("10", JD, "@0")])
         assert ("499", JD, "@0") in res
         assert ("10", JD, "@0") in res
 
     def test_batch_all_cached_short_circuit(self):
         client = HorizonsClient()
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+            ),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             client.fetch_state_vector("499", JD, "@0", "TDB")
             res = client.fetch_batch([("499", JD, "@0")])
         assert res == {("499", JD, "@0"): res[("499", JD, "@0")]}
@@ -273,9 +281,12 @@ class TestFetchWithRetry:
     def test_api_error_raises_keyerror_no_retry(self):
         client = HorizonsClient()
         payload = json.dumps({"error": "No matches found"}).encode("utf-8")
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(payload)
-        ) as op, mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(payload)
+            ) as op,
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             with pytest.raises(KeyError):
                 client.fetch_state_vector("nope", JD)
         # KeyError is not retried.
@@ -292,20 +303,22 @@ class TestFetchWithRetry:
                 raise item
             return item
 
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", side_effect=_urlopen
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None), mock.patch(
-            "time.sleep", return_value=None
+        with (
+            mock.patch.object(hb.urllib.request, "urlopen", side_effect=_urlopen),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+            mock.patch("time.sleep", return_value=None),
         ):
             sv = client.fetch_state_vector("499", JD)
         assert sv.x == 1.2
 
     def test_all_attempts_fail_raises_connectionerror(self):
         client = HorizonsClient()
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", side_effect=OSError("down")
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None), mock.patch(
-            "time.sleep", return_value=None
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", side_effect=OSError("down")
+            ),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+            mock.patch("time.sleep", return_value=None),
         ):
             with pytest.raises(ConnectionError):
                 client.fetch_state_vector("499", JD)
@@ -349,9 +362,12 @@ class TestParseResponse:
 class TestClearCache:
     def test_clear_and_shutdown(self):
         client = HorizonsClient()
-        with mock.patch.object(
-            hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
-        ), mock.patch.object(hb, "_get_ssl_context", return_value=None):
+        with (
+            mock.patch.object(
+                hb.urllib.request, "urlopen", return_value=_FakeResp(_good_json_bytes())
+            ),
+            mock.patch.object(hb, "_get_ssl_context", return_value=None),
+        ):
             client.fetch_state_vector("499", JD)
         assert len(client._cache) == 1
         client.clear_cache()
@@ -417,9 +433,7 @@ class TestCalcUtHeliocentric:
 
     def test_planet_heliocentric_truepos_skips_lighttime(self):
         client = FakeHorizonsClient()
-        horizons_calc_ut(
-            client, JD, 4, FLG_SWIEPH | FLG_HELCTR | FLG_TRUEPOS
-        )
+        horizons_calc_ut(client, JD, 4, FLG_SWIEPH | FLG_HELCTR | FLG_TRUEPOS)
         # No retarded refetch: exactly one target fetch at jd_tt.
         target_calls = [c for c in client.calls if c[0] == "499"]
         assert len(target_calls) == 1
@@ -735,9 +749,7 @@ class TestCalcAnalytical:
         # _calc_analytical now calls calc_mean_lunar_node three times:
         # position (jd_tt), then jd_tt-dt and jd_tt+dt for the speed.
         seq = iter([0.0, 359.9, 0.1])
-        with mock.patch.object(
-            hb, "_calc_analytical", wraps=hb._calc_analytical
-        ):
+        with mock.patch.object(hb, "_calc_analytical", wraps=hb._calc_analytical):
             import libephemeris.lunar as lunar
 
             with mock.patch.object(
@@ -763,3 +775,49 @@ class TestCalcUranian:
     def test_uranian_sidereal(self):
         (data, fl) = _calc_uranian(JD, 40, FLG_SWIEPH | FLG_SIDEREAL)
         assert 0.0 <= data[0] < 360.0
+
+
+class TestSiderealSpeedBranchResolvesGlobalMode:
+    """The star-anchored speed branch must resolve sid_mode=None to the
+    global mode (measured gap vs the precession branch: ~0.36"/day for
+    SIDM_TRUE_CITRA). The module-level Horizons dispatch passes no sid_mode,
+    so an unresolved None sent every star-based mode down the wrong branch.
+    """
+
+    POS = (1.2, -1.0, 0.4)
+    VEL = (0.005, 0.006, 0.001)
+
+    def test_none_matches_explicit_star_mode(self):
+        import libephemeris as le
+        from libephemeris.constants import SIDM_TRUE_CITRA
+
+        le.set_sid_mode(SIDM_TRUE_CITRA)
+        try:
+            iflag = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
+            (out_none, _) = _to_ecliptic_output(self.POS, self.VEL, JD, JD, iflag, None)
+            (out_explicit, _) = _to_ecliptic_output(
+                self.POS, self.VEL, JD, JD, iflag, SIDM_TRUE_CITRA
+            )
+            # Same branch, same ayanamsha: identical longitude AND speed.
+            assert abs(out_none[0] - out_explicit[0]) < 1e-12
+            assert abs(out_none[3] - out_explicit[3]) < 1e-12
+        finally:
+            le.set_sid_mode(0)
+
+    def test_entry_snapshots_global_mode(self):
+        """horizons_calc_ut resolves sid_mode at entry for sidereal requests
+        (nodes go through _calc_analytical without HTTP)."""
+        import libephemeris as le
+        from libephemeris.constants import MEAN_NODE, SIDM_TRUE_CITRA
+
+        le.set_sid_mode(SIDM_TRUE_CITRA)
+        try:
+            iflag = FLG_SWIEPH | FLG_SIDEREAL | FLG_SPEED
+            (d_none, _) = hb.horizons_calc_ut(None, JD, MEAN_NODE, iflag)
+            (d_expl, _) = hb.horizons_calc_ut(
+                None, JD, MEAN_NODE, iflag, sid_mode=SIDM_TRUE_CITRA
+            )
+            assert abs(d_none[0] - d_expl[0]) < 1e-12
+            assert abs(d_none[3] - d_expl[3]) < 1e-12
+        finally:
+            le.set_sid_mode(0)

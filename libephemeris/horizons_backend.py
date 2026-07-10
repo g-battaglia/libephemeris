@@ -413,11 +413,24 @@ def horizons_calc_ut(
         FLG_ICRS,
         FLG_NOABERR,
         FLG_NOGDEFL,
+        FLG_SIDEREAL,
         FLG_SPEED,
         FLG_TOPOCTR,
         FLG_TRUEPOS,
         FLG_NONUT,
     )
+
+    if sid_mode is None and (iflag & FLG_SIDEREAL):
+        # Snapshot the global sidereal mode once at entry (mirroring
+        # fast_calc_ut): the ayanamsha *value* lookups resolve None to the
+        # global mode on their own, but the star-anchored-vs-precession
+        # SPEED branch selector in _to_ecliptic_output tests the raw mode
+        # id (`sid_mode in _STAR_BASED_MODES`), and an unresolved None sent
+        # every star-based mode down the general-precession branch
+        # (~0.36"/day off for SIDM_TRUE_CITRA).
+        from .state import get_sid_mode
+
+        sid_mode = get_sid_mode()
 
     # Unsupported flags → fallback to Skyfield
     if iflag & FLG_TOPOCTR:
@@ -896,7 +909,19 @@ def _to_ecliptic_output(
         if iflag & FLG_SPEED:
             from .fast_calc import _STAR_BASED_MODES
 
-            if sid_mode in _STAR_BASED_MODES:
+            # Resolve None to the global mode before testing the branch:
+            # the ayanamsha lookups above do this internally, but the raw
+            # `sid_mode in _STAR_BASED_MODES` test does not, and None sent
+            # every star-anchored mode down the precession branch
+            # (~0.36"/day off). horizons_calc_ut snapshots the global mode
+            # at entry, so this is a defensive resolve for direct callers.
+            _sid_eff = sid_mode
+            if _sid_eff is None:
+                from .state import get_sid_mode
+
+                _sid_eff = get_sid_mode()
+
+            if _sid_eff in _STAR_BASED_MODES:
                 # Star-anchored modes: the ayanamsa drift is the anchor star's
                 # apparent-longitude drift (annual-aberration-dominated), not the
                 # IAU 2006 precession polynomial. Central-difference the actual
