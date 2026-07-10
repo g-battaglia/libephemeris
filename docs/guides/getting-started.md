@@ -22,7 +22,7 @@ libephemeris download extended     # -13200 to +17191, full range
 pip install libephemeris[nbody]   # REBOUND/ASSIST n-body integration for TNOs
 pip install libephemeris[stars]   # Star catalog building (astropy)
 pip install libephemeris[all]     # All permissive-licensed extras
-pip install libephemeris[all,nbody]  # ... plus the GPL-licensed N-body extra
+pip install libephemeris[all,nbody]  # ... plus the GPL-licensed N-body extra (provenance-ok)
 ```
 
 **Requirements:** Python 3.12+ | skyfield >= 1.54 | pyerfa >= 2.0

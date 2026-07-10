@@ -205,7 +205,9 @@ preservation of copyright, license, and attribution notices. See
 > to the GPL; the core library and its required dependencies are permissive.
 > See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-LibEphemeris is an independent, API-compatible implementation; it contains
-no Swiss Ephemeris code ([NOTICE.md](NOTICE.md),
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)). "Swiss Ephemeris" is a
+LibEphemeris is an independent, API-compatible implementation; independence
+from Swiss Ephemeris code is the project's enforced working standard, with
+disclosures and the current remediation record in
+[NOTICE.md](NOTICE.md) and
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). "Swiss Ephemeris" is a
 product of Astrodienst AG.

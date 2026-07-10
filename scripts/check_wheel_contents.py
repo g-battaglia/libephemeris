@@ -34,6 +34,8 @@ FORBIDDEN = (
     re.compile(r"\.se1$", re.IGNORECASE),
     re.compile(r"sefstars", re.IGNORECASE),
     re.compile(r"seorbel", re.IGNORECASE),
+    re.compile(r"seleapsec", re.IGNORECASE),
+    re.compile(r"sedeltat", re.IGNORECASE),
     re.compile(r"data/reference/"),
 )
 WHEEL_REQUIRED = (

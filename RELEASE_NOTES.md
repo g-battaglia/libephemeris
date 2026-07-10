@@ -9,7 +9,7 @@ current release.
 
 ## 3.0.0rc2 — the v3.0.0 release candidate (2026-06-29)
 
-**v3.0.0 is the Apache-2.0, clean-room provenance release** that re-grounds the
+**v3.0.0 is the Apache-2.0, provenance-remediated release** that re-grounds the
 whole library on long-term-valid models (Vondrák 2011 precession & obliquity,
 long-term sidereal-time house cusps, a multi-era Delta T with a selectable
 model) and ships a full review-driven correctness sweep across eclipses,
@@ -31,7 +31,7 @@ pip install --pre libephemeris==3.0.0rc2
 Highlights:
 
 - **Apache-2.0 license** — permissive, free for closed-source and commercial
-  use, on a clean-room provenance footing with no copyleft code in the shipped
+  use, on a documented-provenance footing with no copyleft code in the shipped
   package (see `LICENSING.md` / `THIRD_PARTY_NOTICES.md`). The optional `nbody`
   extra pulls in GPL-3.0 `rebound`/`assist`, which are never bundled.
 - **Vondrák 2011 long-term precession & obliquity** across the whole pipeline

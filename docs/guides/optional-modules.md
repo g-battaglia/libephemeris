@@ -142,10 +142,10 @@ named stars.
 ### `all` -- All permissive-licensed extras
 
 ```bash
-pip install libephemeris[all]        # permissive-only; add ,nbody for the GPL extra
+pip install libephemeris[all]        # permissive-only; add ,nbody for the GPL extra (provenance-ok)
 ```
 
-Installs all optional runtime dependencies (`nbody` + `stars`).
+Installs the permissive-licensed optional runtime dependencies (`stars`); the GPL-licensed `nbody` extra is a separate explicit opt-in. <!-- provenance-ok -->
 
 ### `dev` -- Development tools
 

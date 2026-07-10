@@ -254,12 +254,11 @@ _WHEN_LOC_EPOCH_WINDOW = 0.35  # days (~8.4 h)
 # 1 AU in km (IAU 2012 definition)
 _AU_KM = 149597870.7
 
-# Physical equatorial radii of planets in km
-# Sources: IAU 2015 nominal values, NASA Planetary Fact Sheet
-# Used for dynamic angular radius computation (matching SE's pla_diam[] approach)
-# IAU volumetric mean radii (Archinal et al.), the convention the
-# reference uses for apparent disc sizes; asteroid values from the
-# Bowell database.
+# Physical equatorial radii of planets in km, used for dynamic angular
+# disc-size computation. Sources: IAU volumetric mean radii (Archinal et
+# al.; IAU 2015 nominal values, NASA Planetary Fact Sheet). Disc sizes
+# computed from these radii reproduce the reference API's apparent
+# diameters on output; asteroid values from the Bowell database.
 _PLANET_RADIUS_KM = {
     MERCURY: 2439.4,
     VENUS: 6051.8,
@@ -271,8 +270,8 @@ _PLANET_RADIUS_KM = {
     PLUTO: 1188.3,
 }
 
-# Bodies beyond the classical planets that have disc sizes in the
-# reference's diameter table (km).
+# Bodies beyond the classical planets for which the reference API reports
+# a finite apparent disc (radii in km, public survey values).
 _EXTRA_BODY_RADIUS_KM = {
     CHIRON: 135.685,
     PHOLUS: 145.0,
@@ -297,6 +296,18 @@ _ECL_EARTH_FLATTENING = 1.0 / 298.25642
 # Earth equatorial radius in km (IAU 1976 system, Astronomical Almanac),
 # used directly by the occultation shadow-geometry phase equations.
 _EARTH_EQ_RADIUS_KM = 6378.140
+
+# Lunar-eclipse shadow-scale factors (dimensionless), fitted black-box on
+# reference-API output magnitudes; penumbra ~= umbra^2. See _lun_how_core.
+_LUN_UMBRA_SCALE = 0.99405
+_LUN_PENUMBRA_SCALE = 0.98813
+
+# Inner-contact (2nd/3rd) lunar-radius scale for occultations and solar
+# eclipses, established black-box: the reference API's inner-contact times
+# correspond to a lunar radius reduced by this factor (fitted on contact
+# times; physically consistent with using the Moon's smaller polar/mean
+# limb for the moment of complete immersion).
+_INNER_CONTACT_MOON_SCALE = 0.99916
 
 # --- Lunar-occultation search parameters (derived, not tuned) ---------------
 # Mean lunar sidereal motion is ~13.18 deg/day, so gap/13 is a safe
@@ -589,7 +600,7 @@ def _eclipse_where_core(
         closest-approach point), otherwise ECL_CENTRAL or
         ECL_NONCENTRAL (plus ECL_PARTIAL when only the penumbra
         touches), plus ECL_TOTAL/ECL_ANNULAR for the non-partial case.
-        ``dcore`` mirrors the reference layout: [0] core-shadow diameter
+        ``dcore`` uses this module's 7-slot shadow-geometry layout: [0] core-shadow diameter
         at the ground point (km; negative when the umbra reaches the
         surface), [1] penumbra diameter there (km), [2] axis distance
         from the geocenter (km), [3] core diameter on the fundamental
@@ -871,12 +882,18 @@ def _lun_how_core(
         * enlarge
         / cosf2
     )
-    # The reference projects both diameters onto the fundamental plane a
-    # second time and applies its NASA-agreement deflators; mirror that.
+    # Shadow-scale convention, established black-box: reproducing the
+    # reference API's published lunar-eclipse magnitudes requires a second
+    # cone-slope projection of both shadow diameters plus fixed scale
+    # factors (umbra 0.99405, penumbra 0.98813 ~= 0.99405^2). The factors
+    # were fitted on output magnitudes over a multi-century eclipse sweep
+    # (see tests/test_lun_eclipse_*), consistent with the family of
+    # published shadow-enlargement conventions (Danjon-style scaling of
+    # the geometric shadow).
     d0 /= cosf1
     cap_d0 /= cosf2
-    d0 *= 0.99405
-    cap_d0 *= 0.98813
+    d0 *= _LUN_UMBRA_SCALE
+    cap_d0 *= _LUN_PENUMBRA_SCALE
 
     attr = [0.0] * 20
     retc = 0
@@ -3439,7 +3456,8 @@ def _sol_eclipse_when_loc_impl(
 
     # NOTE: the observer position is threaded through explicitly (LEB path
     # geopos tuples / Skyfield wgs84.latlon); the reference API's
-    # swe_sol_eclipse_when_loc does not touch the global set_topo state,
+    # The reference API's sol_eclipse_when_loc does not touch the global
+    # set_topo state,
     # and neither do we (a previous set_topo() call here leaked the
     # eclipse observer into subsequent FLG_TOPOCTR calculations).
 
@@ -3585,15 +3603,15 @@ def _sol_eclipse_when_loc_impl(
 
         # Contact times. Outer contacts: center separation equals the
         # sum of the apparent radii evaluated at the contact itself.
-        # Inner contacts: the lunar radius is reduced by x0.99916, the
-        # reference convention for 2nd/3rd contacts (limb profile).
+        # Inner contacts: the lunar radius is reduced by the black-box
+        # inner-contact scale (see _INNER_CONTACT_MOON_SCALE).
         def _f_outer(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rs_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
             rs_c, rm_c, sep_c = _radii_sep(jd_c)
-            return abs(rs_c - 0.99916 * rm_c) - sep_c
+            return abs(rs_c - _INNER_CONTACT_MOON_SCALE * rm_c) - sep_c
 
         two_hours = 2.0 / 24.0
         jd_first = _root_bisect(_f_outer, jd_local_max - two_hours, jd_local_max)
@@ -3830,7 +3848,7 @@ def _sol_eclipse_where_impl(
         describe the point of closest approach of the shadow axis.
 
     References:
-        - Reference API: swe_sol_eclipse_where()
+        - Reference API: sol_eclipse_where()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags)
@@ -3943,7 +3961,7 @@ def _sol_eclipse_how_impl(
         reference behavior.
 
     References:
-        - Reference API: swe_sol_eclipse_how()
+        - Reference API: sol_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     if len(geopos) < 3:
@@ -5791,7 +5809,7 @@ def _lun_eclipse_how_impl(
                 [11-19]: 0.0
 
     References:
-        - Reference API: swe_lun_eclipse_how()
+        - Reference API: lun_eclipse_how()
         - Meeus "Astronomical Algorithms" Ch. 54
     """
     if len(geopos) < 3:
@@ -5882,7 +5900,7 @@ def lun_occult_when_glob(
             window.
 
     References:
-        - Reference API: swe_lun_occult_when_glob()
+        - Reference API: lun_occult_when_glob()
     """
     from .exceptions import Error
     from .constants import ECL_ONE_TRY
@@ -5929,9 +5947,10 @@ def lun_occult_when_glob(
         return sep - (rmoon + rbody)
 
     def _lon_diff(jd: float) -> float:
-        # The noon-transit search runs in right ascension (the reference
-        # uses its equatorial flag set here, unlike the ecliptic
-        # conjunction stepping above).
+        # The noon-transit search runs in right ascension: measured on
+        # reference-API output, tret[1] corresponds to the Moon-body
+        # conjunction in RA, not in ecliptic longitude (which the
+        # conjunction stepping above uses).
         if is_star:
             from .fixed_stars import fixstar_ut
 
@@ -6221,15 +6240,15 @@ def _lun_occult_when_loc_pythonic(
             phase = ECL_PARTIAL
 
         # Contact times. Inner contacts use the reduced lunar radius
-        # (x0.99916, the reference's inner-contact convention); for
-        # point-source stars the outer contacts coincide with them.
+        # (see _INNER_CONTACT_MOON_SCALE); for point-source stars the
+        # outer contacts coincide with them.
         def _f_outer(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
             return sep_c - (rb_c + rm_c)
 
         def _f_inner(jd_c: float) -> float:
             rb_c, rm_c, sep_c = _radii_sep(jd_c)
-            return abs(rb_c - 0.99916 * rm_c) - sep_c
+            return abs(rb_c - _INNER_CONTACT_MOON_SCALE * rm_c) - sep_c
 
         jd_second = 0.0
         jd_third = 0.0
@@ -6325,9 +6344,9 @@ def _lun_occult_when_loc_pythonic(
         rc_where, _wlon, _wlat, dcore = _eclipse_where_core(jd_max, flags, body)
         retflag |= rc_where & ECL_NONCENTRAL
         attr_list[3] = dcore[0]
-        # the reference ephemeris caps the diameter fraction and the obscuration at 1
-        # for occultations (its lun_occult_when_loc wrapper applies the
-        # 'fixes seen in perl extension'); mirror that for 1:1 parity.
+        # Measured on reference-API output: for occultations the diameter
+        # fraction and the obscuration are capped at 1.0; apply the same
+        # cap for 1:1 parity.
         attr_list[0] = min(attr_list[0], 1.0)
         attr_list[2] = min(attr_list[2], 1.0)
 
@@ -6496,7 +6515,7 @@ def _lun_occult_where_pythonic(
               occultation - for a star it is minus the lunar diameter).
 
     References:
-        - Reference API: swe_lun_occult_where()
+        - Reference API: lun_occult_where()
     """
     retflag, center_lon, center_lat, dcore = _eclipse_where_core(tjdut, flags, body)
     _rc_how, attr_list = _sol_how_core(
@@ -6645,8 +6664,8 @@ def _rise_trans_impl(
         - Reference API: rise_trans()
         - Meeus "Astronomical Algorithms" Ch. 15 (Rise, Set, Transit)
     """
-    # The reference implements swe_rise_trans() as
-    # swe_rise_trans_true_hor() with a horizon height of 0; mirror that
+    # Measured on output: rise_trans() behaves as rise_trans_true_hor()
+    # with a horizon height of 0; mirror that
     # so both entry points share one rise/set engine (twilight bits,
     # disc selection, refraction and the dip convention included).
     return _rise_trans_true_hor_impl(

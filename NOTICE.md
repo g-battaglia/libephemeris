@@ -3,8 +3,10 @@
 ## Independent Implementation
 
 LibEphemeris is an **independent implementation** of an astronomical ephemeris
-library for Python. Its computations are independently implemented and are not
-derived from the Swiss Ephemeris (SE) source code by Astrodienst AG.
+library for Python. Independence from the Swiss Ephemeris (SE) source code by
+Astrodienst AG is the project's working standard, enforced by provenance
+gates and remediated whenever a finding surfaces (see the sweep records
+referenced below and docs/methodology/independence-remediation-2026-07.md).
 
 In June 2026 an internal provenance review found that a small cluster of
 house-system routines in `houses.py` (Savard-A, Krusinski, APC, the
@@ -47,8 +49,9 @@ for Swiss Ephemeris). Function names follow the canonical bare-name form
 of the upstream reference API (e.g., `calc_ut`, `houses`, `julday`), with
 matching parameters and flag constants to allow drop-in migration.
 
-API compatibility does not imply code derivation. The underlying algorithms,
-data sources, and implementation are entirely independent. API signatures
+API compatibility does not imply code derivation. The underlying algorithms
+and implementation are independently written; data sources are public or,
+where output-calibrated, disclosed below. API signatures
 and interface conventions are not copyrightable subject matter
 (see *Google LLC v. Oracle America, Inc.*, 593 U.S. 1 (2021); EU Directive
 2009/24/EC art. 1.2).
@@ -78,16 +81,21 @@ interface level, which is not copyrightable subject matter.
 ## Development History
 
 During early development, some experimental branches temporarily included
-data from Swiss Ephemeris sources (e.g., Moshier trigonometric tables,
-`seorbel.txt` orbital element file). These were identified, removed, and
-replaced with independently sourced alternatives before any stable release:
+data from Swiss Ephemeris sources (e.g., Moshier trigonometric tables, the
+`seorbel.txt` orbital element file). These were identified and removed
+before any stable release:
 
 - Moshier analytical backend: removed entirely in favor of JPL DE440/DE441
   via Skyfield (no analytical approximations are used in production)
-- `seorbel.txt`: replaced with `data/fictitious_orbits.csv`, compiled from
-  primary published sources (Witte/Sieggrun 1928, Neely 1988)
-- All algorithms reference peer-reviewed publications or JPL data products
-  as their primary sources
+- `seorbel.txt`: removed from the tree and replaced with
+  `data/fictitious_orbits.csv`. Most rows cite primary published sources
+  (Witte/Sieggrun 1928, Neely 1988, Strubell 1952, Hoyt 1980, Weston,
+  peer-reviewed papers); the rows without a known publication (Nibiru,
+  Proserpina, Selena digits, the Waldemath reconstruction) are carried as
+  disclosed interoperability values recovered by black-box output fits —
+  see docs/methodology/independence-remediation-2026-07.md §3.
+- Historical blobs (including `seorbel.txt`) remain reachable in the git
+  history pending the prepared history rewrite (remediation record §5).
 
 The git history of this repository reflects this progression transparently.
 
@@ -116,8 +124,8 @@ independence record:
 
 ## Calibration Data Disclosure
 
-Two generated data sets are calibrated against pyswisseph used strictly as
-a **black-box oracle**: the residual tables in
+The following generated data sets are calibrated against pyswisseph used
+strictly as a **black-box oracle**. First, the lunar apse tables: the residual tables in
 `libephemeris/lunar_apse_corrections.py` (interpolated lunar apogee and
 perigee, bodies INTP_APOG / INTP_PERG) and the trigonometric perturbation
 coefficients in `lunar.py` produced by the `leph calibrate` workflow
@@ -128,7 +136,14 @@ all runtime code are original. The INTP_* bodies are constructs defined by
 the reference API, so 1:1 behavioral parity requires fitting to reference
 output. This is disclosed for transparency.
 
-A third, smaller item: the **legacy Uranian display tables** in
+Second, four **fictitious-body element rows** in
+`data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena digits and
+the Waldemath reconstruction) have no known public publication and are
+carried as interoperability values demonstrably recoverable by black-box
+Keplerian fits against reference-API output — procedure and residuals in
+docs/methodology/independence-remediation-2026-07.md §3.
+
+A further, smaller item: the **legacy Uranian display tables** in
 `libephemeris/hypothetical.py` (`URANIAN_ELEMENTS` and the per-body
 `*_KEPLERIAN_ELEMENTS` `L0` / Hades `M0` constants) are historical
 pyswisseph-oracle-calibrated fits. They are **not consulted at runtime** —

@@ -4490,13 +4490,9 @@ def _houses_sunshine_makransky(
     """
     _NEAR_ZERO = 1e-10
 
-    # MC-below-horizon check (same as Treindl variant)
-    acmc = asc - mc
-    while acmc > 180:
-        acmc -= 360
-    while acmc < -180:
-        acmc += 360
-    mc_under_horizon = acmc < 0
+    # MC-below-horizon check: signed asc-MC separation flips sign when the
+    # meridian's upper intersection sinks below the horizon.
+    mc_under_horizon = difdeg2n(asc, mc) < 0
     if mc_under_horizon:
         asc = (asc + 180.0) % 360.0
 
@@ -4789,8 +4785,8 @@ def _houses_horizontal(
 
     # Polar circle handling: check Asc-MC orientation
     if abs(co_lat) >= 90.0 - eps:
-        acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-        if acmc_diff < 0:
+        asc_mc_diff = (asc - mc + 540.0) % 360.0 - 180.0
+        if asc_mc_diff < 0:
             asc = (asc + 180.0) % 360.0
             mc = (mc + 180.0) % 360.0
             for i in range(1, 13):
@@ -4804,8 +4800,8 @@ def _houses_horizontal(
         cusps[i] = (cusps[i] + 180.0) % 360.0
 
     # Check Asc/DC orientation
-    acmc_diff = (asc - mc + 540.0) % 360.0 - 180.0
-    if acmc_diff < 0:
+    asc_mc_diff = (asc - mc + 540.0) % 360.0 - 180.0
+    if asc_mc_diff < 0:
         asc = (asc + 180.0) % 360.0
 
     # Set MC/IC and derive opposite cusps (4-9 from 10-3)
@@ -4926,8 +4922,9 @@ def _apc_cusp(house: int, lat_rad: float, eps_rad: float, armc_rad: float) -> fl
         _denom = 1 + _tphi_teps * math.sin(armc_rad)
         if _denom == 0.0:
             # Inside the polar circle the denominator can vanish at one armc.
-            # The C reference divides in IEEE arithmetic, so atan(+-inf) gives
-            # +-pi/2; match that limit instead of raising ZeroDivisionError.
+            # Observed black-box: the reference API returns the +-pi/2
+            # limit of atan at this pole; take the same limit instead of
+            # raising ZeroDivisionError.
             asc_diff = math.copysign(math.pi / 2, _numer)
         else:
             asc_diff = math.atan(_numer / _denom)

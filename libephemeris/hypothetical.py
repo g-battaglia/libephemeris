@@ -41,7 +41,8 @@ docs/methodology/hypothetical-bodies.md for the per-body source table):
     - Neely, J. (1988). "The Uranian Planets." NCGR Research Journal,
       vol. 1. (refined Uranian elements)
     - Strubell, M. (1952). "Die Sterne" 3/1952, p. 70ff. (Transpluto/Isis)
-    - Abramov, V. (unpublished). (Proserpina)
+    - Proserpina: interoperability values, concept credited to V. Abramov
+      (see data/fictitious_orbits.csv)
     - Hoyt, W.G. (1980). "Planets X and Pluto." Univ. of Arizona Press.
       (historical Neptune / Pluto predictions)
     - Harrington, R.S. (1988). "The Location of Planet X." AJ 96(4), 1476.
@@ -926,11 +927,14 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
     ),
     PROSERPINA: HypotheticalElements(
         name="Proserpina",
-        # Published elements by Valentin Abramov (Tartu, Estonia), the set
-        # in standard astrological use for the hypothetical trans-Plutonian
-        # Proserpina: epoch J1900, equinox of date, circular orbit.
+        # The circular-orbit convention in astrological use for the
+        # hypothetical trans-Plutonian Proserpina (concept credited to
+        # V. Abramov; no public publication of the digits is known — they
+        # are interoperability values recovered by a black-box fit against
+        # reference-API output, see data/fictitious_orbits.csv and
+        # docs/methodology/independence-remediation-2026-07.md).
         epoch=2415020.0,  # J1900.0
-        a=79.225630,  # Semi-major axis in AU (Abramov)
+        a=79.225630,  # Semi-major axis in AU (interoperability value)
         e=0.0,  # Circular orbit
         i=0.0,  # On ecliptic plane
         omega=0.0,  # Irrelevant for circular orbit
@@ -1085,9 +1089,13 @@ class WaldemathElements:
 # Epoch J2000.0 (JD 2451545.0); a=0.0029833 AU, geocentric circular orbit
 #
 # Mean motion calculation:
-# Canonical Koch-reconstructed geocentric orbit (D. Koch, from Waldemath's
-# 1898 published values), as bundled in data/fictitious_orbits.csv and the
-# reference seorbel dataset. The elements are referred to the ecliptic and
+# Fully-specified geocentric orbit for Waldemath's 1898 published claims
+# (dark satellite, ~120-day period), as carried in
+# data/fictitious_orbits.csv: the digits are the reconstruction circulating
+# in the astrological community, held as interoperability values verified
+# against reference-API output (see the CSV row and
+# docs/methodology/independence-remediation-2026-07.md).
+# The elements are referred to the ecliptic and
 # equinox of the 1898 epoch and are propagated with per-century rates, so the
 # orbit is eccentric (e=0.1587) and inclined (i=2.5 deg) - NOT the circular
 # J2000 approximation used previously (which was ~144 deg off in longitude).
@@ -2252,9 +2260,10 @@ def get_hypothetical_name(ipl: int) -> str:
 
 
 # Orbital elements of the classical hypothetical/predicted planets the
-# reference exposes as bodies 49-54. The values are historical data from
-# the published predictions (collected, like every fictitious-body
-# element set, in the standard orbital-elements file format):
+# reference exposes as bodies 49-54. Except for Nibiru (whose digits are
+# interoperability values with no known publication — see
+# data/fictitious_orbits.csv), the values are historical data from the
+# published predictions:
 # - Nibiru: elements as circulated in the astrological community for
 #   Z. Sitchin's popular "12th planet" lore.
 # - Harrington: R.S. Harrington's Planet X search orbit (AJ 96, 1476,
@@ -3169,8 +3178,9 @@ def calc_waldemath(jd_tt: float) -> Tuple[float, float, float, float, float, flo
     Waldemath claimed to have observed this body in 1898, describing it as a dark
     moon with an orbital period of approximately 120 days.
 
-    Uses the canonical Koch-reconstructed geocentric Keplerian orbit
-    (``WALDEMATH_ELEMENTS``, from data/fictitious_orbits.csv), propagated with
+    Uses the fully-specified geocentric Keplerian orbit for Waldemath's
+    1898 claims (``WALDEMATH_ELEMENTS``, interoperability values from
+    data/fictitious_orbits.csv), propagated with
     per-century rates and precessed from the 1898 element equinox to the mean
     ecliptic of date. Matches the reference to sub-arcsecond in longitude.
 
@@ -3456,8 +3466,9 @@ def calc_white_moon_position(
 ) -> Tuple[float, float, float, float, float, float]:
     """Position of the White Moon (Selena).
 
-    Uses the published circular geocentric orbit (the standard
-    orbital-elements convention for this body): mean longitude
+    Uses the circular geocentric convention for this body (Russian-school
+    7-year cycle; the exact digits are interoperability values, see
+    data/fictitious_orbits.csv): mean longitude
     242.2205555 + 5143.5418158*T degrees (T in Julian centuries from
     J2000, equinox of date), radius 0.05280098949 AU, zero eccentricity
     and inclination. The longitude advances 0.140822 degrees/day

@@ -561,7 +561,7 @@ wheels = [
 
 [[package]]
 name = "libephemeris"
-version = "3.0.0rc4"
+version = "3.0.0rc5"
 source = { editable = "." }
 dependencies = [
     { name = "astroquery" },
@@ -575,9 +575,7 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "assist" },
     { name = "astropy" },
-    { name = "rebound" },
 ]
 dev = [
     { name = "astropy" },
@@ -612,7 +610,6 @@ stars = [
 
 [package.metadata]
 requires-dist = [
-    { name = "assist", marker = "extra == 'all'", specifier = ">=1.1.0" },
     { name = "assist", marker = "extra == 'nbody'", specifier = ">=1.1.0" },
     { name = "astropy", marker = "extra == 'all'", specifier = ">=5.0.0" },
     { name = "astropy", marker = "extra == 'dev'", specifier = ">=5.0.0" },
@@ -634,7 +631,6 @@ requires-dist = [
     { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.1.1" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
-    { name = "rebound", marker = "extra == 'all'", specifier = ">=4.0.0" },
     { name = "rebound", marker = "extra == 'nbody'", specifier = ">=4.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.6" },
     { name = "skyfield", specifier = ">=1.54" },

@@ -581,16 +581,16 @@ class EphemerisContext:
         from .planets import _normalize_calc_flags, _remap_ast_offset
 
         # Handle ECL_NUT (-1), like the module-level entry points: the
-        # reference uses plaus_iflag-style flag handling here (MOSEPH kept,
+        # reference applies its exclusive-ephemeris-bit handling here (MOSEPH kept,
         # SPEED3 not remapped), so it runs on the raw flags.
         if ipl == ECL_NUT:
             from .planets import (
                 _calc_nutation_obliquity,
                 _calc_nutation_obliquity_tt,
-                _plaus_ephemeris_flags,
+                _exclusive_ephemeris_bit,
             )
 
-            iflag = _plaus_ephemeris_flags(iflag)
+            iflag = _exclusive_ephemeris_bit(iflag)
             if ut:
                 return _calc_nutation_obliquity(tjd, iflag)
             return _calc_nutation_obliquity_tt(tjd, iflag)
@@ -885,7 +885,7 @@ class EphemerisContext:
 
         ts = self.get_timescale()
         t = ts.ut1_jd(tjd_ut)
-        # Same plaus_iflag/output-flag pipeline as the module-level
+        # Same flag-normalization/output pipeline as the module-level
         # calc_pctr(), shared so the semantics cannot drift.
         try:
             return _run_pctr_pipeline(

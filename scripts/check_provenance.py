@@ -35,6 +35,16 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCAN_DIRS = ("libephemeris", "scripts", "docs")
+# Root-level files that legally represent the package (long_description,
+# notices) are scanned individually in addition to the directories.
+ROOT_FILES = (
+    "README.md",
+    "NOTICE.md",
+    "LICENSING.md",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
+    "RELEASE_NOTES.md",
+)
 # Every text format that ships or documents the package: code, docs, data
 # tables, packaging and tool configuration. Binary blobs (.bsp/.leb/.leb2)
 # are covered by the dedicated data-artifact class below.
@@ -49,6 +59,7 @@ SCAN_SUFFIXES = (
     ".json",
     ".yaml",
     ".yml",
+    ".rst",
 )
 
 # Files that legitimately record the retired SE / PyMeeus / LGPL history
@@ -61,6 +72,15 @@ ALLOWLIST = frozenset(
         "docs/methodology/galilean-clean-room-2026-06.md",
         "docs/methodology/galilean-e5-spec.md",
         "docs/methodology/independence-remediation-2026-07.md",
+        # Root legal/provenance documents: they exist to name licenses and
+        # record the retired-source history, so every class legitimately
+        # appears in them.
+        "NOTICE.md",
+        "LICENSING.md",
+        "THIRD_PARTY_NOTICES.md",
+        "CHANGELOG.md",
+        "RELEASE_NOTES.md",
+        "README.md",
     }
 )
 
@@ -71,7 +91,8 @@ SOURCE_FILE_RE = re.compile(
 )
 IDENTIFIER_RE = re.compile(
     r"\bswed\b|\bdgsect\b|\bxs1\b|\bxh1\b|\bfh1\b|\bmdd\b|\bmdn\b|\badp\b"
-    r"|\badmc\b|\bsamc\b|\bdfac\b|apc_sector|\bxeq0\b|\bxp0\b"
+    r"|\badmc\b|\bsamc\b|\bacmc\b|\bdfac\b|apc_sector|\bxeq0\b|\bxp0\b"
+    r"|\bplaus_iflag\b"
 )
 # PyMeeus implementation identifiers (confirmed from pymeeus 0.5.12
 # JupiterMoons.py). These are PyMeeus's own expression — the independent
@@ -122,13 +143,24 @@ DATA_DIR = "libephemeris/data"
 def main() -> int:
     hits: list[tuple[Path, int, str, str]] = []
 
-    # Filename gate: no reference-distribution data file anywhere in the
-    # scanned tree (and none at the repo root either).
-    for d in (*SCAN_DIRS, "."):
-        base = REPO_ROOT / d
-        for p in base.rglob("*") if d != "." else base.glob("*"):
-            if p.is_file() and FOREIGN_DATA_NAME_RE.search(p.name):
-                hits.append((p, 0, "foreign-data-file", p.name))
+    # Filename gate: no reference-distribution data file among the files
+    # tracked by git (the gitignored local oracle data used by the
+    # validation tooling is dev-only and never shipped; anything TRACKED
+    # under such a name is a hard failure).
+    import subprocess
+
+    tracked = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.split("\0")
+    for rel in tracked:
+        if not rel:
+            continue
+        name = rel.rsplit("/", 1)[-1]
+        if FOREIGN_DATA_NAME_RE.search(name):
+            hits.append((REPO_ROOT / rel, 0, "foreign-data-file", name))
 
     # Content scan of the shipped data directory (any text file).
     data_dir = REPO_ROOT / DATA_DIR
@@ -144,10 +176,13 @@ def main() -> int:
                 if AGPL_RE.search(line) or COPYLEFT_RE.search(line):
                     hits.append((p, lineno, "data-license-marker", line.strip()))
     files = sorted(
-        p
-        for d in SCAN_DIRS
-        for p in (REPO_ROOT / d).rglob("*")
-        if p.suffix in SCAN_SUFFIXES and "__pycache__" not in p.parts
+        [
+            p
+            for d in SCAN_DIRS
+            for p in (REPO_ROOT / d).rglob("*")
+            if p.suffix in SCAN_SUFFIXES and "__pycache__" not in p.parts
+        ]
+        + [REPO_ROOT / f for f in ROOT_FILES if (REPO_ROOT / f).exists()]
     )
     scanned = 0
     for path in files:
@@ -158,6 +193,13 @@ def main() -> int:
         for lineno, line in enumerate(
             path.read_text(encoding="utf-8").splitlines(), start=1
         ):
+            # An explicit inline waiver for individually-reviewed lines
+            # (e.g. install docs that must name an optional extra's GPL
+            # license). Never valid inside libephemeris/.
+            if "provenance-ok" in line and not path.is_relative_to(
+                REPO_ROOT / "libephemeris"
+            ):
+                continue
             for label, pattern in CLASSES:
                 if pattern.search(line):
                     hits.append((path, lineno, label, line.strip()))

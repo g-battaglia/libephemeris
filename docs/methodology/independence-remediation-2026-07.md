@@ -77,11 +77,12 @@ matching the element sets that circulate with the reference distribution.
   fit against reference-API output positions recovers these element sets
   without access to any non-public source. Fit procedure: Gauss-Newton
   on (M0, a, e, ω, Ω, i) (static heliocentric rows), (M0, a) (circular
-  Proserpina), (L0, rate, radius) (Selena), targets sampled from oracle
-  output over ±multi-decade spans; recovered values agree with the CSV
-  digits to the fit's model floor (RMS ≈ 2×10⁻³ deg, dominated by frame
-  conventions in the quick forward model, orders below the bodies' own
-  model differences).
+  Proserpina), (L0, rate, radius) (Selena), and the full 9-parameter set
+  (M0, M_rate, a, e, ω, ω_rate, Ω, Ω_rate, i) for the geocentric
+  Waldemath orbit; targets sampled from oracle output over multi-decade
+  spans; recovered values agree with the CSV digits to the fit's model
+  floor (RMS ≈ 2–3×10⁻³ deg, dominated by frame conventions in the quick
+  forward model, orders below the bodies' own model differences).
 * Numeric values were left unchanged, so runtime behaviour and parity
   are untouched.
 
@@ -92,7 +93,31 @@ license obligations; they state the working standard (independence,
 black-box-only validation), the disclosures, and point here for the open
 items.
 
-## 5. Open items
+## 5. Adversarial audit round (WS2-H)
+
+After the remediation above, a 48-agent adversarial audit (6 finders with
+distinct lenses + per-finding refutation verifiers) swept the tree for
+residual taint. It confirmed 42 residual items — all remediated in the
+follow-up commits: source-knowledge comment language replaced with
+observed-output framing (houses `_apc_cusp`, eclipse shadow scales,
+noon-transit flag note, `dcore` layout note, disc-radius table notes); the
+`acmc`/`acmc_diff` identifiers renamed and the identifier gate extended
+(`acmc`, `plaus_iflag`); the `_plaus_ephemeris_flags` helper renamed to
+`_exclusive_ephemeris_bit` with black-box docstrings; magic factors named
+and framed as fitted interop constants (`_LUN_UMBRA_SCALE`,
+`_LUN_PENUMBRA_SCALE`, `_INNER_CONTACT_MOON_SCALE`); every remaining
+`swe_`-prefixed name purged from docstrings; the Waldemath row's black-box
+fit actually performed (9-parameter recovery, §3); all residual
+categorical independence claims aligned (NOTICE, README,
+THIRD_PARTY_NOTICES, comparison hub, release notes, v1.0.0 errata,
+hypothetical-bodies.md); a working document containing a pointer into the
+reference source distribution removed from the tree; the provenance gate
+re-scoped (tracked-files filename gate, root legal docs allowlisted,
+reviewed-line waivers) and re-verified at zero together with the SPDX
+gate; `uv.lock` regenerated so the `all` extra resolves without GPL
+packages.
+
+## 6. Open items
 
 * **Repository history.** The repository history still contains: the
   upstream `seorbel.txt` data file added by ca32b36 (removed from the

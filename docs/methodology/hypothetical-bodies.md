@@ -57,17 +57,26 @@ elements referred to J2000, **derived** as:
 
 ### Proserpina
 
-Abramov, V. (unpublished; Tartu). CSV row: epoch J1900, a = 79.225630 AU,
-circular, M0 = 170.73°. Gate: exact equality live↔CSV.
+Circular-orbit convention credited to V. Abramov (Tartu); no public
+publication of the digits is known, so they are interoperability values
+(black-box output fit — see independence-remediation-2026-07.md §3). CSV
+row: epoch J1900, a = 79.225630 AU, circular, M0 = 170.73°. Gate: exact
+equality live↔CSV.
 
 ### Other predicted/historical bodies
 
-`fictitious_orbits.csv` carries full per-row citations for Nibiru
-(Wöltge, unpubl.), Harrington (1988, AJ 96(4) 1476), the historical
-Neptune predictions (Leverrier/Adams, via Hoyt 1980), the historical Pluto
-predictions (Lowell/Pickering, via Hoyt 1980), Vulcan (Weston, unpubl.;
-Le Verrier 1859), and Selena/White Moon (Shkurovich, 1990s; mean lunar
-apogee cycle). These are propagated directly from the CSV.
+`fictitious_orbits.csv` carries full per-row provenance for Nibiru
+(interoperability values; concept circulated via C. Wöltge), Harrington
+(1988, AJ 96(4) 1476), the historical Neptune predictions (Leverrier/
+Adams, via Hoyt 1980), the historical Pluto predictions (Lowell/
+Pickering, via Hoyt 1980), Vulcan (L.H. Weston's published AFA monograph;
+see also Le Verrier 1859), Selena/White Moon (Russian-school 7-year
+circular convention; digits are interoperability values) and Waldemath
+(1898 published claims; the fully-specified digits are interoperability
+values). "Interoperability values" means: no public publication of the
+digits is known and they are held as black-box fits against
+reference-API output — see independence-remediation-2026-07.md §3.
+These are propagated directly from the CSV.
 
 ## CSV ↔ publication cross-check
 
@@ -75,9 +84,11 @@ The gate verifies code ↔ CSV automatically. The CSV ↔ publication step is a
 documented manual check: the Uranian and Transpluto/Proserpina values in
 `fictitious_orbits.csv` were transcribed from the editions cited above and
 spot-checked against the values in standard astrological-software element
-sets that credit the same sources (Neely's published refinement is the set
-SE's `seorbel.txt` also credits). No value was taken from Swiss Ephemeris
-source or data files.
+sets that credit the same sources (Neely's published refinement is the
+set the reference distribution also credits). For the rows classified as
+interoperability values no publication exists to check against; their
+provenance is the documented black-box output fit
+(independence-remediation-2026-07.md §3).
 
 ## Legacy display tables (disclosed, frozen)
 

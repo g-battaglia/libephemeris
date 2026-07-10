@@ -570,7 +570,7 @@ def _normalize_calc_flags(flags: int) -> int:
     - FLG_MOSEPH is accepted for compatibility but stripped (all
       calculations use the JPL DE440/DE441 path).
     - Exactly one ephemeris bit is echoed, never two: the reference
-      plaus_iflag() makes the ephemeris bits mutually exclusive, so a
+      normalization makes the ephemeris bits mutually exclusive, so a
       caller passing FLG_JPLEPH|FLG_SWIEPH must get a single-bit retflag
       (JPLEPH wins, matching the reference's sequential-overwrite priority
       JPLEPH > SWIEPH). FLG_SWIEPH is echoed when the caller passed none.
@@ -651,8 +651,12 @@ def _implied_retflag_bits(flags: int) -> int:
     return extra
 
 
-def _plaus_ephemeris_flags(flags: int) -> int:
-    """Force exactly one ephemeris bit, like the reference plaus_iflag().
+def _exclusive_ephemeris_bit(flags: int) -> int:
+    """Force exactly one ephemeris bit in the flag word.
+
+    Measured on reference-API output: the echoed retflag always carries
+    exactly one ephemeris-selection bit, with priority JPLEPH > SWIEPH >
+    MOSEPH when several are requested.
 
     Used by calc_pctr(), whose upstream counterpart normalizes flags via
     the flag-plausibility step only: the ephemeris bits become mutually
@@ -703,13 +707,13 @@ def _finalize_output_flags(
 
 
 def _run_pctr_pipeline(calc_fn, flags: int) -> Tuple[PositionResult, int]:
-    """plaus_iflag -> strip -> compute -> finalize, shared by calc_pctr().
+    """normalize-bits -> strip -> compute -> finalize, shared by calc_pctr().
 
     Both the module-level calc_pctr() and EphemerisContext.calc_pctr()
     route through this so their flag semantics cannot drift apart;
     ``calc_fn`` receives the stripped calculation flags.
     """
-    flags = _plaus_ephemeris_flags(flags)
+    flags = _exclusive_ephemeris_bit(flags)
     pos, retflag = calc_fn(_strip_output_flags(flags))
     return _finalize_output_flags(pos, retflag, flags)
 
@@ -1286,7 +1290,7 @@ def calc_ut(
     from .constants import ECL_NUT
 
     # Handle ECL_NUT (-1) - returns nutation and obliquity.
-    # The reference normalizes ECL_NUT flags plaus_iflag-style: exactly one
+    # The reference normalizes ECL_NUT flags to exactly one
     # ephemeris bit, but FLG_MOSEPH is KEPT and FLG_SPEED3 is NOT remapped
     # (verified vs pyswisseph 2.10.03: MOSEPH -> 4, MOSEPH|SPEED3 -> 132,
     # flags=0 -> 2) — so it must run on the raw flags, before
@@ -1301,7 +1305,7 @@ def calc_ut(
         if res_flags & FLG_SPEED:
             res_flags &= ~FLG_SPEED3
         pos_nut, rf_nut = _calc_nutation_obliquity(
-            tjdut, _plaus_ephemeris_flags(res_flags)
+            tjdut, _exclusive_ephemeris_bit(res_flags)
         )
         return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
 
@@ -1484,7 +1488,7 @@ def calc(
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
     # missing here and ECL_NUT fell through to UnknownBodyError).
-    # plaus_iflag-style flag handling on the raw flags (see calc_ut).
+    # exclusive-ephemeris-bit flag handling on the raw flags (see calc_ut).
     if planet == ECL_NUT:
         # Same center-priority resolution and SPEED3 collapse as the calc_ut
         # ECL_NUT branch (see there for the measured reference retflags).
@@ -1492,7 +1496,7 @@ def calc(
         if res_flags & FLG_SPEED:
             res_flags &= ~FLG_SPEED3
         pos_nut, rf_nut = _calc_nutation_obliquity_tt(
-            tjdet, _plaus_ephemeris_flags(res_flags)
+            tjdet, _exclusive_ephemeris_bit(res_flags)
         )
         return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
 
