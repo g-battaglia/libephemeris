@@ -2971,17 +2971,25 @@ def _apply_fixstar_flags(
         # full mean-equinox motion (ayanamsha-rate-independent). Uses the same
         # UT epochs and ayanamsha source the transform differenced, so the two
         # cancel exactly. speed_lat / speed_dist are untouched.
+        # EXEMPT the fixed-epoch frame modes (SIDM_J2000/J1900/B1950): there
+        # the reference projects onto a fixed reference ecliptic and reports
+        # the frame derivative on BOTH star families — no ayanamsha-rate
+        # add-back (measured black-box: legacy == modern == oracle for the
+        # three epoch modes; every other mode keeps the add-back).
         if legacy_sidereal and (iflag & FLG_SIDEREAL):
-            from .state import get_timescale
+            from .constants import SIDM_B1950, SIDM_J1900, SIDM_J2000
+            from .state import get_sid_mode, get_timescale
             from .planets import get_ayanamsa_ut
 
-            ts_ayan = get_timescale()
-            ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
-            ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
-            # Shortest-arc delta: the ayanamsha is mod 360 and can straddle
-            # the 0/360 wrap (star-anchored modes cross 0 on supported dates).
-            d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
-            speed_lon += d_ayan / (2.0 * h)
+            if get_sid_mode() not in (SIDM_J2000, SIDM_J1900, SIDM_B1950):
+                ts_ayan = get_timescale()
+                ayan_p = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt + h).ut1)
+                ayan_m = get_ayanamsa_ut(ts_ayan.tt_jd(jd_tt - h).ut1)
+                # Shortest-arc delta: the ayanamsha is mod 360 and can
+                # straddle the 0/360 wrap (star-anchored modes cross 0 on
+                # supported dates).
+                d_ayan = (ayan_p - ayan_m + 180.0) % 360.0 - 180.0
+                speed_lon += d_ayan / (2.0 * h)
     else:
         speed_lon = 0.0
         speed_lat = 0.0
