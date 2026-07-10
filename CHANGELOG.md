@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.0rc4] - 2026-07-08
+## [3.0.0rc4] - 2026-07-10
 
 This RC closes the 2026-07-08 adversarial wave — Round J plus the advanced
 Round-K slices and a full three-area re-review: ~27 confirmed defects fixed
@@ -87,6 +87,61 @@ and osculating elements, plus newly documented reference-side artifacts.
   (§6.1), the ±1-day (±2 shallowest) heliacal model floor, the Pluto
   far-target crossing skip and its ~375 s offset, refreshed refraction
   accuracy figures, and a scoped `vis_limit_mag` accuracy claim.
+
+### Fixed (adversarial review rounds R–Z)
+
+A further ~50 confirmed defects closed after the first rc4 wave:
+
+- **Frames and centers.** J2000 outputs are emitted in the reference frame;
+  `FLG_HELCTR`/`FLG_BARYCTR` imply the astrometric place in `calc_pctr` and
+  gate its SPEED3 bit; nodes and apsides return zeros under those centers;
+  `FLG_HELCTR|FLG_TRUEPOS` reports the giant planets' system barycentre; the
+  `FLG_ECL_NUT` return flag normalizes its center and speed bits;
+  `FLG_TRUEPOS` suppresses aberration on both SPK paths; unrequested speed
+  slots are zeroed for the Uranians and Transpluto; heliocentric and
+  barycentric moon positions are retarded by light time.
+
+- **Fixed stars.** The comma-form lookup is swapped between the `fixstar` and
+  `fixstar2` families, the `%` prefix wildcard belongs to the `fixstar2`
+  family, topocentric speeds carry the diurnal term, the TT entry points echo
+  the request flags verbatim, and the epoch frame modes no longer add back the
+  ayanamsha rate.
+
+- **Houses.** `houses_ex`/`houses_ex2` honor `FLG_RADIANS`; the Vertex equator
+  clamp keeps the latitude sign and guards the angle speed at the flip; the
+  CoAsc Munkasey clamp band is sign-aware and matches the reference; the two
+  0/0 angle singularities are pinned to the reference limits; the `% 360`
+  artifact is snapped so cusps and `ascmc` stay in `[0, 360)`.
+
+- **Heliacal and `pheno`.** The visibility window respects the caller's
+  observer, `dret[18]` is the Yallop visibility class code and `dret[19]` the
+  parallax in altitude, observer age and `HELFLAG_OPTICAL_PARAMS` optics are
+  applied, and the LEB and Skyfield twilight detectors are unified.
+
+- **Eclipses.** Forward `sol_eclipse_when_glob` probes the current lunation,
+  the LEB refraction temperature matches its backends, and the legacy pair
+  raises `Error` instead of shadowing it with a local import.
+
+- **Sidereal.** The fixed-epoch modes (J2000/J1900/B1950) are frame requests,
+  the ayanamsha delta unwraps at the 0/360 seam, and star-anchored SPEED uses
+  the true ayanamsa drift on the LEB and Horizons paths.
+
+- **Horizons backend.** `sid_mode=None` resolves before the star-anchored
+  speed branch, `FLG_HELCTR` light time is taken over the barycentric
+  distance, `FLG_ICRS` defers to the Skyfield backend, the analytical J2000
+  frame stays nutation-free, and the Uranian path follows the canonical frame
+  pipeline.
+
+- **Time, state and misc.** `utc_to_jd` matches the reference invalid-time
+  message and guards `second < 61`; `TIDAL_DEFAULT` aliases the DE431 value and
+  `TIDAL_DE440` is exported; `get_calc_mode` is lock-free (ABBA deadlock);
+  kernel handles are released on drop and closed quietly at collection;
+  `EphemerisContext` stores the sidereal `t0` literally, re-echoes the caller's
+  speed bit on the south-node path, and releases the kernel it uses;
+  `mooncross`/crossing honors `FLG_RADIANS` on the target longitude;
+  `rise_trans` tolerates an `rsmi` without an explicit event type; the SPK
+  auto-loader floors (not truncates) the Meeus date conversions; and the dotenv
+  reader strips inline comments after quoted values.
 
 ## [3.0.0rc3] - 2026-07-08
 
