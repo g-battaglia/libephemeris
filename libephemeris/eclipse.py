@@ -2546,6 +2546,25 @@ def _sol_eclipse_when_glob_pythonic(
         )
 
     # Forward search (default behavior for "forward" and "bidirectional")
+    # The conjunction in longitude can lie BEFORE jd_start while the eclipse
+    # maximum lies a few minutes AFTER it: probe the previous conjunction
+    # first (mirror of the backward pre-probe above) so an in-progress
+    # eclipse is not skipped for the next lunation's, ~29 days late. Only
+    # the forward direction invariant (maximum strictly after jd_start)
+    # lets the probe result through, so long-past eclipses cannot leak.
+    if search_direction == "forward":
+        try:
+            jd_prev_nm = _find_previous_new_moon(jd_start)
+        except Exception as _exc:
+            if _is_ephemeris_boundary(_exc):
+                jd_prev_nm = None
+            else:
+                raise
+        if jd_prev_nm is not None and jd_start - jd_prev_nm <= BIDIRECTIONAL_WINDOW:
+            result = _check_new_moon_for_eclipse(jd_prev_nm)
+            if result is not None and result[1][0] > jd_start:
+                return result
+
     jd = jd_start
 
     for _ in range(MAX_NEW_MOONS):
