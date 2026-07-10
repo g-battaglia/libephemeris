@@ -89,25 +89,18 @@ The v2.2 method combines the strengths of earlier approaches while avoiding thei
 
 The spline interpolation acts as a physically motivated smoothing: it passes exactly through the ground-truth passage points while providing well-conditioned data at arbitrary intermediate times. The daily samples have full M' coverage (unlike passages) and no correlated osculating noise (unlike raw data).
 
-### Perturbation Series (61 Terms)
+### Perturbation Series (66 Terms)
 
-| Category | Terms | Dominant Coefficient |
-|----------|-------|---------------------|
-| Primary evection sin(kD - kM') | 13 | sin(2D-2M') = **-22.21°** |
-| Evection phase cos(kD - kM') | 7 | cos(2D-2M') = -0.075° |
-| Solar anomaly coupling (E×sin) | 9 | E×sin(4D-4M'-M) = +0.53° |
-| Solar double coupling (E²×sin) | 4 | E²×sin(2D-2M'+2M) = +0.071° |
-| Lunar anomaly (sin kM') | 2 | sin(M') = +0.011° |
-| Latitude coupling (F terms) | 3 | sin(2F-2M') = +0.17° |
-| Cross-coupling (D,M' combos) | 7 | sin(6D-5M') = -0.45° |
-| Solar-latitude cross | 3 | E×sin(2F-2D-M) = +0.010° |
-| Higher-order evection-solar | 3 | E×sin(8D-8M'-M) = +0.038° |
-| Secular (T×trig) | 3 | T×cos(2D-2M') = -0.004° |
-| Cosine phase corrections | 2 | cos(2F-2M') = +0.022° |
-| Sun-Moon anomaly coupling | 2 | E×sin(M-M') = -0.002° |
-| Polynomial corrections | 4 | const = -0.175° |
-
-The polynomial correction terms (const, T, T², T³) absorb secular drift between the mean perigee model and the JPL-calibrated series.
+The shipping series (`_calc_elp2000_perigee_perturbations()` in
+`libephemeris/lunar.py` — the single source of truth for the coefficients)
+is a pure sine series of 66 terms: primary evection harmonics
+sin(kD − kM′) up to k = 30, plus solar-anomaly, latitude and
+cross-coupling terms. The dominant term is
+sin(2D − 2M′) = **−22.2479°**. There are no cosine, secular (T×trig) or
+polynomial terms — the residual correction table below absorbs the
+secular drift instead. (Earlier calibration rounds used a 61-term mixed
+sine/cosine/polynomial fit; the table that used to be reproduced here
+described that retired version.)
 
 ### Residual Correction Table
 

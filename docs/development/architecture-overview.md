@@ -60,6 +60,7 @@ kernels via **jplephem**). The library provides:
 | `certifi`      | SSL certificates for HTTPS to JPL                    |
 | `zstandard`    | Zstandard compression for LEB2 format                |
 | `pyerfa`       | IAU ERFA nutation, obliquity, precession, aberration |
+| `click`        | CLI framework (`libephemeris` and `leph` commands)   |
 
 > Note: `spktype21` is vendored at `libephemeris/vendor/spktype21.py` (upstream unmaintained since 2018, NumPy 2.x fix applied) — it is not a separate package dependency.
 
@@ -372,7 +373,9 @@ calculation function, as found in the source code analysis:
 | L    | Pullen SD               | Sinusoidal    | No         | Yes         |
 | Q    | Pullen SR               | Newton-Raphson| Yes (20)   | Yes         |
 | D    | Equal from MC           | Geometric     | No         | Yes         |
-| I/i  | Sunshine (Makransky)    | Sun arc       | No         | Unstable    |
+| I    | Sunshine (Treindl)      | Sun arc       | No         | Unstable    |
+| i    | Sunshine (Makransky)    | Sun arc       | No         | Unstable    |
+| J    | Savard-A                | Equator proj. | No         | Unstable    |
 
 ### A.4 Ayanamsha Systems (47)
 

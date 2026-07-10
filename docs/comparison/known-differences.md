@@ -272,7 +272,13 @@ clamp band, so there is no remaining divergence here.
 
 **2.3 House position (`house_pos`).** < 0.01" for most systems; up to ~46" for
 **Alcabitius (B)**, **Koch (K)**, **Topocentric (T)** from different cusp
-interpolation algorithms.
+interpolation algorithms. For the Horizontal (H) system in the SOUTHERN
+hemisphere, `house_pos` and the cusps from `houses()` disagree — a body
+sitting exactly on cusp *k* is reported in house 14−*k* (MC↔IC swapped,
+intermediate houses reversed); only cusps 1 and 7 round-trip. This is NOT a
+libephemeris bug: the reference API produces the identical reversed mapping
+on its own cusps (verified black-box at lat −35°, all 12 cusps byte-matching
+ours), and libephemeris replicates it as a parity contract.
 
 **2.4 MC "flip" for quadrant house systems inside the polar circle (parity
 behavior, not a divergence).** At latitudes inside the polar circle where the

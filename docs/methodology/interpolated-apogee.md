@@ -95,9 +95,9 @@ LibEphemeris computes both interpolated apsides the same way — an
 ELP2000-82B-derived perturbation series on top of the mean apsidal
 position, plus a precomputed residual correction table:
 
-1. **ELP2000-82B Perturbation Series (Apogee)**: Adds ~50 periodic
+1. **ELP2000-82B Perturbation Series (Apogee)**: Adds 25 periodic
    perturbation terms derived from ELP2000-82B theory to the mean apogee
-   (evection harmonics up to k=10, solar-anomaly coupling, latitude
+   (evection harmonics up to k=14, solar-anomaly coupling, latitude
    coupling, and cross-coupling terms).
 
 2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation
@@ -115,7 +115,7 @@ that absorbs the remaining error inside the table's date range.
 1. Calculate Mean Lilith (mean lunar apogee) longitude
 2. Calculate Julian centuries from J2000.0
 3. Compute fundamental lunar arguments (D, M, M', F, Ω)
-4. Apply the ELP2000-82B perturbation series (~50 terms):
+4. Apply the ELP2000-82B perturbation series (25 terms):
    - Dominant term: +4.53° × sin(2D - 2M')
    - Second-order terms from lunar theory
    - Long-period terms for secular evolution
@@ -347,7 +347,7 @@ within a year and only the series precision remains.
 3. The osculating apogee concept is inherently model-dependent for strongly perturbed orbits
 
 **Note on Interpolated differences:** The remaining differences arise from:
-1. The perturbation series uses ~50 harmonic terms vs. a full analytical lunar theory
+1. The perturbation series uses a few dozen harmonic terms vs. a full analytical lunar theory
 2. Coefficient calibration and the residual tables were fitted on a finite sample of dates
 3. The apogee and perigee series are calibrated separately, each for its own perturbation amplitude
 
