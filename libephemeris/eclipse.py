@@ -5072,8 +5072,11 @@ def _lun_eclipse_when_pythonic(
     if eclipse_type & (ECL_ANNULAR | ECL_ANNULAR_TOTAL):
         eclipse_type &= ~(ECL_ANNULAR | ECL_ANNULAR_TOTAL)
         if eclipse_type == 0:
-            from .exceptions import Error
-
+            # NOTE: use the module-level Error — a local
+            # `from .exceptions import Error` here would make the name local
+            # to the WHOLE function and turn the search-exhaustion
+            # `raise Error(...)` at the bottom into an UnboundLocalError on
+            # every non-annular call.
             raise Error("annular lunar eclipses don't exist")
     eclipse_type = eclipse_type & ECL_ALLTYPES_LUNAR
 
