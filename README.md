@@ -4,7 +4,7 @@
     <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/badge/pypi-v3.0.0rc4-blue" alt="PyPI Version">
+    <img src="https://img.shields.io/badge/pypi-v3.0.0rc6-blue" alt="PyPI Version">
     <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
@@ -12,6 +12,8 @@
 A high-precision astronomical ephemeris library for Python, powered by NASA JPL DE440/DE441 ephemerides and IAU 2006/2000A standards.
 
 **Drop-in replacement for PySwissEph** - readable Python algorithms, standard debugging, easy deployment on the scientific Python stack (NumPy, Skyfield, pyerfa).
+
+**100% independent of the Swiss Ephemeris, under a completely different and independent license.** LibEphemeris is released under the permissive **Apache-2.0** license — wholly separate from the Swiss Ephemeris's AGPL-3.0 / commercial dual license, with **no copyleft, no AGPL network-disclosure requirement, and no commercial licensing**. Concretely, the shipped package contains **zero Swiss Ephemeris source code** and **zero Swiss Ephemeris data files**, has **no runtime dependency** on it or on `pyswisseph`, and computes entirely from NASA JPL DE440/DE441 (via Skyfield) and ERFA/pyerfa — all permissively licensed. Swiss Ephemeris–compatible *API signatures* exist only to make migration drop-in; the reference implementation is used **solely as an external black-box oracle for parity testing**, never as a source of code or data. Provenance is enforced by an automated zero-hit gate. See [NOTICE.md](NOTICE.md) and [LICENSING.md](LICENSING.md).
 
 ---
 
