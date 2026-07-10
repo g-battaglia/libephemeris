@@ -323,51 +323,51 @@ def test_calc_position_leb_valueerror_falls_back(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _resolve_star_se
+# _resolve_star_ref
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_star_se_empty():
+def test_resolve_star_ref_empty():
     """Empty search yields the 'star name empty' error (2520)."""
-    star_id, error, name = fs._resolve_star_se("   ")
+    star_id, error, name = fs._resolve_star_ref("   ")
     assert star_id == -1
     assert error == "star name empty"
 
 
-def test_resolve_star_se_comma_forms():
+def test_resolve_star_ref_comma_forms():
     """Comma-form semantics measured on the reference's v1 family:
     'name,' and 'name,nomen' key on the NAME (nomenclature ignored);
     ',nomen' keys on the nomenclature; ',' alone errors."""
-    star_id, error, name = fs._resolve_star_se("Regulus,")
+    star_id, error, name = fs._resolve_star_ref("Regulus,")
     assert error is None and name.startswith("Regulus")
-    star_id, error, name = fs._resolve_star_se("Regulus,zzZzz")
+    star_id, error, name = fs._resolve_star_ref("Regulus,zzZzz")
     assert error is None and name.startswith("Regulus")
-    star_id, error, _ = fs._resolve_star_se("Nosuch,alTau")
+    star_id, error, _ = fs._resolve_star_ref("Nosuch,alTau")
     assert star_id == -1
-    star_id, error, _ = fs._resolve_star_se(",")
+    star_id, error, _ = fs._resolve_star_ref(",")
     assert star_id == -1 and error is not None
 
 
-def test_resolve_star_se_digit_then_nondigit():
+def test_resolve_star_ref_digit_then_nondigit():
     """Sequential number stops at the first non-digit char (2538->2543)."""
-    star_id, error, name = fs._resolve_star_se("5x")
+    star_id, error, name = fs._resolve_star_ref("5x")
     assert star_id != -1
     assert name is not None
 
 
-def test_resolve_star_se_sequential_out_of_range():
+def test_resolve_star_ref_sequential_out_of_range():
     """Out-of-range sequential number errors (2546)."""
-    star_id, error, name = fs._resolve_star_se("999999")
+    star_id, error, name = fs._resolve_star_ref("999999")
     assert star_id == -1
     assert "sequential" in error
 
 
-def test_resolve_star_se_rejects_wildcard():
+def test_resolve_star_ref_rejects_wildcard():
     """The v1 family treats '%' strings as plain unmatched names (the
     reference API rejects wildcards on fixstar/fixstar_ut/fixstar_mag;
     the prefix search belongs to the fixstar2 family only)."""
     for q in ("Reg%", "Sir%", "Reg%ul", "Reg%%", "Zzzzq%"):
-        star_id, error, _ = fs._resolve_star_se(q)
+        star_id, error, _ = fs._resolve_star_ref(q)
         assert star_id == -1
         assert "could not find star name" in error
 
@@ -397,12 +397,12 @@ def test_resolve_star2_wildcard_invalid_and_no_match():
     assert "could not find star name" in error
 
 
-def test_resolve_star_se_alias_id_without_entry(monkeypatch):
+def test_resolve_star_ref_alias_id_without_entry(monkeypatch):
     """An alias whose id has no catalog entry exhausts the inner loop (2571->2569)."""
     aliases = dict(fs.STAR_ALIASES)
     aliases["zzzfakestar"] = 999999999
     monkeypatch.setattr(fs, "STAR_ALIASES", aliases)
-    star_id, error, _ = fs._resolve_star_se("zzzfakestar")
+    star_id, error, _ = fs._resolve_star_ref("zzzfakestar")
     assert star_id == -1
 
 

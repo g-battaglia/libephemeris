@@ -1863,9 +1863,9 @@ def load_bundled_seorbel() -> List[OrbitalElements]:
     return load_bundled_fictitious_orbits()
 
 
-# Backward-compatible aliases (legacy SE-derived names)
+# Backward-compatible aliases (legacy reference-derived names)
 # These aliases are maintained for backward compatibility with existing code.
-# The canonical names are the SE-independent versions used throughout this module.
+# The canonical names are the reference-independent versions used throughout this module.
 
 
 def _parse_orbital_elements_line(line: str, line_num: int) -> Optional[OrbitalElements]:
@@ -3884,10 +3884,10 @@ def list_hypothetical_bodies() -> Dict[int, str]:
 
 
 # ---------------------------------------------------------------------------
-# Backward-compatible aliases (legacy SE-derived names)
+# Backward-compatible aliases (legacy reference-derived names)
 # ---------------------------------------------------------------------------
 # These aliases preserve backward compatibility for code using the old
-# SE-derived naming convention. New code should use the canonical names:
+# reference-derived naming convention. New code should use the canonical names:
 #   OrbitalElements, parse_orbital_elements, get_orbital_body_by_name,
 #   calc_orbital_position, _parse_orbital_elements_line
 # ---------------------------------------------------------------------------

@@ -159,7 +159,7 @@ The True Node (osculating node) shows larger differences due to different algori
 | Mean Apogee (Mean Lilith) | < 0.01 degrees | High precision |
 | Osculating Apogee (True Lilith) | ~0.015° mean, ~0.065° max | Sub-arcminute precision |
 
-**Note**: True Lilith (OSCU_APOG, body ID 13) now achieves excellent precision (~0.015° mean difference from pyswisseph) through calibrated perturbation corrections applied to osculating orbital elements derived from JPL DE440 state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
+**Note**: True Lilith (OSCU_APOG, body ID 13) achieves ~0.015° mean agreement with the reference by computing the osculating apogee directly from the Moon's JPL DE440/DE441 geocentric state vectors (eccentricity-vector method); no analytical perturbation series is applied — the perturbations are already contained in the numerical state vectors. See [True Lilith Methods](../methodology/true-lilith.md) for details.
 
 ---
 

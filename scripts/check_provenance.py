@@ -17,11 +17,17 @@ PyMeeus-adapted ``moon_theories/galilean.py`` with an independent
 implementation derived from Lieske 1998 / Meeus ch. 44; class 4 flags any
 copyleft (L/GPL) license declaration that strays into the tree.
 
-The sweep covers ``libephemeris/``, ``scripts/`` and ``docs/`` (``*.py``
-and ``*.md``). A short allowlist exempts the files that legitimately record
-the retired Swiss Ephemeris / PyMeeus history (this script and the
-methodology docs); ``libephemeris/`` is never exempt. All classes must
-produce zero hits; this gate keeps the tree that way.
+The sweep covers ``libephemeris/``, ``scripts/``, ``docs/`` and
+``release-notes/`` plus the root legal/packaging files, across every
+shipped text format. A filename gate (over git-tracked files) blocks the
+reference distribution's data files re-entering under any suffix; a content
+scan flags copyleft markers in ``libephemeris/data/``. Two allowlists: a
+full one for the gate and provenance/legal docs that must quote retired-
+source identifiers to record what was removed, and a license-naming-only
+one (README, release notes) exempt from the copyleft/AGPL classes but still
+checked for SE identifiers and PyMeeus tokens. ``libephemeris/`` is never
+exempt. All classes must produce zero hits; this gate keeps the tree that
+way.
 
 Usage:
     python scripts/check_provenance.py
@@ -63,9 +69,11 @@ SCAN_SUFFIXES = (
     ".rst",
 )
 
-# Files that legitimately record the retired SE / PyMeeus / LGPL history
-# (the gate itself and the provenance evidence docs). Never includes any
-# libephemeris/ file — shipped code stays strictly zero-hit.
+# Files that legitimately record the retired SE / PyMeeus / LGPL history at
+# the IMPLEMENTATION level (the gate itself and the provenance-evidence
+# docs, which must quote SE source-file names and internal identifiers to
+# describe what was removed). These are exempt from ALL classes. Never
+# includes any libephemeris/ file — shipped code stays strictly zero-hit.
 ALLOWLIST = frozenset(
     {
         "scripts/check_provenance.py",
@@ -73,17 +81,33 @@ ALLOWLIST = frozenset(
         "docs/methodology/galilean-clean-room-2026-06.md",
         "docs/methodology/galilean-e5-spec.md",
         "docs/methodology/independence-remediation-2026-07.md",
-        # Root legal/provenance documents: they exist to name licenses and
-        # record the retired-source history, so every class legitimately
-        # appears in them.
+        # The legal/notice files record the retired-source remediation at the
+        # implementation level (they must name swehouse.c, PyMeeus, LGPL to
+        # say what was removed), so every class legitimately appears.
         "NOTICE.md",
         "LICENSING.md",
         "THIRD_PARTY_NOTICES.md",
         "CHANGELOG.md",
+    }
+)
+
+# Documents that legitimately NAME licenses (the retired AGPL/dual era, the
+# optional GPL nbody extra) but must NOT carry SE source-file references,
+# internal identifiers or PyMeeus tokens: the root legal/notice files (incl.
+# README, the shipped long_description) and the historical release notes.
+# These are exempt from the copyleft/agpl classes ONLY; every other class
+# still applies.
+LICENSE_NAMING_OK = frozenset(
+    {
         "RELEASE_NOTES.md",
         "README.md",
     }
 )
+
+# A single tracked file that legitimately carries a foreign-data NAME in its
+# own filename: the parser's test module. (It is a .py test, content-scanned
+# like any other, so nothing hides behind the name.)
+FOREIGN_DATA_NAME_EXCEPTIONS = frozenset({"tests/test_parse_seorbel.py"})
 
 SOURCE_FILE_RE = re.compile(
     r"swehouse|swecl\.c|sweph\.c|swephlib|swejpl|swehel"
@@ -168,10 +192,13 @@ def main() -> int:
         if not rel:
             continue
         name = rel.rsplit("/", 1)[-1]
-        # Source and doc files may legitimately carry these tokens in their
-        # names (e.g. the parser's test module); the gate targets the data
-        # files themselves.
-        if name.endswith((".py", ".md", ".rst")):
+        # The gate targets a data file re-entering under a reference name.
+        # A single source module (the parser's own test) legitimately
+        # carries the token in its filename and is content-scanned anyway;
+        # everything else matching the name pattern is a hard failure,
+        # whatever suffix it wears (so a suffix-renamed dataset like
+        # ``seorbel.md`` or ``sefstars.py`` is still caught).
+        if rel in FOREIGN_DATA_NAME_EXCEPTIONS:
             continue
         if FOREIGN_DATA_NAME_RE.search(name):
             hits.append((REPO_ROOT / rel, 0, "foreign-data-file", name))
@@ -214,12 +241,20 @@ def main() -> int:
             waived = "provenance-ok" in line and not path.is_relative_to(
                 REPO_ROOT / "libephemeris"
             )
-            # Historical release notes legitimately record the project's own
-            # past licensing (AGPL/dual era); the license-naming classes are
-            # therefore expected there. All other classes still apply.
-            in_release_notes = path.is_relative_to(REPO_ROOT / "release-notes")
+            # The license-naming classes (copyleft/agpl) are expected in:
+            # the root legal/notice docs (LICENSE_NAMING_OK), the historical
+            # release notes (which record the retired AGPL/dual era), and
+            # any line carrying an explicit reviewed waiver. Every OTHER
+            # class (SE source-file refs, internal identifiers, PyMeeus)
+            # still applies to all of these — a stray SE identifier in
+            # README or a release note is still a failure.
+            license_naming_ok = (
+                waived
+                or rel in LICENSE_NAMING_OK
+                or path.is_relative_to(REPO_ROOT / "release-notes")
+            )
             for label, pattern in CLASSES:
-                if label in ("copyleft", "agpl") and (waived or in_release_notes):
+                if label in ("copyleft", "agpl") and license_naming_ok:
                     continue
                 if pattern.search(line):
                     hits.append((path, lineno, label, line.strip()))

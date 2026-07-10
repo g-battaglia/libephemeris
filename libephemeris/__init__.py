@@ -508,7 +508,7 @@ from .hypothetical import (  # Hamburg School Uranian planets
     calc_orbital_position,
     get_bundled_fictitious_orbits_path,
     load_bundled_fictitious_orbits,
-    # Backward-compatible aliases (legacy SE-derived names)
+    # Backward-compatible aliases (legacy reference-derived names)
     parse_seorbel,
     SeorbelElements,
     get_seorbel_body_by_name,
@@ -702,7 +702,7 @@ __all__ = [
     "validate_coordinates",
     # Thread-safe Context API
     "EphemerisContext",
-    # Time functions (both swe_ and non-prefixed aliases)
+    # Time functions
     "julday",
     "revjul",
     "deltat",
@@ -1079,7 +1079,7 @@ __all__ = [
     "calc_orbital_position",
     "get_bundled_fictitious_orbits_path",
     "load_bundled_fictitious_orbits",
-    # Backward-compatible aliases (legacy SE-derived names)
+    # Backward-compatible aliases (legacy reference-derived names)
     "parse_seorbel",
     "SeorbelElements",
     "get_seorbel_body_by_name",

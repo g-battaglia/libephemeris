@@ -2859,7 +2859,7 @@ def _calculate_local_eclipse_phases_impl(
             sun_az, sun_alt_true, sun_alt_app = azalt(
                 jd, ECL2HOR, geopos, 0, 0, sun_pos[:3]
             )
-            # azalt returns SE convention azimuth (S=0)
+            # azalt returns the reference azimuth convention (S=0)
             return sun_alt_true, sun_az
 
         def _get_distances(jd: float) -> Tuple[float, float]:
@@ -2905,7 +2905,7 @@ def _calculate_local_eclipse_phases_impl(
 
             sun_app = observer_at.at(t).observe(sun).apparent()
             alt, az, _ = sun_app.altaz()
-            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            # Convert Skyfield navigational azimuth (N=0) to the reference convention (S=0)
             return alt.degrees, (az.degrees + 180.0) % 360.0
 
         def _get_distances(jd: float) -> Tuple[float, float]:
@@ -4218,7 +4218,7 @@ def _sol_eclipse_how_details_impl(
             """Get Sun altitude and azimuth at given JD."""
             sun_app, _ = _get_sun_moon_positions(jd)
             alt, az, _ = sun_app.altaz()
-            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            # Convert Skyfield navigational azimuth (N=0) to the reference convention (S=0)
             return alt.degrees, (az.degrees + 180.0) % 360.0
 
         def _get_angular_sizes(jd: float) -> tuple:
@@ -5670,7 +5670,7 @@ def _lun_eclipse_how_pythonic(
         moon_app_altaz = moon_app.altaz()
         moon_altitude_true = moon_app_altaz[0].degrees
         moon_altitude_app = moon_app.altaz(temperature_C="standard")[0].degrees
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        # Convert Skyfield navigational azimuth (N=0) to the reference convention (S=0)
         moon_azimuth = (moon_app_altaz[1].degrees + 180.0) % 360.0
 
     # Eclipse circumstances from the canonical selenocentric shadow model
@@ -7449,7 +7449,7 @@ def heliacal_ut(
         body_app = observer_at.at(t).observe(target).apparent()
         body_alt, body_az, _ = body_app.altaz()
 
-        # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+        # Convert Skyfield navigational azimuth (N=0) to the reference convention (S=0)
         return sun_alt.degrees, body_alt.degrees, (body_az.degrees + 180.0) % 360.0
 
     def _get_elongation(jd: float) -> float:
@@ -13548,7 +13548,7 @@ def _planet_occult_when_loc_impl(
                 target = get_planet_target(eph, target_name)
                 target_app = observer_at.at(t).observe(target).apparent()
             alt, az, _ = target_app.altaz()
-            # Convert Skyfield navigational azimuth (N=0) to SE convention (S=0)
+            # Convert Skyfield navigational azimuth (N=0) to the reference convention (S=0)
             return alt.degrees, (az.degrees + 180.0) % 360.0
 
     def _is_visible_at_location(jd: float) -> bool:

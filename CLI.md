@@ -165,29 +165,6 @@ leph test leb-backend unit-fast   # Parallel (~1 min) [RECOMMENDED for daily dev
 leph test leb-backend unit-full   # Including @slow
 ```
 
-#### `leph test compare` — libephemeris vs pyswisseph
-
-Compares output against the C reference implementation. Requires `pyswisseph`.
-
-```bash
-# Via Skyfield backend
-leph test compare skyfield            # No @slow
-leph test compare skyfield-fast       # Parallel
-leph test compare skyfield-full       # Including @slow
-
-# Via Skyfield with explicit env var
-leph test compare skyfield-jpl        # Forces COMPARE_MODE=skyfield
-leph test compare skyfield-jpl-full   # Including @slow
-
-# Via LEB backend
-leph test compare leb-backend         # Validates LEB accuracy vs pyswisseph
-leph test compare leb-backend-full    # Including @slow
-
-# Via Horizons API (requires internet)
-leph test compare horizons-backend      # No @slow
-leph test compare horizons-backend-full # Including @slow
-```
-
 #### `leph test lunar` — Lunar module
 
 ```bash
@@ -343,19 +320,15 @@ leph generate keplerian-elements       # Multi-epoch elements for 37 bodies
 leph generate keplerian-dry-run        # Preview available SPKs
 ```
 
-### `leph calibrate` — Lunar calibration
+### Lunar calibration (separate `validation/` repo)
 
-```bash
-leph calibrate perigee          # Full calibration, 1500-2500 CE (~30 min)
-leph calibrate perigee-quick    # Quick validation, 100-year range (~2 min)
-```
-
-Workflow after calibration:
-
-1. `leph calibrate perigee`
-2. Paste coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`
-3. `leph generate lunar-corrections`
-4. `leph test lunar perigee`
+The perigee/residual-table calibration is **not** a command of this
+package's dev CLI — it lives in the separate `validation/` repository,
+which drives the reference binding as a black-box oracle. The workflow
+(run from `validation/`): calibrate the perigee perturbations, paste the
+coefficients into `_calc_elp2000_perigee_perturbations()` in `lunar.py`,
+regenerate the residual table into `lunar_apse_corrections.py`, then run
+`leph test lunar perigee` here. See `docs/methodology/interpolated-perigee.md`.
 
 ### `leph release` — Release management
 
@@ -539,14 +512,6 @@ poe test:horizons:core                  # -> leph test horizons precision-quick 
 poe test:horizons:fast                  # -> leph test horizons precision (~45s)
 poe test:horizons:full                  # -> leph test horizons vs-leb
 
-# Compare: libephemeris vs pyswisseph
-poe test:compare:skyfield               # -> leph test compare skyfield-fast (parallel)
-poe test:compare:skyfield:full          # -> leph test compare skyfield-full
-poe test:compare:leb                    # -> leph test compare leb-backend
-poe test:compare:leb:full              # -> leph test compare leb-backend-full
-poe test:compare:horizons               # -> leph test compare horizons-backend
-poe test:compare:horizons:full          # -> leph test compare horizons-backend-full
-
 # Coverage
 poe coverage                            # -> leph test coverage run
 
@@ -596,7 +561,6 @@ pytest tests/ -m "not slow" --calc-mode leb            # With LEB backend
 | `cmd_download.py` | 7 | SPK, LEB, ASSIST downloads |
 | `cmd_diag.py` | 4 | Tier diagnostics, data download |
 | `cmd_generate.py` | 8 | Planet centers SPK, lunar corrections, Keplerian |
-| `cmd_calibrate.py` | 2 | Perigee calibration (full + quick) |
 | `cmd_release.py` | 5 | LEB upload to GitHub Releases |
 | `cmd_manual.py` | 8 | Manual build (EPUB/PDF, pandoc/ebooklib) |
 | `cmd_completion.py` | 3 | Shell completion scripts (zsh, bash, fish) |

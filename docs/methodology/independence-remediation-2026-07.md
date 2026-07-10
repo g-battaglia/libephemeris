@@ -136,6 +136,30 @@ license-history classes expected in historical notes, waiver restricted
 to the license-naming classes, foreign-data regex widened with data-file
 targeting, `git ls-files` failure now fatal).
 
+### Round 3
+
+A third audit confirmed 13 further residuals (42 → 20 → 13, converging),
+all remediated: the last "JPL-only" calibration narrative
+(interpolated-apogee.md, which round 2 missed) aligned with the black-box
+oracle disclosure; dead reproducibility pointers in NOTICE fixed (the
+calibration tooling lives in the separate validation/ repo, not in a
+`leph calibrate` command or a scripts/ file); the "no analytical
+approximations in production" claim narrowed to planetary positions;
+phantom dev-CLI commands removed from CLI.md (`leph test compare`,
+`leph calibrate`) and the testing.md pyswisseph/seorbel provisioning
+instructions corrected to reflect that no test here imports a reference
+binding; broken script cross-references in THIRD_PARTY_NOTICES fixed; the
+stale True-Lilith "calibrated perturbation corrections" story in the
+migration guide corrected to the eccentricity-vector method; the bare "SE"
+product abbreviation swept from ~14 shipped comments and the `_se_*`
+private star-resolver identifiers renamed to `_ref_*`; the stale
+"swe_ aliases" comment removed. Gate hardened again: the foreign-data
+filename gate now catches suffix-renamed datasets (only the parser's own
+test module is name-exempt); the allowlist split so README/release-notes
+are exempt from the license classes ONLY (still scanned for SE
+identifiers/PyMeeus), while the legal/notice docs that record
+implementation-level history keep the full exemption.
+
 ## 6. Open items
 
 * **Repository history.** The repository history still contains: the

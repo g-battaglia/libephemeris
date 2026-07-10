@@ -1,6 +1,6 @@
 # Interpolated Lunar Apogee and Perigee
 
-LibEphemeris computes the interpolated (natural) lunar apogee and perigee by smoothing osculating orbital elements to remove the spurious ±30-degree oscillations inherent in the two-body approximation, producing positions that reflect the genuine apsidal motion derived from JPL DE440/DE441 numerical integrations.
+LibEphemeris computes the interpolated (natural) lunar apogee and perigee by smoothing osculating orbital elements to remove the spurious ±30-degree oscillations inherent in the two-body approximation, producing positions that reflect the genuine apsidal motion. Passage geometry comes from the JPL DE440/DE441 numerical integrations; the perturbation coefficients and residual table are fitted against reference-API output used strictly as a black-box oracle (see NOTICE.md, Calibration Data Disclosure).
 
 ## Table of Contents
 
@@ -81,7 +81,7 @@ The interpolated (or "natural") apogee seeks a middle ground between:
 
 The goal is to smooth out the spurious 30-degree oscillations while preserving the genuine apsidal motion.
 
-Analysis of actual lunar apogee and perigee passages (when the Moon is at its farthest/nearest distance from Earth) via numerical integration of JPL DE440 reveals that:
+Analysis of actual lunar apogee and perigee passages (when the Moon is at its farthest/nearest distance from Earth), located on the JPL DE440 numerical integration, reveals that:
 
 1. **Apogee oscillates ~5 degrees from mean position** (vs. 30 degrees for osculating)
 2. **Perigee oscillates ~25 degrees from mean position** (due to asymmetric solar effects)
@@ -101,9 +101,9 @@ position, plus a precomputed residual correction table:
    coupling, and cross-coupling terms).
 
 2. **ELP2000-82B Perturbation Series (Perigee)**: Adds perturbation
-   corrections to the mean perigee position using calibrated coefficients
-   fitted to JPL DE440 reference positions (see
-   [interpolated-perigee.md](interpolated-perigee.md)).
+   corrections to the mean perigee position using coefficients fitted
+   against reference-API output (black-box oracle; see
+   [interpolated-perigee.md](interpolated-perigee.md) and NOTICE.md).
 
 Both variants then apply a **precomputed residual correction table**
 (linear interpolation, tapered to zero within a year of the table edges)
@@ -131,7 +131,7 @@ that absorbs the remaining error inside the table's date range.
 3. Compute fundamental lunar arguments (D, M, M', F)
 4. Apply calibrated perigee perturbation series:
    - Dominant term: -22.2° × sin(2D - 2M')  (opposite sign to apogee!)
-   - Additional terms calibrated to JPL DE440 reference positions
+   - Additional terms fitted against reference-API output (black-box oracle)
 5. Add the residual correction from the precomputed table
 6. Normalize result to [0°, 360°)
 ```
@@ -170,7 +170,7 @@ delta += 0.250542 * sin(D - M')
 # (full series: _calc_elp2000_apogee_perturbations in lunar.py)
 ```
 
-**Perigee perturbation (calibrated to JPL DE440):**
+**Perigee perturbation (coefficients fitted against reference-API output):**
 
 ```python
 # Dominant evection term (opposite sign, ~5x the apogee coefficient)
@@ -187,12 +187,16 @@ delta += -0.979771 * E * sin(2*D - 2*M' - M)
 ### Coefficient Calibration
 
 The perigee perturbation coefficients were derived by:
-1. Sampling 500 JPL DE440 reference positions across a wide date range
-2. Computing the residual (DE440 perigee - mean perigee - 180°)
+1. Sampling reference-API perigee positions (black-box oracle) across a
+   wide date range
+2. Computing the residual (oracle perigee - mean perigee - 180°)
 3. Using least-squares fitting to find optimal coefficients
 4. Validating against independent test dates
 
-This approach achieves a computationally efficient analytical formula grounded in the JPL numerical integration.
+This approach achieves a computationally efficient analytical formula. The
+INTP_* apsides are constructs defined by the reference API, so 1:1
+behavioural parity requires fitting to its output — disclosed in NOTICE.md
+(Calibration Data Disclosure).
 
 ## When to Use Each Variant
 

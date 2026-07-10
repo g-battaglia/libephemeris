@@ -116,6 +116,7 @@ remain fully permissive, and the shipped wheel contains no copyleft code.
   runtime dependency. See [NOTICE.md](NOTICE.md) for the independence
   statement.
 - **Swiss Ephemeris reference data files** (`sefstars.txt`, `seorbel.txt`,
-  `*.se1`): used only as local oracle inputs for comparison tests; they
-  are gitignored (`data/reference/`), downloaded on demand by
-  `scripts/download_reference_data.py`, and never bundled in any artifact.
+  `*.se1`): used only as local oracle inputs by the comparison/calibration
+  tooling in the separate `validation/` repository; they are gitignored
+  (`data/reference/`), never tracked by this repository, and never bundled
+  in any artifact.

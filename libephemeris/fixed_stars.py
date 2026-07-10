@@ -2598,7 +2598,7 @@ def calc_fixed_star_velocity(
     return lon, lat, dist, speed_lon, speed_lat, speed_dist
 
 
-def _se_star_key(name: str) -> str:
+def _ref_star_key(name: str) -> str:
     """Reference search key for a traditional star name.
 
     The reference removes every whitespace character and lowercases the
@@ -2610,10 +2610,10 @@ def _se_star_key(name: str) -> str:
     return head.lower() + sep + tail
 
 
-_SE_SORTED_CATALOG: "list | None" = None
+_REF_SORTED_CATALOG: "list | None" = None
 
 
-def _se_sorted_catalog():
+def _ref_sorted_catalog():
     """Catalog entries sorted by their reference search key.
 
     Sequential star numbers ("1", "2", ...) index this order — measured on
@@ -2621,13 +2621,13 @@ def _se_sorted_catalog():
     catalog order (the sequence here is specific to the catalog shipped
     with this library).
     """
-    global _SE_SORTED_CATALOG
-    if _SE_SORTED_CATALOG is None:
-        _SE_SORTED_CATALOG = sorted(STAR_CATALOG, key=lambda e: _se_star_key(e.name))
-    return _SE_SORTED_CATALOG
+    global _REF_SORTED_CATALOG
+    if _REF_SORTED_CATALOG is None:
+        _REF_SORTED_CATALOG = sorted(STAR_CATALOG, key=lambda e: _ref_star_key(e.name))
+    return _REF_SORTED_CATALOG
 
 
-def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
+def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     """Resolve a star with the reference's exact search semantics.
 
     Mirrors the reference resolution rules:
@@ -2651,7 +2651,7 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
         (star_id, error_message, "Name,nomenclature"); on error the id
         is -1 and the canonical name is None.
     """
-    sstar = _se_star_key(star_name)
+    sstar = _ref_star_key(star_name)
     if not sstar:
         return -1, "star name empty", None
 
@@ -2687,7 +2687,7 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
             else:
                 break
         star_nr = int(digits)
-        ordered = _se_sorted_catalog()
+        ordered = _ref_sorted_catalog()
         if star_nr < 1 or star_nr > len(ordered):
             return (
                 -1,
@@ -2706,10 +2706,10 @@ def _resolve_star_se(star_name: str) -> tuple[int, str | None, str | None]:
     # the reference catalog's additional name lines per star, so exact
     # alias keys resolve too (still no fuzzy or prefix matching).
     for entry in STAR_CATALOG:
-        if _se_star_key(entry.name) == sstar:
+        if _ref_star_key(entry.name) == sstar:
             return _found(entry)
     for alias, star_id in STAR_ALIASES.items():
-        if _se_star_key(alias) == sstar:
+        if _ref_star_key(alias) == sstar:
             for entry in STAR_CATALOG:
                 if entry.id == star_id:
                     return _found(entry)
@@ -2734,7 +2734,7 @@ def _resolve_star_id(star_name: str) -> tuple[int, str | None, str | None]:
         Tuple of (star_id, error_message, canonical_name).
         If error, star_id is -1 and canonical_name is None.
     """
-    return _resolve_star_se(star_name)
+    return _resolve_star_ref(star_name)
 
 
 def _preprocess_flags(iflag: int) -> int:
@@ -3555,18 +3555,18 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
 
     # Trailing-'%' prefix wildcard on the traditional name — a v2-family
     # feature of the reference API (its v1 family rejects wildcards; see
-    # _resolve_star_se). A '%' anywhere else is an invalid search string.
+    # _resolve_star_ref). A '%' anywhere else is an invalid search string.
     # Ambiguous prefixes resolve to the first match in the library's
     # sorted catalog, which can differ from the reference's star-file
     # order for very short prefixes (documented in known-differences).
     if "%" in search:
-        skey = _se_star_key(search)
+        skey = _ref_star_key(search)
         if not skey.endswith("%") or skey.count("%") != 1:
             return None, f"invalid search string {search}"
         prefix = skey[:-1]
         if prefix:
-            for entry in _se_sorted_catalog():
-                if _se_star_key(entry.name).startswith(prefix):
+            for entry in _ref_sorted_catalog():
+                if _ref_star_key(entry.name).startswith(prefix):
                     return entry, None
         return None, f"could not find star name {search}"
 
@@ -3598,7 +3598,7 @@ def _resolve_star2(star_name: str) -> Tuple[StarCatalogEntry | None, str | None]
     # the name part is ignored entirely. Matched exactly and
     # case-sensitively (",alTau" -> Aldebaran; ",ALTAU" -> not found).
     # (The v1 family is the mirror image: it keys on the name — see
-    # _resolve_star_se.)
+    # _resolve_star_ref.)
     if "," in search:
         _head, _sep, tail = search.partition(",")
         key = "".join(tail.split())

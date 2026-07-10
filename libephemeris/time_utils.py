@@ -150,7 +150,7 @@ def revjul(jd: float, cal: int = GREG_CAL) -> tuple[int, int, int, float]:
     z = _floor(jd)
     f = jd - z
 
-    # Always respect cal — SE uses proleptic Gregorian for ancient dates
+    # Always respect cal — the reference uses proleptic Gregorian for ancient dates
     # when GREG_CAL is requested, not auto-detection by JD threshold.
     if cal == GREG_CAL:
         alpha = _floor((z - 1867216.25) / 36524.25)

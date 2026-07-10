@@ -54,13 +54,13 @@ These tests are marked as "expected to fail" for documented reasons:
 
 To run the complete test suite without skips, the following conditions must be satisfied.
 
-### 1. Install pyswisseph
+### 1. Optional comparison tooling (separate repo)
 
-Most skipped tests require the C-based Swiss Ephemeris library for comparison:
-
-```bash
-pip install pyswisseph
-```
+The reference-comparison / oracle-calibration tests do **not** live in this
+repository — they are maintained in the separate `validation/` repo, which
+drives the reference binding purely as a black-box oracle. This package's
+own test suite imports no reference binding and needs none; installing one
+here does not un-skip any test in this repo.
 
 ### 2. Install Optional Dependencies
 
@@ -82,13 +82,15 @@ export LIBEPHEMERIS_TEST_SPK_DOWNLOAD=1
 
 ### 4. Ephemeris Data Files
 
-Some tests require reference ephemeris data files. Point the
-``REF_EPHE_PATH`` environment variable to a directory containing
-the expected datasets:
+A few tests exercise optional data paths:
 
-- `fictitious_orbits.csv` - bundled orbital elements dataset (included in package)
-- Asteroid/TNO data files
-- `seorbel.txt` - orbital elements reference (optional, skipped if missing)
+- `fictitious_orbits.csv` — bundled orbital-elements dataset (shipped in
+  the package; always present).
+- Asteroid/TNO SPK files — auto-downloaded on demand for the small-body
+  tests (network-gated, see below).
+- The `seorbel.txt` *parser* has one test that runs only if you place your
+  own copy of that reference-format file under `ephe/`; it is skipped
+  otherwise and no such file ships with the package.
 
 ---
 

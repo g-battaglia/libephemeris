@@ -65,7 +65,7 @@ class TestCalcUtFixedStarDispatchParity:
         """A digit-leading Flamsteed id must not resolve as a catalog number.
 
         Regression guard: dispatching by the traditional name '29Psc' made
-        _resolve_star_se read it as sequential catalog number 29, returning
+        _resolve_star_ref read it as sequential catalog number 29, returning
         a different star entirely.
         """
         digit_ids = [e.id for e in fixed_stars.STAR_CATALOG if e.name[:1].isdigit()]

@@ -1076,7 +1076,7 @@ def _leb_body_altaz(
         attemp,
         (ecl_lon, ecl_lat, ecl_dist),
     )
-    # Convert SE convention (S=0, westward) to Skyfield convention (N=0, eastward)
+    # Convert the reference azimuth convention (S=0, westward) to Skyfield's (N=0, eastward)
     # to match the Skyfield heliacal path output.
     az_north = (az + 180.0) % 360.0
     return az_north, alt_true, alt_app
