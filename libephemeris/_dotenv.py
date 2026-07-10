@@ -19,7 +19,8 @@ Syntax supported::
     KEY="value with spaces"
     KEY='value with spaces'
     export KEY=value
-    KEY=value  # inline comment (unquoted only)
+    KEY=value  # inline comment
+    KEY="value"  # inline comment after a quoted value
 
 Existing environment variables are **not** overwritten unless
 *override=True* is passed.
@@ -28,6 +29,7 @@ Existing environment variables are **not** overwritten unless
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Optional, Tuple, Union
 
@@ -72,6 +74,14 @@ def _parse_line(line: str) -> Optional[Tuple[str, str]]:
     # Remove matching quotes (double or single)
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
         value = value[1:-1]
+    elif value[:1] in ('"', "'"):
+        # Quoted value followed by an inline comment: KEY="value" # comment.
+        # The greedy group runs to the LAST closing quote before the '#', so
+        # embedded same-type quotes inside the value survive. An unterminated
+        # quote (no such match) keeps the literal value, as before.
+        m = re.match(rf"^({value[0]}(.*){value[0]})\s+#", value)
+        if m:
+            value = m.group(2)
     else:
         # Unquoted: strip inline comments (KEY=value # comment)
         comment_idx = value.find(" #")
