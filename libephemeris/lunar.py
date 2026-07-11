@@ -3015,8 +3015,14 @@ def calc_interpolated_perigee(jd_tt: float) -> Tuple[float, float, float]:
     node_lon = calc_mean_lunar_node(jd_tt)
     interp_lat = 5.145396 * math.sin(math.radians(interp_lon - node_lon))
 
-    # Distance: mean perigee distance ~0.002422 AU (362,600 km)
-    # with variability from eccentricity oscillations
+    # Distance channel: the mean perigee distance (~0.002422 AU, 362,600 km).
+    # The reference API returns a date-varying value (measured black-box:
+    # 0.002383..0.002475 AU over 1549-2650, +-1.9% about this mean); its
+    # oscillation does not track the standard evection argument evaluated at
+    # the request time (phase-shifted by the passage interpolation), so it is
+    # not reproducible by a quick harmonic fit. Documented divergence — see
+    # known-differences.md §1.2 (distance channel); a dedicated calibration
+    # in the validation/ repo would be needed to close it.
     interp_dist = 0.0024222
 
     return interp_lon, interp_lat, interp_dist
