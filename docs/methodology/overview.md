@@ -74,7 +74,8 @@ calculation, with no user configuration, using a three-tier fallback:
    system, Keplerian models for Neptune's Triton and Pluto's Charon.
 3. **Tier 3 — Raw barycenter**: only when both higher tiers are unavailable.
 
-For Jupiter this transparently eliminates up to 0.6 arcseconds of systematic error.
+For Jupiter this transparently eliminates the barycenter-to-center systematic
+error — up to ~0.08 arcseconds at opposition (typically ~0.02", a ~64 km offset).
 
 ### Lunar Apsides
 
