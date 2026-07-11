@@ -1542,8 +1542,8 @@ Typical generation-time errors:
 | Mars | <1e-12 | AU |
 | Jupiter | <1e-12 | AU |
 | Mean Node | <1e-12 | degrees |
-| True Node | <1e-9 | degrees (~0.004") |
-| Interp Apogee | <1e-7 | degrees (~0.4") |
+| True Node | <1e-9 | degrees (~4e-6") |
+| Interp Apogee | <1e-7 | degrees (~4e-4") |
 
 ### 10.2 End-to-End Precision (vs Skyfield Reference)
 

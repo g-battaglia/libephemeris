@@ -44,7 +44,7 @@ poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
 leph test lunar all          # All lunar tests (nodes, Lilith, perigee, apogee), no @slow
 leph test lunar perigee      # Perigee tests only
 leph test lunar apogee       # Apogee tests only
-leph test lunar lilith       # Lilith tests only (8 files)
+leph test lunar lilith       # Lilith tests only (7 files)
 leph test leb2-format all    # LEB2 format unit tests (compression + reader)
 ```
 

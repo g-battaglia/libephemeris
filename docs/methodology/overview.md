@@ -52,13 +52,17 @@ Pluto as *system barycenters* — the center of mass of the planet and all its
 satellites — which is not the same as the physical center of the planet. The
 angular offset can be significant:
 
-| Planet  | Maximum offset | Primary contributor  |
-| ------- | -------------- | -------------------- |
-| Jupiter | ~0.6"          | Galilean satellites  |
-| Saturn  | ~0.2"          | Titan                |
-| Neptune | ~0.05"         | Triton               |
-| Pluto   | ~0.3"          | Charon (binary)      |
-| Uranus  | ~0.01"         | Major satellites     |
+| Planet  | Typical offset (geocentric) | Primary contributor  |
+| ------- | --------------------------- | -------------------- |
+| Jupiter | ~0.02"                      | Galilean satellites  |
+| Saturn  | ~0.03"                      | Titan                |
+| Neptune | ~0.01"                      | Triton               |
+| Pluto   | ~0.15"                      | Charon (binary)      |
+| Uranus  | ~0.003"                     | Major satellites     |
+
+(Measured values; see
+[planet-centers-spk.md](planet-centers-spk.md) for the per-planet
+kilometre offsets these correspond to.)
 
 LibEphemeris corrects to the true planet body center **automatically** for every
 calculation, with no user configuration, using a three-tier fallback:

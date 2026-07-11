@@ -356,7 +356,7 @@ _LILITH_FILES = [
 @click.group(
     "lunar",
     short_help="Lunar module: nodes, apsides, Lilith, ELP2000 perturbation coefficients.",
-    help="Tests for the lunar module: mean/true nodes, perigee/apogee apsides,\nmean and true Lilith (Black Moon), ELP2000 perturbation coefficients.\n\nThese tests validate the analytical lunar element calculations and\nthe interpolated perigee/apogee pipeline.\n\n  leph test lunar perigee   # ELP2000 coefficients + interpolated perigee\n  leph test lunar lilith    # Mean + true Lilith precision (8 test files)",
+    help="Tests for the lunar module: mean/true nodes, perigee/apogee apsides,\nmean and true Lilith (Black Moon), ELP2000 perturbation coefficients.\n\nThese tests validate the analytical lunar element calculations and\nthe interpolated perigee/apogee pipeline.\n\n  leph test lunar perigee   # ELP2000 coefficients + interpolated perigee\n  leph test lunar lilith    # Mean + true Lilith precision (7 test files)",
 )
 def lunar_group() -> None:
     """Lunar-specific test suites."""

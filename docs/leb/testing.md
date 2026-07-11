@@ -276,8 +276,8 @@ base and medium tiers.
 | True Node | 0.001 | 0.01 |
 | Mean Apogee | 0.001 | 0.0001 |
 | Oscu Apogee | 0.001 | 0.05 |
-| Interp Apogee | 0.001 | 0.01 |
-| Interp Perigee | 0.001 | 0.01 |
+| Interp Apogee | 3600 (pre-regen; lat 36000, dist 0.001 AU) | 1.0 |
+| Interp Perigee | 7200 (pre-regen; lat 36000, dist 0.001 AU) | 1.0 |
 
 #### Timing (indirect functions)
 
