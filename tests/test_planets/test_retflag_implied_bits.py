@@ -160,3 +160,27 @@ class TestMosephEchoRegression:
         p_mos, _ = le.calc_ut(JD, MARS, FLG_MOSEPH)
         p_def, _ = le.calc_ut(JD, MARS, 0)
         assert p_mos == p_def
+
+
+@pytest.mark.unit
+class TestFictitiousSpeedGate:
+    """Fictitious/predicted bodies (49-58) return zero speed slots when
+    FLG_SPEED is absent, like every other body class (measured black-box:
+    the reference returns zeros)."""
+
+    def test_no_speed_returns_zeros(self):
+        for ipl in (49, 50, 51, 55, 56, 57, 58):
+            r, _ = le.calc_ut(JD, ipl, 0)
+            assert r[3:] == (0.0, 0.0, 0.0), (ipl, r[3:])
+
+    def test_speed_flag_still_computes(self):
+        from libephemeris.constants import FLG_SPEED
+
+        r, _ = le.calc_ut(JD, 56, FLG_SPEED)
+        assert r[3] != 0.0
+
+    def test_helio_no_speed_zeros(self):
+        from libephemeris.constants import FLG_HELCTR
+
+        r, _ = le.calc_ut(JD, 55, FLG_HELCTR)
+        assert r[3:] == (0.0, 0.0, 0.0)

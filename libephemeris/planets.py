@@ -3493,7 +3493,13 @@ def _calc_body(
             pos = hypothetical.calc_hypothetical_position(ipl, jd_tt)
 
         lon, lat, dist = pos[0], pos[1], pos[2]
-        dlon, dlat, ddist = pos[3], pos[4], pos[5]
+        # Zero the speed slots when FLG_SPEED is absent (the reference
+        # returns zeros; the Uranian/Transpluto branches and the standard
+        # planet path already gate this way).
+        if iflag & FLG_SPEED:
+            dlon, dlat, ddist = pos[3], pos[4], pos[5]
+        else:
+            dlon, dlat, ddist = 0.0, 0.0, 0.0
 
         # These functions return mean ecliptic of date. Add nutation unless
         # suppressed (NONUT, SIDEREAL+EQUATORIAL, or J2000 output, which is
