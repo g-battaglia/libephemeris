@@ -91,7 +91,12 @@ from .constants import (
 )
 from .planets import calc_ut
 from .cache import get_cached_nutation
-from .exceptions import Error, PolarCircleError, validate_coordinates
+from .exceptions import (
+    CalculationError,
+    Error,
+    PolarCircleError,
+    validate_coordinates,
+)
 from .utils import cotrans, degnorm, difdeg2n
 from . import sidereal_longterm as _sidlt
 from .time_utils import deltat as _deltat
@@ -895,7 +900,7 @@ def houses(
             eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
-        except (IndexError, TypeError, ValueError):
+        except (IndexError, TypeError, ValueError, CalculationError):
             # Fallback to 0 declination (same as equinox behavior)
             sun_dec = 0.0
 
@@ -1828,7 +1833,7 @@ def _houses_fixed_epoch_sidereal(
             eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             ascmc9 = sun_pos[1]
-        except (IndexError, TypeError, ValueError):
+        except (IndexError, TypeError, ValueError, CalculationError):
             ascmc9 = 0.0
 
     eng_cusps, eng_ascmc = houses_armc(
@@ -1960,7 +1965,7 @@ def houses_ex(
                 eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
                 sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
-            except (IndexError, TypeError, ValueError):
+            except (IndexError, TypeError, ValueError, CalculationError):
                 sun_dec = 0.0
             _, eps = _house_armc_obliquity(tjdut)
             armc = ascmc[2]
