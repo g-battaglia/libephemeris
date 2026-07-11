@@ -9,6 +9,8 @@ lat=0.0 gives 180.0; 'H' at +1e-11 gives 180.0 while lat=0.0 gives 360/0-side.
 
 from __future__ import annotations
 
+import pytest
+
 import libephemeris as le
 
 EPS = 23.4393
@@ -36,3 +38,28 @@ def test_h_system_tiny_positive_latitude_gets_positive_side_limit():
 def test_h_system_exact_zero_keeps_negative_side_limit():
     v = _vertex(0.0, "H")
     assert abs(v - 0.0) < 1e-6 or abs(v - 360.0) < 1e-6
+
+
+@pytest.mark.unit
+class TestHousePosIntHsysObjcoordForm:
+    """The objcoord-first house_pos form honors an int house code (character
+    code, same convention as the 6-arg form) instead of silently falling
+    back to Placidus."""
+
+    def test_int_matches_bytes_and_sixarg(self):
+        from libephemeris.houses import house_pos
+
+        i = house_pos(0, 23.4, 23.4393, (40.0, 0.0), ord("S"))
+        b = house_pos(0, 23.4, 23.4393, (40.0, 0.0), b"S")
+        six = house_pos(0, 23.4, 23.4393, ord("S"), 40.0, 0.0)
+        assert i == b == six
+        # And it is NOT the Placidus value.
+        p = house_pos(0, 23.4, 23.4393, (40.0, 0.0), b"P")
+        assert i != p
+
+    def test_omitted_hsys_defaults_placidus(self):
+        from libephemeris.houses import house_pos
+
+        d = house_pos(0, 23.4, 23.4393, (40.0, 0.0))
+        p = house_pos(0, 23.4, 23.4393, (40.0, 0.0), b"P")
+        assert d == p

@@ -5667,15 +5667,22 @@ def _house_pos_pythonic(
         objcoord = hsys_or_objcoord
         lon = objcoord[0]
         lat_body = objcoord[1] if len(objcoord) > 1 else 0.0
-        # hsys comes from lon_or_hsys (bytes/str), default to b"P"
+        # hsys comes from lon_or_hsys (bytes/str/int), default to b"P".
+        # An int is a character code (the same convention as
+        # houses(..., hsys=ord('P')) and the 6-arg form below); silently
+        # falling back to Placidus here used to discard the requested
+        # system for every int caller.
         if isinstance(lon_or_hsys, bytes):
             hsys_char = chr(lon_or_hsys[0])
             hsys_int = lon_or_hsys[0]
         elif isinstance(lon_or_hsys, str):
             hsys_char = lon_or_hsys[0]
             hsys_int = ord(lon_or_hsys[0])
+        elif isinstance(lon_or_hsys, int) and not isinstance(lon_or_hsys, bool):
+            hsys_char = chr(lon_or_hsys)
+            hsys_int = lon_or_hsys
         else:
-            # Default to Placidus
+            # Default to Placidus (hsys omitted in the 4-arg form)
             hsys_char = "P"
             hsys_int = ord("P")
     else:
