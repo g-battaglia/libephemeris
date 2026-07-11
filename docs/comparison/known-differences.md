@@ -908,8 +908,10 @@ JD/coordinate utilities); only the atlas/database/timezone functions remain
 `NotImplementedError` stubs. **14.3 `d2l`
 with negative values** differs due to unsigned-integer overflow in the C
 implementation vs Python integers. **14.4 `FLG_MOSEPH`** is accepted for API
-compatibility but ignored — every calculation uses JPL DE440/DE441 via Skyfield,
-with no Moshier fallback. **14.6 `cotrans_sp` speed for a non-physical `|lat| > 90°`** may differ from the
+compatibility and echoed in the retflag exactly as the reference does
+(MOSEPH-only echoes MOSEPH; SWIEPH/JPLEPH win when combined), but the
+*computation* always uses JPL DE440/DE441 via Skyfield — there is no Moshier
+fallback, so MOSEPH positions differ from a Moshier-based engine. **14.6 `cotrans_sp` speed for a non-physical `|lat| > 90°`** may differ from the
 reference: the position (longitude/latitude) now matches for all inputs, and
 the speed is exact for every physical `|lat| <= 90°`, but above 90° the two
 engines reparametrise the (non-physical) point differently, so the returned

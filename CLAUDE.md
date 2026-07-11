@@ -63,7 +63,7 @@ leph test leb2-format all    # LEB2 format unit tests (compression + reader)
 
 Three precision tiers: `base` (de440s.bsp, 1849-2150), `medium` (de440.bsp, 1550-2650, **default**), `extended` (de441.bsp, -13200 to +17191).
 
-`FLG_MOSEPH` is accepted for API compatibility but silently ignored. All calculations always use JPL DE440/DE441 via Skyfield.
+`FLG_MOSEPH` is accepted for API compatibility: it is echoed in the retflag like the reference (MOSEPH-only echoes MOSEPH), but the computation always uses JPL DE440/DE441 via Skyfield.
 
 ## LEB vs Skyfield Precision (Measured)
 
