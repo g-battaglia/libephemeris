@@ -22,6 +22,7 @@ import json
 import logging
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -194,7 +195,14 @@ class HorizonsClient:
             "REF_PLANE": "'FRAME'",
             "TIME_TYPE": f"'{time_type}'",
         }
-        query = "&".join(f"{k}={v}" for k, v in params.items())
+        # URL-encode every value: the small-body COMMAND syntax carries a
+        # semicolon ("2060;"), which an unencoded query string would let the
+        # server read as a parameter separator (HTTP 400 on every asteroid
+        # fetch). quote() with safe="" also encodes the quotes Horizons
+        # expects to receive percent-encoded.
+        query = "&".join(
+            f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in params.items()
+        )
         url = f"{API_URL}?{query}"
 
         # Fetch with retry
