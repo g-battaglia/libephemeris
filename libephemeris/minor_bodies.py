@@ -2789,6 +2789,15 @@ def calc_minor_body_heliocentric(
 
     lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
 
+    # The SPK branch above returns the TRUE ecliptic of date (Skyfield's
+    # ecliptic_frame carries nutation in longitude); _precess_ecliptic is
+    # precession-only, so add Δψ to keep the two branches on the same
+    # frame (callers treat the result as true-of-date and add no nutation).
+    from .cache import get_cached_nutation
+
+    dpsi_rad, _ = get_cached_nutation(jd_tt)
+    lon = (lon + math.degrees(dpsi_rad)) % 360.0
+
     return lon, lat, r
 
 
@@ -3694,5 +3703,13 @@ def calc_asteroid_by_number(
     from .astrometry import _precess_ecliptic
 
     lon, lat = _precess_ecliptic(lon, lat, 2451545.0, jd_tt)
+
+    # True ecliptic of date, like the SPK branch above (see
+    # calc_minor_body_heliocentric): _precess_ecliptic is precession-only,
+    # so the nutation in longitude is added explicitly.
+    from .cache import get_cached_nutation
+
+    dpsi_rad, _ = get_cached_nutation(jd_tt)
+    lon = (lon + math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r

@@ -530,3 +530,28 @@ class TestNeptunePerturbations:
         # Over 10 years, expect differences of order 0.001-0.1 AU for plutinos
         assert dist > 0, "Positions should differ with perturbations"
         assert dist < 1.0, f"Position difference {dist} AU seems too large"
+
+
+class TestKeplerianFrameContract:
+    """The Keplerian fallback returns the TRUE ecliptic of date, matching the
+    SPK branch (Skyfield's ecliptic_frame carries nutation in longitude).
+    Before the fix it returned the mean ecliptic (precession-only), leaving
+    the two branches of calc_minor_body_heliocentric ~14" apart in 2000."""
+
+    def test_helio_longitude_is_true_of_date(self):
+        import erfa
+
+        from libephemeris.constants import CHIRON
+        from libephemeris.minor_bodies import calc_minor_body_heliocentric
+
+        # Pinned values (true ecliptic of date; J2000-elements + precession
+        # + nutation in longitude).
+        for jd, want_lon in (
+            (2451545.0, 248.86259024251177),
+            (2460000.5, 15.496094384170133),
+        ):
+            lon, _, _ = calc_minor_body_heliocentric(CHIRON, jd, use_spk=False)
+            assert abs(lon - want_lon) * 3600.0 < 0.01
+            # The mean-of-date value sits a full nutation away.
+            dpsi, _ = erfa.nut06a(jd, 0.0)
+            assert abs(lon - (want_lon - math.degrees(dpsi))) * 3600.0 > 5.0

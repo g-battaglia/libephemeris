@@ -2476,7 +2476,19 @@ def _keplerian_position_at(
                 body_id=ipl,
             ) from e
 
+    # The minor-body helpers return the TRUE ecliptic of date. The
+    # nutation-free frames (NONUT, J2000 — whose downstream precession is
+    # nutation-blind — and SIDEREAL+EQUATORIAL) need Δψ stripped, exactly
+    # like every other body path.
+    from .cache import get_cached_nutation
+
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    _nut_free = bool(iflag & (FLG_NONUT | FLG_J2000)) or _sid_eq
+
     if iflag & FLG_HELCTR:
+        if _nut_free:
+            dpsi_rad, _ = get_cached_nutation(jd_tt)
+            lon_hel = (lon_hel - math.degrees(dpsi_rad)) % 360.0
         return lon_hel, lat_hel, r_hel
 
     # Convert heliocentric ecliptic spherical to Cartesian
@@ -2503,6 +2515,10 @@ def _keplerian_position_at(
     r_geo = math.sqrt(x_geo_ecl**2 + y_geo_ecl**2 + z_geo_ecl**2)
     lon = math.degrees(math.atan2(y_geo_ecl, x_geo_ecl)) % 360.0
     lat = math.degrees(math.asin(z_geo_ecl / r_geo)) if r_geo > 0 else 0.0
+
+    if _nut_free:
+        dpsi_rad, _ = get_cached_nutation(jd_tt)
+        lon = (lon - math.degrees(dpsi_rad)) % 360.0
 
     return lon, lat, r_geo
 
