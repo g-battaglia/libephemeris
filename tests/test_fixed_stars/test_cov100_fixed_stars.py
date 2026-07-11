@@ -906,3 +906,15 @@ def test_galalign_mardyks_no_legacy_speed_addback():
         assert abs((w1 - w2) - 3.82e-5) < 5e-6, (w1, w2)
     finally:
         le.set_sid_mode(0)
+
+
+def test_spica_radial_velocity_distance_evolution():
+    """Spica's catalog RV is +1.0 km/s (SIMBAD; also recovered from the
+    reference's own distance evolution). The old -22.85 doubled speed_dist
+    and drifted the distance ~2500 AU by year 2600 (oracle: 15793735.809)."""
+    import libephemeris as le
+
+    d2600 = le.fixstar_ut("Spica", 2634167.0, le.FLG_TRUEPOS)[0][2]
+    assert abs(d2600 - 15793735.809) < 1.0
+    sd = le.fixstar_ut("Spica", 2451545.0, le.FLG_SPEED)[0][5]
+    assert -0.020 < sd < -0.012  # oracle -0.015998; was -0.030199
