@@ -238,9 +238,15 @@ different model class: libephemeris reconstructs it as i·sin(lon − node) from
 the mean inclination and mean node, which differs from the reference's
 latitude by up to ~0.16° (~570") at all epochs — measured e.g. IntpApog
 −566" at JD 2452340, IntpPerig +535" at JD 2453082, while MEAN_APOG/OSCU_APOG
-latitudes at the same dates agree to <1". Both channels are classified as a
-known divergence in all tests (the LEB compare suite deliberately allows a
-wide latitude tolerance for these two bodies).
+latitudes at the same dates agree to <1". The **distance** channel of
+IntpPerig is a constant (the mean perigee distance, 0.0024222 AU) while the
+reference returns a date-varying value (measured 0.002383–0.002475 AU over
+1549–2650, ±1.9% about the mean, max |Δ| ≈ 5.3×10⁻⁵ AU); the reference's
+oscillation does not follow the standard evection argument at the request
+time (the passage interpolation shifts its phase), so closing it needs a
+dedicated calibration in the validation/ repo. All three channels are
+classified as a known divergence in the tests (the LEB compare suite
+deliberately allows wide tolerances for these two bodies).
 
 **1.3 Pholus (body 16) historical dates.** The SPK auto-download path requests
 padding around the selected tier and verifies cached-kernel coverage before reuse,
@@ -891,15 +897,21 @@ See `intentional-divergences.md` §8 (resolved).
 
 ### 14. Constants and API
 
-**14.0 Fixed-star `%` prefix wildcard (fixstar2 family).** The trailing-`%`
-prefix search is supported on the v2 family only (the v1
-`fixstar`/`fixstar_ut`/`fixstar_mag` reject it, matching the reference).
-Named prefixes resolve identically (`Spica%`, `Sir%`, `Aldeb%`), but an
-ambiguous short prefix may pick a DIFFERENT star than the reference: the
-tie-break follows the reference's star-file order, which is not fully
-replicable, and libephemeris's star catalog is a subset of the reference
-file (e.g. `Reg%` → Regulus here vs Regor upstream, which is absent from
-our catalog).
+**14.0 Fixed-star prefix matching (both families).** Measured black-box:
+the reference's v1 family (`fixstar`/`fixstar_ut`/`fixstar_mag`) does
+*implicit* case-insensitive prefix matching on the traditional name
+(`Reg` → Regulus, `A` → Aldebaran) while rejecting the trailing-`%` form;
+its v2 family accepts only the explicit trailing-`%` wildcard (a bare
+partial name errors). libephemeris matches the v1 implicit-prefix
+behaviour and supports `%` on v2; additionally the v2 family resolves
+bare partial names too, as part of its documented deliberate extensions
+(§4.5/§4.7: HIP lookup, Bayer/Flamsteed parsing, IAU-name corrections).
+Unambiguous prefixes resolve identically (`Spica`, `Sir`, `Betelg`), but
+an ambiguous short prefix may pick a DIFFERENT star than the reference on
+either family: the tie-break follows the star-file order, which is not
+fully replicable, and libephemeris's star catalog is a subset of the
+reference file (e.g. `Reg%` → Regulus here vs Regor upstream, absent from
+our catalog; `Ald` → alDor here vs Aldebaran upstream).
 
 **14.1 Version string** intentionally differs (libephemeris reports its own
 version). **14.2 `contrib` attribute**: libephemeris ships a compatible

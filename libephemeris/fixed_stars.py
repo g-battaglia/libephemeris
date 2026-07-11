@@ -2636,16 +2636,18 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
     - "name,nomenclature": the traditional-name part is ignored and the
       nomenclature key decides;
     - leading digit: 1-based sequential number in the sorted catalog;
-    - otherwise: exact traditional-name match (whitespace removed,
-      case-insensitive). A '%' is NOT special here: the reference's v1
+    - otherwise: traditional-name match (whitespace removed,
+      case-insensitive) — exact first, then implicit PREFIX match in
+      catalog order (measured black-box on the v1 family: 'Reg' ->
+      Regulus, 'A' -> Aldebaran, 'B' -> Bazak — first catalog-order hit,
+      not alphabetical). A '%' is NOT special here: the reference's v1
       family (fixstar/fixstar_ut/fixstar_mag) rejects wildcard strings
-      as unknown star names — the trailing-'%' prefix wildcard belongs
+      as unknown star names — the trailing-'%' explicit wildcard belongs
       to the v2 family only (see _resolve_star2).
 
-    No fuzzy matching, Bayer-word parsing or prefix guessing happens
-    here - those remain available in the library's own search helpers
-    (resolve_star_name, search helpers), not in the reference-named
-    functions.
+    No fuzzy matching or Bayer-word parsing happens here — those remain
+    available in the library's own search helpers (resolve_star_name),
+    not in the reference-named functions.
 
     Returns:
         (star_id, error_message, "Name,nomenclature"); on error the id
@@ -2713,6 +2715,17 @@ def _resolve_star_ref(star_name: str) -> tuple[int, str | None, str | None]:
             for entry in STAR_CATALOG:
                 if entry.id == star_id:
                     return _found(entry)
+
+    # Implicit prefix match (measured black-box): a partial traditional
+    # name resolves to the first catalog-order star whose name starts
+    # with it, case-insensitively ('Reg' -> Regulus, 'Sir' -> Sirius).
+    # First catalog hit wins — the reference walks its file in order, so
+    # ambiguous prefixes are a file-order/coverage question of the same
+    # class documented in known-differences.md §14.0.
+    for entry in STAR_CATALOG:
+        if _ref_star_key(entry.name).startswith(sstar):
+            return _found(entry)
+
     return -1, f"could not find star name {sstar}", None
 
 

@@ -76,7 +76,9 @@ def test_propagate_proper_motion_clamps_and_pole():
     )
     assert dec_hi == 90.0
     # Start exactly at the pole so cos(dec_epoch) ~ 0 -> RA unchanged.
-    ra_pole, _ = fs.propagate_proper_motion(123.0, 90.0, 5.0, -36000.0, JD, JD + 36525.0)
+    ra_pole, _ = fs.propagate_proper_motion(
+        123.0, 90.0, 5.0, -36000.0, JD, JD + 36525.0
+    )
     assert ra_pole == 123.0
     # Force dec_target below -90 (clamp low branch).
     _, dec_lo = fs.propagate_proper_motion(
@@ -841,3 +843,42 @@ def test_fixstar_mag_fallback_name(monkeypatch):
     mag, name = fs.fixstar_mag("whatever")
     assert mag == pytest.approx(3.14)
     assert name == "FakeCanon"
+
+
+# ---------------------------------------------------------------------------
+# v1 implicit prefix matching (measured black-box: the reference's v1 family
+# resolves partial traditional names by case-insensitive prefix, first
+# catalog-order hit; the v2 oracle instead requires the explicit '%' form).
+# ---------------------------------------------------------------------------
+
+
+def test_v1_prefix_resolves_unambiguous_names():
+    import libephemeris as le
+
+    for query, want in (
+        ("Reg", "Regulus"),
+        ("Sir", "Sirius"),
+        ("Betelg", "Betelgeuse"),
+        ("Spi", "Spica"),
+        ("Ant", "Antares"),
+        ("SPICA", "Spica"),
+    ):
+        _, name, _ = le.fixstar_ut(query, 2451545.0, 0)
+        assert name.startswith(want), (query, name)
+
+
+def test_v1_prefix_same_result_as_exact():
+    import libephemeris as le
+
+    full = le.fixstar_ut("Regulus", 2451545.0, 0)
+    pre = le.fixstar_ut("Reg", 2451545.0, 0)
+    assert full[0] == pre[0] and full[1] == pre[1]
+
+
+def test_v1_unknown_name_still_errors():
+    import libephemeris as le
+    import pytest as _pytest
+    from libephemeris.exceptions import Error
+
+    with _pytest.raises(Error):
+        le.fixstar_ut("nosuchstar", 2451545.0, 0)
