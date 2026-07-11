@@ -1612,3 +1612,31 @@ class TestPhenoWindowObserver:
             jd, args[0], args[1], (75.0, 0.7, 0.0, 0.0, 0.0, 0.0), "Sirius", 1
         )
         assert any(abs(r_young[i] - r_old[i]) > 1e-6 for i in (11, 12, 13, 14, 24))
+
+
+@pytest.mark.unit
+class TestPhenoWindowSpikeAtEdge:
+    """The twilight visibility window is a narrow spike at the sunset edge
+    of the 4-hour bracket; a bare golden-section over the bracket missed it
+    (dret[12..14,24] came back as the no-window sentinel). The grid+refine
+    search must find the real window (reference finds ~40 min for this
+    case; exact instants carry the documented VISLIMIT model floor)."""
+
+    def test_venus_evening_window_exists(self):
+        import libephemeris as le
+
+        jd = le.julday(2024, 9, 1, 4.0)
+        d = le.heliacal_pheno_ut(
+            jd,
+            (12.5, 41.9, 0),
+            (1013.25, 15, 40, 0),
+            (36, 1, 0, 0, 0, 0),
+            "Venus",
+            3,
+        )
+        assert d[12] < 99999998.0, "TfirstVR missing"
+        assert d[13] < 99999998.0, "TbVR missing"
+        assert d[14] < 99999998.0, "TlastVR missing"
+        # Window ~40 min (oracle 0.0274 d); allow the documented model floor.
+        assert 0.01 < d[24] < 0.06
+        assert d[12] < d[13] < d[14]

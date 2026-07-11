@@ -3792,11 +3792,28 @@ def _pheno_rise_window(
     else:
         lo, hi = rise_s, rise_s + win
 
+    # The visibility margin is not unimodal over the 4-hour bracket: it is
+    # a narrow positive spike anchored at the twilight edge sitting on a
+    # flat -99 plateau (Sun above horizon / object invisible), so a bare
+    # golden-section search whose first probes land on the plateau slides
+    # to the wrong edge and misses a real window. Locate the spike with a
+    # coarse grid first (5-minute steps across the bracket), then refine
+    # the best sample with a golden-section pass confined to its
+    # neighbouring samples, where the margin IS unimodal.
+    n_grid = 48
+    step = (hi - lo) / n_grid
+    best_i, best_m = 0, -1e99
+    for i in range(n_grid + 1):
+        m_i = _margin(lo + i * step)
+        if m_i > best_m:
+            best_i, best_m = i, m_i
+    g_lo = lo + max(best_i - 1, 0) * step
+    g_hi = lo + min(best_i + 1, n_grid) * step
+
     phi = (1.0 + math.sqrt(5.0)) / 2.0
-    a = hi - (hi - lo) / phi
-    b = lo + (hi - lo) / phi
+    a = g_hi - (g_hi - g_lo) / phi
+    b = g_lo + (g_hi - g_lo) / phi
     fa, fb = _margin(a), _margin(b)
-    g_lo, g_hi = lo, hi
     for _ in range(22):
         if fa > fb:
             g_hi, b, fb = b, a, fa
