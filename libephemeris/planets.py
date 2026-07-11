@@ -1371,6 +1371,13 @@ def calc_ut(
     from .logging_config import get_logger
 
     reader = get_leb_reader()
+    # Degenerate topocentric Earth: the reference returns the exact zero
+    # vector (Earth is the coordinate origin; TOPOCTR is echoed but the
+    # position stays zero). The Skyfield path already handles this; the LEB
+    # fast path would instead return the geocentre-from-topocentre offset
+    # (~1 Earth radius), so route the case past LEB.
+    if planet == EARTH and (flags & FLG_TOPOCTR):
+        reader = None
     if reader is not None:
         try:
             from . import fast_calc
@@ -1550,6 +1557,10 @@ def calc(
     from .logging_config import get_logger
 
     reader = get_leb_reader()
+    # Degenerate topocentric Earth: see calc_ut — the reference returns the
+    # zero vector; keep this off the LEB fast path.
+    if planet == EARTH and (flags & FLG_TOPOCTR):
+        reader = None
     if reader is not None:
         try:
             from . import fast_calc
