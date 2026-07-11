@@ -1138,6 +1138,7 @@ def _calc_type21_position(
     """
     from . import state
     from .constants import (
+        FLG_EQUATORIAL,
         FLG_HELCTR,
         FLG_J2000,
         FLG_NOABERR,
@@ -1169,7 +1170,11 @@ def _calc_type21_position(
         not (iflag & FLG_TRUEPOS) and not (iflag & FLG_NOABERR) and not is_heliocentric
     )
     apply_precession = not (iflag & FLG_J2000)
-    apply_nutation = not (iflag & FLG_NONUT) and apply_precession
+    # SIDEREAL|EQUATORIAL lands on the mean equator of date with no
+    # ayanamsha (the shared _sid_eq convention), so nutation is skipped for
+    # that combination exactly like FLG_NONUT.
+    _sid_eq = bool(iflag & FLG_SIDEREAL) and bool(iflag & FLG_EQUATORIAL)
+    apply_nutation = not (iflag & FLG_NONUT) and not _sid_eq and apply_precession
 
     # Earth/Sun sources for geocentric reduction and stellar aberration.
     planets = state.get_planets()
@@ -1319,8 +1324,10 @@ def _calc_type21_position(
     # =========================================================================
     # Step 8: Apply sidereal correction if requested
     # =========================================================================
-    if iflag & FLG_SIDEREAL:
-        # Flag-aware ayanamsa (true for of-date, mean for NONUT/J2000) and the
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
+        # Ecliptic sidereal output only — SID|EQ keeps the plain mean-equator
+        # RA (no ayanamsha; nutation already skipped above). Flag-aware
+        # ayanamsa (true for of-date, mean for NONUT/J2000) and the
         # ayanamsha-rate speed correction, via the canonical helper. The
         # type-21 longitude already honors FLG_J2000/FLG_NONUT (precession /
         # nutation applied above), so the flag-aware ayanamsa matches it; the
@@ -1489,6 +1496,7 @@ def calc_spk_body_position(
     """
     from . import state
     from .constants import (
+        FLG_EQUATORIAL,
         FLG_HELCTR,
         FLG_SPEED,
         FLG_SIDEREAL,
@@ -1640,7 +1648,12 @@ def calc_spk_body_position(
     # For J2000 the downstream _maybe_equatorial_convert precesses of-date→J2000
     # but does not remove nutation, so it must be removed first — matching the
     # type-21 path and the reference, whose J2000 ecliptic output is mean.
-    if (iflag & FLG_NONUT) or (iflag & FLG_J2000):
+    # SIDEREAL|EQUATORIAL also lands on the mean frame: the reported RA sits
+    # on the mean equator of date with NO ayanamsha subtraction (the shared
+    # convention of every other body class — see fast_calc's SID+EQ branch),
+    # so the nutation term must be stripped here just like NONUT/J2000.
+    _sid_eq = (iflag & FLG_SIDEREAL) and (iflag & FLG_EQUATORIAL)
+    if (iflag & FLG_NONUT) or (iflag & FLG_J2000) or _sid_eq:
         from .cache import get_cached_nutation
 
         dpsi_rad, _ = get_cached_nutation(t.tt)
@@ -1650,12 +1663,14 @@ def calc_spk_body_position(
 
             speed_lon -= _nutation_rate_deg_per_day(t.tt)
 
-    # Apply sidereal correction if requested. Routed through the canonical
-    # flag-aware helper so the ayanamsa variant matches the longitude frame set
-    # above: TRUE ayanamsa (mean + Δψ) cancels Δψ on a true-of-date longitude,
-    # while NONUT/J2000 (Δψ already stripped) get the MEAN ayanamsa. The helper
-    # also removes the ~50"/yr ayanamsha drift from speed_lon under FLG_SPEED.
-    if iflag & FLG_SIDEREAL:
+    # Apply sidereal correction if requested — ecliptic output only (the
+    # ayanamsha is a longitude offset; SID|EQ output keeps the plain mean-
+    # equator RA). Routed through the canonical flag-aware helper so the
+    # ayanamsa variant matches the longitude frame set above: TRUE ayanamsa
+    # (mean + Δψ) cancels Δψ on a true-of-date longitude, while NONUT/J2000
+    # (Δψ already stripped) get the MEAN ayanamsa. The helper also removes
+    # the ~50"/yr ayanamsha drift from speed_lon under FLG_SPEED.
+    if (iflag & FLG_SIDEREAL) and not (iflag & FLG_EQUATORIAL):
         from .planets import _apply_sidereal_correction
 
         lon, speed_lon = _apply_sidereal_correction(lon, speed_lon, t.ut1, iflag)
