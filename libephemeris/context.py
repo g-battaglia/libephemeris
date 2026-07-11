@@ -609,7 +609,7 @@ class EphemerisContext:
         from .constants import FLG_SIDEREAL
 
         if iflag & FLG_SIDEREAL:
-            from .planets import _echo_speed_bit
+            from .planets import _echo_request_bits
             from .sidereal_epoch import (
                 fixed_epoch_request_flags,
                 fixed_epoch_retflag,
@@ -624,7 +624,7 @@ class EphemerisContext:
                 xx_t0 = transform_fixed_epoch_result(sub_xx, iflag, self.sidereal_mode)
                 from .planets import _to_native_floats
 
-                return _to_native_floats(xx_t0), _echo_speed_bit(
+                return _to_native_floats(xx_t0), _echo_request_bits(
                     fixed_epoch_retflag(sub_rf, iflag), raw_iflag
                 )
 
@@ -637,14 +637,14 @@ class EphemerisContext:
         # no antipode branch), and the antipode is representation-dependent
         # (FLG_XYZ / FLG_RADIANS) — _south_node_from_north handles all three.
         if ipl in (-MEAN_NODE, -TRUE_NODE):
-            from .planets import _echo_speed_bit, _south_node_from_north
+            from .planets import _echo_request_bits, _south_node_from_north
 
             north_result, retflag = self._calc_impl(tjd, abs(ipl), iflag, ut=ut)
             # The recursion sees the already-normalized iflag (SPEED3 mapped
             # to SPEED), so its echoed retflag loses the caller's original
             # speed bit — re-echo against raw_iflag exactly like the
             # module-level south-node branch (planets.py _calc_body_south).
-            return _south_node_from_north(north_result, iflag), _echo_speed_bit(
+            return _south_node_from_north(north_result, iflag), _echo_request_bits(
                 retflag, raw_iflag
             )
 
@@ -683,11 +683,11 @@ class EphemerisContext:
 
                 get_logger().debug("body=%d jd=%.1f source=LEB (context)", ipl, tjd)
                 _record(ipl, "LEB")
-                from .planets import _implied_retflag_bits, _echo_speed_bit
+                from .planets import _implied_retflag_bits, _echo_request_bits
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_speed_bit(
+                return _to_native_floats(result[0]), _echo_request_bits(
                     result[1] | _implied_retflag_bits(iflag), raw_iflag
                 )
             except (KeyError, ValueError) as _leb_err:
@@ -733,11 +733,11 @@ class EphemerisContext:
                     "body=%d jd=%.1f source=Horizons (context)", ipl, tjd
                 )
                 _record(ipl, "Horizons")
-                from .planets import _implied_retflag_bits, _echo_speed_bit
+                from .planets import _implied_retflag_bits, _echo_request_bits
 
                 from .planets import _to_native_floats
 
-                return _to_native_floats(result[0]), _echo_speed_bit(
+                return _to_native_floats(result[0]), _echo_request_bits(
                     result[1] | _implied_retflag_bits(iflag), raw_iflag
                 )
             except KeyError as _hz_err:
@@ -807,10 +807,10 @@ class EphemerisContext:
         # the module-level entry points (the context LEB/Horizons paths call
         # _record; the Skyfield fallback must too for telemetry parity).
         _record(ipl, "Skyfield")
-        from .planets import _echo_speed_bit
+        from .planets import _echo_request_bits
 
         pos_out, rf_out = _finalize_output_flags(pos, retflag, iflag)
-        return pos_out, _echo_speed_bit(rf_out, raw_iflag)
+        return pos_out, _echo_request_bits(rf_out, raw_iflag)
 
     def houses(
         self, tjd_ut: float, lat: float, lon: float, hsys: int

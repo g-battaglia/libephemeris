@@ -578,7 +578,7 @@ def _normalize_calc_flags(flags: int) -> int:
       differentiation is already the only speed method used. The reference
       *echoes* SPEED3 when SPEED3 alone was requested (SPEED wins if both are
       set); that echo correction is applied from the raw request by
-      _echo_speed_bit at the entry points, not here.
+      _echo_request_bits at the entry points, not here.
     """
     from .constants import FLG_JPLEPH, FLG_MOSEPH
 
@@ -611,19 +611,33 @@ def _resolve_center_flags(flags: int) -> int:
     return flags
 
 
-def _echo_speed_bit(retflag: int, raw_flags: int) -> int:
-    """Echo the speed bit the reference API reports, from the raw request.
+def _echo_request_bits(retflag: int, raw_flags: int) -> int:
+    """Echo corrections the reference API derives from the raw request.
 
-    _normalize_calc_flags remaps FLG_SPEED3 -> FLG_SPEED for the (identical)
-    computation, which would make retflag always echo SPEED. The reference
-    echoes SPEED3 when SPEED3 alone was requested and SPEED when SPEED is
-    present (SPEED wins if both are set). This corrects the echoed speed bit
-    from the caller's original flags, touching nothing in the computation.
-    Verified against the reference oracle: SPEED3 -> SPEED3, SPEED -> SPEED,
-    SPEED|SPEED3 -> SPEED.
+    _normalize_calc_flags remaps bits for the (identical) computation in
+    two ways that must not leak into the echoed retflag:
+
+    - FLG_SPEED3 -> FLG_SPEED: the reference echoes SPEED3 when SPEED3
+      alone was requested and SPEED when SPEED is present (SPEED wins if
+      both are set). Verified black-box: SPEED3 -> SPEED3, SPEED -> SPEED,
+      SPEED|SPEED3 -> SPEED.
+    - FLG_MOSEPH is stripped from the computation flags (every calculation
+      uses the JPL DE440/DE441 path), but the reference echoes exactly one
+      ephemeris bit with priority JPLEPH > SWIEPH > MOSEPH, so a
+      MOSEPH-only request must echo MOSEPH. Verified black-box: MOSEPH -> 4,
+      MOSEPH|SPEED -> 260, MOSEPH|SPEED3 -> 132, MOSEPH|SWIEPH -> 2
+      (SWIEPH wins). Matches the ECL_NUT and calc_pctr paths, which already
+      keep MOSEPH via _exclusive_ephemeris_bit.
+
+    Both corrections touch only the ECHO — computation flags stay as
+    normalized.
     """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
     if (raw_flags & FLG_SPEED3) and not (raw_flags & FLG_SPEED):
-        return (retflag & ~FLG_SPEED) | FLG_SPEED3
+        retflag = (retflag & ~FLG_SPEED) | FLG_SPEED3
+    if (raw_flags & FLG_MOSEPH) and not (raw_flags & (FLG_JPLEPH | FLG_SWIEPH)):
+        retflag = (retflag & ~(FLG_SWIEPH | FLG_JPLEPH)) | FLG_MOSEPH
     return retflag
 
 
@@ -1327,7 +1341,7 @@ def calc_ut(
         if is_fixed_epoch_request(flags, _sidm):
             sub_xx, sub_rf = calc_ut(tjdut, planet, fixed_epoch_request_flags(flags))
             xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
-            return _to_native_floats(xx_t0), _echo_speed_bit(
+            return _to_native_floats(xx_t0), _echo_request_bits(
                 fixed_epoch_retflag(sub_rf, flags), raw_flags
             )
 
@@ -1348,7 +1362,7 @@ def calc_ut(
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_ipl = abs(planet)
         north_result, retflag = calc_ut(tjdut, north_ipl, flags)
-        return _south_node_from_north(north_result, flags), _echo_speed_bit(
+        return _south_node_from_north(north_result, flags), _echo_request_bits(
             retflag, raw_flags
         )
 
@@ -1364,7 +1378,7 @@ def calc_ut(
             result = fast_calc.fast_calc_ut(reader, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdut)
             _record(planet, "LEB")
-            return _to_native_floats(result[0]), _echo_speed_bit(
+            return _to_native_floats(result[0]), _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
         except (KeyError, ValueError) as _leb_err:
@@ -1385,7 +1399,7 @@ def calc_ut(
             result = horizons_backend.horizons_calc_ut(h_client, tjdut, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdut)
             _record(planet, "Horizons")
-            return _to_native_floats(result[0]), _echo_speed_bit(
+            return _to_native_floats(result[0]), _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
         except KeyError as _hz_err:
@@ -1437,7 +1451,7 @@ def calc_ut(
             _record(planet, "Skyfield")
         # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
         pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
-        return pos_out, _echo_speed_bit(rf_out, raw_flags)
+        return pos_out, _echo_request_bits(rf_out, raw_flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdut, planet) from e
     except ValueError as e:
@@ -1514,7 +1528,7 @@ def calc(
         if is_fixed_epoch_request(flags, _sidm):
             sub_xx, sub_rf = calc(tjdet, planet, fixed_epoch_request_flags(flags))
             xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
-            return _to_native_floats(xx_t0), _echo_speed_bit(
+            return _to_native_floats(xx_t0), _echo_request_bits(
                 fixed_epoch_retflag(sub_rf, flags), raw_flags
             )
 
@@ -1527,7 +1541,7 @@ def calc(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_result, retflag = calc(tjdet, abs(planet), flags)
-        return _south_node_from_north(north_result, flags), _echo_speed_bit(
+        return _south_node_from_north(north_result, flags), _echo_request_bits(
             retflag, raw_flags
         )
 
@@ -1543,7 +1557,7 @@ def calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             _record(planet, "LEB")
-            return _to_native_floats(result[0]), _echo_speed_bit(
+            return _to_native_floats(result[0]), _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
         except (KeyError, ValueError) as _leb_err:
@@ -1569,7 +1583,7 @@ def calc(
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
             _record(planet, "Horizons")
-            return _to_native_floats(result[0]), _echo_speed_bit(
+            return _to_native_floats(result[0]), _echo_request_bits(
                 result[1] | _implied_retflag_bits(flags), raw_flags
             )
         except KeyError as _hz_err:
@@ -1616,7 +1630,7 @@ def calc(
             _record(planet, "Skyfield")
         # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
         pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
-        return pos_out, _echo_speed_bit(rf_out, raw_flags)
+        return pos_out, _echo_request_bits(rf_out, raw_flags)
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:

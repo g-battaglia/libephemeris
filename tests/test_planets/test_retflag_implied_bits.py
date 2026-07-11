@@ -122,3 +122,41 @@ class TestImpliedRetflagBits:
         trop_mean, _ = le.calc_ut(JD, MARS, FLG_NONUT)
         delta = (trop_true[0] - trop_mean[0] + 180.0) % 360.0 - 180.0
         assert 1.0 < abs(delta) * 3600.0 < 60.0  # nutation-sized
+
+
+@pytest.mark.unit
+class TestMosephEchoRegression:
+    """MOSEPH-only requests echo FLG_MOSEPH in the retflag (measured
+    black-box: MOSEPH -> 4, MOSEPH|SPEED -> 260, MOSEPH|SPEED3 -> 132,
+    MOSEPH|SWIEPH -> 2 with SWIEPH winning). The computation still uses the
+    DE440/DE441 path — only the echo changes."""
+
+    def test_moseph_only_echoes_moseph(self):
+        from libephemeris.constants import FLG_MOSEPH
+
+        _, rf = le.calc_ut(JD, MARS, FLG_MOSEPH)
+        assert rf == FLG_MOSEPH
+
+    def test_moseph_speed_matrix(self):
+        from libephemeris.constants import FLG_MOSEPH, FLG_SPEED, FLG_SPEED3
+
+        assert le.calc_ut(JD, MARS, FLG_MOSEPH | FLG_SPEED)[1] == (
+            FLG_MOSEPH | FLG_SPEED
+        )
+        assert le.calc_ut(JD, MARS, FLG_MOSEPH | FLG_SPEED3)[1] == (
+            FLG_MOSEPH | FLG_SPEED3
+        )
+
+    def test_swieph_beats_moseph(self):
+        from libephemeris.constants import FLG_MOSEPH, FLG_SWIEPH
+
+        _, rf = le.calc_ut(JD, MARS, FLG_MOSEPH | FLG_SWIEPH)
+        assert rf == FLG_SWIEPH
+
+    def test_moseph_position_unchanged(self):
+        """MOSEPH must not change the computed position (DE path always)."""
+        from libephemeris.constants import FLG_MOSEPH
+
+        p_mos, _ = le.calc_ut(JD, MARS, FLG_MOSEPH)
+        p_def, _ = le.calc_ut(JD, MARS, 0)
+        assert p_mos == p_def
