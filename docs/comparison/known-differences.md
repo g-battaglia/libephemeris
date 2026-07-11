@@ -643,8 +643,8 @@ to ~40" at ±100y, up to ~145" for galactic/calculated modes at the extremes —
 inherited from small fixed-star proper-motion / galactic-frame-definition
 differences (§4). This is a definitional difference in those niche modes, not an
 error: every fixed-epoch mode's ayanamsha value is exact. (For the *positions*
-returned under the fixed-epoch modes 18/19/20 — which the reference computes as
-a frame transformation, not an ayanamsha subtraction — see §10.2b.)
+returned under the fixed-epoch modes 18/19/20/34 — which the reference computes
+as a frame transformation, not an ayanamsha subtraction — see §10.2b.)
 
 A second, smaller family effect: libephemeris applies the same modern 5-term
 IAU 2006 precession-rate polynomial to **all** formula-based ayanamsha modes,
@@ -662,7 +662,14 @@ For `SIDM_J2000`/`SIDM_J1900`/`SIDM_B1950` the reference does not subtract an
 ayanamsha at all: it returns the position expressed on the **mean ecliptic and
 equinox of the mode's epoch t0** (measured black-box — `SIDM_J2000` output is
 bit-identical to a `FLG_J2000 | FLG_NONUT` request for every representation:
-ecliptic, equatorial, XYZ, speeds). libephemeris implements the same frame
+ecliptic, equatorial, XYZ, speeds). `SIDM_GALALIGN_MARDYKS` (34) belongs to the
+same family: its t0 was fitted black-box as JD 2451079.771 (the September-1998
+"galactic alignment" equinox; 0.0000" residual over stars, planets, the lunar
+node and epochs 1900–2050), with a constant 30° longitude offset on the
+ecliptic/XYZ channels (the mode's ayanamsha is exactly 30° at t0) and no offset
+on the equatorial channel. A scalar-ayanamsha model reproduces its longitudes
+only near J2000 and puts latitudes on the wrong plane (~24" off at ±55y from
+the precession of the ecliptic pole). libephemeris implements the same frame
 transformation for planets, both fixed-star families, and houses (houses run
 the cusp engine against the node of the t0 ecliptic on the true equator of
 date, including the reference's measured near-t0 sign quirk: within the
@@ -685,7 +692,8 @@ implement. `set_sid_mode()` **strips them and emits a `UserWarning`**, keeping t
 base ayanamsha mode — rather than the composite value silently falling back to
 Lahiri. `SIDM_USER` (255) is unaffected. Planned for a future release. (The
 *implicit* ecliptic-of-t0 projection that the reference applies to the plain
-fixed-epoch modes 18/19/20 is implemented — see §10.2b.)
+fixed-epoch modes 18/19/20 and to SIDM_GALALIGN_MARDYKS (34) is implemented —
+see §10.2b.)
 
 **10.4 `SIDEREAL | EQUATORIAL` speed frame (parity).** Both engines report
 the SID|EQ *position* on the mean equator of date and the accompanying

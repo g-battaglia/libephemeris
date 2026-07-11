@@ -1756,7 +1756,7 @@ def _houses_fixed_epoch_sidereal(
     flags: int,
     sid_mode: int,
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
-    """Sidereal houses for the fixed-epoch modes (SIDM_J2000/J1900/B1950).
+    """Sidereal houses for the fixed-epoch modes (J2000/J1900/B1950/GALALIGN).
 
     The reference computes these on the mean ecliptic of the mode's epoch t0
     (measured black-box, oracle-exact for every house system): the house
@@ -1764,16 +1764,13 @@ def _houses_fixed_epoch_sidereal(
     true equator of date — the ARMC is re-based to that node and the
     obliquity becomes the inclination between the two planes — and the
     resulting cusp arcs are measured from the mean equinox of t0 along the
-    t0 ecliptic.
+    t0 ecliptic. GALALIGN_MARDYKS additionally subtracts its constant
+    30-degree longitude offset (its ayanamsha is exactly 30 degrees at t0).
 
-    Two measured reference quirks are reproduced:
-
-    - Near t0, when the mean and true ayanamshas have opposite signs (|true
-      ayanamsha| < ~17", a window of roughly ±4 months around t0), the
-      reference shifts every ecliptic output by -2x the (unwrapped) true
-      ayanamsha.
-    - The Sunshine pair collapses: sidereal 'i' (Makransky) is computed
-      identically to 'I' (Treindl), as on the general sidereal path.
+    One measured reference quirk is reproduced: near t0, when the mean and
+    true ayanamshas (net of the mode's constant offset) have opposite signs
+    (a window of roughly ±4 months around t0), the reference shifts every
+    ecliptic output by -2x the (unwrapped) net true ayanamsha.
 
     The reported ARMC slot keeps the tropical ARMC: the reference's own
     ARMC drifts from it by <~15" over five centuries with no clean
@@ -1784,7 +1781,7 @@ def _houses_fixed_epoch_sidereal(
 
     from .planets import get_ayanamsa_ex_ut
     from .precession_vondrak import vondrak_pn_matrix, vondrak_precession_matrix
-    from .sidereal_epoch import FIXED_EPOCH_T0
+    from .sidereal_epoch import FIXED_EPOCH_LON_OFFSET, FIXED_EPOCH_T0
 
     import erfa
 
@@ -1816,19 +1813,26 @@ def _houses_fixed_epoch_sidereal(
     # mode is the precession accumulated since t0, so its sign is exactly
     # sign(jd_tt - t0) — used directly because our mean value at t0 can sit
     # a fraction of a milliarcsecond on the wrong side of zero (B1950).
+    # For an offset mode (GALALIGN_MARDYKS: ayanamsha == offset at t0) the
+    # zero-crossing reference is the offset, not zero.
+    off = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
     aya_true = (
-        (get_ayanamsa_ex_ut(tjdut, flags & (FLG_JPLEPH | FLG_SWIEPH))[1] + 180.0)
+        (get_ayanamsa_ex_ut(tjdut, flags & (FLG_JPLEPH | FLG_SWIEPH))[1] - off + 180.0)
         % 360.0
     ) - 180.0
     corr = 0.0
     if (jd_tt >= t0) != (aya_true > 0.0):
         corr = 2.0 * aya_true
 
-    # Sun declination of date for the Sunshine systems; sidereal 'i'
-    # collapses onto 'I' (see docstring).
-    engine_hsys = "I" if hsys_char == "i" else hsys_char
+    # Sun declination of date for the Sunshine systems. Unlike the
+    # ayanamsha-based sidereal modes (where the reference computes 'i'
+    # identically to 'I'), the fixed-epoch modes keep 'i' as a distinct
+    # Makransky solution (measured: at lat 60 under SIDM_J2000 the
+    # reference's 'i' cusps differ from 'I' by up to ~78 deg), so no
+    # collapse happens here.
+    engine_hsys = hsys_char
     ascmc9 = 0.0
-    if engine_hsys == "I":
+    if engine_hsys in ("I", "i"):
         try:
             eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
@@ -1844,11 +1848,11 @@ def _houses_fixed_epoch_sidereal(
         # Aries houses stay anchored at 0 deg of the zodiac in use.
         cusps = tuple(float(i * 30) for i in range(12))
     else:
-        cusps = tuple((lon_node + c + corr) % 360.0 for c in eng_cusps)
+        cusps = tuple((lon_node + c + corr - off) % 360.0 for c in eng_cusps)
 
     ascmc_list = list(trop_ascmc)
     for i in (0, 1, 3, 4, 5, 6, 7):
-        ascmc_list[i] = (lon_node + eng_ascmc[i] + corr) % 360.0
+        ascmc_list[i] = (lon_node + eng_ascmc[i] + corr - off) % 360.0
     # ascmc[2] (ARMC) keeps the tropical value (see docstring).
     return cusps, tuple(ascmc_list)
 

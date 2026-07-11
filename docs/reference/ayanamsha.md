@@ -765,12 +765,19 @@ A variant placing the galactic equator node at the nakshatra Mula.
 | Property | Value |
 |----------|-------|
 | Constant | `SIDM_GALALIGN_MARDYKS = 34` |
-| J2000 Value | ~30.11° |
-| Zero Epoch | ~165 BCE |
-| Calculation | Dynamic (galactic pole) |
+| J2000 Value | 30.0178° |
+| Reference Epoch | JD 2451079.771 (September 1998), ayanamsha exactly 30° |
+| Calculation | Fixed-epoch frame mode |
 
 **Historical Basis:**
 Raymond Mardyks' system based on the alignment of the winter solstice with the Galactic Center, which he associates with the end of the Mayan calendar cycle in 2012.
+
+**Frame behavior:** like the J2000/J1900/B1950 modes, sidereal *positions*
+under this mode are frame projections onto the mean ecliptic and equinox of
+the reference epoch (with a constant 30° longitude offset on the ecliptic/XYZ
+channels; the equatorial channel carries no offset), not a scalar ayanamsha
+subtraction. `get_ayanamsa()` still returns the scalar value above. See
+`docs/comparison/known-differences.md` §10.2b.
 
 ---
 

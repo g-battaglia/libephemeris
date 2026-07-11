@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Fixed-epoch sidereal modes (SIDM_J2000 / SIDM_J1900 / SIDM_B1950).
+"""Fixed-epoch sidereal modes (SIDM_J2000 / J1900 / B1950 / GALALIGN_MARDYKS).
 
-The reference API implements these three ayanamsha modes as *frame*
+The reference API implements these ayanamsha modes as *frame*
 transformations, not as a scalar longitude offset: a sidereal position is
 the apparent position expressed on the mean ecliptic and equinox of the
 mode's reference epoch t0 (measured black-box, exact to sub-milliarcsecond):
@@ -13,6 +13,12 @@ mode's reference epoch t0 (measured black-box, exact to sub-milliarcsecond):
   additionally precessed (Vondrák 2011 chain) to the mean frame of t0 and,
   for ecliptic output, rotated onto the mean ecliptic of t0 (IAU 2006 mean
   obliquity at t0).
+- ``SIDM_GALALIGN_MARDYKS``: same frame projection with t0 fitted black-box
+  as JD 2451079.771 (the September-1998 "galactic alignment" equinox;
+  0.0000" residual over 8 stars, planets, the lunar node and epochs
+  1900-2050), plus a constant 30-degree longitude offset on the ecliptic
+  and XYZ channels (the mode's ayanamsha is defined as exactly 30 degrees
+  at t0). The equatorial channel carries no offset.
 
 The returned flags echo the caller's flags with ``FLG_NONUT`` added (the
 reference does the same; the internal ``FLG_J2000`` bit is not echoed).
@@ -39,6 +45,7 @@ from .constants import (
     FLG_SIDEREAL,
     FLG_XYZ,
     SIDM_B1950,
+    SIDM_GALALIGN_MARDYKS,
     SIDM_J1900,
     SIDM_J2000,
 )
@@ -46,11 +53,22 @@ from .precession_vondrak import vondrak_precession_matrix
 
 _J2000 = 2451545.0
 
+# Fitted reference epoch of the Mardyks galactic-alignment mode (see module
+# docstring): the September-1998 equinox.
+GALALIGN_MARDYKS_T0 = 2451079.771
+
 # Reference epochs of the fixed-epoch ayanamsha modes.
 FIXED_EPOCH_T0 = {
     SIDM_J2000: _J2000,
     SIDM_J1900: 2415020.0,
     SIDM_B1950: 2433282.42345905,
+    SIDM_GALALIGN_MARDYKS: GALALIGN_MARDYKS_T0,
+}
+
+# Constant longitude offset subtracted from the ecliptic/XYZ channels after
+# the t0-frame projection (never from the equatorial channel).
+FIXED_EPOCH_LON_OFFSET = {
+    SIDM_GALALIGN_MARDYKS: 30.0,
 }
 
 
@@ -99,6 +117,11 @@ def _epoch_matrices(sid_mode: int) -> Tuple[np.ndarray, np.ndarray]:
 def _rot_x(angle_rad: float) -> np.ndarray:
     c, s = math.cos(angle_rad), math.sin(angle_rad)
     return np.array([[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]])
+
+
+def _rot_z(angle_rad: float) -> np.ndarray:
+    c, s = math.cos(angle_rad), math.sin(angle_rad)
+    return np.array([[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
 def _rotate_spherical(
@@ -162,7 +185,13 @@ def transform_fixed_epoch_result(
     re-applies FLG_RADIANS at the end when the caller asked for it.
     """
     m_eq, m_ecl = _epoch_matrices(sid_mode)
-    if sid_mode != SIDM_J2000:
+    # Constant longitude offset (ecliptic/XYZ channels only): folded into the
+    # rotation as an extra spin about the t0 ecliptic pole, so positions and
+    # velocities pick it up uniformly in every representation.
+    off = FIXED_EPOCH_LON_OFFSET.get(sid_mode, 0.0)
+    if off and not (iflag & FLG_EQUATORIAL):
+        m_ecl = _rot_z(math.radians(off)) @ m_ecl
+    if sid_mode != SIDM_J2000 or off:
         if iflag & FLG_XYZ:
             m = m_eq if iflag & FLG_EQUATORIAL else m_ecl
             pos = m @ np.array(xx[:3])
