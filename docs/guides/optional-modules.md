@@ -153,9 +153,11 @@ Installs the permissive-licensed optional runtime dependencies (`stars`); the GP
 pip install libephemeris[dev]
 ```
 
-For contributors only. Includes testing tools (pytest, pyswisseph for
-cross-validation), code quality (ruff, mypy), SPK generation (spiceypy),
-and manual building (ebooklib). Not needed for using the library.
+For contributors only. Includes testing tools (pytest and plugins), code
+quality (ruff, mypy), SPK generation (spiceypy), and manual building
+(ebooklib). Not needed for using the library. (Reference-comparison
+tooling — including the black-box oracle binding — lives in the separate
+`validation/` repository, not in any extra of this package.)
 
 ---
 

@@ -1447,7 +1447,7 @@ These are never stored as LEB Chebyshev data:
 
 | Category | Bodies | IDs | Count | How computed |
 |----------|--------|-----|-------|--------------|
-| Additional hypotheticals | Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 51–58 | 8 | Keplerian from `hypothetical.py` |
+| Additional hypotheticals | Nibiru, Harrington, Leverrier, Adams, Lowell, Pickering, Vulcan, Selena, Proserpina, Waldemath | 49–58 | 10 | Keplerian from `hypothetical.py` |
 | Fixed stars | full star catalog (Regulus, Spica, Aldebaran, …) | FIXSTAR_OFFSET + n | 1447 | `fixed_stars.py` (see §9.4) |
 | Planetary moons | Io, Europa, Ganymede, Callisto, Titan, Triton, Charon, etc. | MOON_OFFSET + n | 21 | SPK via `planetary_moons.py` |
 | Astrological angles | Ascendant, MC, Descendant, IC, Vertex, Antivertex | 9000–9005 | 6 | `angles.py` (house-based) |
@@ -1457,7 +1457,7 @@ These are never stored as LEB Chebyshev data:
 Any minor body outside the `exotics` registry (e.g. Bennu) likewise falls
 back to the SPK → Skyfield pipeline.
 
-**Total bodies NOT in LEB Chebyshev data:** ~1487 (8 hypotheticals + 1447
+**Total bodies NOT in LEB Chebyshev data:** ~1489 (10 hypotheticals + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
 
 **Why the core/exotics split:** the 31 **core** bodies are used in nearly
