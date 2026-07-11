@@ -21,7 +21,7 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 
 | Metric                      | Value                                  |
 |-----------------------------|----------------------------------------|
-| Package version             | 3.0.0rc4                               |
+| Package version             | 3.0.0rc6                               |
 | Python support              | 3.12 - 3.14                            |
 | Library source files        | 70+ `.py` files in `libephemeris/`     |
 | Total library LOC           | ~100,000 lines                         |
@@ -30,7 +30,7 @@ for LibEphemeris. For the implemented LEB binary ephemeris system, see the
 | Comparison test files       | ~120 in `compare_scripts/tests/`       |
 | Public API entries (`__all__`)| 500+                                 |
 | Constants defined           | ~300+ (`SUN`, `MOON`, `FLG_*`, `SIDM_*`, etc.) |
-| Exception classes           | 14 (1 base + 4 categories + 9 specific)|
+| Exception classes           | 15 (1 base + 4 categories + 10 specific)|
 | Runtime dependencies        | 7                                      |
 
 ### Architecture Summary

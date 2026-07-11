@@ -8666,9 +8666,10 @@ def calc_besselian_l2(jd: float, flags: int = FLG_SWIEPH) -> float:
     Moon-Sun line (the shadow axis direction).
 
     The umbral cone is formed by the internal tangent lines from the Sun's limb
-    to the Moon's limb. The sign of l2 indicates the eclipse type:
-    - l2 > 0: Umbral cone apex is beyond Earth (total eclipse possible)
-    - l2 < 0: Umbral cone apex is between Moon and Earth (annular eclipse)
+    to the Moon's limb. The sign of l2 indicates the eclipse type (standard
+    Besselian convention):
+    - l2 < 0: umbral shadow reaches the fundamental plane (total eclipse)
+    - l2 > 0: only the antumbra reaches it (annular eclipse)
 
     Args:
         jd: Julian Day (UT) at which to calculate l2
@@ -8676,9 +8677,10 @@ def calc_besselian_l2(jd: float, flags: int = FLG_SWIEPH) -> float:
 
     Returns:
         The umbral/antumbral shadow radius l2 in Earth equatorial radii.
-        Positive for total eclipses (umbral shadow), negative for annular
-        eclipses (antumbral shadow). Typical absolute values range from
-        0.003 to 0.05 Earth radii during solar eclipses.
+        Negative for total eclipses (umbral shadow), positive for annular
+        eclipses (antumbral shadow) — measured: 2024-04-08 total gives
+        -0.0103, 2023-10-14 annular gives +0.0181. Typical absolute values
+        range from 0.003 to 0.05 Earth radii during solar eclipses.
 
     Algorithm:
         1. Get geocentric equatorial positions of Moon and Sun
