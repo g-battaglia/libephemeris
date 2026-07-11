@@ -469,7 +469,10 @@ only (latitude/declination and distance speeds are identical on both families).
 The offset is the *actual* ayanamsha rate at the epoch — ≈ the mean general
 precession rate (~50.29″/yr at J2000) for precession-based modes such as
 Fagan/Bradley and Lahiri, but the mode-specific rate (e.g. ~80.5″/yr at J2000)
-for a fixed-target mode such as Galactic Centre 0° Sagittarius. Verified against
+for a fixed-target mode such as Galactic Centre 0° Sagittarius. Exceptions,
+measured across every mode (0–47): the fixed-epoch frame modes
+(SIDM_J2000/J1900/B1950) and SIDM_GALALIGN_MARDYKS (34) get NO legacy
+add-back — their legacy speed equals the modern one. Verified against
 the reference oracle to < 0.001″/day across stars, ayanamshas and epochs.
 Positions are identical on both families; only this speed channel differs.
 

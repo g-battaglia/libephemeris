@@ -882,3 +882,27 @@ def test_v1_unknown_name_still_errors():
 
     with _pytest.raises(Error):
         le.fixstar_ut("nosuchstar", 2451545.0, 0)
+
+
+def test_galalign_mardyks_no_legacy_speed_addback():
+    """Measured black-box across modes 0-47: SIDM_GALALIGN_MARDYKS (34) is
+    the one non-fixed-epoch mode whose legacy star speed equals the modern
+    one (no ayanamsha-rate add-back); every other mode keeps the add-back."""
+    import libephemeris as le
+
+    le.set_sid_mode(le.SIDM_GALALIGN_MARDYKS, 0, 0)
+    try:
+        v1 = le.fixstar_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
+        v2 = le.fixstar2_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
+        assert abs(v1 - v2) < 1e-9, (v1, v2)
+    finally:
+        le.set_sid_mode(0)
+
+    # Control: an ordinary mode keeps the legacy add-back (~3.8e-5 deg/day).
+    le.set_sid_mode(1)
+    try:
+        w1 = le.fixstar_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
+        w2 = le.fixstar2_ut("Spica", 2451545.0, le.FLG_SIDEREAL | le.FLG_SPEED)[0][3]
+        assert abs((w1 - w2) - 3.82e-5) < 5e-6, (w1, w2)
+    finally:
+        le.set_sid_mode(0)

@@ -3025,7 +3025,19 @@ def _apply_fixstar_flags(
         # this branch: they are rewritten to a FLG_J2000|FLG_NONUT request
         # at the top of this function, and in a fixed frame the reference
         # reports the frame derivative on BOTH star families.)
-        if legacy_sidereal and (iflag & FLG_SIDEREAL):
+        # Measured black-box across every sidereal mode (0..47, legacy vs
+        # modern speed): the reference makes NO legacy add-back for
+        # SIDM_GALALIGN_MARDYKS (34) either — its legacy speed equals the
+        # modern one, exactly like the fixed-epoch trio. All other modes
+        # (including the other star-anchored ones) do get the add-back.
+        from .constants import SIDM_GALALIGN_MARDYKS
+        from .state import get_sid_mode as _get_sidm
+
+        if (
+            legacy_sidereal
+            and (iflag & FLG_SIDEREAL)
+            and _get_sidm() != SIDM_GALALIGN_MARDYKS
+        ):
             from .state import get_timescale
             from .planets import get_ayanamsa_ut
 
