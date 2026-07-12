@@ -184,3 +184,22 @@ class TestFictitiousSpeedGate:
 
         r, _ = le.calc_ut(JD, 55, FLG_HELCTR)
         assert r[3:] == (0.0, 0.0, 0.0)
+
+
+class TestEclNutRetflagEphemerisBits:
+    """ECL_NUT (-1) ephemeris-bit echo, measured on the reference API:
+    calc() (TT) echoes only the ephemeris bits the caller passed (no forced
+    default SWIEPH: calc(jd,-1,0) echoes 0), while calc_ut() adds the
+    default (calc_ut(jd,-1,0) echoes 2)."""
+
+    def test_calc_tt_no_forced_default(self):
+        for f, want in [(0, 0), (256, 256), (128, 128), (64, 64), (32, 96)]:
+            assert le.calc(JD, -1, f)[1] == want, f
+
+    def test_calc_tt_explicit_bits_kept(self):
+        for f, want in [(2, 2), (4, 4), (258, 258)]:
+            assert le.calc(JD, -1, f)[1] == want, f
+
+    def test_calc_ut_adds_default(self):
+        for f, want in [(0, 2), (256, 258), (128, 130), (64, 66), (32, 98)]:
+            assert le.calc_ut(JD, -1, f)[1] == want, f

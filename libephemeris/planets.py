@@ -1511,12 +1511,21 @@ def calc(
     if planet == ECL_NUT:
         # Same center-priority resolution and SPEED3 collapse as the calc_ut
         # ECL_NUT branch (see there for the measured reference retflags).
+        # One measured asymmetry: the reference's calc() (TT) echoes only the
+        # ephemeris bits the caller actually passed — it does NOT force the
+        # default SWIEPH bit for ECL_NUT (calc(jd,-1,0) echoes 0), while
+        # calc_ut() does add the default. Resolve exclusivity only when an
+        # ephemeris bit was explicitly requested.
+        from .constants import FLG_JPLEPH, FLG_MOSEPH
+
         res_flags = _resolve_center_flags(flags)
         if res_flags & FLG_SPEED:
             res_flags &= ~FLG_SPEED3
-        pos_nut, rf_nut = _calc_nutation_obliquity_tt(
-            tjdet, _exclusive_ephemeris_bit(res_flags)
-        )
+        if res_flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH):
+            nut_flags = _exclusive_ephemeris_bit(res_flags)
+        else:
+            nut_flags = res_flags
+        pos_nut, rf_nut = _calc_nutation_obliquity_tt(tjdet, nut_flags)
         return pos_nut, rf_nut | _implied_retflag_bits(res_flags)
 
     raw_flags = flags
