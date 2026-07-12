@@ -828,18 +828,14 @@ def jdet_to_utc(
     g_second = float(utc_data[5])
 
     if calendar == JUL_CAL:
-        # Convert Gregorian date to Julian calendar
-        # First compute the JD for this Gregorian date
-        decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
-        jd_greg = julday(g_year, g_month, g_day, decimal_hour, GREG_CAL)
-        # Convert to Julian calendar
-        j_year, j_month, j_day, j_decimal_hour = revjul(jd_greg, JUL_CAL)
-        # Extract time components from decimal hour
-        j_hour = int(j_decimal_hour)
-        j_minute_frac = (j_decimal_hour - j_hour) * 60.0
-        j_minute = int(j_minute_frac)
-        j_second = (j_minute_frac - j_minute) * 60.0
-        return j_year, j_month, j_day, j_hour, j_minute, j_second
+        # Only the calendar DATE differs between Gregorian and Julian (a
+        # whole number of days), so remap the date at noon and carry the
+        # clock components over verbatim. Folding h/m/s into a decimal hour
+        # would roll a 23:59:60 leap second past 24h into the next day,
+        # dropping the leap second (the reference preserves it).
+        jd_noon = julday(g_year, g_month, g_day, 12.0, GREG_CAL)
+        j_year, j_month, j_day, _ = revjul(jd_noon, JUL_CAL)
+        return j_year, j_month, j_day, g_hour, g_minute, g_second
 
     return g_year, g_month, g_day, g_hour, g_minute, g_second
 
@@ -914,18 +910,14 @@ def jdut1_to_utc(
     g_second = float(utc_data[5])
 
     if calendar == JUL_CAL:
-        # Convert Gregorian date to Julian calendar
-        # First compute the JD for this Gregorian date
-        decimal_hour = g_hour + g_minute / 60.0 + g_second / 3600.0
-        jd_greg = julday(g_year, g_month, g_day, decimal_hour, GREG_CAL)
-        # Convert to Julian calendar
-        j_year, j_month, j_day, j_decimal_hour = revjul(jd_greg, JUL_CAL)
-        # Extract time components from decimal hour
-        j_hour = int(j_decimal_hour)
-        j_minute_frac = (j_decimal_hour - j_hour) * 60.0
-        j_minute = int(j_minute_frac)
-        j_second = (j_minute_frac - j_minute) * 60.0
-        return j_year, j_month, j_day, j_hour, j_minute, j_second
+        # Only the calendar DATE differs between Gregorian and Julian (a
+        # whole number of days), so remap the date at noon and carry the
+        # clock components over verbatim. Folding h/m/s into a decimal hour
+        # would roll a 23:59:60 leap second past 24h into the next day,
+        # dropping the leap second (the reference preserves it).
+        jd_noon = julday(g_year, g_month, g_day, 12.0, GREG_CAL)
+        j_year, j_month, j_day, _ = revjul(jd_noon, JUL_CAL)
+        return j_year, j_month, j_day, g_hour, g_minute, g_second
 
     return g_year, g_month, g_day, g_hour, g_minute, g_second
 

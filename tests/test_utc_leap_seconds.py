@@ -558,3 +558,27 @@ class TestUtcTimezoneWithLeapSeconds:
         result = ephem.utc_time_zone(2020, 1, 15, 2, 0, 0.0, -5.0)
 
         assert result[:5] == (2020, 1, 15, 7, 0)
+
+
+class TestJulianCalendarLeapSecondPreserved:
+    """jdut1_to_utc/jdet_to_utc with JUL_CAL must keep a 23:59:60 leap
+    second: the calendar remap only shifts the DATE (whole days), never the
+    clock. Folding h/m/s into a decimal hour rolled the leap second past
+    24h into the next day (reference: (2016, 12, 18, 23, 59, 60.41))."""
+
+    def test_jdut1_julian_keeps_leap_second(self):
+        y, m, d, hh, mm, ss = ephem.jdut1_to_utc(2457754.5, 0)
+        assert (y, m, d, hh, mm) == (2016, 12, 18, 23, 59)
+        assert 60.0 <= ss < 61.0
+
+    def test_jdet_julian_keeps_leap_second(self):
+        jd_tt, _ = ephem.utc_to_jd(2016, 12, 31, 23, 59, 60.4, 1)
+        y, m, d, hh, mm, ss = ephem.jdet_to_utc(jd_tt, 0)
+        assert (y, m, d, hh, mm) == (2016, 12, 18, 23, 59)
+        assert 60.0 <= ss < 61.0
+
+    def test_julian_normal_date_unchanged(self):
+        _, jd_ut1 = ephem.utc_to_jd(2020, 6, 15, 14, 30, 0.0, 1)
+        y, m, d, hh, mm, ss = ephem.jdut1_to_utc(jd_ut1, 0)
+        assert (y, m, d) == (2020, 6, 2)
+        assert abs((hh * 3600 + mm * 60 + ss) - (14 * 3600 + 30 * 60)) < 0.001
