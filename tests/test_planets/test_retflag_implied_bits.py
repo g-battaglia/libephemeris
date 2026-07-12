@@ -203,3 +203,39 @@ class TestEclNutRetflagEphemerisBits:
     def test_calc_ut_adds_default(self):
         for f, want in [(0, 2), (256, 258), (128, 130), (64, 66), (32, 98)]:
             assert le.calc_ut(JD, -1, f)[1] == want, f
+
+
+class TestCalcTTNormalBodyEphemerisBits:
+    """calc() (TT) for ordinary bodies echoes only caller-passed ephemeris
+    bits (measured: calc(jd, MERCURY, 0) echoes 0 while calc_ut echoes 2);
+    matrix from the reference API with set_topo(0,0,0)."""
+
+    def test_no_forced_default_matrix(self):
+        le.set_topo(0.0, 0.0, 0.0)
+        for f, want in [
+            (0, 0),
+            (256, 256),
+            (8, 1544),
+            (16384, 17920),
+            (32768, 32768),
+            (16, 1552),
+            (64, 64),
+            (32, 96),
+            (65536, 65600),
+        ]:
+            assert le.calc(JD, 2, f)[1] == want, f
+
+    def test_explicit_bits_kept(self):
+        for f, want in [(2, 2), (4, 4), (258, 258)]:
+            assert le.calc(JD, 2, f)[1] == want, f
+
+    def test_calc_ut_keeps_default(self):
+        assert le.calc_ut(JD, 2, 0)[1] == 2
+        assert le.calc_ut(JD, 2, 256)[1] == 258
+
+    def test_south_node_and_leb_paths(self):
+        assert le.calc(JD, -10, 0)[1] == 0
+        for mode in ("skyfield", "leb"):
+            le.set_calc_mode(mode)
+            assert le.calc(JD, 2, 0)[1] == 0, mode
+        le.set_calc_mode("auto")

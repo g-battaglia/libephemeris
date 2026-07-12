@@ -665,6 +665,22 @@ def _implied_retflag_bits(flags: int) -> int:
     return extra
 
 
+def _calc_tt_epheflag_echo(retflag: int, raw_flags: int) -> int:
+    """calc() (TT) ephemeris-bit echo, measured on the reference API.
+
+    The reference's calc() echoes only the ephemeris-selection bits the
+    caller actually passed (calc(jd, body, 0) echoes retflag 0), while
+    calc_ut() adds the default SWIEPH bit. Strip the default-injected
+    ephemeris bit when the raw request carried none. Echo-only: the
+    computation keeps the normalized (defaulted) flags.
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    if not (raw_flags & (FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)):
+        return retflag & ~(FLG_JPLEPH | FLG_SWIEPH | FLG_MOSEPH)
+    return retflag
+
+
 def _exclusive_ephemeris_bit(flags: int) -> int:
     """Force exactly one ephemeris bit in the flag word.
 
@@ -1544,8 +1560,9 @@ def calc(
         if is_fixed_epoch_request(flags, _sidm):
             sub_xx, sub_rf = calc(tjdet, planet, fixed_epoch_request_flags(flags))
             xx_t0 = transform_fixed_epoch_result(sub_xx, flags, _sidm)
-            return _to_native_floats(xx_t0), _echo_request_bits(
-                fixed_epoch_retflag(sub_rf, flags), raw_flags
+            return _to_native_floats(xx_t0), _calc_tt_epheflag_echo(
+                _echo_request_bits(fixed_epoch_retflag(sub_rf, flags), raw_flags),
+                raw_flags,
             )
 
     # Built-in asteroids by AST_OFFSET number (see calc_ut)
@@ -1557,8 +1574,8 @@ def calc(
 
     if planet in (-MEAN_NODE, -TRUE_NODE):
         north_result, retflag = calc(tjdet, abs(planet), flags)
-        return _south_node_from_north(north_result, flags), _echo_request_bits(
-            retflag, raw_flags
+        return _south_node_from_north(north_result, flags), _calc_tt_epheflag_echo(
+            _echo_request_bits(retflag, raw_flags), raw_flags
         )
 
     # --- LEB fast path: use precomputed binary ephemeris if available ---
@@ -1577,8 +1594,9 @@ def calc(
             result = fast_calc.fast_calc_tt(reader, tjdet, planet, flags)
             get_logger().debug("body=%d jd=%.1f source=LEB", planet, tjdet)
             _record(planet, "LEB")
-            return _to_native_floats(result[0]), _echo_request_bits(
-                result[1] | _implied_retflag_bits(flags), raw_flags
+            return _to_native_floats(result[0]), _calc_tt_epheflag_echo(
+                _echo_request_bits(result[1] | _implied_retflag_bits(flags), raw_flags),
+                raw_flags,
             )
         except (KeyError, ValueError) as _leb_err:
             # missing body / out-of-range -> DEBUG, corruption -> WARNING
@@ -1603,8 +1621,9 @@ def calc(
             )
             get_logger().debug("body=%d jd=%.1f source=Horizons", planet, tjdet)
             _record(planet, "Horizons")
-            return _to_native_floats(result[0]), _echo_request_bits(
-                result[1] | _implied_retflag_bits(flags), raw_flags
+            return _to_native_floats(result[0]), _calc_tt_epheflag_echo(
+                _echo_request_bits(result[1] | _implied_retflag_bits(flags), raw_flags),
+                raw_flags,
             )
         except KeyError as _hz_err:
             get_logger().debug(
@@ -1650,7 +1669,9 @@ def calc(
             _record(planet, "Skyfield")
         # Apply output-format flags (XYZ, RADIANS) and echo them in retflag
         pos_out, rf_out = _finalize_output_flags(pos, retflag, flags)
-        return pos_out, _echo_request_bits(rf_out, raw_flags)
+        return pos_out, _calc_tt_epheflag_echo(
+            _echo_request_bits(rf_out, raw_flags), raw_flags
+        )
     except SkyfieldRangeError as e:
         raise _wrap_ephemeris_range_error(e, tjdet, planet) from e
     except ValueError as e:
