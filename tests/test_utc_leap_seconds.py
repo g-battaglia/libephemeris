@@ -582,3 +582,26 @@ class TestJulianCalendarLeapSecondPreserved:
         y, m, d, hh, mm, ss = ephem.jdut1_to_utc(jd_ut1, 0)
         assert (y, m, d) == (2020, 6, 2)
         assert abs((hh * 3600 + mm * 60 + ss) - (14 * 3600 + 30 * 60)) < 0.001
+
+
+class TestPre1972LeapSecondMessage:
+    """Pre-1972 dates at 23:59:60 get the plain 'invalid time' wording;
+    the '(no leap second!)' suffix is reserved for the UTC era (measured
+    on the reference API for 1971/1965/1900 vs 2000)."""
+
+    def test_pre_1972_plain_wording(self):
+        import pytest
+
+        from libephemeris.exceptions import Error
+
+        for y, m, d in ((1971, 12, 31), (1965, 6, 30), (1900, 1, 1)):
+            with pytest.raises(Error, match=r"^invalid time: 23:59:60\.00$"):
+                ephem.utc_to_jd(y, m, d, 23, 59, 60.0, 1)
+
+    def test_utc_era_keeps_suffix(self):
+        import pytest
+
+        from libephemeris.exceptions import Error
+
+        with pytest.raises(Error, match=r"no leap second"):
+            ephem.utc_to_jd(2000, 1, 1, 23, 59, 60.0, 1)

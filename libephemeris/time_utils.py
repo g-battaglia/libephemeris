@@ -700,8 +700,10 @@ def utc_to_jd(
         # Message parity (measured black-box): a structurally invalid time
         # (second >= 61, or second == 60 outside 23:59) gets the plain
         # "invalid time" wording with UNPADDED hour/minute; only the
-        # right-time-wrong-date case carries the "(no leap second!)" suffix.
-        if second >= 61.0 or hour != 23 or minute != 59:
+        # right-time-wrong-date case carries the "(no leap second!)" suffix,
+        # and that suffix is reserved for the UTC era — pre-1972 dates (no
+        # leap seconds existed) get the plain wording too.
+        if second >= 61.0 or hour != 23 or minute != 59 or check_year < 1972:
             raise Error(f"invalid time: {hour}:{minute}:{second:05.2f}")
         if not _is_leap_second_date(check_year, check_month, check_day):
             raise Error(
