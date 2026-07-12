@@ -205,3 +205,25 @@ class TestHousesEx2SpeedAccuracy:
         _, _, _, ascmc_speed = swe.houses_ex2(JD_J2000, 48.85, 2.35, ord("P"))
         # ascmc_speed[1] = MC speed
         assert abs(ascmc_speed[1]) > 10.0, f"MC speed too small: {ascmc_speed[1]}"
+
+
+class TestSunshineOutOfRangeAnalyticFallback:
+    """Dates outside the loaded ephemeris must not silently substitute
+    sun_dec=0.0: the Sunshine fetch falls back to an analytic solar
+    declination (Meeus ch. 25, ~0.01 deg), matching the reference's cusps
+    (JD 2200000.0 is outside the default medium tier)."""
+
+    def test_cusp_matches_reference_out_of_range(self):
+        import libephemeris as le
+
+        cusps, _ = le.houses(2200000.0, 41.9, 12.5, ord("I"))
+        # Reference API: cusp 5 = 262.631; sun_dec=0.0 gives 260.247.
+        assert abs(cusps[4] - 262.631) < 0.01
+
+    def test_analytic_declination_accuracy(self):
+        import libephemeris as le
+        from libephemeris.houses import _sun_declination_analytic
+
+        for jd in (2451545.0, 2460000.5, 2432000.5):
+            real = le.calc_ut(jd, le.SUN, le.FLG_EQUATORIAL)[0][1]
+            assert abs(_sun_declination_analytic(jd) - real) < 0.01, jd

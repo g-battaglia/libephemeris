@@ -93,6 +93,7 @@ from .planets import calc_ut
 from .cache import get_cached_nutation
 from .exceptions import (
     CalculationError,
+    EphemerisRangeError,
     Error,
     PolarCircleError,
     validate_coordinates,
@@ -635,6 +636,35 @@ def _calc_ascendant(
     )
 
 
+def _sun_declination_analytic(tjdut: float) -> float:
+    """Low-precision apparent solar declination (Meeus 1998, ch. 25).
+
+    Fallback for the Sunshine ('I'/'i') Sun-declination fetch when the
+    loaded ephemeris does not cover the date: the reference implementation
+    likewise falls back to an analytic solar position instead of failing,
+    and substituting 0.0 would silently bend the cusps (up to degrees at
+    high latitude). Accuracy ~0.01 deg — ample for cusp geometry.
+    """
+    t = (tjdut + _deltat(tjdut) - 2451545.0) / 36525.0
+    l0 = (280.46646 + 36000.76983 * t + 0.0003032 * t * t) % 360.0
+    m = math.radians((357.52911 + 35999.05029 * t - 0.0001537 * t * t) % 360.0)
+    c = (
+        (1.914602 - 0.004817 * t - 0.000014 * t * t) * math.sin(m)
+        + (0.019993 - 0.000101 * t) * math.sin(2.0 * m)
+        + 0.000289 * math.sin(3.0 * m)
+    )
+    omega = math.radians(125.04 - 1934.136 * t)
+    lon_app = math.radians(l0 + c - 0.00569 - 0.00478 * math.sin(omega))
+    eps = math.radians(
+        23.4392911111
+        - 0.0130041667 * t
+        - 1.639e-7 * t * t
+        + 5.036e-7 * t**3
+        + 0.00256 * math.cos(omega)
+    )
+    return math.degrees(math.asin(math.sin(eps) * math.sin(lon_app)))
+
+
 def houses(
     tjdut: float, lat: float, lon: float, hsys: int = ord("P"), iflag: int = 0
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -900,6 +930,11 @@ def houses(
             eph_flags = iflag & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
+        except EphemerisRangeError:
+            # Date outside the loaded ephemeris: analytic solar declination
+            # (the reference falls back analytically too; 0.0 would silently
+            # bend the cusps).
+            sun_dec = _sun_declination_analytic(tjdut)
         except (IndexError, TypeError, ValueError, CalculationError):
             # Fallback to 0 declination (same as equinox behavior)
             sun_dec = 0.0
@@ -1837,6 +1872,8 @@ def _houses_fixed_epoch_sidereal(
             eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             ascmc9 = sun_pos[1]
+        except EphemerisRangeError:
+            ascmc9 = _sun_declination_analytic(tjdut)
         except (IndexError, TypeError, ValueError, CalculationError):
             ascmc9 = 0.0
 
@@ -1969,6 +2006,8 @@ def houses_ex(
                 eph_flags = flags & (FLG_JPLEPH | FLG_SWIEPH)
                 sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
                 sun_dec = sun_pos[1]
+            except EphemerisRangeError:
+                sun_dec = _sun_declination_analytic(tjdut)
             except (IndexError, TypeError, ValueError, CalculationError):
                 sun_dec = 0.0
             _, eps = _house_armc_obliquity(tjdut)
