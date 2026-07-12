@@ -53,7 +53,7 @@ Isis-Transpluto, 2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0.0, 0.0, 0, Stru
 # credited to C. Woeltge (Hannover). No independent public publication of
 # these numbers is known, so they are carried here as interoperability
 # values: a black-box Keplerian fit against reference-API output positions
-# recovers this element set (see docs/methodology/independence-remediation-2026-07.md).
+# recovers this element set (see NOTICE.md, Calibration Data Disclosure).
 
 Nibiru, 1856113.380954, 1856113.380954, 0.0, 234.8921, 0.981092, 103.966, -44.567, 158.708, 0, interoperability elements (black-box output fit; concept credited to Woeltge C.)
 
@@ -95,7 +95,7 @@ Vulcan, 2415020.0, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212
 # Introduced in Russian astrological tradition (published as a circular
 # geocentric point with a 7-year cycle). The rate/radius digits here are
 # interoperability values verified by a black-box fit against
-# reference-API output (see docs/methodology/independence-remediation-2026-07.md).
+# reference-API output (see NOTICE.md, Calibration Data Disclosure).
 
 Selena, 2451545.0, JDATE, 242.2205555 + 5143.5418158 * T, 0.05280098949, 0.0, 0.0, 0.0, 0.0, 1, Russian-school 7-year circular convention; digits = interoperability values (black-box output fit)
 
@@ -105,7 +105,7 @@ Selena, 2451545.0, JDATE, 242.2205555 + 5143.5418158 * T, 0.05280098949, 0.0, 0.
 # credited to V. Abramov (Ukraine); no independent public publication of the
 # digits is known, so they are carried as interoperability values: a
 # black-box fit against reference-API output recovers them (see
-# docs/methodology/independence-remediation-2026-07.md).
+# NOTICE.md, Calibration Data Disclosure).
 
 Proserpina, 2415020.0, JDATE, 170.73, 79.225630, 0.0, 0.0, 0.0, 0.0, 0, interoperability elements (black-box output fit; concept credited to Abramov V.)
 
@@ -118,7 +118,7 @@ Proserpina, 2415020.0, JDATE, 170.73, 79.225630, 0.0, 0.0, 0.0, 0.0, 0, interope
 # (cf. Walters, D., "The Book on Vulcan", Dark Moon chapter; it differs from
 # Solar Fire's implementation and from Delphine Jay's ephemeris). The digits
 # are carried as interoperability values verified by a black-box fit against
-# reference-API output (see docs/methodology/independence-remediation-2026-07.md).
+# reference-API output (see NOTICE.md, Calibration Data Disclosure).
 # Geocentric body with retrograde nodal motion.
 
 Waldemath, 2414290.95827875, 2414290.95827875, 70.3407215 + 109023.2634989 * T, 0.0068400705250028, 0.1587, 8.14049594 + 2393.47417444 * T, 136.24878256 - 1131.71719709 * T, 2.5, 1, Waldemath G. 1898 published claims; digits = interoperability values (black-box output fit)

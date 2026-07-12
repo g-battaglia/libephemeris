@@ -611,7 +611,7 @@ Juno, Vesta (11 bodies)
    - PPN formula matching Skyfield's `apparent(deflectors=(10, 599, 699))`
    - Three deflectors: Sun (mass ratio 1.0), Jupiter (1047.3), Saturn (3497.9)
    - Evaluates deflector positions at both observation time and closest-approach time
-   - See [Algorithms & Theory](algorithms.md#gravitational-deflection) for details
+   - See [Algorithms & Theory](algorithms.md#9-gravitational-deflection) for details
 6. **Aberration** (unless disabled or helio/bary/truepos):
    - Classical first-order formula using Earth velocity
    - `u' = u + v/c - u*(u.v/c)`, renormalize
