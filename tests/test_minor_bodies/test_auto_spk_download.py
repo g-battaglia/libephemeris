@@ -679,3 +679,41 @@ class TestEnsureMajorAsteroidSpkForNonMajor:
         assert call_kwargs["body_id"] == "136199"
         assert call_kwargs["ipl"] == ERIS
         assert call_kwargs["naif_id"] == NAIF_ERIS
+
+
+class TestSpkType23TopocentricObserver:
+    """calc_spk_body_position (type-2/3 path) must honor FLG_TOPOCTR: the
+    observer was always the geocenter, silently dropping the diurnal
+    parallax (measured ~900" in longitude for a lunar-distance target at
+    lat 89)."""
+
+    def test_topocentric_differs_from_geocentric(self):
+        import os
+
+        import pytest
+
+        import libephemeris as le
+        from libephemeris import state
+        from libephemeris.spk import calc_spk_body_position
+
+        cands = [os.path.expanduser("~/.libephemeris/de440s.bsp")] + [
+            p for p in ("data/de440s.bsp", "data/de440.bsp") if os.path.exists(p)
+        ]
+        bsp = next((p for p in cands if os.path.exists(p)), None)
+        if bsp is None:
+            pytest.skip("no local DE kernel with NAIF 301")
+        state._SPK_BODY_MAP[999999] = (bsp, 301)
+        try:
+            if bsp not in state._SPK_KERNELS:
+                from skyfield.api import load_file
+
+                state._SPK_KERNELS[bsp] = load_file(bsp)
+            ts = state.get_timescale()
+            t = ts.tt_jd(2451545.0)
+            le.set_topo(0.0, 89.0, 0.0)
+            geo = calc_spk_body_position(t, 999999, 0)
+            topo = calc_spk_body_position(t, 999999, le.FLG_TOPOCTR)
+            dlon = abs(geo[0] - topo[0]) * 3600.0
+            assert dlon > 100.0, dlon  # lunar diurnal parallax, was 0.0
+        finally:
+            del state._SPK_BODY_MAP[999999]

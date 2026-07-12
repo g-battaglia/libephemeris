@@ -1502,6 +1502,7 @@ def calc_spk_body_position(
         FLG_SIDEREAL,
         FLG_NONUT,
         FLG_J2000,
+        FLG_TOPOCTR,
     )
 
     # Check if body is registered
@@ -1567,6 +1568,21 @@ def calc_spk_body_position(
 
     if is_heliocentric:
         observer = planets["sun"]
+    elif iflag & FLG_TOPOCTR:
+        # Topocentric observer, like the type-21 and planetary-moon paths;
+        # without this branch the diurnal parallax was silently dropped and
+        # a topocentric request returned the geocentric place.
+        topo = state.get_topo()
+        if topo is None:
+            from .exceptions import ConfigurationError
+
+            raise ConfigurationError(
+                "FLG_TOPOCTR requires a geographic position: "
+                "call set_topo(lon, lat, alt) first",
+                missing_config="observer_location",
+                suggestion="Call set_topo(lon, lat, alt) first",
+            )
+        observer = planets["earth"] + topo
     else:
         observer = planets["earth"]
 
