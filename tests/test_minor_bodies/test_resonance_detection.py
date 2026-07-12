@@ -514,3 +514,48 @@ class TestEdgeCases:
         # it might not match
         # This tests that the function handles edge case gracefully
         assert isinstance(result.is_resonant, bool)
+
+
+class TestAssistCacheKeyedOnElementValues:
+    """The propagation cache must key on the orbital-element VALUES: two
+    different orbits sharing a name (and window) previously aliased to the
+    same slot and the second returned the first's position."""
+
+    def test_cache_key_includes_element_values(self):
+        import pytest
+
+        try:
+            import assist  # noqa: F401
+            import rebound  # noqa: F401
+        except ImportError:
+            pytest.skip("rebound/assist not installed")
+        from libephemeris import rebound_integration as ri
+        from libephemeris.minor_bodies import OrbitalElements
+
+        e2 = OrbitalElements("X", 2460000.5, 30.0, 0.1, 5.0, 10.0, 20.0, 30.0, 0.2)
+        sentinel = object()
+        new_key = (
+            "X",
+            2460000.5,
+            30.0,
+            0.1,
+            5.0,
+            10.0,
+            20.0,
+            30.0,
+            0.2,
+            2460000.5,
+            round(2460365.5 * 86400.0),
+        )
+        old_key = ("X", 2460000.5, round(2460365.5 * 86400.0))
+        with ri._assist_propagation_cache_lock:
+            ri._assist_propagation_cache.clear()
+            ri._assist_propagation_cache[new_key] = sentinel
+            # A stale name-only entry must never be served.
+            ri._assist_propagation_cache[old_key] = object()
+        try:
+            got = ri.propagate_orbit_assist(e2, 2460000.5, 2460365.5)
+            assert got is sentinel
+        finally:
+            with ri._assist_propagation_cache_lock:
+                ri._assist_propagation_cache.clear()

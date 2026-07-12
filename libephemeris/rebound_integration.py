@@ -980,7 +980,21 @@ def propagate_orbit_assist(
         and A3 == 0.0
         and elements.name.lower() not in _ASSIST_ASTEROID_PERTURBER_NAMES
     ):
-        cache_key = (elements.name, float(jd_start), round(float(jd_end) * 86400.0))
+        # Key on the element VALUES, not just the name: two different orbits
+        # sharing a name (and window) must not alias to the same slot.
+        cache_key = (
+            elements.name,
+            float(elements.epoch),
+            float(elements.a),
+            float(elements.e),
+            float(elements.i),
+            float(elements.omega),
+            float(elements.Omega),
+            float(elements.M0),
+            float(elements.n),
+            float(jd_start),
+            round(float(jd_end) * 86400.0),
+        )
         with _assist_propagation_cache_lock:
             cached = _assist_propagation_cache.get(cache_key)
             if cached is not None:
