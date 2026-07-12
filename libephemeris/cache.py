@@ -7,7 +7,8 @@ This module provides LRU caches for expensive calculations that are called
 repeatedly with the same inputs. Key optimizations include:
 
 1. Nutation caching - IAU 2006/2000A nutation calculations (via pyerfa)
-2. Obliquity caching - True obliquity of the ecliptic (IAU 2006)
+2. Obliquity caching - mean/true obliquity of the ecliptic (Vondrák 2011
+   long-term mean obliquity + IAU 2000A nutation in obliquity)
 3. Timescale object caching - Skyfield timescale objects
 
 These caches significantly improve performance when calculating multiple
@@ -15,7 +16,8 @@ planetary positions for the same Julian Day (common in chart calculations).
 
 Precision:
     - Nutation: IAU 2006/2000A model via pyerfa (~0.01-0.05 mas precision)
-    - Obliquity: IAU 2006 model via pyerfa (consistent across all code paths)
+    - Obliquity: Vondrák 2011 long-term mean obliquity via pyerfa
+      (consistent across all code paths, valid at remote epochs)
 
 Thread Safety:
     The caches use functools.lru_cache which is thread-safe for reads but

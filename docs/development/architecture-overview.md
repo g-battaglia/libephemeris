@@ -172,15 +172,15 @@ observer position `earth.at(t)` is recomputed **30 times** (10 planets x
 #### 5. `erfa.nut06a()` (mitigated by cache)
 
 Would be expensive (~0.02ms per call with 1365 nutation terms), but the
-LRU cache in `cache.py` (128 entries) makes this negligible for same-JD
+LRU cache in `cache.py` (16 entries) makes this negligible for same-JD
 calculations. Cache hit: ~0.0001ms (200x speedup).
 
 ### 2.3 Existing Caching Infrastructure
 
 | Cached function              | Cache size | Underlying call    | Speedup |
 |------------------------------|------------|--------------------|---------| 
-| `get_cached_nutation(jd_tt)` | 128 entries| `erfa.nut06a()`    | 200x    |
-| `get_cached_obliquity(jd_tt)`| 128 entries| `erfa.obl06()` + nutation | 200x |
+| `get_cached_nutation(jd_tt)` | 16 entries | `erfa.nut06a()`    | 200x    |
+| `get_cached_obliquity(jd_tt)`| 16 entries | Vondrák 2011 mean obliquity + nutation | 200x |
 
 **What is NOT cached:**
 - Planet positions (every `calc_ut()` hits Skyfield every time)

@@ -12944,11 +12944,11 @@ def lun_eclipse_gamma(
         ifl: Calculation flags (FLG_SWIEPH, etc.)
 
     Returns:
-        Gamma value as a float:
-            - Positive: Moon passes north of shadow axis
-            - Negative: Moon passes south of shadow axis
-            - |gamma| ~ 0: Most central eclipse
-            - |gamma| > ~1.5: No eclipse
+        Gamma value as a float — the NON-NEGATIVE distance of the Moon's
+        center from the shadow axis in Earth radii (the reference attr[7]
+        channel is unsigned too; no north/south sign is carried):
+            - gamma ~ 0: Most central eclipse
+            - gamma > ~1.5: No eclipse
 
     Example:
         >>> from libephemeris import lun_eclipse_gamma, FLG_SWIEPH
