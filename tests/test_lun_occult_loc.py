@@ -129,10 +129,7 @@ class TestSweLunOccultWhenLoc:
 
         # At least one visibility flag should be set
         visibility_flags = (
-            ECL_VISIBLE
-            | ECL_MAX_VISIBLE
-            | ECL_1ST_VISIBLE
-            | ECL_4TH_VISIBLE
+            ECL_VISIBLE | ECL_MAX_VISIBLE | ECL_1ST_VISIBLE | ECL_4TH_VISIBLE
         )
         assert retflags & visibility_flags
 
@@ -173,9 +170,7 @@ class TestSweLunOccultWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
         geopos = [-96.797, 32.7767, 0.0]  # Dallas, 2024-04-08 path
 
-        retflags, tret, attr = lun_occult_when_loc(
-            jd_start, 0, geopos, FLG_SWIEPH
-        )
+        retflags, tret, attr = lun_occult_when_loc(jd_start, 0, geopos, FLG_SWIEPH)
         assert retflags != 0
         assert tret[0] > jd_start
 
@@ -380,3 +375,26 @@ class TestLunOccultWhenLocLegacy:
         )
 
         assert times[0] > jd_start
+
+
+class TestIntegerStarIdRoutesToStarPath:
+    """Integer fixed-star ids (e.g. REGULUS=1000001) must behave exactly
+    like the star name in when_loc/where — they crashed with a raw
+    KeyError while when_glob/calc_ut accepted them."""
+
+    def test_when_loc_int_equals_str(self):
+        import libephemeris as le
+
+        jd = le.julday(2024, 1, 1, 0)
+        r_int = le.lun_occult_when_loc(jd, le.REGULUS, [12.5, 41.9, 0])
+        r_str = le.lun_occult_when_loc(jd, "Regulus", [12.5, 41.9, 0])
+        assert r_int[0] == r_str[0]
+        assert all(abs(a - b) < 1e-9 for a, b in zip(r_int[1], r_str[1]))
+
+    def test_where_int_equals_str(self):
+        import libephemeris as le
+
+        w_int = le.lun_occult_where(2460883.3934, le.REGULUS)
+        w_str = le.lun_occult_where(2460883.3934, "Regulus")
+        assert w_int[0] == w_str[0]
+        assert all(abs(a - b) < 1e-9 for a, b in zip(w_int[1], w_str[1]))

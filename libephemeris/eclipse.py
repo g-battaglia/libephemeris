@@ -550,6 +550,15 @@ def _occ_body_topo(
 
         pos, _name, _retflags = fixstar_ut(body, tjd_ut, _ecl_eph_flags(flags))
         return (float(pos[0]), float(pos[1]), float(pos[2]))
+    from .fixed_stars import FIXED_STARS
+
+    if body in FIXED_STARS:
+        # Integer fixed-star id (calc_ut dispatches these by id): geocentric
+        # like the str branch — the diurnal parallax is far below the
+        # occultation tolerances. Without this, the id fell through to the
+        # planet machinery and leaked a raw KeyError.
+        pos, _ = calc_ut(tjd_ut, body, _ecl_eph_flags(flags))
+        return (float(pos[0]), float(pos[1]), float(pos[2]))
     if body == SUN:
         sun_p, _moon_p = _topo_sun_moon(tjd_ut, geopos, reader)
         return sun_p
@@ -6447,13 +6456,23 @@ def lun_occult_when_loc(
     lat = geopos[1]
     altitude = geopos[2]
 
-    # Determine if body is planet ID or star name
+    # Determine if body is planet ID or star name. Integer fixed-star ids
+    # route through the star path like calc_ut / lun_occult_when_glob
+    # (dispatch by id); without this they fell through to the planet
+    # machinery and leaked a raw KeyError.
     if isinstance(body, str):
         planet = 0
         star_name = body
     else:
-        planet = body
-        star_name = ""
+        from .fixed_stars import FIXED_STARS as _FS
+        from .fixed_stars import get_canonical_star_name as _star_name_by_id
+
+        if body in _FS:
+            planet = 0
+            star_name = _star_name_by_id(body) or ""
+        else:
+            planet = body
+            star_name = ""
 
     # bools/ints keep their flag bits (ECL_ONE_TRY rides on the int);
     # direction strings are coerced to a plain 0/1.
@@ -6546,6 +6565,14 @@ def lun_occult_where(
     Returns:
         Tuple of (retflag, geopos, attr) matching the reference ephemeris.
     """
+    if isinstance(body, int):
+        from .fixed_stars import FIXED_STARS as _FS
+        from .fixed_stars import get_canonical_star_name as _star_name_by_id
+
+        if body in _FS:
+            # Integer fixed-star id: same star path as a str name (see
+            # lun_occult_when_loc).
+            body = _star_name_by_id(body) or body
     return _call_with_leb_skyfield_fallback(
         _lun_occult_where_internal,
         tjdut,
