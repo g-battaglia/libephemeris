@@ -932,7 +932,7 @@ HYPOTHETICAL_ELEMENTS: Dict[int, HypotheticalElements] = {
         # V. Abramov; no public publication of the digits is known — they
         # are interoperability values recovered by a black-box fit against
         # reference-API output, see data/fictitious_orbits.csv and
-        # docs/methodology/independence-remediation-2026-07.md).
+        # NOTICE.md, Calibration Data Disclosure).
         epoch=2415020.0,  # J1900.0
         a=79.225630,  # Semi-major axis in AU (interoperability value)
         e=0.0,  # Circular orbit
@@ -1094,7 +1094,7 @@ class WaldemathElements:
 # data/fictitious_orbits.csv: the digits are the reconstruction circulating
 # in the astrological community, held as interoperability values verified
 # against reference-API output (see the CSV row and
-# docs/methodology/independence-remediation-2026-07.md).
+# NOTICE.md, Calibration Data Disclosure).
 # The elements are referred to the ecliptic and
 # equinox of the 1898 epoch and are propagated with per-century rates, so the
 # orbit is eccentric (e=0.1587) and inclined (i=2.5 deg) - NOT the circular

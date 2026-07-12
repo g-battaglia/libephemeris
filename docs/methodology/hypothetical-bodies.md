@@ -59,7 +59,7 @@ elements referred to J2000, **derived** as:
 
 Circular-orbit convention credited to V. Abramov (Tartu); no public
 publication of the digits is known, so they are interoperability values
-(black-box output fit — see independence-remediation-2026-07.md §3). CSV
+recovered by a black-box output fit against the reference API. CSV
 row: epoch J1900, a = 79.225630 AU, circular, M0 = 170.73°. Gate: exact
 equality live↔CSV.
 
@@ -75,8 +75,7 @@ circular convention; digits are interoperability values) and Waldemath
 (1898 published claims; the fully-specified digits are interoperability
 values). "Interoperability values" means: no public publication of the
 digits is known and they are held as black-box fits against
-reference-API output — see independence-remediation-2026-07.md §3.
-These are propagated directly from the CSV.
+reference-API output. These are propagated directly from the CSV.
 
 ## CSV ↔ publication cross-check
 
@@ -87,8 +86,7 @@ spot-checked against the values in standard astrological-software element
 sets that credit the same sources (Neely's published refinement is the
 set the reference distribution also credits). For the rows classified as
 interoperability values no publication exists to check against; their
-provenance is the documented black-box output fit
-(independence-remediation-2026-07.md §3).
+provenance is the documented black-box output fit.
 
 ## Legacy display tables (disclosed, frozen)
 

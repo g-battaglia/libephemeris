@@ -107,17 +107,14 @@ specifically expect them; the default `smh2016` is the recommended choice.
 > but leaves `"skyfield"`-mode positions unchanged. This is a pre-existing property
 > of all three overrides, not specific to the model selector.
 
-## 4. Independence
+## 4. Model provenance
 
-libephemeris is independent of the reference (copyleft) Swiss Ephemeris; it
-depends only on permissively-licensed tooling (Skyfield/pyerfa, both MIT/BSD).
 Of the two ΔT models above, ``espenak_meeus`` is a native reimplementation
 from published coefficients, while the default ``smh2016`` is obtained from
 Skyfield's own implementation. When exact parity with another engine's ΔT is
-required for a controlled
-comparison, that engine's ΔT can be injected from the *outside* via
-`set_delta_t_userdef`, isolating the pure ephemeris-model difference from the ΔT
-choice.
+required for a controlled comparison, that engine's ΔT can be injected from
+the *outside* via `set_delta_t_userdef`, isolating the pure ephemeris-model
+difference from the ΔT choice.
 
 ## 5. Validation
 

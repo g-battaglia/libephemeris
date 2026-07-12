@@ -1,7 +1,6 @@
 # Functional Specification — Galilean Satellite Module (Lieske E5)
 
-**Status:** clean-room specification (dirty-room artifact).
-**Audience:** the clean-room implementer of `libephemeris/moon_theories/galilean.py`.
+Functional specification of `libephemeris/moon_theories/galilean.py`.
 **Sources of all mathematics and coefficients below:**
 
 - Lieske, J.H. (1998). "Galilean satellite ephemerides E5." *Astronomy &
@@ -581,34 +580,3 @@ one satellite** means one mistranscribed coefficient in that satellite's
 tables — recheck §4 against your implementation term by term; a
 **broadband sub-centimetre residual** means floating-point re-association
 — recheck §7.
-
-## 9. Process rules (clean-room expression independence)
-
-The implementer:
-
-- Works from **this document only**. Must not read: the existing
-  `libephemeris/moon_theories/galilean.py` (overwrite it blind), its git
-  history, `THIRD_PARTY_NOTICES.md`, or any PyMeeus source in any form.
-- Chooses identifier names and code organization independently. A
-  **table-driven** layout (module-level coefficient tables + small generic
-  series evaluators) is recommended; descriptive English names are
-  preferred. Literature symbol names (as documented notation in comments)
-  are acceptable.
-- Writes all docstrings/comments fresh, citing Lieske (1998) A&AS 129,
-  205 and Meeus (1998) ch. 44 as the theory sources — never any prior
-  implementation.
-- Module header, exactly these first two lines:
-  ```
-  # SPDX-License-Identifier: Apache-2.0
-  # Copyright (c) 2025-2026 Giacomo Battaglia
-  ```
-- Style: `from __future__ import annotations`; Google-style docstrings
-  with Args/Returns; line length 88; double quotes; module docstring
-  describing theory, accuracy (~100–200 km ≈ 0.05″ at Jupiter distance),
-  frame conventions (Jupiter-centric J2000 ecliptic, km, JD as TT, no
-  light-time), and the §5/§6.2 fixed-J2000 adaptations.
-
----
-
-*Spec prepared 2026-06-12 as part of the Galilean clean-room rewrite; see
-`docs/methodology/galilean-clean-room-2026-06.md` for the process record.*

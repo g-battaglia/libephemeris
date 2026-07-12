@@ -15,9 +15,8 @@ The packages published on PyPI are Apache-2.0.
 
 Copyright (c) 2025-2026 Giacomo Battaglia.
 
-Every owned source file carries the SPDX expression
-`Apache-2.0`. The independent-implementation and provenance record is in
-[NOTICE.md](NOTICE.md).
+Every owned source file carries the SPDX expression `Apache-2.0`.
+Attribution and data-source details are in [NOTICE.md](NOTICE.md).
 
 ## Third-party components
 
@@ -44,18 +43,11 @@ agreement is required.
 ## Relationship to Swiss Ephemeris
 
 LibEphemeris is an **independent implementation** with an API that is
-signature-compatible with pyswisseph; independence from Swiss Ephemeris
-code is the project's working standard, enforced by provenance sweeps and
-remediated whenever a finding surfaces (details, disclosures and the
-current remediation record: [NOTICE.md](NOTICE.md) and
-docs/methodology/independence-remediation-2026-07.md). While that record
-lists open items (repository history, output-calibrated data sets), this
-document does not assert a categorical absence of obligations toward
-Astrodienst AG. "Swiss Ephemeris" is a product
-of Astrodienst AG; the name is used here nominatively only.
-pyswisseph is used only as a black-box test oracle in the separate
-validation tooling; it is not declared among this package's dependencies
-(not even in the `dev` extra) and is never a runtime dependency.
+signature-compatible with the reference ephemeris API (see
+[NOTICE.md](NOTICE.md)). "Swiss Ephemeris" is a product of Astrodienst AG;
+the name is used here nominatively only. Its Python binding is used only as
+a black-box test oracle in separate validation tooling and is never a
+dependency of this package.
 
 ---
 

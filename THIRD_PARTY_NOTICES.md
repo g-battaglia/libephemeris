@@ -20,12 +20,11 @@ covered by the project's Apache-2.0 license, but they are all permissively
 
 The Galilean satellite module (`libephemeris/moon_theories/galilean.py`)
 was, through v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. It was
-**rewritten clean-room in June 2026** from the published theory (Lieske,
-J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129, 205; Meeus 1998,
-*Astronomical Algorithms*, ch. 44) and is now owned by the project under
-the Apache-2.0 license. See
-[docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md)
-for the process and independence record.
+rewritten in June 2026 as an independent implementation of the published
+theory (Lieske, J.H. 1998, "Galilean satellite ephemerides E5", A&AS 129,
+205; Meeus 1998, *Astronomical Algorithms*, ch. 44) and is now owned by
+the project under the Apache-2.0 license. Theory specification:
+[docs/methodology/galilean-e5-spec.md](docs/methodology/galilean-e5-spec.md).
 
 ### MIT license text (spktype21, TASS 1.7 port)
 

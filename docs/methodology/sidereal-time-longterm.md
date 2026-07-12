@@ -93,11 +93,10 @@ difference is the library's own ΔT, so houses and positions share one ΔT.
   *same* obliquity realization and the *same* ΔT. Using one model for positions and
   another for houses can place a body on the wrong side of a cusp at remote epochs
   even when each piece is individually "reasonable".
-* **Independence and verifiability.** Every coefficient comes from the cited
-  peer-reviewed papers (Vondrák 2011 + corrigendum; Simon 1994) and the IAU 2006
-  GMST expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567). Nothing is
-  fitted to, or copied from, any other software's output or source code — it is a
-  direct, auditable implementation of published physics.
+* **Verifiability.** Every coefficient comes from the cited peer-reviewed
+  papers (Vondrák 2011 + corrigendum; Simon 1994) and the IAU 2006 GMST
+  expression (Capitaine, Wallace & Chapront 2003, A&A 412, 567) — a direct,
+  auditable implementation of published physics.
 
 ## The one honest caveat: ΔT at remote epochs
 

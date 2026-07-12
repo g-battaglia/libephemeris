@@ -22,7 +22,7 @@ License: Apache-2.0, except the
          TASS 1.7 port from Stellarium (`tass17.py`, `tass17_data.py`),
          which is MIT. The Galilean theory is an independent
          implementation from Lieske 1998 / Meeus ch. 44 (see
-         docs/methodology/galilean-clean-room-2026-06.md).
+         docs/methodology/galilean-e5-spec.md).
 """
 
 from .constants import (

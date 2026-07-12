@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """Third-party-source provenance sweep (zero-hit CI gate).
 
-Re-runs the fingerprint greps recorded in
-``docs/methodology/provenance-sweep-2026-06.md`` and
-``docs/methodology/galilean-clean-room-2026-06.md`` over the shipped
-package:
+Fingerprint greps over the shipped package:
 
   class 1 — SE source-file references (swehouse, swecl.c, sweph.c, ...)
   class 2 — SE implementation identifiers (swed, dgsect, xs1, mdd, ...)
@@ -77,10 +74,7 @@ SCAN_SUFFIXES = (
 ALLOWLIST = frozenset(
     {
         "scripts/check_provenance.py",
-        "docs/methodology/provenance-sweep-2026-06.md",
-        "docs/methodology/galilean-clean-room-2026-06.md",
         "docs/methodology/galilean-e5-spec.md",
-        "docs/methodology/independence-remediation-2026-07.md",
         # The legal/notice files record the retired-source remediation at the
         # implementation level (they must name swehouse.c, PyMeeus, LGPL to
         # say what was removed), so every class legitimately appears.

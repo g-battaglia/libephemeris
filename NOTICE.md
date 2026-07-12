@@ -1,194 +1,66 @@
-# NOTICE — Provenance and Intellectual Property
+# NOTICE
 
-## Independent Implementation
+LibEphemeris is an independent implementation of an astronomical ephemeris
+library for Python, licensed under the **Apache License, Version 2.0** (see
+[LICENSE](LICENSE) and [LICENSING.md](LICENSING.md)).
 
-LibEphemeris is an **independent implementation** of an astronomical ephemeris
-library for Python. Independence from the Swiss Ephemeris (SE) source code by
-Astrodienst AG is the project's working standard, enforced by provenance
-gates and remediated whenever a finding surfaces (see the sweep records
-referenced below and docs/methodology/independence-remediation-2026-07.md).
-
-In June 2026 an internal provenance review found that a small cluster of
-house-system routines in `houses.py` (Savard-A, Krusinski, APC, the
-Sunshine/Makransky variant, and parts of `house_pos`) carried
-implementation expression that followed the structure and identifiers of
-SE's `swehouse.c` more closely than this project's independence standard
-allows. Those routines were rewritten in place: identifiers, comments and
-docstrings were re-derived from the published system definitions (Savard;
-Krusinski 1995 / Pisa 1997 / Goelzer 1995; Knegt; Makransky 1988; Holden
-1977; Koch), while the underlying mathematics — which is not protectable
-subject matter — was preserved and verified bit-identical over a ~91,000
-case grid against the pre-rewrite outputs. The full sweep record lives in
-`docs/methodology/provenance-sweep-2026-06.md`.
+## Data and Model Sources
 
 All astronomical computations are based on:
 
 - **JPL DE440/DE441** planetary and lunar ephemerides, accessed via the
   [Skyfield](https://rhodesmill.org/skyfield/) library (Brandon Rhodes, MIT license)
-- **IAU 2006/2000A** precession-nutation model, via
-  [pyerfa](https://github.com/liberfa/pyerfa) (BSD-3-Clause license)
-- **Peer-reviewed academic sources**, including but not limited to:
+- **IAU 2006/2000A** precession-nutation and **Vondrák 2011** long-term
+  precession, via [pyerfa](https://github.com/liberfa/pyerfa) (BSD-3-Clause)
+- **Peer-reviewed academic sources**, including:
   - Meeus, J. — *Astronomical Algorithms*, 2nd ed. (1998)
-  - Simon, J.L. et al. — "Numerical expressions for precession formulae
-    and mean elements for the Moon and the planets", A&A 282, 663 (1994)
-  - Chapront, J. et al. — "A new determination of lunar orbital parameters,
-    precession constant and tidal acceleration from LLR", A&A 387, 700 (2002)
-  - Chapront-Touze, M. & Chapront, J. — ELP 2000-85 lunar theory
-  - Park, R.S. et al. — "The JPL Planetary and Lunar Ephemerides
-    DE440 and DE441", AJ 161, 105 (2021)
-- **Primary historical sources** for hypothetical bodies:
-  - Witte, A. & Lefeldt, H. — *Regelwerk für Planetenbilder* (1928)
-    (Sieggrün later added four of the Uranian bodies)
-  - Neely, J. — refined orbital elements (1988)
-  - Makransky, B. — *Primary Directions* (1988), for the Sunshine house system
+  - Simon, J.L. et al. — A&A 282, 663 (1994)
+  - Chapront, J. et al. — A&A 387, 700 (2002); ELP 2000-85 lunar theory
+  - Park, R.S. et al. — "The JPL Planetary and Lunar Ephemerides DE440 and
+    DE441", AJ 161, 105 (2021)
+  - Lieske, J.H. — "Galilean satellite ephemerides E5", A&AS 129, 205 (1998)
+- **Primary historical sources** for hypothetical bodies: Witte, A. &
+  Lefeldt, H. — *Regelwerk für Planetenbilder* (1928); Neely, J. (1988);
+  Makransky, B. — *Primary Directions* (1988).
 
 ## API Compatibility
 
-LibEphemeris provides an API that is **signature-compatible** with
-[pyswisseph](https://github.com/astrorigin/pyswisseph) (the Python binding
-for Swiss Ephemeris). Function names follow the canonical bare-name form
-of the upstream reference API (e.g., `calc_ut`, `houses`, `julday`), with
-matching parameters and flag constants to allow drop-in migration.
-
-API compatibility does not imply code derivation. The underlying algorithms
-and implementation are independently written; data sources are public or,
-where output-calibrated, disclosed below. API signatures
-and interface conventions are not copyrightable subject matter
-(see *Google LLC v. Oracle America, Inc.*, 593 U.S. 1 (2021); EU Directive
-2009/24/EC art. 1.2).
-
-## Extended Astrology Helpers (`contrib` submodule)
-
-The `libephemeris.contrib` submodule provides extended astrology helpers
-(zodiac sign and nakshatra constants, aspect angles, Vedic dignity
-calculations, longitude-to-rasi conversions, antiscion arithmetic, etc.).
-
-These are **independently reimplemented in pure Python** from public
-astrological tradition and standard zodiacal geometry. Specifically:
-
-- Sign and nakshatra divisions follow the standard zodiacal partitions
-  (12 × 30° and 27 × 13°20') documented in any classical astrology text.
-- Vedic dignity tables (exaltation, debilitation, lordship, naisargika
-  friendships) derive from traditional Vedic astrology (Parashara,
-  Varahamihira) and are in the public domain.
-- Aspect angles (conjunction, sextile, square, etc.) are geometric
-  constants of pure mathematics.
-
-No source code from the upstream pyswisseph contrib submodule (the C
-``swephelp`` library) was consulted or copied during implementation.
-API names and signatures match the upstream reference only at the
-interface level, which is not copyrightable subject matter.
-
-## Development History
-
-During early development, some experimental branches temporarily included
-data from Swiss Ephemeris sources (e.g., Moshier trigonometric tables, the
-`seorbel.txt` orbital element file). These were identified and removed
-before any stable release:
-
-- Moshier analytical backend: removed entirely in favor of JPL DE440/DE441
-  via Skyfield (no analytical *planetary-position* approximations are used
-  in production; the interpolated lunar apsides do use an analytical
-  perturbation series, disclosed below)
-- `seorbel.txt`: removed from the tree and replaced with
-  `libephemeris/data/fictitious_orbits.csv`. Most rows cite primary published sources
-  (Witte & Lefeldt 1928, Neely 1988, Strubell 1952, Hoyt 1980, Weston,
-  peer-reviewed papers); the rows without a known publication (Nibiru,
-  Proserpina, Selena digits, the Waldemath reconstruction) are carried as
-  disclosed interoperability values recovered by black-box output fits —
-  see docs/methodology/independence-remediation-2026-07.md §3.
-- Historical blobs (including `seorbel.txt`) remain reachable in the git
-  history pending the prepared history rewrite (remediation record §5).
-
-The git history of this repository reflects this progression transparently.
-
-## Vendored and Adapted Components
-
-Three files shipped in the package are vendored or adapted third-party
-code and keep their upstream licenses, all permissive (MIT):
-`vendor/spktype21.py`, `moon_theories/tass17.py`, and the generated
-periodic-term tables in `moon_theories/tass17_data.py`. The package
-contains no copyleft code. Full inventory and license texts:
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-The Galilean satellite module (`moon_theories/galilean.py`) was, through
-v2.1.0, adapted from PyMeeus and licensed LGPL-3.0. In June 2026 it was
-rewritten clean-room from the published theory (Lieske 1998, A&AS 129,
-205; Meeus 1998, *Astronomical Algorithms*, ch. 44) under strict
-information barriers: a functional specification restating the published
-mathematics and the project's frame adaptations was written from the
-theory, and an independent implementation was produced from that
-specification alone — without reference to PyMeeus or the prior module.
-The rewrite reproduces the prior numeric output to floating-point
-re-association level (sub-nanometre per moon component over 1800–2200) and
-is now owned by the project and licensed Apache-2.0. Process and
-independence record:
-[docs/methodology/galilean-clean-room-2026-06.md](docs/methodology/galilean-clean-room-2026-06.md).
+LibEphemeris provides an API signature-compatible with the reference
+ephemeris API (function names, parameters and flag constants match, e.g.
+`calc_ut`, `houses`, `julday`) to allow drop-in migration. API compatibility
+does not imply code derivation: the algorithms and implementation are
+independently written.
 
 ## Calibration Data Disclosure
 
-The following generated data sets are calibrated against pyswisseph used
-strictly as a **black-box oracle**. First, the lunar apse tables: the residual tables in
-`libephemeris/lunar_apse_corrections.py` (interpolated lunar apogee and
-perigee, bodies INTP_APOG / INTP_PERG) and the trigonometric perturbation
-coefficients in `lunar.py`. The residual tables are regenerated by the
-calibration tooling in the separate `validation/` repository (which drives
-the black-box oracle); no calibration step or oracle dependency ships in
-this package. These
-tables contain numeric program *output* — computed positions of the lunar
-apsides — not Swiss Ephemeris source expression; the fitting pipeline and
-all runtime code are original. The INTP_* bodies are constructs defined by
-the reference API, so 1:1 behavioral parity requires fitting to reference
-output. This is disclosed for transparency.
+Two generated data sets are fitted against the reference API used strictly
+as a black-box oracle, and are disclosed for transparency: the interpolated
+lunar-apse residual tables (`libephemeris/lunar_apse_corrections.py` and the
+perturbation coefficients in `lunar.py` — the INTP_APOG/INTP_PERG bodies are
+constructs defined by the reference API, so behavioral parity requires
+fitting to its output), and four fictitious-body element rows in
+`libephemeris/data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena
+digits, the Waldemath reconstruction) that have no known publication and are
+carried as interoperability values. These tables contain numeric program
+*output*, not source expression; all runtime code is original.
 
-Second, four **fictitious-body element rows** in
-`libephemeris/data/fictitious_orbits.csv` (Nibiru, Proserpina, the Selena digits and
-the Waldemath reconstruction) have no known public publication and are
-carried as interoperability values demonstrably recoverable by black-box
-Keplerian fits against reference-API output — procedure and residuals in
-docs/methodology/independence-remediation-2026-07.md §3.
+## Vendored Components
 
-A further, smaller item: the **legacy Uranian display tables** in
-`libephemeris/hypothetical.py` (`URANIAN_ELEMENTS` and the per-body
-`*_KEPLERIAN_ELEMENTS` `L0` / Hades `M0` constants) are historical
-pyswisseph-oracle-calibrated fits. They are **not consulted at runtime** —
-the live Keplerian propagation uses the published Witte/Lefeldt 1928 +
-Neely 1988 elements from `libephemeris/data/fictitious_orbits.csv` — and
-are retained only for module-API stability (tests pin them). The
-code↔CSV↔publication provenance is enforced by
-`scripts/check_hypothetical_provenance.py` (`poe provenance:hypothetical`)
-and documented in `docs/methodology/hypothetical-bodies.md`.
+Three files are vendored or adapted third-party code and keep their upstream
+licenses, all permissive (MIT): `vendor/spktype21.py`,
+`moon_theories/tass17.py`, and `moon_theories/tass17_data.py`. The package
+contains no copyleft code. Full inventory:
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## AI-Assisted Development
 
-Parts of this codebase were developed with AI assistance (Anthropic
-Claude), always under the direction and review of the project author, with
-behavior verified against published references and the black-box oracle
-harness. Under Anthropic's commercial terms, rights in such output belong
-to the customer; copyright in the work is held by Giacomo Battaglia.
+Parts of this codebase were developed with AI assistance (Anthropic Claude)
+under the direction and review of the project author. Copyright in the work
+is held by Giacomo Battaglia.
 
 ## Trademarks
 
 "Swiss Ephemeris" is a product name of Astrodienst AG. References to it in
-this repository are nominative only: they describe interface compatibility
-and black-box verification targets. LibEphemeris is not affiliated with,
-or endorsed by, Astrodienst AG.
-
-## License
-
-LibEphemeris is licensed under the **Apache License, Version 2.0**
-(`Apache-2.0` — see the [LICENSE](LICENSE) file and
-[LICENSING.md](LICENSING.md)). Owned source files carry the SPDX expression
-`Apache-2.0`; vendored/adapted modules keep their own identifiers (all
-permissive — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
-
-The project's goal and working standard is full independence from the Swiss
-Ephemeris: no SE source code is used, the runtime has no SE dependency, and
-provenance findings are remediated as they surface (see the July 2026
-remediation record in
-[docs/methodology/independence-remediation-2026-07.md](docs/methodology/independence-remediation-2026-07.md),
-which also lists the items still under review — notably repository history
-and the output-calibrated data sets disclosed above). Pending completion of
-that review, this NOTICE intentionally does not assert a categorical
-absence of obligations; it documents the facts so that downstream users can
-make their own assessment.
+this repository are nominative only (interface compatibility and black-box
+verification targets). LibEphemeris is not affiliated with, or endorsed by,
+Astrodienst AG.

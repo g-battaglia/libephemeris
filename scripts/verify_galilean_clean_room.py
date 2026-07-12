@@ -21,7 +21,7 @@ Usage:
     .venv/bin/python scripts/verify_galilean_clean_room.py --check tasks/results/galilean_baseline.json
     .venv/bin/python scripts/verify_galilean_clean_room.py compare [--spk path/to/jup365.bsp]
 
-Grid design (see docs/methodology/galilean-clean-room-2026-06.md):
+Grid design:
     * 1800-01-01 .. ~2200-01 every 16 days (9132 epochs) — two centuries of
       margin around the 1900-2100 pyswisseph comparison window, wide enough
       that any frame/precession mistake that grows with |t - J2000| blows
