@@ -66,7 +66,9 @@ COMPRESSION_ZSTD_TRUNC_SHUFFLE = (
 
 # LEB2 v2 chunk index constants (10-year temporal chunks per body)
 CHUNK_INTERVAL_DAYS = 10 * 365.25  # 10 years in days
-CHUNK_INDEX_HEADER_FMT = "<IIfI"  # chunk_count, reserved, chunk_interval_days, reserved2
+CHUNK_INDEX_HEADER_FMT = (
+    "<IIfI"  # chunk_count, reserved, chunk_interval_days, reserved2
+)
 CHUNK_INDEX_HEADER_SIZE = struct.calcsize(CHUNK_INDEX_HEADER_FMT)  # 16
 CHUNK_ENTRY_FMT = "<ddQQQII"  # jd_start, jd_end, blob_offset, compressed_size, uncompressed_size, segment_start, segment_count
 CHUNK_ENTRY_SIZE = struct.calcsize(CHUNK_ENTRY_FMT)  # 48
@@ -523,9 +525,7 @@ def write_chunk_index_header(
     )
 
 
-def read_chunk_index_header(
-    data: Any, offset: int
-) -> tuple:
+def read_chunk_index_header(data: Any, offset: int) -> tuple:
     """Unpack a chunk index header. Returns (chunk_count, chunk_interval_days)."""
     fields = struct.unpack_from(CHUNK_INDEX_HEADER_FMT, data, offset)
     return fields[0], fields[2]  # chunk_count, chunk_interval_days

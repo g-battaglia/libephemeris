@@ -1336,6 +1336,7 @@ class OrbitalElements:
 
     The orbital elements file format defines orbital elements
     for fictitious bodies. Each line contains 9 comma-separated fields:
+
         1. epoch: Reference epoch (Julian day or "J1900", "B1950", "J2000")
         2. equinox: Coordinate equinox (Julian day, "J1900", "B1950", "J2000", or "JDATE")
         3. mean_anomaly: Mean anomaly at epoch (degrees, may include T-polynomial)
@@ -1347,7 +1348,9 @@ class OrbitalElements:
         9. name: Body name (may include ", geo" suffix for geocentric bodies)
 
     T-polynomials allow elements to have secular variations, expressed as:
+
         "constant + rate * T"
+
     where T is Julian centuries from the epoch.
 
     Attributes:
@@ -1555,70 +1558,28 @@ def _parse_t_polynomial(expr: str) -> TPolynomial:
 
 
 def parse_orbital_elements(filepath: Union[str, Path]) -> List[OrbitalElements]:
-    """
-    Parse an orbital elements file to extract orbital elements.
+    """Parse a custom hypothetical-body orbital-elements file.
 
-    The orbital elements file format defines orbital elements for fictitious/hypothetical
-    bodies. This function parses the file and returns a list of OrbitalElements
-    objects that can be used to compute positions of custom hypothetical bodies.
-
-    File Format:
-        - Lines starting with '#' (after optional whitespace) are comments
-        - Empty or whitespace-only lines are ignored
-        - Each data line has 9 comma-separated fields:
-            1. epoch: Reference epoch (Julian day or "J1900", "B1950", "J2000")
-            2. equinox: Coordinate equinox (Julian day, "J1900", "B1950", "J2000", or "JDATE")
-            3. mean_anomaly: Mean anomaly at epoch (degrees, may include "+ rate * T")
-            4. semi_axis: Semi-major axis (AU)
-            5. eccentricity: Orbital eccentricity (may include T-polynomial)
-            6. arg_perihelion: Argument of perihelion (degrees, may include T-polynomial)
-            7. asc_node: Longitude of ascending node (degrees, may include T-polynomial)
-            8. inclination: Orbital inclination (degrees, may include T-polynomial)
-            9. name: Body name (may include ", geo" suffix for geocentric bodies)
-        - Inline comments can appear after the 9th field, starting with '#'
-
-    T-Polynomials:
-        Some orbital elements can be expressed as polynomials in T, where
-        T is Julian centuries from the epoch. For example:
-            "252.8987988 + 707550.7341 * T"
-        This represents an element that changes linearly with time.
-
-    Geocentric Bodies:
-        If the name field contains ", geo" (case-insensitive), the body is
-        marked as geocentric (orbiting Earth rather than the Sun).
+    Data lines contain nine comma-separated fields: epoch, equinox, mean
+    anomaly, semi-major axis, eccentricity, argument of perihelion, ascending
+    node, inclination, and body name. Blank lines and lines beginning with
+    ``#`` are ignored. Supported elements may use a linear polynomial in
+    Julian centuries, for example ``252.8987988 + 707550.7341 * T``.
 
     Args:
-        filepath: Path to the orbital elements file
+        filepath: Path to the orbital-elements file.
 
     Returns:
-        List of OrbitalElements objects, one for each valid data line.
-        The list preserves the order of bodies as they appear in the file.
+        Parsed ``OrbitalElements`` objects in file order.
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If a line cannot be parsed (with line number in message).
+        ValueError: If a data line cannot be parsed.
 
     Example:
-        >>> from libephemeris.hypothetical import parse_orbital_elements
         >>> elements = parse_orbital_elements("my_orbits.txt")
-        >>> for elem in elements:
-        ...     print(f"{elem.name}: a={elem.semi_axis} AU, e={elem.eccentricity.constant}")
-        Cupido: a=40.99837 AU, e=0.0046
-        Hades: a=50.66744 AU, e=0.00245
-        ...
-
-    Example with custom file:
-        >>> # Create a custom orbital elements file
-        >>> with open("my_planet.txt", "w") as f:
-        ...     f.write("# My custom hypothetical planet\\n")
-        ...     f.write("J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, MyPlanet\\n")
-        >>> elements = parse_orbital_elements("my_planet.txt")
-        >>> print(elements[0].name)
-        MyPlanet
-
-    See Also:
-        - Reference documentation on fictitious objects
-        - OrbitalElements dataclass for the structure of parsed elements
+        >>> [element.name for element in elements]
+        ['MyPlanet']
     """
     filepath = Path(filepath)
 

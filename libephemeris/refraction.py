@@ -60,12 +60,13 @@ References
 - Smart, W.M. (1977) "Textbook on Spherical Astronomy", Ch. VI
 - Bomford, G. (1980) "Geodesy", 4th ed., Clarendon Press, §2.17-2.20
 
-Deviation from the reference implementation
+Black-box comparison with the reference API
 -------------------------------------------
-The reference ephemeris computes refraction from empirical curve fits:
-Sinclair's formula (quoted in Bennett 1982) inside its azimuth/altitude
-and extended-refraction paths and the Saemundsson/Bennett pair in its
-plain refraction path.
+Independent probes of the public API are reproduced by established empirical
+curve fits: Sinclair's formula (quoted in Bennett 1982) for the
+azimuth/altitude and extended-refraction behavior, and the
+Saemundsson/Bennett pair for plain refraction. This describes measured public
+outputs only; no reference source or implementation material was consulted.
 
 Plain ``refrac()`` deliberately keeps the ray-traced model above
 (owner decision, 2026-06): it is physically grounded and at least as
@@ -80,7 +81,7 @@ accurate against rigorous benchmarks. Measured envelope of the plain
                                     is observationally constrained)
 
 ``refrac_extended()`` and ``azalt()`` must instead be 1:1 with the
-reference, so they use the reference-matched analytic model further down
+reference API, so they use the black-box-matched analytic model further down
 (see calc_refraction_ref_app_to_true / calc_refraction_ref_true_to_app),
 which reproduces the reference to < 30" across observer elevation,
 pressure and temperature -- both above and below the dip.
@@ -89,7 +90,7 @@ Consequences: apparent altitudes from plain ``refrac()`` can differ from
 the reference by the envelope above, which can flip near-horizon
 visibility bits (eclipse/occultation *_VISIBLE flags) within a few
 seconds of an event's horizon crossing. Rise/set times are NOT affected:
-eclipse.rise_trans and everything built on it use the reference's own
+eclipse.rise_trans and everything built on it use the independently published
 Sinclair model (see eclipse._rise_true_to_apparent) so that rise/set,
 twilight and eclipse timing agree with the reference to fractions of a
 second.

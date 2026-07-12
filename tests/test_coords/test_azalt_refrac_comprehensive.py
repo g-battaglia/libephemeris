@@ -264,9 +264,7 @@ class TestRefracExtended:
 
     def test_details_all_finite(self):
         """All detail values should be finite."""
-        _, details = swe.refrac_extended(
-            10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP
-        )
+        _, details = swe.refrac_extended(10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP)
         for i, val in enumerate(details):
             assert math.isfinite(val), f"Detail[{i}] = {val} not finite"
 
@@ -280,9 +278,7 @@ class TestRefracExtended:
 
     def test_sea_level_minimal_dip(self):
         """At sea level, dip should be ~0."""
-        _, details = swe.refrac_extended(
-            10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP
-        )
+        _, details = swe.refrac_extended(10.0, 0.0, 1013.25, 15.0, 0.0065, TRUE_TO_APP)
         dip = details[3]
         assert abs(dip) < 0.1, f"Sea level dip: {dip}° (expected ~0)"
 

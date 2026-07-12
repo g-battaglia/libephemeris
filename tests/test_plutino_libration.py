@@ -154,9 +154,7 @@ class TestResonantArgument:
 
         elements = MINOR_BODY_ELEMENTS[IXION]
         jd = elements.epoch
-        phi0 = calc_resonant_argument_plutino(
-            elements, jd, elements.omega, elements.M0
-        )
+        phi0 = calc_resonant_argument_plutino(elements, jd, elements.omega, elements.M0)
         delta = 37.0
         rotated = dataclasses.replace(elements, Omega=elements.Omega + delta)
         phi1 = calc_resonant_argument_plutino(

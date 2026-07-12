@@ -117,12 +117,8 @@ class TestBaseMediumDistance:
         worst_jd = 0.0
 
         for jd in base_medium_dates:
-            base, _ = cross_base_medium.tier_a(
-                ephem.calc_ut, jd, body_id, FLG_SPEED
-            )
-            medium, _ = cross_base_medium.tier_b(
-                ephem.calc_ut, jd, body_id, FLG_SPEED
-            )
+            base, _ = cross_base_medium.tier_a(ephem.calc_ut, jd, body_id, FLG_SPEED)
+            medium, _ = cross_base_medium.tier_b(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
             err = abs(base[2] - medium[2])
             if err > max_err:

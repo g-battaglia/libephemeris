@@ -8,8 +8,9 @@ library for Python, licensed under the **Apache License, Version 2.0** (see
 
 All astronomical computations are based on:
 
-- **JPL DE440/DE441** planetary and lunar ephemerides, accessed via the
-  [Skyfield](https://rhodesmill.org/skyfield/) library (Brandon Rhodes, MIT license)
+- **JPL DE440/DE441** planetary and lunar ephemerides, accessed through the
+  local [Skyfield](https://rhodesmill.org/skyfield/) path (Brandon Rhodes, MIT
+  license), precomputed LEB coefficients, or NASA JPL Horizons state vectors
 - **IAU 2006/2000A** precession-nutation and **Vondrák 2011** long-term
   precession, via [pyerfa](https://github.com/liberfa/pyerfa) (BSD-3-Clause)
 - **Peer-reviewed academic sources**, including:

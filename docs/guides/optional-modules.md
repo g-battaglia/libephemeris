@@ -135,17 +135,19 @@ technical details and precision benchmarks.
 pip install libephemeris[stars]
 ```
 
-Installs [Astropy](https://www.astropy.org/) for building and querying
-star catalogs. Required for fixed star calculations beyond the built-in
-named stars.
+Installs [Astropy](https://www.astropy.org/) and Astroquery for star-catalog
+building and related developer tooling. Runtime fixed-star calculations use the
+catalog shipped by LibEphemeris and do not require this extra.
 
-### `all` -- All permissive-licensed extras
+### `all` -- Permissive optional runtime features
 
 ```bash
 pip install libephemeris[all]        # permissive-only; add ,nbody for the GPL extra (provenance-ok)
 ```
 
-Installs the permissive-licensed optional runtime dependencies (`stars`); the GPL-licensed `nbody` extra is a separate explicit opt-in. <!-- provenance-ok -->
+Installs the permissive optional runtime features (currently Astropy
+integration). It does not include the Astroquery-based catalog tooling from
+`stars`. The GPL-licensed `nbody` extra is a separate explicit opt-in. <!-- provenance-ok -->
 
 ### `dev` -- Development tools
 

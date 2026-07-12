@@ -1461,11 +1461,12 @@ back to the SPK → Skyfield pipeline.
 **Total bodies NOT in LEB Chebyshev data:** ~1489 (10 hypotheticals + 1447
 stars + 21 moons + 10 angles/parts + 1 nutation).
 
-**Why the core/exotics split:** the 31 **core** bodies are used in nearly
-every chart; their compressed LEB2 `core` group is small enough (~10.6 MB)
-to bundle with the wheel. The 31 **exotic** bodies are SPK-derived and much
-larger on disk (the base `exotics` group is ~59 MB compressed), so they ship
-as a separate optional group served from LEB once downloaded. Fixed stars,
+**Why the core/exotics split:** the frequently used compressed LEB2 `core`
+group is small enough (~10.6 MB for the bundled base artifact). The 31
+**exotic** bodies are SPK-derived and much larger on disk (a generated base
+`exotics` group is ~59 MB compressed). The format and generator support that
+separate companion, but no exotics file is currently published in the release
+download manifest; users must generate or provide it themselves. Fixed stars,
 planetary moons, and chart angles/parts stay on the Skyfield pipeline — they
 are cheap to compute analytically or vary with observer/house settings, so
 precomputing them would add size with little benefit. The Skyfield fallback
@@ -2035,8 +2036,9 @@ LEB2 files are organized into **body groups** instead of one monolithic file:
 | `uranians` | 9 | 2.1 MB | Cupido-Transpluto |
 
 The `exotics` group (`LEB2_GROUPS` in `libephemeris/leb_groups.py`) is by far
-the largest and ships as a separate optional download; the pip wheel bundles
-only the `core` group.
+the largest. It is a supported generated companion but is not currently a
+published download. The pip wheel bundles only `base_core.leb2`; the release
+manifest currently publishes the other non-exotics groups separately.
 
 **File naming convention:** `{tier}_{group}.leb2` (e.g. `base_core.leb2`,
 `medium_asteroids.leb2`).

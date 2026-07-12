@@ -364,152 +364,55 @@ def _deltat_with_tid_acc(tjdut: float, tid_acc: float) -> float:
 
 
 def deltat(tjdut: float) -> float:
-    """
-    Calculate Delta T (TT - UT1) for a given Julian Day.
+    """Calculate Delta T (TT minus UT1) for a Julian Day.
 
     Args:
-        tjdut: Julian Day number in UT1
+        tjdut: Julian Day in UT1.
 
     Returns:
-        float: Delta T in days (TT - UT1)
+        Delta T in days.
 
-    Note:
-        Delta T accounts for Earth's irregular rotation and is required
-        for high-precision planetary calculations.
+    Notes:
+        A user-defined value has first priority. Observed IERS data is next
+        when enabled and available. Otherwise the configured model is used:
+        ``smh2016`` (the default) or ``espenak_meeus``. Before 1955, an
+        explicitly selected tidal acceleration can adjust the model result.
 
-        The implementation uses multiple sources for Delta T:
+        Outside the SMH-2016 spline interval, Skyfield's implementation uses
+        the long-term parabola ``Delta T = -320 + 32.5 * u**2`` seconds, where
+        ``u = (year - 1825) / 100``.
 
-        **Priority 1: User-defined Delta T**
-            If set via set_delta_t_userdef(), that fixed value is returned.
-
-        **Priority 2: IERS observed data (if enabled)**
-            If IERS Delta T is enabled via set_iers_delta_t_enabled(True),
-            and IERS data is available for the date, the observed Delta T
-            from IERS is used. This provides the highest precision for
-            recent dates (typically 1973-present).
-
-        **Priority 3: Selected Delta T model**
-            Uses the model chosen via ``set_delta_t_model()`` (or the
-            ``LIBEPHEMERIS_DELTAT_MODEL`` environment variable / ``deltat_model``
-            TOML key). The default is ``smh2016`` — Skyfield's implementation of
-            the Stephenson, Morrison, and Hohenkerk (2016) model; selecting
-            ``espenak_meeus`` instead uses the classic NASA Espenak & Meeus
-            (2006) polynomial set.
-
-            The default ``smh2016`` model resolves as follows:
-
-            **For historical dates (720 BC - ~2016):**
-                Uses cubic spline interpolation from Table S15 published in
-                "Measurement of the Earth's rotation: 720 BC to AD 2015"
-                (Stephenson, Morrison, Hohenkerk, 2016, Proc. Royal Society A).
-
-            **For dates outside the spline range:**
-                Uses the long-term parabolic model:
-                    ΔT = -320 + 32.5 × u²
-                where u = (year - 1825) / 100
-
-            **For modern/recent dates:**
-                Uses observed IERS (International Earth Rotation Service) data,
-                smoothly blended with the historical model.
-
-        **Scope of the userdef / IERS / model overrides**
-            These three priorities set the ΔT returned by ``deltat()`` /
-            ``deltat_ex()`` and hence the TT used by every calculation that
-            converts UT to TT through them: eclipses, heliacal events, long-term
-            sidereal time, and the LEB / fast / Horizons position backends. The
-            Skyfield position backend instead obtains TT from Skyfield's own
-            internal ΔT model (SMH-2016 + IERS), so its planetary positions are
-            unaffected by ``set_delta_t_userdef()``, the IERS toggle, or
-            ``set_delta_t_model()``. Selecting a model therefore changes
-            positions in the default (LEB) backend but not in ``"skyfield"``
-            mode — a pre-existing property of all three ΔT overrides.
-
-        **Tidal acceleration (set_tid_acc)**
-            For dates before 1955.0, a non-default tidal acceleration set
-            via ``set_tid_acc()`` rescales the computed Delta T exactly as
-            the reference API does (see
-            :func:`_tid_acc_adjustment_seconds`). At the default value
-            (TIDAL_DE440, -25.936 arcsec/cy^2) the adjustment is exactly
-            zero. A user-defined Delta T is never adjusted.
-
-        Typical values:
-            - Year 1000: ~1500 seconds
-            - Year 1800: ~14 seconds
-            - Year 1900: ~-3 seconds
-            - Year 2000: ~64 seconds
-            - Year 2020: ~69 seconds
+        The selected Delta-T value drives calculations that convert UT to TT
+        through this function, including LEB, Horizons, event searches, and
+        long-term sidereal time. The direct Skyfield position path uses the
+        Delta-T realization in its Skyfield time object.
 
     References:
-        Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
-        "Measurement of the Earth's rotation: 720 BC to AD 2015."
-        Proceedings of the Royal Society A, 472: 20160404.
-        https://doi.org/10.1098/rspa.2016.0404
+        Stephenson, Morrison, and Hohenkerk (2016), *Proceedings of the Royal
+        Society A* 472, 20160404.
     """
     return _deltat_with_tid_acc(tjdut, get_tid_acc())
 
 
 def deltat_ex(tjdut: float, flag: int = FLG_SWIEPH) -> float:
-    """
-    Calculate Delta T (TT - UT1) with explicit ephemeris source specification.
-
-    Extended version of deltat() that allows specifying the ephemeris
-    source for Delta T calculation.
+    """Calculate Delta T with an explicit ephemeris-selection flag.
 
     Args:
-        tjdut: Julian Day number in UT1
-        flag: Ephemeris selection flag:
-            - FLG_SWIEPH (2): Use JPL/Skyfield ephemeris (default)
-            - FLG_JPLEPH (1): Use JPL ephemeris (same Delta T as FLG_SWIEPH)
-            - FLG_MOSEPH (4): Use the semi-analytical ephemeris tidal
-              acceleration (TIDAL_MOSEPH, -25.58 arcsec/cy^2) for Delta T
+        tjdut: Julian Day in UT1.
+        flag: Ephemeris-selection flags. ``FLG_SWIEPH`` and
+            ``FLG_JPLEPH`` use the standard tidal acceleration;
+            ``FLG_MOSEPH`` implies ``TIDAL_MOSEPH`` unless an explicit
+            ``set_tid_acc()`` setting takes precedence.
 
     Returns:
-        float: Delta T in days (TT - UT1)
+        Delta T in days.
 
-    Note:
-        The implementation uses multiple sources for Delta T:
-
-        **Priority 1: User-defined Delta T**
-            If set via set_delta_t_userdef(), that fixed value is returned.
-
-        **Priority 2: IERS observed data (if enabled)**
-            If IERS Delta T is enabled via set_iers_delta_t_enabled(True),
-            and IERS data is available for the date, the observed Delta T
-            from IERS is used. This provides the highest precision for
-            recent dates (typically 1973-present).
-
-        **Priority 3: Selected Delta T model**
-            Uses the configured Delta T model. The default is Skyfield's
-            implementation of the Stephenson, Morrison, and Hohenkerk (2016)
-            model; ``espenak_meeus`` selects the Espenak & Meeus polynomial
-            model.
-
-        Since libephemeris uses Skyfield which internally uses JPL data,
-        FLG_SWIEPH and FLG_JPLEPH produce identical results.
-
-        **FLG_MOSEPH** applies the tidal-acceleration adjustment for
-        TIDAL_MOSEPH (-25.58 arcsec/cy^2) to the computed Delta T, exactly
-        as the reference API does — a measurable difference only for dates
-        before 1955.0 (see :func:`_tid_acc_adjustment_seconds`). The
-        reference's precedence is honoured:
-
-        - a tidal acceleration explicitly set via set_tid_acc() wins over
-          the flag-implied one;
-        - FLG_SWIEPH wins over FLG_MOSEPH when both bits are set.
-
-        If a user-defined Delta T has been set via set_delta_t_userdef(),
-        that value will be returned instead of the computed value.
-
-    Example:
-        >>> from libephemeris import deltat_ex, FLG_SWIEPH, FLG_JPLEPH
-        >>> dt = deltat_ex(2451545.0, FLG_SWIEPH)
-        >>> print(f"Delta T: {dt * 86400:.2f} seconds")
-        Delta T: 63.83 seconds
-
-    References:
-        Stephenson F.R., Morrison L.V., Hohenkerk C.Y. (2016).
-        "Measurement of the Earth's rotation: 720 BC to AD 2015."
-        Proceedings of the Royal Society A, 472: 20160404.
+    Notes:
+        The user-defined value, optional IERS observations, and configured
+        model have the same priority as in ``deltat()``. A user-defined
+        Delta T is never tidally adjusted. The default configured model is the
+        Stephenson, Morrison, and Hohenkerk (2016) realization supplied by
+        Skyfield, including its long-term parabola outside the spline range.
     """
     # FLG_MOSEPH selects the semi-analytical ephemeris tidal acceleration,
     # unless the user explicitly set one (set_tid_acc() wins) or FLG_SWIEPH
@@ -557,7 +460,7 @@ def date_conversion(
         >>> date_conversion(1582, 10, 5, 12.0, 'g')
         (1582, 10, 15, 12.0)
     """
-    # Accept bytes calendar (the reference ephemeris uses b'g'/b'j')
+    # Black-box compatibility: the public API accepts bytes calendar codes.
     if isinstance(calendar, bytes):
         calendar = calendar.decode("ascii")
     calendar = calendar.lower()
@@ -660,7 +563,7 @@ def utc_to_jd(
 
     Note:
         - UTC includes leap seconds while UT1 follows Earth's rotation
-        - |UTC - UT1| is always < 0.9 seconds by definition
+        - ``abs(UTC - UT1)`` is always less than 0.9 seconds by definition
         - TT = TAI + 32.184 seconds, where TAI is atomic time
         - For dates before 1972 (when UTC was standardized), the function
           treats the input as UT1 approximation and still provides proper
@@ -679,6 +582,16 @@ def utc_to_jd(
     # across the 1972 boundary, where the pre-UTC branch defers to julday).
     _validate_calendar(calendar, "utc_to_jd")
 
+    # Leap-second dates and the beginning of the UTC era are defined in the
+    # Gregorian calendar.  Map a Julian-calendar label to that physical
+    # Gregorian date once, before either decision.  In particular, Julian
+    # 1971-12-19 is Gregorian 1972-01-01 and must use the UTC-era path.
+    if calendar == JUL_CAL:
+        greg_jd = julday(year, month, day, 12.0, JUL_CAL)
+        greg_year, greg_month, greg_day, _ = revjul(greg_jd, GREG_CAL)
+    else:
+        greg_year, greg_month, greg_day = year, month, day
+
     # Validate leap second: second=60 is only valid at 23:59:60 on dates
     # where a leap second was actually inserted (end of June 30 or Dec 31).
     # Raises the project Error (reference API raises its Error class too).
@@ -691,21 +604,15 @@ def utc_to_jd(
         # while Julian 2016-12-31 (Gregorian 2017-01-13) is not. The calendar
         # shift only relabels the date, never the clock time, so converting at
         # noon yields the right date for any time within the day.
-        if calendar == JUL_CAL:
-            greg_jd = julday(year, month, day, 12.0, JUL_CAL)
-            check_year, check_month, check_day, _ = revjul(greg_jd, GREG_CAL)
-        else:
-            check_year, check_month, check_day = year, month, day
-
         # Message parity (measured black-box): a structurally invalid time
         # (second >= 61, or second == 60 outside 23:59) gets the plain
         # "invalid time" wording with UNPADDED hour/minute; only the
         # right-time-wrong-date case carries the "(no leap second!)" suffix,
         # and that suffix is reserved for the UTC era — pre-1972 dates (no
         # leap seconds existed) get the plain wording too.
-        if second >= 61.0 or hour != 23 or minute != 59 or check_year < 1972:
+        if second >= 61.0 or hour != 23 or minute != 59 or greg_year < 1972:
             raise Error(f"invalid time: {hour}:{minute}:{second:05.2f}")
-        if not _is_leap_second_date(check_year, check_month, check_day):
+        if not _is_leap_second_date(greg_year, greg_month, greg_day):
             raise Error(
                 f"invalid time (no leap second!): {hour}:{minute}:{second:05.2f}"
             )
@@ -715,7 +622,7 @@ def utc_to_jd(
     # and jd_et = jd_ut1 + Delta T. (Routing through Skyfield's ts.utc()
     # would clamp TAI-UTC to 10 s, drifting up to tens of minutes in
     # antiquity — verified +24 s at 1800, -27 min at year 1000.)
-    if year < 1972:
+    if greg_year < 1972:
         decimal_hour = hour + minute / 60.0 + second / 3600.0
         jd_ut1 = julday(year, month, day, decimal_hour, calendar)
         jd_et = jd_ut1 + deltat(jd_ut1)
@@ -730,9 +637,7 @@ def utc_to_jd(
         # :60 leap second — pass straight through. Folding them into a decimal
         # hour instead would push 23:59:60 into the next midnight and drop the
         # leap second entirely.
-        greg_jd = julday(year, month, day, 12.0, JUL_CAL)
-        g_year, g_month, g_day, _ = revjul(greg_jd, GREG_CAL)
-        t = ts.utc(g_year, g_month, g_day, hour, minute, second)
+        t = ts.utc(greg_year, greg_month, greg_day, hour, minute, second)
     else:
         # Gregorian calendar - use directly with Skyfield
         t = ts.utc(year, month, day, hour, minute, second)

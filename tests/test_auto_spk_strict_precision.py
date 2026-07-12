@@ -95,9 +95,7 @@ class TestAutoDownloadInStrictMode:
             "libephemeris.rebound_integration.check_assist_data_available",
             return_value=False,
         ):
-            with patch(
-                "libephemeris.spk.download_and_register_spk"
-            ) as mock_download:
+            with patch("libephemeris.spk.download_and_register_spk") as mock_download:
                 with pytest.raises(eph.SPKRequiredError):
                     eph.calc_ut(2451545.0, CHIRON, FLG_SPEED)
 

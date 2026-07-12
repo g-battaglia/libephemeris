@@ -425,12 +425,8 @@ class TestHouseCuspVelocityProgression:
         jd1 = 2451545.0
         jd2 = 2451545.5  # 12 hours later
 
-        _, _, _, ascmc_speed1 = ephem.houses_ex2(
-            jd1, lat, lon, ord("P"), FLG_SPEED
-        )
-        _, _, _, ascmc_speed2 = ephem.houses_ex2(
-            jd2, lat, lon, ord("P"), FLG_SPEED
-        )
+        _, _, _, ascmc_speed1 = ephem.houses_ex2(jd1, lat, lon, ord("P"), FLG_SPEED)
+        _, _, _, ascmc_speed2 = ephem.houses_ex2(jd2, lat, lon, ord("P"), FLG_SPEED)
 
         # MC velocity should be similar at different times
         # (variation possible due to Earth's orbital motion)

@@ -164,9 +164,7 @@ class TestLunOccultWhere:
         jd_max = times[0]
 
         ocl_type1, geopos1, attr1 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
-        ocl_type2, geopos2, attr2 = lun_occult_where(
-            jd_max, "Regulus", FLG_SWIEPH
-        )
+        ocl_type2, geopos2, attr2 = lun_occult_where(jd_max, "Regulus", FLG_SWIEPH)
 
         assert geopos1 == geopos2
         assert attr1 == attr2
@@ -326,9 +324,7 @@ class TestLunOccultWherePlanetOccultations:
             )
             if retflags != 0:
                 jd_max = times[0]
-                ocl_type, geopos, attr = lun_occult_where(
-                    jd_max, VENUS, FLG_SWIEPH
-                )
+                ocl_type, geopos, attr = lun_occult_where(jd_max, VENUS, FLG_SWIEPH)
 
                 assert len(geopos) == 10
                 assert len(attr) == 20

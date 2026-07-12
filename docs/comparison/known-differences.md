@@ -28,16 +28,12 @@ rejecting bracket candidates whose signed-difference jump exceeds 180°.)
 **What:** the maximum difference in lunar longitude is ~135" (0.037°), occurring at
 the extremes of the DE440 range (around 1550 CE and 2650 CE).
 
-**Why:** the two libraries use fundamentally different lunar models. libephemeris
-uses **JPL DE440**, where the Moon's position comes from numerical integration of
-the full equations of motion, fitted to Lunar Laser Ranging data (1970–present) at
-~1 mas precision for the modern era. pyswisseph combines **DE431** for the modern
-period with the **ELP/MPP02 analytical theory** (a sum of thousands of
-trigonometric terms). Near the present (1900–2100) the two agree to a few
-arcseconds; they diverge toward historical/far-future dates because of
-(1) different tidal-acceleration parameters, (2) different fitting datasets (DE440
-adds 8 years of LLR plus Juno/MESSENGER data), and (3) numerical-integration vs
-analytical-truncation error profiles.
+**Why:** libephemeris uses **JPL DE440**, where the Moon's position comes from
+JPL's numerical integration fitted to Lunar Laser Ranging data. Black-box
+reference output agrees to a few arcseconds near the present (1900–2100) and
+diverges toward historical/far-future dates. The comparison establishes a
+different lunar solution and tidal-acceleration behavior; it does not require or
+claim knowledge of the reference engine's internal reduction chain.
 
 **Practical impact:** for dates within ±200 years the difference is < 5". For natal
 charts, transits and progressions it is astronomically negligible (~4 minutes of
@@ -48,15 +44,13 @@ lunar motion).
 **What:** the computed ΔT (TT − UT1) can differ by up to ~232 s between the two
 libraries for extreme dates.
 
-**Why:** both libraries use the **same family** of ΔT model — Stephenson, Morrison
-& Hohenkerk (2016) for the pre-1955 era and IERS observed values for the modern
-era. (Swiss Ephemeris used Espenak & Meeus 2006 up to SE 1.77, then switched to
-SMH-2016 at SE 2.06/2.08 in 2017–2018. Verified empirically: `swe.deltat` at 2100 =
-93.2 s, matching libephemeris's 95.9 s and nowhere near the Espenak-Meeus value of
-202.8 s.) The difference is therefore **not** a different model — it is the
-unavoidable difference between two *extrapolations of an unknowable quantity*
-(future Earth rotation, or deep-past rotation beyond the eclipse record). Where ΔT
-is constrained by data the two agree to ≤ ~1 s.
+**Why:** black-box `deltat` output follows the **same broad family** as the
+Stephenson, Morrison & Hohenkerk (2016) reconstruction and modern IERS values
+(`deltat` at 2100 is 93.2 s, near libephemeris's 95.9 s and far from the
+Espenak-Meeus value of 202.8 s). The remaining difference is between two
+*extrapolations of an unknowable quantity* (future Earth rotation, or deep-past
+rotation beyond the eclipse record). Where ΔT is constrained by data the two
+agree to ≤ ~1 s; no internal reference table or algorithm is asserted here.
 
 | Era | libephemeris | pyswisseph 2.10 | difference |
 |---|---|---|---|
@@ -107,17 +101,18 @@ L.set_delta_t_userdef(None)             # restore the native model
 
 `houses_ex2` / `houses_armc_ex2` compute cusp velocities by centered finite
 differences; the maximum difference from pyswisseph is
-~0.7°/day (~0.2% relative). pyswisseph differentiates the cusp formulas
-analytically. Both approaches are valid; the numerical method has a truncation
-error ∝ dt² that at a 1-minute step is < 1°/day against the analytical result, i.e.
+~0.7°/day (~0.2% relative). Its black-box speeds differ slightly from a centered
+finite difference and are consistent with another derivative convention. The
+numerical method has a truncation error ∝ dt² that at a 1-minute step is < 1°/day, i.e.
 < 0.3% of the ~280–340°/day cusp speeds. (Both implementations compute and
 return the speed arrays unconditionally — no `FLG_SPEED` gate.)
 
 ### 2.5 Asteroids — Keplerian approximation vs integrated ephemerides
 
 Minor-body positions (Chiron, Ceres, Pallas, Juno, Vesta) can differ by up to ~5°.
-pyswisseph uses pre-integrated NASA JPL asteroid ephemerides (sub-arcsecond).
-libephemeris uses a **Keplerian approximation** by default — an ideal ellipse from
+The reference API can use separately supplied asteroid data files; this audit
+makes no claim about how those files were generated. libephemeris uses a
+**Keplerian approximation** by default — an ideal ellipse from
 mean orbital elements — which ignores planetary perturbations, resonances and
 secular element variation, so it degrades with time (Chiron is the most affected,
 its orbit between Saturn and Uranus being chaotic).
@@ -152,9 +147,10 @@ longitude or ARMC; see
 [Intentional divergences §3](intentional-divergences.md#3-of-date-mean-obliquity-at-deep-bce-epochs).)
 The ARMC difference is a *model* difference: libephemeris uses the IAU-2006 GMST
 polynomial inside 1850–2050
-(same branch as pyswisseph → ~0.002″) and a geometric Vondrák-2011 long-term
-sidereal time outside it, whereas pyswisseph continues an IAU-2006-style
-precession-in-RA realization that diverges at remote epochs. The long-term
+(matching black-box output to ~0.002″) and a geometric Vondrák-2011 long-term
+sidereal time outside it. The black-box residual beyond that window has the
+shape of a different long-term realization; no internal reference model is
+asserted. The long-term
 construction is detailed in
 [../methodology/sidereal-time-longterm.md](../methodology/sidereal-time-longterm.md).
 
@@ -173,12 +169,12 @@ Jacobian ∂Asc/∂ARMC, which *damps* the error at high northern latitude (≈ 
 65°N) and slightly amplifies it in the south (≈ 1.38 at 34°S) — there is no polar
 blow-up.
 
-**The ~1.9″ step seen near 2050 originates in Swiss Ephemeris's own model
-boundary.** A sub-day kink test at JD 2469807.5 (2050-01-01 00:00) shows
+**The black-box reference output has a ~1.9″ step near 2050.** A sub-day kink
+test at JD 2469807.5 (2050-01-01 00:00) shows
 libephemeris's ARMC incrementing smoothly across the boundary (constant
 ~1299.548″ per 0.001 d), while pyswisseph has a single anomalous increment short by
-~1.908″ at that instant — an internal Swiss precession/sidereal-time model
-boundary. libephemeris's own two branches join to 0.000000″ there (the continuity
+~1.908″ at that instant. The responsible internal reference mechanism is
+unknown. libephemeris's own two branches join to 0.000000″ there (the continuity
 offset pins the long-term branch to the IAU-2006 value at the boundary).
 
 **Verdict:** a benign, expected model difference. Inside 1850–2050, where
@@ -213,7 +209,7 @@ pyswisseph 2.10.03 (4400+ comparison rounds across 29 API sections).
 ### 1. Ephemeris engine differences
 
 **1.1 Planetary positions (`calc_ut`).** libephemeris uses Skyfield + JPL
-DE440/DE441; pyswisseph uses its internal integration of DE431. Typical divergence:
+DE440/DE441; the comparison target returns a different black-box solution. Typical divergence:
 Sun and Mercury–Neptune 0.001–0.01"; Moon 0.01–1.0"; Pluto 0.001–0.01". Speeds:
 most planets 0.01–2.0", Moon speed up to ~5" (central finite difference vs
 analytical). Future dates (>2050): up to 2" from ΔT extrapolation.
@@ -224,8 +220,9 @@ LEB tier, fit to DE441) tracks the exact ephemeris to **< 0.01"** across the who
 range for Sun, Moon and inner planets (< 0.09" for the giants, the residual being
 the center-vs-barycenter choice). pyswisseph's geocentric apparent positions vs the
 same DE441 truth grow toward the past — ~11" (Moon, 1000 CE) → ~157" (1000 BCE) →
-~550" (~0.15°, Moon, 3000 BCE); the planets stay smaller (a few arcsec to ~1′) — because it is built on DE431 (2013) plus its own
-lunar secular model. For historical/archaeo-astronomy work this makes libephemeris
+~550" (~0.15°, Moon, 3000 BCE); the planets stay smaller (a few arcsec to ~1′).
+That measurement does not identify the target's internal model. For
+historical/archaeo-astronomy work this makes libephemeris
 the closer match to JPL's latest long-range integration.
 
 **1.2 Interpolated apogee/perigee (bodies 21, 22).** IntpApog/IntpPerg use
@@ -495,7 +492,7 @@ latitude/declination speed channel differs.
 Bennett's formula with slightly different coefficients and boundary handling.
 
 **5.2 Azimuth/altitude (`azalt`).** `azalt` routes its apparent altitude through
-`refrac_extended`, which now reproduces the reference's analytic refraction curve
+`refrac_extended`, which now reproduces the reference's black-box refraction curve
 and dip clamp to < 30" across the full observer-elevation / pressure / temperature
 grid, both above and below the horizon (see §13). The former ~1654" below-horizon
 gap is closed; only the reference's own divergent deep-cold iteration (§13) still
@@ -575,13 +572,13 @@ For of-date sidereal output libephemeris subtracts the **true** ayanamsha
 (mean + Δψ) uniformly, in `calc`/`calc_ut` AND in `nod_aps`/`nod_aps_ut` — the
 two surfaces agree exactly (e.g. `nod_aps(MOON, MEAN)` node ≡
 `calc(MEAN_NODE)` to 0.000" under `FLG_SIDEREAL`). The reference API is
-internally inconsistent here: its `calc` subtracts the true ayanamsha
+observably inconsistent here: its `calc` subtracts the true ayanamsha
 (measured shift 23.853203° at J2000, Lahiri) while its `nod_aps` subtracts
 the **mean** ayanamsha (23.857073° — same date, same mode, all methods and
 bodies). Sidereal `nod_aps` longitudes therefore differ from the reference by
 exactly Δψ (nutation in longitude, ≤ ~17.5", −13.93" at J2000); tropical
 `nod_aps` matches to < 0.01". libephemeris keeps the uniform reduction rather
-than reproducing the reference's internal inconsistency.
+than reproducing that observable inconsistency.
 
 ### 8. Phenomena (`pheno_ut`)
 
@@ -648,7 +645,7 @@ as a frame transformation, not an ayanamsha subtraction — see §10.2b.)
 
 A second, smaller family effect: libephemeris applies the same modern 5-term
 IAU 2006 precession-rate polynomial to **all** formula-based ayanamsha modes,
-while the reference API uses a different (older) accumulation model for a
+while the black-box reference outputs follow a different accumulation curve for a
 group of classic/historical modes (De Luce, Suryasiddhanta variants, Aryabhata
 variants, Kugler 1–3, Huber, Eta Piscium, Britton, Aldebaran-15Tau, J2000,
 J1900, B1950, Lahiri-VP285, Krishnamurti-VP291). The residual is zero at
@@ -746,17 +743,17 @@ documented "first crossing at or after the start" contract.
 
 **Pluto crossing time offset.** Independently of the above, Pluto crossing
 *instants* carry a residual offset of up to ~375 s versus the reference. This is
-the ephemeris-source floor (DE440/DE441 vs the reference's `.se1`/DE431 Pluto),
+the ephemeris-source floor (DE440/DE441 vs the black-box reference solution),
 not a solver difference — it reflects the small underlying position difference
 propagated through the crossing's shallow longitude rate.
 
 ### 12. Asteroid pipeline (`AST_OFFSET`)
 
-`AST_OFFSET + N` remaps to dedicated body IDs through the Skyfield/SPK pipeline;
-pyswisseph uses `.se1` files. Typical divergence ~0.2" for major asteroids.
-**Missing .se1 files:** Chiron (2060) and Pholus (5145) require dedicated `.se1`
-files in pyswisseph; if absent, pyswisseph raises an error, while libephemeris
-always has these bodies via SPK.
+`AST_OFFSET + N` remaps to dedicated body IDs through the Skyfield/SPK pipeline.
+Typical divergence is ~0.2" for major asteroids. Black-box reference calls may
+raise when their separately configured asteroid coverage is absent, while
+libephemeris always has the curated bodies via SPK. No reference-distribution
+data file is needed for this comparison.
 
 ### 13. Heliacal events
 
@@ -821,8 +818,8 @@ Measured agreement (calibrated and held-out probes against the reference):
   engines' limiting-magnitude models differ by ≈0.1–0.3 mag at the 3–9° object
   altitudes where the event is decided. Because that residual varies in sign with
   object altitude and Sun depression, no single offset removes it, and the exact
-  low-altitude sky-brightness / extinction variant the reference uses inside its
-  heliacal detection is not reproducible black-box (its detection threshold is
+  low-altitude sky-brightness / extinction behavior seen in reference output is
+  not reproducible black-box (its detection threshold is
   measurably stricter than its own published `vis_limit_mag`: e.g. at Tromsø the
   reference's own `vis_limit_mag` margin turns positive four days before the day
   `heliacal_ut` reports, and no `heliacal_pheno_ut` element changes character at
@@ -830,15 +827,15 @@ Measured agreement (calibrated and held-out probes against the reference):
   vs the reference's 6 Aug (one day early).
 - **High-latitude / perpetually-shallow-twilight geometries** are a *separate,
   larger* floor. Where the Sun never sinks far below the horizon (high summer at
-  polar-adjacent sites), the reference's `heliacal_ut` switches to an internal
-  geometric / arcus-visionis criterion **decoupled from photometric visibility**:
+  polar-adjacent sites), black-box `heliacal_ut` output behaves as if a geometric
+  criterion were **decoupled from photometric visibility**:
   the day it returns can carry a `vis_limit_mag` margin anywhere from ≈+0.5 down
   to ≈−4.5 mag, and the two engines can select **different apparitions entirely**
   (measured divergences from a few days up to a full year, e.g. Sirius/Tromsø,
   Venus/Tromsø across 2000–2006). libephemeris keeps a single photometric
   detection rule at all latitudes; matching the reference's geometric high-latitude
-  fallback would require reproducing unpublished internals and is deliberately not
-  attempted. Bright objects that *are* photometrically detected there (e.g.
+  behavior would require a specification not recoverable from public output and
+  is deliberately not attempted. Bright objects that *are* photometrically detected there (e.g.
   Venus/Tromsø 2000) still land within the ±1–2-day photometric floor above.
 - **Observer corrections in `vis_limit_mag` (age and `HELFLAG_OPTICAL_PARAMS`
   optics).** The Snellen term is exact (`5·log10(SN)`) and the naked-eye
@@ -847,8 +844,8 @@ Measured agreement (calibrated and held-out probes against the reference):
   threshold) matches the reference to ≤0.07 mag over ages 23–80 (~0.15 mag at
   the extrapolated age 90). The telescopic/binocular gain under
   `HELFLAG_OPTICAL_PARAMS` is an empirical fit with a residual up to ~1.3 mag
-  (median ~0.5): the reference's optical-aid model is a bespoke, undocumented
-  variant whose magnification trend is *opposite* to Schaefer's published 1990
+  (median ~0.5): the black-box optical-aid response is not reproduced by
+  Schaefer's published 1990 formula; its magnification trend is *opposite* to that
   telescopic formula and whose aperture dependence (~D^3.5) exceeds the
   physical D² light grasp, so it is not reproducible black-box from published
   material. Flag gating is exact (optics ignored without the flag; age ignored
@@ -933,8 +930,9 @@ with negative values** differs due to unsigned-integer overflow in the C
 implementation vs Python integers. **14.4 `FLG_MOSEPH`** is accepted for API
 compatibility and echoed in the retflag exactly as the reference does
 (MOSEPH-only echoes MOSEPH; SWIEPH/JPLEPH win when combined), but the
-*computation* always uses JPL DE440/DE441 via Skyfield — there is no Moshier
-fallback, so MOSEPH positions differ from a Moshier-based engine. **14.6 `cotrans_sp` speed for a non-physical `|lat| > 90°`** may differ from the
+*computation* remains on the active LEB, Horizons, or local Skyfield/JPL path —
+there is no Moshier fallback, so MOSEPH positions differ from a Moshier-based
+engine. **14.6 `cotrans_sp` speed for a non-physical `|lat| > 90°`** may differ from the
 reference: the position (longitude/latitude) now matches for all inputs, and
 the speed is exact for every physical `|lat| <= 90°`, but above 90° the two
 engines reparametrise the (non-physical) point differently, so the returned
@@ -955,8 +953,8 @@ position and cusp differences.
 
 ### 16. pheno phase angle (attr[0])
 
-The reference engine computes the Sun-body-Earth phase angle with an internal
-vector recipe that black-box probing could not fully reproduce: no combination
+The reference engine's black-box phase-angle output could not be fully reproduced
+by the candidate vector recipes tested: no combination
 of apparent / light-time-only / geometric positions matches it for every body
 (apparent geocentric vectors match the Moon to <1" but leave 5-25" on planets
 and asteroids; distance-based law-of-cosines behaves conversely). LibEphemeris
@@ -980,8 +978,9 @@ so this script requires that checkout to run:
 | SKIP | 12 | 0.3% |
 
 **0 failures.** All divergences are documented and classified as inherent
-differences between the two computation engines. The 12 SKIP results are missing
-`.se1` asteroid files in the pyswisseph configuration.
+differences between the two computation engines. The 12 SKIP results are
+black-box calls lacking reference-side asteroid coverage; no
+reference-distribution data files are accepted into either worktree.
 
 ```bash
 .venv/bin/python3 validation/verify/hyper_validate.py --json report.json

@@ -248,9 +248,7 @@ def test_download_file_hash_match(tmp_path, monkeypatch):
     digest = hashlib.sha256(data).hexdigest()
     monkeypatch.setattr(dl.urllib.request, "urlopen", _make_urlopen(data, len(data)))
     dest = tmp_path / "v.bin"
-    ok = dl.download_file(
-        "http://x", dest, expected_sha256=digest, show_progress=False
-    )
+    ok = dl.download_file("http://x", dest, expected_sha256=digest, show_progress=False)
     assert ok is True
     assert dest.exists()
 
@@ -425,9 +423,7 @@ def test_download_planet_centers_oserror(tmp_path, monkeypatch, capsys):
 def test_download_all(tmp_path, monkeypatch):
     """download_all delegates to download_planet_centers (525-529)."""
     sentinel = tmp_path / "planet_centers.bsp"
-    monkeypatch.setattr(
-        dl, "download_planet_centers", lambda **kwargs: sentinel
-    )
+    monkeypatch.setattr(dl, "download_planet_centers", lambda **kwargs: sentinel)
     paths = dl.download_all(force=True, show_progress=False, quiet=True)
     assert paths == [sentinel]
 
@@ -769,9 +765,7 @@ def test_init_all_full_paths(monkeypatch, capsys):
     # Step 1: DE440 succeeds.
     monkeypatch.setattr(state, "get_planets", lambda: object())
     # Step 2: planet_centers succeeds.
-    monkeypatch.setattr(
-        dl, "download_planet_centers", lambda **kw: Path("/tmp/pc.bsp")
-    )
+    monkeypatch.setattr(dl, "download_planet_centers", lambda **kw: Path("/tmp/pc.bsp"))
 
     # No real sleeping for rate-limit (init_all imports time locally).
     import time as _time
@@ -893,9 +887,7 @@ def test_init_all_quiet_full_loop(monkeypatch):
     monkeypatch.setattr(spk_auto, "_iso_to_jd", lambda s: 2451545.0)
     # Nothing cached -> each chunk attempts a download.
     monkeypatch.setattr(dl.os.path, "exists", lambda p: False)
-    monkeypatch.setattr(
-        spk_auto, "download_spk_from_horizons", lambda **kw: None
-    )
+    monkeypatch.setattr(spk_auto, "download_spk_from_horizons", lambda **kw: None)
 
     result = dl.init_all(
         force=False,
@@ -1170,7 +1162,9 @@ def test_download_leb_for_tier_existing_valid_quiet_no_activate(tmp_path, monkey
     from libephemeris import state
 
     called = {"n": 0}
-    monkeypatch.setattr(state, "set_leb_file", lambda p: called.update(n=called["n"] + 1))
+    monkeypatch.setattr(
+        state, "set_leb_file", lambda p: called.update(n=called["n"] + 1)
+    )
 
     result = dl.download_leb_for_tier("base", force=False, quiet=True, activate=False)
     assert result == dest
@@ -1232,7 +1226,9 @@ def test_download_leb_for_tier_corrupt_remove_oserror(tmp_path, monkeypatch):
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
     )
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f"),
     )
     result = dl.download_leb_for_tier("base", force=False, quiet=True, activate=False)
     assert result == dest
@@ -1246,7 +1242,9 @@ def test_download_leb_for_tier_download_invalid(tmp_path, monkeypatch):
     # No pre-existing file -> goes straight to download.
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     with pytest.raises(ValueError, match="failed LEB validation"):
         dl.download_leb_for_tier("base", force=True, quiet=False, activate=False)
@@ -1259,7 +1257,9 @@ def test_download_leb_for_tier_download_invalid_remove_oserror(tmp_path, monkeyp
     leb_dir.mkdir()
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     monkeypatch.setattr(
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
@@ -1275,7 +1275,9 @@ def test_download_leb_for_tier_download_no_activate(tmp_path, monkeypatch, capsy
     leb_dir.mkdir()
     monkeypatch.setattr(dl, "_is_valid_leb", lambda p: True)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     result = dl.download_leb_for_tier("base", force=True, quiet=False, activate=False)
     assert result == leb_dir / "ephemeris_base.leb"
@@ -1428,7 +1430,9 @@ def test_download_leb2_for_tier_activate_core_missing(tmp_path, monkeypatch):
     from libephemeris import state
 
     called = {"n": 0}
-    monkeypatch.setattr(state, "set_leb_file", lambda p: called.update(n=called["n"] + 1))
+    monkeypatch.setattr(
+        state, "set_leb_file", lambda p: called.update(n=called["n"] + 1)
+    )
 
     downloaded = dl.download_leb2_for_tier(
         "base", groups=["core"], force=True, quiet=True, activate=True
@@ -1488,7 +1492,9 @@ def test_download_planet_centers_for_tier_corrupt_remove_oserror(tmp_path, monke
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
     )
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"f"),
     )
     result = dl._download_planet_centers_for_tier("base", force=False, quiet=True)
     assert result == dest
@@ -1499,7 +1505,9 @@ def test_download_planet_centers_for_tier_download_invalid(tmp_path, monkeypatch
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     with pytest.raises(ValueError, match="failed validation"):
         dl._download_planet_centers_for_tier("base", force=True, quiet=False)
@@ -1512,7 +1520,9 @@ def test_download_planet_centers_for_tier_download_invalid_remove_oserror(
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: False)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     monkeypatch.setattr(
         dl.os, "remove", lambda p: (_ for _ in ()).throw(OSError("nope"))
@@ -1526,7 +1536,9 @@ def test_download_planet_centers_for_tier_success(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(dl, "get_data_dir", lambda: tmp_path)
     monkeypatch.setattr(dl, "_is_valid_bsp", lambda p: True)
     monkeypatch.setattr(
-        dl, "download_file", lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x")
+        dl,
+        "download_file",
+        lambda url, dest_path, **kw: Path(dest_path).write_bytes(b"x"),
     )
     result = dl._download_planet_centers_for_tier("medium", force=True, quiet=False)
     assert result == tmp_path / "planet_centers_medium.bsp"

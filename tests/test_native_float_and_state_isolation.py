@@ -10,6 +10,7 @@ setting only shows as a wrong number in an unrelated later call):
     effect — a geocentric call is unaffected by a topo change, a tropical call by
     a sidereal mode, and switching backend/ayanamsha and back is reproducible.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -17,9 +18,21 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MARS, PLUTO, MEAN_NODE, TRUE_NODE, MEAN_APOG,
-    FLG_SWIEPH, FLG_SPEED, FLG_EQUATORIAL, FLG_XYZ, FLG_HELCTR, FLG_J2000,
-    FLG_SIDEREAL, FLG_TOPOCTR,
+    SUN,
+    MOON,
+    MARS,
+    PLUTO,
+    MEAN_NODE,
+    TRUE_NODE,
+    MEAN_APOG,
+    FLG_SWIEPH,
+    FLG_SPEED,
+    FLG_EQUATORIAL,
+    FLG_XYZ,
+    FLG_HELCTR,
+    FLG_J2000,
+    FLG_SIDEREAL,
+    FLG_TOPOCTR,
 )
 
 JD = 2451545.0
@@ -27,8 +40,14 @@ CERES = 10000 + 1
 CHIRON = 10000 + 2060
 
 _BODIES = [SUN, MOON, MARS, PLUTO, MEAN_NODE, TRUE_NODE, MEAN_APOG, CERES, CHIRON]
-_FLAGS = [FLG_SWIEPH, FLG_SWIEPH | FLG_SPEED, FLG_SWIEPH | FLG_EQUATORIAL,
-          FLG_SWIEPH | FLG_XYZ, FLG_SWIEPH | FLG_HELCTR, FLG_SWIEPH | FLG_J2000]
+_FLAGS = [
+    FLG_SWIEPH,
+    FLG_SWIEPH | FLG_SPEED,
+    FLG_SWIEPH | FLG_EQUATORIAL,
+    FLG_SWIEPH | FLG_XYZ,
+    FLG_SWIEPH | FLG_HELCTR,
+    FLG_SWIEPH | FLG_J2000,
+]
 
 
 @pytest.fixture(autouse=True)

@@ -386,9 +386,7 @@ def find_next_transit(
         crossing_jd = ephem.mooncross_ut(target_longitude, start_jd, FLG_SWIEPH)
     else:
         # cross_ut works for any planet
-        crossing_jd = ephem.cross_ut(
-            planet_id, target_longitude, start_jd, FLG_SWIEPH
-        )
+        crossing_jd = ephem.cross_ut(planet_id, target_longitude, start_jd, FLG_SWIEPH)
 
     # Convert Julian Day back to calendar date
     year, month, day, hour = ephem.revjul(crossing_jd)

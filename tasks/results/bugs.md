@@ -6,7 +6,7 @@
 - **Bodies**: Neptune (8), Pluto (9)  
 - **Check**: Distance |lib - ref| < 1e-5 AU
 - **Observed**: Neptune max diff 1.23e-5 AU, Pluto max diff 4.1e-5 AU
-- **Cause**: JPL DE440 (via Skyfield) vs Swiss Ephemeris internal data differ slightly for distant bodies
+- **Cause**: JPL DE440 (via Skyfield) vs black-box reference output differ slightly for distant bodies; the reference's internal data are not inferred
 - **Severity**: LOW — differences are ~3.5e-7 relative, sub-arcsecond angular impact
 - **Recommendation**: Relax dist tolerance to 5e-5 AU for outer planets, or use relative tolerance
 
@@ -14,7 +14,7 @@
 - **Bodies**: Pallas (18), Juno (19), Vesta (20), Chiron (15)
 - **Check**: Longitude |lib - ref| < 1.0 arcsec
 - **Observed**: Pallas max 5.53", Juno max 5.40", Vesta max 1.28", Chiron max 1.21"
-- **Cause**: Different source ephemerides — libephemeris uses JPL SPK files, Swiss Ephemeris uses its own asteroid files
+- **Cause**: Different returned orbit solutions — libephemeris uses JPL SPK files; the reference's internal data source is not inferred
 - **Severity**: LOW — within expected inter-ephemeris variation for minor bodies
 - **Recommendation**: Use 6" tolerance for asteroids
 
@@ -200,7 +200,7 @@
 - **Bodies**: Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, Pluto
 - **Check**: Speed |lib - ref| < 0.0001°/day
 - **Observed**: 22/100 golden regression checks fail. Max diff ~0.000236°/day (Mercury). All planet positions (lon/lat/dist) match within tolerance; only speed (derivative) shows small systematic offset.
-- **Cause**: Different derivative computation methods (Skyfield numerical vs Swiss Ephemeris analytical). The difference is ~0.001 arcsec/day — negligible for all practical applications.
+- **Cause**: Different derivative output conventions (libephemeris uses a documented numerical derivative; the reference's internal method is not inferred). The difference is ~0.001 arcsec/day — negligible for all practical applications.
 - **Severity**: VERY LOW — sub-arcsecond speed differences
 - **Recommendation**: Use 0.0003°/day tolerance for planet speeds in golden regression
 - **Secondary effect (v1.0.0a6)**: Near retrograde stations (velocity ≈ 0), this offset is amplified into a timing shift δt = δv/a, where a is angular acceleration. For outer planets (small a), this produces station timing differences of up to ~3400s (Saturn). Comparison test tolerances calibrated per-planet in v1.0.0a6.

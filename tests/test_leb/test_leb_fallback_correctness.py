@@ -7,6 +7,7 @@ number. This checks that, for every combination that falls back, the result is
 identical to forcing the Skyfield backend directly (the fallback must BE
 Skyfield, not an approximation of it).
 """
+
 from __future__ import annotations
 
 import os
@@ -15,7 +16,14 @@ import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MARS, MEAN_NODE, MEAN_APOG, FLG_SWIEPH, FLG_TOPOCTR, FLG_ICRS,
+    SUN,
+    MOON,
+    MARS,
+    MEAN_NODE,
+    MEAN_APOG,
+    FLG_SWIEPH,
+    FLG_TOPOCTR,
+    FLG_ICRS,
     FLG_RADIANS,
 )
 

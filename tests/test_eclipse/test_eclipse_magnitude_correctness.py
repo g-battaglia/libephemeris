@@ -6,6 +6,7 @@ topocentric apparent Sun/Moon (centres' angular separation vs their angular
 radii), classifies total vs annular by magnitude, and sanity-bounds the path
 width on the central line.
 """
+
 from __future__ import annotations
 
 import math
@@ -29,8 +30,7 @@ _ECLIPSES = [
 
 def _ang_sep(ra1, d1, ra2, d2):
     ra1, d1, ra2, d2 = map(math.radians, (ra1, d1, ra2, d2))
-    c = (math.sin(d1) * math.sin(d2)
-         + math.cos(d1) * math.cos(d2) * math.cos(ra1 - ra2))
+    c = math.sin(d1) * math.sin(d2) + math.cos(d1) * math.cos(d2) * math.cos(ra1 - ra2)
     return math.degrees(math.acos(max(-1.0, min(1.0, c))))
 
 

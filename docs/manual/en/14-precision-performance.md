@@ -333,7 +333,7 @@ Mode: leb
 
 ### `"horizons"`
 
-Always uses the NASA JPL Horizons REST API for calculations. This mode requires an internet connection and does not need any local ephemeris files. It supports planets, asteroids, Mean Node, Mean Apogee, and Uranians. Bodies or flags not supported by Horizons (e.g., `FLG_TOPOCTR`, fixed stars) fall back to Skyfield:
+Prefers the NASA JPL Horizons REST API for calculations. This mode requires an internet connection for supported requests and does not require a local ephemeris file for them. It supports planets, asteroids, Mean Node, Mean Apogee, and Uranians. Bodies or flags not supported by Horizons (e.g., `FLG_TOPOCTR`, fixed stars) fall back to Skyfield:
 
 ```python
 import libephemeris as ephem

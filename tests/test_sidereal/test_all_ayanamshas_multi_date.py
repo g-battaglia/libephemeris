@@ -8,7 +8,8 @@ comparing calculated values against reference values at multiple epochs:
 - 2050-01-01 12:00 TT (future)
 - 2100-01-01 12:00 TT (far future)
 
-Reference values are derived from the reference ephemeris to ensure accuracy.
+Reference values are frozen public-API outputs obtained by black-box calls; no
+reference source or implementation material is used.
 """
 
 import pytest
@@ -252,11 +253,7 @@ class TestAyanamshaTemporalProgression:
     @pytest.mark.parametrize(
         "mode_id,sid_mode,name",
         [m for m in ALL_AYANAMSHA_MODES if m[1] not in {SIDM_J2000, SIDM_J1900}],
-        ids=[
-            m[2]
-            for m in ALL_AYANAMSHA_MODES
-            if m[1] not in {SIDM_J2000, SIDM_J1900}
-        ],
+        ids=[m[2] for m in ALL_AYANAMSHA_MODES if m[1] not in {SIDM_J2000, SIDM_J1900}],
     )
     def test_precession_rate_reasonable(self, mode_id, sid_mode, name):
         """

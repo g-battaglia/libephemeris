@@ -38,6 +38,10 @@ class TestDocstringPresence:
             f"The following public functions are missing docstrings: {missing_docstrings}"
         )
 
+    def test_performance_reset_is_exported(self):
+        """The documented reset_session performance API belongs to __all__."""
+        assert "reset_session" in libephemeris.__all__
+
     def test_core_functions_have_detailed_docstrings(self):
         """Core functions should have detailed docstrings with Args/Returns."""
         core_functions = [
@@ -148,8 +152,8 @@ class TestDocumentationFiles:
         index_path = os.path.join(docs_dir, "index.rst")
         assert os.path.exists(index_path), f"index.rst not found at {index_path}"
 
-    def test_api_reference_has_content(self):
-        """API reference should have substantial content."""
+    def test_api_reference_generates_public_api(self):
+        """API reference should generate content from the runtime public surface."""
         docs_dir = os.path.join(os.path.dirname(__file__), "..", "docs")
         api_ref_path = os.path.join(docs_dir, "api_reference.rst")
 
@@ -157,18 +161,18 @@ class TestDocumentationFiles:
             with open(api_ref_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Should have at least 10KB of documentation
-            assert len(content) > 10000, (
-                f"API reference seems too short: {len(content)} bytes"
-            )
+            assert ".. automodule:: libephemeris" in content
+            assert ":members:" in content
+            assert ":imported-members:" in content
+            assert ":undoc-members:" in content
+            assert ".. public-data::" in content
 
-            # Should document key functions
+            # The introductory example should exercise key entry points.
             assert "calc_ut" in content, "API reference should document calc_ut"
             assert "julday" in content, "API reference should document julday"
-            assert "houses" in content, "API reference should document houses"
 
-    def test_api_reference_has_sections(self):
-        """API reference should be organized in sections."""
+    def test_api_reference_explains_generated_contract(self):
+        """API reference should state how it stays synchronized with the package."""
         docs_dir = os.path.join(os.path.dirname(__file__), "..", "docs")
         api_ref_path = os.path.join(docs_dir, "api_reference.rst")
 
@@ -176,19 +180,8 @@ class TestDocumentationFiles:
             with open(api_ref_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # Check for major sections
-            expected_sections = [
-                "Time Functions",
-                "Planet",
-                "House",
-                "Ayanamsha",
-                "Constants",
-            ]
-
-            for section in expected_sections:
-                assert section in content, (
-                    f"API reference should have '{section}' section"
-                )
+            assert "libephemeris.__all__" in content
+            assert "reset_session" in content
 
 
 class TestExceptionClass:

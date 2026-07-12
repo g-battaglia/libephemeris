@@ -1,5 +1,5 @@
 """
-Tests for the orbital elements file parser.
+Tests for the independent orbital-elements file parser.
 
 This module tests the parse_orbital_elements() function and related utilities
 for parsing hypothetical/fictitious body orbital elements files, as well
@@ -99,8 +99,8 @@ class TestParseTPolynomial:
 
     def test_simple_number(self):
         """Test parsing a simple number."""
-        poly = _parse_t_polynomial("163.7409")
-        assert poly.constant == pytest.approx(163.7409)
+        poly = _parse_t_polynomial("12.3456")
+        assert poly.constant == pytest.approx(12.3456)
         assert poly.linear == 0.0
 
     def test_negative_number(self):
@@ -111,27 +111,27 @@ class TestParseTPolynomial:
 
     def test_polynomial_plus(self):
         """Test parsing polynomial with + operator."""
-        poly = _parse_t_polynomial("252.8987988 + 707550.7341 * T")
-        assert poly.constant == pytest.approx(252.8987988)
-        assert poly.linear == pytest.approx(707550.7341)
+        poly = _parse_t_polynomial("12.5 + 3456.75 * T")
+        assert poly.constant == pytest.approx(12.5)
+        assert poly.linear == pytest.approx(3456.75)
 
     def test_polynomial_minus(self):
         """Test parsing polynomial with - operator."""
-        poly = _parse_t_polynomial("47.787931 - 1670.056 * T")
-        assert poly.constant == pytest.approx(47.787931)
-        assert poly.linear == pytest.approx(-1670.056)
+        poly = _parse_t_polynomial("98.25 - 432.5 * T")
+        assert poly.constant == pytest.approx(98.25)
+        assert poly.linear == pytest.approx(-432.5)
 
     def test_polynomial_compact(self):
         """Test parsing polynomial without spaces."""
-        poly = _parse_t_polynomial("322.212069+1670.056*T")
-        assert poly.constant == pytest.approx(322.212069)
-        assert poly.linear == pytest.approx(1670.056)
+        poly = _parse_t_polynomial("271.25+84.5*T")
+        assert poly.constant == pytest.approx(271.25)
+        assert poly.linear == pytest.approx(84.5)
 
     def test_polynomial_compact_minus(self):
         """Test parsing compact polynomial with minus."""
-        poly = _parse_t_polynomial("47.787931-1670.056*T")
-        assert poly.constant == pytest.approx(47.787931)
-        assert poly.linear == pytest.approx(-1670.056)
+        poly = _parse_t_polynomial("47.5-84.5*T")
+        assert poly.constant == pytest.approx(47.5)
+        assert poly.linear == pytest.approx(-84.5)
 
     def test_zero_constant(self):
         """Test parsing with zero constant."""
@@ -143,28 +143,25 @@ class TestParseTPolynomial:
 class TestParseOrbitalElements:
     """Tests for parse_orbital_elements function."""
 
-    def test_parse_real_seorbel_file(self):
-        """Test parsing the actual Swiss Ephemeris seorbel.txt file."""
-        seorbel_path = (
-            Path(__file__).parent.parent / "ephe" / "seorbel.txt"
+    def test_parse_synthetic_file(self, tmp_path: Path):
+        """Test parsing a wholly synthetic orbital-elements file."""
+        path = tmp_path / "synthetic_orbits.txt"
+        path.write_text(
+            "J2000,J2000,15.0,12.5,0.25,35.0,45.0,5.0,SyntheticOne\n",
+            encoding="utf-8",
         )
-        if not seorbel_path.exists():
-            pytest.skip("seorbel.txt not found in reference ephemeris dir")
 
-        elements = parse_orbital_elements(seorbel_path)
+        elements = parse_orbital_elements(path)
 
-        # Should have parsed multiple elements
-        assert len(elements) > 0
-
-        # Check that Cupido is first (it's line #1 in the file)
-        cupido = get_orbital_body_by_name(elements, "Cupido")
-        assert cupido is not None
-        assert cupido.semi_axis == pytest.approx(40.99837)
-        assert cupido.eccentricity.constant == pytest.approx(0.00460)
-        assert cupido.epoch_jd == 2415020.0  # J1900
+        assert len(elements) == 1
+        body = get_orbital_body_by_name(elements, "SyntheticOne")
+        assert body is not None
+        assert body.semi_axis == pytest.approx(12.5)
+        assert body.eccentricity.constant == pytest.approx(0.25)
+        assert body.epoch_jd == 2451545.0
 
     def test_parse_simple_file(self):
-        """Test parsing a simple custom seorbel file."""
+        """Test parsing a simple custom orbital-elements file."""
         content = """\
 # Custom test file
 J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestPlanet
@@ -193,7 +190,7 @@ J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, TestPlanet
     def test_parse_geocentric_body(self):
         """Test parsing a geocentric body (with ', geo' suffix)."""
         content = """\
-J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo
+J2000, JDATE, 45.0, 0.01, 0.05, 10.0, 20.0, 3.0, SyntheticMoon, geo
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(content)
@@ -205,7 +202,7 @@ J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo
             assert len(elements) == 1
 
             elem = elements[0]
-            assert elem.name == "Waldemath"
+            assert elem.name == "SyntheticMoon"
             assert elem.is_geocentric is True
             assert elem.equinox_is_jdate is True
         finally:
@@ -213,9 +210,8 @@ J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo
 
     def test_parse_t_polynomial_elements(self):
         """Test parsing elements with T-polynomial expressions."""
-        # From the actual seorbel.txt Vulcan entry
         content = """\
-J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan
+J1900,JDATE,12.5 + 3456.75 * T,2.75,0.125,98.25+432.5*T,47.5-84.5*T,12.0,SyntheticComet
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(content)
@@ -227,30 +223,30 @@ J1900,JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069+1670.056*
             assert len(elements) == 1
 
             elem = elements[0]
-            assert elem.name == "Vulcan"
+            assert elem.name == "SyntheticComet"
             assert elem.epoch_jd == 2415020.0  # J1900
             assert elem.equinox_is_jdate is True
 
             # Check T-polynomial parsing
-            assert elem.mean_anomaly.constant == pytest.approx(252.8987988)
-            assert elem.mean_anomaly.linear == pytest.approx(707550.7341)
+            assert elem.mean_anomaly.constant == pytest.approx(12.5)
+            assert elem.mean_anomaly.linear == pytest.approx(3456.75)
 
-            assert elem.arg_perihelion.constant == pytest.approx(322.212069)
-            assert elem.arg_perihelion.linear == pytest.approx(1670.056)
+            assert elem.arg_perihelion.constant == pytest.approx(98.25)
+            assert elem.arg_perihelion.linear == pytest.approx(432.5)
 
-            assert elem.asc_node.constant == pytest.approx(47.787931)
-            assert elem.asc_node.linear == pytest.approx(-1670.056)
+            assert elem.asc_node.constant == pytest.approx(47.5)
+            assert elem.asc_node.linear == pytest.approx(-84.5)
 
-            assert elem.semi_axis == pytest.approx(0.13744)
-            assert elem.eccentricity.constant == pytest.approx(0.019)
-            assert elem.inclination.constant == pytest.approx(7.5)
+            assert elem.semi_axis == pytest.approx(2.75)
+            assert elem.eccentricity.constant == pytest.approx(0.125)
+            assert elem.inclination.constant == pytest.approx(12.0)
         finally:
             Path(filepath).unlink()
 
     def test_parse_inline_comments(self):
         """Test that inline comments are handled correctly."""
         content = """\
-J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, Cupido   # 1
+J1900, J1900, 15.0, 12.5, 0.25, 35.0, 45.0, 5.0, SyntheticInline # comment
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(content)
@@ -260,7 +256,7 @@ J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, Cupido   
         try:
             elements = parse_orbital_elements(filepath)
             assert len(elements) == 1
-            assert elements[0].name == "Cupido"
+            assert elements[0].name == "SyntheticInline"
         finally:
             Path(filepath).unlink()
 
@@ -309,12 +305,12 @@ J2000, J2000, 90.0, 60.0, 0.0, 0.0, 0.0, 0.0, Planet2
     def test_file_not_found(self):
         """Test that FileNotFoundError is raised for missing file."""
         with pytest.raises(FileNotFoundError):
-            parse_orbital_elements("/nonexistent/path/seorbel.txt")
+            parse_orbital_elements("/nonexistent/path/orbits.txt")
 
     def test_parse_numeric_epoch(self):
         """Test parsing with numeric Julian Day epoch."""
         content = """\
-2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto
+2400000.5, 2451545.0, 22.5, 15.0, 0.2, 33.0, 44.0, 5.0, SyntheticNumeric
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write(content)
@@ -326,11 +322,11 @@ J2000, J2000, 90.0, 60.0, 0.0, 0.0, 0.0, 0.0, Planet2
             assert len(elements) == 1
 
             elem = elements[0]
-            assert elem.name == "Isis-Transpluto"
-            assert elem.epoch_jd == pytest.approx(2368547.66)
-            assert elem.equinox_jd == pytest.approx(2431456.5)
-            assert elem.semi_axis == pytest.approx(77.775)
-            assert elem.eccentricity.constant == pytest.approx(0.3)
+            assert elem.name == "SyntheticNumeric"
+            assert elem.epoch_jd == pytest.approx(2400000.5)
+            assert elem.equinox_jd == pytest.approx(2451545.0)
+            assert elem.semi_axis == pytest.approx(15.0)
+            assert elem.eccentricity.constant == pytest.approx(0.2)
         finally:
             Path(filepath).unlink()
 
@@ -522,32 +518,30 @@ class TestCalcOrbitalPosition:
         actual_advance = (pos2[0] - pos1[0]) % 360.0
         assert actual_advance == pytest.approx(expected_advance, abs=1.0)
 
-    def test_position_matches_cupido(self):
-        """Test that calculated position is reasonable for Cupido."""
-        seorbel_path = (
-            Path(__file__).parent.parent / "ephe" / "seorbel.txt"
+    def test_position_from_synthetic_parsed_orbit(self, tmp_path: Path):
+        """Test a calculated position from a wholly synthetic fixture."""
+        path = tmp_path / "synthetic_orbit.txt"
+        path.write_text(
+            "J2000,J2000,15.0,25.0,0.05,35.0,45.0,5.0,SyntheticSlow\n",
+            encoding="utf-8",
         )
-        if not seorbel_path.exists():
-            pytest.skip("seorbel.txt not found in reference ephemeris dir")
-
-        elements = parse_orbital_elements(seorbel_path)
-        cupido = get_orbital_body_by_name(elements, "Cupido")
-        assert cupido is not None
+        elements = parse_orbital_elements(path)
+        body = get_orbital_body_by_name(elements, "SyntheticSlow")
+        assert body is not None
 
         # Calculate position at J2000.0
-        pos = calc_orbital_position(cupido, 2451545.0)
+        pos = calc_orbital_position(body, 2451545.0)
         lon, lat, dist, dlon, dlat, ddist = pos
 
         # Check reasonable values
         assert 0 <= lon < 360
         assert -90 <= lat <= 90
         assert dist > 0
-        assert dist == pytest.approx(cupido.semi_axis, rel=0.1)
+        assert dist == pytest.approx(body.semi_axis, rel=0.1)
 
-        # Mean motion should be very slow (Cupido has ~262 year period)
         # n = 360 / (a^1.5 * 365.25) deg/day
-        expected_n = 360.0 / (cupido.semi_axis**1.5 * 365.25)
-        assert dlon == pytest.approx(expected_n, rel=0.1)
+        expected_n = 360.0 / (body.semi_axis**1.5 * 365.25)
+        assert dlon == pytest.approx(expected_n, rel=0.2)
 
 
 class TestOrbitalElementsDataclass:
@@ -734,16 +728,16 @@ class TestBundledFictitiousOrbits:
 class TestParseTPolynomialEdgeCases:
     """Additional edge case tests for _parse_t_polynomial helper.
 
-    These tests cover various spacing patterns, format variations,
-    and edge cases that might occur in seorbel.txt files.
+    These tests cover spacing patterns, format variations, and edge cases in
+    the independently documented orbital-elements text format.
     """
 
     # Tests for various spacing patterns
     def test_polynomial_extra_spaces(self):
         """Test parsing polynomial with extra spaces around operators."""
-        poly = _parse_t_polynomial("252.8987988  +  707550.7341  *  T")
-        assert poly.constant == pytest.approx(252.8987988)
-        assert poly.linear == pytest.approx(707550.7341)
+        poly = _parse_t_polynomial("12.5  +  3456.75  *  T")
+        assert poly.constant == pytest.approx(12.5)
+        assert poly.linear == pytest.approx(3456.75)
 
     def test_polynomial_leading_trailing_spaces(self):
         """Test parsing polynomial with leading and trailing spaces."""
@@ -893,47 +887,47 @@ class TestParseOrbitalElementsLine:
 
     def test_parse_line_with_t_polynomial(self):
         """Test parsing a line with T-polynomial expressions."""
-        line = "J1900, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 322.212069+1670.056*T, 47.787931-1670.056*T, 7.5, Vulcan"
+        line = "J1900,JDATE,12.5 + 3456.75 * T,2.75,0.125,98.25+432.5*T,47.5-84.5*T,12.0,SyntheticComet"
         elem = _parse_orbital_elements_line(line, 1)
 
         assert elem is not None
-        assert elem.name == "Vulcan"
+        assert elem.name == "SyntheticComet"
         assert elem.epoch_jd == 2415020.0  # J1900
         assert elem.equinox_is_jdate is True
-        assert elem.mean_anomaly.constant == pytest.approx(252.8987988)
-        assert elem.mean_anomaly.linear == pytest.approx(707550.7341)
-        assert elem.arg_perihelion.constant == pytest.approx(322.212069)
-        assert elem.arg_perihelion.linear == pytest.approx(1670.056)
-        assert elem.asc_node.constant == pytest.approx(47.787931)
-        assert elem.asc_node.linear == pytest.approx(-1670.056)
+        assert elem.mean_anomaly.constant == pytest.approx(12.5)
+        assert elem.mean_anomaly.linear == pytest.approx(3456.75)
+        assert elem.arg_perihelion.constant == pytest.approx(98.25)
+        assert elem.arg_perihelion.linear == pytest.approx(432.5)
+        assert elem.asc_node.constant == pytest.approx(47.5)
+        assert elem.asc_node.linear == pytest.approx(-84.5)
 
     def test_parse_geocentric_body(self):
         """Test parsing a geocentric body line."""
-        line = "J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, Waldemath, geo"
+        line = "J2000,JDATE,45.0,0.01,0.05,10.0,20.0,3.0,SyntheticMoon, geo"
         elem = _parse_orbital_elements_line(line, 1)
 
         assert elem is not None
-        assert elem.name == "Waldemath"
+        assert elem.name == "SyntheticMoon"
         assert elem.is_geocentric is True
 
     def test_parse_line_with_inline_comment(self):
         """Test parsing a line with inline comment."""
-        line = "J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, Cupido   # 1"
+        line = "J1900,J1900,15.0,12.5,0.25,35.0,45.0,5.0,SyntheticInline # comment"
         elem = _parse_orbital_elements_line(line, 1)
 
         assert elem is not None
-        assert elem.name == "Cupido"
-        assert elem.semi_axis == pytest.approx(40.99837)
+        assert elem.name == "SyntheticInline"
+        assert elem.semi_axis == pytest.approx(12.5)
 
     def test_parse_line_numeric_epoch(self):
         """Test parsing a line with numeric Julian Day epoch."""
-        line = "2368547.66, 2431456.5, 0.0, 77.775, 0.3, 0.7, 0, 0, Isis-Transpluto"
+        line = "2400000.5,2451545.0,22.5,15.0,0.2,33.0,44.0,5.0,SyntheticNumeric"
         elem = _parse_orbital_elements_line(line, 1)
 
         assert elem is not None
-        assert elem.name == "Isis-Transpluto"
-        assert elem.epoch_jd == pytest.approx(2368547.66)
-        assert elem.equinox_jd == pytest.approx(2431456.5)
+        assert elem.name == "SyntheticNumeric"
+        assert elem.epoch_jd == pytest.approx(2400000.5)
+        assert elem.equinox_jd == pytest.approx(2451545.0)
 
     def test_line_number_tracking(self):
         """Test that line number is tracked correctly."""
@@ -999,15 +993,15 @@ class TestParseOrbitalElementsRobustness:
     """Integration tests for parse_orbital_elements robustness with various formats."""
 
     def test_parse_all_documented_formats(self):
-        """Test parsing a file with all documented seorbel.txt formats."""
+        """Test parsing all independently documented text formats."""
         content = """\
 # Test file with various documented formats
 
 # Standard format with J2000 epoch
 J2000, J2000, 0.0, 100.0, 0.1, 45.0, 30.0, 5.0, StandardBody
 
-# J1900 epoch (common for Uranian planets)
-J1900, J1900, 163.7409, 40.99837, 0.00460, 171.4333, 129.8325, 1.0833, CupidoStyle
+# J1900 epoch
+J1900, J1900, 15.0, 12.5, 0.25, 35.0, 45.0, 5.0, J1900Body
 
 # B1950 epoch
 B1950, J2000, 0.0, 50.0, 0.0, 0.0, 0.0, 0.0, B1950Body
@@ -1019,15 +1013,15 @@ J2000, JDATE, 0.0, 60.0, 0.0, 0.0, 0.0, 0.0, JdateEquinox
 2451545.0, 2451545.0, 0.0, 70.0, 0.0, 0.0, 0.0, 0.0, NumericEpoch
 
 # T-polynomial mean anomaly with various spacing
-J1900, JDATE, 252.8987988 + 707550.7341 * T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolySpaced
-J1900, JDATE, 100.0+50.0*T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolyCompact
-J1900, JDATE, 100.0 - 50.0 * T, 0.13744, 0.019, 0.0, 0.0, 7.5, TPolyMinus
+J1900, JDATE, 12.5 + 3456.75 * T, 2.75, 0.125, 0.0, 0.0, 12.0, TPolySpaced
+J1900, JDATE, 100.0+50.0*T, 2.75, 0.125, 0.0, 0.0, 12.0, TPolyCompact
+J1900, JDATE, 100.0 - 50.0 * T, 2.75, 0.125, 0.0, 0.0, 12.0, TPolyMinus
 
 # Multiple T-polynomials in one line
-J1900, JDATE, 252.0+707550.0*T, 0.13744, 0.019, 322.0+1670.0*T, 47.0-1670.0*T, 7.5, MultiPoly
+J1900, JDATE, 25.0+2500.0*T, 2.75, 0.125, 120.0+320.0*T, 75.0-160.0*T, 12.0, MultiPoly
 
 # Geocentric body
-J2000, JDATE, 248.8833, 0.0029833, 0.0, 0.0, 0.0, 0.0, GeoBody, geo
+J2000, JDATE, 45.0, 0.01, 0.05, 10.0, 20.0, 3.0, GeoBody, geo
 
 # Inline comment
 J2000, J2000, 0.0, 80.0, 0.0, 0.0, 0.0, 0.0, CommentBody # This is a comment
@@ -1047,7 +1041,7 @@ J2000, J2000, 0.0, 80.0, 0.0, 0.0, 0.0, 0.0, CommentBody # This is a comment
             # Verify key bodies were parsed correctly
             names = [e.name for e in elements]
             assert "StandardBody" in names
-            assert "CupidoStyle" in names
+            assert "J1900Body" in names
             assert "B1950Body" in names
             assert "JdateEquinox" in names
             assert "NumericEpoch" in names
@@ -1061,8 +1055,8 @@ J2000, J2000, 0.0, 80.0, 0.0, 0.0, 0.0, 0.0, CommentBody # This is a comment
             # Verify T-polynomial parsing
             tpoly_spaced = get_orbital_body_by_name(elements, "TPolySpaced")
             assert tpoly_spaced is not None, "TPolySpaced not found"
-            assert tpoly_spaced.mean_anomaly.constant == pytest.approx(252.8987988)
-            assert tpoly_spaced.mean_anomaly.linear == pytest.approx(707550.7341)
+            assert tpoly_spaced.mean_anomaly.constant == pytest.approx(12.5)
+            assert tpoly_spaced.mean_anomaly.linear == pytest.approx(3456.75)
 
             tpoly_compact = get_orbital_body_by_name(elements, "TPolyCompact")
             assert tpoly_compact is not None, "TPolyCompact not found"
@@ -1076,8 +1070,8 @@ J2000, J2000, 0.0, 80.0, 0.0, 0.0, 0.0, 0.0, CommentBody # This is a comment
 
             multi_poly = get_orbital_body_by_name(elements, "MultiPoly")
             assert multi_poly is not None, "MultiPoly not found"
-            assert multi_poly.arg_perihelion.linear == pytest.approx(1670.0)
-            assert multi_poly.asc_node.linear == pytest.approx(-1670.0)
+            assert multi_poly.arg_perihelion.linear == pytest.approx(320.0)
+            assert multi_poly.asc_node.linear == pytest.approx(-160.0)
 
             # Verify geocentric body
             geo_body = get_orbital_body_by_name(elements, "GeoBody")

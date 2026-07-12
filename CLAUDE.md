@@ -31,13 +31,13 @@ pytest tests/test_file.py::TestClass::test_method -v  # Single test
 pytest -k "pattern" -v                                # By keyword
 
 # Skyfield backend (main unit test suite)
-poe test:skyfield:core       # Essential ~490 tests, ~20s (parallel)
-poe test:skyfield:fast       # All unit tests ~5890, ~1 min (parallel, no @slow)
+poe test:skyfield:core       # Essential ~900 tests, ~20s (parallel)
+poe test:skyfield:fast       # All unit tests ~16,000, ~1 min (parallel, no @slow)
 poe test:skyfield:full       # ALL tests including @slow (parallel)
 
 # LEB backend (precomputed Chebyshev ephemeris, ~14x faster)
-poe test:leb:core            # LEB essential ~490 tests, ~20s (parallel)
-poe test:leb:fast            # LEB unit tests ~5890, ~1 min (parallel, no @slow) [RECOMMENDED]
+poe test:leb:core            # LEB essential ~900 tests, ~20s (parallel)
+poe test:leb:fast            # LEB unit tests ~16,000, ~1 min (parallel, no @slow) [RECOMMENDED]
 poe test:leb:full            # LEB ALL unit tests including @slow (sequential)
 
 # Feature-specific suites (via leph CLI)
@@ -78,9 +78,9 @@ LEB Chebyshev approximation error vs Skyfield reference, per body group and tier
 | **IntpApog/IntpPerig** | ~1-2° (pre-regen) | ~1-2° (pre-regen) | ~1-2° (pre-regen) |
 | **Uranians** | ~0.000000" | ~0.000000" | ~0.000000" |
 
-**Precession at extreme dates**: the apparent-place reduction uses the **Vondrák 2011** long-term precession (valid ±200,000 years), via pyerfa — see `libephemeris/precession_vondrak.py`. This replaced the IAU 2006 precession (only valid a few centuries from J2000, ~36" off for the Sun at year -3000) and matches Swiss Ephemeris's precession model. Modern results are unchanged (Vondrák ≡ IAU 2006 to <1 mas near J2000).
+**Precession at extreme dates**: the apparent-place reduction uses the **Vondrák 2011** long-term precession (valid ±200,000 years), via pyerfa — see `libephemeris/precession_vondrak.py`. This replaced the IAU 2006 precession (only valid a few centuries from J2000, ~36" off for the Sun at year -3000) and improves independently measured black-box agreement at extreme dates. Modern results are unchanged (Vondrák ≡ IAU 2006 to <1 mas near J2000).
 
-**Known limitations at extreme dates**: (1) the nutation series still adds ~0.003" of degradation beyond ±2000 years (a physical limit, not a Chebyshev fit error; test floor 0.005" for extended extreme-date tests). (2) Versus pyswisseph specifically, the underlying ephemeris differs (libephemeris DE441 vs Swiss .se1/DE431), an irreducible floor of tens-to-hundreds of arcsec for planets at deep-BCE dates that Vondrák does NOT remove (e.g. Mars ~600" at -3000). For the Sun this floor is small (~6" at -3000 once precession and ΔT are accounted for).
+**Known limitations at extreme dates**: (1) the nutation series still adds ~0.003" of degradation beyond ±2000 years (a physical limit, not a Chebyshev fit error; test floor 0.005" for extended extreme-date tests). (2) Versus pyswisseph specifically, the black-box reference solution differs from libephemeris DE441, creating an irreducible floor of tens-to-hundreds of arcsec for planets at deep-BCE dates that Vondrák does NOT remove (e.g. Mars ~600" at -3000). For the Sun this floor is small (~6" at -3000 once precession and ΔT are accounted for); no internal reference data source is inferred.
 
 **Asteroid SPK coverage**: Safe range 1920-2080 CE. Outside this range, SPK data is unavailable and calculations use Keplerian fallback (catastrophically wrong for LEB compare tests). Test dates are filtered to this range.
 

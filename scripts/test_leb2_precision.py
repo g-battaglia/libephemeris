@@ -134,9 +134,7 @@ def run_test(tier: str, n_dates: int = 200, seed: int = 42) -> bool:
                 if bid in HELIO_ONLY and not (fl & swe.FLG_HELCTR):
                     continue
                 try:
-                    ref[(float(jd), bid, fl)] = swe.calc_ut(float(jd), bid, fl)[0][
-                        :3
-                    ]
+                    ref[(float(jd), bid, fl)] = swe.calc_ut(float(jd), bid, fl)[0][:3]
                 except Exception:
                     pass
     swe.close()

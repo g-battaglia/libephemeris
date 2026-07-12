@@ -436,9 +436,7 @@ class TestKeplerianFrameContract:
 
         jd = 2461204.5  # 2026-06-13
         lon_k, lat_k, _ = calc_minor_body_heliocentric(CERES, jd, use_spk=False)
-        pos_ref, _ = swe.calc_ut(
-            jd - 69.0 / 86400.0, CERES, FLG_HELCTR | FLG_TRUEPOS
-        )
+        pos_ref, _ = swe.calc_ut(jd - 69.0 / 86400.0, CERES, FLG_HELCTR | FLG_TRUEPOS)
         dlon = (
             abs((pos_ref[0] - lon_k + 180) % 360 - 180)
             * 3600

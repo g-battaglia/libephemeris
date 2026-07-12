@@ -149,8 +149,8 @@ Log output format:
 [libephemeris] DEBUG: body=146199 jd=2448045.9167 source=ASSIST (n-body)
 ```
 
-See [Testing -- Source Tracing](../development/testing.md#source-tracing-debug-logs)
-for the full list of log-level source tags.
+See [Testing -- Backend Isolation](../development/testing.md#backend-isolation)
+for guidance on source-selection assertions.
 
 ## When to Use Which
 

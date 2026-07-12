@@ -86,9 +86,7 @@ class TestPlanetOccultWhenGlob:
         jd_start = julday(2020, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            planet_occult_when_glob(
-                jd_start, VENUS, 0, "UnknownStar123", FLG_SWIEPH, 0
-            )
+            planet_occult_when_glob(jd_start, VENUS, 0, "UnknownStar123", FLG_SWIEPH, 0)
 
     def test_swe_alias(self):
         """Test that planet_occult_when_glob is an alias."""
@@ -124,18 +122,14 @@ class TestPlanetOccultWhenLoc:
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError):
-            planet_occult_when_loc(
-                jd_start, VENUS, 0, "", 40.0, -74.0, 0, FLG_SWIEPH
-            )
+            planet_occult_when_loc(jd_start, VENUS, 0, "", 40.0, -74.0, 0, FLG_SWIEPH)
 
     def test_raises_error_for_sun_as_occulting_body(self):
         """Test that Sun cannot be the occulting body."""
         jd_start = julday(2024, 1, 1, 0)
 
         with pytest.raises(ValueError, match="Sun cannot be"):
-            planet_occult_when_loc(
-                jd_start, SUN, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH
-            )
+            planet_occult_when_loc(jd_start, SUN, VENUS, "", 40.0, -74.0, 0, FLG_SWIEPH)
 
     def test_raises_error_for_moon_as_occulting_body(self):
         """Test that Moon cannot be the occulting body."""
@@ -226,7 +220,6 @@ class TestPlanetOccultImports:
 
     def test_swe_aliases_are_same_function(self):
         """Test that swe_* are aliases to base functions."""
-
 
 
 class TestPlanetOccultDocumentation:

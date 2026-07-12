@@ -20,8 +20,8 @@ libephemeris download extended     # -13200 to +17191, full range
 
 ```bash
 pip install libephemeris[nbody]   # REBOUND/ASSIST n-body integration for TNOs
-pip install libephemeris[stars]   # Star catalog building (astropy)
-pip install libephemeris[all]     # All permissive-licensed extras
+pip install libephemeris[stars]   # Star-catalog tooling (astropy + astroquery)
+pip install libephemeris[all]     # Permissive runtime extras (currently astropy)
 pip install libephemeris[all,nbody]  # ... plus the GPL-licensed N-body extra (provenance-ok)
 ```
 

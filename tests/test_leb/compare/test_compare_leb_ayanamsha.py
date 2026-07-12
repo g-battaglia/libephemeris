@@ -81,9 +81,7 @@ class TestAyanamshaConsistency:
 
             # LEB: tropical - sidereal offset
             trop_leb, _ = compare.leb(ephem.calc_ut, jd, SUN, FLG_SPEED)
-            sid_leb, _ = compare.leb(
-                ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL
-            )
+            sid_leb, _ = compare.leb(ephem.calc_ut, jd, SUN, FLG_SPEED | FLG_SIDEREAL)
             offset_leb = (trop_leb[0] - sid_leb[0]) % 360.0
 
             # Skyfield: tropical - sidereal offset

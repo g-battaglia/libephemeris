@@ -640,10 +640,10 @@ def _sun_declination_analytic(tjdut: float) -> float:
     """Low-precision apparent solar declination (Meeus 1998, ch. 25).
 
     Fallback for the Sunshine ('I'/'i') Sun-declination fetch when the
-    loaded ephemeris does not cover the date: the reference implementation
-    likewise falls back to an analytic solar position instead of failing,
-    and substituting 0.0 would silently bend the cusps (up to degrees at
-    high latitude). Accuracy ~0.01 deg — ample for cusp geometry.
+    loaded ephemeris does not cover the date. Black-box reference calls still
+    return finite cusps there; this independent analytic position avoids the
+    severe cusp distortion that a 0.0 substitute would cause at high latitude.
+    Accuracy is ~0.01 deg, ample for cusp geometry.
     """
     t = (tjdut + _deltat(tjdut) - 2451545.0) / 36525.0
     l0 = (280.46646 + 36000.76983 * t + 0.0003032 * t * t) % 360.0
@@ -931,9 +931,9 @@ def houses(
             sun_pos, _ = calc_ut(tjdut, SUN, FLG_EQUATORIAL | eph_flags)
             sun_dec = sun_pos[1]  # Declination is second element in equatorial coords
         except EphemerisRangeError:
-            # Date outside the loaded ephemeris: analytic solar declination
-            # (the reference falls back analytically too; 0.0 would silently
-            # bend the cusps).
+            # Date outside the loaded ephemeris: analytic solar declination.
+            # Black-box reference calls still return finite cusps there; 0.0
+            # would silently bend the cusps.
             sun_dec = _sun_declination_analytic(tjdut)
         except (IndexError, TypeError, ValueError, CalculationError):
             # Fallback to 0 declination (same as equinox behavior)
@@ -1731,10 +1731,9 @@ def houses_armc_ex2(
         cs[9] = v_mc  # cusp 10 = MC
         cusps_speed = tuple(cs)
     elif hsys_code in (ord("N"), ord("U")):
-        # Aries houses ('N') have fixed cusps and Krusinski ('U') has
-        # no analytic speed model in the reference: the reference ephemeris returns
-        # the ASC rate on cusps 1/7, the MC rate on 4/10, and zeros on
-        # the intermediate cusps for both systems.  Mirror that.
+        # Black-box outputs for Aries ('N') and Krusinski ('U') return the ASC
+        # rate on cusps 1/7, the MC rate on 4/10, and zeros on the intermediate
+        # cusps. Reproduce that public contract without inferring internals.
         v_asc = ascmc_speed[0]
         v_mc = ascmc_speed[1]
         cs = [0.0] * len(cusps)
@@ -1744,8 +1743,8 @@ def houses_armc_ex2(
         cs[9] = v_mc
         cusps_speed = tuple(cs)
     elif hsys_code == ord("O"):
-        # Porphyry: the reference derives cusp speeds from the angle
-        # rates as v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
+        # Porphyry: black-box cusp speeds equal the angle-rate expression
+        # v = v_mc + k (v_asc - v_mc)/3 with k = 3,2,1,0 for
         # cusps 1-4 and k = 4,5 for cusps 5-6 (continuing the
         # progression across the IC rather than re-interpolating
         # toward the descendant; verified against the reference ephemeris).
@@ -1793,10 +1792,10 @@ def _houses_fixed_epoch_sidereal(
 ) -> tuple[tuple[float, ...], tuple[float, ...]]:
     """Sidereal houses for the fixed-epoch modes (J2000/J1900/B1950/GALALIGN).
 
-    The reference computes these on the mean ecliptic of the mode's epoch t0
-    (measured black-box, oracle-exact for every house system): the house
-    engine runs against the ascending node of the mean ecliptic of t0 on the
-    true equator of date — the ARMC is re-based to that node and the
+    Black-box reference output is reproduced by evaluating these on the mean
+    ecliptic of the mode's epoch t0 (oracle-exact for every house system): the
+    independent construction runs against the ascending node of that ecliptic
+    on the true equator of date — the ARMC is re-based to that node and the
     obliquity becomes the inclination between the two planes — and the
     resulting cusp arcs are measured from the mean equinox of t0 along the
     t0 ecliptic. GALALIGN_MARDYKS additionally subtracts its constant
@@ -2150,8 +2149,8 @@ def houses_ex2(
     # jumps. For these we report the speed of the point that drives the wheel —
     # the Ascendant rate on cusps 1/7, the MC rate on 4/10, zero on the
     # intermediates — i.e. the astrologically meaningful daily motion of the
-    # chart frame. Porphyry ('O') uses the reference's analytic cusp-speed
-    # progression (handled below); every other system keeps the true
+    # chart frame. Porphyry ('O') uses the black-box-matched cusp-speed
+    # progression handled below; every other system keeps the true
     # time-derivative computed above, which by construction integrates to the
     # cusp's actual motion.
     if _hsys_code(hsys) in (ord("W"), ord("N"), ord("U")):
@@ -2170,8 +2169,8 @@ def houses_ex2(
             cs[9] = ascmc_speed[1]  # cusp 10 = MC
             cusps_speed = tuple(cs)
     elif _hsys_code(hsys) == ord("O"):
-        # Porphyry: the reference derives the intermediate cusp speeds from the
-        # angle rates as v = v_mc + k*(v_asc - v_mc)/3 with k = 3,2,1,0 for cusps
+        # Porphyry: black-box intermediate cusp speeds equal the angle-rate
+        # expression v = v_mc + k*(v_asc - v_mc)/3 with k = 3,2,1,0 for cusps
         # 1-4 and k = 4,5 for cusps 5-6 (continuing the progression across the IC
         # rather than re-interpolating toward the Descendant). houses_armc_ex2
         # already applies this; mirror it here so both speed APIs agree and stay

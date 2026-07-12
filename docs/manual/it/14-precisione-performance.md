@@ -333,7 +333,7 @@ Modalità: leb
 
 ### `"horizons"`
 
-Usa sempre l'API REST NASA JPL Horizons per i calcoli. Questa modalità richiede una connessione internet e non necessita di file di efemeridi locali. Supporta pianeti, asteroidi, Nodo Medio, Apogeo Medio e Uraniani. Corpi o flag non supportati da Horizons (es. `FLG_TOPOCTR`, stelle fisse) passano automaticamente a Skyfield:
+Preferisce l'API REST NASA JPL Horizons per i calcoli. Questa modalità richiede una connessione internet per le richieste supportate e non necessita di file di effemeridi locali per tali richieste. Supporta pianeti, asteroidi, Nodo Medio, Apogeo Medio e Uraniani. Corpi o flag non supportati da Horizons (es. `FLG_TOPOCTR`, stelle fisse) passano automaticamente a Skyfield:
 
 ```python
 import libephemeris as ephem

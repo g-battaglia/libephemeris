@@ -148,7 +148,7 @@ python scripts/generate_leb2.py generate --tier base --group core \
 |-------|------|------|--------|
 | core | `data/leb2/base_core.leb2` | 10.6 MB | Sun-Pluto, Earth, Nodes, Mean Apogee (14) |
 | asteroids | `data/leb2/base_asteroids.leb2` | 8.7 MB | Chiron, Ceres, Pallas, Juno, Vesta (5) |
-| exotics | `data/leb2/base_exotics.leb2` | 59.0 MB | Centaurs, TNOs, NEAs (31) |
+| exotics | `data/leb2/base_exotics.leb2` | 59.0 MB | Generated locally; not currently in the release download manifest |
 | apogee | `data/leb2/base_apogee.leb2` | 11.4 MB | OscuApog, IntpApog, IntpPerig (3) |
 | uranians | `data/leb2/base_uranians.leb2` | 2.1 MB | Cupido-Transpluto (9) |
 | **Total** | | **91.7 MB** | **62 bodies** |
@@ -264,7 +264,7 @@ set_calc_mode("leb")
 Auto-discovery: files in `~/.libephemeris/leb/` are found automatically.
 
 ```bash
-# End-user download
+# End-user download (published groups only; exotics is currently skipped)
 libephemeris download leb-base       # ~53 MB
 libephemeris download leb-medium     # ~175 MB
 libephemeris download leb-extended   # ~1.6 GB

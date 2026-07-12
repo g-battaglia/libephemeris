@@ -395,6 +395,18 @@ class TestSplitDegNakshatra:
         result = split_deg(359.9, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
         assert result[4] == 0
 
+    @pytest.mark.unit
+    def test_nakshatra_round_deg_matches_reference_truncation(self):
+        """Nakshatra rounding preserves reference floating-point field values."""
+        result = split_deg(0.09, SPLIT_DEG_NAKSHATRA | SPLIT_DEG_ROUND_DEG)
+        assert result == (0, 35, 23, 23.0, 0)
+
+    @pytest.mark.unit
+    def test_nakshatra_decimal_boundary_keeps_raw_index(self):
+        """The reference span constant puts this longitude in index 28."""
+        result = split_deg(373.3333333333333, SPLIT_DEG_NAKSHATRA)
+        assert result[4] == 28
+
 
 class TestSplitDegMain:
     """Cover the main split_deg path (lines 1604-1645)."""

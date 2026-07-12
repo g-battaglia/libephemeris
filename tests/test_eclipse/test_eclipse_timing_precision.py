@@ -64,9 +64,7 @@ class TestSolarEclipseTiming:
 
     def test_sol_eclipse_filter_annular(self):
         """Can filter for annular eclipses only."""
-        retflag, tret = swe.sol_eclipse_when_glob(
-            JD_J2000, FLG_SWIEPH, ECL_ANNULAR
-        )
+        retflag, tret = swe.sol_eclipse_when_glob(JD_J2000, FLG_SWIEPH, ECL_ANNULAR)
         assert retflag & ECL_ANNULAR
 
     def test_sol_eclipse_duration_reasonable(self):

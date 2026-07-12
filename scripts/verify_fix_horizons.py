@@ -59,7 +59,7 @@ def main() -> int:
         speed_ok = True
         if flags & FLG_SPEED:
             dspd = abs(got[3] - ref[3]) * 3600.0
-            speed_note = f" dspeed={dspd:.4f}\"/d"
+            speed_note = f' dspeed={dspd:.4f}"/d'
             # 0.5"/day allows the known LEB-analytic vs apparent-derivative
             # difference (~0.1-0.35"/day) while catching real regressions.
             speed_ok = dspd <= 0.5
@@ -68,7 +68,7 @@ def main() -> int:
         if not ok:
             failures += 1
         print(
-            f"{status} {name}: dlon={dlon:.4f}\" dlat={dlat:.4f}\" "
+            f'{status} {name}: dlon={dlon:.4f}" dlat={dlat:.4f}" '
             f"ddist_rel={ddist_rel:.2e}{speed_note}"
         )
     if failures:

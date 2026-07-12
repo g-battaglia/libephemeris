@@ -6,13 +6,22 @@ station's speed is ~0 and the motion reverses, a node crossing has zero latitude
 and forward/backward searches land on the correct side. This is the property that
 caught the cross_ut bugs; here it guards the rest of the family.
 """
+
 from __future__ import annotations
 
 import pytest
 
 import libephemeris as L
 from libephemeris.constants import (
-    SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN, FLG_SWIEPH, FLG_SPEED,
+    SUN,
+    MOON,
+    MERCURY,
+    VENUS,
+    MARS,
+    JUPITER,
+    SATURN,
+    FLG_SWIEPH,
+    FLG_SPEED,
     FLG_HELCTR,
 )
 
@@ -65,10 +74,16 @@ def test_helio_cross_forward_and_backward(body):
         for target in (37.0, 211.0):
             fwd = L.helio_cross_ut(body, target, start, FLG_SWIEPH)
             assert fwd >= start - 1e-6
-            assert _wrap(L.calc_ut(fwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
+            assert (
+                _wrap(L.calc_ut(fwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target)
+                < 1e-3
+            )
             bwd = L.helio_cross_ut(body, target, start, FLG_SWIEPH, True)
             assert bwd <= start + 1e-6
-            assert _wrap(L.calc_ut(bwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target) < 1e-3
+            assert (
+                _wrap(L.calc_ut(bwd, body, FLG_SWIEPH | FLG_HELCTR)[0][0], target)
+                < 1e-3
+            )
 
 
 @pytest.mark.slow

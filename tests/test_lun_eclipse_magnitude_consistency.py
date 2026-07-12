@@ -43,7 +43,7 @@ _GEO = (0.0, 0.0, 0.0)  # lunar-eclipse magnitude is observer-independent
 # NASA Five Millennium Canon of Lunar Eclipses: umbral magnitude at greatest
 # eclipse. (year, month, umbral_magnitude, kind)
 _NASA_UMBRAL = [
-    (2018, 7, 1.6087, "total"),    # longest total eclipse of the 21st century
+    (2018, 7, 1.6087, "total"),  # longest total eclipse of the 21st century
     (2019, 1, 1.1956, "total"),
     (2021, 5, 1.0095, "total"),
     (2022, 5, 1.4141, "total"),

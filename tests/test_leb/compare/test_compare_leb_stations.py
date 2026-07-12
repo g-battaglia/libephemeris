@@ -44,9 +44,7 @@ class TestFindStation:
         ref_result = compare.skyfield(
             ephem.find_station_ut, body_id, jd_start, 0, jd_end
         )
-        leb_result = compare.leb(
-            ephem.find_station_ut, body_id, jd_start, 0, jd_end
-        )
+        leb_result = compare.leb(ephem.find_station_ut, body_id, jd_start, 0, jd_end)
 
         if ref_result[0] != 0 and leb_result[0] != 0:
             ref_jd = ref_result[1][0]
@@ -121,9 +119,7 @@ class TestNextRetrograde:
         """Retrograde period timing matches within tolerance."""
         jd_start = year_to_jd(2024)
 
-        ref_result = compare.skyfield(
-            ephem.next_retrograde_ut, body_id, jd_start, 0
-        )
+        ref_result = compare.skyfield(ephem.next_retrograde_ut, body_id, jd_start, 0)
         leb_result = compare.leb(ephem.next_retrograde_ut, body_id, jd_start, 0)
 
         if ref_result[0] != 0 and leb_result[0] != 0:

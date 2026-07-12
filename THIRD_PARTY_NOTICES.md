@@ -56,7 +56,6 @@ the project under the Apache-2.0 license. Theory specification:
 | jplephem | MIT | Transitive via skyfield; SPK kernel reader |
 | sgp4 | MIT | Transitive via skyfield |
 | numpy | BSD-3-Clause | Transitive |
-| astroquery | BSD-3-Clause | JPL Horizons / SPK downloads |
 | pyerfa | BSD-3-Clause | Bundles the ERFA C library, distributed under the ERFA license (permissive, SOFA-derived, with naming restrictions) |
 | click | BSD-3-Clause | CLI framework |
 | certifi | MPL-2.0 | Used unmodified; MPL file-level copyleft imposes no obligation on LibEphemeris code |
@@ -64,6 +63,13 @@ the project under the Apache-2.0 license. Theory specification:
 
 Dependencies are installed from PyPI by the user or installer under their
 own licenses; they are not part of LibEphemeris's license grant.
+
+## Optional permissive tooling
+
+| Package | License | Notes |
+|---|---|---|
+| astropy | BSD-3-Clause | Installed by the `stars` extra for star-catalog tooling; also a development dependency |
+| astroquery | BSD-3-Clause | Installed by the `stars` extra and development environment for catalog/validation scripts; runtime SPK downloads use LibEphemeris's direct JPL Horizons HTTPS client |
 
 ## Optional `nbody` extra — GPL-3.0 (not bundled)
 
@@ -117,8 +123,9 @@ strong-copyleft (GPL/LGPL/AGPL) dependency.
   the `dev` extra), is never imported by the shipped package, and is not a
   runtime dependency. See [NOTICE.md](NOTICE.md) for the independence
   statement.
-- **Swiss Ephemeris reference data files** (`sefstars.txt`, `seorbel.txt`,
-  `*.se1`): used only as local oracle inputs by the comparison/calibration
-  tooling in the separate `validation/` repository; they are gitignored
-  (`data/reference/`), never tracked by this repository, and never bundled
-  in any artifact.
+- **Reference-distribution source and data artifacts are prohibited.** Neither
+  this repository nor its separate validation worktree may contain or consume
+  those files. Compatibility validation calls the installed Python API strictly
+  as a black box and records only public inputs and outputs; the provenance gate
+  rejects known reference-distribution filenames and `data/reference`
+  directories even when they are ignored or untracked.

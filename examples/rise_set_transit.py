@@ -210,9 +210,7 @@ def example_moonrise_moonset() -> None:
     print("Date: 2024-04-08\n")
 
     # Calculate moonrise
-    flag, tret = eph.rise_trans(
-        jd_start, MOON, CALC_RISE, [longitude, latitude, 0.0]
-    )
+    flag, tret = eph.rise_trans(jd_start, MOON, CALC_RISE, [longitude, latitude, 0.0])
     jd_moonrise = tret[0]
 
     # Calculate moonset
@@ -220,9 +218,7 @@ def example_moonrise_moonset() -> None:
     jd_moonset = tret[0]
 
     # Calculate moon transit
-    _, tret = eph.rise_trans(
-        jd_start, MOON, CALC_MTRANSIT, [longitude, latitude, 0.0]
-    )
+    _, tret = eph.rise_trans(jd_start, MOON, CALC_MTRANSIT, [longitude, latitude, 0.0])
     jd_transit = tret[0]
 
     if flag != -2:  # -2 means circumpolar (never rises/sets)
@@ -347,13 +343,9 @@ def example_no_refraction() -> None:
     print("slightly higher than it actually is, affecting rise/set times.\n")
 
     # With refraction (default)
-    _, tret = eph.rise_trans(
-        jd_start, SUN, CALC_RISE, [longitude, latitude, altitude]
-    )
+    _, tret = eph.rise_trans(jd_start, SUN, CALC_RISE, [longitude, latitude, altitude])
     jd_rise_refr = tret[0]
-    _, tret = eph.rise_trans(
-        jd_start, SUN, CALC_SET, [longitude, latitude, altitude]
-    )
+    _, tret = eph.rise_trans(jd_start, SUN, CALC_SET, [longitude, latitude, altitude])
     jd_set_refr = tret[0]
 
     # Without refraction

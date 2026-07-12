@@ -108,9 +108,7 @@ def _jd_for_year(year: float) -> float:
 def synthetic_perigee_table(monkeypatch):
     """Install a tiny deterministic perigee correction table."""
     monkeypatch.setattr(lunar, "_PERIGEE_CORRECTIONS_AVAILABLE", True)
-    monkeypatch.setattr(
-        lunar, "PERIGEE_PERTURBATION_CORRECTIONS", (10.0, 20.0, 30.0)
-    )
+    monkeypatch.setattr(lunar, "PERIGEE_PERTURBATION_CORRECTIONS", (10.0, 20.0, 30.0))
     monkeypatch.setattr(lunar, "PERIGEE_CORRECTION_START_YEAR", 2000)
     monkeypatch.setattr(lunar, "PERIGEE_CORRECTION_END_YEAR", 2010)
     monkeypatch.setattr(lunar, "PERIGEE_CORRECTION_STEP_YEARS", 2)
@@ -178,7 +176,9 @@ _APSE_N = 3
 
 def test_apse_correction_empty():
     """Line 294: empty corrections / zero count returns 0.0."""
-    assert lunar._interpolate_apse_correction(_APSE_START, _APSE_START, 10.0, (), 0) == 0.0
+    assert (
+        lunar._interpolate_apse_correction(_APSE_START, _APSE_START, 10.0, (), 0) == 0.0
+    )
 
 
 def test_apse_correction_before_start_within_taper():

@@ -637,9 +637,7 @@ class TestUranianLongitudeSpeed:
         for jd in (2386562.0, 2386563.0, 2386564.0, 2386565.0):
             dlon = calc_uranian_planet(CUPIDO, jd)[3]
             assert abs(dlon) < 0.01, f"jd {jd}: dlon {dlon} (wrap artefact)"
-            assert dlon == pytest.approx(
-                _unwrapped_central_dlon(CUPIDO, jd), abs=1e-9
-            )
+            assert dlon == pytest.approx(_unwrapped_central_dlon(CUPIDO, jd), abs=1e-9)
 
     def test_calc_heliocentric_speed_sane_across_crossing(self):
         # The public calc() heliocentric path forwards this speed, so it must

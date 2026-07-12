@@ -19,9 +19,6 @@ Usage:
     python scripts/download_spk.py --cache-dir /path  # Use custom cache directory
     python scripts/download_spk.py --chunk 20         # Use 20-year chunks
 
-Requirements:
-    pip install astroquery
-
 """
 
 import argparse
@@ -76,16 +73,6 @@ COMMON_BODIES = [
     "eris",
     "sedna",
 ]
-
-
-def check_astroquery() -> bool:
-    """Check if astroquery is available."""
-    try:
-        from astroquery.jplhorizons import Horizons  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
 
 
 def download_spk_for_body(
@@ -396,15 +383,6 @@ For full initialization, prefer:  libephemeris init
     if args.list_cache:
         list_cache_contents(args.cache_dir)
         return 0
-
-    # Check astroquery
-    if not check_astroquery():
-        print(
-            "Error: astroquery is required for downloading SPK files.",
-            file=sys.stderr,
-        )
-        print("Install it with: pip install astroquery", file=sys.stderr)
-        return 1
 
     # Determine which bodies to download
     bodies_to_download: list[str] = []

@@ -1,8 +1,16 @@
-# Roadmap
+# Historical Roadmap and Status Record
 
-Current project status and remaining tasks for LibEphemeris.
+This document preserves the development plan and completion record assembled in
+March 2026.
 
 > Last updated: March 2026
+
+> **Historical snapshot — not the current release checklist.** Later releases
+> changed test commands, counts, download manifests, module locations, and some
+> fallback behavior. Completed items below describe the state when they were
+> closed; open items must be revalidated against current code before being
+> treated as planned work. Use the [Architecture Overview](architecture-overview.md),
+> [Testing Guide](testing.md), and current issue tracker for present behavior.
 
 ## Table of Contents
 

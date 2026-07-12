@@ -237,9 +237,7 @@ class TestFastCalcFlags:
     @pytest.mark.integration
     def test_equatorial_j2000_flag(self, leb_reader, jd_mid):
         """FLG_EQUATORIAL|FLG_J2000 should return J2000 RA/Dec."""
-        result, _ = fast_calc_ut(
-            leb_reader, jd_mid, SUN, FLG_EQUATORIAL | FLG_J2000
-        )
+        result, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_EQUATORIAL | FLG_J2000)
         assert 0.0 <= result[0] < 360.0, f"RA = {result[0]}"
         assert -90.0 <= result[1] <= 90.0, f"Dec = {result[1]}"
 
@@ -309,6 +307,7 @@ class TestFastCalcFlags:
     def test_radians_flag(self, leb_reader, jd_mid):
         """FLG_RADIANS returns coordinates in radians."""
         import math
+
         result_deg, _ = fast_calc_ut(leb_reader, jd_mid, SUN, 0)
         result_rad, _ = fast_calc_ut(leb_reader, jd_mid, SUN, FLG_RADIANS)
         assert abs(result_rad[0] - math.radians(result_deg[0])) < 1e-10

@@ -316,7 +316,7 @@ def propagate_proper_motion(
           standard in the Hipparcos catalog (column "pmRA" or mu_alpha*).
           This represents actual angular motion on the sky in the RA direction.
 
-        - For stars near the poles (|dec| > 89.9 degrees), numerical precision
+        - For stars near the poles (``abs(dec) > 89.9`` degrees), numerical precision
           may degrade due to the 1/cos(dec) factor. However, proper motion
           values are also smaller in the RA direction for polar stars.
 

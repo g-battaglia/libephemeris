@@ -149,9 +149,7 @@ class TestStarBasedFallback:
             )
 
     @pytest.mark.leb_compare
-    def test_star_based_speed_no_spike_at_ayanamsha_wrap(
-        self, compare: CompareHelper
-    ):
+    def test_star_based_speed_no_spike_at_ayanamsha_wrap(self, compare: CompareHelper):
         """No speed spike where the star-anchored ayanamsha wraps at 0/360.
 
         SIDM_GALCENT_COCHRANE's ayanamsha crosses 0 deg inside the medium

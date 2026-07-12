@@ -1,60 +1,43 @@
 # Release Notes
 
 The authoritative, machine-checkable change history lives in
-[`CHANGELOG.md`](CHANGELOG.md). Long-form, narrative release notes for each
-version live under [`release-notes/`](release-notes/). This file front-pages the
-current release.
+[`CHANGELOG.md`](CHANGELOG.md). Long-form notes for each release live under
+[`release-notes/`](release-notes/). This page points to the candidate currently
+prepared in the source tree.
 
 ---
 
-## 3.0.0rc2 — the v3.0.0 release candidate (2026-06-29)
+## 3.0.0rc8 — prepared review candidate (2026-07-13)
 
-**v3.0.0 is the Apache-2.0, provenance-remediated release** that re-grounds the
-whole library on long-term-valid models (Vondrák 2011 precession & obliquity,
-long-term sidereal-time house cusps, a multi-era Delta T with a selectable
-model) and ships a full review-driven correctness sweep across eclipses,
-houses, fixed stars, minor bodies, and the LEB / Horizons backends — while
-keeping the v2 canonical bare-name public API and 1:1 reference parity except
-for documented intentional divergences.
+`3.0.0rc8` is the candidate currently prepared in this source tree; it has not
+yet been published to PyPI. It is a clean-room review and release-hardening pass
+over rc7, with focused fixes for context entry points, forced backend selection,
+nakshatra boundaries, pre-UTC Julian dates, packaging, and public API
+documentation.
 
-`3.0.0rc2` is the **second release candidate** of the v3 line and the first to
-ship under the new license: it **relicenses the project from the previous
-AGPL-3.0 / commercial dual license to the permissive Apache License 2.0** (see
-[`LICENSE`](LICENSE) and [`LICENSING.md`](LICENSING.md)). It is published on the
-PyPI pre-release channel and will be promoted to `3.0.0` final unchanged if it
-proves clean.
-
-```bash
-pip install --pre libephemeris==3.0.0rc2
-```
+After publication it will be installable with
+`pip install --pre libephemeris==3.0.0rc8`. Until then, install this source tree
+to evaluate rc8.
 
 Highlights:
 
-- **Apache-2.0 license** — permissive, free for closed-source and commercial
-  use, on a documented-provenance footing with no copyleft code in the shipped
-  package (see `LICENSING.md` / `THIRD_PARTY_NOTICES.md`). The optional `nbody`
-  extra pulls in GPL-3.0 `rebound`/`assist`, which are never bundled.
-- **Vondrák 2011 long-term precession & obliquity** across the whole pipeline
-  (valid ±200,000 years); modern results unchanged to sub-milliarcsecond.
-- **Multi-era Delta T** with a selectable model (`set_delta_t_model`).
-- **Long-term house cusps** and **true time-derivative cusp speeds**
-  (`houses_ex2`).
-- **Eclipse / occultation / fixed-star / minor-body correctness sweep** and a
-  functional live **Horizons** backend.
-- A hardened **test & validation** regime (100% line-coverage campaign,
-  oracle-free invariants, independent cross-checks).
+- `EphemerisContext.calc()` and `calc_ut()` now preserve backend, flag, and
+  tracing semantics across LEB, Skyfield, Horizons, SPK, ASSIST, and Keplerian
+  paths.
+- Explicit Skyfield or Horizons mode bypasses a cached LEB reader.
+- `split_deg()` handles nakshatra boundary-adjacent values consistently.
+- Pre-1972 Julian-calendar input is mapped to the correct civil instant.
+- The documented top-level export surface now includes all intentionally public
+  performance helpers, eclipse extensions, moon identifiers, and constants.
+- Clean-room and packaging checks cover ignored/untracked worktree artifacts,
+  data namespaces, optional dependencies, wheels, and source distributions.
+- API documentation is generated from the live public exports and validated by
+  strict Sphinx and focused contract tests.
 
-**Upgrading from v2?** Several observable behavior changes are deliberate
-(default sidereal ayanamsha, eclipse retflags/obscuration, error policy, fixed
-stars, remote-epoch positions, house speeds). Re-check any pinned values against
-the migration table in
-[`release-notes/v3.0.0rc2.md`](release-notes/v3.0.0rc2.md),
-[`docs/guides/migration-guide.md`](docs/guides/migration-guide.md), and
-[`docs/comparison/intentional-divergences.md`](docs/comparison/intentional-divergences.md).
-
-Full detail:
-[release-notes/v3.0.0rc2.md](release-notes/v3.0.0rc2.md) ·
-[CHANGELOG.md](CHANGELOG.md).
+For the complete rc8 fixes and upgrade details, see
+[`release-notes/v3.0.0rc8.md`](release-notes/v3.0.0rc8.md),
+[`CHANGELOG.md`](CHANGELOG.md), and the
+[`migration guide`](docs/guides/migration-guide.md).
 
 ---
 
@@ -62,11 +45,10 @@ Full detail:
 
 Per-version narrative notes are under [`release-notes/`](release-notes/):
 
-- **2.0.0** (2026-05-14) — removal of the legacy `swe_`/`SE_`/`SEFLG_` prefixed
-  aliases in favour of the canonical bare-name public API; see `CHANGELOG.md`.
-- **1.x** — the LEB binary-ephemeris line (LEB1/LEB2 compressed format, page-cache
-  management, performance work). See `release-notes/v1.*.md`.
-- **0.x** — early development. See `release-notes/v0.*.md`.
+- **3.0.0rc7 and earlier v3 prereleases** — correctness, licensing,
+  provenance, precision, and compatibility history.
+- **2.x** — canonical bare-name API and removal of legacy prefixed aliases.
+- **1.x** — the LEB binary-ephemeris and performance line.
+- **0.x** — early development.
 
-For the complete, structured history of every release, see
-[`CHANGELOG.md`](CHANGELOG.md).
+For the complete structured history, see [`CHANGELOG.md`](CHANGELOG.md).

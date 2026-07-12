@@ -120,9 +120,7 @@ class TestSweSolEclipseWhereApril2024:
         retflag, geopos, attr = sol_eclipse_where(self.tjd_ut, FLG_SWIEPH)
 
         # Should be central eclipse
-        assert retflag & ECL_CENTRAL, (
-            f"Expected central eclipse, got flags: {retflag}"
-        )
+        assert retflag & ECL_CENTRAL, f"Expected central eclipse, got flags: {retflag}"
 
     def test_attributes_are_valid(self):
         """Test that eclipse attributes are in valid ranges."""
@@ -236,9 +234,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_finds_eclipse_at_dallas(self):
         """Test that function finds eclipse at Dallas."""
-        retflag, attr = sol_eclipse_how(
-            self.tjd_ut, self.geopos_dallas, FLG_SWIEPH
-        )
+        retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         # Should find an eclipse (non-zero return flag)
         assert retflag != 0
@@ -246,18 +242,14 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_dallas_eclipse_is_total(self):
         """Test that Dallas sees a total eclipse."""
-        retflag, attr = sol_eclipse_how(
-            self.tjd_ut, self.geopos_dallas, FLG_SWIEPH
-        )
+        retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         # Should be total eclipse
         assert retflag & ECL_TOTAL, f"Expected total eclipse, got flags: {retflag}"
 
     def test_dallas_obscuration_is_total(self):
         """Test that obscuration at Dallas is ~100% (within 1%)."""
-        retflag, attr = sol_eclipse_how(
-            self.tjd_ut, self.geopos_dallas, FLG_SWIEPH
-        )
+        retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         obscuration = attr[2]
         # For total eclipse, obscuration should be ~1.0 (within 1%)
@@ -267,9 +259,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_dallas_attributes_are_valid(self):
         """Test that eclipse attributes at Dallas are in valid ranges."""
-        retflag, attr = sol_eclipse_how(
-            self.tjd_ut, self.geopos_dallas, FLG_SWIEPH
-        )
+        retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         magnitude = attr[0]
         ratio = attr[1]
@@ -307,9 +297,7 @@ class TestSweSolEclipseHowDallasApril2024:
 
     def test_refraction_included(self):
         """Test that apparent altitude differs from true altitude (refraction)."""
-        retflag, attr = sol_eclipse_how(
-            self.tjd_ut, self.geopos_dallas, FLG_SWIEPH
-        )
+        retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_dallas, FLG_SWIEPH)
 
         true_alt = attr[5]
         apparent_alt = attr[6]
@@ -345,9 +333,7 @@ class TestSweSolEclipseHowNYCApril2024:
         retflag, attr = sol_eclipse_how(self.tjd_ut, self.geopos_nyc, FLG_SWIEPH)
 
         # Should be partial eclipse (not total)
-        assert retflag & ECL_PARTIAL, (
-            f"Expected partial eclipse, got flags: {retflag}"
-        )
+        assert retflag & ECL_PARTIAL, f"Expected partial eclipse, got flags: {retflag}"
         assert not (retflag & ECL_TOTAL), "Should not be total at NYC"
 
     def test_nyc_obscuration_is_partial(self):

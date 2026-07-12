@@ -147,7 +147,7 @@ All batches 1–7 pass with zero failures:
 
 ## Known Tolerance Issues (NOT bugs)
 
-12 known tolerance issues documented in `tasks/results/bugs.md` (KI-001 through KI-012). These are inherent differences between JPL DE440 data and Swiss Ephemeris internal data, not implementation bugs.
+12 known tolerance issues documented in `tasks/results/bugs.md` (KI-001 through KI-012). These are measured differences between JPL DE440 results and black-box reference output, not implementation bugs; no reference internals are inferred.
 
 ---
 

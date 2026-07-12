@@ -9,6 +9,7 @@ sidereal offset was applied correctly, so the bug only bit at extreme dates.
 These check the contract that holds for every other body: sidereal longitude =
 (tropical - ayanamsa) mod 360, across both the in-range and the fallback path.
 """
+
 from __future__ import annotations
 
 import pytest

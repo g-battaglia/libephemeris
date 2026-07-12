@@ -97,7 +97,9 @@ class TestLoadDotenv:
 
     def test_load_from_explicit_path(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
-        env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_A=hello\nLIBEPHEMERIS_TEST_DOTENV_B=world\n")
+        env_file.write_text(
+            "LIBEPHEMERIS_TEST_DOTENV_A=hello\nLIBEPHEMERIS_TEST_DOTENV_B=world\n"
+        )
 
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_A", None)
@@ -117,7 +119,9 @@ class TestLoadDotenv:
         env_file = tmp_path / ".env"
         env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_X=from_file\n")
 
-        with mock.patch.dict(os.environ, {"LIBEPHEMERIS_TEST_DOTENV_X": "from_env"}, clear=False):
+        with mock.patch.dict(
+            os.environ, {"LIBEPHEMERIS_TEST_DOTENV_X": "from_env"}, clear=False
+        ):
             load_dotenv(env_file)
             assert os.environ["LIBEPHEMERIS_TEST_DOTENV_X"] == "from_env"
 
@@ -125,7 +129,9 @@ class TestLoadDotenv:
         env_file = tmp_path / ".env"
         env_file.write_text("LIBEPHEMERIS_TEST_DOTENV_Y=from_file\n")
 
-        with mock.patch.dict(os.environ, {"LIBEPHEMERIS_TEST_DOTENV_Y": "from_env"}, clear=False):
+        with mock.patch.dict(
+            os.environ, {"LIBEPHEMERIS_TEST_DOTENV_Y": "from_env"}, clear=False
+        ):
             load_dotenv(env_file, override=True)
             assert os.environ["LIBEPHEMERIS_TEST_DOTENV_Y"] == "from_file"
 
@@ -228,7 +234,6 @@ class TestLoadDotenv:
         for k in keys:
             os.environ.pop(k, None)
 
-
     def test_non_libephemeris_keys_are_not_exported(self, tmp_path):
         """Keys outside LIBEPHEMERIS_* never reach os.environ.
 
@@ -238,9 +243,7 @@ class TestLoadDotenv:
         import os
 
         env_file = tmp_path / ".env"
-        env_file.write_text(
-            "SECRET_API_KEY=hunter2\nLIBEPHEMERIS_TEST_DOTENV_OK=1\n"
-        )
+        env_file.write_text("SECRET_API_KEY=hunter2\nLIBEPHEMERIS_TEST_DOTENV_OK=1\n")
         os.environ.pop("SECRET_API_KEY", None)
         os.environ.pop("LIBEPHEMERIS_TEST_DOTENV_OK", None)
         try:

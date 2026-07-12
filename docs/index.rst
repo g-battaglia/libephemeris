@@ -4,14 +4,14 @@ libephemeris Documentation
 libephemeris is a pure-Python astronomical ephemeris library, API-compatible
 with pyswisseph. It provides high-precision planetary positions,
 house calculations, eclipse predictions, and more using NASA JPL DE440/DE441
-ephemerides via Skyfield.
+through local Skyfield, precomputed LEB, and remote Horizons backends.
 
 Features
 --------
 
 - **pyswisseph Compatible**: Drop-in replacement for pyswisseph
 - **Readable Python**: the ephemeris algorithms are plain, inspectable Python (on the standard NumPy/Skyfield/pyerfa stack)
-- **High Precision**: Uses NASA JPL DE440/DE441 ephemeris via Skyfield
+- **High Precision**: Uses NASA JPL DE440/DE441 ephemerides and IAU/ERFA reductions
 - **Four Calculation Modes**: auto, skyfield, leb, horizons
 - **25 House Systems**: Including Placidus, Koch, Whole Sign, and more (26 codes with A/E alias)
 - **47 Ayanamshas**: Full sidereal zodiac support
@@ -91,6 +91,7 @@ Contents
    :caption: Methodology
 
    methodology/overview
+   methodology/independence
    methodology/delta-t
    methodology/sidereal-time-longterm
    methodology/planet-centers-spk
@@ -101,6 +102,7 @@ Contents
    methodology/hypothetical-bodies
    methodology/pyerfa-integration
    methodology/rebound-integration
+   methodology/galilean-e5-spec
 
 .. toctree::
    :maxdepth: 2
@@ -130,6 +132,22 @@ Contents
    development/precision-history
    development/keplerian-improvements
    development/full-range-coverage
+   analysis/skyfield-to-leb-porting
+   analysis/test-performance-analysis
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Manuals
+
+   manual/en/README
+   manual/it/README
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Documentation Map
+
+   README
+   PRECISION
 
 
 Indices and Tables

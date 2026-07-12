@@ -47,6 +47,11 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
     sys.exit(subprocess.call([sys.executable, *args], env=run_env))
 
 
+def _skyfield_pytest(args: list[str]) -> None:
+    """Run pytest with the Skyfield backend selected explicitly."""
+    _pytest([*args, "--calc-mode", "skyfield"])
+
+
 # ---------------------------------------------------------------------------
 # Root test group
 # ---------------------------------------------------------------------------
@@ -55,7 +60,7 @@ def _python(args: list[str], env: dict[str, str] | None = None) -> None:
 @click.group(
     "test",
     short_help="Run tests: unit, lunar, LEB, Horizons, coverage.",
-    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~490 tests, ~20s\n  leph test leb-backend unit-fast    # ~5890 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
+    help="Run tests: unit, lunar, LEB format, Horizons, coverage.\n\nEach subgroup specifies WHAT is tested and WHICH backend is used.\nUse TAB completion to explore: leph test <TAB>\n\nRecommended for daily development:\n\n  leph test skyfield essential       # ~900 tests, ~20s\n  leph test leb-backend unit-fast    # ~16,000 tests, ~1 min\n\nNever run the full test suite -- always pick a targeted subcommand.",
 )
 def test_group() -> None:
     """Test runner with clear backend/target naming."""
@@ -95,6 +100,7 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "tests/test_ephemeris_config.py",
     "tests/test_extinction.py",
     "tests/test_logging_config.py",
+    "tests/test_packaging_metadata.py",
     "tests/test_dotenv.py",
     "tests/test_type_safety.py",
     "tests/test_golden_regression.py",
@@ -122,8 +128,8 @@ _SMOKE_FILES = _ESSENTIAL_FILES + [
     "kernels via the Skyfield library and computes positions in real time.\n"
     "Requires DE440 data to be downloaded first (leph download spk-medium).\n\n"
     "Start here:\n\n"
-    "  leph test skyfield essential   # ~490 tests, ~20s, parallel\n"
-    "  leph test skyfield smoke       # ~1460 tests, ~30s, parallel",
+    "  leph test skyfield essential   # ~900 tests, ~20s, parallel\n"
+    "  leph test skyfield smoke       # ~1,700 tests, ~30s, parallel",
 )
 def skyfield_group() -> None:
     """Unit tests using the Skyfield/DE440 backend."""
@@ -139,7 +145,7 @@ def skyfield_all() -> None:
     Runs the tests/ tree (pytest.ini testpaths).
     Sequential execution means slower but easier to debug failures.
     """
-    _pytest(["-m", "not slow"])
+    _skyfield_pytest(["-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -152,7 +158,7 @@ def skyfield_all_full() -> None:
     Includes iterative search tests, hypothesis property tests, and other
     slow tests that are normally skipped. Very slow (~10+ min).
     """
-    _pytest([])
+    _skyfield_pytest([])
 
 
 @skyfield_group.command(
@@ -165,7 +171,7 @@ def skyfield_all_fast() -> None:
     Same scope as 'all' but uses pytest-xdist for parallel execution.
     Much faster (~2 min) but harder to read output on failures.
     """
-    _pytest(["-n", "auto", "-m", "not slow"])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -174,7 +180,7 @@ def skyfield_all_fast() -> None:
 )
 def skyfield_all_full_fast() -> None:
     """Run ALL tests including @slow in parallel. Still slow due to iterative tests."""
-    _pytest(["-n", "auto"])
+    _skyfield_pytest(["-n", "auto"])
 
 
 @skyfield_group.command(
@@ -185,34 +191,34 @@ def progress() -> None:
 
     Same scope as 'all' (no @slow) but uses --no-header -q for minimal output.
     """
-    _pytest(["--no-header", "-q", "-m", "not slow"])
+    _skyfield_pytest(["--no-header", "-q", "-m", "not slow"])
 
 
 @skyfield_group.command(
-    short_help="Quick sanity check: 1 test per module, parallel (~490 tests, ~20s).",
+    short_help="Quick sanity check: 1 test per module, parallel (~900 tests, ~20s).",
 )
 def essential() -> None:
-    """Quick sanity check: 1 test file per major module, in parallel (~490 tests, ~20s).
+    """Quick sanity check: 1 test file per major module, in parallel (~900 tests, ~20s).
 
     Covers planets, houses, eclipses, fixed stars, asteroids, hypothetical
     bodies, heliacal events, rise/transit, Arabic parts, planetary moons,
     date conversion, sidereal, and more. Best for a fast "did I break anything?" check.
     """
-    _pytest(["-n", "auto", "-m", "not slow", *_ESSENTIAL_FILES])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow", *_ESSENTIAL_FILES])
 
 
 @skyfield_group.command(
-    short_help="Broader sanity check: 1+ test files per module, parallel (~1460 tests).",
+    short_help="Broader sanity check: 1+ test files per module, parallel (~1,700 tests).",
 )
 def smoke() -> None:
-    """Broader sanity check: 1+ test files per module, in parallel (~1460 tests, ~30s).
+    """Broader sanity check: 1+ test files per module, in parallel (~1,700 tests, ~30s).
 
     Everything in 'essential' plus cache, SPK loader, ephemeris config,
     extinction, logging, packaging, dotenv, type safety, golden regression,
     coordinate validation, profiling, retrograde stations, edge cases,
     ERFA nutation, LEB format/reader, Lilith, true node, UTC, IERS delta-T.
     """
-    _pytest(["-n", "auto", "-m", "not slow", *_SMOKE_FILES])
+    _skyfield_pytest(["-n", "auto", "-m", "not slow", *_SMOKE_FILES])
 
 
 @skyfield_group.command(
@@ -221,9 +227,9 @@ def smoke() -> None:
 def unit() -> None:
     """Run all unit tests from the tests/ directory sequentially with verbose output.
 
-    Excludes @slow-marked tests. ~5890 tests, takes ~2 min.
+    Excludes @slow-marked tests. ~16,000 tests, takes ~2 min.
     """
-    _pytest(["tests/", "-v", "-m", "not slow"])
+    _skyfield_pytest(["tests/", "-v", "-m", "not slow"])
 
 
 @skyfield_group.command(
@@ -236,7 +242,7 @@ def unit_full() -> None:
     Includes iterative searches, hypothesis property-based tests, and other
     long-running tests that are excluded by default.
     """
-    _pytest(["tests/", "-v"])
+    _skyfield_pytest(["tests/", "-v"])
 
 
 @skyfield_group.command(
@@ -248,7 +254,7 @@ def unit_fast() -> None:
 
     Same scope as 'unit' but parallelized for speed.
     """
-    _pytest(["tests/", "-n", "auto", "-m", "not slow"])
+    _skyfield_pytest(["tests/", "-n", "auto", "-m", "not slow"])
 
 
 test_group.add_command(skyfield_group)
@@ -270,7 +276,7 @@ _LEB_ENV = {"LIBEPHEMERIS_LEB": "data/leb/ephemeris_medium.leb"}
     ".leb files. ~14x faster than Skyfield at runtime.\n\n"
     "Requires: data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').\n\n"
     "Recommended for everyday development:\n\n"
-    "  leph test leb-backend unit-fast   # ~5890 tests, ~1 min, parallel",
+    "  leph test leb-backend unit-fast   # ~16,000 tests, ~1 min, parallel",
 )
 def leb_backend_group() -> None:
     """Unit tests using LEB as the calculation backend."""
@@ -278,10 +284,10 @@ def leb_backend_group() -> None:
 
 @leb_backend_group.command(
     "essential",
-    short_help="Quick sanity check in LEB mode: ~490 tests, parallel (~20s).",
+    short_help="Quick sanity check in LEB mode: ~900 tests, parallel (~20s).",
 )
 def leb_essential() -> None:
-    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~490 tests, ~20s).
+    """Quick sanity check in LEB mode: 1 test file per major module, parallel (~900 tests, ~20s).
 
     Same file set as 'leph test skyfield essential' but positions are read from
     precomputed Chebyshev polynomials instead of computed from DE440.
@@ -327,7 +333,7 @@ def leb_unit_fast() -> None:
     """RECOMMENDED: run unit tests in LEB mode, parallel across CPU cores (~1 min).
 
     Best balance of speed and coverage for everyday development.
-    Runs ~5890 tests in ~1 minute using pytest-xdist parallelism.
+    Runs ~16,000 tests in ~1 minute using pytest-xdist parallelism.
     Requires data/leb/ephemeris_medium.leb (generate with 'leph leb generate medium groups').
     """
     _pytest(

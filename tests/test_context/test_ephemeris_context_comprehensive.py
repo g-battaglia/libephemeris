@@ -227,13 +227,9 @@ class TestContextThreadSafety:
 
         threads = [
             threading.Thread(target=calc_in_thread, args=(0, SUN, SIDM_LAHIRI)),
-            threading.Thread(
-                target=calc_in_thread, args=(1, MOON, SIDM_FAGAN_BRADLEY)
-            ),
+            threading.Thread(target=calc_in_thread, args=(1, MOON, SIDM_FAGAN_BRADLEY)),
             threading.Thread(target=calc_in_thread, args=(2, MARS, SIDM_RAMAN)),
-            threading.Thread(
-                target=calc_in_thread, args=(3, JUPITER, SIDM_LAHIRI)
-            ),
+            threading.Thread(target=calc_in_thread, args=(3, JUPITER, SIDM_LAHIRI)),
         ]
 
         for t in threads:

@@ -197,9 +197,7 @@ class TestSweFindStationUt:
         # Velocity should be very small at station
         assert abs(velocity) < 0.01, f"Velocity at station: {velocity}"
 
-    @pytest.mark.parametrize(
-        "planet", [MERCURY, VENUS, MARS, JUPITER, SATURN]
-    )
+    @pytest.mark.parametrize("planet", [MERCURY, VENUS, MARS, JUPITER, SATURN])
     def test_find_station_various_planets(self, planet):
         """Test station finding for various planets."""
         jd = ephem.julday(2024, 1, 1, 0.0)

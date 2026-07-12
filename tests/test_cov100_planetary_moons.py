@@ -438,9 +438,7 @@ def test_calc_position_speed_wrap_positive(monkeypatch):
     monkeypatch.setattr(pm, "get_planets", lambda: {"earth": _Observer()})
     monkeypatch.setattr(planets_mod, "get_ayanamsa_ut", lambda jd: 0.0)
 
-    result = pm.calc_moon_position(
-        t, MOON_IO, FLG_SPEED | FLG_TRUEPOS | FLG_NOABERR
-    )
+    result = pm.calc_moon_position(t, MOON_IO, FLG_SPEED | FLG_TRUEPOS | FLG_NOABERR)
     assert result is not None
     # Wrapped rate must be small in magnitude, not ~15M deg/day.
     assert abs(result[3]) < 1.0e6
@@ -457,9 +455,7 @@ def test_calc_position_speed_wrap_negative(monkeypatch):
     monkeypatch.setattr(pm, "get_planets", lambda: {"earth": _Observer()})
     monkeypatch.setattr(planets_mod, "get_ayanamsa_ut", lambda jd: 0.0)
 
-    result = pm.calc_moon_position(
-        t, MOON_IO, FLG_SPEED | FLG_TRUEPOS | FLG_NOABERR
-    )
+    result = pm.calc_moon_position(t, MOON_IO, FLG_SPEED | FLG_TRUEPOS | FLG_NOABERR)
     assert result is not None
     assert abs(result[3]) < 1.0e6
 

@@ -120,9 +120,7 @@ def check_proserpina(rows, problems, explain):
     }
     for field, (got, want) in pairs.items():
         if got != want:
-            problems.append(
-                f"Proserpina.{field}: live {got!r} != CSV {want!r}"
-            )
+            problems.append(f"Proserpina.{field}: live {got!r} != CSV {want!r}")
     if explain:
         print(f"  Proserpina a={live.a} M0={live.M0} epoch={live.epoch} -> CSV match")
 

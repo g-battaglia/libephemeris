@@ -15,6 +15,7 @@ The body-to-group mapping itself lives with the generators
 (``scripts/generate_leb.py`` ``BODY_GROUPS``, ``scripts/generate_leb2.py``
 ``LEB2_GROUPS``); the keys of those dicts must match the tuples below.
 """
+
 from __future__ import annotations
 
 # LEB1 generation/merge partition (order = generation + merge order).

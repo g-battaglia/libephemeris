@@ -601,9 +601,7 @@ class TestValidationRequirements:
         moon_alt_wrong = attr_wrong[5]
 
         # Correct LA should have the eclipse observable (nonzero retflag)
-        assert retflag_correct != 0, (
-            "Moon should be visible at correct LA position"
-        )
+        assert retflag_correct != 0, "Moon should be visible at correct LA position"
         assert moon_alt_correct > 30, (
             f"Moon altitude at correct LA should be high, got {moon_alt_correct}°"
         )

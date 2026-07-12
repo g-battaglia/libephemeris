@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """
-Automatic SPK download and caching for minor bodies using astroquery.
+Automatic SPK download and caching for minor bodies.
 
 This module provides automatic SPK file management for minor body calculations:
 - Automatic download of SPK kernels from JPL Horizons on demand
 - Local caching to avoid redundant downloads
 - Seamless integration with calc_ut() for transparent SPK usage
 
-The module uses astroquery.jplhorizons to download SPK files, which provides
-a more robust and feature-rich interface than direct HTTP requests.
+Downloads use :func:`libephemeris.spk.download_spk`, the project's direct JPL
+Horizons HTTP client.  No optional download library is required.
 
 Usage:
     >>> from libephemeris import spk_auto
@@ -23,11 +23,7 @@ Usage:
     >>> # Now calc_ut automatically downloads and uses SPK if needed
     >>> pos, _ = calc_ut(2451545.0, CHIRON, 0)
 
-Requirements:
-    pip install astroquery
-
 References:
-    - astroquery.jplhorizons: https://astroquery.readthedocs.io/en/latest/jplhorizons/jplhorizons.html
     - JPL Horizons: https://ssd.jpl.nasa.gov/horizons/
 """
 
@@ -299,7 +295,7 @@ class AutoSpkConfig:
 
 
 # =============================================================================
-# ASTROQUERY-BASED DOWNLOAD
+# DIRECT HORIZONS DOWNLOAD
 # =============================================================================
 
 
@@ -310,11 +306,12 @@ def _download_spk_astroquery(
     output_path: str,
     location: str = "@0",
 ) -> str:
-    """
-    Download SPK file using the spk module's download function.
+    """Download an SPK file using the direct Horizons HTTP client.
 
-    This function wraps the main download_spk() function from spk.py,
-    which uses the JPL Horizons API directly to download SPK data.
+    The private name is retained for compatibility with existing callers and
+    tests, but the implementation no longer uses Astroquery.  It wraps
+    :func:`libephemeris.spk.download_spk` and normalizes the returned path to
+    the cache filename requested by this module.
 
     Args:
         body_id: JPL Horizons target identifier (e.g., "2060", "Chiron")
@@ -371,7 +368,11 @@ def _download_spk_astroquery(
 
 
 def _check_astroquery_available() -> bool:
-    """Check if astroquery is available."""
+    """Return whether Astroquery is installed (legacy compatibility probe).
+
+    Auto-SPK downloads no longer consult this helper or require Astroquery.
+    Catalog-building and validation scripts may still use the dependency.
+    """
     try:
         from astroquery.jplhorizons import Horizons  # noqa: F401 (availability probe)
 
@@ -516,8 +517,8 @@ def download_now(ipl: int, force: bool = False) -> str:
         str: Path to the downloaded SPK file
 
     Raises:
-        ValueError: If auto-SPK is not enabled for this body
-        ImportError: If astroquery is not installed
+        ValueError: If auto-SPK is not enabled for this body or the direct
+            Horizons download fails.
     """
     config = get_auto_spk_config(ipl)
     if config is None:
@@ -1384,7 +1385,7 @@ def auto_get_spk(
 
     This function checks if an SPK file for the requested body and date range
     exists in the local cache directory. If not, it automatically downloads
-    the file from JPL Horizons using the Horizons class.
+    the file with the direct JPL Horizons HTTP client.
 
     If ``ipl`` is provided, the SPK body is automatically registered with
     libephemeris after download, making it immediately usable by ``calc_ut()``.
@@ -1409,8 +1410,7 @@ def auto_get_spk(
         str: Path to the SPK file (either existing cached or newly downloaded)
 
     Raises:
-        ImportError: If astroquery is not installed
-        ValueError: If body not found, download fails, or naif_id cannot be
+        ValueError: If the body is not found, download fails, or naif_id cannot be
             deduced when ipl is provided
 
     Note:
@@ -1469,7 +1469,8 @@ def auto_get_spk(
     filename = _generate_spk_cache_filename(body_id, jd_start, jd_end)
     output_path = os.path.join(cache_dir, filename)
 
-    # Download using astroquery
+    # Download through the direct JPL Horizons HTTP client.  The helper keeps
+    # its historical private name for compatibility.
     with _AUTO_SPK_LOCK:
         # Double-check after acquiring lock (another thread may have downloaded)
         if os.path.exists(output_path) and _is_valid_bsp(output_path):

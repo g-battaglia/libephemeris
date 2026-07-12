@@ -7,11 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc8] - 2026-07-13
+
+A clean-room review and release-hardening pass over `3.0.0rc7`. It corrects
+entry-point and backend-selection edge cases, strengthens the provenance and
+packaging gates, and makes the generated API documentation follow the actual
+public export surface. No breaking API changes.
+
+### Fixed
+
+- **`EphemerisContext.calc()` / `calc_ut()` parity.** Context entry points now
+  preserve the measured TT/UT retflag distinction, normalize `ECL_NUT` flags,
+  return the topocentric-Earth zero vector on the LEB path, reject the
+  incompatible barycentric/analytic-ephemeris combination consistently, and
+  preserve the selected SPK, ASSIST, or Keplerian path while tracing.
+- **Forced backend selection.** Explicit `skyfield` and `horizons` modes bypass
+  an already-cached LEB reader; automatic and LEB modes retain the cache.
+- **`split_deg()` nakshatra boundaries.** The 13°20′ segment is represented
+  with the reference-compatible rounded value, fixing carry behaviour at
+  boundary-adjacent floating-point inputs.
+- **Pre-UTC Julian dates.** `utc_to_jd()` maps Julian-calendar civil dates to
+  their equivalent Gregorian instant before applying the pre-1972 UTC model.
+- **Backend-specific developer tests.** The Skyfield test commands now force
+  Skyfield mode instead of allowing an available LEB file to select the fast
+  path implicitly.
+- **SPK test isolation.** SPK download and cache tests use the production HTTP
+  path and synthetic fixtures without depending on an external catalog client
+  or stale local data.
+
+### Added
+
+- **Complete public export inventory.** The package-level `__all__` now includes
+  `reset_session()`, the documented performance and eclipse helpers, planetary
+  moon IDs, and every constant declared public by `constants.__all__`.
+- **Clean-room worktree gate.** `scripts/check_provenance.py` now rejects
+  prohibited source-distribution artifacts by filename anywhere in the
+  physical worktree, including ignored and untracked paths, in addition to its
+  tracked-source and shipped-data checks.
+- **Packaging assertions.** Tests verify the explicit data namespaces, bundled
+  runtime assets, optional dependency boundaries, and absence of prohibited
+  artifacts from both wheels and source distributions.
+- **Archive clean-room gate.** Wheel and source-distribution audits now apply
+  the same case-insensitive forbidden filename and directory rules as the
+  physical-worktree provenance check.
+
+### Changed
+
+- `astroquery` moved from the core dependency set to the `stars` and `dev`
+  extras; runtime SPK acquisition continues through the direct HTTP client.
+- API documentation is generated from the live top-level export list, with
+  strict Sphinx validation and focused public-signature/docstring tests.
+- The orbital-elements parser suite now uses a neutral name and synthetic
+  fixtures; release notices explicitly prohibit reference-distribution
+  artifacts in source trees and packages.
+- Project-owned Python was normalized with the configured Ruff formatter;
+  vendored sources remain excluded from project formatting.
+
 ## [3.0.0rc7] - 2026-07-12
 
 A review-driven correctness and documentation pass over `3.0.0rc6`. No public
-API changes; several edge-case behaviours move closer to the reference. Both
-test backends green (16,083 tests each).
+API changes; several edge-case behaviours move closer to the reference. At the
+initial rc7 preparation gate, both test backends were green (16,083 tests each).
 
 ### Fixed
 

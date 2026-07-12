@@ -21,6 +21,7 @@ extended tier; ``tno``/``centaur``/``mainbelt`` are integrable over millennia.
 Bennu is intentionally absent: JPL Horizons blocks SPK generation for it
 (see ``constants.SPK_AUTO_DOWNLOAD_BLOCKED``).
 """
+
 from __future__ import annotations
 
 from typing import Dict, List, NamedTuple
@@ -87,9 +88,7 @@ EXOTIC_BODIES: Dict[int, ExoticBody] = {b.body_id: b for b in _REGISTRY}
 # Convenience exports for the consumers.
 EXOTIC_IDS: List[int] = sorted(EXOTIC_BODIES)
 # Bodies eligible for the future N-body extended tier (regular, non-chaotic).
-EXOTIC_EXTENDED_IDS: List[int] = sorted(
-    b.body_id for b in _REGISTRY if b.cls != "nea"
-)
+EXOTIC_EXTENDED_IDS: List[int] = sorted(b.body_id for b in _REGISTRY if b.cls != "nea")
 
 
 def naif_map() -> Dict[int, int]:

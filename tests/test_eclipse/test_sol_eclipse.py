@@ -466,9 +466,7 @@ class TestSolEclipseWhenLoc:
         ecl_type1, times1, attr1 = sol_eclipse_when_loc(jd_start, geopos)
 
         # Call sol_eclipse_when_loc (reference-style with geopos sequence)
-        ecl_type2, times2, attr2 = sol_eclipse_when_loc(
-            jd_start, geopos, FLG_SWIEPH
-        )
+        ecl_type2, times2, attr2 = sol_eclipse_when_loc(jd_start, geopos, FLG_SWIEPH)
 
         # Both should find the same eclipse (same maximum time within tolerance)
         assert abs(times1[0] - times2[0]) < 0.01  # Within ~15 minutes
@@ -1082,9 +1080,7 @@ class TestKnownEclipseValidation:
         """Verify eclipse type classification is consistent for known eclipses."""
         # Total eclipse 2024
         ecl_type1, times1 = sol_eclipse_when_glob(2460400.0, ecltype=ECL_TOTAL)
-        assert ecl_type1 & ECL_TOTAL, (
-            "April 2024 eclipse should be classified as TOTAL"
-        )
+        assert ecl_type1 & ECL_TOTAL, "April 2024 eclipse should be classified as TOTAL"
 
         # Annular eclipse 2023
         ecl_type2, times2 = sol_eclipse_when_glob(2460200.0, ecltype=ECL_ANNULAR)
@@ -1277,7 +1273,6 @@ class TestSolEclipseMaxTime:
 
     def test_swe_alias_exists(self):
         """sol_eclipse_max_time should be an alias."""
-
 
     def test_known_eclipse_april_2024_precision(self):
         """Test precision against known April 8, 2024 eclipse."""

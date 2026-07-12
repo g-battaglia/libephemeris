@@ -448,9 +448,7 @@ def test_houses_ex_sidereal_hsys_bytes():
 def test_houses_ex_sidereal_whole_sign():
     """Whole Sign sidereal recomputation path."""
     ephem.set_sid_mode(ephem.SIDM_LAHIRI)
-    cusps, ascmc = ephem.houses_ex(
-        JD, ROME_LAT, ROME_LON, ord("W"), ephem.FLG_SIDEREAL
-    )
+    cusps, ascmc = ephem.houses_ex(JD, ROME_LAT, ROME_LON, ord("W"), ephem.FLG_SIDEREAL)
     assert len(cusps) == 12
 
 
@@ -670,9 +668,7 @@ def test_gauquelin_helper_high_latitude_iterates():
     lat = 60.0
     tan_lat = math.tan(math.radians(lat))
     tan_eps = math.tan(math.radians(EPS))
-    ad = math.degrees(
-        math.asin(max(-1.0, min(1.0, tan_lat * tan_eps)))
-    )
+    ad = math.degrees(math.asin(max(-1.0, min(1.0, tan_lat * tan_eps))))
     val = H._gauquelin_cusp_for_sector(
         sector_offset=4,
         base_ramc=33.0,
@@ -781,9 +777,7 @@ def test_makransky_many_geometries():
                 ad_arg = math.tan(math.radians(sd)) * math.tan(math.radians(lat))
                 if abs(ad_arg) >= 1.0:
                     continue
-                cusps = H._houses_sunshine_makransky(
-                    armc, lat, EPS, 100.0, 200.0, sd
-                )
+                cusps = H._houses_sunshine_makransky(armc, lat, EPS, 100.0, 200.0, sd)
                 assert len(cusps) == 13
                 for c in cusps[1:]:
                     assert 0.0 <= c < 360.0
@@ -827,9 +821,7 @@ def test_apc_cusp_near_pole():
 def test_apc_cusp_equator_limit():
     """APC cusp helper at the equator uses the declination limit (4560-4565)."""
     val_n = H._apc_cusp(5, math.radians(1e-11), math.radians(EPS), math.radians(200.0))
-    val_s = H._apc_cusp(
-        5, math.radians(-1e-11), math.radians(EPS), math.radians(200.0)
-    )
+    val_s = H._apc_cusp(5, math.radians(-1e-11), math.radians(EPS), math.radians(200.0))
     assert 0.0 <= val_n < 360.0
     assert 0.0 <= val_s < 360.0
 
@@ -1020,6 +1012,7 @@ def test_house_pos_default_fallback():
 
 def test_house_pos_default_fallback_zero_width(monkeypatch):
     """A zero-width house in the fallback path is handled (5209-5217)."""
+
     # Force coincident cusps so a house has zero width.
     def fake_armc(armc, lat, obliquity, hsys):
         cusps = tuple([10.0] * 12)  # all identical -> zero-width houses
@@ -1037,6 +1030,7 @@ def test_house_pos_default_fallback_zero_width(monkeypatch):
 
 def test_house_pos_alcabitius_zero_interval(monkeypatch):
     """Alcabitius with coincident cusp RAs uses the 30 deg interval default."""
+
     def fake_armc(armc, lat, obliquity, hsys):
         cusps = tuple([10.0] * 12)
         ascmc = tuple([0.0] * 8)

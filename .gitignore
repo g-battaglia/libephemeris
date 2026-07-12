@@ -57,8 +57,8 @@ data/leb2/*.leb2
 data/leb/.DS_Store
 data/.DS_Store
 
-# Reference ephemeris data for comparison tests (dev-only)
-data/reference/
+# Reference-distribution artifacts are deliberately not ignored: the
+# provenance gate rejects them even when untracked.
 
 # Manual build output (EPUB/PDF)
 docs/build/

@@ -25,18 +25,30 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+try:
+    from .check_provenance import (
+        FOREIGN_DATA_NAME_RE,
+        FOREIGN_SOURCE_DIR_RE,
+        FOREIGN_SOURCE_NAME_RE,
+    )
+except ImportError:  # Direct execution: ``python scripts/check_wheel_contents.py``
+    from check_provenance import (
+        FOREIGN_DATA_NAME_RE,
+        FOREIGN_SOURCE_DIR_RE,
+        FOREIGN_SOURCE_NAME_RE,
+    )
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 FORBIDDEN = (
-    re.compile(r"(^|/)tests?/"),
-    re.compile(r"(^|/)compare_scripts/"),
-    re.compile(r"libephemeris/dev_cli(/|\.py)"),
+    re.compile(r"(^|/)tests?/", re.IGNORECASE),
+    re.compile(r"(^|/)compare_scripts/", re.IGNORECASE),
+    re.compile(r"libephemeris/dev_cli(/|\.py)", re.IGNORECASE),
     re.compile(r"\.se1$", re.IGNORECASE),
     re.compile(r"sefstars", re.IGNORECASE),
     re.compile(r"seorbel", re.IGNORECASE),
     re.compile(r"seleapsec", re.IGNORECASE),
     re.compile(r"sedeltat", re.IGNORECASE),
-    re.compile(r"data/reference/"),
 )
 WHEEL_REQUIRED = (
     "libephemeris/__init__.py",
@@ -65,9 +77,30 @@ def build_artifacts(outdir: Path) -> tuple[Path, Path]:
 
 
 def forbidden_in(names: list[str]) -> list[str]:
-    return sorted(
-        {name for name in names for pattern in FORBIDDEN if pattern.search(name)}
-    )
+    """Return archive paths forbidden by packaging or clean-room policy."""
+    bad: set[str] = set()
+    for name in names:
+        normalized = name.replace("\\", "/")
+        parts = tuple(part for part in normalized.split("/") if part)
+        folded = tuple(part.casefold() for part in parts)
+        filename = parts[-1] if parts else ""
+
+        packaging_match = any(pattern.search(normalized) for pattern in FORBIDDEN)
+        foreign_data_dir = any(
+            folded[index : index + 2] == ("data", "reference")
+            for index in range(max(0, len(folded) - 1))
+        )
+        foreign_source_dir = any(
+            FOREIGN_SOURCE_DIR_RE.fullmatch(part) for part in parts[:-1]
+        )
+        foreign_file = bool(
+            FOREIGN_DATA_NAME_RE.search(filename)
+            or FOREIGN_SOURCE_NAME_RE.search(filename)
+        )
+        if packaging_match or foreign_data_dir or foreign_source_dir or foreign_file:
+            bad.add(name)
+
+    return sorted(bad)
 
 
 def audit(sdist: Path | None, wheel: Path) -> int:

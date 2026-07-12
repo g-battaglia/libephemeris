@@ -15,9 +15,10 @@ copyleft (L/GPL) license declaration that strays into the tree.
 
 The sweep covers ``libephemeris/``, ``scripts/``, ``docs/`` and
 ``release-notes/`` plus the root legal/packaging files, across every
-shipped text format. A filename gate (over git-tracked files) blocks the
-reference distribution's data files re-entering under any suffix; a content
-scan flags copyleft markers in ``libephemeris/data/``. Two allowlists: a
+shipped text format. A name-only gate walks the physical worktree (including
+gitignored and untracked paths) and blocks reference-distribution source/data
+files and ``data/reference`` directories without opening them; a content scan
+flags copyleft markers in ``libephemeris/data/``. Two allowlists: a
 full one for the gate and provenance/legal docs that must quote retired-
 source identifiers to record what was removed, and a license-naming-only
 one (README, release notes) exempt from the copyleft/AGPL classes but still
@@ -31,6 +32,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -97,14 +99,6 @@ LICENSE_NAMING_OK = frozenset(
     }
 )
 
-# A single tracked file that legitimately carries a foreign-data NAME in its
-# own filename: the seorbel-format parser's own test module. It is this
-# project's reviewed Python test (it exercises the parser on a user-provided
-# file; it bundles no reference data), so the name is expected. Note tests/
-# is not in SCAN_DIRS, so this exception is a name allowance only — it is not
-# separately content-scanned by this gate.
-FOREIGN_DATA_NAME_EXCEPTIONS = frozenset({"tests/test_parse_seorbel.py"})
-
 SOURCE_FILE_RE = re.compile(
     r"swehouse|swecl\.c|sweph\.c|swephlib|swejpl|swehel"
     r"|swemmoon|swemplan|swedate\.c",
@@ -158,46 +152,65 @@ FOREIGN_DATA_NAME_RE = re.compile(
     r"(seorbel|sefstars|seleapsec|sedeltat|seasnam)|\.se1(\.|$)",
     re.IGNORECASE,
 )
+FOREIGN_SOURCE_NAME_RE = re.compile(
+    r"^swe[a-z0-9_]*\.(?:c|h)(?:\.|$)",
+    re.IGNORECASE,
+)
+FOREIGN_SOURCE_DIR_RE = re.compile(
+    r"^(?:pyswisseph|swisseph|swiss[-_]?ephemeris)(?:[-_.].*)?$",
+    re.IGNORECASE,
+)
+# VCS metadata, local virtual environments and interpreter/tool caches are not
+# worktree artifacts. Everything else is examined by name, including ignored
+# output/build trees and nested tool-created worktrees.
+PHYSICAL_SCAN_SKIP_DIRS = frozenset(
+    {".git", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+)
 DATA_DIR = "libephemeris/data"
+
+
+def _physical_foreign_artifacts(root: Path) -> list[tuple[Path, str, str]]:
+    """Find prohibited reference artifacts by path name without reading them.
+
+    Returns:
+        Tuples of ``(path, label, displayed_name)`` for each prohibited path.
+    """
+    hits: list[tuple[Path, str, str]] = []
+    for current, dirnames, filenames in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        dirnames[:] = sorted(d for d in dirnames if d not in PHYSICAL_SCAN_SKIP_DIRS)
+
+        # A data/reference directory is prohibited even when empty or ignored.
+        # Record it once and prune it; its contents need not be named or opened.
+        for dirname in tuple(dirnames):
+            path = current_path / dirname
+            rel = path.relative_to(root)
+            folded_parts = tuple(part.casefold() for part in rel.parts[-2:])
+            if len(rel.parts) >= 2 and folded_parts == ("data", "reference"):
+                hits.append((path, "foreign-data-dir", rel.as_posix()))
+                dirnames.remove(dirname)
+            elif FOREIGN_SOURCE_DIR_RE.fullmatch(dirname):
+                hits.append((path, "foreign-source-dir", rel.as_posix()))
+                dirnames.remove(dirname)
+
+        for filename in sorted(filenames):
+            path = current_path / filename
+            rel = path.relative_to(root)
+            if FOREIGN_DATA_NAME_RE.search(filename):
+                hits.append((path, "foreign-data-file", filename))
+            elif FOREIGN_SOURCE_NAME_RE.search(filename):
+                hits.append((path, "foreign-source-file", filename))
+    return hits
 
 
 def main() -> int:
     hits: list[tuple[Path, int, str, str]] = []
 
-    # Filename gate: no reference-distribution data file among the files
-    # tracked by git (the gitignored local oracle data used by the
-    # validation tooling is dev-only and never shipped; anything TRACKED
-    # under such a name is a hard failure).
-    import subprocess
-
-    ls = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if ls.returncode != 0 or not ls.stdout:
-        print(
-            "provenance sweep: FATAL — `git ls-files` unavailable, the "
-            "filename gate cannot run (not a git work tree?)",
-            file=sys.stderr,
-        )
-        return 2
-    tracked = ls.stdout.split("\0")
-    for rel in tracked:
-        if not rel:
-            continue
-        name = rel.rsplit("/", 1)[-1]
-        # The gate targets a data file re-entering under a reference name.
-        # A single source module (the parser's own test) legitimately
-        # carries the token in its filename and is content-scanned anyway;
-        # everything else matching the name pattern is a hard failure,
-        # whatever suffix it wears (so a suffix-renamed dataset like
-        # ``seorbel.md`` or ``sefstars.py`` is still caught).
-        if rel in FOREIGN_DATA_NAME_EXCEPTIONS:
-            continue
-        if FOREIGN_DATA_NAME_RE.search(name):
-            hits.append((REPO_ROOT / rel, 0, "foreign-data-file", name))
+    # Physical name gate: no reference-distribution directory, source file or
+    # data file anywhere in the worktree, whether tracked, untracked or ignored.
+    # This deliberately inspects path names only and never opens these artifacts.
+    for path, label, displayed_name in _physical_foreign_artifacts(REPO_ROOT):
+        hits.append((path, 0, label, displayed_name))
 
     # Content scan of the shipped data directory (any text file).
     data_dir = REPO_ROOT / DATA_DIR

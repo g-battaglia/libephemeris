@@ -67,9 +67,7 @@ class TestGMEarthConstant:
         """The shared constant equals the combined Earth-Moon mu in AU^3/day^2."""
         from libephemeris.lunar import GM_EARTH_MOON_AU3_DAY2
 
-        expected = (
-            GM_EARTH_MOON_IAU2015_KM3_S2 / (AU_KM**3) * (SECONDS_PER_DAY**2)
-        )
+        expected = GM_EARTH_MOON_IAU2015_KM3_S2 / (AU_KM**3) * (SECONDS_PER_DAY**2)
         assert math.isclose(GM_EARTH_MOON_AU3_DAY2, expected, rel_tol=1e-12), (
             f"GM_EARTH_MOON_AU3_DAY2 = {GM_EARTH_MOON_AU3_DAY2} does not equal "
             f"the combined IAU 2015 Earth-Moon mu {expected} AU^3/day^2"

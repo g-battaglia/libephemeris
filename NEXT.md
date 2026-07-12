@@ -47,13 +47,13 @@ Documented in `docs/comparison/intentional-divergences.md` and
 
 | Topic | Divergence | Why we are the correct one |
 |---|---|---|
-| Modern ΔT | ±100–144 ms in 2024 | We use the real IERS signal; the reference uses an internal table + extrapolation |
+| Modern ΔT | ±100–144 ms in 2024 | We use the real IERS signal; black-box reference output follows a different interpolation/extrapolation curve |
 | Historic/future ΔT | up to 20 s @1582, 875 s @3000 | We use a newer peer-reviewed long-term model |
-| GMST / houses from 2050 | ~2" (up to 9" @2340 via ΔT) | The reference has a ~1.9" discontinuity at 2050-01-01; we join continuously |
+| GMST / houses from 2050 | ~2" (up to 9" @2340 via ΔT) | Black-box reference output has a ~1.9" discontinuity at 2050-01-01; we join continuously |
 | Placidus/Koch cusp speed | up to 2392"/day | We report the true derivative |
-| MEAN apside lat speed | different slot | The reference stores the position at t+1d; we store the true rate |
+| MEAN apside lat speed | different slot | The black-box slot equals the position at t+1d; we store the true rate |
 | MEAN planetary apside speed | ~0.15°/day (speed channels only) | The reference's convention is unidentified; positions and nodes match exactly |
-| Planetary nodes (scattered days) | transient spikes up to 3.5" | A transient glitch in the reference's apparent-place corrector |
+| Planetary nodes (scattered days) | transient spikes up to 3.5" | Isolated spikes in black-box reference output; internal cause unknown |
 | Star radial-velocity slots | ~250 "AU" on Spica | We use a modern catalogue; angular positions are unaffected |
 | Minor-body historic orbit solutions | 80–130" (Nessus/Amor/Bennu, 1900–1970) | We follow the SPK/Horizons solution; Horizons confirms us to ≤0.25" |
 | Near-polar rise/set search window | Moon events at lat ±80–85° | The reference searches ~1 day and reports none; we search 2 |

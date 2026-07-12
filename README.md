@@ -4,7 +4,7 @@
     <img src="https://static.pepy.tech/badge/libephemeris/month" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/badge/libephemeris/week" alt="PyPI Downloads">
     <img src="https://static.pepy.tech/personalized-badge/libephemeris?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads/total" alt="PyPI Downloads">
-    <img src="https://img.shields.io/badge/pypi-v3.0.0rc7-blue" alt="PyPI Version">
+    <img src="https://img.shields.io/pypi/v/libephemeris.svg" alt="PyPI Version">
     <img src="https://img.shields.io/pypi/pyversions/libephemeris.svg" alt="Python Versions">
     <img src="https://img.shields.io/github/license/g-battaglia/libephemeris.svg" alt="License">
 </div>
@@ -140,7 +140,7 @@ libephemeris download medium       # 1550-2650, ~200 MB (recommended)
 libephemeris download extended     # -13200 to +17191 CE, full range
 ```
 
-**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
+**Optional extras:** `pip install libephemeris[stars]` for star-catalog tooling, `[nbody]` for REBOUND/ASSIST n-body integration (GPL-3.0-or-later components — explicit opt-in), `[all]` for every permissive-licensed runtime extra. [Details](https://github.com/g-battaglia/libephemeris/blob/main/docs/guides/getting-started.md#optional-extras).
 
 ---
 

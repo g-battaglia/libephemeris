@@ -110,9 +110,7 @@ def evaluate(jd: float, ts) -> list[float]:
     values: list[float] = []
     for xyz in galilean_moon_positions(jd):
         values.extend(float(c) for c in xyz)
-    values.extend(
-        float(c) for c in get_cob_offset("jupiter barycenter", ts.tt_jd(jd))
-    )
+    values.extend(float(c) for c in get_cob_offset("jupiter barycenter", ts.tt_jd(jd)))
     return values
 
 

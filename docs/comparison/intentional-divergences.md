@@ -253,9 +253,8 @@ changes when `set_tid_acc()` is called. Only introspection via
 
 ## 6. `nod_aps` node positions: transient light-time spikes
 
-With default flags the reference engine applies its apparent-position
-correction to each node/apsis point with a per-point numerical scheme that
-occasionally glitches: on isolated days (~15 days out of 3653 sampled over
+With default flags the reference engine's black-box output has isolated spikes:
+on ~15 days out of 3653 sampled over
 1995-2005 for Jupiter) one node — and only one — jumps by up to ~3.5" while
 its reported speed spikes an order of magnitude, and with `FLG_TRUEPOS` the
 same call returns exactly antipodal nodes again (0.000000"). The median
@@ -275,8 +274,8 @@ central finite-difference derivative of that distance with a half-day step. This
 keeps the fixed-star channel semantics consistent with the planetary API: a
 speed slot is the derivative of the corresponding position slot.
 
-The reference engine uses a different radial-distance convention for some
-catalog entries. Reproducing that convention would make the same `dist_spd`
+Black-box reference output follows a different radial-distance convention for
+some catalog entries. Reproducing that convention would make the same `dist_spd`
 channel mean one thing for planets and another for fixed stars, so it is not
 copied.
 

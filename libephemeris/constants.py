@@ -1078,7 +1078,7 @@ NALL_NAT_POINTS: int = 38
 PLMOON_OFFSET: int = 9000
 
 # Canonical planetary-moon ids (PLMOON_OFFSET + NAIF satellite id).
-# These match the ipl numbers the reference API uses for its sepm* files.
+# Their public-call behavior matches the corresponding reference API body ids.
 PLMOON_IO: int = PLMOON_OFFSET + NAIF_IO  # 9501
 PLMOON_EUROPA: int = PLMOON_OFFSET + NAIF_EUROPA  # 9502
 PLMOON_GANYMEDE: int = PLMOON_OFFSET + NAIF_GANYMEDE  # 9503

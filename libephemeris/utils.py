@@ -489,59 +489,24 @@ def refrac(
     attemp: float = 15.0,
     flag: int = TRUE_TO_APP,
 ) -> float:
-    """
-    Calculate true altitude from apparent altitude, or vice-versa.
-
-    Atmospheric refraction makes celestial objects appear higher than their
-    true (geometric) position. The effect is strongest near the horizon
-    and negligible at high altitudes.
-
-    This function converts between true (geometric) altitude and apparent
-    (observed) altitude by adding or removing the refraction correction.
-
-    Compatible with the reference API's refraction function.
+    """Convert between true and apparent altitude.
 
     Args:
-        alt: Altitude in degrees. For TRUE_TO_APP, this is the true
-                  (geometric) altitude. For APP_TO_TRUE, this is the apparent
-                  (observed) altitude.
-        atpress: Atmospheric pressure in mbar (hPa). Default is 1013.25 (sea level).
-                  Use 0 to disable refraction correction (returns input altitude).
-        attemp: Atmospheric temperature in Celsius. Default is 15.0.
-        flag: Direction of conversion:
-            - TRUE_TO_APP (0): Convert true altitude to apparent altitude
-              (add refraction - object appears higher)
-            - APP_TO_TRUE (1): Convert apparent altitude to true altitude
-              (subtract refraction - object's true position)
+        alt: Input altitude in degrees.
+        atpress: Atmospheric pressure in hPa. A non-positive value disables
+            refraction.
+        attemp: Atmospheric temperature in degrees Celsius.
+        flag: ``TRUE_TO_APP`` adds refraction; ``APP_TO_TRUE`` removes it.
 
     Returns:
-        The converted altitude in degrees:
-        - For TRUE_TO_APP: apparent altitude (= true altitude + refraction)
-        - For APP_TO_TRUE: true altitude (= apparent altitude - refraction)
+        Apparent altitude for ``TRUE_TO_APP``, or true altitude for
+        ``APP_TO_TRUE``, in degrees.
 
     Notes:
-        - At TRUE altitude 0 this function returns ~28.5 arcminutes of
-          refraction under standard conditions (matching the reference API);
-          the textbook "~34 arcminutes at the horizon" figure refers to
-          APPARENT altitude 0. In the APP_TO_TRUE direction the correction
-          at 0 degrees is clamped to 0 (again matching the reference API).
-        - Refraction is ray-traced through the ICAO Standard Atmosphere (see
-          ``libephemeris/refraction.py`` for the model and References), not
-          an empirical curve fit; it agrees with the Bennett 1982 /
-          Sæmundsson 1986 fits within the envelope documented there.
-        - Pressure and temperature enter through the atmospheric model
-          (refractive index n ∝ P/T), not a separate correction factor.
-
-    Examples:
-        >>> # True altitude at horizon -> apparent altitude is higher
-        >>> refrac(0.0, 1013.25, 15.0, TRUE_TO_APP)
-        0.476...  # apparent altitude
-        >>> # Apparent altitude at horizon -> true altitude (0° apparent = ~-0.5° true)
-        >>> refrac(0.5, 1013.25, 15.0, APP_TO_TRUE)
-        0.0...  # approximately 0° true altitude
-        >>> # No refraction when pressure is 0
-        >>> refrac(10.0, 0, 15.0, TRUE_TO_APP)
-        10.0  # returns input altitude unchanged
+        Refraction is ray-traced through the ICAO Standard Atmosphere. At true
+        altitude zero under standard conditions, the apparent altitude is
+        about 28.5 arcminutes higher. In the reverse direction the correction
+        at apparent altitude zero follows the compatibility API's clamp.
     """
     from .refraction import calc_refraction_true_to_app, calc_refraction_app_to_true
 
@@ -1280,7 +1245,7 @@ def cs2timestr(cs: int, sep: "str | bytes" = ":", suppresszero: bool = False) ->
         >>> cs2timestr(-360000)  # -1 hour wraps mod 24
         '23:00:00'
     """
-    # Accept bytes separator (the reference ephemeris uses b':')
+    # Black-box compatibility: the public API accepts a bytes separator.
     if isinstance(sep, bytes):
         sep = sep.decode("ascii")
 
@@ -1526,14 +1491,13 @@ def _split_deg_nakshatra(
     The ecliptic is divided into 27 equal segments (nakshatras) of
     13°20' each.  Returns the position within the current nakshatra.
     """
-    nakshatra_span = 360.0 / 27.0  # 13.33333...°
-
-    # Reduce to within-nakshatra position for KEEP-flag boundary checks.
-    # Plain fmod(ddeg, span) fails at exact nakshatra multiples (40°, 120°,
-    # 360°) because span = 360/27 is irrational in IEEE 754.
-    # fmod(ddeg*27, 360)/27 operates on integer multiples at those
-    # boundaries, giving exact zeros.
-    pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
+    # Clean-room compatibility note: the observed black-box field outputs are
+    # reproduced by quantizing the ideal 40/3-degree span to 14 decimal places.
+    # This is an empirical compatibility rule, not a claim about reference
+    # internals.  The resulting binary float differs from ``360.0 / 27.0`` and
+    # affects boundary indices (for example at 373.3333333333333 degrees).
+    nakshatra_span = round(40.0 / 3.0, 14)
+    pos_in_nak = math.fmod(ddeg, nakshatra_span)
 
     # Determine and conditionally suppress rounding offset
     offset = _rounding_offset(roundflag)
@@ -1547,17 +1511,11 @@ def _split_deg_nakshatra(
             if pos_in_nak + offset >= nakshatra_span:
                 offset = 0.0
 
-    # Apply offset to the original degree, then reduce AND decompose in the
-    # integer centisecond domain. A *27/27 (or fmod) round trip perturbs the
-    # within-nakshatra position by ~1 ULP with a systematically LOW bias, so
-    # the integer seconds field truncated one arcsecond short of the
-    # reference for ~a third of ordinary longitudes (e.g. 0.09 deg ->
-    # 5'23".9999 -> 23 instead of 5'24"). A single multiply into
-    # centiseconds (nakshatra span = 4_800_000 cs exactly) carries no
-    # reduction error and is exact at nakshatra multiples (40 deg, 120 deg,
-    # 360 deg). Residual differences versus the reference are confined to
-    # inputs whose true value sits within ~1 ULP of an integer arcsecond
-    # (the split fields still reconstruct the identical angle).
+    # Apply the offset using the clean-room decomposition that reproduces the
+    # black-box field outputs.  Re-associating this into an integer-centisecond
+    # reduction looks more stable mathematically, but changes compatibility-
+    # visible truncation: with degree=0.09 and degree rounding, the observed
+    # API result is 35'23", not 35'24".
     ddeg += offset
     nak_idx = int(ddeg / nakshatra_span)
     # Reference parity: only the exact 360 deg rollover (index 27, i.e.
@@ -1567,21 +1525,20 @@ def _split_deg_nakshatra(
     if nak_idx == 27:
         nak_idx = 0
 
+    ddeg = math.fmod(ddeg, nakshatra_span)
+    ideg = int(ddeg)
+    ddeg -= ideg
+    imin = int(ddeg * 60.0)
+    ddeg -= imin / 60.0
+    isec = int(ddeg * 3600.0)
+
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    cs_tot = ddeg * 360000.0
-    ics = int(cs_tot)
-    rem = ics % 4_800_000
-    ideg = rem // 360000
-    r2 = rem % 360000
-    imin = r2 // 6000
-    r3 = r2 % 6000
-    isec = r3 // 100
     if has_rounding:
         secfr = float(isec)
     else:
-        secfr = (r3 % 100) / 100.0 + (cs_tot - ics) / 100.0
+        secfr = ddeg * 3600.0 - isec
     return (ideg, imin, isec, secfr, nak_idx)
 
 

@@ -506,6 +506,7 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     LIBEPHEMERIS_MODE environment variable:
 
     - ``"skyfield"``: Always returns None (LEB disabled).
+    - ``"horizons"``: Always returns None (the remote backend is forced).
     - ``"leb"``: Returns LEBReader or raises RuntimeError if unavailable.
     - ``"auto"`` (default): Returns LEBReader if configured or
       auto-discovered, else None.
@@ -531,8 +532,9 @@ def get_leb_reader() -> Optional["LEBReader | LEB2Reader | CompositeLEBReader"]:
     global _LEB_READER
     mode = get_calc_mode()
 
-    # In skyfield mode, never use LEB
-    if mode == "skyfield":
+    # Forced non-LEB backends must bypass even an already-open reader. Keep
+    # the cached reader alive so switching back to auto/leb can reuse it.
+    if mode in ("skyfield", "horizons"):
         return None
 
     if _LEB_READER is None:
@@ -2139,12 +2141,12 @@ def set_auto_spk_download(enabled: Optional[bool]) -> None:
                  or None to use the environment variable (LIBEPHEMERIS_AUTO_SPK).
 
     Note:
-        - Requires the 'astroquery' package to be installed for downloads
-        - Downloads are cached in ~/.libephemeris/spk/ directory
-        - If astroquery is not available and auto-download is enabled,
-          the library will silently fall back to Keplerian propagation
-        - Set to False for offline use or to ensure consistent behavior
-        - Default is True (enabled) when no env var is set
+        - Downloads use the direct JPL Horizons HTTP client and require no
+          optional Python dependency.
+        - Downloads are cached in ~/.libephemeris/spk/ directory.
+        - Network and API failures fall back to Keplerian propagation.
+        - Set to False for offline use or to ensure consistent behavior.
+        - Default is True (enabled) when no env var is set.
 
     Environment Variable:
         LIBEPHEMERIS_AUTO_SPK: Set to "0", "false", or "no" to disable,

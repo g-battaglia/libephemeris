@@ -8,7 +8,7 @@ This guide helps users migrate from `pyswisseph` (Python bindings to Swiss Ephem
 - [Quick Migration](#quick-migration)
 - [API Differences](#api-differences)
 - [Precision Differences](#precision-differences)
-- [Features Not Yet Implemented](#features-not-yet-implemented)
+- [Known Compatibility Gaps](#known-compatibility-gaps)
 - [Thread Safety with EphemerisContext](#thread-safety-with-ephemeriscontext)
 - [FLG_MOSEPH (Moshier Ephemeris Flag)](#flg_moseph-moshier-ephemeris-flag)
 - [Calculation Backend](#calculation-backend)
@@ -376,10 +376,14 @@ ctx3.set_sid_mode(27) # True Citra
 
 ## FLG_MOSEPH (Moshier Ephemeris Flag)
 
-The `FLG_MOSEPH` flag is accepted for API compatibility but **silently ignored**. All calculations in LibEphemeris always use JPL DE440/DE441 via Skyfield, regardless of whether `FLG_MOSEPH` is passed. Code that previously used `FLG_MOSEPH` to select the Moshier semi-analytical ephemeris will continue to work without errors, but will use the JPL ephemeris instead.
+The `FLG_MOSEPH` flag is accepted for API compatibility but does not select a
+Moshier semi-analytical ephemeris. Backend selection remains controlled by the
+active calculation mode: LEB, Horizons, or the local Skyfield/JPL pipeline.
+Code that used `FLG_MOSEPH` continues to run, but the flag does not replace the
+active source with Moshier.
 
 ```python
-# This still works, but FLG_MOSEPH is silently ignored:
+# This still works, but FLG_MOSEPH does not select another backend:
 pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_MOSEPH | swe.FLG_SPEED)
 # Equivalent to:
 pos, _ = swe.calc_ut(jd, swe.SUN, swe.FLG_SPEED)

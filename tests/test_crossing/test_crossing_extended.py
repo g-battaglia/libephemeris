@@ -179,9 +179,7 @@ class TestFindStation:
     def test_mercury_station_types(self, station_type: str):
         """Mercury SR and SD stations should be findable."""
         jd_start = swe.julday(2024, 1, 1, 0.0)
-        result = swe.find_station_ut(
-            MERCURY, jd_start, station_type, FLG_SWIEPH
-        )
+        result = swe.find_station_ut(MERCURY, jd_start, station_type, FLG_SWIEPH)
         jd_station, stype = result
         assert isinstance(jd_station, float)
         assert math.isfinite(jd_station)

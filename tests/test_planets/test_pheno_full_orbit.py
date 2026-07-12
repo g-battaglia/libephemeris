@@ -122,9 +122,7 @@ class TestPhenoMoonPhases:
 class TestPhenoInnerPlanets:
     """Phenomena for inner planets (Mercury, Venus)."""
 
-    @pytest.mark.parametrize(
-        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
-    )
+    @pytest.mark.parametrize("body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")])
     def test_max_elongation_bounded(self, body, name):
         """Inner planet elongation should be bounded (< 90°)."""
         max_elong = 0
@@ -137,9 +135,7 @@ class TestPhenoInnerPlanets:
         else:
             assert max_elong < 50, f"Venus max elongation {max_elong}° > 50"
 
-    @pytest.mark.parametrize(
-        "body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")]
-    )
+    @pytest.mark.parametrize("body,name", [(MERCURY, "Mercury"), (VENUS, "Venus")])
     def test_illumination_varies_with_elongation(self, body, name):
         """Inner planet illumination should correlate with elongation."""
         # At small elongation (near Sun), can be nearly full or nearly new

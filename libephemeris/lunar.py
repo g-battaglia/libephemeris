@@ -1732,6 +1732,7 @@ class MeeusPolynomialWarning(UserWarning):
 
     Severity levels based on distance from J2000.0 (warnings only — no
     range ever raises, matching the reference API which computes any date):
+
         - Beyond ±1000 years: precision degraded but still usable
         - Beyond ±2000 years: error may exceed 1 degree; use with caution
     """
@@ -1818,129 +1819,31 @@ def calc_mean_lunar_node(jd_tt: float) -> float:
 
 
 def calc_true_lunar_node(jd_tt: float) -> Tuple[float, float, float]:
-    """
-        Calculate True (osculating) Lunar Node using orbital mechanics approach.
+    """Calculate the true (osculating) lunar ascending node.
 
-        The True Lunar Node represents the instantaneous ascending node of the Moon's
-        osculating orbit - the point where the Moon crosses the ecliptic plane from
-        south to north at the given moment. Unlike the Mean Node (which moves smoothly
-        at ~19.3°/year retrograde), the True Node oscillates around the mean position
-        with amplitudes up to ±1.5° on timescales of days to weeks.
+    The instantaneous orbital plane is derived from geocentric JPL Moon state
+    vectors in the true ecliptic frame of date. Its angular-momentum vector is
+    ``h = r × v``, and the ascending-node direction is the intersection of
+    that plane with the ecliptic. The node distance follows from the
+    corresponding osculating orbit. Skyfield supplies the frame transformation
+    using IAU 2006 precession and IAU 2000A nutation.
 
-        Calculation Method
-        ==================
+    Args:
+        jd_tt: Julian Day in Terrestrial Time (TT).
 
-        This function uses a rigorous orbital mechanics approach, computing the
-        angular momentum vector directly in the true ecliptic frame of date:
+    Returns:
+        A tuple ``(longitude, latitude, distance)``. Longitude is in degrees,
+        latitude is always ``0.0`` by definition, and distance is in AU.
 
-        **Step 1: Obtain Moon State Vectors in Ecliptic Frame**
-            - Query JPL DE ephemeris (DE440/DE441) via Skyfield
-            - Get geocentric position r and velocity v in the true ecliptic
-              frame of date (Skyfield's ``ecliptic_frame``)
-            - This frame automatically includes IAU 2006 precession and
-              IAU 2000A nutation via Skyfield's internal rotation matrices
-
-        **Step 2: Compute Angular Momentum Vector**
-            - h = r × v (cross product) in ecliptic coordinates
-            - h is perpendicular to the instantaneous orbital plane
-            - Since r and v are already in the ecliptic frame, no further
-              coordinate transformation is needed
-
-        **Step 3: Compute Ascending Node Longitude**
-            - The ascending node direction n = k × h (where k is ecliptic pole)
-            - Simplifies to: n = (-h_y, h_x, 0)
-            - Longitude = atan2(h_x, -h_y), normalized to [0°, 360°)
-            - Result is directly in the true ecliptic of date
-
-        Mathematical Foundation
-        =======================
-
-        The osculating orbital plane is defined by the angular momentum vector:
-
-            h = r × v = |r| |v| sin(θ) n̂
-
-        where θ is the angle between r and v, and n̂ is the unit normal to the
-        orbital plane. The ascending node is where the orbital plane intersects
-        the ecliptic plane, moving from south to north.
-
-        For the ascending node direction:
-            n_node = k̂_ecliptic × ĥ
-
-        The longitude of the ascending node Ω is:
-            Ω = atan2(n_x, n_y) = atan2(h_x, -h_y)
-
-        This geometric approach captures the instantaneous orbital geometry,
-        including all perturbations affecting the Moon's position and velocity
-        at the given moment.
-
-        Args:
-            jd_tt: Julian Day in Terrestrial Time (TT).
-                   TT is the uniform time scale used for ephemeris calculations,
-                   approximately TT = UTC + 32.184 seconds + leap seconds.
-
-        Returns:
-            Tuple[float, float, float]: (longitude, latitude, distance) where:
-                - longitude: Ecliptic longitude of ascending node in degrees [0, 360),
-                            referenced to true ecliptic of date (includes nutation)
-                - latitude: Always 0.0 (the node lies on the ecliptic by definition)
-                - distance: Geocentric distance of the osculating orbit at the
-                           ascending node in AU, from the conic r = p/(1 + e cos nu)
-                           evaluated at the node (p, e, omega from r, v)
-
-    Precision and Accuracy
-    ======================
-
-    **Compared to JPL DE ephemeris geometric method (1000 random dates, 1950-2050):**
-        - Mean error: ~8.9 arcsec (~0.0025 degrees)
-        - RMS error: ~11.8 arcsec (~0.0033 degrees)
-        - Maximum error: ~52 arcsec (~0.014 degrees)
-        - 100% of dates within 60 arcsec
-
-    **Across the full DE440 range (1550-2650):**
-        - Typical error: 2-13 arcsec
-        - Maximum observed: ~23 arcsec
-
-    **Temporal Behavior:**
-        - The true node oscillates +/-1.5 degrees around the mean node
-        - Primary oscillation period: ~27.2 days (draconic month)
-        - Secondary oscillations: fortnightly (~14.8 days), monthly (~29.5 days)
-        - Long-term motion: retrograde ~19.3 degrees/year (18.6 year period)
-
-        Physical Interpretation
-        =======================
-
-        The True Node represents the actual intersection of the Moon's instantaneous
-        orbit with the ecliptic. Key points:
-
-        - **Eclipses**: Solar and lunar eclipses occur when the Sun is near a node
-          during New/Full Moon. The True Node gives the instantaneous position.
-
-        - **Oscillation**: The ±1.5° oscillation is primarily caused by:
-          1. The Moon's orbital eccentricity (e ≈ 0.0549)
-          2. Solar gravitational perturbations (evection, variation)
-          3. The tilt of the Moon's orbit (~5.145° to ecliptic)
-
-        - **Astrological Use**: Many systems prefer the True Node for its
-          astronomical accuracy; others use the Mean Node for smoother motion.
-
-        Note:
-            The true node can move rapidly (several arcminutes per hour) and
-            occasionally appears to reverse direction briefly due to the
-            complex perturbation interplay. This is physically correct behavior,
-            not a calculation artifact.
-
-        See Also:
-            - calc_mean_lunar_node: Smoothed average node position
+    Notes:
+        The calculation uses JPL DE440/DE441 state vectors and the true
+        ecliptic frame of date. Its valid range and precision are therefore
+        governed by the active ephemeris and frame transformations; measured
+        accuracy is reported in ``docs/reference/precision.md``.
 
     References:
-        Primary:
-            - Park, R.S. et al. (2021) "The JPL Planetary and Lunar Ephemerides DE440 and DE441"
-            - Vallado, D. "Fundamentals of Astrodynamics and Applications"
-              (4th ed., 2013), Chapter 2: Orbit Determination
-
-        Orbital Mechanics:
-            - Bate, Mueller, White "Fundamentals of Astrodynamics" (1971)
-            - Roy, A.E. "Orbital Motion" (4th ed., 2005)
+        Vallado, *Fundamentals of Astrodynamics and Applications*, chapter 2;
+        Meeus, *Astronomical Algorithms*, chapter 47.
     """
     from skyfield.framelib import ecliptic_frame
 
@@ -2114,8 +2017,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     the Moon's instantaneous position and velocity from JPL DE ephemeris,
     points toward perigee. The apogee direction is 180° from perigee.
 
-    Algorithm
-    =========
+    Algorithm:
 
     **Step 1: Obtain Moon State Vectors in Ecliptic Frame**
         - Query JPL DE ephemeris via Skyfield
@@ -2126,7 +2028,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
 
     **Step 2: Compute Eccentricity Vector**
         - h = r × v (angular momentum)
-        - e = (v × h)/μ - r/|r| (points toward perigee)
+        - ``e = (v × h)/μ - r/abs(r)`` (points toward perigee)
         - μ = G(M_Earth + M_Moon) for the two-body problem
         - Apogee direction = -e (opposite to perigee)
 
@@ -2135,8 +2037,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
           vector is directly in ecliptic coordinates of date
         - Convert from Cartesian to spherical (longitude, latitude)
 
-    Physical Background
-    ==================
+    Physical background:
 
     The osculating lunar apogee is the apogee direction of the instantaneous
     Keplerian orbit that passes through the Moon's current position with its
@@ -2152,8 +2053,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
             - latitude: Ecliptic latitude in degrees (small, typically < 5°)
             - distance: Apogee distance from Earth in AU
 
-    Precision
-    =========
+    Precision:
 
     **Computed from JPL DE ephemeris state vectors (500 random dates, 1950-2050):**
         - Mean internal consistency: sub-arcsecond
@@ -2190,7 +2090,7 @@ def calc_true_lilith(jd_tt: float) -> Tuple[float, float, float]:
     # Earth-Moon system gravitational parameter (shared module constant)
     mu = GM_EARTH_MOON_AU3_DAY2
 
-    # Eccentricity vector e = (v × h)/μ - r/|r| (points toward perigee)
+    # Eccentricity vector e = (v × h)/μ - r/abs(r) (points toward perigee)
     vxh_x = v[1] * h_z - v[2] * h_y
     vxh_y = v[2] * h_x - v[0] * h_z
     vxh_z = v[0] * h_y - v[1] * h_x

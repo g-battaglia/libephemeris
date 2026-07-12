@@ -13,8 +13,8 @@ leph code lint                          # Ruff linter with auto-fix
 leph code format                        # Ruff formatter
 leph code typecheck                     # mypy
 
-leph test skyfield essential            # ~490 tests, ~20s (fast sanity check)
-leph test leb-backend unit-fast         # ~5890 tests, ~1 min [RECOMMENDED]
+leph test skyfield essential            # ~900 tests, ~20s (fast sanity check)
+leph test leb-backend unit-fast         # ~16,000 tests, ~1 min [RECOMMENDED]
 pytest tests/test_file.py -v            # Single file
 pytest tests/test_file.py::test_name -v # Single test
 ```

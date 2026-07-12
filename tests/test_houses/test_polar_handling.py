@@ -271,8 +271,8 @@ class TestSweHousesWithFallback:
         lat = 70.0
 
         # Get fallback result
-        cusps_fallback, ascmc_fallback, used_fallback, _ = (
-            ephem.houses_with_fallback(jd, lat, 0.0, ord("P"))
+        cusps_fallback, ascmc_fallback, used_fallback, _ = ephem.houses_with_fallback(
+            jd, lat, 0.0, ord("P")
         )
 
         # Get direct Porphyry
@@ -586,8 +586,8 @@ class TestKochPolarEdgeCases:
         lat = 70.0
 
         # Get fallback result
-        cusps_fallback, ascmc_fallback, used_fallback, _ = (
-            ephem.houses_with_fallback(jd, lat, 0.0, ord("K"))
+        cusps_fallback, ascmc_fallback, used_fallback, _ = ephem.houses_with_fallback(
+            jd, lat, 0.0, ord("K")
         )
 
         # Get direct Porphyry

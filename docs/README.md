@@ -71,5 +71,5 @@ The single, centralized place for the head-to-head with Swiss Ephemeris (pyswiss
 Beginner-friendly introductions to astronomical and astrological calculations.
 No prior knowledge of astronomy or programming required.
 
-- **[Manuale (Italiano)](manual/it/)** -- 15 capitoli
-- **[Manual (English)](manual/en/)** -- 15 chapters
+- **[Manuale (Italiano)](manual/it/README.md)** -- prefazione + 15 capitoli
+- **[Manual (English)](manual/en/README.md)** -- preface + 15 chapters

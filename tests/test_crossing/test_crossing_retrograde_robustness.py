@@ -14,6 +14,7 @@ The previous tests only asserted ``isinstance(result, float)``, so none of these
 were caught. These assert the crossing against an independent fine scan of the
 library's own longitude curve, plus the forward-only invariant.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -32,8 +33,13 @@ def _lon(planet: int, jd: float) -> float:
     return L.calc_ut(jd, planet, FLG_SWIEPH)[0][0]
 
 
-def _first_crossing(planet: int, jd_start: float, target: float,
-                    max_days: float = 950.0, step: float = 0.5):
+def _first_crossing(
+    planet: int,
+    jd_start: float,
+    target: float,
+    max_days: float = 950.0,
+    step: float = 0.5,
+):
     """Independent first genuine sign-change crossing of the library's longitude
     curve (the reference cross_ut should reproduce). None if none in window."""
     prev = _lon(planet, jd_start)
@@ -68,7 +74,9 @@ def test_cross_ut_is_forward_only():
         assert jd >= start - 1e-6, f"cross_ut went backward: {jd - start:.2f} d"
         truth = _first_crossing(MARS, start, target)
         assert truth is not None
-        assert abs(jd - truth) < 2.0, f"di={di}: {jd-start:.1f} vs {truth-start:.1f}"
+        assert abs(jd - truth) < 2.0, (
+            f"di={di}: {jd - start:.1f} vs {truth - start:.1f}"
+        )
 
 
 def test_cross_ut_far_behind_prograde_is_forward():
@@ -93,7 +101,7 @@ def test_cross_ut_behind_target_not_decades_late():
     start = L.julday(2020, 5, 1, 0.0, L.GREG_CAL)  # Saturn approaching retro
     target = 301.2596  # ~0.6 deg behind Saturn here
     jd = L.cross_ut(SATURN, target, start, FLG_SWIEPH)
-    assert jd - start < 90.0, f"returned {jd-start:.0f} d late (decades-late bug)"
+    assert jd - start < 90.0, f"returned {jd - start:.0f} d late (decades-late bug)"
     truth = _first_crossing(SATURN, start, target)
     assert truth is not None and abs(jd - truth) < 2.0
 
@@ -112,10 +120,13 @@ def test_cross_ut_near_station_does_not_diverge():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("planet,year,month", [
-    (MARS, 2020, 8),
-    (SATURN, 2020, 3),
-])
+@pytest.mark.parametrize(
+    "planet,year,month",
+    [
+        (MARS, 2020, 8),
+        (SATURN, 2020, 3),
+    ],
+)
 def test_cross_ut_behind_targets_genuine(planet, year, month):
     """Breadth guard: targets a few degrees BEHIND the planet across its
     retrograde window are reached via the imminent retrograde dip (forward,
@@ -135,7 +146,7 @@ def test_cross_ut_behind_targets_genuine(planet, year, month):
             jd = L.cross_ut(planet, target, start, FLG_SWIEPH)
             assert jd >= start - 1e-6
             assert abs(jd - truth) < 2.0, (
-                f"{planet} di={di} off={off}: {jd-start:.1f} vs {truth-start:.1f}"
+                f"{planet} di={di} off={off}: {jd - start:.1f} vs {truth - start:.1f}"
             )
             checked += 1
     assert checked > 0

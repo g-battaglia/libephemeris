@@ -492,9 +492,9 @@ Constant 0.12 mag offset.
 #### Neptune Magnitude — Secular Brightness Variation
 
 **Problem:** Neptune uses a fixed V(1,0) = -7.00, but Neptune's albedo has been
-changing over its 165-year orbital period. Swiss Ephemeris models this with a
-secular V(1,0) that transitions from -6.89 (pre-1980) to -7.00 (by J2000.0).
-Our fixed value produced 0.11 mag error at pre-1980 dates.
+changing over its 165-year orbital period. Black-box reference magnitudes follow
+a secular V(1,0) curve consistent with a transition from -6.89 (pre-1980) to
+-7.00 (by J2000.0). Our fixed value produced 0.11 mag error at pre-1980 dates.
 
 Additionally, the `tjd` parameter was not being passed to `_calc_planet_magnitude()`
 for non-Saturn planets (it was initialized to `0.0` instead of `t.tt`), so the
@@ -522,8 +522,10 @@ year calculation gave ~4712 BC regardless of actual date.
 #### Apparent Diameter — IAU 2015 Equatorial Radii (Intentional Divergence)
 
 **Investigation:**
-Swiss Ephemeris uses **mean volumetric radii** for giant planets, producing
-systematically smaller apparent diameters (2--3.5% for Jupiter/Saturn).
+Black-box reference diameters match values computed with **mean volumetric
+radii** for giant planets, producing systematically smaller apparent diameters
+(2--3.5% for Jupiter/Saturn). This is an output inference, not an internal-source
+claim.
 LibEphemeris uses **IAU 2015 equatorial radii**, which is the standard adopted
 by the Astronomical Almanac for apparent diameter computation.
 

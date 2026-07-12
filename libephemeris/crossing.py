@@ -1129,7 +1129,7 @@ def mooncross_node_ut(
 
         Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
         crossing (measured black-box: identical instants). The only
-        divergence is the time frame of the *_ut return value: the reference
+        divergence is the time frame of the ``*_ut`` return value: the reference
         reports the TT/ET instant unconverted, while libephemeris reports
         the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
         growing at extreme epochs). See known-differences.md §11.
@@ -1201,7 +1201,7 @@ def mooncross_node(
 
         Both engines solve the SAME event — the Moon's ecliptic-latitude-zero
         crossing (measured black-box: identical instants). The only
-        divergence is the time frame of the *_ut return value: the reference
+        divergence is the time frame of the ``*_ut`` return value: the reference
         reports the TT/ET instant unconverted, while libephemeris reports
         the true UT instant, so the gap is exactly Delta-T (~64 s at J2000,
         growing at extreme epochs). See known-differences.md §11.

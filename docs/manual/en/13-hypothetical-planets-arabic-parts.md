@@ -162,7 +162,10 @@ Waldemath's Moon: 61.36°
 
 ## 13.3 Custom fictitious orbits
 
-If you need a hypothetical body not included in the library, you can define your own orbit. The library uses a file format with orbital elements (compatible with a reference-ephemeris orbital-elements file format (`seorbel.txt`)).
+If you need a hypothetical body not included in the library, you can define
+your own orbit using LibEphemeris's documented nine-field orbital-elements text
+format. Supply values from sources you are entitled to use; reference-distribution
+data files are not required or supported as bundled inputs.
 
 ### Loading predefined orbits
 

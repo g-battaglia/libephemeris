@@ -1343,16 +1343,16 @@ class TestWaldemathGeocentricMoon:
     """Waldemath's hypothetical second moon of Earth (body 58).
 
     Waldemath is a GEOCENTRIC body using the canonical Koch-reconstructed
-    orbit (D. Koch, from Waldemath's 1898 elements) bundled in
-    data/fictitious_orbits.csv and the reference seorbel dataset: an
+    orbit (D. Koch, from Waldemath's 1898 elements) bundled in the independent
+    data/fictitious_orbits.csv dataset: an
     ECCENTRIC (e=0.1587), INCLINED (i=2.5 deg) orbit referred to the 1898
     ecliptic/equinox, propagated with per-century rates. (It is NOT the
     circular, zero-inclination, J2000 approximation used before v3.0.0,
     which was ~144 deg off in longitude.)
 
-    Reference longitudes below come from an independent ephemeris oracle
-    configured with the canonical seorbel elements (validation only; the
-    oracle is not imported).
+    Reference longitudes below are frozen public-API outputs obtained by
+    black-box validation. No reference-distribution data artifact is imported,
+    read, or required by this test.
     """
 
     # Reference calc(jd_tt, Waldemath, FLG_SPEED) -> (lon, lat, dist) of date.

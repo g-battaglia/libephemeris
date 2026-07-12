@@ -20,29 +20,30 @@ principal modelling choices behind the library and the rationale for each.
 
 LibEphemeris aligns every component with the most current JPL and IAU models, so a
 chart is accurate and internally self-consistent from antiquity to the far future.
-The guiding principles are: use NASA JPL numerical ephemerides directly (no
-reduced-precision fallback), use the official IAU/ERFA routines for the
-precession–nutation–obliquity chain, and share a single time argument (ΔT) and a
-single obliquity realization between body positions and house angles. All
-modelling choices produce sub-arcsecond effects for the planets and sub-degree
-effects for the lunar apsides.
+The guiding principles are: use NASA JPL numerical ephemerides for planetary
+and lunar state vectors, make every fallback explicit, use the official IAU/ERFA
+routines for the precession–nutation–obliquity chain, and share a single time
+argument (ΔT) and obliquity realization between body positions and house
+angles. Model accuracy depends on body class and source; the documented strict
+precision controls prevent an unnoticed minor-body downgrade.
 
 ## Method
 
 ### Ephemeris Foundation
 
-LibEphemeris uses exclusively JPL **DE440** (Park et al., 2021) or **DE441**, the
-most recent numerical planetary ephemerides — the same data NASA uses for
-spacecraft navigation. Every calculation, without exception, uses the full JPL
-numerical integration in the ICRF 3.0 reference frame. There is no analytical
-reduced-precision fallback: the `FLG_MOSEPH` flag is accepted for API
-compatibility but ignored, so users never have to manage ephemeris files or worry
-about silent accuracy degradation.
+The main planetary/lunar sources are JPL **DE440** (Park et al., 2021) and
+**DE441** in the ICRF. The local Skyfield path reads those kernels directly; LEB
+evaluates precomputed Chebyshev representations; and the remote backend requests
+state vectors from JPL Horizons. Dedicated analytical or catalog pipelines
+serve nodes, apsides, hypothetical bodies, houses, and fixed stars. Minor bodies
+may use SPK, optional N-body, or Keplerian sources. The `FLG_MOSEPH` flag is
+accepted for API compatibility but does not select a Moshier ephemeris.
 
 | Property | LibEphemeris |
 | -------- | ------------ |
 | Primary ephemeris | DE440/DE441 (2021) |
-| Analytical fallback | None (JPL always) |
+| Runtime backends | LEB, Horizons, local Skyfield |
+| Analytical models | Derived bodies and minor-body fallback |
 | Reference frame | ICRF 3.0 |
 
 ### Outer Planet Body Centers
@@ -67,12 +68,16 @@ kilometre offsets these correspond to.)
 LibEphemeris corrects to the true planet body center **automatically** for every
 calculation, with no user configuration, using a three-tier fallback:
 
-1. **Tier 1 — SPK-based** (<0.001"): bundled planet-center segments extracted from
-   JPL satellite ephemerides (jup204, sat319, ura083, nep050, plu017).
+1. **Tier 1 — SPK-based** (<0.001"): optional planet-center files extracted from
+   JPL satellite ephemerides (jup204, sat319, ura083, nep050, plu017), when the
+   configured tier file has been downloaded.
 2. **Tier 2 — Analytical satellite models** (sub-arcsecond): Lieske E5 for
    Jupiter's Galilean satellites, TASS 1.7 (Vienne & Duriez, 1995) for Saturn's
    system, Keplerian models for Neptune's Triton and Pluto's Charon.
-3. **Tier 3 — Raw barycenter**: only when both higher tiers are unavailable.
+
+The analytical models are part of the core package, so supported outer planets
+do not silently fall back to an uncorrected system barycenter merely because an
+optional planet-center file is absent.
 
 For Jupiter this transparently eliminates the barycenter-to-center systematic
 error — up to ~0.08 arcseconds at opposition (typically ~0.02", a ~64 km offset).
@@ -117,9 +122,9 @@ and the selectable alternatives are documented in full in
 
 LibEphemeris supports three approaches for minor bodies, in order of precision:
 
-1. **JPL SPK kernels**: downloaded directly from NASA JPL Horizons via
-   `astroquery`. These contain the same numerical integration results used by JPL
-   and provide sub-arcsecond accuracy across their full date range.
+1. **JPL SPK kernels**: downloaded by the built-in direct HTTPS client from NASA
+   JPL Horizons. These contain JPL numerical-integration results and provide
+   sub-arcsecond accuracy across their coverage interval.
 2. **N-body integration** (optional, via `rebound` + `assist`): for dates outside
    SPK coverage, real-time gravitational N-body integration including the major
    planets' influence at each timestep.

@@ -447,8 +447,7 @@ class TestOrbitMaxMinTrueDistanceAsteroids:
         for jd in (2433282.5, 2451545.0, 2469807.5):
             max_d, min_d, true_d = swe.orbit_max_min_true_distance(jd, body_id, 0)
             assert all(
-                type(v) is float and math.isfinite(v)
-                for v in (max_d, min_d, true_d)
+                type(v) is float and math.isfinite(v) for v in (max_d, min_d, true_d)
             ), f"{name}: non-float/non-finite result"
             assert min_d >= 0.0, f"{name}: min distance {min_d} < 0"
             assert min_d < max_d, f"{name}: min {min_d} >= max {max_d}"
@@ -465,9 +464,11 @@ class TestOrbitMaxMinTrueDistanceAsteroids:
             q_body, big_q_body = a * (1 - e), a * (1 + e)
             # Max distance never exceeds aphelion-to-aphelion, never below the
             # body's aphelion minus Earth's perihelion.
-            assert big_q_body - self._EMB_q - 1e-6 <= max_d <= big_q_body + self._EMB_Q + 1e-6, (
-                f"{name}@{jd}: max {max_d} outside aphelion bounds"
-            )
+            assert (
+                big_q_body - self._EMB_q - 1e-6
+                <= max_d
+                <= big_q_body + self._EMB_Q + 1e-6
+            ), f"{name}@{jd}: max {max_d} outside aphelion bounds"
             # Min distance never below perihelion-difference, never above the
             # body's perihelion plus Earth's aphelion.
             assert min_d <= q_body + self._EMB_Q + 1e-6, (

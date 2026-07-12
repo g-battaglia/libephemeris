@@ -396,7 +396,9 @@ def write_leb2_chunked(
         SectionEntry(SECTION_COMPRESSED_CHEBYSHEV, cheb_offset, cheb_total),
     ]
     if nutation_data:
-        sec_entries.append(SectionEntry(SECTION_NUTATION, nut_offset, len(nutation_data)))
+        sec_entries.append(
+            SectionEntry(SECTION_NUTATION, nut_offset, len(nutation_data))
+        )
     if delta_t_data:
         sec_entries.append(SectionEntry(SECTION_DELTA_T, dt_offset, len(delta_t_data)))
     if star_data:
@@ -459,7 +461,7 @@ def write_leb2_chunked(
             write_chunk_entry(buf, ci_cursor + ci * CHUNK_ENTRY_SIZE, chunk_entry)
 
             # Write blob
-            buf[blob_cursor: blob_cursor + len(blob)] = blob
+            buf[blob_cursor : blob_cursor + len(blob)] = blob
             blob_cursor += len(blob)
             seg_cursor += chunk_seg_count
 
@@ -467,11 +469,11 @@ def write_leb2_chunked(
 
     # Write auxiliary sections
     if nutation_data:
-        buf[nut_offset: nut_offset + len(nutation_data)] = nutation_data
+        buf[nut_offset : nut_offset + len(nutation_data)] = nutation_data
     if delta_t_data:
-        buf[dt_offset: dt_offset + len(delta_t_data)] = delta_t_data
+        buf[dt_offset : dt_offset + len(delta_t_data)] = delta_t_data
     if star_data:
-        buf[star_offset: star_offset + len(star_data)] = star_data
+        buf[star_offset : star_offset + len(star_data)] = star_data
 
     # Flush
     os.makedirs(os.path.dirname(os.path.abspath(output)) or ".", exist_ok=True)
@@ -481,7 +483,9 @@ def write_leb2_chunked(
     if verbose:
         print(f"\n  Output: {output}")
         print(f"  File size: {total_size / 1e6:.2f} MB ({total_size:,} bytes)")
-        print(f"  Format: LEB2 v2 (chunked, {chunk_interval_days / 365.25:.0f}-year chunks)")
+        print(
+            f"  Format: LEB2 v2 (chunked, {chunk_interval_days / 365.25:.0f}-year chunks)"
+        )
 
 
 # =============================================================================
@@ -507,7 +511,9 @@ def convert_leb1_to_leb2(
     """
     if verbose:
         chunk_years = CHUNK_INTERVAL_DAYS / 365.25
-        print(f"Converting {input_path} -> {output_path} (v2, {chunk_years:.0f}-year chunks)")
+        print(
+            f"Converting {input_path} -> {output_path} (v2, {chunk_years:.0f}-year chunks)"
+        )
         if group:
             print(f"  Group: {group} ({len(LEB2_GROUPS[group])} bodies)")
 
@@ -531,7 +537,9 @@ def convert_leb1_to_leb2(
     total_compressed = 0
 
     if verbose:
-        print(f"\n  {'Body':<16s}  {'Raw KB':>8s}  {'Comp KB':>8s}  {'Ratio':>6s}  {'Chunks':>6s}")
+        print(
+            f"\n  {'Body':<16s}  {'Raw KB':>8s}  {'Comp KB':>8s}  {'Ratio':>6s}  {'Chunks':>6s}"
+        )
         print(f"  {'-' * 52}")
 
     for bid in body_ids:
@@ -552,7 +560,12 @@ def convert_leb1_to_leb2(
 
         # Compress into chunks
         chunks = compress_body_chunked(
-            raw, entry.segment_count, entry.degree, entry.components, bits, segs_per_chunk
+            raw,
+            entry.segment_count,
+            entry.degree,
+            entry.components,
+            bits,
+            segs_per_chunk,
         )
 
         comp_size = sum(len(blob) for blob, _ in chunks)

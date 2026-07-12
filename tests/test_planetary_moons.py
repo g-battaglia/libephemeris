@@ -233,10 +233,9 @@ class TestMoonPositionUnregistered:
     def test_calc_ut_unregistered_moon_raises(self):
         """calc_ut raises Error for an unregistered moon (reference parity).
 
-        The reference API raises (reporting that the satellite ephemeris file
-        'sepm9501.se1' is not found) when the satellite ephemeris is
-        unavailable; silent zeros would be
-        indistinguishable from a real position.
+        Black-box reference calls also raise when satellite ephemeris coverage
+        is unavailable; silent zeros would be indistinguishable from a real
+        position. No reference-distribution file is needed by this test.
         """
         jd = 2451545.0  # J2000.0
         with pytest.raises(eph.Error):

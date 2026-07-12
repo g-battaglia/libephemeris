@@ -228,9 +228,7 @@ class TestNoDeadlocks:
         def worker(thread_id: int):
             try:
                 ctx = EphemerisContext()
-                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN][
-                    thread_id % 3
-                ]
+                mode = [SIDM_LAHIRI, SIDM_FAGAN_BRADLEY, SIDM_RAMAN][thread_id % 3]
                 ctx.set_sid_mode(mode)
 
                 # Perform a few calculations

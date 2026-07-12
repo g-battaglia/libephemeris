@@ -141,10 +141,10 @@ leph code typecheck           # mypy static type checker
 Positions are computed in real time from DE440 binary kernels via Skyfield.
 
 ```bash
-leph test skyfield essential      # ~490 tests, ~20s — fast sanity check
-leph test skyfield smoke          # ~1460 tests, ~30s — broader sanity check
-leph test skyfield unit           # ~5890 tests, ~2 min — all unit tests, sequential
-leph test skyfield unit-fast      # ~5890 tests, ~1 min — all unit tests, parallel
+leph test skyfield essential      # ~900 tests, ~20s — fast sanity check
+leph test skyfield smoke          # ~1,700 tests, ~30s — broader sanity check
+leph test skyfield unit           # ~16,000 tests, ~2 min — all unit tests, sequential
+leph test skyfield unit-fast      # ~16,000 tests, ~1 min — all unit tests, parallel
 leph test skyfield unit-full      # ALL tests including @slow (~10+ min)
 leph test skyfield all            # unit + compare, sequential
 leph test skyfield all-fast       # unit + compare, parallel
@@ -159,7 +159,7 @@ Same test suite but positions come from precomputed Chebyshev polynomials (~14x 
 Requires `data/leb/ephemeris_medium.leb` (generate it with `leph leb generate medium groups`).
 
 ```bash
-leph test leb-backend essential   # ~490 tests, ~20s — fast sanity check (parallel)
+leph test leb-backend essential   # ~900 tests, ~20s — fast sanity check (parallel)
 leph test leb-backend unit        # Sequential, verbose
 leph test leb-backend unit-fast   # Parallel (~1 min) [RECOMMENDED for daily dev]
 leph test leb-backend unit-full   # Including @slow
@@ -498,12 +498,12 @@ poe format                              # -> leph code format
 poe typecheck                           # -> leph code typecheck
 
 # Skyfield backend: core / fast / full
-poe test:skyfield:core                  # -> leph test skyfield essential (~490, ~20s)
-poe test:skyfield:fast                  # -> leph test skyfield unit-fast (~5890, ~1 min)
+poe test:skyfield:core                  # -> leph test skyfield essential (~900, ~20s)
+poe test:skyfield:fast                  # -> leph test skyfield unit-fast (~16,000, ~1 min)
 poe test:skyfield:full                  # -> leph test skyfield all-full-fast (+@slow)
 
 # LEB backend: core / fast / full
-poe test:leb:core                       # -> leph test leb-backend essential (~490, ~20s)
+poe test:leb:core                       # -> leph test leb-backend essential (~900, ~20s)
 poe test:leb:fast                       # -> leph test leb-backend unit-fast [RECOMMENDED]
 poe test:leb:full                       # -> leph test leb-backend unit-full (+@slow)
 

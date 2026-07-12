@@ -66,12 +66,8 @@ class TestAllTierConsistency:
 
             for jd in all_overlap_dates:
                 base, _ = helper_base.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
-                medium, _ = helper_medium.leb(
-                    ephem.calc_ut, jd, body_id, FLG_SPEED
-                )
-                extended, _ = helper_extended.leb(
-                    ephem.calc_ut, jd, body_id, FLG_SPEED
-                )
+                medium, _ = helper_medium.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
+                extended, _ = helper_extended.leb(ephem.calc_ut, jd, body_id, FLG_SPEED)
 
                 bm = lon_error_arcsec(base[0], medium[0])
                 me = lon_error_arcsec(medium[0], extended[0])

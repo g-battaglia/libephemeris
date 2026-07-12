@@ -3295,118 +3295,32 @@ def heliacal_ut(
     eventtype: int,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[float, float, float]:
-    """
-    Calculate heliacal rising or setting time for a celestial body.
-
-    This function implements the heliacal_ut() API,
-    finding the Julian day of the next heliacal phenomenon after a given
-    start date. It works between geographic latitudes 60S - 60N.
+    """Find the next requested heliacal event after a UT start date.
 
     Args:
-        tjdut: Julian Day (UT) to start search from for the heliacal event.
-        geopos: Geographic position as a sequence of at least 3 values:
-            - [0]: Geographic longitude in degrees (east positive)
-            - [1]: Geographic latitude in degrees (north positive)
-            - [2]: Altitude above sea level in meters (eye height)
-        atmo: Atmospheric conditions as a sequence of at least 4 values:
-            - [0]: Atmospheric pressure in mbar/hPa (default: 1013.25)
-            - [1]: Atmospheric temperature in degrees Celsius (default: 15)
-            - [2]: Relative humidity in percent (0-100) (default: 40)
-            - [3]: If >= 1: Meteorological Range in km
-                   If 0 < value < 1: Total atmospheric coefficient (ktot)
-                   If 0: Calculate ktot from other parameters
-        observer: Observer description as a sequence of at least 6 values:
-            - [0]: Age of observer in years (default: 36)
-            - [1]: Snellen ratio of observer's eyes (default: 1.0 = normal)
-            - [2]: 0 = monocular, 1 = binocular (used if HELFLAG_OPTICAL_PARAMS)
-            - [3]: Telescope magnification (0 = naked eye)
-            - [4]: Optical aperture (telescope diameter) in mm
-            - [5]: Optical transmission coefficient
-        objname: Name of the celestial body. Can be:
-            - Planet name: "Sun", "Moon", "Mercury", "Venus", "Mars",
-              "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"
-            - Fixed star name: "Sirius", "Aldebaran", "Regulus", etc.
-            Note: Sun and Moon are not valid for heliacal calculations
-              and will raise a ValueError.
-        eventtype: Type of heliacal event:
-            - HELIACAL_RISING (1): Morning first visibility (heliacal rising)
-              Exists for all visible planets and stars.
-            - HELIACAL_SETTING (2): Evening last visibility (heliacal setting)
-              Exists for all visible planets and stars.
-            - EVENING_FIRST (3): First evening visibility after superior
-              conjunction. Only valid for inner planets (Mercury, Venus).
-            - MORNING_LAST (4): Last morning visibility before superior
-              conjunction. Only valid for inner planets (Mercury, Venus).
-        flags: Calculation flags (bitmap). Contains ephemeris flags like
-            FLG_SWIEPH, plus heliacal-specific flags:
-            - HELFLAG_OPTICAL_PARAMS (512): Use optical instrument parameters
-              from observer[2-5]. Without this flag, those values are ignored.
-            - HELFLAG_NO_DETAILS (1024): Provide date only, skip visibility
-              start/optimum/end details. Makes calculation faster.
-            - HELFLAG_VISLIM_DARK (4096): Function behaves as if Sun at nadir.
-            - HELFLAG_VISLIM_NOMOON (8192): Exclude Moon's brightness
-              contribution (useful for calculating epoch heliacal dates).
+        tjdut: Search start as a Julian Day in UT.
+        geopos: Longitude, latitude, and observer altitude.
+        atmo: Pressure, temperature, humidity, and either meteorological
+            range or a total atmospheric coefficient.
+        observer: Observer age and visual-acuity values, followed optionally
+            by binocular/telescope parameters.
+        objname: Planet or fixed-star name. The Sun and Moon are invalid for
+            this API.
+        eventtype: ``HELIACAL_RISING``, ``HELIACAL_SETTING``,
+            ``EVENING_FIRST``, or ``MORNING_LAST``.
+        flags: Ephemeris and heliacal calculation flags.
 
     Returns:
-        Tuple of 3 floats:
-            - [0]: Start of visibility (Julian day number)
-            - [1]: Optimum visibility (Julian day number),
-                   zero if HELFLAG_NO_DETAILS is set
-            - [2]: End of visibility (Julian day number),
-                   zero if HELFLAG_NO_DETAILS is set
+        Three Julian Days giving visibility start, optimum, and end. Detail
+        slots may be zero when ``HELFLAG_NO_DETAILS`` is set.
 
     Raises:
-        ValueError: If invalid object_name, body ID, or event_type.
-            Also raised if object_name is "Sun" or "Moon" which are not
-            valid for heliacal calculations.
+        ValueError: If the object or event type is invalid.
 
-    Algorithm:
-        The function searches for the moment when:
-        1. The body is at a specific altitude above the horizon (arcus visionis)
-        2. The Sun is at twilight position (typically -6 to -12 degrees below)
-        3. The body's apparent magnitude is brighter than sky's limiting magnitude
-
-        For heliacal rising (morning first):
-        - Search forward for when body first becomes visible at dawn
-        - Body must be above horizon while Sun is still below
-        - Sky must be dark enough for the body to be seen
-
-        For heliacal setting (evening last):
-        - Search forward for when body is last visible at dusk
-        - Body must be above horizon while Sun is setting
-        - Sky brightness must not overwhelm the body's light
-
-    Historical Note:
-        Heliacal risings were crucial for ancient calendars. The heliacal
-        rising of Sirius marked the Egyptian new year and predicted the
-        Nile flood. Babylonians used heliacal events to track planetary
-        positions without modern instruments.
-
-    Example:
-        >>> from libephemeris import julday, heliacal_ut
-        >>> from libephemeris import HELIACAL_RISING, FLG_SWIEPH
-        >>> jd = julday(2024, 1, 1, 0)
-        >>> # Geographic position: Rome (lon, lat, altitude)
-        >>> geopos = (12.5, 41.9, 0)
-        >>> # Atmospheric conditions: standard
-        >>> datm = (1013.25, 15.0, 40.0, 0.0)
-        >>> # Observer: age 36, normal vision
-        >>> dobs = (36.0, 1.0, 0, 0, 0, 0)
-        >>> # Find next heliacal rising of Venus
-        >>> jd1, jd2, jd3 = heliacal_ut(jd, geopos, datm, dobs,
-        ...                                  "Venus", HELIACAL_RISING)
-        >>> if jd1 > 0:
-        ...     print(f"Venus heliacal rising at JD {jd1:.5f}")
-
-    See Also:
-        - _heliacal_ut_pythonic: Internal function using planet ID instead of name
-        - _heliacal_pheno_ut_pythonic: Detailed heliacal phenomena calculation
-        - vis_limit_mag: Calculate limiting visual magnitude
-
-    References:
-        - Reference documentation
-        - Schoch "Planets in Mesopotamian Astral Science"
-        - Ptolemy's criteria for heliacal visibility
+    Notes:
+        The visibility search combines body altitude, solar twilight, object
+        magnitude, atmospheric extinction, sky brightness, and observer
+        characteristics.
     """
     from .constants import (
         HELIACAL_RISING,
@@ -4409,98 +4323,29 @@ def vis_limit_mag(
     objname: str,
     flags: int = FLG_SWIEPH,
 ) -> Tuple[float, Tuple[float, ...]]:
-    """
-    Calculate the limiting visual magnitude for observing a celestial body.
-
-    This function determines whether a celestial body (planet, star, etc.)
-    is visible given the current sky brightness conditions, atmospheric
-    parameters, and observer characteristics. It returns both the visibility
-    status and detailed information about the observation conditions.
+    """Evaluate the limiting visual magnitude for an object.
 
     Args:
-        tjdut: Julian Day (UT) for the observation time
-        geopos: Geographic position as a sequence:
-            - [0]: Geographic longitude in degrees (east positive)
-            - [1]: Geographic latitude in degrees (north positive)
-            - [2]: Altitude above sea level in meters
-        atmo: Atmospheric conditions as a sequence:
-            - [0]: Atmospheric pressure in mbar/hPa
-            - [1]: Atmospheric temperature in degrees Celsius
-            - [2]: Relative humidity in percent (0-100)
-            - [3]: If >= 1: Meteorological Range in km
-                   If 0-1: Total atmospheric coefficient (ktot)
-                   If 0: Compute ktot from other parameters
-        observer: Observer characteristics as a sequence:
-            - [0]: Age of observer in years (default 36)
-            - [1]: Snellen ratio of observer's eyes (default 1.0 = normal)
-            For optical instruments (when HELFLAG_OPTICAL_PARAMS is set):
-            - [2]: 0 = monocular, 1 = binocular
-            - [3]: Telescope magnification (0 = naked eye)
-            - [4]: Optical aperture (telescope diameter) in mm
-            - [5]: Optical transmission coefficient
-        objname: Name of the object to observe. Can be:
-            - Planet name (e.g., "Venus", "Mars", "Jupiter")
-            - Fixed star name (e.g., "Sirius", "Aldebaran")
-            - Planet number as string (e.g., "2" for Venus)
-        flags: Calculation flags combining ephemeris and heliacal flags:
-            - FLG_SWIEPH, FLG_JPLEPH, etc. for ephemeris
-            - HELFLAG_OPTICAL_PARAMS: Use optical instrument parameters
-            - HELFLAG_NO_DETAILS: Skip detailed calculations
-            - HELFLAG_VISLIM_DARK: Assume Sun at nadir (dark sky)
-            - HELFLAG_VISLIM_NOMOON: Exclude Moon's brightness contribution
+        tjdut: Observation time as a Julian Day in UT.
+        geopos: Longitude, latitude, and observer altitude.
+        atmo: Pressure, temperature, humidity, and meteorological-range or
+            total-extinction input.
+        observer: Observer age and acuity, with optional optical-instrument
+            parameters.
+        objname: Planet, fixed-star name, or supported numeric body string.
+        flags: Ephemeris and heliacal visibility flags.
 
     Returns:
-        Tuple containing:
-            - result: Visibility status code:
-                - (-2): Object is below horizon
-                - (0): OK, photopic vision (bright conditions)
-                - (1): OK, scotopic vision (dark conditions)
-                - (2): OK, near limit between photopic/scotopic
-            - dret: Tuple of 8 floats with observation details:
-                - [0]: Limiting visual magnitude (object visible if mag < this)
-                - [1]: Altitude of object in degrees
-                - [2]: Azimuth of object in degrees
-                - [3]: Altitude of Sun in degrees
-                - [4]: Azimuth of Sun in degrees
-                - [5]: Altitude of Moon in degrees
-                - [6]: Azimuth of Moon in degrees
-                - [7]: Magnitude of object
+        A status code and an eight-value detail tuple containing limiting
+        magnitude, object/Sun/Moon horizontal coordinates, and object
+        magnitude.
 
     Raises:
-        ValueError: If objname is empty or invalid
+        ValueError: If the object name is empty or invalid.
 
-    Algorithm:
-        The limiting magnitude calculation is based on Schaefer's model (1990)
-        which considers:
-        1. Sky brightness from Sun, Moon, zodiacal light, airglow
-        2. Atmospheric extinction based on airmass and conditions
-        3. Observer's eye adaptation (scotopic vs photopic)
-        4. Optional optical instrument characteristics
-
-        The sky background brightness varies with:
-        - Sun altitude (twilight contribution)
-        - Moon altitude and phase (moonlight)
-        - Atmospheric scattering
-
-    Example:
-        >>> from libephemeris import julday, vis_limit_mag
-        >>> jd = julday(2024, 8, 15, 22.0)
-        >>> # Rome location
-        >>> geopos = (12.5, 41.9, 0)
-        >>> # Standard atmosphere
-        >>> atmo = (1013.25, 15.0, 50.0, 0.0)
-        >>> # Normal observer
-        >>> observer = (36, 1.0)
-        >>> result, dret = vis_limit_mag(jd, geopos, atmo, observer, "Venus")
-        >>> if dret[0] > dret[7]:
-        ...     print("Venus is visible")
-        ... else:
-        ...     print("Venus is not visible")
-
-    References:
-        - Reference API: vis_limit_mag()
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Schaefer, B.E. (1993) "Astronomy and the Limits of Vision"
+    Notes:
+        The Schaefer visibility model includes solar and lunar sky brightness,
+        atmospheric extinction, eye adaptation, and optional optics.
     """
     # --- LEB fast path ---
     from .state import get_leb_reader as _get_leb_reader

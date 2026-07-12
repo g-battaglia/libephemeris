@@ -311,13 +311,9 @@ default.
 
 ## Automatic SPK Download
 
-For convenience, LibEphemeris can automatically download SPK kernels on demand using `astroquery`.
-
-### Installation
-
-```bash
-pip install astroquery
-```
+For convenience, LibEphemeris can automatically download SPK kernels on demand
+with its built-in direct HTTPS client for NASA JPL Horizons. No optional Python
+package is required for this runtime path.
 
 ### Enabling Automatic SPK Download
 

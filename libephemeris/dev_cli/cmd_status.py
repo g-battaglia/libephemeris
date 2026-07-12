@@ -20,9 +20,7 @@ _LEB2_DIR = _PROJECT_ROOT / "data" / "leb2"
 _LEB2_GROUPS = list(LEB2_GROUPS)
 # Per-tier LEB1 partial paths — derived from the canonical group partition.
 _LEB1_PARTIALS = {
-    tier: {
-        g: _LEB1_DIR / f"ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS
-    }
+    tier: {g: _LEB1_DIR / f"ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS}
     for tier in ("base", "medium", "extended")
 }
 _PLANET_CENTER_SOURCE_FILES = {

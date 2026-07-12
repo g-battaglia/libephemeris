@@ -222,7 +222,7 @@ class TestHelioBarySpeedIsExactDerivative:
         assert err_arcsec < self.TOL_ARCSEC, (
             f"body={body} jd={jd} frame={frame:#x}: reported speed "
             f"{reported} deg/day differs from position derivative "
-            f"{numerical} deg/day by {err_arcsec:.4f}\"/day"
+            f'{numerical} deg/day by {err_arcsec:.4f}"/day'
         )
 
 

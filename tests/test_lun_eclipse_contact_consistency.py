@@ -94,24 +94,36 @@ def test_contacts_satisfy_defining_magnitude_conditions(year, month, kind):
     p4 = calc_lunar_eclipse_penumbral_fourth_contact_p4(jd_max, FLG_SWIEPH)
     # P1/P4 exist for every lunar eclipse: penumbral magnitude tangent (== 0).
     assert p1 > 0.0 and p4 > 0.0
-    assert lun_eclipse_penumbral_magnitude(p1, FLG_SWIEPH) == pytest.approx(0.0, abs=2e-3)
-    assert lun_eclipse_penumbral_magnitude(p4, FLG_SWIEPH) == pytest.approx(0.0, abs=2e-3)
+    assert lun_eclipse_penumbral_magnitude(p1, FLG_SWIEPH) == pytest.approx(
+        0.0, abs=2e-3
+    )
+    assert lun_eclipse_penumbral_magnitude(p4, FLG_SWIEPH) == pytest.approx(
+        0.0, abs=2e-3
+    )
 
     if kind in ("total", "partial"):
         u1 = calc_lunar_eclipse_umbral_first_contact_u1(jd_max, FLG_SWIEPH)
         u4 = calc_lunar_eclipse_umbral_fourth_contact_u4(jd_max, FLG_SWIEPH)
         assert u1 > 0.0 and u4 > 0.0
         # U1/U4: umbral magnitude tangent (== 0).
-        assert lun_eclipse_umbral_magnitude(u1, FLG_SWIEPH) == pytest.approx(0.0, abs=2e-3)
-        assert lun_eclipse_umbral_magnitude(u4, FLG_SWIEPH) == pytest.approx(0.0, abs=2e-3)
+        assert lun_eclipse_umbral_magnitude(u1, FLG_SWIEPH) == pytest.approx(
+            0.0, abs=2e-3
+        )
+        assert lun_eclipse_umbral_magnitude(u4, FLG_SWIEPH) == pytest.approx(
+            0.0, abs=2e-3
+        )
 
     if kind == "total":
         u2 = calc_lunar_eclipse_umbral_second_contact_u2(jd_max, FLG_SWIEPH)
         u3 = calc_lunar_eclipse_umbral_third_contact_u3(jd_max, FLG_SWIEPH)
         assert u2 > 0.0 and u3 > 0.0
         # U2/U3: Moon fully immersed -> umbral magnitude == 1.
-        assert lun_eclipse_umbral_magnitude(u2, FLG_SWIEPH) == pytest.approx(1.0, abs=2e-3)
-        assert lun_eclipse_umbral_magnitude(u3, FLG_SWIEPH) == pytest.approx(1.0, abs=2e-3)
+        assert lun_eclipse_umbral_magnitude(u2, FLG_SWIEPH) == pytest.approx(
+            1.0, abs=2e-3
+        )
+        assert lun_eclipse_umbral_magnitude(u3, FLG_SWIEPH) == pytest.approx(
+            1.0, abs=2e-3
+        )
 
 
 @pytest.mark.parametrize("year,month,kind", _ECLIPSES)

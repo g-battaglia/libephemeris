@@ -2,10 +2,10 @@
 # Copyright (c) 2025-2026 Giacomo Battaglia
 """Fixed-epoch sidereal modes (SIDM_J2000 / J1900 / B1950 / GALALIGN_MARDYKS).
 
-The reference API implements these ayanamsha modes as *frame*
-transformations, not as a scalar longitude offset: a sidereal position is
-the apparent position expressed on the mean ecliptic and equinox of the
-mode's reference epoch t0 (measured black-box, exact to sub-milliarcsecond):
+Black-box outputs for these ayanamsha modes are equivalent to *frame*
+transformations rather than a scalar longitude offset: a sidereal position is
+reproduced as the apparent position expressed on the mean ecliptic and equinox
+of the mode's reference epoch t0 (exact to sub-milliarcsecond):
 
 - ``SIDM_J2000``: bit-identical to a ``FLG_J2000 | FLG_NONUT`` request —
   positions, speeds, equatorial and XYZ representations alike.

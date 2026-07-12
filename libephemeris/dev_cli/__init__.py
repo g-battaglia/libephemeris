@@ -38,7 +38,7 @@ code quality, LEB binary ephemeris management, and release workflows.
 
 \b
 Quick start:
-  leph test skyfield essential     # Fast sanity check (~490 tests, ~20s)
+  leph test skyfield essential     # Fast sanity check (~900 tests, ~20s)
   leph test leb-backend unit-fast  # Recommended daily driver (~1 min)
   leph code lint                   # Ruff linter with auto-fix
 

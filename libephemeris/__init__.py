@@ -44,6 +44,7 @@ del _load_config
 
 from .constants import *
 from .constants import FLG_SPEED, GREG_CAL, JUL_CAL
+from .constants import __all__ as _CONSTANT_EXPORTS
 from .logging_config import (
     get_logger,
     set_log_level,
@@ -478,6 +479,7 @@ from .minor_bodies import (  # Generic asteroid lookup by number
     get_major_asteroid_info,
     list_major_asteroids,
     MAJOR_ASTEROID_SPK_INFO,
+    detect_mean_motion_resonance,
 )
 from .hypothetical import (  # Hamburg School Uranian planets
     calc_cupido,
@@ -639,7 +641,7 @@ from ._dotenv import load_dotenv
 # Extended astrology helpers submodule
 from . import contrib
 
-__version__ = "3.0.0rc7"
+__version__ = "3.0.0rc8"
 version = __version__
 __author__ = "Giacomo Battaglia"
 __license__ = "Apache-2.0"
@@ -659,6 +661,7 @@ __all__ = [
     "disable_logging",
     "enable_logging",
     "format_file_size",
+    "LIBEPHEMERIS_LOG_LEVEL_ENV",
     # Computation tracing
     "start_tracing",
     "get_trace_results",
@@ -747,6 +750,8 @@ __all__ = [
     "is_morning_star",
     "is_evening_star",
     "get_elongation_type",
+    "NutationFallbackWarning",
+    "get_nutation_model",
     # Houses
     "houses",
     "houses_armc",
@@ -756,6 +761,11 @@ __all__ = [
     "house_name",
     "house_pos",
     "gauquelin_sector",
+    "houses_with_fallback",
+    "houses_armc_with_fallback",
+    "get_polar_latitude_threshold",
+    "get_extreme_latitude_info",
+    "EXTREME_LATITUDE_THRESHOLD",
     # Ayanamsa (sidereal)
     "set_sid_mode",
     "get_ayanamsa_ut",
@@ -783,6 +793,12 @@ __all__ = [
     "get_current_file_data",
     # Close and cleanup
     "close",
+    "reset_session",
+    # LEB backend and calculation mode
+    "set_leb_file",
+    "get_leb_reader",
+    "set_calc_mode",
+    "get_calc_mode",
     # Crossings
     "solcross_ut",
     "solcross",
@@ -813,10 +829,14 @@ __all__ = [
     "lun_eclipse_umbral_magnitude",
     # Lunar eclipse penumbral magnitude
     "lun_eclipse_penumbral_magnitude",
+    "lun_eclipse_gamma",
     "lun_occult_when_glob",
     "lun_occult_when_loc",
     "lun_occult_where",
+    "planet_occult_when_glob",
+    "planet_occult_when_loc",
     # Besselian elements
+    "BesselianElements",
     "calc_besselian_x",
     "calc_besselian_y",
     "calc_besselian_d",
@@ -830,6 +850,7 @@ __all__ = [
     "calc_besselian_dl1_dt",
     "calc_besselian_dl2_dt",
     "calc_besselian_dmu_dt",
+    "interpolate_besselian_elements",
     # Solar eclipse contact points
     "calc_eclipse_first_contact_c1",
     "calc_eclipse_second_contact_c2",
@@ -851,6 +872,9 @@ __all__ = [
     "calc_eclipse_path_width",
     # Eclipse central line coordinates
     "calc_eclipse_central_line",
+    # Eclipse path limits
+    "calc_eclipse_northern_limit",
+    "calc_eclipse_southern_limit",
     # Saros series calculation
     "get_saros_number",
     "SAROS_CYCLE_DAYS",
@@ -949,6 +973,7 @@ __all__ = [
     "SPLIT_DEG_KEEP_DEG",
     # Helpers
     "calc_all_arabic_parts",
+    "contrib",
     # Fixed Stars
     "fixstar_ut",
     "fixstar",
@@ -1051,6 +1076,7 @@ __all__ = [
     "get_major_asteroid_info",
     "list_major_asteroids",
     "MAJOR_ASTEROID_SPK_INFO",
+    "detect_mean_motion_resonance",
     # Hypothetical bodies (Hamburg School Uranian planets)
     "calc_cupido",
     "calc_hades",
@@ -1063,6 +1089,7 @@ __all__ = [
     "calc_transpluto",  # Transpluto (Isis) - hypothetical trans-Plutonian planet
     "calc_vulcan",  # Vulcan - hypothetical intramercurial planet
     "calc_waldemath",  # Waldemath Moon - hypothetical second moon of Earth
+    "calc_proserpina",  # Proserpina - hypothetical trans-Plutonian planet
     "calc_planet_x_pickering",  # Pickering's Planet O/X prediction (1919)
     "calc_white_moon_position",  # White Moon (Selena) - opposite to Black Moon Lilith
     "calc_uranian_planet",
@@ -1096,6 +1123,27 @@ __all__ = [
     "get_moon_coverage",
     "calc_moon_position",
     "close_moon_kernels",
+    "NAIF_IO",
+    "NAIF_EUROPA",
+    "NAIF_GANYMEDE",
+    "NAIF_CALLISTO",
+    "NAIF_MIMAS",
+    "NAIF_ENCELADUS",
+    "NAIF_TETHYS",
+    "NAIF_DIONE",
+    "NAIF_RHEA",
+    "NAIF_TITAN",
+    "NAIF_HYPERION",
+    "NAIF_IAPETUS",
+    "NAIF_MIRANDA",
+    "NAIF_ARIEL",
+    "NAIF_UMBRIEL",
+    "NAIF_TITANIA",
+    "NAIF_OBERON",
+    "NAIF_TRITON",
+    "NAIF_PHOBOS",
+    "NAIF_DEIMOS",
+    "NAIF_CHARON",
     "MOON_NAIF_MAP",
     "MOON_NAMES",
     "MOON_PARENT_MAP",
@@ -1420,3 +1468,10 @@ __all__ = [
     "WHITE_MOON",
     "ZEUS",
 ]
+
+# Keep the package-level wildcard surface synchronized with the constants
+# module, whose own ``__all__`` is the authoritative public constants list.
+# ``dict.fromkeys`` preserves the curated order above while adding any newer
+# constants exactly once.
+__all__ = list(dict.fromkeys([*__all__, *_CONSTANT_EXPORTS]))
+del _CONSTANT_EXPORTS

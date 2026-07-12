@@ -404,13 +404,11 @@ class SPKNotFoundError(DataNotFoundError):
                 '   >>> eph.download_and_register_spk("<body_id>", <libephemeris_body_id>)'
             )
         lines.append("")
-        lines.append("3. Enable automatic downloading (requires astroquery):")
+        lines.append("3. Enable automatic downloading (uses direct JPL Horizons HTTP):")
         lines.append("   >>> eph.set_auto_spk_download(True)")
         lines.append("")
         lines.append("4. Use the CLI download script:")
-        lines.append(
-            "   $ python -m libephemeris.scripts.download_spk --bodies <body_name>"
-        )
+        lines.append("   $ python scripts/download_spk.py --bodies <body_name>")
         lines.append("")
         lines.append("For more information, see the libephemeris documentation.")
 

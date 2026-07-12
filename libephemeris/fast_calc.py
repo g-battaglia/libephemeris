@@ -684,7 +684,8 @@ def _get_precession_matrix(
 ) -> Tuple[Tuple[float, float, float], ...]:
     """Get the ICRS->mean-equator-of-date rotation matrix (no nutation).
 
-    Used for sidereal+equatorial output, where the reference ephemeris uses the mean equator.
+    Used for sidereal+equatorial output, whose black-box reference results are
+    expressed on the mean equator.
     Now sourced from the Vondrák 2011 long-term precession (via erfa, ICRS frame
     bias included) -- the same single source as the LEB path -- so both backends
     agree and remain valid at remote epochs. (Previously this used Skyfield's
@@ -2649,8 +2650,8 @@ def _fast_calc_core(
 
     # Sidereal correction
     #
-    # When EQUATORIAL is set, the reference ephemeris does NOT subtract ayanamsha from RA
-    # for any body type:
+    # Black-box reference outputs show that EQUATORIAL output does not subtract
+    # ayanamsha from RA for any body type:
     #   - Pipeline A (ICRS): already outputs equatorial coordinates using the
     #     mean equator (P matrix) when sidereal is set.
     #   - Pipeline B/C (ecliptic/helio): the pipeline handles equatorial
@@ -2673,9 +2674,9 @@ def _fast_calc_core(
             # J2000 ecliptic has no nutation component → mean ayanamsha.
             # Ecliptic of date includes nutation → true ayanamsha (mean + Δψ).
             #
-            # This applies uniformly to ALL bodies.  the reference ephemeris uses true
-            # ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even when
-            # FLG_J2000 is set (because it skips J2000 precession for them).
+            # This applies uniformly to ALL bodies. Black-box reference outputs
+            # use true ayanamsha for TrueNode/OscuApog/IntpApog/IntpPerg even
+            # when FLG_J2000 is set.
             # LibEphemeris intentionally fixes this: when J2000 is requested,
             # mean ayanamsha is always used, for all bodies.
             # See docs/comparison/intentional-divergences.md

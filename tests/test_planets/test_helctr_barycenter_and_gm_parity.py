@@ -103,7 +103,9 @@ def test_baryctr_truepos_matches_apparent_position() -> None:
     # The COB is skipped on both the TRUEPOS (no light-time) and apparent
     # BARYCTR paths, so Pluto's barycentre place differs only by the small
     # light-time shift — a stray COB on either path would open a ~0.09" gap.
-    tp, _ = lib.calc(_J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_TRUEPOS)
+    tp, _ = lib.calc(
+        _J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR | lib.FLG_TRUEPOS
+    )
     ap, _ = lib.calc(_J2000, lib.PLUTO, lib.FLG_SWIEPH | lib.FLG_BARYCTR)
     # Light-time over ~32 AU moves Pluto's barycentric longitude by ~0.02 deg;
     # a COB left on only one path would add a further ~0.09" (2.5e-5 deg).

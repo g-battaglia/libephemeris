@@ -2,26 +2,26 @@
 
 LibEphemeris is an independent implementation: it shares an API surface with
 the Swiss Ephemeris ecosystem so existing code can migrate without changes,
-but everything underneath — data sources, reduction chain, time-scale model,
-file formats and runtime architecture — is a different engineering stack.
-This page explains what is actually different, and how behavioral parity is
-achieved without sharing any code.
+while its implementation is built from the independent sources and components
+documented below. This page describes that stack and how behavioral parity is
+achieved without sharing any code or implementation material.
 
 ## Different data sources
 
-| Layer | LibEphemeris | Reference implementation |
+| Layer | LibEphemeris | Compatibility comparison |
 |---|---|---|
-| Planetary/lunar ephemeris | **NASA JPL DE440/DE441** SPK kernels, read directly (Chebyshev evaluation via Skyfield) | Proprietary compressed `.se1` files derived from DE431 |
-| Asteroids / minor bodies | JPL **SBDB** osculating elements, JPL **Horizons** SPK kernels, optional ASSIST N-body propagation | Proprietary compressed asteroid files |
-| Fixed stars | Catalog built from **Hipparcos** (van Leeuwen 2007), Tycho-2, VizieR and the IAU WGSN name list — public astrometry only | Bundled star data file |
-| Outer-planet centers | JPL satellite ephemerides (jup204, sat319, ura083, nep050, plu017) for barycenter→body-center correction | Barycenters |
-| Hypothetical bodies | Published primary sources (Witte & Lefeldt 1928, Neely 1988, Hoyt 1980, …) in an auditable CSV | Internal element file |
+| Planetary/lunar ephemeris | **NASA JPL DE440/DE441** through the local Skyfield path, precomputed LEB coefficients, or JPL Horizons | Numeric differences are measured from public API output only. |
+| Asteroids / minor bodies | JPL **SBDB** osculating elements, JPL **Horizons** SPK kernels, optional ASSIST N-body propagation | Coverage and values are compared through public API calls. |
+| Fixed stars | Catalog built from **Hipparcos** (van Leeuwen 2007), Tycho-2, VizieR and the IAU WGSN name list — public astrometry only | Names and returned astrometry are compared through public API calls. |
+| Outer-planet centers | JPL satellite ephemerides (jup204, sat319, ura083, nep050, plu017) for barycenter→body-center correction | Center/barycenter distinctions are established from output comparisons. |
+| Hypothetical bodies | Published primary sources (Witte & Lefeldt 1928, Neely 1988, Hoyt 1980, …) in an auditable CSV | Corresponding public body outputs are used only as interoperability targets. |
 
-Using DE440/DE441 directly means positions inherit JPL's current solution
-(DE440 supersedes DE431, with improved planetary masses and lunar dynamics);
-there is no intermediate re-compression step between JPL and the output.
+The local Skyfield path reads DE440/DE441 SPK kernels directly. The LEB path is
+an intentional intermediate representation generated from the same JPL state
+data, with its compression error bounded and verified separately; the Horizons
+path receives JPL-produced state vectors over HTTPS.
 
-## Different reduction chain
+## Independently sourced reduction chain
 
 The apparent-place pipeline (geometric position → light-time → gravitational
 deflection → aberration → frame rotation) is built on the **official IAU
@@ -47,7 +47,8 @@ routines** rather than on a private reimplementation:
 
 ## Own architecture
 
-Several components have no counterpart in the reference stack:
+Several components are LibEphemeris-native features outside the compatibility
+surface:
 
 - **LEB / LEB2 binary format** — a precomputed Chebyshev ephemeris designed
   for this library (~14× faster than the general pipeline), with
@@ -55,8 +56,8 @@ Several components have no counterpart in the reference stack:
   [the LEB guide](../leb/guide.md).
 - **Horizons backend** — zero-install operation by querying the NASA JPL
   Horizons REST API when no local kernels are present.
-- **Four-backend dispatch** — `auto` mode selects LEB → Horizons → Skyfield
-  per call, with a documented fallback contract.
+- **Four calculation modes** — `auto`, `leb`, `horizons`, and `skyfield` expose
+  a documented LEB → Horizons → Skyfield fallback contract.
 - **Thread-safe contexts** — `EphemerisContext` isolates per-thread state
   alongside the classic global-state API.
 - Pure Python throughout: inspectable algorithms, standard debugging and
@@ -79,7 +80,9 @@ rather than papered over.
 Two generated data sets are fitted against that oracle's *output* and are
 disclosed as such (the interpolated lunar-apse residual tables, and four
 fictitious-body element rows with no known publication) — see the
-Calibration Data Disclosure in [NOTICE.md](../../NOTICE.md). They contain
+Calibration Data Disclosure in
+[NOTICE.md](https://github.com/g-battaglia/libephemeris/blob/main/NOTICE.md).
+They contain
 computed positions, not source expression.
 
 ## What this means in practice

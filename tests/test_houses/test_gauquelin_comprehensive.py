@@ -136,9 +136,7 @@ class TestGauquelinSectorFunction:
     def test_different_methods(self, method):
         """Methods 0 and 1 both return valid sectors."""
         geopos = (2.35, 48.85, 0.0)
-        sector = swe.gauquelin_sector(
-            JD_J2000, MARS, method, geopos, 1013.25, 15.0
-        )
+        sector = swe.gauquelin_sector(JD_J2000, MARS, method, geopos, 1013.25, 15.0)
         assert 1.0 <= sector < 37.0
 
     @pytest.mark.unit
@@ -155,9 +153,7 @@ class TestGauquelinSectorFunction:
     @pytest.mark.unit
     def test_sector_varies_with_location(self):
         """Sector depends on geographic location."""
-        s1 = swe.gauquelin_sector(
-            JD_J2000, MARS, 0, (2.35, 48.85, 0.0), 1013.25, 15.0
-        )
+        s1 = swe.gauquelin_sector(JD_J2000, MARS, 0, (2.35, 48.85, 0.0), 1013.25, 15.0)
         s2 = swe.gauquelin_sector(
             JD_J2000, MARS, 0, (139.69, 35.68, 0.0), 1013.25, 15.0
         )

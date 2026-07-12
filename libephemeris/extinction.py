@@ -73,46 +73,25 @@ class ExtinctionCoefficients:
 
 
 def calc_airmass(altitude_deg: float, method: str = "kasten_young") -> float:
-    """
-    Calculate the airmass (relative path length through atmosphere).
-
-    Airmass indicates how much atmosphere light must traverse compared
-    to looking straight up (zenith, airmass = 1.0). At the horizon,
-    airmass is approximately 38-40.
+    """Calculate relative optical path length through the atmosphere.
 
     Args:
-        altitude_deg: Altitude of object above horizon in degrees.
-                     Negative values indicate object below horizon.
-        method: Airmass calculation method:
-            - "secant": Simple sec(z) formula, accurate above ~15 degrees
-            - "kasten_young": Kasten & Young (1989) formula, accurate to horizon
-            - "rozenberg": Rozenberg (1966) formula for very low altitudes
+        altitude_deg: Object altitude above the horizon in degrees.
+        method: One of ``"secant"``, ``"kasten_young"``, or
+            ``"rozenberg"``. The default Kasten-Young model remains useful
+            down to the horizon.
 
     Returns:
-        Airmass value (dimensionless). Returns 40.0 for objects at or below
-        horizon as practical maximum.
+        Dimensionless airmass. Objects at or below the horizon use the
+        practical cap of 40.0.
 
-    Algorithm:
-        The simple plane-parallel approximation uses X = sec(z) where z is
-        the zenith angle. This breaks down near the horizon due to Earth's
-        curvature and atmospheric refraction.
-
-        The Kasten & Young (1989) formula provides accurate airmass even
-        near the horizon:
-            X = 1 / [sin(h) + 0.50572 * (h + 6.07995)^(-1.6364)]
-        where h is altitude in degrees.
-
-    Example:
-        >>> calc_airmass(90.0)  # Zenith
-        1.0
-        >>> calc_airmass(30.0)  # 30 degrees altitude
-        2.0
-        >>> calc_airmass(0.0)   # Horizon
-        37.9...
+    Notes:
+        The plane-parallel model uses ``X = sec(z)``. The Kasten-Young model
+        corrects the low-altitude behavior for atmospheric curvature.
 
     References:
-        - Kasten, F. & Young, A.T. (1989) Applied Optics 28, 4735-4738
-        - Rozenberg, G.V. (1966) Twilight: A Study in Atmospheric Optics
+        Kasten and Young (1989), *Applied Optics* 28, 4735-4738; Rozenberg
+        (1966), *Twilight: A Study in Atmospheric Optics*.
     """
     # Handle objects at or below horizon
     if altitude_deg <= 0:
@@ -223,44 +202,22 @@ def calc_aerosol_coefficient(
     wavelength_nm: float = WAVELENGTH_V,
     visibility_km: Optional[float] = None,
 ) -> float:
-    """
-    Calculate the aerosol (Mie) scattering extinction coefficient.
-
-    Aerosol scattering is caused by dust, pollen, smoke, and other
-    particulates in the atmosphere. It is highly variable and depends
-    on local conditions.
+    """Calculate the aerosol (Mie) extinction coefficient.
 
     Args:
-        humidity_percent: Relative humidity (0-100).
-                         Higher humidity increases aerosol scattering.
-        altitude_m: Observer altitude in meters above sea level.
-                   Aerosol concentration decreases with altitude.
-        wavelength_nm: Wavelength of observation in nanometers.
-        visibility_km: Meteorological visibility in km. If provided,
-                       this is used to estimate aerosol content directly.
+        humidity_percent: Relative humidity from 0 to 100 percent.
+        altitude_m: Observer altitude above sea level in metres.
+        wavelength_nm: Observation wavelength in nanometres.
+        visibility_km: Optional meteorological visibility in kilometres.
 
     Returns:
-        Aerosol scattering coefficient in magnitudes per airmass.
-        Typical values range from 0.05 (excellent) to 0.30 (hazy).
-
-    Algorithm:
-        If visibility is given:
-            k_A = 3.912 / V - 0.1066 (empirical formula)
-        Otherwise, estimate from humidity:
-            k_A = 0.08 * (1 + 2 * (humidity/100)^2) * exp(-altitude/H_A)
-        where H_A ~ 1500m is the aerosol scale height.
-
-    Example:
-        >>> calc_aerosol_coefficient(30.0, 0.0)   # Low humidity, sea level
-        0.10...
-        >>> calc_aerosol_coefficient(80.0, 0.0)   # High humidity
-        0.18...
-        >>> calc_aerosol_coefficient(50.0, 2000)  # Moderate humidity, 2km altitude
-        0.07...
+        Aerosol extinction in magnitudes per airmass. Visibility, when
+        supplied, drives a Koschmieder estimate; otherwise humidity, altitude,
+        and wavelength provide the estimate.
 
     References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
+        Schaefer (1990), *Telescopic Limiting Magnitudes*; Green (1992),
+        *Magnitude Corrections for Atmospheric Extinction*.
     """
     if visibility_km is not None and visibility_km > 0:
         # Direct calculation from meteorological visibility
@@ -374,45 +331,24 @@ def calc_extinction_coefficient(
     wavelength_nm: float = WAVELENGTH_V,
     visibility_km: Optional[float] = None,
 ) -> ExtinctionCoefficients:
-    """
-    Calculate the total atmospheric extinction coefficient and its components.
-
-    This is the main function for determining how much light is lost
-    as it passes through the atmosphere. The extinction coefficient k
-    is used with airmass X to calculate total extinction:
-        delta_m = k * X
-    where delta_m is the increase in apparent magnitude.
+    """Calculate total atmospheric extinction and its components.
 
     Args:
-        pressure_mbar: Atmospheric pressure in millibars (hPa).
-                      Default is 1013.25 (standard sea level).
-        temperature_c: Temperature in degrees Celsius.
-                      Default is 15.0.
-        humidity_percent: Relative humidity (0-100).
-                         Default is 50.0.
-        altitude_m: Observer altitude in meters above sea level.
-                   Default is 0.0 (sea level).
-        wavelength_nm: Wavelength of observation in nanometers.
-                      Default is 550 (V-band).
-        visibility_km: Meteorological visibility in km.
-                      If provided, used to estimate aerosol content.
+        pressure_mbar: Atmospheric pressure in hPa.
+        temperature_c: Air temperature in degrees Celsius.
+        humidity_percent: Relative humidity from 0 to 100 percent.
+        altitude_m: Observer altitude above sea level in metres.
+        wavelength_nm: Observation wavelength in nanometres.
+        visibility_km: Optional meteorological visibility in kilometres.
 
     Returns:
-        ExtinctionCoefficients dataclass with individual components
-        and total extinction coefficient in mag/airmass.
+        An ``ExtinctionCoefficients`` value containing the Rayleigh, aerosol,
+        ozone, water-vapour, and total coefficients in magnitudes per airmass.
 
     Example:
         >>> coeff = calc_extinction_coefficient()
-        >>> print(f"Total extinction: {coeff.k_total:.3f} mag/airmass")
-        Total extinction: 0.28... mag/airmass
-
-        >>> coeff = calc_extinction_coefficient(humidity_percent=90)
-        >>> print(f"Humid extinction: {coeff.k_total:.3f} mag/airmass")
-        Humid extinction: 0.36... mag/airmass
-
-    References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
+        >>> coeff.k_total > 0
+        True
     """
     k_rayleigh = calc_rayleigh_coefficient(
         wavelength_nm=wavelength_nm,
@@ -456,50 +392,23 @@ def calc_extinction_magnitude(
     wavelength_nm: float = WAVELENGTH_V,
     visibility_km: Optional[float] = None,
 ) -> float:
-    """
-    Calculate the total atmospheric extinction in magnitudes for an object.
-
-    This function combines the extinction coefficient with airmass to give
-    the actual extinction experienced by an object at a given altitude.
-
-    For objects near the horizon, the extinction can be several magnitudes,
-    making faint objects invisible.
+    """Calculate atmospheric extinction for an object altitude.
 
     Args:
-        altitude_deg: Altitude of object above horizon in degrees.
-        pressure_mbar: Atmospheric pressure in millibars (hPa).
-        temperature_c: Temperature in degrees Celsius.
-        humidity_percent: Relative humidity (0-100).
-        observer_altitude_m: Observer altitude in meters above sea level.
-        wavelength_nm: Wavelength of observation in nanometers.
-        visibility_km: Meteorological visibility in km.
+        altitude_deg: Object altitude above the horizon in degrees.
+        pressure_mbar: Atmospheric pressure in hPa.
+        temperature_c: Air temperature in degrees Celsius.
+        humidity_percent: Relative humidity from 0 to 100 percent.
+        observer_altitude_m: Observer altitude above sea level in metres.
+        wavelength_nm: Observation wavelength in nanometres.
+        visibility_km: Optional meteorological visibility in kilometres.
 
     Returns:
-        Total extinction in magnitudes. This value should be added
-        to the object's catalog magnitude to get apparent magnitude.
-        Returns a large value (99.0) for objects at or below the horizon.
+        Extinction in magnitudes. Objects at or below the horizon return 99.0.
 
-    Algorithm:
-        extinction = k * X
-        where k is the extinction coefficient and X is airmass.
-
-        Using the basic formula (approximately):
-            extinction ~ 0.28 * sec(z)
-        where z is zenith angle and 0.28 is typical k for V-band.
-
-    Example:
-        >>> calc_extinction_magnitude(90.0)  # Zenith
-        0.28...  # Minimal extinction
-        >>> calc_extinction_magnitude(30.0)  # 30 degrees altitude
-        0.56...  # 2x airmass = 2x extinction
-        >>> calc_extinction_magnitude(5.0)   # Near horizon
-        3.2...   # Significant extinction
-        >>> calc_extinction_magnitude(0.0)   # Horizon
-        99.0  # At or below the horizon: treated as essentially infinite
-
-    References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
+    Notes:
+        The result is the total extinction coefficient multiplied by the
+        selected airmass model.
     """
     # Objects at or below the horizon have essentially infinite extinction.
     # Use <= 0 (not < 0) to match calc_simple_extinction and avoid an ~88-mag
@@ -525,38 +434,19 @@ def calc_extinction_magnitude(
 
 
 def calc_simple_extinction(altitude_deg: float, k: float = 0.28) -> float:
-    """
-    Calculate atmospheric extinction using the simple Schaefer/Green formula.
-
-    This is the basic formula mentioned in the task:
-        extinction = k * sec(z) = k / cos(z) = k / sin(h)
-    where z is zenith angle, h is altitude, and k ~ 0.28 for typical
-    visual observations.
+    """Calculate extinction with the simple plane-parallel model.
 
     Args:
-        altitude_deg: Altitude of object above horizon in degrees.
-        k: Extinction coefficient in mag/airmass. Default 0.28 is
-           typical for V-band at a good observing site.
+        altitude_deg: Object altitude above the horizon in degrees.
+        k: Extinction coefficient in magnitudes per airmass.
 
     Returns:
-        Extinction in magnitudes.
+        Extinction in magnitudes, or 99.0 at and below the horizon.
 
-    Note:
-        This simple formula is accurate for altitudes above ~15 degrees.
-        For lower altitudes, use calc_extinction_magnitude() which
-        applies proper airmass corrections for atmospheric curvature.
-
-    Example:
-        >>> calc_simple_extinction(90.0, 0.28)  # Zenith
-        0.28
-        >>> calc_simple_extinction(30.0, 0.28)  # 30 degrees (sec(60) = 2)
-        0.56
-        >>> calc_simple_extinction(19.47, 0.28)  # airmass = 3
-        0.84
-
-    References:
-        - Schaefer, B.E. (1990) "Telescopic Limiting Magnitudes"
-        - Green, D.W.E. (1992) "Magnitude Corrections for Atmospheric Extinction"
+    Notes:
+        The formula is ``k / sin(altitude)`` and is intended for altitudes
+        above roughly 15 degrees. Use ``calc_extinction_magnitude()`` near
+        the horizon.
     """
     if altitude_deg <= 0:
         return 99.0

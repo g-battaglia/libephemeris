@@ -611,8 +611,31 @@ def _resolve_center_flags(flags: int) -> int:
     return flags
 
 
+def _validate_barycentric_moseph(flags: int, entry_point: str) -> None:
+    """Reject the unsupported barycentric-MOSEPH request combination.
+
+    Black-box API probes show that this validation happens on the raw request
+    before body dispatch in both calc entry points.  Center priority still
+    applies (TOPOCTR removes BARYCTR), as does ephemeris priority (JPLEPH or
+    SWIEPH wins over MOSEPH when supplied).
+    """
+    from .constants import FLG_JPLEPH, FLG_MOSEPH
+
+    resolved = _resolve_center_flags(flags)
+    if (
+        resolved & FLG_BARYCTR
+        and resolved & FLG_MOSEPH
+        and not (resolved & (FLG_JPLEPH | FLG_SWIEPH))
+    ):
+        from .exceptions import Error
+
+        raise Error(
+            f"swisseph.{entry_point}: barycentric Moshier positions are not supported."
+        )
+
+
 def _echo_request_bits(retflag: int, raw_flags: int) -> int:
-    """Echo corrections the reference API derives from the raw request.
+    """Match reference API retflag echoes for the raw request.
 
     _normalize_calc_flags remaps bits for the (identical) computation in
     two ways that must not leak into the echoed retflag:
@@ -644,8 +667,7 @@ def _echo_request_bits(retflag: int, raw_flags: int) -> int:
 def _implied_retflag_bits(flags: int) -> int:
     """Retflag bits the reference API's flag normalization implies.
 
-    Beyond echoing the caller's bits, the reference switches on internally
-    (and echoes) the flags its normalization derives from the request:
+    Beyond echoing the caller's bits, black-box output also echoes implied flags:
     J2000 and SIDEREAL output is referred to a mean equinox, so FLG_NONUT is
     echoed; heliocentric, barycentric and true-position output skips light
     deflection and annual aberration, so FLG_NOGDEFL | FLG_NOABERR are echoed.
@@ -1317,6 +1339,8 @@ def calc_ut(
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT
 
+    _validate_barycentric_moseph(flags, "calc_ut")
+
     # Handle ECL_NUT (-1) - returns nutation and obliquity.
     # The reference normalizes ECL_NUT flags to exactly one
     # ephemeris bit, but FLG_MOSEPH is KEPT and FLG_SPEED3 is NOT remapped
@@ -1519,6 +1543,8 @@ def calc(
     from skyfield.errors import EphemerisRangeError as SkyfieldRangeError
     from .exceptions import validate_jd_range
     from .constants import ECL_NUT
+
+    _validate_barycentric_moseph(flags, "calc")
 
     # Handle ECL_NUT (-1) — nutation and obliquity. The input is already
     # TT, so compute directly (calc_ut converts UT first; this mirror was
@@ -4133,8 +4159,8 @@ def _calc_body(
             # Use the already-computed pos (with light-time correction) for the
             # main position. This is critical for HELCTR/BARYCTR where pos
             # includes iterative light-time correction applied in section 3.
-            # When SIDEREAL+EQUATORIAL, the reference ephemeris uses mean equator (no nutation),
-            # same as NONUT behavior.
+            # Black-box reference results for SIDEREAL+EQUATORIAL use the mean
+            # equator (no nutation), matching NONUT behavior.
             _use_mean_equator = bool(iflag & FLG_NONUT) or is_sidereal
 
             if is_icrs:
@@ -6003,8 +6029,8 @@ def _calc_nod_aps(
 
     # Speeds on request.
     #
-    # Moon MEAN: the reference derives the rates as a FORWARD difference
-    # over one day, x(t+1d) − x(t) — reproduced exactly for the
+    # Moon MEAN: black-box rates equal a FORWARD difference over one day,
+    # x(t+1d) − x(t) — reproduced exactly for the
     # longitude and distance channels. Its latitude-speed slot instead
     # contains the LATITUDE AT t+1d, not a rate (a defect, verified
     # black-box); we return the true forward-difference rate — see
@@ -6251,9 +6277,9 @@ def _calc_nod_aps(
             PLUTO,
         )
         if mirror_sun:
-            # The reference derives the solar orbit from the Earth-Moon
-            # barycenter (the Earth-alone osculating elements wobble by
-            # ~0.2 deg in perihelion direction from the Moon's pull).
+            # Black-box solar-orbit output is matched by using the Earth-Moon
+            # barycenter; the Earth-alone osculating elements wobble by
+            # ~0.2 deg in perihelion direction from the Moon's pull.
             emb_pos = planets["earth barycenter"].at(t)
             r_icrs = emb_pos.position.au - sun_pos.position.au
             v_icrs = emb_pos.velocity.au_per_d - sun_pos.velocity.au_per_d
@@ -6704,8 +6730,8 @@ def _calc_orbital_elements(t, ipl: int, iflag: int) -> Tuple[float, ...]:
         return zero_elements
 
     target_name = _PLANET_MAP[ipl]
-    # For Earth, the reference derives the heliocentric orbit from the
-    # Earth-Moon barycenter (mirroring _calc_nod_aps): the Earth-alone
+    # For Earth, black-box output is matched by deriving the heliocentric orbit
+    # from the Earth-Moon barycenter (mirroring _calc_nod_aps): the Earth-alone
     # osculating elements wobble by ~1e-5 AU in a/Q from the Moon's monthly
     # pull. Use the EMB as the target.
     if ipl == EARTH:

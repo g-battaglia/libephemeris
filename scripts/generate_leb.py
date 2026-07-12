@@ -1856,17 +1856,19 @@ def generate_body_icrs_asteroid_nbody(
                 f"N-body seed expects a heliocentric SPK (center=10) for body "
                 f"{body_id}; got center={center_id}."
             )
-        pos_km, vel_km_s = kernel.compute_type21(
-            center_id, target_id, _NBODY_ANCHOR_JD
-        )
+        pos_km, vel_km_s = kernel.compute_type21(center_id, target_id, _NBODY_ANCHOR_JD)
     finally:
         kernel.close()
     pos_au = np.asarray(pos_km, dtype=float) / AU_KM
     vel_au_d = np.asarray(vel_km_s, dtype=float) * 86400.0 / AU_KM
     sun0 = ephem.get_particle("sun", _NBODY_ANCHOR_JD - ephem.jd_ref)
     seed = dict(
-        x=pos_au[0] + sun0.x, y=pos_au[1] + sun0.y, z=pos_au[2] + sun0.z,
-        vx=vel_au_d[0] + sun0.vx, vy=vel_au_d[1] + sun0.vy, vz=vel_au_d[2] + sun0.vz,
+        x=pos_au[0] + sun0.x,
+        y=pos_au[1] + sun0.y,
+        z=pos_au[2] + sun0.z,
+        vx=vel_au_d[0] + sun0.vx,
+        vy=vel_au_d[1] + sun0.vy,
+        vz=vel_au_d[2] + sun0.vz,
     )
 
     # --- sample grid: exactly the nodes/verify points the fitter reads back ---
@@ -1885,7 +1887,11 @@ def generate_body_icrs_asteroid_nbody(
         # Disable the ASTEROIDS force when the body IS one of the sb441-n16
         # perturbers (Hygiea etc.) to avoid the self-singularity.
         _assist_disable_self_perturber(
-            extras, ephem, seed["x"], seed["y"], seed["z"],
+            extras,
+            ephem,
+            seed["x"],
+            seed["y"],
+            seed["z"],
             _NBODY_ANCHOR_JD - ephem.jd_ref,
         )
         sim.t = _NBODY_ANCHOR_JD - ephem.jd_ref
@@ -2490,11 +2496,14 @@ def assemble_leb(
             # Register such a kernel, then claim the FULL extended range.
             if bid in nbody_ids:
                 a_lo, a_hi = _NBODY_ANCHOR_JD - 400.0, _NBODY_ANCHOR_JD + 400.0
-                if not (bid in _SPK_BODY_MAP
-                        and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)):
+                if not (
+                    bid in _SPK_BODY_MAP
+                    and _spk_covers_range(_SPK_BODY_MAP[bid][0], bid, a_lo, a_hi)
+                ):
                     covering = _find_covering_cached_spk(bid, a_lo, a_hi)
                     if covering is not None:
                         from libephemeris import spk as _spk
+
                         _spk.register_spk_body(bid, covering, _ASTEROID_NAIF[bid])
                     else:
                         try:
@@ -2548,7 +2557,9 @@ def assemble_leb(
                     else:
                         need_force = True
                         if verbose:
-                            print(f"    {name}: cached SPK too narrow, re-downloading...")
+                            print(
+                                f"    {name}: cached SPK too narrow, re-downloading..."
+                            )
 
             try:
                 auto_download_asteroid_spk(

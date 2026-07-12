@@ -34,8 +34,7 @@ _TIER_INFO = {
 # Partial files merged into the final {tier}.leb — derived from the canonical
 # group partition so a new group (e.g. exotics) is never silently omitted.
 _MERGE_FILES = {
-    tier: [f"data/leb/ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS]
-    for tier in _TIERS
+    tier: [f"data/leb/ephemeris_{tier}_{g}.leb" for g in LEB1_GROUPS] for tier in _TIERS
 }
 
 
@@ -177,9 +176,7 @@ def _make_tier_group(tier: str) -> click.Group:
 
         Recommended over 'full' to avoid macOS multiprocessing deadlocks.
         """
-        steps = [
-            (g, ["--tier", tier, "--group", g]) for g in LEB1_GROUPS
-        ]
+        steps = [(g, ["--tier", tier, "--group", g]) for g in LEB1_GROUPS]
         steps.append(
             ("merge", ["--tier", tier, "--merge", *_MERGE_FILES[tier], "--verify"])
         )
@@ -191,7 +188,9 @@ def _make_tier_group(tier: str) -> click.Group:
             if ret != 0:
                 sys.exit(ret)
 
-    groups.__doc__ = f"Generate {tier} tier via groups ({' + '.join(LEB1_GROUPS)}) then merge."
+    groups.__doc__ = (
+        f"Generate {tier} tier via groups ({' + '.join(LEB1_GROUPS)}) then merge."
+    )
 
     @tier_group.command(
         short_help=f"Generate {tier} tier one body at a time (lowest memory).",

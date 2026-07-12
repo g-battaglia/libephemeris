@@ -1,5 +1,12 @@
 # Test Suite Performance Analysis
 
+> **Historical snapshot — not current test status.** This document records one
+> diagnostic run from 2026-03-30 and preserves the bottleneck investigation
+> that followed. Its command names, counts, failures, timings, and suite layout
+> are not current release gates. Use the
+> [Testing Guide](../development/testing.md) and `leph test --help` for today's
+> supported commands, and rely on fresh command output for current status.
+
 **Date**: 2026-03-30
 **Run**: `poe test:full` (sequential, no `-n auto`)
 **Duration**: 8h 48m 45s (31,725s)
