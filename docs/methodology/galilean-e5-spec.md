@@ -563,7 +563,7 @@ per component (see §8). To stay at the centimetre level:
 Run from the repo root, in this order:
 
 ```
-.venv/bin/python scripts/verify_galilean_clean_room.py --check tasks/results/galilean_baseline.json
+.venv/bin/python scripts/verify_galilean.py --check tasks/results/galilean_baseline.json
 ```
 
 must report **0 drifted** (worst moon delta ≤ 1e-3 km, worst COB delta

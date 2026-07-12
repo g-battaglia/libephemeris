@@ -22,8 +22,8 @@ which is fitted to a numerical integration and stays accurate over ±200,000
 years while agreeing with IAU 2006 to sub-milliarcsecond precision near J2000.
 Adopting it makes ancient/future positions scientifically correct.
 
-How it is implemented (provenance / clean-room)
------------------------------------------------
+How it is implemented
+---------------------
 The Vondrák 2011 precession matrix is obtained **from pyerfa/ERFA**, not
 transcribed by hand and not derived from any third-party application source:
 

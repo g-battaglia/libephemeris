@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (c) 2025-2026 Giacomo Battaglia
-"""Verification harness for the Galilean-module clean-room rewrite.
+"""Verification harness for the Galilean satellite module.
 
 Records the numeric behavior of ``galilean_moon_positions`` (and the Jupiter
 COB offset derived from it through ``moon_theories.constants``) over a dense
-JD grid, so that an expression-level rewrite of
+JD grid, so that any change to
 ``libephemeris/moon_theories/galilean.py`` can be proven output-preserving.
 
 Modes:
@@ -17,9 +17,9 @@ Modes:
                        skips gracefully otherwise.
 
 Usage:
-    .venv/bin/python scripts/verify_galilean_clean_room.py --dump tasks/results/galilean_baseline.json
-    .venv/bin/python scripts/verify_galilean_clean_room.py --check tasks/results/galilean_baseline.json
-    .venv/bin/python scripts/verify_galilean_clean_room.py compare [--spk path/to/jup365.bsp]
+    .venv/bin/python scripts/verify_galilean.py --dump tasks/results/galilean_baseline.json
+    .venv/bin/python scripts/verify_galilean.py --check tasks/results/galilean_baseline.json
+    .venv/bin/python scripts/verify_galilean.py compare [--spk path/to/jup365.bsp]
 
 Grid design:
     * 1800-01-01 .. ~2200-01 every 16 days (9132 epochs) — two centuries of

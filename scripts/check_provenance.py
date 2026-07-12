@@ -8,10 +8,9 @@ Fingerprint greps over the shipped package:
   class 3 — PyMeeus implementation identifiers (JupiterMoons,
             rectangular_positions_jovian_equatorial, ...)
 
-Classes 1-2 come from the June 2026 Swiss Ephemeris remediation (WS1);
-class 3 from the June 2026 Galilean clean-room rewrite, which replaced the
-PyMeeus-adapted ``moon_theories/galilean.py`` with an independent
-implementation derived from Lieske 1998 / Meeus ch. 44; class 4 flags any
+Classes 1-2 guard against Swiss Ephemeris source identifiers; class 3
+against PyMeeus identifiers (``moon_theories/galilean.py`` is an independent
+implementation derived from Lieske 1998 / Meeus ch. 44); class 4 flags any
 copyleft (L/GPL) license declaration that strays into the tree.
 
 The sweep covers ``libephemeris/``, ``scripts/``, ``docs/`` and
@@ -75,9 +74,9 @@ ALLOWLIST = frozenset(
     {
         "scripts/check_provenance.py",
         "docs/methodology/galilean-e5-spec.md",
-        # The legal/notice files record the retired-source remediation at the
-        # implementation level (they must name swehouse.c, PyMeeus, LGPL to
-        # say what was removed), so every class legitimately appears.
+        # The legal/notice files may name retired-source identifiers
+        # (swehouse.c, PyMeeus, LGPL) to describe what is not present, so
+        # every class legitimately appears.
         "NOTICE.md",
         "LICENSING.md",
         "THIRD_PARTY_NOTICES.md",
@@ -141,7 +140,7 @@ COPYLEFT_RE = re.compile(
 )
 # AGPL is its own class: the reference implementation's license. It must
 # never appear in shipped code or data; docs may name it only in the
-# allowlisted provenance/remediation records.
+# allowlisted legal/notice files.
 AGPL_RE = re.compile(r"\bAGPL\b|\bGNU\s+Affero\b", re.IGNORECASE)
 CLASSES = (
     ("source-file-ref", SOURCE_FILE_RE),
