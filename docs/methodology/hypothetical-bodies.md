@@ -92,7 +92,7 @@ provenance is the documented black-box output fit.
 
 `URANIAN_ELEMENTS` (a mean-longitude oscillation table) and the per-body
 `*_KEPLERIAN_ELEMENTS` `L0` constants (and Hades `M0` = 26.850162) are
-historical fits **calibrated against pyswisseph output**, not attested in
+historical fits **calibrated against reference-API output**, not attested in
 Hamburg-school literature. They are **no longer consulted at runtime**
 (`calc_uranian_longitude` delegates to the published Keplerian set) but are
 pinned by tests for module-API stability. The gate freezes them against a
