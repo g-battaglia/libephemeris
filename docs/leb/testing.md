@@ -77,7 +77,7 @@ leph test leb-format vs-skyfield extended
 pytest tests/test_leb/compare/test_compare_leb_planets.py -v -n 4
 
 # A specific test
-pytest tests/test_leb/compare/test_compare_leb_planets.py::TestPlanetLongitude::test_longitude[6-Saturn] -v
+pytest "tests/test_leb/compare/test_compare_leb_planets.py::TestPlanetPrecision::test_all_components" -v
 
 # By keyword
 pytest tests/test_leb/compare/ -m "leb_compare" -k "asteroid" -v -n 4
