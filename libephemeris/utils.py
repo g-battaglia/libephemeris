@@ -1547,10 +1547,17 @@ def _split_deg_nakshatra(
             if pos_in_nak + offset >= nakshatra_span:
                 offset = 0.0
 
-    # Apply offset to the original degree and re-reduce using *27/27.
-    # This preserves FP precision better than adding offset to the
-    # already-reduced pos_in_nak (avoids 1-ULP loss at boundaries
-    # like 90° + ROUND_MIN offset).
+    # Apply offset to the original degree, then reduce AND decompose in the
+    # integer centisecond domain. A *27/27 (or fmod) round trip perturbs the
+    # within-nakshatra position by ~1 ULP with a systematically LOW bias, so
+    # the integer seconds field truncated one arcsecond short of the
+    # reference for ~a third of ordinary longitudes (e.g. 0.09 deg ->
+    # 5'23".9999 -> 23 instead of 5'24"). A single multiply into
+    # centiseconds (nakshatra span = 4_800_000 cs exactly) carries no
+    # reduction error and is exact at nakshatra multiples (40 deg, 120 deg,
+    # 360 deg). Residual differences versus the reference are confined to
+    # inputs whose true value sits within ~1 ULP of an integer arcsecond
+    # (the split fields still reconstruct the identical angle).
     ddeg += offset
     nak_idx = int(ddeg / nakshatra_span)
     # Reference parity: only the exact 360 deg rollover (index 27, i.e.
@@ -1559,12 +1566,22 @@ def _split_deg_nakshatra(
     # >= 27 to 0.
     if nak_idx == 27:
         nak_idx = 0
-    pos_in_nak = math.fmod(ddeg * 27.0, 360.0) / 27.0
 
     has_rounding = bool(
         roundflag & (SPLIT_DEG_ROUND_DEG | SPLIT_DEG_ROUND_MIN | SPLIT_DEG_ROUND_SEC)
     )
-    ideg, imin, isec, secfr = _decompose_to_dms(pos_in_nak, has_rounding)
+    cs_tot = ddeg * 360000.0
+    ics = int(cs_tot)
+    rem = ics % 4_800_000
+    ideg = rem // 360000
+    r2 = rem % 360000
+    imin = r2 // 6000
+    r3 = r2 % 6000
+    isec = r3 // 100
+    if has_rounding:
+        secfr = float(isec)
+    else:
+        secfr = (r3 % 100) / 100.0 + (cs_tot - ics) / 100.0
     return (ideg, imin, isec, secfr, nak_idx)
 
 
