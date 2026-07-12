@@ -555,8 +555,9 @@ Both functions:
 3. Convert UT to TT via `deltat()` from `time_utils` (high-precision
    Skyfield model, **not** `reader.delta_t()` which uses linear interpolation
    on a sparse table and can introduce up to ~0.004s error near 1985).
-   The `fast_calc_tt` path uses `reader.delta_t()` only for the reverse
-   TT→UT approximation needed by sidereal ayanamsa.
+   The `fast_calc_tt` path likewise converts TT→UT via the canonical
+   `deltat()` (inverted with one fixed-point step); `reader.delta_t()` is
+   only a last-resort fallback when `deltat()` is unavailable.
 4. Delegate to `_fast_calc_core()`.
 
 ### 5.2 Flag Handling
@@ -1493,9 +1494,9 @@ calculations.
 #### Delta-T (Section 3)
 
 Stores a sparse table of historical Delta-T values (TT − UT1) at regular
-intervals. Used by `fast_calc_tt()` for reverse UT↔TT lookups, but
-**not** used by `fast_calc_ut()` for the forward UT→TT conversion (which
-uses `deltat()` for higher precision — see §5).
+intervals. Kept only as a last-resort fallback for `fast_calc_tt()`'s
+reverse TT→UT step when the canonical `deltat()` is unavailable; both
+entry points normally use `deltat()` (see §5).
 
 - **Format:** array of `(jd, delta_t_days)` pairs
 - **Interpolation:** linear between adjacent entries

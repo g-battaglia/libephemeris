@@ -878,9 +878,10 @@ delta_t = deltat(tjd_ut)  # high-precision model
 jd_tt = tjd_ut + delta_t
 ```
 
-The reader's `delta_t()` method is still used by `fast_calc_tt()` for the
-reverse (TT->UT) approximation needed by sidereal ayanamsa computation,
-where the ~0.004s error is negligible.
+`fast_calc_tt()` also uses the canonical `deltat()` for the reverse
+(TT->UT) conversion (one fixed-point inversion step); the reader's
+`delta_t()` method survives only as a last-resort fallback when
+`deltat()` is unavailable.
 
 ---
 
