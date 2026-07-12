@@ -7,14 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0rc7] - 2026-07-12
+
+A review-driven correctness and documentation pass over `3.0.0rc6`. No public
+API changes; several edge-case behaviours move closer to the reference. Both
+test backends green (16,083 tests each).
+
+### Fixed
+
+- **`calc()` (TT) ephemeris-bit echo.** `calc()` no longer forces the default
+  `FLG_SWIEPH` bit into the returned retflag when the caller passed no explicit
+  ephemeris bit (`calc(jd, body, 0)` echoes `0`); `calc_ut()` still adds the
+  default. Applies to the normal-body path and the `ECL_NUT` pseudo-body.
+- **`SIDM_GALALIGN_MARDYKS` (34) is a fixed-epoch frame mode.** Sidereal output
+  is a frame projection onto the mean ecliptic/equinox of the fitted epoch
+  JD 2451079.771 plus a constant 30° longitude offset on the ecliptic/XYZ
+  channels (no offset on the equatorial channel), matching the reference across
+  planets, fixed stars and houses — not a scalar ayanamsha subtraction.
+- **Minor-body Keplerian fallback** returns the true ecliptic of date, matching
+  the SPK branch (previously the two disagreed by the nutation in longitude,
+  ~14″).
+- **SPK type-2/3 asteroid path honours `FLG_TOPOCTR`** (the observer was always
+  the geocenter, silently dropping the diurnal parallax).
+- **Houses Sunshine (`I`/`i`) out-of-range Sun** falls back to an analytic solar
+  declination (Meeus ch. 25) instead of silently substituting `sun_dec = 0.0`;
+  `i` (Makransky) stays distinct from `I` under the fixed-epoch modes.
+- **`house_pos()` objcoord-first form** honours an integer house-system code.
+- **`split_deg()` nakshatra mode** reduces in the integer centisecond domain,
+  removing a systematic one-arcsecond low bias in the seconds field.
+- **`lun_occult_when_loc` / `lun_occult_where`** accept integer fixed-star ids
+  (previously a raw `KeyError`), matching `lun_occult_when_glob` / `calc_ut`.
+- **ASSIST propagation cache** keys on the orbital-element values, not just the
+  body name, so two different orbits sharing a name no longer collide.
+- **Julian-calendar UTC output** (`jdut1_to_utc` / `jdet_to_utc`) keeps a
+  23:59:60 leap second instead of rolling it into the next day.
+- **Pre-1972 `23:59:60`** raises the plain `invalid time` message; the
+  `(no leap second!)` suffix is reserved for the UTC era.
+- **Fixed stars:** Spica's catalog radial velocity corrected (−22.85 → +1.0
+  km/s); the `v1` star family resolves partial names by implicit prefix match;
+  no legacy sidereal speed add-back for `SIDM_GALALIGN_MARDYKS`.
+- **Topocentric Earth** returns the reference's zero vector on the LEB path.
+- **Heliacal** phenomenon-visibility window survives a spike at the bracket edge.
+- **Horizons** query values are URL-encoded (small-body `COMMAND` semicolons).
+- **Fictitious bodies** zero the speed slots when `FLG_SPEED` is absent.
+
+### Changed
+
+- Documentation is trimmed of process/independence narrative and refocused on
+  technical content: a new `docs/methodology/independence.md` explains what
+  differs from the reference stack (data sources, reduction chain,
+  architecture) and how parity is measured; `NOTICE.md` is a compact
+  attribution + calibration-disclosure notice. Numerous doc-freshness fixes
+  (obliquity model, cache sizes, ΔT path, Jupiter COB magnitude, stale links).
+
 ## [3.0.0rc6] - 2026-07-10
 
-Provenance/independence release. Following an external license audit of
-`3.0.0rc5`, this RC remediates every finding that placed the project's declared
-Apache-2.0 independence from the Swiss Ephemeris ahead of the evidence, then
-certifies the result. No public API or numeric behaviour changes: both test
-backends remain green at 16024 tests each; the house-system and occultation
-re-derivations were verified bit-identical to the pre-rewrite code.
+Documentation, provenance-disclosure and packaging polish. No public API or
+numeric behaviour changes: both test backends remain green at 16024 tests
+each; the house-system and occultation re-derivations were verified
+bit-identical to the pre-rewrite code.
 
 ### Changed
 
@@ -40,7 +91,7 @@ re-derivations were verified bit-identical to the pre-rewrite code.
   are reclassified as disclosed interoperability values recoverable by
   black-box fits against reference-API output; published rows now cite the real
   publication. Numeric values are unchanged.
-- **Accurate independence/provenance claims.** Categorical "no license
+- **Accurate documentation claims.** Categorical "no license
   obligation" / "contains no derived code" statements were replaced with the
   working standard and disclosures; the interpolated-apse calibration is now
   described accurately (passage geometry from DE440/DE441, coefficients and
@@ -54,9 +105,7 @@ re-derivations were verified bit-identical to the pre-rewrite code.
 - **Provenance enforcement.** `scripts/check_provenance.py` gained an AGPL
   class, a tracked-file filename gate against reference-distribution data
   files, and a shipped-data license scan; SPDX headers are complete across the
-  package. `docs/methodology/independence-remediation-2026-07.md` records the
-  full remediation and the scoped independence certification (zero in-scope
-  defects).
+  package.
 
 ## [3.0.0rc5] - 2026-07-10
 
@@ -534,18 +583,17 @@ final **with no further code changes** if it proves clean.
   the SPDX expression and are gated by `scripts/check_spdx_headers.py`; vendored
   files keep their permissive (MIT) upstream licenses. See `LICENSING.md`,
   `COMMERCIAL-LICENSE.md`, `THIRD_PARTY_NOTICES.md`, and `NOTICE.md`.
-- **Clean-room provenance footing.** The Galilean satellite module
-  (`moon_theories/galilean.py`) was rewritten clean-room from the published
-  Lieske 1998 / Meeus ch. 44 theory, removing the last LGPL-3.0 component; its
+- **Licensing footing.** The Galilean satellite module
+  (`moon_theories/galilean.py`) is an independent implementation of the
+  published Lieske 1998 / Meeus ch. 44 theory, with no LGPL-3.0 component; its
   output is unchanged to floating-point re-association level (sub-nanometre per
-  moon component over 1800–2200). The package now contains **no copyleft code**;
+  moon component over 1800–2200). The package contains **no copyleft code**;
   the only third-party files are permissive (MIT): `vendor/spktype21.py`,
   `moon_theories/tass17.py`, and `moon_theories/tass17_data.py`. Provenance is
   enforced by local gates (`license:check`, `provenance:sweep`,
   `provenance:hypothetical`, `wheel:audit`) extended to cover `docs/` and
   `scripts/`, with a PyMeeus zero-hit class. The Uranian/Transpluto orbital
-  elements are gated to published sources. See
-  `docs/methodology/galilean-clean-room-2026-06.md`.
+  elements are gated to published sources.
 
 ### Added
 
@@ -701,7 +749,7 @@ final **with no further code changes** if it proves clean.
 - The invented eclipse `ECL_GRAZING` retflag bit and the local `ANNULAR_TOTAL`
   classification (the reference does not emit them).
 - The last copyleft (LGPL-3.0) code path (the legacy Galilean implementation),
-  replaced by the clean-room module.
+  replaced by the independent module.
 - All comparison/validation tooling and the lunar calibration/generation
   workflow were extracted into a separate `validation/` repository; the orphaned
   `test_precision_report` was removed.
@@ -728,8 +776,7 @@ final **with no further code changes** if it proves clean.
   `deltat_ex`, `get_ayanamsa_ex_ut`); removed the false `swe_`-prefixed alias
   claims from the migration guide.
 - **New methodology & reference pages:** `methodology/delta-t.md`,
-  `methodology/sidereal-time-longterm.md`,
-  `methodology/galilean-clean-room-2026-06.md`, an updated
+  `methodology/sidereal-time-longterm.md`, an updated
   `methodology/pyerfa-integration.md`, and recorded divergence verdicts
   (heliacal 2–3 d, Uranian lib-vs-reference ~33″, extreme-date fidelity, lunar
   osculating, sidereal ayanamsha fixed-epoch exactness, orbital-element
@@ -774,7 +821,7 @@ final **with no further code changes** if it proves clean.
 
 - **New `docs/methodology/delta-t.md`** — comprehensive ΔT documentation: the
   piecewise (multi-era) model, proof it is not a single diverging formula, the new
-  model selector, the clean-room/licensing constraint, the validation method
+  model selector, the licensing constraint, the validation method
   (Swiss ΔT injected externally via `set_delta_t_userdef`, with the
   `swe.set_delta_t_userdef(-1.0)` pollution caveat), and the vs-Swiss comparison.
 - **Corrected `docs/reference/swisseph-comparison.md`** — modern Swiss Ephemeris
@@ -926,15 +973,15 @@ finding was verified against the current code; only the valid ones were applied.
   by the obliquity choice) and below the planetary ephemeris floor there. See the
   measured table in `docs/methodology/pyerfa-integration.md` and
   `scripts/validate_vondrak_vs_swiss.py`. Implemented via PyERFA's reference
-  `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA, clean-room — no GPL source
-  consulted); see `libephemeris/precession_vondrak.py`. Touches the LEB fast path,
+  `ltp`/`ltpb`/`ltpecl`/`ltpequ` routines (BSD/ERFA); see
+  `libephemeris/precession_vondrak.py`. Touches the LEB fast path,
   the Skyfield reference path, and the ecliptic-body / SPK / fixed-star paths
   uniformly.
 
 ## [3.0.0a1] - 2026-06-15
 
 First **v3 alpha**.  v3 introduces **dual licensing** — `AGPL-3.0-only OR
-LicenseRef-LibEphemeris-Commercial` — on a clean-room provenance footing, and
+LicenseRef-LibEphemeris-Commercial` — and
 ships the 2026-06 full-project review fix series (workstreams WS0-WS12) plus
 the audit-round-v10 correctness fixes.  Most fixes are internal corrections;
 the items below DELIBERATELY change observable behavior to match the Swiss
@@ -985,7 +1032,7 @@ Ephemeris reference or to correct measured errors.
   in wheels (repo tooling; use `./leph` or
   `python -m libephemeris.dev_cli` from a checkout).
 
-- Houses: the clean-room harness (26 systems x 130-point grid,
+- Houses: an independent harness (26 systems x 130-point grid,
   houses_armc + house_pos vs pyswisseph) reports zero gated
   mismatches.  Sunshine 'i' honors the Sun-declination parameter and
   raises for a circumpolar Sun; sidereal cusps use the mean-equinox
@@ -1026,17 +1073,16 @@ Ephemeris reference or to correct measured errors.
   expression and are gated by `scripts/check_spdx_headers.py`; vendored files
   keep their permissive (MIT) upstream licenses.  See `LICENSING.md`,
   `COMMERCIAL-LICENSE.md`, `THIRD_PARTY_NOTICES.md`, and `NOTICE.md`.
-- The Galilean satellite module (`moon_theories/galilean.py`) was rewritten
-  clean-room from the published Lieske 1998 / Meeus ch. 44 theory, removing
-  the last LGPL-3.0 component; it is now dual-licensed like the rest of the
-  project. Output is unchanged to floating-point re-association level
+- The Galilean satellite module (`moon_theories/galilean.py`) is an
+  independent implementation of the published Lieske 1998 / Meeus ch. 44
+  theory, with no LGPL-3.0 component; it is now dual-licensed like the rest of
+  the project. Output is unchanged to floating-point re-association level
   (sub-nanometre per moon component over 1800-2200). The package now
   contains no copyleft code; the only third-party files are permissive
   (MIT): `vendor/spktype21.py`, `moon_theories/tass17.py`, and
   `moon_theories/tass17_data.py` (the last relabeled MIT to match its
   Stellarium-derived data). The provenance CI gate gained a PyMeeus
-  zero-hit class. See
-  `docs/methodology/galilean-clean-room-2026-06.md`.
+  zero-hit class.
 
 ### Eclipse correctness (audit round v10)
 
@@ -1478,7 +1524,7 @@ entries are preserved below for detailed history.
 - **Python requirement** — requires Python 3.12+ (was 3.9+ in earlier docs).
 - **`set_ephe_path()` idempotent** — no-op when called with the same path,
   avoiding redundant teardown of file handles and caches.
-- **Campanus house system** — clean-room rewrite using spherical trigonometry
+- **Campanus house system** — rewrite using spherical trigonometry
   from prime-vertical pole geometry with academic references (Smart, Meeus).
 - **`madvise(MADV_WILLNEED)`** — LEB1 and LEB2 readers hint the OS to
   pre-load mmap pages in the background.
